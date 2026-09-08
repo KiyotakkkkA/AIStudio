@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { StreamId } from "../primitives/branded.js";
 import { Timestamp } from "../primitives/time.js";
 import { defineContract } from "./defineContract.js";
 
@@ -10,6 +11,10 @@ export const contract = defineContract({
       hostTime: Timestamp,
       roundTripHint: z.number(),
     }),
+  },
+  "system.demoStream": {
+    input: z.object({ steps: z.number().int().min(1).max(100) }),
+    output: z.object({ streamId: StreamId }),
   },
 });
 

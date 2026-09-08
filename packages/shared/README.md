@@ -35,3 +35,14 @@ code to report; anything else becomes `UNKNOWN` at the boundary.
 
 All app labels and user-facing messages are authored in Russian from the start, without
 a `t()` shim. Code identifiers and error codes remain English.
+
+`src/events/HostEvent.ts` holds the one multiplexed event channel (PASSPORT §7, decision D4).
+`EVENT_CHANNEL` is `zvs:events`; `HostEvent` is a discriminated union over `type` with the
+variants `token`, `progress`, `step`, `log`, `approval` and `end`. Every variant carries the
+same envelope — `streamId`, a per-stream monotonic `seq` and `ts`. `HostEventDraft` is the
+same union without that envelope: producers describe the payload, the host stamps the rest.
+`StepEventDto`, `LogLineDto` and `ApprovalRequestDto` are still loose JSON records; TASK_022
+tightens the step and log shapes and TASK_023 tightens the approval request. `RunOutcomeDto`
+is already closed: `status` is `ok | cancelled | failed` with an optional `AppErrorCode` and
+message. Adding a variant is a breaking change for every subscriber — extend the payload of
+an existing one where that is possible.

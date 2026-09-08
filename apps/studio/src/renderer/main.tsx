@@ -1,9 +1,29 @@
-import { StrictMode, useEffect, useState } from "react";
+import { StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import type { StreamId } from "@zvs/shared";
+import { createEventRouter } from "./app/EventRouter";
+import { createReplayHook } from "./app/replay";
 import { ipc, isIpcError } from "./ipc";
+
+const DEMO_STEPS = 10;
+
+interface DemoStream {
+  id: StreamId;
+  done: number;
+  total: number;
+  finished: boolean;
+  gaps: number;
+}
+
+const router = createEventRouter();
+
+if (import.meta.env.DEV) {
+  Object.defineProperty(window, "zvsReplay", { value: createReplayHook(router) });
+}
 
 function Placeholder() {
   const [status, setStatus] = useState("Проверка связи с хостом…");
+  const [streams, setStreams] = useState<DemoStream[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -23,10 +43,56 @@ function Placeholder() {
     };
   }, []);
 
+  useEffect(() => router.connect((handler) => window.zvs.subscribe(handler)), []);
+
+  const start = useCallback(() => {
+    void ipc
+      .call("system.demoStream", { steps: DEMO_STEPS })
+      .then(({ streamId }) => {
+        setStreams((current) => [
+          ...current,
+          { id: streamId, done: 0, total: DEMO_STEPS, finished: false, gaps: 0 },
+        ]);
+        let ended = false;
+        const dispose = router.subscribe(streamId, (event) => {
+          setStreams((current) =>
+            current.map((stream) => {
+              if (stream.id !== streamId) return stream;
+              const gaps = stream.gaps + (event.gap ?? 0);
+              if (event.type === "progress")
+                return { ...stream, done: event.done, total: event.total, gaps };
+              if (event.type === "end") return { ...stream, finished: true, gaps };
+              return { ...stream, gaps };
+            }),
+          );
+          if (event.type === "end") {
+            ended = true;
+            dispose?.();
+          }
+        });
+        if (ended) dispose();
+      })
+      .catch(() => {
+        setStatus("Не удалось запустить поток");
+      });
+  }, []);
+
   return (
     <main>
       ZVS AI Studio
       <p>{status}</p>
+      <button type="button" onClick={start}>
+        Запустить демонстрационный поток
+      </button>
+      <ul>
+        {streams.map((stream, index) => (
+          <li key={stream.id}>
+            Поток {index + 1} ({stream.id.slice(-8)}): {stream.done} / {stream.total}
+            {stream.finished ? " — завершён" : ""}
+            {stream.gaps > 0 ? ` — пропущено ${stream.gaps}` : ""}
+          </li>
+        ))}
+      </ul>
     </main>
   );
 }

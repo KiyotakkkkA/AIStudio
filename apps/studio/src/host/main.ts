@@ -6,12 +6,16 @@ import { createHandlers } from "./ipc";
 import { resolvePaths } from "./platform/paths";
 import { createLogger } from "./platform/logger";
 import type { Logger } from "./platform/logger";
+import { createEventBus } from "./platform/events";
+import type { EventBus, WindowSender } from "./platform/events";
+import { createEventRecorder, recordingEnabled } from "./platform/eventRecorder";
 import { createStudioWindow, installContentSecurityPolicy } from "./platform/windows";
 
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
 let window: BrowserWindow | undefined;
 let ipcServer: IpcServer | undefined;
+let eventBus: EventBus | undefined;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -29,6 +33,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on("will-quit", () => {
     logger?.log("info", "host", "Shutdown");
     ipcServer?.dispose();
+    eventBus?.dispose();
     // TASK_006: close the database.
     logger?.close();
   });
@@ -49,7 +54,19 @@ if (!app.requestSingleInstanceLock()) {
       });
       logger.log("info", "host", "Startup", { version: app.getVersion() });
       // TASK_006: open database and finish migrations before constructing services.
-      ipcServer = createIpcServer(contract, createHandlers(), {
+      const recording = recordingEnabled();
+      eventBus = createEventBus({
+        logger,
+        senders: (): readonly WindowSender[] =>
+          BrowserWindow.getAllWindows()
+            .filter((open) => !open.isDestroyed())
+            .map((open) => open.webContents),
+        recorder: recording
+          ? createEventRecorder({ directory: paths.streamsDir, logger })
+          : undefined,
+      });
+      logger.log("info", "host", "Opened the event channel", { recording });
+      ipcServer = createIpcServer(contract, createHandlers({ events: eventBus }), {
         ipcMain,
         logger,
         validateOutput: !app.isPackaged,
