@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "4.2.0",
+    "@tailwindcss/vite": "4.3.3",
     "@types/better-sqlite3": "9.6.0",
     "@types/node": "26.5.0",
     "@types/react": "19.2.18",
@@ -24,15 +25,22 @@
     "drizzle-kit": "0.31.10",
     "electron": "44.2.0",
     "electron-vite": "5.0.0",
+    "tailwindcss": "4.3.3",
     "vite": "7.3.6"
   },
   "dependencies": {
+    "@kiyotakkkka/zvs-uikit-lib": "8.3.0",
+    "@mdi/js": "7.4.47",
     "@zvs/ipc": "workspace:*",
     "@zvs/shared": "workspace:*",
     "better-sqlite3": "13.0.3",
     "drizzle-orm": "0.45.2",
+    "mobx": "7.0.3",
+    "mobx-react-lite": "5.0.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "react-router": "7.18.3",
+    "react-router-dom": "7.18.3",
     "uuid": "14.0.2"
   }
 }

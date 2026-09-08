@@ -1,0 +1,73 @@
+@import "tailwindcss";
+@import "@kiyotakkkka/zvs-uikit-lib/styles.css";
+
+@source "../../../node_modules/@kiyotakkkka/zvs-uikit-lib/dist";
+
+@theme {
+  --color-main-50: #f4f5f7;
+  --color-main-100: #e6e8ec;
+  --color-main-200: #c9ced6;
+  --color-main-300: #a2a8b2;
+  --color-main-400: #8b919b;
+  --color-main-500: #6e747e;
+  --color-main-600: #3a3e46;
+  --color-main-700: #2a2d33;
+  --color-main-800: #191b20;
+  --color-main-900: #0e0f12;
+
+  --color-accent-light: #d9e7fb;
+  --color-accent-medium: #b6d2f5;
+  --color-accent-dark: #85aad6;
+
+  --color-ok: #7fb894;
+  --color-warn: #d6b47f;
+  --color-err: #d68f85;
+  --color-error: #d68f85;
+
+  --color-success-light: #a7cdb6;
+  --color-success-medium: #7fb894;
+  --color-success-dark: #5c8f71;
+
+  --color-warning-light: #e3cca7;
+  --color-warning-medium: #d6b47f;
+  --color-warning-dark: #a98a5c;
+
+  --color-danger-light: #e3b0a9;
+  --color-danger-medium: #d68f85;
+  --color-danger-dark: #a96a62;
+
+  --color-info-light: #d9e7fb;
+  --color-info-medium: #b6d2f5;
+  --color-info-dark: #85aad6;
+
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, "Cascadia Mono", monospace;
+
+  --radius-card: 10px;
+  --radius-control: 6px;
+  --radius-pill: 5px;
+
+  --spacing-rail: 248px;
+  --spacing-rail-collapsed: 64px;
+  --spacing-header: 56px;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-main-800);
+  color: var(--color-main-50);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}

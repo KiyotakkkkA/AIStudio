@@ -1,4 +1,5 @@
 import { cpSync } from "node:fs";
+import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "electron-vite";
 import type { Plugin } from "vite";
 
@@ -38,6 +39,7 @@ export default defineConfig({
       __ZVS_VALIDATE_IPC__: JSON.stringify(process.env.ZVS_VALIDATE_IPC !== "false"),
     },
     plugins: [
+      tailwindcss(),
       {
         name: "development-csp",
         apply: "serve",
@@ -45,7 +47,9 @@ export default defineConfig({
           const address = context.server?.resolvedUrls?.local[0];
           if (!address) throw new Error("Development server URL is unavailable");
           const websocketOrigin = new URL(address).origin.replace(/^http/, "ws");
-          return html.replace("connect-src 'none'", `connect-src 'self' ${websocketOrigin}`);
+          return html
+            .replace("connect-src 'none'", `connect-src 'self' ${websocketOrigin}`)
+            .replace("style-src 'self'", "style-src 'self' 'unsafe-inline'");
         },
       },
     ],

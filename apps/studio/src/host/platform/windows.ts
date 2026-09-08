@@ -12,7 +12,8 @@ export function installContentSecurityPolicy(developmentUrl?: string): void {
   const connections = developmentUrl
     ? `'self' ${new URL(developmentUrl).origin.replace(/^http/, "ws")}`
     : "'none'";
-  const policy = `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src ${connections}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
+  const styles = developmentUrl ? "'self' 'unsafe-inline'" : "'self'";
+  const policy = `default-src 'none'; script-src 'self'; style-src ${styles}; img-src 'self'; font-src 'self'; connect-src ${connections}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const headers = { ...details.responseHeaders };
     for (const name of Object.keys(headers)) {
