@@ -1,2 +1,6 @@
-// TASK_003 replaces this bootstrap export with validated DTOs and contract primitives.
-export const workspaceName = "ZVS AI Studio";
+export * from "./primitives/branded.js";
+export * from "./primitives/time.js";
+export * from "./primitives/paging.js";
+export * from "./primitives/sort.js";
+export * from "./errors/AppErrorCode.js";
+export * from "./errors/Result.js";

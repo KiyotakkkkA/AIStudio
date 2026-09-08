@@ -500,8 +500,8 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
 3. Windows is the only verified target for v1.
 4. Secrets encrypted with `safeStorage`, ciphertext in SQLite (not a separate vault file).
 5. Single window; no multi-window or tray-only mode in v1.
-6. English-only UI at v1, but no hard-coded strings — copy goes through a `t()` shim so i18n
-   is additive later.
+6. **Confirmed (TASK_003):** all app labels and user-facing messages are Russian from the
+   start, without a `t()` shim. Developer communication and code identifiers remain English.
 7. `@kiyotakkkka/zvs-uikit-lib` is ESM-only and Tailwind-based; the app's Tailwind config
    must include its `dist` in `content` for class scanning.
 8. Office→PDF conversion uses a bundled headless LibreOffice invoked by the sidecar. It would

@@ -11,10 +11,15 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run && tsc -p tsconfig.test.json",
     "lint": "eslint . --max-warnings 0"
   },
   "devDependencies": {
-    "@zvs/tsconfig": "workspace:*"
+    "@zvs/tsconfig": "workspace:*",
+    "vitest": "5.0.0"
+  },
+  "dependencies": {
+    "zod": "4.5.4"
   }
 }
