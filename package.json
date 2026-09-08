@@ -11,7 +11,7 @@
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
-    "lint:root": "eslint . --max-warnings 0",
+    "lint:root": "eslint . --max-warnings 0 --ignore-pattern apps/** --ignore-pattern packages/**",
     "format": "turbo run format:root",
     "format:root": "prettier --write .",
     "format:check": "prettier --check .",

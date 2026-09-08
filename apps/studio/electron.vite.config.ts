@@ -17,6 +17,9 @@ export default defineConfig({
   },
   renderer: {
     root: "src/renderer",
+    define: {
+      __ZVS_VALIDATE_IPC__: JSON.stringify(process.env.ZVS_VALIDATE_IPC !== "false"),
+    },
     plugins: [
       {
         name: "development-csp",

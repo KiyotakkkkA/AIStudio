@@ -9,8 +9,8 @@
   "tasks": {
     "dev": { "cache": false, "persistent": true },
     "build": { "dependsOn": ["^build", "lint"], "outputs": ["dist/**", "out/**"] },
-    "typecheck": { "dependsOn": ["^typecheck"], "outputs": [] },
-    "lint": { "dependsOn": ["//#lint:root"], "outputs": [] },
+    "typecheck": { "dependsOn": ["^build"], "outputs": [] },
+    "lint": { "dependsOn": ["//#lint:root", "^build"], "outputs": [] },
     "//#lint:root": { "cache": false },
     "test": { "dependsOn": ["^build"], "outputs": [] },
     "//#format:root": { "cache": false }

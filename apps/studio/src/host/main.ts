@@ -1,4 +1,8 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
+import { contract } from "@zvs/shared";
+import { createIpcServer } from "@zvs/ipc";
+import type { IpcServer } from "@zvs/ipc";
+import { createHandlers } from "./ipc";
 import { resolvePaths } from "./platform/paths";
 import { createLogger } from "./platform/logger";
 import type { Logger } from "./platform/logger";
@@ -7,6 +11,7 @@ import { createStudioWindow, installContentSecurityPolicy } from "./platform/win
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
 let window: BrowserWindow | undefined;
+let ipcServer: IpcServer | undefined;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -23,7 +28,8 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.on("will-quit", () => {
     logger?.log("info", "host", "Shutdown");
-    // TASK_004: dispose IPC registrations; TASK_006: close the database.
+    ipcServer?.dispose();
+    // TASK_006: close the database.
     logger?.close();
   });
 
@@ -43,8 +49,12 @@ if (!app.requestSingleInstanceLock()) {
       });
       logger.log("info", "host", "Startup", { version: app.getVersion() });
       // TASK_006: open database and finish migrations before constructing services.
-      // Construct services here with explicit dependencies.
-      // TASK_004: register the typed IPC handlers before creating the window.
+      ipcServer = createIpcServer(contract, createHandlers(), {
+        ipcMain,
+        logger,
+        validateOutput: !app.isPackaged,
+      });
+      logger.log("info", "host", "Registered IPC channels", { count: ipcServer.channels.length });
       const developmentUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL;
       installContentSecurityPolicy(developmentUrl);
       window = createStudioWindow(paths, logger, developmentUrl);

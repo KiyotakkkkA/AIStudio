@@ -26,5 +26,12 @@ must follow the DTO rules. Error details are optional JSON objects; omit them wh
 Handlers never throw across IPC. Keep stacks on the host; the renderer maps error codes
 to copy and never parses message strings. Error codes are append-only, never renamed.
 
+`src/ipc/contract.ts` is the single source of truth for every channel: `domain.verb`,
+lowercase, dot-separated. `defineContract` preserves the literal channel names so
+`ChannelName`, `InputOf` and `OutputOf` stay exact; `@zvs/ipc` derives the typed client and
+the exhaustive handler map from them. A breaking change adds `domain.verb@2` instead of
+editing a released channel. `AppError` is what host code throws when it already knows the
+code to report; anything else becomes `UNKNOWN` at the boundary.
+
 All app labels and user-facing messages are authored in Russian from the start, without
 a `t()` shim. Code identifiers and error codes remain English.

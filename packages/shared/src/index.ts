@@ -3,4 +3,7 @@ export * from "./primitives/time.js";
 export * from "./primitives/paging.js";
 export * from "./primitives/sort.js";
 export * from "./errors/AppErrorCode.js";
+export * from "./errors/AppError.js";
 export * from "./errors/Result.js";
+export * from "./ipc/defineContract.js";
+export * from "./ipc/contract.js";

@@ -1,0 +1,26 @@
+{
+  "name": "@zvs/ipc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run && tsc -p tsconfig.test.json",
+    "lint": "eslint . --max-warnings 0"
+  },
+  "devDependencies": {
+    "@zvs/tsconfig": "workspace:*",
+    "vitest": "5.0.0"
+  },
+  "dependencies": {
+    "@zvs/shared": "workspace:*",
+    "zod": "4.5.4"
+  }
+}

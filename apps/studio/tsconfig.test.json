@@ -1,0 +1,11 @@
+{
+  "extends": "@zvs/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["tests/**/*.ts"]
+}

@@ -9,9 +9,9 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json",
     "lint": "eslint . --max-warnings 0",
-    "test": "node --experimental-strip-types --test tests/*.test.ts"
+    "test": "node --experimental-strip-types --test tests/*.test.ts && tsc -p tsconfig.test.json"
   },
   "devDependencies": {
     "@types/node": "26.5.0",
@@ -23,6 +23,8 @@
     "vite": "7.3.6"
   },
   "dependencies": {
+    "@zvs/ipc": "workspace:*",
+    "@zvs/shared": "workspace:*",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "uuid": "14.0.2"
