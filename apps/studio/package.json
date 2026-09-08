@@ -1,0 +1,30 @@
+{
+  "name": "studio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "out/host/main.js",
+  "scripts": {
+    "postinstall": "install-electron",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc -b",
+    "lint": "eslint . --max-warnings 0",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "26.5.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@zvs/tsconfig": "workspace:*",
+    "electron": "44.2.0",
+    "electron-vite": "5.0.0",
+    "vite": "7.3.6"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "uuid": "14.0.2"
+  }
+}

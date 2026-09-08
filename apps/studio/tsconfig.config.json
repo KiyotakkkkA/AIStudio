@@ -1,0 +1,5 @@
+{
+  "extends": "@zvs/tsconfig/base.json",
+  "compilerOptions": { "composite": true, "noEmit": true, "skipLibCheck": true, "types": ["node"] },
+  "include": ["electron.vite.config.ts"]
+}

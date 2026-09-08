@@ -1,0 +1,12 @@
+{
+  "extends": "@zvs/tsconfig/base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "rootDir": "src/host",
+    "types": ["node"]
+  },
+  "include": ["src/host/**/*.ts"]
+}

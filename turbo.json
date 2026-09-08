@@ -8,7 +8,7 @@
   ],
   "tasks": {
     "dev": { "cache": false, "persistent": true },
-    "build": { "dependsOn": ["^build", "lint"], "outputs": ["dist/**"] },
+    "build": { "dependsOn": ["^build", "lint"], "outputs": ["dist/**", "out/**"] },
     "typecheck": { "dependsOn": ["^typecheck"], "outputs": [] },
     "lint": { "dependsOn": ["//#lint:root"], "outputs": [] },
     "//#lint:root": { "cache": false },
