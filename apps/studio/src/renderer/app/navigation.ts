@@ -25,43 +25,28 @@ export const NAV_GROUPS: readonly NavGroupModel[] = [
     id: "workspace",
     label: "Рабочее пространство",
     items: [
-      { id: "secrets", label: "Секреты и профиль", icon: mdiKeyOutline, path: ROUTES.secrets },
-      { id: "providers", label: "AI-провайдеры", icon: mdiLayersOutline, path: ROUTES.providers },
-      {
-        id: "vector-stores",
-        label: "Векторные хранилища",
-        icon: mdiDatabaseOutline,
-        path: ROUTES.vectorStores,
-      },
-    ],
-  },
-  {
-    id: "workspace",
-    label: "Рабочее пространство",
-    items: [
-      { id: "secrets", label: "Секреты и профиль", icon: mdiKeyOutline, path: ROUTES.secrets },
-      { id: "providers", label: "AI-провайдеры", icon: mdiLayersOutline, path: ROUTES.providers },
-      {
-        id: "vector-stores",
-        label: "Векторные хранилища",
-        icon: mdiDatabaseOutline,
-        path: ROUTES.vectorStores,
-      },
-    ],
-  },
-  {
-    id: "build",
-    label: "Сборка",
-    items: [
       { id: "chat", label: "Чат", icon: mdiChatOutline, path: ROUTES.chat },
       {
         id: "agentic-build",
-        label: "Агентная сборка",
+        label: "Агенты",
         icon: mdiCreationOutline,
         path: ROUTES.agenticBuild,
       },
+      { id: "providers", label: "Провадеры", icon: mdiLayersOutline, path: ROUTES.providers },
       { id: "scenarios", label: "Сценарии", icon: mdiGraphOutline, path: ROUTES.scenarios },
-      { id: BROWSER_NAV_ID, label: "Браузер", icon: mdiWeb, external: true },
+    ],
+  },
+  {
+    id: "storage",
+    label: "Хранилище",
+    items: [
+      { id: "secrets", label: "Секреты и профиль", icon: mdiKeyOutline, path: ROUTES.secrets },
+      {
+        id: "vector-stores",
+        label: "Векторные хранилища",
+        icon: mdiDatabaseOutline,
+        path: ROUTES.vectorStores,
+      },
     ],
   },
   {
@@ -71,7 +56,7 @@ export const NAV_GROUPS: readonly NavGroupModel[] = [
       { id: "skills", label: "Навыки", icon: mdiBookOpenOutline, path: ROUTES.skills },
       {
         id: "connections",
-        label: "Подключения",
+        label: "Коннекторы",
         icon: mdiPowerPlugOutline,
         path: ROUTES.connections,
       },
@@ -82,6 +67,7 @@ export const NAV_GROUPS: readonly NavGroupModel[] = [
         path: ROUTES.integrations,
       },
       { id: "tools", label: "Инструменты", icon: mdiWrenchOutline, path: ROUTES.tools },
+      { id: BROWSER_NAV_ID, label: "Браузер", icon: mdiWeb, external: true },
     ],
   },
   {
