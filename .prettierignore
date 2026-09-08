@@ -1,0 +1,12 @@
+dist/
+build/
+node_modules/
+out/
+target/
+.turbo/
+coverage/
+pnpm-lock.yaml
+design/
+references/
+tasks/
+docs/PASSPORT.md

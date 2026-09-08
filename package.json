@@ -1,0 +1,28 @@
+{
+  "name": "zvs-ai-studio",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.3.4",
+  "engines": {
+    "node": ">=26 <27"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "lint:root": "eslint . --max-warnings 0",
+    "format": "turbo run format:root",
+    "format:root": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "@zvs/eslint-config": "workspace:*",
+    "@zvs/tsconfig": "workspace:*",
+    "eslint": "9.39.5",
+    "prettier": "3.9.6",
+    "turbo": "2.10.12",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,0 +1,16 @@
+# private dirs
+tasks/**
+references/**
+design/**
+
+# Tooling and generated output
+node_modules/
+dist/
+out/
+build/
+target/
+*.node
+.turbo/
+.env*
+coverage/
+*.tsbuildinfo

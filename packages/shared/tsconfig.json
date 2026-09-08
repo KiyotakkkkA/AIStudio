@@ -1,0 +1,11 @@
+{
+  "extends": "@zvs/tsconfig/base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/shared.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"]
+}

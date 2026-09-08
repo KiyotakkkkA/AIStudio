@@ -1,0 +1,4 @@
+[workspace]
+resolver = "3"
+# TASK_017 adds zvs-core, zvs-napi and zvs-jobd.
+members = []
