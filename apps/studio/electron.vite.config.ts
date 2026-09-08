@@ -1,12 +1,11 @@
 import { cpSync } from "node:fs";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "electron-vite";
-import type { Plugin } from "vite";
 
 const MIGRATIONS_SOURCE = "src/host/data/migrations";
 const MIGRATIONS_OUTPUT = "out/host/migrations";
 
-const copyMigrations = (): Plugin => ({
+const copyMigrations = () => ({
   name: "copy-migrations",
   closeBundle() {
     cpSync(MIGRATIONS_SOURCE, MIGRATIONS_OUTPUT, { recursive: true });

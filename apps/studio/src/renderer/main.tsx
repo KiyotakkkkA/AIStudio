@@ -9,7 +9,10 @@ const events = createEventRouter();
 events.connect((handler) => window.zvs.subscribe(handler));
 
 if (import.meta.env.DEV) {
-  Object.defineProperty(window, "zvsReplay", { value: createReplayHook(events) });
+  Object.defineProperty(window, "zvsReplay", {
+    value: createReplayHook(events),
+    configurable: true,
+  });
 }
 
 const container = document.getElementById("root");
