@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 import { HostEvent, type StreamId } from "@zvs/shared";
 import { createEventBus, type WindowSender } from "../src/host/platform/events.ts";
 import { createEventRecorder, recordingEnabled } from "../src/host/platform/eventRecorder.ts";
 import { createHandlers } from "../src/host/ipc/index.ts";
+import { SettingService } from "../src/host/services/SettingService.ts";
+import { temporaryDatabase } from "./database.ts";
 import { createEventRouter, type RoutedEvent } from "../src/renderer/app/EventRouter.ts";
 import { replayRecording } from "../src/renderer/app/replay.ts";
 
@@ -238,13 +240,17 @@ test("recording is opt in through the environment flag", () => {
   assert.equal(recordingEnabled({ ZVS_RECORD_EVENTS: "1" }), true);
 });
 
+const database = temporaryDatabase();
+const settings = new SettingService({ data: database.client });
+after(() => database.dispose());
+
 test("system.demoStream counts to the requested total and terminates", async () => {
   const { sent, sender } = fakeSender();
   const bus = createEventBus({ senders: () => [sender] });
-  const handlers = createHandlers({ events: bus, intervalMs: 0 });
+  const handlers = createHandlers({ events: bus, intervalMs: 0, settings });
   const { streamId } = await handlers["system.demoStream"]({ steps: 10 });
 
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  while (bus.open > 0) await new Promise((resolve) => setTimeout(resolve, 5));
 
   assert.equal(bus.open, 0);
   assert.deepEqual(

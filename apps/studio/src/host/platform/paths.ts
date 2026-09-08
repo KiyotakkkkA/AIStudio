@@ -13,6 +13,7 @@ export const dbPath = (env: PathEnvironment): string => join(userDataDir(env), "
 export const logsDir = (env: PathEnvironment): string => join(userDataDir(env), "logs");
 export const cacheDir = (env: PathEnvironment): string => join(userDataDir(env), "cache");
 export const streamsDir = (env: PathEnvironment): string => join(logsDir(env), "streams");
+export const backupsDir = (env: PathEnvironment): string => join(userDataDir(env), "backups");
 export const resourcesDir = (env: PathEnvironment): string =>
   env.packaged ? env.resources : join(env.appRoot, "resources");
 
@@ -23,8 +24,10 @@ export function resolvePaths(env: PathEnvironment) {
     dbPath: dbPath(env),
     logsDir: logsDir(env),
     streamsDir: streamsDir(env),
+    backupsDir: backupsDir(env),
     cacheDir: cacheDir(env),
     resourcesDir: resourcesDir(env),
+    migrationsDir: join(hostDir, "migrations"),
     preloadPath: join(hostDir, "../preload/index.cjs"),
     rendererUrl: pathToFileURL(join(hostDir, "../renderer/index.html")).href,
   };

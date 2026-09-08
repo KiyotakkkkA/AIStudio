@@ -23,6 +23,7 @@ if (import.meta.env.DEV) {
 
 function Placeholder() {
   const [status, setStatus] = useState("Проверка связи с хостом…");
+  const [geometry, setGeometry] = useState("Размер окна ещё не сохранён");
   const [streams, setStreams] = useState<DemoStream[]>([]);
 
   useEffect(() => {
@@ -37,6 +38,26 @@ function Placeholder() {
       .catch((error: unknown) => {
         if (!active) return;
         setStatus(isIpcError(error) ? `Ошибка связи: ${error.code}` : "Ошибка связи");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    ipc
+      .call("settings.get", { key: "window.main" })
+      .then((stored) => {
+        if (!active) return;
+        const bounds = (
+          stored.value as { bounds?: { width?: number; height?: number } } | undefined
+        )?.bounds;
+        if (bounds?.width === undefined || bounds.height === undefined) return;
+        setGeometry(`Сохранённый размер окна: ${bounds.width} × ${bounds.height}`);
+      })
+      .catch(() => {
+        if (active) setGeometry("Не удалось прочитать настройки");
       });
     return () => {
       active = false;
@@ -81,6 +102,7 @@ function Placeholder() {
     <main>
       ZVS AI Studio
       <p>{status}</p>
+      <p>{geometry}</p>
       <button type="button" onClick={start}>
         Запустить демонстрационный поток
       </button>

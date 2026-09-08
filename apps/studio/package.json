@@ -5,19 +5,23 @@
   "type": "module",
   "main": "out/host/main.js",
   "scripts": {
-    "postinstall": "install-electron",
+    "postinstall": "install-electron && electron-rebuild -f -w better-sqlite3",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc -b && tsc -p tsconfig.test.json",
     "lint": "eslint . --max-warnings 0",
-    "test": "node --experimental-strip-types --test tests/*.test.ts && tsc -p tsconfig.test.json"
+    "test": "node scripts/run-tests.mjs",
+    "db:generate": "drizzle-kit generate"
   },
   "devDependencies": {
+    "@electron/rebuild": "4.2.0",
+    "@types/better-sqlite3": "9.6.0",
     "@types/node": "26.5.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "@zvs/tsconfig": "workspace:*",
+    "drizzle-kit": "0.31.10",
     "electron": "44.2.0",
     "electron-vite": "5.0.0",
     "vite": "7.3.6"
@@ -25,6 +29,8 @@
   "dependencies": {
     "@zvs/ipc": "workspace:*",
     "@zvs/shared": "workspace:*",
+    "better-sqlite3": "13.0.3",
+    "drizzle-orm": "0.45.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "uuid": "14.0.2"

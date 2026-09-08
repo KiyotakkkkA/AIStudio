@@ -1,10 +1,27 @@
+import { cpSync } from "node:fs";
 import { defineConfig } from "electron-vite";
+import type { Plugin } from "vite";
+
+const MIGRATIONS_SOURCE = "src/host/data/migrations";
+const MIGRATIONS_OUTPUT = "out/host/migrations";
+
+const copyMigrations = (): Plugin => ({
+  name: "copy-migrations",
+  closeBundle() {
+    cpSync(MIGRATIONS_SOURCE, MIGRATIONS_OUTPUT, { recursive: true });
+  },
+});
 
 export default defineConfig({
   main: {
+    plugins: [copyMigrations()],
     build: {
       outDir: "out/host",
-      rollupOptions: { input: "src/host/main.ts", output: { entryFileNames: "main.js" } },
+      rollupOptions: {
+        input: "src/host/main.ts",
+        output: { entryFileNames: "main.js" },
+        external: ["better-sqlite3"],
+      },
     },
   },
   preload: {

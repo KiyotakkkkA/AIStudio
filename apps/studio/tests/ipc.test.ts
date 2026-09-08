@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { after } from "node:test";
 import { contract } from "@zvs/shared";
 import { createHandlers } from "../src/host/ipc/index.ts";
+import { SettingService } from "../src/host/services/SettingService.ts";
+import { temporaryDatabase } from "./database.ts";
+
+const database = temporaryDatabase();
+const settings = new SettingService({ data: database.client });
+after(() => database.dispose());
 
 test("system.ping echoes the host clock and matches the contract", () => {
-  const handlers = createHandlers({ clock: () => 1_700_000_000_500 });
+  const handlers = createHandlers({ settings, clock: () => 1_700_000_000_500 });
   const output = handlers["system.ping"]({ sentAt: 1_700_000_000_000 });
   assert.deepEqual(output, {
     pong: true,
@@ -15,6 +21,6 @@ test("system.ping echoes the host clock and matches the contract", () => {
 });
 
 test("every contract channel has a handler at runtime too", () => {
-  const handlers = createHandlers();
+  const handlers = createHandlers({ settings });
   assert.deepEqual(Object.keys(handlers).sort(), Object.keys(contract).sort());
 });

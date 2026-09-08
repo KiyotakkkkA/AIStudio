@@ -4,18 +4,30 @@ import { createIpcServer } from "@zvs/ipc";
 import type { IpcServer } from "@zvs/ipc";
 import { createHandlers } from "./ipc";
 import { resolvePaths } from "./platform/paths";
+import type { StudioPaths } from "./platform/paths";
 import { createLogger } from "./platform/logger";
 import type { Logger } from "./platform/logger";
 import { createEventBus } from "./platform/events";
 import type { EventBus, WindowSender } from "./platform/events";
 import { createEventRecorder, recordingEnabled } from "./platform/eventRecorder";
-import { createStudioWindow, installContentSecurityPolicy } from "./platform/windows";
+import {
+  createRecoveryWindow,
+  createStudioWindow,
+  installContentSecurityPolicy,
+} from "./platform/windows";
+import { captureWindowState, readWindowState, WINDOW_STATE_KEY } from "./platform/windowState";
+import type { DatabaseClient } from "./data/client";
+import { prepareDatabase } from "./data/migrate";
+import { isMigrationFailedError } from "./data/MigrationFailedError";
+import { SettingService } from "./services/SettingService";
 
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
 let window: BrowserWindow | undefined;
 let ipcServer: IpcServer | undefined;
 let eventBus: EventBus | undefined;
+let database: DatabaseClient | undefined;
+let settings: SettingService | undefined;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -34,7 +46,7 @@ if (!app.requestSingleInstanceLock()) {
     logger?.log("info", "host", "Shutdown");
     ipcServer?.dispose();
     eventBus?.dispose();
-    // TASK_006: close the database.
+    database?.close();
     logger?.close();
   });
 
@@ -53,7 +65,27 @@ if (!app.requestSingleInstanceLock()) {
         development: !app.isPackaged,
       });
       logger.log("info", "host", "Startup", { version: app.getVersion() });
-      // TASK_006: open database and finish migrations before constructing services.
+
+      try {
+        const prepared = prepareDatabase({
+          file: paths.dbPath,
+          migrationsDir: paths.migrationsDir,
+          backupsDir: paths.backupsDir,
+          logger,
+        });
+        database = prepared.client;
+        logger.log("info", "host", "Database ready", { applied: prepared.report.applied.length });
+      } catch (error: unknown) {
+        if (!isMigrationFailedError(error)) throw error;
+        window = createRecoveryWindow({
+          message: error.message,
+          backupsDir: error.backupsDir,
+          onQuit: () => app.quit(),
+        });
+        return;
+      }
+
+      settings = new SettingService({ data: database });
       const recording = recordingEnabled();
       eventBus = createEventBus({
         logger,
@@ -66,7 +98,7 @@ if (!app.requestSingleInstanceLock()) {
           : undefined,
       });
       logger.log("info", "host", "Opened the event channel", { recording });
-      ipcServer = createIpcServer(contract, createHandlers({ events: eventBus }), {
+      ipcServer = createIpcServer(contract, createHandlers({ events: eventBus, settings }), {
         ipcMain,
         logger,
         validateOutput: !app.isPackaged,
@@ -74,10 +106,10 @@ if (!app.requestSingleInstanceLock()) {
       logger.log("info", "host", "Registered IPC channels", { count: ipcServer.channels.length });
       const developmentUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL;
       installContentSecurityPolicy(developmentUrl);
-      window = createStudioWindow(paths, logger, developmentUrl);
+      window = openStudioWindow(paths, logger, settings, developmentUrl);
       app.on("activate", () => {
-        if (BrowserWindow.getAllWindows().length === 0 && logger) {
-          window = createStudioWindow(paths, logger, developmentUrl);
+        if (BrowserWindow.getAllWindows().length === 0 && logger && settings) {
+          window = openStudioWindow(paths, logger, settings, developmentUrl);
         }
       });
     })
@@ -86,4 +118,29 @@ if (!app.requestSingleInstanceLock()) {
       else process.stderr.write(`Startup failed: ${String(error)}\n`);
       app.exit(1);
     });
+}
+
+function openStudioWindow(
+  paths: StudioPaths,
+  hostLogger: Logger,
+  settingService: SettingService,
+  developmentUrl?: string,
+): BrowserWindow {
+  const stored = settingService.get(WINDOW_STATE_KEY);
+  const created = createStudioWindow(
+    paths,
+    hostLogger,
+    developmentUrl,
+    readWindowState(stored?.value),
+  );
+  created.on("close", () => {
+    try {
+      settingService.set(WINDOW_STATE_KEY, captureWindowState(created));
+    } catch (error: unknown) {
+      hostLogger.log("warn", "window", "Could not store the window geometry", {
+        error: String(error),
+      });
+    }
+  });
+  return created;
 }
