@@ -4,7 +4,11 @@ import PageShell from "../ui/templates/PageShell";
 
 export default function ToolsPage() {
   return (
-    <PageShell title="Инструменты" subtitle="Реестр инструментов и потолок разрешений">
+    <PageShell
+      icon={mdiWrenchOutline}
+      title="Инструменты"
+      subtitle="Реестр инструментов и потолок разрешений"
+    >
       <PagePlaceholder
         icon={mdiWrenchOutline}
         title="Инструментов пока нет"

@@ -4,7 +4,11 @@ import PageShell from "../ui/templates/PageShell";
 
 export default function DownloadsPage() {
   return (
-    <PageShell title="Загрузки" subtitle="Очередь загрузок и локальный каталог моделей">
+    <PageShell
+      icon={mdiTrayArrowDown}
+      title="Загрузки"
+      subtitle="Очередь загрузок и локальный каталог моделей"
+    >
       <PagePlaceholder
         icon={mdiTrayArrowDown}
         title="Загрузок пока нет"

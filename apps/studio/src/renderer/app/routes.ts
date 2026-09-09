@@ -1,4 +1,5 @@
 export const ROUTES = {
+  browser: "/browser",
   secrets: "/secrets",
   providers: "/providers",
   vectorStores: "/vector-stores",

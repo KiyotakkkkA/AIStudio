@@ -4,7 +4,11 @@ import PageShell from "../ui/templates/PageShell";
 
 export default function SkillsPage() {
   return (
-    <PageShell title="Навыки" subtitle="Определения навыков, триггеры и разрешения">
+    <PageShell
+      icon={mdiBookOpenOutline}
+      title="Навыки"
+      subtitle="Определения навыков, триггеры и разрешения"
+    >
       <PagePlaceholder
         icon={mdiBookOpenOutline}
         title="Навыков пока нет"

@@ -22,6 +22,7 @@ import { isMigrationFailedError } from "./data/MigrationFailedError";
 import { CryptoService } from "./services/CryptoService";
 import { SecretService } from "./services/SecretService";
 import { SettingService } from "./services/SettingService";
+import { BrowserViewManager } from "./browser/BrowserViewManager";
 
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
@@ -31,6 +32,7 @@ let eventBus: EventBus | undefined;
 let database: DatabaseClient | undefined;
 let settings: SettingService | undefined;
 let secrets: SecretService | undefined;
+let browser: BrowserViewManager | undefined;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -48,6 +50,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on("will-quit", () => {
     logger?.log("info", "host", "Shutdown");
     ipcServer?.dispose();
+    browser?.dispose();
     eventBus?.dispose();
     database?.close();
     logger?.close();
@@ -111,7 +114,21 @@ if (!app.requestSingleInstanceLock()) {
         contract,
         createHandlers({ events: eventBus, settings, secrets }),
         {
-          ipcMain,
+          ipcMain: {
+            handle(channel, listener) {
+              ipcMain.handle(channel, (event, ...args: unknown[]) => {
+                if (
+                  !window ||
+                  window.isDestroyed() ||
+                  event.sender !== window.webContents ||
+                  event.senderFrame !== window.webContents.mainFrame
+                )
+                  throw new Error("Forbidden");
+                return listener(event, ...args);
+              });
+            },
+            removeHandler: (channel) => ipcMain.removeHandler(channel),
+          },
           logger,
           validateOutput: !app.isPackaged,
         },
@@ -120,6 +137,7 @@ if (!app.requestSingleInstanceLock()) {
       const developmentUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL;
       installContentSecurityPolicy(developmentUrl);
       window = openStudioWindow(paths, logger, settings, developmentUrl);
+      browser = new BrowserViewManager(paths, () => window, developmentUrl);
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0 && logger && settings) {
           window = openStudioWindow(paths, logger, settings, developmentUrl);

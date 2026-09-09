@@ -4,7 +4,11 @@ import PageShell from "../ui/templates/PageShell";
 
 export default function VectorStoresPage() {
   return (
-    <PageShell title="Векторные хранилища" subtitle="Коллекции, документы и тестовый поиск">
+    <PageShell
+      icon={mdiDatabaseOutline}
+      title="Векторные хранилища"
+      subtitle="Коллекции, документы и тестовый поиск"
+    >
       <PagePlaceholder
         icon={mdiDatabaseOutline}
         title="Хранилищ пока нет"

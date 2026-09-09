@@ -4,16 +4,12 @@ import { Outlet } from "react-router-dom";
 import { useAppNavigation } from "../hooks/useAppNavigation";
 import { useStore } from "../stores/useStore";
 import NavRail from "../ui/organisms/NavRail";
-import { BROWSER_NAV_ID, NAV_GROUPS, RAIL_IDENTITY } from "./navigation";
+import { NAV_GROUPS, RAIL_IDENTITY } from "./navigation";
 import type { NavItemModel } from "../ui/organisms/NavRailTypes";
 import AppShell from "../ui/templates/AppShell";
 import { ROUTES } from "./routes";
 
 const APP_VERSION = "v0.1.0 · local";
-
-function openBrowserWindow(): void {
-  console.info("[renderer] Окно браузера появится в TASK_045");
-}
 
 function AppFrame() {
   const { ui } = useStore();
@@ -38,10 +34,6 @@ function AppFrame() {
 
   const select = useCallback(
     (item: NavItemModel) => {
-      if (item.id === BROWSER_NAV_ID) {
-        openBrowserWindow();
-        return;
-      }
       if (item.path !== undefined) navigation.go(item.path);
     },
     [navigation],

@@ -4,7 +4,11 @@ import PageShell from "../ui/templates/PageShell";
 
 export default function TasksPage() {
   return (
-    <PageShell title="Задачи" subtitle="Выполняется сейчас: очередь, расписание и подтверждения">
+    <PageShell
+      icon={mdiClockOutline}
+      title="Задачи"
+      subtitle="Выполняется сейчас: очередь, расписание и подтверждения"
+    >
       <PagePlaceholder
         icon={mdiClockOutline}
         title="Активных задач нет"

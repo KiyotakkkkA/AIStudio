@@ -4,7 +4,11 @@ import PageShell from "../ui/templates/PageShell";
 
 export default function IntegrationsPage() {
   return (
-    <PageShell title="Интеграции" subtitle="Почта, Telegram, git-хостинг и вебхуки">
+    <PageShell
+      icon={mdiEmailOutline}
+      title="Интеграции"
+      subtitle="Почта, Telegram, git-хостинг и вебхуки"
+    >
       <PagePlaceholder
         icon={mdiEmailOutline}
         title="Аккаунтов пока нет"

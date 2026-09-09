@@ -29,6 +29,9 @@ export function resolvePaths(env: PathEnvironment) {
     resourcesDir: resourcesDir(env),
     migrationsDir: join(hostDir, "migrations"),
     preloadPath: join(hostDir, "../preload/index.cjs"),
+    browserPreloadPath: join(hostDir, "../preload/browser.cjs"),
+    sitePreloadPath: join(hostDir, "../preload/site.cjs"),
+    browserRendererUrl: pathToFileURL(join(hostDir, "../renderer/browser-ui/index.html")).href,
     rendererUrl: pathToFileURL(join(hostDir, "../renderer/index.html")).href,
   };
 }

@@ -67,7 +67,7 @@ export const NAV_GROUPS: readonly NavGroupModel[] = [
         path: ROUTES.integrations,
       },
       { id: "tools", label: "Инструменты", icon: mdiWrenchOutline, path: ROUTES.tools },
-      { id: BROWSER_NAV_ID, label: "Браузер", icon: mdiWeb, external: true },
+      { id: BROWSER_NAV_ID, label: "Браузер", icon: mdiWeb, path: ROUTES.browser },
     ],
   },
   {

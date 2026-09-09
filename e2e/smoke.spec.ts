@@ -20,7 +20,7 @@ declare global {
 const STUDIO_ROOT = fileURLToPath(new URL("../apps/studio", import.meta.url));
 const MAIN_BUNDLE = join(STUDIO_ROOT, "out", "host", "main.js");
 
-/** The rail is fourteen routes plus the Browser entry, which opens a window instead. */
+/** All fifteen rail entries stay within the studio window. */
 const RAIL_ITEMS = [
   "Чат",
   "Агенты",

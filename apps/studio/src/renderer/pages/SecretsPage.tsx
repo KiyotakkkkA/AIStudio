@@ -1,4 +1,4 @@
-import { mdiHistory } from "@mdi/js";
+import { mdiHistory, mdiKeyOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { useState } from "react";
 import SecretsHeaderActions from "../features/secrets/SecretsHeaderActions";
@@ -21,6 +21,7 @@ function SecretsPage() {
 
   return (
     <PageShell
+      icon={mdiKeyOutline}
       title="Секреты"
       subtitle={`${String(secrets.total)} секретов`}
       actions={<SecretsHeaderActions />}

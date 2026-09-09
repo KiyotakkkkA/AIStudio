@@ -581,6 +581,14 @@ arrives on the event channel), `documents.close`.
 
 ## 21. Agent browser window (D9)
 
+> Implementation update (TASK_045, 2026-09-09): the user requested the browser attached to
+> the main studio window, like VS Code, superseding D9's separate-window presentation below.
+> `/browser` mounts the `browser-ui` chrome and active site as native `WebContentsView`s
+> within the main content panel. Switching routes detaches the views and retains tabs;
+> the persistent profile, empty site preload and security boundaries below still apply.
+> Cookie metadata and deletion are available through Sites & cookies; cookie values remain
+> host-only. Automation remains deferred to TASK_046/TASK_047.
+
 **Its own window**, not a route. The rail's `Browser` item opens it, or focuses it if it is
 already open. It is a separate `BrowserWindow` whose chrome is a small renderer
 (`browser-ui/`) and whose page area is a `WebContentsView`.

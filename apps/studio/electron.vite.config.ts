@@ -27,13 +27,17 @@ export default defineConfig({
   preload: {
     build: {
       rollupOptions: {
-        input: "src/preload/index.ts",
-        output: { format: "cjs", entryFileNames: "index.cjs" },
+        input: {
+          index: "src/preload/index.ts",
+          browser: "src/preload/browser.ts",
+          site: "src/preload/site.ts",
+        },
+        output: { format: "cjs", entryFileNames: "[name].cjs" },
       },
     },
   },
   renderer: {
-    root: "src/renderer",
+    root: "src",
     resolve: {
       dedupe: ["react", "react-dom"],
     },
@@ -65,6 +69,8 @@ export default defineConfig({
         },
       },
     ],
-    build: { rollupOptions: { input: "src/renderer/index.html" } },
+    build: {
+      rollupOptions: { input: { studio: "src/index.html", browser: "src/browser-ui/index.html" } },
+    },
   },
 });

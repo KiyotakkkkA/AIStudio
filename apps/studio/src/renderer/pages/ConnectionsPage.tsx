@@ -4,7 +4,11 @@ import PageShell from "../ui/templates/PageShell";
 
 export default function ConnectionsPage() {
   return (
-    <PageShell title="Подключения" subtitle="MCP-серверы и обнаруженные инструменты">
+    <PageShell
+      icon={mdiPowerPlugOutline}
+      title="Подключения"
+      subtitle="MCP-серверы и обнаруженные инструменты"
+    >
       <PagePlaceholder
         icon={mdiPowerPlugOutline}
         title="Подключений пока нет"

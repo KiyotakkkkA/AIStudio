@@ -4,7 +4,11 @@ import PageShell from "../ui/templates/PageShell";
 
 export default function AgenticBuildPage() {
   return (
-    <PageShell title="Агенты" subtitle="План агента, поток вызовов инструментов и контекст сессии">
+    <PageShell
+      icon={mdiCreationOutline}
+      title="Агенты"
+      subtitle="План агента, поток вызовов инструментов и контекст сессии"
+    >
       <PagePlaceholder
         icon={mdiCreationOutline}
         title="Сессий пока нет"
