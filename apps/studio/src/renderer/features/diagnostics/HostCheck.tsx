@@ -47,20 +47,20 @@ export default function HostCheck() {
   return (
     <section
       data-testid="host-check"
-      className="flex flex-none flex-col gap-[12px] rounded-[10px] border border-main-700 bg-main-900 p-[16px]"
+      className="flex flex-none flex-col gap-3 rounded-card border border-main-700 bg-main-900 p-4"
     >
-      <div className="flex flex-col gap-[2px]">
+      <div className="flex flex-col gap-0.5">
         <h2 className="text-[13px] font-semibold text-main-100">Проверка хоста</h2>
         <p className="text-[11.5px] text-main-500">
           Круговой вызов IPC и демонстрационный поток событий.
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-[10px]">
+      <div className="flex flex-wrap items-center gap-2.5">
         <button
           type="button"
           data-testid="ping-button"
           onClick={runPing}
-          className="rounded-[6px] border border-main-600 px-[12px] py-[6px] text-[12px] text-main-200 hover:bg-main-800"
+          className="rounded-[6px] border border-main-600 px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
         >
           Пинг
         </button>
@@ -68,12 +68,12 @@ export default function HostCheck() {
           {ping}
         </span>
       </div>
-      <div className="flex flex-wrap items-center gap-[10px]">
+      <div className="flex flex-wrap items-center gap-2.5">
         <button
           type="button"
           data-testid="stream-button"
           onClick={runStream}
-          className="rounded-[6px] border border-main-600 px-[12px] py-[6px] text-[12px] text-main-200 hover:bg-main-800"
+          className="rounded-[6px] border border-main-600 px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
         >
           Поток
         </button>

@@ -38,7 +38,7 @@ export default function TagsInput({
   };
 
   return (
-    <div className="flex min-h-[34px] flex-wrap items-center gap-[5px] rounded-[6px] border border-main-600 bg-main-900 px-[10px] py-[5px] text-[12.5px] focus-within:border-accent-dark">
+    <div className="flex min-h-8.5 flex-wrap items-center gap-1.25 rounded-[6px] border border-main-600 bg-main-900 px-2.5 py-1.25 text-[12.5px] focus-within:border-accent-dark">
       {tags.map((tag) => (
         <Chip
           key={tag}
@@ -57,7 +57,7 @@ export default function TagsInput({
         onKeyDown={onKeyDown}
         onBlur={commit}
         rounded=""
-        className="min-w-[80px] flex-1"
+        className="min-w-20 flex-1"
         classNames={{
           input:
             "h-[22px] border-0 bg-transparent px-0 text-[12.5px] text-main-100 focus-visible:border-0 focus-visible:ring-0",

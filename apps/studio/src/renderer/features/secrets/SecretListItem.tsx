@@ -35,7 +35,7 @@ export default function SecretListItem({
       onClick={onSelect}
       leading={
         <span
-          className={`flex size-[32px] flex-none items-center justify-center rounded-[8px] bg-main-700 text-[11px] font-semibold ${
+          className={`flex size-8 flex-none items-center justify-center rounded-lg bg-main-700 text-[11px] font-semibold ${
             selected ? "text-accent-medium" : "text-main-300"
           }`}
         >
@@ -44,14 +44,14 @@ export default function SecretListItem({
       }
       trailing={<StatusDot tone={statusTone(secret)} title={schema?.label ?? secret.type} />}
     >
-      <span className="flex items-center gap-[7px]">
+      <span className="flex items-center gap-1.75">
         <span className="truncate font-semibold text-main-50">{secret.name}</span>
         <Chip tone={selected ? "raised" : "neutral"}>{secret.type}</Chip>
       </span>
       <span className="truncate font-mono text-[11px] text-main-500">
         {maskedHint(secret.hint)}
       </span>
-      <span className="flex gap-[12px] text-[11px] text-main-400">
+      <span className="flex gap-3 text-[11px] text-main-400">
         <span>{SCOPE_LABELS[secret.scope]}</span>
         <span>{usageLabel(secret.usageCount)}</span>
         <span className="truncate">{metaLabel(secret, now)}</span>

@@ -35,7 +35,7 @@ export default function NavRailItem({ item, active, collapsed, onSelect }: NavRa
         <Icon path={item.icon} />
         {collapsed && item.status ? (
           <span
-            className={`absolute -top-[1px] -right-[2px] size-[6px] flex-none rounded-full ${STATUS_COLOR[item.status]}`}
+            className={`absolute -top-px -right-0.5 size-1.5 flex-none rounded-full ${STATUS_COLOR[item.status]}`}
           />
         ) : null}
       </span>
@@ -44,7 +44,7 @@ export default function NavRailItem({ item, active, collapsed, onSelect }: NavRa
           <span className="flex-1 truncate text-left">{item.label}</span>
           {item.badge === undefined ? null : (
             <span
-              className={`inline-flex h-[19px] flex-none items-center rounded-[5px] px-[7px] text-[10px] font-medium ${
+              className={`inline-flex h-4.75 flex-none items-center rounded-pill px-1.75 text-[10px] font-medium ${
                 active ? "bg-main-600 text-main-200" : "bg-main-800 text-main-300"
               }`}
             >
@@ -52,7 +52,7 @@ export default function NavRailItem({ item, active, collapsed, onSelect }: NavRa
             </span>
           )}
           {item.status ? (
-            <span className={`size-[7px] flex-none rounded-full ${STATUS_COLOR[item.status]}`} />
+            <span className={`size-1.75 flex-none rounded-full ${STATUS_COLOR[item.status]}`} />
           ) : null}
           {item.external ? (
             <Icon path={mdiOpenInNew} size={12} className="flex-none opacity-55" />

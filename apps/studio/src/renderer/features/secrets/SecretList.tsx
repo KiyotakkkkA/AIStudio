@@ -28,8 +28,8 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
   const typeNames = secrets.types.map((schema) => schema.label).join(" · ");
 
   return (
-    <div className="flex min-h-0 w-[396px] flex-none flex-col gap-[10px]">
-      <div className="flex flex-none gap-[6px]">
+    <div className="flex min-h-0 w-99 flex-none flex-col gap-2.5">
+      <div className="flex flex-none gap-1.5">
         {SCOPE_FILTERS.map((filter) => (
           <Chip
             key={filter}
@@ -85,7 +85,7 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
           dashed
           onClick={onCreate}
           leading={
-            <span className="flex size-[32px] flex-none items-center justify-center rounded-[8px] border border-dashed border-main-600 text-main-400">
+            <span className="flex size-8 flex-none items-center justify-center rounded-lg border border-dashed border-main-600 text-main-400">
               <Icon path={mdiPlus} size={15} />
             </span>
           }

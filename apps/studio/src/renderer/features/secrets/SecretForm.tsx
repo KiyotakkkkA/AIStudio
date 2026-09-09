@@ -31,45 +31,58 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
 
   return (
     <form
-      className="flex min-h-0 min-w-0 flex-1 flex-col rounded-[10px] border border-main-700 bg-main-900"
+      className="flex min-h-0 min-w-0 flex-1 flex-col rounded-card border border-main-700 bg-main-900"
       onSubmit={(event) => {
         event.preventDefault();
         onSave();
       }}
     >
-      <div className="flex flex-none items-center gap-[10px] border-b border-main-700 px-[18px] py-[16px]">
+      <div className="flex flex-none items-center gap-2.5 border-b border-main-700 px-4.5 py-4">
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[14px] font-semibold text-main-50">
             {vm.name.trim().length > 0 ? vm.name : "Новый секрет"}
           </h2>
-          <p className="mt-[2px] text-[11.5px] text-main-400">
+          <p className="mt-0.5 text-[11.5px] text-main-400">
             Поля ниже сгенерированы из схемы{" "}
             <span className="font-mono text-accent-dark">{vm.schemaChip}</span>.
           </p>
         </div>
         {vm.isNew ? null : (
-          <Button type="button" tone="danger" onClick={onDelete}>
+          <Button
+            key={vm.secretId}
+            type="button"
+            tone="danger"
+            disabled={saving}
+            needConfirm
+            modalSetup={{
+              title: "Удалить секрет?",
+              content: <>Секрет «{vm.name}» будет удалён. Это действие нельзя отменить.</>,
+              tone: "danger",
+              confirmLabel: "Удалить",
+            }}
+            onClick={onDelete}
+          >
             <Icon path={mdiDeleteOutline} size={15} />
             Удалить
           </Button>
         )}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-[20px] overflow-y-auto p-[18px]">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4.5">
         {vm.banner === null ? null : (
           <p
             role="alert"
-            className="rounded-[6px] border border-err-border bg-main-800 px-[12px] py-[9px] text-[12px] text-err"
+            className="rounded-[6px] border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
           >
             {vm.banner}
           </p>
         )}
 
-        <section className="flex flex-col gap-[12px]">
+        <section className="flex flex-col gap-3">
           <h3 className="text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
             Общее
           </h3>
-          <div className="grid grid-cols-2 gap-[14px]">
+          <div className="grid grid-cols-2 gap-3.5">
             <Field label="Тип секрета">
               <SelectInput
                 label="Тип секрета"
@@ -108,8 +121,8 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
           </Field>
         </section>
 
-        <section className="flex flex-col gap-[12px] rounded-[9px] border border-main-700 bg-main-800 p-[14px]">
-          <div className="flex items-center gap-[8px]">
+        <section className="flex flex-col gap-3 rounded-[9px] border border-main-700 bg-main-800 p-3.5">
+          <div className="flex items-center gap-2">
             <h3 className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
               {vm.schema.label}
             </h3>
@@ -160,7 +173,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
           )}
 
           {inputs.length === 0 ? null : (
-            <div className="grid grid-cols-2 gap-[14px]">
+            <div className="grid grid-cols-2 gap-3.5">
               {inputs.map((field) => (
                 <SecretCredentialField key={field.key} field={field} vm={vm} />
               ))}
@@ -180,11 +193,11 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
           ))}
         </section>
 
-        <section className="flex flex-col gap-[12px]">
+        <section className="flex flex-col gap-3">
           <h3 className="text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
             Метаданные
           </h3>
-          <div className="grid grid-cols-2 gap-[14px]">
+          <div className="grid grid-cols-2 gap-3.5">
             <Field label="Теги" htmlFor="secret-tags">
               <TagsInput id="secret-tags" tags={vm.tags} onChange={vm.setTags} />
             </Field>
@@ -213,7 +226,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
         </section>
       </div>
 
-      <div className="flex flex-none items-center gap-[12px] border-t border-main-700 px-[18px] py-[14px]">
+      <div className="flex flex-none items-center gap-3 border-t border-main-700 px-4.5 py-3.5">
         <Icon path={mdiLockOutline} size={15} className="flex-none text-ok" />
         <span
           className="line-clamp-2 min-w-0 flex-1 text-[11.5px] text-main-400"

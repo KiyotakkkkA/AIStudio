@@ -28,10 +28,10 @@ export default function ListRow({
       type="button"
       aria-current={selected ? "true" : undefined}
       onClick={onClick}
-      className={`flex w-full gap-[11px] rounded-[10px] border p-[12px] text-left ${tone}`}
+      className={`flex w-full gap-2.75 rounded-card border p-3 text-left ${tone}`}
     >
       {leading}
-      <div className="flex min-w-0 flex-1 flex-col gap-[5px]">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.25">{children}</div>
       {trailing}
     </button>
   );

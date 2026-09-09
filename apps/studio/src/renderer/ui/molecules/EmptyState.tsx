@@ -12,9 +12,9 @@ export interface EmptyStateProps {
 export default function EmptyState({ icon, title, description, action }: EmptyStateProps) {
   return (
     <KitEmptyState
-      className="max-w-[420px] px-[24px] py-[36px] text-center"
+      className="max-w-105 px-6 py-9 text-center"
       icon={
-        <span className="mx-auto flex size-[40px] items-center justify-center rounded-[10px] bg-main-700 text-main-300">
+        <span className="mx-auto flex size-10 items-center justify-center rounded-card bg-main-700 text-main-300">
           <Icon path={icon} size={20} />
         </span>
       }

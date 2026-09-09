@@ -12,6 +12,8 @@
     "typecheck": "turbo run typecheck",
     "typecheck:root": "tsc -p tsconfig.test.json",
     "lint": "turbo run lint",
+    "lint:tailwind": "eslint --config eslint.tailwind.config.js apps/studio/src/renderer --max-warnings 0",
+    "lint:tailwind:fix": "pnpm lint:tailwind --fix",
     "lint:root": "eslint . --max-warnings 0 --ignore-pattern apps/** --ignore-pattern packages/**",
     "format": "turbo run format:root",
     "format:root": "prettier --write .",
@@ -30,10 +32,12 @@
     "@zvs/shared": "workspace:*",
     "@zvs/tsconfig": "workspace:*",
     "eslint": "9.39.5",
+    "eslint-plugin-better-tailwindcss": "4.7.0",
     "jsdom": "30.0.1",
     "prettier": "3.9.6",
     "turbo": "2.10.12",
     "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0",
     "vitest": "5.0.0"
   }
 }

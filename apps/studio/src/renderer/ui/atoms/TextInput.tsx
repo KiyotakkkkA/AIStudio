@@ -29,13 +29,13 @@ export default function TextInput({
   return (
     <div className="relative flex w-full items-center">
       {leading === undefined ? null : (
-        <span className="pointer-events-none absolute left-[10px] z-10 flex items-center text-main-500">
+        <span className="pointer-events-none absolute left-2.5 z-10 flex items-center text-main-500">
           {leading}
         </span>
       )}
       <InputSmall {...props} rounded="" className="w-full" classNames={{ input }} />
       {trailing === undefined ? null : (
-        <span className="absolute right-[8px] z-10 flex items-center">{trailing}</span>
+        <span className="absolute right-2 z-10 flex items-center">{trailing}</span>
       )}
     </div>
   );

@@ -26,7 +26,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
   render(): ReactNode {
     if (this.state.message === undefined) return this.props.children;
     return (
-      <div className="flex h-full w-full items-center justify-center bg-main-900 p-6">
+      <div className="flex size-full  items-center justify-center bg-main-900 p-6">
         <div className="flex max-w-130 flex-col gap-3 rounded-card border border-main-700 bg-main-800 p-5">
           <h1 className="text-[15px] font-semibold text-main-50">
             Интерфейс не удалось отрисовать

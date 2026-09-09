@@ -15,16 +15,16 @@ export default function Toggle({ checked, label, onChange, id, disabled = false 
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="flex items-center gap-[9px] text-left disabled:opacity-60"
+      className="flex items-center gap-2.25 text-left disabled:opacity-60"
     >
       <span
-        className={`relative h-[18px] w-[32px] flex-none rounded-[9px] ${
+        className={`relative h-4.5 w-8 flex-none rounded-[9px] ${
           checked ? "bg-accent-dark" : "bg-main-600"
         }`}
       >
         <span
-          className={`absolute top-[2px] size-[14px] rounded-full bg-main-900 ${
-            checked ? "left-[16px]" : "left-[2px]"
+          className={`absolute top-0.5 size-3.5 rounded-full bg-main-900 ${
+            checked ? "left-4" : "left-0.5"
           }`}
         />
       </span>

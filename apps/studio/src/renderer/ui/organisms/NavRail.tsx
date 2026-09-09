@@ -27,20 +27,20 @@ export default function NavRail({
   return (
     <aside
       className={`flex h-full flex-none flex-col border-r border-main-700 bg-main-900 ${
-        collapsed ? "w-[64px]" : "w-[248px]"
+        collapsed ? "w-[64px]" : "w-rail"
       }`}
     >
       <div
-        className={`flex h-[56px] flex-none items-center gap-[10px] border-b border-main-800 ${
-          collapsed ? "justify-center px-0" : "px-[16px]"
+        className={`flex h-[56px] flex-none items-center gap-2.5 border-b border-main-800 ${
+          collapsed ? "justify-center px-0" : "px-4"
         }`}
       >
-        <div className="flex size-[28px] flex-none items-center justify-center rounded-[8px] bg-accent-dark text-main-900">
+        <div className="flex size-7 flex-none items-center justify-center rounded-lg bg-accent-dark text-main-900">
           <Icon path={mdiLightningBolt} size={15} />
         </div>
         {collapsed ? null : (
           <>
-            <div className="flex min-w-0 flex-1 flex-col leading-[1.25]">
+            <div className="flex min-w-0 flex-1 flex-col leading-tight">
               <span className="truncate text-[13px] font-semibold tracking-[0.01em]">
                 ZVS AI Studio
               </span>
@@ -51,7 +51,7 @@ export default function NavRail({
               aria-label="Свернуть панель навигации"
               title="Свернуть панель навигации"
               onClick={onToggleCollapse}
-              className="flex size-[24px] flex-none items-center justify-center rounded-[6px] text-main-500 hover:bg-main-800 hover:text-main-200"
+              className="flex size-6 flex-none items-center justify-center rounded-[6px] text-main-500 hover:bg-main-800 hover:text-main-200"
             >
               <Icon path={mdiDockLeft} size={16} />
             </button>
@@ -59,17 +59,17 @@ export default function NavRail({
         )}
       </div>
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto px-[10px] py-[12px]">
+      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 py-3">
         {groups.map((group, index) => (
-          <div key={group.id} className="flex flex-col gap-[2px]">
+          <div key={group.id} className="flex flex-col gap-0.5">
             {collapsed ? (
               index === 0 ? null : (
-                <div className="my-[7px] h-px bg-main-800" />
+                <div className="my-1.75 h-px bg-main-800" />
               )
             ) : (
               <div
-                className={`px-[8px] pb-[6px] text-[10px] font-medium tracking-[0.09em] text-main-500 uppercase ${
-                  index === 0 ? "" : "mt-[14px]"
+                className={`px-2 pb-1.5 text-[10px] font-medium tracking-[0.09em] text-main-500 uppercase ${
+                  index === 0 ? "" : "mt-3.5"
                 }`}
               >
                 {group.label}
@@ -89,16 +89,16 @@ export default function NavRail({
       </nav>
 
       <div
-        className={`flex flex-none items-center gap-[10px] border-t border-main-800 p-[10px] ${
+        className={`flex flex-none items-center gap-2.5 border-t border-main-800 p-2.5 ${
           collapsed ? "justify-center" : ""
         }`}
       >
-        <div className="flex size-[28px] flex-none items-center justify-center rounded-full bg-main-600 text-[11px] font-semibold text-accent-light">
+        <div className="flex size-7 flex-none items-center justify-center rounded-full bg-main-600 text-[11px] font-semibold text-accent-light">
           {identity.initials}
         </div>
         {collapsed ? null : (
           <>
-            <div className="flex min-w-0 flex-1 flex-col leading-[1.25]">
+            <div className="flex min-w-0 flex-1 flex-col leading-tight">
               <span className="truncate text-[12.5px] font-medium">{identity.name}</span>
               <span className="truncate text-[10.5px] text-main-500">{identity.hint}</span>
             </div>
@@ -107,7 +107,7 @@ export default function NavRail({
               aria-label="Открыть настройки"
               title="Открыть настройки"
               onClick={onOpenIdentity}
-              className="flex size-[24px] flex-none items-center justify-center rounded-[6px] text-main-500 hover:bg-main-800 hover:text-main-200"
+              className="flex size-6 flex-none items-center justify-center rounded-[6px] text-main-500 hover:bg-main-800 hover:text-main-200"
             >
               <Icon path={mdiCogOutline} size={16} />
             </button>
@@ -121,7 +121,7 @@ export default function NavRail({
           aria-label="Развернуть панель навигации"
           title="Развернуть панель навигации"
           onClick={onToggleCollapse}
-          className="flex h-[32px] flex-none items-center justify-center border-t border-main-800 text-main-500 hover:bg-main-800 hover:text-main-200"
+          className="flex h-8 flex-none items-center justify-center border-t border-main-800 text-main-500 hover:bg-main-800 hover:text-main-200"
         >
           <Icon path={mdiDockLeft} size={16} className="rotate-180" />
         </button>

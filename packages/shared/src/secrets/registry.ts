@@ -95,7 +95,7 @@ export const SECRET_TYPE_REGISTRY: readonly SecretTypeSchema[] = [
   {
     key: "custom",
     version: 1,
-    label: "Custom value",
+    label: "Иное",
     fields: [
       {
         key: "value",

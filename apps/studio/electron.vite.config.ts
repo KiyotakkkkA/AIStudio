@@ -34,6 +34,19 @@ export default defineConfig({
   },
   renderer: {
     root: "src/renderer",
+    resolve: {
+      dedupe: ["react", "react-dom"],
+    },
+    optimizeDeps: {
+      include: [
+        "react",
+        "react-dom/client",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+        "mobx",
+        "mobx-react-lite",
+      ],
+    },
     define: {
       __ZVS_VALIDATE_IPC__: JSON.stringify(process.env.ZVS_VALIDATE_IPC !== "false"),
     },

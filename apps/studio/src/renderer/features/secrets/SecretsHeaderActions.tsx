@@ -11,8 +11,8 @@ function SecretsHeaderActions() {
   const { secrets } = useStore();
 
   return (
-    <div className="flex flex-none items-center gap-[12px]">
-      <div className="w-[240px]">
+    <div className="flex flex-none items-center gap-3">
+      <div className="w-60">
         <TextInput
           value={secrets.query}
           placeholder="Поиск секретов…"
