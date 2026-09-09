@@ -156,7 +156,6 @@ header {
 }
 .tab.active {
   background: var(--color-main-800);
-  border-top-color: var(--color-accent-dark);
 }
 .tab.active:hover,
 .tab.active:focus-within {

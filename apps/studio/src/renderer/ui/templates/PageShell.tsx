@@ -23,11 +23,11 @@ export default function PageShell({
       <header className="flex h-[56px] flex-none items-center gap-3 border-b border-main-700 bg-main-900 px-5">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <Icon path={icon} size={20} className="flex-none text-accent-dark" />
-          <h1 className="m-0 flex-none text-[20px] leading-7 font-semibold tracking-[-0.01em] text-main-50">
+          <h1 className="m-0 flex-none text-xl/7  font-semibold tracking-[-0.01em] text-main-50">
             {title}
           </h1>
           {subtitle ? (
-            <span className="ml-1.5 truncate text-[12px] leading-4 text-main-400" title={subtitle}>
+            <span className="ml-1.5 truncate text-xs/4  text-main-400" title={subtitle}>
               {subtitle}
             </span>
           ) : null}

@@ -24,11 +24,9 @@ export default function NavRailItem({ item, active, collapsed, onSelect }: NavRa
       aria-current={active ? "page" : undefined}
       onClick={() => onSelect(item)}
       className={[
-        "flex h-[32px] w-full flex-none items-center gap-[10px] rounded-[7px] text-[13px] font-medium",
-        collapsed ? "justify-center px-0" : "px-[8px]",
-        active
-          ? "bg-main-700 text-main-50 shadow-[inset_2px_0_0_var(--color-accent-dark)]"
-          : "text-main-300 hover:bg-main-800 hover:text-main-100",
+        "flex h-8 w-full flex-none items-center gap-2.5 rounded-[7px] text-[13px] font-medium",
+        collapsed ? "justify-center px-0" : "px-2",
+        active ? "bg-main-700 text-main-50" : "text-main-300 hover:bg-main-800 hover:text-main-100",
       ].join(" ")}
     >
       <span className="relative flex flex-none items-center justify-center">
