@@ -47,7 +47,7 @@ async function openBrowser() {
     .context()
     .pages()
     .find((page) => page.url().includes("browser-ui/index.html"))!;
-  await expect(chrome.getByRole("button", { name: "Sites & cookies" })).toBeVisible();
+  await expect(chrome.getByRole("button", { name: "Сайты & cookies" })).toBeVisible();
 }
 
 test.beforeAll(async () => {
@@ -95,12 +95,11 @@ test.afterAll(async () => {
 
 test("isolated browser, navigation, cookie management and restart persistence", async () => {
   await openBrowser();
-  await studio.locator("aside").getByText("Браузер", { exact: true }).click();
   expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
-  await chrome.getByRole("textbox", { name: "Address", exact: true }).fill(origin);
-  await chrome.getByRole("button", { name: "Go", exact: true }).click();
+  await chrome.getByRole("textbox", { name: "Адрес", exact: true }).fill(origin);
+  await chrome.getByRole("button", { name: "Перейти", exact: true }).click();
   await expect(chrome.getByRole("tab", { name: "Test site" })).toBeVisible();
-  await expect(chrome.getByText("Not secure · HTTP", { exact: true })).toBeVisible();
+  await expect(chrome.getByText("Подключение не защищено", { exact: true })).toBeVisible();
   const isolation = await app.evaluate(async ({ webContents, session }, origin) => {
     const page = webContents.getAllWebContents().find((item) => item.getURL() === `${origin}/`)!;
     const globals = await page.executeJavaScript(
@@ -189,15 +188,15 @@ test("isolated browser, navigation, cookie management and restart persistence", 
   }, origin);
   expect(downloadBlocked).toBe(true);
 
-  await chrome.getByRole("textbox", { name: "Address", exact: true }).fill(`${origin}/second`);
-  await chrome.getByRole("button", { name: "Go", exact: true }).click();
+  await chrome.getByRole("textbox", { name: "Адрес", exact: true }).fill(`${origin}/second`);
+  await chrome.getByRole("button", { name: "Перейти", exact: true }).click();
   await expect(chrome.getByRole("tab", { name: "Second page" })).toBeVisible();
-  await chrome.getByRole("button", { name: "Back", exact: true }).click();
+  await chrome.getByRole("button", { name: "Назад", exact: true }).click();
   await expect(chrome.getByRole("tab", { name: "Test site" })).toBeVisible();
-  await chrome.getByRole("button", { name: "Forward", exact: true }).click();
+  await chrome.getByRole("button", { name: "Вперед", exact: true }).click();
   await expect(chrome.getByRole("tab", { name: "Second page" })).toBeVisible();
-  await chrome.getByRole("textbox", { name: "Address", exact: true }).fill("file:///etc/passwd");
-  await chrome.getByRole("button", { name: "Go", exact: true }).click();
+  await chrome.getByRole("textbox", { name: "Адрес", exact: true }).fill("file:///etc/passwd");
+  await chrome.getByRole("button", { name: "Перейти", exact: true }).click();
   await expect(chrome.getByRole("status")).toContainText("Action failed");
 
   await app.evaluate(async ({ webContents }, origin) => {
@@ -210,7 +209,7 @@ test("isolated browser, navigation, cookie management and restart persistence", 
   expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
   await chrome.getByRole("tab").last().press("Alt+ArrowLeft");
   await expect(chrome.getByRole("tab").first()).toHaveAttribute("aria-selected", "true");
-  await chrome.getByRole("button", { name: "Close Test site", exact: true }).click();
+  await chrome.getByRole("button", { name: "Закрыть Test site", exact: true }).click();
   await expect(chrome.getByRole("tab")).toHaveCount(1);
   await app.evaluate(async ({ webContents }, origin) => {
     const page = webContents
@@ -259,15 +258,15 @@ test("isolated browser, navigation, cookie management and restart persistence", 
     origin.replace("http:", "https:"),
   );
   await expect(chrome.getByRole("status")).toContainText("Page could not load");
-  await expect(chrome.getByText("Page error", { exact: true })).toBeVisible();
+  await expect(chrome.getByText("Ошибка загрузки контента", { exact: true })).toBeVisible();
   await chrome
     .locator(".tab")
     .last()
-    .getByRole("button", { name: /^Close / })
+    .getByRole("button", { name: /^Закрыть / })
     .click();
   await expect(chrome.getByRole("tab")).toHaveCount(1);
 
-  await chrome.getByRole("button", { name: "Sites & cookies" }).click();
+  await chrome.getByRole("button", { name: "Сайты & cookies" }).click();
   await expect(chrome.getByRole("cell", { name: "login /" })).toBeVisible();
   expect(await chrome.locator("body").innerText()).not.toContain("private-value");
   await chrome.screenshot({ path: "test-results/browser-cookies.png" });
@@ -290,11 +289,11 @@ test("isolated browser, navigation, cookie management and restart persistence", 
   await app.close();
   await launch();
   await openBrowser();
-  await chrome.getByRole("button", { name: "Sites & cookies" }).click();
+  await chrome.getByRole("button", { name: "Сайты & cookies" }).click();
   await expect(chrome.getByRole("cell", { name: "login /" })).toBeVisible();
-  await chrome.getByRole("button", { name: "Remove", exact: true }).click();
+  await chrome.getByRole("button", { name: "Удалить", exact: true }).click();
   await chrome.getByRole("button", { name: "Confirm removal" }).click();
-  await expect(chrome.getByText("No cookies found.", { exact: false })).toBeVisible();
+  await expect(chrome.getByText("Нет куки.", { exact: false })).toBeVisible();
   expect(
     await app.evaluate(
       async ({ session }) =>
@@ -306,11 +305,11 @@ test("isolated browser, navigation, cookie management and restart persistence", 
     await cookies.set({ url: "https://one.example/", name: "one", value: "private" });
     await cookies.set({ url: "https://two.example/", name: "two", value: "private" });
   });
-  await chrome.getByRole("button", { name: "Refresh", exact: true }).click();
+  await chrome.getByRole("button", { name: "Обновить", exact: true }).click();
   await chrome
     .locator("article")
     .filter({ has: chrome.getByRole("heading", { name: "one.example", exact: true }) })
-    .getByRole("button", { name: "Clear domain cookies" })
+    .getByRole("button", { name: "Очистить cookies" })
     .click();
   await chrome.getByRole("button", { name: "Confirm removal" }).click();
   await expect(chrome.getByRole("heading", { name: "one.example", exact: true })).toHaveCount(0);

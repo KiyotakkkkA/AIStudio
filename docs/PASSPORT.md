@@ -375,17 +375,67 @@ retry/cancel/progress are written once.
 
 ## 12. AI layer
 
-Vercel AI SDK lives on the **host** only; the renderer has no vendor SDK and no API keys.
+Vercel AI SDK lives on the **host** only; the renderer has no vendor SDK, no API keys and no
+session cookies.
 
-- `drivers/ai/` exposes our own port (`TextGenerationDriver`, `EmbeddingDriver`,
-  `ImageDriver`) implemented over the AI SDK's provider packages.
-- A **provider registry** maps a `provider` row (kind + base URL + secret ref + model
-  settings) to a configured SDK client. The three tabs on the AI Providers page are three
-  capability filters over one table, not three code paths.
-- **Test connection** hits the provider's model-list endpoint, persists the discovered models
-  and returns latency — the same call the Providers page shows and the health check reuses.
-- Streaming: the SDK's stream is consumed on the host and re-emitted as `token` events on the
+### Two independent axes (decided 2026-09-10)
+
+A connection to a vendor is described by two orthogonal choices, and the code must never
+collapse them into one enum:
+
+| Axis | Values | What it decides |
+| --- | --- | --- |
+| **Adapter family** — `provider.adapter` | `openai-compatible`, `anthropic`, `qwen-web`, `deepseek-web` | The wire shape: request/response mapping, model-list endpoint, streaming format |
+| **Auth mode** — `provider.auth_mode` | `api`, `account` | How a request is credentialed and which HTTP stack carries it |
+
+One adapter family serves many vendors: Ollama, OpenRouter, Mistral, LM Studio and vLLM are
+all `openai-compatible` rows differing only by base URL and secret. A vendor whose wire
+format is its own — Qwen, DeepSeek — gets its own family. **Adding a vendor that speaks a
+known dialect must be a row, not a file.**
+
+- **`api` mode** — base URL plus a `secret` reference. `SecretService.resolve()` at point of
+  use, `Authorization` header, ordinary host fetch. This is the classic path.
+- **`account` mode** — no API key exists. The user signs into the vendor's own web app inside
+  the integrated browser (§21), and the host issues requests through Electron's
+  `net.fetch` bound to the `persist:browser-work` session, so the vendor's cookies ride along
+  exactly as they do in the browser tab. Where the vendor also requires a bearer token
+  (Qwen does), that token is captured from the identity endpoint and stored through
+  `SecretService` like any other credential — encrypted at rest, never in a DTO, never in the
+  renderer. Cookies are never copied out of the partition.
+
+### Structure
+
+- `drivers/ai/ports.ts` — our ports: `TextGenerationDriver`, `EmbeddingDriver`, `ImageDriver`.
+  Services depend on these, never on a vendor SDK.
+- `drivers/ai/transport/` — `Transport` is the seam between the two auth modes: `ApiTransport`
+  and `AccountTransport` both expose one `request()`/`stream()` shape. **An adapter never
+  learns which mode it is running under**, which is why an adapter family can be offered over
+  either.
+- `drivers/ai/adapters/` — one file per adapter family, each declaring an
+  `AdapterCapabilities` descriptor (supports streaming? live model list? honours `topK`?
+  requires an account?) so services and UI degrade honestly instead of guessing.
+- `drivers/ai/identity/` — per-family identity probes for `account` mode: a small mapper from
+  the vendor's "current user" endpoint onto our `AccountIdentity`
+  (`chat.qwen.ai/api/v1/auths/`, `chat.deepseek.com/api/v0/users/current`).
+- A **provider registry** maps a `provider` row to a configured driver: pick the adapter
+  family, build the transport for the auth mode, cache the client per provider id, invalidate
+  on provider, secret or account change. **Never cache a resolved plaintext credential.**
+  The three capability tabs on the AI Providers page remain three filters over one table.
+- **Test connection** hits the provider's model-list endpoint (or, in `account` mode, first
+  the identity endpoint), persists the discovered models and returns latency — the same call
+  the Providers page shows and the health check reuses. Its outcome is a union, not a
+  boolean, and it includes `account-not-linked` and `session-expired`.
+- Streaming: the vendor stream is consumed on the host and re-emitted as `token` events on the
   one event channel (D4). The renderer never sees an SDK object.
+
+### Accounts
+
+An `account` row is an identity linked from the browser session: external id, masked email,
+display name, avatar, optional bearer-token secret ref, expiry, status, partition. Its
+lifecycle is link → healthy → `needs-relink`. An expired session is a **distinct state** from
+a bad API key: the Accounts tab offers Re-link, and the app never opens a login page on its
+own. The schema permits several accounts per vendor; one browser partition means one live
+session per vendor for now.
 
 ---
 
@@ -586,7 +636,7 @@ arrives on the event channel), `documents.close`.
 > `/browser` mounts the `browser-ui` chrome and active site as native `WebContentsView`s
 > within the main content panel. Switching routes detaches the views and retains tabs;
 > the persistent profile, empty site preload and security boundaries below still apply.
-> Cookie metadata and deletion are available through Sites & cookies; cookie values remain
+> Cookie metadata and deletion are available through Сайты & cookies; cookie values remain
 > host-only. Automation remains deferred to TASK_046/TASK_047.
 
 **Its own window**, not a route. The rail's `Browser` item opens it, or focuses it if it is
@@ -608,6 +658,14 @@ is being automated beyond what a normal browser reveals.
 One persistent partition, `persist:browser-work`. The user logs into sites once, inside the
 app, and those cookies survive restarts — which is what makes the automations useful at all.
 The partition is separate from the studio's own session and holds no app credentials.
+
+> Update (2026-09-10): this partition is also the identity source for **account-mode AI
+> providers** (§12). The Accounts tab's Login button opens the vendor's site in this browser;
+> the host then issues that provider's API calls with `net.fetch({ session })` against the
+> same partition. Cookies stay inside the partition — the AI layer reads no cookie values and
+> the renderer sees only a masked identity. Clearing a vendor's cookies in Sites & cookies
+> therefore un-links that account, and the provider must report `session-expired`, not a
+> generic auth failure.
 
 ### Automation
 

@@ -145,7 +145,7 @@ function BrowserApp() {
               <button
                 type="button"
                 className="tab-close"
-                aria-label={`Close ${tab.title}`}
+                aria-label={`Закрыть ${tab.title}`}
                 title="Close tab"
                 draggable={false}
                 onPointerDown={(event) => event.stopPropagation()}
@@ -176,7 +176,7 @@ function BrowserApp() {
         >
           <button
             type="button"
-            aria-label="Back"
+            aria-label="Назад"
             disabled={!active?.canGoBack}
             onClick={() => void send({ action: "back" })}
           >
@@ -184,7 +184,7 @@ function BrowserApp() {
           </button>
           <button
             type="button"
-            aria-label="Forward"
+            aria-label="Вперед"
             disabled={!active?.canGoForward}
             onClick={() => void send({ action: "forward" })}
           >
@@ -200,8 +200,8 @@ function BrowserApp() {
             {securityLabels[active?.security ?? "none"]}
           </span>
           <input
-            aria-label="Address"
-            placeholder="Enter a website address"
+            aria-label="Адрес"
+            placeholder="Введите адрес сайта..."
             value={address}
             onChange={(event) => setAddress(event.target.value)}
             onFocus={(event) => event.target.select()}
