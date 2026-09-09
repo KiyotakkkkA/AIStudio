@@ -53,6 +53,7 @@ export class ProviderRepository extends Repository {
         .values({ ...draft, ...capabilityColumns(draft.capabilities), id: draft.id ?? createId() })
         .returning()
         .get();
+      requireAuthModeIntegrity(row);
       if (row.secretId !== null)
         new SecretRepository(tx).addUsage({
           secretId: row.secretId,
@@ -78,6 +79,7 @@ export class ProviderRepository extends Repository {
         .where(eq(provider.id, id))
         .returning()
         .get();
+      if (row !== undefined) requireAuthModeIntegrity(row);
       if (row !== undefined && previous.secretId !== row.secretId) {
         const secrets = new SecretRepository(tx);
         if (previous.secretId !== null) secrets.removeUsage(previous.secretId, "provider", id);
@@ -142,6 +144,32 @@ export class ProviderRepository extends Repository {
         .get();
     });
   }
+}
+
+function requireAuthModeIntegrity(row: ProviderEntity): void {
+  if (row.authMode === "account") {
+    if (row.secretId !== null) {
+      throw integrityError(row, "Провайдер в режиме аккаунта не может ссылаться на секрет");
+    }
+    if (row.accountId === null && row.status !== "needs-relink") {
+      throw integrityError(row, "Провайдер в режиме аккаунта должен быть привязан к аккаунту");
+    }
+    return;
+  }
+  if (row.accountId !== null) {
+    throw integrityError(row, "Провайдер в режиме API не может быть привязан к аккаунту");
+  }
+}
+
+function integrityError(row: ProviderEntity, message: string): AppError {
+  return new AppError(AppErrorCode.VALIDATION_FAILED, message, {
+    details: {
+      providerId: row.id,
+      authMode: row.authMode,
+      hasSecret: row.secretId !== null,
+      hasAccount: row.accountId !== null,
+    },
+  });
 }
 
 function capabilityColumns(capabilities: ProviderCapability[]) {

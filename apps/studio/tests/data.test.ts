@@ -45,6 +45,7 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
       "0001_secret",
       "0002_provider_model",
       "0003_provider_adapter_auth_mode",
+      "0004_account",
     ]);
     const tables = database.client.db.$client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'")
@@ -80,11 +81,13 @@ test("a backup is written before migrating and only the last three are kept", ()
           "0001_secret",
           "0002_provider_model",
           "0003_provider_adapter_auth_mode",
+          "0004_account",
         ]);
         if (run === 0) assert.equal(report.backup, undefined);
         else assert.equal(typeof report.backup, "string");
         client.db.$client.exec("DROP TABLE model");
         client.db.$client.exec("DROP TABLE provider");
+        client.db.$client.exec("DROP TABLE account");
         client.db.$client.exec("DROP TABLE secret_usage");
         client.db.$client.exec("DROP TABLE secret");
         client.db.$client.exec("DROP TABLE setting");
@@ -196,6 +199,7 @@ test("prepareDatabase opens and migrates in one step", () => {
         "0001_secret",
         "0002_provider_model",
         "0003_provider_adapter_auth_mode",
+        "0004_account",
       ]);
       assert.equal(prepared.client.repositories.settings.all().length, 0);
     } finally {

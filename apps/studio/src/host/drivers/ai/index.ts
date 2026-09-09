@@ -5,5 +5,8 @@ export * from "./streamToEvents.ts";
 export * from "./ProviderRegistry.ts";
 export * from "./transport/Transport.ts";
 export * from "./transport/ApiTransport.ts";
+export * from "./transport/AccountTransport.ts";
+export * from "./transport/SessionGateway.ts";
+export * from "./identity/index.ts";
 export * from "./adapters/index.ts";
 export * from "./adapters/sse.ts";

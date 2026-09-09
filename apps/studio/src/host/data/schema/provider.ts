@@ -1,5 +1,6 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { AdapterFamily, AuthMode } from "@zvs/shared";
+import { account } from "./account.ts";
 import { secret } from "./secret.ts";
 
 export const PROVIDER_KINDS = [
@@ -12,7 +13,7 @@ export const PROVIDER_KINDS = [
 export type ProviderKind = (typeof PROVIDER_KINDS)[number];
 export const PROVIDER_CAPABILITIES = ["text", "embedding", "image"] as const;
 export type ProviderCapability = (typeof PROVIDER_CAPABILITIES)[number];
-export const PROVIDER_STATUSES = ["unknown", "ok", "degraded", "failed"] as const;
+export const PROVIDER_STATUSES = ["unknown", "ok", "degraded", "failed", "needs-relink"] as const;
 export type ProviderStatus = (typeof PROVIDER_STATUSES)[number];
 
 export interface ProviderSettings {
@@ -33,6 +34,7 @@ export const provider = sqliteTable(
     name: text("name").notNull(),
     baseUrl: text("base_url").notNull(),
     secretId: text("secret_id").references(() => secret.id, { onDelete: "restrict" }),
+    accountId: text("account_id").references(() => account.id, { onDelete: "set null" }),
     capabilities: text("capabilities", { mode: "json" }).$type<ProviderCapability[]>().notNull(),
     capText: integer("cap_text", { mode: "boolean" }).notNull().default(false),
     capEmbedding: integer("cap_embedding", { mode: "boolean" }).notNull().default(false),

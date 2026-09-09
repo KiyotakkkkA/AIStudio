@@ -1,4 +1,4 @@
-import { AppError, AppErrorCode, isAppError, type ErrorDetails } from "@zvs/shared";
+import { AppError, AppErrorCode, isAppError, type AuthMode, type ErrorDetails } from "@zvs/shared";
 
 const UNREACHABLE_CODES = new Set([
   "ECONNREFUSED",
@@ -21,6 +21,27 @@ export interface HttpFailure {
   readonly headers?: Readonly<Record<string, string>>;
   readonly body?: string;
   readonly details?: ErrorDetails;
+  readonly authMode?: AuthMode;
+}
+
+export function sessionExpired(details: ErrorDetails = {}): AppError {
+  return new AppError(
+    AppErrorCode.PROVIDER_SESSION_EXPIRED,
+    "Сессия аккаунта истекла — требуется повторная привязка",
+    { details },
+  );
+}
+
+export function isSessionExpired(error: unknown): boolean {
+  return isAppError(error) && error.code === AppErrorCode.PROVIDER_SESSION_EXPIRED;
+}
+
+export function isSignedOutResponse(
+  status: number,
+  headers: Readonly<Record<string, string>>,
+): boolean {
+  if (status >= 300 && status < 400) return true;
+  return (headers["content-type"] ?? "").toLowerCase().includes("text/html");
 }
 
 export function isCancellation(error: unknown): boolean {
@@ -47,6 +68,7 @@ export function httpFailure(failure: HttpFailure): AppError {
   if (vendorMessage !== null) details.vendorMessage = vendorMessage;
 
   if (status === 401 || status === 403) {
+    if (failure.authMode === "account") return sessionExpired(details);
     return new AppError(AppErrorCode.PROVIDER_AUTH_FAILED, "Провайдер отклонил учётные данные", {
       details,
     });

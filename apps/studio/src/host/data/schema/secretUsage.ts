@@ -6,6 +6,7 @@ export const SECRET_CONSUMER_KINDS = [
   "mcp_server",
   "integration",
   "vector_store",
+  "account",
 ] as const;
 export type SecretConsumerKind = (typeof SECRET_CONSUMER_KINDS)[number];
 
