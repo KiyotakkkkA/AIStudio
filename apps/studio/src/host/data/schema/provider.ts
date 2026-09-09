@@ -1,20 +1,19 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { AdapterFamily, AuthMode } from "@zvs/shared";
+import {
+  PROVIDER_CAPABILITIES,
+  PROVIDER_KINDS,
+  PROVIDER_STATUSES,
+  type AdapterFamily,
+  type AuthMode,
+  type ProviderCapability,
+  type ProviderKind,
+  type ProviderStatus,
+} from "@zvs/shared";
 import { account } from "./account.ts";
 import { secret } from "./secret.ts";
 
-export const PROVIDER_KINDS = [
-  "ollama",
-  "openrouter",
-  "anthropic",
-  "mistral",
-  "openai-compatible",
-] as const;
-export type ProviderKind = (typeof PROVIDER_KINDS)[number];
-export const PROVIDER_CAPABILITIES = ["text", "embedding", "image"] as const;
-export type ProviderCapability = (typeof PROVIDER_CAPABILITIES)[number];
-export const PROVIDER_STATUSES = ["unknown", "ok", "degraded", "failed", "needs-relink"] as const;
-export type ProviderStatus = (typeof PROVIDER_STATUSES)[number];
+export { PROVIDER_CAPABILITIES, PROVIDER_KINDS, PROVIDER_STATUSES };
+export type { ProviderCapability, ProviderKind, ProviderStatus };
 
 export interface ProviderSettings {
   temperature?: number;

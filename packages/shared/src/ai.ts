@@ -21,6 +21,21 @@ export function isAccountFamily(family: AdapterFamily): family is AccountFamily 
   return (ACCOUNT_FAMILIES as readonly string[]).includes(family);
 }
 
+export const TUNABLE_PARAMETERS = ["temperature", "topK", "topP", "maxOutputTokens"] as const;
+export const TunableParameter = z.enum(TUNABLE_PARAMETERS);
+export type TunableParameter = z.infer<typeof TunableParameter>;
+
+export const AdapterCapabilitiesDto = z.object({
+  family: AdapterFamily,
+  authModes: z.array(AuthMode),
+  streaming: z.boolean(),
+  liveModelList: z.boolean(),
+  embedding: z.boolean(),
+  image: z.boolean(),
+  honours: z.record(TunableParameter, z.boolean()),
+});
+export type AdapterCapabilitiesDto = z.infer<typeof AdapterCapabilitiesDto>;
+
 export const DELTA_KINDS = ["text", "reasoning"] as const;
 export const DeltaKind = z.enum(DELTA_KINDS);
 export type DeltaKind = z.infer<typeof DeltaKind>;

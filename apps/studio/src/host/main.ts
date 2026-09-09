@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage, session } from "electron";
 import { contract } from "@zvs/shared";
 import { createIpcServer } from "@zvs/ipc";
 import type { IpcServer } from "@zvs/ipc";
@@ -23,6 +23,11 @@ import { CryptoService } from "./services/CryptoService";
 import { SecretService } from "./services/SecretService";
 import { SettingService } from "./services/SettingService";
 import { BrowserViewManager } from "./browser/BrowserViewManager";
+import { ProviderRegistry } from "./drivers/ai/ProviderRegistry";
+import { probeAccountCredentials } from "./drivers/ai/identity/ProbeAccountCredentials";
+import type { SessionGatewayFactory } from "./drivers/ai/transport/SessionGateway";
+import { ProviderService } from "./services/ProviderService";
+import { HealthCheckService } from "./services/HealthCheckService";
 
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
@@ -33,6 +38,9 @@ let database: DatabaseClient | undefined;
 let settings: SettingService | undefined;
 let secrets: SecretService | undefined;
 let browser: BrowserViewManager | undefined;
+let providers: ProviderService | undefined;
+let healthCheck: HealthCheckService | undefined;
+let quitting = false;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -46,6 +54,13 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
+  });
+  app.on("before-quit", (event) => {
+    if (quitting || providers === undefined) return;
+    event.preventDefault();
+    quitting = true;
+    healthCheck?.stop();
+    void Promise.all([providers.dispose(), healthCheck?.dispose()]).finally(() => app.quit());
   });
   app.on("will-quit", () => {
     logger?.log("info", "host", "Shutdown");
@@ -110,9 +125,30 @@ if (!app.requestSingleInstanceLock()) {
           : undefined,
       });
       logger.log("info", "host", "Opened the event channel", { recording });
+      const sessions: SessionGatewayFactory = (partition) => {
+        const current = session.fromPartition(partition);
+        return {
+          partition,
+          userAgent: () => current.getUserAgent(),
+          fetch: (url, request) => current.fetch(url, request),
+        };
+      };
+      const vault = secrets;
+      const registry = new ProviderRegistry({
+        providers: database.repositories.providers,
+        accounts: database.repositories.accounts,
+        secrets: vault,
+        sessions,
+        logger,
+        credentials: (account) =>
+          probeAccountCredentials(account, sessions(account.partition), vault),
+      });
+      providers = new ProviderService({ data: database, drivers: registry, secrets, logger });
+      healthCheck = new HealthCheckService({ providers, settings, events: eventBus, logger });
+      healthCheck.start();
       ipcServer = createIpcServer(
         contract,
-        createHandlers({ events: eventBus, settings, secrets }),
+        createHandlers({ events: eventBus, settings, secrets, providers, healthCheck }),
         {
           ipcMain: {
             handle(channel, listener) {

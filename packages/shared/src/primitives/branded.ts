@@ -63,3 +63,6 @@ export type TaskId = z.infer<typeof TaskId>;
 
 export const StreamId = brandedId("StreamId");
 export type StreamId = z.infer<typeof StreamId>;
+
+export const AccountId = brandedId("AccountId");
+export type AccountId = z.infer<typeof AccountId>;

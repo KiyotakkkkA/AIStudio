@@ -8,6 +8,18 @@ import { UpdateSecretInput } from "../secrets/UpdateSecretInput.js";
 import { SecretDto, SecretScope, SecretSummaryDto } from "../secrets/SecretDto.js";
 import { SecretTypeKey } from "../secrets/registry.js";
 import { SecretTypeSchema } from "../secrets/SecretTypeSchema.js";
+import {
+  CreateProviderInput,
+  ProbeRequest,
+  ProbeResultDto,
+  ProviderDto,
+  ProviderListFilter,
+  ProviderRef,
+  ProviderSummaryDto,
+  SetDefaultModelInput,
+  UpdateProviderInput,
+} from "../providers/index.js";
+import { ProviderId } from "../primitives/branded.js";
 import { defineContract } from "./defineContract.js";
 
 export const SecretFilter = z.object({
@@ -75,6 +87,38 @@ export const contract = defineContract({
   "secrets.remove": {
     input: SecretRef,
     output: z.object({ id: SecretId, removed: z.literal(true) }),
+  },
+  "providers.list": {
+    input: ProviderListFilter,
+    output: z.array(ProviderSummaryDto),
+  },
+  "providers.get": {
+    input: ProviderRef,
+    output: ProviderDto,
+  },
+  "providers.create": {
+    input: CreateProviderInput,
+    output: ProviderDto,
+  },
+  "providers.update": {
+    input: UpdateProviderInput,
+    output: ProviderDto,
+  },
+  "providers.remove": {
+    input: ProviderRef,
+    output: z.object({ id: ProviderId, removed: z.literal(true) }),
+  },
+  "providers.probe": {
+    input: ProbeRequest,
+    output: ProbeResultDto,
+  },
+  "providers.setDefaultModel": {
+    input: SetDefaultModelInput,
+    output: ProviderDto,
+  },
+  "providers.refreshAll": {
+    input: z.void(),
+    output: z.array(ProviderSummaryDto),
   },
 });
 

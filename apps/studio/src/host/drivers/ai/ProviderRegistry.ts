@@ -75,14 +75,7 @@ export class ProviderRegistry {
     const cached = this.#cache.get(providerId);
     if (cached !== undefined && cached.fingerprint === fingerprint) return cached.driver;
 
-    const entry = adapterEntry(row.adapter);
-    this.#requireAuthMode(entry.capabilities, row);
-    const transport = await this.#transport(row);
-    const context: AdapterContext = {
-      transport,
-      ...(this.#logger === undefined ? {} : { logger: this.#logger }),
-    };
-    const driver = entry.build(context);
+    const driver = await this.ephemeralDriver(row);
     this.#cache.set(providerId, {
       driver,
       fingerprint,
@@ -90,6 +83,17 @@ export class ProviderRegistry {
       accountId: row.accountId,
     });
     return driver;
+  }
+
+  async ephemeralDriver(row: ProviderEntity): Promise<AiDriver> {
+    const entry = adapterEntry(row.adapter);
+    this.#requireAuthMode(entry.capabilities, row);
+    const transport = await this.#transport(row);
+    const context: AdapterContext = {
+      transport,
+      ...(this.#logger === undefined ? {} : { logger: this.#logger }),
+    };
+    return entry.build(context);
   }
 
   async text(providerId: string): Promise<TextGenerationDriver> {

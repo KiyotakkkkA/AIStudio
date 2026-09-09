@@ -1,3 +1,4 @@
+import { createProviderService } from "../../../test/helpers/providerService.ts";
 import assert from "node:assert/strict";
 import { cpSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -270,7 +271,11 @@ test("settings channels carry JSON values through the whole chain", async () => 
   const database = temporaryDatabase();
   try {
     const settings = new SettingService({ data: database.client, clock: createFakeClock() });
-    const handlers = createHandlers({ settings, secrets: createSecretService(database.client) });
+    const handlers = createHandlers({
+      providers: createProviderService(database.client),
+      settings,
+      secrets: createSecretService(database.client),
+    });
     const geometry = { bounds: { x: 10, y: 20, width: 1600, height: 1000 }, maximized: false };
 
     const missing = await handlers["settings.get"]({ key: "window.main" });

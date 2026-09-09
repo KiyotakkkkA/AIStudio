@@ -1,8 +1,9 @@
 import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { MODEL_CAPABILITIES, type ModelCapability } from "@zvs/shared";
 import { provider } from "./provider.ts";
 
-export const MODEL_CAPABILITIES = ["tools", "vision", "streaming", "reasoning", "code"] as const;
-export type ModelCapability = (typeof MODEL_CAPABILITIES)[number];
+export { MODEL_CAPABILITIES };
+export type { ModelCapability };
 
 export const model = sqliteTable(
   "model",

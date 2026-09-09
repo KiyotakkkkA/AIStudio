@@ -1,10 +1,13 @@
-import { ADAPTER_FAMILIES, type AdapterFamily, type AuthMode } from "@zvs/shared";
+import {
+  ADAPTER_FAMILIES,
+  TUNABLE_PARAMETERS,
+  type AdapterFamily,
+  type AuthMode,
+  type TunableParameter,
+} from "@zvs/shared";
 
-export { ADAPTER_FAMILIES };
-export type { AdapterFamily, AuthMode };
-
-export const TUNABLE_PARAMETERS = ["temperature", "topK", "topP", "maxOutputTokens"] as const;
-export type TunableParameter = (typeof TUNABLE_PARAMETERS)[number];
+export { ADAPTER_FAMILIES, TUNABLE_PARAMETERS };
+export type { AdapterFamily, AuthMode, TunableParameter };
 
 export interface AdapterCapabilities {
   readonly family: AdapterFamily;

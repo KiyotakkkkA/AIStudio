@@ -1,3 +1,4 @@
+import { createProviderService } from "../../../test/helpers/providerService.ts";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -251,7 +252,13 @@ afterAll(() => database.dispose());
 test("system.demoStream counts to the requested total and terminates", async () => {
   const { sent, sender } = fakeSender();
   const bus = createEventBus({ senders: () => [sender] });
-  const handlers = createHandlers({ events: bus, intervalMs: 0, settings, secrets });
+  const handlers = createHandlers({
+    providers: createProviderService(database.client),
+    events: bus,
+    intervalMs: 0,
+    settings,
+    secrets,
+  });
   const { streamId } = await handlers["system.demoStream"]({ steps: 10 });
 
   while (bus.open > 0) await new Promise((resolve) => setTimeout(resolve, 5));
