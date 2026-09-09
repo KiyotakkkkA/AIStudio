@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DeltaKind } from "../ai.js";
 import { AppErrorCode } from "../errors/AppErrorCode.js";
 import { StreamId } from "../primitives/branded.js";
 import { Timestamp } from "../primitives/time.js";
@@ -29,7 +30,12 @@ export type RunOutcomeDto = z.infer<typeof RunOutcomeDto>;
 const envelope = { streamId: StreamId, seq: EventSeq, ts: Timestamp };
 
 export const HostEvent = z.discriminatedUnion("type", [
-  z.object({ ...envelope, type: z.literal("token"), delta: z.string() }),
+  z.object({
+    ...envelope,
+    type: z.literal("token"),
+    delta: z.string(),
+    kind: DeltaKind.optional(),
+  }),
   z.object({
     ...envelope,
     type: z.literal("progress"),

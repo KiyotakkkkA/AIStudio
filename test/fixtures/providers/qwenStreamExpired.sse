@@ -1,0 +1,6 @@
+data: {"response.created": {"chat_id": "1a77c526-b841-4fef-805c-8096a2b5e4c3", "parent_id": "ca8ef2b6-93c6-43b6-bc5a-0b96e4fab5ef", "response_id": "3112202d-2c44-4b3f-8fc8-783e8b17dbc0", "response_index": "0"}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "Прив", "phase": "answer", "status": "typing"}}], "response_id": "3112202d-2c44-4b3f-8fc8-783e8b17dbc0"}
+
+data: {"success": false, "code": "Unauthorized", "status": 401, "request_id": "2de0d3be-28b5-44e4-8d81-eaf8f05752f2"}
+

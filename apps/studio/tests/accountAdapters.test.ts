@@ -2,12 +2,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { AppErrorCode, isAppError } from "@zvs/shared";
+import { AppErrorCode, isAppError, type AppError, type HostEvent } from "@zvs/shared";
 import { createFakeSession } from "../../../test/helpers/FakeSession.ts";
-import { createFakeTransport } from "../../../test/helpers/FakeTransport.ts";
+import { createFakeTransport, type FakeTransport } from "../../../test/helpers/FakeTransport.ts";
 import { REPO_ROOT } from "../../../test/helpers/paths.ts";
 import {
   ACCOUNT_GENERATION_PENDING,
+  flattenPrompt,
   type AccountAdapterOptions,
 } from "../src/host/drivers/ai/adapters/accountFamily.ts";
 import {
@@ -17,6 +18,9 @@ import {
   DEEPSEEK_WEB_CAPABILITIES,
 } from "../src/host/drivers/ai/adapters/deepseekWeb.ts";
 import {
+  QWEN_CHATS_NEW_PATH,
+  QWEN_COMPLETIONS_PATH,
+  QWEN_GENERATION_OBSERVATION,
   QWEN_MODELS_OBSERVATION,
   QWEN_MODELS_PATH,
   QwenWebAdapter,
@@ -24,8 +28,10 @@ import {
 } from "../src/host/drivers/ai/adapters/qwenWeb.ts";
 import { adapterEntry } from "../src/host/drivers/ai/adapters/index.ts";
 import { AccountTransport } from "../src/host/drivers/ai/transport/AccountTransport.ts";
+import { streamToEvents } from "../src/host/drivers/ai/streamToEvents.ts";
+import { createEventBus, type StreamHandle } from "../src/host/platform/events.ts";
 import type { Logger, LogLevel } from "../src/host/platform/logger.ts";
-import type { DiscoveredModel } from "../src/host/drivers/ai/ports.ts";
+import type { GenerateRequest, TextDelta, DiscoveredModel } from "../src/host/drivers/ai/ports.ts";
 
 interface LogEntry {
   readonly level: LogLevel;
@@ -37,9 +43,67 @@ interface LogEntry {
 const QWEN_BASE_URL = "https://chat.qwen.ai/api/v2";
 const QWEN_MODELS_URL = `${QWEN_BASE_URL}${QWEN_MODELS_PATH}`;
 
+const QWEN_CHAT_ID = "1a77c526-b841-4fef-805c-8096a2b5e4c3";
+const FIXED_NOW = 1788994021000;
+const FIXED_FID = "b222dc0d-1910-427d-b25e-291a8570e556";
+
+const prompt: GenerateRequest = {
+  model: "qwen3.7-plus",
+  messages: [{ role: "user", content: "Привет" }],
+  temperature: 0.4,
+  topK: 40,
+};
+
+function fixtureText(name: string): string {
+  return readFileSync(join(REPO_ROOT, "test", "fixtures", "providers", name), "utf8");
+}
+
 function fixture(name: string): unknown {
-  const path = join(REPO_ROOT, "test", "fixtures", "providers", name);
-  return JSON.parse(readFileSync(path, "utf8")) as unknown;
+  return JSON.parse(fixtureText(name)) as unknown;
+}
+
+function sseFixture(name: string): string[] {
+  return fixtureText(name)
+    .split("\n\n")
+    .filter((frame) => frame.trim().length > 0)
+    .map((frame) => `${frame}\n\n`);
+}
+
+function qwenTransport(stream: string[], delayMs = 0): FakeTransport {
+  const transport = createFakeTransport(QWEN_BASE_URL);
+  transport.reply(QWEN_CHATS_NEW_PATH, { body: fixture("qwenChatCreated.json") });
+  transport.reply(QWEN_COMPLETIONS_PATH, { chunks: stream, delayMs });
+  return transport;
+}
+
+function qwenAdapter(transport: FakeTransport, extra: Partial<AccountAdapterOptions> = {}) {
+  return new QwenWebAdapter({
+    transport,
+    clock: () => FIXED_NOW,
+    newId: () => FIXED_FID,
+    ...extra,
+  });
+}
+
+async function drain(deltas: AsyncIterable<TextDelta>): Promise<TextDelta[]> {
+  const collected: TextDelta[] = [];
+  for await (const delta of deltas) collected.push(delta);
+  return collected;
+}
+
+function eventStream(): { events: HostEvent[]; stream: StreamHandle } {
+  const events: HostEvent[] = [];
+  const bus = createEventBus({
+    senders: () => [
+      {
+        isDestroyed: () => false,
+        send: (_channel, payload) => {
+          events.push(payload as HostEvent);
+        },
+      },
+    ],
+  });
+  return { events, stream: bus.openStream() };
 }
 
 function recordingLogger(): { entries: LogEntry[]; logger: Logger } {
@@ -172,7 +236,6 @@ test("the deepseek family serves a curated list because the vendor exposes no en
 test("both account families declare their honoured parameters honestly", () => {
   for (const capabilities of [QWEN_WEB_CAPABILITIES, DEEPSEEK_WEB_CAPABILITIES]) {
     assert.deepEqual(capabilities.authModes, ["account"]);
-    assert.equal(capabilities.streaming, true);
     assert.equal(capabilities.embedding, false);
     assert.equal(capabilities.image, false);
     assert.deepEqual(capabilities.honours, {
@@ -182,6 +245,8 @@ test("both account families declare their honoured parameters honestly", () => {
       maxOutputTokens: false,
     });
   }
+  assert.equal(QWEN_WEB_CAPABILITIES.streaming, true);
+  assert.equal(DEEPSEEK_WEB_CAPABILITIES.streaming, false);
   for (const family of ["qwen-web", "deepseek-web"] as const) {
     const driver = adapterEntry(family).build({ transport: createFakeTransport() });
     assert.equal(driver.embedding, null);
@@ -189,26 +254,207 @@ test("both account families declare their honoured parameters honestly", () => {
   }
 });
 
-test("generation over an account session fails with the documented message", async () => {
+test("deepseek generation stays unimplemented until its wire format is recorded", async () => {
   const options: AccountAdapterOptions = { transport: createFakeTransport() };
-  for (const adapter of [new QwenWebAdapter(options), new DeepSeekWebAdapter(options)]) {
-    const family = adapter.capabilities().family;
-    await assert.rejects(
-      () => adapter.generate(),
-      (error: unknown) =>
-        isAppError(error) &&
-        error.code === AppErrorCode.UNKNOWN &&
-        error.message === ACCOUNT_GENERATION_PENDING &&
-        error.details?.family === family,
-    );
-    await assert.rejects(
-      async () => {
-        for await (const delta of adapter.stream()) void delta;
-      },
-      (error: unknown) =>
-        isAppError(error) &&
-        error.code === AppErrorCode.UNKNOWN &&
-        error.message === ACCOUNT_GENERATION_PENDING,
-    );
+  const adapter = new DeepSeekWebAdapter(options);
+  const rejected = (error: unknown): boolean =>
+    isAppError(error) &&
+    error.code === AppErrorCode.UNKNOWN &&
+    error.message === ACCOUNT_GENERATION_PENDING &&
+    error.details?.family === "deepseek-web" &&
+    error.details?.model === "deepseek-chat";
+
+  await assert.rejects(() => adapter.generate({ ...prompt, model: "deepseek-chat" }), rejected);
+  await assert.rejects(
+    () => drain(adapter.stream({ ...prompt, model: "deepseek-chat" })),
+    rejected,
+  );
+  assert.equal(DEEPSEEK_WEB_CAPABILITIES.streaming, false);
+});
+
+test("the qwen family opens a chat and streams reasoning and answer as distinct deltas", async () => {
+  const transport = qwenTransport(sseFixture("qwenStream.sse"));
+  const deltas = await drain(qwenAdapter(transport).stream(prompt, signal()));
+
+  assert.deepEqual(
+    deltas.map((delta) => delta.kind),
+    ["reasoning", "reasoning", "text", "text", "text"],
+  );
+  assert.deepEqual(
+    deltas.filter((delta) => delta.kind === "text").map((delta) => delta.text),
+    ["Привет", ", мир", "!"],
+  );
+  assert.deepEqual(
+    deltas.filter((delta) => delta.kind === "reasoning").map((delta) => delta.text),
+    [
+      "Пользователь здоровается.\nОтвечу коротким приветствием.",
+      "Достаточно одного предложения без лишних деталей.",
+    ],
+  );
+
+  const [create, completion] = transport.calls;
+  assert.equal(create?.method, "POST");
+  assert.equal(create?.url, `${QWEN_BASE_URL}${QWEN_CHATS_NEW_PATH}`);
+  assert.deepEqual(create?.body, {
+    chatId: "",
+    chat_mode: "local",
+    chat_type: "t2t",
+    models: ["qwen3.7-plus"],
+    project_id: "",
+    timestamp: FIXED_NOW,
+  });
+  assert.equal(completion?.streamed, true);
+  assert.equal(completion?.url, `${QWEN_BASE_URL}${QWEN_COMPLETIONS_PATH}?chat_id=${QWEN_CHAT_ID}`);
+
+  const body = completion?.body as Record<string, unknown>;
+  assert.equal(body.chat_id, QWEN_CHAT_ID);
+  assert.equal(body.chatId, QWEN_CHAT_ID);
+  assert.equal(body.model, "qwen3.7-plus");
+  assert.equal(body.stream, true);
+  assert.equal(body.incremental_output, true);
+  assert.equal(body.version, "2.1");
+  assert.equal(body.parentId, null);
+  assert.equal(body.parent_id, null);
+  assert.equal(body.timestamp, Math.floor(FIXED_NOW / 1000));
+
+  const [message] = body.messages as Record<string, unknown>[];
+  assert.equal(message?.fid, FIXED_FID);
+  assert.equal(message?.role, "user");
+  assert.equal(message?.content, "Привет");
+  assert.equal(message?.parent_id, null);
+  assert.deepEqual(message?.models, ["qwen3.7-plus"]);
+  assert.equal(QWEN_GENERATION_OBSERVATION.observedAt, "2026-09-10");
+});
+
+test("qwen generate collects the answer, the reasoning and the vendor usage", async () => {
+  const transport = qwenTransport(sseFixture("qwenStream.sse"));
+  const result = await qwenAdapter(transport).generate(prompt, signal());
+
+  assert.equal(result.model, "qwen3.7-plus");
+  assert.equal(result.text, "Привет, мир!");
+  assert.equal(
+    result.reasoning,
+    "Пользователь здоровается.\nОтвечу коротким приветствием.Достаточно одного предложения без лишних деталей.",
+  );
+  assert.equal(result.finishReason, "stop");
+  assert.deepEqual(result.usage, { promptTokens: 621, completionTokens: 186, totalTokens: 807 });
+});
+
+test("qwen deltas reach the event bus with reasoning kept apart from the answer", async () => {
+  const transport = qwenTransport(sseFixture("qwenStream.sse"));
+  const { events, stream } = eventStream();
+
+  const result = await streamToEvents(stream, qwenAdapter(transport).stream(prompt, signal()));
+
+  assert.deepEqual(result.outcome, { status: "ok" });
+  assert.equal(result.text, "Привет, мир!");
+  assert.equal(result.reasoning.length > 0, true);
+  const tokens = events.flatMap((event) => (event.type === "token" ? [event] : []));
+  assert.deepEqual(
+    tokens.filter((event) => event.kind === undefined).map((event) => event.delta),
+    ["Привет", ", мир", "!"],
+  );
+  assert.equal(tokens.filter((event) => event.kind === "reasoning").length, 2);
+  assert.equal(events.at(-1)?.type, "end");
+});
+
+test("aborting a qwen stream stops emission and ends the run as cancelled", async () => {
+  const transport = qwenTransport(sseFixture("qwenStream.sse"), 5);
+  const controller = new AbortController();
+  const { events, stream } = eventStream();
+  const pump = streamToEvents(stream, qwenAdapter(transport).stream(prompt, controller.signal));
+
+  setTimeout(() => controller.abort(), 12);
+  const result = await pump;
+
+  assert.equal(result.outcome.status, "cancelled");
+  assert.equal(result.outcome.code, AppErrorCode.RUN_CANCELLED);
+  assert.equal(transport.aborts > 0, true);
+  assert.equal(events.at(-1)?.type, "end");
+});
+
+test("a session that expires mid stream keeps the partial text and asks for a re-link", async () => {
+  const transport = qwenTransport(sseFixture("qwenStreamExpired.sse"));
+  const seen: AppError[] = [];
+  const { stream } = eventStream();
+
+  const result = await streamToEvents(
+    stream,
+    qwenAdapter(transport, { onSessionExpired: (error) => seen.push(error) }).stream(
+      prompt,
+      signal(),
+    ),
+  );
+
+  assert.equal(result.text, "Прив");
+  assert.equal(result.outcome.status, "failed");
+  assert.equal(result.outcome.code, AppErrorCode.PROVIDER_SESSION_EXPIRED);
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0]?.details?.status, 401);
+});
+
+test("a truncated qwen stream is an error rather than a short answer", async () => {
+  const transport = qwenTransport(sseFixture("qwenStreamTruncated.sse"));
+  const { stream } = eventStream();
+
+  const result = await streamToEvents(stream, qwenAdapter(transport).stream(prompt, signal()));
+
+  assert.equal(result.text, "Привет, мир");
+  assert.equal(result.outcome.status, "failed");
+  assert.equal(result.outcome.code, AppErrorCode.PROVIDER_UNREACHABLE);
+});
+
+test("qwen generation logs dropped parameters and never a request or response body", async () => {
+  const transport = qwenTransport(sseFixture("qwenStream.sse"));
+  const { entries, logger } = recordingLogger();
+
+  await drain(qwenAdapter(transport, { logger }).stream(prompt, signal()));
+
+  assert.deepEqual(entries, [
+    {
+      level: "debug",
+      scope: "ai",
+      message: "Dropped parameters the adapter family does not honour",
+      fields: { family: "qwen-web", dropped: ["temperature", "topK"] },
+    },
+  ]);
+  const logged = JSON.stringify(entries);
+  for (const secret of ["Привет", QWEN_CHAT_ID, FIXED_FID]) {
+    assert.equal(logged.includes(secret), false);
   }
+});
+
+test("a malformed chat-create reply fails before any completion request is made", async () => {
+  const transport = createFakeTransport(QWEN_BASE_URL);
+  transport.reply(QWEN_CHATS_NEW_PATH, { body: { success: true, data: { id: "" } } });
+  const { entries, logger } = recordingLogger();
+
+  await assert.rejects(
+    () => drain(qwenAdapter(transport, { logger }).stream(prompt, signal())),
+    (error: unknown) =>
+      isAppError(error) &&
+      error.code === AppErrorCode.UNKNOWN &&
+      error.details?.endpoint === QWEN_CHATS_NEW_PATH,
+  );
+  assert.equal(transport.calls.length, 1);
+  assert.equal(
+    entries.some((entry) => JSON.stringify(entry).includes("Привет")),
+    false,
+  );
+});
+
+test("the flattened prompt keeps roles when a turn carries history or a system message", () => {
+  assert.equal(flattenPrompt(prompt), "Привет");
+  assert.equal(
+    flattenPrompt({
+      model: "qwen3.7-plus",
+      system: "Отвечай кратко",
+      messages: [
+        { role: "user", content: "Привет" },
+        { role: "assistant", content: "Здравствуйте" },
+        { role: "user", content: "Как дела?" },
+      ],
+    }),
+    "System: Отвечай кратко\n\nUser: Привет\n\nAssistant: Здравствуйте\n\nUser: Как дела?",
+  );
 });

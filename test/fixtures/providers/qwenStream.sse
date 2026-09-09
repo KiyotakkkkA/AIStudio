@@ -1,0 +1,16 @@
+data: {"response.created": {"chat_id": "1a77c526-b841-4fef-805c-8096a2b5e4c3", "parent_id": "ca8ef2b6-93c6-43b6-bc5a-0b96e4fab5ef", "response_id": "3112202d-2c44-4b3f-8fc8-783e8b17dbc0", "response_index": "0"}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "thinking_summary", "status": "typing", "extra": {"summary_title": {"content": ["Разбираю приветствие"]}, "summary_thought": {"content": ["Пользователь здоровается.\nОтвечу коротким приветствием."]}}}}], "response_id": "3112202d-2c44-4b3f-8fc8-783e8b17dbc0", "timestamp": 1788993907, "usage": {"input_tokens": 621, "output_tokens": 53, "characters": 0, "total_tokens": 674}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "thinking_summary", "status": "typing", "extra": {"summary_title": {"content": ["Разбираю приветствие", "Готовлю короткий ответ"]}, "summary_thought": {"content": ["Пользователь здоровается.\nОтвечу коротким приветствием.", "Достаточно одного предложения без лишних деталей."]}}}}], "response_id": "3112202d-2c44-4b3f-8fc8-783e8b17dbc0", "timestamp": 1788993907, "usage": {"input_tokens": 621, "output_tokens": 151, "characters": 0, "total_tokens": 772}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "thinking_summary", "status": "finished"}}], "response_id": "3112202d-2c44-4b3f-8fc8-783e8b17dbc0", "timestamp": 1788993907}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "Привет", "phase": "answer", "status": "typing"}}], "response_id": "3112202d-2c44-4b3f-8fc8-783e8b17dbc0", "usage": {"input_tokens": 621, "output_tokens": 181, "characters": 0, "total_tokens": 802}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": ", мир", "phase": "answer", "status": "typing"}}], "response_id": "3112202d-2c44-4b3f-8fc8-783e8b17dbc0", "usage": {"input_tokens": 621, "output_tokens": 183, "characters": 0, "total_tokens": 804}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "!", "phase": "answer", "status": "typing"}}], "response_id": "3112202d-2c44-4b3f-8fc8-783e8b17dbc0", "usage": {"input_tokens": 621, "output_tokens": 186, "characters": 0, "total_tokens": 807}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "answer", "status": "finished"}}], "response_id": "3112202d-2c44-4b3f-8fc8-783e8b17dbc0", "usage": {"input_tokens": 621, "output_tokens": 186, "characters": 0, "total_tokens": 807}}
+

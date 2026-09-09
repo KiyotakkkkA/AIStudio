@@ -21,6 +21,10 @@ export function isAccountFamily(family: AdapterFamily): family is AccountFamily 
   return (ACCOUNT_FAMILIES as readonly string[]).includes(family);
 }
 
+export const DELTA_KINDS = ["text", "reasoning"] as const;
+export const DeltaKind = z.enum(DELTA_KINDS);
+export type DeltaKind = z.infer<typeof DeltaKind>;
+
 export const ACCOUNT_STATUSES = ["linked", "needs-relink", "revoked"] as const;
 export const AccountStatus = z.enum(ACCOUNT_STATUSES);
 export type AccountStatus = z.infer<typeof AccountStatus>;

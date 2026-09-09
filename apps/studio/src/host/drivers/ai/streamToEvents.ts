@@ -5,6 +5,7 @@ import type { TextDelta } from "./ports.ts";
 
 export interface StreamToEventsResult {
   readonly text: string;
+  readonly reasoning: string;
   readonly outcome: RunOutcomeDto;
 }
 
@@ -13,10 +14,16 @@ export async function streamToEvents(
   deltas: AsyncIterable<TextDelta>,
 ): Promise<StreamToEventsResult> {
   let text = "";
+  let reasoning = "";
   let outcome: RunOutcomeDto = { status: "ok" };
   try {
     for await (const delta of deltas) {
       if (delta.text.length === 0) continue;
+      if (delta.kind === "reasoning") {
+        reasoning += delta.text;
+        stream.emit({ type: "token", delta: delta.text, kind: "reasoning" });
+        continue;
+      }
       text += delta.text;
       stream.emit({ type: "token", delta: delta.text });
     }
@@ -24,7 +31,7 @@ export async function streamToEvents(
     outcome = toOutcome(error);
   }
   stream.end(outcome);
-  return { text, outcome };
+  return { text, reasoning, outcome };
 }
 
 function toOutcome(error: unknown): RunOutcomeDto {

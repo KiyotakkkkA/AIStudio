@@ -1,3 +1,4 @@
+import type { DeltaKind } from "@zvs/shared";
 import type { ModelCapability } from "../../data/schema/index.ts";
 import type { AdapterCapabilities } from "./AdapterCapabilities.ts";
 
@@ -34,12 +35,14 @@ export interface TokenUsage {
 export interface GenerateResult {
   readonly model: string;
   readonly text: string;
+  readonly reasoning: string | null;
   readonly finishReason: FinishReason;
   readonly usage: TokenUsage | null;
 }
 
 export interface TextDelta {
   readonly text: string;
+  readonly kind: DeltaKind;
 }
 
 export interface DiscoveredModel {

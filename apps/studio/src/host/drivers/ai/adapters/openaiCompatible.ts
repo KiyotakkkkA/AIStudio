@@ -29,9 +29,15 @@ export const OPENAI_COMPATIBLE_CAPABILITIES: AdapterCapabilities = {
   honours: { temperature: true, topK: false, topP: true, maxOutputTokens: true },
 };
 
+interface ChatContent {
+  content?: unknown;
+  reasoning_content?: unknown;
+  reasoning?: unknown;
+}
+
 interface ChatChoice {
-  message?: { content?: unknown };
-  delta?: { content?: unknown };
+  message?: ChatContent;
+  delta?: ChatContent;
   finish_reason?: unknown;
 }
 
@@ -94,6 +100,7 @@ export class OpenAiCompatibleAdapter implements TextGenerationDriver, EmbeddingD
     return {
       model: typeof payload.model === "string" ? payload.model : request.model,
       text: typeof choice?.message?.content === "string" ? choice.message.content : "",
+      reasoning: reasoningOf(choice?.message),
       finishReason: finishReason(choice?.finish_reason),
       usage: usage(payload.usage),
     };
@@ -107,9 +114,13 @@ export class OpenAiCompatibleAdapter implements TextGenerationDriver, EmbeddingD
         try {
           for await (const payload of sseData(transport.stream(spec, signal))) {
             if (signal.aborted) throw cancelled();
-            const frame = tryDecode<ChatResponse>(payload);
-            const content = frame?.choices?.[0]?.delta?.content;
-            if (typeof content === "string" && content.length > 0) yield { text: content };
+            const delta = tryDecode<ChatResponse>(payload)?.choices?.[0]?.delta;
+            const reasoning = reasoningOf(delta);
+            if (reasoning !== null) yield { text: reasoning, kind: "reasoning" };
+            const content = delta?.content;
+            if (typeof content === "string" && content.length > 0) {
+              yield { text: content, kind: "text" };
+            }
           }
         } catch (error: unknown) {
           throw isCancellation(error) ? cancelled() : toAppError(error);
@@ -256,6 +267,11 @@ function finishReason(raw: unknown): FinishReason {
   if (raw === "length" || raw === "max_tokens") return "length";
   if (raw === "cancelled" || raw === "aborted") return "cancelled";
   return "unknown";
+}
+
+function reasoningOf(content: ChatContent | undefined): string | null {
+  const raw = content?.reasoning_content ?? content?.reasoning;
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
 }
 
 function usage(raw: Record<string, unknown> | undefined): TokenUsage | null {

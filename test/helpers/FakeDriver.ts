@@ -105,6 +105,7 @@ export function createFakeDriver(initial: FakeDriverScript = {}): FakeDriver {
       return {
         model: request.model,
         text: script.text ?? deltas().join(""),
+        reasoning: null,
         finishReason: "stop",
         usage: null,
       };
@@ -121,7 +122,7 @@ export function createFakeDriver(initial: FakeDriverScript = {}): FakeDriver {
             const chunk = chunks[index];
             if (chunk === undefined) continue;
             emitted += 1;
-            yield { text: chunk };
+            yield { text: chunk, kind: "text" };
           }
           if (script.failAfter === chunks.length && script.failWith !== undefined) {
             throw script.failWith;
