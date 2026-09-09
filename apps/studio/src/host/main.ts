@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage } from "electron";
 import { contract } from "@zvs/shared";
 import { createIpcServer } from "@zvs/ipc";
 import type { IpcServer } from "@zvs/ipc";
@@ -19,6 +19,8 @@ import { captureWindowState, readWindowState, WINDOW_STATE_KEY } from "./platfor
 import type { DatabaseClient } from "./data/client";
 import { prepareDatabase } from "./data/migrate";
 import { isMigrationFailedError } from "./data/MigrationFailedError";
+import { CryptoService } from "./services/CryptoService";
+import { SecretService } from "./services/SecretService";
 import { SettingService } from "./services/SettingService";
 
 app.setName("ZVS AI Studio");
@@ -28,6 +30,7 @@ let ipcServer: IpcServer | undefined;
 let eventBus: EventBus | undefined;
 let database: DatabaseClient | undefined;
 let settings: SettingService | undefined;
+let secrets: SecretService | undefined;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -86,6 +89,12 @@ if (!app.requestSingleInstanceLock()) {
       }
 
       settings = new SettingService({ data: database });
+      const crypto = new CryptoService(safeStorage);
+      secrets = new SecretService({ data: database, crypto, logger });
+      logger.log("info", "host", "Secret store ready", {
+        encryption: crypto.isAvailable(),
+        count: secrets.list().length,
+      });
       const recording = recordingEnabled();
       eventBus = createEventBus({
         logger,

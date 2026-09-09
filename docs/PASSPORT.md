@@ -498,7 +498,12 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
 1. Router is react-router with hash history.
 2. Packaging via electron-builder; no signing or auto-update in v1.
 3. Windows is the only verified target for v1.
-4. Secrets encrypted with `safeStorage`, ciphertext in SQLite (not a separate vault file).
+4. **Confirmed (TASK_010):** secrets encrypted with `safeStorage`, ciphertext in SQLite (not
+   a separate vault file). Values are therefore bound to the OS user account: copy the
+   database to another machine and the metadata survives while the values do not. No
+   passphrase-derived key, so no passphrase prompt at launch. Stored values are also
+   **write-only** — there is no reveal channel and no IPC path that returns a plaintext;
+   a value can be replaced but never read back into the renderer.
 5. Single window; no multi-window or tray-only mode in v1.
 6. **Confirmed (TASK_003):** all app labels and user-facing messages are Russian from the
    start, without a `t()` shim. Developer communication and code identifiers remain English.
