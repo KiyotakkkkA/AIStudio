@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -109,6 +109,18 @@ test("the rail routes between pages and each page renders its own header", async
     await page.locator("aside").getByText(item, { exact: true }).click();
     await expect(page.locator("h1")).toHaveText(header);
   }
+});
+
+test("startup logs the provider migration exactly once", () => {
+  const lines = readFileSync(join(userData.path, "logs", "studio.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as { message: string; migration?: string });
+  expect(
+    lines.filter(
+      (line) => line.message === "Applied migration" && line.migration === "0002_provider_model",
+    ),
+  ).toHaveLength(1);
 });
 
 test("system.ping round-trips from the renderer to the host", async () => {

@@ -40,7 +40,7 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
       backupsDir: database.backupsDir,
     };
     const first = migrate(options);
-    assert.deepEqual(first.applied, ["0000_setting", "0001_secret"]);
+    assert.deepEqual(first.applied, ["0000_setting", "0001_secret", "0002_provider_model"]);
     const tables = database.client.db.$client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'")
       .all();
@@ -70,9 +70,11 @@ test("a backup is written before migrating and only the last three are kept", ()
         now: () => clock.advance(60_000),
       });
       try {
-        assert.deepEqual(report.applied, ["0000_setting", "0001_secret"]);
+        assert.deepEqual(report.applied, ["0000_setting", "0001_secret", "0002_provider_model"]);
         if (run === 0) assert.equal(report.backup, undefined);
         else assert.equal(typeof report.backup, "string");
+        client.db.$client.exec("DROP TABLE model");
+        client.db.$client.exec("DROP TABLE provider");
         client.db.$client.exec("DROP TABLE secret_usage");
         client.db.$client.exec("DROP TABLE secret");
         client.db.$client.exec("DROP TABLE setting");
@@ -179,7 +181,11 @@ test("prepareDatabase opens and migrates in one step", () => {
       backupsDir: join(directory, "backups"),
     });
     try {
-      assert.deepEqual(prepared.report.applied, ["0000_setting", "0001_secret"]);
+      assert.deepEqual(prepared.report.applied, [
+        "0000_setting",
+        "0001_secret",
+        "0002_provider_model",
+      ]);
       assert.equal(prepared.client.repositories.settings.all().length, 0);
     } finally {
       prepared.client.close();
