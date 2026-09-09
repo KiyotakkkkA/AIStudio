@@ -12,6 +12,7 @@
   --color-main-500: #6e747e;
   --color-main-600: #3a3e46;
   --color-main-700: #2a2d33;
+  --color-main-750: #1c2027;
   --color-main-800: #191b20;
   --color-main-900: #0e0f12;
 
@@ -23,6 +24,7 @@
   --color-warn: #d6b47f;
   --color-err: #d68f85;
   --color-error: #d68f85;
+  --color-err-border: #4a3134;
 
   --color-success-light: #a7cdb6;
   --color-success-medium: #7fb894;

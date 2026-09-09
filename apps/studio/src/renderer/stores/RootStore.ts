@@ -2,6 +2,7 @@ import { makeAutoObservable } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import type { Contract } from "@zvs/shared";
 import type { EventRouter } from "../app/EventRouter";
+import { SecretStore } from "../features/secrets/SecretStore";
 import { UiStore } from "./UiStore";
 
 export interface RootStoreEnvironment {
@@ -11,12 +12,14 @@ export interface RootStoreEnvironment {
 
 export class RootStore {
   readonly ui: UiStore;
+  readonly secrets: SecretStore;
 
   constructor(private readonly environment: RootStoreEnvironment) {
     this.ui = new UiStore(environment.ipc);
+    this.secrets = new SecretStore(environment.ipc);
     makeAutoObservable<RootStore, "environment">(
       this,
-      { environment: false, ui: false },
+      { environment: false, ui: false, secrets: false },
       { autoBind: true },
     );
   }
