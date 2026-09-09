@@ -153,6 +153,8 @@ export function mapQwenModels(payload: unknown): DiscoveredModel[] | null {
 }
 
 export class QwenWebAdapter extends AccountFamilyAdapter {
+  #models: DiscoveredModel[] | undefined;
+
   capabilities(): AdapterCapabilities {
     return QWEN_WEB_CAPABILITIES;
   }
@@ -161,6 +163,7 @@ export class QwenWebAdapter extends AccountFamilyAdapter {
     const response = await this.request({ method: "GET", path: QWEN_MODELS_PATH }, signal);
     const models = mapQwenModels(this.decode(response.text, QWEN_MODELS_PATH));
     if (models === null) throw malformedPayload("qwen-web", QWEN_MODELS_PATH, this.logger);
+    this.#models = models;
     return models;
   }
 
@@ -191,11 +194,16 @@ export class QwenWebAdapter extends AccountFamilyAdapter {
     summary?: TurnSummary,
   ): AsyncIterable<TextDelta> {
     this.dropUnsupported(request);
+    const models = this.#models ?? (await this.listModels(signal));
+    const thinking =
+      models
+        .find((model) => model.externalId === request.model)
+        ?.capabilities.includes("reasoning") ?? false;
     const chatId = await this.#createChat(request.model, signal);
     const emitted: string[] = [];
     let finished = false;
 
-    for await (const payload of this.frames(this.#turn(chatId, request), signal)) {
+    for await (const payload of this.frames(this.#turn(chatId, request, thinking), signal)) {
       const parsed = QwenStreamFrame.safeParse(parse(payload));
       if (!parsed.success) continue;
       const frame = parsed.data;
@@ -247,7 +255,7 @@ export class QwenWebAdapter extends AccountFamilyAdapter {
     return chatId;
   }
 
-  #turn(chatId: string, request: GenerateRequest): RequestSpec {
+  #turn(chatId: string, request: GenerateRequest, thinking: boolean): RequestSpec {
     const timestamp = Math.floor(this.clock() / 1000);
     const message = {
       id: null,
@@ -256,6 +264,7 @@ export class QwenWebAdapter extends AccountFamilyAdapter {
       parent_id: null,
       childrenIds: [],
       role: "user",
+      // Each generation is stateless: history is role-labelled text in a fresh vendor chat.
       content: flattenPrompt(request),
       user_action: "chat",
       files: [],
@@ -265,9 +274,9 @@ export class QwenWebAdapter extends AccountFamilyAdapter {
       chat_type: QWEN_CHAT_TYPE,
       sub_chat_type: QWEN_CHAT_TYPE,
       feature_config: {
-        thinking_enabled: true,
+        thinking_enabled: thinking,
         thinking_format: "summary",
-        thinking_mode: "Thinking",
+        thinking_mode: thinking ? "Thinking" : "Fast",
         auto_thinking: false,
         auto_search: false,
         output_schema: "phase",
@@ -299,7 +308,6 @@ export class QwenWebAdapter extends AccountFamilyAdapter {
 }
 
 function vendorFailure(frame: QwenFrame): AppError | null {
-  if (frame.success !== false && frame.error == null) return null;
   const nested = typeof frame.error === "object" && frame.error !== null ? frame.error : null;
   const code = nested?.code ?? frame.code ?? null;
   const status = nested?.status ?? frame.status ?? null;
@@ -310,11 +318,14 @@ function vendorFailure(frame: QwenFrame): AppError | null {
     ...(status === null ? {} : { status }),
   };
   if (status === 401 || status === 403 || isAuthCode(code)) return sessionExpired(details);
+  if (frame.success !== false && frame.error == null && (status === null || status < 400)) {
+    return null;
+  }
   return new AppError(AppErrorCode.UNKNOWN, "Вендор прервал генерацию", { details });
 }
 
 function isAuthCode(code: string | number | null): boolean {
-  if (code === 401 || code === 403) return true;
+  if (code === 401 || code === 403 || code === "401" || code === "403") return true;
   return typeof code === "string" && /unauth|forbidden|token|login|expire|session/i.test(code);
 }
 
@@ -363,11 +374,9 @@ function toDiscoveredModel(externalId: string, entry: QwenEntry): DiscoveredMode
 function modelCapabilities(entry: QwenEntry): ModelCapability[] {
   const meta = entry.info?.meta;
   const capabilities: ModelCapability[] = ["streaming"];
-  const modality = meta?.modality ?? [];
-  if (enabled(meta?.capabilities?.vision, meta?.abilities?.vision) || modality.includes("image")) {
-    capabilities.push("vision");
-  }
-  if (enabled(meta?.capabilities?.thinking, meta?.abilities?.thinking)) {
+  // Advertise only implemented request paths. Files/media are not sent by this adapter.
+  // Explicit capabilities override legacy abilities, including false/zero.
+  if (enabled(meta?.capabilities?.thinking ?? meta?.abilities?.thinking)) {
     capabilities.push("reasoning");
   }
   return capabilities;

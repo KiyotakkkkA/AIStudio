@@ -24,6 +24,7 @@ import {
   QWEN_MODELS_OBSERVATION,
   QWEN_MODELS_PATH,
   QwenWebAdapter,
+  mapQwenModels,
   QWEN_WEB_CAPABILITIES,
 } from "../src/host/drivers/ai/adapters/qwenWeb.ts";
 import { adapterEntry } from "../src/host/drivers/ai/adapters/index.ts";
@@ -71,6 +72,7 @@ function sseFixture(name: string): string[] {
 
 function qwenTransport(stream: string[], delayMs = 0): FakeTransport {
   const transport = createFakeTransport(QWEN_BASE_URL);
+  transport.reply(QWEN_MODELS_PATH, { body: fixture("qwenModels.json") });
   transport.reply(QWEN_CHATS_NEW_PATH, { body: fixture("qwenChatCreated.json") });
   transport.reply(QWEN_COMPLETIONS_PATH, { chunks: stream, delayMs });
   return transport;
@@ -140,7 +142,7 @@ test("the qwen family lists models from the recorded payload", async () => {
       contextWindow: 131072,
       maxOutput: 32768,
       sizeBytes: null,
-      capabilities: ["streaming", "vision", "reasoning"],
+      capabilities: ["streaming", "reasoning"],
     },
     {
       externalId: "qwen3.5-omni-plus",
@@ -149,7 +151,7 @@ test("the qwen family lists models from the recorded payload", async () => {
       contextWindow: 262144,
       maxOutput: 65536,
       sizeBytes: null,
-      capabilities: ["streaming", "vision", "reasoning"],
+      capabilities: ["streaming"],
     },
     {
       externalId: "qwen3.5-plus",
@@ -292,7 +294,7 @@ test("the qwen family opens a chat and streams reasoning and answer as distinct 
     ],
   );
 
-  const [create, completion] = transport.calls;
+  const [, create, completion] = transport.calls;
   assert.equal(create?.method, "POST");
   assert.equal(create?.url, `${QWEN_BASE_URL}${QWEN_CHATS_NEW_PATH}`);
   assert.deepEqual(create?.body, {
@@ -338,6 +340,95 @@ test("qwen generate collects the answer, the reasoning and the vendor usage", as
   );
   assert.equal(result.finishReason, "stop");
   assert.deepEqual(result.usage, { promptTokens: 621, completionTokens: 186, totalTokens: 807 });
+});
+
+test("qwen selects thinking from discovery and reuses the model list", async () => {
+  const transport = qwenTransport(sseFixture("qwenStream.sse"));
+  const adapter = qwenAdapter(transport);
+  await adapter.listModels(signal());
+  for (const [model, thinking] of [
+    ["qwen3.7-plus", true],
+    ["qwen3.5-omni-plus", false],
+    ["qwen3.5-plus", false],
+    ["unlisted-model", false],
+  ] as const) {
+    await adapter.generate({ ...prompt, model }, signal());
+    const body = transport.calls.at(-1)?.body as {
+      messages: { feature_config: { thinking_enabled: boolean; thinking_mode: string } }[];
+    };
+    assert.equal(body.messages[0]?.feature_config.thinking_enabled, thinking);
+    assert.equal(body.messages[0]?.feature_config.thinking_mode, thinking ? "Thinking" : "Fast");
+  }
+  assert.equal(transport.calls.filter((call) => call.url === QWEN_MODELS_URL).length, 1);
+});
+
+test("qwen uses legacy thinking only when the explicit capability is absent", () => {
+  for (const [capability, ability, expected] of [
+    [false, 2, false],
+    [0, 2, false],
+    [true, 0, true],
+    [undefined, 2, true],
+    [null, 1, true],
+    [undefined, undefined, false],
+  ] as const) {
+    const models = mapQwenModels({
+      data: [
+        {
+          id: "model",
+          info: {
+            meta: {
+              capabilities: { thinking: capability, vision: true },
+              abilities: { thinking: ability },
+              modality: ["image", "audio", "video"],
+            },
+          },
+        },
+      ],
+    });
+    assert.deepEqual(
+      models?.[0]?.capabilities,
+      expected ? ["streaming", "reasoning"] : ["streaming"],
+    );
+  }
+});
+
+for (const status of [401, 403]) {
+  test(`qwen standalone SSE status ${status} preserves partial text and expires the session once`, async () => {
+    const transport = qwenTransport(sseFixture(`qwenStreamStatus${status}.sse`));
+    const seen: AppError[] = [];
+    const { stream } = eventStream();
+    const result = await streamToEvents(
+      stream,
+      qwenAdapter(transport, {
+        onSessionExpired: (error) => seen.push(error),
+      }).stream(prompt, signal()),
+    );
+    assert.equal(result.text, "Partial");
+    assert.equal(result.outcome.code, AppErrorCode.PROVIDER_SESSION_EXPIRED);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0]?.details?.status, status);
+  });
+}
+
+test("qwen recognises standalone authentication codes and numeric strings", async () => {
+  for (const code of [401, 403, "401", "403", "session_expired"]) {
+    const transport = qwenTransport([`data: ${JSON.stringify({ code })}\n\n`]);
+    await assert.rejects(
+      () => qwenAdapter(transport).generate(prompt, signal()),
+      (error: unknown) => isAppError(error) && error.code === AppErrorCode.PROVIDER_SESSION_EXPIRED,
+    );
+  }
+});
+
+test("qwen allows success status frames but rejects standalone server errors", async () => {
+  const successful = qwenTransport(['data: {"status":200}\n\n', ...sseFixture("qwenStream.sse")]);
+  assert.equal((await qwenAdapter(successful).generate(prompt, signal())).text, "Привет, мир!");
+  const failed = qwenTransport(['data: {"status":500}\n\n']);
+  await assert.rejects(
+    () => qwenAdapter(failed).generate(prompt, signal()),
+    (error: unknown) =>
+      isAppError(error) && error.code === AppErrorCode.UNKNOWN && error.details?.status === 500,
+  );
 });
 
 test("qwen deltas reach the event bus with reasoning kept apart from the answer", async () => {
@@ -426,6 +517,7 @@ test("qwen generation logs dropped parameters and never a request or response bo
 
 test("a malformed chat-create reply fails before any completion request is made", async () => {
   const transport = createFakeTransport(QWEN_BASE_URL);
+  transport.reply(QWEN_MODELS_PATH, { body: fixture("qwenModels.json") });
   transport.reply(QWEN_CHATS_NEW_PATH, { body: { success: true, data: { id: "" } } });
   const { entries, logger } = recordingLogger();
 
@@ -436,7 +528,7 @@ test("a malformed chat-create reply fails before any completion request is made"
       error.code === AppErrorCode.UNKNOWN &&
       error.details?.endpoint === QWEN_CHATS_NEW_PATH,
   );
-  assert.equal(transport.calls.length, 1);
+  assert.equal(transport.calls.length, 2);
   assert.equal(
     entries.some((entry) => JSON.stringify(entry).includes("Привет")),
     false,

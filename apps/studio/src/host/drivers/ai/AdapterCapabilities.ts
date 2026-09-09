@@ -15,6 +15,7 @@ export interface AdapterCapabilities {
   readonly streaming: boolean;
   readonly liveModelList: boolean;
   readonly embedding: boolean;
+  /** Image generation through ImageDriver; not image/vision input. */
   readonly image: boolean;
   readonly honours: Readonly<Record<TunableParameter, boolean>>;
 }

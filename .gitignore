@@ -2,6 +2,7 @@
 tasks/**
 references/**
 design/**
+resolved/
 
 # Tooling and generated output
 node_modules/
