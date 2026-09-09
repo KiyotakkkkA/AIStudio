@@ -6,6 +6,7 @@ import {
   createBrandedId,
   isAppError,
   SECRET_TYPE_KEYS,
+  SECRET_TYPE_REGISTRY,
   SecretId,
   type CreateSecretInput,
 } from "@zvs/shared";
@@ -112,29 +113,24 @@ test("secrets.create rejects an unknown field, an unknown type and a missing cre
   }
 });
 
-test("secrets.create accepts a keyless qdrant cluster because its schema says so", async () => {
+test("secrets.create demands a credential for every type in the registry", async () => {
   const { handlers, dispose } = harness();
   try {
-    const created = await handlers["secrets.create"]({
-      type: "qdrant",
-      name: "Local Qdrant",
-      scope: "personal",
-      fields: { url: "http://127.0.0.1:6333" },
-      tags: [],
-    });
-    assert.equal(created.hint, null);
-    assert.equal(
-      codeOf(() =>
-        handlers["secrets.create"]({
-          type: "qdrant",
-          name: "No URL",
-          scope: "personal",
-          fields: {},
-          tags: [],
-        }),
-      ),
-      AppErrorCode.VALIDATION_FAILED,
-    );
+    for (const schema of SECRET_TYPE_REGISTRY) {
+      assert.equal(
+        codeOf(() =>
+          handlers["secrets.create"]({
+            type: schema.key as CreateSecretInput["type"],
+            name: `Без значения — ${schema.key}`,
+            scope: "personal",
+            fields: {},
+            tags: [],
+          }),
+        ),
+        AppErrorCode.VALIDATION_FAILED,
+        schema.key,
+      );
+    }
   } finally {
     dispose();
   }
@@ -155,7 +151,7 @@ test("secrets.list and secrets.get carry the hint and never a value", async () =
 
     const fetched = await handlers["secrets.get"]({ id: created.id });
     assert.deepEqual(fetched, created);
-    assert.deepEqual(await handlers["secrets.list"]({ type: "qdrant" }), []);
+    assert.deepEqual(await handlers["secrets.list"]({ type: "mistral" }), []);
     assert.equal(
       codeOf(() => handlers["secrets.get"]({ id: MISSING })),
       AppErrorCode.NOT_FOUND,

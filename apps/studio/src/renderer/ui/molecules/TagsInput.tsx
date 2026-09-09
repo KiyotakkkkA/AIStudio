@@ -1,3 +1,4 @@
+import { InputSmall } from "@kiyotakkkka/zvs-uikit-lib";
 import { useState, type KeyboardEvent } from "react";
 import Chip from "../atoms/Chip";
 
@@ -48,14 +49,19 @@ export default function TagsInput({
           {tag}
         </Chip>
       ))}
-      <input
+      <InputSmall
         id={id}
         value={draft}
         placeholder={placeholder}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={onKeyDown}
         onBlur={commit}
-        className="min-w-[80px] flex-1 bg-transparent text-main-100 outline-none placeholder:text-main-500"
+        rounded=""
+        className="min-w-[80px] flex-1"
+        classNames={{
+          input:
+            "h-[22px] border-0 bg-transparent px-0 text-[12.5px] text-main-100 focus-visible:border-0 focus-visible:ring-0",
+        }}
       />
     </div>
   );

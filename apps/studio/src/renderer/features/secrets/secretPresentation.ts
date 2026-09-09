@@ -1,4 +1,4 @@
-import { mdiDatabaseOutline, mdiKeyOutline } from "@mdi/js";
+import { mdiKeyOutline } from "@mdi/js";
 import type { SecretScope, SecretSummaryDto } from "@zvs/shared";
 import type { StatusTone } from "../../ui/atoms/StatusDot";
 
@@ -16,7 +16,6 @@ export const SCOPE_OPTIONS: readonly { value: SecretScope; label: string }[] = [
 
 const TYPE_ICONS: Record<string, string> = {
   "ollama-cloud": mdiKeyOutline,
-  qdrant: mdiDatabaseOutline,
 };
 
 export function typeIcon(type: string): string | undefined {

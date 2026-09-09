@@ -6,7 +6,6 @@ import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import SegmentedControl from "../../ui/atoms/SegmentedControl";
 import SelectInput from "../../ui/atoms/SelectInput";
-import StatusDot from "../../ui/atoms/StatusDot";
 import TextArea from "../../ui/atoms/TextArea";
 import TextInput from "../../ui/atoms/TextInput";
 import Toggle from "../../ui/atoms/Toggle";
@@ -71,14 +70,13 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
             Общее
           </h3>
           <div className="grid grid-cols-2 gap-[14px]">
-            <Field label="Тип секрета" htmlFor="secret-type">
+            <Field label="Тип секрета">
               <SelectInput
-                id="secret-type"
+                label="Тип секрета"
                 value={vm.type}
                 onChange={(value) => {
                   vm.setType(value as SecretTypeKey);
                 }}
-                leading={<StatusDot tone="accent" />}
                 options={vm.types.map((schema) => ({ value: schema.key, label: schema.label }))}
               />
             </Field>
@@ -190,9 +188,9 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
             <Field label="Теги" htmlFor="secret-tags">
               <TagsInput id="secret-tags" tags={vm.tags} onChange={vm.setTags} />
             </Field>
-            <Field label="Напоминание о ротации" htmlFor="secret-rotation">
+            <Field label="Напоминание о ротации">
               <SelectInput
-                id="secret-rotation"
+                label="Напоминание о ротации"
                 value={vm.rotationDays === null ? "" : String(vm.rotationDays)}
                 options={[...ROTATION_OPTIONS]}
                 onChange={(value) => {

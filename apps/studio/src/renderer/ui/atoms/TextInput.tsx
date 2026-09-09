@@ -1,6 +1,7 @@
-import type { InputHTMLAttributes, ReactNode } from "react";
+import { InputSmall, type InputSmallProps } from "@kiyotakkkka/zvs-uikit-lib";
+import type { ReactNode } from "react";
 
-export type TextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "size"> & {
+export type TextInputProps = Omit<InputSmallProps, "className" | "classNames" | "rounded"> & {
   readonly mono?: boolean;
   readonly invalid?: boolean;
   readonly leading?: ReactNode;
@@ -14,20 +15,28 @@ export default function TextInput({
   trailing,
   ...props
 }: TextInputProps) {
+  const input = [
+    "h-[34px] rounded-[6px] bg-main-900 px-[10px] text-[12.5px] text-main-100",
+    invalid
+      ? "border-err focus-visible:border-err"
+      : "border-main-600 focus-visible:border-accent-dark",
+    "focus-visible:ring-0",
+    leading === undefined ? "" : "pl-[32px]",
+    trailing === undefined ? "" : "pr-[34px]",
+    mono ? "font-mono text-[12px]" : "",
+  ].join(" ");
+
   return (
-    <div
-      className={`flex h-[34px] items-center gap-[8px] rounded-[6px] border bg-main-900 px-[10px] text-[12.5px] text-main-100 focus-within:border-accent-dark ${
-        invalid ? "border-err" : "border-main-600"
-      }`}
-    >
-      {leading}
-      <input
-        {...props}
-        className={`min-w-0 flex-1 bg-transparent text-main-100 outline-none placeholder:text-main-500 ${
-          mono ? "font-mono text-[12px]" : ""
-        }`}
-      />
-      {trailing}
+    <div className="relative flex w-full items-center">
+      {leading === undefined ? null : (
+        <span className="pointer-events-none absolute left-[10px] z-10 flex items-center text-main-500">
+          {leading}
+        </span>
+      )}
+      <InputSmall {...props} rounded="" className="w-full" classNames={{ input }} />
+      {trailing === undefined ? null : (
+        <span className="absolute right-[8px] z-10 flex items-center">{trailing}</span>
+      )}
     </div>
   );
 }

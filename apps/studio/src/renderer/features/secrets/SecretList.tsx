@@ -43,7 +43,7 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
         ))}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-[8px] overflow-y-auto pr-[2px]">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-0.5">
         {secrets.loading && secrets.summaries.length === 0 ? (
           <>
             <ListRowSkeleton />
@@ -53,7 +53,7 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
         ) : null}
 
         {secrets.isEmpty ? (
-          <div className="flex flex-1 items-center justify-center rounded-[10px] border border-dashed border-main-600 bg-main-800/40">
+          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-800/40 px-4">
             <EmptyState
               icon={mdiKeyPlus}
               title="Секретов пока нет"
@@ -63,7 +63,7 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
         ) : null}
 
         {!secrets.isEmpty && !secrets.loading && secrets.visible.length === 0 ? (
-          <p className="rounded-[10px] border border-dashed border-main-600 px-[12px] py-[18px] text-center text-[12px] text-main-400">
+          <p className="rounded-card border border-dashed border-main-600 px-3 py-4.5 text-center text-[12px] text-main-400">
             Ничего не найдено по текущему фильтру.
           </p>
         ) : null}

@@ -38,17 +38,17 @@ test("switching the type swaps the credential fields and keeps name and scope", 
     ["baseUrl", "organization", "verifyTls"],
   );
 
-  vm.setType("qdrant");
+  vm.setType("openrouter");
 
   assert.equal(vm.name, "Ollama Cloud — личный");
   assert.equal(vm.scope, "shared");
   assert.deepEqual(
     vm.credentialFields.map((field) => field.key),
-    ["url"],
+    ["baseUrl", "referer"],
   );
   assert.equal(vm.fieldValues.organization, undefined);
-  assert.equal(vm.fieldValues.url, "http://127.0.0.1:6333");
-  assert.equal(vm.schemaChip, "qdrant@1");
+  assert.equal(vm.fieldValues.baseUrl, "https://openrouter.ai/api/v1");
+  assert.equal(vm.schemaChip, "openrouter@1");
 });
 
 test("defaults from the registry prefill a new form", () => {
@@ -61,20 +61,20 @@ test("defaults from the registry prefill a new form", () => {
   assert.equal(vm.dirty, false);
 });
 
-test("client validation agrees with the host schema on a required field", () => {
+test("client validation agrees with the host schema on a malformed field", () => {
   const vm = new SecretFormVm(SECRET_TYPE_REGISTRY);
-  vm.setType("qdrant");
-  vm.setName("Qdrant");
-  vm.setField("url", "");
+  vm.setName("Ollama");
+  vm.setValue("osk_live_secret");
+  vm.setField("baseUrl", "не ссылка");
 
   assert.equal(vm.validate(), false);
-  assert.equal(vm.errorOf("fields.url") !== undefined, true);
+  assert.equal(vm.errorOf("fields.baseUrl") !== undefined, true);
 
-  const schema = findSecretTypeSchema("qdrant");
-  if (schema === undefined) throw new Error("В реестре нет схемы qdrant");
+  const schema = findSecretTypeSchema("ollama-cloud");
+  if (schema === undefined) throw new Error("В реестре нет схемы ollama-cloud");
   assert.equal(buildFieldsSchema(schema).safeParse(vm.fieldsPayload()).success, false);
 
-  vm.setField("url", "http://127.0.0.1:6333");
+  vm.setField("baseUrl", "https://ollama.com/api");
   assert.equal(vm.validate(), true);
   assert.equal(buildFieldsSchema(schema).safeParse(vm.fieldsPayload()).success, true);
 });

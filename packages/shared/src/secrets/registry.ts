@@ -1,14 +1,7 @@
 import { z } from "zod";
 import { SecretTypeSchema } from "./SecretTypeSchema.js";
 
-export const SECRET_TYPE_KEYS = [
-  "ollama-cloud",
-  "openrouter",
-  "anthropic",
-  "mistral",
-  "qdrant",
-  "custom",
-] as const;
+export const SECRET_TYPE_KEYS = ["ollama-cloud", "openrouter", "mistral", "custom"] as const;
 
 export const SecretTypeKey = z.enum(SECRET_TYPE_KEYS);
 export type SecretTypeKey = z.infer<typeof SecretTypeKey>;
@@ -79,34 +72,6 @@ export const SECRET_TYPE_REGISTRY: readonly SecretTypeSchema[] = [
     ],
   },
   {
-    key: "anthropic",
-    version: 1,
-    label: "Claude (Anthropic) API key",
-    fields: [
-      {
-        key: "apiKey",
-        label: "API key",
-        kind: "secret",
-        required: true,
-        placeholder: "sk-ant-api03-…",
-      },
-      {
-        key: "baseUrl",
-        label: "Base URL",
-        kind: "url",
-        required: false,
-        default: "https://api.anthropic.com",
-      },
-      {
-        key: "apiVersion",
-        label: "API version",
-        kind: "text",
-        required: false,
-        default: "2023-06-01",
-      },
-    ],
-  },
-  {
     key: "mistral",
     version: 1,
     label: "Mistral API key",
@@ -124,27 +89,6 @@ export const SECRET_TYPE_REGISTRY: readonly SecretTypeSchema[] = [
         kind: "url",
         required: false,
         default: "https://api.mistral.ai/v1",
-      },
-    ],
-  },
-  {
-    key: "qdrant",
-    version: 1,
-    label: "Qdrant cluster",
-    fields: [
-      {
-        key: "apiKey",
-        label: "API key",
-        kind: "secret",
-        required: false,
-        help: "Local clusters usually run without one.",
-      },
-      {
-        key: "url",
-        label: "URL",
-        kind: "url",
-        required: true,
-        default: "http://127.0.0.1:6333",
       },
     ],
   },

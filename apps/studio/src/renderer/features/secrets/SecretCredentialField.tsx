@@ -16,18 +16,20 @@ function SecretCredentialField({ field, vm }: SecretCredentialFieldProps) {
   const raw = vm.fieldValues[field.key];
   const value = typeof raw === "string" ? raw : "";
 
+  const isSelect = field.kind === "select";
+
   return (
     <Field
       label={field.label}
-      htmlFor={id}
+      htmlFor={isSelect ? undefined : id}
       required={field.required}
       optionalHint={!field.required}
       help={field.help}
       error={error}
     >
-      {field.kind === "select" ? (
+      {isSelect ? (
         <SelectInput
-          id={id}
+          label={field.label}
           value={value}
           invalid={error !== undefined}
           options={(field.options ?? []).map((option) => ({

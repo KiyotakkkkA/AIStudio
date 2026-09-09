@@ -11,8 +11,9 @@ export const CreateSecretInput = z.object({
     .string()
     .optional()
     .describe(
-      "The credential itself. Required unless the type's secret field is optional, which " +
-        "only qdrant currently is.",
+      "The credential itself. Required unless the type's secret field is optional; every " +
+        "type in the registry currently requires one, and the host enforces that from the " +
+        "schema rather than from this type.",
     ),
   fields: z.record(z.string(), Json).default({}),
   tags: z.array(z.string().min(1).max(32)).max(16).default([]),

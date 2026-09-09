@@ -40,7 +40,7 @@ describe("the secret type registry", () => {
     expect(new Set(keys).size).toBe(keys.length);
     expect(findSecretTypeSchema("ollama-cloud")?.label).toBe("Ollama Cloud API key");
     expect(findSecretTypeSchema("nope")).toBeUndefined();
-    expect(isSecretTypeKey("qdrant")).toBe(true);
+    expect(isSecretTypeKey("openrouter")).toBe(true);
     expect(isSecretTypeKey("nope")).toBe(false);
   });
 
@@ -60,7 +60,15 @@ describe("the secret type registry", () => {
 
 describe("buildFieldsSchema", () => {
   const ollama = findSecretTypeSchema("ollama-cloud")!;
-  const qdrant = findSecretTypeSchema("qdrant")!;
+  const withRequiredField: SecretTypeSchema = {
+    key: "fixture",
+    version: 1,
+    label: "Fixture",
+    fields: [
+      { key: "apiKey", label: "API key", kind: "secret", required: true },
+      { key: "url", label: "URL", kind: "url", required: true },
+    ],
+  };
 
   it("never asks for the secret field", () => {
     const parsed = buildFieldsSchema(ollama).parse({});
@@ -81,10 +89,10 @@ describe("buildFieldsSchema", () => {
   });
 
   it("rejects a missing required field", () => {
-    expect(buildFieldsSchema(qdrant).safeParse({}).success).toBe(false);
-    expect(buildFieldsSchema(qdrant).safeParse({ url: "http://127.0.0.1:6333" }).success).toBe(
-      true,
-    );
+    expect(buildFieldsSchema(withRequiredField).safeParse({}).success).toBe(false);
+    expect(
+      buildFieldsSchema(withRequiredField).safeParse({ url: "http://127.0.0.1:6333" }).success,
+    ).toBe(true);
   });
 
   it("rejects an undeclared field instead of storing it", () => {

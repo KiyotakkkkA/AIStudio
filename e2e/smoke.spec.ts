@@ -133,9 +133,7 @@ test("the secret channels answer the renderer without ever carrying a value", as
   expect((types as { data: { key: string }[] }).data.map((schema) => schema.key)).toEqual([
     "ollama-cloud",
     "openrouter",
-    "anthropic",
     "mistral",
-    "qdrant",
     "custom",
   ]);
 
