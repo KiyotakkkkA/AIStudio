@@ -7,12 +7,30 @@
     "tsconfig.json"
   ],
   "tasks": {
-    "dev": { "cache": false, "persistent": true },
-    "build": { "dependsOn": ["^build", "lint"], "outputs": ["dist/**", "out/**"] },
-    "typecheck": { "dependsOn": ["^build"], "outputs": [] },
-    "lint": { "dependsOn": ["//#lint:root", "^build"], "outputs": [] },
-    "//#lint:root": { "cache": false },
-    "test": { "dependsOn": ["^build"], "outputs": [] },
-    "//#format:root": { "cache": false }
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "build": {
+      "dependsOn": ["^build", "lint"],
+      "outputs": ["dist/**", "out/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build", "//#typecheck:root"],
+      "outputs": []
+    },
+    "lint": {
+      "dependsOn": ["//#lint:root", "^build"],
+      "outputs": []
+    },
+    "//#lint:root": {
+      "cache": false
+    },
+    "//#format:root": {
+      "cache": false
+    },
+    "//#typecheck:root": {
+      "cache": false
+    }
   }
 }

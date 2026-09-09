@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 import { createLogger } from "../src/host/platform/logger.ts";
 import { createId } from "../src/host/platform/ids.ts";
 import {
@@ -12,6 +12,8 @@ import {
   resourcesDir,
   logFilePath,
 } from "../src/host/platform/paths.ts";
+import { createFakeClock } from "../../../test/helpers/fakeClock.ts";
+import { temporaryDirectory } from "../../../test/helpers/paths.ts";
 
 test("platform paths separate persistent data from bundled resources", () => {
   const env = {
@@ -28,7 +30,8 @@ test("platform paths separate persistent data from bundled resources", () => {
 });
 
 test("logger filters, preserves scope, rotates, resumes and closes", () => {
-  const directory = mkdtempSync(join(tmpdir(), "studio-logger-"));
+  const temp = temporaryDirectory("studio-logger-");
+  const directory = temp.path;
   try {
     const options = {
       directory,
@@ -36,7 +39,7 @@ test("logger filters, preserves scope, rotates, resumes and closes", () => {
       development: false,
       maxBytes: 100,
       backups: 2,
-      now: () => 123,
+      now: createFakeClock(123),
     };
     const logger = createLogger(options);
     logger.log("debug", "test", "filtered");
@@ -57,7 +60,7 @@ test("logger filters, preserves scope, rotates, resumes and closes", () => {
     assert.match(readFileSync(logFilePath(directory, 1), "utf8"), /line 4/);
     assert.match(readFileSync(logFilePath(directory), "utf8"), /resumed/);
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    temp.dispose();
   }
 });
 

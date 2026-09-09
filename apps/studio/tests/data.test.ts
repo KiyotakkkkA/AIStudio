@@ -1,16 +1,7 @@
 import assert from "node:assert/strict";
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { cpSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 import { AppErrorCode } from "@zvs/shared";
 import { openDatabase } from "../src/host/data/client.ts";
 import { migrate, prepareDatabase, BACKUPS_KEPT } from "../src/host/data/migrate.ts";
@@ -22,7 +13,9 @@ import {
   DEFAULT_WINDOW_STATE,
   readWindowState,
 } from "../src/host/platform/windowState.ts";
-import { MIGRATIONS_DIR, temporaryDatabase } from "./database.ts";
+import { createFakeClock } from "../../../test/helpers/fakeClock.ts";
+import { temporaryDirectory } from "../../../test/helpers/paths.ts";
+import { MIGRATIONS_DIR, temporaryDatabase } from "../../../test/helpers/tempDb.ts";
 
 test("the connection is opened with the pragmas the data layer depends on", () => {
   const database = temporaryDatabase({ migrate: false });
@@ -61,18 +54,19 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
 });
 
 test("a backup is written before migrating and only the last three are kept", () => {
-  const directory = mkdtempSync(join(tmpdir(), "studio-backup-"));
+  const temp = temporaryDirectory("studio-backup-");
+  const directory = temp.path;
   const backupsDir = join(directory, "backups");
   const file = join(directory, "studio.sqlite");
   try {
-    let stamp = 1_700_000_000_000;
+    const clock = createFakeClock();
     for (let run = 0; run < BACKUPS_KEPT + 2; run++) {
       const client = openDatabase({ file });
       const report = migrate({
         client,
         migrationsDir: MIGRATIONS_DIR,
         backupsDir,
-        now: () => (stamp += 60_000),
+        now: () => clock.advance(60_000),
       });
       try {
         assert.deepEqual(report.applied, ["0000_setting"]);
@@ -93,12 +87,13 @@ test("a backup is written before migrating and only the last three are kept", ()
       true,
     );
   } finally {
-    rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    temp.dispose();
   }
 });
 
 test("a broken migration blocks boot with MigrationFailedError", () => {
-  const directory = mkdtempSync(join(tmpdir(), "studio-broken-"));
+  const temp = temporaryDirectory("studio-broken-");
+  const directory = temp.path;
   const migrationsDir = join(directory, "migrations");
   const backupsDir = join(directory, "backups");
   try {
@@ -123,12 +118,13 @@ test("a broken migration blocks boot with MigrationFailedError", () => {
       client.close();
     }
   } finally {
-    rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    temp.dispose();
   }
 });
 
 test("a missing journal is reported as a migration failure, not a crash", () => {
-  const directory = mkdtempSync(join(tmpdir(), "studio-nojournal-"));
+  const temp = temporaryDirectory("studio-nojournal-");
+  const directory = temp.path;
   try {
     mkdirSync(join(directory, "migrations"), { recursive: true });
     const client = openDatabase({ file: join(directory, "studio.sqlite") });
@@ -146,12 +142,13 @@ test("a missing journal is reported as a migration failure, not a crash", () => 
       client.close();
     }
   } finally {
-    rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    temp.dispose();
   }
 });
 
 test("a corrupt database file is refused at open as a migration failure", () => {
-  const directory = mkdtempSync(join(tmpdir(), "studio-corrupt-"));
+  const temp = temporaryDirectory("studio-corrupt-");
+  const directory = temp.path;
   const file = join(directory, "studio.sqlite");
   try {
     writeFileSync(file, "not a database at all, just junk bytes");
@@ -165,12 +162,13 @@ test("a corrupt database file is refused at open as a migration failure", () => 
       (error: unknown) => isMigrationFailedError(error),
     );
   } finally {
-    rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    temp.dispose();
   }
 });
 
 test("prepareDatabase opens and migrates in one step", () => {
-  const directory = mkdtempSync(join(tmpdir(), "studio-prepare-"));
+  const temp = temporaryDirectory("studio-prepare-");
+  const directory = temp.path;
   try {
     const prepared = prepareDatabase({
       file: join(directory, "studio.sqlite"),
@@ -184,7 +182,7 @@ test("prepareDatabase opens and migrates in one step", () => {
       prepared.client.close();
     }
   } finally {
-    rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    temp.dispose();
   }
 });
 
@@ -222,7 +220,7 @@ test("SettingRepository round-trips values and lists them in key order", () => {
 test("a transaction rolls the whole unit of work back when it throws", () => {
   const database = temporaryDatabase();
   try {
-    const settings = new SettingService({ data: database.client, clock: () => 1_700_000_000_000 });
+    const settings = new SettingService({ data: database.client, clock: createFakeClock() });
     settings.set("theme.name", "dark");
 
     assert.throws(() =>
@@ -247,7 +245,7 @@ test("a transaction rolls the whole unit of work back when it throws", () => {
 test("settings channels carry JSON values through the whole chain", async () => {
   const database = temporaryDatabase();
   try {
-    const settings = new SettingService({ data: database.client, clock: () => 1_700_000_000_000 });
+    const settings = new SettingService({ data: database.client, clock: createFakeClock() });
     const handlers = createHandlers({ settings });
     const geometry = { bounds: { x: 10, y: 20, width: 1600, height: 1000 }, maximized: false };
 

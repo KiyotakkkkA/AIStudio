@@ -14,3 +14,7 @@ target/
 .env*
 coverage/
 *.tsbuildinfo
+
+# Test output
+test-results/
+playwright-report/

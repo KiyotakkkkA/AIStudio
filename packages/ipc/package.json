@@ -12,7 +12,6 @@
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
-    "test": "vitest run && tsc -p tsconfig.test.json",
     "lint": "eslint . --max-warnings 0"
   },
   "devDependencies": {
