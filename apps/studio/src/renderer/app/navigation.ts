@@ -40,7 +40,7 @@ export const NAV_GROUPS: readonly NavGroupModel[] = [
     id: "storage",
     label: "Хранилище",
     items: [
-      { id: "secrets", label: "Секреты и профиль", icon: mdiKeyOutline, path: ROUTES.secrets },
+      { id: "secrets", label: "Секреты", icon: mdiKeyOutline, path: ROUTES.secrets },
       {
         id: "vector-stores",
         label: "Векторные хранилища",
