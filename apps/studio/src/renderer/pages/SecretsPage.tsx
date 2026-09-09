@@ -6,6 +6,7 @@ import SecretsWorkspace from "../features/secrets/SecretsWorkspace";
 import useStore from "../stores/useStore";
 import EmptyState from "../ui/molecules/EmptyState";
 import PageShell from "../ui/templates/PageShell";
+import SegmentedControl from "../ui/atoms/SegmentedControl";
 
 const TABS = [
   { value: "secrets", label: "Секреты" },
@@ -23,20 +24,15 @@ function SecretsPage() {
       title="Секреты"
       subtitle={`${String(secrets.total)} секретов`}
       actions={<SecretsHeaderActions />}
-      toolbar={TABS.map((entry) => (
-        <button
-          key={entry.value}
-          type="button"
-          onClick={() => {
-            setTab(entry.value);
-          }}
-          className={`inline-flex h-7.5 items-center gap-1.75 rounded-[7px] px-3 text-[12.5px] font-medium ${
-            tab === entry.value ? "bg-main-700 text-main-50" : "text-main-400 hover:text-main-200"
-          }`}
-        >
-          {entry.label}
-        </button>
-      ))}
+      toolbar={
+        <SegmentedControl
+          label="Область видимости"
+          value={tab}
+          options={TABS}
+          onChange={setTab}
+          ghost={true}
+        />
+      }
     >
       {tab === "secrets" ? <SecretsWorkspace /> : null}
 

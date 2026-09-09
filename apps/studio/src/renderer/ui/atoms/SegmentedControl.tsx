@@ -10,6 +10,7 @@ export interface SegmentedControlProps<T extends string> {
   readonly options: readonly SegmentedControlOption<T>[];
   readonly onChange: (value: T) => void;
   readonly label: string;
+  readonly ghost?: boolean;
 }
 
 export default function SegmentedControl<T extends string>({
@@ -17,6 +18,7 @@ export default function SegmentedControl<T extends string>({
   options,
   onChange,
   label,
+  ghost = false,
 }: SegmentedControlProps<T>) {
   return (
     <Switcher
@@ -27,7 +29,7 @@ export default function SegmentedControl<T extends string>({
         onChange(next as T);
       }}
       rounded=""
-      className="gap-1 rounded-lg border-main-700 bg-main-800 p-1"
+      className={`gap-1 rounded-lg ${ghost ? "bg-transparent border-transparent" : "bg-main-800 border-main-700 p-1"}`}
       classNames={{ tab: "rounded-[5px] px-[14px] py-[5px] text-[12px]" }}
     />
   );
