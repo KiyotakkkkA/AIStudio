@@ -1,4 +1,14 @@
-import { AppError, AppErrorCode, timestampNow, type Json, type Timestamp } from "@zvs/shared";
+import {
+  AppError,
+  AppErrorCode,
+  timestampNow,
+  type Json,
+  type SecretDto,
+  type SecretId,
+  type SecretSummaryDto,
+  type SecretTypeKey,
+  type Timestamp,
+} from "@zvs/shared";
 import type { UnitOfWork } from "../data/UnitOfWork.ts";
 import type { SecretFilter, SecretPatch } from "../data/repositories/index.ts";
 import type {
@@ -22,6 +32,7 @@ export interface SecretSummary {
   readonly scope: SecretScope;
   readonly cipherVersion: number;
   readonly hint: string | null;
+  readonly usageCount: number;
   readonly fields: Readonly<Record<string, Json>>;
   readonly tags: readonly string[];
   readonly note: string | null;
@@ -36,7 +47,7 @@ export interface SecretCreateInput {
   type: string;
   name: string;
   scope: SecretScope;
-  value: string;
+  value?: string;
   fields?: Readonly<Record<string, Json>>;
   tags?: readonly string[];
   note?: string | null;
@@ -77,20 +88,28 @@ export class SecretService {
 
   list(filter: SecretFilter = {}): SecretSummary[] {
     const now = timestampNow(this.#clock);
-    return this.#data.repositories.secrets.listSummaries(filter).map((row) => toSummary(row, now));
+    const usage = this.#data.repositories.secrets.countUsageBySecret();
+    return this.#data.repositories.secrets
+      .listSummaries(filter)
+      .map((row) => toSummary(row, now, usage.get(row.id) ?? 0));
+  }
+
+  get(id: string): SecretSummary {
+    const row = this.#require(id);
+    return toSummary(row, timestampNow(this.#clock), this.#countUsage(id));
   }
 
   create(input: SecretCreateInput): SecretSummary {
     const name = requireText(input.name, "name");
-    const value = requireValue(input.value);
+    const value = input.value === undefined ? undefined : requireValue(input.value);
     const now = timestampNow(this.#clock);
     const created = this.#data.repositories.secrets.create({
       type: input.type,
       name,
       scope: input.scope,
-      cipher: this.#crypto.encrypt(value),
+      cipher: value === undefined ? null : this.#crypto.encrypt(value),
       cipherVersion: 1,
-      hint: computeHint(value),
+      hint: value === undefined ? null : computeHint(value),
       fields: JSON.stringify(input.fields ?? {}),
       tags: JSON.stringify(input.tags ?? []),
       note: input.note ?? null,
@@ -103,7 +122,7 @@ export class SecretService {
       secretId: created.id,
       type: created.type,
     });
-    return toSummary(created, now);
+    return toSummary(created, now, 0);
   }
 
   update(id: string, input: SecretUpdateInput): SecretSummary {
@@ -132,7 +151,7 @@ export class SecretService {
       secretId: id,
       replacedValue: input.value !== undefined,
     });
-    return toSummary(updated, now);
+    return toSummary(updated, now, this.#countUsage(id));
   }
 
   remove(id: string): void {
@@ -188,6 +207,10 @@ export class SecretService {
     return await Promise.resolve(this.#crypto.decrypt(row.cipher));
   }
 
+  #countUsage(id: string): number {
+    return this.#data.repositories.secrets.countUsage(id);
+  }
+
   #require(id: string): SecretRow {
     const row = this.#data.repositories.secrets.findById(id);
     if (row === undefined) throw notFound(id);
@@ -195,7 +218,7 @@ export class SecretService {
   }
 }
 
-function toSummary(row: SecretRow, now: Timestamp): SecretSummary {
+function toSummary(row: SecretRow, now: Timestamp, usageCount: number): SecretSummary {
   return {
     id: row.id,
     type: row.type,
@@ -203,6 +226,7 @@ function toSummary(row: SecretRow, now: Timestamp): SecretSummary {
     scope: row.scope,
     cipherVersion: row.cipherVersion,
     hint: row.hint,
+    usageCount,
     fields: decodeFields(row.id, row.fields),
     tags: decodeTags(row.id, row.tags),
     note: row.note,
@@ -260,4 +284,27 @@ function requireValue(value: string): string {
 
 function notFound(id: string): AppError {
   return new AppError(AppErrorCode.NOT_FOUND, "Секрет не найден", { details: { secretId: id } });
+}
+
+export function toSecretSummaryDto(summary: SecretSummary): SecretSummaryDto {
+  return {
+    id: summary.id as SecretId,
+    type: summary.type as SecretTypeKey,
+    name: summary.name,
+    scope: summary.scope,
+    hint: summary.hint,
+    tags: [...summary.tags],
+    usageCount: summary.usageCount,
+    rotationStatus: summary.rotation,
+    rotatesAt: summary.rotatesAt,
+    updatedAt: summary.updatedAt,
+  };
+}
+
+export function toSecretDto(summary: SecretSummary): SecretDto {
+  return {
+    ...toSecretSummaryDto(summary),
+    fields: { ...summary.fields },
+    note: summary.note,
+  };
 }

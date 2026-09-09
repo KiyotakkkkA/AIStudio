@@ -16,6 +16,7 @@ import {
 import { createFakeClock } from "../../../test/helpers/fakeClock.ts";
 import { temporaryDirectory } from "../../../test/helpers/paths.ts";
 import { MIGRATIONS_DIR, temporaryDatabase } from "../../../test/helpers/tempDb.ts";
+import { createSecretService } from "../../../test/helpers/secretService.ts";
 
 test("the connection is opened with the pragmas the data layer depends on", () => {
   const database = temporaryDatabase({ migrate: false });
@@ -248,7 +249,7 @@ test("settings channels carry JSON values through the whole chain", async () => 
   const database = temporaryDatabase();
   try {
     const settings = new SettingService({ data: database.client, clock: createFakeClock() });
-    const handlers = createHandlers({ settings });
+    const handlers = createHandlers({ settings, secrets: createSecretService(database.client) });
     const geometry = { bounds: { x: 10, y: 20, width: 1600, height: 1000 }, maximized: false };
 
     const missing = await handlers["settings.get"]({ key: "window.main" });

@@ -6,6 +6,7 @@ export * from "./primitives/sort.js";
 export * from "./errors/AppErrorCode.js";
 export * from "./errors/AppError.js";
 export * from "./errors/Result.js";
+export * from "./secrets/index.js";
 export * from "./ipc/defineContract.js";
 export * from "./ipc/contract.js";
 export * from "./events/HostEvent.js";

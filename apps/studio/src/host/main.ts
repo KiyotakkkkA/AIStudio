@@ -107,11 +107,15 @@ if (!app.requestSingleInstanceLock()) {
           : undefined,
       });
       logger.log("info", "host", "Opened the event channel", { recording });
-      ipcServer = createIpcServer(contract, createHandlers({ events: eventBus, settings }), {
-        ipcMain,
-        logger,
-        validateOutput: !app.isPackaged,
-      });
+      ipcServer = createIpcServer(
+        contract,
+        createHandlers({ events: eventBus, settings, secrets }),
+        {
+          ipcMain,
+          logger,
+          validateOutput: !app.isPackaged,
+        },
+      );
       logger.log("info", "host", "Registered IPC channels", { count: ipcServer.channels.length });
       const developmentUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL;
       installContentSecurityPolicy(developmentUrl);

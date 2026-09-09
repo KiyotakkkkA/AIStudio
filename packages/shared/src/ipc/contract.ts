@@ -2,7 +2,23 @@ import { z } from "zod";
 import { StreamId } from "../primitives/branded.js";
 import { Timestamp } from "../primitives/time.js";
 import { Json } from "../primitives/json.js";
+import { SecretId } from "../primitives/branded.js";
+import { CreateSecretInput } from "../secrets/CreateSecretInput.js";
+import { UpdateSecretInput } from "../secrets/UpdateSecretInput.js";
+import { SecretDto, SecretScope, SecretSummaryDto } from "../secrets/SecretDto.js";
+import { SecretTypeKey } from "../secrets/registry.js";
+import { SecretTypeSchema } from "../secrets/SecretTypeSchema.js";
 import { defineContract } from "./defineContract.js";
+
+export const SecretFilter = z.object({
+  scope: SecretScope.optional(),
+  type: SecretTypeKey.optional(),
+  query: z.string().max(128).optional(),
+});
+export type SecretFilter = z.infer<typeof SecretFilter>;
+
+export const SecretRef = z.object({ id: SecretId });
+export type SecretRef = z.infer<typeof SecretRef>;
 
 export const SettingKey = z
   .string()
@@ -35,6 +51,30 @@ export const contract = defineContract({
   "settings.set": {
     input: z.object({ key: SettingKey, value: Json }),
     output: z.object({ key: SettingKey, value: Json, updatedAt: Timestamp }),
+  },
+  "secrets.types": {
+    input: z.void(),
+    output: z.array(SecretTypeSchema),
+  },
+  "secrets.list": {
+    input: SecretFilter,
+    output: z.array(SecretSummaryDto),
+  },
+  "secrets.get": {
+    input: SecretRef,
+    output: SecretDto,
+  },
+  "secrets.create": {
+    input: CreateSecretInput,
+    output: SecretDto,
+  },
+  "secrets.update": {
+    input: UpdateSecretInput,
+    output: SecretDto,
+  },
+  "secrets.remove": {
+    input: SecretRef,
+    output: z.object({ id: SecretId, removed: z.literal(true) }),
   },
 });
 

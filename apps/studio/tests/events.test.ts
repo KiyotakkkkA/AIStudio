@@ -10,6 +10,7 @@ import { SettingService } from "../src/host/services/SettingService.ts";
 import { createFakeClock } from "../../../test/helpers/fakeClock.ts";
 import { temporaryDirectory } from "../../../test/helpers/paths.ts";
 import { temporaryDatabase } from "../../../test/helpers/tempDb.ts";
+import { createSecretService } from "../../../test/helpers/secretService.ts";
 import { createEventRouter, type RoutedEvent } from "../src/renderer/app/EventRouter.ts";
 import { replayRecording } from "../src/renderer/app/replay.ts";
 
@@ -244,12 +245,13 @@ test("recording is opt in through the environment flag", () => {
 
 const database = temporaryDatabase();
 const settings = new SettingService({ data: database.client });
+const secrets = createSecretService(database.client);
 afterAll(() => database.dispose());
 
 test("system.demoStream counts to the requested total and terminates", async () => {
   const { sent, sender } = fakeSender();
   const bus = createEventBus({ senders: () => [sender] });
-  const handlers = createHandlers({ events: bus, intervalMs: 0, settings });
+  const handlers = createHandlers({ events: bus, intervalMs: 0, settings, secrets });
   const { streamId } = await handlers["system.demoStream"]({ steps: 10 });
 
   while (bus.open > 0) await new Promise((resolve) => setTimeout(resolve, 5));

@@ -118,6 +118,15 @@ export class SecretRepository extends Repository {
     this.db.delete(secret).where(eq(secret.id, id)).run();
   }
 
+  countUsageBySecret(): Map<string, number> {
+    const rows = this.db
+      .select({ secretId: secretUsage.secretId, total: sql<number>`count(*)` })
+      .from(secretUsage)
+      .groupBy(secretUsage.secretId)
+      .all();
+    return new Map(rows.map((row) => [row.secretId, row.total]));
+  }
+
   countUsage(id: string): number {
     const row = this.db
       .select({ total: sql<number>`count(*)` })

@@ -11,6 +11,12 @@ import {
 } from "@playwright/test";
 import { temporaryDirectory, type TemporaryDirectory } from "../test/helpers/paths.ts";
 
+declare global {
+  interface Window {
+    readonly zvs: { call(channel: string, payload: unknown): Promise<unknown> };
+  }
+}
+
 const STUDIO_ROOT = fileURLToPath(new URL("../apps/studio", import.meta.url));
 const MAIN_BUNDLE = join(STUDIO_ROOT, "out", "host", "main.js");
 
@@ -119,6 +125,51 @@ test("the demo stream counts to completion over the event channel", async () => 
   await page.getByTestId("stream-button").click();
   await expect(value).toHaveText("1/5");
   await expect(value).toHaveText("готово · ok");
+});
+
+test("the secret channels answer the renderer without ever carrying a value", async () => {
+  const types = await page.evaluate(() => window.zvs.call("secrets.types", undefined));
+  expect(types).toMatchObject({ ok: true });
+  expect((types as { data: { key: string }[] }).data.map((schema) => schema.key)).toEqual([
+    "ollama-cloud",
+    "openrouter",
+    "anthropic",
+    "mistral",
+    "qdrant",
+    "custom",
+  ]);
+
+  const VALUE = "osk_live_0a1b2c3d4e5f60718293a4b5c6d7e8f4f2a";
+  const created = await page.evaluate(
+    (value) =>
+      window.zvs.call("secrets.create", {
+        type: "ollama-cloud",
+        name: "Ollama Cloud — e2e",
+        scope: "personal",
+        value,
+        fields: { organization: "zvs-lab" },
+        tags: ["e2e"],
+      }),
+    VALUE,
+  );
+  expect(created).toMatchObject({ ok: true });
+
+  const listed = await page.evaluate(() => window.zvs.call("secrets.list", {}));
+  expect(listed).toMatchObject({ ok: true, data: [{ hint: "osk_live_…4f2a" }] });
+  expect(JSON.stringify(listed)).not.toContain(VALUE);
+
+  const rejected = await page.evaluate(
+    (value) =>
+      window.zvs.call("secrets.create", {
+        type: "ollama-cloud",
+        name: "Ollama Cloud — sneaky",
+        scope: "personal",
+        value,
+        fields: { sneaky: "value" },
+      }),
+    VALUE,
+  );
+  expect(rejected).toMatchObject({ ok: false, error: { code: "VALIDATION_FAILED" } });
 });
 
 test("nothing logged a console error or a content security policy violation", () => {
