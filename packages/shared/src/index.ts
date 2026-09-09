@@ -11,3 +11,4 @@ export * from "./ipc/defineContract.js";
 export * from "./ipc/contract.js";
 export * from "./events/HostEvent.js";
 export * from "./browser.js";
+export * from "./ai.js";

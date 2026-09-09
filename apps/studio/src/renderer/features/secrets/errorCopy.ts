@@ -19,6 +19,7 @@ const COPY: Record<AppErrorCode, string> = {
     "Хранилище ключей недоступно, поэтому значение нельзя сохранить или прочитать.",
   [AppErrorCode.PROVIDER_UNREACHABLE]: "Провайдер недоступен.",
   [AppErrorCode.PROVIDER_AUTH_FAILED]: "Провайдер отклонил учётные данные.",
+  [AppErrorCode.PROVIDER_SESSION_EXPIRED]: "Сессия провайдера истекла — нужна повторная привязка.",
   [AppErrorCode.RATE_LIMITED]: "Слишком много запросов, попробуйте позже.",
   [AppErrorCode.RUN_CANCELLED]: "Операция отменена.",
   [AppErrorCode.RUN_FAILED]: "Операция завершилась ошибкой.",

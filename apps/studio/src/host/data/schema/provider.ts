@@ -1,4 +1,5 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import type { AdapterFamily, AuthMode } from "@zvs/shared";
 import { secret } from "./secret.ts";
 
 export const PROVIDER_KINDS = [
@@ -27,6 +28,8 @@ export const provider = sqliteTable(
   {
     id: text("id").primaryKey(),
     kind: text("kind").$type<ProviderKind>().notNull(),
+    adapter: text("adapter").$type<AdapterFamily>().notNull().default("openai-compatible"),
+    authMode: text("auth_mode").$type<AuthMode>().notNull().default("api"),
     name: text("name").notNull(),
     baseUrl: text("base_url").notNull(),
     secretId: text("secret_id").references(() => secret.id, { onDelete: "restrict" }),
