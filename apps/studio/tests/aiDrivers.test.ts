@@ -97,24 +97,26 @@ test("migration 0003 adds adapter and auth mode and backfills from kind", () => 
   assert.equal(repositories.providers.findById(claude.id)?.adapter, "anthropic");
 });
 
-test("every adapter family is registered and only the openai-compatible one is built", () => {
+test("every adapter family is registered and only anthropic is still a stub", () => {
   assert.deepEqual(Object.keys(ADAPTER_REGISTRY).sort(), [
     "anthropic",
     "deepseek-web",
     "openai-compatible",
     "qwen-web",
   ]);
-  assert.equal(adapterEntry("openai-compatible").implemented, true);
-  for (const family of ["anthropic", "qwen-web", "deepseek-web"] as const) {
-    assert.equal(adapterEntry(family).implemented, false);
-    assert.throws(
-      () => adapterEntry(family).build({ transport: createFakeTransport() }),
-      (error: unknown) =>
-        isAppError(error) &&
-        error.code === AppErrorCode.UNKNOWN &&
-        error.message === `adapter ${family} is not implemented yet`,
-    );
+  for (const family of ["openai-compatible", "qwen-web", "deepseek-web"] as const) {
+    const driver = adapterEntry(family).build({ transport: createFakeTransport() });
+    assert.equal(adapterEntry(family).implemented, true);
+    assert.notEqual(driver.text, null);
   }
+  assert.equal(adapterEntry("anthropic").implemented, false);
+  assert.throws(
+    () => adapterEntry("anthropic").build({ transport: createFakeTransport() }),
+    (error: unknown) =>
+      isAppError(error) &&
+      error.code === AppErrorCode.UNKNOWN &&
+      error.message === "adapter anthropic is not implemented yet",
+  );
   assert.equal(adapterCapabilities("qwen-web").authModes.includes("account"), true);
   assert.equal(adapterCapabilities("openai-compatible").honours.topK, false);
 });

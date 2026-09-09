@@ -1,0 +1,163 @@
+{
+  "request_id": "00000000-0000-0000-0000-000000000000",
+  "success": true,
+  "data": {
+    "data": [
+      {
+        "id": "qwen3.7-plus",
+        "name": "Qwen3.7-Plus",
+        "object": "model",
+        "owned_by": "qwen",
+        "preset": true,
+        "action_ids": [],
+        "info": {
+          "id": "qwen3.7-plus",
+          "user_id": "00000000-0000-0000-0000-000000000000",
+          "base_model_id": null,
+          "access_control": null,
+          "created_at": 1732711466,
+          "updated_at": 1732711466,
+          "is_active": true,
+          "is_visitor_active": false,
+          "name": "Qwen3.7-Plus",
+          "meta": {
+            "profile_image_url": "/static/favicon.png",
+            "description": "Flagship Qwen3.7 text model.",
+            "short_description": "Qwen3.7 Plus",
+            "capabilities": {
+              "vision": true,
+              "document": true,
+              "citations": true,
+              "video": false,
+              "audio": false,
+              "thinking": true
+            },
+            "abilities": {
+              "vision": 1,
+              "document": 1,
+              "citations": 1,
+              "video": 0,
+              "audio": 0,
+              "thinking": 2
+            },
+            "chat_type": ["t2t", "search"],
+            "modality": ["text", "image"],
+            "max_context_length": 131072,
+            "max_generation_length": 32768
+          }
+        }
+      },
+      {
+        "id": "qwen3.5-omni-plus",
+        "name": "Qwen3.5-Omni-Plus",
+        "object": "model",
+        "owned_by": "qwen",
+        "preset": true,
+        "action_ids": [],
+        "info": {
+          "id": "qwen3.5-omni-plus",
+          "user_id": "00000000-0000-0000-0000-000000000000",
+          "base_model_id": null,
+          "access_control": null,
+          "created_at": 1732711466,
+          "updated_at": 1732711466,
+          "is_active": true,
+          "is_visitor_active": false,
+          "name": "Qwen3.5-Omni-Plus",
+          "meta": {
+            "profile_image_url": "/static/favicon.png",
+            "description": "Natively multimodal Qwen3.5 model.",
+            "short_description": "Qwen3.5 Omni Plus",
+            "capabilities": {
+              "vision": true,
+              "document": true,
+              "citations": true,
+              "video": true,
+              "audio": true,
+              "thinking": false
+            },
+            "abilities": {
+              "vision": 1,
+              "document": 1,
+              "citations": 1,
+              "video": 1,
+              "audio": 1,
+              "thinking": 2
+            },
+            "chat_type": ["t2t", "t2i", "search"],
+            "modality": ["text", "image", "video", "audio"],
+            "max_context_length": 262144,
+            "max_generation_length": 65536
+          }
+        }
+      },
+      {
+        "id": "qwen3.6-plus",
+        "name": "Qwen3.6-Plus",
+        "object": "model",
+        "owned_by": "qwen",
+        "preset": true,
+        "action_ids": [],
+        "info": {
+          "id": "qwen3.6-plus",
+          "user_id": "00000000-0000-0000-0000-000000000000",
+          "base_model_id": null,
+          "access_control": null,
+          "created_at": 1732711466,
+          "updated_at": 1732711466,
+          "is_active": false,
+          "is_visitor_active": false,
+          "name": "Qwen3.6-Plus",
+          "meta": {
+            "profile_image_url": "/static/favicon.png",
+            "chat_type": ["t2t"],
+            "modality": ["text"],
+            "max_context_length": 131072,
+            "max_generation_length": 32768
+          }
+        }
+      },
+      {
+        "id": "qwen3.5-plus",
+        "name": "",
+        "object": "model",
+        "owned_by": "qwen",
+        "preset": true,
+        "action_ids": [],
+        "info": {
+          "id": "qwen3.5-plus",
+          "user_id": "00000000-0000-0000-0000-000000000000",
+          "base_model_id": null,
+          "access_control": null,
+          "created_at": 1732711466,
+          "updated_at": 1732711466,
+          "is_active": true,
+          "is_visitor_active": false,
+          "name": "Qwen3.5-Plus",
+          "meta": {
+            "profile_image_url": "/static/favicon.png",
+            "chat_type": ["t2t"]
+          }
+        }
+      },
+      {
+        "id": "qwen3.5-plus",
+        "name": "Qwen3.5-Plus (duplicate)",
+        "object": "model",
+        "owned_by": "qwen",
+        "preset": true,
+        "action_ids": [],
+        "info": null
+      },
+      {
+        "id": "   ",
+        "name": "Blank",
+        "object": "model",
+        "owned_by": "qwen",
+        "preset": true,
+        "action_ids": [],
+        "info": null
+      }
+    ]
+  }
+}

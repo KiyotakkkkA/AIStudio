@@ -3,7 +3,9 @@ import type { Logger } from "../../../platform/logger.ts";
 import type { AdapterCapabilities } from "../AdapterCapabilities.ts";
 import type { AiDriver } from "../ports.ts";
 import type { Transport } from "../transport/Transport.ts";
+import { DeepSeekWebAdapter, DEEPSEEK_WEB_CAPABILITIES } from "./deepseekWeb.ts";
 import { OpenAiCompatibleAdapter, OPENAI_COMPATIBLE_CAPABILITIES } from "./openaiCompatible.ts";
+import { QwenWebAdapter, QWEN_WEB_CAPABILITIES } from "./qwenWeb.ts";
 
 export interface AdapterContext {
   transport: Transport;
@@ -52,22 +54,20 @@ export const ADAPTER_REGISTRY: Readonly<Record<AdapterFamily, AdapterFamilyEntry
     image: false,
     honours: { temperature: true, topK: true, topP: true, maxOutputTokens: true },
   }),
-  "qwen-web": stub("qwen-web", {
-    authModes: ["account"],
-    streaming: true,
-    liveModelList: true,
-    embedding: false,
-    image: false,
-    honours: { temperature: false, topK: false, topP: false, maxOutputTokens: false },
-  }),
-  "deepseek-web": stub("deepseek-web", {
-    authModes: ["account"],
-    streaming: true,
-    liveModelList: false,
-    embedding: false,
-    image: false,
-    honours: { temperature: false, topK: false, topP: false, maxOutputTokens: false },
-  }),
+  "qwen-web": {
+    capabilities: QWEN_WEB_CAPABILITIES,
+    implemented: true,
+    build(context: AdapterContext): AiDriver {
+      return { text: new QwenWebAdapter(context), embedding: null, image: null };
+    },
+  },
+  "deepseek-web": {
+    capabilities: DEEPSEEK_WEB_CAPABILITIES,
+    implemented: true,
+    build(context: AdapterContext): AiDriver {
+      return { text: new DeepSeekWebAdapter(context), embedding: null, image: null };
+    },
+  },
 };
 
 export function adapterEntry(family: AdapterFamily): AdapterFamilyEntry {
@@ -80,4 +80,6 @@ export function adapterCapabilities(family: AdapterFamily): AdapterCapabilities 
   return adapterEntry(family).capabilities;
 }
 
+export { DeepSeekWebAdapter, DEEPSEEK_WEB_CAPABILITIES };
 export { OpenAiCompatibleAdapter, OPENAI_COMPATIBLE_CAPABILITIES };
+export { QwenWebAdapter, QWEN_WEB_CAPABILITIES };

@@ -475,10 +475,10 @@ test("an account-mode provider without a live account never reaches the network"
     sessions: () => session,
   });
 
-  assert.equal(
-    code(await rejection(() => registry.driver(linked.id))),
-    AppErrorCode.UNKNOWN,
-    "a linked account must get as far as the adapter stub",
+  assert.notEqual(
+    (await registry.driver(linked.id)).text,
+    null,
+    "a linked account must get as far as a built adapter",
   );
 
   repositories.accounts.updateStatus(account.id, "needs-relink", "Куки очищены", 900);
@@ -498,7 +498,7 @@ test("an account-mode provider without a live account never reaches the network"
 
   const relinked = repositories.accounts.create({ ...accountDraft, externalId: "user-2" });
   repositories.providers.update(detached.id, { accountId: relinked.id, status: "unknown" });
-  assert.equal(code(await rejection(() => registry.driver(detached.id))), AppErrorCode.UNKNOWN);
+  assert.notEqual((await registry.driver(detached.id)).text, null);
 
   const noSessions = new ProviderRegistry({
     providers: repositories.providers,
