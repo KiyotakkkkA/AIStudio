@@ -1,37 +1,25 @@
 import { mdiAccountPlusOutline, mdiChevronDown } from "@mdi/js";
+import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
 import { observer } from "mobx-react-lite";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { AccountFamily } from "@zvs/shared";
-import Button from "../../ui/atoms/Button";
 import Icon from "../../ui/atoms/Icon";
 import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import useStore from "../../stores/useStore";
 import { adapterLabel } from "./accountPresentation";
 
-export interface AccountLoginMenuProps {
-  readonly tone?: "primary" | "secondary";
-}
+const TRIGGER = [
+  "h-8 w-auto justify-center gap-1.75 rounded-[6px] border-0 px-3.25",
+  "bg-accent-dark text-[12.5px] font-semibold text-main-900 hover:bg-accent-medium",
+  "disabled:cursor-not-allowed disabled:opacity-50",
+].join(" ");
 
-function AccountLoginMenu({ tone = "primary" }: AccountLoginMenuProps) {
+function AccountLoginMenu() {
   const { accounts } = useStore();
-  const [open, setOpen] = useState(false);
   const [replacing, setReplacing] = useState<AccountFamily | null>(null);
-  const root = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = (event: MouseEvent): void => {
-      if (root.current?.contains(event.target as Node) === true) return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => {
-      document.removeEventListener("mousedown", close);
-    };
-  }, [open]);
+  const disabled = accounts.busy || accounts.families.length === 0;
 
   const start = (adapter: AccountFamily): void => {
-    setOpen(false);
     if (accounts.accountFor(adapter) === null) {
       void accounts.link(adapter);
       return;
@@ -40,49 +28,46 @@ function AccountLoginMenu({ tone = "primary" }: AccountLoginMenuProps) {
   };
 
   return (
-    <div ref={root} className="relative flex-none">
-      <Button
-        type="button"
-        tone={tone}
-        disabled={accounts.busy || accounts.families.length === 0}
-        aria-expanded={open}
-        onClick={() => {
-          setOpen((current) => !current);
-        }}
-      >
-        <Icon path={mdiAccountPlusOutline} size={15} />
-        Войти
-        <Icon path={mdiChevronDown} size={14} />
-      </Button>
+    <div className="flex-none">
+      <Dropdown disabled={disabled} menuWidth={240} menuPlacement="bottom-right">
+        <Dropdown.Trigger
+          className={TRIGGER}
+          rounded=""
+          disabled={disabled}
+          icon={<Icon path={mdiChevronDown} size={14} />}
+        >
+          <span className="inline-flex items-center gap-1.75">
+            <Icon path={mdiAccountPlusOutline} size={15} />
+            Войти
+          </span>
+        </Dropdown.Trigger>
 
-      {open ? (
-        <div
+        <Dropdown.Menu
           role="menu"
           aria-label="Выберите вендора"
-          className="absolute top-full right-0 z-20 mt-1.5 flex w-56 flex-col gap-1 rounded-card border border-main-600 bg-main-800 p-1.5"
+          rounded=""
+          className="rounded-card border-main-600"
         >
           {accounts.families.map((family) => (
-            <button
+            <Dropdown.Item
               key={family}
-              type="button"
               role="menuitem"
-              className="flex flex-col rounded-[6px] px-2.5 py-1.75 text-left hover:bg-main-700"
+              rounded="rounded-md"
+              className="text-[12.5px] text-main-100"
               onClick={() => {
                 start(family);
               }}
             >
-              <span className="text-[12.5px] font-medium text-main-100">
-                {adapterLabel(family)}
+              <span className="flex w-full items-baseline justify-between gap-2">
+                <span className="font-medium">{adapterLabel(family)}</span>
+                <span className="text-[11px] text-main-400">
+                  {accounts.accountFor(family) === null ? "Откроется сайт вендора" : "Уже привязан"}
+                </span>
               </span>
-              <span className="text-[11px] text-main-400">
-                {accounts.accountFor(family) === null
-                  ? "Откроется сайт вендора"
-                  : "Аккаунт уже привязан"}
-              </span>
-            </button>
+            </Dropdown.Item>
           ))}
-        </div>
-      ) : null}
+        </Dropdown.Menu>
+      </Dropdown>
 
       <ConfirmDialog
         open={replacing !== null}

@@ -49,7 +49,9 @@ async function openAccountsTab(bridge: ReturnType<typeof createFakeBridge<Contra
 function loginMenu(): HTMLElement {
   const trigger = screen.getAllByRole("button", { name: /Войти/u })[0];
   assert.ok(trigger !== undefined);
+  assert.equal(trigger.getAttribute("aria-expanded"), "false");
   fireEvent.click(trigger);
+  assert.equal(trigger.getAttribute("aria-expanded"), "true");
   return screen.getByRole("menu", { name: "Выберите вендора" });
 }
 
@@ -70,12 +72,15 @@ test("the empty state explains account mode and offers only the vendors the host
   await openAccountsTab(bridge);
 
   assert.ok(await screen.findByText("Аккаунтов пока нет"));
+
+  // The menu stays shut until the button is pressed, and lists what the host reported.
+  assert.equal(screen.queryByRole("menu"), null);
   const menu = loginMenu();
   assert.deepEqual(
     within(menu)
       .getAllByRole("menuitem")
-      .map((item) => item.textContent?.split("О")[0]?.trim()),
-    ["DeepSeek", "Qwen"],
+      .map((item) => item.textContent),
+    ["DeepSeekОткроется сайт вендора", "QwenОткроется сайт вендора"],
   );
 
   // The vendor's own page takes the password; our UI never offers a field for one.
@@ -93,6 +98,8 @@ test("waiting shows the vendor and cancels through the channel", async () => {
 
   fireEvent.click(within(loginMenu()).getByRole("menuitem", { name: /Qwen/u }));
 
+  // Choosing a vendor closes the menu; the waiting panel takes over.
+  assert.equal(screen.queryByRole("menu"), null);
   assert.ok(await screen.findByText(/Войдите в Qwen в браузере/u));
   fireEvent.click(screen.getByRole("button", { name: "Отменить" }));
 
