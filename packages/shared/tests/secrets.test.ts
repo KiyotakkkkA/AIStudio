@@ -38,14 +38,14 @@ describe("the secret type registry", () => {
   it("keeps type keys unique and looks them up", () => {
     const keys = SECRET_TYPE_REGISTRY.map((schema) => schema.key);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(findSecretTypeSchema("ollama-cloud")?.label).toBe("Ollama Cloud API key");
+    expect(findSecretTypeSchema("ollama")?.label).toBe("Ollama API key");
     expect(findSecretTypeSchema("nope")).toBeUndefined();
     expect(isSecretTypeKey("openrouter")).toBe(true);
     expect(isSecretTypeKey("nope")).toBe(false);
   });
 
   it("renders the chip the mockup shows", () => {
-    expect(schemaChip(findSecretTypeSchema("ollama-cloud")!)).toBe("ollama-cloud@1");
+    expect(schemaChip(findSecretTypeSchema("ollama")!)).toBe("ollama@1");
   });
 
   it("declares only select fields with options", () => {
@@ -59,7 +59,7 @@ describe("the secret type registry", () => {
 });
 
 describe("buildFieldsSchema", () => {
-  const ollama = findSecretTypeSchema("ollama-cloud")!;
+  const ollama = findSecretTypeSchema("ollama")!;
   const withRequiredField: SecretTypeSchema = {
     key: "fixture",
     version: 1,
@@ -115,8 +115,8 @@ describe("buildFieldsSchema", () => {
 describe("secret DTOs", () => {
   const summary = {
     id,
-    type: "ollama-cloud" as const,
-    name: "Ollama Cloud — personal",
+    type: "ollama" as const,
+    name: "Ollama — personal",
     scope: "personal" as const,
     hint: "osk_live_…4f2a",
     tags: ["llm", "cloud"],

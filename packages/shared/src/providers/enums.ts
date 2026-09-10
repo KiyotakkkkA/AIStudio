@@ -1,12 +1,6 @@
 import { z } from "zod";
 
-export const PROVIDER_KINDS = [
-  "ollama",
-  "openrouter",
-  "anthropic",
-  "mistral",
-  "openai-compatible",
-] as const;
+export const PROVIDER_KINDS = ["ollama", "openrouter", "mistral", "openai-compatible"] as const;
 export const ProviderKind = z.enum(PROVIDER_KINDS);
 export type ProviderKind = z.infer<typeof ProviderKind>;
 

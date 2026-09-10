@@ -15,7 +15,7 @@ export const SCOPE_OPTIONS: readonly { value: SecretScope; label: string }[] = [
 ];
 
 const TYPE_ICONS: Record<string, string> = {
-  "ollama-cloud": mdiKeyOutline,
+  ollama: mdiKeyOutline,
 };
 
 export function typeIcon(type: string): string | undefined {

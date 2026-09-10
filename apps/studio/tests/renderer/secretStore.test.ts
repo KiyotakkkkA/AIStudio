@@ -20,8 +20,8 @@ const CREATED = "0199aa11-1111-7111-8111-000000000003" as SecretId;
 
 function summary(overrides: Partial<SecretSummaryDto> & { id: SecretId }): SecretSummaryDto {
   return {
-    type: "ollama-cloud",
-    name: "Ollama Cloud — личный",
+    type: "ollama",
+    name: "Ollama — личный",
     scope: "personal",
     hint: "osk_live_••••4f2a",
     tags: ["llm"],
@@ -116,7 +116,7 @@ test("selecting a secret loads its detail and builds a clean form", async () => 
 
   assert.equal(store.selectedId, OLLAMA);
   assert.notEqual(store.form, null);
-  assert.equal(store.form?.name, "Ollama Cloud — личный");
+  assert.equal(store.form?.name, "Ollama — личный");
   assert.equal(store.form?.dirty, false);
   assert.equal(store.form?.isNew, false);
 });
@@ -170,7 +170,7 @@ test("a validation failure from the host lands on the field, not in a banner", a
     throw new AppError(AppErrorCode.VALIDATION_FAILED, "raw host text", {
       details: {
         field: "fields",
-        type: "ollama-cloud",
+        type: "ollama",
         issues: [{ path: "baseUrl", code: "invalid_format" }],
       },
     });

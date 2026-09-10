@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "vitest";
-import { AppError, AppErrorCode, isAppError, type HostEvent } from "@zvs/shared";
+import {
+  ADAPTER_FAMILIES,
+  AppError,
+  AppErrorCode,
+  isAppError,
+  type AdapterFamily,
+  type HostEvent,
+} from "@zvs/shared";
 import { createFakeDriver } from "../../../test/helpers/FakeDriver.ts";
 import { createFakeTransport, sseFrames } from "../../../test/helpers/FakeTransport.ts";
 import { temporaryDatabase, type TemporaryDatabase } from "../../../test/helpers/tempDb.ts";
@@ -89,33 +96,31 @@ test("migration 0003 adds adapter and auth mode and backfills from kind", () => 
   assert.equal(authMode?.dflt_value, "'api'");
 
   const local = repositories.providers.create(draft);
-  const claude = repositories.providers.create({ ...draft, kind: "anthropic", name: "Claude" });
+  const qwen = repositories.providers.create({ ...draft, kind: "openai-compatible", name: "Qwen" });
   assert.equal(repositories.providers.findById(local.id)?.adapter, "openai-compatible");
   assert.equal(repositories.providers.findById(local.id)?.authMode, "api");
-  assert.equal(claude.adapter, "openai-compatible");
-  repositories.providers.update(claude.id, { adapter: "anthropic" });
-  assert.equal(repositories.providers.findById(claude.id)?.adapter, "anthropic");
+  assert.equal(qwen.adapter, "openai-compatible");
+  repositories.providers.update(qwen.id, { adapter: "qwen-web" });
+  assert.equal(repositories.providers.findById(qwen.id)?.adapter, "qwen-web");
 });
 
-test("every adapter family is registered and only anthropic is still a stub", () => {
+test("every registered adapter family is implemented, and an unknown one is refused", () => {
   assert.deepEqual(Object.keys(ADAPTER_REGISTRY).sort(), [
-    "anthropic",
     "deepseek-web",
     "openai-compatible",
     "qwen-web",
   ]);
-  for (const family of ["openai-compatible", "qwen-web", "deepseek-web"] as const) {
+  for (const family of ADAPTER_FAMILIES) {
     const driver = adapterEntry(family).build({ transport: createFakeTransport() });
     assert.equal(adapterEntry(family).implemented, true);
     assert.notEqual(driver.text, null);
   }
-  assert.equal(adapterEntry("anthropic").implemented, false);
   assert.throws(
-    () => adapterEntry("anthropic").build({ transport: createFakeTransport() }),
+    () => adapterEntry("made-up" as AdapterFamily),
     (error: unknown) =>
       isAppError(error) &&
       error.code === AppErrorCode.UNKNOWN &&
-      error.message === "adapter anthropic is not implemented yet",
+      error.message === "adapter made-up is not implemented yet",
   );
   assert.equal(adapterCapabilities("qwen-web").authModes.includes("account"), true);
   assert.equal(adapterCapabilities("openai-compatible").honours.topK, false);
@@ -136,12 +141,12 @@ test("the registry builds a driver per adapter value, caches it and invalidates 
   assert.equal(providers.size, 0);
   assert.notEqual(second, await providers.driver(row.id));
 
-  const claude = repositories.providers.create({ ...draft, kind: "anthropic", name: "Claude" });
-  repositories.providers.update(claude.id, { adapter: "anthropic" });
+  const stray = repositories.providers.create({ ...draft, name: "Stray" });
+  repositories.providers.update(stray.id, { adapter: "made-up" as AdapterFamily });
   await assert.rejects(
-    () => providers.driver(claude.id),
+    () => providers.driver(stray.id),
     (error: unknown) =>
-      isAppError(error) && error.message === "adapter anthropic is not implemented yet",
+      isAppError(error) && error.message === "adapter made-up is not implemented yet",
   );
 });
 

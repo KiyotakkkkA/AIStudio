@@ -1,11 +1,6 @@
 import { z } from "zod";
 
-export const ADAPTER_FAMILIES = [
-  "openai-compatible",
-  "anthropic",
-  "qwen-web",
-  "deepseek-web",
-] as const;
+export const ADAPTER_FAMILIES = ["openai-compatible", "qwen-web", "deepseek-web"] as const;
 export const AdapterFamily = z.enum(ADAPTER_FAMILIES);
 export type AdapterFamily = z.infer<typeof AdapterFamily>;
 

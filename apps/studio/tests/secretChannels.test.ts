@@ -36,8 +36,8 @@ function harness() {
 
 function draft(overrides: Partial<CreateSecretInput> = {}): CreateSecretInput {
   return {
-    type: "ollama-cloud",
-    name: "Ollama Cloud — personal",
+    type: "ollama",
+    name: "Ollama — personal",
     scope: "personal",
     value: VALUE,
     fields: { organization: "zvs-lab" },

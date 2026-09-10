@@ -1,16 +1,16 @@
 import { z } from "zod";
 import { SecretTypeSchema } from "./SecretTypeSchema.js";
 
-export const SECRET_TYPE_KEYS = ["ollama-cloud", "openrouter", "mistral", "custom"] as const;
+export const SECRET_TYPE_KEYS = ["ollama", "openrouter", "mistral", "custom"] as const;
 
 export const SecretTypeKey = z.enum(SECRET_TYPE_KEYS);
 export type SecretTypeKey = z.infer<typeof SecretTypeKey>;
 
 export const SECRET_TYPE_REGISTRY: readonly SecretTypeSchema[] = [
   {
-    key: "ollama-cloud",
+    key: "ollama",
     version: 1,
-    label: "Ollama Cloud API key",
+    label: "Ollama API key",
     fields: [
       {
         key: "apiKey",

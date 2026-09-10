@@ -12,7 +12,7 @@ const NOW = createFakeClock().now();
 function draft(overrides: Partial<SecretDraft> = {}): SecretDraft {
   return {
     type: "ollama",
-    name: "Ollama Cloud — personal",
+    name: "Ollama — personal",
     scope: "personal",
     cipher: Buffer.from("ciphertext"),
     hint: "…4f2a",
@@ -31,14 +31,14 @@ test("a secret round-trips through create, read, update and delete", () => {
     const created = secrets.create(draft());
 
     assert.equal(typeof created.id, "string");
-    assert.equal(created.name, "Ollama Cloud — personal");
+    assert.equal(created.name, "Ollama — personal");
     assert.equal(created.cipherVersion, 1);
     assert.equal(created.hint, "…4f2a");
     assert.deepEqual(JSON.parse(created.tags), ["llm", "cloud"]);
     assert.deepEqual(secrets.findById(created.id), created);
 
-    const updated = secrets.update(created.id, { name: "Ollama Cloud — lab", updatedAt: NOW + 10 });
-    assert.equal(updated?.name, "Ollama Cloud — lab");
+    const updated = secrets.update(created.id, { name: "Ollama — lab", updatedAt: NOW + 10 });
+    assert.equal(updated?.name, "Ollama — lab");
     assert.equal(updated?.updatedAt, NOW + 10);
     assert.equal(secrets.listSummaries().length, 1);
 

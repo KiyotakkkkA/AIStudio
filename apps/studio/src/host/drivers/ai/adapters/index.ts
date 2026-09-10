@@ -24,19 +24,6 @@ export function notImplemented(family: AdapterFamily): AppError {
   });
 }
 
-function stub(
-  family: AdapterFamily,
-  capabilities: Omit<AdapterCapabilities, "family">,
-): AdapterFamilyEntry {
-  return {
-    capabilities: { family, ...capabilities },
-    implemented: false,
-    build(): AiDriver {
-      throw notImplemented(family);
-    },
-  };
-}
-
 export const ADAPTER_REGISTRY: Readonly<Record<AdapterFamily, AdapterFamilyEntry>> = {
   "openai-compatible": {
     capabilities: OPENAI_COMPATIBLE_CAPABILITIES,
@@ -46,14 +33,6 @@ export const ADAPTER_REGISTRY: Readonly<Record<AdapterFamily, AdapterFamilyEntry
       return { text: adapter, embedding: adapter, image: null };
     },
   },
-  anthropic: stub("anthropic", {
-    authModes: ["api"],
-    streaming: true,
-    liveModelList: true,
-    embedding: false,
-    image: false,
-    honours: { temperature: true, topK: true, topP: true, maxOutputTokens: true },
-  }),
   "qwen-web": {
     capabilities: QWEN_WEB_CAPABILITIES,
     implemented: true,

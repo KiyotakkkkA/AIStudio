@@ -76,7 +76,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
             id="provider-name"
             value={vm.name}
             maxLength={128}
-            placeholder="Ollama Cloud"
+            placeholder="Ollama"
             invalid={vm.errorOf("name") !== undefined}
             onChange={(event) => {
               vm.setName(event.target.value);

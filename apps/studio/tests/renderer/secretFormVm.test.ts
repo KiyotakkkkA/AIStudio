@@ -14,8 +14,8 @@ const ID = "0199aa11-1111-7111-8111-000000000042" as SecretId;
 function ollamaSecret(overrides: Partial<SecretDto> = {}): SecretDto {
   return {
     id: ID,
-    type: "ollama-cloud",
-    name: "Ollama Cloud — личный",
+    type: "ollama",
+    name: "Ollama — личный",
     scope: "personal",
     hint: "osk_live_••••4f2a",
     tags: ["llm"],
@@ -40,7 +40,7 @@ test("switching the type swaps the credential fields and keeps name and scope", 
 
   vm.setType("openrouter");
 
-  assert.equal(vm.name, "Ollama Cloud — личный");
+  assert.equal(vm.name, "Ollama — личный");
   assert.equal(vm.scope, "shared");
   assert.deepEqual(
     vm.credentialFields.map((field) => field.key),
@@ -54,7 +54,7 @@ test("switching the type swaps the credential fields and keeps name and scope", 
 test("defaults from the registry prefill a new form", () => {
   const vm = new SecretFormVm(SECRET_TYPE_REGISTRY);
 
-  assert.equal(vm.type, "ollama-cloud");
+  assert.equal(vm.type, "ollama");
   assert.equal(vm.isNew, true);
   assert.equal(vm.fieldValues.baseUrl, "https://ollama.com/api");
   assert.equal(vm.fieldValues.verifyTls, true);
@@ -70,8 +70,8 @@ test("client validation agrees with the host schema on a malformed field", () =>
   assert.equal(vm.validate(), false);
   assert.equal(vm.errorOf("fields.baseUrl") !== undefined, true);
 
-  const schema = findSecretTypeSchema("ollama-cloud");
-  if (schema === undefined) throw new Error("В реестре нет схемы ollama-cloud");
+  const schema = findSecretTypeSchema("ollama");
+  if (schema === undefined) throw new Error("В реестре нет схемы ollama");
   assert.equal(buildFieldsSchema(schema).safeParse(vm.fieldsPayload()).success, false);
 
   vm.setField("baseUrl", "https://ollama.com/api");
@@ -94,14 +94,14 @@ test("a new secret of a type with a required secret field demands a value", () =
 
 test("editing without touching the value omits it from the update payload", () => {
   const vm = new SecretFormVm(SECRET_TYPE_REGISTRY, ollamaSecret());
-  vm.setName("Ollama Cloud — рабочий");
+  vm.setName("Ollama — рабочий");
 
   assert.equal(vm.valueRequired, false);
   assert.equal(vm.validate(), true);
 
   const payload = vm.toUpdateInput();
   assert.equal(Object.hasOwn(payload, "value"), false);
-  assert.equal(payload.name, "Ollama Cloud — рабочий");
+  assert.equal(payload.name, "Ollama — рабочий");
   assert.deepEqual(payload.fields, { baseUrl: "https://ollama.com/api", verifyTls: true });
 
   vm.setValue("osk_live_new");

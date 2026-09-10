@@ -27,14 +27,12 @@ export const CAPABILITY_LIST_HEADINGS: Record<ProviderCapability, string> = {
 export const KIND_LABELS: Record<ProviderKind, string> = {
   ollama: "Ollama",
   openrouter: "OpenRouter",
-  anthropic: "Anthropic",
   mistral: "Mistral",
   "openai-compatible": "Совместимый с OpenAI",
 };
 
 export const ADAPTER_LABELS: Record<AdapterFamily, string> = {
   "openai-compatible": "openai-compatible",
-  anthropic: "anthropic",
   "qwen-web": "qwen-web",
   "deepseek-web": "deepseek-web",
 };
@@ -62,7 +60,6 @@ export const PARAMETER_LABELS = {
 const KIND_BASE_URLS: Record<ProviderKind, string> = {
   ollama: "https://ollama.com/api",
   openrouter: "https://openrouter.ai/api/v1",
-  anthropic: "https://api.anthropic.com/v1",
   mistral: "https://api.mistral.ai/v1",
   "openai-compatible": "",
 };
@@ -73,11 +70,10 @@ const ADAPTER_BASE_URLS: Partial<Record<AdapterFamily, string>> = {
 };
 
 const KIND_SECRET_TYPES: Record<ProviderKind, readonly string[]> = {
-  ollama: ["ollama-cloud", "custom"],
+  ollama: ["ollama", "custom"],
   openrouter: ["openrouter", "custom"],
-  anthropic: ["custom"],
   mistral: ["mistral", "custom"],
-  "openai-compatible": ["ollama-cloud", "openrouter", "mistral", "custom"],
+  "openai-compatible": ["ollama", "openrouter", "mistral", "custom"],
 };
 
 export function suggestedBaseUrl(kind: ProviderKind, adapter: AdapterFamily): string {

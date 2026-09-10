@@ -75,7 +75,7 @@ test("required fields match the host contract", () => {
   assert.equal(vm.errorOf("name"), "Укажите название подключения.");
   assert.equal(vm.errorOf("secretId"), "Выберите секрет с учётными данными.");
 
-  vm.setName("Ollama Cloud");
+  vm.setName("Ollama");
   vm.setSecretId(SECRET);
 
   assert.equal(vm.validate(), true);
@@ -107,14 +107,23 @@ test("an account-only family disables the API-key segment and switches the mode"
   assert.equal(vm.authMode, "account");
 });
 
-test("an unimplemented family is refused with its own message", () => {
-  const vm = formFor();
-  vm.setName("Anthropic");
+test("a family the host declares but has not wired up is refused", () => {
+  // Every registered family is implemented today; the guard must still hold when one is not.
+  const stub = ADAPTERS.map((entry) =>
+    entry.family === "deepseek-web" ? { ...entry, implemented: false } : entry,
+  );
+  const vm = new ProviderFormVm({
+    adapters: stub,
+    accounts: ACCOUNTS,
+    capability: "text",
+    provider: null,
+  });
+  vm.setName("DeepSeek");
   vm.setSecretId(SECRET);
-  vm.setAdapter("anthropic");
+  vm.setAdapter("deepseek-web");
 
   assert.equal(vm.validate(), false);
-  assert.equal(vm.errorOf("adapter"), "Семейство anthropic ещё не реализовано.");
+  assert.equal(vm.errorOf("adapter"), "Семейство deepseek-web ещё не реализовано.");
 });
 
 test("tunables come from the descriptor, never from vendor guesswork", () => {

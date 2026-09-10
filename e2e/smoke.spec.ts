@@ -143,7 +143,7 @@ test("the secret channels answer the renderer without ever carrying a value", as
   const types = await page.evaluate(() => window.zvs.call("secrets.types", undefined));
   expect(types).toMatchObject({ ok: true });
   expect((types as { data: { key: string }[] }).data.map((schema) => schema.key)).toEqual([
-    "ollama-cloud",
+    "ollama",
     "openrouter",
     "mistral",
     "custom",
@@ -153,8 +153,8 @@ test("the secret channels answer the renderer without ever carrying a value", as
   const created = await page.evaluate(
     (value) =>
       window.zvs.call("secrets.create", {
-        type: "ollama-cloud",
-        name: "Ollama Cloud — e2e",
+        type: "ollama",
+        name: "Ollama — e2e",
         scope: "personal",
         value,
         fields: { organization: "zvs-lab" },
@@ -171,8 +171,8 @@ test("the secret channels answer the renderer without ever carrying a value", as
   const rejected = await page.evaluate(
     (value) =>
       window.zvs.call("secrets.create", {
-        type: "ollama-cloud",
-        name: "Ollama Cloud — sneaky",
+        type: "ollama",
+        name: "Ollama — sneaky",
         scope: "personal",
         value,
         fields: { sneaky: "value" },

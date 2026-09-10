@@ -103,7 +103,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
                 id="secret-name"
                 value={vm.name}
                 maxLength={128}
-                placeholder="Ollama Cloud — личный"
+                placeholder="Ollama — личный"
                 invalid={vm.errorOf("name") !== undefined}
                 onChange={(event) => {
                   vm.setName(event.target.value);
