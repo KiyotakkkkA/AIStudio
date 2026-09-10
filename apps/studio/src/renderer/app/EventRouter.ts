@@ -20,6 +20,7 @@ export interface EventRouterOptions {
 
 export interface EventRouter {
   subscribe(streamId: StreamId, handler: EventHandler): () => void;
+  observe(handler: EventHandler): () => void;
   dispatch(payload: unknown): void;
   connect(source: EventSource): () => void;
   dispose(): void;
@@ -37,6 +38,7 @@ export function createEventRouter(options: EventRouterOptions = {}): EventRouter
   const logger = options.logger ?? consoleLogger;
   const capacity = options.buffer ?? 256;
   const handlers = new Map<StreamId, Set<EventHandler>>();
+  const observers = new Set<EventHandler>();
   const lastSeq = new Map<StreamId, number>();
   let pending: RoutedEvent[] = [];
   let detach: (() => void) | undefined;
@@ -53,6 +55,7 @@ export function createEventRouter(options: EventRouterOptions = {}): EventRouter
   };
 
   const route = (event: RoutedEvent): void => {
+    for (const observer of [...observers]) observer(event);
     const targets = handlers.get(event.streamId);
     if (!targets || targets.size === 0) {
       hold(event);
@@ -119,6 +122,16 @@ export function createEventRouter(options: EventRouterOptions = {}): EventRouter
       };
     },
 
+    observe(handler) {
+      observers.add(handler);
+      let active = true;
+      return () => {
+        if (!active) return;
+        active = false;
+        observers.delete(handler);
+      };
+    },
+
     connect(source) {
       detach?.();
       const stop = source(dispatch);
@@ -133,6 +146,7 @@ export function createEventRouter(options: EventRouterOptions = {}): EventRouter
       detach?.();
       detach = undefined;
       handlers.clear();
+      observers.clear();
       lastSeq.clear();
       pending = [];
     },

@@ -17,6 +17,7 @@ import {
 import { providerErrorCopy, providerFieldErrors } from "./providerErrors";
 import { discoveredRows, modelRows, type ModelRow } from "./modelRows";
 import ProviderFormVm from "./ProviderFormVm";
+import { ACCOUNTS_TAB, type ProvidersTab } from "./providerTabs";
 
 export type PendingIntent =
   | { readonly kind: "create" }
@@ -25,6 +26,8 @@ export type PendingIntent =
 
 export class ProviderStore {
   capability: ProviderCapability = "text";
+  /** The visible tab. `accounts` is a sibling of the capability filters, never one of them. */
+  tab: ProvidersTab = "text";
   summaries: ProviderSummaryDto[] = [];
   counts: Record<ProviderCapability, number> = { text: 0, embedding: 0, image: 0 };
   selectedId: ProviderId | null = null;
@@ -127,6 +130,7 @@ export class ProviderStore {
   }
 
   async setCapability(capability: ProviderCapability): Promise<void> {
+    this.tab = capability;
     if (capability === this.capability) return;
     this.capability = capability;
     this.selectedId = null;
@@ -136,12 +140,25 @@ export class ProviderStore {
   }
 
   requestCapability(capability: ProviderCapability): void {
-    if (capability === this.capability) return;
-    if (this.form?.dirty === true) {
+    if (capability === this.capability && this.tab === capability) return;
+    if (capability !== this.capability && this.form?.dirty === true) {
       this.pending = { kind: "capability", capability };
       return;
     }
     void this.setCapability(capability);
+  }
+
+  /**
+   * Switching to Accounts keeps the form and its edits in the store, so it needs no
+   * unsaved-changes guard — only the capability filters do.
+   */
+  requestTab(tab: ProvidersTab): void {
+    if (tab === this.tab) return;
+    if (tab === ACCOUNTS_TAB) {
+      this.tab = tab;
+      return;
+    }
+    this.requestCapability(tab);
   }
 
   async select(id: ProviderId): Promise<void> {
