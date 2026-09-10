@@ -1,6 +1,6 @@
 import { mdiKeyOutline } from "@mdi/js";
 import type { SecretScope, SecretSummaryDto } from "@zvs/shared";
-import type { StatusTone } from "../../ui/atoms/StatusDot";
+import type { StatusTone } from "../../ui/atoms/statusTone";
 
 export const SCOPE_LABELS: Record<SecretScope, string> = {
   personal: "Личный",

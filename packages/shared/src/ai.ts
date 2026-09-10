@@ -36,6 +36,13 @@ export const AdapterCapabilitiesDto = z.object({
 });
 export type AdapterCapabilitiesDto = z.infer<typeof AdapterCapabilitiesDto>;
 
+export const AdapterDescriptorDto = AdapterCapabilitiesDto.extend({
+  implemented: z
+    .boolean()
+    .describe("false marks a family declared by the registry but not yet wired to a driver."),
+});
+export type AdapterDescriptorDto = z.infer<typeof AdapterDescriptorDto>;
+
 export const DELTA_KINDS = ["text", "reasoning"] as const;
 export const DeltaKind = z.enum(DELTA_KINDS);
 export type DeltaKind = z.infer<typeof DeltaKind>;

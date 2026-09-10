@@ -1,12 +1,6 @@
-export type StatusTone = "ok" | "warn" | "err" | "idle" | "accent";
+import { STATUS_TONE_BACKGROUNDS, type StatusTone } from "./statusTone";
 
-const TONES: Record<StatusTone, string> = {
-  ok: "bg-ok",
-  warn: "bg-warn",
-  err: "bg-err",
-  idle: "bg-main-500",
-  accent: "bg-accent-dark",
-};
+export type { StatusTone };
 
 export interface StatusDotProps {
   readonly tone: StatusTone;
@@ -15,7 +9,10 @@ export interface StatusDotProps {
 
 export default function StatusDot({ tone, title }: StatusDotProps) {
   return (
-    <span className={`size-1.75 flex-none rounded-full ${TONES[tone]}`} title={title}>
+    <span
+      className={`size-1.75 flex-none rounded-full ${STATUS_TONE_BACKGROUNDS[tone]}`}
+      title={title}
+    >
       {title === undefined ? null : <span className="sr-only">{title}</span>}
     </span>
   );

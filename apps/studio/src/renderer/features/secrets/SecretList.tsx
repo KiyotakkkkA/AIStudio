@@ -25,7 +25,6 @@ export interface SecretListProps {
 function SecretList({ onSelect, onCreate }: SecretListProps) {
   const { secrets } = useStore();
   const now = Date.now();
-  const typeNames = secrets.types.map((schema) => schema.label).join(" · ");
 
   return (
     <div className="flex min-h-0 w-99 flex-none flex-col gap-2.5">
@@ -91,7 +90,9 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
           }
         >
           <span className="font-medium text-main-300">Добавить секрет по схеме провайдера</span>
-          <span className="truncate text-[11px] text-main-400">{typeNames}</span>
+          <span className="truncate text-[11px] text-main-400">
+            Секреты хранятся локально и не покидают внутренний контур приложения.
+          </span>
         </ListRow>
       </div>
     </div>

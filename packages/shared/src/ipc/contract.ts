@@ -22,6 +22,7 @@ import {
 import { ProviderId } from "../primitives/branded.js";
 import { defineContract } from "./defineContract.js";
 import { AccountDto, AccountLinkInput, AccountLinkResult, AccountRef } from "../accounts.js";
+import { AdapterDescriptorDto } from "../ai.js";
 
 export const SecretFilter = z.object({
   scope: SecretScope.optional(),
@@ -99,6 +100,10 @@ export const contract = defineContract({
   "secrets.remove": {
     input: SecretRef,
     output: z.object({ id: SecretId, removed: z.literal(true) }),
+  },
+  "providers.adapters": {
+    input: z.void(),
+    output: z.array(AdapterDescriptorDto),
   },
   "providers.list": {
     input: ProviderListFilter,

@@ -1,9 +1,27 @@
-import type { Contract } from "@zvs/shared";
+import { ADAPTER_FAMILIES, type AdapterDescriptorDto, type Contract } from "@zvs/shared";
 import type { IpcHandlers } from "@zvs/ipc";
+import { adapterEntry } from "../drivers/ai/adapters/index.ts";
 import { toProbeResultDto, type ProviderService } from "../services/ProviderService.ts";
+
+function adapterDescriptors(): AdapterDescriptorDto[] {
+  return ADAPTER_FAMILIES.map((family) => {
+    const entry = adapterEntry(family);
+    return {
+      family,
+      authModes: [...entry.capabilities.authModes],
+      streaming: entry.capabilities.streaming,
+      liveModelList: entry.capabilities.liveModelList,
+      embedding: entry.capabilities.embedding,
+      image: entry.capabilities.image,
+      honours: { ...entry.capabilities.honours },
+      implemented: entry.implemented,
+    };
+  });
+}
 
 export type ProviderHandlers = Pick<
   IpcHandlers<Contract>,
+  | "providers.adapters"
   | "providers.list"
   | "providers.get"
   | "providers.create"
@@ -16,6 +34,8 @@ export type ProviderHandlers = Pick<
 
 export function createProviderHandlers(providers: ProviderService): ProviderHandlers {
   return {
+    "providers.adapters": () => adapterDescriptors(),
+
     "providers.list": (filter) => providers.list(filter),
 
     "providers.get": ({ id }) => providers.get(id),
