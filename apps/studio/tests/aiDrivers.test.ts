@@ -300,6 +300,91 @@ test("the openai-compatible adapter turns SSE frames into deltas and maps discov
   assert.equal(models[1]?.family, "llama3");
 });
 
+test("a base URL that speaks the OpenAI dialect is listed in one request", async () => {
+  const transport = createFakeTransport("https://openrouter.ai/api/v1");
+  const adapter = new OpenAiCompatibleAdapter({ transport });
+  transport.reply("/models", { body: { data: [{ id: "deepseek/deepseek-v4.1-flash" }] } });
+
+  const models = await adapter.listModels(new AbortController().signal);
+
+  assert.deepEqual(
+    models.map((entry) => entry.externalId),
+    ["deepseek/deepseek-v4.1-flash"],
+  );
+  assert.deepEqual(
+    transport.calls.map((call) => call.path),
+    ["/models"],
+    "/tags is never asked for when /models answers",
+  );
+});
+
+test("Ollama's own /tags answers where /models is absent, and carries the size it omits", async () => {
+  // Shapes taken from the live endpoints: ollama.com/v1/models reports id and nothing else,
+  // ollama.com/api/tags reports name, size and details.
+  const transport = createFakeTransport("https://ollama.com/api");
+  const adapter = new OpenAiCompatibleAdapter({ transport });
+  transport.reply("/models", { status: 404, body: { error: "not found" } });
+  transport.reply("/tags", {
+    body: {
+      models: [
+        {
+          name: "gpt-oss:120b",
+          model: "gpt-oss:120b",
+          size: 65_290_180_781,
+          details: { family: "", parameter_size: "" },
+        },
+        { name: "qwen3.5:397b", model: "qwen3.5:397b", size: 1_000, details: { family: "qwen3" } },
+        { name: "  ", model: "  " },
+      ],
+    },
+  });
+
+  const models = await adapter.listModels(new AbortController().signal);
+
+  assert.deepEqual(
+    transport.calls.map((call) => call.path),
+    ["/models", "/tags"],
+  );
+  assert.deepEqual(models[0], {
+    externalId: "gpt-oss:120b",
+    displayName: "gpt-oss:120b",
+    family: "gpt-oss",
+    contextWindow: null,
+    maxOutput: null,
+    sizeBytes: 65_290_180_781,
+    capabilities: ["streaming"],
+  });
+  assert.equal(models[1]?.family, "qwen3", "the vendor's own family wins over the id prefix");
+  assert.equal(models.length, 2, "a nameless row is dropped, exactly as on the OpenAI path");
+});
+
+test("a rejected key is reported from the first path, never retried against the second", async () => {
+  const transport = createFakeTransport("https://api.mistral.ai/v1");
+  const adapter = new OpenAiCompatibleAdapter({ transport });
+  transport.reply("/models", { status: 401, body: { detail: "Invalid API Key" } });
+
+  await assert.rejects(
+    () => adapter.listModels(new AbortController().signal),
+    (error: unknown) => isAppError(error) && error.code === AppErrorCode.PROVIDER_AUTH_FAILED,
+  );
+  assert.deepEqual(
+    transport.calls.map((call) => call.path),
+    ["/models"],
+  );
+});
+
+test("a vendor that has neither endpoint reports the second failure, not an empty list", async () => {
+  const transport = createFakeTransport();
+  const adapter = new OpenAiCompatibleAdapter({ transport });
+  transport.reply("/models", { status: 404, body: {} });
+  transport.reply("/tags", { status: 404, body: {} });
+
+  await assert.rejects(
+    () => adapter.listModels(new AbortController().signal),
+    (error: unknown) => isAppError(error) && error.details?.status === 404,
+  );
+});
+
 test("the SSE reader tolerates split chunks, CRLF frames, comments and a missing terminator", async () => {
   async function* chunks(): AsyncIterable<Uint8Array> {
     const encoder = new TextEncoder();

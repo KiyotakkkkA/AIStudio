@@ -44,6 +44,10 @@ export function isSignedOutResponse(
   return (headers["content-type"] ?? "").toLowerCase().includes("text/html");
 }
 
+export function isNotFoundResponse(error: unknown): boolean {
+  return isAppError(error) && error.details?.status === 404;
+}
+
 export function isCancellation(error: unknown): boolean {
   return (
     (error instanceof Error && error.name === "AbortError") ||

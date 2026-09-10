@@ -173,7 +173,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
               id="provider-base-url"
               mono
               value={vm.baseUrl}
-              placeholder="https://ollama.com/api"
+              placeholder="https://ollama.com/v1"
               invalid={vm.errorOf("baseUrl") !== undefined}
               onChange={(event) => {
                 vm.setBaseUrl(event.target.value);

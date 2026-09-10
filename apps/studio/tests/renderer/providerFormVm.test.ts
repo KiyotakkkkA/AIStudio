@@ -150,7 +150,7 @@ test("capabilities the family cannot serve are refused with a reason", () => {
 
 test("switching the vendor moves the untouched base URL with it", () => {
   const vm = formFor();
-  assert.equal(vm.baseUrl, "https://ollama.com/api");
+  assert.equal(vm.baseUrl, "https://ollama.com/v1");
 
   vm.setKind("openrouter");
   assert.equal(vm.baseUrl, "https://openrouter.ai/api/v1");

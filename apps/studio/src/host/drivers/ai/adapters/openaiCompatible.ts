@@ -5,7 +5,7 @@ import {
   type AdapterCapabilities,
   type TunableParameter,
 } from "../AdapterCapabilities.ts";
-import { cancelled, isCancellation, toAppError } from "../errors.ts";
+import { cancelled, isCancellation, isNotFoundResponse, toAppError } from "../errors.ts";
 import type {
   DiscoveredModel,
   EmbeddingDriver,
@@ -49,8 +49,10 @@ interface ChatResponse {
 
 interface ModelListEntry {
   id?: unknown;
+  model?: unknown;
   name?: unknown;
   display_name?: unknown;
+  details?: { family?: unknown; parameter_size?: unknown };
   context_length?: unknown;
   context_window?: unknown;
   max_output_tokens?: unknown;
@@ -65,6 +67,8 @@ interface ModelListResponse {
   data?: ModelListEntry[];
   models?: ModelListEntry[];
 }
+
+const MODEL_LIST_PATHS = ["/models", "/tags"] as const;
 
 interface EmbeddingResponse {
   data?: { embedding?: unknown }[];
@@ -130,18 +134,33 @@ export class OpenAiCompatibleAdapter implements TextGenerationDriver, EmbeddingD
   }
 
   async listModels(signal: AbortSignal): Promise<DiscoveredModel[]> {
-    const response = await this.#request({ method: "GET", path: "/models" }, signal);
-    const payload = decode<ModelListResponse>(response.text);
+    const payload = await this.#modelList(signal);
     const entries = payload.data ?? payload.models ?? [];
     const seen = new Set<string>();
     const discovered: DiscoveredModel[] = [];
     for (const entry of entries) {
-      const externalId = typeof entry.id === "string" ? entry.id.trim() : "";
+      const externalId = firstString(entry.id, entry.model, entry.name) ?? "";
       if (externalId.length === 0 || seen.has(externalId)) continue;
       seen.add(externalId);
       discovered.push(toDiscoveredModel(externalId, entry));
     }
     return discovered;
+  }
+
+  async #modelList(signal: AbortSignal): Promise<ModelListResponse> {
+    for (const [index, path] of MODEL_LIST_PATHS.entries()) {
+      try {
+        const response = await this.#request({ method: "GET", path }, signal);
+        return decode<ModelListResponse>(response.text);
+      } catch (error: unknown) {
+        if (index === MODEL_LIST_PATHS.length - 1 || !isNotFoundResponse(error)) throw error;
+        this.#logger?.log("debug", "ai", "Model list endpoint is absent, trying the next one", {
+          baseUrl: this.#transport.baseUrl,
+          path,
+        });
+      }
+    }
+    return {};
   }
 
   async embed(
@@ -209,7 +228,7 @@ function toDiscoveredModel(externalId: string, entry: ModelListEntry): Discovere
   return {
     externalId,
     displayName: firstString(entry.display_name, entry.name) ?? externalId,
-    family: firstString(entry.owned_by) ?? familyOf(externalId),
+    family: firstString(entry.owned_by, entry.details?.family) ?? familyOf(externalId),
     contextWindow: firstNumber(
       entry.context_length,
       entry.context_window,
