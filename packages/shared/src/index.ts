@@ -13,3 +13,4 @@ export * from "./events/HostEvent.js";
 export * from "./browser.js";
 export * from "./ai.js";
 export * from "./providers/index.js";
+export * from "./accounts.js";

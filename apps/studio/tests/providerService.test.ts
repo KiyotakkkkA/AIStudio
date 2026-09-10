@@ -319,6 +319,7 @@ test("account draft credentials verify identity without changing the database", 
   const probe = {
     family: "qwen-web" as const,
     endpoint: "https://example.com/identity",
+    loginUrl: "https://example.com/",
     probe: vi.fn(async () => ({
       identity: { externalId: "same-id" },
       credential: { token: "private-token", tokenType: "Bearer" },

@@ -86,7 +86,7 @@ export class ProviderService {
   list(filter: ProviderListFilter = {}): ProviderSummaryDto[] {
     return this.#repositories.providers
       .list(filter)
-      .map((row) => toSummaryDto(row, this.#countModels(row.id)));
+      .map((row) => toSummaryDto(this.#accountStatus(row), this.#countModels(row.id)));
   }
 
   get(id: string): ProviderDto {
@@ -213,6 +213,9 @@ export class ProviderService {
   }
 
   async #runProbe(row: ProviderEntity, signal?: AbortSignal): Promise<ProbeOutcome> {
+    if (row.accountId !== null && this.#account(row.accountId)?.status !== "linked") {
+      return { kind: "session-expired" };
+    }
     const seconds = row.settings.timeoutSeconds ?? this.#timeoutSeconds;
     const controller = new AbortController();
     const abort = () => controller.abort(cancelled());
@@ -316,7 +319,7 @@ export class ProviderService {
     const models = this.#repositories.models.listByProvider(row.id);
     const account = row.accountId === null ? undefined : this.#account(row.accountId);
     return {
-      ...toSummaryDto(row, models.length),
+      ...toSummaryDto(this.#accountStatus(row), models.length),
       baseUrl: row.baseUrl,
       secretId: row.secretId as SecretId | null,
       secretName: row.secretId === null ? null : (this.#secretSummary(row.secretId)?.name ?? null),
@@ -330,6 +333,17 @@ export class ProviderService {
 
   #countModels(providerId: string): number {
     return this.#repositories.models.listByProvider(providerId).length;
+  }
+
+  #accountStatus(row: ProviderEntity): ProviderEntity {
+    if (row.accountId === null) return row;
+    const account = this.#account(row.accountId);
+    if (account?.status === "linked") return row;
+    const derived = deriveStatus({
+      outcome: { kind: "session-expired" },
+      now: timestampNow(this.#clock),
+    });
+    return { ...row, status: derived.status, statusDetail: derived.detail };
   }
 
   #require(id: string): ProviderEntity {

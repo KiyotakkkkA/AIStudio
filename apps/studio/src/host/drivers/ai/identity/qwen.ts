@@ -10,6 +10,7 @@ import {
 } from "./IdentityProbe.ts";
 
 export const QWEN_IDENTITY_ENDPOINT = "https://chat.qwen.ai/api/v1/auths/";
+export const QWEN_LOGIN_URL = "https://chat.qwen.ai/";
 
 const text = z
   .string()
@@ -55,6 +56,7 @@ export function mapQwenIdentity(payload: unknown): ProbeResult {
 export const qwenIdentityProbe: IdentityProbe = {
   family: "qwen-web",
   endpoint: QWEN_IDENTITY_ENDPOINT,
+  loginUrl: QWEN_LOGIN_URL,
   async probe(session: SessionGateway, signal: AbortSignal): Promise<ProbeResult> {
     return mapQwenIdentity(
       await fetchIdentity("qwen-web", QWEN_IDENTITY_ENDPOINT, session, signal),

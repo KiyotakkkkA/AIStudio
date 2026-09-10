@@ -9,8 +9,11 @@ import { createSystemHandlers } from "./system.ts";
 import { createSecretHandlers } from "./secrets.ts";
 import { createSettingHandlers } from "./settings.ts";
 import { createProviderHandlers } from "./providers.ts";
+import { createAccountHandlers } from "./accounts.ts";
+import type { AccountService } from "../services/AccountService.ts";
 
 export interface HostIpcDependencies {
+  accounts: AccountService;
   settings: SettingService;
   secrets: SecretService;
   providers: ProviderService;
@@ -30,5 +33,6 @@ export function createHandlers(dependencies: HostIpcDependencies): IpcHandlers<C
     ...createSettingHandlers(dependencies.settings, dependencies.healthCheck),
     ...createSecretHandlers(dependencies.secrets),
     ...createProviderHandlers(dependencies.providers),
+    ...createAccountHandlers(dependencies.accounts),
   };
 }

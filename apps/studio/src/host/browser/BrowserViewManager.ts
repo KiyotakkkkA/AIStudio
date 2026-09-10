@@ -3,6 +3,7 @@ import type { Cookie, IpcMainInvokeEvent, WebContents, WebPreferences } from "el
 import { BrowserBounds, BrowserCommand, type BrowserCookie, type BrowserState } from "@zvs/shared";
 import type { StudioPaths } from "../platform/paths.ts";
 import { createId } from "../platform/ids.ts";
+import type { BrowserLifecycle } from "./lifecycle.ts";
 import {
   BROWSER_PARTITION,
   CHROME_HEIGHT,
@@ -26,13 +27,23 @@ export class BrowserViewManager {
   private activeId: string | null = null;
   private attached?: WebContentsView;
   private sitesVisible = false;
+  private readonly linkTabs = new Map<WebContents, string>();
+  private readonly stopLifecycle?: () => void;
   private readonly profile = session.fromPartition(BROWSER_PARTITION);
 
   constructor(
     private readonly paths: StudioPaths,
     private readonly studio: () => BrowserWindow | undefined,
     private readonly developmentUrl?: string,
+    private readonly lifecycle?: BrowserLifecycle,
+    private readonly navigateWorkspace?: (path: "/browser" | "/providers") => void,
   ) {
+    this.stopLifecycle = lifecycle?.subscribe((event) => {
+      if (event.type !== "link-finished") return;
+      for (const [contents, url] of this.linkTabs) {
+        if (url === event.url) this.linkTabs.delete(contents);
+      }
+    });
     this.profile.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     this.profile.setPermissionCheckHandler(() => false);
     this.profile.setDevicePermissionHandler(() => false);
@@ -52,6 +63,7 @@ export class BrowserViewManager {
     ipcMain.handle("browser.hide", (event) => {
       if (!this.isSender(event, this.studio())) throw new Error("Forbidden");
       this.visible = false;
+      this.lifecycle?.emit({ type: "workspace-closed" });
       this.layout();
     });
     ipcMain.handle("browser.command", async (event, input: unknown) => {
@@ -100,6 +112,7 @@ export class BrowserViewManager {
     window.on("resize", () => this.layout());
     chrome.webContents.on("did-finish-load", () => this.publish());
     window.once("closed", () => {
+      this.lifecycle?.emit({ type: "workspace-closed" });
       this.window = undefined;
       this.visible = false;
       this.attached = undefined;
@@ -117,6 +130,22 @@ export class BrowserViewManager {
       : this.paths.browserRendererUrl;
     void chrome.webContents.loadURL(url).catch(() => undefined);
     this.newTab();
+  }
+
+  openTab(url: string): void {
+    this.navigateWorkspace?.("/browser");
+    this.open();
+    const contents = this.newTab(url);
+    this.linkTabs.set(contents, url);
+    const closed = () => {
+      if (!this.linkTabs.delete(contents)) return;
+      this.lifecycle?.emit({ type: "link-tab-closed", url });
+    };
+    contents.once("destroyed", closed);
+    contents.on("render-process-gone", closed);
+    contents.on("will-navigate", (_event, destination) => {
+      if (new URL(destination).origin !== new URL(url).origin) closed();
+    });
   }
 
   private active(): Tab | undefined {
@@ -313,6 +342,7 @@ export class BrowserViewManager {
       );
       url.pathname = cookie.path ?? "/";
       await this.profile.cookies.remove(url.href, cookie.name);
+      if (cookie.domain) this.lifecycle?.emit({ type: "cookies-cleared", domain: cookie.domain });
     }
     await this.profile.cookies.flushStore();
   }
@@ -328,6 +358,11 @@ export class BrowserViewManager {
       case "navigate": {
         if (!tab) throw new Error("No active tab");
         const url = navigationUrl(command.url);
+        const linkUrl = this.linkTabs.get(tab.view.webContents);
+        if (linkUrl) {
+          this.linkTabs.delete(tab.view.webContents);
+          this.lifecycle?.emit({ type: "link-tab-closed", url: linkUrl });
+        }
         this.sitesVisible = false;
         void tab.view.webContents.loadURL(url).catch(() => undefined);
         break;
@@ -385,6 +420,7 @@ export class BrowserViewManager {
           (cookie) => cookie.domain === command.domain,
         );
         await this.removeCookies(cookies);
+        this.lifecycle?.emit({ type: "cookies-cleared", domain: command.domain });
         return this.cookies();
       }
     }
@@ -393,6 +429,9 @@ export class BrowserViewManager {
   }
 
   dispose(): void {
+    this.lifecycle?.emit({ type: "workspace-closed" });
+    this.stopLifecycle?.();
+    this.linkTabs.clear();
     ipcMain.removeHandler("browser.mount");
     ipcMain.removeHandler("browser.hide");
     ipcMain.removeHandler("browser.command");

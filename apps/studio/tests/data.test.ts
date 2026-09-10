@@ -9,6 +9,7 @@ import { migrate, prepareDatabase, BACKUPS_KEPT } from "../src/host/data/migrate
 import { isMigrationFailedError } from "../src/host/data/MigrationFailedError.ts";
 import { SettingService } from "../src/host/services/SettingService.ts";
 import { createHandlers } from "../src/host/ipc/index.ts";
+import { createAccountService } from "../../../test/helpers/accountService.ts";
 import {
   captureWindowState,
   DEFAULT_WINDOW_STATE,
@@ -272,6 +273,7 @@ test("settings channels carry JSON values through the whole chain", async () => 
   try {
     const settings = new SettingService({ data: database.client, clock: createFakeClock() });
     const handlers = createHandlers({
+      accounts: createAccountService(database.client),
       providers: createProviderService(database.client),
       settings,
       secrets: createSecretService(database.client),

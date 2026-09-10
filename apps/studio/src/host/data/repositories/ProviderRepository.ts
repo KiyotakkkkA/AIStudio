@@ -151,7 +151,7 @@ function requireAuthModeIntegrity(row: ProviderEntity): void {
     if (row.secretId !== null) {
       throw integrityError(row, "Провайдер в режиме аккаунта не может ссылаться на секрет");
     }
-    if (row.accountId === null && row.status !== "needs-relink") {
+    if (row.accountId === null && row.status !== "needs-relink" && row.status !== "failed") {
       throw integrityError(row, "Провайдер в режиме аккаунта должен быть привязан к аккаунту");
     }
     return;

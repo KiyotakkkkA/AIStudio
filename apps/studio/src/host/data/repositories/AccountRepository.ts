@@ -110,8 +110,8 @@ export class AccountRepository extends Repository {
         .update(provider)
         .set({
           accountId: null,
-          status: "needs-relink",
-          statusDetail: "Аккаунт отвязан",
+          status: "failed",
+          statusDetail: "no account linked",
           updatedAt: now,
         })
         .where(eq(provider.accountId, id))

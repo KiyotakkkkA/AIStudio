@@ -1,4 +1,5 @@
 import { createProviderService } from "../../../test/helpers/providerService.ts";
+import { createAccountService } from "../../../test/helpers/accountService.ts";
 import assert from "node:assert/strict";
 import { afterAll, test } from "vitest";
 import { contract } from "@zvs/shared";
@@ -15,6 +16,7 @@ afterAll(() => database.dispose());
 
 test("system.ping echoes the host clock and matches the contract", () => {
   const handlers = createHandlers({
+    accounts: createAccountService(database.client),
     providers: createProviderService(database.client),
     settings,
     secrets,
@@ -31,6 +33,7 @@ test("system.ping echoes the host clock and matches the contract", () => {
 
 test("every contract channel has a handler at runtime too", () => {
   const handlers = createHandlers({
+    accounts: createAccountService(database.client),
     providers: createProviderService(database.client),
     settings,
     secrets,

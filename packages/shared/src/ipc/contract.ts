@@ -21,6 +21,7 @@ import {
 } from "../providers/index.js";
 import { ProviderId } from "../primitives/branded.js";
 import { defineContract } from "./defineContract.js";
+import { AccountDto, AccountLinkInput, AccountLinkResult, AccountRef } from "../accounts.js";
 
 export const SecretFilter = z.object({
   scope: SecretScope.optional(),
@@ -40,6 +41,17 @@ export const SettingKey = z
 export type SettingKey = z.infer<typeof SettingKey>;
 
 export const contract = defineContract({
+  "accounts.list": { input: z.void(), output: z.array(AccountDto) },
+  "accounts.link": { input: AccountLinkInput, output: AccountLinkResult },
+  "accounts.cancelLink": { input: AccountLinkInput, output: z.object({ cancelled: z.boolean() }) },
+  "accounts.unlink": {
+    input: AccountRef,
+    output: AccountRef.extend({
+      removed: z.literal(true),
+      browserSessionPreserved: z.literal(true),
+    }),
+  },
+  "accounts.refresh": { input: AccountRef, output: AccountDto },
   "system.ping": {
     input: z.object({ sentAt: Timestamp }),
     output: z.object({

@@ -28,6 +28,8 @@ import { probeAccountCredentials } from "./drivers/ai/identity/ProbeAccountCrede
 import type { SessionGatewayFactory } from "./drivers/ai/transport/SessionGateway";
 import { ProviderService } from "./services/ProviderService";
 import { HealthCheckService } from "./services/HealthCheckService";
+import { AccountService } from "./services/AccountService";
+import { BrowserLifecycle } from "./browser/lifecycle";
 
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
@@ -40,6 +42,7 @@ let secrets: SecretService | undefined;
 let browser: BrowserViewManager | undefined;
 let providers: ProviderService | undefined;
 let healthCheck: HealthCheckService | undefined;
+let accounts: AccountService | undefined;
 let quitting = false;
 
 if (!app.requestSingleInstanceLock()) {
@@ -60,7 +63,9 @@ if (!app.requestSingleInstanceLock()) {
     event.preventDefault();
     quitting = true;
     healthCheck?.stop();
-    void Promise.all([providers.dispose(), healthCheck?.dispose()]).finally(() => app.quit());
+    void Promise.all([providers.dispose(), healthCheck?.dispose(), accounts?.dispose()]).finally(
+      () => app.quit(),
+    );
   });
   app.on("will-quit", () => {
     logger?.log("info", "host", "Shutdown");
@@ -144,11 +149,32 @@ if (!app.requestSingleInstanceLock()) {
           probeAccountCredentials(account, sessions(account.partition), vault),
       });
       providers = new ProviderService({ data: database, drivers: registry, secrets, logger });
+      const lifecycle = new BrowserLifecycle();
+      const navigateWorkspace = (path: "/browser" | "/providers") => {
+        const stream = eventBus!.openStream();
+        stream.emit({ type: "step", step: { domain: "navigation", path } });
+        stream.end({ status: "ok" });
+      };
+      accounts = new AccountService({
+        data: database,
+        secrets,
+        sessions,
+        events: eventBus,
+        lifecycle,
+        logger,
+        browser: {
+          openTab: (url) => {
+            if (!browser) throw new Error("Browser is unavailable");
+            browser.openTab(url);
+          },
+        },
+        onLinked: () => navigateWorkspace("/providers"),
+      });
       healthCheck = new HealthCheckService({ providers, settings, events: eventBus, logger });
       healthCheck.start();
       ipcServer = createIpcServer(
         contract,
-        createHandlers({ events: eventBus, settings, secrets, providers, healthCheck }),
+        createHandlers({ events: eventBus, settings, secrets, providers, healthCheck, accounts }),
         {
           ipcMain: {
             handle(channel, listener) {
@@ -173,7 +199,13 @@ if (!app.requestSingleInstanceLock()) {
       const developmentUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL;
       installContentSecurityPolicy(developmentUrl);
       window = openStudioWindow(paths, logger, settings, developmentUrl);
-      browser = new BrowserViewManager(paths, () => window, developmentUrl);
+      browser = new BrowserViewManager(
+        paths,
+        () => window,
+        developmentUrl,
+        lifecycle,
+        navigateWorkspace,
+      );
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0 && logger && settings) {
           window = openStudioWindow(paths, logger, settings, developmentUrl);

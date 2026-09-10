@@ -11,6 +11,7 @@ import {
 } from "./IdentityProbe.ts";
 
 export const DEEPSEEK_IDENTITY_ENDPOINT = "https://chat.deepseek.com/api/v0/users/current";
+export const DEEPSEEK_LOGIN_URL = "https://chat.deepseek.com/";
 
 const text = z
   .string()
@@ -73,6 +74,7 @@ export function mapDeepSeekIdentity(payload: unknown): ProbeResult {
 export const deepSeekIdentityProbe: IdentityProbe = {
   family: "deepseek-web",
   endpoint: DEEPSEEK_IDENTITY_ENDPOINT,
+  loginUrl: DEEPSEEK_LOGIN_URL,
   async probe(session: SessionGateway, signal: AbortSignal): Promise<ProbeResult> {
     return mapDeepSeekIdentity(
       await fetchIdentity("deepseek-web", DEEPSEEK_IDENTITY_ENDPOINT, session, signal),

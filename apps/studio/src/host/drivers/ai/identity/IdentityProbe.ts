@@ -13,6 +13,7 @@ export interface ProbeResult {
 export interface IdentityProbe {
   readonly family: AccountFamily;
   readonly endpoint: string;
+  readonly loginUrl: string;
   probe(session: SessionGateway, signal: AbortSignal): Promise<ProbeResult>;
 }
 

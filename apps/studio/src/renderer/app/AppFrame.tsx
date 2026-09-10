@@ -8,6 +8,7 @@ import { NAV_GROUPS, RAIL_IDENTITY } from "./navigation";
 import type { NavItemModel } from "../ui/organisms/NavRailTypes";
 import AppShell from "../ui/templates/AppShell";
 import { ROUTES } from "./routes";
+import { HostEvent } from "@zvs/shared";
 
 const APP_VERSION = "v0.1.0 · local";
 
@@ -15,6 +16,18 @@ function AppFrame() {
   const { ui } = useStore();
   const navigation = useAppNavigation();
   const restoredOnce = useRef(false);
+
+  useEffect(
+    () =>
+      window.zvs.subscribe((payload) => {
+        const parsed = HostEvent.safeParse(payload);
+        if (!parsed.success || parsed.data.type !== "step") return;
+        const { domain, path } = parsed.data.step;
+        if (domain === "navigation" && (path === "/browser" || path === "/providers"))
+          navigation.go(path);
+      }),
+    [navigation],
+  );
 
   useEffect(() => {
     if (!ui.restored || restoredOnce.current) return;

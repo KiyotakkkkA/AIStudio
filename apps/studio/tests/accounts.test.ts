@@ -216,7 +216,7 @@ test("removing an account detaches providers instead of deleting them", () => {
 
   const survivor = repositories.providers.findById(linked.id);
   assert.equal(survivor?.accountId, null);
-  assert.equal(survivor?.status, "needs-relink");
+  assert.equal(survivor?.status, "failed");
   assert.equal(survivor?.settings.timeoutSeconds, 45);
   assert.equal(survivor?.authMode, "account");
   assert.deepEqual(repositories.accounts.remove(account.id).detachedProviderIds, []);
