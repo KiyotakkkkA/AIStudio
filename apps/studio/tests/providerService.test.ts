@@ -26,6 +26,21 @@ import { ProviderRegistry } from "../src/host/drivers/ai/ProviderRegistry.ts";
 import { probeAccountCredentials } from "../src/host/drivers/ai/identity/ProbeAccountCredentials.ts";
 
 const now = 1_800_000_000_000;
+
+test("selected models and filter metadata survive saving and rediscovery", async () => {
+  const selectedModelIds = ["model-1", "model-2"];
+  const row = service.create({ ...input, settings: { selectedModelIds } });
+  driver.script({ models: [{ ...model, isFree: true, noTraining: true }] });
+  await service.probe({ id: row.id });
+  const saved = service.get(row.id);
+  expect(saved.settings.selectedModelIds).toEqual(selectedModelIds);
+  expect(saved.models[0]).toMatchObject({ isFree: true, noTraining: true });
+  expect(
+    ProbeResultDto.parse(toProbeResultDto(await service.probe({ id: row.id }))).provider?.models[0],
+  ).toMatchObject({ isFree: true, noTraining: true });
+  service.update({ id: row.id, settings: { selectedModelIds: [] } });
+  expect(service.get(row.id).settings.selectedModelIds).toEqual([]);
+});
 const model = {
   externalId: "model-1",
   displayName: "Model One",

@@ -13,6 +13,37 @@ function formFor(existing = false): ProviderFormVm {
   });
 }
 
+test("multiple model selections round-trip and can all be cleared", () => {
+  const vm = formFor(true);
+  vm.toggleModel("gpt-oss:120b");
+  vm.toggleModel("qwen3-coder:480b");
+  assert.equal(vm.dirty, true);
+  const settings = vm.toUpdateInput().settings;
+  assert.deepEqual(settings?.selectedModelIds, ["gpt-oss:120b", "qwen3-coder:480b"]);
+  const restored = new ProviderFormVm({
+    adapters: ADAPTERS,
+    accounts: ACCOUNTS,
+    capability: "text",
+    provider: provider({ settings }),
+  });
+  assert.equal(restored.dirty, false);
+  restored.toggleModel("gpt-oss:120b");
+  assert.deepEqual(restored.selectedModelIds, ["qwen3-coder:480b"]);
+  restored.toggleModel("qwen3-coder:480b");
+  assert.deepEqual(restored.toUpdateInput().settings?.selectedModelIds, []);
+});
+
+test("an old default becomes the initial selection unless an explicit selection exists", () => {
+  const saved = provider();
+  saved.defaultModelId = saved.models[0]!.id;
+  const options = { adapters: ADAPTERS, accounts: ACCOUNTS, capability: "text" as const };
+  assert.deepEqual(new ProviderFormVm({ ...options, provider: saved }).selectedModelIds, [
+    "gpt-oss:120b",
+  ]);
+  saved.settings.selectedModelIds = [];
+  assert.deepEqual(new ProviderFormVm({ ...options, provider: saved }).selectedModelIds, []);
+});
+
 const OK_PROBE: ProbeResultDto = {
   providerId: null,
   outcome: { kind: "ok", latencyMs: 412, live: true, models: [] },
@@ -58,10 +89,15 @@ test("settings round-trip through the form untouched", () => {
 
   assert.equal(vm.settingOf("temperature"), 0.4);
   assert.equal(vm.isSettingExplicit("topK"), false);
-  assert.deepEqual(vm.toUpdateInput().settings, { temperature: 0.4, maxOutputTokens: 2048 });
+  assert.deepEqual(vm.toUpdateInput().settings, {
+    selectedModelIds: [],
+    temperature: 0.4,
+    maxOutputTokens: 2048,
+  });
 
   vm.setSetting("topP", 0.8);
   assert.deepEqual(vm.toUpdateInput().settings, {
+    selectedModelIds: [],
     temperature: 0.4,
     maxOutputTokens: 2048,
     topP: 0.8,

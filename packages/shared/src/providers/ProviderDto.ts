@@ -11,6 +11,8 @@ export const BaseUrl = z.url().max(2048);
 export type BaseUrl = z.infer<typeof BaseUrl>;
 
 export const ProviderSettingsDto = z.object({
+  // External vendor IDs also identify models selected from an unsaved draft probe.
+  selectedModelIds: z.array(z.string().min(1)).optional(),
   temperature: z.number().min(0).max(2).optional(),
   topK: z.number().int().min(1).max(4096).optional(),
   topP: z.number().min(0).max(1).optional(),
@@ -20,6 +22,8 @@ export const ProviderSettingsDto = z.object({
 export type ProviderSettingsDto = z.infer<typeof ProviderSettingsDto>;
 
 export const ModelDto = z.object({
+  isFree: z.boolean().nullable().optional(),
+  noTraining: z.boolean().nullable().optional(),
   id: ModelId,
   providerId: ProviderId,
   externalId: z.string().min(1),

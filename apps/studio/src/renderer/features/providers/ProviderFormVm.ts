@@ -75,6 +75,7 @@ export class ProviderFormVm {
     timeoutSeconds: null,
   };
   enabled = true;
+  selectedModelIds: string[] = [];
 
   errors: Record<string, string> = {};
   banner: string | null = null;
@@ -108,6 +109,12 @@ export class ProviderFormVm {
       this.accountId = provider.accountId;
       this.capabilities = [...provider.capabilities];
       this.enabled = provider.enabled;
+      this.selectedModelIds = [
+        ...(provider.settings.selectedModelIds ??
+          provider.models
+            .filter((model) => model.id === provider.defaultModelId)
+            .map((model) => model.externalId)),
+      ];
       this.settings = {
         temperature: provider.settings.temperature ?? null,
         topK: provider.settings.topK ?? null,
@@ -255,6 +262,12 @@ export class ProviderFormVm {
     this.enabled = enabled;
   }
 
+  toggleModel(externalId: string): void {
+    this.selectedModelIds = this.selectedModelIds.includes(externalId)
+      ? this.selectedModelIds.filter((id) => id !== externalId)
+      : [...this.selectedModelIds, externalId];
+  }
+
   settingOf(key: SettingKey): number {
     return this.settings[key] ?? SETTING_DEFAULTS[key];
   }
@@ -322,7 +335,7 @@ export class ProviderFormVm {
   }
 
   settingsPayload(): ProviderSettingsDto {
-    const payload: ProviderSettingsDto = {};
+    const payload: ProviderSettingsDto = { selectedModelIds: [...this.selectedModelIds] };
     if (this.settings.temperature !== null) payload.temperature = this.settings.temperature;
     if (this.settings.topK !== null) payload.topK = this.settings.topK;
     if (this.settings.topP !== null) payload.topP = this.settings.topP;
@@ -383,7 +396,7 @@ export class ProviderFormVm {
         this.capabilities,
       ]),
       name: this.name,
-      settings: JSON.stringify(this.settings),
+      settings: JSON.stringify([this.settings, this.selectedModelIds]),
       enabled: this.enabled,
     };
   }

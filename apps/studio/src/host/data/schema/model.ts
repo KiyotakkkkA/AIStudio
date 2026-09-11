@@ -13,6 +13,8 @@ export const model = sqliteTable(
       .notNull()
       .references(() => provider.id, { onDelete: "cascade" }),
     externalId: text("external_id").notNull(),
+    isFree: integer("is_free", { mode: "boolean" }),
+    noTraining: integer("no_training", { mode: "boolean" }),
     displayName: text("display_name").notNull(),
     family: text("family"),
     contextWindow: integer("context_window"),

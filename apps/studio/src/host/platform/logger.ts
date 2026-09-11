@@ -66,13 +66,19 @@ export function createLogger(options: {
   return {
     log(level, scope, message, fields = {}) {
       if (closed || priorities[level] < priorities[options.level]) return;
+      const { raw, ...context } = fields;
       const line =
         JSON.stringify({
-          ...redactSecrets(fields),
+          ...redactSecrets(context),
           timestamp: (options.now ?? Date.now)(),
           level,
           scope,
           message: redactSecrets(message),
+          ...(level === "warn" || level === "error"
+            ? { raw: redactSecrets(raw ?? message) }
+            : raw === undefined
+              ? {}
+              : { raw: redactSecrets(raw) }),
         }) + "\n";
       const bytes = Buffer.byteLength(line);
       if (size > 0 && size + bytes > maxBytes) {

@@ -5,7 +5,13 @@ import {
   type AdapterCapabilities,
   type TunableParameter,
 } from "../AdapterCapabilities.ts";
-import { cancelled, isCancellation, isNotFoundResponse, toAppError } from "../errors.ts";
+import {
+  cancelled,
+  isCancellation,
+  isNotFoundResponse,
+  rawErrorText,
+  toAppError,
+} from "../errors.ts";
 import type {
   DiscoveredModel,
   EmbeddingDriver,
@@ -48,6 +54,17 @@ interface ChatResponse {
 }
 
 interface ModelListEntry {
+  slug?: unknown;
+  endpoint?: {
+    model_variant_slug?: unknown;
+    is_free?: unknown;
+    data_policy?: {
+      retainsPrompt?: unknown;
+      retainsPrompts?: unknown;
+      training?: unknown;
+      trainingOpenRouter?: unknown;
+    };
+  };
   id?: unknown;
   model?: unknown;
   name?: unknown;
@@ -136,15 +153,56 @@ export class OpenAiCompatibleAdapter implements TextGenerationDriver, EmbeddingD
   async listModels(signal: AbortSignal): Promise<DiscoveredModel[]> {
     const payload = await this.#modelList(signal);
     const entries = payload.data ?? payload.models ?? [];
+    const metadata = await this.#openRouterMetadata(signal);
     const seen = new Set<string>();
     const discovered: DiscoveredModel[] = [];
     for (const entry of entries) {
-      const externalId = firstString(entry.id, entry.model, entry.name) ?? "";
+      const externalId =
+        firstString(
+          entry.endpoint?.model_variant_slug,
+          entry.id,
+          entry.slug,
+          entry.model,
+          entry.name,
+        ) ?? "";
       if (externalId.length === 0 || seen.has(externalId)) continue;
       seen.add(externalId);
-      discovered.push(toDiscoveredModel(externalId, entry));
+      discovered.push(
+        toDiscoveredModel(externalId, {
+          ...entry,
+          ...(metadata.get(externalId)?.endpoint === undefined
+            ? {}
+            : { endpoint: metadata.get(externalId)?.endpoint }),
+        }),
+      );
     }
     return discovered;
+  }
+
+  async #openRouterMetadata(signal: AbortSignal): Promise<Map<string, ModelListEntry>> {
+    const url = new URL(this.#transport.baseUrl);
+    if (url.hostname !== "openrouter.ai" && url.hostname !== "eu.openrouter.ai") return new Map();
+    try {
+      // Same-origin catalog used by OpenRouter's model browser. The public /models
+      // response lacks endpoint data policies. Keep discovery usable if it changes.
+      const response = await this.#request(
+        { method: "GET", path: "../frontend/v1/catalog/models" },
+        signal,
+      );
+      const payload = decode<ModelListResponse>(response.text);
+      return new Map(
+        (payload.data ?? []).flatMap((entry) => {
+          const id = firstString(entry.endpoint?.model_variant_slug, entry.slug);
+          return id === null ? [] : [[id, entry] as const];
+        }),
+      );
+    } catch (error: unknown) {
+      if (signal.aborted || isCancellation(error)) throw cancelled();
+      this.#logger?.log("warn", "ai", "OpenRouter filter metadata is unavailable", {
+        raw: rawErrorText(error),
+      });
+      return new Map();
+    }
   }
 
   async #modelList(signal: AbortSignal): Promise<ModelListResponse> {
@@ -225,7 +283,14 @@ function specOf(path: string, body: Record<string, unknown>): RequestSpec {
 }
 
 function toDiscoveredModel(externalId: string, entry: ModelListEntry): DiscoveredModel {
+  const policy = entry.endpoint?.data_policy;
+  const retention = policy?.retainsPrompt ?? policy?.retainsPrompts;
   return {
+    isFree: typeof entry.endpoint?.is_free === "boolean" ? entry.endpoint.is_free : null,
+    noTraining:
+      policy === undefined
+        ? null
+        : retention === false && policy.training === false && policy.trainingOpenRouter === false,
     externalId,
     displayName: firstString(entry.display_name, entry.name) ?? externalId,
     family: firstString(entry.owned_by, entry.details?.family) ?? familyOf(externalId),

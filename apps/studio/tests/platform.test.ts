@@ -64,6 +64,35 @@ test("logger filters, preserves scope, rotates, resumes and closes", () => {
   }
 });
 
+test("warning and error logs place redacted raw text immediately after message", () => {
+  const temp = temporaryDirectory("studio-logger-raw-");
+  try {
+    const logger = createLogger({ directory: temp.path, level: "debug", development: false });
+    for (const level of ["warn", "error"] as const) {
+      logger.log(level, "providers", "Probe did not succeed", {
+        providerId: "provider-1",
+        raw: `Invalid key sk-${"a".repeat(24)}\nVendor detail`,
+      });
+    }
+    logger.log("warn", "ai", "Unknown response format");
+    logger.log("info", "providers", "Created a provider");
+    logger.close();
+    const rows = readFileSync(logFilePath(temp.path), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    for (const row of rows.slice(0, 2)) {
+      assert.equal(row.raw, "Invalid key [redacted]\nVendor detail");
+      const keys = Object.keys(row);
+      assert.equal(keys.indexOf("raw"), keys.indexOf("message") + 1);
+    }
+    assert.equal(rows[2]!.raw, "Unknown response format");
+    assert.equal(Object.hasOwn(rows[3]!, "raw"), false);
+  } finally {
+    temp.dispose();
+  }
+});
+
 test("entity ids are unique, ordered UUID v7 values", () => {
   const ids = Array.from({ length: 1000 }, createId);
   assert.equal(new Set(ids).size, ids.length);

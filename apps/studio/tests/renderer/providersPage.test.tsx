@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { test } from "vitest";
 import { createIpcClient } from "@zvs/ipc";
@@ -44,6 +44,31 @@ function renderPage() {
   );
   return bridge;
 }
+
+test("model checkboxes allow multiple selections and filtering preserves checked models", async () => {
+  renderPage();
+  const first = await screen.findByRole("checkbox", { name: "Использовать модель: gpt-oss:120b" });
+  const second = screen.getByRole("checkbox", { name: "Использовать модель: qwen3-coder:480b" });
+  fireEvent.click(first);
+  fireEvent.click(second);
+  assert.equal((first as HTMLInputElement).checked, true);
+  assert.equal((second as HTMLInputElement).checked, true);
+  fireEvent.click(screen.getByRole("checkbox", { name: "Бесплатные модели" }));
+  assert.equal(
+    screen.queryByRole("checkbox", { name: "Использовать модель: qwen3-coder:480b" }),
+    null,
+  );
+  fireEvent.click(screen.getByRole("checkbox", { name: "Бесплатные модели" }));
+  assert.equal(
+    (
+      screen.getByRole("checkbox", {
+        name: "Использовать модель: qwen3-coder:480b",
+      }) as HTMLInputElement
+    ).checked,
+    true,
+  );
+  assert.equal(screen.queryByRole("checkbox", { name: "Не используют данные для обучения" }), null);
+});
 
 test("the page mounts one form and one list, with the token as a picker over secrets", async () => {
   renderPage();

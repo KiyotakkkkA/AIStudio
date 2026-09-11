@@ -1,6 +1,8 @@
 import type { DiscoveredModelDto, ModelCapability, ModelDto, ModelId } from "@zvs/shared";
 
 export interface ModelRow {
+  readonly isFree?: boolean | null;
+  readonly noTraining?: boolean | null;
   readonly key: string;
   /** Null for a model returned by a draft probe: it has no row to point a default at yet. */
   readonly modelId: ModelId | null;
@@ -16,6 +18,8 @@ export interface ModelRow {
 
 export function modelRows(models: readonly ModelDto[]): ModelRow[] {
   return models.map((model) => ({
+    isFree: model.isFree ?? null,
+    noTraining: model.noTraining ?? null,
     key: model.id,
     modelId: model.id,
     externalId: model.externalId,
@@ -31,6 +35,8 @@ export function modelRows(models: readonly ModelDto[]): ModelRow[] {
 
 export function discoveredRows(models: readonly DiscoveredModelDto[]): ModelRow[] {
   return models.map((model) => ({
+    isFree: model.isFree ?? null,
+    noTraining: model.noTraining ?? null,
     key: model.externalId,
     modelId: null,
     externalId: model.externalId,

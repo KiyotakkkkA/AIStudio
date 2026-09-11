@@ -46,6 +46,8 @@ export interface TextDelta {
 }
 
 export interface DiscoveredModel {
+  readonly isFree?: boolean | null;
+  readonly noTraining?: boolean | null;
   readonly externalId: string;
   readonly displayName: string;
   readonly family: string | null;

@@ -1,3 +1,4 @@
+import { InputCheckBox } from "@kiyotakkkka/zvs-uikit-lib";
 import Chip from "../../ui/atoms/Chip";
 import type { ModelRow } from "./modelRows";
 import { contextWindowLabel, MODEL_CAPABILITY_LABELS, sizeLabel } from "./providerPresentation";
@@ -5,17 +6,17 @@ import { contextWindowLabel, MODEL_CAPABILITY_LABELS, sizeLabel } from "./provid
 export interface ModelCardProps {
   readonly row: ModelRow;
   readonly providerName: string;
-  readonly isDefault: boolean;
+  readonly selected: boolean;
   readonly selectable: boolean;
-  readonly onMakeDefault: () => void;
+  readonly onToggle: () => void;
 }
 
 export default function ModelCard({
   row,
   providerName,
-  isDefault,
+  selected,
   selectable,
-  onMakeDefault,
+  onToggle,
 }: ModelCardProps) {
   const meta = [providerName, row.sizeBytes === null ? null : sizeLabel(row.sizeBytes)]
     .filter((part) => part !== null)
@@ -24,8 +25,9 @@ export default function ModelCard({
   return (
     <article
       className={`flex flex-col gap-2 rounded-card border p-3 ${
-        isDefault ? "border-accent-dark bg-main-750" : "border-main-700 bg-main-800"
+        selected ? "border-accent-dark bg-main-750" : "border-main-700 bg-main-800"
       } ${row.available ? "" : "opacity-55"}`}
+      onClick={selectable ? onToggle : undefined}
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
@@ -39,19 +41,12 @@ export default function ModelCard({
             {row.available ? meta : (row.unavailableReason ?? "Недоступна")}
           </div>
         </div>
-        {row.available && isDefault ? <Chip tone="selected">По умолчанию</Chip> : null}
-        {row.available && !isDefault ? (
-          <input
-            type="radio"
-            name="provider-default-model"
-            aria-label={`Модель по умолчанию: ${row.externalId}`}
-            checked={isDefault}
-            disabled={!selectable}
-            title={
-              selectable ? undefined : "Сохраните подключение, чтобы выбрать модель по умолчанию."
-            }
-            className="mt-0.5 size-3.75 flex-none accent-accent-dark disabled:cursor-not-allowed disabled:opacity-40"
-            onChange={onMakeDefault}
+        {row.available || selected ? (
+          <InputCheckBox
+            aria-label={`Использовать модель: ${row.externalId}`}
+            checked={selected}
+            disabled={!selectable || (!row.available && !selected)}
+            onChange={onToggle}
           />
         ) : null}
       </div>

@@ -1,4 +1,5 @@
 import { mdiCubeOutline, mdiMagnify } from "@mdi/js";
+import { InputCheckBox } from "@kiyotakkkka/zvs-uikit-lib";
 import { observer } from "mobx-react-lite";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
@@ -25,7 +26,7 @@ function ModelGrid() {
               ? "— появятся после проверки связи"
               : curated
                 ? "— курируемый список, а не ответ вендора"
-                : "— возвращены проверкой связи"}
+                : "— список получен"}
           </span>
         </h2>
         <span className="w-47.5 flex-none">
@@ -40,6 +41,20 @@ function ModelGrid() {
           />
         </span>
         <Chip>{`${String(rows.length)} из ${String(providers.rows.length)}`}</Chip>
+      </div>
+
+      <div className="flex flex-none flex-wrap items-center gap-4 text-[12px] text-main-300">
+        {providers.supportsFreeFilter ? (
+          <InputCheckBox checked={providers.freeModelsOnly} onChange={providers.setFreeModelsOnly}>
+            Бесплатные модели
+          </InputCheckBox>
+        ) : null}
+        {providers.modelProviderKind === "openrouter" ? (
+          <InputCheckBox checked={providers.noTrainingOnly} onChange={providers.setNoTrainingOnly}>
+            Не используют данные для обучения
+          </InputCheckBox>
+        ) : null}
+        <span>Выбрано: {providers.form?.selectedModelIds.length ?? 0}</span>
       </div>
 
       {providers.rows.length === 0 ? (
@@ -61,10 +76,10 @@ function ModelGrid() {
               key={row.key}
               row={row}
               providerName={providerName}
-              isDefault={row.modelId !== null && saved?.defaultModelId === row.modelId}
-              selectable={row.modelId !== null}
-              onMakeDefault={() => {
-                void providers.setDefaultModel(row.modelId);
+              selected={providers.form?.selectedModelIds.includes(row.externalId) === true}
+              selectable={providers.form !== null && !providers.saving}
+              onToggle={() => {
+                providers.form?.toggleModel(row.externalId);
               }}
             />
           ))}

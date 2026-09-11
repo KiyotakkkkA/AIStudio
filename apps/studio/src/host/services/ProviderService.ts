@@ -25,7 +25,7 @@ import type {
 } from "../data/schema/index.ts";
 import { adapterCapabilities } from "../drivers/ai/adapters/index.ts";
 import type { AdapterCapabilities } from "../drivers/ai/AdapterCapabilities.ts";
-import { cancelled, timedOut, toAppError } from "../drivers/ai/errors.ts";
+import { cancelled, rawErrorText, timedOut, toAppError } from "../drivers/ai/errors.ts";
 import type { AiDriver, DiscoveredModel } from "../drivers/ai/ports.ts";
 import type { Logger } from "../platform/logger.ts";
 import { createId } from "../platform/ids.ts";
@@ -242,6 +242,7 @@ export class ProviderService {
     } catch (error: unknown) {
       const outcome = failureOutcome(toAppError(error));
       this.#logger?.log("warn", "providers", "Probe did not succeed", {
+        raw: rawErrorText(error),
         providerId: row.id,
         kind: outcome.kind,
       });
@@ -374,6 +375,8 @@ function latencyOf(outcome: ProbeOutcome): number | null {
 function discoveredRows(outcome: ProbeOutcome, discoveredAt: Timestamp) {
   const models: readonly DiscoveredModel[] = outcome.kind === "ok" ? outcome.models : [];
   return models.map((entry) => ({
+    isFree: entry.isFree ?? null,
+    noTraining: entry.noTraining ?? null,
     externalId: entry.externalId,
     displayName: entry.displayName,
     family: entry.family,
@@ -457,6 +460,8 @@ export function toSummaryDto(row: ProviderEntity, modelCount: number): ProviderS
 
 export function toModelDto(row: ModelEntity): ModelDto {
   return {
+    isFree: row.isFree,
+    noTraining: row.noTraining,
     id: row.id as ModelId,
     providerId: row.providerId as ProviderId,
     externalId: row.externalId,
@@ -490,6 +495,8 @@ function toOutcomeDto(outcome: ProbeOutcome): ProbeResultDto["outcome"] {
     latencyMs: outcome.latencyMs,
     live: outcome.live,
     models: outcome.models.map((entry) => ({
+      isFree: entry.isFree ?? null,
+      noTraining: entry.noTraining ?? null,
       externalId: entry.externalId,
       displayName: entry.displayName,
       family: entry.family,

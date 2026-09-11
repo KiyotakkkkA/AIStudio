@@ -38,6 +38,8 @@ export class ProviderStore {
   accounts: AccountDto[] = [];
   pending: PendingIntent | null = null;
   modelQuery = "";
+  freeModelsOnly = false;
+  noTrainingOnly = false;
   loading = false;
   loaded = false;
   saving = false;
@@ -66,13 +68,36 @@ export class ProviderStore {
 
   get visibleRows(): ModelRow[] {
     const query = this.modelQuery.trim().toLowerCase();
-    if (query.length === 0) return this.rows;
     return this.rows.filter(
       (row) =>
-        row.externalId.toLowerCase().includes(query) ||
-        row.displayName.toLowerCase().includes(query) ||
-        (row.family ?? "").toLowerCase().includes(query),
+        (!this.freeModelsOnly ||
+          !this.supportsFreeFilter ||
+          (this.modelProviderKind === "ollama"
+            ? isFreeOllamaModel(row.externalId)
+            : row.isFree === true)) &&
+        (!this.noTrainingOnly ||
+          this.modelProviderKind !== "openrouter" ||
+          row.noTraining === true) &&
+        (row.externalId.toLowerCase().includes(query) ||
+          row.displayName.toLowerCase().includes(query) ||
+          (row.family ?? "").toLowerCase().includes(query)),
     );
+  }
+
+  get modelProviderKind() {
+    return this.form?.kind ?? this.detail?.kind;
+  }
+
+  get supportsFreeFilter(): boolean {
+    return this.modelProviderKind === "openrouter" || this.modelProviderKind === "ollama";
+  }
+
+  setFreeModelsOnly(checked: boolean): void {
+    this.freeModelsOnly = checked;
+  }
+
+  setNoTrainingOnly(checked: boolean): void {
+    this.noTrainingOnly = checked;
   }
 
   get discoveredModelCount(): number {
@@ -454,3 +479,17 @@ export class ProviderStore {
 }
 
 export default ProviderStore;
+
+const FREE_OLLAMA_MODELS = new Set([
+  "gemma4:31b",
+  "gpt-oss:120b",
+  "gpt-oss:20b",
+  "nemotron-3-nano:30b",
+  "nemotron-3-super",
+  "nemotron-3-ultra",
+]);
+
+function isFreeOllamaModel(externalId: string): boolean {
+  const id = externalId.replace(/(?::cloud|-cloud)$/, "").replace(/:latest$/, "");
+  return FREE_OLLAMA_MODELS.has(id);
+}

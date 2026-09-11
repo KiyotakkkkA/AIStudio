@@ -6,6 +6,8 @@ import { ModelCapability, ProviderStatus } from "./enums.js";
 import { ProviderConnectionInput, ProviderDto, ProviderRef } from "./ProviderDto.js";
 
 export const DiscoveredModelDto = z.object({
+  isFree: z.boolean().nullable().optional(),
+  noTraining: z.boolean().nullable().optional(),
   externalId: z.string().min(1),
   displayName: z.string(),
   family: z.string().nullable(),

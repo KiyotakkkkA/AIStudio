@@ -27,7 +27,7 @@ function ProvidersPage() {
       title="AI-провайдеры"
       subtitle={
         onAccounts
-          ? `${accountsWord(accounts.accounts.length)} привязано · вход только на сайте вендора`
+          ? `${accountsWord(accounts.accounts.length)} привязано`
           : `${String(providers.summaries.length)} подключений · ${modelsWord(providers.discoveredModelCount)} найдено`
       }
       actions={
@@ -75,11 +75,6 @@ function ProvidersPage() {
               </button>
             );
           })}
-          <span className="ml-auto text-[11.5px] text-main-500">
-            {onAccounts
-              ? "Аккаунты — не фильтр возможностей: здесь живут сессии вендоров."
-              : "На трёх вкладках одна форма и один список — меняется только фильтр возможностей."}
-          </span>
         </>
       }
     >

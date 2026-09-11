@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage, session } from "electron";
+import { app, BrowserWindow, ipcMain, net, safeStorage, session } from "electron";
 import { contract } from "@zvs/shared";
 import { createIpcServer } from "@zvs/ipc";
 import type { IpcServer } from "@zvs/ipc";
@@ -145,6 +145,8 @@ if (!app.requestSingleInstanceLock()) {
         secrets: vault,
         sessions,
         logger,
+        // Use Chromium's certificate and proxy handling for API providers too.
+        fetch: (url, request) => net.fetch(url, { ...request, credentials: "omit" }),
         credentials: (account) =>
           probeAccountCredentials(account, sessions(account.partition), vault),
       });

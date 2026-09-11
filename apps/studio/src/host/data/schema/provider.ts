@@ -16,6 +16,7 @@ export { PROVIDER_CAPABILITIES, PROVIDER_KINDS, PROVIDER_STATUSES };
 export type { ProviderCapability, ProviderKind, ProviderStatus };
 
 export interface ProviderSettings {
+  selectedModelIds?: string[];
   temperature?: number;
   topK?: number;
   topP?: number;

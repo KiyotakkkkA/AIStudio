@@ -121,6 +121,21 @@ export function toAppError(error: unknown): AppError {
   return networkFailure(error);
 }
 
+export function rawErrorText(error: unknown): string {
+  const messages: string[] = [];
+  const seen = new Set<unknown>();
+  for (let current = error; current !== undefined && !seen.has(current);) {
+    seen.add(current);
+    if (isAppError(current) && typeof current.details?.vendorMessage === "string") {
+      messages.push(current.details.vendorMessage);
+    } else {
+      messages.push(current instanceof Error ? current.message : String(current));
+    }
+    current = current instanceof Error ? current.cause : undefined;
+  }
+  return messages.join("\nCaused by: ");
+}
+
 function errorCode(error: unknown): string | null {
   for (let current: unknown = error, depth = 0; current !== undefined && depth < 4; depth += 1) {
     if (typeof current !== "object" || current === null) break;
@@ -153,7 +168,7 @@ function extractMessage(body: string | undefined): string | null {
     const message = (parsed as { message?: unknown }).message;
     if (typeof message === "string") return message;
   }
-  return body.slice(0, 500);
+  return body;
 }
 
 function parseJson(raw: string): unknown {

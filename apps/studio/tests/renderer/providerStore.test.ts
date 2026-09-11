@@ -25,6 +25,61 @@ import {
 } from "./providerFixtures.ts";
 
 const TEXT_ROW = summary({ id: OLLAMA });
+
+test("OpenRouter filters intersect with search without dropping hidden selections", async () => {
+  const saved = provider({ kind: "openrouter" });
+  const template = saved.models[0]!;
+  saved.models = [
+    { ...template, externalId: "free/private", isFree: true, noTraining: true },
+    { ...template, externalId: "free/training", isFree: true, noTraining: false },
+    { ...template, externalId: "paid/private", isFree: false, noTraining: true },
+    { ...template, externalId: "unknown" },
+  ];
+  const { store } = storeWith({ detail: saved });
+  await store.load();
+  store.form?.toggleModel("paid/private");
+  store.setFreeModelsOnly(true);
+  assert.equal(store.visibleRows.length, 2);
+  store.setNoTrainingOnly(true);
+  assert.deepEqual(
+    store.visibleRows.map((row) => row.externalId),
+    ["free/private"],
+  );
+  store.setModelQuery("missing");
+  assert.equal(store.visibleRows.length, 0);
+  assert.deepEqual(store.form?.selectedModelIds, ["paid/private"]);
+  store.setFreeModelsOnly(false);
+  store.setModelQuery("paid");
+  assert.deepEqual(
+    store.visibleRows.map((row) => row.externalId),
+    ["paid/private"],
+  );
+});
+
+test("Ollama free filter uses the fixed allowlist, including cloud and latest suffixes", async () => {
+  const saved = provider();
+  const ids = [
+    "gemma4:31b",
+    "gpt-oss:120b-cloud",
+    "gpt-oss:20b",
+    "nemotron-3-nano:30b",
+    "nemotron-3-super:cloud",
+    "nemotron-3-ultra:latest",
+    "qwen3-coder:480b",
+    "gpt-oss:7b",
+  ];
+  saved.models = ids.map((externalId) => ({ ...saved.models[0]!, externalId }));
+  const { store } = storeWith({ detail: saved });
+  await store.load();
+  store.setFreeModelsOnly(true);
+  store.setNoTrainingOnly(true);
+  assert.deepEqual(
+    store.visibleRows.map((row) => row.externalId),
+    ids.slice(0, 6),
+  );
+  store.form?.setKind("mistral");
+  assert.equal(store.visibleRows.length, ids.length);
+});
 const EMBEDDING_ROW = summary({
   id: EMBEDDER,
   name: "Ollama Embeddings",

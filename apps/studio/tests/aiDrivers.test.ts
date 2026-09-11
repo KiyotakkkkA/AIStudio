@@ -20,7 +20,12 @@ import {
 import { OpenAiCompatibleAdapter } from "../src/host/drivers/ai/adapters/openaiCompatible.ts";
 import { sseData } from "../src/host/drivers/ai/adapters/sse.ts";
 import { unsupportedParameters } from "../src/host/drivers/ai/AdapterCapabilities.ts";
-import { httpFailure, networkFailure, toAppError } from "../src/host/drivers/ai/errors.ts";
+import {
+  httpFailure,
+  networkFailure,
+  rawErrorText,
+  toAppError,
+} from "../src/host/drivers/ai/errors.ts";
 import { ProviderRegistry } from "../src/host/drivers/ai/ProviderRegistry.ts";
 import { streamToEvents } from "../src/host/drivers/ai/streamToEvents.ts";
 import { ApiTransport } from "../src/host/drivers/ai/transport/ApiTransport.ts";
@@ -183,7 +188,7 @@ test("the registry resolves the secret at point of use and drops the driver when
   assert.equal(providers.size, 0);
   const refreshed = await providers.text(row.id);
   await refreshed.listModels(AbortSignal.timeout(5000));
-  assert.equal(calls[1]?.headers.authorization, "Bearer sk-second");
+  assert.equal(calls.at(-1)?.headers.authorization, "Bearer sk-second");
 });
 
 test("a disabled or missing provider is refused before any transport is built", async () => {
@@ -288,6 +293,8 @@ test("the openai-compatible adapter turns SSE frames into deltas and maps discov
   const models = await adapter.listModels(new AbortController().signal);
   assert.equal(models.length, 2);
   assert.deepEqual(models[0], {
+    isFree: null,
+    noTraining: null,
     externalId: "openai/gpt-4o",
     displayName: "GPT-4o",
     family: "openai",
@@ -300,8 +307,62 @@ test("the openai-compatible adapter turns SSE frames into deltas and maps discov
   assert.equal(models[1]?.family, "llama3");
 });
 
-test("a base URL that speaks the OpenAI dialect is listed in one request", async () => {
+test("OpenRouter catalog joins on the variant slug and requires explicit privacy flags", async () => {
   const transport = createFakeTransport("https://openrouter.ai/api/v1");
+  const adapter = new OpenAiCompatibleAdapter({ transport });
+  const policies = [
+    { retainsPrompts: false, training: false, trainingOpenRouter: false },
+    { retainsPrompt: false, training: false, trainingOpenRouter: false },
+    { retainsPrompts: true, training: false, trainingOpenRouter: false },
+    { retainsPrompts: false, training: true, trainingOpenRouter: false },
+    { retainsPrompts: false, training: false, trainingOpenRouter: true },
+    { retainsPrompts: false, training: false },
+  ];
+  transport.reply("/models", {
+    body: {
+      data: [
+        ...policies.map((_, index) => ({ id: `author/model-${String(index)}:free` })),
+        { id: "author/unknown:free" },
+        { id: "author/model-0" },
+      ],
+    },
+  });
+  transport.reply("../frontend/v1/catalog/models", {
+    body: {
+      data: policies.map((policy, index) => ({
+        slug: `author/model-${String(index)}`,
+        endpoint: {
+          model_variant_slug: `author/model-${String(index)}:free`,
+          is_free: index !== 1,
+          data_policy: policy,
+        },
+      })),
+    },
+  });
+  const models = await adapter.listModels(new AbortController().signal);
+  assert.deepEqual(
+    models.map((model) => model.noTraining),
+    [true, true, false, false, false, false, null, null],
+  );
+  assert.deepEqual(
+    models.map((model) => model.isFree),
+    [true, false, true, true, true, true, null, null],
+  );
+});
+
+test("OpenRouter metadata failures preserve discovery without assuming free or private", async () => {
+  const transport = createFakeTransport("https://openrouter.ai/api/v1");
+  const adapter = new OpenAiCompatibleAdapter({ transport });
+  transport.reply("/models", { body: { data: [{ id: "author/model:free" }] } });
+  transport.reply("../frontend/v1/catalog/models", { status: 503, body: {} });
+  const models = await adapter.listModels(new AbortController().signal);
+  assert.equal(models.length, 1);
+  assert.equal(models[0]?.isFree, null);
+  assert.equal(models[0]?.noTraining, null);
+});
+
+test("a base URL that speaks the OpenAI dialect is listed in one request", async () => {
+  const transport = createFakeTransport("https://api.mistral.ai/v1");
   const adapter = new OpenAiCompatibleAdapter({ transport });
   transport.reply("/models", { body: { data: [{ id: "deepseek/deepseek-v4.1-flash" }] } });
 
@@ -346,6 +407,8 @@ test("Ollama's own /tags answers where /models is absent, and carries the size i
     ["/models", "/tags"],
   );
   assert.deepEqual(models[0], {
+    isFree: null,
+    noTraining: null,
     externalId: "gpt-oss:120b",
     displayName: "gpt-oss:120b",
     family: "gpt-oss",
@@ -408,6 +471,17 @@ test("each vendor failure class maps onto one AppErrorCode", () => {
 
   const teapot = httpFailure({ status: 418, body: JSON.stringify({ error: { message: "нет" } }) });
   assert.equal(teapot.details?.vendorMessage, "нет");
+  assert.equal(rawErrorText(teapot), "нет");
+  const body = "Vendor error ".repeat(100);
+  assert.equal(rawErrorText(httpFailure({ status: 500, body })), body);
+  assert.equal(
+    rawErrorText(new Error("fetch failed", { cause: new Error("ECONNRESET") })),
+    "fetch failed\nCaused by: ECONNRESET",
+  );
+  assert.equal(rawErrorText("plain warning"), "plain warning");
+  const cyclic = new Error("cyclic");
+  cyclic.cause = cyclic;
+  assert.equal(rawErrorText(cyclic), "cyclic");
   assert.match(teapot.message, /неизвестную/);
 
   for (const code of ["ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT"]) {

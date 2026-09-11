@@ -137,6 +137,7 @@ export class AccountCredentialStore implements AccountCredentials {
   #markNeedsRelink(row: AccountEntity, detail: string): void {
     this.#accounts.updateStatus(row.id, "needs-relink", detail, this.#clock());
     this.#logger?.log("warn", "ai", "Account needs a re-link", {
+      raw: detail,
       accountId: row.id,
       adapter: row.adapter,
     });
