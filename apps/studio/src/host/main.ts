@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net, safeStorage, session } from "electron";
+import { app, BrowserWindow, ipcMain, net, safeStorage } from "electron";
 import { contract } from "@zvs/shared";
 import { createIpcServer } from "@zvs/ipc";
 import type { IpcServer } from "@zvs/ipc";
@@ -25,7 +25,8 @@ import { SettingService } from "./services/SettingService";
 import { BrowserViewManager } from "./browser/BrowserViewManager";
 import { ProviderRegistry } from "./drivers/ai/ProviderRegistry";
 import { probeAccountCredentials } from "./drivers/ai/identity/ProbeAccountCredentials";
-import type { SessionGatewayFactory } from "./drivers/ai/transport/SessionGateway";
+import { sessionGateways } from "./browser/sessionGateway";
+import { BROWSER_PARTITION } from "./browser/policy";
 import { ProviderService } from "./services/ProviderService";
 import { HealthCheckService } from "./services/HealthCheckService";
 import { AccountService } from "./services/AccountService";
@@ -130,14 +131,8 @@ if (!app.requestSingleInstanceLock()) {
           : undefined,
       });
       logger.log("info", "host", "Opened the event channel", { recording });
-      const sessions: SessionGatewayFactory = (partition) => {
-        const current = session.fromPartition(partition);
-        return {
-          partition,
-          userAgent: () => current.getUserAgent(),
-          fetch: (url, request) => current.fetch(url, request),
-        };
-      };
+      const sessions = sessionGateways();
+      sessions(BROWSER_PARTITION);
       const vault = secrets;
       const registry = new ProviderRegistry({
         providers: database.repositories.providers,
@@ -172,6 +167,7 @@ if (!app.requestSingleInstanceLock()) {
         },
         onLinked: () => navigateWorkspace("/providers"),
       });
+      accounts.startAutoRefresh();
       healthCheck = new HealthCheckService({ providers, settings, events: eventBus, logger });
       healthCheck.start();
       ipcServer = createIpcServer(

@@ -21,6 +21,8 @@ function AccountsTab() {
 
   useEffect(() => {
     void accounts.load();
+    const timer = setInterval(() => void accounts.load(), 30_000);
+    return () => clearInterval(timer);
   }, [accounts]);
 
   const openSites = (): void => {
@@ -29,6 +31,11 @@ function AccountsTab() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {accounts.accounts.length > 0 ? (
+        <p className="text-[11.5px] text-main-400">
+          Сессии проверяются автоматически; новые данные входа сохраняются, когда вендор их выдаёт.
+        </p>
+      ) : null}
       {accounts.error === null ? null : (
         <div
           role="alert"
@@ -116,7 +123,7 @@ function AccountsTab() {
             <EmptyState
               icon={mdiAccountCircleOutline}
               title="Аккаунтов пока нет"
-              description={`В режиме аккаунта ключ не нужен: вы входите на сайт вендора в интегрированном браузере, и приложение обращается к вендору с той же сессией. Поддерживаются ${vendorList(accounts.families)}.`}
+              description={`В режиме аккаунта ключ не нужен: вы входите на сайт вендора в интегрированном браузере, и приложение обращается к вендору с той же сессией. Поддерживаются ${vendorList(accounts.families)}. Не все способы входа поддерживаются, поэтому иногда придётся отказаться от входа через соцсети или Google.`}
               action={<AccountLoginMenu />}
             />
           </div>
@@ -150,7 +157,7 @@ function AccountsTab() {
 
 function vendorList(families: readonly AccountFamily[]): string {
   if (families.length === 0) return "вендоры, у которых есть адаптер";
-  return families.map((family) => adapterLabel(family)).join(" и ");
+  return families.map((family) => adapterLabel(family)).join(", ");
 }
 
 export default observer(AccountsTab);

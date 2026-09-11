@@ -11,6 +11,7 @@ import {
   type CreateSecretInput,
 } from "@zvs/shared";
 import { createSecretHandlers } from "../src/host/ipc/secrets.ts";
+import { ACCOUNT_TOKEN_SECRET_TYPE } from "../src/host/drivers/ai/identity/AccountCredentialStore.ts";
 import { CryptoService } from "../src/host/services/CryptoService.ts";
 import { SecretService } from "../src/host/services/SecretService.ts";
 import { createFakeClock } from "../../../test/helpers/fakeClock.ts";
@@ -180,6 +181,42 @@ test("secrets.update without a value leaves the credential alone", async () => {
       codeOf(() => handlers["secrets.update"]({ id: MISSING, name: "x" })),
       AppErrorCode.NOT_FOUND,
     );
+  } finally {
+    dispose();
+  }
+});
+
+test("account tokens remain host-internal and do not invalidate the public secret list", async () => {
+  const { handlers, service, dispose } = harness();
+  try {
+    const token = service.create({
+      type: ACCOUNT_TOKEN_SECRET_TYPE,
+      name: "qwen-web account token",
+      scope: "personal",
+      value: "internal-account-credential",
+    });
+    const id = SecretId.parse(token.id);
+    assert.deepEqual(contract["secrets.list"].output.parse(await handlers["secrets.list"]({})), []);
+    const visible = await handlers["secrets.create"](draft());
+    const listed = contract["secrets.list"].output.parse(await handlers["secrets.list"]({}));
+    assert.deepEqual(
+      listed.map((secret) => secret.id),
+      [visible.id],
+    );
+    assert.deepEqual(await handlers["secrets.list"]({ type: "mistral" }), []);
+    assert.equal(
+      codeOf(() => handlers["secrets.get"]({ id })),
+      AppErrorCode.NOT_FOUND,
+    );
+    assert.equal(
+      codeOf(() => handlers["secrets.update"]({ id, value: "replacement" })),
+      AppErrorCode.NOT_FOUND,
+    );
+    assert.equal(
+      codeOf(() => handlers["secrets.remove"]({ id })),
+      AppErrorCode.NOT_FOUND,
+    );
+    assert.equal(await service.resolve(id), "internal-account-credential");
   } finally {
     dispose();
   }

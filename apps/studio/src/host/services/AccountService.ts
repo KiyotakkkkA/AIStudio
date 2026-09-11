@@ -4,6 +4,7 @@ import {
   AccountFamily,
   AppError,
   AppErrorCode,
+  isAppError,
   type AccountLinkResult,
 } from "@zvs/shared";
 import type { UnitOfWork } from "../data/UnitOfWork.ts";
@@ -13,6 +14,7 @@ import type { BrowserLifecycle, BrowserLifecycleEvent } from "../browser/lifecyc
 import { identityProbe } from "../drivers/ai/identity/registry.ts";
 import type { IdentityProbe, ProbeResult } from "../drivers/ai/identity/IdentityProbe.ts";
 import { ACCOUNT_TOKEN_SECRET_TYPE } from "../drivers/ai/identity/AccountCredentialStore.ts";
+import { accountSession } from "../drivers/ai/identity/AccountSession.ts";
 import type { SessionGatewayFactory } from "../drivers/ai/transport/SessionGateway.ts";
 import { isSessionExpired } from "../drivers/ai/errors.ts";
 import type { EventBus } from "../platform/events.ts";
@@ -51,6 +53,8 @@ export class AccountService {
   >();
   readonly #unsubscribe: () => void;
   #disposed = false;
+  #autoRefreshTimer: ReturnType<typeof setInterval> | undefined;
+  readonly #autoRefreshAttempts = new Map<string, number>();
 
   constructor(options: AccountServiceOptions) {
     this.#options = options;
@@ -61,6 +65,39 @@ export class AccountService {
     return ACCOUNT_FAMILIES.flatMap((adapter) =>
       this.#options.data.repositories.accounts.listByAdapter(adapter),
     ).map((row) => this.#dto(row));
+  }
+
+  startAutoRefresh(): void {
+    this.#requireActive();
+    if (this.#autoRefreshTimer !== undefined) return;
+    this.#autoRefreshTimer = setInterval(() => this.#autoRefresh(), 60_000);
+    this.#autoRefreshTimer.unref?.();
+    this.#autoRefresh();
+  }
+
+  #autoRefresh(): void {
+    const now = this.#now();
+    for (const account of this.list()) {
+      if (
+        account.status !== "linked" ||
+        this.#links.has(account.adapter) ||
+        this.#refreshes.has(account.id)
+      )
+        continue;
+      const checked = Math.max(
+        account.lastCheckedAt ?? 0,
+        this.#autoRefreshAttempts.get(account.id) ?? 0,
+      );
+      const interval =
+        account.expiresAt !== null && account.expiresAt <= now + 5 * 60_000 ? 60_000 : 15 * 60_000;
+      if (now - checked < interval) continue;
+      this.#autoRefreshAttempts.set(account.id, now);
+      void this.refresh(account.id).catch(() => {
+        this.#options.logger?.log("debug", "accounts", "Automatic session refresh deferred", {
+          adapter: account.adapter,
+        });
+      });
+    }
   }
 
   link(input: { adapter: AccountFamily }): Promise<AccountLinkResult> {
@@ -89,6 +126,7 @@ export class AccountService {
     const row = this.#require(id);
     this.cancelLink({ adapter: row.adapter });
     this.#refreshes.get(id)?.controller.abort();
+    this.#autoRefreshAttempts.delete(id);
     this.#options.data.transaction((repositories) => {
       const removal = repositories.accounts.remove(id, this.#now());
       if (removal.freedSecretId !== null) this.#options.secrets.remove(removal.freedSecretId);
@@ -111,6 +149,9 @@ export class AccountService {
 
   async dispose(): Promise<void> {
     this.#disposed = true;
+    clearInterval(this.#autoRefreshTimer);
+    this.#autoRefreshTimer = undefined;
+    this.#autoRefreshAttempts.clear();
     this.#unsubscribe();
     const pending = [...this.#links.values(), ...this.#refreshes.values()];
     for (const operation of pending) operation.controller.abort();
@@ -130,6 +171,7 @@ export class AccountService {
     try {
       signal.throwIfAborted();
       const probe = this.#probe(adapter);
+      const session = this.#options.sessions(BROWSER_PARTITION);
       this.#options.browser.openTab(probe.loginUrl);
       while (true) {
         signal.throwIfAborted();
@@ -144,13 +186,13 @@ export class AccountService {
         });
         let result: ProbeResult;
         try {
-          result = await abortable(
-            probe.probe(this.#options.sessions(BROWSER_PARTITION), signal),
-            signal,
-          );
+          result = await abortable(probe.probe(session, signal), signal);
         } catch (error: unknown) {
           signal.throwIfAborted();
-          if (!isSessionExpired(error))
+          if (
+            !isSessionExpired(error) &&
+            !(isAppError(error) && error.code === AppErrorCode.PROVIDER_UNREACHABLE)
+          )
             throw new AppError(
               AppErrorCode.PROVIDER_UNREACHABLE,
               "Could not check the vendor session",
@@ -195,10 +237,13 @@ export class AccountService {
     const timer = setTimeout(() => controller.abort(), this.#options.timeoutMs ?? 180_000);
     const { signal } = controller;
     try {
-      const result = await abortable(
-        this.#probe(row.adapter).probe(this.#options.sessions(row.partition), signal),
-        signal,
+      const session = await accountSession(
+        row,
+        this.#options.sessions(row.partition),
+        this.#options.secrets,
       );
+      signal.throwIfAborted();
+      const result = await abortable(this.#probe(row.adapter).probe(session, signal), signal);
       signal.throwIfAborted();
       if (result.identity.externalId !== row.externalId) {
         this.#options.data.repositories.accounts.updateStatus(
@@ -327,7 +372,7 @@ export class AccountService {
       avatarUrl: row.avatarUrl,
       status: row.status,
       detail: row.statusDetail,
-      expiresAt: row.tokenExpiresAt,
+      expiresAt: row.tokenExpiresAt === null ? null : row.tokenExpiresAt * 1000,
       lastCheckedAt: row.lastCheckedAt,
       linkedProvidersCount: this.#options.data.repositories.providers
         .list()

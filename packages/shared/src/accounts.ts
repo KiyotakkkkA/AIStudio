@@ -10,6 +10,7 @@ export const AccountDto = z.object({
   avatarUrl: z.string().nullable(),
   status: AccountStatus,
   detail: z.string().nullable(),
+  /** Unix milliseconds for display; vendor identity and stored token expiry use seconds. */
   expiresAt: z.number().nullable(),
   lastCheckedAt: z.number().nullable(),
   linkedProvidersCount: z.number().int().nonnegative(),

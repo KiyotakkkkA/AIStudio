@@ -5,6 +5,7 @@ import type { AccountCredentials } from "../transport/AccountTransport.ts";
 import type { SessionGateway } from "../transport/SessionGateway.ts";
 import type { IdentityProbe } from "./IdentityProbe.ts";
 import { identityProbe } from "./registry.ts";
+import { accountSession } from "./AccountSession.ts";
 
 export function probeAccountCredentials(
   account: AccountEntity,
@@ -13,7 +14,9 @@ export function probeAccountCredentials(
   probe: IdentityProbe = identityProbe(account.adapter),
 ): AccountCredentials {
   const read = async (signal: AbortSignal) => {
-    const result = await probe.probe(session, signal);
+    const currentSession = await accountSession(account, session, secrets);
+    signal.throwIfAborted();
+    const result = await probe.probe(currentSession, signal);
     signal.throwIfAborted();
     if (result.identity.externalId !== account.externalId) throw sessionExpired();
     if (result.credential !== null) return result.credential;

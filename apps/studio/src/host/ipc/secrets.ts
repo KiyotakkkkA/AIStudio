@@ -3,6 +3,7 @@ import {
   AppErrorCode,
   buildFieldsSchema,
   findSecretTypeSchema,
+  isSecretTypeKey,
   SECRET_TYPE_REGISTRY,
   secretFieldOf,
   type Contract,
@@ -26,9 +27,13 @@ export function createSecretHandlers(secrets: SecretService): SecretHandlers {
   return {
     "secrets.types": () => SECRET_TYPE_REGISTRY.map((schema) => ({ ...schema })),
 
-    "secrets.list": (filter) => secrets.list(filter).map(toSecretSummaryDto),
+    "secrets.list": (filter) =>
+      secrets
+        .list(filter)
+        .filter((secret) => isSecretTypeKey(secret.type))
+        .map(toSecretSummaryDto),
 
-    "secrets.get": ({ id }) => toSecretDto(secrets.get(id)),
+    "secrets.get": ({ id }) => toSecretDto(requirePublicSecret(secrets, id)),
 
     "secrets.create": (input) => {
       const schema = requireSchema(input.type);
@@ -37,7 +42,7 @@ export function createSecretHandlers(secrets: SecretService): SecretHandlers {
     },
 
     "secrets.update": ({ id, ...patch }) => {
-      const current = secrets.get(id);
+      const current = requirePublicSecret(secrets, id);
       const schema = requireSchema(current.type);
       return toSecretDto(
         secrets.update(id, {
@@ -48,10 +53,20 @@ export function createSecretHandlers(secrets: SecretService): SecretHandlers {
     },
 
     "secrets.remove": ({ id }) => {
+      requirePublicSecret(secrets, id);
       secrets.remove(id);
       return { id, removed: true };
     },
   };
+}
+
+function requirePublicSecret(secrets: SecretService, id: string) {
+  const secret = secrets.get(id);
+  // Account credentials are managed by account services, not the public secret editor.
+  if (!isSecretTypeKey(secret.type)) {
+    throw new AppError(AppErrorCode.NOT_FOUND, "Секрет не найден");
+  }
+  return secret;
 }
 
 function requireSchema(type: string): SecretTypeSchema {

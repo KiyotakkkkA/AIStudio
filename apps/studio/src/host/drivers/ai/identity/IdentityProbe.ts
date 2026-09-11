@@ -28,6 +28,7 @@ export async function fetchIdentity(
   endpoint: string,
   session: SessionGateway,
   signal: AbortSignal,
+  credential: AccountToken | null = null,
 ): Promise<unknown> {
   const url = new URL(endpoint);
   const timeout = AbortSignal.timeout(IDENTITY_TIMEOUT_SECONDS * 1000);
@@ -41,6 +42,9 @@ export async function fetchIdentity(
         "user-agent": session.userAgent(),
         origin: url.origin,
         referer: `${url.origin}/`,
+        ...(credential === null
+          ? {}
+          : { authorization: `${credential.tokenType} ${credential.token}` }),
       },
       signal: combined,
     });

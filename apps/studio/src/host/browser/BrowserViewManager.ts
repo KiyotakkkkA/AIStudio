@@ -63,7 +63,6 @@ export class BrowserViewManager {
     ipcMain.handle("browser.hide", (event) => {
       if (!this.isSender(event, this.studio())) throw new Error("Forbidden");
       this.visible = false;
-      this.lifecycle?.emit({ type: "workspace-closed" });
       this.layout();
     });
     ipcMain.handle("browser.command", async (event, input: unknown) => {
@@ -143,9 +142,6 @@ export class BrowserViewManager {
     };
     contents.once("destroyed", closed);
     contents.on("render-process-gone", closed);
-    contents.on("will-navigate", (_event, destination) => {
-      if (new URL(destination).origin !== new URL(url).origin) closed();
-    });
   }
 
   private active(): Tab | undefined {

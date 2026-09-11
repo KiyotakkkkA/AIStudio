@@ -9,7 +9,6 @@ import {
   mdiPlus,
   mdiClose,
   mdiCookieOutline,
-  mdiOpenInNew,
 } from "@mdi/js";
 import "../renderer/app/theme.css";
 import "./style.css";
@@ -78,7 +77,6 @@ function BrowserApp() {
     return () => window.clearInterval(timer);
   }, [state.sitesVisible]);
 
-  const openSite = (url: string) => void send({ action: "new", url });
   const filtered = cookies.filter((cookie) =>
     `${cookie.domain} ${cookie.name}`.toLowerCase().includes(query.toLowerCase()),
   );
@@ -337,27 +335,6 @@ function BrowserApp() {
                 <Icon path={mdiWeb} />
               </div>
               <h1>Ваш браузер - ваше пространство</h1>
-              <div className="shortcuts">
-                <button className="site-card" onClick={() => openSite("https://chat.qwen.ai/")}>
-                  <span className="site-avatar">Q</span>
-                  <span>
-                    <strong>Qwen</strong>
-                    <small>chat.qwen.ai</small>
-                  </span>
-                  <Icon path={mdiOpenInNew} />
-                </button>
-                <button
-                  className="site-card"
-                  onClick={() => openSite("https://chat.deepseek.com/")}
-                >
-                  <span className="site-avatar">D</span>
-                  <span>
-                    <strong>DeepSeek</strong>
-                    <small>chat.deepseek.com</small>
-                  </span>
-                  <Icon path={mdiOpenInNew} />
-                </button>
-              </div>
             </section>
           )
         )}

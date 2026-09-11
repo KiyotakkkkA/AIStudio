@@ -76,8 +76,10 @@ export const deepSeekIdentityProbe: IdentityProbe = {
   endpoint: DEEPSEEK_IDENTITY_ENDPOINT,
   loginUrl: DEEPSEEK_LOGIN_URL,
   async probe(session: SessionGateway, signal: AbortSignal): Promise<ProbeResult> {
-    return mapDeepSeekIdentity(
-      await fetchIdentity("deepseek-web", DEEPSEEK_IDENTITY_ENDPOINT, session, signal),
+    const credential = session.accountToken?.(DEEPSEEK_IDENTITY_ENDPOINT) ?? null;
+    const result = mapDeepSeekIdentity(
+      await fetchIdentity("deepseek-web", DEEPSEEK_IDENTITY_ENDPOINT, session, signal, credential),
     );
+    return { ...result, credential: result.credential ?? credential };
   },
 };

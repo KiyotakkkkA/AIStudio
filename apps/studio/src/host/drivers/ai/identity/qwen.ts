@@ -58,8 +58,10 @@ export const qwenIdentityProbe: IdentityProbe = {
   endpoint: QWEN_IDENTITY_ENDPOINT,
   loginUrl: QWEN_LOGIN_URL,
   async probe(session: SessionGateway, signal: AbortSignal): Promise<ProbeResult> {
-    return mapQwenIdentity(
-      await fetchIdentity("qwen-web", QWEN_IDENTITY_ENDPOINT, session, signal),
+    const credential = session.accountToken?.(QWEN_IDENTITY_ENDPOINT) ?? null;
+    const result = mapQwenIdentity(
+      await fetchIdentity("qwen-web", QWEN_IDENTITY_ENDPOINT, session, signal, credential),
     );
+    return { ...result, credential: result.credential ?? credential };
   },
 };

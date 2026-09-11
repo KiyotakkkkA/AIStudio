@@ -100,7 +100,7 @@ test("polling stores a masked identity and encrypted token with progress and don
   expect(result.status).toBe("linked");
   const dto = service.list()[0]!;
   expect(dto.emailMasked).toBe("p***@example.com");
-  expect(dto.expiresAt).toBe(2_000_000_000);
+  expect(dto.expiresAt).toBe(2_000_000_000_000);
   const row = database.client.repositories.accounts.getById(dto.id)!;
   expect(await createSecretService(database.client).resolve(row.tokenSecretId!)).toBe(
     "private-bearer-token",
@@ -125,6 +125,73 @@ test("timeout writes nothing and makes no further requests", async () => {
   const count = probe.mock.calls.length;
   await vi.advanceTimersByTimeAsync(60_000);
   expect(probe).toHaveBeenCalledTimes(count);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+test("temporary vendor failures do not end sign-in before the browser authenticates", async () => {
+  probe.mockRejectedValueOnce(new AppError(AppErrorCode.PROVIDER_UNREACHABLE, "Connection reset"));
+  const pending = service.link({ adapter: "qwen-web" });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(service.list()).toEqual([]);
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(await pending).toMatchObject({ status: "linked" });
+  expect(probe).toHaveBeenCalledTimes(2);
+});
+
+test("automatic refresh saves rotated credentials without opening a login tab", async () => {
+  probe.mockResolvedValueOnce({
+    ...identity(),
+    identity: { externalId: "user-1", expiresAt: Math.floor(Date.now() / 1000) + 120 },
+  });
+  await service.link({ adapter: "qwen-web" });
+  const id = service.list()[0]!.id;
+  probe.mockResolvedValue(identity("user-1", "rotated-token"));
+  service.startAutoRefresh();
+  service.startAutoRefresh();
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(probe).toHaveBeenCalledTimes(2);
+  expect(opener).toHaveBeenCalledOnce();
+  const row = database.client.repositories.accounts.getById(id)!;
+  expect(await createSecretService(database.client).resolve(row.tokenSecretId!)).toBe(
+    "rotated-token",
+  );
+  await service.dispose();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+test("automatic refresh checks unknown expiry every fifteen minutes and stops on sign-out", async () => {
+  probe.mockResolvedValueOnce({ ...identity(), identity: { externalId: "user-1" } });
+  await service.link({ adapter: "deepseek-web" });
+  probe.mockRejectedValue(signedOut());
+  service.startAutoRefresh();
+  await vi.advanceTimersByTimeAsync(14 * 60_000);
+  expect(probe).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(service.list()[0]?.status).toBe("needs-relink");
+  await vi.advanceTimersByTimeAsync(30 * 60_000);
+  expect(probe).toHaveBeenCalledTimes(2);
+  expect(opener).toHaveBeenCalledOnce();
+});
+
+test("automatic refresh backs off after transient failures and recovers", async () => {
+  probe.mockResolvedValueOnce({ ...identity(), identity: { externalId: "user-1" } });
+  await service.link({ adapter: "qwen-web" });
+  probe.mockRejectedValueOnce(new AppError(AppErrorCode.PROVIDER_UNREACHABLE, "Offline"));
+  service.startAutoRefresh();
+  await vi.advanceTimersByTimeAsync(15 * 60_000);
+  expect(service.list()[0]?.status).toBe("linked");
+  await vi.advanceTimersByTimeAsync(14 * 60_000);
+  expect(probe).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(probe).toHaveBeenCalledTimes(3);
+});
+
+test("persistent vendor failures still stop at the sign-in deadline", async () => {
+  probe.mockRejectedValue(new AppError(AppErrorCode.PROVIDER_UNREACHABLE, "Unavailable"));
+  const pending = service.link({ adapter: "deepseek-web" });
+  await vi.advanceTimersByTimeAsync(6000);
+  expect(await pending).toMatchObject({ status: "timeout" });
+  expect(service.list()).toEqual([]);
   expect(vi.getTimerCount()).toBe(0);
 });
 
@@ -286,7 +353,7 @@ test("refresh updates health, expiry and token, and rejects mismatched identitie
   });
   expect(await service.refresh(row.id)).toMatchObject({
     status: "linked",
-    expiresAt: 3_000_000_000,
+    expiresAt: 3_000_000_000_000,
   });
   expect(createSecretService(database.client).list()).toEqual([]);
 });

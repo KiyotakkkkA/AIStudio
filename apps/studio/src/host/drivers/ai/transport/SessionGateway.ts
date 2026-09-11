@@ -1,3 +1,5 @@
+import type { AccountToken } from "./AccountTransport.ts";
+
 export interface SessionRequest {
   readonly method: string;
   readonly headers: Readonly<Record<string, string>>;
@@ -8,6 +10,7 @@ export interface SessionRequest {
 export interface SessionGateway {
   readonly partition: string;
   userAgent(): string;
+  accountToken?(url: string): AccountToken | null;
   fetch(url: string, request: SessionRequest): Promise<Response>;
 }
 
