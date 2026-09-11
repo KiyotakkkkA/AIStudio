@@ -28,8 +28,6 @@ import {
 } from "./providerPresentation";
 import useStore from "../../stores/useStore";
 
-export const ACCOUNTS_PENDING_NOTE = "Привязка аккаунтов появится в TASK_016_EXTRA_1.";
-
 export interface ConnectionCardProps {
   readonly vm: ProviderFormVm;
   readonly onManageSecrets: () => void;
@@ -124,7 +122,6 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
               <span className="flex-1">
                 Нет привязанных аккаунтов для {ADAPTER_LABELS[vm.adapter]}.
               </span>
-              <span className="flex-none text-[11px] text-main-500">{ACCOUNTS_PENDING_NOTE}</span>
             </div>
           ) : (
             <div className="flex gap-2">
@@ -155,7 +152,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
                   </Chip>
                 )}
               </div>
-              <Button type="button" tone="ghost" disabled title={ACCOUNTS_PENDING_NOTE}>
+              <Button type="button" tone="ghost" disabled>
                 Аккаунты
               </Button>
             </div>
@@ -248,11 +245,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
           <Icon path={mdiFlashOutline} size={15} />
           {providers.probing ? "Проверяем…" : "Проверить связь"}
         </Button>
-        <ProbeResultLine
-          result={vm.probeResult}
-          probing={providers.probing}
-          relinkNote={ACCOUNTS_PENDING_NOTE}
-        />
+        <ProbeResultLine result={vm.probeResult} probing={providers.probing} />
       </div>
 
       {vm.banner === null ? null : (

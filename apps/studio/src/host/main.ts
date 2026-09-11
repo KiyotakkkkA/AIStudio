@@ -33,6 +33,7 @@ import { AccountService } from "./services/AccountService";
 import { BrowserLifecycle } from "./browser/lifecycle";
 import { RustCore } from "./drivers/rust/RustCore";
 import { SystemService } from "./services/SystemService";
+import { VectorStoreService } from "./services/VectorStoreService";
 
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
@@ -172,16 +173,25 @@ if (!app.requestSingleInstanceLock()) {
       accounts.startAutoRefresh();
       healthCheck = new HealthCheckService({ providers, settings, events: eventBus, logger });
       healthCheck.start();
+      const core = RustCore.fromPaths(paths);
+      const vectorStores = new VectorStoreService({
+        data: database,
+        core,
+        drivers: registry,
+        directory: paths.vectorStoresDir,
+        logger,
+      });
       ipcServer = createIpcServer(
         contract,
         createHandlers({
+          vectorStores,
           events: eventBus,
           settings,
           secrets,
           providers,
           healthCheck,
           accounts,
-          system: new SystemService(RustCore.fromPaths(paths)),
+          system: new SystemService(core),
         }),
         {
           ipcMain: {

@@ -12,7 +12,7 @@ use arrow_schema::{DataType, Field, Schema};
 use futures::TryStreamExt;
 use lancedb::{
     Table,
-    query::{ExecutableQuery, QueryBase},
+    query::{ExecutableQuery, QueryBase, Select},
 };
 use serde::{Deserialize, Serialize};
 
@@ -74,6 +74,7 @@ pub struct SearchHit {
 #[serde(rename_all = "camelCase")]
 pub struct IndexStats {
     pub row_count: usize,
+    pub document_count: usize,
     pub dimension: u32,
     pub metric: Metric,
     pub on_disk_bytes: u64,
@@ -126,6 +127,20 @@ fn local_path(path: &Path) -> Result<&str> {
 }
 
 impl VectorIndex {
+    pub fn remove(path: &Path) -> Result<()> {
+        local_path(path)?;
+        if path.file_name().is_none() {
+            return Err(Error::InvalidInput(
+                "Cannot remove a filesystem root".into(),
+            ));
+        }
+        match std::fs::remove_dir_all(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(error.into()),
+        }
+    }
+
     pub async fn create(path: &Path, dimension: u32, metric: Metric) -> Result<Self> {
         if dimension == 0 || dimension > i32::MAX as u32 {
             return Err(Error::InvalidInput(
@@ -364,8 +379,27 @@ impl VectorIndex {
     }
 
     pub async fn stats(&self) -> Result<IndexStats> {
+        let mut documents = HashSet::new();
+        let mut row_count = 0;
+        let mut batches = self
+            .table
+            .query()
+            .select(Select::columns(&["document_id"]))
+            .execute()
+            .await
+            .map_err(backend)?;
+        while let Some(batch) = batches.try_next().await.map_err(backend)? {
+            row_count += batch.num_rows();
+            for document in column::<StringArray>(&batch, "document_id")?
+                .iter()
+                .flatten()
+            {
+                documents.insert(document.to_owned());
+            }
+        }
         Ok(IndexStats {
-            row_count: self.table.count_rows(None).await.map_err(backend)?,
+            row_count,
+            document_count: documents.len(),
             dimension: self.dimension,
             metric: self.metric,
             on_disk_bytes: directory_bytes(&self.directory)?,

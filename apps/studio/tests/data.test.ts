@@ -10,6 +10,7 @@ import { migrate, prepareDatabase, BACKUPS_KEPT } from "../src/host/data/migrate
 import { isMigrationFailedError } from "../src/host/data/MigrationFailedError.ts";
 import { SettingService } from "../src/host/services/SettingService.ts";
 import { createHandlers } from "../src/host/ipc/index.ts";
+import { createVectorStoreService } from "../../../test/helpers/vectorStoreService.ts";
 import { createAccountService } from "../../../test/helpers/accountService.ts";
 import {
   captureWindowState,
@@ -50,6 +51,7 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
       "0003_provider_adapter_auth_mode",
       "0004_account",
       "0005_slimy_tiger_shark",
+      "0006_exotic_jane_foster",
     ]);
     const tables = database.client.db.$client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'")
@@ -73,13 +75,13 @@ test("a backup is written before migrating and only the last three are kept", ()
     const clock = createFakeClock();
     for (let run = 0; run < BACKUPS_KEPT + 2; run++) {
       const client = openDatabase({ file });
-      const report = migrate({
-        client,
-        migrationsDir: MIGRATIONS_DIR,
-        backupsDir,
-        now: () => clock.advance(60_000),
-      });
       try {
+        const report = migrate({
+          client,
+          migrationsDir: MIGRATIONS_DIR,
+          backupsDir,
+          now: () => clock.advance(60_000),
+        });
         assert.deepEqual(report.applied, [
           "0000_setting",
           "0001_secret",
@@ -87,9 +89,12 @@ test("a backup is written before migrating and only the last three are kept", ()
           "0003_provider_adapter_auth_mode",
           "0004_account",
           "0005_slimy_tiger_shark",
+          "0006_exotic_jane_foster",
         ]);
         if (run === 0) assert.equal(report.backup, undefined);
         else assert.equal(typeof report.backup, "string");
+        client.db.$client.exec("DROP TABLE vector_document");
+        client.db.$client.exec("DROP TABLE vector_store");
         client.db.$client.exec("DROP TABLE model");
         client.db.$client.exec("DROP TABLE provider");
         client.db.$client.exec("DROP TABLE account");
@@ -206,6 +211,7 @@ test("prepareDatabase opens and migrates in one step", () => {
         "0003_provider_adapter_auth_mode",
         "0004_account",
         "0005_slimy_tiger_shark",
+        "0006_exotic_jane_foster",
       ]);
       assert.equal(prepared.client.repositories.settings.all().length, 0);
     } finally {
@@ -277,6 +283,7 @@ test("settings channels carry JSON values through the whole chain", async () => 
   try {
     const settings = new SettingService({ data: database.client, clock: createFakeClock() });
     const handlers = createHandlers({
+      vectorStores: createVectorStoreService(database.client),
       system: createSystemService(),
       accounts: createAccountService(database.client),
       providers: createProviderService(database.client),

@@ -23,6 +23,14 @@ import { ProviderId } from "../primitives/branded.js";
 import { defineContract } from "./defineContract.js";
 import { AccountDto, AccountLinkInput, AccountLinkResult, AccountRef } from "../accounts.js";
 import { AdapterDescriptorDto } from "../ai.js";
+import {
+  CreateVectorStoreInput,
+  UpdateVectorStoreInput,
+  VectorStoreDto,
+  VectorStoreRef,
+  VectorSearchInput,
+  VectorSearchHitDto,
+} from "../vectorStores/index.js";
 
 export const SecretFilter = z.object({
   scope: SecretScope.optional(),
@@ -42,6 +50,16 @@ export const SettingKey = z
 export type SettingKey = z.infer<typeof SettingKey>;
 
 export const contract = defineContract({
+  "vectorStores.list": { input: z.void(), output: z.array(VectorStoreDto) },
+  "vectorStores.get": { input: VectorStoreRef, output: VectorStoreDto },
+  "vectorStores.create": { input: CreateVectorStoreInput, output: VectorStoreDto },
+  "vectorStores.update": { input: UpdateVectorStoreInput, output: VectorStoreDto },
+  "vectorStores.remove": {
+    input: VectorStoreRef,
+    output: VectorStoreRef.extend({ removed: z.literal(true) }),
+  },
+  "vectorStores.search": { input: VectorSearchInput, output: z.array(VectorSearchHitDto) },
+  "vectorStores.reconcile": { input: VectorStoreRef, output: VectorStoreDto },
   "accounts.list": { input: z.void(), output: z.array(AccountDto) },
   "accounts.link": { input: AccountLinkInput, output: AccountLinkResult },
   "accounts.cancelLink": { input: AccountLinkInput, output: z.object({ cancelled: z.boolean() }) },

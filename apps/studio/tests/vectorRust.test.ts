@@ -10,6 +10,7 @@ import { join } from "node:path";
 
 const stats = {
   rowCount: 0,
+  documentCount: 0,
   dimension: 1024,
   metric: "cosine",
   onDiskBytes: 123,
@@ -43,7 +44,7 @@ test("vector wrapper transports typed operations and validates native results", 
       async vectorCall(request) {
         const value = JSON.parse(request) as { operation: string };
         requests.push(value);
-        if (value.operation.startsWith("delete")) return "null";
+        if (value.operation.startsWith("delete") || value.operation === "remove") return "null";
         if (value.operation === "search") return "[]";
         return JSON.stringify(stats);
       },
@@ -56,6 +57,7 @@ test("vector wrapper transports typed operations and validates native results", 
   assert.deepEqual(await core.searchVectors("store", [1, 0], 3, 0.8, "chunk_index > 2"), []);
   await core.deleteVectorsByIds("store", ["a"]);
   await core.deleteVectorsBySource("store", "doc");
+  await core.removeVectorIndex("store");
   assert.deepEqual(requests, [
     { operation: "create", path: "store", dimension: 1024, metric: "cosine" },
     { operation: "open", path: "store" },
@@ -70,6 +72,7 @@ test("vector wrapper transports typed operations and validates native results", 
     },
     { operation: "deleteByIds", path: "store", ids: ["a"] },
     { operation: "deleteBySource", path: "store", documentId: "doc" },
+    { operation: "remove", path: "store" },
   ]);
   await assert.rejects(
     new RustCore(() =>

@@ -12,8 +12,11 @@ import { createProviderHandlers } from "./providers.ts";
 import { createAccountHandlers } from "./accounts.ts";
 import type { AccountService } from "../services/AccountService.ts";
 import type { SystemService } from "../services/SystemService.ts";
+import type { VectorStoreService } from "../services/VectorStoreService.ts";
+import { createVectorStoreHandlers } from "./vectorStores.ts";
 
 export interface HostIpcDependencies {
+  vectorStores: VectorStoreService;
   system: SystemService;
   accounts: AccountService;
   settings: SettingService;
@@ -27,6 +30,7 @@ export interface HostIpcDependencies {
 
 export function createHandlers(dependencies: HostIpcDependencies): IpcHandlers<Contract> {
   return {
+    ...createVectorStoreHandlers(dependencies.vectorStores),
     ...createSystemHandlers({
       system: dependencies.system,
       events: dependencies.events ?? createEventBus(),

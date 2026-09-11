@@ -43,6 +43,13 @@
       "when": 1789083789090,
       "tag": "0005_slimy_tiger_shark",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789167583877,
+      "tag": "0006_exotic_jane_foster",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import { HostEvent, type StreamId } from "@zvs/shared";
 import { createEventBus, type WindowSender } from "../src/host/platform/events.ts";
 import { createEventRecorder, recordingEnabled } from "../src/host/platform/eventRecorder.ts";
 import { createHandlers } from "../src/host/ipc/index.ts";
+import { createVectorStoreService } from "../../../test/helpers/vectorStoreService.ts";
 import { createAccountService } from "../../../test/helpers/accountService.ts";
 import { SettingService } from "../src/host/services/SettingService.ts";
 import { createFakeClock } from "../../../test/helpers/fakeClock.ts";
@@ -255,6 +256,7 @@ test("system.demoStream counts to the requested total and terminates", async () 
   const { sent, sender } = fakeSender();
   const bus = createEventBus({ senders: () => [sender] });
   const handlers = createHandlers({
+    vectorStores: createVectorStoreService(database.client),
     system: createSystemService(),
     accounts: createAccountService(database.client),
     providers: createProviderService(database.client),

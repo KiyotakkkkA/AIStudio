@@ -157,4 +157,8 @@ export class RustCore implements RustCorePort, VectorCorePort {
   async vectorStats(path: string) {
     return this.vectorCall({ operation: "stats", path }, VectorStatsSchema);
   }
+
+  async removeVectorIndex(path: string): Promise<void> {
+    await this.vectorCall({ operation: "remove", path }, z.null());
+  }
 }

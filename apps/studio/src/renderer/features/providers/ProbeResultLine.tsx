@@ -7,11 +7,9 @@ import { checkedAgo, probeLine } from "./providerPresentation";
 export interface ProbeResultLineProps {
   readonly result: ProbeResultDto | null;
   readonly probing: boolean;
-  /** Shown instead of a bad-key message when the outcome is about the vendor session. */
-  readonly relinkNote: string;
 }
 
-export default function ProbeResultLine({ result, probing, relinkNote }: ProbeResultLineProps) {
+export default function ProbeResultLine({ result, probing }: ProbeResultLineProps) {
   if (probing) {
     return (
       <span className="flex items-center gap-1.75 text-[11.5px] text-main-400">
@@ -43,10 +41,7 @@ export default function ProbeResultLine({ result, probing, relinkNote }: ProbeRe
         <span className="truncate text-main-500">{checkedAgo(result, Date.now())}</span>
       </span>
       {line.detail === null ? null : (
-        <span className="text-[11px] text-main-500">
-          {line.detail}
-          {line.relink ? <span className="ml-1 text-accent-dark">{relinkNote}</span> : null}
-        </span>
+        <span className="text-[11px] text-main-500">{line.detail}</span>
       )}
     </div>
   );

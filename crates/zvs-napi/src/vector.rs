@@ -63,6 +63,9 @@ enum Request {
     Stats {
         path: String,
     },
+    Remove {
+        path: String,
+    },
 }
 
 struct Operation(String);
@@ -78,6 +81,10 @@ impl Drop for Operation {
 
 async fn execute(request: Request) -> zvs_core::Result<serde_json::Value> {
     match request {
+        Request::Remove { path } => {
+            VectorIndex::remove(Path::new(&path))?;
+            Ok(serde_json::Value::Null)
+        }
         Request::Create {
             path,
             dimension,

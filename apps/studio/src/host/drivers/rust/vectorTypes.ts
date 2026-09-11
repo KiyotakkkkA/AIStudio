@@ -16,6 +16,7 @@ export interface VectorRow {
 
 export const VectorStatsSchema = z.object({
   rowCount: z.number().int().nonnegative(),
+  documentCount: z.number().int().nonnegative(),
   dimension: z.number().int().positive(),
   metric: z.enum(["cosine", "l2", "dot"]),
   onDiskBytes: z.number().int().nonnegative(),
@@ -35,6 +36,7 @@ export type VectorStats = z.infer<typeof VectorStatsSchema>;
 export type VectorHit = z.infer<typeof VectorHitSchema>;
 
 export interface VectorCorePort {
+  removeVectorIndex(path: string): Promise<void>;
   createVectorIndex(path: string, dimension: number, metric?: VectorMetric): Promise<VectorStats>;
   openVectorIndex(path: string): Promise<VectorStats>;
   upsertVectors(path: string, rows: VectorRow[], signal?: AbortSignal): Promise<number>;
