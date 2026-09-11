@@ -24,7 +24,8 @@
       "outputs": []
     },
     "//#build:rust": {
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["PROTOC"]
     },
     "//#lint:root": {
       "cache": false

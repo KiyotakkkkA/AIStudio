@@ -7,6 +7,13 @@ edition = "2024"
 publish = false
 
 [workspace.dependencies]
+arrow-array = "=58.4.0"
+arrow-schema = "=58.4.0"
+futures = "=0.3.32"
+lancedb = { version = "=0.38.0", features = ["remote"] }
+serde = { version = "=1.0.228", features = ["derive"] }
+tempfile = "=3.27.0"
+tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "time"] }
 blake3 = "=1.8.7"
 napi = { version = "=3.12.4", default-features = false, features = ["napi8", "tokio_rt"] }
 napi-derive = "=3.6.5"

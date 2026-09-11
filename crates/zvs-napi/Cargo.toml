@@ -11,6 +11,8 @@ crate-type = ["cdylib"]
 debug-panic = []
 
 [dependencies]
+futures.workspace = true
+serde.workspace = true
 napi.workspace = true
 napi-derive.workspace = true
 serde_json.workspace = true

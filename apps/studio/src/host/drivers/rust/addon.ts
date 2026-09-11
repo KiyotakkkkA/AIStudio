@@ -4,6 +4,10 @@ import type { StudioPaths } from "../../platform/paths.ts";
 import type { ChunkConfig, TextChunk } from "./ports.ts";
 
 export interface NativeAddon {
+  vectorCall(request: string): Promise<string>;
+  vectorBeginUpsert(): Promise<string>;
+  vectorCancel(operationId: string): Promise<void>;
+  vectorRelease(operationId: string): Promise<void>;
   chunkText(text: string, config: ChunkConfig): Promise<TextChunk[]>;
   hashBytes(bytes: Buffer): Promise<string>;
 }
@@ -26,6 +30,11 @@ export function loadAddon(paths: Pick<StudioPaths, "nativeAddonPath">): NativeAd
       typeof addon.hashBytes !== "function"
     )
       throw new Error("Native addon exports do not match the RustCore interface");
+    for (const name of ["vectorCall", "vectorBeginUpsert", "vectorCancel", "vectorRelease"]) {
+      if (!(name in addon) || typeof (addon as Record<string, unknown>)[name] !== "function") {
+        throw new Error(`Native addon is missing ${name}`);
+      }
+    }
     loaded.set(path, addon as NativeAddon);
     return addon as NativeAddon;
   } catch (cause) {

@@ -10,6 +10,21 @@ import { createSystemHandlers } from "../src/host/ipc/system.ts";
 import { createEventBus } from "../src/host/platform/events.ts";
 import { STUDIO_ROOT, temporaryDirectory } from "../../../test/helpers/paths.ts";
 
+const unusedVectorExports = {
+  async vectorCall() {
+    throw new Error("unused");
+  },
+  async vectorBeginUpsert() {
+    throw new Error("unused");
+  },
+  async vectorCancel() {
+    throw new Error("unused");
+  },
+  async vectorRelease() {
+    throw new Error("unused");
+  },
+};
+
 test("native paths resolve through resources in development and packaged layouts", () => {
   const env = { userData: "user", resources: "bundle", appRoot: STUDIO_ROOT, packaged: false };
   assert.equal(
@@ -56,6 +71,7 @@ test("wrapper maps structured native codes and unexpected failures for both meth
   ]) {
     const error = new Error(JSON.stringify({ code, message: "native detail" }));
     const addon: NativeAddon = {
+      ...unusedVectorExports,
       async chunkText() {
         throw error;
       },
@@ -82,6 +98,7 @@ test("wrapper maps structured native codes and unexpected failures for both meth
 test("wrapper owns binary inputs and rejects configs before napi numeric coercion", async () => {
   let received: Buffer | undefined;
   const core = new RustCore(() => ({
+    ...unusedVectorExports,
     async chunkText() {
       throw new Error("must not call");
     },

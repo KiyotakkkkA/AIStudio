@@ -1,11 +1,17 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync } from "node:fs";
+import { copyFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 import process from "node:process";
 import { NapiCli } from "@napi-rs/cli";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
+const localProtoc = join(
+  root,
+  "target/tools/protoc/bin",
+  process.platform === "win32" ? "protoc.exe" : "protoc",
+);
+if (!process.env.PROTOC && existsSync(localProtoc)) process.env.PROTOC = localProtoc;
 const debug = process.argv.includes("--debug-panic");
 const target = execFileSync("rustc", ["-vV"], { encoding: "utf8", cwd: root })
   .match(/^host: (.+)$/m)?.[1]

@@ -12,6 +12,11 @@ export const userDataDir = (env: PathEnvironment): string => env.userData;
 export const dbPath = (env: PathEnvironment): string => join(userDataDir(env), "studio.sqlite");
 export const logsDir = (env: PathEnvironment): string => join(userDataDir(env), "logs");
 export const cacheDir = (env: PathEnvironment): string => join(userDataDir(env), "cache");
+export const vectorStoresDir = (env: PathEnvironment): string => join(userDataDir(env), "vectors");
+export function vectorStorePath(directory: string, storeId: string): string {
+  if (!/^[a-zA-Z0-9_-]+$/.test(storeId)) throw new Error("Invalid vector store ID");
+  return join(directory, storeId);
+}
 export const streamsDir = (env: PathEnvironment): string => join(logsDir(env), "streams");
 export const backupsDir = (env: PathEnvironment): string => join(userDataDir(env), "backups");
 export const resourcesDir = (env: PathEnvironment): string =>
@@ -38,6 +43,7 @@ export function resolvePaths(env: PathEnvironment) {
     streamsDir: streamsDir(env),
     backupsDir: backupsDir(env),
     cacheDir: cacheDir(env),
+    vectorStoresDir: vectorStoresDir(env),
     resourcesDir: resourcesDir(env),
     nativeAddonPath: nativeAddonPath(env),
     migrationsDir: join(hostDir, "migrations"),

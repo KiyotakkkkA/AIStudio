@@ -6,6 +6,8 @@ import { test } from "node:test";
 import { fileURLToPath, URL } from "node:url";
 import { Buffer } from "node:buffer";
 import { setInterval, clearInterval } from "node:timers";
+import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const triple = execFileSync("rustc", ["-vV"], { encoding: "utf8" })
@@ -62,5 +64,91 @@ test("native work leaves the JavaScript event loop responsive", async () => {
     assert.ok(ticks > 0);
   } finally {
     clearInterval(timer);
+  }
+});
+
+test("vector addon persists hundreds of vectors, replaces IDs, filters, deletes and reports stats", async () => {
+  const path = mkdtempSync(join(tmpdir(), "zvs-vector-native-"));
+  const call = async (request) =>
+    JSON.parse(await addon.vectorCall(JSON.stringify({ path, ...request })));
+  try {
+    const created = await call({ operation: "create", dimension: 16, metric: "cosine" });
+    assert.equal(created.rowCount, 0);
+    assert.equal(created.dimension, 16);
+    assert.equal(created.indexType, "FLAT");
+    let seed = 19;
+    const random = () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 2 ** 32 - 0.5;
+    };
+    const rows = Array.from({ length: 400 }, (_, i) => ({
+      id: `row-${i}`,
+      vector: Array.from({ length: 16 }, random),
+      payload: { text: `Фрагмент ${i}` },
+      documentId: i < 200 ? "doc'1" : "doc2",
+      chunkIndex: i,
+      path: "C:/docs/source.txt",
+    }));
+    const operationId = await addon.vectorBeginUpsert();
+    try {
+      assert.equal(await call({ operation: "upsert", rows, operationId }), 400);
+    } finally {
+      await addon.vectorRelease(operationId);
+    }
+    assert.ok(existsSync(join(path, "vectors.lance")));
+    const hits = await call({ operation: "search", vector: rows[42].vector, k: 5, minScore: 0 });
+    assert.equal(hits.length, 5);
+    assert.equal(hits[0].id, "row-42");
+    assert.ok(hits[0].score > 0.99999);
+    assert.deepEqual(hits[0].payload, rows[42].payload);
+    const filtered = await call({
+      operation: "search",
+      vector: rows[42].vector,
+      k: 5,
+      minScore: 0,
+      filter: "document_id = 'doc2'",
+    });
+    assert.ok(filtered.every((hit) => hit.documentId === "doc2"));
+    const replacement = { ...rows[42], payload: { text: "updated" } };
+    const updateId = await addon.vectorBeginUpsert();
+    try {
+      await call({ operation: "upsert", rows: [replacement], operationId: updateId });
+    } finally {
+      await addon.vectorRelease(updateId);
+    }
+    const updated = await call({
+      operation: "search",
+      vector: rows[42].vector,
+      k: 1,
+      minScore: 0.99,
+    });
+    assert.deepEqual(updated[0].payload, replacement.payload);
+    const stats = await call({ operation: "open" });
+    assert.equal(stats.rowCount, 400);
+    assert.ok(stats.onDiskBytes > 0);
+    await assert.rejects(call({ operation: "create", dimension: 8, metric: "cosine" }), (error) => {
+      assert.equal(JSON.parse(error.message).code, "VALIDATION_FAILED");
+      return true;
+    });
+    await call({ operation: "deleteBySource", documentId: "doc'1" });
+    assert.equal((await call({ operation: "stats" })).rowCount, 200);
+    await call({ operation: "deleteByIds", ids: ["row-200", "x') OR true --"] });
+    assert.equal((await call({ operation: "stats" })).rowCount, 199);
+    const cancelledId = await addon.vectorBeginUpsert();
+    await addon.vectorCancel(cancelledId);
+    try {
+      await assert.rejects(
+        call({ operation: "upsert", rows, operationId: cancelledId }),
+        (error) => {
+          assert.equal(JSON.parse(error.message).code, "RUN_CANCELLED");
+          return true;
+        },
+      );
+    } finally {
+      await addon.vectorRelease(cancelledId);
+    }
+    assert.equal((await call({ operation: "stats" })).rowCount, 199);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
   }
 });
