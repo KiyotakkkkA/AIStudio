@@ -17,6 +17,18 @@ export const backupsDir = (env: PathEnvironment): string => join(userDataDir(env
 export const resourcesDir = (env: PathEnvironment): string =>
   env.packaged ? env.resources : join(env.appRoot, "resources");
 
+export function nativeTargetTriple(platform = process.platform, arch = process.arch): string {
+  const architecture = arch === "x64" ? "x86_64" : arch === "arm64" ? "aarch64" : undefined;
+  if (!architecture) throw new Error(`Unsupported native architecture: ${arch}`);
+  if (platform === "win32") return `${architecture}-pc-windows-msvc`;
+  if (platform === "darwin") return `${architecture}-apple-darwin`;
+  if (platform === "linux") return `${architecture}-unknown-linux-gnu`;
+  throw new Error(`Unsupported native platform: ${platform}`);
+}
+
+export const nativeAddonPath = (env: PathEnvironment): string =>
+  join(resourcesDir(env), "native", nativeTargetTriple(), "zvs-core.node");
+
 export function resolvePaths(env: PathEnvironment) {
   const hostDir = dirname(fileURLToPath(import.meta.url));
   return {
@@ -27,6 +39,7 @@ export function resolvePaths(env: PathEnvironment) {
     backupsDir: backupsDir(env),
     cacheDir: cacheDir(env),
     resourcesDir: resourcesDir(env),
+    nativeAddonPath: nativeAddonPath(env),
     migrationsDir: join(hostDir, "migrations"),
     preloadPath: join(hostDir, "../preload/index.cjs"),
     browserPreloadPath: join(hostDir, "../preload/browser.cjs"),

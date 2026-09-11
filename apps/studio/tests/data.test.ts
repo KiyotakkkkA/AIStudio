@@ -1,3 +1,4 @@
+import { createSystemService } from "../../../test/helpers/systemService.ts";
 import { createProviderService } from "../../../test/helpers/providerService.ts";
 import assert from "node:assert/strict";
 import { cpSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
@@ -48,6 +49,7 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
       "0002_provider_model",
       "0003_provider_adapter_auth_mode",
       "0004_account",
+      "0005_slimy_tiger_shark",
     ]);
     const tables = database.client.db.$client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'")
@@ -84,6 +86,7 @@ test("a backup is written before migrating and only the last three are kept", ()
           "0002_provider_model",
           "0003_provider_adapter_auth_mode",
           "0004_account",
+          "0005_slimy_tiger_shark",
         ]);
         if (run === 0) assert.equal(report.backup, undefined);
         else assert.equal(typeof report.backup, "string");
@@ -202,6 +205,7 @@ test("prepareDatabase opens and migrates in one step", () => {
         "0002_provider_model",
         "0003_provider_adapter_auth_mode",
         "0004_account",
+        "0005_slimy_tiger_shark",
       ]);
       assert.equal(prepared.client.repositories.settings.all().length, 0);
     } finally {
@@ -273,6 +277,7 @@ test("settings channels carry JSON values through the whole chain", async () => 
   try {
     const settings = new SettingService({ data: database.client, clock: createFakeClock() });
     const handlers = createHandlers({
+      system: createSystemService(),
       accounts: createAccountService(database.client),
       providers: createProviderService(database.client),
       settings,

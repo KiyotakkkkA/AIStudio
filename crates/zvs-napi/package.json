@@ -1,0 +1,7 @@
+{
+  "name": "zvs-napi",
+  "private": true,
+  "napi": {
+    "binaryName": "zvs-core"
+  }
+}

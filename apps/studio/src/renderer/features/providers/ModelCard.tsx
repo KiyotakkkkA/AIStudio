@@ -42,12 +42,14 @@ export default function ModelCard({
           </div>
         </div>
         {row.available || selected ? (
-          <InputCheckBox
-            aria-label={`Использовать модель: ${row.externalId}`}
-            checked={selected}
-            disabled={!selectable || (!row.available && !selected)}
-            onChange={onToggle}
-          />
+          <span onClick={(event) => event.stopPropagation()}>
+            <InputCheckBox
+              aria-label={`Использовать модель: ${row.externalId}`}
+              checked={selected}
+              disabled={!selectable || (!row.available && !selected)}
+              onChange={onToggle}
+            />
+          </span>
         ) : null}
       </div>
 

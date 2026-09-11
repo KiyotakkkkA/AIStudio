@@ -65,6 +65,10 @@ export const contract = defineContract({
     input: z.object({ steps: z.number().int().min(1).max(100) }),
     output: z.object({ streamId: StreamId }),
   },
+  "system.nativePing": {
+    input: z.object({ text: z.string().max(1_000_000) }),
+    output: z.object({ count: z.number().int().nonnegative() }),
+  },
   "settings.get": {
     input: z.object({ key: SettingKey }),
     output: z.object({

@@ -11,8 +11,10 @@ import { createSettingHandlers } from "./settings.ts";
 import { createProviderHandlers } from "./providers.ts";
 import { createAccountHandlers } from "./accounts.ts";
 import type { AccountService } from "../services/AccountService.ts";
+import type { SystemService } from "../services/SystemService.ts";
 
 export interface HostIpcDependencies {
+  system: SystemService;
   accounts: AccountService;
   settings: SettingService;
   secrets: SecretService;
@@ -26,6 +28,7 @@ export interface HostIpcDependencies {
 export function createHandlers(dependencies: HostIpcDependencies): IpcHandlers<Contract> {
   return {
     ...createSystemHandlers({
+      system: dependencies.system,
       events: dependencies.events ?? createEventBus(),
       clock: dependencies.clock,
       intervalMs: dependencies.intervalMs,

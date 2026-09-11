@@ -11,6 +11,7 @@ out/
 build/
 target/
 *.node
+apps/studio/resources/native/
 .turbo/
 .env*
 coverage/

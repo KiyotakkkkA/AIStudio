@@ -9,6 +9,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
+    "test": "vitest run --root ../.. --project host --project renderer",
     "typecheck": "tsc -b && tsc -p tsconfig.test.json",
     "lint": "eslint . --max-warnings 0",
     "db:generate": "drizzle-kit generate"

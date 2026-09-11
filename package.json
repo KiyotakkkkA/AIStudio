@@ -9,7 +9,9 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "build:rust": "cargo build --workspace --release --locked",
+    "build:rust": "node scripts/build-rust.mjs",
+    "build:rust:debug": "node scripts/build-rust.mjs --debug-panic",
+    "test:rust": "pnpm build:rust && pnpm build:rust:debug && node --test test/native/addon.test.mjs",
     "typecheck": "turbo run typecheck",
     "typecheck:root": "tsc -p tsconfig.test.json",
     "lint": "turbo run lint",
@@ -25,6 +27,7 @@
     "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@napi-rs/cli": "3.9.1",
     "@playwright/test": "1.63.0",
     "@types/node": "26.5.0",
     "@vitest/coverage-v8": "5.0.0",

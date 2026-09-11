@@ -31,6 +31,8 @@ import { ProviderService } from "./services/ProviderService";
 import { HealthCheckService } from "./services/HealthCheckService";
 import { AccountService } from "./services/AccountService";
 import { BrowserLifecycle } from "./browser/lifecycle";
+import { RustCore } from "./drivers/rust/RustCore";
+import { SystemService } from "./services/SystemService";
 
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
@@ -172,7 +174,15 @@ if (!app.requestSingleInstanceLock()) {
       healthCheck.start();
       ipcServer = createIpcServer(
         contract,
-        createHandlers({ events: eventBus, settings, secrets, providers, healthCheck, accounts }),
+        createHandlers({
+          events: eventBus,
+          settings,
+          secrets,
+          providers,
+          healthCheck,
+          accounts,
+          system: new SystemService(RustCore.fromPaths(paths)),
+        }),
         {
           ipcMain: {
             handle(channel, listener) {

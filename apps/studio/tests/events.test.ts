@@ -1,3 +1,4 @@
+import { createSystemService } from "../../../test/helpers/systemService.ts";
 import { createProviderService } from "../../../test/helpers/providerService.ts";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
@@ -254,6 +255,7 @@ test("system.demoStream counts to the requested total and terminates", async () 
   const { sent, sender } = fakeSender();
   const bus = createEventBus({ senders: () => [sender] });
   const handlers = createHandlers({
+    system: createSystemService(),
     accounts: createAccountService(database.client),
     providers: createProviderService(database.client),
     events: bus,

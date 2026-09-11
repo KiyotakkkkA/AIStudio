@@ -91,6 +91,13 @@ test.afterAll(async () => {
   userData?.dispose();
 });
 
+test("renderer calls the real Rust chunker through nativePing", async () => {
+  const result = await page.evaluate(() =>
+    window.zvs.call("system.nativePing", { text: "word ".repeat(600) }),
+  );
+  expect(result).toEqual({ ok: true, data: { count: 3 } });
+});
+
 test("the built app opens a window with the whole navigation rail", async () => {
   await expect(page.locator("#root")).toBeVisible();
   expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
