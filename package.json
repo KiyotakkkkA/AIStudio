@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "build:rust": "cargo build --workspace --release --locked",
     "typecheck": "turbo run typecheck",
     "typecheck:root": "tsc -p tsconfig.test.json",
     "lint": "turbo run lint",

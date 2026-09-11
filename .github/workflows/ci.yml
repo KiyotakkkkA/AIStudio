@@ -11,11 +11,26 @@ permissions:
 # e2e smoke runs on Windows because Windows is the only verified target (PASSPORT §18.3).
 # No `xvfb-run` is needed anywhere as a result; adding a Linux e2e job would need it.
 jobs:
+  rust:
+    name: Rust format · clippy · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+
   gates:
     name: typecheck · lint · build · test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -33,13 +48,14 @@ jobs:
           name: coverage
           path: coverage
           retention-days: 7
-      # TASK_017: install Rust, then cargo clippy -- -D warnings and cargo test.
 
   e2e:
     name: e2e smoke (Windows)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

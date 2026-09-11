@@ -12,7 +12,7 @@
       "persistent": true
     },
     "build": {
-      "dependsOn": ["^build", "lint"],
+      "dependsOn": ["^build", "lint", "//#build:rust"],
       "outputs": ["dist/**", "out/**"]
     },
     "typecheck": {
@@ -22,6 +22,9 @@
     "lint": {
       "dependsOn": ["//#lint:root", "^build"],
       "outputs": []
+    },
+    "//#build:rust": {
+      "cache": false
     },
     "//#lint:root": {
       "cache": false
