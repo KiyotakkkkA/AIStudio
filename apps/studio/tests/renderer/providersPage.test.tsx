@@ -18,7 +18,7 @@ import {
   summary,
 } from "./providerFixtures.ts";
 
-function renderPage() {
+function renderPage(selectedProvider = provider()) {
   const bridge = createFakeBridge<Contract>();
   bridge.handle("settings.get", ({ key }) => ({ key }));
   bridge.handle("providers.adapters", () => ADAPTERS.map((entry) => ({ ...entry })));
@@ -31,7 +31,7 @@ function renderPage() {
     }
     return [];
   });
-  bridge.handle("providers.get", () => provider());
+  bridge.handle("providers.get", () => selectedProvider);
 
   render(
     <MemoryRouter>
@@ -86,7 +86,23 @@ test("the page mounts one form and one list, with the token as a picker over sec
   const tokenField = screen.getByText("API-токен").parentElement;
   assert.ok(tokenField !== null);
   assert.equal(tokenField.querySelectorAll("input").length, 0, "the token is picked, never typed");
+  assert.equal(screen.queryByRole("radiogroup", { name: "Способ авторизации" }), null);
 
   const models = screen.getAllByText("gpt-oss:120b");
   assert.ok(models.length > 0);
+});
+
+test("web adapter hides the vendor field", async () => {
+  renderPage(
+    provider({
+      adapter: "deepseek-web",
+      authMode: "account",
+      secretId: null,
+      accountId: null,
+    }),
+  );
+
+  assert.ok(await screen.findByText("Семейство адаптера"));
+  assert.equal(screen.queryByText("Вендор"), null);
+  assert.equal(screen.queryByText("Способ авторизации"), null);
 });

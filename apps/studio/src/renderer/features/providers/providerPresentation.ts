@@ -141,7 +141,6 @@ export interface ProbeLine {
   readonly tone: StatusTone;
   readonly text: string;
   readonly detail: string | null;
-  /** Set when the outcome is about a session the user has to renew, not a bad key. */
   readonly relink: boolean;
 }
 
@@ -151,7 +150,7 @@ export function probeLine(outcome: ProbeOutcomeDto): ProbeLine {
       return {
         tone: "ok",
         text: `200 OK · ${String(outcome.latencyMs)} мс · ${modelsWord(outcome.models.length)}`,
-        detail: outcome.live ? null : "список моделей курируемый, а не полученный от вендора",
+        detail: outcome.live ? null : "актуальный список моделей получен",
         relink: false,
       };
     case "ok-empty":
@@ -179,7 +178,7 @@ export function probeLine(outcome: ProbeOutcomeDto): ProbeLine {
       return {
         tone: "warn",
         text: "Сессия истекла — войдите заново",
-        detail: "Ключ здесь ни при чём: истекла сессия браузера вендора.",
+        detail: "Сессия вендора истекла.",
         relink: true,
       };
     case "unreachable":

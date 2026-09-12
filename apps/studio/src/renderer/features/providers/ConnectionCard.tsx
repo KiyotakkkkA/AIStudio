@@ -7,6 +7,7 @@ import {
   type AdapterFamily,
   type ProviderKind,
   type SecretId,
+  isAccountFamily,
 } from "@zvs/shared";
 import Button from "../../ui/atoms/Button";
 import Chip from "../../ui/atoms/Chip";
@@ -38,6 +39,8 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
   const summary = providers.selectedSummary;
   const pickable = secretsForKind(providers.secrets, vm.kind);
   const account = vm.account;
+  const hasAuthModeChoice = vm.descriptor.authModes.length > 1;
+  const showsVendor = !isAccountFamily(vm.adapter);
 
   return (
     <section className="flex min-w-0 flex-[1.35] flex-col gap-3.25 rounded-card border border-main-700 bg-main-900 p-4">
@@ -54,13 +57,24 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
       </div>
 
       <div className="grid grid-cols-2 gap-3.25">
-        <Field label="Вендор">
+        <Field
+          label="Семейство адаптера"
+          help={
+            vm.descriptor.implemented ? undefined : "Семейство объявлено, но ещё не реализован."
+          }
+          error={vm.errorOf("adapter")}
+        >
           <SelectInput
-            label="Вендор"
-            value={vm.kind}
-            options={PROVIDER_KINDS.map((kind) => ({ value: kind, label: KIND_LABELS[kind] }))}
+            label="Семейство адаптера"
+            value={vm.adapter}
+            options={vm.adapterOptions.map((entry) => ({
+              value: entry.family,
+              label: entry.implemented
+                ? ADAPTER_LABELS[entry.family]
+                : `${ADAPTER_LABELS[entry.family]} — не реализован`,
+            }))}
             onChange={(value) => {
-              vm.setKind(value as ProviderKind);
+              vm.setAdapter(value as AdapterFamily);
             }}
           />
         </Field>
@@ -83,36 +97,33 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
         </Field>
       </div>
 
-      <div className="grid grid-cols-2 gap-3.25">
-        <Field
-          label="Семейство адаптера"
-          help={
-            vm.descriptor.implemented ? undefined : "Семейство объявлено, но ещё не реализовано."
-          }
-          error={vm.errorOf("adapter")}
+      {showsVendor || hasAuthModeChoice ? (
+        <div
+          className={`grid gap-3.25 ${showsVendor && hasAuthModeChoice ? "grid-cols-2" : "grid-cols-1"}`}
         >
-          <SelectInput
-            label="Семейство адаптера"
-            value={vm.adapter}
-            options={vm.adapterOptions.map((entry) => ({
-              value: entry.family,
-              label: entry.implemented
-                ? ADAPTER_LABELS[entry.family]
-                : `${ADAPTER_LABELS[entry.family]} — не реализован`,
-            }))}
-            onChange={(value) => {
-              vm.setAdapter(value as AdapterFamily);
-            }}
-          />
-        </Field>
-        <Field label="Способ авторизации" error={vm.errorOf("authMode")}>
-          <AuthModeSwitch
-            value={vm.authMode}
-            disabledReason={vm.authModeDisabledReason}
-            onChange={vm.setAuthMode}
-          />
-        </Field>
-      </div>
+          {showsVendor ? (
+            <Field label="Вендор">
+              <SelectInput
+                label="Вендор"
+                value={vm.kind}
+                options={PROVIDER_KINDS.map((kind) => ({ value: kind, label: KIND_LABELS[kind] }))}
+                onChange={(value) => {
+                  vm.setKind(value as ProviderKind);
+                }}
+              />
+            </Field>
+          ) : null}
+          {hasAuthModeChoice ? (
+            <Field label="Способ авторизации" error={vm.errorOf("authMode")}>
+              <AuthModeSwitch
+                value={vm.authMode}
+                disabledReason={vm.authModeDisabledReason}
+                onChange={vm.setAuthMode}
+              />
+            </Field>
+          ) : null}
+        </div>
+      ) : null}
 
       {vm.usesAccount ? (
         <Field label="Связанный аккаунт" error={vm.errorOf("accountId")}>
