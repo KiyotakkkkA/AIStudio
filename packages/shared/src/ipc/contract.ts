@@ -53,6 +53,11 @@ export const SettingKey = z
 export type SettingKey = z.infer<typeof SettingKey>;
 
 export const contract = defineContract({
+  "runs.approve": {
+    input: RunIdInput.extend({ approvalId: z.string().uuid(), always: z.boolean().default(false) }),
+    output: z.void(),
+  },
+  "runs.deny": { input: RunIdInput.extend({ approvalId: z.string().uuid() }), output: z.void() },
   "runs.start": { input: StartRunInput, output: RunHandleDto },
   "runs.cancel": { input: RunIdInput, output: z.void() },
   "runs.list": { input: z.void(), output: z.array(RunDto) },

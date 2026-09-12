@@ -34,7 +34,10 @@ export const GraphNode = z.object({
     .default({ maxAttempts: 1, backoffMs: 0 }),
 });
 export type GraphNode = z.infer<typeof GraphNode>;
-export const RunGraph = z.object({ nodes: z.array(GraphNode).max(10_000) });
+export const RunGraph = z.object({
+  nodes: z.array(GraphNode).max(10_000),
+  permissionScopes: z.array(z.string().regex(/^(skill|scenario|site):.+$/)).optional(),
+});
 export type RunGraph = z.infer<typeof RunGraph>;
 export const StartRunInput = z.object({
   kind: RunKind,

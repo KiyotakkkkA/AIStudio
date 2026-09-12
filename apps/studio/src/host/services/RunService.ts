@@ -1,3 +1,5 @@
+import { ApprovalService } from "./ApprovalService.ts";
+import { PermissionService } from "./PermissionService.ts";
 import {
   AppError,
   AppErrorCode,
@@ -16,6 +18,7 @@ import type { EventBus, StreamHandle } from "../platform/events.ts";
 import { createId } from "../platform/ids.ts";
 
 export interface RunServiceOptions extends Partial<Omit<SchedulerOptions, "data" | "registry">> {
+  approvalTimeoutMs?: number;
   data: UnitOfWork;
   events: EventBus;
   registry: NodeRegistry;
@@ -24,16 +27,68 @@ export class RunService {
   private readonly active = new Map<string, { scheduler: Scheduler; done: Promise<void> }>();
   private readonly options: SchedulerOptions;
   private closed = false;
+  readonly permissions: PermissionService;
+  private readonly approvals: ApprovalService;
   constructor(private readonly dependencies: RunServiceOptions) {
     const graceMs = dependencies.graceMs ?? 500;
     if (!Number.isInteger(graceMs) || graceMs < 0 || graceMs > 30_000)
       throw new Error("Invalid cancellation grace period");
+    this.permissions = new PermissionService(
+      dependencies.data,
+      dependencies.registry,
+      dependencies.clock,
+    );
+    this.approvals = new ApprovalService(
+      dependencies.data,
+      this.permissions,
+      dependencies.approvalTimeoutMs,
+      dependencies.clock,
+    );
     this.options = {
       ...dependencies,
       clock: dependencies.clock ?? Date.now,
       graceMs,
       services: dependencies.services ?? {},
+      approval:
+        dependencies.approval ?? ((request, signal) => this.approvals.wait(request, signal)),
+      admit:
+        dependencies.admit ??
+        (async (requirement, context) => {
+          if ("kind" in requirement) return;
+          const run = this.get(context.runId);
+          const scopes = [
+            ...(run.graph.permissionScopes ?? []),
+            ...(run.kind === "scenario" && run.subjectId ? [`scenario:${run.subjectId}`] : []),
+          ];
+          const admission = this.permissions.admitSubject(
+            requirement.tool,
+            { runId: run.id, scopes },
+            requirement.tier,
+          );
+          if (admission === "deny")
+            throw new AppError(AppErrorCode.PERMISSION_DENIED, "Permission denied");
+          if (admission === "ask") {
+            const request = this.approvals.create(run.id, requirement.tool, scopes[0] ?? "global");
+            const decision = await context.requestApproval(request);
+            if (decision !== "approved")
+              throw new AppError(AppErrorCode.APPROVAL_DENIED, "Approval denied");
+            if (
+              this.permissions.admitSubject(
+                requirement.tool,
+                { runId: run.id, scopes },
+                requirement.tier,
+              ) === "deny"
+            )
+              throw new AppError(AppErrorCode.PERMISSION_DENIED, "Permission revoked");
+          }
+        }),
     };
+  }
+  approve(id: string, approvalId: string, always = false): void {
+    this.approvals.decide(id, approvalId, "approved", always);
+  }
+  deny(id: string, approvalId: string): void {
+    this.approvals.decide(id, approvalId, "denied");
   }
   start(raw: StartRunInput): RunHandleDto {
     if (this.closed) throw new AppError(AppErrorCode.CONFLICT, "Сервис выполнения остановлен");
@@ -126,6 +181,19 @@ export class RunService {
           stream.emit({ type: "step", step: { ...step, ...patch } });
         }
       });
+      const pending = this.dependencies.data.repositories.permissions.approvalsForRun(run.id);
+      if (
+        pending.some((row) => row.decision === null) ||
+        (run.status === "blocked" && pending.length > 0)
+      ) {
+        this.dependencies.data.repositories.permissions.denyUnfinished(run.id);
+        new Scheduler(run, stream, this.options).finish(
+          "failed",
+          "Approval interrupted",
+          AppErrorCode.APPROVAL_DENIED,
+        );
+        continue;
+      }
       if (this.dependencies.registry.canResume(run.graph)) {
         stream.emit({
           type: "log",

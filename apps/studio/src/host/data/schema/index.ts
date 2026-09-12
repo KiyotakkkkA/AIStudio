@@ -9,3 +9,5 @@ export * from "./vectorDocument.ts";
 export * from "./run.ts";
 export * from "./step.ts";
 export * from "./runEvent.ts";
+
+export * from "./permission.ts";

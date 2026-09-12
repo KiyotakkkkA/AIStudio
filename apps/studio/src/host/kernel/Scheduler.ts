@@ -49,6 +49,7 @@ export class Scheduler {
   private readonly latest = new Map<string, StepEntity>();
   private readonly readyAt = new Map<string, number>();
   private failure: string | undefined;
+  private failureCode: AppErrorCode = AppErrorCode.RUN_FAILED;
 
   constructor(
     private readonly run: RunEntity,
@@ -80,14 +81,18 @@ export class Scheduler {
     this.emit({ type: "progress", done: this.completed.size, total: this.run.graph.nodes.length });
   }
 
-  finish(status: "succeeded" | "failed" | "cancelled" | "interrupted", error?: string): void {
+  finish(
+    status: "succeeded" | "failed" | "cancelled" | "interrupted",
+    error?: string,
+    code = this.failureCode,
+  ): void {
     if (this.terminal) return;
     const outcome: RunOutcomeDto =
       status === "succeeded"
         ? { status: "ok" }
         : {
             status: status === "cancelled" ? "cancelled" : "failed",
-            code: status === "cancelled" ? AppErrorCode.RUN_CANCELLED : AppErrorCode.RUN_FAILED,
+            code: status === "cancelled" ? AppErrorCode.RUN_CANCELLED : code,
             message:
               error ?? (status === "interrupted" ? "Выполнение прервано" : "Выполнение отменено"),
           };
@@ -132,6 +137,7 @@ export class Scheduler {
       while (!this.controller.signal.aborted && this.completed.size < nodes.length) {
         let next = Infinity;
         for (const node of nodes) {
+          if (this.pendingApprovals) break;
           if (this.active.size >= this.run.concurrency) break;
           if (
             this.completed.has(node.id) ||
@@ -241,7 +247,12 @@ export class Scheduler {
           services: this.options.services,
           emit: (event) => {
             if (!live || signal.aborted) return;
-            const parsed = HostEvent.parse(event);
+            const parsed = HostEvent.parse({
+              ...event,
+              streamId: this.run.streamId,
+              seq: 0,
+              ts: clock(),
+            });
             if (parsed.type === "end") throw new Error("Only the kernel can end a run");
             this.emit(parsed);
           },
@@ -312,7 +323,14 @@ export class Scheduler {
         step.status = "failed";
         step.error = failureText(result.error);
         this.readyAt.set(node.id, clock() + node.retry.backoffMs * attempt);
-        if (attempt >= node.retry.maxAttempts) {
+        const permissionFailure =
+          result.error instanceof AppError &&
+          (result.error.code === AppErrorCode.APPROVAL_DENIED ||
+            result.error.code === AppErrorCode.PERMISSION_DENIED);
+        if (permissionFailure)
+          this.failureCode =
+            result.error instanceof AppError ? result.error.code : AppErrorCode.RUN_FAILED;
+        if (permissionFailure || attempt >= node.retry.maxAttempts) {
           this.failure = step.error;
           this.controller.abort();
         }

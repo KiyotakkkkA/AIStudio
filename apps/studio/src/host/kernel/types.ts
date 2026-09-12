@@ -1,26 +1,28 @@
 import type { z } from "zod";
-import type { ApprovalRequestDto, HostEvent, RunId } from "@zvs/shared";
+import type { ApprovalRequestDto, HostEventDraft, RunId } from "@zvs/shared";
 import type { ProviderRegistry } from "../drivers/ai/ProviderRegistry.ts";
 import type { VectorStoreService } from "../services/VectorStoreService.ts";
 
-export type PermissionRequirement = { tool: string } | { kind: "none" };
+export type PermissionRequirement =
+  { tool: string; tier?: "auto" | "ask" | "off" } | { kind: "none" };
 export type ApprovalDecision = "approved" | "denied";
 export interface KernelServices {
-  providers?: Pick<ProviderRegistry, "ephemeralDriver">;
+  providers?: Pick<ProviderRegistry, "ephemeralDriver" | "text">;
   vectorStores?: Pick<VectorStoreService, "search">;
 }
 export interface StepContext {
   runId: RunId;
   signal: AbortSignal;
-  emit(event: HostEvent): void;
+  emit(event: HostEventDraft): void;
   requestApproval(req: ApprovalRequestDto): Promise<ApprovalDecision>;
   services: KernelServices;
 }
-export interface NodeDef<I, O> {
+export type NodeDef<I, O> = {
   type: string;
   input: z.ZodType<I>;
   output: z.ZodType<O>;
   permission: PermissionRequirement;
-  sideEffectFree: boolean;
   run(ctx: StepContext, input: I): Promise<O>;
-}
+} & (
+  { sideEffect: boolean; sideEffectFree?: never } | { sideEffectFree: boolean; sideEffect?: never }
+);

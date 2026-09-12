@@ -54,6 +54,7 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
       "0005_slimy_tiger_shark",
       "0006_exotic_jane_foster",
       "0007_kernel",
+      "0008_permissions",
     ]);
     const tables = database.client.db.$client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'")
@@ -93,9 +94,13 @@ test("a backup is written before migrating and only the last three are kept", ()
           "0005_slimy_tiger_shark",
           "0006_exotic_jane_foster",
           "0007_kernel",
+          "0008_permissions",
         ]);
         if (run === 0) assert.equal(report.backup, undefined);
         else assert.equal(typeof report.backup, "string");
+        client.db.$client.exec("DROP TABLE pending_approval");
+        client.db.$client.exec("DROP TABLE permission_use");
+        client.db.$client.exec("DROP TABLE tool_permission");
         client.db.$client.exec("DROP TABLE run_event");
         client.db.$client.exec("DROP TABLE step");
         client.db.$client.exec("DROP TABLE run");
@@ -219,6 +224,7 @@ test("prepareDatabase opens and migrates in one step", () => {
         "0005_slimy_tiger_shark",
         "0006_exotic_jane_foster",
         "0007_kernel",
+        "0008_permissions",
       ]);
       assert.equal(prepared.client.repositories.settings.all().length, 0);
     } finally {

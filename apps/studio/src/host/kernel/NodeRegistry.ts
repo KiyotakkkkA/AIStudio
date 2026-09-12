@@ -3,7 +3,10 @@ import { AppError, AppErrorCode, type Json, type RunGraph } from "@zvs/shared";
 import type { NodeDef, StepContext } from "./types.ts";
 
 export interface RegisteredNode {
+  readonly input: z.ZodType<unknown>;
+  readonly output: z.ZodType<unknown>;
   readonly sideEffectFree: boolean;
+  readonly sideEffect: boolean;
   readonly permission: NodeDef<unknown, unknown>["permission"];
   execute(context: StepContext, input: unknown): Promise<Json>;
 }
@@ -11,11 +14,17 @@ export class NodeRegistry {
   private readonly nodes = new Map<string, RegisteredNode>();
   register<I, O>(definition: NodeDef<I, O>): void {
     if (this.nodes.has(definition.type)) throw new Error(`Duplicate node type: ${definition.type}`);
-    if (typeof definition.sideEffectFree !== "boolean")
-      throw new Error("Node must declare sideEffectFree");
+    const sideEffectFree =
+      definition.sideEffect !== undefined ? !definition.sideEffect : definition.sideEffectFree;
+    if (definition.sideEffect !== undefined && definition.sideEffectFree !== undefined)
+      throw new Error("Conflicting side effect declarations");
+    if (typeof sideEffectFree !== "boolean") throw new Error("Node must declare sideEffectFree");
     this.nodes.set(definition.type, {
-      sideEffectFree: definition.sideEffectFree,
-      permission: definition.permission,
+      input: definition.input,
+      output: definition.output,
+      sideEffectFree,
+      sideEffect: !sideEffectFree,
+      permission: Object.freeze(structuredClone(definition.permission)),
       execute: async (context, input) => {
         const output = await definition.run(
           context,
@@ -24,6 +33,9 @@ export class NodeRegistry {
         return structuredClone(z.json().parse(definition.output.parse(output)));
       },
     });
+  }
+  resolve(type: string): RegisteredNode {
+    return this.get(type);
   }
   get(type: string): RegisteredNode {
     const node = this.nodes.get(type);

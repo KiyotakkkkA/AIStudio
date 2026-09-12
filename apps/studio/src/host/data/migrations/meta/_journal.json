@@ -57,6 +57,13 @@
       "when": 1789254983248,
       "tag": "0007_kernel",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789256559886,
+      "tag": "0008_permissions",
+      "breakpoints": true
     }
   ]
 }

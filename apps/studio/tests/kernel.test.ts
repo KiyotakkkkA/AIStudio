@@ -638,7 +638,7 @@ test("renderer delivery failure cannot roll back a checkpoint or fail the run", 
   expect(db.client.repositories.runs.events(handle.id).at(-1)?.type).toBe("end");
 });
 
-test("nodes needing permission fail closed until an admission service is provided", async () => {
+test("nodes needing permission fail closed when the stored ceiling is off", async () => {
   const run = vi.fn(async () => null);
   registry.register({
     type: "tool",
@@ -648,6 +648,7 @@ test("nodes needing permission fail closed until an admission service is provide
     permission: { tool: "mail.send" },
     run,
   });
+  service.permissions.grant("mail.send", "global", "off", "user");
   const handle = start([{ id: "a", type: "tool" }]);
   await service.wait(handle.id);
   expect(run).not.toHaveBeenCalled();

@@ -1,3 +1,4 @@
+import { PermissionRepository } from "./PermissionRepository.ts";
 import type { DatabaseHandle } from "../types.ts";
 import { RunRepository } from "./RunRepository.ts";
 import { SecretRepository } from "./SecretRepository.ts";
@@ -21,6 +22,7 @@ export { AccountRepository } from "./AccountRepository.ts";
 export type { AccountDraft, AccountPatch, AccountRemoval } from "./AccountRepository.ts";
 
 export interface Repositories {
+  readonly permissions: PermissionRepository;
   readonly runs: RunRepository;
   readonly vectorStores: VectorStoreRepository;
   readonly vectorDocuments: VectorDocumentRepository;
@@ -33,6 +35,7 @@ export interface Repositories {
 
 export function createRepositories(db: DatabaseHandle): Repositories {
   return {
+    permissions: new PermissionRepository(db),
     runs: new RunRepository(db),
     vectorStores: new VectorStoreRepository(db),
     vectorDocuments: new VectorDocumentRepository(db),

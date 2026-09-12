@@ -1,3 +1,4 @@
+import { registerCoreNodes } from "./kernel/coreNodes.ts";
 import { app, BrowserWindow, ipcMain, net, safeStorage } from "electron";
 import { contract } from "@zvs/shared";
 import { createIpcServer } from "@zvs/ipc";
@@ -188,7 +189,7 @@ if (!app.requestSingleInstanceLock()) {
       runs = new RunService({
         data: database,
         events: eventBus,
-        registry: new NodeRegistry(),
+        registry: registerCoreNodes(new NodeRegistry()),
         services: { providers: registry, vectorStores },
         logger,
       });
