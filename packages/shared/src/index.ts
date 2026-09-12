@@ -15,3 +15,5 @@ export * from "./ai.js";
 export * from "./providers/index.js";
 export * from "./accounts.js";
 export * from "./vectorStores/index.js";
+export * from "./runs/RunDto.js";
+export * from "./runs/StepDto.js";

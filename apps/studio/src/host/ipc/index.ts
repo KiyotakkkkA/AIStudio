@@ -1,4 +1,6 @@
 import type { Contract } from "@zvs/shared";
+import type { RunService } from "../services/RunService.ts";
+import { createRunHandlers } from "./runs.ts";
 import type { IpcHandlers } from "@zvs/ipc";
 import { createEventBus, type EventBus } from "../platform/events.ts";
 import type { SecretService } from "../services/SecretService.ts";
@@ -16,6 +18,7 @@ import type { VectorStoreService } from "../services/VectorStoreService.ts";
 import { createVectorStoreHandlers } from "./vectorStores.ts";
 
 export interface HostIpcDependencies {
+  runs: RunService;
   vectorStores: VectorStoreService;
   system: SystemService;
   accounts: AccountService;
@@ -30,6 +33,7 @@ export interface HostIpcDependencies {
 
 export function createHandlers(dependencies: HostIpcDependencies): IpcHandlers<Contract> {
   return {
+    ...createRunHandlers(dependencies.runs),
     ...createVectorStoreHandlers(dependencies.vectorStores),
     ...createSystemHandlers({
       system: dependencies.system,

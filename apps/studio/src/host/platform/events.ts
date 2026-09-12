@@ -29,7 +29,11 @@ export interface StreamHandle {
 
 export interface EventBus {
   readonly open: number;
-  openStream(): StreamHandle;
+  openStream(options?: {
+    id?: StreamId;
+    nextSeq?: number;
+    record?: (event: HostEvent) => void;
+  }): StreamHandle;
   dispose(): void;
 }
 
@@ -55,8 +59,20 @@ export function createEventBus(options: EventBusOptions = {}): EventBus {
   let disposed = false;
 
   const deliver = (event: HostEvent): void => {
-    options.recorder?.append(event);
-    const targets = senders().filter((sender) => !sender.isDestroyed());
+    try {
+      options.recorder?.append(event);
+    } catch (error) {
+      logger.log("error", "events", "Event recorder failed", { error: String(error) });
+    }
+    let targets: readonly WindowSender[];
+    try {
+      targets = senders().filter((sender) => !sender.isDestroyed());
+    } catch (error) {
+      logger.log("error", "events", "Could not enumerate event recipients", {
+        error: String(error),
+      });
+      return;
+    }
     if (targets.length === 0) {
       logger.log("debug", "events", "Dropped an event, no window is open", {
         streamId: event.streamId,
@@ -65,7 +81,16 @@ export function createEventBus(options: EventBusOptions = {}): EventBus {
       });
       return;
     }
-    for (const target of targets) target.send(EVENT_CHANNEL, event);
+    for (const target of targets) {
+      try {
+        target.send(EVENT_CHANNEL, event);
+      } catch (error) {
+        logger.log("error", "events", "Could not deliver event", {
+          streamId: event.streamId,
+          error: String(error),
+        });
+      }
+    }
   };
 
   return {
@@ -73,11 +98,12 @@ export function createEventBus(options: EventBusOptions = {}): EventBus {
       return live.size;
     },
 
-    openStream() {
+    openStream(streamOptions = {}) {
       if (disposed) throw new Error("The event bus is disposed");
-      const id = createBrandedId(StreamId, newId());
+      const id = streamOptions.id ?? createBrandedId(StreamId, newId());
+      if (live.has(id)) throw new Error("The stream is already open");
       live.add(id);
-      let seq = 0;
+      let seq = streamOptions.nextSeq ?? 0;
       let closed = false;
 
       const stamp = (draft: HostEventDraft): HostEvent =>
@@ -100,7 +126,9 @@ export function createEventBus(options: EventBusOptions = {}): EventBus {
             refuse(draft.type);
             return;
           }
-          deliver(stamp(draft));
+          const event = stamp(draft);
+          streamOptions.record?.(event);
+          deliver(event);
         },
         end(outcome) {
           if (closed) {
@@ -108,6 +136,7 @@ export function createEventBus(options: EventBusOptions = {}): EventBus {
             return;
           }
           const event = stamp({ type: "end", outcome });
+          streamOptions.record?.(event);
           closed = true;
           live.delete(id);
           deliver(event);

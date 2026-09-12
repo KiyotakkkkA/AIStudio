@@ -34,6 +34,8 @@ import { BrowserLifecycle } from "./browser/lifecycle";
 import { RustCore } from "./drivers/rust/RustCore";
 import { SystemService } from "./services/SystemService";
 import { VectorStoreService } from "./services/VectorStoreService";
+import { RunService } from "./services/RunService";
+import { NodeRegistry } from "./kernel/NodeRegistry";
 
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
@@ -48,6 +50,7 @@ let providers: ProviderService | undefined;
 let healthCheck: HealthCheckService | undefined;
 let accounts: AccountService | undefined;
 let quitting = false;
+let runs: RunService | undefined;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -67,9 +70,10 @@ if (!app.requestSingleInstanceLock()) {
     event.preventDefault();
     quitting = true;
     healthCheck?.stop();
-    void Promise.all([providers.dispose(), healthCheck?.dispose(), accounts?.dispose()]).finally(
-      () => app.quit(),
-    );
+    void (async () => {
+      await runs?.dispose();
+      await Promise.all([providers.dispose(), healthCheck?.dispose(), accounts?.dispose()]);
+    })().finally(() => app.quit());
   });
   app.on("will-quit", () => {
     logger?.log("info", "host", "Shutdown");
@@ -181,9 +185,18 @@ if (!app.requestSingleInstanceLock()) {
         directory: paths.vectorStoresDir,
         logger,
       });
+      runs = new RunService({
+        data: database,
+        events: eventBus,
+        registry: new NodeRegistry(),
+        services: { providers: registry, vectorStores },
+        logger,
+      });
+      runs.recover();
       ipcServer = createIpcServer(
         contract,
         createHandlers({
+          runs,
           vectorStores,
           events: eventBus,
           settings,

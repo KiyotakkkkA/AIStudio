@@ -1,3 +1,4 @@
+import { createRunService } from "../../../test/helpers/runService.ts";
 import { createSystemService } from "../../../test/helpers/systemService.ts";
 import { createProviderService } from "../../../test/helpers/providerService.ts";
 import assert from "node:assert/strict";
@@ -52,6 +53,7 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
       "0004_account",
       "0005_slimy_tiger_shark",
       "0006_exotic_jane_foster",
+      "0007_kernel",
     ]);
     const tables = database.client.db.$client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'")
@@ -90,9 +92,13 @@ test("a backup is written before migrating and only the last three are kept", ()
           "0004_account",
           "0005_slimy_tiger_shark",
           "0006_exotic_jane_foster",
+          "0007_kernel",
         ]);
         if (run === 0) assert.equal(report.backup, undefined);
         else assert.equal(typeof report.backup, "string");
+        client.db.$client.exec("DROP TABLE run_event");
+        client.db.$client.exec("DROP TABLE step");
+        client.db.$client.exec("DROP TABLE run");
         client.db.$client.exec("DROP TABLE vector_document");
         client.db.$client.exec("DROP TABLE vector_store");
         client.db.$client.exec("DROP TABLE model");
@@ -212,6 +218,7 @@ test("prepareDatabase opens and migrates in one step", () => {
         "0004_account",
         "0005_slimy_tiger_shark",
         "0006_exotic_jane_foster",
+        "0007_kernel",
       ]);
       assert.equal(prepared.client.repositories.settings.all().length, 0);
     } finally {
@@ -283,6 +290,7 @@ test("settings channels carry JSON values through the whole chain", async () => 
   try {
     const settings = new SettingService({ data: database.client, clock: createFakeClock() });
     const handlers = createHandlers({
+      runs: createRunService(database.client),
       vectorStores: createVectorStoreService(database.client),
       system: createSystemService(),
       accounts: createAccountService(database.client),

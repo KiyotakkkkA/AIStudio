@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { RunDto, RunHandleDto, RunIdInput, StartRunInput } from "../runs/RunDto.js";
+import { StepDto } from "../runs/StepDto.js";
 import { StreamId } from "../primitives/branded.js";
 import { Timestamp } from "../primitives/time.js";
 import { Json } from "../primitives/json.js";
@@ -51,6 +53,11 @@ export const SettingKey = z
 export type SettingKey = z.infer<typeof SettingKey>;
 
 export const contract = defineContract({
+  "runs.start": { input: StartRunInput, output: RunHandleDto },
+  "runs.cancel": { input: RunIdInput, output: z.void() },
+  "runs.list": { input: z.void(), output: z.array(RunDto) },
+  "runs.get": { input: RunIdInput, output: RunDto },
+  "runs.steps": { input: RunIdInput, output: z.array(StepDto) },
   "vectorStores.list": { input: z.void(), output: z.array(VectorStoreDto) },
   "vectorStores.get": { input: VectorStoreRef, output: VectorStoreDto },
   "vectorStores.create": { input: CreateVectorStoreInput, output: VectorStoreDto },
