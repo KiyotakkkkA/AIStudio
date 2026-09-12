@@ -86,6 +86,15 @@ test("channels create, search a manually seeded LanceDB table, detect loss and r
       minScore: 0.5,
     });
     expect(hits.map((hit) => hit.id)).toEqual(["a", "b"]);
+    const timed = await handlers["vectorStores.searchTimed"]({
+      storeId: store.id,
+      query: "A",
+      k: 2,
+      minScore: 0.5,
+    });
+    expect(timed.hits).toEqual(hits);
+    expect(timed.embeddingMs).toBeGreaterThanOrEqual(0);
+    expect(timed.searchMs).toBeGreaterThan(0);
     expect((await handlers["vectorStores.list"](undefined))[0]?.status).toBe("stale");
     expect(await handlers["vectorStores.get"]({ id: store.id })).toMatchObject({
       status: "healthy",

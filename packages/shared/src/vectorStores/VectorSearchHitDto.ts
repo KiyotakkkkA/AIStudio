@@ -18,3 +18,10 @@ export const VectorSearchHitDto = z.object({
   path: z.string(),
 });
 export type VectorSearchHitDto = z.infer<typeof VectorSearchHitDto>;
+
+export const VectorSearchResultDto = z.object({
+  hits: z.array(VectorSearchHitDto),
+  embeddingMs: z.number().nonnegative(),
+  searchMs: z.number().nonnegative(),
+});
+export type VectorSearchResultDto = z.infer<typeof VectorSearchResultDto>;

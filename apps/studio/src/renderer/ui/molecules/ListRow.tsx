@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 export interface ListRowProps {
   readonly leading?: ReactNode;
   readonly trailing?: ReactNode;
+  readonly disabled?: boolean;
   readonly selected?: boolean;
   readonly dashed?: boolean;
   readonly onClick?: () => void;
@@ -12,6 +13,7 @@ export interface ListRowProps {
 export default function ListRow({
   leading,
   trailing,
+  disabled = false,
   selected = false,
   dashed = false,
   onClick,
@@ -26,9 +28,10 @@ export default function ListRow({
   return (
     <button
       type="button"
+      disabled={disabled}
       aria-current={selected ? "true" : undefined}
       onClick={onClick}
-      className={`flex w-full gap-2.75 rounded-card border p-3 text-left ${tone}`}
+      className={`flex w-full gap-2.75 rounded-card border p-3 text-left ${tone} disabled:cursor-not-allowed disabled:opacity-50`}
     >
       {leading}
       <div className="flex min-w-0 flex-1 flex-col gap-1.25">{children}</div>

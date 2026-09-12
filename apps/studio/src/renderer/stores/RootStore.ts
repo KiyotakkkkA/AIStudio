@@ -6,6 +6,7 @@ import { AccountStore } from "../features/providers/AccountStore";
 import { ProviderStore } from "../features/providers/ProviderStore";
 import { SecretStore } from "../features/secrets/SecretStore";
 import { UiStore } from "./UiStore";
+import VectorStoreStore from "../features/vector-stores/VectorStoreStore";
 
 export interface RootStoreEnvironment {
   readonly ipc: IpcClient<Contract>;
@@ -17,15 +18,24 @@ export class RootStore {
   readonly secrets: SecretStore;
   readonly providers: ProviderStore;
   readonly accounts: AccountStore;
+  readonly vectorStores: VectorStoreStore;
 
   constructor(private readonly environment: RootStoreEnvironment) {
     this.ui = new UiStore(environment.ipc);
     this.secrets = new SecretStore(environment.ipc);
     this.providers = new ProviderStore(environment.ipc);
     this.accounts = new AccountStore(environment);
+    this.vectorStores = new VectorStoreStore(environment.ipc);
     makeAutoObservable<RootStore, "environment">(
       this,
-      { environment: false, ui: false, secrets: false, providers: false, accounts: false },
+      {
+        environment: false,
+        ui: false,
+        secrets: false,
+        providers: false,
+        accounts: false,
+        vectorStores: false,
+      },
       { autoBind: true },
     );
   }

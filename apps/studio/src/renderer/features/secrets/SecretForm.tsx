@@ -235,7 +235,18 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
           Значение шифруется хранилищем учётных данных операционной системы и не покидает эту
           машину, пока его не запросит провайдер.
         </span>
-        <Button type="button" tone="secondary" onClick={onCancel} disabled={saving}>
+        <Button
+          type="button"
+          tone="secondary"
+          onClick={onCancel}
+          disabled={saving}
+          needConfirm
+          modalSetup={{
+            title: "Отменить?",
+            content: "Несохранённые изменения будут потеряны.",
+            confirmLabel: "Отменить",
+          }}
+        >
           Отмена
         </Button>
         <Button type="submit" tone="primary" disabled={saving}>

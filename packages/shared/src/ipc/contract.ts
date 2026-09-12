@@ -30,6 +30,7 @@ import {
   VectorStoreRef,
   VectorSearchInput,
   VectorSearchHitDto,
+  VectorSearchResultDto,
 } from "../vectorStores/index.js";
 
 export const SecretFilter = z.object({
@@ -59,6 +60,7 @@ export const contract = defineContract({
     output: VectorStoreRef.extend({ removed: z.literal(true) }),
   },
   "vectorStores.search": { input: VectorSearchInput, output: z.array(VectorSearchHitDto) },
+  "vectorStores.searchTimed": { input: VectorSearchInput, output: VectorSearchResultDto },
   "vectorStores.reconcile": { input: VectorStoreRef, output: VectorStoreDto },
   "accounts.list": { input: z.void(), output: z.array(AccountDto) },
   "accounts.link": { input: AccountLinkInput, output: AccountLinkResult },

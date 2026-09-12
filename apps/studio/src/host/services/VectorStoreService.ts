@@ -6,6 +6,7 @@ import {
   VectorStoreDto,
   VectorSearchInput,
   type VectorSearchHitDto,
+  type VectorSearchResultDto,
 } from "@zvs/shared";
 import type { UnitOfWork } from "../data/UnitOfWork.ts";
 import type { VectorStoreEntity } from "../data/schema/index.ts";
@@ -155,11 +156,19 @@ export class VectorStoreService {
     });
   }
 
-  search(
+  async search(
     storeId: string,
     query: string,
     options: { k?: number; minScore?: number } = {},
   ): Promise<VectorSearchHitDto[]> {
+    return (await this.searchTimed(storeId, query, options)).hits;
+  }
+
+  searchTimed(
+    storeId: string,
+    query: string,
+    options: { k?: number; minScore?: number } = {},
+  ): Promise<VectorSearchResultDto> {
     const input = VectorSearchInput.parse({ storeId, query, ...options });
     return this.exclusive(storeId, async () => {
       const row = this.require(storeId);
@@ -168,11 +177,13 @@ export class VectorStoreService {
       const driver = await this.options.drivers.ephemeralDriver(provider);
       if (driver.embedding === null)
         throw new AppError(AppErrorCode.CONFLICT, "Provider does not support embeddings");
+      const embeddingStart = performance.now();
       const vectors = await driver.embedding.embed(
         [input.query],
         row.embeddingModelId,
         AbortSignal.timeout((provider.settings.timeoutSeconds ?? 30) * 1000),
       );
+      const embeddingMs = performance.now() - embeddingStart;
       const vector = vectors[0];
       if (
         vectors.length !== 1 ||
@@ -185,12 +196,14 @@ export class VectorStoreService {
           "Embedding dimension does not match the store",
         );
       }
-      return this.options.core.searchVectors(
+      const searchStart = performance.now();
+      const hits = await this.options.core.searchVectors(
         this.path(storeId),
         Array.from(vector),
         input.k,
         input.minScore,
       );
+      return { hits, embeddingMs, searchMs: performance.now() - searchStart };
     });
   }
 

@@ -1,0 +1,192 @@
+import { mdiDatabaseOutline } from "@mdi/js";
+import { observer } from "mobx-react-lite";
+import useStore from "../../stores/useStore";
+import Button from "../../ui/atoms/Button";
+import Chip from "../../ui/atoms/Chip";
+import Icon from "../../ui/atoms/Icon";
+import VectorSearchPanel from "./VectorSearchPanel";
+import { healthLabels } from "./vectorPresentation";
+import EmptyState from "../../ui/molecules/EmptyState";
+
+function VectorStoreDetail() {
+  const { vectorStores: store } = useStore();
+  const detail = store.detail;
+  if (!detail)
+    return (
+      <div className="flex min-w-0 flex-1 items-center justify-center rounded-card border border-main-700 bg-main-900">
+        <EmptyState
+          icon={mdiDatabaseOutline}
+          title={
+            store.loading || (store.selectedId && !store.error)
+              ? "Загрузка хранилища…"
+              : "Хранилище не выбрано"
+          }
+          description={
+            store.loading || (store.selectedId && !store.error)
+              ? "Получаем настройки и статистику хранилища."
+              : "Выберите хранилище слева или добавьте новое, чтобы настроить поиск по документам."
+          }
+        />
+      </div>
+    );
+  const stats = [
+    [detail.documents.toLocaleString(), "Документы"],
+    [detail.vectors.toLocaleString(), "Векторы"],
+    [String(detail.dimension), "Размерность"],
+    [detail.indexType, `Индекс · ${detail.metric}`],
+    [detail.bytes.toLocaleString() + " B", "На диске"],
+    [
+      detail.embeddingModelId,
+      `Embedding · ${store.providers.find((p) => p.id === detail.embeddingProviderId)?.name ?? detail.embeddingProviderId}`,
+    ],
+  ];
+  const disabled = store.busy || store.searching;
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5">
+      <div className="flex flex-none flex-col gap-3.5 rounded-card border border-main-700 bg-main-900 px-4.5 py-4">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="flex size-9.5  flex-none items-center justify-center rounded-card bg-main-700 text-accent-medium">
+            <Icon path={mdiDatabaseOutline} size={19} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="wrap-break-word text-[15px] font-semibold">{detail.name}</h2>
+              <Chip>{healthLabels[detail.status]}</Chip>
+            </div>
+            <p className="mt-0.75 text-xs text-main-400">{detail.description}</p>
+          </div>
+          <div className="flex gap-1.75">
+            <Button disabled={disabled} onClick={store.edit}>
+              Изменить
+            </Button>
+            <Button
+              disabled={disabled}
+              title="Сверить статистику; индексация появится в TASK_028"
+              onClick={() => {
+                void store.reconcile();
+              }}
+            >
+              Полная переиндексация
+            </Button>
+            <Button disabled title="Экспорт — после TASK_028">
+              Экспорт
+            </Button>
+            <Button
+              tone="danger"
+              disabled={disabled}
+              needConfirm
+              modalSetup={{
+                title: `Удалить «${detail.name}»?`,
+                content: `Будут удалены хранилище и его документы (${detail.documents}). Зависимые чаты и сценарии ещё не подключены к хранилищам. Это действие нельзя отменить.`,
+                tone: "danger",
+                confirmLabel: "Удалить",
+              }}
+              onClick={() => {
+                void store.remove();
+              }}
+            >
+              Удалить
+            </Button>
+          </div>
+        </div>
+        <div className="flex overflow-hidden rounded-[9px] border border-main-700 bg-main-800">
+          {stats.map(([value, label], i) => (
+            <div
+              key={label}
+              className={`min-w-0 flex-1 border-r border-main-700 px-3.25 py-2.75 last:border-r-0 ${i === 5 ? "grow-[1.6]" : ""}`}
+            >
+              <div
+                title={value}
+                className={`truncate text-[17px] font-semibold ${i === 5 ? "text-accent-medium" : ""}`}
+              >
+                {detail.status === "broken" && i !== 2 && i !== 5 ? "—" : value}
+              </div>
+              <div title={label} className="mt-px truncate text-[10.5px] text-main-500">
+                {label}
+              </div>
+            </div>
+          ))}
+        </div>
+        {detail.status === "broken" ? (
+          <div role="alert" className="flex items-center gap-3 text-xs text-err">
+            <span>
+              Таблица недоступна. Статистика не подтверждена. Сверка не восстанавливает удалённые
+              данные.
+            </span>
+            <Button
+              disabled={disabled}
+              onClick={() => {
+                void store.reconcile();
+              }}
+            >
+              Сверить
+            </Button>
+          </div>
+        ) : detail.status === "pending" || detail.vectors === 0 ? (
+          <p className="text-xs text-warn">
+            Ожидает индексации. Добавление документов появится в TASK_028.
+          </p>
+        ) : null}
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col rounded-card border border-main-700 bg-main-900">
+        <div
+          role="tablist"
+          aria-label="Хранилище"
+          className="flex h-11 flex-none items-center gap-1.5 border-b border-main-700 px-3.5"
+        >
+          {["Overview", "Documents", "Test search", "Settings"].map((tab) => (
+            <button
+              key={tab}
+              role="tab"
+              aria-selected={store.tab === tab}
+              type="button"
+              className={`h-7.5 rounded-[7px] px-3 text-[12.5px] ${store.tab === tab ? "bg-main-700 text-main-50" : "text-main-400"}`}
+              onClick={() => store.set("tab", tab)}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        {store.tab === "Test search" ? (
+          <VectorSearchPanel />
+        ) : (
+          <div role="tabpanel" className="space-y-3 overflow-auto p-4 text-xs text-main-300">
+            {store.tab === "Documents" ? (
+              <p>Управление документами и загрузка файлов появятся в TASK_028.</p>
+            ) : store.tab === "Settings" ? (
+              <>
+                <p>
+                  Чанк: {detail.chunkSize} · перекрытие: {detail.chunkOverlap}
+                </p>
+                <p>
+                  Backend: {detail.backend} · метрика: {detail.metric}
+                </p>
+                <Button disabled={disabled} onClick={store.edit}>
+                  Изменить настройки
+                </Button>
+              </>
+            ) : (
+              <>
+                <p>{detail.description || "Описание не задано."}</p>
+                <p>
+                  Хранилище: {detail.backend} · {healthLabels[detail.status]}
+                </p>
+                <p>
+                  Последняя индексация:{" "}
+                  {detail.lastIndexedAt === null
+                    ? "ещё не выполнялась"
+                    : new Date(detail.lastIndexedAt).toLocaleString()}
+                </p>
+                <p>
+                  Статистика сверена при открытии. Полная переиндексация сейчас выполняет только
+                  сверку с таблицей.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+export default observer(VectorStoreDetail);

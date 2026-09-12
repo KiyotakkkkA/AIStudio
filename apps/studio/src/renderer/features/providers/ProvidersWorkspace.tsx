@@ -109,9 +109,15 @@ function ProvidersWorkspace() {
                 type="button"
                 tone="secondary"
                 disabled={!form.dirty || providers.saving}
+                needConfirm
+                modalSetup={{
+                  title: "Отменить?",
+                  content: "Несохранённые изменения будут потеряны.",
+                  confirmLabel: "Отменить",
+                }}
                 onClick={providers.resetForm}
               >
-                Отменить правки
+                Отменить
               </Button>
               <Button
                 type="button"

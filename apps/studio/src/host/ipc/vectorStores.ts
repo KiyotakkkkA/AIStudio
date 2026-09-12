@@ -12,6 +12,7 @@ export function createVectorStoreHandlers(
   | "vectorStores.update"
   | "vectorStores.remove"
   | "vectorStores.search"
+  | "vectorStores.searchTimed"
   | "vectorStores.reconcile"
 > {
   return {
@@ -25,6 +26,8 @@ export function createVectorStoreHandlers(
     },
     "vectorStores.search": ({ storeId, query, k, minScore }) =>
       service.search(storeId, query, { k, minScore }),
+    "vectorStores.searchTimed": ({ storeId, query, k, minScore }) =>
+      service.searchTimed(storeId, query, { k, minScore }),
     "vectorStores.reconcile": ({ id }) => service.reconcile(id),
   };
 }

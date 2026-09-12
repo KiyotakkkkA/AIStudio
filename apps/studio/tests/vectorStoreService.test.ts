@@ -60,6 +60,22 @@ beforeEach(() => {
 });
 afterEach(() => db.dispose());
 
+test("timed search measures embedding and native search separately", async () => {
+  const store = await service.create(input);
+  const timer = vi.spyOn(performance, "now");
+  timer
+    .mockReturnValueOnce(100)
+    .mockReturnValueOnce(118)
+    .mockReturnValueOnce(120)
+    .mockReturnValueOnce(165);
+  try {
+    const result = await service.searchTimed(store.id, "hello");
+    expect(result).toEqual({ hits: [], embeddingMs: 18, searchMs: 45 });
+  } finally {
+    timer.mockRestore();
+  }
+});
+
 test("creation persists the pending row before native work and rolls back partial creation", async () => {
   vi.spyOn(core, "createVectorIndex").mockImplementation(async () => {
     expect(db.client.repositories.vectorStores.list()[0]?.status).toBe("pending");
