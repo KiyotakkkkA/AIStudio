@@ -136,7 +136,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
             </div>
           ) : (
             <div className="flex gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[6px] border border-main-600 bg-main-900 px-2.5 py-1.5">
+              <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[6px] bg-main-900 px-2.5 py-1.5">
                 <Icon
                   path={mdiAccountCircleOutline}
                   size={16}
@@ -163,9 +163,6 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
                   </Chip>
                 )}
               </div>
-              <Button type="button" tone="ghost" disabled>
-                Аккаунты
-              </Button>
             </div>
           )}
         </Field>

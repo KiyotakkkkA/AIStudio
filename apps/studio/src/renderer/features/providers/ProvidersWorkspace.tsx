@@ -57,7 +57,7 @@ function ProvidersWorkspace() {
             <EmptyState
               icon={mdiLayersOutline}
               title="Подключение не выбрано"
-              description="Выберите подключение слева или добавьте новое — форма одна и та же на всех трёх вкладках."
+              description="Выберите подключение слева или добавьте новое"
             />
           </div>
         ) : (

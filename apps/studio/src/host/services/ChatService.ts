@@ -166,6 +166,17 @@ export class ChatService {
       this.options.data.repositories.chat.update(id, { title: parsed, updatedAt: this.clock() }),
     );
   }
+  truncate(conversationId: string, messageId: string): ConversationDetailDto {
+    const conversation = this.get(conversationId);
+    this.requireIdle(conversationId);
+    if (!conversation.messages.some((message) => message.id === messageId))
+      throw new AppError(AppErrorCode.NOT_FOUND, "Message not found");
+    this.options.data.transaction(({ chat }) => {
+      chat.truncateFrom(conversationId, messageId);
+      chat.update(conversationId, { updatedAt: this.clock() });
+    });
+    return this.get(conversationId);
+  }
   remove(id: string): void {
     this.get(id);
     this.requireIdle(id);

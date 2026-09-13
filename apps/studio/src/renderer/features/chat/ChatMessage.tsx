@@ -15,6 +15,7 @@ export default function ChatMessage({
   usage,
   onEdit,
   onRefresh,
+  onDelete,
 }: {
   readonly content: string;
   readonly reasoning?: string;
@@ -26,6 +27,7 @@ export default function ChatMessage({
   readonly usage?: string;
   readonly onEdit?: () => void;
   readonly onRefresh?: () => void;
+  readonly onDelete?: () => void;
 }) {
   return (
     <article aria-label="Ответ ассистента" className="group flex min-w-0 gap-3">
@@ -76,7 +78,12 @@ export default function ChatMessage({
           {usage && <p className="font-mono text-[10.5px] text-main-500">{usage}</p>}
         </div>
         <div className="mt-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-          <MessageActions content={content} onEdit={onEdit} onRefresh={onRefresh} />
+          <MessageActions
+            content={content}
+            onEdit={onEdit}
+            onRefresh={onRefresh}
+            onDelete={onDelete}
+          />
         </div>
       </div>
     </article>

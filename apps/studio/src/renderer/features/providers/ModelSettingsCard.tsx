@@ -9,13 +9,6 @@ export interface ModelSettingsCardProps {
   readonly vm: ProviderFormVm;
 }
 
-function ignoredNote(
-  vm: ProviderFormVm,
-  parameter: "temperature" | "topK" | "topP",
-): string | undefined {
-  return vm.honours(parameter) ? undefined : `Адаптер ${vm.adapter} не учитывает этот параметр.`;
-}
-
 function ModelSettingsCard({ vm }: ModelSettingsCardProps) {
   return (
     <section className="flex min-w-0 flex-1 flex-col gap-3.5 rounded-card border border-main-700 bg-main-900 p-4">
@@ -23,72 +16,69 @@ function ModelSettingsCard({ vm }: ModelSettingsCardProps) {
         Параметры модели
       </h2>
 
-      <Slider
-        id="provider-temperature"
-        label={PARAMETER_LABELS.temperature}
-        value={vm.settingOf("temperature")}
-        min={SETTING_BOUNDS.temperature.min}
-        max={SETTING_BOUNDS.temperature.max}
-        step={SETTING_BOUNDS.temperature.step}
-        disabled={!vm.honours("temperature")}
-        note={ignoredNote(vm, "temperature")}
-        readout={vm.settingOf("temperature").toFixed(2)}
-        onChange={(value) => {
-          vm.setSetting("temperature", value);
-        }}
-      />
+      {vm.honours("temperature") ? (
+        <Slider
+          id="provider-temperature"
+          label={PARAMETER_LABELS.temperature}
+          value={vm.settingOf("temperature")}
+          min={SETTING_BOUNDS.temperature.min}
+          max={SETTING_BOUNDS.temperature.max}
+          step={SETTING_BOUNDS.temperature.step}
+          readout={vm.settingOf("temperature").toFixed(2)}
+          onChange={(value) => {
+            vm.setSetting("temperature", value);
+          }}
+        />
+      ) : null}
 
-      <Slider
-        id="provider-top-k"
-        label={PARAMETER_LABELS.topK}
-        value={vm.settingOf("topK")}
-        min={SETTING_BOUNDS.topK.min}
-        max={200}
-        step={SETTING_BOUNDS.topK.step}
-        disabled={!vm.honours("topK")}
-        note={ignoredNote(vm, "topK")}
-        readout={String(vm.settingOf("topK"))}
-        onChange={(value) => {
-          vm.setSetting("topK", Math.round(value));
-        }}
-      />
+      {vm.honours("topK") ? (
+        <Slider
+          id="provider-top-k"
+          label={PARAMETER_LABELS.topK}
+          value={vm.settingOf("topK")}
+          min={SETTING_BOUNDS.topK.min}
+          max={200}
+          step={SETTING_BOUNDS.topK.step}
+          readout={String(vm.settingOf("topK"))}
+          onChange={(value) => {
+            vm.setSetting("topK", Math.round(value));
+          }}
+        />
+      ) : null}
 
-      <Slider
-        id="provider-top-p"
-        label={PARAMETER_LABELS.topP}
-        value={vm.settingOf("topP")}
-        min={SETTING_BOUNDS.topP.min}
-        max={SETTING_BOUNDS.topP.max}
-        step={SETTING_BOUNDS.topP.step}
-        disabled={!vm.honours("topP")}
-        note={ignoredNote(vm, "topP")}
-        readout={vm.settingOf("topP").toFixed(2)}
-        onChange={(value) => {
-          vm.setSetting("topP", value);
-        }}
-      />
+      {vm.honours("topP") ? (
+        <Slider
+          id="provider-top-p"
+          label={PARAMETER_LABELS.topP}
+          value={vm.settingOf("topP")}
+          min={SETTING_BOUNDS.topP.min}
+          max={SETTING_BOUNDS.topP.max}
+          step={SETTING_BOUNDS.topP.step}
+          readout={vm.settingOf("topP").toFixed(2)}
+          onChange={(value) => {
+            vm.setSetting("topP", value);
+          }}
+        />
+      ) : null}
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field
-          label={PARAMETER_LABELS.maxOutputTokens}
-          htmlFor="provider-max-output"
-          help={
-            vm.honours("maxOutputTokens") ? undefined : `Адаптер ${vm.adapter} не учитывает бюджет.`
-          }
-        >
-          <TextInput
-            id="provider-max-output"
-            mono
-            type="number"
-            min={SETTING_BOUNDS.maxOutputTokens.min}
-            max={SETTING_BOUNDS.maxOutputTokens.max}
-            disabled={!vm.honours("maxOutputTokens")}
-            value={String(vm.settingOf("maxOutputTokens"))}
-            onChange={(event) => {
-              vm.setSetting("maxOutputTokens", numberOrNull(event.target.value));
-            }}
-          />
-        </Field>
+      <div
+        className={`grid gap-3 ${vm.honours("maxOutputTokens") ? "grid-cols-2" : "grid-cols-1"}`}
+      >
+        {vm.honours("maxOutputTokens") ? (
+          <Field label={PARAMETER_LABELS.maxOutputTokens} htmlFor="provider-max-output">
+            <TextInput
+              id="provider-max-output"
+              mono
+              type="number"
+              min={SETTING_BOUNDS.maxOutputTokens.min}
+              max={SETTING_BOUNDS.maxOutputTokens.max}
+              value={String(vm.settingOf("maxOutputTokens"))}
+              onChange={(event) => {
+                vm.setSetting("maxOutputTokens", numberOrNull(event.target.value));
+              }}
+            />
+          </Field>
+        ) : null}
         <Field label="Таймаут запроса" htmlFor="provider-timeout">
           <TextInput
             id="provider-timeout"

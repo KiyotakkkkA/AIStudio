@@ -11,6 +11,7 @@ export function createChatHandlers(
   | "chat.conversations.create"
   | "chat.conversations.remove"
   | "chat.conversations.rename"
+  | "chat.conversations.truncate"
   | "chat.send"
   | "chat.cancel"
 > {
@@ -20,6 +21,7 @@ export function createChatHandlers(
     "chat.conversations.create": (input) => service.create(input),
     "chat.conversations.remove": ({ id }) => service.remove(id),
     "chat.conversations.rename": ({ id, title }) => service.rename(id, title),
+    "chat.conversations.truncate": ({ id, messageId }) => service.truncate(id, messageId),
     "chat.send": ({ conversationId, text, providerId, modelId, settings }) =>
       service.sendMessage(conversationId, text, { providerId, modelId, settings }),
     "chat.cancel": ({ id }) => service.cancel(id),

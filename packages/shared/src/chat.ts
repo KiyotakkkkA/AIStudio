@@ -64,3 +64,5 @@ export const ChatSendInput = z.object({
   settings: ChatSettings.optional(),
 });
 export type ChatSendInput = z.infer<typeof ChatSendInput>;
+export const TruncateConversationInput = ConversationRef.extend({ messageId: MessageId });
+export type TruncateConversationInput = z.infer<typeof TruncateConversationInput>;

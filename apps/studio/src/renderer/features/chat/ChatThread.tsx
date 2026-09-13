@@ -3,6 +3,7 @@ import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/Button";
 import Chip from "../../ui/atoms/Chip";
+import TextArea from "../../ui/atoms/TextArea";
 import ChatMessage from "./ChatMessage";
 import MessageActions from "../../ui/molecules/MessageActions";
 import ChatComposer from "./ChatComposer";
@@ -15,6 +16,8 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
   const content = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
   const [jump, setJump] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
   const scrollLatest = () => {
     const element = viewport.current;
     if (element) element.scrollTop = element.scrollHeight;
@@ -80,15 +83,47 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
             message.role === "user" ? (
               <div key={message.id} className="group flex justify-end">
                 <div className="flex max-w-[78%] flex-col items-end">
-                  <div className="rounded-xl rounded-br-sm border border-main-600 bg-main-700 px-3.5 py-3 text-[13.5px] leading-relaxed wrap-break-word whitespace-pre-wrap">
-                    {message.content}
-                  </div>
+                  {editingId === message.id ? (
+                    <div className="w-[min(78vw,620px)] space-y-2 rounded-xl border border-main-600 bg-main-800 p-2">
+                      <TextArea
+                        aria-label="Редактировать сообщение"
+                        value={editingText}
+                        onChange={(event) => setEditingText(event.target.value)}
+                        autoFocus
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" onClick={() => setEditingId(null)}>
+                          Отмена
+                        </Button>
+                        <Button
+                          type="button"
+                          tone="primary"
+                          disabled={!editingText.trim() || store.generating}
+                          onClick={() => {
+                            void store
+                              .editMessage(message.id, editingText)
+                              .then((edited) => edited && setEditingId(null));
+                          }}
+                        >
+                          Отправить
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl rounded-br-sm border border-main-600 bg-main-700 px-3.5 py-3 text-[13.5px] leading-relaxed wrap-break-word whitespace-pre-wrap">
+                      {message.content}
+                    </div>
+                  )}
                   <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                     <MessageActions
                       content={message.content}
                       isUser={message.role === "user"}
-                      onEdit={() => store.composer.setText(message.content)}
-                      onRefresh={store.retry}
+                      onEdit={() => {
+                        setEditingId(message.id);
+                        setEditingText(message.content);
+                      }}
+                      onRefresh={() => void store.refreshMessage(message.id, message.content)}
+                      onDelete={() => void store.deleteMessage(message.id)}
                     />
                   </div>
                 </div>
@@ -103,7 +138,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                 stores={store.stores}
                 partial={message.partial}
                 onEdit={() => store.composer.setText(message.content)}
-                onRefresh={store.retry}
+                onDelete={() => void store.deleteMessage(message.id)}
                 usage={`${message.usageEstimated ? "~" : ""}${message.tokensIn} вход. · ${message.tokensOut} выход. · ${(message.durationMs / 1000).toFixed(1)} с`}
               />
             ),

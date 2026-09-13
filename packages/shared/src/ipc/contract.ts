@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   ChatSendInput,
   ConversationDetailDto,
+  TruncateConversationInput,
   ConversationDto,
   ConversationRef,
   CreateConversationInput,
@@ -67,6 +68,10 @@ export const contract = defineContract({
   "chat.conversations.rename": {
     input: ConversationRef.extend({ title: z.string().trim().min(1).max(200) }),
     output: ConversationDto,
+  },
+  "chat.conversations.truncate": {
+    input: TruncateConversationInput,
+    output: ConversationDetailDto,
   },
   "chat.send": { input: ChatSendInput, output: RunHandleDto },
   "chat.cancel": { input: RunIdInput, output: z.void() },

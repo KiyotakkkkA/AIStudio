@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte, gt, or } from "drizzle-orm";
 import {
   conversation,
   message,
@@ -46,5 +46,21 @@ export class ChatRepository extends Repository {
     patch: Partial<Omit<MessageInsert, "id" | "conversationId" | "createdAt">>,
   ): void {
     this.db.update(message).set(patch).where(eq(message.id, id)).run();
+  }
+  truncateFrom(conversationId: string, messageId: string): void {
+    const target = this.getMessage(messageId);
+    if (!target || target.conversationId !== conversationId) return;
+    this.db
+      .delete(message)
+      .where(
+        and(
+          eq(message.conversationId, conversationId),
+          or(
+            gt(message.createdAt, target.createdAt),
+            and(eq(message.createdAt, target.createdAt), gte(message.id, target.id)),
+          ),
+        ),
+      )
+      .run();
   }
 }

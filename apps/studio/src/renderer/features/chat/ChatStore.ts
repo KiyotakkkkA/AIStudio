@@ -8,6 +8,7 @@ import {
   type ConversationDetailDto,
   type ConversationDto,
   type ConversationId,
+  type MessageId,
   type ProviderDto,
   type RunHandleDto,
   type VectorStoreDto,
@@ -293,6 +294,49 @@ export default class ChatStore {
         this.pendingTurn = false;
       });
     }
+  }
+
+  async truncateMessage(messageId: MessageId): Promise<boolean> {
+    if (!this.active || this.generating) return false;
+    try {
+      const active = await this.ipc.call("chat.conversations.truncate", {
+        id: this.active.id,
+        messageId,
+      });
+      runInAction(() => {
+        this.active = active;
+        this.conversations = this.conversations.map((conversation) =>
+          conversation.id === active.id ? active : conversation,
+        );
+        this.liveText = "";
+        this.liveReasoning = "";
+        this.liveCitations = [];
+        this.pendingTurn = false;
+        this.retryText = "";
+      });
+      return true;
+    } catch (error) {
+      this.error = errorCopy(error);
+      return false;
+    }
+  }
+
+  async deleteMessage(messageId: MessageId) {
+    await this.truncateMessage(messageId);
+  }
+
+  async refreshMessage(messageId: MessageId, content: string) {
+    if (!(await this.truncateMessage(messageId))) return;
+    this.composer.setText(content);
+    await this.send();
+  }
+
+  async editMessage(messageId: MessageId, content: string): Promise<boolean> {
+    const text = content.trim();
+    if (!text || !(await this.truncateMessage(messageId))) return false;
+    this.composer.setText(text);
+    await this.send();
+    return true;
   }
 
   retry() {

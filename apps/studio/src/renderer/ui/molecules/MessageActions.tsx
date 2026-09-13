@@ -7,11 +7,13 @@ export default function MessageActions({
   isUser,
   onEdit,
   onRefresh,
+  onDelete,
 }: {
   readonly content: string;
   readonly isUser?: boolean;
   readonly onEdit?: () => void;
   readonly onRefresh?: () => void;
+  readonly onDelete?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -41,7 +43,7 @@ export default function MessageActions({
         path={copied ? mdiCheck : mdiContentCopy}
         onClick={() => void handleCopy()}
       />
-      {isUser && (
+      {isUser && onRefresh && (
         <>
           <IconButton
             aria-label="Повторить сообщение"
@@ -50,19 +52,24 @@ export default function MessageActions({
             iconSize={16}
             onClick={onRefresh}
           />{" "}
-          <IconButton
-            aria-label="Редактировать сообщение"
-            title="Редактировать"
-            path={mdiPencilOutline}
-            onClick={onEdit}
-          />
-          <IconButton
-            aria-label="Удалить сообщение"
-            title="Удалить"
-            path={mdiDeleteOutline}
-            className="hover:text-err"
-          />
         </>
+      )}
+      {onEdit && (
+        <IconButton
+          aria-label="Редактировать сообщение"
+          title="Редактировать"
+          path={mdiPencilOutline}
+          onClick={onEdit}
+        />
+      )}
+      {onDelete && (
+        <IconButton
+          aria-label="Удалить сообщение"
+          title="Удалить"
+          path={mdiDeleteOutline}
+          className="hover:text-err"
+          onClick={onDelete}
+        />
       )}
     </div>
   );
