@@ -15,7 +15,8 @@ async function rpc<T>(page: Page, channel: string, payload?: unknown): Promise<T
   return result.data;
 }
 
-test("chat streams grounded answers, preserves scroll, cancels and fits a narrow thread", async (__, testInfo) => {
+test("chat streams grounded answers, preserves scroll, cancels and fits a narrow thread", async ({ browserName }, testInfo) => {
+  expect(browserName).toBe("chromium");
   const directory = temporaryDirectory("studio-chat-ui-");
   let turn = 0;
   const server = createServer(async (request, response) => {
@@ -72,7 +73,7 @@ test("chat streams grounded answers, preserves scroll, cancels and fits a narrow
     executablePath: createRequire(join(STUDIO_ROOT, "package.json"))("electron") as string,
     cwd: STUDIO_ROOT,
     args: [STUDIO_ROOT, `--user-data-dir=${directory.path}`],
-    env: environment,
+    env: { ...environment, NODE_ENV: "production" },
   });
   try {
     const page = await app.firstWindow();
