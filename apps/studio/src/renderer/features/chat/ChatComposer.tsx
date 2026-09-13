@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { mdiCogOutline } from "@mdi/js";
 import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/Button";
-import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import SelectInput from "../../ui/atoms/SelectInput";
 import TextArea from "../../ui/atoms/TextArea";
@@ -33,6 +32,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
         >
           <TextArea
             aria-label="Сообщение"
+            noBorder
             placeholder="Задайте вопрос или обратитесь к подключённым хранилищам…"
             value={store.composer.text}
             maxLength={100000}

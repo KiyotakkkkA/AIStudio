@@ -34,7 +34,7 @@ function summary(overrides: Partial<SecretSummaryDto> & { id: SecretId }): Secre
 }
 
 function detail(base: SecretSummaryDto): SecretDto {
-  return { ...base, fields: { baseUrl: "https://ollama.com/api", verifyTls: true }, note: null };
+  return { ...base, fields: { baseUrl: "https://ollama.com/api" }, note: null };
 }
 
 function storeWith(summaries: SecretSummaryDto[]) {

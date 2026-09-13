@@ -26,20 +26,6 @@ export const SECRET_TYPE_REGISTRY: readonly SecretTypeSchema[] = [
         required: false,
         default: "https://ollama.com/api",
       },
-      {
-        key: "organization",
-        label: "Organization",
-        kind: "text",
-        required: false,
-        placeholder: "zvs-lab",
-      },
-      {
-        key: "verifyTls",
-        label: "Verify TLS certificate",
-        kind: "boolean",
-        required: false,
-        default: true,
-      },
     ],
   },
   {

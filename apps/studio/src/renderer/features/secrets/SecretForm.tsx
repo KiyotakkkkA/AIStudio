@@ -129,42 +129,39 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
             <Chip tone="accent">{`schema ${vm.schemaChip}`}</Chip>
           </div>
 
-          {secretField === undefined ? null : (
-            <Field
-              label={secretField.label}
-              htmlFor="secret-value"
-              required={vm.valueRequired}
-              optionalHint={secretField.required !== true}
-              help={
-                vm.isNew
-                  ? secretField.help
-                  : "Оставьте поле пустым, чтобы сохранённое значение осталось прежним."
-              }
-              error={vm.errorOf("value")}
-            >
-              <TextInput
-                id="secret-value"
-                preset="password"
-                autoComplete="off"
-                spellCheck={false}
-                mono
-                value={vm.value}
-                invalid={vm.errorOf("value") !== undefined}
-                placeholder={vm.isNew ? (secretField.placeholder ?? "") : maskedHint(hint)}
-                onChange={(event) => {
-                  vm.setValue(event.target.value);
-                }}
-              />
-            </Field>
-          )}
-
-          {inputs.length === 0 ? null : (
-            <div className="grid grid-cols-2 gap-3.5">
-              {inputs.map((field) => (
-                <SecretCredentialField key={field.key} field={field} vm={vm} />
-              ))}
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-3.5">
+            {secretField === undefined ? null : (
+              <Field
+                label={secretField.label}
+                htmlFor="secret-value"
+                required={vm.valueRequired}
+                optionalHint={secretField.required !== true}
+                help={
+                  vm.isNew
+                    ? secretField.help
+                    : "Оставьте поле пустым, чтобы сохранённое значение осталось прежним."
+                }
+                error={vm.errorOf("value")}
+              >
+                <TextInput
+                  id="secret-value"
+                  preset="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  mono
+                  value={vm.value}
+                  invalid={vm.errorOf("value") !== undefined}
+                  placeholder={vm.isNew ? (secretField.placeholder ?? "") : maskedHint(hint)}
+                  onChange={(event) => {
+                    vm.setValue(event.target.value);
+                  }}
+                />
+              </Field>
+            )}
+            {inputs.map((field) => (
+              <SecretCredentialField key={field.key} field={field} vm={vm} />
+            ))}
+          </div>
 
           {switches.map((field) => (
             <Toggle

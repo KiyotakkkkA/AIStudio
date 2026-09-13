@@ -23,7 +23,7 @@ function ollamaSecret(overrides: Partial<SecretDto> = {}): SecretDto {
     rotationStatus: "ok",
     rotatesAt: null,
     updatedAt: 1_700_000_000_000,
-    fields: { baseUrl: "https://ollama.com/api", verifyTls: true },
+    fields: { baseUrl: "https://ollama.com/api" },
     note: "Только для локальных экспериментов",
     ...overrides,
   };
@@ -31,11 +31,9 @@ function ollamaSecret(overrides: Partial<SecretDto> = {}): SecretDto {
 
 test("switching the type swaps the credential fields and keeps name and scope", () => {
   const vm = new SecretFormVm(SECRET_TYPE_REGISTRY, ollamaSecret({ scope: "shared" }));
-  vm.setField("organization", "zvs-lab");
-
   assert.deepEqual(
     vm.credentialFields.map((field) => field.key),
-    ["baseUrl", "organization", "verifyTls"],
+    ["baseUrl"],
   );
 
   vm.setType("openrouter");
@@ -46,7 +44,6 @@ test("switching the type swaps the credential fields and keeps name and scope", 
     vm.credentialFields.map((field) => field.key),
     ["baseUrl", "referer"],
   );
-  assert.equal(vm.fieldValues.organization, undefined);
   assert.equal(vm.fieldValues.baseUrl, "https://openrouter.ai/api/v1");
   assert.equal(vm.schemaChip, "openrouter@1");
 });
@@ -57,7 +54,6 @@ test("defaults from the registry prefill a new form", () => {
   assert.equal(vm.type, "ollama");
   assert.equal(vm.isNew, true);
   assert.equal(vm.fieldValues.baseUrl, "https://ollama.com/api");
-  assert.equal(vm.fieldValues.verifyTls, true);
   assert.equal(vm.dirty, false);
 });
 
@@ -102,7 +98,7 @@ test("editing without touching the value omits it from the update payload", () =
   const payload = vm.toUpdateInput();
   assert.equal(Object.hasOwn(payload, "value"), false);
   assert.equal(payload.name, "Ollama — рабочий");
-  assert.deepEqual(payload.fields, { baseUrl: "https://ollama.com/api", verifyTls: true });
+  assert.deepEqual(payload.fields, { baseUrl: "https://ollama.com/api" });
 
   vm.setValue("osk_live_new");
   assert.equal(vm.toUpdateInput().value, "osk_live_new");

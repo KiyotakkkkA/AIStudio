@@ -146,7 +146,11 @@ test("the registry builds a driver per adapter value, caches it and invalidates 
   assert.equal(providers.size, 0);
   assert.notEqual(second, await providers.driver(row.id));
 
-  const stray = repositories.providers.create({ ...draft, name: "Stray" });
+  const stray = repositories.providers.create({
+    ...draft,
+    kind: "openrouter",
+    name: "Stray",
+  });
   repositories.providers.update(stray.id, { adapter: "made-up" as AdapterFamily });
   await assert.rejects(
     () => providers.driver(stray.id),
@@ -205,7 +209,7 @@ test("a disabled or missing provider is refused before any transport is built", 
 });
 
 test("account auth mode is rejected with a clear message rather than a silent fallback", async () => {
-  const row = repositories.providers.create(draft);
+  const row = repositories.providers.create({ ...draft, kind: "openrouter" });
   database.client.db.$client
     .prepare("UPDATE provider SET auth_mode = 'account' WHERE id = ?")
     .run(row.id);

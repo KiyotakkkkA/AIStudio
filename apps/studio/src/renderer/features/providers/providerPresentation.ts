@@ -65,7 +65,7 @@ const KIND_BASE_URLS: Record<ProviderKind, string> = {
 };
 
 const ADAPTER_BASE_URLS: Partial<Record<AdapterFamily, string>> = {
-  "qwen-web": "https://chat.qwen.ai/api",
+  "qwen-web": "https://chat.qwen.ai/api/v2",
   "deepseek-web": "https://chat.deepseek.com/api",
 };
 

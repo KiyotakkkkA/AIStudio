@@ -41,7 +41,7 @@ function draft(overrides: Partial<CreateSecretInput> = {}): CreateSecretInput {
     name: "Ollama — personal",
     scope: "personal",
     value: VALUE,
-    fields: { organization: "zvs-lab" },
+    fields: {},
     tags: ["llm"],
     ...overrides,
   };
@@ -82,8 +82,6 @@ test("secrets.create stores the schema fields, applies defaults and returns no v
     assert.equal(created.hint, "osk_live_…4f2a");
     assert.deepEqual(created.fields, {
       baseUrl: "https://ollama.com/api",
-      organization: "zvs-lab",
-      verifyTls: true,
     });
     assert.equal(created.usageCount, 0);
     assert.equal(created.rotationStatus, "ok");
@@ -232,11 +230,10 @@ test("secrets.update validates replacement fields against the stored type schema
     );
     const updated = await handlers["secrets.update"]({
       id: created.id,
-      fields: { verifyTls: false },
+      fields: {},
     });
     assert.deepEqual(updated.fields, {
       baseUrl: "https://ollama.com/api",
-      verifyTls: false,
     });
   } finally {
     dispose();

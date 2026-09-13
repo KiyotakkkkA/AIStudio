@@ -317,12 +317,12 @@ test("conversation channels rename, list and cascade message deletion while reta
   expect(runs.get(handle.id).status).toBe("succeeded");
 });
 
-test("permission denial prevents generation and leaves the answer partial", async () => {
+test("chat generation does not require tool approval and completes normally", async () => {
   runs.permissions.grant("llm.generate", "global", "off", "test");
   const created = conversation();
   const handle = chat.sendMessage(created.id, "Question");
   await runs.wait(handle.id);
-  expect(runs.get(handle.id).status).toBe("failed");
-  expect(driver.requests).toHaveLength(0);
-  expect(chat.get(created.id).messages[1]).toMatchObject({ partial: true, content: "" });
+  expect(runs.get(handle.id).status).toBe("succeeded");
+  expect(driver.requests).toHaveLength(1);
+  expect(chat.get(created.id).messages[1]).toMatchObject({ partial: false });
 });

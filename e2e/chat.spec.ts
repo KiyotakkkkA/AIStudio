@@ -15,7 +15,7 @@ async function rpc<T>(page: Page, channel: string, payload?: unknown): Promise<T
   return result.data;
 }
 
-test("chat streams grounded answers, preserves scroll, cancels and fits a narrow thread", async ({}, testInfo) => {
+test("chat streams grounded answers, preserves scroll, cancels and fits a narrow thread", async (__, testInfo) => {
   const directory = temporaryDirectory("studio-chat-ui-");
   let turn = 0;
   const server = createServer(async (request, response) => {

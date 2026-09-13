@@ -7,7 +7,7 @@ export type TextInputProps = Omit<InputSmallProps, "className" | "classNames" | 
 
 export default function TextInput({ mono = false, invalid = false, ...props }: TextInputProps) {
   const input = [
-    "h-[34px] rounded-[6px] bg-main-900 text-[12.5px] text-main-100",
+    "h-[34px] bg-main-900 text-[12.5px] text-main-100",
     invalid
       ? "border-err focus-visible:border-err"
       : "border-main-600 focus-visible:border-accent-dark",
@@ -17,7 +17,7 @@ export default function TextInput({ mono = false, invalid = false, ...props }: T
 
   return (
     <div className="relative flex w-full items-center">
-      <InputSmall {...props} rounded="" className="w-full" classNames={{ input }} />
+      <InputSmall {...props} rounded="rounded-lg" className="w-full" classNames={{ input }} />
     </div>
   );
 }

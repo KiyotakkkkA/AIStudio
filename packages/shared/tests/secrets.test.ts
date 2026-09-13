@@ -73,18 +73,12 @@ describe("buildFieldsSchema", () => {
   it("never asks for the secret field", () => {
     const parsed = buildFieldsSchema(ollama).parse({});
     expect(Object.keys(parsed)).not.toContain("apiKey");
-    expect(configFieldsOf(ollama).map((field) => field.key)).toEqual([
-      "baseUrl",
-      "organization",
-      "verifyTls",
-    ]);
+    expect(configFieldsOf(ollama).map((field) => field.key)).toEqual(["baseUrl"]);
   });
 
   it("accepts a valid payload and fills optional defaults", () => {
-    expect(buildFieldsSchema(ollama).parse({ organization: "zvs-lab" })).toEqual({
+    expect(buildFieldsSchema(ollama).parse({})).toEqual({
       baseUrl: "https://ollama.com/api",
-      organization: "zvs-lab",
-      verifyTls: true,
     });
   });
 
@@ -101,7 +95,6 @@ describe("buildFieldsSchema", () => {
   });
 
   it("rejects a wrong type", () => {
-    expect(buildFieldsSchema(ollama).safeParse({ verifyTls: "yes" }).success).toBe(false);
     expect(buildFieldsSchema(ollama).safeParse({ baseUrl: "not a url" }).success).toBe(false);
   });
 
@@ -148,8 +141,8 @@ describe("secret DTOs", () => {
   });
 
   it("adds only fields and note on the full DTO", () => {
-    const parsed = SecretDto.parse({ ...summary, fields: { verifyTls: true }, note: null });
-    expect(parsed.fields).toEqual({ verifyTls: true });
+    const parsed = SecretDto.parse({ ...summary, fields: {}, note: null });
+    expect(parsed.fields).toEqual({});
     expect(parsed.note).toBeNull();
   });
 
