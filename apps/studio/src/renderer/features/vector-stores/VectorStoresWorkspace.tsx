@@ -2,7 +2,7 @@ import { mdiDatabaseOutline, mdiMagnify, mdiPlus, mdiRefresh } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useEffect } from "react";
-import useStore from "../../stores/useStore";
+import { useStore } from "../../stores/useStore";
 import PageShell from "../../ui/templates/PageShell";
 import Button from "../../ui/atoms/Button";
 import Chip from "../../ui/atoms/Chip";

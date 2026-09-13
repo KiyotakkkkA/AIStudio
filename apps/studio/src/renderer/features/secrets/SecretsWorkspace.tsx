@@ -3,7 +3,7 @@ import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
 import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import EmptyState from "../../ui/molecules/EmptyState";
-import useStore from "../../stores/useStore";
+import { useStore } from "../../stores/useStore";
 import SecretConflictDialog from "./SecretConflictDialog";
 import SecretForm from "./SecretForm";
 import SecretList from "./SecretList";

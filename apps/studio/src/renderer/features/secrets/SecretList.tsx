@@ -7,7 +7,7 @@ import Icon from "../../ui/atoms/Icon";
 import EmptyState from "../../ui/molecules/EmptyState";
 import ListRow from "../../ui/molecules/ListRow";
 import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
-import useStore from "../../stores/useStore";
+import { useStore } from "../../stores/useStore";
 import SecretListItem from "./SecretListItem";
 import { SCOPE_FILTERS, type ScopeFilter } from "./SecretStore";
 

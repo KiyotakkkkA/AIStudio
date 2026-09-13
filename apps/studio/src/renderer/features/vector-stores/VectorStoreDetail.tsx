@@ -1,7 +1,7 @@
 import { mdiDatabaseOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
-import useStore from "../../stores/useStore";
+import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/Button";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";

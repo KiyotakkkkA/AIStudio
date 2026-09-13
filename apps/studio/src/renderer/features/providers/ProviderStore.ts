@@ -16,7 +16,7 @@ import {
 } from "@zvs/shared";
 import { providerErrorCopy, providerFieldErrors } from "./providerErrors";
 import { discoveredRows, modelRows, type ModelRow } from "./modelRows";
-import ProviderFormVm from "./ProviderFormVm";
+import { ProviderFormVm } from "./ProviderFormVm";
 import { ACCOUNTS_TAB, type ProvidersTab } from "./providerTabs";
 
 export type PendingIntent =
@@ -477,8 +477,6 @@ export class ProviderStore {
     });
   }
 }
-
-export default ProviderStore;
 
 const FREE_OLLAMA_MODELS = new Set([
   "gemma4:31b",

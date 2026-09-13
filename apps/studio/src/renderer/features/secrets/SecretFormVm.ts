@@ -308,5 +308,3 @@ function issueCopy(code: string): string {
       return "Некорректное значение.";
   }
 }
-
-export default SecretFormVm;

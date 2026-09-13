@@ -10,7 +10,7 @@ import ProvidersWorkspace from "../features/providers/ProvidersWorkspace";
 import { accountsWord } from "../features/providers/accountPresentation";
 import { modelsWord } from "../features/providers/providerPresentation";
 import { ACCOUNTS_TAB, PROVIDERS_TABS, TAB_LABELS } from "../features/providers/providerTabs";
-import useStore from "../stores/useStore";
+import { useStore } from "../stores/useStore";
 import PageShell from "../ui/templates/PageShell";
 
 function ProvidersPage() {

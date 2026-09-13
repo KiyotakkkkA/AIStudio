@@ -4,7 +4,7 @@ import { observer } from "mobx-react-lite";
 import Chip from "../../ui/atoms/Chip";
 import TextInput from "../../ui/atoms/TextInput";
 import EmptyState from "../../ui/molecules/EmptyState";
-import useStore from "../../stores/useStore";
+import { useStore } from "../../stores/useStore";
 import ModelCard from "./ModelCard";
 
 function ModelGrid() {

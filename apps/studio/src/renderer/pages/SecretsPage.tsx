@@ -3,7 +3,7 @@ import { observer } from "mobx-react-lite";
 import { useState } from "react";
 import SecretsHeaderActions from "../features/secrets/SecretsHeaderActions";
 import SecretsWorkspace from "../features/secrets/SecretsWorkspace";
-import useStore from "../stores/useStore";
+import { useStore } from "../stores/useStore";
 import EmptyState from "../ui/molecules/EmptyState";
 import PageShell from "../ui/templates/PageShell";
 import SegmentedControl from "../ui/atoms/SegmentedControl";

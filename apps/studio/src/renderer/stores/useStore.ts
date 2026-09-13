@@ -7,5 +7,3 @@ export function useStore(): RootStore {
   if (!store) throw new Error("Root store is not provided");
   return store;
 }
-
-export default useStore;

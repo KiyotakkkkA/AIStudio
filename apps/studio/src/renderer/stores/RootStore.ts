@@ -66,5 +66,3 @@ export class RootStore {
 export function createRootStore(environment: RootStoreEnvironment): RootStore {
   return new RootStore(environment);
 }
-
-export default RootStore;

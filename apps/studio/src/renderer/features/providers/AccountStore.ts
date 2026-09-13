@@ -237,5 +237,3 @@ function accountFamilies(adapters: readonly AdapterDescriptorDto[]): AccountFami
       (ACCOUNT_FAMILIES as readonly string[]).includes(family),
     );
 }
-
-export default AccountStore;

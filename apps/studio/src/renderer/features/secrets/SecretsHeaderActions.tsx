@@ -3,7 +3,7 @@ import { observer } from "mobx-react-lite";
 import Button from "../../ui/atoms/Button";
 import Icon from "../../ui/atoms/Icon";
 import TextInput from "../../ui/atoms/TextInput";
-import useStore from "../../stores/useStore";
+import { useStore } from "../../stores/useStore";
 
 const IMPORT_HINT = "Импорт .env появится в отдельной задаче — канал ещё не существует.";
 

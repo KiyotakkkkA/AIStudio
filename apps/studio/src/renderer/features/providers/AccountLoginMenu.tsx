@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { AccountFamily } from "@zvs/shared";
 import Icon from "../../ui/atoms/Icon";
 import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
-import useStore from "../../stores/useStore";
+import { useStore } from "../../stores/useStore";
 import { adapterLabel } from "./accountPresentation";
 
 const TRIGGER = [

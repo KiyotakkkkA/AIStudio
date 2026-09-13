@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
-import useStore from "../../stores/useStore";
+import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/Button";
 import TextInput from "../../ui/atoms/TextInput";
 import SelectInput from "../../ui/atoms/SelectInput";

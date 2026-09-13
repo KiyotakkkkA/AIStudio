@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { observer } from "mobx-react-lite";
 import { mdiChatOutline } from "@mdi/js";
-import useStore from "../../stores/useStore";
+import { useStore } from "../../stores/useStore";
 import Icon from "../../ui/atoms/Icon";
 import ConversationList from "./ConversationList";
 import ChatThread from "./ChatThread";

@@ -77,5 +77,3 @@ export class UiStore {
     }
   }
 }
-
-export default UiStore;

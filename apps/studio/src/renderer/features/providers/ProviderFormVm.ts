@@ -410,5 +410,3 @@ function isUrl(value: string): boolean {
     return false;
   }
 }
-
-export default ProviderFormVm;

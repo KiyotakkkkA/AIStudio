@@ -7,7 +7,7 @@ import StatusDot from "../../ui/atoms/StatusDot";
 import EmptyState from "../../ui/molecules/EmptyState";
 import ListRow from "../../ui/molecules/ListRow";
 import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
-import useStore from "../../stores/useStore";
+import { useStore } from "../../stores/useStore";
 import {
   CAPABILITY_LIST_HEADINGS,
   providerInitials,

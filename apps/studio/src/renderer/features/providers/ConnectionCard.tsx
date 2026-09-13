@@ -18,7 +18,7 @@ import TextInput from "../../ui/atoms/TextInput";
 import Field from "../../ui/molecules/Field";
 import AuthModeSwitch from "./AuthModeSwitch";
 import ProbeResultLine from "./ProbeResultLine";
-import type ProviderFormVm from "./ProviderFormVm";
+import type { ProviderFormVm } from "./ProviderFormVm";
 import {
   ADAPTER_LABELS,
   CAPABILITY_LABELS,
@@ -27,7 +27,7 @@ import {
   STATUS_LABELS,
   statusTone,
 } from "./providerPresentation";
-import useStore from "../../stores/useStore";
+import { useStore } from "../../stores/useStore";
 
 export interface ConnectionCardProps {
   readonly vm: ProviderFormVm;

@@ -37,5 +37,3 @@ export function useAppNavigation(): AppNavigation {
     [current, pathname, isActive, go, replace],
   );
 }
-
-export default useAppNavigation;

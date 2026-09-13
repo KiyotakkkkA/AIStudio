@@ -10,7 +10,7 @@ import type {
   UpdateSecretInput,
 } from "@zvs/shared";
 import { consumersFrom, errorCopy, fieldErrorsFrom, type SecretConsumerRef } from "./errorCopy";
-import SecretFormVm from "./SecretFormVm";
+import { SecretFormVm } from "./SecretFormVm";
 
 export const SCOPE_FILTERS = ["all", "personal", "shared", "public"] as const;
 export type ScopeFilter = (typeof SCOPE_FILTERS)[number];
@@ -292,5 +292,3 @@ export class SecretStore {
     this.form = new SecretFormVm(this.types, secret);
   }
 }
-
-export default SecretStore;
