@@ -1,4 +1,11 @@
 import { z } from "zod";
+import {
+  ChatSendInput,
+  ConversationDetailDto,
+  ConversationDto,
+  ConversationRef,
+  CreateConversationInput,
+} from "../chat.js";
 import { RunDto, RunHandleDto, RunIdInput, StartRunInput } from "../runs/RunDto.js";
 import { StepDto } from "../runs/StepDto.js";
 import { StreamId } from "../primitives/branded.js";
@@ -53,6 +60,16 @@ export const SettingKey = z
 export type SettingKey = z.infer<typeof SettingKey>;
 
 export const contract = defineContract({
+  "chat.conversations.list": { input: z.void(), output: z.array(ConversationDto) },
+  "chat.conversations.get": { input: ConversationRef, output: ConversationDetailDto },
+  "chat.conversations.create": { input: CreateConversationInput, output: ConversationDto },
+  "chat.conversations.remove": { input: ConversationRef, output: z.void() },
+  "chat.conversations.rename": {
+    input: ConversationRef.extend({ title: z.string().trim().min(1).max(200) }),
+    output: ConversationDto,
+  },
+  "chat.send": { input: ChatSendInput, output: RunHandleDto },
+  "chat.cancel": { input: RunIdInput, output: z.void() },
   "runs.approve": {
     input: RunIdInput.extend({ approvalId: z.string().uuid(), always: z.boolean().default(false) }),
     output: z.void(),

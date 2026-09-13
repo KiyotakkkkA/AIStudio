@@ -11,3 +11,5 @@ export * from "./step.ts";
 export * from "./runEvent.ts";
 
 export * from "./permission.ts";
+export * from "./conversation.ts";
+export * from "./message.ts";

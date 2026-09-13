@@ -2,25 +2,28 @@ import { z } from "zod";
 import { AppError, AppErrorCode, VectorSearchHitDto, VectorSearchInput } from "@zvs/shared";
 import { NodeRegistry } from "./NodeRegistry.ts";
 
+export const GenerateNodeInput = z.object({
+  providerId: z.string().min(1),
+  model: z.string().min(1),
+  messages: z.array(
+    z.object({ role: z.enum(["system", "user", "assistant"]), content: z.string() }),
+  ),
+  system: z.string().optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  topK: z.number().int().positive().optional(),
+  topP: z.number().min(0).max(1).optional(),
+  maxOutputTokens: z.number().int().positive().optional(),
+});
+
 export function registerCoreNodes(registry: NodeRegistry): NodeRegistry {
   registry.register({
     type: "llm.generate",
-    input: z.object({
-      providerId: z.string().min(1),
-      model: z.string().min(1),
-      messages: z.array(
-        z.object({ role: z.enum(["system", "user", "assistant"]), content: z.string() }),
-      ),
-      system: z.string().optional(),
-      temperature: z.number().min(0).max(2).optional(),
-      topK: z.number().int().positive().optional(),
-      topP: z.number().min(0).max(1).optional(),
-      maxOutputTokens: z.number().int().positive().optional(),
-    }),
+    input: z.union([GenerateNodeInput, z.object({ request: GenerateNodeInput })]),
     output: z.object({ text: z.string(), reasoning: z.string() }),
     permission: { tool: "llm.generate" },
     sideEffect: true,
-    async run(context, { providerId, ...request }) {
+    async run(context, input) {
+      const { providerId, ...request } = "request" in input ? input.request : input;
       if (!context.services.providers)
         throw new AppError(AppErrorCode.CONFLICT, "Provider service unavailable");
       const driver = await context.services.providers.text(providerId);
@@ -45,7 +48,12 @@ export function registerCoreNodes(registry: NodeRegistry): NodeRegistry {
       context.signal.throwIfAborted();
       if (!context.services.vectorStores)
         throw new AppError(AppErrorCode.CONFLICT, "Vector service unavailable");
-      const hits = await context.services.vectorStores.search(storeId, query, options);
+      const hits = await context.services.vectorStores.search(
+        storeId,
+        query,
+        options,
+        context.signal,
+      );
       context.signal.throwIfAborted();
       return hits;
     },

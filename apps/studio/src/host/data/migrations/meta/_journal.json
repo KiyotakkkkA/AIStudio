@@ -64,6 +64,13 @@
       "when": 1789256559886,
       "tag": "0008_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1789317109269,
+      "tag": "0009_chat",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { createChatService } from "../../../test/helpers/chatService.ts";
 import { createRunService } from "../../../test/helpers/runService.ts";
 import { createSystemService } from "../../../test/helpers/systemService.ts";
 import { createProviderService } from "../../../test/helpers/providerService.ts";
@@ -257,6 +258,7 @@ test("system.demoStream counts to the requested total and terminates", async () 
   const { sent, sender } = fakeSender();
   const bus = createEventBus({ senders: () => [sender] });
   const handlers = createHandlers({
+    chat: createChatService(database.client),
     runs: createRunService(database.client),
     vectorStores: createVectorStoreService(database.client),
     system: createSystemService(),

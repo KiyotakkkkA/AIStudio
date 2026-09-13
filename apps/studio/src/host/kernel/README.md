@@ -2,7 +2,7 @@
 
 `RunService` owns admission, inspection, cancellation and boot recovery. `Scheduler` runs
 one graph with one abort controller and a per-run concurrency cap. Register node definitions
-in `NodeRegistry` before calling `recover()`. Production registers `llm.generate`, `vector.search`, `flow.branch` and `flow.map`.
+in `NodeRegistry` before calling `recover()`. Production registers `llm.generate`, `vector.search`, `flow.branch`, `flow.map`, `chat.prepare` and `chat.persist`.
 
 Graph nodes have unique string IDs, a registered type, dependencies, JSON input and optional
 bindings. Ready nodes are ordered by ID. Bindings replace top-level input properties with
@@ -58,6 +58,7 @@ Core node inputs and outputs are available through `NodeRegistry.resolve`:
 - `llm.generate`: provider ID, model, messages and optional generation settings; streams text
   and reasoning token events and returns `{ text, reasoning }`. It has side effects because
   generation can incur charges or modify a provider session, so recovery never replays it.
+  It also accepts `{ request }` to bind a complete request from a preparation node.
 - `vector.search`: the shared vector search input; returns the service's validated hits.
 - `flow.branch`: `{ condition, then, else }`; returns the selected JSON value.
 - `flow.map`: `{ items, path? }`; projects an own-property path from each item, preserving
@@ -67,3 +68,40 @@ Core node inputs and outputs are available through `NodeRegistry.resolve`:
 IPC: `runs.start`, `runs.cancel`, `runs.list`, `runs.get`, `runs.steps`, `runs.approve`, `runs.deny`. Start returns
 `{ id, streamId }` before graph execution is scheduled. `wait()` is a host-only completion
 hook used by tests and callers that need to drain a run.
+
+## Chat
+
+Construct `ChatService` with the same registry and run service before recovery. A turn runs
+one `vector.search` per attached store, followed by `chat.prepare`, `llm.generate` and
+`chat.persist`. Retrieval nodes are independent and run within the kernel concurrency cap;
+no retrieval nodes exist for a conversation without stores. Embedding receives the run's
+abort signal. Native search cannot be interrupted, but cancelled results are discarded.
+
+The channels are `chat.conversations.list|get|create|remove|rename`, `chat.send` and
+`chat.cancel`. Create accepts providerId, modelId (a discovered model row ID or external ID),
+settings, systemPrompt, attachedStoreIds and an optional title. Get returns the conversation
+with ordered messages. Send accepts `{ conversationId, text }` and returns `{ id, streamId }`;
+cancel accepts `{ id }` with the run ID. Only one turn may run in a conversation at a time.
+Removal rejects active conversations and cascades messages while retaining run history.
+Missing model/provider references fail future sends while existing history stays readable.
+
+Subscribe to the returned stream immediately, append text token deltas to the pending answer,
+and refresh the conversation on `end`. Reasoning deltas are distinct from answer text.
+`RunService.subscribe` supplies synchronous host observers before renderer delivery and
+removes them on end or shutdown. Chat uses it to save each accepted token, so cancellation,
+provider failure and shutdown retain a partial answer. `chat.persist` marks a complete
+answer non-partial. Recovery never repeats a charged generation. A cancellation before
+preparation leaves only the user message.
+
+Prompt windowing reserves output capacity and always keeps the system prompt and current
+turn. If those cannot fit, send fails before creating messages or a run. Retrieved passages
+use payload.text (or a string payload); only passages that fit are included and cited.
+Citations contain storeId, documentId, sourcePath, chunkIndex and score. Remaining space
+holds a contiguous recent history, without a leading orphan assistant message. Trimming is
+logged both to the run and host log.
+
+The streaming driver port currently exposes no provider usage or tokenizer. Counts use a
+conservative UTF-8 byte estimate with message overhead and are marked `usageEstimated: true`.
+Unknown context windows use 8192; output defaults to at most 1024, the model's output limit,
+and one quarter of context. An untouched default title is derived from the first question
+after an answer arrives, without another model call. TASK_025 owns the renderer integration.

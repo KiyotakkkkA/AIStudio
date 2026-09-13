@@ -1,3 +1,4 @@
+import { createChatService } from "../../../test/helpers/chatService.ts";
 import { createRunService } from "../../../test/helpers/runService.ts";
 import { createSystemService } from "../../../test/helpers/systemService.ts";
 import { createProviderService } from "../../../test/helpers/providerService.ts";
@@ -55,6 +56,7 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
       "0006_exotic_jane_foster",
       "0007_kernel",
       "0008_permissions",
+      "0009_chat",
     ]);
     const tables = database.client.db.$client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'")
@@ -95,9 +97,12 @@ test("a backup is written before migrating and only the last three are kept", ()
           "0006_exotic_jane_foster",
           "0007_kernel",
           "0008_permissions",
+          "0009_chat",
         ]);
         if (run === 0) assert.equal(report.backup, undefined);
         else assert.equal(typeof report.backup, "string");
+        client.db.$client.exec("DROP TABLE message");
+        client.db.$client.exec("DROP TABLE conversation");
         client.db.$client.exec("DROP TABLE pending_approval");
         client.db.$client.exec("DROP TABLE permission_use");
         client.db.$client.exec("DROP TABLE tool_permission");
@@ -225,6 +230,7 @@ test("prepareDatabase opens and migrates in one step", () => {
         "0006_exotic_jane_foster",
         "0007_kernel",
         "0008_permissions",
+        "0009_chat",
       ]);
       assert.equal(prepared.client.repositories.settings.all().length, 0);
     } finally {
@@ -296,6 +302,7 @@ test("settings channels carry JSON values through the whole chain", async () => 
   try {
     const settings = new SettingService({ data: database.client, clock: createFakeClock() });
     const handlers = createHandlers({
+      chat: createChatService(database.client),
       runs: createRunService(database.client),
       vectorStores: createVectorStoreService(database.client),
       system: createSystemService(),

@@ -1,4 +1,6 @@
 import type { Contract } from "@zvs/shared";
+import type { ChatService } from "../services/ChatService.ts";
+import { createChatHandlers } from "./chat.ts";
 import type { RunService } from "../services/RunService.ts";
 import { createRunHandlers } from "./runs.ts";
 import type { IpcHandlers } from "@zvs/ipc";
@@ -18,6 +20,7 @@ import type { VectorStoreService } from "../services/VectorStoreService.ts";
 import { createVectorStoreHandlers } from "./vectorStores.ts";
 
 export interface HostIpcDependencies {
+  chat: ChatService;
   runs: RunService;
   vectorStores: VectorStoreService;
   system: SystemService;
@@ -33,6 +36,7 @@ export interface HostIpcDependencies {
 
 export function createHandlers(dependencies: HostIpcDependencies): IpcHandlers<Contract> {
   return {
+    ...createChatHandlers(dependencies.chat),
     ...createRunHandlers(dependencies.runs),
     ...createVectorStoreHandlers(dependencies.vectorStores),
     ...createSystemHandlers({

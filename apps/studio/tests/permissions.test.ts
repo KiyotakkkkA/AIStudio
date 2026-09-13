@@ -285,7 +285,7 @@ test("core vector search delegates validated options and observes cancellation",
       .resolve("vector.search")
       .execute(context, { storeId, query: "query", k: 3, minScore: 0.5 }),
   ).toEqual([]);
-  expect(search).toHaveBeenCalledWith(storeId, "query", { k: 3, minScore: 0.5 });
+  expect(search).toHaveBeenCalledWith(storeId, "query", { k: 3, minScore: 0.5 }, controller.signal);
   controller.abort();
   await expect(
     registry.resolve("vector.search").execute(context, { storeId, query: "query" }),

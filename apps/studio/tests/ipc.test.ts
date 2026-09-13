@@ -1,3 +1,4 @@
+import { createChatService } from "../../../test/helpers/chatService.ts";
 import { createRunService } from "../../../test/helpers/runService.ts";
 import { createSystemService } from "../../../test/helpers/systemService.ts";
 import { createVectorStoreService } from "../../../test/helpers/vectorStoreService.ts";
@@ -19,6 +20,7 @@ afterAll(() => database.dispose());
 
 test("system.ping echoes the host clock and matches the contract", () => {
   const handlers = createHandlers({
+    chat: createChatService(database.client),
     runs: createRunService(database.client),
     vectorStores: createVectorStoreService(database.client),
     system: createSystemService(),
@@ -39,6 +41,7 @@ test("system.ping echoes the host clock and matches the contract", () => {
 
 test("every contract channel has a handler at runtime too", () => {
   const handlers = createHandlers({
+    chat: createChatService(database.client),
     runs: createRunService(database.client),
     vectorStores: createVectorStoreService(database.client),
     system: createSystemService(),

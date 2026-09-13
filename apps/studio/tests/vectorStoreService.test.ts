@@ -14,13 +14,14 @@ import { createId } from "../src/host/platform/ids.ts";
 import { VectorStoreService } from "../src/host/services/VectorStoreService.ts";
 import { deriveVectorHealth } from "../src/host/services/vectorHealth.ts";
 import { createVectorStoreHandlers } from "../src/host/ipc/vectorStores.ts";
+import type { AiDriver } from "../src/host/drivers/ai/ports.ts";
 
 let db: TemporaryDatabase;
 let core: FakeVectorCore;
 let service: VectorStoreService;
 let input: CreateVectorStoreInput;
 const embed = vi.fn(async () => [new Float32Array([1, 0, 0])]);
-const driverSource = vi.fn(async () => ({
+const driverSource = vi.fn(async (): Promise<AiDriver> => ({
   ...createFakeDriver(),
   embedding: {
     embed,
@@ -59,6 +60,19 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 afterEach(() => db.dispose());
+
+test("cancelling retrieval aborts embedding and releases the store", async () => {
+  const store = await service.create(input);
+  const fake = createFakeDriver({ manual: true, vectors: [[1, 0, 0]] });
+  driverSource.mockResolvedValueOnce(fake);
+  const controller = new AbortController();
+  const search = service.search(store.id, "query", {}, controller.signal);
+  const rejected = expect(search).rejects.toThrow();
+  await fake.whenHolding();
+  controller.abort();
+  await rejected;
+  await expect(service.search(store.id, "query")).resolves.toEqual([]);
+});
 
 test("timed search measures embedding and native search separately", async () => {
   const store = await service.create(input);

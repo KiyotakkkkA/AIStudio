@@ -160,29 +160,35 @@ export class VectorStoreService {
     storeId: string,
     query: string,
     options: { k?: number; minScore?: number } = {},
+    signal?: AbortSignal,
   ): Promise<VectorSearchHitDto[]> {
-    return (await this.searchTimed(storeId, query, options)).hits;
+    return (await this.searchTimed(storeId, query, options, signal)).hits;
   }
 
   searchTimed(
     storeId: string,
     query: string,
     options: { k?: number; minScore?: number } = {},
+    signal?: AbortSignal,
   ): Promise<VectorSearchResultDto> {
     const input = VectorSearchInput.parse({ storeId, query, ...options });
     return this.exclusive(storeId, async () => {
+      signal?.throwIfAborted();
       const row = this.require(storeId);
       this.requireBackend(row);
       const provider = this.requireProvider(row.embeddingProviderId);
       const driver = await this.options.drivers.ephemeralDriver(provider);
+      signal?.throwIfAborted();
       if (driver.embedding === null)
         throw new AppError(AppErrorCode.CONFLICT, "Provider does not support embeddings");
       const embeddingStart = performance.now();
+      const timeout = AbortSignal.timeout((provider.settings.timeoutSeconds ?? 30) * 1000);
       const vectors = await driver.embedding.embed(
         [input.query],
         row.embeddingModelId,
-        AbortSignal.timeout((provider.settings.timeoutSeconds ?? 30) * 1000),
+        signal ? AbortSignal.any([signal, timeout]) : timeout,
       );
+      signal?.throwIfAborted();
       const embeddingMs = performance.now() - embeddingStart;
       const vector = vectors[0];
       if (
@@ -203,6 +209,7 @@ export class VectorStoreService {
         input.k,
         input.minScore,
       );
+      signal?.throwIfAborted();
       return { hits, embeddingMs, searchMs: performance.now() - searchStart };
     });
   }

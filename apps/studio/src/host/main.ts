@@ -1,4 +1,5 @@
 import { registerCoreNodes } from "./kernel/coreNodes.ts";
+import { ChatService } from "./services/ChatService.ts";
 import { app, BrowserWindow, ipcMain, net, safeStorage } from "electron";
 import { contract } from "@zvs/shared";
 import { createIpcServer } from "@zvs/ipc";
@@ -186,17 +187,20 @@ if (!app.requestSingleInstanceLock()) {
         directory: paths.vectorStoresDir,
         logger,
       });
+      const nodes = registerCoreNodes(new NodeRegistry());
       runs = new RunService({
         data: database,
         events: eventBus,
-        registry: registerCoreNodes(new NodeRegistry()),
+        registry: nodes,
         services: { providers: registry, vectorStores },
         logger,
       });
+      const chat = new ChatService({ data: database, runs, registry: nodes, logger });
       runs.recover();
       ipcServer = createIpcServer(
         contract,
         createHandlers({
+          chat,
           runs,
           vectorStores,
           events: eventBus,

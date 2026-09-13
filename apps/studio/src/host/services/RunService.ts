@@ -9,6 +9,7 @@ import {
   StepDto,
   StreamId,
   type RunHandleDto,
+  type HostEvent,
 } from "@zvs/shared";
 import type { UnitOfWork } from "../data/UnitOfWork.ts";
 import type { RunEntity } from "../data/schema/index.ts";
@@ -24,6 +25,7 @@ export interface RunServiceOptions extends Partial<Omit<SchedulerOptions, "data"
   registry: NodeRegistry;
 }
 export class RunService {
+  private readonly observers = new Map<string, Set<(event: HostEvent) => void>>();
   private readonly active = new Map<string, { scheduler: Scheduler; done: Promise<void> }>();
   private readonly options: SchedulerOptions;
   private closed = false;
@@ -113,8 +115,22 @@ export class RunService {
     return this.dependencies.events.openStream({
       id: StreamId.parse(run.streamId),
       nextSeq: runs.nextSequence(run.id),
-      record: (event) => runs.appendEvent(run.id, event),
+      record: (event) => {
+        runs.appendEvent(run.id, event);
+        for (const observer of this.observers.get(run.id) ?? []) observer(event);
+        if (event.type === "end") this.observers.delete(run.id);
+      },
     });
+  }
+  subscribe(id: string, observer: (event: HostEvent) => void): () => void {
+    this.get(id);
+    const observers = this.observers.get(id) ?? new Set<(event: HostEvent) => void>();
+    observers.add(observer);
+    this.observers.set(id, observers);
+    return () => {
+      observers.delete(observer);
+      if (!observers.size) this.observers.delete(id);
+    };
   }
   private launch(run: RunEntity, stream: StreamHandle): void {
     const scheduler = new Scheduler(run, stream, this.options);
@@ -211,5 +227,6 @@ export class RunService {
     this.closed = true;
     for (const active of this.active.values()) active.scheduler.suspend();
     await Promise.all([...this.active.values()].map((active) => active.done));
+    this.observers.clear();
   }
 }
