@@ -29,7 +29,7 @@ import {
 } from "./providerPresentation";
 import { useStore } from "../../stores/useStore";
 
-export interface ConnectionCardProps {
+interface ConnectionCardProps {
   readonly vm: ProviderFormVm;
   readonly onManageSecrets: () => void;
 }

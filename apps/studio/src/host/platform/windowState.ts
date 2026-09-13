@@ -1,6 +1,6 @@
 export const WINDOW_STATE_KEY = "window.main";
 
-export interface WindowBounds {
+interface WindowBounds {
   x?: number;
   y?: number;
   width: number;

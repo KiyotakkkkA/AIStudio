@@ -12,7 +12,7 @@ import {
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import { providerErrorCopy } from "./providerErrors";
 
-export type LinkPhase = "waiting" | "success" | "timeout" | "cancelled";
+type LinkPhase = "waiting" | "success" | "timeout" | "cancelled";
 
 export interface LinkingState {
   readonly adapter: AccountFamily;

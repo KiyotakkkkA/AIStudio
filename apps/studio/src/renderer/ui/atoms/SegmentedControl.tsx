@@ -1,6 +1,6 @@
 import { Switcher } from "@kiyotakkkka/zvs-uikit-lib";
 
-export interface SegmentedControlOption<T extends string> {
+interface SegmentedControlOption<T extends string> {
   readonly value: T;
   readonly label: string;
 }

@@ -18,7 +18,7 @@ const FILTER_LABELS: Record<ScopeFilter, string> = {
   public: "Публичные",
 };
 
-export interface SecretListProps {
+interface SecretListProps {
   readonly onSelect: (id: SecretId) => void;
   readonly onCreate: () => void;
 }

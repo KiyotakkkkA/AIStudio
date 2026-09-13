@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type ChipTone = "neutral" | "raised" | "accent" | "selected";
+type ChipTone = "neutral" | "raised" | "accent" | "selected";
 
 const TONES: Record<ChipTone, string> = {
   neutral: "bg-main-700 text-main-300",

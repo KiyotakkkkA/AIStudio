@@ -16,7 +16,7 @@ import SecretCredentialField from "./SecretCredentialField";
 import { ROTATION_OPTIONS, type SecretFormVm } from "./SecretFormVm";
 import { maskedHint, SCOPE_OPTIONS } from "./secretPresentation";
 
-export interface SecretFormProps {
+interface SecretFormProps {
   readonly vm: SecretFormVm;
   readonly hint: string | null;
   readonly saving: boolean;

@@ -10,7 +10,7 @@ export interface ChatMessage {
   readonly content: string;
 }
 
-export interface GenerationSettings {
+interface GenerationSettings {
   readonly temperature?: number;
   readonly topK?: number;
   readonly topP?: number;

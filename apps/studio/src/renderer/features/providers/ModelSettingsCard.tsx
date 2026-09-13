@@ -5,7 +5,7 @@ import Field from "../../ui/molecules/Field";
 import { SETTING_BOUNDS, type ProviderFormVm } from "./ProviderFormVm";
 import { PARAMETER_LABELS } from "./providerPresentation";
 
-export interface ModelSettingsCardProps {
+interface ModelSettingsCardProps {
   readonly vm: ProviderFormVm;
 }
 

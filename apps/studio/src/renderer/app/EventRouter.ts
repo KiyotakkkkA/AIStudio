@@ -1,10 +1,10 @@
 import { HostEvent, type StreamId } from "@zvs/shared";
 
 export type RoutedEvent = HostEvent & { readonly gap?: number };
-export type EventHandler = (event: RoutedEvent) => void;
-export type EventSource = (handler: (payload: unknown) => void) => () => void;
+type EventHandler = (event: RoutedEvent) => void;
+type EventSource = (handler: (payload: unknown) => void) => () => void;
 
-export interface RouterLogger {
+interface RouterLogger {
   log(
     level: "debug" | "warn",
     scope: string,

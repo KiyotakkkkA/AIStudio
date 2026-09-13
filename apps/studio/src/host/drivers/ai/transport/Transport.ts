@@ -1,4 +1,4 @@
-export type RequestMethod = "GET" | "POST" | "DELETE";
+type RequestMethod = "GET" | "POST" | "DELETE";
 
 export interface RequestSpec {
   readonly method: RequestMethod;

@@ -17,7 +17,7 @@ import {
   providersWord,
 } from "./accountPresentation";
 
-export interface AccountCardProps {
+interface AccountCardProps {
   readonly account: AccountDto;
   readonly now: number;
   readonly checking: boolean;

@@ -15,7 +15,7 @@ import {
   summaryLine,
 } from "./providerPresentation";
 
-export interface ProviderListProps {
+interface ProviderListProps {
   readonly onSelect: (id: ProviderId) => void;
   readonly onCreate: () => void;
 }

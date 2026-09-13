@@ -1,7 +1,5 @@
 import { STATUS_TONE_BACKGROUNDS, type StatusTone } from "./statusTone";
 
-export type { StatusTone };
-
 export interface StatusDotProps {
   readonly tone: StatusTone;
   readonly title?: string;

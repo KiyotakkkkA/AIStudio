@@ -5,7 +5,7 @@ import TextInput from "../../ui/atoms/TextInput";
 import Field from "../../ui/molecules/Field";
 import type { SecretFormVm } from "./SecretFormVm";
 
-export interface SecretCredentialFieldProps {
+interface SecretCredentialFieldProps {
   readonly field: FieldDescriptor;
   readonly vm: SecretFormVm;
 }

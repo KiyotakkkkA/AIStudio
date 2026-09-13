@@ -16,8 +16,6 @@ export type ProbeOutcome =
   | { readonly kind: "rate-limited"; readonly retryAfter?: number }
   | { readonly kind: "error"; readonly code: AppErrorCode; readonly detail: string };
 
-export type ProbeOutcomeKind = ProbeOutcome["kind"];
-
 export function succeeded(outcome: ProbeOutcome): boolean {
   return outcome.kind === "ok" || outcome.kind === "ok-empty";
 }

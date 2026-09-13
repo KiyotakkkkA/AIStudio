@@ -5,7 +5,7 @@ import type { ProbeOutcome } from "./probeOutcome.ts";
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const CREDENTIAL_SOURCES = ["secret", "account"] as const;
-export type CredentialSource = (typeof CREDENTIAL_SOURCES)[number];
+type CredentialSource = (typeof CREDENTIAL_SOURCES)[number];
 
 export interface CredentialLifetime {
   readonly source: CredentialSource;

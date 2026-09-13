@@ -17,10 +17,9 @@ export { SettingRepository } from "./SettingRepository.ts";
 export type { SecretDraft, SecretFilter, SecretPatch } from "./SecretRepository.ts";
 export { ProviderRepository } from "./ProviderRepository.ts";
 export { ModelRepository } from "./ModelRepository.ts";
-export type { ProviderDraft, ProviderFilter, ProviderPatch } from "./ProviderRepository.ts";
-export type { DiscoveredModel } from "./ModelRepository.ts";
+export type { ProviderDraft, ProviderPatch } from "./ProviderRepository.ts";
 export { AccountRepository } from "./AccountRepository.ts";
-export type { AccountDraft, AccountPatch, AccountRemoval } from "./AccountRepository.ts";
+export type { AccountDraft } from "./AccountRepository.ts";
 
 export interface Repositories {
   readonly chat: ChatRepository;

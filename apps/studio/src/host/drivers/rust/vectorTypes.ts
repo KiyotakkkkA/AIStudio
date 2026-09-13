@@ -2,8 +2,7 @@ import { z } from "zod";
 
 export const defaultVectorStore = { dimension: 1024, metric: "cosine" } as const;
 export type VectorMetric = "cosine" | "l2" | "dot";
-export type JsonValue =
-  null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
+type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
 export interface VectorRow {
   id: string;

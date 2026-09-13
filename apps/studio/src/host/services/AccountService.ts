@@ -21,7 +21,7 @@ import type { EventBus } from "../platform/events.ts";
 import type { Logger } from "../platform/logger.ts";
 import type { SecretService } from "./SecretService.ts";
 
-export interface AccountBrowserOpener {
+interface AccountBrowserOpener {
   openTab(url: string): void;
 }
 

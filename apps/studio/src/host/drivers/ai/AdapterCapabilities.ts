@@ -7,7 +7,7 @@ import {
 } from "@zvs/shared";
 
 export { ADAPTER_FAMILIES, TUNABLE_PARAMETERS };
-export type { AdapterFamily, AuthMode, TunableParameter };
+export type { AuthMode, TunableParameter };
 
 export interface AdapterCapabilities {
   readonly family: AdapterFamily;
