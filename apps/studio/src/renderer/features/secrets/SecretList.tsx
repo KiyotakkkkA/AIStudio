@@ -1,4 +1,5 @@
 import { mdiKeyPlus, mdiPlus } from "@mdi/js";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { observer } from "mobx-react-lite";
 import type { SecretId } from "@zvs/shared";
 import Chip from "../../ui/atoms/Chip";
@@ -42,7 +43,7 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
         ))}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-0.5">
+      <ScrollArea className="flex min-h-0 flex-1 flex-col gap-2 pr-0.5">
         {secrets.loading && secrets.summaries.length === 0 ? (
           <>
             <ListRowSkeleton />
@@ -94,7 +95,7 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
             Секреты хранятся локально и не покидают внутренний контур приложения.
           </span>
         </ListRow>
-      </div>
+      </ScrollArea>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Icon from "../atoms/Icon";
 
 export interface PageShellProps {
@@ -39,9 +40,9 @@ export default function PageShell({
           {toolbar}
         </div>
       ) : null}
-      <div className="flex min-h-0 flex-1 flex-col gap-4.5 overflow-auto px-5 py-4.5">
+      <ScrollArea className="flex min-h-0 flex-1 flex-col gap-4.5 px-5 py-4.5">
         {children}
-      </div>
+      </ScrollArea>
     </div>
   );
 }

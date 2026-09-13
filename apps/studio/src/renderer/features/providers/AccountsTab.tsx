@@ -1,5 +1,5 @@
 import { mdiAccountCircleOutline } from "@mdi/js";
-import { Loader } from "@kiyotakkkka/zvs-uikit-lib";
+import { Loader, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
 import type { AccountFamily } from "@zvs/shared";
@@ -110,7 +110,7 @@ function AccountsTab() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-0.5">
+      <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 pr-0.5">
         {accounts.loading && accounts.accounts.length === 0 ? (
           <>
             <ListRowSkeleton />
@@ -150,7 +150,7 @@ function AccountsTab() {
             />
           ))}
         </div>
-      </div>
+      </ScrollArea>
     </div>
   );
 }

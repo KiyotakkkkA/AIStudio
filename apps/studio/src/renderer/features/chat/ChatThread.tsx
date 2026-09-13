@@ -137,8 +137,6 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                 storeIds={store.active?.attachedStoreIds ?? []}
                 stores={store.stores}
                 partial={message.partial}
-                onEdit={() => store.composer.setText(message.content)}
-                onDelete={() => void store.deleteMessage(message.id)}
                 usage={`${message.usageEstimated ? "~" : ""}${message.tokensIn} вход. · ${message.tokensOut} выход. · ${(message.durationMs / 1000).toFixed(1)} с`}
               />
             ),

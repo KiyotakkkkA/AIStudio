@@ -1,5 +1,5 @@
 import { mdiCubeOutline } from "@mdi/js";
-import { InputCheckBox } from "@kiyotakkkka/zvs-uikit-lib";
+import { InputCheckBox, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { observer } from "mobx-react-lite";
 import Chip from "../../ui/atoms/Chip";
 import TextInput from "../../ui/atoms/TextInput";
@@ -69,7 +69,7 @@ function ModelGrid() {
           Ничего не найдено по фильтру.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-2.5 overflow-y-auto xl:grid-cols-3">
+        <ScrollArea className="grid grid-cols-2 gap-2.5 xl:grid-cols-3">
           {rows.map((row) => (
             <ModelCard
               key={row.key}
@@ -82,7 +82,7 @@ function ModelGrid() {
               }}
             />
           ))}
-        </div>
+        </ScrollArea>
       )}
     </section>
   );

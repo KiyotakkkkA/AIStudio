@@ -1,5 +1,6 @@
 import { mdiLayersOutline, mdiPlus } from "@mdi/js";
 import { observer } from "mobx-react-lite";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import type { ProviderId } from "@zvs/shared";
 import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
@@ -28,7 +29,7 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
         {CAPABILITY_LIST_HEADINGS[providers.capability]}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-0.5">
+      <ScrollArea className="flex min-h-0 flex-1 flex-col gap-2 pr-0.5">
         {providers.loading && providers.summaries.length === 0 ? (
           <>
             <ListRowSkeleton />
@@ -91,7 +92,7 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
           <span className="font-medium text-main-300">Добавить подключение</span>
           <span className="truncate text-[11px] text-main-400">Подключения хранятся локально.</span>
         </ListRow>
-      </div>
+      </ScrollArea>
     </div>
   );
 }

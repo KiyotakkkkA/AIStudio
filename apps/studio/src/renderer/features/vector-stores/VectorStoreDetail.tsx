@@ -1,5 +1,6 @@
 import { mdiDatabaseOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import useStore from "../../stores/useStore";
 import Button from "../../ui/atoms/Button";
 import Chip from "../../ui/atoms/Chip";
@@ -150,7 +151,7 @@ function VectorStoreDetail() {
         {store.tab === "Test search" ? (
           <VectorSearchPanel />
         ) : (
-          <div role="tabpanel" className="space-y-3 overflow-auto p-4 text-xs text-main-300">
+          <ScrollArea role="tabpanel" className="space-y-3 p-4 text-xs text-main-300">
             {store.tab === "Documents" ? (
               <p>Управление документами и загрузка файлов появятся в TASK_028.</p>
             ) : store.tab === "Settings" ? (
@@ -183,7 +184,7 @@ function VectorStoreDetail() {
                 </p>
               </>
             )}
-          </div>
+          </ScrollArea>
         )}
       </div>
     </div>

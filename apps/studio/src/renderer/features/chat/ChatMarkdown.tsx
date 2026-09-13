@@ -1,6 +1,7 @@
 import { Children, isValidElement, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { CodeView } from "@kiyotakkkka/zvs-uikit-lib/code-view";
 
 export default function ChatMarkdown({ content }: { readonly content: string }) {
@@ -17,9 +18,9 @@ export default function ChatMarkdown({ content }: { readonly content: string }) 
             const code = String(child.props.children ?? "").replace(/\n$/, "");
             const language = /language-([\w+-]+)/.exec(child.props.className ?? "")?.[1] ?? "text";
             return (
-              <div className="min-w-0 max-w-full overflow-x-auto">
+              <ScrollArea orientation="horizontal" className="min-w-0 max-w-full">
                 <CodeView code={code} language={language} downloadable={false} />
-              </div>
+              </ScrollArea>
             );
           },
           a({ children }) {

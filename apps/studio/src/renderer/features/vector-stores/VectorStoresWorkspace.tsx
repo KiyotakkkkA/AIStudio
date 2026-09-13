@@ -1,5 +1,6 @@
 import { mdiDatabaseOutline, mdiMagnify, mdiPlus, mdiRefresh } from "@mdi/js";
 import { observer } from "mobx-react-lite";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useEffect } from "react";
 import useStore from "../../stores/useStore";
 import PageShell from "../../ui/templates/PageShell";
@@ -72,7 +73,7 @@ function VectorStoresWorkspace() {
           <div className="flex-none px-0.5 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
             Хранилища
           </div>
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-0.5">
+          <ScrollArea className="flex min-h-0 flex-1 flex-col gap-2 pr-0.5">
             {store.loading && !store.loaded ? (
               <>
                 <ListRowSkeleton />
@@ -131,7 +132,7 @@ function VectorStoresWorkspace() {
               <span className="font-medium text-main-300">Подключить хранилище</span>
               <span className="text-[11px] text-main-400">Документы хранятся локально.</span>
             </ListRow>
-          </div>
+          </ScrollArea>
         </aside>
         {store.form ? <VectorStoreForm /> : <VectorStoreDetail />}
       </div>

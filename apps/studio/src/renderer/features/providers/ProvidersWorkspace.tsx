@@ -1,5 +1,6 @@
 import { mdiDeleteOutline, mdiImageOutline, mdiLayersOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useEffect } from "react";
 import Button from "../../ui/atoms/Button";
 import Icon from "../../ui/atoms/Icon";
@@ -61,7 +62,7 @@ function ProvidersWorkspace() {
             />
           </div>
         ) : (
-          <div className="flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto">
+          <ScrollArea className="flex min-w-0 flex-1 flex-col gap-3.5">
             <div className="flex flex-none flex-col gap-3.5 xl:flex-row">
               <ConnectionCard
                 vm={form}
@@ -130,7 +131,7 @@ function ProvidersWorkspace() {
                 {providers.saving ? "Сохранение…" : "Сохранить подключение"}
               </Button>
             </div>
-          </div>
+          </ScrollArea>
         )}
       </div>
 

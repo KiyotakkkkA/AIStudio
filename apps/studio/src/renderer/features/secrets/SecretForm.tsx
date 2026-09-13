@@ -1,5 +1,6 @@
 import { mdiDeleteOutline, mdiLockOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import type { SecretTypeKey } from "@zvs/shared";
 import Button from "../../ui/atoms/Button";
 import Chip from "../../ui/atoms/Chip";
@@ -68,7 +69,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
         )}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4.5">
+      <ScrollArea className="flex min-h-0 flex-1 flex-col gap-5 p-4.5">
         {vm.banner === null ? null : (
           <p
             role="alert"
@@ -207,7 +208,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
             />
           </Field>
         </section>
-      </div>
+      </ScrollArea>
 
       <div className="flex flex-none items-center gap-3 border-t border-main-700 px-4.5 py-3.5">
         <Icon path={mdiLockOutline} size={15} className="flex-none text-ok" />

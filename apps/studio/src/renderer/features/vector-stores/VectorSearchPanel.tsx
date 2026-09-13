@@ -1,4 +1,5 @@
 import { observer } from "mobx-react-lite";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import useStore from "../../stores/useStore";
 import Button from "../../ui/atoms/Button";
 import Chip from "../../ui/atoms/Chip";
@@ -74,7 +75,7 @@ function VectorSearchPanel() {
           Нет результатов выше порога. Попробуйте снизить минимальную оценку или изменить запрос.
         </p>
       ) : null}
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+      <ScrollArea className="flex min-h-0 flex-1 flex-col gap-2">
         {store.rows.map((row) => (
           <article
             key={row.id}
@@ -97,7 +98,7 @@ function VectorSearchPanel() {
             </div>
           </article>
         ))}
-      </div>
+      </ScrollArea>
     </div>
   );
 }

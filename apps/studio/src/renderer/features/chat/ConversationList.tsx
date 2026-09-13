@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { mdiDotsVertical } from "@mdi/js";
-import { Dropdown, Modal } from "@kiyotakkkka/zvs-uikit-lib";
+import { Dropdown, Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useState } from "react";
 import Button from "../../ui/atoms/Button";
 import Icon from "../../ui/atoms/Icon";
@@ -49,7 +49,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
           onChange={(event) => store.setQuery(event.target.value)}
         />
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+      <ScrollArea className="min-h-0 flex-1 px-2 pb-3">
         {groups.map(
           (group) =>
             group.rows.length > 0 && (
@@ -117,7 +117,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
             {store.query ? "Подходящих диалогов нет." : "Здесь появятся ваши диалоги."}
           </p>
         )}
-      </div>
+      </ScrollArea>
       <Modal
         open={renameTarget !== null}
         onClose={() => setRenameTarget(null)}

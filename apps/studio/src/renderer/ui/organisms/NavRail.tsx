@@ -1,4 +1,5 @@
 import { mdiCogOutline, mdiDockLeft, mdiLightningBolt } from "@mdi/js";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Icon from "../atoms/Icon";
 import NavRailItem from "../molecules/NavRailItem";
 import type { NavGroupModel, NavItemModel, RailIdentity } from "./NavRailTypes";
@@ -59,34 +60,36 @@ export default function NavRail({
         )}
       </div>
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 py-3">
-        {groups.map((group, index) => (
-          <div key={group.id} className="flex flex-col gap-0.5">
-            {collapsed ? (
-              index === 0 ? null : (
-                <div className="my-1.75 h-px bg-main-800" />
-              )
-            ) : (
-              <div
-                className={`px-2 pb-1.5 text-[10px] font-medium tracking-[0.09em] text-main-500 uppercase ${
-                  index === 0 ? "" : "mt-3.5"
-                }`}
-              >
-                {group.label}
-              </div>
-            )}
-            {group.items.map((item) => (
-              <NavRailItem
-                key={item.id}
-                item={item}
-                active={isActive(item)}
-                collapsed={collapsed}
-                onSelect={onSelect}
-              />
-            ))}
-          </div>
-        ))}
-      </nav>
+      <ScrollArea className="min-h-0 flex-1 px-2.5 py-3">
+        <nav className="flex flex-col gap-0.5">
+          {groups.map((group, index) => (
+            <div key={group.id} className="flex flex-col gap-0.5">
+              {collapsed ? (
+                index === 0 ? null : (
+                  <div className="my-1.75 h-px bg-main-800" />
+                )
+              ) : (
+                <div
+                  className={`px-2 pb-1.5 text-[10px] font-medium tracking-[0.09em] text-main-500 uppercase ${
+                    index === 0 ? "" : "mt-3.5"
+                  }`}
+                >
+                  {group.label}
+                </div>
+              )}
+              {group.items.map((item) => (
+                <NavRailItem
+                  key={item.id}
+                  item={item}
+                  active={isActive(item)}
+                  collapsed={collapsed}
+                  onSelect={onSelect}
+                />
+              ))}
+            </div>
+          ))}
+        </nav>
+      </ScrollArea>
 
       <div
         className={`flex flex-none items-center gap-2.5 border-t border-main-800 p-2.5 ${
