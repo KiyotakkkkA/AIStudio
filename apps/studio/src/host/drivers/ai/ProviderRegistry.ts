@@ -2,6 +2,7 @@ import { AppError, AppErrorCode } from "@zvs/shared";
 import type { AccountEntity, ProviderEntity } from "../../data/schema/index.ts";
 import type { Logger } from "../../platform/logger.ts";
 import { adapterEntry, type AdapterContext } from "./adapters/index.ts";
+import { OllamaAdapter, OLLAMA_CAPABILITIES } from "./adapters/ollama.ts";
 import { supportsAuthMode, type AdapterCapabilities } from "./AdapterCapabilities.ts";
 import { sessionExpired } from "./errors.ts";
 import type { AiDriver, EmbeddingDriver, ImageDriver, TextGenerationDriver } from "./ports.ts";
@@ -66,7 +67,8 @@ export class ProviderRegistry {
   }
 
   capabilities(providerId: string): AdapterCapabilities {
-    return adapterEntry(this.#row(providerId).adapter).capabilities;
+    const row = this.#row(providerId);
+    return row.kind === "ollama" ? OLLAMA_CAPABILITIES : adapterEntry(row.adapter).capabilities;
   }
 
   async driver(providerId: string): Promise<AiDriver> {
@@ -86,6 +88,10 @@ export class ProviderRegistry {
   }
 
   async ephemeralDriver(row: ProviderEntity): Promise<AiDriver> {
+    if (row.kind === "ollama") {
+      const transport = await this.#transport(row);
+      return { text: new OllamaAdapter(transport, this.#logger), embedding: null, image: null };
+    }
     const entry = adapterEntry(row.adapter);
     this.#requireAuthMode(entry.capabilities, row);
     const transport = await this.#transport(row);

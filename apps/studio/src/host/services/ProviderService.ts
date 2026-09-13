@@ -89,8 +89,8 @@ export class ProviderService {
       .map((row) => toSummaryDto(this.#accountStatus(row), this.#countModels(row.id)));
   }
 
-  get(id: string): ProviderDto {
-    return this.#toDto(this.#require(id));
+  get(id: string, selectedOnly = false): ProviderDto {
+    return this.#toDto(this.#require(id), selectedOnly);
   }
 
   create(input: CreateProviderInput): ProviderDto {
@@ -316,8 +316,8 @@ export class ProviderService {
     return this.#repositories.accounts.getById(accountId);
   }
 
-  #toDto(row: ProviderEntity): ProviderDto {
-    const models = this.#repositories.models.listByProvider(row.id);
+  #toDto(row: ProviderEntity, selectedOnly = false): ProviderDto {
+    const models = this.#repositories.models.listByProvider(row.id, selectedOnly);
     const account = row.accountId === null ? undefined : this.#account(row.accountId);
     return {
       ...toSummaryDto(this.#accountStatus(row), models.length),

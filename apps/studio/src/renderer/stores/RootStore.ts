@@ -7,6 +7,7 @@ import { ProviderStore } from "../features/providers/ProviderStore";
 import { SecretStore } from "../features/secrets/SecretStore";
 import { UiStore } from "./UiStore";
 import VectorStoreStore from "../features/vector-stores/VectorStoreStore";
+import ChatStore from "../features/chat/ChatStore";
 
 export interface RootStoreEnvironment {
   readonly ipc: IpcClient<Contract>;
@@ -19,6 +20,7 @@ export class RootStore {
   readonly providers: ProviderStore;
   readonly accounts: AccountStore;
   readonly vectorStores: VectorStoreStore;
+  readonly chat: ChatStore;
 
   constructor(private readonly environment: RootStoreEnvironment) {
     this.ui = new UiStore(environment.ipc);
@@ -26,6 +28,7 @@ export class RootStore {
     this.providers = new ProviderStore(environment.ipc);
     this.accounts = new AccountStore(environment);
     this.vectorStores = new VectorStoreStore(environment.ipc);
+    this.chat = new ChatStore(environment.ipc, environment.events);
     makeAutoObservable<RootStore, "environment">(
       this,
       {
@@ -35,6 +38,7 @@ export class RootStore {
         providers: false,
         accounts: false,
         vectorStores: false,
+        chat: false,
       },
       { autoBind: true },
     );
@@ -54,6 +58,7 @@ export class RootStore {
 
   dispose(): void {
     this.accounts.dispose();
+    this.chat.dispose();
     this.environment.events.dispose();
   }
 }

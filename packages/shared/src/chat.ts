@@ -58,4 +58,8 @@ export type ConversationDetailDto = z.infer<typeof ConversationDetailDto>;
 export const ChatSendInput = z.object({
   conversationId: ConversationId,
   text: z.string().trim().min(1).max(100000),
+  providerId: ProviderId.optional(),
+  modelId: z.string().min(1).optional(),
+  settings: ChatSettings.optional(),
 });
+export type ChatSendInput = z.infer<typeof ChatSendInput>;

@@ -91,7 +91,9 @@ function VectorSearchPanel() {
                 <span className="break-all font-mono text-[11.5px] text-main-300">{row.path}</span>
                 <Chip>чанк {row.position}</Chip>
               </div>
-              <p className="whitespace-pre-wrap wrap-break-word text-xs text-main-300">{row.text}</p>
+              <p className="whitespace-pre-wrap wrap-break-word text-xs text-main-300">
+                {row.text}
+              </p>
             </div>
           </article>
         ))}

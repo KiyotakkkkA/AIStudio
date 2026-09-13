@@ -1,4 +1,4 @@
-import { mdiMagnify, mdiPlus } from "@mdi/js";
+import { mdiPlus } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import Button from "../../ui/atoms/Button";
 import Icon from "../../ui/atoms/Icon";
@@ -14,10 +14,10 @@ function SecretsHeaderActions() {
     <div className="flex flex-none items-center gap-3">
       <div className="w-60">
         <TextInput
+          preset="search"
           value={secrets.query}
           placeholder="Поиск секретов…"
           aria-label="Поиск секретов"
-          leading={<Icon path={mdiMagnify} size={15} className="flex-none text-main-500" />}
           onChange={(event) => {
             secrets.setQuery(event.target.value);
           }}

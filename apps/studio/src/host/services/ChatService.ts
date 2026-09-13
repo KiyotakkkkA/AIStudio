@@ -34,7 +34,19 @@ export class ChatService {
     options.registry.register({
       type: "chat.prepare",
       input: z
-        .object({ conversationId: z.string(), userId: z.string(), assistantId: z.string() })
+        .object({
+          conversationId: z.string(),
+          userId: z.string(),
+          assistantId: z.string(),
+          providerId: z.string(),
+          modelId: z.string(),
+          settings: z.object({
+            temperature: z.number().optional(),
+            topK: z.number().int().positive().optional(),
+            topP: z.number().optional(),
+            maxOutputTokens: z.number().int().positive().optional(),
+          }),
+        })
         .catchall(z.array(VectorSearchHitDto)),
       output: GenerateNodeInput,
       permission: { kind: "none" },
@@ -45,7 +57,12 @@ export class ChatService {
         this.requireTurn(context.runId, input.conversationId, input.userId);
         const user = conversation.messages.find((message) => message.id === input.userId)!;
         const history = conversation.messages.slice(0, conversation.messages.indexOf(user));
-        const model = this.resolveModel(conversation);
+        const model = this.resolveModel(
+          conversation,
+          input.providerId ?? conversation.providerId,
+          input.modelId ?? conversation.modelId,
+          input.settings,
+        );
         const sources = conversation.attachedStoreIds.flatMap((storeId, index) =>
           (input[`store${index}`] ?? []).map((hit) => ({ storeId, hit })),
         );
@@ -85,7 +102,7 @@ export class ChatService {
           model: model.externalId,
           messages: prepared.messages,
           system: conversation.systemPrompt,
-          ...conversation.settings,
+          ...input.settings,
           maxOutputTokens: model.maxOutputTokens,
         };
       },
@@ -152,11 +169,18 @@ export class ChatService {
     this.requireIdle(id);
     this.options.data.repositories.chat.remove(id);
   }
-  sendMessage(conversationId: string, text: string): RunHandleDto {
-    const input = ChatSendInput.parse({ conversationId, text });
+  sendMessage(
+    conversationId: string,
+    text: string,
+    selection: Pick<ChatSendInput, "providerId" | "modelId" | "settings"> = {},
+  ): RunHandleDto {
+    const input = ChatSendInput.parse({ conversationId, text, ...selection });
     const conversation = this.get(conversationId);
     this.requireIdle(conversationId);
-    const model = this.resolveModel(conversation);
+    const providerId = input.providerId ?? conversation.providerId;
+    const modelId = input.modelId ?? conversation.modelId;
+    const settings = input.settings ?? conversation.settings;
+    const model = this.resolveModel(conversation, providerId, modelId, settings);
     windowChatHistory(
       conversation.systemPrompt,
       [],
@@ -178,7 +202,7 @@ export class ChatService {
           id: "prepare",
           type: "chat.prepare",
           dependencies: retrieval.map((node) => node.id),
-          input: { conversationId, userId, assistantId },
+          input: { conversationId, userId, assistantId, providerId, modelId, settings },
           bindings: Object.fromEntries(
             retrieval.map((node) => [node.id, { source: "node", nodeId: node.id }]),
           ),
@@ -272,21 +296,24 @@ export class ChatService {
     )
       throw new AppError(AppErrorCode.CONFLICT, "Invalid chat turn");
   }
-  private resolveModel(conversation: CreateConversationInput) {
+  private resolveModel(
+    conversation: CreateConversationInput,
+    providerId: string = conversation.providerId,
+    modelId = conversation.modelId,
+    settings = conversation.settings,
+  ) {
     const repositories = this.options.data.repositories;
-    const provider = repositories.providers.findById(conversation.providerId);
+    const provider = repositories.providers.findById(providerId);
     if (!provider?.enabled || !provider.capabilities.includes("text"))
       throw new AppError(AppErrorCode.VALIDATION_FAILED, "Text provider unavailable");
     const model = repositories.models
       .listByProvider(provider.id)
-      .find(
-        (model) => model.id === conversation.modelId || model.externalId === conversation.modelId,
-      );
+      .find((model) => model.id === modelId || model.externalId === modelId);
     if (!model?.available)
       throw new AppError(AppErrorCode.VALIDATION_FAILED, "Text model unavailable");
     const contextWindow = model.contextWindow ?? 8192;
     const maxOutputTokens =
-      conversation.settings.maxOutputTokens ??
+      settings.maxOutputTokens ??
       Math.min(model.maxOutput ?? 1024, Math.max(1, Math.floor(contextWindow / 4)));
     if (
       maxOutputTokens >= contextWindow ||

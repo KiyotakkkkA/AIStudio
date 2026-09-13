@@ -84,7 +84,6 @@ function ModelSettingsCard({ vm }: ModelSettingsCardProps) {
             max={SETTING_BOUNDS.maxOutputTokens.max}
             disabled={!vm.honours("maxOutputTokens")}
             value={String(vm.settingOf("maxOutputTokens"))}
-            trailing={<span className="text-[11px] text-main-500">ток</span>}
             onChange={(event) => {
               vm.setSetting("maxOutputTokens", numberOrNull(event.target.value));
             }}
@@ -98,7 +97,6 @@ function ModelSettingsCard({ vm }: ModelSettingsCardProps) {
             min={SETTING_BOUNDS.timeoutSeconds.min}
             max={SETTING_BOUNDS.timeoutSeconds.max}
             value={String(vm.settingOf("timeoutSeconds"))}
-            trailing={<span className="text-[11px] text-main-500">с</span>}
             onChange={(event) => {
               vm.setSetting("timeoutSeconds", numberOrNull(event.target.value));
             }}

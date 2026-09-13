@@ -1,4 +1,4 @@
-import { Select, type SelectOption } from "@kiyotakkkka/zvs-uikit-lib";
+import { Select, type PositionAnchor, type SelectOption } from "@kiyotakkkka/zvs-uikit-lib";
 
 export interface SelectInputProps {
   readonly value: string;
@@ -8,6 +8,7 @@ export interface SelectInputProps {
   readonly placeholder?: string;
   readonly invalid?: boolean;
   readonly disabled?: boolean;
+  readonly menuPlacement?: PositionAnchor;
 }
 
 export default function SelectInput({
@@ -18,6 +19,7 @@ export default function SelectInput({
   placeholder,
   invalid = false,
   disabled = false,
+  menuPlacement = "bottom-left",
 }: SelectInputProps) {
   const trigger = [
     "h-[34px] w-full gap-[8px] rounded-[6px] bg-main-900 px-[10px] py-0 text-[12.5px] text-main-100",
@@ -32,6 +34,7 @@ export default function SelectInput({
       placeholder={placeholder}
       disabled={disabled}
       className="w-full"
+      menuPlacement={menuPlacement}
     >
       <Select.Trigger className={trigger} rounded="" />
       <Select.Menu label={label} rounded="rounded-md">

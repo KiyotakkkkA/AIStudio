@@ -1,4 +1,4 @@
-import { mdiContentCopy, mdiDeleteOutline, mdiLockOutline } from "@mdi/js";
+import { mdiDeleteOutline, mdiLockOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import type { SecretTypeKey } from "@zvs/shared";
 import Button from "../../ui/atoms/Button";
@@ -144,7 +144,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
             >
               <TextInput
                 id="secret-value"
-                type="password"
+                preset="password"
                 autoComplete="off"
                 spellCheck={false}
                 mono
@@ -154,20 +154,6 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
                 onChange={(event) => {
                   vm.setValue(event.target.value);
                 }}
-                trailing={
-                  hint === null ? null : (
-                    <button
-                      type="button"
-                      title="Скопировать маску значения"
-                      className="flex-none text-main-400 hover:text-main-100"
-                      onClick={() => {
-                        void navigator.clipboard?.writeText(hint);
-                      }}
-                    >
-                      <Icon path={mdiContentCopy} size={15} />
-                    </button>
-                  )
-                }
               />
             </Field>
           )}

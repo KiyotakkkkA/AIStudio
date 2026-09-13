@@ -58,7 +58,7 @@ export const PARAMETER_LABELS = {
 } as const;
 
 const KIND_BASE_URLS: Record<ProviderKind, string> = {
-  ollama: "https://ollama.com/v1",
+  ollama: "https://ollama.com/api",
   openrouter: "https://openrouter.ai/api/v1",
   mistral: "https://api.mistral.ai/v1",
   "openai-compatible": "",

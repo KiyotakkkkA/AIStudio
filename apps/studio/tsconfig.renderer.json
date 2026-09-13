@@ -4,7 +4,7 @@
     "composite": true,
     "noEmit": true,
     "rootDir": "src/renderer",
-    "lib": ["ES2023", "ESNext.Collection", "DOM", "DOM.Iterable"],
+    "lib": ["ES2023", "ESNext.Collection", "ESNext.Disposable", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "types": ["vite/client"]
   },

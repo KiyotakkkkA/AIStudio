@@ -38,7 +38,7 @@ export function createProviderHandlers(providers: ProviderService): ProviderHand
 
     "providers.list": (filter) => providers.list(filter),
 
-    "providers.get": ({ id }) => providers.get(id),
+    "providers.get": ({ id, selectedOnly }) => providers.get(id, selectedOnly),
 
     "providers.create": (input) => providers.create(input),
 

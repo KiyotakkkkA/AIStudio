@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { AppError, AppErrorCode } from "@zvs/shared";
 import { model, provider, type ModelEntity, type ModelInsert } from "../schema/index.ts";
 import { createId } from "../../platform/ids.ts";
@@ -7,7 +7,19 @@ import { Repository } from "./Repository.ts";
 export type DiscoveredModel = Omit<ModelInsert, "id" | "providerId">;
 
 export class ModelRepository extends Repository {
-  listByProvider(providerId: string): ModelEntity[] {
+  listByProvider(providerId: string, selectedOnly = false): ModelEntity[] {
+    if (selectedOnly) {
+      return this.db
+        .select({ model })
+        .from(model)
+        .innerJoin(provider, eq(model.providerId, provider.id))
+        .where(
+          sql`${provider.id} = ${providerId} AND EXISTS (SELECT 1 FROM json_each(${provider.settings}, '$.selectedModelIds') WHERE value = ${model.externalId})`,
+        )
+        .orderBy(asc(model.externalId))
+        .all()
+        .map((row) => row.model);
+    }
     return this.db
       .select()
       .from(model)

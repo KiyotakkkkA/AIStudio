@@ -28,9 +28,9 @@ function VectorStoresWorkspace() {
         <div className="flex flex-none items-center gap-3">
           <div className="w-60">
             <TextInput
+              preset="search"
               aria-label="Поиск хранилищ"
               placeholder="Поиск хранилищ…"
-              leading={<Icon path={mdiMagnify} size={15} className="flex-none text-main-500" />}
               value={store.filter}
               onChange={(e) => store.set("filter", e.target.value)}
             />

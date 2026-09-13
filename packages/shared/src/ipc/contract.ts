@@ -163,7 +163,7 @@ export const contract = defineContract({
     output: z.array(ProviderSummaryDto),
   },
   "providers.get": {
-    input: ProviderRef,
+    input: ProviderRef.extend({ selectedOnly: z.boolean().optional() }),
     output: ProviderDto,
   },
   "providers.create": {

@@ -4,10 +4,6 @@ import { useStore } from "../../stores/useStore";
 const DEMO_STEPS = 5;
 const IDLE = "—";
 
-/**
- * A live round trip to the host, kept on the Settings page so the end-to-end smoke test
- * can assert that IPC and the event channel work in the app that actually ships.
- */
 export default function HostCheck() {
   const { ipc, events } = useStore();
   const [ping, setPing] = useState(IDLE);

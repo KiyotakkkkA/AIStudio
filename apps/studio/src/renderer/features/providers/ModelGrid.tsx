@@ -1,8 +1,7 @@
-import { mdiCubeOutline, mdiMagnify } from "@mdi/js";
+import { mdiCubeOutline } from "@mdi/js";
 import { InputCheckBox } from "@kiyotakkkka/zvs-uikit-lib";
 import { observer } from "mobx-react-lite";
 import Chip from "../../ui/atoms/Chip";
-import Icon from "../../ui/atoms/Icon";
 import TextInput from "../../ui/atoms/TextInput";
 import EmptyState from "../../ui/molecules/EmptyState";
 import useStore from "../../stores/useStore";
@@ -31,10 +30,10 @@ function ModelGrid() {
         </h2>
         <span className="w-47.5 flex-none">
           <TextInput
+            preset="search"
             aria-label="Фильтр моделей"
             value={providers.modelQuery}
             placeholder="Фильтр моделей…"
-            leading={<Icon path={mdiMagnify} size={14} />}
             onChange={(event) => {
               providers.setModelQuery(event.target.value);
             }}
