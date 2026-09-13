@@ -20,6 +20,15 @@ test("Markdown drops raw HTML and remote images and renders fenced code as escap
   expect(container.querySelector("script, img, iframe, a[href^='javascript:']")).toBeNull();
 });
 
+test("Markdown renders GFM tables", () => {
+  const { container } = render(
+    <ChatMarkdown content={"| Name | Value |\n| --- | ---: |\n| Model | 20b |"} />,
+  );
+  expect(container.querySelector("table")).toBeTruthy();
+  expect(screen.getByRole("columnheader", { name: "Name" })).toBeTruthy();
+  expect(screen.getByRole("cell", { name: "20b" })).toBeTruthy();
+});
+
 test("no provider routes to configuration and does not leave a dead composer", async () => {
   const bridge = createFakeBridge<Contract>()
     .handle("chat.conversations.list", () => [])
@@ -58,6 +67,7 @@ test("composer keeps Shift+Enter and IME Enter local, while Enter sends", async 
       <ChatComposer store={store} />
     </MemoryRouter>,
   );
+  expect(screen.getAllByText(saved.models[0].displayName).length).toBeGreaterThan(0);
   const input = screen.getByRole("textbox", { name: /Message|Сообщение/ });
   fireEvent.change(input, { target: { value: "hello" } });
   fireEvent.keyDown(input, { key: "Enter", shiftKey: true });

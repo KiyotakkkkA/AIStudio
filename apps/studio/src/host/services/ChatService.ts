@@ -88,6 +88,7 @@ export class ChatService {
           conversationId: conversation.id,
           role: "assistant",
           content: "",
+          reasoning: "",
           citations: prepared.citations,
           tokensIn: prepared.tokensIn,
           tokensOut: 0,
@@ -124,6 +125,7 @@ export class ChatService {
           throw new AppError(AppErrorCode.CONFLICT, "Message does not belong to this run");
         repository.updateMessage(message.id, {
           content: input.result.text,
+          reasoning: input.result.reasoning,
           tokensOut: estimateTokens(input.result.text + input.result.reasoning),
           partial: false,
           durationMs: Math.max(0, this.clock() - message.createdAt),
@@ -258,7 +260,8 @@ export class ChatService {
     if (!message) return;
     if (event.type === "token") {
       repository.updateMessage(assistantId, {
-        content: message.content + (event.kind === "reasoning" ? "" : event.delta),
+        content: event.kind === "reasoning" ? message.content : message.content + event.delta,
+        reasoning: event.kind === "reasoning" ? message.reasoning + event.delta : message.reasoning,
         tokensOut: message.tokensOut + estimateTokens(event.delta),
         durationMs: Math.max(0, this.clock() - message.createdAt),
       });

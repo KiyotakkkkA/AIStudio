@@ -1,0 +1,1 @@
+ALTER TABLE `message` ADD `reasoning` text DEFAULT '' NOT NULL;

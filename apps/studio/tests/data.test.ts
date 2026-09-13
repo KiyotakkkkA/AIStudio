@@ -57,6 +57,7 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
       "0007_kernel",
       "0008_permissions",
       "0009_chat",
+      "0010_shallow_marvel_boy",
     ]);
     const tables = database.client.db.$client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'")
@@ -98,6 +99,7 @@ test("a backup is written before migrating and only the last three are kept", ()
           "0007_kernel",
           "0008_permissions",
           "0009_chat",
+          "0010_shallow_marvel_boy",
         ]);
         if (run === 0) assert.equal(report.backup, undefined);
         else assert.equal(typeof report.backup, "string");
@@ -231,6 +233,7 @@ test("prepareDatabase opens and migrates in one step", () => {
         "0007_kernel",
         "0008_permissions",
         "0009_chat",
+        "0010_shallow_marvel_boy",
       ]);
       assert.equal(prepared.client.repositories.settings.all().length, 0);
     } finally {

@@ -4,6 +4,7 @@ import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/Button";
 import Chip from "../../ui/atoms/Chip";
 import ChatMessage from "./ChatMessage";
+import MessageActions from "../../ui/molecules/MessageActions";
 import ChatComposer from "./ChatComposer";
 import ChatApprovals from "./ChatApprovals";
 import { shouldPinToBottom } from "./scroll";
@@ -77,19 +78,32 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           )}
           {store.active?.messages.map((message) =>
             message.role === "user" ? (
-              <div key={message.id} className="flex justify-end">
-                <div className="max-w-[78%] rounded-xl rounded-br-sm border border-main-600 bg-main-700 px-3.5 py-3 text-[13.5px] leading-relaxed wrap-break-word whitespace-pre-wrap">
-                  {message.content}
+              <div key={message.id} className="group flex justify-end">
+                <div className="flex max-w-[78%] flex-col items-end">
+                  <div className="rounded-xl rounded-br-sm border border-main-600 bg-main-700 px-3.5 py-3 text-[13.5px] leading-relaxed wrap-break-word whitespace-pre-wrap">
+                    {message.content}
+                  </div>
+                  <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                    <MessageActions
+                      content={message.content}
+                      isUser={message.role === "user"}
+                      onEdit={() => store.composer.setText(message.content)}
+                      onRefresh={store.retry}
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
               <ChatMessage
                 key={message.id}
                 content={message.content}
+                reasoning={message.reasoning}
                 citations={message.citations}
                 storeIds={store.active?.attachedStoreIds ?? []}
                 stores={store.stores}
                 partial={message.partial}
+                onEdit={() => store.composer.setText(message.content)}
+                onRefresh={store.retry}
                 usage={`${message.usageEstimated ? "~" : ""}${message.tokensIn} вход. · ${message.tokensOut} выход. · ${(message.durationMs / 1000).toFixed(1)} с`}
               />
             ),
@@ -104,6 +118,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           {(store.generating || store.liveText) && (
             <ChatMessage
               content={store.liveText}
+              reasoning={store.liveReasoning}
               citations={store.liveCitations}
               storeIds={store.searchedStoreIds}
               stores={store.stores}

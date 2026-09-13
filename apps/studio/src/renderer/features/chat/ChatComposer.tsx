@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { observer } from "mobx-react-lite";
 import { Link } from "react-router-dom";
 import { mdiCogOutline } from "@mdi/js";
@@ -9,6 +10,16 @@ import TextArea from "../../ui/atoms/TextArea";
 import type ChatStore from "./ChatStore";
 
 export default observer(function ChatComposer({ store }: { readonly store: ChatStore }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const wasGenerating = useRef(store.generating);
+
+  useEffect(() => {
+    if (wasGenerating.current && !store.generating) {
+      formRef.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
+    }
+    wasGenerating.current = store.generating;
+  }, [store.generating]);
+
   return (
     <div className="mx-auto w-full max-w-5xl shrink-0 px-5 pt-3 pb-4">
       {!store.available && !store.loading ? (
@@ -20,6 +31,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
         </div>
       ) : (
         <form
+          ref={formRef}
           onSubmit={(event) => {
             event.preventDefault();
             void store.send();
@@ -33,7 +45,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
           <TextArea
             aria-label="Сообщение"
             noBorder
-            placeholder="Задайте вопрос или обратитесь к подключённым хранилищам…"
+            placeholder="Задайте вопрос…"
             value={store.composer.text}
             maxLength={100000}
             disabled={store.loading || store.generating}
@@ -99,6 +111,9 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 </div>
               </Dropdown.Menu>
             </Dropdown>
+            <span className="min-w-0 max-w-56 truncate text-sm text-main-400">
+              {store.model?.displayName || store.model?.externalId || store.modelId}
+            </span>
             <span className="flex-1" />
             {store.generating ? (
               <Button

@@ -12,6 +12,7 @@ export const message = sqliteTable(
       .references(() => conversation.id, { onDelete: "cascade" }),
     role: text("role").$type<"user" | "assistant">().notNull(),
     content: text("content").notNull(),
+    reasoning: text("reasoning").notNull().default(""),
     citations: text("citations", { mode: "json" }).$type<ChatCitationDto[]>().notNull(),
     tokensIn: integer("tokens_in").notNull(),
     tokensOut: integer("tokens_out").notNull(),

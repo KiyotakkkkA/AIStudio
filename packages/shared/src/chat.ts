@@ -43,6 +43,7 @@ export const MessageDto = z.object({
   conversationId: ConversationId,
   role: z.enum(["user", "assistant"]),
   content: z.string(),
+  reasoning: z.string().default(""),
   citations: z.array(ChatCitationDto),
   tokensIn: z.number().int().nonnegative(),
   tokensOut: z.number().int().nonnegative(),

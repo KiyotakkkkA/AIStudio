@@ -29,6 +29,7 @@ export default class ChatStore {
   error: string | null = null;
   run: RunHandleDto | null = null;
   liveText = "";
+  liveReasoning = "";
   liveCitations: ChatCitationDto[] = [];
   searchedStoreIds: VectorStoreDto["id"][] = [];
   approvals: { id: string; subject: string; busy: boolean }[] = [];
@@ -180,6 +181,7 @@ export default class ChatStore {
           this.composer.setTemperature(active.settings.temperature ?? this.composer.temperature);
         }
         this.liveText = "";
+        this.liveReasoning = "";
         this.liveCitations = [];
         this.outcome = null;
         this.retryText = "";
@@ -205,6 +207,7 @@ export default class ChatStore {
     this.error = null;
     this.outcome = null;
     this.liveText = "";
+    this.liveReasoning = "";
     this.liveCitations = [];
     this.retryText = "";
     this.pendingTurn = false;
@@ -342,9 +345,12 @@ export default class ChatStore {
       if (!this.approvals.some((request) => request.id === event.request.id))
         this.approvals.push({ id: event.request.id, subject: event.request.subject, busy: false });
     }
-    if (event.type === "token" && event.kind !== "reasoning") {
-      this.buffer += event.delta;
-      this.timer ??= setTimeout(this.flush, 32);
+    if (event.type === "token") {
+      if (event.kind === "reasoning") this.liveReasoning += event.delta;
+      else {
+        this.buffer += event.delta;
+        this.timer ??= setTimeout(this.flush, 32);
+      }
     }
     if (event.type === "step" && event.step.status === "succeeded") {
       const nodeId = event.step.nodeId;
@@ -370,6 +376,7 @@ export default class ChatStore {
         if (message.success) {
           this.flush();
           this.liveText = message.data.content;
+          this.liveReasoning = message.data.reasoning;
           this.liveCitations = message.data.citations;
         }
       }
@@ -411,6 +418,7 @@ export default class ChatStore {
           conversation.id === id ? active : conversation,
         );
         this.liveText = "";
+        this.liveReasoning = "";
         this.liveCitations = [];
         this.pendingTurn = false;
       });
