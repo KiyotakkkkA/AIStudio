@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import { CreateProviderInput, type ProbeResultDto } from "@zvs/shared";
-import ProviderFormVm from "../../src/renderer/features/providers/ProviderFormVm.ts";
+import { ProviderFormVm } from "../../src/renderer/features/providers/ProviderFormVm.ts";
 import { ACCOUNTS, ADAPTERS, provider, SECRET } from "./providerFixtures.ts";
 
 function formFor(existing = false): ProviderFormVm {

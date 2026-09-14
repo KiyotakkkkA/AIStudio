@@ -42,6 +42,8 @@ export type RunGraph = z.infer<typeof RunGraph>;
 export const StartRunInput = z.object({
   kind: RunKind,
   subjectId: z.string().min(1).optional(),
+  title: z.string().trim().min(1).max(200).optional(),
+  retryOfId: RunId.optional(),
   graph: RunGraph,
   input: z.json().default(null),
   concurrency: z.number().int().min(1).max(64).default(4),
@@ -54,6 +56,8 @@ export const RunDto = z.object({
   ...RunHandleDto.shape,
   kind: RunKind,
   subjectId: z.string().optional(),
+  title: z.string().optional(),
+  retryOfId: RunId.optional(),
   status: RunStatus,
   graph: RunGraph,
   input: z.json(),
@@ -62,6 +66,7 @@ export const RunDto = z.object({
   createdAt: z.number().int(),
   startedAt: z.number().int().optional(),
   finishedAt: z.number().int().optional(),
+  prunedAt: z.number().int().optional(),
   error: z.string().optional(),
 });
 export type RunDto = z.infer<typeof RunDto>;

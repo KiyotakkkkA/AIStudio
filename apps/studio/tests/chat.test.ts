@@ -285,7 +285,7 @@ test("oversized mandatory prompts fail before persisting or launching a run", ()
   const created = conversation({ systemPrompt: "s".repeat(900) });
   expect(() => chat.sendMessage(created.id, "current")).toThrow("context budget");
   expect(chat.get(created.id).messages).toEqual([]);
-  expect(runs.list()).toEqual([]);
+  expect(runs.list().items).toEqual([]);
   expect(() =>
     windowChatHistory("system", [], { role: "user", content: "я".repeat(50) }, 100, 20),
   ).toThrow("context budget");

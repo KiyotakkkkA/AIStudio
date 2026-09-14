@@ -8,6 +8,8 @@ import {
   CreateConversationInput,
 } from "../chat.js";
 import { RunDto, RunHandleDto, RunIdInput, StartRunInput } from "../runs/RunDto.js";
+import { RunListFilter, RunPageDto } from "../runs/RunListFilter.js";
+import { RunDetailDto } from "../runs/RunDetailDto.js";
 import { StepDto } from "../runs/StepDto.js";
 import { StreamId } from "../primitives/branded.js";
 import { Timestamp } from "../primitives/time.js";
@@ -82,9 +84,15 @@ export const contract = defineContract({
   "runs.deny": { input: RunIdInput.extend({ approvalId: z.string().uuid() }), output: z.void() },
   "runs.start": { input: StartRunInput, output: RunHandleDto },
   "runs.cancel": { input: RunIdInput, output: z.void() },
-  "runs.list": { input: z.void(), output: z.array(RunDto) },
+  "runs.list": { input: RunListFilter, output: RunPageDto },
   "runs.get": { input: RunIdInput, output: RunDto },
   "runs.steps": { input: RunIdInput, output: z.array(StepDto) },
+  "runs.detail": { input: RunIdInput, output: RunDetailDto },
+  "runs.retry": { input: RunIdInput, output: RunHandleDto },
+  "runs.clearFinished": {
+    input: z.void(),
+    output: z.object({ removed: z.number().int().nonnegative() }),
+  },
   "vectorStores.list": { input: z.void(), output: z.array(VectorStoreDto) },
   "vectorStores.get": { input: VectorStoreRef, output: VectorStoreDto },
   "vectorStores.create": { input: CreateVectorStoreInput, output: VectorStoreDto },

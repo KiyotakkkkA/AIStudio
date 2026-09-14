@@ -37,6 +37,7 @@ import { RustCore } from "./drivers/rust/RustCore";
 import { SystemService } from "./services/SystemService";
 import { VectorStoreService } from "./services/VectorStoreService";
 import { RunService } from "./services/RunService";
+import { RetentionService } from "./services/RetentionService";
 import { NodeRegistry } from "./kernel/NodeRegistry";
 
 app.setName("ZVS AI Studio");
@@ -53,6 +54,7 @@ let healthCheck: HealthCheckService | undefined;
 let accounts: AccountService | undefined;
 let quitting = false;
 let runs: RunService | undefined;
+let retention: RetentionService | undefined;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -72,6 +74,7 @@ if (!app.requestSingleInstanceLock()) {
     event.preventDefault();
     quitting = true;
     healthCheck?.stop();
+    retention?.stop();
     void (async () => {
       await runs?.dispose();
       await Promise.all([providers.dispose(), healthCheck?.dispose(), accounts?.dispose()]);
@@ -196,6 +199,8 @@ if (!app.requestSingleInstanceLock()) {
         logger,
       });
       const chat = new ChatService({ data: database, runs, registry: nodes, logger });
+      retention = new RetentionService({ data: database, settings, logger });
+      retention.start();
       runs.recover();
       ipcServer = createIpcServer(
         contract,

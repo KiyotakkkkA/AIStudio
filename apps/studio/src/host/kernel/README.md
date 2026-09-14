@@ -65,9 +65,21 @@ Core node inputs and outputs are available through `NodeRegistry.resolve`:
   order. An empty path is identity; missing fields fail validation. These flow nodes transform
   data in the static DAG and do not execute arbitrary code or invoke nested nodes.
 
-IPC: `runs.start`, `runs.cancel`, `runs.list`, `runs.get`, `runs.steps`, `runs.approve`, `runs.deny`. Start returns
+IPC: `runs.start`, `runs.cancel`, `runs.list`, `runs.get`, `runs.steps`, `runs.detail`, `runs.retry`,
+`runs.clearFinished`, `runs.approve`, `runs.deny`. Start returns
 `{ id, streamId }` before graph execution is scheduled. `wait()` is a host-only completion
 hook used by tests and callers that need to drain a run.
+
+`runs.list` takes one `RunListFilter` (statuses, kinds, text query, date range, `live`, cursor
+paging) and answers with `RunSummaryDto` rows plus global counts, so the Tasks page and Runs &
+Logs are the same query at different filters. `live` means unfinished plus failures from the last
+24 hours. `runs.retry` re-runs a finished graph as a new run carrying `retryOfId`; chat turns are
+refused because their graph binds the messages of the original turn.
+
+`RetentionService` sweeps finished runs on a timer: past `runs.retention.days` (default 30) a run
+keeps its summary, steps, timings and errors while step inputs, outputs and recorded events are
+dropped and `prunedAt` is stamped. Whole runs are only ever deleted by `runs.clearFinished`, which
+spares any run a conversation message still references.
 
 ## Chat
 

@@ -251,7 +251,12 @@ export class ChatService {
         createdAt: this.clock(),
       });
       const handle = this.options.runs.start(
-        StartRunInput.parse({ kind: "chat", subjectId: conversationId, graph }),
+        StartRunInput.parse({
+          kind: "chat",
+          subjectId: conversationId,
+          title: conversation.title,
+          graph,
+        }),
       );
       chat.updateMessage(userId, { runId: handle.id });
       chat.update(conversationId, { updatedAt: this.clock() });
@@ -283,12 +288,16 @@ export class ChatService {
       });
       const conversation = this.get(message.conversationId);
       const first = conversation.messages.find((item) => item.role === "user");
+      const renamed =
+        conversation.title === "New conversation" && first && message.content
+          ? first.content.replace(/\s+/g, " ").slice(0, 80)
+          : undefined;
       repository.update(conversation.id, {
         updatedAt: this.clock(),
-        ...(conversation.title === "New conversation" && first && message.content
-          ? { title: first.content.replace(/\s+/g, " ").slice(0, 80) }
-          : {}),
+        ...(renamed === undefined ? {} : { title: renamed }),
       });
+      if (renamed !== undefined && message.runId !== null)
+        this.options.data.repositories.runs.update(message.runId, { title: renamed });
     }
   }
   private requireIdle(id: string): void {

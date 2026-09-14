@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   HostEvent,
   RunId,
+  RunListFilter,
   StartRunInput,
   StreamId,
   contract,
@@ -296,7 +297,7 @@ test.each([
 ])("invalid graphs create neither rows nor streams: %j", (...nodes) => {
   register("work", async () => null);
   expect(() => start(nodes)).toThrow();
-  expect(service.list()).toEqual([]);
+  expect(service.list().items).toEqual([]);
   expect(bus.open).toBe(0);
 });
 
@@ -512,7 +513,7 @@ test("cancellation bounds approval waits and late approval cannot revive a run",
   expect(sent.at(-1)?.type).toBe("end");
 });
 
-test("all five run channels validate outputs, list persisted runs, and handle missing IDs", async () => {
+test("every run channel validates outputs, lists persisted runs, and handles missing IDs", async () => {
   const handlers = createRunHandlers(service);
   const handle = await handlers["runs.start"](
     StartRunInput.parse({ kind: "chat", graph: { nodes: [] } }),
@@ -522,13 +523,21 @@ test("all five run channels validate outputs, list persisted runs, and handle mi
   expect(
     contract["runs.get"].output.parse(await handlers["runs.get"]({ id: handle.id })).status,
   ).toBe("succeeded");
-  expect(contract["runs.list"].output.parse(await handlers["runs.list"](undefined))).toHaveLength(
-    1,
+  const page = contract["runs.list"].output.parse(
+    await handlers["runs.list"](RunListFilter.parse({})),
   );
+  expect(page.items).toHaveLength(1);
+  expect(page.counts.byStatus.succeeded).toBe(1);
+  expect(
+    contract["runs.detail"].output.parse(await handlers["runs.detail"]({ id: handle.id })).summary
+      .progress,
+  ).toEqual({ done: 0, total: 0 });
   expect(
     contract["runs.steps"].output.parse(await handlers["runs.steps"]({ id: handle.id })),
   ).toEqual([]);
   expect(await handlers["runs.cancel"]({ id: handle.id })).toBeUndefined();
+  expect(await handlers["runs.clearFinished"](undefined)).toEqual({ removed: 1 });
+  expect(service.list(RunListFilter.parse({})).items).toEqual([]);
   expect(() => service.get(createId())).toThrow("Запуск не найден");
 });
 

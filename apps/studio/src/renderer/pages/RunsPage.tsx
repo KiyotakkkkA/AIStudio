@@ -1,20 +1,5 @@
-import { mdiHistory } from "@mdi/js";
-import PagePlaceholder from "../ui/molecules/PagePlaceholder";
-import PageShell from "../ui/templates/PageShell";
+import RunsWorkspace from "../features/tasks/RunsWorkspace";
 
 export default function RunsPage() {
-  return (
-    <PageShell
-      icon={mdiHistory}
-      title="Запуски и логи"
-      subtitle="История выполнений, шаги и журналы"
-    >
-      <PagePlaceholder
-        icon={mdiHistory}
-        title="Запусков пока нет"
-        description="История завершённых запусков, дерево шагов и журналы появятся здесь."
-        task="TASK_026"
-      />
-    </PageShell>
-  );
+  return <RunsWorkspace />;
 }

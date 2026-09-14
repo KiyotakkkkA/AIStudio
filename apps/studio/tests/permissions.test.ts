@@ -119,7 +119,7 @@ test("unknown nodes reject the entire graph before any run or step is created", 
       }),
     ),
   ).toThrow();
-  expect(service.list()).toEqual([]);
+  expect(service.list().items).toEqual([]);
   expect(execute).not.toHaveBeenCalled();
 });
 test("approval persists before emission, blocks execution, then resumes via IPC", async () => {

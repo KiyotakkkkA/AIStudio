@@ -4,15 +4,23 @@ import {
   AppError,
   AppErrorCode,
   RunDto,
+  RunDetailDto,
   RunId,
+  RunKind,
+  RunListFilter,
+  RunPageDto,
+  RunStatus,
+  RunSummaryDto,
   StartRunInput,
   StepDto,
   StreamId,
+  type RunCountsDto,
   type RunHandleDto,
   type HostEvent,
 } from "@zvs/shared";
 import type { UnitOfWork } from "../data/UnitOfWork.ts";
 import type { RunEntity } from "../data/schema/index.ts";
+import { encodeRunCursor } from "../data/repositories/RunRepository.ts";
 import { NodeRegistry } from "../kernel/NodeRegistry.ts";
 import { Scheduler, type SchedulerOptions } from "../kernel/Scheduler.ts";
 import type { EventBus, StreamHandle } from "../platform/events.ts";
@@ -20,10 +28,14 @@ import { createId } from "../platform/ids.ts";
 
 export interface RunServiceOptions extends Partial<Omit<SchedulerOptions, "data" | "registry">> {
   approvalTimeoutMs?: number;
+  attentionWindowMs?: number;
   data: UnitOfWork;
   events: EventBus;
   registry: NodeRegistry;
 }
+
+const ATTENTION_WINDOW_MS = 24 * 60 * 60 * 1000;
+const UNFINISHED: readonly RunDto["status"][] = ["queued", "running", "blocked"];
 export class RunService {
   private readonly observers = new Map<string, Set<(event: HostEvent) => void>>();
   private readonly active = new Map<string, { scheduler: Scheduler; done: Promise<void> }>();
@@ -165,21 +177,116 @@ export class RunService {
     return RunDto.parse({
       ...row,
       subjectId: row.subjectId ?? undefined,
+      title: row.title ?? undefined,
+      retryOfId: row.retryOfId ?? undefined,
       outcome: row.outcome ?? undefined,
       startedAt: row.startedAt ?? undefined,
       finishedAt: row.finishedAt ?? undefined,
+      prunedAt: row.prunedAt ?? undefined,
       error: row.error ?? undefined,
     });
   }
-  list(): RunDto[] {
-    return this.dependencies.data.repositories.runs.list().map((row) => this.get(row.id));
+  list(filter: RunListFilter = RunListFilter.parse({})): RunPageDto {
+    const query = RunListFilter.parse(filter);
+    const fetched = this.dependencies.data.repositories.runs.page({
+      ...query,
+      limit: query.limit + 1,
+      attentionSince:
+        this.options.clock() - (this.dependencies.attentionWindowMs ?? ATTENTION_WINDOW_MS),
+    });
+    const rows = fetched.slice(0, query.limit);
+    const last = rows.at(-1);
+    return RunPageDto.parse({
+      items: this.summaries(rows),
+      counts: this.counts(),
+      ...(fetched.length > query.limit && last
+        ? { nextCursor: encodeRunCursor({ createdAt: last.createdAt, id: last.id }) }
+        : {}),
+    });
+  }
+  detail(id: string): RunDetailDto {
+    const run = this.get(id);
+    const row = this.dependencies.data.repositories.runs.get(id)!;
+    return RunDetailDto.parse({
+      run,
+      summary: this.summaries([row])[0],
+      steps: this.steps(id),
+      logs: this.dependencies.data.repositories.runs.logs(id),
+    });
+  }
+  retry(id: string): RunHandleDto {
+    const original = this.get(id);
+    if (UNFINISHED.includes(original.status))
+      throw new AppError(AppErrorCode.CONFLICT, "Запуск ещё не завершён");
+    if (original.kind === "chat")
+      throw new AppError(
+        AppErrorCode.CONFLICT,
+        "Ход чата повторяется со страницы чата: граф ссылается на сообщения исходного хода",
+      );
+    return this.start({
+      kind: original.kind,
+      graph: original.graph,
+      input: original.input,
+      concurrency: original.concurrency,
+      retryOfId: RunId.parse(original.id),
+      ...(original.subjectId === undefined ? {} : { subjectId: original.subjectId }),
+      ...(original.title === undefined ? {} : { title: original.title }),
+    });
+  }
+  clearFinished(): { removed: number } {
+    return this.dependencies.data.transaction(({ runs }) => ({
+      removed: runs.removeFinished(runs.referenced()),
+    }));
+  }
+  private counts(): RunCountsDto {
+    const raw = this.dependencies.data.repositories.runs.counts();
+    const byStatus = Object.fromEntries(RunStatus.options.map((status) => [status, 0]));
+    const byKind = Object.fromEntries(RunKind.options.map((kind) => [kind, 0]));
+    let total = 0;
+    for (const row of raw.byStatus) {
+      byStatus[row.key] = row.total;
+      total += row.total;
+    }
+    for (const row of raw.byKind) byKind[row.key] = row.total;
+    return { total, byStatus, byKind } as RunCountsDto;
+  }
+  private summaries(rows: readonly RunEntity[]): RunSummaryDto[] {
+    const { runs, permissions } = this.dependencies.data.repositories;
+    const ids = rows.map((row) => row.id);
+    const succeeded = new Map(runs.succeededCounts(ids).map((row) => [row.runId, row.total]));
+    const active = new Map<string, string>();
+    for (const row of runs.runningNodes(ids))
+      if (!active.has(row.runId)) active.set(row.runId, row.nodeId);
+    const approvals = new Map<string, RunSummaryDto["approval"]>();
+    for (const row of permissions.pendingForRuns(ids))
+      if (!approvals.has(row.runId)) approvals.set(row.runId, row);
+    return rows.map((row) =>
+      RunSummaryDto.parse({
+        id: row.id,
+        streamId: row.streamId,
+        kind: row.kind,
+        subjectId: row.subjectId ?? undefined,
+        title: row.title ?? row.subjectId ?? row.id,
+        status: row.status,
+        progress: { done: succeeded.get(row.id) ?? 0, total: row.graph.nodes.length },
+        activeNodeId: active.get(row.id),
+        approval: approvals.get(row.id),
+        outcome: row.outcome ?? undefined,
+        error: row.error ?? undefined,
+        retryOfId: row.retryOfId ?? undefined,
+        createdAt: row.createdAt,
+        startedAt: row.startedAt ?? undefined,
+        finishedAt: row.finishedAt ?? undefined,
+        prunedAt: row.prunedAt ?? undefined,
+      }),
+    );
   }
   steps(id: string): StepDto[] {
     this.get(id);
     return this.dependencies.data.repositories.runs.steps(id).map((row) =>
       StepDto.parse({
         ...row,
-        output: row.status === "succeeded" ? row.output : undefined,
+        output: row.status === "succeeded" && row.output !== null ? row.output : undefined,
         error: row.error ?? undefined,
         finishedAt: row.finishedAt ?? undefined,
       }),

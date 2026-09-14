@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type { DatabaseHandle } from "../types.ts";
 import { pendingApproval, permissionUse, toolPermission } from "../schema/permission.ts";
 
@@ -43,6 +43,15 @@ export class PermissionRepository {
       .select()
       .from(pendingApproval)
       .where(and(eq(pendingApproval.runId, runId), isNull(pendingApproval.decision)))
+      .all();
+  }
+  pendingForRuns(runIds: readonly string[]) {
+    if (runIds.length === 0) return [];
+    return this.db
+      .select()
+      .from(pendingApproval)
+      .where(and(inArray(pendingApproval.runId, [...runIds]), isNull(pendingApproval.decision)))
+      .orderBy(asc(pendingApproval.expiresAt))
       .all();
   }
   denyUnfinished(runId: string) {

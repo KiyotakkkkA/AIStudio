@@ -47,7 +47,7 @@ export default function ChatMessage({
               <Accordion.Summary className="w-full text-left text-xs text-main-400">
                 Размышления
               </Accordion.Summary>
-              <Accordion.Content className="mt-2 text-xs leading-relaxed whitespace-pre-wrap text-main-400">
+              <Accordion.Content className="mt-2 text-xs/relaxed  whitespace-pre-wrap text-main-400">
                 {reasoning}
               </Accordion.Content>
             </Accordion>
