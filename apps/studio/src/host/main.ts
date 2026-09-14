@@ -28,6 +28,7 @@ import { SecretService } from "./services/SecretService";
 import { SettingService } from "./services/SettingService";
 import { BrowserViewManager } from "./browser/BrowserViewManager";
 import { ProviderRegistry } from "./drivers/ai/ProviderRegistry";
+import { FileSystemModelStore } from "./drivers/ai/adapters/local";
 import { probeAccountCredentials } from "./drivers/ai/identity/ProbeAccountCredentials";
 import { sessionGateways } from "./browser/sessionGateway";
 import { BROWSER_PARTITION } from "./browser/policy";
@@ -171,6 +172,7 @@ if (!app.requestSingleInstanceLock()) {
         fetch: (url, request) => net.fetch(url, { ...request, credentials: "omit" }),
         credentials: (account) =>
           probeAccountCredentials(account, sessions(account.partition), vault),
+        localModels: new FileSystemModelStore({ root: paths.downloadsDir, logger }),
       });
       providers = new ProviderService({ data: database, drivers: registry, secrets, logger });
       const lifecycle = new BrowserLifecycle();

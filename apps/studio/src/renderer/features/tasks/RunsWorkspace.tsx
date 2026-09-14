@@ -11,7 +11,7 @@ import TextInput from "../../ui/atoms/TextInput";
 import EmptyState from "../../ui/molecules/EmptyState";
 import RunDetailPanel from "./RunDetailPanel";
 import RunHistoryRow from "./RunHistoryRow";
-import TaskFilterButton from "./TaskFilterButton";
+import FilterRailButton from "../../ui/molecules/FilterRailButton";
 import { KIND_FILTER_LABELS, STATUS_LABELS, STATUS_TONES } from "./runPresentation";
 import type { RunRangeKey } from "./RunHistoryStore";
 
@@ -71,7 +71,7 @@ export default observer(function RunsWorkspace() {
             Период
           </p>
           {RANGES.map((range) => (
-            <TaskFilterButton
+            <FilterRailButton
               key={range.key}
               active={store.range === range.key}
               label={range.label}
@@ -83,7 +83,7 @@ export default observer(function RunsWorkspace() {
             Статус
           </p>
           {RunStatus.options.map((status) => (
-            <TaskFilterButton
+            <FilterRailButton
               key={status}
               active={store.statuses.includes(status)}
               label={STATUS_LABELS[status]}
@@ -96,7 +96,7 @@ export default observer(function RunsWorkspace() {
             Вид
           </p>
           {RunKind.options.map((kind) => (
-            <TaskFilterButton
+            <FilterRailButton
               key={kind}
               active={store.kinds.includes(kind)}
               label={KIND_FILTER_LABELS[kind]}

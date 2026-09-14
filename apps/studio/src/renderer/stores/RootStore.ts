@@ -8,6 +8,7 @@ import { SecretStore } from "../features/secrets/SecretStore";
 import { UiStore } from "./UiStore";
 import VectorStoreStore from "../features/vector-stores/VectorStoreStore";
 import ChatStore from "../features/chat/ChatStore";
+import DownloadStore from "../features/downloads/DownloadStore";
 import TaskStore from "../features/tasks/TaskStore";
 import RunHistoryStore from "../features/tasks/RunHistoryStore";
 
@@ -24,6 +25,7 @@ export class RootStore {
   readonly vectorStores: VectorStoreStore;
   readonly chat: ChatStore;
   readonly tasks: TaskStore;
+  readonly downloads: DownloadStore;
   readonly runs: RunHistoryStore;
 
   constructor(private readonly environment: RootStoreEnvironment) {
@@ -34,6 +36,7 @@ export class RootStore {
     this.vectorStores = new VectorStoreStore(environment.ipc, environment.events);
     this.chat = new ChatStore(environment.ipc, environment.events);
     this.tasks = new TaskStore(environment.ipc, environment.events);
+    this.downloads = new DownloadStore(environment.ipc, environment.events);
     this.runs = new RunHistoryStore(environment.ipc);
     makeAutoObservable<RootStore, "environment">(
       this,
@@ -46,6 +49,7 @@ export class RootStore {
         vectorStores: false,
         chat: false,
         tasks: false,
+        downloads: false,
         runs: false,
       },
       { autoBind: true },
@@ -69,6 +73,7 @@ export class RootStore {
     this.vectorStores.dispose();
     this.chat.dispose();
     this.tasks.dispose();
+    this.downloads.dispose();
     this.runs.dispose();
     this.environment.events.dispose();
   }

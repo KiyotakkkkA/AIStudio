@@ -1,6 +1,7 @@
 import { makeAutoObservable } from "mobx";
 import {
   CreateVectorStoreInput,
+  type ModelDto,
   type ProviderSummaryDto,
   type VectorStoreDto,
   type UpdateVectorStoreInput,
@@ -20,6 +21,7 @@ export default class VectorStoreFormVm {
   constructor(
     readonly original: VectorStoreDto | null,
     readonly providers: readonly ProviderSummaryDto[],
+    readonly modelsByProvider: ReadonlyMap<string, readonly ModelDto[]> = new Map(),
   ) {
     if (original) {
       this.name = original.name;
@@ -36,6 +38,9 @@ export default class VectorStoreFormVm {
 
   get isNew() {
     return this.original === null;
+  }
+  get embeddingModels() {
+    return this.modelsByProvider.get(this.embeddingProviderId) ?? [];
   }
   get chunkLocked() {
     return (
@@ -57,6 +62,9 @@ export default class VectorStoreFormVm {
       | "chunkOverlap",
     value: string,
   ) {
+    if (field === "embeddingProviderId" && value !== this.embeddingProviderId) {
+      this.embeddingModelId = "";
+    }
     this[field] = value;
     this.errors = {};
   }

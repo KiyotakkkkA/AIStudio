@@ -3,7 +3,7 @@ import { RunKind } from "@zvs/shared";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 import { KIND_FILTER_LABELS } from "./runPresentation";
 import type { TaskStatusFilter } from "./runGroups";
-import TaskFilterButton from "./TaskFilterButton";
+import FilterRailButton from "../../ui/molecules/FilterRailButton";
 import type TaskStore from "./TaskStore";
 
 const STATUS_FILTERS: readonly { key: TaskStatusFilter; label: string; tone?: StatusTone }[] = [
@@ -24,7 +24,7 @@ export default observer(function TaskFilterRail({ store }: { readonly store: Tas
         Статус
       </p>
       {STATUS_FILTERS.map((filter) => (
-        <TaskFilterButton
+        <FilterRailButton
           key={filter.key}
           active={store.status === filter.key}
           label={filter.label}
@@ -36,14 +36,14 @@ export default observer(function TaskFilterRail({ store }: { readonly store: Tas
       <p className="mt-3.5 px-2 pb-1.5 text-[10px] font-medium tracking-[0.09em] text-main-500 uppercase">
         Вид
       </p>
-      <TaskFilterButton
+      <FilterRailButton
         active={store.kind === "all"}
         label="Все виды"
         count={store.visible.length}
         onClick={() => store.setKind("all")}
       />
       {RunKind.options.map((kind) => (
-        <TaskFilterButton
+        <FilterRailButton
           key={kind}
           active={store.kind === kind}
           label={KIND_FILTER_LABELS[kind]}

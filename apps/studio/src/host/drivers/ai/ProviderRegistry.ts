@@ -1,7 +1,7 @@
-import { AppError, AppErrorCode } from "@zvs/shared";
+import { AppError, AppErrorCode, isLocalFamily } from "@zvs/shared";
 import type { AccountEntity, ProviderEntity } from "../../data/schema/index.ts";
 import type { Logger } from "../../platform/logger.ts";
-import { adapterEntry, type AdapterContext } from "./adapters/index.ts";
+import { adapterEntry, type AdapterContext, type LocalModelStore } from "./adapters/index.ts";
 import { OllamaAdapter, OLLAMA_CAPABILITIES } from "./adapters/ollama.ts";
 import { supportsAuthMode, type AdapterCapabilities } from "./AdapterCapabilities.ts";
 import { sessionExpired } from "./errors.ts";
@@ -31,6 +31,7 @@ export interface ProviderRegistryOptions {
   accounts?: AccountSource;
   sessions?: SessionGatewayFactory;
   credentials?: AccountCredentialsFactory;
+  localModels?: LocalModelStore;
   logger?: Logger;
   fetch?: FetchLike;
 }
@@ -48,6 +49,7 @@ export class ProviderRegistry {
   readonly #accounts: AccountSource | undefined;
   readonly #sessions: SessionGatewayFactory | undefined;
   readonly #credentials: AccountCredentialsFactory | undefined;
+  readonly #localModels: LocalModelStore | undefined;
   readonly #logger: Logger | undefined;
   readonly #fetch: FetchLike | undefined;
   readonly #cache = new Map<string, CacheEntry>();
@@ -58,6 +60,7 @@ export class ProviderRegistry {
     this.#accounts = options.accounts;
     this.#sessions = options.sessions;
     this.#credentials = options.credentials;
+    this.#localModels = options.localModels;
     this.#logger = options.logger;
     this.#fetch = options.fetch;
   }
@@ -68,6 +71,7 @@ export class ProviderRegistry {
 
   capabilities(providerId: string): AdapterCapabilities {
     const row = this.#row(providerId);
+    if (isLocalFamily(row.adapter)) return adapterEntry(row.adapter).capabilities;
     return row.kind === "ollama" ? OLLAMA_CAPABILITIES : adapterEntry(row.adapter).capabilities;
   }
 
@@ -88,16 +92,17 @@ export class ProviderRegistry {
   }
 
   async ephemeralDriver(row: ProviderEntity): Promise<AiDriver> {
-    if (row.kind === "ollama") {
+    if (row.kind === "ollama" && !isLocalFamily(row.adapter)) {
       const transport = await this.#transport(row);
       return { text: new OllamaAdapter(transport, this.#logger), embedding: null, image: null };
     }
     const entry = adapterEntry(row.adapter);
-    this.#requireAuthMode(entry.capabilities, row);
-    const transport = await this.#transport(row);
+    const local = isLocalFamily(row.adapter);
+    if (!local) this.#requireAuthMode(entry.capabilities, row);
     const context: AdapterContext = {
-      transport,
+      ...(local ? {} : { transport: await this.#transport(row) }),
       ...(this.#logger === undefined ? {} : { logger: this.#logger }),
+      ...(this.#localModels === undefined ? {} : { localModels: this.#localModels }),
     };
     return entry.build(context);
   }

@@ -249,6 +249,38 @@ test("the queue respects the concurrency cap and lets a small package overtake a
   ]);
 });
 
+test("raising the priority of a waiting item moves it ahead of the queue", async () => {
+  build(1);
+  freeBytes = 500 * GIB;
+  items = [
+    item({ ref: "curated:model:alpha", name: "alpha" }),
+    item({ ref: "curated:model:first", name: "first" }),
+    item({ ref: "curated:model:second", name: "second" }),
+  ];
+  for (const entry of items) jobs.serve(entry.url, BODY, 6);
+  jobs.hold("https://example.test/alpha");
+
+  const blocking = await downloads.start({ ref: "curated:model:alpha" });
+  await jobs.started(1);
+  const first = await downloads.start({ ref: "curated:model:first" });
+  const second = await downloads.start({ ref: "curated:model:second" });
+
+  const raised = downloads.prioritise(second.id, second.priority + 1);
+  expect(raised.priority).toBe(second.priority + 1);
+  expect(() => downloads.prioritise(blocking.id, 9)).toThrow(AppError);
+
+  jobs.release("https://example.test/alpha");
+  await settle(blocking.id);
+  await settle(second.id);
+  await settle(first.id);
+
+  expect(jobs.attempts.map((attempt) => attempt.url)).toEqual([
+    "https://example.test/alpha",
+    "https://example.test/second",
+    "https://example.test/first",
+  ]);
+});
+
 test("a download with nowhere to put it is rejected before a byte moves", async () => {
   items = [item({ ref: "curated:model:huge", name: "huge", sizeBytes: 380 * GIB })];
   jobs.serve("https://example.test/huge", BODY);

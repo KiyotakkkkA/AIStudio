@@ -3,6 +3,7 @@ import type { IpcClient } from "@zvs/ipc";
 import {
   VectorSearchInput,
   type Contract,
+  type ModelDto,
   type ProviderSummaryDto,
   type VectorStoreDto,
   type VectorStoreId,
@@ -20,6 +21,7 @@ import { searchRows } from "./searchRows";
 export default class VectorStoreStore {
   stores: VectorStoreDto[] = [];
   providers: ProviderSummaryDto[] = [];
+  embeddingModelsByProvider = new Map<string, readonly ModelDto[]>();
   selectedId: VectorStoreId | null = null;
   detail: VectorStoreDto | null = null;
   form: VectorStoreFormVm | null = null;
@@ -95,9 +97,21 @@ export default class VectorStoreStore {
         this.ipc.call("vectorStores.list", undefined),
         this.ipc.call("providers.list", { capability: "embedding" }),
       ]);
+      const modelEntries = await Promise.all(
+        providers
+          .filter((provider) => provider.capabilities.includes("embedding"))
+          .map(async (provider) => {
+            const detail = await this.ipc.call("providers.get", {
+              id: provider.id,
+              selectedOnly: true,
+            });
+            return [provider.id, detail.models] as const;
+          }),
+      );
       runInAction(() => {
         this.stores = stores;
         this.providers = providers.filter((p) => p.capabilities.includes("embedding"));
+        this.embeddingModelsByProvider = new Map(modelEntries);
       });
       if (!this.form) {
         const id = this.selectedId ?? stores[0]?.id;
@@ -143,10 +157,15 @@ export default class VectorStoreStore {
     if (this.busy || this.form) return;
     ++this.revision;
     this.searching = false;
-    this.form = new VectorStoreFormVm(null, this.providers);
+    this.form = new VectorStoreFormVm(null, this.providers, this.embeddingModelsByProvider);
   }
   edit() {
-    if (this.detail && !this.busy) this.form = new VectorStoreFormVm(this.detail, this.providers);
+    if (this.detail && !this.busy)
+      this.form = new VectorStoreFormVm(
+        this.detail,
+        this.providers,
+        this.embeddingModelsByProvider,
+      );
   }
   cancel() {
     if (!this.busy) this.form = null;

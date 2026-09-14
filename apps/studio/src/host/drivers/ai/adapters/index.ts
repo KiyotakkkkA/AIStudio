@@ -4,12 +4,24 @@ import type { AdapterCapabilities } from "../AdapterCapabilities.ts";
 import type { AiDriver } from "../ports.ts";
 import type { Transport } from "../transport/Transport.ts";
 import { DeepSeekWebAdapter, DEEPSEEK_WEB_CAPABILITIES } from "./deepseekWeb.ts";
+import { LocalEmbeddingAdapter, LOCAL_CAPABILITIES, type LocalModelStore } from "./local.ts";
 import { OpenAiCompatibleAdapter, OPENAI_COMPATIBLE_CAPABILITIES } from "./openaiCompatible.ts";
 import { QwenWebAdapter, QWEN_WEB_CAPABILITIES } from "./qwenWeb.ts";
 
 export interface AdapterContext {
-  transport: Transport;
+  transport?: Transport;
   logger?: Logger;
+  localModels?: LocalModelStore;
+}
+
+export interface NetworkAdapterContext extends AdapterContext {
+  transport: Transport;
+}
+
+export function requireTransport(context: AdapterContext): NetworkAdapterContext {
+  if (context.transport === undefined)
+    throw new AppError(AppErrorCode.CONFLICT, "Адаптеру нужен транспорт");
+  return { ...context, transport: context.transport };
 }
 
 export interface AdapterFamilyEntry {
@@ -29,7 +41,7 @@ export const ADAPTER_REGISTRY: Readonly<Record<AdapterFamily, AdapterFamilyEntry
     capabilities: OPENAI_COMPATIBLE_CAPABILITIES,
     implemented: true,
     build(context: AdapterContext): AiDriver {
-      const adapter = new OpenAiCompatibleAdapter(context);
+      const adapter = new OpenAiCompatibleAdapter(requireTransport(context));
       return { text: adapter, embedding: adapter, image: null };
     },
   },
@@ -37,14 +49,31 @@ export const ADAPTER_REGISTRY: Readonly<Record<AdapterFamily, AdapterFamilyEntry
     capabilities: QWEN_WEB_CAPABILITIES,
     implemented: true,
     build(context: AdapterContext): AiDriver {
-      return { text: new QwenWebAdapter(context), embedding: null, image: null };
+      return { text: new QwenWebAdapter(requireTransport(context)), embedding: null, image: null };
     },
   },
   "deepseek-web": {
     capabilities: DEEPSEEK_WEB_CAPABILITIES,
     implemented: true,
     build(context: AdapterContext): AiDriver {
-      return { text: new DeepSeekWebAdapter(context), embedding: null, image: null };
+      return {
+        text: new DeepSeekWebAdapter(requireTransport(context)),
+        embedding: null,
+        image: null,
+      };
+    },
+  },
+  local: {
+    capabilities: LOCAL_CAPABILITIES,
+    implemented: true,
+    build(context: AdapterContext): AiDriver {
+      if (context.localModels === undefined)
+        throw new AppError(AppErrorCode.CONFLICT, "Каталог локальных моделей недоступен");
+      return {
+        text: null,
+        embedding: new LocalEmbeddingAdapter(context.localModels, context.logger),
+        image: null,
+      };
     },
   },
 };
@@ -62,3 +91,5 @@ export function adapterCapabilities(family: AdapterFamily): AdapterCapabilities 
 export { DeepSeekWebAdapter, DEEPSEEK_WEB_CAPABILITIES };
 export { OpenAiCompatibleAdapter, OPENAI_COMPATIBLE_CAPABILITIES };
 export { QwenWebAdapter, QWEN_WEB_CAPABILITIES };
+export { LocalEmbeddingAdapter, LOCAL_CAPABILITIES };
+export type { LocalModelStore };

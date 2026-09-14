@@ -8,6 +8,7 @@ type DownloadChannels =
   | "downloads.pause"
   | "downloads.resume"
   | "downloads.cancel"
+  | "downloads.prioritise"
   | "downloads.remove"
   | "downloads.catalogue"
   | "downloads.disk";
@@ -25,6 +26,7 @@ export function createDownloadHandlers(
     "downloads.pause": ({ id }) => service().pause(id),
     "downloads.resume": ({ id }) => service().resume(id),
     "downloads.cancel": ({ id }) => service().cancel(id),
+    "downloads.prioritise": ({ id, priority }) => service().prioritise(id, priority),
     "downloads.remove": async ({ id }) => {
       await service().remove(id);
       return { id, removed: true };

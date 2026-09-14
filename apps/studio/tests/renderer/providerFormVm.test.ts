@@ -203,3 +203,45 @@ test("dirty tracking sees connection, name and settings edits", () => {
   vm.setSetting("topK", 40);
   assert.equal(vm.dirty, true);
 });
+
+test("the local family is offered only on the embedding tab and asks for nothing but a name", () => {
+  const onText = new ProviderFormVm({
+    adapters: ADAPTERS,
+    accounts: ACCOUNTS,
+    capability: "text",
+    provider: null,
+  });
+  assert.equal(
+    onText.adapterOptions.some((entry) => entry.family === "local"),
+    false,
+  );
+
+  const vm = new ProviderFormVm({
+    adapters: ADAPTERS,
+    accounts: ACCOUNTS,
+    capability: "embedding",
+    provider: null,
+  });
+  assert.equal(
+    vm.adapterOptions.some((entry) => entry.family === "local"),
+    true,
+  );
+
+  vm.setAdapter("local");
+  assert.equal(vm.isLocal, true);
+  assert.deepEqual(vm.capabilities, ["embedding"]);
+  assert.equal(vm.secretId, null);
+  assert.notEqual(vm.capabilityDisabledReason("text"), null);
+
+  assert.equal(vm.validate(), false);
+  assert.equal(vm.errorOf("name") !== undefined, true);
+
+  vm.setName("Мои модели");
+  assert.equal(vm.validate(), true);
+
+  const input = CreateProviderInput.parse(vm.toCreateInput());
+  assert.equal(input.adapter, "local");
+  assert.equal(input.baseUrl, "local://models");
+  assert.equal(input.secretId, null);
+  assert.deepEqual(input.capabilities, ["embedding"]);
+});

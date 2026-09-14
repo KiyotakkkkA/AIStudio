@@ -1,3 +1,5 @@
+import { InputCheckSlided } from "@kiyotakkkka/zvs-uikit-lib";
+
 export interface ToggleProps {
   readonly checked: boolean;
   readonly label: string;
@@ -8,27 +10,21 @@ export interface ToggleProps {
 
 export default function Toggle({ checked, label, onChange, id, disabled = false }: ToggleProps) {
   return (
-    <button
-      id={id}
-      type="button"
-      role="switch"
-      aria-checked={checked}
+    <InputCheckSlided
+      ref={
+        id === undefined
+          ? undefined
+          : (input) => {
+              if (input !== null) input.id = id;
+            }
+      }
+      checked={checked}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
+      onChange={onChange}
       className="flex items-center gap-2.25 text-left disabled:opacity-60"
+      variant="tertiary"
     >
-      <span
-        className={`relative h-4.5 w-8 flex-none rounded-[9px] ${
-          checked ? "bg-accent-dark" : "bg-main-600"
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 size-3.5 rounded-full bg-main-900 ${
-            checked ? "left-4" : "left-0.5"
-          }`}
-        />
-      </span>
-      <span className="text-[12px] text-main-300">{label}</span>
-    </button>
+      <span className="text-sm">{label}</span>
+    </InputCheckSlided>
   );
 }

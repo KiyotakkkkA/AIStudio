@@ -112,14 +112,18 @@ test("migration 0003 adds adapter and auth mode and backfills from kind", () => 
 test("every registered adapter family is implemented, and an unknown one is refused", () => {
   assert.deepEqual(Object.keys(ADAPTER_REGISTRY).sort(), [
     "deepseek-web",
+    "local",
     "openai-compatible",
     "qwen-web",
   ]);
   for (const family of ADAPTER_FAMILIES) {
-    const driver = adapterEntry(family).build({ transport: createFakeTransport() });
     assert.equal(adapterEntry(family).implemented, true);
+    if (family === "local") continue;
+    const driver = adapterEntry(family).build({ transport: createFakeTransport() });
     assert.notEqual(driver.text, null);
   }
+  assert.equal(adapterCapabilities("local").embedding, true);
+  assert.equal(adapterCapabilities("local").streaming, false);
   assert.throws(
     () => adapterEntry("made-up" as AdapterFamily),
     (error: unknown) =>

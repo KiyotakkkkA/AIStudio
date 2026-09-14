@@ -2,8 +2,8 @@ import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/Button";
-import TextInput from "../../ui/atoms/TextInput";
 import SelectInput from "../../ui/atoms/SelectInput";
+import TextInput from "../../ui/atoms/TextInput";
 import Field from "../../ui/molecules/Field";
 import TextArea from "../../ui/atoms/TextArea";
 import Chip from "../../ui/atoms/Chip";
@@ -81,18 +81,20 @@ function VectorStoreForm() {
             </Field>
             <Field
               label="Модель эмбеддингов"
-              htmlFor="vs-embeddingModelId"
               required
               error={vm.errors.embeddingModelId}
             >
-              <TextInput
-                id="vs-embeddingModelId"
+              <SelectInput
+                label="Модель эмбеддингов"
                 value={vm.embeddingModelId}
-                placeholder="mxbai-embed-large"
-                mono
+                placeholder="Выберите модель"
                 invalid={!!vm.errors.embeddingModelId}
-                disabled={!vm.isNew || store.busy}
-                onChange={(e) => vm.set("embeddingModelId", e.target.value)}
+                disabled={!vm.isNew || store.busy || !vm.embeddingProviderId}
+                options={vm.embeddingModels.map((model) => ({
+                  value: model.externalId,
+                  label: model.displayName || model.externalId,
+                }))}
+                onChange={(value) => vm.set("embeddingModelId", value)}
               />
             </Field>
             {fields.map(([key, label]) => (

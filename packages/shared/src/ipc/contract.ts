@@ -22,6 +22,7 @@ import {
   DownloadDto,
   DownloadListFilter,
   DownloadRef,
+  PrioritiseDownloadInput,
   StartDownloadInput,
 } from "../downloads/index.js";
 import { CreateSecretInput } from "../secrets/CreateSecretInput.js";
@@ -142,6 +143,7 @@ export const contract = defineContract({
     input: DownloadRef,
     output: z.object({ id: DownloadId, removed: z.literal(true) }),
   },
+  "downloads.prioritise": { input: PrioritiseDownloadInput, output: DownloadDto },
   "downloads.catalogue": { input: CatalogueFilter, output: z.array(CatalogueItemDto) },
   "downloads.disk": {
     input: z.object({ refresh: z.boolean().default(false) }),

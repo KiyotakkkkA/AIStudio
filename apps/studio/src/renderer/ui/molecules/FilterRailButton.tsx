@@ -1,7 +1,7 @@
-import StatusDot from "../../ui/atoms/StatusDot";
-import type { StatusTone } from "../../ui/atoms/statusTone";
+import StatusDot from "../atoms/StatusDot";
+import type { StatusTone } from "../atoms/statusTone";
 
-export interface TaskFilterButtonProps {
+export interface FilterRailButtonProps {
   readonly active: boolean;
   readonly label: string;
   readonly count: number;
@@ -9,13 +9,13 @@ export interface TaskFilterButtonProps {
   readonly onClick: () => void;
 }
 
-export default function TaskFilterButton({
+export default function FilterRailButton({
   active,
   label,
   count,
   tone,
   onClick,
-}: TaskFilterButtonProps) {
+}: FilterRailButtonProps) {
   return (
     <button
       type="button"

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ADAPTER_FAMILIES = ["openai-compatible", "qwen-web", "deepseek-web"] as const;
+export const ADAPTER_FAMILIES = ["openai-compatible", "qwen-web", "deepseek-web", "local"] as const;
 export const AdapterFamily = z.enum(ADAPTER_FAMILIES);
 export type AdapterFamily = z.infer<typeof AdapterFamily>;
 
@@ -14,6 +14,14 @@ export type AccountFamily = z.infer<typeof AccountFamily>;
 
 export function isAccountFamily(family: AdapterFamily): family is AccountFamily {
   return (ACCOUNT_FAMILIES as readonly string[]).includes(family);
+}
+
+export const LOCAL_FAMILY = "local";
+
+export const LOCAL_BASE_URL = "local://models";
+
+export function isLocalFamily(family: AdapterFamily): family is typeof LOCAL_FAMILY {
+  return family === LOCAL_FAMILY;
 }
 
 export const TUNABLE_PARAMETERS = ["temperature", "topK", "topP", "maxOutputTokens"] as const;

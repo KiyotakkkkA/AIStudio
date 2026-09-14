@@ -48,6 +48,16 @@ export const ADAPTERS: AdapterDescriptorDto[] = [
     honours: { temperature: false, topK: false, topP: false, maxOutputTokens: false },
     implemented: true,
   },
+  {
+    family: "local",
+    authModes: ["api"],
+    streaming: false,
+    liveModelList: true,
+    embedding: true,
+    image: false,
+    honours: { temperature: false, topK: false, topP: false, maxOutputTokens: false },
+    implemented: true,
+  },
 ];
 
 export const SECRETS: SecretSummaryDto[] = [

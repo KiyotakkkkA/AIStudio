@@ -265,6 +265,15 @@ export class DownloadService {
     return this.toDto(updated);
   }
 
+  prioritise(id: string, priority: number): DownloadDto {
+    const row = this.require(id);
+    if (row.status !== "queued")
+      throw new AppError(AppErrorCode.CONFLICT, "Приоритет меняется только у ожидающих загрузок");
+    const updated = this.repository.update(id, { priority, updatedAt: this.now() });
+    this.pump();
+    return this.toDto(updated);
+  }
+
   async cancel(id: string): Promise<DownloadDto> {
     const row = this.require(id);
     if (TERMINAL.includes(row.status)) return this.toDto(row);

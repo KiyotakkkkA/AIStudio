@@ -1,5 +1,7 @@
 import { makeAutoObservable } from "mobx";
 import {
+  isLocalFamily,
+  LOCAL_BASE_URL,
   PROVIDER_CAPABILITIES,
   type AccountDto,
   type AccountId,
@@ -83,6 +85,7 @@ export class ProviderFormVm {
 
   private adapters: readonly AdapterDescriptorDto[];
   private accounts: readonly AccountDto[];
+  private readonly tab: ProviderCapability;
   private readonly initial: Snapshot;
 
   constructor(options: {
@@ -93,6 +96,7 @@ export class ProviderFormVm {
   }) {
     this.adapters = options.adapters;
     this.accounts = options.accounts;
+    this.tab = options.capability;
     const provider = options.provider ?? null;
     this.providerId = provider?.id ?? null;
 
@@ -125,9 +129,9 @@ export class ProviderFormVm {
     }
 
     this.initial = this.snapshot();
-    makeAutoObservable<ProviderFormVm, "initial" | "adapters" | "accounts">(
+    makeAutoObservable<ProviderFormVm, "initial" | "adapters" | "accounts" | "tab">(
       this,
-      { initial: false, adapters: false, accounts: false },
+      { initial: false, adapters: false, accounts: false, tab: false },
       { autoBind: true },
     );
   }
@@ -140,8 +144,14 @@ export class ProviderFormVm {
     return this.adapters.find((entry) => entry.family === this.adapter) ?? FALLBACK_DESCRIPTOR;
   }
 
+  get isLocal(): boolean {
+    return isLocalFamily(this.adapter);
+  }
+
   get adapterOptions(): readonly AdapterDescriptorDto[] {
-    return this.adapters;
+    return this.adapters.filter(
+      (entry) => !isLocalFamily(entry.family) || this.tab === "embedding" || this.isLocal,
+    );
   }
 
   get accountOptions(): readonly AccountDto[] {
@@ -178,6 +188,9 @@ export class ProviderFormVm {
   }
 
   capabilityDisabledReason(capability: ProviderCapability): string | null {
+    if (this.isLocal && capability !== "embedding") {
+      return "Локальное семейство пока отдаёт только эмбеддинги.";
+    }
     if (capability === "embedding" && !this.descriptor.embedding) {
       return `Семейство ${this.adapter} не отдаёт эмбеддинги.`;
     }
@@ -204,6 +217,19 @@ export class ProviderFormVm {
     this.adapter = adapter;
     if (this.baseUrl.trim().length === 0 || this.baseUrl === previous) {
       this.baseUrl = suggestedBaseUrl(this.kind, adapter);
+    }
+    if (isLocalFamily(adapter)) {
+      this.kind = "openai-compatible";
+      this.authMode = "api";
+      this.secretId = null;
+      this.accountId = null;
+      this.capabilities = ["embedding"];
+      this.clearError("baseUrl");
+      this.clearError("secretId");
+      this.clearError("capabilities");
+      this.clearError("adapter");
+      this.forgetProbe();
+      return;
     }
     const modes = this.descriptor.authModes;
     const fallback = modes[0];
@@ -307,14 +333,19 @@ export class ProviderFormVm {
     if (name.length === 0) errors.name = "Укажите название подключения.";
     else if (name.length > 128) errors.name = "Не длиннее 128 символов.";
 
+    if (!this.descriptor.implemented) {
+      errors.adapter = `Семейство ${this.adapter} ещё не реализовано.`;
+    }
+    if (this.isLocal) {
+      this.errors = errors;
+      return Object.keys(errors).length === 0;
+    }
+
     const baseUrl = this.effectiveBaseUrl();
     if (baseUrl.length === 0) errors.baseUrl = "Укажите базовый адрес.";
     else if (!isUrl(baseUrl)) errors.baseUrl = "Нужен полный адрес, например https://host/api.";
 
     if (this.capabilities.length === 0) errors.capabilities = "Выберите хотя бы одну возможность.";
-    if (!this.descriptor.implemented) {
-      errors.adapter = `Семейство ${this.adapter} ещё не реализовано.`;
-    }
     if (this.authModeDisabledReason(this.authMode) !== null) {
       errors.authMode = this.authModeDisabledReason(this.authMode) ?? "";
     }
@@ -330,6 +361,7 @@ export class ProviderFormVm {
   }
 
   effectiveBaseUrl(): string {
+    if (this.isLocal) return LOCAL_BASE_URL;
     const typed = this.baseUrl.trim();
     return typed.length > 0 ? typed : suggestedBaseUrl(this.kind, this.adapter);
   }
@@ -354,9 +386,9 @@ export class ProviderFormVm {
       adapter: this.adapter,
       authMode: this.authMode,
       baseUrl: this.effectiveBaseUrl(),
-      secretId: this.authMode === "api" ? this.secretId : null,
-      accountId: this.authMode === "account" ? this.accountId : null,
-      capabilities: [...this.capabilities],
+      secretId: this.isLocal || this.authMode !== "api" ? null : this.secretId,
+      accountId: this.isLocal || this.authMode !== "account" ? null : this.accountId,
+      capabilities: this.isLocal ? ["embedding"] : [...this.capabilities],
       settings: this.settingsPayload(),
     };
   }

@@ -1,3 +1,4 @@
+import { LOCAL_BASE_URL } from "@zvs/shared";
 import type {
   AdapterFamily,
   AuthMode,
@@ -28,13 +29,14 @@ export const KIND_LABELS: Record<ProviderKind, string> = {
   ollama: "Ollama",
   openrouter: "OpenRouter",
   mistral: "Mistral",
-  "openai-compatible": "Совместимый с OpenAI",
+  "openai-compatible": "Иное (совместимое с OpenAI)",
 };
 
 export const ADAPTER_LABELS: Record<AdapterFamily, string> = {
-  "openai-compatible": "openai-compatible",
-  "qwen-web": "qwen-web",
-  "deepseek-web": "deepseek-web",
+  "openai-compatible": "Совместимый с OpenAI (API)",
+  "qwen-web": "Qwen (веб)",
+  "deepseek-web": "DeepSeek (веб)",
+  local: "Локальные модели",
 };
 
 export const AUTH_MODE_LABELS: Record<AuthMode, string> = {
@@ -67,6 +69,7 @@ const KIND_BASE_URLS: Record<ProviderKind, string> = {
 const ADAPTER_BASE_URLS: Partial<Record<AdapterFamily, string>> = {
   "qwen-web": "https://chat.qwen.ai/api/v2",
   "deepseek-web": "https://chat.deepseek.com/api",
+  local: LOCAL_BASE_URL,
 };
 
 const KIND_SECRET_TYPES: Record<ProviderKind, readonly string[]> = {

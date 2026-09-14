@@ -39,8 +39,8 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
   const summary = providers.selectedSummary;
   const pickable = secretsForKind(providers.secrets, vm.kind);
   const account = vm.account;
-  const hasAuthModeChoice = vm.descriptor.authModes.length > 1;
-  const showsVendor = !isAccountFamily(vm.adapter);
+  const hasAuthModeChoice = !vm.isLocal && vm.descriptor.authModes.length > 1;
+  const showsVendor = !vm.isLocal && !isAccountFamily(vm.adapter);
 
   return (
     <section className="flex min-w-0 flex-[1.35] flex-col gap-3.25 rounded-card border border-main-750 bg-main-900 p-4">
@@ -125,7 +125,12 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
         </div>
       ) : null}
 
-      {vm.usesAccount ? (
+      {vm.isLocal ? (
+        <p className="rounded-[6px] border border-dashed border-main-750 px-3 py-2.25 text-[12px] text-main-400">
+          Модели читаются из папки загрузок этого компьютера. Ничего настраивать не нужно — нажмите
+          «Найти модели», чтобы увидеть найденные файлы.
+        </p>
+      ) : vm.usesAccount ? (
         <Field label="Связанный аккаунт" error={vm.errorOf("accountId")}>
           {vm.accountOptions.length === 0 ? (
             <div className="flex items-center gap-2.5 rounded-[6px] border border-dashed border-main-750 px-2.5 py-2 text-[12px] text-main-400">
@@ -216,30 +221,32 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
         </>
       )}
 
-      <Field label="Возможности" error={vm.errorOf("capabilities")}>
-        <div className="flex flex-wrap gap-1.5">
-          {PROVIDER_CAPABILITIES.map((capability) => {
-            const reason = vm.capabilityDisabledReason(capability);
-            const active = vm.capabilities.includes(capability);
-            return (
-              <Chip
-                key={capability}
-                tone={active ? "selected" : "neutral"}
-                title={reason ?? undefined}
-                onClick={
-                  reason === null
-                    ? () => {
-                        vm.toggleCapability(capability);
-                      }
-                    : undefined
-                }
-              >
-                {CAPABILITY_LABELS[capability]}
-              </Chip>
-            );
-          })}
-        </div>
-      </Field>
+      {vm.isLocal ? null : (
+        <Field label="Возможности" error={vm.errorOf("capabilities")}>
+          <div className="flex flex-wrap gap-1.5">
+            {PROVIDER_CAPABILITIES.map((capability) => {
+              const reason = vm.capabilityDisabledReason(capability);
+              const active = vm.capabilities.includes(capability);
+              return (
+                <Chip
+                  key={capability}
+                  tone={active ? "selected" : "neutral"}
+                  title={reason ?? undefined}
+                  onClick={
+                    reason === null
+                      ? () => {
+                          vm.toggleCapability(capability);
+                        }
+                      : undefined
+                  }
+                >
+                  {CAPABILITY_LABELS[capability]}
+                </Chip>
+              );
+            })}
+          </div>
+        </Field>
+      )}
 
       <div className="mt-0.5 flex items-center gap-3">
         <Button
@@ -251,7 +258,13 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
           }}
         >
           <Icon path={mdiFlashOutline} size={15} />
-          {providers.probing ? "Проверяем…" : "Проверить связь"}
+          {providers.probing
+            ? vm.isLocal
+              ? "Ищем…"
+              : "Проверяем…"
+            : vm.isLocal
+              ? "Найти модели"
+              : "Проверить связь"}
         </Button>
         <ProbeResultLine result={vm.probeResult} probing={providers.probing} />
       </div>

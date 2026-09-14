@@ -120,6 +120,12 @@ export type DiskUsageDto = z.infer<typeof DiskUsageDto>;
 export const DownloadRef = z.object({ id: DownloadId });
 export type DownloadRef = z.infer<typeof DownloadRef>;
 
+export const PrioritiseDownloadInput = z.object({
+  id: DownloadId,
+  priority: z.number().int().min(0).max(9),
+});
+export type PrioritiseDownloadInput = z.infer<typeof PrioritiseDownloadInput>;
+
 export const StartDownloadInput = z.object({
   ref: ItemRef,
   priority: z.number().int().min(0).max(9).optional(),
