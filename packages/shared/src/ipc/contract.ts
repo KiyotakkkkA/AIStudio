@@ -14,7 +14,7 @@ import { StepDto } from "../runs/StepDto.js";
 import { StreamId } from "../primitives/branded.js";
 import { Timestamp } from "../primitives/time.js";
 import { Json } from "../primitives/json.js";
-import { SecretId } from "../primitives/branded.js";
+import { DocumentId, SecretId, VectorStoreId } from "../primitives/branded.js";
 import { CreateSecretInput } from "../secrets/CreateSecretInput.js";
 import { UpdateSecretInput } from "../secrets/UpdateSecretInput.js";
 import { SecretDto, SecretScope, SecretSummaryDto } from "../secrets/SecretDto.js";
@@ -43,6 +43,13 @@ import {
   VectorSearchInput,
   VectorSearchHitDto,
   VectorSearchResultDto,
+  VectorDocumentDto,
+  VectorSourceDto,
+  VectorSourceRef,
+  AddVectorSourceInput,
+  PickVectorSourceInput,
+  PickVectorSourceResult,
+  VectorIndexInput,
 } from "../vectorStores/index.js";
 
 export const SecretFilter = z.object({
@@ -104,6 +111,19 @@ export const contract = defineContract({
   "vectorStores.search": { input: VectorSearchInput, output: z.array(VectorSearchHitDto) },
   "vectorStores.searchTimed": { input: VectorSearchInput, output: VectorSearchResultDto },
   "vectorStores.reconcile": { input: VectorStoreRef, output: VectorStoreDto },
+  "vectorStores.sources.list": { input: VectorStoreRef, output: z.array(VectorSourceDto) },
+  "vectorStores.sources.add": { input: AddVectorSourceInput, output: VectorSourceDto },
+  "vectorStores.sources.remove": {
+    input: VectorSourceRef,
+    output: VectorSourceRef.extend({ removed: z.literal(true) }),
+  },
+  "vectorStores.sources.pick": { input: PickVectorSourceInput, output: PickVectorSourceResult },
+  "vectorStores.documents.list": { input: VectorStoreRef, output: z.array(VectorDocumentDto) },
+  "vectorStores.documents.remove": {
+    input: z.object({ storeId: VectorStoreId, id: DocumentId }),
+    output: z.object({ id: DocumentId, removed: z.literal(true) }),
+  },
+  "vectorStores.index": { input: VectorIndexInput, output: RunHandleDto },
   "accounts.list": { input: z.void(), output: z.array(AccountDto) },
   "accounts.link": { input: AccountLinkInput, output: AccountLinkResult },
   "accounts.cancelLink": { input: AccountLinkInput, output: z.object({ cancelled: z.boolean() }) },

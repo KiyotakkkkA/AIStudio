@@ -1,7 +1,7 @@
 import { registerCoreNodes } from "./kernel/coreNodes.ts";
 import { registerJobNodes } from "./kernel/jobNodes.ts";
 import { ChatService } from "./services/ChatService.ts";
-import { app, BrowserWindow, ipcMain, net, safeStorage } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, net, safeStorage } from "electron";
 import { contract } from "@zvs/shared";
 import { createIpcServer } from "@zvs/ipc";
 import type { IpcServer } from "@zvs/ipc";
@@ -41,6 +41,7 @@ import { RunService } from "./services/RunService";
 import { RetentionService } from "./services/RetentionService";
 import { NodeRegistry } from "./kernel/NodeRegistry";
 import { SidecarDriver } from "./drivers/sidecar/SidecarDriver";
+import { IndexingService } from "./indexing/IndexingService";
 
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
@@ -198,13 +199,20 @@ if (!app.requestSingleInstanceLock()) {
         directory: paths.vectorStoresDir,
         logger,
       });
+      const indexing = new IndexingService({
+        data: database,
+        core,
+        drivers: registry,
+        stores: vectorStores,
+        logger,
+      });
       sidecar = new SidecarDriver({ binaryPath: paths.sidecarPath, logger });
       const nodes = registerJobNodes(registerCoreNodes(new NodeRegistry()));
       runs = new RunService({
         data: database,
         events: eventBus,
         registry: nodes,
-        services: { providers: registry, vectorStores, jobs: sidecar },
+        services: { providers: registry, vectorStores, jobs: sidecar, indexing },
         logger,
       });
       const chat = new ChatService({ data: database, runs, registry: nodes, logger });
@@ -217,6 +225,16 @@ if (!app.requestSingleInstanceLock()) {
           chat,
           runs,
           vectorStores,
+          indexing,
+          pickSources: async (kind) => {
+            const result = await dialog.showOpenDialog({
+              properties:
+                kind === "folder"
+                  ? ["openDirectory", "createDirectory"]
+                  : ["openFile", "multiSelections"],
+            });
+            return result.canceled ? [] : result.filePaths;
+          },
           events: eventBus,
           settings,
           secrets,

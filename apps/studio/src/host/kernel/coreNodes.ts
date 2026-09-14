@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { AppError, AppErrorCode, VectorSearchHitDto, VectorSearchInput } from "@zvs/shared";
+import {
+  AppError,
+  AppErrorCode,
+  VectorIndexInput,
+  VectorIndexReportDto,
+  VectorSearchHitDto,
+  VectorSearchInput,
+} from "@zvs/shared";
 import { NodeRegistry } from "./NodeRegistry.ts";
 
 export const GenerateNodeInput = z.object({
@@ -56,6 +63,26 @@ export function registerCoreNodes(registry: NodeRegistry): NodeRegistry {
       );
       context.signal.throwIfAborted();
       return hits;
+    },
+  });
+  registry.register({
+    type: "vector.index",
+    input: VectorIndexInput,
+    output: VectorIndexReportDto,
+    permission: { tool: "vector.index" },
+    sideEffect: true,
+    async run(context, input) {
+      context.signal.throwIfAborted();
+      if (!context.services.indexing)
+        throw new AppError(AppErrorCode.CONFLICT, "Сервис индексации недоступен");
+      return context.services.indexing.index(input, {
+        signal: context.signal,
+        onProgress: ({ done, total, message }) => {
+          context.emit({ type: "progress", done, total });
+          if (message !== undefined)
+            context.emit({ type: "log", line: { storeId: input.storeId, message } });
+        },
+      });
     },
   });
   registry.register({

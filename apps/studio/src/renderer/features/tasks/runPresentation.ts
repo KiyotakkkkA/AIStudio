@@ -4,6 +4,7 @@ import {
   mdiGraphOutline,
   mdiTrayArrowDown,
   mdiWeb,
+  mdiDatabaseArrowDownOutline,
 } from "@mdi/js";
 import type { RunDto, RunSummaryDto } from "@zvs/shared";
 import type { StatusTone } from "../../ui/atoms/statusTone";
@@ -16,6 +17,7 @@ export const KIND_LABELS: Record<RunKind, string> = {
   scenario: "сценарий",
   agentic: "агент",
   job: "задание",
+  indexing: "индексация",
   browser: "браузер",
 };
 
@@ -24,6 +26,7 @@ export const KIND_FILTER_LABELS: Record<RunKind, string> = {
   scenario: "Сценарии",
   agentic: "Сессии агента",
   job: "Задания",
+  indexing: "Индексация",
   browser: "Браузер",
 };
 
@@ -32,6 +35,7 @@ export const KIND_ICONS: Record<RunKind, string> = {
   scenario: mdiGraphOutline,
   agentic: mdiCreationOutline,
   job: mdiTrayArrowDown,
+  indexing: mdiDatabaseArrowDownOutline,
   browser: mdiWeb,
 };
 
@@ -105,6 +109,10 @@ export function shortRunId(id: string): string {
 
 export function runSubline(run: RunSummaryDto): string {
   const { done, total } = run.progress;
+  if (run.kind === "indexing")
+    return total > 0
+      ? `${done.toLocaleString("ru-RU")} из ${total.toLocaleString("ru-RU")} фрагментов встроено`
+      : "подготовка индексации";
   if (run.kind === "job")
     return total > 0 ? `${String(done)} из ${String(total)} ед. обработано` : "единицы работы";
   if (total === 0) return "без шагов";

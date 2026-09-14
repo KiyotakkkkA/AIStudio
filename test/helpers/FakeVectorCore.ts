@@ -10,6 +10,7 @@ import type {
 export class FakeVectorCore implements VectorCorePort {
   readonly tables = new Map<string, VectorStats>();
   readonly rows = new Map<string, VectorRow[]>();
+  upserts = 0;
   async createVectorIndex(path: string, dimension: number, metric: VectorMetric = "cosine") {
     const stats = {
       dimension,
@@ -20,6 +21,7 @@ export class FakeVectorCore implements VectorCorePort {
       indexType: "FLAT",
     };
     this.tables.set(path, stats);
+    this.rows.set(path, []);
     return stats;
   }
   async vectorStats(path: string) {
@@ -34,14 +36,14 @@ export class FakeVectorCore implements VectorCorePort {
     this.tables.delete(path);
     this.rows.delete(path);
   }
-  async upsertVectors(path: string, rows: VectorRow[]) {
-    const stats = await this.vectorStats(path);
-    this.rows.set(path, rows);
-    this.tables.set(path, {
-      ...stats,
-      rowCount: rows.length,
-      documentCount: new Set(rows.map((row) => row.documentId)).size,
-    });
+  async upsertVectors(path: string, rows: VectorRow[], signal?: AbortSignal) {
+    if (signal?.aborted === true)
+      throw new AppError(AppErrorCode.RUN_CANCELLED, "Операция отменена");
+    await this.vectorStats(path);
+    this.upserts += 1;
+    const incoming = new Set(rows.map((row) => row.id));
+    const kept = (this.rows.get(path) ?? []).filter((row) => !incoming.has(row.id));
+    this.write(path, [...kept, ...rows]);
     return rows.length;
   }
   async searchVectors(path: string): Promise<VectorHit[]> {
@@ -55,6 +57,30 @@ export class FakeVectorCore implements VectorCorePort {
       score: 1,
     }));
   }
-  async deleteVectorsByIds() {}
-  async deleteVectorsBySource() {}
+  async deleteVectorsByIds(path: string, ids: string[]) {
+    const gone = new Set(ids);
+    this.write(
+      path,
+      (this.rows.get(path) ?? []).filter((row) => !gone.has(row.id)),
+    );
+  }
+  async deleteVectorsBySource(path: string, documentId: string) {
+    this.write(
+      path,
+      (this.rows.get(path) ?? []).filter((row) => row.documentId !== documentId),
+    );
+  }
+  rowsFor(path: string, documentId: string): VectorRow[] {
+    return (this.rows.get(path) ?? []).filter((row) => row.documentId === documentId);
+  }
+  private write(path: string, rows: VectorRow[]): void {
+    this.rows.set(path, rows);
+    const stats = this.tables.get(path);
+    if (!stats) return;
+    this.tables.set(path, {
+      ...stats,
+      rowCount: rows.length,
+      documentCount: new Set(rows.map((row) => row.documentId)).size,
+    });
+  }
 }

@@ -31,7 +31,7 @@ export class RootStore {
     this.secrets = new SecretStore(environment.ipc);
     this.providers = new ProviderStore(environment.ipc);
     this.accounts = new AccountStore(environment);
-    this.vectorStores = new VectorStoreStore(environment.ipc);
+    this.vectorStores = new VectorStoreStore(environment.ipc, environment.events);
     this.chat = new ChatStore(environment.ipc, environment.events);
     this.tasks = new TaskStore(environment.ipc, environment.events);
     this.runs = new RunHistoryStore(environment.ipc);
@@ -66,6 +66,7 @@ export class RootStore {
 
   dispose(): void {
     this.accounts.dispose();
+    this.vectorStores.dispose();
     this.chat.dispose();
     this.tasks.dispose();
     this.runs.dispose();

@@ -7,7 +7,13 @@ import {
   type VectorStoreDto,
   type VectorStoreId,
   type VectorSearchResultDto,
+  type VectorSourceDto,
+  type VectorSourceKind,
+  type VectorDocumentDto,
+  type DocumentId,
+  type RunId,
 } from "@zvs/shared";
+import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import VectorStoreFormVm from "./VectorStoreFormVm";
 import { searchRows } from "./searchRows";
 
@@ -23,6 +29,14 @@ export default class VectorStoreStore {
   k = "5";
   minScore = "0.35";
   result: VectorSearchResultDto | null = null;
+  sources: VectorSourceDto[] = [];
+  documents: VectorDocumentDto[] = [];
+  sourceKind: VectorSourceKind = "folder";
+  sourcePath = "";
+  sourceInclude = "";
+  sourceExclude = "node_modules, .git, dist, build";
+  indexRun: { id: RunId; done: number; total: number; note: string } | null = null;
+  documentsLoading = false;
   loading = false;
   loaded = false;
   busy = false;
@@ -30,8 +44,17 @@ export default class VectorStoreStore {
   error: string | null = null;
   private revision = 0;
 
-  constructor(private readonly ipc: IpcClient<Contract>) {
-    makeAutoObservable<VectorStoreStore, "ipc">(this, { ipc: false }, { autoBind: true });
+  private stopIndexStream: (() => void) | null = null;
+
+  constructor(
+    private readonly ipc: IpcClient<Contract>,
+    private readonly events?: EventRouter,
+  ) {
+    makeAutoObservable<VectorStoreStore, "ipc" | "events">(
+      this,
+      { ipc: false, events: false },
+      { autoBind: true },
+    );
   }
   get visibleStores() {
     const q = this.filter.trim().toLowerCase();
@@ -43,8 +66,25 @@ export default class VectorStoreStore {
   get hitCount() {
     return this.rows.filter((r) => !r.belowFloor).length;
   }
-  set(field: "filter" | "query" | "k" | "minScore" | "tab", value: string) {
+  set(
+    field:
+      | "filter"
+      | "query"
+      | "k"
+      | "minScore"
+      | "tab"
+      | "sourcePath"
+      | "sourceInclude"
+      | "sourceExclude",
+    value: string,
+  ) {
     this[field] = value;
+  }
+  setSourceKind(kind: VectorSourceKind) {
+    this.sourceKind = kind;
+  }
+  get indexing() {
+    return this.indexRun !== null;
   }
   async load() {
     if (this.loading) return;
@@ -80,6 +120,8 @@ export default class VectorStoreStore {
     this.selectedId = id;
     this.detail = null;
     this.result = null;
+    this.sources = [];
+    this.documents = [];
     this.searching = false;
     this.error = null;
     try {
@@ -90,6 +132,7 @@ export default class VectorStoreStore {
           this.merge(detail);
         }
       });
+      if (revision === this.revision) await this.loadDocuments(id);
     } catch (error) {
       runInAction(() => {
         if (revision === this.revision) this.error = errorCopy(error);
@@ -193,6 +236,142 @@ export default class VectorStoreStore {
       });
     }
   }
+  async loadDocuments(id: VectorStoreId | null = this.selectedId) {
+    if (!id) return;
+    this.documentsLoading = true;
+    try {
+      const [sources, documents] = await Promise.all([
+        this.ipc.call("vectorStores.sources.list", { id }),
+        this.ipc.call("vectorStores.documents.list", { id }),
+      ]);
+      runInAction(() => {
+        if (this.selectedId !== id) return;
+        this.sources = sources;
+        this.documents = documents;
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.error = errorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.documentsLoading = false;
+      });
+    }
+  }
+  async pickSource() {
+    const id = this.selectedId;
+    if (!id || this.busy) return false;
+    return this.mutate(async () => {
+      const { paths } = await this.ipc.call("vectorStores.sources.pick", {
+        kind: this.sourceKind,
+      });
+      for (const path of paths) await this.submitSource(id, path);
+      await this.loadDocuments(id);
+    });
+  }
+  async addSource() {
+    const id = this.selectedId;
+    const path = this.sourcePath.trim();
+    if (!id || !path || this.busy) return false;
+    return this.mutate(async () => {
+      await this.submitSource(id, path);
+      runInAction(() => {
+        this.sourcePath = "";
+      });
+      await this.loadDocuments(id);
+    });
+  }
+  async removeSource(sourceId: string) {
+    if (this.busy) return false;
+    return this.mutate(async () => {
+      await this.ipc.call("vectorStores.sources.remove", { id: sourceId });
+      await this.loadDocuments();
+    });
+  }
+  async removeDocument(documentId: DocumentId) {
+    const storeId = this.selectedId;
+    if (!storeId || this.busy) return false;
+    return this.mutate(async () => {
+      await this.ipc.call("vectorStores.documents.remove", { storeId, id: documentId });
+      const detail = await this.ipc.call("vectorStores.get", { id: storeId });
+      runInAction(() => {
+        this.merge(detail);
+        if (this.selectedId === storeId) this.detail = detail;
+      });
+      await this.loadDocuments(storeId);
+    });
+  }
+  async startIndex(full = false) {
+    const storeId = this.selectedId;
+    if (!storeId || this.busy || this.indexRun) return false;
+    return this.mutate(async () => {
+      const handle = await this.ipc.call("vectorStores.index", { storeId, full });
+      runInAction(() => {
+        this.indexRun = { id: handle.id, done: 0, total: 0, note: "Индексация запущена" };
+      });
+      this.stopIndexStream?.();
+      this.stopIndexStream =
+        this.events?.subscribe(handle.streamId, (event) => {
+          this.receiveIndexEvent(storeId, event);
+        }) ?? null;
+    });
+  }
+  async cancelIndex() {
+    const run = this.indexRun;
+    if (!run) return;
+    try {
+      await this.ipc.call("runs.cancel", { id: run.id });
+    } catch (error) {
+      runInAction(() => {
+        this.error = errorCopy(error);
+      });
+    }
+  }
+  private receiveIndexEvent(storeId: VectorStoreId, event: RoutedEvent) {
+    runInAction(() => {
+      if (!this.indexRun) return;
+      if (event.type === "progress")
+        this.indexRun = { ...this.indexRun, done: event.done, total: event.total };
+      else if (event.type === "log" && typeof event.line.message === "string")
+        this.indexRun = { ...this.indexRun, note: event.line.message };
+    });
+    if (event.type !== "end") return;
+    this.stopIndexStream?.();
+    this.stopIndexStream = null;
+    runInAction(() => {
+      this.indexRun = null;
+      if (event.outcome.status === "failed" && event.outcome.message !== undefined)
+        this.error = event.outcome.message;
+    });
+    void this.refreshAfterIndex(storeId);
+  }
+  private async refreshAfterIndex(storeId: VectorStoreId) {
+    try {
+      const detail = await this.ipc.call("vectorStores.get", { id: storeId });
+      runInAction(() => {
+        this.merge(detail);
+        if (this.selectedId === storeId) this.detail = detail;
+      });
+    } catch {
+      /* the detail refresh is best effort; the store list stays as it was */
+    }
+    await this.loadDocuments(storeId);
+  }
+  private async submitSource(storeId: VectorStoreId, path: string) {
+    await this.ipc.call("vectorStores.sources.add", {
+      storeId,
+      kind: this.sourceKind,
+      path,
+      include: splitPatterns(this.sourceInclude),
+      exclude: splitPatterns(this.sourceExclude),
+      recursive: true,
+    });
+  }
+  dispose() {
+    this.stopIndexStream?.();
+    this.stopIndexStream = null;
+  }
   private merge(detail: VectorStoreDto) {
     this.stores = this.stores.some((s) => s.id === detail.id)
       ? this.stores.map((s) => (s.id === detail.id ? detail : s))
@@ -216,6 +395,13 @@ export default class VectorStoreStore {
       });
     }
   }
+}
+
+function splitPatterns(value: string): string[] {
+  return value
+    .split(/[\n,]/)
+    .map((pattern) => pattern.trim())
+    .filter((pattern) => pattern.length > 0);
 }
 
 function errorCopy(error: unknown) {

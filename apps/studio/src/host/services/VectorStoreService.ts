@@ -214,6 +214,18 @@ export class VectorStoreService {
     });
   }
 
+  withExclusiveStore<T>(id: string, work: (row: VectorStoreEntity) => Promise<T>): Promise<T> {
+    return this.exclusive(id, () => work(this.require(id)));
+  }
+
+  requireStore(id: string): VectorStoreEntity {
+    return this.require(id);
+  }
+
+  storePath(id: string): string {
+    return this.path(id);
+  }
+
   private async observe(row: VectorStoreEntity) {
     try {
       this.requireBackend(row);

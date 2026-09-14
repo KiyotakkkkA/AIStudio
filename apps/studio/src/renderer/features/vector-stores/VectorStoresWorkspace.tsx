@@ -43,7 +43,7 @@ function VectorStoresWorkspace() {
             }}
           >
             <Icon path={mdiRefresh} size={15} />
-            Полная переиндексация
+            Сверить все
           </Button>
           <Button tone="primary" disabled={store.busy || !!store.form} onClick={store.create}>
             <Icon path={mdiPlus} size={15} />

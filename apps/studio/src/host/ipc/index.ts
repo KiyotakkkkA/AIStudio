@@ -17,12 +17,15 @@ import { createAccountHandlers } from "./accounts.ts";
 import type { AccountService } from "../services/AccountService.ts";
 import type { SystemService } from "../services/SystemService.ts";
 import type { VectorStoreService } from "../services/VectorStoreService.ts";
-import { createVectorStoreHandlers } from "./vectorStores.ts";
+import { createVectorStoreHandlers, type SourcePicker } from "./vectorStores.ts";
+import type { IndexingService } from "../indexing/IndexingService.ts";
 
 export interface HostIpcDependencies {
   chat: ChatService;
   runs: RunService;
   vectorStores: VectorStoreService;
+  indexing?: IndexingService;
+  pickSources?: SourcePicker;
   system: SystemService;
   accounts: AccountService;
   settings: SettingService;
@@ -38,7 +41,12 @@ export function createHandlers(dependencies: HostIpcDependencies): IpcHandlers<C
   return {
     ...createChatHandlers(dependencies.chat),
     ...createRunHandlers(dependencies.runs),
-    ...createVectorStoreHandlers(dependencies.vectorStores),
+    ...createVectorStoreHandlers({
+      service: dependencies.vectorStores,
+      indexing: dependencies.indexing,
+      runs: dependencies.runs,
+      pick: dependencies.pickSources,
+    }),
     ...createSystemHandlers({
       system: dependencies.system,
       runs: dependencies.runs,

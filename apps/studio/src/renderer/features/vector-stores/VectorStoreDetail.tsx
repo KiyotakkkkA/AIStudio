@@ -6,6 +6,7 @@ import Button from "../../ui/atoms/Button";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import VectorSearchPanel from "./VectorSearchPanel";
+import VectorDocumentsPanel from "./VectorDocumentsPanel";
 import { healthLabels } from "./vectorPresentation";
 import EmptyState from "../../ui/molecules/EmptyState";
 
@@ -61,16 +62,22 @@ function VectorStoreDetail() {
               Изменить
             </Button>
             <Button
-              disabled={disabled}
-              title="Сверить статистику; индексация появится в TASK_028"
+              disabled={disabled || store.indexing || store.sources.length === 0}
+              title="Переиндексировать все файлы источников"
               onClick={() => {
-                void store.reconcile();
+                void store.startIndex(true);
               }}
             >
               Полная переиндексация
             </Button>
-            <Button disabled title="Экспорт — после TASK_028">
-              Экспорт
+            <Button
+              disabled={disabled}
+              title="Сверить статистику с таблицей"
+              onClick={() => {
+                void store.reconcile();
+              }}
+            >
+              Сверить
             </Button>
             <Button
               tone="danger"
@@ -125,7 +132,7 @@ function VectorStoreDetail() {
           </div>
         ) : detail.status === "pending" || detail.vectors === 0 ? (
           <p className="text-xs text-warn">
-            Ожидает индексации. Добавление документов появится в TASK_028.
+            Ожидает индексации. Добавьте источники на вкладке Documents и запустите индексацию.
           </p>
         ) : null}
       </div>
@@ -150,11 +157,11 @@ function VectorStoreDetail() {
         </div>
         {store.tab === "Test search" ? (
           <VectorSearchPanel />
+        ) : store.tab === "Documents" ? (
+          <VectorDocumentsPanel />
         ) : (
           <ScrollArea role="tabpanel" className="space-y-3 p-4 text-xs text-main-300">
-            {store.tab === "Documents" ? (
-              <p>Управление документами и загрузка файлов появятся в TASK_028.</p>
-            ) : store.tab === "Settings" ? (
+            {store.tab === "Settings" ? (
               <>
                 <p>
                   Чанк: {detail.chunkSize} · перекрытие: {detail.chunkOverlap}
@@ -179,8 +186,7 @@ function VectorStoreDetail() {
                     : new Date(detail.lastIndexedAt).toLocaleString()}
                 </p>
                 <p>
-                  Статистика сверена при открытии. Полная переиндексация сейчас выполняет только
-                  сверку с таблицей.
+                  Источников: {store.sources.length} · документов: {store.documents.length}
                 </p>
               </>
             )}

@@ -69,11 +69,13 @@ export class RunService {
         dependencies.admit ??
         (async (requirement, context) => {
           if ("kind" in requirement) return;
+          const kind = this.get(context.runId).kind;
           if (
-            this.get(context.runId).kind === "chat" &&
+            kind === "chat" &&
             (requirement.tool === "llm.generate" || requirement.tool === "vector.search")
           )
             return;
+          if (kind === "indexing" && requirement.tool === "vector.index") return;
           const run = this.get(context.runId);
           const scopes = [
             ...(run.graph.permissionScopes ?? []),

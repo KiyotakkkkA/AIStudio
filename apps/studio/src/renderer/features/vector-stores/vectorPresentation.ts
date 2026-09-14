@@ -12,3 +12,13 @@ export const healthColors: Record<VectorHealth, string> = {
   pending: "bg-warn",
   broken: "bg-err",
 };
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${String(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function formatIndexedAt(timestamp: number): string {
+  return new Date(timestamp).toLocaleString("ru-RU", { hour12: false });
+}

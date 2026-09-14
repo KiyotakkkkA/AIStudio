@@ -9,7 +9,8 @@ import { ModelRepository } from "./ModelRepository.ts";
 import { AccountRepository } from "./AccountRepository.ts";
 import { VectorStoreRepository } from "./VectorStoreRepository.ts";
 import { VectorDocumentRepository } from "./VectorDocumentRepository.ts";
-export { VectorStoreRepository, VectorDocumentRepository };
+import { VectorSourceRepository } from "./VectorSourceRepository.ts";
+export { VectorStoreRepository, VectorDocumentRepository, VectorSourceRepository };
 
 export { Repository } from "./Repository.ts";
 export { SecretRepository } from "./SecretRepository.ts";
@@ -27,6 +28,7 @@ export interface Repositories {
   readonly runs: RunRepository;
   readonly vectorStores: VectorStoreRepository;
   readonly vectorDocuments: VectorDocumentRepository;
+  readonly vectorSources: VectorSourceRepository;
   readonly secrets: SecretRepository;
   readonly settings: SettingRepository;
   readonly providers: ProviderRepository;
@@ -41,6 +43,7 @@ export function createRepositories(db: DatabaseHandle): Repositories {
     runs: new RunRepository(db),
     vectorStores: new VectorStoreRepository(db),
     vectorDocuments: new VectorDocumentRepository(db),
+    vectorSources: new VectorSourceRepository(db),
     secrets: new SecretRepository(db),
     settings: new SettingRepository(db),
     providers: new ProviderRepository(db),

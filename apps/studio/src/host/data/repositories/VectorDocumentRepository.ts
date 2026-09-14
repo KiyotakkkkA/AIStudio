@@ -11,6 +11,9 @@ export class VectorDocumentRepository extends Repository {
       .orderBy(asc(vectorDocument.sourcePath))
       .all();
   }
+  findById(id: string) {
+    return this.db.select().from(vectorDocument).where(eq(vectorDocument.id, id)).get();
+  }
   findBySource(storeId: string, sourcePath: string) {
     return this.db
       .select()
@@ -33,6 +36,9 @@ export class VectorDocumentRepository extends Repository {
       })
       .returning()
       .get();
+  }
+  remove(id: string): void {
+    this.db.delete(vectorDocument).where(eq(vectorDocument.id, id)).run();
   }
   removeBySource(storeId: string, sourcePath: string): void {
     this.db
