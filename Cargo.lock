@@ -6055,8 +6055,13 @@ dependencies = [
 name = "zvs-jobd"
 version = "0.1.0"
 dependencies = [
+ "blake3",
+ "futures",
+ "reqwest",
  "serde",
  "serde_json",
+ "sha2",
+ "tempfile",
  "tokio",
  "tokio-util",
  "zvs-core",

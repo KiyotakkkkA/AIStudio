@@ -26,7 +26,7 @@ const counts: RunCountsDto = {
     cancelled: 0,
     interrupted: 0,
   },
-  byKind: { chat: 0, scenario: 2, agentic: 0, job: 0, indexing: 0, browser: 0 },
+  byKind: { chat: 0, scenario: 2, agentic: 0, job: 0, indexing: 0, download: 0, browser: 0 },
 };
 
 const blocked = RunSummaryDto.parse({

@@ -13,14 +13,19 @@ name = "zvs-jobd"
 path = "src/main.rs"
 
 [dependencies]
+blake3.workspace = true
+futures.workspace = true
+reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tokio = { workspace = true, features = ["io-std", "io-util", "sync"] }
+sha2.workspace = true
+tokio = { workspace = true, features = ["fs", "io-std", "io-util", "sync"] }
 tokio-util.workspace = true
 zvs-core = { path = "../zvs-core" }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["io-util", "sync"] }
+tempfile.workspace = true
+tokio = { workspace = true, features = ["fs", "io-util", "net", "sync"] }
 
 [lints]
 workspace = true

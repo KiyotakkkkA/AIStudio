@@ -19,6 +19,7 @@ export const SidecarResponse = z.discriminatedUnion("type", [
     id: z.string(),
     done: z.number().int().nonnegative(),
     total: z.number().int().nonnegative(),
+    rate: z.number().nonnegative().optional(),
     message: z.string().optional(),
   }),
   z.object({ type: z.literal("job.done"), id: z.string(), result: z.json() }),
@@ -34,5 +35,7 @@ export type SidecarResponse = z.infer<typeof SidecarResponse>;
 export interface JobProgress {
   done: number;
   total: number;
+  /** Smoothed bytes per second, present only for jobs that move bytes. */
+  rate?: number;
   message?: string;
 }

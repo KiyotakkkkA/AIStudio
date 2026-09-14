@@ -14,7 +14,16 @@ import { StepDto } from "../runs/StepDto.js";
 import { StreamId } from "../primitives/branded.js";
 import { Timestamp } from "../primitives/time.js";
 import { Json } from "../primitives/json.js";
-import { DocumentId, SecretId, VectorStoreId } from "../primitives/branded.js";
+import { DocumentId, DownloadId, SecretId, VectorStoreId } from "../primitives/branded.js";
+import {
+  CatalogueFilter,
+  CatalogueItemDto,
+  DiskUsageDto,
+  DownloadDto,
+  DownloadListFilter,
+  DownloadRef,
+  StartDownloadInput,
+} from "../downloads/index.js";
 import { CreateSecretInput } from "../secrets/CreateSecretInput.js";
 import { UpdateSecretInput } from "../secrets/UpdateSecretInput.js";
 import { SecretDto, SecretScope, SecretSummaryDto } from "../secrets/SecretDto.js";
@@ -124,6 +133,20 @@ export const contract = defineContract({
     output: z.object({ id: DocumentId, removed: z.literal(true) }),
   },
   "vectorStores.index": { input: VectorIndexInput, output: RunHandleDto },
+  "downloads.list": { input: DownloadListFilter, output: z.array(DownloadDto) },
+  "downloads.start": { input: StartDownloadInput, output: DownloadDto },
+  "downloads.pause": { input: DownloadRef, output: DownloadDto },
+  "downloads.resume": { input: DownloadRef, output: DownloadDto },
+  "downloads.cancel": { input: DownloadRef, output: DownloadDto },
+  "downloads.remove": {
+    input: DownloadRef,
+    output: z.object({ id: DownloadId, removed: z.literal(true) }),
+  },
+  "downloads.catalogue": { input: CatalogueFilter, output: z.array(CatalogueItemDto) },
+  "downloads.disk": {
+    input: z.object({ refresh: z.boolean().default(false) }),
+    output: DiskUsageDto,
+  },
   "accounts.list": { input: z.void(), output: z.array(AccountDto) },
   "accounts.link": { input: AccountLinkInput, output: AccountLinkResult },
   "accounts.cancelLink": { input: AccountLinkInput, output: z.object({ cancelled: z.boolean() }) },

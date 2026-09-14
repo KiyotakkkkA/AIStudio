@@ -16,6 +16,7 @@ export * from "./chat.js";
 export * from "./providers/index.js";
 export * from "./accounts.js";
 export * from "./vectorStores/index.js";
+export * from "./downloads/index.js";
 export * from "./runs/RunDto.js";
 export * from "./runs/RunSummaryDto.js";
 export * from "./runs/RunListFilter.js";

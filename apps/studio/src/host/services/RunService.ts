@@ -76,6 +76,7 @@ export class RunService {
           )
             return;
           if (kind === "indexing" && requirement.tool === "vector.index") return;
+          if (kind === "download" && requirement.tool === "download.fetch") return;
           const run = this.get(context.runId);
           const scopes = [
             ...(run.graph.permissionScopes ?? []),

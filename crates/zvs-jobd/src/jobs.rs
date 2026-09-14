@@ -8,7 +8,10 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc::UnboundedSender;
 use zvs_core::{CancellationToken, Error, Result};
 
-use crate::protocol::Response;
+use crate::{
+    download::{DOWNLOAD_JOB, download},
+    protocol::Response,
+};
 
 pub const SLEEP_JOB: &str = "job.sleep";
 pub const MAX_SLEEP_STEPS: u64 = 100_000;
@@ -45,6 +48,11 @@ impl JobContext {
     /// Reports progress, dropping reports that arrive faster than the sidecar's rate limit.
     /// The first and the last report of a job are always delivered.
     pub fn progress(&self, done: u64, total: u64, message: Option<String>) {
+        self.progress_at(done, total, None, message);
+    }
+
+    /// Reports progress alongside a smoothed transfer rate in bytes per second.
+    pub fn progress_at(&self, done: u64, total: u64, rate: Option<f64>, message: Option<String>) {
         let now = Instant::now();
         {
             let mut reported = self
@@ -63,6 +71,7 @@ impl JobContext {
             id: self.id.clone(),
             done,
             total,
+            rate,
             message,
         });
     }
@@ -71,6 +80,7 @@ impl JobContext {
 pub async fn dispatch(job: &str, params: Value, context: &JobContext) -> Result<Value> {
     match job {
         SLEEP_JOB => sleep(params, context).await,
+        DOWNLOAD_JOB => download(params, context).await,
         unknown => Err(Error::InvalidInput(format!("Unknown job: {unknown}"))),
     }
 }

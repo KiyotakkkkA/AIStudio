@@ -17,6 +17,24 @@ export function vectorStorePath(directory: string, storeId: string): string {
   if (!/^[a-zA-Z0-9_-]+$/.test(storeId)) throw new Error("Invalid vector store ID");
   return join(directory, storeId);
 }
+export const downloadsDir = (env: PathEnvironment): string => join(userDataDir(env), "downloads");
+
+/** Where a finished download lands, one directory per catalogue kind. */
+export const DOWNLOAD_DIRECTORIES = {
+  model: "models",
+  embedding: "embeddings",
+  mcp: "mcp",
+  skill: "skills",
+} as const;
+
+export function downloadTargetPath(directory: string, kind: string, fileName: string): string {
+  const folder = DOWNLOAD_DIRECTORIES[kind as keyof typeof DOWNLOAD_DIRECTORIES];
+  if (folder === undefined) throw new Error(`Unknown download kind: ${kind}`);
+  if (!/^[a-zA-Z0-9._-]+$/.test(fileName) || fileName === "." || fileName === "..")
+    throw new Error(`Unsafe download file name: ${fileName}`);
+  return join(directory, folder, fileName);
+}
+
 export const streamsDir = (env: PathEnvironment): string => join(logsDir(env), "streams");
 export const backupsDir = (env: PathEnvironment): string => join(userDataDir(env), "backups");
 export const resourcesDir = (env: PathEnvironment): string =>
@@ -52,6 +70,7 @@ export function resolvePaths(env: PathEnvironment) {
     backupsDir: backupsDir(env),
     cacheDir: cacheDir(env),
     vectorStoresDir: vectorStoresDir(env),
+    downloadsDir: downloadsDir(env),
     resourcesDir: resourcesDir(env),
     nativeAddonPath: nativeAddonPath(env),
     sidecarPath: sidecarPath(env),

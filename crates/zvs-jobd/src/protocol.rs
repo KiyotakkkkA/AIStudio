@@ -28,6 +28,9 @@ pub enum Response {
         id: String,
         done: u64,
         total: u64,
+        /// Smoothed bytes per second, for jobs that move bytes. Absent when meaningless.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rate: Option<f64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         message: Option<String>,
     },
@@ -100,6 +103,7 @@ mod tests {
             id: "a".into(),
             done: 1,
             total: 2,
+            rate: None,
             message: None,
         };
         assert_eq!(progress.id(), "a");

@@ -1,5 +1,6 @@
 import { registerCoreNodes } from "./kernel/coreNodes.ts";
 import { registerJobNodes } from "./kernel/jobNodes.ts";
+import { registerDownloadNodes } from "./kernel/downloadNodes.ts";
 import { ChatService } from "./services/ChatService.ts";
 import { app, BrowserWindow, dialog, ipcMain, net, safeStorage } from "electron";
 import { contract } from "@zvs/shared";
@@ -42,6 +43,9 @@ import { RetentionService } from "./services/RetentionService";
 import { NodeRegistry } from "./kernel/NodeRegistry";
 import { SidecarDriver } from "./drivers/sidecar/SidecarDriver";
 import { IndexingService } from "./indexing/IndexingService";
+import { DownloadService } from "./downloads/DownloadService";
+import { DiskService } from "./downloads/disk";
+import { CatalogueService, curatedProvider, ollamaProvider } from "./downloads/catalogue";
 
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
@@ -59,6 +63,7 @@ let quitting = false;
 let runs: RunService | undefined;
 let retention: RetentionService | undefined;
 let sidecar: SidecarDriver | undefined;
+let downloads: DownloadService | undefined;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -80,6 +85,7 @@ if (!app.requestSingleInstanceLock()) {
     healthCheck?.stop();
     retention?.stop();
     void (async () => {
+      downloads?.dispose();
       await runs?.dispose();
       await Promise.all([
         providers.dispose(),
@@ -207,18 +213,49 @@ if (!app.requestSingleInstanceLock()) {
         logger,
       });
       sidecar = new SidecarDriver({ binaryPath: paths.sidecarPath, logger });
-      const nodes = registerJobNodes(registerCoreNodes(new NodeRegistry()));
+      const disk = new DiskService({
+        downloadsDir: paths.downloadsDir,
+        vectorStoresDir: paths.vectorStoresDir,
+        userDataDir: paths.userDataDir,
+        logger,
+      });
+      downloads = new DownloadService({
+        data: database,
+        jobs: sidecar,
+        disk,
+        downloadsDir: paths.downloadsDir,
+        settings,
+        catalogue: new CatalogueService({
+          providers: [
+            curatedProvider,
+            ollamaProvider({
+              baseUrl: () =>
+                database?.repositories.providers
+                  .list({})
+                  .find((provider) => provider.kind === "ollama" && provider.enabled)?.baseUrl ??
+                undefined,
+              fetch: (url, request) => net.fetch(url as string, request),
+              logger,
+            }),
+          ],
+          logger,
+        }),
+        logger,
+      });
+      const nodes = registerDownloadNodes(registerJobNodes(registerCoreNodes(new NodeRegistry())));
       runs = new RunService({
         data: database,
         events: eventBus,
         registry: nodes,
-        services: { providers: registry, vectorStores, jobs: sidecar, indexing },
+        services: { providers: registry, vectorStores, jobs: sidecar, indexing, downloads },
         logger,
       });
+      downloads.attach(runs);
       const chat = new ChatService({ data: database, runs, registry: nodes, logger });
       retention = new RetentionService({ data: database, settings, logger });
       retention.start();
       runs.recover();
+      downloads.recover();
       ipcServer = createIpcServer(
         contract,
         createHandlers({
@@ -226,6 +263,7 @@ if (!app.requestSingleInstanceLock()) {
           runs,
           vectorStores,
           indexing,
+          downloads,
           pickSources: async (kind) => {
             const result = await dialog.showOpenDialog({
               properties:

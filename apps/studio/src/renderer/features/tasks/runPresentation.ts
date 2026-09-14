@@ -18,6 +18,7 @@ export const KIND_LABELS: Record<RunKind, string> = {
   agentic: "агент",
   job: "задание",
   indexing: "индексация",
+  download: "загрузка",
   browser: "браузер",
 };
 
@@ -27,6 +28,7 @@ export const KIND_FILTER_LABELS: Record<RunKind, string> = {
   agentic: "Сессии агента",
   job: "Задания",
   indexing: "Индексация",
+  download: "Загрузки",
   browser: "Браузер",
 };
 
@@ -36,6 +38,7 @@ export const KIND_ICONS: Record<RunKind, string> = {
   agentic: mdiCreationOutline,
   job: mdiTrayArrowDown,
   indexing: mdiDatabaseArrowDownOutline,
+  download: mdiTrayArrowDown,
   browser: mdiWeb,
 };
 
@@ -113,6 +116,10 @@ export function runSubline(run: RunSummaryDto): string {
     return total > 0
       ? `${done.toLocaleString("ru-RU")} из ${total.toLocaleString("ru-RU")} фрагментов встроено`
       : "подготовка индексации";
+  if (run.kind === "download")
+    return total > 0
+      ? `${formatBytes(done)} из ${formatBytes(total)} загружено`
+      : "подготовка загрузки";
   if (run.kind === "job")
     return total > 0 ? `${String(done)} из ${String(total)} ед. обработано` : "единицы работы";
   if (total === 0) return "без шагов";
@@ -122,6 +129,18 @@ export function runSubline(run: RunSummaryDto): string {
     return `шаг ${String(current)} из ${String(total)}${node}`;
   }
   return `${String(done)} из ${String(total)} шагов`;
+}
+
+const BYTE_UNITS = ["Б", "КБ", "МБ", "ГБ", "ТБ"] as const;
+
+export function formatBytes(bytes: number): string {
+  let value = Math.max(0, bytes);
+  let unit = 0;
+  while (value >= 1024 && unit < BYTE_UNITS.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(unit === 0 ? 0 : 1)} ${BYTE_UNITS[unit]}`;
 }
 
 export function runNote(run: RunSummaryDto): string {

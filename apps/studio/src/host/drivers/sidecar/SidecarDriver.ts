@@ -304,6 +304,7 @@ export class SidecarDriver implements SidecarJobsPort {
       pending.onProgress?.({
         done: message.done,
         total: message.total,
+        ...(message.rate === undefined ? {} : { rate: message.rate }),
         ...(message.message === undefined ? {} : { message: message.message }),
       });
       return;

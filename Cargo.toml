@@ -18,6 +18,8 @@ blake3 = "=1.8.7"
 napi = { version = "=3.12.4", default-features = false, features = ["napi8", "tokio_rt"] }
 napi-derive = "=3.6.5"
 napi-build = "=2.4.2"
+reqwest = { version = "=0.12.28", default-features = false, features = ["rustls-tls-native-roots", "stream", "http2", "charset"] }
+sha2 = "=0.11.0"
 serde_json = "=1.0.151"
 thiserror = "=2.0.20"
 tokio-util = { version = "=0.7.19", features = ["rt"] }

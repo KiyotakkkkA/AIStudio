@@ -11,7 +11,15 @@ export const RunStatus = z.enum([
   "cancelled",
   "interrupted",
 ]);
-export const RunKind = z.enum(["chat", "scenario", "agentic", "job", "indexing", "browser"]);
+export const RunKind = z.enum([
+  "chat",
+  "scenario",
+  "agentic",
+  "job",
+  "indexing",
+  "download",
+  "browser",
+]);
 export const GraphNode = z.object({
   id: z.string().min(1).max(128),
   type: z.string().min(1).max(128),

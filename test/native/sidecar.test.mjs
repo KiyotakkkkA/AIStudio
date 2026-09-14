@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
+import { Buffer } from "node:buffer";
 import { execFileSync, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import { tmpdir } from "node:os";
 import { createInterface } from "node:readline";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -81,5 +86,73 @@ test("the released sidecar answers ping, runs the demo job and cancels it", asyn
   } finally {
     sidecar.child.stdin.end();
     await new Promise((done) => sidecar.child.once("exit", done));
+  }
+});
+
+test("the released sidecar resumes a ranged download and verifies its checksum", async () => {
+  const body = Buffer.from("zvs".repeat(4096));
+  const digest = createHash("sha256").update(body).digest("hex");
+  const ranges = [];
+  const origin = createServer((request, response) => {
+    const match = /^bytes=(\d+)-/.exec(request.headers.range ?? "");
+    const offset = match ? Number(match[1]) : 0;
+    if (match) ranges.push(offset);
+    const rest = body.subarray(offset);
+    response.writeHead(offset > 0 ? 206 : 200, {
+      "Accept-Ranges": "bytes",
+      "Content-Length": String(rest.length),
+      ...(offset > 0
+        ? { "Content-Range": `bytes ${offset}-${body.length - 1}/${body.length}` }
+        : {}),
+    });
+    response.end(rest);
+  });
+  await new Promise((listening) => origin.listen(0, "127.0.0.1", listening));
+  const url = `http://127.0.0.1:${origin.address().port}/blob`;
+  const directory = mkdtempSync(join(tmpdir(), "zvs-jobd-download-"));
+  const target = join(directory, "artefact.bin");
+  // Half the artefact is already on disk, as it would be after the app was killed mid-pull.
+  writeFileSync(`${target}.part`, body.subarray(0, 6000));
+
+  const sidecar = start();
+  try {
+    sidecar.send({
+      type: "job.start",
+      id: "pull",
+      job: "job.download",
+      params: {
+        url,
+        targetPath: target,
+        checksum: { algorithm: "sha256", value: digest },
+      },
+    });
+    const done = await sidecar.settle("pull");
+    assert.equal(done.type, "job.done", JSON.stringify(done));
+    assert.equal(done.result.resumedFrom, 6000);
+    assert.equal(done.result.bytes, body.length);
+    assert.equal(done.result.checksum, digest);
+    assert.deepEqual(ranges, [6000]);
+    assert.deepEqual(readFileSync(target), body);
+
+    // A digest that does not match must fail and leave nothing behind to resume from.
+    sidecar.send({
+      type: "job.start",
+      id: "corrupt",
+      job: "job.download",
+      params: {
+        url,
+        targetPath: join(directory, "corrupt.bin"),
+        checksum: { algorithm: "sha256", value: createHash("sha256").update("nope").digest("hex") },
+      },
+    });
+    const failed = await sidecar.settle("corrupt");
+    assert.equal(failed.code, "VALIDATION_FAILED");
+    assert.equal(existsSync(join(directory, "corrupt.bin")), false);
+    assert.equal(existsSync(join(directory, "corrupt.bin.part")), false);
+  } finally {
+    sidecar.child.stdin.end();
+    await new Promise((exited) => sidecar.child.once("exit", exited));
+    origin.close();
+    rmSync(directory, { recursive: true, force: true });
   }
 });
