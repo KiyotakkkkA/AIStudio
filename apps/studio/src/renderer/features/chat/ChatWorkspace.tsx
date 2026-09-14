@@ -15,7 +15,7 @@ export default observer(function ChatWorkspace() {
   }, [chat]);
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <header className="flex h-[56px] flex-none items-center gap-3 border-b border-main-700 bg-main-900 px-5">
+      <header className="flex h-[56px] flex-none items-center gap-3 border-b border-main-750 bg-main-900 px-5">
         <Icon path={mdiChatOutline} size={20} className="flex-none text-accent-dark" />
         <h1 className="m-0 flex-none text-xl/7 font-semibold tracking-[-0.01em] text-main-50">
           Чат

@@ -47,7 +47,7 @@ function AccountCard({
   return (
     <div
       className={`flex min-w-0 flex-col gap-3 rounded-card border bg-main-900 p-4 ${
-        needsRelink ? "border-warning-dark" : "border-main-700"
+        needsRelink ? "border-warning-dark" : "border-main-750"
       }`}
     >
       <div className="flex min-w-0 items-start gap-3">

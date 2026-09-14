@@ -33,7 +33,7 @@ export default function ConfirmModal({
       open={open}
       onClose={onCancel}
       label={title}
-      className={`w-105 max-w-[92vw] rounded-card border bg-main-900 p-4.5 ${tone === "danger" ? "border-err-border" : "border-main-700"}`}
+      className={`w-105 max-w-[92vw] rounded-card border bg-main-900 p-4.5 ${tone === "danger" ? "border-err-border" : "border-main-750"}`}
     >
       <h2
         className={`text-[14px] font-semibold ${tone === "danger" ? "text-err" : "text-main-50"}`}

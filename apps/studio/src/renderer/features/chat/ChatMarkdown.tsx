@@ -6,7 +6,7 @@ import { CodeView } from "@kiyotakkkka/zvs-uikit-lib/code-view";
 
 export default function ChatMarkdown({ content }: { readonly content: string }) {
   return (
-    <div className="min-w-0 space-y-3 text-[13.5px] leading-relaxed wrap-break-word text-main-100 [&_h1]:text-xl [&_h2]:text-lg [&_h3]:font-semibold [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:border-accent-dark [&_blockquote]:pl-3 [&_table]:w-full [&_table]:border-collapse [&_th]:border-b [&_th]:border-main-600 [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-xs [&_th]:font-medium [&_th]:text-main-300 [&_td]:border-b [&_td]:border-main-700 [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top [&_td]:text-[13px] [&_tr:last-child_td]:border-b-0">
+    <div className="min-w-0 space-y-3 text-[13.5px] leading-relaxed wrap-break-word text-main-100 [&_h1]:text-xl [&_h2]:text-lg [&_h3]:font-semibold [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:border-accent-dark [&_blockquote]:pl-3 [&_table]:w-full [&_table]:border-collapse [&_th]:border-b [&_th]:border-main-750 [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-xs [&_th]:font-medium [&_th]:text-main-300 [&_td]:border-b [&_td]:border-main-750 [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top [&_td]:text-[13px] [&_tr:last-child_td]:border-b-0">
       <ReactMarkdown
         skipHtml
         remarkPlugins={[remarkGfm]}

@@ -46,7 +46,7 @@ function AccountLoginMenu() {
           role="menu"
           aria-label="Выберите вендора"
           rounded=""
-          className="rounded-card border-main-600"
+          className="rounded-card border-main-750"
         >
           {accounts.families.map((family) => (
             <Dropdown.Item

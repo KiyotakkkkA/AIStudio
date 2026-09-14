@@ -43,7 +43,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
   const showsVendor = !isAccountFamily(vm.adapter);
 
   return (
-    <section className="flex min-w-0 flex-[1.35] flex-col gap-3.25 rounded-card border border-main-700 bg-main-900 p-4">
+    <section className="flex min-w-0 flex-[1.35] flex-col gap-3.25 rounded-card border border-main-750 bg-main-900 p-4">
       <div className="flex items-center gap-2">
         <h2 className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
           Настройка подключения
@@ -128,7 +128,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
       {vm.usesAccount ? (
         <Field label="Связанный аккаунт" error={vm.errorOf("accountId")}>
           {vm.accountOptions.length === 0 ? (
-            <div className="flex items-center gap-2.5 rounded-[6px] border border-dashed border-main-600 px-2.5 py-2 text-[12px] text-main-400">
+            <div className="flex items-center gap-2.5 rounded-[6px] border border-dashed border-main-750 px-2.5 py-2 text-[12px] text-main-400">
               <Icon path={mdiAccountCircleOutline} size={16} className="flex-none text-main-500" />
               <span className="flex-1">
                 Нет привязанных аккаунтов для {ADAPTER_LABELS[vm.adapter]}.

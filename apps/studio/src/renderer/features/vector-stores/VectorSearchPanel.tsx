@@ -79,7 +79,7 @@ function VectorSearchPanel() {
         {store.rows.map((row) => (
           <article
             key={row.id}
-            className={`flex gap-3 rounded-card border border-main-700 bg-main-800 px-3.25 py-3 ${row.belowFloor ? "opacity-50" : ""}`}
+            className={`flex gap-3 rounded-card border border-main-750 bg-main-800 px-3.25 py-3 ${row.belowFloor ? "opacity-50" : ""}`}
           >
             <div className="w-13 flex-none">
               <div className="font-mono text-sm font-semibold text-accent-medium">{row.score}</div>

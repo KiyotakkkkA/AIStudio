@@ -25,7 +25,7 @@ export default function ModelCard({
   return (
     <article
       className={`flex flex-col gap-2 rounded-card border p-3 ${
-        selected ? "border-accent-dark bg-main-750" : "border-main-700 bg-main-800"
+        selected ? "border-accent-dark bg-main-750" : "border-main-750 bg-main-800"
       } ${row.available ? "" : "opacity-55"}`}
       onClick={selectable ? onToggle : undefined}
     >

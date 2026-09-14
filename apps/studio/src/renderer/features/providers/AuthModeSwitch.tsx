@@ -10,7 +10,7 @@ export interface AuthModeSwitchProps {
 export default function AuthModeSwitch({ value, disabledReason, onChange }: AuthModeSwitchProps) {
   return (
     <div role="radiogroup" aria-label="Способ авторизации" className="flex flex-col gap-1.5">
-      <div className="flex gap-1 rounded-lg border border-main-700 bg-main-800 p-1">
+      <div className="flex gap-1 rounded-lg border border-main-750 bg-main-800 p-1">
         {AUTH_MODES.map((mode) => {
           const reason = disabledReason(mode);
           const active = value === mode;

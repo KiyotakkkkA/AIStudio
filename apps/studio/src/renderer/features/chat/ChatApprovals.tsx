@@ -9,7 +9,7 @@ export default observer(function ChatApprovals({ store }: { readonly store: Chat
         <div
           key={request.id}
           role="status"
-          className="space-y-2 rounded-card border border-main-600 bg-main-900 p-3"
+          className="space-y-2 rounded-card border border-main-750 bg-main-900 p-3"
         >
           <p className="text-xs text-main-300">
             Разрешить{" "}

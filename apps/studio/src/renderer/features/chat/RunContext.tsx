@@ -9,7 +9,7 @@ export default observer(function RunContext({ store }: { readonly store: ChatSto
   return (
     <aside
       aria-label="Контекст запуска"
-      className={`flex w-73 shrink-0 flex-col border-l border-main-700 bg-main-900 max-[1250px]:w-57.5 ${store.contextOpen ? "max-[1100px]:absolute max-[1100px]:inset-y-0 max-[1100px]:right-0 max-[1100px]:z-10 max-[1100px]:w-73" : "max-[1100px]:hidden"}`}
+      className={`flex w-73 shrink-0 flex-col border-l border-main-750 bg-main-900 max-[1250px]:w-57.5 ${store.contextOpen ? "max-[1100px]:absolute max-[1100px]:inset-y-0 max-[1100px]:right-0 max-[1100px]:z-10 max-[1100px]:w-73" : "max-[1100px]:hidden"}`}
     >
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-4 p-4">
         <div className="flex items-center justify-between">
@@ -29,7 +29,7 @@ export default observer(function RunContext({ store }: { readonly store: ChatSto
             .map((item) => (
               <label
                 key={item.id}
-                className="flex items-center gap-2 rounded-card border border-main-700 bg-main-800 p-3"
+                className="flex items-center gap-2 rounded-card border border-main-750 bg-main-800 p-3"
               >
                 <input
                   type="checkbox"
@@ -63,7 +63,7 @@ export default observer(function RunContext({ store }: { readonly store: ChatSto
             Начните новый чат, чтобы изменить модель, хранилища или настройки.
           </p>
         )}
-        <div className="mt-auto space-y-2 rounded-card border border-main-700 bg-main-800 p-3">
+        <div className="mt-auto space-y-2 rounded-card border border-main-750 bg-main-800 p-3">
           <div className="flex justify-between text-xs text-main-400">
             <span>Использование за сеанс</span>
             <span>{store.sessionTokens.toLocaleString()} ток.</span>

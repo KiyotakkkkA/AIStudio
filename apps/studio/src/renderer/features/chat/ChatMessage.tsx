@@ -43,7 +43,7 @@ export default function ChatMessage({
             <ChatRetrieval citations={citations} storeIds={storeIds} stores={stores} />
           )}
           {reasoning && (
-            <Accordion className="rounded-card border border-main-700 bg-main-800/40">
+            <Accordion className="rounded-card border border-main-750 bg-main-800/40">
               <Accordion.Summary className="w-full text-left text-xs text-main-400">
                 Размышления
               </Accordion.Summary>
@@ -65,7 +65,7 @@ export default function ChatMessage({
                 <span
                   key={`${citation.storeId}:${citation.documentId}:${citation.chunkIndex}`}
                   title={citation.sourcePath}
-                  className="max-w-full rounded-pill border border-main-600 px-2 py-1 break-all text-accent-medium"
+                  className="max-w-full rounded-pill border border-main-750 px-2 py-1 break-all text-accent-medium"
                 >
                   {citation.sourcePath} · {citation.score.toFixed(2)}
                 </span>

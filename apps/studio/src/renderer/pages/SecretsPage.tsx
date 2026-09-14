@@ -38,7 +38,7 @@ function SecretsPage() {
       {tab === "secrets" ? <SecretsWorkspace /> : null}
 
       {tab === "access" ? (
-        <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-800/40">
+        <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-750 bg-main-800/40">
           <EmptyState
             icon={mdiHistory}
             title="Журнал доступа ещё не описан"

@@ -11,7 +11,7 @@ interface ModelSettingsCardProps {
 
 function ModelSettingsCard({ vm }: ModelSettingsCardProps) {
   return (
-    <section className="flex min-w-0 flex-1 flex-col gap-3.5 rounded-card border border-main-700 bg-main-900 p-4">
+    <section className="flex min-w-0 flex-1 flex-col gap-3.5 rounded-card border border-main-750 bg-main-900 p-4">
       <h2 className="text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
         Параметры модели
       </h2>

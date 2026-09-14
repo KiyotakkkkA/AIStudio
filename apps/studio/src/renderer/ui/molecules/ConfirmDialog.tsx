@@ -28,7 +28,7 @@ export default function ConfirmDialog({
       open={open}
       onClose={onCancel}
       label={title}
-      className="w-105 max-w-[92vw] rounded-card border border-main-700 bg-main-900 p-4.5"
+      className="w-105 max-w-[92vw] rounded-card border border-main-750 bg-main-900 p-4.5"
     >
       <h2 className="text-[14px] font-semibold text-main-50">{title}</h2>
       <div className="mt-2.5 text-[12px] leading-[1.6] text-main-400">{children}</div>

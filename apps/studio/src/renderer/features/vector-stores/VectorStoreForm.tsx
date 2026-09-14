@@ -26,7 +26,7 @@ function VectorStoreForm() {
       }}
     >
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3.5">
-        <section className="flex flex-none flex-col gap-3.25 rounded-card border border-main-700 bg-main-900 p-4">
+        <section className="flex flex-none flex-col gap-3.25 rounded-card border border-main-750 bg-main-900 p-4">
           <div className="flex items-center gap-2">
             <h2 className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
               {vm.isNew ? "Новое хранилище" : "Настройки хранилища"}
@@ -61,7 +61,7 @@ function VectorStoreForm() {
             />
           </Field>
         </section>
-        <section className="flex flex-none flex-col gap-3.25 rounded-card border border-main-700 bg-main-900 p-4">
+        <section className="flex flex-none flex-col gap-3.25 rounded-card border border-main-750 bg-main-900 p-4">
           <h2 className="text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
             Эмбеддинги и индексация
           </h2>
@@ -136,13 +136,13 @@ function VectorStoreForm() {
           {vm.isNew && !vm.providers.some((p) => p.enabled) ? (
             <p
               role="status"
-              className="rounded-[6px] border border-dashed border-main-600 px-3 py-2.5 text-xs text-warn"
+              className="rounded-[6px] border border-dashed border-main-750 px-3 py-2.5 text-xs text-warn"
             >
               Сначала добавьте включённый embedding-провайдер на странице «AI-провайдеры».
             </p>
           ) : null}
         </section>
-        <div className="flex flex-none items-center gap-3 rounded-card border border-main-700 bg-main-900 px-4 py-3">
+        <div className="flex flex-none items-center gap-3 rounded-card border border-main-750 bg-main-900 px-4 py-3">
           <Button type="submit" tone="primary" disabled={store.busy}>
             {store.busy ? "Сохранение…" : "Сохранить"}
           </Button>

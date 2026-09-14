@@ -20,10 +20,10 @@ export default function ListRow({
   children,
 }: ListRowProps) {
   const tone = dashed
-    ? "border-dashed border-main-600 bg-transparent hover:border-main-500"
+    ? "border-dashed border-main-750 bg-transparent hover:border-main-500"
     : selected
       ? "border-accent-dark bg-main-750"
-      : "border-main-700 bg-main-800 hover:border-main-600";
+      : "border-main-750 bg-main-800 hover:border-main-600";
 
   return (
     <button

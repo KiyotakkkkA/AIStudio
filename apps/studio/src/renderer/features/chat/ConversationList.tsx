@@ -33,7 +33,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
   return (
     <aside
       aria-label="Диалоги"
-      className="flex w-62.5 shrink-0 flex-col border-r border-main-700 max-[850px]:w-45"
+      className="flex w-62.5 shrink-0 flex-col border-r border-main-750 max-[850px]:w-45"
     >
       <div className="flex h-header shrink-0 items-center px-3">
         <Button onClick={store.newChat} disabled={store.generating}>
@@ -84,7 +84,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
                         role="menu"
                         aria-label="Действия диалога"
                         rounded="rounded-md"
-                        className="rounded-card border-main-600"
+                        className="rounded-card border-main-750"
                       >
                         <Dropdown.Item
                           role="menuitem"
@@ -122,7 +122,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
         open={renameTarget !== null}
         onClose={() => setRenameTarget(null)}
         label="Переименовать диалог"
-        className="w-105 max-w-[92vw] rounded-card border border-main-700 bg-main-900 p-4.5"
+        className="w-105 max-w-[92vw] rounded-card border border-main-750 bg-main-900 p-4.5"
       >
         <h2 className="text-[14px] font-semibold text-main-50">Переименовать диалог</h2>
         <div className="mt-3">

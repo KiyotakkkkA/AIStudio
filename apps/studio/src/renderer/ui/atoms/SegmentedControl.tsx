@@ -29,7 +29,7 @@ export default function SegmentedControl<T extends string>({
         onChange(next as T);
       }}
       rounded=""
-      className={`gap-1 rounded-lg ${ghost ? "bg-transparent border-transparent" : "bg-main-800 border-main-700 p-1"}`}
+      className={`gap-1 rounded-lg ${ghost ? "bg-transparent border-transparent" : "bg-main-800 border-main-750 p-1"}`}
       classNames={{ tab: "rounded-[5px] px-[14px] py-[5px] text-[12px]" }}
     />
   );

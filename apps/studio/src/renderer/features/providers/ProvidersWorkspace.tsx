@@ -26,7 +26,7 @@ function ProvidersWorkspace() {
 
   if (providers.loaded && providers.capability === "image" && !providers.capabilitySupported) {
     return (
-      <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-800/40">
+      <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-750 bg-main-800/40">
         <EmptyState
           icon={mdiImageOutline}
           title="Провайдеров изображений пока нет"
@@ -54,7 +54,7 @@ function ProvidersWorkspace() {
         <ProviderList onSelect={providers.requestSelect} onCreate={providers.requestCreate} />
 
         {form === null ? (
-          <div className="flex min-w-0 flex-1 items-center justify-center rounded-card border border-main-700 bg-main-900">
+          <div className="flex min-w-0 flex-1 items-center justify-center rounded-card border border-main-750 bg-main-900">
             <EmptyState
               icon={mdiLayersOutline}
               title="Подключение не выбрано"
@@ -75,7 +75,7 @@ function ProvidersWorkspace() {
 
             <ModelGrid />
 
-            <div className="flex flex-none items-center gap-3 rounded-card border border-main-700 bg-main-900 px-4 py-3">
+            <div className="flex flex-none items-center gap-3 rounded-card border border-main-750 bg-main-900 px-4 py-3">
               {form.isNew ? null : (
                 <Button
                   key={form.providerId}

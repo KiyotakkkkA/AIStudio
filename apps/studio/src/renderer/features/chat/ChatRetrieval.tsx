@@ -16,7 +16,7 @@ export default function ChatRetrieval({
         return (
           <details
             key={id}
-            className="rounded-card border border-main-700 bg-main-900 p-3 text-xs text-main-300"
+            className="rounded-card border border-main-750 bg-main-900 p-3 text-xs text-main-300"
           >
             <summary className="cursor-pointer">
               Searched{" "}

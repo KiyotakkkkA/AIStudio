@@ -30,7 +30,7 @@
     "vite": "7.3.6"
   },
   "dependencies": {
-    "@kiyotakkkka/zvs-uikit-lib": "8.3.0",
+    "@kiyotakkkka/zvs-uikit-lib": "8.4.0",
     "@mdi/js": "7.4.47",
     "@zvs/ipc": "workspace:*",
     "@zvs/shared": "workspace:*",

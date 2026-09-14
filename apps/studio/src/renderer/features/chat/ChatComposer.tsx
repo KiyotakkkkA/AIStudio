@@ -23,7 +23,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
   return (
     <div className="mx-auto w-full max-w-5xl shrink-0 px-5 pt-3 pb-4">
       {!store.available && !store.loading ? (
-        <div className="rounded-card border border-main-600 bg-main-900 p-4 text-main-300">
+        <div className="rounded-card border border-main-750 bg-main-900 p-4 text-main-300">
           Выберите доступную текстовую модель, чтобы начать диалог.{" "}
           <Link className="text-accent-medium underline" to="/providers">
             Открыть провайдеров ИИ
@@ -40,7 +40,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             if ((event.target as HTMLElement).closest("button, a")) return;
             event.currentTarget.querySelector<HTMLTextAreaElement>("textarea")?.focus();
           }}
-          className="space-y-3 rounded-xl border border-main-600 bg-main-900 p-3"
+          className="space-y-3 rounded-xl border border-main-750 bg-main-900 p-3"
         >
           <TextArea
             aria-label="Сообщение"
@@ -72,7 +72,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 role="menu"
                 aria-label="Провайдер и модель"
                 rounded=""
-                className="space-y-3 rounded-card border-main-600 bg-main-900 p-3"
+                className="space-y-3 rounded-card border-main-750 bg-main-900 p-3"
               >
                 <div>
                   <p className="mb-1.5 text-[11px] font-medium tracking-wide text-main-400 uppercase">

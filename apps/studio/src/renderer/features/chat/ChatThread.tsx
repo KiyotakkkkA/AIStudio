@@ -40,7 +40,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
   }, []);
   return (
     <section aria-label="Лента чата" className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <header className="shrink-0 border-b border-main-700 px-5">
+      <header className="shrink-0 border-b border-main-750 px-5">
         <div className="mx-auto flex h-header w-full max-w-4xl items-center gap-3">
           <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">
             {store.active?.title ?? "Новый чат"}
@@ -84,7 +84,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
               <div key={message.id} className="group flex justify-end">
                 <div className="flex max-w-[78%] flex-col items-end">
                   {editingId === message.id ? (
-                    <div className="w-[min(78vw,620px)] space-y-2 rounded-xl border border-main-600 bg-main-800 p-2">
+                    <div className="w-[min(78vw,620px)] space-y-2 rounded-xl border border-main-750 bg-main-800 p-2">
                       <TextArea
                         aria-label="Редактировать сообщение"
                         value={editingText}
@@ -110,7 +110,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-xl rounded-br-sm border border-main-600 bg-main-700 px-3.5 py-3 text-[13.5px] leading-relaxed wrap-break-word whitespace-pre-wrap">
+                    <div className="rounded-xl rounded-br-sm border border-main-750 bg-main-700 px-3.5 py-3 text-[13.5px] leading-relaxed wrap-break-word whitespace-pre-wrap">
                       {message.content}
                     </div>
                   )}
@@ -143,7 +143,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           )}
           {store.pendingUserText && (
             <div className="flex justify-end">
-              <div className="max-w-[78%] rounded-xl rounded-br-sm border border-main-600 bg-main-700 px-3.5 py-3 wrap-break-word whitespace-pre-wrap">
+              <div className="max-w-[78%] rounded-xl rounded-br-sm border border-main-750 bg-main-700 px-3.5 py-3 wrap-break-word whitespace-pre-wrap">
                 {store.pendingUserText}
               </div>
             </div>

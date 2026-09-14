@@ -16,7 +16,7 @@ export default function TextArea({ invalid = false, noBorder = false, ...props }
       ? "border-0 focus:border-0"
       : invalid
         ? "border-err focus:border-err"
-        : "border-main-600 focus:border-accent-dark",
+        : "border-main-750 focus:border-accent-dark",
   ].join(" ");
 
   return <InputBig {...props} rows={2} className="w-full" classNames={{ textarea }} />;

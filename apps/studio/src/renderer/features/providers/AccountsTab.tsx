@@ -49,7 +49,7 @@ function AccountsTab() {
       )}
 
       {linking === null || linking.phase === "cancelled" ? null : (
-        <div className="flex flex-none flex-col gap-2.5 rounded-card border border-main-600 bg-main-750 px-4 py-3.5">
+        <div className="flex flex-none flex-col gap-2.5 rounded-card border border-main-750 bg-main-750 px-4 py-3.5">
           {linking.phase === "waiting" ? (
             <>
               <div className="flex items-center gap-3">
@@ -119,7 +119,7 @@ function AccountsTab() {
         ) : null}
 
         {accounts.isEmpty ? (
-          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-800/40 px-3">
+          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-750 bg-main-800/40 px-3">
             <EmptyState
               icon={mdiAccountCircleOutline}
               title="Аккаунтов пока нет"

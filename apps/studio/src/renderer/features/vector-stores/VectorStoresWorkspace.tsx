@@ -106,7 +106,7 @@ function VectorStoresWorkspace() {
               </ListRow>
             ))}
             {store.loaded && store.visibleStores.length === 0 ? (
-              <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-800/40 px-3">
+              <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-750 bg-main-800/40 px-3">
                 <EmptyState
                   icon={store.stores.length ? mdiMagnify : mdiDatabaseOutline}
                   title={store.stores.length ? "Ничего не найдено" : "Хранилищ пока нет."}
@@ -124,7 +124,7 @@ function VectorStoresWorkspace() {
               disabled={store.busy || !!store.form}
               onClick={store.create}
               leading={
-                <span className="flex size-7.5 flex-none items-center justify-center rounded-lg border border-dashed border-main-600 text-main-400">
+                <span className="flex size-7.5 flex-none items-center justify-center rounded-lg border border-dashed border-main-750 text-main-400">
                   <Icon path={mdiPlus} size={14} />
                 </span>
               }

@@ -33,7 +33,7 @@ function SecretsWorkspace() {
         <SecretList onSelect={secrets.requestSelect} onCreate={secrets.requestCreate} />
 
         {secrets.form === null ? (
-          <div className="flex min-w-0 flex-1 items-center justify-center rounded-card border border-main-700 bg-main-900">
+          <div className="flex min-w-0 flex-1 items-center justify-center rounded-card border border-main-750 bg-main-900">
             <EmptyState
               icon={mdiKeyOutline}
               title="Секрет не выбран"

@@ -4,8 +4,8 @@ export type ButtonTone = "primary" | "secondary" | "ghost" | "danger";
 
 const TONES: Record<ButtonTone, string> = {
   primary: "bg-accent-dark text-main-900 hover:bg-accent-medium",
-  secondary: "border border-main-600 bg-main-700 text-main-100 hover:border-main-500",
-  ghost: "border border-main-600 bg-transparent text-main-300 hover:text-main-100",
+  secondary: "border border-main-750 bg-main-700 text-main-100 hover:border-main-500",
+  ghost: "border border-main-750 bg-transparent text-main-300 hover:text-main-100",
   danger: "border border-err-border bg-transparent text-err hover:border-err",
 };
 

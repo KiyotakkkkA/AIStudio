@@ -27,12 +27,12 @@ export default function NavRail({
 }: NavRailProps) {
   return (
     <aside
-      className={`flex h-full flex-none flex-col border-r border-main-700 bg-main-900 ${
+      className={`flex h-full flex-none flex-col border-r border-main-750 bg-main-900 ${
         collapsed ? "w-[64px]" : "w-rail"
       }`}
     >
       <div
-        className={`flex h-[56px] flex-none items-center gap-2.5 border-b border-main-800 ${
+        className={`flex h-[56px] flex-none items-center gap-2.5 border-b border-main-750 ${
           collapsed ? "justify-center px-0" : "px-4"
         }`}
       >
@@ -92,7 +92,7 @@ export default function NavRail({
       </ScrollArea>
 
       <div
-        className={`flex flex-none items-center gap-2.5 border-t border-main-800 p-2.5 ${
+        className={`flex flex-none items-center gap-2.5 border-t border-main-750 p-2.5 ${
           collapsed ? "justify-center" : ""
         }`}
       >
@@ -124,7 +124,7 @@ export default function NavRail({
           aria-label="Развернуть панель навигации"
           title="Развернуть панель навигации"
           onClick={onToggleCollapse}
-          className="flex h-8 flex-none items-center justify-center border-t border-main-800 text-main-500 hover:bg-main-800 hover:text-main-200"
+          className="flex h-8 flex-none items-center justify-center border-t border-main-750 text-main-500 hover:bg-main-800 hover:text-main-200"
         >
           <Icon path={mdiDockLeft} size={16} className="rotate-180" />
         </button>
