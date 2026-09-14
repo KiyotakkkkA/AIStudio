@@ -5,6 +5,8 @@ import {
   UpdateVectorStoreInput,
   VectorStoreDto,
   VectorSearchInput,
+  type VectorOcrConfig,
+  type VectorRerankConfig,
   type VectorSearchHitDto,
   type VectorSearchResultDto,
 } from "@zvs/shared";
@@ -36,6 +38,7 @@ export class VectorStoreService {
       throw new AppError(AppErrorCode.UNSUPPORTED_FORMAT, "Only LanceDB is supported");
     this.requireProvider(draft.embeddingProviderId);
     this.requireName(draft.name);
+    this.requireAdvanced(draft.rerank, draft.ocr);
     const now = this.now();
     const row = this.stores.create({ ...draft, id: createId(), createdAt: now, updatedAt: now });
     return this.exclusive(row.id, async () => {
@@ -117,6 +120,7 @@ export class VectorStoreService {
         }
       }
       if (patch.name !== undefined) this.requireName(patch.name, id);
+      this.requireAdvanced(patch.rerank ?? row.rerank, patch.ocr ?? row.ocr);
       const updated = this.stores.update(id, { ...patch, updatedAt: this.now() })!;
       const observed = await this.observe(updated);
       return this.toDto({ ...updated, status: observed.health });
@@ -266,6 +270,13 @@ export class VectorStoreService {
         "Embedding provider must be enabled and support embeddings",
       );
     return provider;
+  }
+  /** An enabled stage without a model is a setting that would silently do nothing. */
+  private requireAdvanced(rerank: VectorRerankConfig, ocr: VectorOcrConfig) {
+    if (rerank.enabled && rerank.modelRef.trim() === "")
+      throw new AppError(AppErrorCode.VALIDATION_FAILED, "Выберите модель переранжирования");
+    if (ocr.enabled && ocr.modelRef.trim() === "")
+      throw new AppError(AppErrorCode.VALIDATION_FAILED, "Выберите модель OCR");
   }
   private requireBackend(row: VectorStoreEntity) {
     if (row.backend !== "lancedb")

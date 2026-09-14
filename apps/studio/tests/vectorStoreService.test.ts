@@ -296,3 +296,45 @@ test("mutations cannot race active native operations", async () => {
   release();
   await removing;
 });
+
+test("advanced stages round-trip and an enabled stage without a model is refused", async () => {
+  const store = await service.create({
+    ...input,
+    rerank: { enabled: true, modelRef: "curated:model:bge-reranker-v2-m3-f16", candidates: 80 },
+    ocr: {
+      enabled: true,
+      modelRef: "curated:model:qwen2.5-vl-7b-instruct-q4_k_m",
+      language: "rus+eng",
+      minCharsPerPage: 120,
+    },
+  });
+  expect(store.rerank).toEqual({
+    enabled: true,
+    modelRef: "curated:model:bge-reranker-v2-m3-f16",
+    candidates: 80,
+  });
+  expect(store.ocr.language).toBe("rus+eng");
+  expect((await service.get(store.id)).ocr.minCharsPerPage).toBe(120);
+
+  const updated = await service.update({
+    id: store.id,
+    ocr: { enabled: false, modelRef: "", language: "auto", minCharsPerPage: 200 },
+  });
+  expect(updated.ocr.enabled).toBe(false);
+  // Reranking was not part of the patch, so it survives untouched.
+  expect(updated.rerank.candidates).toBe(80);
+
+  await expect(
+    service.update({
+      id: store.id,
+      rerank: { enabled: true, modelRef: "  ", candidates: 10 },
+    }),
+  ).rejects.toMatchObject({ code: AppErrorCode.VALIDATION_FAILED });
+  await expect(
+    service.create({
+      ...input,
+      name: "Other",
+      ocr: { enabled: true, modelRef: "", language: "auto", minCharsPerPage: 200 },
+    }),
+  ).rejects.toMatchObject({ code: AppErrorCode.VALIDATION_FAILED });
+});

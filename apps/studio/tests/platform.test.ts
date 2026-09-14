@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "vitest";
 import { createLogger } from "../src/host/platform/logger.ts";
 import { createId } from "../src/host/platform/ids.ts";
+import { DeviceProbe, deviceTier } from "../src/host/platform/device.ts";
 import {
   cacheDir,
   dbPath,
@@ -99,4 +100,50 @@ test("entity ids are unique, ordered UUID v7 values", () => {
   assert.deepEqual(ids, [...ids].sort());
   for (const id of ids)
     assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+});
+
+const READINGS = {
+  platform: "win32",
+  arch: "x64",
+  cpuModel: "Test CPU",
+  cpuCores: 8,
+  totalMemoryBytes: 16 * 1024 ** 3,
+  freeMemoryBytes: 4 * 1024 ** 3,
+};
+
+test("the device tier follows memory and cores, and a discrete GPU lifts it one step", () => {
+  const gpu = { vendor: "NVIDIA", model: "RTX", vramBytes: null, discrete: true };
+  const integrated = { ...gpu, vendor: "Intel", discrete: false };
+  assert.equal(deviceTier(READINGS, null), "medium");
+  assert.equal(deviceTier(READINGS, integrated), "medium");
+  assert.equal(deviceTier(READINGS, gpu), "high");
+  const weak = { ...READINGS, cpuCores: 4, totalMemoryBytes: 8 * 1024 ** 3 };
+  assert.equal(deviceTier(weak, null), "low");
+  assert.equal(deviceTier(weak, gpu), "medium");
+  const strong = { ...READINGS, cpuCores: 16, totalMemoryBytes: 64 * 1024 ** 3 };
+  assert.equal(deviceTier(strong, null), "high");
+});
+
+test("the device profile is measured once and a failing probe costs only its own field", async () => {
+  const clock = createFakeClock();
+  let reads = 0;
+  const probe = new DeviceProbe({
+    readings: () => {
+      reads += 1;
+      return READINGS;
+    },
+    gpu: () => Promise.reject(new Error("no GPU service")),
+    freeDisk: () => Promise.resolve(123.9),
+    clock: () => clock.advance(1),
+  });
+  const first = await probe.profile();
+  assert.equal(first.gpu, null);
+  assert.equal(first.freeDiskBytes, 123);
+  assert.equal(first.tier, "medium");
+  assert.equal(first.cpuModel, "Test CPU");
+
+  assert.equal((await probe.profile()).measuredAt, first.measuredAt);
+  assert.equal(reads, 1);
+  assert.notEqual((await probe.profile(true)).measuredAt, first.measuredAt);
+  assert.equal(reads, 2);
 });

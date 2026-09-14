@@ -1,6 +1,6 @@
 import { mdiDatabaseOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
-import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import { ScrollArea, Switcher } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/Button";
 import Chip from "../../ui/atoms/Chip";
@@ -9,6 +9,13 @@ import VectorSearchPanel from "./VectorSearchPanel";
 import VectorDocumentsPanel from "./VectorDocumentsPanel";
 import { healthLabels } from "./vectorPresentation";
 import EmptyState from "../../ui/molecules/EmptyState";
+
+const VECTOR_STORE_TABS = [
+  { value: "Overview", label: "Обзор" },
+  { value: "Documents", label: "Документы" },
+  { value: "Test search", label: "Тестовый поиск" },
+  { value: "Settings", label: "Настройки" },
+] as const;
 
 function VectorStoreDetail() {
   const { vectorStores: store } = useStore();
@@ -132,28 +139,23 @@ function VectorStoreDetail() {
           </div>
         ) : detail.status === "pending" || detail.vectors === 0 ? (
           <p className="text-xs text-warn">
-            Ожидает индексации. Добавьте источники на вкладке Documents и запустите индексацию.
+            Ожидает индексации. Добавьте источники на вкладке «Документы» и запустите индексацию.
           </p>
         ) : null}
       </div>
       <div className="flex min-h-0 flex-1 flex-col rounded-card border border-main-750 bg-main-900">
-        <div
-          role="tablist"
-          aria-label="Хранилище"
-          className="flex h-11 flex-none items-center gap-1.5 border-b border-main-750 px-3.5"
-        >
-          {["Overview", "Documents", "Test search", "Settings"].map((tab) => (
-            <button
-              key={tab}
-              role="tab"
-              aria-selected={store.tab === tab}
-              type="button"
-              className={`h-7.5 rounded-[7px] px-3 text-[12.5px] ${store.tab === tab ? "bg-main-700 text-main-50" : "text-main-400"}`}
-              onClick={() => store.set("tab", tab)}
-            >
-              {tab}
-            </button>
-          ))}
+        <div className="flex h-11 flex-none items-center border-b border-main-750 px-3.5">
+          <Switcher
+            value={store.tab}
+            label="Раздел хранилища"
+            options={[...VECTOR_STORE_TABS]}
+            onChange={(tab) => {
+              store.set("tab", tab);
+            }}
+            rounded=""
+            className="gap-1 rounded-lg bg-transparent border-transparent"
+            classNames={{ tab: "rounded-[5px] px-[14px] py-[5px] text-[12px]" }}
+          />
         </div>
         {store.tab === "Test search" ? (
           <VectorSearchPanel />
@@ -167,7 +169,19 @@ function VectorStoreDetail() {
                   Чанк: {detail.chunkSize} · перекрытие: {detail.chunkOverlap}
                 </p>
                 <p>
-                  Backend: {detail.backend} · метрика: {detail.metric}
+                  Движок: {detail.backend} · метрика: {detail.metric}
+                </p>
+                <p>
+                  Переранжирование:{" "}
+                  {detail.rerank.enabled
+                    ? `${describeRef(detail.rerank.modelRef)} · ${detail.rerank.candidates} кандидатов`
+                    : "выключено"}
+                </p>
+                <p>
+                  OCR:{" "}
+                  {detail.ocr.enabled
+                    ? `${describeRef(detail.ocr.modelRef)} · язык: ${detail.ocr.language} · порог: ${detail.ocr.minCharsPerPage}`
+                    : "выключен"}
                 </p>
                 <Button disabled={disabled} onClick={store.edit}>
                   Изменить настройки
@@ -196,4 +210,9 @@ function VectorStoreDetail() {
     </div>
   );
 }
+/** A catalogue ref is `<source>:<kind>:<name>`; the name is the part worth showing. */
+function describeRef(ref: string): string {
+  return ref.split(":").slice(2).join(":") || ref || "модель не выбрана";
+}
+
 export default observer(VectorStoreDetail);

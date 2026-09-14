@@ -10,6 +10,8 @@ import { createHandlers } from "./ipc";
 import { resolvePaths } from "./platform/paths";
 import type { StudioPaths } from "./platform/paths";
 import { createLogger } from "./platform/logger";
+import { DeviceProbe } from "./platform/device";
+import { electronGpuProbe } from "./platform/gpu";
 import type { Logger } from "./platform/logger";
 import { createEventBus } from "./platform/events";
 import type { EventBus, WindowSender } from "./platform/events";
@@ -281,7 +283,12 @@ if (!app.requestSingleInstanceLock()) {
           providers,
           healthCheck,
           accounts,
-          system: new SystemService(core),
+          system: new SystemService(core, {
+            device: new DeviceProbe({
+              gpu: electronGpuProbe(logger),
+              freeDisk: () => disk.freeBytes(),
+            }),
+          }),
         }),
         {
           ipcMain: {

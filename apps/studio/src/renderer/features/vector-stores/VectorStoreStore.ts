@@ -2,7 +2,9 @@ import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
   VectorSearchInput,
+  type CatalogueItemDto,
   type Contract,
+  type DeviceProfileDto,
   type ModelDto,
   type ProviderSummaryDto,
   type VectorStoreDto,
@@ -22,6 +24,8 @@ export default class VectorStoreStore {
   stores: VectorStoreDto[] = [];
   providers: ProviderSummaryDto[] = [];
   embeddingModelsByProvider = new Map<string, readonly ModelDto[]>();
+  catalogue: readonly CatalogueItemDto[] = [];
+  device: DeviceProfileDto | null = null;
   selectedId: VectorStoreId | null = null;
   detail: VectorStoreDto | null = null;
   form: VectorStoreFormVm | null = null;
@@ -108,10 +112,19 @@ export default class VectorStoreStore {
             return [provider.id, detail.models] as const;
           }),
       );
+      const [catalogue, device] = await Promise.all([
+        this.optional(() => this.ipc.call("downloads.catalogue", { refresh: false }), []),
+        this.optional<DeviceProfileDto | null>(
+          () => this.ipc.call("system.device", { refresh: false }),
+          null,
+        ),
+      ]);
       runInAction(() => {
         this.stores = stores;
         this.providers = providers.filter((p) => p.capabilities.includes("embedding"));
         this.embeddingModelsByProvider = new Map(modelEntries);
+        this.catalogue = catalogue;
+        this.device = device;
       });
       if (!this.form) {
         const id = this.selectedId ?? stores[0]?.id;
@@ -157,7 +170,12 @@ export default class VectorStoreStore {
     if (this.busy || this.form) return;
     ++this.revision;
     this.searching = false;
-    this.form = new VectorStoreFormVm(null, this.providers, this.embeddingModelsByProvider);
+    this.form = new VectorStoreFormVm(
+      null,
+      this.providers,
+      this.embeddingModelsByProvider,
+      this.formContext,
+    );
   }
   edit() {
     if (this.detail && !this.busy)
@@ -165,6 +183,7 @@ export default class VectorStoreStore {
         this.detail,
         this.providers,
         this.embeddingModelsByProvider,
+        this.formContext,
       );
   }
   cancel() {
@@ -395,6 +414,20 @@ export default class VectorStoreStore {
     this.stores = this.stores.some((s) => s.id === detail.id)
       ? this.stores.map((s) => (s.id === detail.id ? detail : s))
       : [...this.stores, detail];
+  }
+  private get formContext() {
+    return { catalogue: this.catalogue, device: this.device };
+  }
+  /**
+   * Downloads and the device profile only sharpen auto-fill. A host that cannot answer must
+   * still leave the page usable, so neither failure reaches the error banner.
+   */
+  private async optional<T>(read: () => Promise<T>, fallback: T): Promise<T> {
+    try {
+      return await read();
+    } catch {
+      return fallback;
+    }
   }
   private async mutate(work: () => Promise<void>) {
     if (this.busy || this.searching) return false;

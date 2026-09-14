@@ -1,0 +1,2 @@
+ALTER TABLE `vector_store` ADD `rerank` text DEFAULT '{"enabled":false,"modelRef":"","candidates":50}' NOT NULL;--> statement-breakpoint
+ALTER TABLE `vector_store` ADD `ocr` text DEFAULT '{"enabled":false,"modelRef":"","language":"auto","minCharsPerPage":200}' NOT NULL;

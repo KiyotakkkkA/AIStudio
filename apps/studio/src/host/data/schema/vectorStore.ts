@@ -1,5 +1,5 @@
 import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { VectorStoreDto } from "@zvs/shared";
+import type { VectorOcrConfig, VectorRerankConfig, VectorStoreDto } from "@zvs/shared";
 import { provider } from "./provider.ts";
 
 export const vectorStore = sqliteTable(
@@ -17,6 +17,14 @@ export const vectorStore = sqliteTable(
     metric: text("metric").$type<VectorStoreDto["metric"]>().notNull(),
     chunkSize: integer("chunk_size").notNull(),
     chunkOverlap: integer("chunk_overlap").notNull(),
+    rerank: text("rerank", { mode: "json" })
+      .$type<VectorRerankConfig>()
+      .notNull()
+      .default({ enabled: false, modelRef: "", candidates: 50 }),
+    ocr: text("ocr", { mode: "json" })
+      .$type<VectorOcrConfig>()
+      .notNull()
+      .default({ enabled: false, modelRef: "", language: "auto", minCharsPerPage: 200 }),
     indexType: text("index_type").notNull().default("FLAT"),
     status: text("status").$type<VectorStoreDto["status"]>().notNull().default("pending"),
     tableCreatedAt: integer("table_created_at"),

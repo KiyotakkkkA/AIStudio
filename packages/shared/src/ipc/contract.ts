@@ -45,6 +45,7 @@ import { ProviderId } from "../primitives/branded.js";
 import { defineContract } from "./defineContract.js";
 import { AccountDto, AccountLinkInput, AccountLinkResult, AccountRef } from "../accounts.js";
 import { AdapterDescriptorDto } from "../ai.js";
+import { DeviceProfileDto } from "../system.js";
 import {
   CreateVectorStoreInput,
   UpdateVectorStoreInput,
@@ -178,6 +179,10 @@ export const contract = defineContract({
       intervalMs: z.number().int().min(0).max(5_000).optional(),
     }),
     output: RunHandleDto,
+  },
+  "system.device": {
+    input: z.object({ refresh: z.boolean().default(false) }),
+    output: DeviceProfileDto,
   },
   "system.nativePing": {
     input: z.object({ text: z.string().max(1_000_000) }),

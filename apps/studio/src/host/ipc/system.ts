@@ -6,7 +6,7 @@ import type { SystemService } from "../services/SystemService.ts";
 
 export type SystemHandlers = Pick<
   IpcHandlers<Contract>,
-  "system.ping" | "system.demoStream" | "system.demoJob" | "system.nativePing"
+  "system.ping" | "system.demoStream" | "system.demoJob" | "system.nativePing" | "system.device"
 >;
 
 export interface SystemHandlerOptions {
@@ -23,6 +23,7 @@ export function createSystemHandlers(options: SystemHandlerOptions): SystemHandl
 
   return {
     "system.nativePing": ({ text }) => options.system.nativePing(text),
+    "system.device": ({ refresh }) => options.system.deviceProfile(refresh),
     "system.ping": ({ sentAt }) => {
       const hostTime = timestampNow(clock);
       return { pong: true, hostTime, roundTripHint: hostTime - sentAt };

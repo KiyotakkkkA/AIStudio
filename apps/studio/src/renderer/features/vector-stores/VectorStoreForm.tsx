@@ -1,12 +1,15 @@
+import { mdiAutoFix, mdiChevronDown, mdiChevronRight } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/Button";
+import Icon from "../../ui/atoms/Icon";
 import SelectInput from "../../ui/atoms/SelectInput";
 import TextInput from "../../ui/atoms/TextInput";
 import Field from "../../ui/molecules/Field";
 import TextArea from "../../ui/atoms/TextArea";
 import Chip from "../../ui/atoms/Chip";
+import VectorStoreAdvanced from "./VectorStoreAdvanced";
 
 function VectorStoreForm() {
   const { vectorStores: store } = useStore();
@@ -62,9 +65,21 @@ function VectorStoreForm() {
           </Field>
         </section>
         <section className="flex flex-none flex-col gap-3.25 rounded-card border border-main-750 bg-main-900 p-4">
-          <h2 className="text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
-            Эмбеддинги и индексация
-          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+              Эмбеддинги и индексация
+            </h2>
+            <Button
+              type="button"
+              tone="ghost"
+              disabled={store.busy}
+              title="Подобрать все настройки, кроме названия и описания, по этому устройству и установленным моделям"
+              onClick={vm.autofill}
+            >
+              <Icon path={mdiAutoFix} size={15} />
+              Заполнить автоматически
+            </Button>
+          </div>
           <div className="grid grid-cols-1 gap-3.25 lg:grid-cols-2">
             <Field label="Embedding-провайдер" required error={vm.errors.embeddingProviderId}>
               <SelectInput
@@ -79,11 +94,7 @@ function VectorStoreForm() {
                 onChange={(value) => vm.set("embeddingProviderId", value)}
               />
             </Field>
-            <Field
-              label="Модель эмбеддингов"
-              required
-              error={vm.errors.embeddingModelId}
-            >
+            <Field label="Модель эмбеддингов" required error={vm.errors.embeddingModelId}>
               <SelectInput
                 label="Модель эмбеддингов"
                 value={vm.embeddingModelId}
@@ -131,6 +142,11 @@ function VectorStoreForm() {
               />
             </Field>
           </div>
+          {vm.autofillNote === "" ? null : (
+            <p role="status" className="text-[11px] leading-relaxed text-accent-medium">
+              {vm.autofillNote}
+            </p>
+          )}
           <p className="text-[11px] leading-relaxed text-main-500">
             LanceDB · FLAT. Провайдер, модель, размерность и метрика фиксируются при создании.
             Размер чанка и перекрытие можно менять до индексации.
@@ -143,6 +159,26 @@ function VectorStoreForm() {
               Сначала добавьте включённый embedding-провайдер на странице «AI-провайдеры».
             </p>
           ) : null}
+        </section>
+        <section className="flex flex-none flex-col gap-3.25 rounded-card border border-main-750 bg-main-900 p-4">
+          <button
+            type="button"
+            aria-expanded={vm.advancedOpen}
+            className="flex items-center gap-2 text-left"
+            onClick={vm.toggleAdvanced}
+          >
+            <Icon
+              path={vm.advancedOpen ? mdiChevronDown : mdiChevronRight}
+              size={16}
+              className="text-main-400"
+            />
+            <h2 className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+              Расширенные настройки
+            </h2>
+            {vm.rerankEnabled ? <Chip>Переранжирование</Chip> : null}
+            {vm.ocrEnabled ? <Chip>OCR</Chip> : null}
+          </button>
+          {vm.advancedOpen ? <VectorStoreAdvanced vm={vm} disabled={store.busy} /> : null}
         </section>
         <div className="flex flex-none items-center gap-3 rounded-card border border-main-750 bg-main-900 px-4 py-3">
           <Button type="submit" tone="primary" disabled={store.busy}>
