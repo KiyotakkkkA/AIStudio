@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 import process from "node:process";
@@ -33,3 +33,16 @@ const outputs = await build.task;
 const addon = outputs.find((output) => output.kind === "node");
 if (!addon) throw new Error("napi build did not produce a .node artifact");
 copyFileSync(addon.path, join(outputDir, "zvs-core.node"));
+
+// The sidecar is a plain binary, packaged as an extraResource and located through paths.ts.
+// It has no debug variant: the debug build exists only for the addon's panic tests.
+if (!debug) {
+  execFileSync("cargo", ["build", "--release", "--locked", "--package", "zvs-jobd"], {
+    cwd: root,
+    stdio: "inherit",
+  });
+  const binary = process.platform === "win32" ? "zvs-jobd.exe" : "zvs-jobd";
+  const sidecarDir = join(root, "apps/studio/resources/sidecar", target);
+  mkdirSync(sidecarDir, { recursive: true });
+  copyFileSync(join(root, "target/release", binary), join(sidecarDir, binary));
+}

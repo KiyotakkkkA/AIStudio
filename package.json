@@ -11,7 +11,7 @@
     "build": "turbo run build",
     "build:rust": "node scripts/build-rust.mjs",
     "build:rust:debug": "node scripts/build-rust.mjs --debug-panic",
-    "test:rust": "pnpm build:rust && pnpm build:rust:debug && node --test test/native/addon.test.mjs",
+    "test:rust": "pnpm build:rust && pnpm build:rust:debug && node --test test/native/",
     "typecheck": "turbo run typecheck",
     "typecheck:root": "tsc -p tsconfig.test.json",
     "lint": "turbo run lint",

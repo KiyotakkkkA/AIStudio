@@ -12,6 +12,7 @@ build/
 target/
 *.node
 apps/studio/resources/native/
+apps/studio/resources/sidecar/
 .turbo/
 .env*
 coverage/

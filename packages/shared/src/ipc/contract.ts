@@ -127,6 +127,13 @@ export const contract = defineContract({
     input: z.object({ steps: z.number().int().min(1).max(100) }),
     output: z.object({ streamId: StreamId }),
   },
+  "system.demoJob": {
+    input: z.object({
+      steps: z.number().int().min(1).max(1000),
+      intervalMs: z.number().int().min(0).max(5_000).optional(),
+    }),
+    output: RunHandleDto,
+  },
   "system.nativePing": {
     input: z.object({ text: z.string().max(1_000_000) }),
     output: z.object({ count: z.number().int().nonnegative() }),

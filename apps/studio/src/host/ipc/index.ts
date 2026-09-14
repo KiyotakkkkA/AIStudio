@@ -41,6 +41,7 @@ export function createHandlers(dependencies: HostIpcDependencies): IpcHandlers<C
     ...createVectorStoreHandlers(dependencies.vectorStores),
     ...createSystemHandlers({
       system: dependencies.system,
+      runs: dependencies.runs,
       events: dependencies.events ?? createEventBus(),
       clock: dependencies.clock,
       intervalMs: dependencies.intervalMs,

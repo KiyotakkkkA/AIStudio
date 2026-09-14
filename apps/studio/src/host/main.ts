@@ -1,4 +1,5 @@
 import { registerCoreNodes } from "./kernel/coreNodes.ts";
+import { registerJobNodes } from "./kernel/jobNodes.ts";
 import { ChatService } from "./services/ChatService.ts";
 import { app, BrowserWindow, ipcMain, net, safeStorage } from "electron";
 import { contract } from "@zvs/shared";
@@ -39,6 +40,7 @@ import { VectorStoreService } from "./services/VectorStoreService";
 import { RunService } from "./services/RunService";
 import { RetentionService } from "./services/RetentionService";
 import { NodeRegistry } from "./kernel/NodeRegistry";
+import { SidecarDriver } from "./drivers/sidecar/SidecarDriver";
 
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
@@ -55,6 +57,7 @@ let accounts: AccountService | undefined;
 let quitting = false;
 let runs: RunService | undefined;
 let retention: RetentionService | undefined;
+let sidecar: SidecarDriver | undefined;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -77,7 +80,12 @@ if (!app.requestSingleInstanceLock()) {
     retention?.stop();
     void (async () => {
       await runs?.dispose();
-      await Promise.all([providers.dispose(), healthCheck?.dispose(), accounts?.dispose()]);
+      await Promise.all([
+        providers.dispose(),
+        healthCheck?.dispose(),
+        accounts?.dispose(),
+        sidecar?.dispose(),
+      ]);
     })().finally(() => app.quit());
   });
   app.on("will-quit", () => {
@@ -190,12 +198,13 @@ if (!app.requestSingleInstanceLock()) {
         directory: paths.vectorStoresDir,
         logger,
       });
-      const nodes = registerCoreNodes(new NodeRegistry());
+      sidecar = new SidecarDriver({ binaryPath: paths.sidecarPath, logger });
+      const nodes = registerJobNodes(registerCoreNodes(new NodeRegistry()));
       runs = new RunService({
         data: database,
         events: eventBus,
         registry: nodes,
-        services: { providers: registry, vectorStores },
+        services: { providers: registry, vectorStores, jobs: sidecar },
         logger,
       });
       const chat = new ChatService({ data: database, runs, registry: nodes, logger });

@@ -34,6 +34,14 @@ export function nativeTargetTriple(platform = process.platform, arch = process.a
 export const nativeAddonPath = (env: PathEnvironment): string =>
   join(resourcesDir(env), "native", nativeTargetTriple(), "zvs-core.node");
 
+export const sidecarPath = (env: PathEnvironment, platform = process.platform): string =>
+  join(
+    resourcesDir(env),
+    "sidecar",
+    nativeTargetTriple(platform),
+    platform === "win32" ? "zvs-jobd.exe" : "zvs-jobd",
+  );
+
 export function resolvePaths(env: PathEnvironment) {
   const hostDir = dirname(fileURLToPath(import.meta.url));
   return {
@@ -46,6 +54,7 @@ export function resolvePaths(env: PathEnvironment) {
     vectorStoresDir: vectorStoresDir(env),
     resourcesDir: resourcesDir(env),
     nativeAddonPath: nativeAddonPath(env),
+    sidecarPath: sidecarPath(env),
     migrationsDir: join(hostDir, "migrations"),
     preloadPath: join(hostDir, "../preload/index.cjs"),
     browserPreloadPath: join(hostDir, "../preload/browser.cjs"),

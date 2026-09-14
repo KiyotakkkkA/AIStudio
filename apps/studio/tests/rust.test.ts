@@ -134,7 +134,15 @@ test("nativePing delegates through the service port and satisfies the IPC contra
     },
   });
   try {
-    const handlers = createSystemHandlers({ system, events });
+    const handlers = createSystemHandlers({
+      system,
+      events,
+      runs: {
+        start() {
+          throw new Error("unused");
+        },
+      },
+    });
     const output = await handlers["system.nativePing"]({ text: "sample" });
     assert.deepEqual(contract["system.nativePing"].output.parse(output), { count: 1 });
     assert.equal(contract["system.nativePing"].input.safeParse({ text: 3 }).success, false);

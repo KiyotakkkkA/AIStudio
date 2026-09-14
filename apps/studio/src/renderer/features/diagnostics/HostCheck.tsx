@@ -2,17 +2,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "../../stores/useStore";
 
 const DEMO_STEPS = 5;
+const DEMO_JOB_STEPS = 8;
 const IDLE = "—";
 
 export default function HostCheck() {
   const { ipc, events } = useStore();
   const [ping, setPing] = useState(IDLE);
   const [stream, setStream] = useState(IDLE);
+  const [job, setJob] = useState(IDLE);
   const unsubscribe = useRef<(() => void) | undefined>(undefined);
+  const jobUnsubscribe = useRef<(() => void) | undefined>(undefined);
 
   useEffect(
     () => () => {
       unsubscribe.current?.();
+      jobUnsubscribe.current?.();
     },
     [],
   );
@@ -40,6 +44,24 @@ export default function HostCheck() {
       .catch((error: unknown) => setStream(`ошибка · ${String(error)}`));
   }, [events, ipc]);
 
+  // The sidecar smoke test: one kernel run over zvs-jobd's job.sleep. It needs the job.run
+  // permission, so the first attempt waits for approval on the Tasks page.
+  const runJob = useCallback(() => {
+    jobUnsubscribe.current?.();
+    jobUnsubscribe.current = undefined;
+    setJob("…");
+    void ipc
+      .call("system.demoJob", { steps: DEMO_JOB_STEPS, intervalMs: 250 })
+      .then(({ streamId }) => {
+        jobUnsubscribe.current = events.subscribe(streamId, (event) => {
+          if (event.type === "progress") setJob(`${event.done}/${event.total}`);
+          if (event.type === "approval") setJob("ждёт подтверждения · Задачи");
+          if (event.type === "end") setJob(`готово · ${event.outcome.status}`);
+        });
+      })
+      .catch((error: unknown) => setJob(`ошибка · ${String(error)}`));
+  }, [events, ipc]);
+
   return (
     <section
       data-testid="host-check"
@@ -48,7 +70,7 @@ export default function HostCheck() {
       <div className="flex flex-col gap-0.5">
         <h2 className="text-[13px] font-semibold text-main-100">Проверка хоста</h2>
         <p className="text-[11.5px] text-main-500">
-          Круговой вызов IPC и демонстрационный поток событий.
+          Круговой вызов IPC, демонстрационный поток событий и задача в sidecar.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2.5">
@@ -75,6 +97,19 @@ export default function HostCheck() {
         </button>
         <span data-testid="stream-value" className="font-mono text-[11.5px] text-main-400">
           {stream}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <button
+          type="button"
+          data-testid="job-button"
+          onClick={runJob}
+          className="rounded-[6px] border border-main-750 px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
+        >
+          Задача
+        </button>
+        <span data-testid="job-value" className="font-mono text-[11.5px] text-main-400">
+          {job}
         </span>
       </div>
     </section>
