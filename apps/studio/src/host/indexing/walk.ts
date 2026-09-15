@@ -1,6 +1,7 @@
 import { readdir, stat } from "node:fs/promises";
 import { join, relative, resolve, basename } from "node:path";
 import type { VectorSourceEntity } from "../data/schema/index.ts";
+import { toExtendedPath } from "../platform/longPath.ts";
 import { accepts, normalizeRelative } from "./patterns.ts";
 
 export interface DiscoveredFile {
@@ -22,6 +23,15 @@ export interface WalkOutcome {
   readonly notes: string[];
 }
 
+/** A walk swallows its errors to keep going, so the note is the only place the cause shows. */
+function reason(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (code === "ENOENT") return "путь не найден";
+  if (code === "EPERM" || code === "EACCES") return "нет доступа";
+  if (code === "ENAMETOOLONG") return "слишком длинный путь";
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function walkSources(
   sources: readonly VectorSourceEntity[],
   limits: WalkLimits = {},
@@ -40,9 +50,9 @@ export async function walkSources(
     const root = resolve(source.path);
     let entry;
     try {
-      entry = await stat(root);
-    } catch {
-      note(`Источник недоступен: ${source.path}`);
+      entry = await stat(toExtendedPath(root));
+    } catch (error: unknown) {
+      note(`Источник недоступен: ${source.path} — ${reason(error)}`);
       continue;
     }
     if (entry.isFile()) {
@@ -64,9 +74,9 @@ export async function walkSources(
       const directory = queue.pop()!;
       let entries;
       try {
-        entries = await readdir(directory, { withFileTypes: true });
-      } catch {
-        note(`Папка недоступна: ${directory}`);
+        entries = await readdir(toExtendedPath(directory), { withFileTypes: true });
+      } catch (error: unknown) {
+        note(`Папка недоступна: ${directory} — ${reason(error)}`);
         continue;
       }
       for (const child of entries) {
@@ -82,9 +92,9 @@ export async function walkSources(
         if (found.has(absolute)) continue;
         let info;
         try {
-          info = await stat(absolute);
-        } catch {
-          note(`Файл недоступен: ${absolute}`);
+          info = await stat(toExtendedPath(absolute));
+        } catch (error: unknown) {
+          note(`Файл недоступен: ${absolute} — ${reason(error)}`);
           continue;
         }
         if (info.size > maxFileBytes) {

@@ -148,6 +148,49 @@ export class VectorStoreService {
     });
   }
 
+  /**
+   * Empties the store without destroying it: the table is dropped and recreated with the same
+   * dimension and metric, and the document rows go with it. Sources, chunking and the OCR
+   * settings are untouched, so the next index refills it from the same configuration.
+   *
+   * Recreating beats deleting row by row — a full corpus is millions of vectors, and a fresh
+   * table also reclaims the space on disk that a delete would only mark as free.
+   */
+  clear(id: string): Promise<VectorStoreDto> {
+    return this.exclusive(id, async () => {
+      const row = this.require(id);
+      this.requireBackend(row);
+      const path = this.path(id);
+      try {
+        await this.options.core.removeVectorIndex(path);
+        await this.options.core.createVectorIndex(path, row.dimension, row.metric);
+      } catch (cause) {
+        // A store that lost its table and could not get a new one is broken, and says so rather
+        // than reporting a successful reset.
+        this.stores.update(id, { status: "broken", updatedAt: this.now() });
+        this.options.logger?.log("error", "vectorStores", "Could not reset the vector store", {
+          storeId: id,
+          error: String(cause),
+        });
+        throw new AppError(AppErrorCode.NATIVE_ERROR, "Не удалось очистить хранилище", { cause });
+      }
+      const removed = this.options.data.repositories.vectorDocuments.removeByStore(id);
+      const updated = this.stores.update(id, {
+        documents: 0,
+        vectors: 0,
+        bytes: 0,
+        lastIndexedAt: null,
+        status: "pending",
+        updatedAt: this.now(),
+      })!;
+      this.options.logger?.log("info", "vectorStores", "Reset a vector store", {
+        storeId: id,
+        documents: removed,
+      });
+      return this.toDto(updated);
+    });
+  }
+
   reconcile(id: string): Promise<VectorStoreDto> {
     return this.exclusive(id, async () => {
       const row = this.require(id);

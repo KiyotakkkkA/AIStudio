@@ -205,6 +205,9 @@ export class LlamaServer {
       String(this.options.contextSize ?? 8192),
       "--batch-size",
       String(this.options.batchSize ?? 2048),
+      ...(this.role === "embedding"
+        ? ["--ubatch-size", String(this.options.batchSize ?? 2048)]
+        : []),
       ...(this.options.threads === undefined ? [] : ["--threads", String(this.options.threads)]),
     ];
     this.options.logger?.log("info", "runtimes", "Starting the local embedding server", {

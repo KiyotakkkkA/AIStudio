@@ -123,6 +123,7 @@ export const contract = defineContract({
   "vectorStores.search": { input: VectorSearchInput, output: z.array(VectorSearchHitDto) },
   "vectorStores.searchTimed": { input: VectorSearchInput, output: VectorSearchResultDto },
   "vectorStores.reconcile": { input: VectorStoreRef, output: VectorStoreDto },
+  "vectorStores.clear": { input: VectorStoreRef, output: VectorStoreDto },
   "vectorStores.sources.list": { input: VectorStoreRef, output: z.array(VectorSourceDto) },
   "vectorStores.sources.add": { input: AddVectorSourceInput, output: VectorSourceDto },
   "vectorStores.sources.remove": {

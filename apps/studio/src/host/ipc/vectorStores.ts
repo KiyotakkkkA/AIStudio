@@ -22,6 +22,7 @@ type VectorStoreChannels =
   | "vectorStores.search"
   | "vectorStores.searchTimed"
   | "vectorStores.reconcile"
+  | "vectorStores.clear"
   | "vectorStores.sources.list"
   | "vectorStores.sources.add"
   | "vectorStores.sources.remove"
@@ -54,6 +55,7 @@ export function createVectorStoreHandlers(
       service.search(storeId, query, { k, minScore }),
     "vectorStores.searchTimed": ({ storeId, query, k, minScore }) =>
       service.searchTimed(storeId, query, { k, minScore }),
+    "vectorStores.clear": ({ id }) => service.clear(id),
     "vectorStores.reconcile": ({ id }) => service.reconcile(id),
     "vectorStores.sources.list": ({ id }) => indexing().listSources(id),
     "vectorStores.sources.add": (input) => indexing().addSource(input),

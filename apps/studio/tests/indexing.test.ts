@@ -549,3 +549,39 @@ test("a file that is skipped or unchanged is never reported as a document", asyn
   expect(report.skipped).toBe(1);
   expect(seen).toEqual([]);
 });
+
+test("a reset empties the store but keeps it, its sources and its settings", async () => {
+  write("guide.md", "alpha beta gamma");
+  write("other.md", "delta epsilon zeta");
+  const source = addFolder();
+  const indexed = await indexing.index({ storeId: store.id, full: false });
+  expect(indexed.indexed).toBe(2);
+  expect(indexing.listDocuments(store.id)).toHaveLength(2);
+
+  const cleared = await stores.clear(store.id);
+
+  expect(cleared.id).toBe(store.id);
+  expect(cleared.documents).toBe(0);
+  expect(cleared.vectors).toBe(0);
+  expect(cleared.lastIndexedAt).toBeNull();
+  expect(indexing.listDocuments(store.id)).toEqual([]);
+  // The configuration survives, so the next index refills from the same sources.
+  expect(indexing.listSources(store.id).map((row) => row.id)).toEqual([source.id]);
+  expect(cleared.chunkSize).toBe(4);
+  expect(cleared.dimension).toBe(3);
+  expect((await core.vectorStats(stores.storePath(store.id))).rowCount).toBe(0);
+});
+
+test("a store can be indexed again after a reset", async () => {
+  write("guide.md", "alpha beta gamma");
+  addFolder();
+  await indexing.index({ storeId: store.id, full: false });
+  await stores.clear(store.id);
+
+  // Nothing is "unchanged" any more: the reset took the content hashes with the rows.
+  const again = await indexing.index({ storeId: store.id, full: false });
+
+  expect(again.indexed).toBe(1);
+  expect(again.unchanged).toBe(0);
+  expect(indexing.listDocuments(store.id)).toHaveLength(1);
+});

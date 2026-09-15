@@ -215,6 +215,7 @@ export class RunService {
       summary: this.summaries([row])[0],
       steps: this.steps(id),
       logs: this.dependencies.data.repositories.runs.logs(id),
+      events: this.dependencies.data.repositories.runs.events(id),
     });
   }
   retry(id: string): RunHandleDto {

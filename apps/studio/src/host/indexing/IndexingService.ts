@@ -21,6 +21,7 @@ import type { RustCorePort, TextChunk } from "../drivers/rust/ports.ts";
 import type { VectorCorePort, VectorRow } from "../drivers/rust/vectorTypes.ts";
 import type { Logger } from "../platform/logger.ts";
 import { createId } from "../platform/ids.ts";
+import { fromExtendedPath, toExtendedPath } from "../platform/longPath.ts";
 import type { DriverSource } from "../services/ProviderService.ts";
 import type { VectorStoreService } from "../services/VectorStoreService.ts";
 import { createExtractorRegistry, type ExtractorRegistry } from "./extraction.ts";
@@ -135,7 +136,7 @@ export class IndexingService {
         id: createId(),
         storeId: input.storeId,
         kind: input.kind,
-        path: resolve(input.path),
+        path: resolve(fromExtendedPath(input.path.trim())),
         include: [...input.include],
         exclude: [...input.exclude],
         recursive: input.recursive,
@@ -239,9 +240,15 @@ export class IndexingService {
         break;
       }
       const estimate = estimateChunks(file.bytes, store.chunkSize, store.chunkOverlap);
+      let pendingForFile = estimate;
       try {
         const outcome = await this.ingest(store, file, known.get(file.path), full, embedding, {
           signal,
+          onChunks: (count) => {
+            pending += count - pendingForFile;
+            pendingForFile = count;
+            report(`${file.path}`, true);
+          },
           onBatch: (embedded) => {
             tally.chunks += embedded;
             report();
@@ -256,10 +263,10 @@ export class IndexingService {
           tally.skipped += 1;
           this.note(tally, `Пропущен ${file.path}: ${outcome.reason}`);
         } else tally.indexed += 1;
-        pending -= estimate;
+        pending -= pendingForFile;
         report(`${file.path}`, true);
       } catch (error) {
-        pending -= estimate;
+        pending -= pendingForFile;
         if (isCancellation(error) || aborted(signal)) {
           cancelled = true;
           break;
@@ -269,7 +276,7 @@ export class IndexingService {
         this.options.logger?.log("warn", "indexing", "Could not index a file", {
           storeId: store.id,
           path: file.path,
-          error: String(error),
+          error: describe(error),
         });
         report(`${file.path}`, true);
       }
@@ -314,6 +321,7 @@ export class IndexingService {
     embedding: EmbeddingDriver,
     context: {
       signal?: AbortSignal;
+      onChunks: (count: number) => void;
       onBatch: (embedded: number) => void;
       note: (message: string) => void;
       onDocument: (document: VectorDocumentDto) => void;
@@ -349,6 +357,7 @@ export class IndexingService {
       size: store.chunkSize,
       overlap: store.chunkOverlap,
     });
+    context.onChunks(chunks.length);
     const documentId = known?.id ?? createId();
     const vectors = await this.embed(store, embedding, chunks, file, documentId, context);
     await this.options.stores.withExclusiveStore(store.id, async (row) => {
@@ -382,7 +391,7 @@ export class IndexingService {
     for (let start = 0; start < chunks.length; start += size)
       batches.push({ start, chunks: chunks.slice(start, start + size) });
     const rows: VectorRow[] = [];
-    const concurrency = Math.max(1, Math.min(this.options.concurrency ?? 2, batches.length));
+    const concurrency = Math.max(1, Math.min(this.options.concurrency ?? 1, batches.length));
     let next = 0;
     const worker = async (): Promise<void> => {
       for (;;) {
@@ -536,11 +545,16 @@ function toSourceDto(row: VectorSourceEntity): VectorSourceDto {
 }
 
 function defaultRead(path: string): Promise<Uint8Array> {
-  return readFile(path);
+  return readFile(toExtendedPath(path));
 }
 
 function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (!(error instanceof Error)) return String(error);
+  if (!(error instanceof AppError) || error.details === undefined) return error.message;
+  const detail = error.details.detail;
+  return typeof detail === "string" && detail !== ""
+    ? `${error.message}: ${detail}`
+    : error.message;
 }
 
 function aborted(signal?: AbortSignal): boolean {

@@ -88,6 +88,23 @@ function VectorStoreDetail() {
             </Button>
             <Button
               tone="danger"
+              disabled={disabled || (detail.documents === 0 && detail.vectors === 0)}
+              title="Очистить содержимое, не удаляя хранилище"
+              needConfirm
+              modalSetup={{
+                title: `Очистить «${detail.name}»?`,
+                content: `Из хранилища будут удалены все векторы (${detail.vectors.toLocaleString("ru-RU")}) и документы (${detail.documents.toLocaleString("ru-RU")}). Само хранилище, его источники и настройки останутся — индексацию можно запустить заново. Это действие нельзя отменить.`,
+                tone: "danger",
+                confirmLabel: "Очистить",
+              }}
+              onClick={() => {
+                void store.clear();
+              }}
+            >
+              Сброс
+            </Button>
+            <Button
+              tone="danger"
               disabled={disabled}
               needConfirm
               modalSetup={{

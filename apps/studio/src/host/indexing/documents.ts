@@ -4,6 +4,7 @@ import { AppError, AppErrorCode, type Json, type VectorOcrConfig } from "@zvs/sh
 import type { SidecarJobsPort } from "../drivers/sidecar/SidecarDriver.ts";
 import type { Logger } from "../platform/logger.ts";
 import { createId } from "../platform/ids.ts";
+import { toExtendedPath } from "../platform/longPath.ts";
 import type { ExtractionInput, Extractor } from "./extraction.ts";
 
 export const DOCUMENT_JOB = "job.document.extract";
@@ -60,7 +61,8 @@ export function createPdfExtractor(options: DocumentExtractorOptions): Extractor
     const scratch = ocr === undefined ? undefined : join(options.scratchDir, createId());
     try {
       const report = await runJob(options.jobs, {
-        path: input.path,
+        // Rust opens this itself, and Windows enforces the same limit on it.
+        path: toExtendedPath(input.path),
         minCharsPerPage: ocr?.config.minCharsPerPage ?? 0,
         ...(scratch === undefined ? {} : { imagesDir: scratch }),
       });

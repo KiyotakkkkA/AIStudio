@@ -46,4 +46,7 @@ export class VectorDocumentRepository extends Repository {
       .where(and(eq(vectorDocument.storeId, storeId), eq(vectorDocument.sourcePath, sourcePath)))
       .run();
   }
+  removeByStore(storeId: string): number {
+    return this.db.delete(vectorDocument).where(eq(vectorDocument.storeId, storeId)).run().changes;
+  }
 }

@@ -176,7 +176,10 @@ export default class VectorStoreStore {
           this.merge(detail);
         }
       });
-      if (revision === this.revision) await this.loadDocuments(id);
+      if (revision === this.revision) {
+        await this.loadDocuments(id);
+        await this.restoreIndex(id, revision);
+      }
     } catch (error) {
       runInAction(() => {
         if (revision === this.revision) this.error = errorCopy(error);
@@ -240,6 +243,19 @@ export default class VectorStoreStore {
           if (this.selectedId === id) this.detail = detail;
         });
       }
+    });
+  }
+  async clear() {
+    const id = this.selectedId;
+    if (!id || this.indexRun) return false;
+    return this.mutate(async () => {
+      const detail = await this.ipc.call("vectorStores.clear", { id });
+      runInAction(() => {
+        this.merge(detail);
+        if (this.selectedId === id) this.detail = detail;
+        this.documents = [];
+        this.result = null;
+      });
     });
   }
   async remove() {
@@ -376,6 +392,34 @@ export default class VectorStoreStore {
           this.receiveIndexEvent(storeId, event);
         }) ?? null;
     });
+  }
+  private async restoreIndex(storeId: VectorStoreId, revision: number) {
+    const page = await this.ipc.call("runs.list", {
+      live: true,
+      kinds: ["indexing"],
+      limit: 100,
+    });
+    const summary = page.items.find(
+      (run) => run.subjectId === storeId && ["queued", "running", "blocked"].includes(run.status),
+    );
+    if (!summary || revision !== this.revision || this.selectedId !== storeId) return;
+
+    this.stopIndexStream?.();
+    this.indexRun = {
+      id: summary.id,
+      done: summary.progress.done,
+      total: summary.progress.total,
+      note: "Индексация продолжается",
+    };
+    this.indexSample = null;
+    this.indexRate = null;
+    const detail = await this.ipc.call("runs.detail", { id: summary.id });
+    if (revision !== this.revision || this.selectedId !== storeId) return;
+    for (const event of detail.events) this.receiveIndexEvent(storeId, event);
+    this.stopIndexStream =
+      this.events?.subscribe(summary.streamId, (event) => {
+        this.receiveIndexEvent(storeId, event);
+      }) ?? null;
   }
   async cancelIndex() {
     const run = this.indexRun;
