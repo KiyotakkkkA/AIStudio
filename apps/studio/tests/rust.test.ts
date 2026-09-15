@@ -10,7 +10,32 @@ import { createSystemHandlers } from "../src/host/ipc/system.ts";
 import { createEventBus } from "../src/host/platform/events.ts";
 import { STUDIO_ROOT, temporaryDirectory } from "../../../test/helpers/paths.ts";
 
+const unusedGraphExports = {
+  async graphAddNode() {
+    throw new Error("unused");
+  },
+  async graphAddEdge() {
+    throw new Error("unused");
+  },
+  async graphRemoveEdge() {
+    throw new Error("unused");
+  },
+  async graphRemoveNode() {
+    throw new Error("unused");
+  },
+  async graphNeighbors() {
+    throw new Error("unused");
+  },
+  async graphShortestPath() {
+    throw new Error("unused");
+  },
+  async graphKHopSubgraph() {
+    throw new Error("unused");
+  },
+};
+
 const unusedVectorExports = {
+  ...unusedGraphExports,
   async vectorCall() {
     throw new Error("unused");
   },

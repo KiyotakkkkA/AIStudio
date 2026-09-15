@@ -7,6 +7,23 @@ import {
   type VectorMetric,
   type VectorRow,
 } from "./vectorTypes.ts";
+import {
+  GraphEdgeSchema,
+  GraphNeighborQuerySchema,
+  GraphNeighborSchema,
+  GraphNodeSchema,
+  GraphPathQuerySchema,
+  GraphPathSchema,
+  GraphSubgraphQuerySchema,
+  GraphSubgraphSchema,
+  type GraphCorePort,
+  type GraphEdgeInput,
+  type GraphNamespace,
+  type GraphNeighborQuery,
+  type GraphNode,
+  type GraphPathQuery,
+  type GraphSubgraphQuery,
+} from "./graphTypes.ts";
 import { loadAddon, type NativeAddon } from "./addon.ts";
 import type { StudioPaths } from "../../platform/paths.ts";
 import type { ChunkConfig, RustCorePort, TextChunk } from "./ports.ts";
@@ -41,7 +58,7 @@ function nativeError(cause: unknown): AppError {
   return new AppError(AppErrorCode.NATIVE_ERROR, "Ошибка Rust addon", { cause });
 }
 
-export class RustCore implements RustCorePort, VectorCorePort {
+export class RustCore implements RustCorePort, VectorCorePort, GraphCorePort {
   constructor(private readonly addon: () => NativeAddon) {}
 
   static fromPaths(paths: Pick<StudioPaths, "nativeAddonPath">): RustCore {
@@ -161,4 +178,89 @@ export class RustCore implements RustCorePort, VectorCorePort {
   async removeVectorIndex(path: string): Promise<void> {
     await this.vectorCall({ operation: "remove", path }, z.null());
   }
+
+  private graphInput<T>(schema: z.ZodType<T>, value: unknown): T {
+    const parsed = schema.safeParse(value);
+    if (!parsed.success) {
+      throw new AppError(AppErrorCode.VALIDATION_FAILED, "Некорректный запрос к графу", {
+        cause: parsed.error,
+      });
+    }
+    return parsed.data;
+  }
+
+  private graphId(graphId: string): string {
+    return this.graphInput(z.string().trim().min(1), graphId);
+  }
+
+  private async graphValue<T>(work: (addon: NativeAddon) => Promise<T>): Promise<T> {
+    try {
+      return await work(this.addon());
+    } catch (cause) {
+      throw nativeError(cause);
+    }
+  }
+
+  private async graphJson<T>(
+    work: (addon: NativeAddon) => Promise<string>,
+    schema: z.ZodType<T>,
+  ): Promise<T> {
+    try {
+      return schema.parse(JSON.parse(await work(this.addon())));
+    } catch (cause) {
+      throw nativeError(cause);
+    }
+  }
+
+  readonly graph: GraphNamespace = {
+    addNode: async (graphId: string, node: GraphNode) => {
+      const payload = JSON.stringify(this.graphInput(GraphNodeSchema, node));
+      const id = this.graphId(graphId);
+      return this.graphValue((addon) => addon.graphAddNode(id, payload));
+    },
+
+    addEdge: async (graphId: string, edge: GraphEdgeInput) => {
+      const payload = JSON.stringify(this.graphInput(GraphEdgeSchema, edge));
+      const id = this.graphId(graphId);
+      return this.graphValue((addon) => addon.graphAddEdge(id, payload));
+    },
+
+    removeEdge: async (graphId: string, from: string, to: string, relation: string) => {
+      const edge = this.graphInput(GraphEdgeSchema, { from, to, relation });
+      const id = this.graphId(graphId);
+      return this.graphValue((addon) =>
+        addon.graphRemoveEdge(id, edge.from, edge.to, edge.relation),
+      );
+    },
+
+    removeNode: async (graphId: string, nodeId: string) => {
+      const node = this.graphInput(z.string().trim().min(1), nodeId);
+      const id = this.graphId(graphId);
+      return this.graphValue((addon) => addon.graphRemoveNode(id, node));
+    },
+
+    neighbors: async (graphId: string, query: GraphNeighborQuery) => {
+      const payload = JSON.stringify(this.graphInput(GraphNeighborQuerySchema, query));
+      const id = this.graphId(graphId);
+      return this.graphJson(
+        (addon) => addon.graphNeighbors(id, payload),
+        GraphNeighborSchema.array(),
+      );
+    },
+
+    shortestPath: async (graphId: string, query: GraphPathQuery) => {
+      const payload = JSON.stringify(this.graphInput(GraphPathQuerySchema, query));
+      const id = this.graphId(graphId);
+      return this.graphJson(
+        (addon) => addon.graphShortestPath(id, payload),
+        GraphPathSchema.nullable(),
+      );
+    },
+
+    kHopSubgraph: async (graphId: string, query: GraphSubgraphQuery) => {
+      const payload = JSON.stringify(this.graphInput(GraphSubgraphQuerySchema, query));
+      const id = this.graphId(graphId);
+      return this.graphJson((addon) => addon.graphKHopSubgraph(id, payload), GraphSubgraphSchema);
+    },
+  };
 }

@@ -33,6 +33,27 @@ function native(overrides: Partial<NativeAddon> = {}): NativeAddon {
     },
     async vectorCancel() {},
     async vectorRelease() {},
+    async graphAddNode() {
+      throw new Error("unused");
+    },
+    async graphAddEdge() {
+      throw new Error("unused");
+    },
+    async graphRemoveEdge() {
+      throw new Error("unused");
+    },
+    async graphRemoveNode() {
+      throw new Error("unused");
+    },
+    async graphNeighbors() {
+      throw new Error("unused");
+    },
+    async graphShortestPath() {
+      throw new Error("unused");
+    },
+    async graphKHopSubgraph() {
+      throw new Error("unused");
+    },
     ...overrides,
   };
 }

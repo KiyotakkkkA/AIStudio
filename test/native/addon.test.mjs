@@ -152,3 +152,102 @@ test("vector addon persists hundreds of vectors, replaces IDs, filters, deletes 
     rmSync(path, { recursive: true, force: true });
   }
 });
+
+test("graph addon stores nodes and edges per graph id and answers every traversal", async () => {
+  const store = "native-graph";
+  assert.equal(
+    await addon.graphAddNode(store, JSON.stringify({ id: "a", kind: "document" })),
+    true,
+  );
+  assert.equal(
+    await addon.graphAddNode(store, JSON.stringify({ id: "a", kind: "document" })),
+    false,
+  );
+  for (const id of ["b", "c", "d"]) {
+    await addon.graphAddNode(store, JSON.stringify({ id, kind: "chunk" }));
+  }
+  const metadata = { note: "Связь", nested: { list: [1, 2, 3] } };
+  assert.equal(
+    await addon.graphAddEdge(
+      store,
+      JSON.stringify({ from: "a", to: "b", relation: "cites", weight: 0.5, metadata }),
+    ),
+    true,
+  );
+  await addon.graphAddEdge(store, JSON.stringify({ from: "b", to: "c", relation: "cites" }));
+  await addon.graphAddEdge(store, JSON.stringify({ from: "c", to: "d", relation: "co_occurs" }));
+
+  const neighbors = JSON.parse(
+    await addon.graphNeighbors(store, JSON.stringify({ id: "a", direction: "outgoing" })),
+  );
+  assert.equal(neighbors.length, 1);
+  assert.equal(neighbors[0].node.id, "b");
+  assert.equal(neighbors[0].direction, "outgoing");
+  assert.equal(neighbors[0].edge.weight, 0.5);
+  assert.deepEqual(neighbors[0].edge.metadata, metadata);
+
+  const path = JSON.parse(
+    await addon.graphShortestPath(store, JSON.stringify({ from: "a", to: "d" })),
+  );
+  assert.deepEqual(
+    path.nodes.map((node) => node.id),
+    ["a", "b", "c", "d"],
+  );
+  assert.equal(path.edges.length, 3);
+  assert.equal(
+    JSON.parse(
+      await addon.graphShortestPath(
+        store,
+        JSON.stringify({ from: "a", to: "d", relation: "cites" }),
+      ),
+    ),
+    null,
+  );
+
+  const subgraph = JSON.parse(
+    await addon.graphKHopSubgraph(store, JSON.stringify({ id: "a", hops: 2 })),
+  );
+  assert.equal(subgraph.root, "a");
+  assert.deepEqual(
+    subgraph.nodes.map((entry) => [entry.node.id, entry.hops]),
+    [
+      ["a", 0],
+      ["b", 1],
+      ["c", 2],
+    ],
+  );
+
+  await assert.rejects(addon.graphNeighbors("other-graph-id", '{"id":"a"}'), (error) => {
+    assert.equal(JSON.parse(error.message).code, "VALIDATION_FAILED");
+    return true;
+  });
+  await assert.rejects(
+    addon.graphKHopSubgraph(store, JSON.stringify({ id: "a", hops: 2, budget: 1 })),
+    (error) => {
+      assert.equal(JSON.parse(error.message).code, "LIMIT_EXCEEDED");
+      return true;
+    },
+  );
+
+  assert.equal(await addon.graphRemoveEdge(store, "b", "c", "cites"), true);
+  assert.equal(await addon.graphRemoveEdge(store, "b", "c", "cites"), false);
+  assert.equal(await addon.graphRemoveNode(store, "a"), 1);
+  assert.equal(await addon.graphRemoveNode(store, "a"), null);
+  assert.deepEqual(JSON.parse(await addon.graphNeighbors(store, '{"id":"b"}')), []);
+});
+
+test("a panic inside a graph export rejects and leaves the shared store usable", async () => {
+  const debug = require(join(directory, "debug/zvs-core.node"));
+  const store = "native-graph-panic";
+  await debug.graphAddNode(store, JSON.stringify({ id: "a", kind: "document" }));
+  await assert.rejects(debug.graphDebugPanic(store), (error) => {
+    assert.equal(JSON.parse(error.message).code, "NATIVE_ERROR");
+    return true;
+  });
+  assert.equal(await debug.graphAddNode(store, JSON.stringify({ id: "b", kind: "chunk" })), true);
+  assert.equal(
+    await debug.graphAddEdge(store, JSON.stringify({ from: "a", to: "b", relation: "cites" })),
+    true,
+  );
+  assert.deepEqual(JSON.parse(await debug.graphNeighbors(store, '{"id":"a"}')).length, 1);
+});

@@ -40,8 +40,8 @@ TASK_042 can use the digest as a content-cache key.
 
 `Error` and `Result<T>` are shared across capabilities. Error codes match
 `packages/shared/src/errors/AppErrorCode.ts`: invalid input maps to
-`VALIDATION_FAILED`, cancellation to `RUN_CANCELLED`, backend failures and general
-IO failures to `NATIVE_ERROR`. Missing files and denied access retain `NOT_FOUND`
+`VALIDATION_FAILED`, a passed bound to `LIMIT_EXCEEDED`, cancellation to
+`RUN_CANCELLED`, backend failures and general IO failures to `NATIVE_ERROR`. Missing files and denied access retain `NOT_FOUND`
 and `PERMISSION_DENIED`. IO errors preserve their source.
 
 ## Module handoffs
@@ -170,7 +170,7 @@ hops then id — so repeated queries return identical output.
 Traversal is bounded, not merely finite. `hops` may not exceed `MAX_HOPS` (8) and
 the node budget defaults to `DEFAULT_NODE_BUDGET` (4096), capped at
 `MAX_NODE_BUDGET` (65536). A k-hop expansion that would pass its budget stops and
-returns `Error::LimitExceeded`, which also maps to `VALIDATION_FAILED`, rather
+returns `Error::LimitExceeded`, which maps to `LIMIT_EXCEEDED`, rather
 than walking a dense graph to exhaustion. An unknown node id in any query is
 `VALIDATION_FAILED`, not an empty result.
 

@@ -62,3 +62,27 @@ upsert token with `vectorBeginUpsert`, pass its `operationId`, and call
 error conversion. Token IDs are local to the loaded addon instance. The core
 README defines batching, cancellation and score semantics. Native tests include
 a 400-vector persistence/search/deletion check in a temporary host-selected path.
+
+Graph services consume `GraphCorePort`, also implemented by `RustCore` as a `graph`
+namespace: `addNode`, `addEdge`, `removeEdge`, `removeNode`, `neighbors`,
+`shortestPath` and `kHopSubgraph`. Each maps to one `#[napi]` async export
+(`graphAddNode` … `graphKHopSubgraph`) through the same `guarded` wrapper as
+`chunkText` and `hashBytes`; `graphDebugPanic` proves that in the debug build.
+
+`zvs_core::GraphStore` has no on-disk format, so the addon owns a process-wide
+registry of stores keyed by a caller-supplied `graphId` behind a `Mutex` that
+recovers from poisoning. Nothing is persisted here: the host hydrates and writes
+back through SQLite (TASK_021_EXTRA_3). The registry lives for the life of the
+loaded addon, so a reload starts empty.
+
+Nodes, edges and queries cross as JSON text, matching zvs-core's camelCase serde
+shapes. Edge `metadata` is a nested JSON value, not a nested JSON string — the
+wrapper serializes the edge once and the addon deserializes it once. Scalar
+arguments that are already plain (`graphId`, node id, `from`/`to`/`relation` on
+`graphRemoveEdge`) stay scalars. `graphRemoveNode` returns the cascaded edge count
+or `null` when the node was absent; `graphShortestPath` returns JSON `null` when no
+path exists. `RustCore` validates ids, directions, hop counts and node budgets
+against zvs-core's bounds before the call, so a malformed request is
+`VALIDATION_FAILED` without crossing the boundary, and validates every response.
+A traversal that passes its node budget is `LIMIT_EXCEEDED`, the code appended to
+`AppErrorCode` for `Error::LimitExceeded`.

@@ -389,7 +389,7 @@ fn k_hop_queries_are_bounded() {
         .k_hop_subgraph("c0", 8, None, Direction::Both, Some(4), &token)
         .unwrap_err();
     assert!(matches!(capped, Error::LimitExceeded(_)));
-    assert_eq!(capped.code(), "VALIDATION_FAILED");
+    assert_eq!(capped.code(), "LIMIT_EXCEEDED");
 
     assert_eq!(
         store

@@ -4,6 +4,7 @@ use napi::bindgen_prelude::Buffer;
 use napi_derive::napi;
 use zvs_core::{CancellationToken, Error as CoreError, chunk, hash};
 
+pub mod graph;
 pub mod vector;
 
 struct CoreFailure(CoreError);
@@ -39,8 +40,8 @@ pub struct TextChunk {
     pub token_count: u32,
 }
 
-fn number(value: usize) -> zvs_core::Result<u32> {
-    u32::try_from(value).map_err(|_| CoreError::InvalidInput("Text exceeds native limits".into()))
+pub(crate) fn number(value: usize) -> zvs_core::Result<u32> {
+    u32::try_from(value).map_err(|_| CoreError::InvalidInput("Value exceeds native limits".into()))
 }
 
 #[napi]

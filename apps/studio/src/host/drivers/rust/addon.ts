@@ -10,6 +10,13 @@ export interface NativeAddon {
   vectorRelease(operationId: string): Promise<void>;
   chunkText(text: string, config: ChunkConfig): Promise<TextChunk[]>;
   hashBytes(bytes: Buffer): Promise<string>;
+  graphAddNode(graphId: string, node: string): Promise<boolean>;
+  graphAddEdge(graphId: string, edge: string): Promise<boolean>;
+  graphRemoveEdge(graphId: string, from: string, to: string, relation: string): Promise<boolean>;
+  graphRemoveNode(graphId: string, id: string): Promise<number | null>;
+  graphNeighbors(graphId: string, query: string): Promise<string>;
+  graphShortestPath(graphId: string, query: string): Promise<string>;
+  graphKHopSubgraph(graphId: string, query: string): Promise<string>;
 }
 
 const require = createRequire(import.meta.url);
@@ -30,7 +37,19 @@ export function loadAddon(paths: Pick<StudioPaths, "nativeAddonPath">): NativeAd
       typeof addon.hashBytes !== "function"
     )
       throw new Error("Native addon exports do not match the RustCore interface");
-    for (const name of ["vectorCall", "vectorBeginUpsert", "vectorCancel", "vectorRelease"]) {
+    for (const name of [
+      "vectorCall",
+      "vectorBeginUpsert",
+      "vectorCancel",
+      "vectorRelease",
+      "graphAddNode",
+      "graphAddEdge",
+      "graphRemoveEdge",
+      "graphRemoveNode",
+      "graphNeighbors",
+      "graphShortestPath",
+      "graphKHopSubgraph",
+    ]) {
       if (!(name in addon) || typeof (addon as Record<string, unknown>)[name] !== "function") {
         throw new Error(`Native addon is missing ${name}`);
       }

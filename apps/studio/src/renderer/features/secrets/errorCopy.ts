@@ -28,6 +28,7 @@ const COPY: Record<AppErrorCode, string> = {
   [AppErrorCode.NATIVE_ERROR]: "Сбой нативного модуля.",
   [AppErrorCode.DB_ERROR]: "Сбой локальной базы данных.",
   [AppErrorCode.UNSUPPORTED_FORMAT]: "Формат не поддерживается.",
+  [AppErrorCode.LIMIT_EXCEEDED]: "Превышен допустимый предел запроса.",
 };
 
 const ISSUE_COPY: Record<string, string> = {
