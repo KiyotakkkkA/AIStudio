@@ -58,6 +58,15 @@ fn read<T>(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct HydrateRequest {
+    #[serde(default)]
+    nodes: Vec<Node>,
+    #[serde(default)]
+    edges: Vec<Edge>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct NeighborQuery {
     id: String,
     #[serde(default)]
@@ -88,6 +97,24 @@ struct SubgraphQuery {
     direction: Direction,
     #[serde(default)]
     budget: Option<u32>,
+}
+
+#[napi]
+pub async fn graph_hydrate(graph_id: String, payload: String) -> napi::Result<String> {
+    guarded(|| {
+        let request: HydrateRequest = parse(&payload, "graph hydrate")?;
+        let graph_id = key(&graph_id)?;
+        let store = GraphStore::hydrate(&request.nodes, &request.edges, &CancellationToken::new())?;
+        let stats = encode(&store.stats())?;
+        let mut graphs = graphs().lock().unwrap_or_else(|error| error.into_inner());
+        graphs.insert(graph_id, store);
+        Ok(stats)
+    })
+}
+
+#[napi]
+pub async fn graph_stats(graph_id: String) -> napi::Result<String> {
+    guarded(|| read(&graph_id, |store| encode(&store.stats())))
 }
 
 #[napi]
@@ -215,6 +242,39 @@ mod tests {
             write(store, |graph| Ok(graph.remove_node("a"))).unwrap(),
             Some(1)
         );
+    }
+
+    #[test]
+    fn hydration_replaces_a_store_and_stats_report_its_size() {
+        let store = "tests-hydration";
+        assert!(
+            write(store, |graph| graph
+                .add_node(parse(&node("stale"), "node")?))
+            .unwrap()
+        );
+
+        let payload = r#"{"nodes":[{"id":"a","kind":"document"},{"id":"b","kind":"document"},{"id":"c","kind":"chunk"}],"edges":[{"from":"a","to":"b","relation":"cites"},{"from":"b","to":"c","relation":"derived_from"}]}"#;
+        let request: HydrateRequest = parse(payload, "graph hydrate").unwrap();
+        let hydrated =
+            GraphStore::hydrate(&request.nodes, &request.edges, &CancellationToken::new()).unwrap();
+        graphs()
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .insert(key(store).unwrap(), hydrated);
+
+        let stats: serde_json::Value =
+            serde_json::from_str(&read(store, |graph| encode(&graph.stats())).unwrap()).unwrap();
+        assert_eq!(stats["nodeCount"], 3);
+        assert_eq!(stats["edgeCount"], 2);
+        assert_eq!(stats["documentCount"], 2);
+        assert_eq!(stats["chunkCount"], 1);
+        assert!(!read(store, |graph| Ok(graph.contains_node("stale"))).unwrap());
+
+        let empty: serde_json::Value = serde_json::from_str(
+            &read("tests-unhydrated", |graph| encode(&graph.stats())).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(empty["edgeCount"], 0);
     }
 
     #[test]

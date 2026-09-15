@@ -42,6 +42,7 @@ import { BrowserLifecycle } from "./browser/lifecycle";
 import { RustCore } from "./drivers/rust/RustCore";
 import { SystemService } from "./services/SystemService";
 import { VectorStoreService } from "./services/VectorStoreService";
+import { GraphService } from "./services/GraphService";
 import { RunService } from "./services/RunService";
 import { RetentionService } from "./services/RetentionService";
 import { NodeRegistry } from "./kernel/NodeRegistry";
@@ -217,6 +218,7 @@ if (!app.requestSingleInstanceLock()) {
         directory: paths.vectorStoresDir,
         logger,
       });
+      const graph = new GraphService({ data: database, core, logger });
       const indexing = new IndexingService({
         data: database,
         core,
@@ -309,6 +311,7 @@ if (!app.requestSingleInstanceLock()) {
           chat,
           runs,
           vectorStores,
+          graph,
           indexing,
           downloads,
           runtimes,

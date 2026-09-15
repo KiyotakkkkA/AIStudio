@@ -10,8 +10,12 @@ import { AccountRepository } from "./AccountRepository.ts";
 import { VectorStoreRepository } from "./VectorStoreRepository.ts";
 import { VectorDocumentRepository } from "./VectorDocumentRepository.ts";
 import { VectorSourceRepository } from "./VectorSourceRepository.ts";
+import { GraphRelationRepository } from "./GraphRelationRepository.ts";
+import { GraphEdgeRepository } from "./GraphEdgeRepository.ts";
 import { DownloadRepository } from "./DownloadRepository.ts";
 export { VectorStoreRepository, VectorDocumentRepository, VectorSourceRepository };
+export { GraphRelationRepository, GraphEdgeRepository };
+export type { GraphEdgeLookup } from "./GraphEdgeRepository.ts";
 export { DownloadRepository };
 export type { DownloadPatch } from "./DownloadRepository.ts";
 
@@ -32,6 +36,8 @@ export interface Repositories {
   readonly vectorStores: VectorStoreRepository;
   readonly vectorDocuments: VectorDocumentRepository;
   readonly vectorSources: VectorSourceRepository;
+  readonly graphRelations: GraphRelationRepository;
+  readonly graphEdges: GraphEdgeRepository;
   readonly downloads: DownloadRepository;
   readonly secrets: SecretRepository;
   readonly settings: SettingRepository;
@@ -48,6 +54,8 @@ export function createRepositories(db: DatabaseHandle): Repositories {
     vectorStores: new VectorStoreRepository(db),
     vectorDocuments: new VectorDocumentRepository(db),
     vectorSources: new VectorSourceRepository(db),
+    graphRelations: new GraphRelationRepository(db),
+    graphEdges: new GraphEdgeRepository(db),
     downloads: new DownloadRepository(db),
     secrets: new SecretRepository(db),
     settings: new SettingRepository(db),

@@ -236,6 +236,53 @@ test("graph addon stores nodes and edges per graph id and answers every traversa
   assert.deepEqual(JSON.parse(await addon.graphNeighbors(store, '{"id":"b"}')), []);
 });
 
+test("hydration replaces a graph from the ledger and stats report both halves", async () => {
+  const store = "native-graph-hydrate";
+  await addon.graphAddNode(store, JSON.stringify({ id: "stale", kind: "document" }));
+  const hydrated = JSON.parse(
+    await addon.graphHydrate(
+      store,
+      JSON.stringify({
+        nodes: [
+          { id: "a", kind: "document" },
+          { id: "b", kind: "document" },
+          { id: "c", kind: "chunk" },
+        ],
+        edges: [
+          { from: "a", to: "b", relation: "cites", weight: 0.5, metadata: { note: "п" } },
+          { from: "b", to: "c", relation: "derived_from" },
+        ],
+      }),
+    ),
+  );
+  assert.deepEqual(hydrated, {
+    nodeCount: 3,
+    edgeCount: 2,
+    documentCount: 2,
+    chunkCount: 1,
+  });
+  assert.deepEqual(JSON.parse(await addon.graphStats(store)), hydrated);
+  await assert.rejects(addon.graphNeighbors(store, '{"id":"stale"}'), (error) => {
+    assert.equal(JSON.parse(error.message).code, "VALIDATION_FAILED");
+    return true;
+  });
+  const neighbors = JSON.parse(
+    await addon.graphNeighbors(store, JSON.stringify({ id: "a", direction: "outgoing" })),
+  );
+  assert.deepEqual(
+    neighbors.map((entry) => entry.node.id),
+    ["b"],
+  );
+  assert.deepEqual(neighbors[0].edge.metadata, { note: "п" });
+  assert.equal(neighbors[0].edge.weight, 0.5);
+  assert.deepEqual(JSON.parse(await addon.graphStats("native-graph-never-used")), {
+    nodeCount: 0,
+    edgeCount: 0,
+    documentCount: 0,
+    chunkCount: 0,
+  });
+});
+
 test("a panic inside a graph export rejects and leaves the shared store usable", async () => {
   const debug = require(join(directory, "debug/zvs-core.node"));
   const store = "native-graph-panic";

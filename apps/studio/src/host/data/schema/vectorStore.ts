@@ -27,6 +27,7 @@ export const vectorStore = sqliteTable(
       .default({ enabled: false, modelRef: "", language: "auto", minCharsPerPage: 200 }),
     indexType: text("index_type").notNull().default("FLAT"),
     status: text("status").$type<VectorStoreDto["status"]>().notNull().default("pending"),
+    graphStale: integer("graph_stale", { mode: "boolean" }).notNull().default(false),
     tableCreatedAt: integer("table_created_at"),
     lastIndexedAt: integer("last_indexed_at"),
     documents: integer("documents").notNull().default(0),

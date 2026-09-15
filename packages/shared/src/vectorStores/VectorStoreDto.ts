@@ -50,6 +50,7 @@ export const VectorStoreDto = z.object({
   ocr: VectorOcrConfig.prefault({}),
   indexType: z.string().min(1),
   status: VectorHealth,
+  graphStale: z.boolean().prefault(false),
   lastIndexedAt: Timestamp.nullable(),
   documents: z.number().int().nonnegative(),
   vectors: z.number().int().nonnegative(),

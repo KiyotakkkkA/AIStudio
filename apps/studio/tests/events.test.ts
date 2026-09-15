@@ -11,6 +11,7 @@ import { createEventBus, type WindowSender } from "../src/host/platform/events.t
 import { createEventRecorder, recordingEnabled } from "../src/host/platform/eventRecorder.ts";
 import { createHandlers } from "../src/host/ipc/index.ts";
 import { createVectorStoreService } from "../../../test/helpers/vectorStoreService.ts";
+import { createGraphService } from "../../../test/helpers/graphService.ts";
 import { createAccountService } from "../../../test/helpers/accountService.ts";
 import { SettingService } from "../src/host/services/SettingService.ts";
 import { createFakeClock } from "../../../test/helpers/fakeClock.ts";
@@ -261,6 +262,7 @@ test("system.demoStream counts to the requested total and terminates", async () 
     chat: createChatService(database.client),
     runs: createRunService(database.client),
     vectorStores: createVectorStoreService(database.client),
+    graph: createGraphService(database.client),
     system: createSystemService(),
     accounts: createAccountService(database.client),
     providers: createProviderService(database.client),

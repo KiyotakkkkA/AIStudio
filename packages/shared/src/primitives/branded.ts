@@ -28,6 +28,12 @@ export type VectorStoreId = z.infer<typeof VectorStoreId>;
 export const DocumentId = brandedId("DocumentId");
 export type DocumentId = z.infer<typeof DocumentId>;
 
+export const GraphRelationTypeId = brandedId("GraphRelationTypeId");
+export type GraphRelationTypeId = z.infer<typeof GraphRelationTypeId>;
+
+export const GraphEdgeId = brandedId("GraphEdgeId");
+export type GraphEdgeId = z.infer<typeof GraphEdgeId>;
+
 export const ConversationId = brandedId("ConversationId");
 export type ConversationId = z.infer<typeof ConversationId>;
 

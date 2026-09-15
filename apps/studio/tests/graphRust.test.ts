@@ -27,6 +27,8 @@ const subgraph: GraphSubgraph = {
   edges: [edge],
 };
 
+const graphStats = { nodeCount: 0, edgeCount: 0, documentCount: 0, chunkCount: 0 };
+
 function native(overrides: Partial<NativeAddon> = {}): NativeAddon {
   return {
     async chunkText() {
@@ -43,6 +45,12 @@ function native(overrides: Partial<NativeAddon> = {}): NativeAddon {
     },
     async vectorCancel() {},
     async vectorRelease() {},
+    async graphHydrate() {
+      return JSON.stringify(graphStats);
+    },
+    async graphStats() {
+      return JSON.stringify(graphStats);
+    },
     async graphAddNode() {
       return true;
     },

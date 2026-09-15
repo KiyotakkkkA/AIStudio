@@ -36,6 +36,18 @@ export const GraphSubgraphSchema = z.object({
   edges: GraphEdgeSchema.array(),
 });
 
+export const GraphStatsSchema = z.object({
+  nodeCount: z.number().int().nonnegative(),
+  edgeCount: z.number().int().nonnegative(),
+  documentCount: z.number().int().nonnegative(),
+  chunkCount: z.number().int().nonnegative(),
+});
+
+export const GraphHydrateSchema = z.object({
+  nodes: GraphNodeSchema.array(),
+  edges: GraphEdgeSchema.array(),
+});
+
 export const GraphNeighborQuerySchema = z.object({
   id: z.string().trim().min(1),
   relation: z.string().trim().min(1).optional(),
@@ -65,11 +77,15 @@ export type GraphEdgeInput = z.input<typeof GraphEdgeSchema>;
 export type GraphNeighbor = z.infer<typeof GraphNeighborSchema>;
 export type GraphPath = z.infer<typeof GraphPathSchema>;
 export type GraphSubgraph = z.infer<typeof GraphSubgraphSchema>;
+export type GraphStats = z.infer<typeof GraphStatsSchema>;
+export type GraphHydrateInput = z.input<typeof GraphHydrateSchema>;
 export type GraphNeighborQuery = z.input<typeof GraphNeighborQuerySchema>;
 export type GraphPathQuery = z.input<typeof GraphPathQuerySchema>;
 export type GraphSubgraphQuery = z.input<typeof GraphSubgraphQuerySchema>;
 
 export interface GraphNamespace {
+  hydrate(graphId: string, content: GraphHydrateInput): Promise<GraphStats>;
+  stats(graphId: string): Promise<GraphStats>;
   addNode(graphId: string, node: GraphNode): Promise<boolean>;
   addEdge(graphId: string, edge: GraphEdgeInput): Promise<boolean>;
   removeEdge(graphId: string, from: string, to: string, relation: string): Promise<boolean>;

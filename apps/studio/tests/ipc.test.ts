@@ -2,6 +2,7 @@ import { createChatService } from "../../../test/helpers/chatService.ts";
 import { createRunService } from "../../../test/helpers/runService.ts";
 import { createSystemService } from "../../../test/helpers/systemService.ts";
 import { createVectorStoreService } from "../../../test/helpers/vectorStoreService.ts";
+import { createGraphService } from "../../../test/helpers/graphService.ts";
 import { createProviderService } from "../../../test/helpers/providerService.ts";
 import { createAccountService } from "../../../test/helpers/accountService.ts";
 import assert from "node:assert/strict";
@@ -23,6 +24,7 @@ test("system.ping echoes the host clock and matches the contract", () => {
     chat: createChatService(database.client),
     runs: createRunService(database.client),
     vectorStores: createVectorStoreService(database.client),
+    graph: createGraphService(database.client),
     system: createSystemService(),
     accounts: createAccountService(database.client),
     providers: createProviderService(database.client),
@@ -44,6 +46,7 @@ test("every contract channel has a handler at runtime too", () => {
     chat: createChatService(database.client),
     runs: createRunService(database.client),
     vectorStores: createVectorStoreService(database.client),
+    graph: createGraphService(database.client),
     system: createSystemService(),
     accounts: createAccountService(database.client),
     providers: createProviderService(database.client),

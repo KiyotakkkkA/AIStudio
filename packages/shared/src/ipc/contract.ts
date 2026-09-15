@@ -48,6 +48,20 @@ import { AdapterDescriptorDto } from "../ai.js";
 import { DeviceProfileDto, ResourceSampleDto } from "../system.js";
 import { InstallRuntimeInput, RuntimeOverviewDto, RuntimeRef } from "../runtimes/index.js";
 import {
+  AddGraphEdgeInput,
+  GraphEdgeDto,
+  GraphEdgeRef,
+  GraphNeighborDto,
+  GraphNeighborsInput,
+  GraphPathDto,
+  GraphReconcileDto,
+  GraphRelationTypeDto,
+  GraphShortestPathInput,
+  GraphSubgraphDto,
+  GraphSubgraphInput,
+  RemoveGraphEdgeInput,
+} from "../graph/index.js";
+import {
   CreateVectorStoreInput,
   UpdateVectorStoreInput,
   VectorStoreDto,
@@ -141,6 +155,19 @@ export const contract = defineContract({
     output: z.object({ id: DocumentId, removed: z.literal(true) }),
   },
   "vectorStores.index": { input: VectorIndexInput, output: RunHandleDto },
+  "graphRelations.list": { input: z.void(), output: z.array(GraphRelationTypeDto) },
+  "graphRelations.addEdge": { input: AddGraphEdgeInput, output: GraphEdgeDto },
+  "graphRelations.removeEdge": {
+    input: RemoveGraphEdgeInput,
+    output: GraphEdgeRef.extend({ removed: z.literal(true) }),
+  },
+  "graphRelations.neighbors": { input: GraphNeighborsInput, output: z.array(GraphNeighborDto) },
+  "graphRelations.shortestPath": {
+    input: GraphShortestPathInput,
+    output: GraphPathDto.nullable(),
+  },
+  "graphRelations.kHopSubgraph": { input: GraphSubgraphInput, output: GraphSubgraphDto },
+  "graphRelations.reconcile": { input: VectorStoreRef, output: GraphReconcileDto },
   "downloads.list": { input: DownloadListFilter, output: z.array(DownloadDto) },
   "downloads.start": { input: StartDownloadInput, output: DownloadDto },
   "downloads.pause": { input: DownloadRef, output: DownloadDto },

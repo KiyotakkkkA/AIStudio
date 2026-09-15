@@ -9,15 +9,18 @@ import {
 } from "./vectorTypes.ts";
 import {
   GraphEdgeSchema,
+  GraphHydrateSchema,
   GraphNeighborQuerySchema,
   GraphNeighborSchema,
   GraphNodeSchema,
   GraphPathQuerySchema,
   GraphPathSchema,
+  GraphStatsSchema,
   GraphSubgraphQuerySchema,
   GraphSubgraphSchema,
   type GraphCorePort,
   type GraphEdgeInput,
+  type GraphHydrateInput,
   type GraphNamespace,
   type GraphNeighborQuery,
   type GraphNode,
@@ -213,6 +216,17 @@ export class RustCore implements RustCorePort, VectorCorePort, GraphCorePort {
   }
 
   readonly graph: GraphNamespace = {
+    hydrate: async (graphId: string, content: GraphHydrateInput) => {
+      const payload = JSON.stringify(this.graphInput(GraphHydrateSchema, content));
+      const id = this.graphId(graphId);
+      return this.graphJson((addon) => addon.graphHydrate(id, payload), GraphStatsSchema);
+    },
+
+    stats: async (graphId: string) => {
+      const id = this.graphId(graphId);
+      return this.graphJson((addon) => addon.graphStats(id), GraphStatsSchema);
+    },
+
     addNode: async (graphId: string, node: GraphNode) => {
       const payload = JSON.stringify(this.graphInput(GraphNodeSchema, node));
       const id = this.graphId(graphId);

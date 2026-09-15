@@ -11,6 +11,12 @@ import { createEventBus } from "../src/host/platform/events.ts";
 import { STUDIO_ROOT, temporaryDirectory } from "../../../test/helpers/paths.ts";
 
 const unusedGraphExports = {
+  async graphHydrate() {
+    throw new Error("unused");
+  },
+  async graphStats() {
+    throw new Error("unused");
+  },
   async graphAddNode() {
     throw new Error("unused");
   },

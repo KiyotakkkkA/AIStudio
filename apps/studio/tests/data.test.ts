@@ -13,6 +13,7 @@ import { isMigrationFailedError } from "../src/host/data/MigrationFailedError.ts
 import { SettingService } from "../src/host/services/SettingService.ts";
 import { createHandlers } from "../src/host/ipc/index.ts";
 import { createVectorStoreService } from "../../../test/helpers/vectorStoreService.ts";
+import { createGraphService } from "../../../test/helpers/graphService.ts";
 import { createAccountService } from "../../../test/helpers/accountService.ts";
 import {
   captureWindowState,
@@ -62,6 +63,7 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
       "0012_vector_source",
       "0013_download",
       "0014_vector_store_advanced",
+      "0015_graph_relations",
     ]);
     const tables = database.client.db.$client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'")
@@ -108,6 +110,7 @@ test("a backup is written before migrating and only the last three are kept", ()
           "0012_vector_source",
           "0013_download",
           "0014_vector_store_advanced",
+          "0015_graph_relations",
         ]);
         if (run === 0) assert.equal(report.backup, undefined);
         else assert.equal(typeof report.backup, "string");
@@ -120,6 +123,8 @@ test("a backup is written before migrating and only the last three are kept", ()
         client.db.$client.exec("DROP TABLE step");
         client.db.$client.exec("DROP TABLE run");
         client.db.$client.exec("DROP TABLE download");
+        client.db.$client.exec("DROP TABLE graph_edge");
+        client.db.$client.exec("DROP TABLE graph_relation_type");
         client.db.$client.exec("DROP TABLE vector_source");
         client.db.$client.exec("DROP TABLE vector_document");
         client.db.$client.exec("DROP TABLE vector_store");
@@ -248,6 +253,7 @@ test("prepareDatabase opens and migrates in one step", () => {
         "0012_vector_source",
         "0013_download",
         "0014_vector_store_advanced",
+        "0015_graph_relations",
       ]);
       assert.equal(prepared.client.repositories.settings.all().length, 0);
     } finally {
@@ -322,6 +328,7 @@ test("settings channels carry JSON values through the whole chain", async () => 
       chat: createChatService(database.client),
       runs: createRunService(database.client),
       vectorStores: createVectorStoreService(database.client),
+      graph: createGraphService(database.client),
       system: createSystemService(),
       accounts: createAccountService(database.client),
       providers: createProviderService(database.client),

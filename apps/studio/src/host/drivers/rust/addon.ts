@@ -10,6 +10,8 @@ export interface NativeAddon {
   vectorRelease(operationId: string): Promise<void>;
   chunkText(text: string, config: ChunkConfig): Promise<TextChunk[]>;
   hashBytes(bytes: Buffer): Promise<string>;
+  graphHydrate(graphId: string, content: string): Promise<string>;
+  graphStats(graphId: string): Promise<string>;
   graphAddNode(graphId: string, node: string): Promise<boolean>;
   graphAddEdge(graphId: string, edge: string): Promise<boolean>;
   graphRemoveEdge(graphId: string, from: string, to: string, relation: string): Promise<boolean>;
@@ -42,6 +44,8 @@ export function loadAddon(paths: Pick<StudioPaths, "nativeAddonPath">): NativeAd
       "vectorBeginUpsert",
       "vectorCancel",
       "vectorRelease",
+      "graphHydrate",
+      "graphStats",
       "graphAddNode",
       "graphAddEdge",
       "graphRemoveEdge",
