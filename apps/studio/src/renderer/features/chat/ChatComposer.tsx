@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Link } from "react-router-dom";
-import { mdiClose, mdiCogOutline, mdiDatabaseOutline, mdiPaperclip, mdiUpload } from "@mdi/js";
-import { Dropdown, InputCheckBox, Modal } from "@kiyotakkkka/zvs-uikit-lib";
+import {
+  mdiClose,
+  mdiCogOutline,
+  mdiDatabaseOutline,
+  mdiInformationOutline,
+  mdiPaperclip,
+  mdiUpload,
+} from "@mdi/js";
+import { Dropdown, InputCheckBox, Modal, ProgressBar } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
@@ -44,6 +51,58 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
           }}
           className="space-y-3 rounded-xl border border-main-750 bg-main-900 p-3"
         >
+          <div className="flex items-center gap-2 border-b border-main-750 pb-3">
+            <Dropdown menuWidth={320} menuPlacement="top-left">
+              <IconDropdownButton
+                label="Контекстное окно"
+                path={mdiInformationOutline}
+                className="size-7 gap-0 justify-center rounded-lg p-0"
+                iconSize={16}
+              />
+              <Dropdown.Menu
+                rounded="rounded-lg"
+                className="w-80 border border-main-700 bg-main-850 p-3 text-xs text-main-300"
+              >
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-main-100">Контекстное окно</p>
+                  <ProgressBar
+                    value={store.sessionTokens}
+                    max={store.model?.contextWindow || Math.max(1, store.sessionTokens)}
+                    label="Общий контекст"
+                    showValue={false}
+                    variant="info"
+                    className="w-full"
+                    classNames={{
+                      label: "text-xs text-main-400",
+                      track: "h-1.5 bg-main-700",
+                      indicator: "bg-info-light",
+                    }}
+                  />
+                  <div className="flex justify-end text-[10.5px] text-main-400">
+                    {store.sessionTokens.toLocaleString()} /{" "}
+                    {store.model?.contextWindow?.toLocaleString() ?? "—"}
+                  </div>
+                </div>
+              </Dropdown.Menu>
+            </Dropdown>
+            <ProgressBar
+              value={store.sessionTokens}
+              max={store.model?.contextWindow || Math.max(1, store.sessionTokens)}
+              label="Общий контекст"
+              showValue={false}
+              variant="info"
+              className="min-w-0 flex-1"
+              classNames={{
+                header: "hidden",
+                track: "h-1.5 bg-main-700",
+                indicator: "bg-info-light",
+              }}
+            />
+            <span className="shrink-0 text-[10.5px] text-main-400">
+              {store.sessionTokens.toLocaleString()} /{" "}
+              {store.model?.contextWindow?.toLocaleString() ?? "—"}
+            </span>
+          </div>
           {store.attachedStoreIds.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {store.stores
@@ -101,7 +160,6 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                   role="menuitem"
                   rounded="rounded-md"
                   className="text-[12.5px] text-main-100"
-                  onClick={() => setStoresOpen(true)}
                 >
                   <span className="flex items-center gap-2">
                     <Icon path={mdiUpload} size={17} className="text-main-400" />
@@ -112,10 +170,11 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                   role="menuitem"
                   rounded="rounded-md"
                   className="text-[12.5px] text-main-100"
+                  onClick={() => setStoresOpen(true)}
                 >
                   <span className="flex items-center gap-2">
                     <Icon path={mdiDatabaseOutline} size={17} className="text-main-400" />
-                    Прдключить векторное хранилище
+                    Подключить векторное хранилище
                   </span>
                 </Dropdown.Item>
               </Dropdown.Menu>

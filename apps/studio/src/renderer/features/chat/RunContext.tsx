@@ -36,24 +36,6 @@ export default observer(function RunContext({ store }: { readonly store: ChatSto
             Начните новый чат, чтобы изменить модель, хранилища или настройки.
           </p>
         )}
-        <div className="mt-auto space-y-2 rounded-card border border-main-750 bg-main-800 p-3">
-          <div className="flex justify-between text-xs text-main-400">
-            <span>Использование за сеанс</span>
-            <span>{store.sessionTokens.toLocaleString()} ток.</span>
-          </div>
-          <meter
-            aria-label="Токены сеанса относительно окна контекста"
-            min={0}
-            max={store.model?.contextWindow || Math.max(1, store.sessionTokens)}
-            value={store.sessionTokens}
-            className="h-2 w-full accent-accent-dark"
-          />
-          <p className="text-[10.5px] text-main-500">
-            Ответов:{" "}
-            {store.active?.messages.filter((message) => message.role === "assistant").length ?? 0} ·
-            примерный расход
-          </p>
-        </div>
       </ScrollArea>
     </aside>
   );

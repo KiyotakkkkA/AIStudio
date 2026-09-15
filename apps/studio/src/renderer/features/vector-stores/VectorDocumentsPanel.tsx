@@ -1,5 +1,6 @@
 import { mdiFileDocumentOutline, mdiFolderOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
+import { useRef, useState } from "react";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
@@ -17,8 +18,13 @@ import {
   formatThroughput,
 } from "./vectorPresentation";
 
+const DOCUMENT_ROW_HEIGHT = 54;
+const DOCUMENT_OVERSCAN = 8;
+
 function VectorDocumentsPanel() {
   const { vectorStores: store } = useStore();
+  const documentsViewportRef = useRef<HTMLDivElement>(null);
+  const [documentsScrollTop, setDocumentsScrollTop] = useState(0);
   const busy = store.busy || store.indexing;
   const run = store.indexRun;
   const percent =
@@ -200,39 +206,71 @@ function VectorDocumentsPanel() {
           />
         </div>
       ) : (
-        <ScrollArea className="flex min-h-0 flex-1 flex-col gap-1.5">
-          {store.documents.map((document) => (
-            <article
-              key={document.id}
-              className="flex items-center gap-3 rounded-card border border-main-750 bg-main-800 px-3.25 py-2.5"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-mono text-[11.5px] text-main-200">
-                  {document.sourcePath}
-                </div>
-                <div className="mt-0.5 text-[10.5px] text-main-500">
-                  {document.chunkCount.toLocaleString("ru-RU")} чанков ·{" "}
-                  {formatBytes(document.bytes)} · {formatIndexedAt(document.indexedAt)}
-                </div>
-              </div>
-              <Button
-                tone="danger"
-                disabled={busy}
-                needConfirm
-                modalSetup={{
-                  title: "Удалить документ?",
-                  content: `Векторы файла ${document.sourcePath} будут удалены из хранилища. Файл на диске останется.`,
-                  tone: "danger",
-                  confirmLabel: "Удалить",
-                }}
-                onClick={() => {
-                  void store.removeDocument(document.id);
-                }}
-              >
-                Удалить
-              </Button>
-            </article>
-          ))}
+        <ScrollArea
+          ref={documentsViewportRef}
+          className="min-h-0 flex-1"
+          onScroll={(event) => setDocumentsScrollTop(event.currentTarget.scrollTop)}
+        >
+          <div
+            className="relative"
+            style={{ height: `${String(store.documents.length * DOCUMENT_ROW_HEIGHT)}px` }}
+          >
+            {store.documents
+              .slice(
+                Math.max(
+                  0,
+                  Math.floor(documentsScrollTop / DOCUMENT_ROW_HEIGHT) - DOCUMENT_OVERSCAN,
+                ),
+                Math.min(
+                  store.documents.length,
+                  Math.ceil(
+                    (documentsScrollTop + (documentsViewportRef.current?.clientHeight ?? 0)) /
+                      DOCUMENT_ROW_HEIGHT,
+                  ) + DOCUMENT_OVERSCAN,
+                ),
+              )
+              .map((document, visibleIndex) => {
+                const firstIndex = Math.max(
+                  0,
+                  Math.floor(documentsScrollTop / DOCUMENT_ROW_HEIGHT) - DOCUMENT_OVERSCAN,
+                );
+                return (
+                  <article
+                    key={document.id}
+                    className="absolute right-0 left-0 flex h-12 items-center gap-3 rounded-card border border-main-750 bg-main-800 px-3.25 py-2.5"
+                    style={{
+                      top: `${String((firstIndex + visibleIndex) * DOCUMENT_ROW_HEIGHT)}px`,
+                    }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-mono text-[11.5px] text-main-200">
+                        {document.sourcePath}
+                      </div>
+                      <div className="mt-0.5 text-[10.5px] text-main-500">
+                        {document.chunkCount.toLocaleString("ru-RU")} чанков ·{" "}
+                        {formatBytes(document.bytes)} · {formatIndexedAt(document.indexedAt)}
+                      </div>
+                    </div>
+                    <Button
+                      tone="danger"
+                      disabled={busy}
+                      needConfirm
+                      modalSetup={{
+                        title: "Удалить документ?",
+                        content: `Векторы файла ${document.sourcePath} будут удалены из хранилища. Файл на диске останется.`,
+                        tone: "danger",
+                        confirmLabel: "Удалить",
+                      }}
+                      onClick={() => {
+                        void store.removeDocument(document.id);
+                      }}
+                    >
+                      Удалить
+                    </Button>
+                  </article>
+                );
+              })}
+          </div>
         </ScrollArea>
       )}
     </div>

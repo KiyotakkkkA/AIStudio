@@ -10,7 +10,7 @@ import Field from "../../ui/molecules/Field";
 import TextArea from "../../ui/atoms/TextArea";
 import Chip from "../../ui/atoms/Chip";
 import VectorStoreAdvanced from "./VectorStoreAdvanced";
-import { InfoButton } from "../../ui/atoms/buttons/InfoButton";
+import { IconFloatingButton } from "../../ui/atoms/buttons/IconFloatingButton";
 
 const METRIC_OPTIONS = [
   { value: "cosine", label: "Косинусное сходство" },
@@ -140,7 +140,7 @@ function VectorStoreForm() {
                       onChange={(e) => vm.set(key, e.target.value)}
                     />
                   </div>
-                  <InfoButton label={`Что означает поле «${label}»`}>
+                  <IconFloatingButton label={`Что означает поле «${label}»`}>
                     {key === "dimension" ? (
                       <>
                         <p className="mb-2 font-medium text-main-50">Размерность</p>
@@ -167,7 +167,7 @@ function VectorStoreForm() {
                         </p>
                       </>
                     )}
-                  </InfoButton>
+                  </IconFloatingButton>
                 </div>
               </Field>
             ))}
