@@ -26,7 +26,6 @@ export interface ResourceMonitorOptions {
   processMemory?: () => number;
   gpu?: GpuSampler;
   clock?: () => number;
-  /** How long a GPU reading stays usable, so a 250 ms progress tick does not spawn a process. */
   gpuTtlMs?: number;
   logger?: Logger;
 }

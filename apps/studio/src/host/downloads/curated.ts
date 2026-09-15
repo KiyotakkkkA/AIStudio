@@ -2,13 +2,49 @@ import type { CatalogueItem } from "./catalogue.ts";
 
 export const CURATED_CATALOGUE: readonly CatalogueItem[] = [
   {
+    ref: "curated:model:qwen2.5-vl-3b-instruct-q4_k_m",
+    kind: "model",
+    source: "curated",
+    name: "qwen2.5-vl:3b",
+    displayName: "Qwen2.5-VL 3B Instruct (OCR)",
+    description:
+      "Зрительно-языковая модель для распознавания текста: сканы, фотографии документов, таблицы и рукописный текст, включая русский. Вместе с проектором занимает около 2,8 ГБ и помещается на видеокарту 8 ГБ рядом с моделью эмбеддингов. Вариант по умолчанию для машин с 16 ГБ ОЗУ.",
+    version: "Q4_K_M",
+    sizeBytes: 1_929_901_056,
+    fileName: "Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf",
+    url: "https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf",
+    checksum: {
+      algorithm: "sha256",
+      value: "d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12",
+    },
+    tags: ["Qwen", "OCR", "зрение", "Q4_K_M", "8 ГБ VRAM"],
+  },
+  {
+    ref: "curated:model:qwen2.5-vl-3b-instruct-mmproj-q8_0",
+    kind: "model",
+    source: "curated",
+    name: "qwen2.5-vl:3b-mmproj",
+    displayName: "Qwen2.5-VL 3B — проектор mmproj",
+    description:
+      "Зрительная часть Qwen2.5-VL 3B: без неё модель не видит изображение и распознавание не запустится. Скачивается в пару к самой модели и лежит рядом с ней.",
+    version: "Q8_0",
+    sizeBytes: 844_757_728,
+    fileName: "mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf",
+    url: "https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf",
+    checksum: {
+      algorithm: "sha256",
+      value: "980c9b2f78c04e6cff93d277ada09e768394f112d75db3b4e9dea8a69f9fb904",
+    },
+    tags: ["Qwen", "OCR", "проектор", "Q8_0"],
+  },
+  {
     ref: "curated:model:qwen2.5-vl-7b-instruct-q4_k_m",
     kind: "model",
     source: "curated",
     name: "qwen2.5-vl:7b",
     displayName: "Qwen2.5-VL 7B Instruct (OCR)",
     description:
-      "Зрительно-языковая модель для локального распознавания текста: сканы, фотографии документов, таблицы и рукописный текст, включая русский. Запускается на видеокарте от 8 ГБ. Работает в паре с проектором mmproj из того же репозитория.",
+      "Та же модель крупнее: заметно точнее на плохих сканах и рукописном тексте. Вместе с проектором занимает около 5,5 ГБ и требует видеокарту от 12 ГБ, если рядом должна работать модель эмбеддингов. На 8 ГБ берите версию 3B.",
     version: "Q4_K_M",
     sizeBytes: 4_683_072_032,
     fileName: "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
@@ -17,7 +53,7 @@ export const CURATED_CATALOGUE: readonly CatalogueItem[] = [
       algorithm: "sha256",
       value: "9258bf05b12686d097ff3b6b18d968ab393649780aa2b3cd67fec43d50554392",
     },
-    tags: ["Qwen", "OCR", "зрение", "Q4_K_M", "32k ctx"],
+    tags: ["Qwen", "OCR", "зрение", "Q4_K_M", "12 ГБ VRAM"],
   },
   {
     ref: "curated:model:qwen2.5-vl-7b-instruct-mmproj-q8_0",
@@ -26,7 +62,7 @@ export const CURATED_CATALOGUE: readonly CatalogueItem[] = [
     name: "qwen2.5-vl:7b-mmproj",
     displayName: "Qwen2.5-VL 7B — проектор mmproj",
     description:
-      "Зрительная часть Qwen2.5-VL: без неё модель не видит изображение и распознавание не запустится. Скачивается в пару к самой модели и лежит рядом с ней.",
+      "Зрительная часть Qwen2.5-VL 7B: без неё модель не видит изображение и распознавание не запустится. Скачивается в пару к самой модели и лежит рядом с ней.",
     version: "Q8_0",
     sizeBytes: 853_119_712,
     fileName: "mmproj-Qwen2.5-VL-7B-Instruct-Q8_0.gguf",

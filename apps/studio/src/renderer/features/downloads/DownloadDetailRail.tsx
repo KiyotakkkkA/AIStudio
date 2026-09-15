@@ -54,6 +54,29 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
       className="flex w-78.5 flex-none flex-col border-l border-main-750 bg-main-900"
     >
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 p-3.5">
+        {item?.kind === "runtime" && store.runtimes !== null ? (
+          <div className="flex flex-col gap-1 rounded-card border border-main-750 bg-main-800 px-3 py-2.5">
+            <span className="text-[11px] font-semibold tracking-[0.06em] text-main-400 uppercase">
+              Эта машина
+            </span>
+            <p className="m-0 text-[11.5px] leading-normal text-main-300">
+              {store.runtimes.plan.reason}
+            </p>
+            {store.runtimes.plan.gpu === null ? null : (
+              <span className="font-mono text-[10.5px] text-main-500">
+                {store.runtimes.plan.gpu.vendor} {store.runtimes.plan.gpu.model}
+                {store.runtimes.plan.gpu.vramBytes === null
+                  ? ""
+                  : ` · ${formatBytes(store.runtimes.plan.gpu.vramBytes)} видеопамяти`}
+              </span>
+            )}
+            {store.runtimeError === null ? null : (
+              <span role="alert" className="text-[11px] text-err">
+                {store.runtimeError}
+              </span>
+            )}
+          </div>
+        ) : null}
         <div className="flex flex-col gap-1">
           <h2 className="m-0 font-mono text-[13.5px] font-medium text-main-50">{title}</h2>
           {item === null ? null : (

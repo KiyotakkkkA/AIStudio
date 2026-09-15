@@ -1,6 +1,7 @@
 import {
   AppError,
   AppErrorCode,
+  type CatalogueItemState,
   type CatalogueSource,
   type ChecksumDto,
   type DownloadItemKind,
@@ -28,6 +29,13 @@ export interface CatalogueItem {
   readonly digest?: string;
   readonly tags: readonly string[];
   readonly dimension?: number;
+  /**
+   * Set by a source that knows its own install state better than the download table does. An
+   * engine is a group of archives unpacked into a directory, so "is it installed" is a question
+   * about the directory, not about whether some row finished.
+   */
+  readonly state?: CatalogueItemState;
+  readonly blockedReason?: string;
 }
 
 /** What a source reports as already present on this machine. */
@@ -144,7 +152,7 @@ const DEFAULT_TTL_MS = 60_000;
  * Downloads page does not re-query anything. `refresh` is the user's explicit live query.
  */
 export class CatalogueService {
-  private readonly providers: readonly CatalogueProvider[];
+  private providers: readonly CatalogueProvider[];
   private readonly offered = new Map<string, CatalogueItem>();
   private items: Snapshot<readonly CatalogueItem[]> | undefined;
   private present: Snapshot<ReadonlyMap<string, InstalledItem>> | undefined;
@@ -154,13 +162,21 @@ export class CatalogueService {
   }
 
   /**
-   * Adds an entry that no provider can describe on its own, because resolving it needed a live
-   * lookup the user asked for: an engine build matched against today's llama.cpp release. It
-   * behaves like any other row from here on — queue, progress, disk accounting.
+   * Joined after construction, for a source that needs services the catalogue is itself built
+   * into: the engine provider needs the download queue.
+   */
+  addProvider(provider: CatalogueProvider): void {
+    this.providers = [...this.providers, provider];
+    this.invalidate();
+  }
+
+  /**
+   * Registers an entry that is downloadable but not browsable: the individual archives of an
+   * engine build, resolved against today's llama.cpp release. They queue and report progress
+   * like anything else, but the catalogue lists the build they belong to, not the archives.
    */
   offer(item: CatalogueItem): CatalogueItem {
     this.offered.set(item.ref, item);
-    this.items = undefined;
     return item;
   }
 
@@ -172,7 +188,6 @@ export class CatalogueService {
       for (const item of await this.safely(provider, () => provider.list()))
         collected.set(item.ref, item);
     }
-    for (const item of this.offered.values()) collected.set(item.ref, item);
     // A refresh that reaches nothing must not empty the page.
     const merged = collected.size === 0 && this.items ? this.items.value : [...collected.values()];
     this.items = { value: merged, at: this.now() };

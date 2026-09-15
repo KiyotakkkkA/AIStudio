@@ -274,6 +274,7 @@ if (!app.requestSingleInstanceLock()) {
         logger,
       });
       downloads.attachInstaller(runtimes.unpackDownload);
+      downloads.catalogueSource.addProvider(runtimes.catalogueProvider());
       // PDF parsing lives in the sidecar and OCR in the local vision model, so the registry is
       // completed here — where both are in scope — rather than inside the indexing service.
       indexing.registry

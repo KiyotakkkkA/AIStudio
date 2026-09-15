@@ -5,6 +5,8 @@ import type { RuntimeDefinition } from "./definitions.ts";
 export const LLAMA_RELEASES_URL =
   "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=8";
 
+export const LLAMA_RELEASES_PAGE = "https://github.com/ggml-org/llama.cpp/releases";
+
 export interface ResolvedAsset {
   readonly name: string;
   readonly url: string;
@@ -14,7 +16,6 @@ export interface ResolvedAsset {
 
 export interface ResolvedBuild {
   readonly runtimeId: string;
-  /** The upstream build tag, e.g. `b10970`. This is the installed version we compare against. */
   readonly tag: string;
   readonly assets: readonly ResolvedAsset[];
 }
@@ -68,7 +69,6 @@ export class ReleaseResolver {
     return this.cached !== undefined;
   }
 
-  /** Resolves one definition, or `undefined` when this platform has no such build. */
   async resolve(
     definition: RuntimeDefinition,
     refresh = false,

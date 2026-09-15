@@ -12,14 +12,11 @@ export interface RuntimeDefinition {
   readonly displayName: string;
   readonly description: string;
   readonly formats: readonly ModelFormat[];
-  /** Roughly what the archives weigh, so the page can warn before a 400 MB pull. */
   readonly approximateBytes: number;
-  /** The archive name patterns for this platform, primary first. */
   assets(platform: NodeJS.Platform, arch: string): AssetPlan | undefined;
 }
 
 export interface AssetPlan {
-  /** Matches the build archive. The first group, when present, is the variant version. */
   readonly primary: RegExp;
   /**
    * Matched against the same release and pinned to the primary's variant version. llama.cpp
@@ -182,7 +179,6 @@ export function planAccelerator(
   };
 }
 
-/** Which engine can load a weight file, by extension. */
 export function formatOf(fileName: string): ModelFormat | undefined {
   const lower = fileName.toLowerCase();
   if (lower.endsWith(".gguf")) return "gguf";

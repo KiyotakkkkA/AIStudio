@@ -27,7 +27,6 @@ pub struct PdfPage {
     pub chars: usize,
 }
 
-/// An image lifted whole out of a page, ready to hand to a vision model.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PdfImage {
@@ -37,7 +36,6 @@ pub struct PdfImage {
     pub bytes: Vec<u8>,
 }
 
-/// Why a page that looks scanned could not be handed to OCR anyway.
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PdfNote {
@@ -53,7 +51,6 @@ pub struct PdfExtraction {
     pub notes: Vec<PdfNote>,
 }
 
-/// Runs a parser that is allowed to panic, and turns a panic into an ordinary error.
 fn guarded<T>(what: &str, run: impl FnOnce() -> Result<T>) -> Result<T> {
     match catch_unwind(AssertUnwindSafe(run)) {
         Ok(result) => result,
@@ -61,7 +58,6 @@ fn guarded<T>(what: &str, run: impl FnOnce() -> Result<T>) -> Result<T> {
     }
 }
 
-/// The text layer, one entry per page, in reading order.
 pub fn extract_pages(bytes: &[u8]) -> Result<Vec<PdfPage>> {
     guarded("PDF text extraction", || {
         let pages = pdf_extract::extract_text_from_mem_by_pages(bytes)

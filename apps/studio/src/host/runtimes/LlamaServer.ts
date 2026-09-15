@@ -15,16 +15,12 @@ export interface LlamaServerOptions {
   executablePath: string;
   modelPath: string;
   role?: LlamaServerRole;
-  /** The multimodal projector that pairs with a vision model, required for `vision`. */
   mmprojPath?: string;
-  /** How many transformer layers to push onto the GPU; zero keeps everything on the CPU. */
   gpuLayers: number;
   contextSize?: number;
   batchSize?: number;
   threads?: number;
-  /** How long the server may stay up with nothing to do before it is stopped. */
   idleMs?: number;
-  /** How long a cold start may take — a multi-gigabyte model is slow to memory-map. */
   startTimeoutMs?: number;
   logger?: Logger;
   spawn?: typeof spawn;
@@ -159,7 +155,6 @@ export class LlamaServer {
     return response.json();
   }
 
-  /** Starts the child if it is not already up, and resolves once `/health` answers. */
   start(signal?: AbortSignal): Promise<string> {
     if (this.#ready !== undefined && this.running) return this.#ready;
     this.#stopped = false;

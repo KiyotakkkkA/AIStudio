@@ -10,12 +10,11 @@ import {
   type DownloadId,
   type DownloadItemKind,
   type Json,
-  type RuntimeDto,
   type RuntimeOverviewDto,
   type StreamId,
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
-import { estimateEta, smoothRate, type RateState } from "./rateSmoothing";
+import { estimateEta, smoothRate, type RateState } from "../progressRate";
 
 const CONCURRENCY_KEY = "downloads.concurrency";
 const OPTIONS_KEY = "downloads.options";
@@ -103,9 +102,6 @@ export default class DownloadStore {
     const query = this.query.trim().toLowerCase();
     return this.catalogue.filter(
       (item) =>
-        // Engine archives are presented by the local-stack panel, which knows what a build is;
-        // they only join the catalogue list when that kind is filtered for explicitly.
-        (item.kind !== "runtime" || this.kind === "runtime") &&
         (this.kind === "all" || item.kind === this.kind) &&
         (this.state === null || item.state === this.state) &&
         (query === "" ||
@@ -150,7 +146,7 @@ export default class DownloadStore {
 
   rateOf(row: DownloadDto): number {
     if (row.status !== "running") return 0;
-    return this.rates[row.id]?.bytesPerSecond ?? row.rateBytesPerSecond;
+    return this.rates[row.id]?.perSecond ?? row.rateBytesPerSecond;
   }
 
   etaOf(row: DownloadDto): number | undefined {
@@ -249,33 +245,52 @@ export default class DownloadStore {
     return this.act(ref, () => this.ipc.call("downloads.start", { ref }));
   }
 
-  get recommendedRuntime(): RuntimeDto | null {
-    return this.runtimes?.runtimes.find((runtime) => runtime.recommended) ?? null;
+  /**
+   * Starts whatever a catalogue row means: a plain artefact is a download, an engine build is a
+   * resolve-then-download that the host owns.
+   */
+  install(item: CatalogueItemDto) {
+    const runtimeId = runtimeIdOf(item);
+    return runtimeId === undefined ? this.start(item.ref) : this.installRuntime(runtimeId);
   }
 
-  /** The catalogue rows the local stack needs beyond the engine: the embedding model. */
-  get recommendedModels(): CatalogueItemDto[] {
-    const refs = this.runtimes?.recommendedModels ?? [];
-    return refs.flatMap((ref) => this.catalogue.filter((item) => item.ref === ref));
+  /** True when this row has something on disk that pressing Remove would actually delete. */
+  isRemovable(item: CatalogueItemDto): boolean {
+    if (runtimeIdOf(item) !== undefined) return item.state === "installed";
+    return this.installedId(item.ref) !== undefined;
   }
 
-  /** True once an engine can load a GGUF and a matching embedding model is on disk. */
-  get localStackReady(): boolean {
-    const engine = this.runtimes?.runtimes.some(
-      (runtime) => runtime.state === "installed" || runtime.state === "ready",
-    );
-    const model = this.recommendedModels.some((item) => item.state === "installed");
-    return engine === true && model;
+  async uninstall(item: CatalogueItemDto) {
+    const runtimeId = runtimeIdOf(item);
+    if (runtimeId === undefined) {
+      const id = this.installedId(item.ref);
+      if (id !== undefined) await this.remove(id);
+      return;
+    }
+    if (this.runtimeBusyId !== null) return;
+    this.runtimeBusyId = runtimeId;
+    this.runtimeError = null;
+    try {
+      await this.ipc.call("runtimes.remove", { id: runtimeId });
+      await this.load();
+    } catch (error) {
+      runInAction(() => {
+        this.runtimeError = copy(error, "Не удалось удалить движок.");
+      });
+    } finally {
+      runInAction(() => {
+        this.runtimeBusyId = null;
+      });
+    }
   }
 
-  /** Installs the engine — the recommended build when `id` is omitted — and its model. */
   async installRuntime(id?: string) {
     if (this.runtimeBusyId !== null) return false;
     this.runtimeBusyId = id ?? "auto";
     this.runtimeError = null;
     try {
       await this.ipc.call("runtimes.install", id === undefined ? {} : { id });
-      await this.reloadRuntimes();
+      await this.load();
       return true;
     } catch (error) {
       runInAction(() => {
@@ -287,23 +302,6 @@ export default class DownloadStore {
         this.runtimeBusyId = null;
       });
     }
-  }
-
-  /** The one-click path the page offers: the right engine plus the embedding model it needs. */
-  async installLocalStack() {
-    const installed = await this.installRuntime();
-    for (const item of this.recommendedModels) {
-      if (item.state === "installed" || !item.downloadable) continue;
-      await this.start(item.ref);
-    }
-    return installed;
-  }
-
-  async reloadRuntimes() {
-    const overview = await this.ipc.call("runtimes.list", undefined).catch(() => null);
-    runInAction(() => {
-      if (overview !== null) this.runtimes = overview;
-    });
   }
 
   pause(id: DownloadId) {
@@ -396,7 +394,7 @@ export default class DownloadStore {
     if (!row) return;
     row.bytesDone = event.done;
     if (event.total > 0) row.sizeBytes = event.total;
-    this.rates[id] = smoothRate(this.rates[id], { bytes: event.done, at: event.ts });
+    this.rates[id] = smoothRate(this.rates[id], { value: event.done, at: event.ts });
   }
 
   private async act(key: string, action: () => Promise<unknown>) {
@@ -486,4 +484,10 @@ function readStoredOptions(value: unknown): Record<string, PostDownloadOptions> 
 
 function copy(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+/** A runtime row is a catalogue row whose ref names an engine build rather than a file. */
+function runtimeIdOf(item: CatalogueItemDto): string | undefined {
+  if (item.kind !== "runtime") return undefined;
+  return /^runtime:([a-z0-9-]+)$/.exec(item.ref)?.[1];
 }

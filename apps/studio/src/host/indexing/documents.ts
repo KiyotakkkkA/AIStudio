@@ -8,7 +8,6 @@ import type { ExtractionInput, Extractor } from "./extraction.ts";
 
 export const DOCUMENT_JOB = "job.document.extract";
 
-/** What the vision model is asked to read. Implemented by `RuntimeService.readImage`. */
 export interface OcrPort {
   readImage(
     modelRef: string,
@@ -21,7 +20,6 @@ export interface OcrPort {
 export interface DocumentExtractorOptions {
   jobs: SidecarJobsPort;
   ocr?: OcrPort;
-  /** Where page images are written while a document is being read, then deleted. */
   scratchDir: string;
   logger?: Logger;
 }

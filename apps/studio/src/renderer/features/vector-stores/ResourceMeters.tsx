@@ -8,7 +8,6 @@ interface Meter {
   readonly detail: string;
 }
 
-/** Amber past 80 %, red past 95 %: the point at which the machine is the bottleneck. */
 function barColour(percent: number): string {
   if (percent >= 95) return "bg-err";
   if (percent >= 80) return "bg-warn";

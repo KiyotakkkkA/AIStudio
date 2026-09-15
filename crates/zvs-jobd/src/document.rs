@@ -18,7 +18,6 @@ use crate::jobs::JobContext;
 
 pub const DOCUMENT_JOB: &str = "job.document.extract";
 
-/// A page bigger than this is not a document page; refusing beats exhausting memory.
 pub const MAX_DOCUMENT_BYTES: u64 = 512 * 1024 * 1024;
 /// How many scanned pages one document may hand to OCR. OCR is the slow stage by a wide margin.
 pub const DEFAULT_MAX_IMAGES: usize = 50;
@@ -97,7 +96,6 @@ pub async fn extract(params: Value, context: &JobContext) -> Result<Value> {
     }))
 }
 
-/// `zvs_core::error::check_cancelled` is crate-private, and the token API is one call anyway.
 fn cancelled(token: &CancellationToken) -> Result<()> {
     if token.is_cancelled() {
         Err(Error::Cancelled)

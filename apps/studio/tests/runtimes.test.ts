@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { AppErrorCode, type DeviceProfileDto, type DownloadDto, type Timestamp } from "@zvs/shared";
@@ -15,6 +15,8 @@ import { ReleaseResolver } from "../src/host/runtimes/releases.ts";
 import {
   parseRuntimeRef,
   RuntimeService,
+  runtimeCatalogueRef,
+  runtimeIdOfCatalogueRef,
   runtimeRef,
 } from "../src/host/runtimes/RuntimeService.ts";
 import type { LlamaServer } from "../src/host/runtimes/LlamaServer.ts";
@@ -85,6 +87,7 @@ let offered: CatalogueItem[];
 let catalogueItems: CatalogueItem[];
 let started: string[];
 let downloads: DownloadDto[];
+let forgotten: number[];
 
 function service(overrides: Partial<Parameters<typeof makeService>[0]> = {}) {
   return makeService(overrides);
@@ -103,6 +106,13 @@ function makeService(options: {
         return Promise.resolve({ itemRef: input.ref } as DownloadDto);
       },
       list: () => downloads,
+      forgetByRef: (matches) => {
+        const kept = downloads.filter((row) => !matches(row.itemRef));
+        const removed = downloads.length - kept.length;
+        downloads = kept;
+        forgotten.push(removed);
+        return Promise.resolve(removed);
+      },
     },
     catalogue: {
       offer: (item) => {
@@ -141,6 +151,7 @@ beforeEach(() => {
   catalogueItems = [];
   started = [];
   downloads = [];
+  forgotten = [];
 });
 afterEach(() => {
   workspace.dispose();
@@ -388,3 +399,106 @@ function zipWith(name: string, body: string): Buffer {
   eocd.writeUInt32LE(local.length + nameBytes.length + content.length, 16);
   return Buffer.concat([local, nameBytes, content, central, nameBytes, eocd]);
 }
+
+/** Installs a build into the fake settings store, as a finished unpack would. */
+function markInstalled(id: string, executable = "llama-server.exe"): void {
+  settings.set("runtimes.installed", {
+    [id]: {
+      tag: TAG,
+      installPath: join(workspace.path, "runtimes", id),
+      executablePath: executable === "" ? "" : join(workspace.path, "runtimes", id, executable),
+      sizeBytes: 1024,
+    },
+  });
+}
+
+test("the catalogue offers one row per build, not one per archive", async () => {
+  const runtimes = service({
+    gpu: { vendor: "NVIDIA", model: "RTX 4070", vramBytes: null, discrete: true },
+  });
+
+  const rows = await runtimes.catalogueProvider().list();
+
+  expect(rows.map((row) => row.ref)).toEqual([
+    runtimeCatalogueRef("llama-cpp-cpu"),
+    runtimeCatalogueRef("llama-cpp-vulkan"),
+    runtimeCatalogueRef("llama-cpp-cuda"),
+  ]);
+  expect(rows.every((row) => row.kind === "runtime")).toBe(true);
+  // The Metal build has no Windows asset, so it is not offered here at all.
+  expect(rows.some((row) => row.ref.includes("metal"))).toBe(false);
+  expect(rows.find((row) => row.ref.includes("vulkan"))?.tags).toContain("рекомендуется");
+});
+
+test("a catalogue row reports its own installed state, archives or not", async () => {
+  const runtimes = service({});
+  const provider = runtimes.catalogueProvider();
+
+  expect((await provider.list()).find((row) => row.name === "llama-cpp-vulkan")?.state).toBe(
+    undefined,
+  );
+
+  markInstalled("llama-cpp-vulkan");
+
+  const rows = await provider.list();
+  expect(rows.find((row) => row.name === "llama-cpp-vulkan")?.state).toBe("installed");
+  expect(rows.find((row) => row.name === "llama-cpp-vulkan")?.version).toBe(TAG);
+  expect(await provider.installed?.()).toEqual([
+    { kind: "runtime", name: "llama-cpp-vulkan", version: TAG, sizeBytes: 1024 },
+  ]);
+});
+
+test("a build with archives in flight reads as downloading", async () => {
+  const runtimes = service({});
+  downloads = [
+    {
+      itemRef: runtimeRef("llama-cpp-cuda", TAG, `llama-${TAG}-bin-win-cuda-13.3-x64.zip`),
+      status: "running",
+    } as DownloadDto,
+  ];
+
+  const rows = await runtimes.catalogueProvider().list();
+
+  expect(rows.find((row) => row.name === "llama-cpp-cuda")?.state).toBe("downloading");
+  expect(rows.find((row) => row.name === "llama-cpp-vulkan")?.state).toBeUndefined();
+});
+
+test("removing a build deletes it from disk, from settings and from the download rows", async () => {
+  const runtimes = service({});
+  const target = join(workspace.path, "runtimes", "llama-cpp-vulkan");
+  mkdirSync(target, { recursive: true });
+  writeFileSync(join(target, "llama-server.exe"), "binary");
+  markInstalled("llama-cpp-vulkan");
+  downloads = [
+    {
+      itemRef: runtimeRef("llama-cpp-vulkan", TAG, `llama-${TAG}-bin-win-vulkan-x64.zip`),
+      status: "succeeded",
+    } as DownloadDto,
+  ];
+
+  await runtimes.uninstall("llama-cpp-vulkan");
+
+  expect(existsSync(target)).toBe(false);
+  expect(settings.get("runtimes.installed")).toEqual({});
+  expect(forgotten).toEqual([1]);
+  expect((await runtimes.catalogueProvider().list()).every((row) => row.state === undefined)).toBe(
+    true,
+  );
+});
+
+test("removing a build that is not installed is refused rather than silently ignored", async () => {
+  const runtimes = service({});
+
+  await expect(runtimes.uninstall("llama-cpp-vulkan")).rejects.toMatchObject({
+    code: AppErrorCode.CONFLICT,
+  });
+  await expect(runtimes.uninstall("llama-cpp-nope")).rejects.toMatchObject({
+    code: AppErrorCode.NOT_FOUND,
+  });
+});
+
+test("a catalogue ref round-trips to its build id and ignores an archive ref", () => {
+  expect(runtimeIdOfCatalogueRef(runtimeCatalogueRef("llama-cpp-cuda"))).toBe("llama-cpp-cuda");
+  expect(runtimeIdOfCatalogueRef(runtimeRef("llama-cpp-cuda", TAG, "a.zip"))).toBeUndefined();
+  expect(runtimeIdOfCatalogueRef("curated:embedding:bge-m3-f16")).toBeUndefined();
+});

@@ -11,7 +11,6 @@ const inflate = promisify(inflateRaw);
 
 export interface ExtractOptions {
   signal?: AbortSignal;
-  /** Called as each member lands, so a long unpack can drive a progress bar. */
   onEntry?: (name: string, done: number, total: number) => void;
 }
 
@@ -94,7 +93,6 @@ function bufferSource(bytes: Uint8Array): ByteSource {
   };
 }
 
-/** Parses the central directory. Everything after this reads members by name or in order. */
 async function readDirectory(source: ByteSource): Promise<readonly ZipEntry[]> {
   const tailLength = Math.min(source.size, MAX_COMMENT + 22);
   const tail = await source.read(source.size - tailLength, tailLength);
@@ -148,11 +146,6 @@ async function readMember(source: ByteSource, entry: ZipEntry): Promise<Buffer> 
   return entry.method === 0 ? compressed : await inflate(compressed);
 }
 
-/**
- * Reads named members out of a zip held in memory. OOXML formats — `.docx`, `.xlsx`, `.pptx` —
- * are zips with an XML part inside, so an extractor needs a couple of entries by name and
- * nothing else.
- */
 export async function readZipEntries(
   bytes: Uint8Array,
   wanted: (name: string) => boolean,
@@ -206,7 +199,6 @@ async function extractZip(
 const BLOCK = 512;
 
 interface TarMember {
-  /** `undefined` for a member whose bytes are read but not written: a link, or a long name. */
   destination: string | undefined;
   longName: boolean;
   remaining: number;
@@ -243,7 +235,6 @@ class TarSink {
     await Promise.all(this.writes);
   }
 
-  /** One pass; returns false when the buffered bytes cannot advance the machine any further. */
   private step(): boolean {
     const member = this.member;
     if (member !== null) return this.fill(member);

@@ -13,7 +13,7 @@ import {
   type VectorOcrLanguage,
 } from "@zvs/shared";
 import type { DownloadEntity } from "../data/schema/index.ts";
-import type { CatalogueItem, CatalogueService } from "../downloads/catalogue.ts";
+import type { CatalogueItem, CatalogueProvider, CatalogueService } from "../downloads/catalogue.ts";
 import type { DownloadService } from "../downloads/DownloadService.ts";
 import { extractArchive } from "../platform/archive.ts";
 import type { DeviceProbe } from "../platform/device.ts";
@@ -25,13 +25,13 @@ import {
   formatOf,
   planAccelerator,
   RUNTIME_DEFINITIONS,
+  type AcceleratorPlan,
   type RuntimeDefinition,
 } from "./definitions.ts";
 import { LlamaServer, type LlamaServerOptions, type LlamaServerRole } from "./LlamaServer.ts";
-import { ReleaseResolver, type ResolvedBuild } from "./releases.ts";
+import { LLAMA_RELEASES_PAGE, ReleaseResolver, type ResolvedBuild } from "./releases.ts";
 
 export const INSTALLED_KEY = "runtimes.installed";
-/** Catalogue refs of the embedding models that pair with a local engine, best first. */
 export const RECOMMENDED_MODEL_REFS: readonly string[] = ["curated:embedding:bge-m3-f16"];
 
 interface InstalledRuntime {
@@ -44,8 +44,7 @@ interface InstalledRuntime {
 type InstalledMap = Record<string, InstalledRuntime>;
 
 export interface RuntimeServiceOptions {
-  /** Narrowed to what is actually used, so a test can stand these in without a database. */
-  downloads: Pick<DownloadService, "start" | "list">;
+  downloads: Pick<DownloadService, "start" | "list" | "forgetByRef">;
   catalogue: Pick<CatalogueService, "offer" | "find">;
   settings: Pick<SettingService, "get" | "set">;
   downloadsDir: string;
@@ -54,7 +53,6 @@ export interface RuntimeServiceOptions {
   logger?: Logger;
   platform?: NodeJS.Platform;
   arch?: string;
-  /** Overridden in tests so no child process is ever spawned. */
   createServer?: (options: LlamaServerOptions) => LlamaServer;
   contextSize?: number;
 }
@@ -75,6 +73,7 @@ export class RuntimeService {
   readonly #servers = new Map<string, LlamaServer>();
   readonly #resolver: ReleaseResolver;
   #installing = new Set<string>();
+  #recommended: Accelerator = "cpu";
 
   constructor(private readonly options: RuntimeServiceOptions) {
     this.#resolver =
@@ -93,10 +92,16 @@ export class RuntimeService {
     return this.options.arch ?? process.arch;
   }
 
-  /** Everything the Downloads page needs to present the local stack in one call. */
-  async overview(): Promise<RuntimeOverviewDto> {
+  private async refreshRecommendation(): Promise<AcceleratorPlan> {
     const device = (await this.options.device?.profile().catch(() => null)) ?? null;
     const plan = planAccelerator(device, this.platform, this.arch);
+    this.#recommended = plan.accelerator;
+    return plan;
+  }
+
+  async overview(): Promise<RuntimeOverviewDto> {
+    const device = (await this.options.device?.profile().catch(() => null)) ?? null;
+    const plan = await this.refreshRecommendation();
     const installed = this.installed();
     const active = this.activeDownloads();
 
@@ -112,6 +117,95 @@ export class RuntimeService {
       },
       runtimes,
       recommendedModels: [...RECOMMENDED_MODEL_REFS],
+    });
+  }
+
+  /**
+   * The engine builds as ordinary catalogue rows, so they sit in the same list and answer to the
+   * same filters as models. One row per build, never the archives it is made of: what the user
+   * installs is "llama.cpp on Vulkan", not three zips.
+   */
+  catalogueProvider(): CatalogueProvider {
+    return {
+      id: "github",
+      live: false,
+      list: async () => {
+        await this.refreshRecommendation();
+        return this.catalogueRows();
+      },
+      installed: () =>
+        Promise.resolve(
+          Object.entries(this.installed()).map(([id, record]) => ({
+            kind: "runtime" as const,
+            name: id,
+            version: record.tag,
+            sizeBytes: record.sizeBytes,
+          })),
+        ),
+    };
+  }
+
+  private catalogueRows(): readonly CatalogueItem[] {
+    const installed = this.installed();
+    const active = this.activeDownloads();
+    const recommended = this.#recommended;
+    return RUNTIME_DEFINITIONS.filter(
+      (definition) => definition.assets(this.platform, this.arch) !== undefined,
+    ).map((definition) => {
+      const record = installed[definition.id];
+      const installing = [...active].some(
+        (ref) => parseRuntimeRef(ref)?.runtimeId === definition.id,
+      );
+      const ready = record !== undefined && record.executablePath !== "";
+      return {
+        ref: runtimeCatalogueRef(definition.id),
+        kind: "runtime" as const,
+        source: "github" as const,
+        name: definition.id,
+        displayName: definition.displayName,
+        description: definition.description,
+        sizeBytes: record?.sizeBytes ?? definition.approximateBytes,
+        url: LLAMA_RELEASES_PAGE,
+        fileName: `${definition.id}.zip`,
+        tags: [
+          "llama.cpp",
+          definition.accelerator,
+          ...definition.formats,
+          ...(definition.accelerator === recommended ? ["рекомендуется"] : []),
+        ],
+        state: installing ? ("downloading" as const) : ready ? ("installed" as const) : undefined,
+        ...(record?.tag === undefined ? {} : { version: record.tag }),
+      };
+    });
+  }
+
+  /**
+   * Removes the unpacked build and forgets it, so a machine that started on Vulkan can move to
+   * CUDA without two engines sharing a disk. Any server still running on it is stopped first.
+   */
+  async uninstall(runtimeId: string): Promise<void> {
+    const definition = definitionOf(runtimeId);
+    if (definition === undefined)
+      throw new AppError(AppErrorCode.NOT_FOUND, "Такого движка нет", { details: { runtimeId } });
+    const record = this.installed()[runtimeId];
+    if (record === undefined)
+      throw new AppError(AppErrorCode.CONFLICT, "Этот движок не установлен");
+
+    this.stop(runtimeId);
+    await rm(runtimeInstallPath(this.options.downloadsDir, runtimeId), {
+      recursive: true,
+      force: true,
+    });
+    const remaining = { ...this.installed() };
+    delete remaining[runtimeId];
+    this.options.settings.set(INSTALLED_KEY, remaining);
+    // The finished archive rows would otherwise keep the build looking half-present.
+    await this.options.downloads.forgetByRef(
+      (ref) => parseRuntimeRef(ref)?.runtimeId === runtimeId,
+    );
+    this.options.logger?.log("info", "runtimes", "Removed an engine", {
+      runtimeId,
+      tag: record.tag,
     });
   }
 
@@ -252,7 +346,6 @@ export class RuntimeService {
     return join(directory, best);
   }
 
-  /** Whether anything installed can load this format — used to explain a refusal up front. */
   supports(format: ModelFormat): boolean {
     try {
       this.engineFor(format);
@@ -262,7 +355,6 @@ export class RuntimeService {
     }
   }
 
-  /** Stops every server of a runtime, whichever role it was serving. */
   stop(runtimeId: string): boolean {
     let stopped = false;
     for (const [key, server] of [...this.#servers]) {
@@ -330,7 +422,6 @@ export class RuntimeService {
     return server;
   }
 
-  /** Weight files land under `embeddings/` or `models/`; either is a valid place to look. */
   private async modelPath(modelName: string): Promise<string> {
     const safe = basename(modelName);
     for (const folder of [DOWNLOAD_DIRECTORIES.embedding, DOWNLOAD_DIRECTORIES.model]) {
@@ -471,6 +562,14 @@ export function runtimeRef(runtimeId: string, tag: string, assetName: string): s
   return `runtime:${runtimeId}:${tag}:${assetName}`;
 }
 
+export function runtimeCatalogueRef(runtimeId: string): string {
+  return `runtime:${runtimeId}`;
+}
+
+export function runtimeIdOfCatalogueRef(ref: string): string | undefined {
+  return /^runtime:([a-z0-9-]+)$/.exec(ref)?.[1];
+}
+
 export function parseRuntimeRef(
   ref: string,
 ): { runtimeId: string; tag: string; assetName: string } | undefined {
@@ -499,7 +598,6 @@ export function ocrPrompt(language: VectorOcrLanguage): string {
   );
 }
 
-/** How much of the model's name a projector file repeats — the pairing heuristic. */
 function overlap(candidate: string, stem: string): number {
   const name = candidate.toLowerCase();
   let score = 0;
@@ -511,7 +609,6 @@ function rank(accelerator: Accelerator): number {
   return accelerator === "cpu" ? 0 : 1;
 }
 
-/** Walks the unpacked tree for the server binary; upstream nests it under `build/bin` on unix. */
 async function findExecutable(root: string, depth = 0): Promise<string | undefined> {
   if (depth > 4) return undefined;
   let entries;

@@ -189,6 +189,7 @@ export const contract = defineContract({
   "runtimes.list": { input: z.void(), output: RuntimeOverviewDto },
   "runtimes.install": { input: InstallRuntimeInput, output: z.array(DownloadDto) },
   "runtimes.stop": { input: RuntimeRef, output: z.object({ stopped: z.boolean() }) },
+  "runtimes.remove": { input: RuntimeRef, output: RuntimeRef.extend({ removed: z.literal(true) }) },
   "system.nativePing": {
     input: z.object({ text: z.string().max(1_000_000) }),
     output: z.object({ count: z.number().int().nonnegative() }),

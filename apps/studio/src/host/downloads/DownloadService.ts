@@ -178,12 +178,15 @@ export class DownloadService {
         const present = succeeded.get(item.ref);
         const reported = installed.get(installedKey(item.kind, item.name));
         const installedVersion = reported?.version ?? present?.version ?? undefined;
-        const state = resolveState(item, running?.status, {
-          installed: reported !== undefined || present !== undefined,
-          installedVersion,
-          digest: reported?.digest,
-        });
-        const blocked = this.precondition(item, freeBytes, running !== undefined);
+        const state =
+          item.state ??
+          resolveState(item, running?.status, {
+            installed: reported !== undefined || present !== undefined,
+            installedVersion,
+            digest: reported?.digest,
+          });
+        const blocked =
+          item.blockedReason ?? this.precondition(item, freeBytes, running !== undefined);
         return CatalogueItemDto.parse({
           ref: item.ref,
           kind: item.kind,
@@ -324,6 +327,25 @@ export class DownloadService {
     this.live.delete(id);
     this.intents.delete(id);
     this.pump();
+  }
+
+  /**
+   * Drops the rows of an artefact whose owner has already deleted it from disk — an engine
+   * whose unpacked directory is gone. Cancels anything still in flight for it first.
+   */
+  async forgetByRef(matches: (ref: string) => boolean): Promise<number> {
+    const rows = this.repository.list().filter((row) => matches(row.itemRef));
+    for (const row of rows) {
+      if (!TERMINAL.includes(row.status) && row.status !== "paused") await this.cancel(row.id);
+      await this.discard(row.targetPath);
+      await rm(row.targetPath, { force: true }).catch(() => undefined);
+      this.repository.remove(row.id);
+      this.live.delete(row.id);
+      this.intents.delete(row.id);
+    }
+    this.catalogueService.invalidate();
+    this.pump();
+    return rows.length;
   }
 
   /**

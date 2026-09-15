@@ -16,7 +16,7 @@ import {
   estimateEta,
   smoothRate,
   type RateState,
-} from "../../src/renderer/features/downloads/rateSmoothing.ts";
+} from "../../src/renderer/features/progressRate.ts";
 import {
   formatBytes,
   formatEta,
@@ -134,23 +134,23 @@ function setup(options: { rows?: DownloadDto[]; catalogue?: CatalogueItemDto[] }
 const wait = (ms: number): Promise<void> => new Promise((resume) => setTimeout(resume, ms));
 
 test("the smoothed rate is a pure function that settles on the real throughput", () => {
-  const first = smoothRate(undefined, { bytes: 0, at: 0 });
-  expect(first.bytesPerSecond).toBe(0);
-  expect(first.sample).toEqual({ bytes: 0, at: 0 });
+  const first = smoothRate(undefined, { value: 0, at: 0 });
+  expect(first.perSecond).toBe(0);
+  expect(first.sample).toEqual({ value: 0, at: 0 });
 
   let state: RateState = first;
   for (let tick = 1; tick <= 20; tick += 1)
-    state = smoothRate(state, { bytes: tick * 10 * MIB, at: tick * 1000 });
-  expect(state.bytesPerSecond).toBeGreaterThan(9.5 * MIB);
-  expect(state.bytesPerSecond).toBeLessThanOrEqual(10 * MIB);
+    state = smoothRate(state, { value: tick * 10 * MIB, at: tick * 1000 });
+  expect(state.perSecond).toBeGreaterThan(9.5 * MIB);
+  expect(state.perSecond).toBeLessThanOrEqual(10 * MIB);
 
-  const dipped = smoothRate(state, { bytes: 20 * 10 * MIB + MIB, at: 21_000 });
-  expect(dipped.bytesPerSecond).toBeGreaterThan(5 * MIB);
+  const dipped = smoothRate(state, { value: 20 * 10 * MIB + MIB, at: 21_000 });
+  expect(dipped.perSecond).toBeGreaterThan(5 * MIB);
 
-  expect(smoothRate(state, { bytes: state.sample.bytes + 1, at: state.sample.at })).toBe(state);
+  expect(smoothRate(state, { value: state.sample.value + 1, at: state.sample.at })).toBe(state);
 
-  const resumed = smoothRate(state, { bytes: 0, at: 22_000 });
-  expect(resumed.bytesPerSecond).toBe(0);
+  const resumed = smoothRate(state, { value: 0, at: 22_000 });
+  expect(resumed.perSecond).toBe(0);
   expect(resumed.sample.bytes).toBe(0);
 });
 

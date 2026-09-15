@@ -32,13 +32,11 @@ export function decodeXmlText(raw: string): string {
   });
 }
 
-/** Every run of text inside `<tag>…</tag>`, in document order. */
 function textRuns(xml: string, tag: string): string[] {
   const pattern = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, "g");
   return [...xml.matchAll(pattern)].map((match) => decodeXmlText(match[1] ?? ""));
 }
 
-/** Splits a part into the blocks that should become separate lines. */
 function blocks(xml: string, closing: string): string[] {
   return xml.split(closing);
 }

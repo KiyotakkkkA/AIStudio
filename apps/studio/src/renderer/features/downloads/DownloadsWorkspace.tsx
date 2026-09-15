@@ -14,7 +14,6 @@ import DownloadFailureRow from "./DownloadFailureRow";
 import DownloadFilterRail from "./DownloadFilterRail";
 import DownloadProgressRow from "./DownloadProgressRow";
 import DownloadQueueRow from "./DownloadQueueRow";
-import LocalStackPanel from "./LocalStackPanel";
 import { formatBytes, formatRate } from "./downloadPresentation";
 
 export default observer(function DownloadsWorkspace() {
@@ -154,8 +153,6 @@ export default observer(function DownloadsWorkspace() {
               </>
             )}
 
-            <LocalStackPanel store={store} />
-
             <div className="flex items-center gap-2.5 border-y border-main-750 bg-main-900/40 px-4 py-2.5">
               <span className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
                 Каталог
@@ -205,13 +202,10 @@ export default observer(function DownloadsWorkspace() {
                   item={item}
                   selected={store.selectedRef === item.ref}
                   busy={busy}
-                  removable={store.installedId(item.ref) !== undefined}
+                  removable={store.isRemovable(item)}
                   onSelect={() => store.select(item.ref)}
-                  onDownload={() => void store.start(item.ref)}
-                  onRemove={() => {
-                    const id = store.installedId(item.ref);
-                    if (id !== undefined) void store.remove(id);
-                  }}
+                  onDownload={() => void store.install(item)}
+                  onRemove={() => void store.uninstall(item)}
                 />
               ))
             )}
