@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 export interface FieldProps {
   readonly label: string;
+  readonly labelAction?: ReactNode;
   readonly htmlFor?: string;
   readonly required?: boolean;
   readonly optionalHint?: boolean;
@@ -12,6 +13,7 @@ export interface FieldProps {
 
 export default function Field({
   label,
+  labelAction,
   htmlFor,
   required = false,
   optionalHint = false,
@@ -27,6 +29,7 @@ export default function Field({
         {!required && optionalHint ? (
           <span className="ml-1 font-normal text-main-500">опционально</span>
         ) : null}
+        {labelAction}
       </label>
       {children}
       {help !== undefined && error === undefined ? (

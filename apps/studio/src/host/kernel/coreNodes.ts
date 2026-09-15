@@ -82,6 +82,11 @@ export function registerCoreNodes(registry: NodeRegistry): NodeRegistry {
           if (message !== undefined)
             context.emit({ type: "log", line: { storeId: input.storeId, message } });
         },
+        // Machine load rides the run's own stream rather than a second subscription: whoever
+        // is watching the index is exactly who wants to see what it costs.
+        onSample: (sample) => {
+          context.emit({ type: "step", step: { domain: "resources", ...sample } });
+        },
       });
     },
   });

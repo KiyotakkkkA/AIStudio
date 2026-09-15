@@ -4,7 +4,7 @@ import { RunId } from "../primitives/branded.js";
 import { Timestamp } from "../primitives/time.js";
 
 /** What a catalogue entry is. The download lands the artefact; wiring it up belongs elsewhere. */
-export const DownloadItemKind = z.enum(["model", "embedding", "mcp", "skill"]);
+export const DownloadItemKind = z.enum(["model", "embedding", "runtime", "mcp", "skill"]);
 export type DownloadItemKind = z.infer<typeof DownloadItemKind>;
 
 export const DownloadStatus = z.enum([
@@ -42,7 +42,7 @@ export type ChecksumDto = z.infer<typeof ChecksumDto>;
 export const ItemRef = z.string().trim().min(3).max(256);
 export type ItemRef = z.infer<typeof ItemRef>;
 
-export const CatalogueSource = z.enum(["curated", "ollama"]);
+export const CatalogueSource = z.enum(["curated", "ollama", "github"]);
 export type CatalogueSource = z.infer<typeof CatalogueSource>;
 
 /**
@@ -104,7 +104,15 @@ export const DownloadDto = z.object({
 });
 export type DownloadDto = z.infer<typeof DownloadDto>;
 
-export const DiskCategory = z.enum(["models", "embeddings", "mcp", "skills", "vectors", "other"]);
+export const DiskCategory = z.enum([
+  "models",
+  "embeddings",
+  "runtimes",
+  "mcp",
+  "skills",
+  "vectors",
+  "other",
+]);
 export type DiskCategory = z.infer<typeof DiskCategory>;
 
 export const DiskUsageDto = z.object({

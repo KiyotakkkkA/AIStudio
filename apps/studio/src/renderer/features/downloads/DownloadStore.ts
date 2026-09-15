@@ -10,6 +10,8 @@ import {
   type DownloadId,
   type DownloadItemKind,
   type Json,
+  type RuntimeDto,
+  type RuntimeOverviewDto,
   type StreamId,
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
@@ -31,6 +33,9 @@ export default class DownloadStore {
   downloads: DownloadDto[] = [];
   catalogue: CatalogueItemDto[] = [];
   disk: DiskUsageDto | null = null;
+  runtimes: RuntimeOverviewDto | null = null;
+  runtimeBusyId: string | null = null;
+  runtimeError: string | null = null;
   concurrency = DEFAULT_CONCURRENCY;
   kind: DownloadItemKind | "all" = "all";
   state: CatalogueItemState | null = null;
@@ -98,6 +103,9 @@ export default class DownloadStore {
     const query = this.query.trim().toLowerCase();
     return this.catalogue.filter(
       (item) =>
+        // Engine archives are presented by the local-stack panel, which knows what a build is;
+        // they only join the catalogue list when that kind is filtered for explicitly.
+        (item.kind !== "runtime" || this.kind === "runtime") &&
         (this.kind === "all" || item.kind === this.kind) &&
         (this.state === null || item.state === this.state) &&
         (query === "" ||
@@ -107,7 +115,13 @@ export default class DownloadStore {
   }
 
   get kindCounts(): Record<DownloadItemKind, number> {
-    const counts: Record<DownloadItemKind, number> = { model: 0, embedding: 0, mcp: 0, skill: 0 };
+    const counts: Record<DownloadItemKind, number> = {
+      model: 0,
+      embedding: 0,
+      runtime: 0,
+      mcp: 0,
+      skill: 0,
+    };
     for (const item of this.catalogue) counts[item.kind] += 1;
     return counts;
   }
@@ -178,7 +192,7 @@ export default class DownloadStore {
     const revision = ++this.revision;
     this.loading = true;
     this.error = null;
-    const [rows, catalogue, disk, streams, concurrency, options] = await Promise.all([
+    const [rows, catalogue, disk, streams, concurrency, options, runtimes] = await Promise.all([
       this.ipc.call("downloads.list", {}).catch(this.keep("error", [] as DownloadDto[])),
       this.ipc
         .call("downloads.catalogue", { refresh: false })
@@ -187,6 +201,7 @@ export default class DownloadStore {
       this.readStreams(),
       this.readConcurrency(),
       this.readOptions(),
+      this.ipc.call("runtimes.list", undefined).catch(() => null),
     ]);
     runInAction(() => {
       if (revision !== this.revision) return;
@@ -195,6 +210,7 @@ export default class DownloadStore {
       if (disk !== null) this.disk = disk;
       this.concurrency = concurrency;
       this.options = options;
+      if (runtimes !== null) this.runtimes = runtimes;
       this.streams.clear();
       for (const [streamId, downloadId] of streams) this.streams.set(streamId, downloadId);
       for (const id of Object.keys(this.rates))
@@ -231,6 +247,63 @@ export default class DownloadStore {
   start(ref: string) {
     this.selectedRef = ref;
     return this.act(ref, () => this.ipc.call("downloads.start", { ref }));
+  }
+
+  get recommendedRuntime(): RuntimeDto | null {
+    return this.runtimes?.runtimes.find((runtime) => runtime.recommended) ?? null;
+  }
+
+  /** The catalogue rows the local stack needs beyond the engine: the embedding model. */
+  get recommendedModels(): CatalogueItemDto[] {
+    const refs = this.runtimes?.recommendedModels ?? [];
+    return refs.flatMap((ref) => this.catalogue.filter((item) => item.ref === ref));
+  }
+
+  /** True once an engine can load a GGUF and a matching embedding model is on disk. */
+  get localStackReady(): boolean {
+    const engine = this.runtimes?.runtimes.some(
+      (runtime) => runtime.state === "installed" || runtime.state === "ready",
+    );
+    const model = this.recommendedModels.some((item) => item.state === "installed");
+    return engine === true && model;
+  }
+
+  /** Installs the engine — the recommended build when `id` is omitted — and its model. */
+  async installRuntime(id?: string) {
+    if (this.runtimeBusyId !== null) return false;
+    this.runtimeBusyId = id ?? "auto";
+    this.runtimeError = null;
+    try {
+      await this.ipc.call("runtimes.install", id === undefined ? {} : { id });
+      await this.reloadRuntimes();
+      return true;
+    } catch (error) {
+      runInAction(() => {
+        this.runtimeError = copy(error, "Не удалось установить движок.");
+      });
+      return false;
+    } finally {
+      runInAction(() => {
+        this.runtimeBusyId = null;
+      });
+    }
+  }
+
+  /** The one-click path the page offers: the right engine plus the embedding model it needs. */
+  async installLocalStack() {
+    const installed = await this.installRuntime();
+    for (const item of this.recommendedModels) {
+      if (item.state === "installed" || !item.downloadable) continue;
+      await this.start(item.ref);
+    }
+    return installed;
+  }
+
+  async reloadRuntimes() {
+    const overview = await this.ipc.call("runtimes.list", undefined).catch(() => null);
+    runInAction(() => {
+      if (overview !== null) this.runtimes = overview;
+    });
   }
 
   pause(id: DownloadId) {

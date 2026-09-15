@@ -14,6 +14,7 @@ import {
   type VectorSourceKind,
   type VectorDocumentDto,
   type DocumentId,
+  ResourceSampleDto,
   type RunId,
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
@@ -42,6 +43,7 @@ export default class VectorStoreStore {
   sourceInclude = "";
   sourceExclude = "node_modules, .git, dist, build";
   indexRun: { id: RunId; done: number; total: number; note: string } | null = null;
+  indexSample: ResourceSampleDto | null = null;
   documentsLoading = false;
   loading = false;
   loaded = false;
@@ -347,6 +349,7 @@ export default class VectorStoreStore {
       const handle = await this.ipc.call("vectorStores.index", { storeId, full });
       runInAction(() => {
         this.indexRun = { id: handle.id, done: 0, total: 0, note: "Индексация запущена" };
+        this.indexSample = null;
       });
       this.stopIndexStream?.();
       this.stopIndexStream =
@@ -373,12 +376,15 @@ export default class VectorStoreStore {
         this.indexRun = { ...this.indexRun, done: event.done, total: event.total };
       else if (event.type === "log" && typeof event.line.message === "string")
         this.indexRun = { ...this.indexRun, note: event.line.message };
+      else if (event.type === "step" && event.step.domain === "resources")
+        this.indexSample = readSample(event.step);
     });
     if (event.type !== "end") return;
     this.stopIndexStream?.();
     this.stopIndexStream = null;
     runInAction(() => {
       this.indexRun = null;
+      this.indexSample = null;
       if (event.outcome.status === "failed" && event.outcome.message !== undefined)
         this.error = event.outcome.message;
     });
@@ -460,4 +466,13 @@ function errorCopy(error: unknown) {
   return error instanceof Error
     ? error.message
     : "Не удалось выполнить операцию. Попробуйте ещё раз.";
+}
+
+/**
+ * A resources step is a loose payload on the wire, so it is validated here rather than trusted.
+ * A malformed sample is dropped: a missing meter is better than a wrong one.
+ */
+function readSample(step: Record<string, unknown>): ResourceSampleDto | null {
+  const parsed = ResourceSampleDto.safeParse(step);
+  return parsed.success ? parsed.data : null;
 }

@@ -1,5 +1,6 @@
 import {
   mdiBookOpenPageVariantOutline,
+  mdiChip,
   mdiCubeOutline,
   mdiPowerPlugOutline,
   mdiVectorTriangle,
@@ -15,6 +16,7 @@ import type { StatusTone } from "../../ui/atoms/statusTone";
 export const KIND_LABELS: Record<DownloadItemKind, string> = {
   model: "модель",
   embedding: "эмбеддинги",
+  runtime: "движок",
   mcp: "MCP-сервер",
   skill: "набор навыков",
 };
@@ -22,6 +24,7 @@ export const KIND_LABELS: Record<DownloadItemKind, string> = {
 export const KIND_FILTER_LABELS: Record<DownloadItemKind, string> = {
   model: "Модели",
   embedding: "Модели эмбеддингов",
+  runtime: "Локальные движки",
   mcp: "MCP-серверы",
   skill: "Наборы навыков",
 };
@@ -29,6 +32,7 @@ export const KIND_FILTER_LABELS: Record<DownloadItemKind, string> = {
 export const KIND_ICONS: Record<DownloadItemKind, string> = {
   model: mdiCubeOutline,
   embedding: mdiVectorTriangle,
+  runtime: mdiChip,
   mcp: mdiPowerPlugOutline,
   skill: mdiBookOpenPageVariantOutline,
 };
@@ -78,6 +82,7 @@ export const STATUS_TONES: Record<DownloadStatus, StatusTone> = {
 export const DISK_CATEGORY_LABELS: Record<DiskCategory, string> = {
   models: "Модели",
   embeddings: "Эмбеддинги",
+  runtimes: "Локальные движки",
   mcp: "MCP-серверы",
   skills: "Наборы навыков",
   vectors: "Векторные индексы",
@@ -87,6 +92,7 @@ export const DISK_CATEGORY_LABELS: Record<DiskCategory, string> = {
 export const DISK_CATEGORY_ORDER: readonly DiskCategory[] = [
   "models",
   "embeddings",
+  "runtimes",
   "vectors",
   "mcp",
   "skills",
@@ -96,7 +102,8 @@ export const DISK_CATEGORY_ORDER: readonly DiskCategory[] = [
 export const DISK_CATEGORY_COLORS: Record<DiskCategory, string> = {
   models: "bg-accent-dark",
   embeddings: "bg-accent-medium",
-  vectors: "bg-accent-light",
+  runtimes: "bg-accent-light",
+  vectors: "bg-main-400",
   mcp: "bg-main-500",
   skills: "bg-main-600",
   other: "bg-main-700",

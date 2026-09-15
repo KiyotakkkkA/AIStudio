@@ -8,6 +8,7 @@ import {
   VectorIndexInput,
   VectorIndexReportDto,
   VectorSourceDto,
+  type ResourceSampleDto,
 } from "@zvs/shared";
 import type { UnitOfWork } from "../data/UnitOfWork.ts";
 import type {
@@ -34,6 +35,16 @@ export interface IndexProgress {
 export interface IndexContext {
   signal?: AbortSignal;
   onProgress?: (progress: IndexProgress) => void;
+  /** Machine load while the pipeline runs, so the page can show what the work costs. */
+  onSample?: (sample: ResourceSampleDto) => void;
+}
+
+/**
+ * The shape `ResourceMonitor` exposes. Structural on purpose: indexing does not care how a
+ * reading is taken, and a test can hand it a constant.
+ */
+export interface ResourceSampler {
+  watch(intervalMs: number, onSample: (sample: ResourceSampleDto) => void): () => void;
 }
 
 export interface IndexingServiceOptions {
@@ -51,6 +62,8 @@ export interface IndexingServiceOptions {
   maxAttempts?: number;
   backoffMs?: number;
   progressIntervalMs?: number;
+  resources?: ResourceSampler;
+  sampleIntervalMs?: number;
   readFile?: (path: string) => Promise<Uint8Array>;
 }
 
@@ -156,9 +169,16 @@ export class IndexingService {
     if (this.running.has(store.id))
       throw new AppError(AppErrorCode.CONFLICT, "Индексация этого хранилища уже выполняется");
     this.running.add(store.id);
+    // Sampling starts with the run and stops with it, so nothing polls the machine while the
+    // app is idle.
+    const stopSampling =
+      context.onSample !== undefined && this.options.resources !== undefined
+        ? this.options.resources.watch(this.options.sampleIntervalMs ?? 1_000, context.onSample)
+        : undefined;
     try {
       return await this.pipeline(store, input.full, context);
     } finally {
+      stopSampling?.();
       this.running.delete(store.id);
     }
   }

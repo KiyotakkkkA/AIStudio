@@ -49,6 +49,9 @@ import { IndexingService } from "./indexing/IndexingService";
 import { DownloadService } from "./downloads/DownloadService";
 import { DiskService } from "./downloads/disk";
 import { CatalogueService, curatedProvider, ollamaProvider } from "./downloads/catalogue";
+import { RuntimeService } from "./runtimes/RuntimeService";
+import { ReleaseResolver } from "./runtimes/releases";
+import { ResourceMonitor, nvidiaSmiSampler } from "./platform/metrics";
 
 app.setName("ZVS AI Studio");
 let logger: Logger | undefined;
@@ -67,6 +70,7 @@ let runs: RunService | undefined;
 let retention: RetentionService | undefined;
 let sidecar: SidecarDriver | undefined;
 let downloads: DownloadService | undefined;
+let runtimes: RuntimeService | undefined;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -89,6 +93,7 @@ if (!app.requestSingleInstanceLock()) {
     retention?.stop();
     void (async () => {
       downloads?.dispose();
+      runtimes?.dispose();
       await runs?.dispose();
       await Promise.all([
         providers.dispose(),
@@ -201,6 +206,7 @@ if (!app.requestSingleInstanceLock()) {
       accounts.startAutoRefresh();
       healthCheck = new HealthCheckService({ providers, settings, events: eventBus, logger });
       healthCheck.start();
+      const resources = new ResourceMonitor({ gpu: nvidiaSmiSampler(logger), logger });
       const core = RustCore.fromPaths(paths);
       const vectorStores = new VectorStoreService({
         data: database,
@@ -214,6 +220,7 @@ if (!app.requestSingleInstanceLock()) {
         core,
         drivers: registry,
         stores: vectorStores,
+        resources,
         logger,
       });
       sidecar = new SidecarDriver({ binaryPath: paths.sidecarPath, logger });
@@ -222,6 +229,10 @@ if (!app.requestSingleInstanceLock()) {
         vectorStoresDir: paths.vectorStoresDir,
         userDataDir: paths.userDataDir,
         logger,
+      });
+      const device = new DeviceProbe({
+        gpu: electronGpuProbe(logger),
+        freeDisk: () => disk.freeBytes(),
       });
       downloads = new DownloadService({
         data: database,
@@ -246,6 +257,23 @@ if (!app.requestSingleInstanceLock()) {
         }),
         logger,
       });
+      runtimes = new RuntimeService({
+        downloads,
+        catalogue: downloads.catalogueSource,
+        settings,
+        downloadsDir: paths.downloadsDir,
+        device,
+        // Chromium's network stack, so a corporate proxy and its certificates apply here too.
+        resolver: new ReleaseResolver({
+          fetch: (url, request) => net.fetch(url, request),
+          logger,
+        }),
+        logger,
+      });
+      downloads.attachInstaller(runtimes.unpackDownload);
+      registry.attachLocalEngine({
+        embed: (model, texts, signal) => runtimes!.embed(model, texts, signal),
+      });
       const nodes = registerDownloadNodes(registerJobNodes(registerCoreNodes(new NodeRegistry())));
       runs = new RunService({
         data: database,
@@ -268,6 +296,7 @@ if (!app.requestSingleInstanceLock()) {
           vectorStores,
           indexing,
           downloads,
+          runtimes,
           pickSources: async (kind) => {
             const result = await dialog.showOpenDialog({
               properties:
@@ -283,12 +312,7 @@ if (!app.requestSingleInstanceLock()) {
           providers,
           healthCheck,
           accounts,
-          system: new SystemService(core, {
-            device: new DeviceProbe({
-              gpu: electronGpuProbe(logger),
-              freeDisk: () => disk.freeBytes(),
-            }),
-          }),
+          system: new SystemService(core, { device, resources }),
         }),
         {
           ipcMain: {

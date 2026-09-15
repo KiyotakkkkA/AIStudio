@@ -23,9 +23,17 @@ export const downloadsDir = (env: PathEnvironment): string => join(userDataDir(e
 export const DOWNLOAD_DIRECTORIES = {
   model: "models",
   embedding: "embeddings",
+  runtime: "runtimes",
   mcp: "mcp",
   skill: "skills",
 } as const;
+
+/** Where an engine archive is unpacked, one directory per runtime id. */
+export function runtimeInstallPath(downloads: string, runtimeId: string): string {
+  if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(runtimeId))
+    throw new Error(`Invalid runtime id: ${runtimeId}`);
+  return join(downloads, DOWNLOAD_DIRECTORIES.runtime, runtimeId);
+}
 
 export function downloadTargetPath(directory: string, kind: string, fileName: string): string {
   const folder = DOWNLOAD_DIRECTORIES[kind as keyof typeof DOWNLOAD_DIRECTORIES];

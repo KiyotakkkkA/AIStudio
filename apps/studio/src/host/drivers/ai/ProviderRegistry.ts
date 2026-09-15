@@ -1,7 +1,12 @@
 import { AppError, AppErrorCode, isLocalFamily } from "@zvs/shared";
 import type { AccountEntity, ProviderEntity } from "../../data/schema/index.ts";
 import type { Logger } from "../../platform/logger.ts";
-import { adapterEntry, type AdapterContext, type LocalModelStore } from "./adapters/index.ts";
+import {
+  adapterEntry,
+  type AdapterContext,
+  type LocalEmbeddingEngine,
+  type LocalModelStore,
+} from "./adapters/index.ts";
 import { OllamaAdapter, OLLAMA_CAPABILITIES } from "./adapters/ollama.ts";
 import { supportsAuthMode, type AdapterCapabilities } from "./AdapterCapabilities.ts";
 import { sessionExpired } from "./errors.ts";
@@ -32,6 +37,7 @@ export interface ProviderRegistryOptions {
   sessions?: SessionGatewayFactory;
   credentials?: AccountCredentialsFactory;
   localModels?: LocalModelStore;
+  localEngine?: LocalEmbeddingEngine;
   logger?: Logger;
   fetch?: FetchLike;
 }
@@ -50,6 +56,7 @@ export class ProviderRegistry {
   readonly #sessions: SessionGatewayFactory | undefined;
   readonly #credentials: AccountCredentialsFactory | undefined;
   readonly #localModels: LocalModelStore | undefined;
+  #localEngine: LocalEmbeddingEngine | undefined;
   readonly #logger: Logger | undefined;
   readonly #fetch: FetchLike | undefined;
   readonly #cache = new Map<string, CacheEntry>();
@@ -61,12 +68,23 @@ export class ProviderRegistry {
     this.#sessions = options.sessions;
     this.#credentials = options.credentials;
     this.#localModels = options.localModels;
+    this.#localEngine = options.localEngine;
     this.#logger = options.logger;
     this.#fetch = options.fetch;
   }
 
   get size(): number {
     return this.#cache.size;
+  }
+
+  /**
+   * The engine is built after the registry — it needs the download service, which needs the
+   * kernel — so it is joined here rather than in the constructor. Cached drivers are dropped so
+   * a provider built before the engine existed picks it up.
+   */
+  attachLocalEngine(engine: LocalEmbeddingEngine): void {
+    this.#localEngine = engine;
+    this.clear();
   }
 
   capabilities(providerId: string): AdapterCapabilities {
@@ -103,6 +121,7 @@ export class ProviderRegistry {
       ...(local ? {} : { transport: await this.#transport(row) }),
       ...(this.#logger === undefined ? {} : { logger: this.#logger }),
       ...(this.#localModels === undefined ? {} : { localModels: this.#localModels }),
+      ...(this.#localEngine === undefined ? {} : { localEngine: this.#localEngine }),
     };
     return entry.build(context);
   }

@@ -14,6 +14,7 @@ import {
 } from "../src/host/downloads/catalogue.ts";
 import { DiskService, directorySize, type DiskProbe } from "../src/host/downloads/disk.ts";
 import { DownloadService, FREE_SPACE_MARGIN_BYTES } from "../src/host/downloads/DownloadService.ts";
+import { downloadTargetPath } from "../src/host/platform/paths.ts";
 import { createDownloadHandlers } from "../src/host/ipc/downloads.ts";
 import { registerDownloadNodes } from "../src/host/kernel/downloadNodes.ts";
 import { NodeRegistry } from "../src/host/kernel/NodeRegistry.ts";
@@ -53,10 +54,7 @@ function item(
 }
 
 function targetOf(entry: CatalogueItem): string {
-  const folder = { model: "models", embedding: "embeddings", mcp: "mcp", skill: "skills" }[
-    entry.kind
-  ];
-  return join(downloadsDir, folder, entry.fileName);
+  return downloadTargetPath(downloadsDir, entry.kind, entry.fileName);
 }
 
 /** Polls until the download stops moving. The queue drives runs, so there is nothing to await. */

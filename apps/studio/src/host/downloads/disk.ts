@@ -17,6 +17,7 @@ export interface DiskProbe {
 const CATEGORY_OF_KIND: Record<keyof typeof DOWNLOAD_DIRECTORIES, DiskCategory> = {
   model: "models",
   embedding: "embeddings",
+  runtime: "runtimes",
   mcp: "mcp",
   skill: "skills",
 };

@@ -45,7 +45,8 @@ import { ProviderId } from "../primitives/branded.js";
 import { defineContract } from "./defineContract.js";
 import { AccountDto, AccountLinkInput, AccountLinkResult, AccountRef } from "../accounts.js";
 import { AdapterDescriptorDto } from "../ai.js";
-import { DeviceProfileDto } from "../system.js";
+import { DeviceProfileDto, ResourceSampleDto } from "../system.js";
+import { InstallRuntimeInput, RuntimeOverviewDto, RuntimeRef } from "../runtimes/index.js";
 import {
   CreateVectorStoreInput,
   UpdateVectorStoreInput,
@@ -184,6 +185,10 @@ export const contract = defineContract({
     input: z.object({ refresh: z.boolean().default(false) }),
     output: DeviceProfileDto,
   },
+  "system.resources": { input: z.void(), output: ResourceSampleDto },
+  "runtimes.list": { input: z.void(), output: RuntimeOverviewDto },
+  "runtimes.install": { input: InstallRuntimeInput, output: z.array(DownloadDto) },
+  "runtimes.stop": { input: RuntimeRef, output: z.object({ stopped: z.boolean() }) },
   "system.nativePing": {
     input: z.object({ text: z.string().max(1_000_000) }),
     output: z.object({ count: z.number().int().nonnegative() }),

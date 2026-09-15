@@ -21,6 +21,14 @@ export interface LocalModelStore {
   list(signal: AbortSignal): Promise<DiscoveredModel[]>;
 }
 
+/**
+ * The engine that turns a weight file into a vector. Kept as a port so the adapter stays a
+ * mapper: it knows which files exist, never how one is loaded or which accelerator ran it.
+ */
+export interface LocalEmbeddingEngine {
+  embed(modelName: string, texts: readonly string[], signal: AbortSignal): Promise<Float32Array[]>;
+}
+
 export interface FileSystemModelStoreOptions {
   root: string;
   directories?: readonly string[];
@@ -81,6 +89,7 @@ export class FileSystemModelStore implements LocalModelStore {
 export class LocalEmbeddingAdapter implements EmbeddingDriver {
   constructor(
     private readonly store: LocalModelStore,
+    private readonly engine?: LocalEmbeddingEngine,
     private readonly logger?: Logger,
   ) {}
 
@@ -104,11 +113,14 @@ export class LocalEmbeddingAdapter implements EmbeddingDriver {
     signal: AbortSignal,
   ): Promise<Float32Array[]> {
     signal.throwIfAborted();
-    await Promise.resolve();
-    throw new AppError(
-      AppErrorCode.CONFLICT,
-      "Локальный движок эмбеддингов ещё не подключён: файл модели виден, но посчитать вектор нечем",
-      { details: { family: "local", model, texts: texts.length } },
-    );
+    if (this.engine === undefined) {
+      await Promise.resolve();
+      throw new AppError(
+        AppErrorCode.CONFLICT,
+        "Локальный движок эмбеддингов не подключён: файл модели виден, но посчитать вектор нечем",
+        { details: { family: "local", model, texts: texts.length } },
+      );
+    }
+    return this.engine.embed(model, texts, signal);
   }
 }

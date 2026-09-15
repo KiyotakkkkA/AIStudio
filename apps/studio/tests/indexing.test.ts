@@ -1,7 +1,13 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { AppError, AppErrorCode, CreateVectorStoreInput, type VectorStoreDto } from "@zvs/shared";
+import {
+  AppError,
+  AppErrorCode,
+  CreateVectorStoreInput,
+  type Timestamp,
+  type VectorStoreDto,
+} from "@zvs/shared";
 import { temporaryDatabase, type TemporaryDatabase } from "../../../test/helpers/tempDb.ts";
 import { temporaryDirectory, type TemporaryDirectory } from "../../../test/helpers/paths.ts";
 import { FakeCore } from "../../../test/helpers/FakeCore.ts";
@@ -435,4 +441,71 @@ test("the documents and sources channels answer the Documents tab", async () => 
   await expect(handlers["vectorStores.sources.pick"]({ kind: "folder" })).rejects.toMatchObject({
     code: AppErrorCode.CONFLICT,
   });
+});
+
+test("machine load is sampled while the pipeline runs and stops with it", async () => {
+  write("guide.md", "alpha beta gamma delta");
+  addFolder();
+  let watching = 0;
+  const sample = {
+    at: 1000 as Timestamp,
+    cpuPercent: 41,
+    memoryUsedBytes: 8,
+    memoryTotalBytes: 16,
+    processMemoryBytes: 4,
+    gpuName: "NVIDIA",
+    gpuPercent: 77,
+    vramUsedBytes: 2,
+    vramTotalBytes: 8,
+  };
+  const watched = new IndexingService({
+    data: db.client,
+    core,
+    drivers: { ephemeralDriver: async () => driver },
+    stores,
+    clock: () => 1000,
+    sleep,
+    resources: {
+      watch(_intervalMs, onSample) {
+        watching += 1;
+        onSample(sample);
+        return () => {
+          watching -= 1;
+        };
+      },
+    },
+  });
+  const samples: number[] = [];
+
+  await watched.index(
+    { storeId: store.id, full: false },
+    { onSample: (taken) => samples.push(taken.gpuPercent ?? -1) },
+  );
+
+  expect(samples).toEqual([77]);
+  expect(watching).toBe(0);
+});
+
+test("nothing is sampled when the caller does not ask for it", async () => {
+  write("guide.md", "alpha beta");
+  addFolder();
+  let watching = 0;
+  const watched = new IndexingService({
+    data: db.client,
+    core,
+    drivers: { ephemeralDriver: async () => driver },
+    stores,
+    clock: () => 1000,
+    sleep,
+    resources: {
+      watch() {
+        watching += 1;
+        return () => undefined;
+      },
+    },
+  });
+
+  await watched.index({ storeId: store.id, full: false });
+
+  expect(watching).toBe(0);
 });

@@ -1,6 +1,6 @@
-import { mdiAutoFix, mdiChevronDown, mdiChevronRight } from "@mdi/js";
+import { mdiAutoFix, mdiChevronDown, mdiChevronRight, mdiInformationOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
-import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import { Floating, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/Button";
 import Icon from "../../ui/atoms/Icon";
@@ -10,6 +10,13 @@ import Field from "../../ui/molecules/Field";
 import TextArea from "../../ui/atoms/TextArea";
 import Chip from "../../ui/atoms/Chip";
 import VectorStoreAdvanced from "./VectorStoreAdvanced";
+import { InfoButton } from "../../ui/atoms/InfoButton";
+
+const METRIC_OPTIONS = [
+  { value: "cosine", label: "Косинусное сходство" },
+  { value: "l2", label: "Евклидово расстояние" },
+  { value: "dot", label: "Скалярное произведение" },
+];
 
 function VectorStoreForm() {
   const { vectorStores: store } = useStore();
@@ -116,30 +123,92 @@ function VectorStoreForm() {
                 required
                 {...(vm.errors[key] ? { error: vm.errors[key] } : {})}
               >
-                <TextInput
-                  id={`vs-${key}`}
-                  value={vm[key]}
-                  mono
-                  inputMode="numeric"
-                  invalid={!!vm.errors[key]}
-                  placeholder={key === "dimension" ? "Например, 1024" : undefined}
-                  disabled={
-                    store.busy ||
-                    (!vm.isNew && key === "dimension") ||
-                    (vm.chunkLocked && (key === "chunkSize" || key === "chunkOverlap"))
-                  }
-                  onChange={(e) => vm.set(key, e.target.value)}
-                />
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <TextInput
+                      id={`vs-${key}`}
+                      value={vm[key]}
+                      mono
+                      inputMode="numeric"
+                      invalid={!!vm.errors[key]}
+                      placeholder={key === "dimension" ? "Например, 1024" : undefined}
+                      disabled={
+                        store.busy ||
+                        (!vm.isNew && key === "dimension") ||
+                        (vm.chunkLocked && (key === "chunkSize" || key === "chunkOverlap"))
+                      }
+                      onChange={(e) => vm.set(key, e.target.value)}
+                    />
+                  </div>
+                  <InfoButton label={`Что означает поле «${label}»`}>
+                    {key === "dimension" ? (
+                      <>
+                        <p className="mb-2 font-medium text-main-50">Размерность</p>
+                        <p>
+                          Количество чисел в описании каждого фрагмента текста. Обычно её задаёт
+                          выбранная embedding-модель, поэтому значение должно совпадать с моделью.
+                        </p>
+                      </>
+                    ) : key === "chunkSize" ? (
+                      <>
+                        <p className="mb-2 font-medium text-main-50">Размер чанка</p>
+                        <p>
+                          Сколько частей текста помещается в один фрагмент для поиска. Большие
+                          значения сохраняют больше контекста, маленькие точнее находят отдельные
+                          места.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="mb-2 font-medium text-main-50">Перекрытие</p>
+                        <p>
+                          Сколько частей текста повторяется между соседними фрагментами. Это
+                          помогает не потерять смысл на границе, но увеличивает объём индекса.
+                        </p>
+                      </>
+                    )}
+                  </InfoButton>
+                </div>
               </Field>
             ))}
             <Field label="Метрика">
-              <SelectInput
-                label="Метрика"
-                value={vm.metric}
-                options={["cosine", "l2", "dot"].map((value) => ({ value, label: value }))}
-                disabled={!vm.isNew || store.busy}
-                onChange={vm.setMetric}
-              />
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <SelectInput
+                    label="Метрика"
+                    value={vm.metric}
+                    options={METRIC_OPTIONS}
+                    disabled={!vm.isNew || store.busy}
+                    onChange={vm.setMetric}
+                  />
+                </div>
+                <Floating anchor="bottom-right">
+                  <Floating.Trigger>
+                    <button
+                      type="button"
+                      aria-label="Что означают метрики"
+                      className="flex size-7 items-center justify-center rounded-full text-main-400 transition-colors hover:bg-main-750 hover:text-main-100 focus-visible:outline-2 focus-visible:outline-accent-dark"
+                    >
+                      <Icon path={mdiInformationOutline} size={16} />
+                    </button>
+                  </Floating.Trigger>
+                  <Floating.Content className="w-72 border border-main-700 bg-main-850 p-3 text-[11px] leading-relaxed text-main-200 shadow-lg">
+                    <p className="mb-2 font-medium text-main-50">Как сравниваются фрагменты</p>
+                    <p>
+                      <strong>Косинусное сходство</strong> сравнивает направление смыслов. Обычно
+                      это лучший универсальный вариант для поиска по тексту.
+                    </p>
+                    <p className="mt-2">
+                      <strong>Евклидово расстояние</strong> сравнивает расстояние между векторами:
+                      чем меньше значение, тем ближе фрагменты.
+                    </p>
+                    <p className="mt-2">
+                      <strong>Скалярное произведение</strong> оценивает совпадение направлений и
+                      длины векторов. Используйте его, если это рекомендует модель.
+                    </p>
+                  </Floating.Content>
+                </Floating>
+              </div>
             </Field>
           </div>
           {vm.autofillNote === "" ? null : (

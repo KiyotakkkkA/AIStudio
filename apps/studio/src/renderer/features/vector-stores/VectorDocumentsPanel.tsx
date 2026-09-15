@@ -1,13 +1,15 @@
-import { mdiFileDocumentOutline } from "@mdi/js";
+import { mdiFileDocumentOutline, mdiFolderOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/Button";
 import Chip from "../../ui/atoms/Chip";
+import Icon from "../../ui/atoms/Icon";
 import SegmentedControl from "../../ui/atoms/SegmentedControl";
 import TextInput from "../../ui/atoms/TextInput";
 import EmptyState from "../../ui/molecules/EmptyState";
 import Field from "../../ui/molecules/Field";
+import ResourceMeters from "./ResourceMeters";
 import { formatBytes, formatIndexedAt } from "./vectorPresentation";
 
 function VectorDocumentsPanel() {
@@ -92,8 +94,13 @@ function VectorDocumentsPanel() {
               key={source.id}
               className="flex items-center gap-2 rounded-card border border-main-750 bg-main-800 py-1 pr-1 pl-2.5"
             >
+              <Icon
+                path={source.kind === "folder" ? mdiFolderOutline : mdiFileDocumentOutline}
+                size={15}
+                className="flex-none text-main-400"
+              />
               <span className="max-w-110 truncate font-mono text-[11.5px] text-main-300">
-                {source.kind === "folder" ? "📁" : "📄"} {source.path}
+                {source.path}
                 {source.include.length > 0 ? ` · ${source.include.join(" ")}` : ""}
               </span>
               <Button
@@ -152,6 +159,13 @@ function VectorDocumentsPanel() {
           <div className="h-1 rounded bg-main-700">
             <div className="h-1 rounded bg-accent-dark" style={{ width: `${String(percent)}%` }} />
           </div>
+          {store.indexSample === null ? (
+            <span className="text-[10.5px] text-main-600">Замер нагрузки…</span>
+          ) : (
+            <div className="mt-1 rounded-card border border-main-750 bg-main-800 px-3 py-2.5">
+              <ResourceMeters sample={store.indexSample} />
+            </div>
+          )}
         </div>
       ) : null}
       {store.documents.length === 0 ? (

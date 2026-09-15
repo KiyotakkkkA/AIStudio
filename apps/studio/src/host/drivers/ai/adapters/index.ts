@@ -4,7 +4,12 @@ import type { AdapterCapabilities } from "../AdapterCapabilities.ts";
 import type { AiDriver } from "../ports.ts";
 import type { Transport } from "../transport/Transport.ts";
 import { DeepSeekWebAdapter, DEEPSEEK_WEB_CAPABILITIES } from "./deepseekWeb.ts";
-import { LocalEmbeddingAdapter, LOCAL_CAPABILITIES, type LocalModelStore } from "./local.ts";
+import {
+  LocalEmbeddingAdapter,
+  LOCAL_CAPABILITIES,
+  type LocalEmbeddingEngine,
+  type LocalModelStore,
+} from "./local.ts";
 import { OpenAiCompatibleAdapter, OPENAI_COMPATIBLE_CAPABILITIES } from "./openaiCompatible.ts";
 import { QwenWebAdapter, QWEN_WEB_CAPABILITIES } from "./qwenWeb.ts";
 
@@ -12,6 +17,7 @@ export interface AdapterContext {
   transport?: Transport;
   logger?: Logger;
   localModels?: LocalModelStore;
+  localEngine?: LocalEmbeddingEngine;
 }
 
 export interface NetworkAdapterContext extends AdapterContext {
@@ -71,7 +77,11 @@ export const ADAPTER_REGISTRY: Readonly<Record<AdapterFamily, AdapterFamilyEntry
         throw new AppError(AppErrorCode.CONFLICT, "Каталог локальных моделей недоступен");
       return {
         text: null,
-        embedding: new LocalEmbeddingAdapter(context.localModels, context.logger),
+        embedding: new LocalEmbeddingAdapter(
+          context.localModels,
+          context.localEngine,
+          context.logger,
+        ),
         image: null,
       };
     },
@@ -92,4 +102,4 @@ export { DeepSeekWebAdapter, DEEPSEEK_WEB_CAPABILITIES };
 export { OpenAiCompatibleAdapter, OPENAI_COMPATIBLE_CAPABILITIES };
 export { QwenWebAdapter, QWEN_WEB_CAPABILITIES };
 export { LocalEmbeddingAdapter, LOCAL_CAPABILITIES };
-export type { LocalModelStore };
+export type { LocalEmbeddingEngine, LocalModelStore };

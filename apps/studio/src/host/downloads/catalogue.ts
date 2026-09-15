@@ -145,11 +145,23 @@ const DEFAULT_TTL_MS = 60_000;
  */
 export class CatalogueService {
   private readonly providers: readonly CatalogueProvider[];
+  private readonly offered = new Map<string, CatalogueItem>();
   private items: Snapshot<readonly CatalogueItem[]> | undefined;
   private present: Snapshot<ReadonlyMap<string, InstalledItem>> | undefined;
 
   constructor(private readonly options: CatalogueServiceOptions = {}) {
     this.providers = options.providers ?? [curatedProvider];
+  }
+
+  /**
+   * Adds an entry that no provider can describe on its own, because resolving it needed a live
+   * lookup the user asked for: an engine build matched against today's llama.cpp release. It
+   * behaves like any other row from here on — queue, progress, disk accounting.
+   */
+  offer(item: CatalogueItem): CatalogueItem {
+    this.offered.set(item.ref, item);
+    this.items = undefined;
+    return item;
   }
 
   async list(refresh = false): Promise<readonly CatalogueItem[]> {
@@ -160,6 +172,7 @@ export class CatalogueService {
       for (const item of await this.safely(provider, () => provider.list()))
         collected.set(item.ref, item);
     }
+    for (const item of this.offered.values()) collected.set(item.ref, item);
     // A refresh that reaches nothing must not empty the page.
     const merged = collected.size === 0 && this.items ? this.items.value : [...collected.values()];
     this.items = { value: merged, at: this.now() };
@@ -179,6 +192,8 @@ export class CatalogueService {
   }
 
   async find(ref: string): Promise<CatalogueItem> {
+    const offered = this.offered.get(ref);
+    if (offered !== undefined) return offered;
     const item = (await this.list()).find((candidate) => candidate.ref === ref);
     if (!item) throw new AppError(AppErrorCode.NOT_FOUND, "Элемент каталога не найден");
     return item;

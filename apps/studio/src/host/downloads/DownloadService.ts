@@ -41,6 +41,8 @@ export const FREE_SPACE_MARGIN_BYTES = 1024 ** 3;
 const PRIORITY_BY_KIND: Record<DownloadItemKind, number> = {
   mcp: 7,
   skill: 7,
+  // An engine is small and nothing local can embed without it, so it goes ahead of weights.
+  runtime: 8,
   embedding: 6,
   model: 5,
 };
@@ -58,6 +60,12 @@ export interface DownloadContext {
 
 export type DownloadRunner = Pick<RunService, "start" | "cancel" | "subscribe">;
 
+/**
+ * Called once an artefact has landed and been verified, for the kinds that are not usable as a
+ * bare file — an engine archive still has to be unpacked before anything can run it.
+ */
+export type DownloadInstaller = (row: DownloadEntity) => Promise<void>;
+
 export interface DownloadServiceOptions {
   data: UnitOfWork;
   jobs: SidecarJobsPort;
@@ -65,6 +73,7 @@ export interface DownloadServiceOptions {
   catalogue?: CatalogueService;
   runs?: DownloadRunner;
   settings?: SettingService;
+  installer?: DownloadInstaller;
   downloadsDir: string;
   logger?: Logger;
   clock?: () => number;
@@ -86,11 +95,23 @@ export class DownloadService {
   private readonly intents = new Map<string, Intent>();
   private readonly catalogueService: CatalogueService;
   private runner: DownloadRunner | undefined;
+  private installer: DownloadInstaller | undefined;
   private closed = false;
 
   constructor(private readonly options: DownloadServiceOptions) {
     this.catalogueService = options.catalogue ?? new CatalogueService({ logger: options.logger });
     this.runner = options.runs;
+    this.installer = options.installer;
+  }
+
+  /** The catalogue this service answers from, so a live resolver can add rows to it. */
+  get catalogueSource(): CatalogueService {
+    return this.catalogueService;
+  }
+
+  /** Joined after construction for the same reason `attach` is: the two services need each other. */
+  attachInstaller(installer: DownloadInstaller): void {
+    this.installer = installer;
   }
 
   /**
@@ -336,6 +357,9 @@ export class DownloadService {
         },
       );
       const report = readReport(result);
+      // Unpacking runs before the row is marked done, so a crash mid-unpack leaves a download
+      // that will be retried rather than an "installed" engine with no executable in it.
+      if (this.installer !== undefined) await this.installer(row);
       const at = this.now();
       this.repository.update(downloadId, {
         status: "succeeded",

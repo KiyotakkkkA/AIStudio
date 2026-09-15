@@ -94,6 +94,22 @@ test("the local adapter discovers models and refuses to embed until an engine ex
   ).rejects.toMatchObject({ code: AppErrorCode.CONFLICT });
 });
 
+test("with an engine attached, the adapter hands the model name straight to it", async () => {
+  put("embeddings", "bge-m3-FP16.gguf", 16);
+  const calls: { model: string; texts: readonly string[] }[] = [];
+  const adapter = new LocalEmbeddingAdapter(store, {
+    embed: (model, texts) => {
+      calls.push({ model, texts });
+      return Promise.resolve([Float32Array.from([1, 0])]);
+    },
+  });
+
+  const vectors = await adapter.embed(["привет"], "bge-m3-FP16.gguf", AbortSignal.timeout(5_000));
+
+  expect(vectors).toEqual([Float32Array.from([1, 0])]);
+  expect(calls).toEqual([{ model: "bge-m3-FP16.gguf", texts: ["привет"] }]);
+});
+
 test("the registry entry builds an embedding-only driver and needs no transport", () => {
   const entry = adapterEntry("local");
 

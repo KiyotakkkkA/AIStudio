@@ -9,6 +9,8 @@
 }
 body {
   margin: 0;
+  min-height: 100vh;
+  background: var(--color-main-800);
 }
 button,
 input {
