@@ -6255,6 +6255,7 @@ dependencies = [
  "futures",
  "lancedb",
  "pdf-extract",
+ "petgraph",
  "serde",
  "serde_json",
  "tempfile",

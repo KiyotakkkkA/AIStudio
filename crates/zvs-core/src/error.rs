@@ -6,6 +6,8 @@ pub enum Error {
     InvalidInput(String),
     #[error("Backend failure: {0}")]
     Backend(String),
+    #[error("Limit exceeded: {0}")]
+    LimitExceeded(String),
     #[error("Operation cancelled")]
     Cancelled,
 }
@@ -18,7 +20,7 @@ impl Error {
                 std::io::ErrorKind::PermissionDenied => "PERMISSION_DENIED",
                 _ => "NATIVE_ERROR",
             },
-            Self::InvalidInput(_) => "VALIDATION_FAILED",
+            Self::InvalidInput(_) | Self::LimitExceeded(_) => "VALIDATION_FAILED",
             Self::Backend(_) => "NATIVE_ERROR",
             Self::Cancelled => "RUN_CANCELLED",
         }

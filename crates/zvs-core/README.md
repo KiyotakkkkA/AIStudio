@@ -50,6 +50,7 @@ and `PERMISSION_DENIED`. IO errors preserve their source.
 | ------------------------ | ------------------------------------------------------------------------------------------------ |
 | `chunk`, `hash`, `error` | TASK_017                                                                                         |
 | `index`                  | TASK_019 storage/search; TASK_028 indexing orchestration                                         |
+| `graph`                  | TASK_021_EXTRA_1 store and traversal; TASK_021_EXTRA_2 napi exposure                             |
 | `embed`                  | TASK_028 embedding pipeline                                                                      |
 | `ocr`                    | Reserved for sidecar document processing after TASK_027; no OCR implementation task assigned yet |
 
@@ -63,6 +64,9 @@ stable release checked for TASK_019. Its default feature build references a
 feature-gated `Error::Http` in `job.rs`; the `remote` feature is enabled as a
 compilation workaround. The index API accepts only host-supplied absolute local
 paths and does not use remote connections.
+
+petgraph is pinned to [0.8.3](https://docs.rs/crate/petgraph/0.8.3), the current stable
+release checked for TASK_021_EXTRA_1.
 
 Lance requires the Protocol Buffers compiler (`protoc`, verified with 36.1).
 Install it from the official Protocol Buffers release and put it on PATH or set
@@ -122,3 +126,55 @@ future polls. `RustCore` exposes typed create/open/upsert/search/delete/stats
 methods through `VectorCorePort`. Upsert bridges `AbortSignal` through async
 operation-token allocation, cancellation and release; release also handles JSON
 serialization failures before the native call starts.
+
+## Relationship graph
+
+`graph::GraphStore` answers "what is connected to this" the way `index` answers
+"what is similar to this". TASK_021_EXTRA_1 chose petgraph in memory over CozoDB
+and over hand-written SQL traversal: the crate gains no persistence engine, and
+the memory bound is accepted until real usage disproves it.
+
+The store is therefore not opened from a path. Persistence belongs to the host,
+which keeps node and edge rows in SQLite and calls `GraphStore::hydrate` at
+startup; `nodes()` and `edges()` return the current rows back, both sorted, for
+the host to write. Rust still never opens SQLite. This is the one deviation from
+the task's steps, which assumed an engine with its own on-disk format.
+
+A node is an id plus a `document` or `chunk` kind. Ids are the ids already in
+`vector_document` and the LanceDB rows; the graph never invents one, and an edge
+whose endpoints are not both present is rejected with `VALIDATION_FAILED`. An
+edge is a from, a to, a `relation` string, an optional finite weight and a JSON
+metadata blob. `relation` is an open string — `cites`, `derived_from`,
+`co_occurs`, `user_linked` and anything later tasks need — so a new relation
+kind costs no Rust change.
+
+Ids and relations are trimmed and must be nonempty. Self-loops are rejected.
+`(from, to, relation)` identifies an edge: adding the same triple again replaces
+its weight and metadata rather than creating a parallel edge, and `add_node`
+on a known id updates its kind. Both add methods return whether the row was new,
+and the batch forms validate everything before mutating anything.
+
+`remove_node` is the cascade TASK_020's document delete will call: it drops the
+node and every edge touching it in one call, returning the edge count.
+`remove_edges_touching` does the same while keeping the node.
+
+`neighbors` takes an optional relation and a direction (`outgoing`, `incoming`
+or `both`) and reports which side each edge was traversed from. `shortest_path`
+is breadth-first over hop count, not over weight — weights here are relevance,
+not distance. `k_hop_subgraph` returns every node within `hops` of the root, each
+with its hop distance, and the induced edges among them: an edge between two
+nodes in the returned set is included whatever direction the traversal reached
+them from. Results are sorted — neighbors and edges by id, subgraph nodes by
+hops then id — so repeated queries return identical output.
+
+Traversal is bounded, not merely finite. `hops` may not exceed `MAX_HOPS` (8) and
+the node budget defaults to `DEFAULT_NODE_BUDGET` (4096), capped at
+`MAX_NODE_BUDGET` (65536). A k-hop expansion that would pass its budget stops and
+returns `Error::LimitExceeded`, which also maps to `VALIDATION_FAILED`, rather
+than walking a dense graph to exhaustion. An unknown node id in any query is
+`VALIDATION_FAILED`, not an empty result.
+
+Cancellation follows the crate convention: `add_nodes`, `add_edges`,
+`remove_nodes`, `shortest_path` and `k_hop_subgraph` check the token before work,
+at frontier and batch boundaries, and before returning. `neighbors` and the
+single-item CRUD calls are O(degree) and take no token.

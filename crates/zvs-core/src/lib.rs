@@ -3,6 +3,7 @@
 pub mod chunk;
 pub mod embed;
 pub mod error;
+pub mod graph;
 pub mod hash;
 pub mod index;
 pub mod ocr;

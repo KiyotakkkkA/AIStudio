@@ -1,4 +1,4 @@
-import { mdiFileDocumentOutline, mdiFolderOutline } from "@mdi/js";
+import { mdiFileDocumentOutline, mdiFolderOutline, mdiTrashCan } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { useRef, useState } from "react";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
@@ -265,7 +265,7 @@ function VectorDocumentsPanel() {
                         void store.removeDocument(document.id);
                       }}
                     >
-                      Удалить
+                      <Icon path={mdiTrashCan} size={16} />
                     </Button>
                   </article>
                 );
