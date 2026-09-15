@@ -241,6 +241,9 @@ export class IndexingService {
             tally.chunks += embedded;
             report();
           },
+          note: (message) => {
+            this.note(tally, message);
+          },
         });
         if (outcome.status === "unchanged") tally.unchanged += 1;
         else if (outcome.status === "skipped") {
@@ -303,14 +306,38 @@ export class IndexingService {
     known: VectorDocumentEntity | undefined,
     full: boolean,
     embedding: EmbeddingDriver,
-    context: { signal?: AbortSignal; onBatch: (embedded: number) => void },
+    context: {
+      signal?: AbortSignal;
+      onBatch: (embedded: number) => void;
+      note: (message: string) => void;
+    },
   ): Promise<{ status: "indexed" | "unchanged" | "skipped"; reason?: string }> {
     if (!this.extractors.supports(file.path))
       return { status: "skipped", reason: this.extractors.reason(file.path) };
     const bytes = await (this.options.readFile ?? defaultRead)(file.path);
     const contentHash = await this.options.core.hash(bytes);
     if (!full && known && known.contentHash === contentHash) return { status: "unchanged" };
-    const text = await this.extractors.extract({ path: file.path, bytes });
+    let text: string;
+    try {
+      text = await this.extractors.extract({
+        path: file.path,
+        bytes,
+        context: {
+          ocr: store.ocr,
+          ...(context.signal === undefined ? {} : { signal: context.signal }),
+          note: context.note,
+        },
+      });
+    } catch (error) {
+      // An extractor that says "not this format" is declining, not failing: a picture in a
+      // folder of notes, with OCR switched off, is a skip the user should not have to act on.
+      if (!(error instanceof AppError) || error.code !== AppErrorCode.UNSUPPORTED_FORMAT)
+        throw error;
+      return { status: "skipped", reason: error.message };
+    }
+    // A document that reads as nothing — a blank scan, a page of images the model saw nothing in
+    // — would otherwise be recorded as indexed with no vectors, and never looked at again.
+    if (text.trim() === "") return { status: "skipped", reason: "не удалось извлечь текст" };
     const chunks = await this.options.core.chunk(text, {
       size: store.chunkSize,
       overlap: store.chunkOverlap,

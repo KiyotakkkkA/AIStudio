@@ -102,8 +102,8 @@ function LocalStackPanel({ store }: { readonly store: DownloadStore }) {
   const ready = store.localStackReady;
 
   return (
-    <section className="border-b border-main-750 bg-main-900/40">
-      <header className="flex flex-wrap items-center gap-2.5 px-4 py-2.5">
+    <section className="border-b border-main-750">
+      <header className="flex flex-wrap items-center gap-2.5 px-4 py-2.5 bg-main-900/40">
         <Icon path={mdiChip} size={15} className="flex-none text-accent-dark" />
         <span className="text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
           Локальные модели
@@ -127,7 +127,7 @@ function LocalStackPanel({ store }: { readonly store: DownloadStore }) {
         </Button>
       </header>
 
-      <p className="m-0 px-4 pb-2.5 text-[11.5px]/4.5  text-main-400">
+      <p className="m-0 px-4 pb-2.5 text-[11.5px]/4.5  text-main-400 bg-main-900/40">
         {overview.plan.reason}
         {gpu === null
           ? ""

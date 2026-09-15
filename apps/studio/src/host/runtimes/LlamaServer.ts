@@ -4,9 +4,19 @@ import { createServer } from "node:net";
 import { AppError, AppErrorCode } from "@zvs/shared";
 import type { Logger } from "../platform/logger.ts";
 
+/**
+ * `embedding` serves `/v1/embeddings`; `vision` serves `/v1/chat/completions` with an image in
+ * the message. One server cannot do both — `--embeddings` puts llama.cpp in a pooling mode that
+ * cannot generate — so the role is fixed when the process starts.
+ */
+export type LlamaServerRole = "embedding" | "vision";
+
 export interface LlamaServerOptions {
   executablePath: string;
   modelPath: string;
+  role?: LlamaServerRole;
+  /** The multimodal projector that pairs with a vision model, required for `vision`. */
+  mmprojPath?: string;
   /** How many transformer layers to push onto the GPU; zero keeps everything on the CPU. */
   gpuLayers: number;
   contextSize?: number;
@@ -24,6 +34,10 @@ export interface LlamaServerOptions {
 
 interface EmbeddingResponse {
   data?: unknown;
+}
+
+interface ChatResponse {
+  choices?: unknown;
 }
 
 /**
@@ -70,28 +84,79 @@ export class LlamaServer {
     return this.options.modelPath;
   }
 
+  get role(): LlamaServerRole {
+    return this.options.role ?? "embedding";
+  }
+
   async embed(texts: readonly string[], signal: AbortSignal): Promise<Float32Array[]> {
     if (texts.length === 0) return [];
+    const payload = (await this.post(
+      "/v1/embeddings",
+      { input: [...texts], model: this.options.modelPath },
+      "посчитать эмбеддинги",
+      signal,
+    )) as EmbeddingResponse;
+    return readEmbeddings(payload);
+  }
+
+  /**
+   * Reads an image with a vision model. The image rides as a data URI in the message, which is
+   * what llama.cpp's multimodal endpoint accepts; nothing is written to disk on the way.
+   */
+  async describeImage(
+    image: { readonly mediaType: string; readonly bytes: Uint8Array },
+    prompt: string,
+    signal: AbortSignal,
+    maxTokens = 2048,
+  ): Promise<string> {
+    const dataUri = `data:${image.mediaType};base64,${Buffer.from(image.bytes).toString("base64")}`;
+    const payload = (await this.post(
+      "/v1/chat/completions",
+      {
+        model: this.options.modelPath,
+        temperature: 0,
+        max_tokens: maxTokens,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: dataUri } },
+            ],
+          },
+        ],
+      },
+      "распознать страницу",
+      signal,
+    )) as ChatResponse;
+    return readChatText(payload);
+  }
+
+  private async post(
+    route: string,
+    body: unknown,
+    what: string,
+    signal: AbortSignal,
+  ): Promise<unknown> {
     const baseUrl = await this.start(signal);
     this.touch();
     const request = this.options.fetch ?? globalThis.fetch;
-    const response = await request(`${baseUrl}/v1/embeddings`, {
+    const response = await request(`${baseUrl}${route}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${this.#apiKey}`,
       },
-      body: JSON.stringify({ input: [...texts], model: this.options.modelPath }),
+      body: JSON.stringify(body),
       signal,
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
-      throw new AppError(AppErrorCode.UNKNOWN, "Локальный движок не смог посчитать эмбеддинги", {
+      throw new AppError(AppErrorCode.UNKNOWN, `Локальный движок не смог ${what}`, {
         details: { status: response.status, detail: detail.slice(0, 500) },
       });
     }
-    const payload = (await response.json()) as EmbeddingResponse;
-    return readEmbeddings(payload);
+    return response.json();
   }
 
   /** Starts the child if it is not already up, and resolves once `/health` answers. */
@@ -128,10 +193,11 @@ export class LlamaServer {
     const port = await (this.options.freePort ?? freeLoopbackPort)();
     this.#apiKey = randomBytes(24).toString("hex");
     this.#stderr = "";
+    const vision = this.role === "vision";
     const argv = [
       "--model",
       this.options.modelPath,
-      "--embeddings",
+      ...(vision ? ["--mmproj", this.options.mmprojPath ?? ""] : ["--embeddings"]),
       "--host",
       "127.0.0.1",
       "--port",
@@ -221,6 +287,19 @@ export class LlamaServer {
     }, idle);
     this.#idleTimer.unref();
   }
+}
+
+function readChatText(payload: ChatResponse): string {
+  if (!Array.isArray(payload.choices) || payload.choices.length === 0)
+    throw new AppError(AppErrorCode.VALIDATION_FAILED, "Движок вернул пустой ответ");
+  const content = (payload.choices[0] as { message?: { content?: unknown } }).message?.content;
+  if (typeof content === "string") return content;
+  // Some builds answer with the content-part array they were given.
+  if (Array.isArray(content))
+    return content
+      .map((part: { text?: unknown }) => (typeof part.text === "string" ? part.text : ""))
+      .join("");
+  throw new AppError(AppErrorCode.VALIDATION_FAILED, "Движок вернул ответ неизвестного вида");
 }
 
 function readEmbeddings(payload: EmbeddingResponse): Float32Array[] {

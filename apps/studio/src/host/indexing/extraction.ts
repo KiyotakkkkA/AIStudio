@@ -1,9 +1,22 @@
 import { extname } from "node:path";
-import { AppError, AppErrorCode } from "@zvs/shared";
+import { AppError, AppErrorCode, type VectorOcrConfig } from "@zvs/shared";
+import { docxExtractor, pptxExtractor, xlsxExtractor } from "./ooxml.ts";
+
+/**
+ * What an extractor may need beyond the bytes. Plain text needs none of it; a PDF needs the
+ * store's OCR settings, a signal to stop on, and somewhere to report a page it could not read.
+ */
+export interface ExtractionContext {
+  readonly ocr?: VectorOcrConfig;
+  readonly signal?: AbortSignal;
+  /** Adds a line to the run's report — used for a page that was skipped and why. */
+  readonly note?: (message: string) => void;
+}
 
 export interface ExtractionInput {
   readonly path: string;
   readonly bytes: Uint8Array;
+  readonly context?: ExtractionContext;
 }
 
 export type Extractor = (input: ExtractionInput) => Promise<string>;
@@ -109,19 +122,12 @@ const TEXT_EXTENSIONS = [
   ".proto",
 ];
 
-const DEFERRED_EXTENSIONS = [
-  ".pdf",
-  ".doc",
-  ".docx",
-  ".odt",
-  ".rtf",
-  ".ppt",
-  ".pptx",
-  ".xls",
-  ".xlsx",
-  ".ods",
-  ".epub",
-];
+/**
+ * Formats with no reader yet. The legacy binary Office formats share nothing with their OOXML
+ * successors — a different container, a different encoding — so they stay deferred rather than
+ * being half-read; `.odt`/`.ods` are zipped XML too and are the obvious next addition.
+ */
+const DEFERRED_EXTENSIONS = [".doc", ".odt", ".rtf", ".ppt", ".xls", ".ods", ".epub"];
 
 export class ExtractorRegistry {
   private readonly extractors = new Map<string, Extractor>();
@@ -159,5 +165,8 @@ export function createExtractorRegistry(): ExtractorRegistry {
   return new ExtractorRegistry()
     .register(TEXT_EXTENSIONS, plainTextExtractor)
     .register([".csv", ".tsv"], csvExtractor)
+    .register([".docx"], docxExtractor)
+    .register([".xlsx"], xlsxExtractor)
+    .register([".pptx"], pptxExtractor)
     .defer(DEFERRED_EXTENSIONS);
 }

@@ -2,6 +2,7 @@ import { registerCoreNodes } from "./kernel/coreNodes.ts";
 import { registerJobNodes } from "./kernel/jobNodes.ts";
 import { registerDownloadNodes } from "./kernel/downloadNodes.ts";
 import { ChatService } from "./services/ChatService.ts";
+import { join } from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, net, safeStorage } from "electron";
 import { contract } from "@zvs/shared";
 import { createIpcServer } from "@zvs/ipc";
@@ -46,6 +47,7 @@ import { RetentionService } from "./services/RetentionService";
 import { NodeRegistry } from "./kernel/NodeRegistry";
 import { SidecarDriver } from "./drivers/sidecar/SidecarDriver";
 import { IndexingService } from "./indexing/IndexingService";
+import { createImageExtractor, createPdfExtractor, IMAGE_EXTENSIONS } from "./indexing/documents";
 import { DownloadService } from "./downloads/DownloadService";
 import { DiskService } from "./downloads/disk";
 import { CatalogueService, curatedProvider, ollamaProvider } from "./downloads/catalogue";
@@ -224,6 +226,7 @@ if (!app.requestSingleInstanceLock()) {
         logger,
       });
       sidecar = new SidecarDriver({ binaryPath: paths.sidecarPath, logger });
+      const scratchDir = join(paths.cacheDir, "documents");
       const disk = new DiskService({
         downloadsDir: paths.downloadsDir,
         vectorStoresDir: paths.vectorStoresDir,
@@ -271,6 +274,17 @@ if (!app.requestSingleInstanceLock()) {
         logger,
       });
       downloads.attachInstaller(runtimes.unpackDownload);
+      // PDF parsing lives in the sidecar and OCR in the local vision model, so the registry is
+      // completed here — where both are in scope — rather than inside the indexing service.
+      indexing.registry
+        .register(
+          [".pdf"],
+          createPdfExtractor({ jobs: sidecar, ocr: runtimes, scratchDir, logger }),
+        )
+        .register(
+          IMAGE_EXTENSIONS,
+          createImageExtractor({ jobs: sidecar, ocr: runtimes, scratchDir, logger }),
+        );
       registry.attachLocalEngine({
         embed: (model, texts, signal) => runtimes!.embed(model, texts, signal),
       });

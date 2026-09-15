@@ -1,5 +1,5 @@
 import { readdir, rm, stat } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import {
   AppError,
   AppErrorCode,
@@ -10,6 +10,7 @@ import {
   type ModelFormat,
   type RuntimeDto,
   type RuntimeState,
+  type VectorOcrLanguage,
 } from "@zvs/shared";
 import type { DownloadEntity } from "../data/schema/index.ts";
 import type { CatalogueItem, CatalogueService } from "../downloads/catalogue.ts";
@@ -26,7 +27,7 @@ import {
   RUNTIME_DEFINITIONS,
   type RuntimeDefinition,
 } from "./definitions.ts";
-import { LlamaServer, type LlamaServerOptions } from "./LlamaServer.ts";
+import { LlamaServer, type LlamaServerOptions, type LlamaServerRole } from "./LlamaServer.ts";
 import { ReleaseResolver, type ResolvedBuild } from "./releases.ts";
 
 export const INSTALLED_KEY = "runtimes.installed";
@@ -45,7 +46,7 @@ type InstalledMap = Record<string, InstalledRuntime>;
 export interface RuntimeServiceOptions {
   /** Narrowed to what is actually used, so a test can stand these in without a database. */
   downloads: Pick<DownloadService, "start" | "list">;
-  catalogue: Pick<CatalogueService, "offer">;
+  catalogue: Pick<CatalogueService, "offer" | "find">;
   settings: Pick<SettingService, "get" | "set">;
   downloadsDir: string;
   device?: Pick<DeviceProbe, "profile">;
@@ -184,7 +185,7 @@ export class RuntimeService {
       files: report.files,
       executable: record.executablePath === "" ? null : record.executablePath,
     });
-    this.#servers.get(definition.id)?.stop();
+    this.stop(definition.id);
   };
 
   /**
@@ -204,8 +205,51 @@ export class RuntimeService {
       );
     const { definition, record } = this.engineFor(format);
     const modelPath = await this.modelPath(modelName);
-    const server = this.serverFor(definition, record, modelPath);
+    const server = this.serverFor(definition, record, { modelPath, role: "embedding" });
     return server.embed(texts, signal);
+  }
+
+  /**
+   * Reads an image with the vision model named by a catalogue ref — the store's `ocr.modelRef`.
+   *
+   * OCR is a vision model rather than a classical engine because the app already needs one:
+   * Qwen2.5-VL is in the catalogue, it reads Russian and handwriting, and it runs on the engine
+   * that is already installed. Nothing new has to ship to make a scanned page searchable.
+   */
+  async readImage(
+    modelRef: string,
+    image: { readonly mediaType: string; readonly bytes: Uint8Array },
+    language: VectorOcrLanguage,
+    signal: AbortSignal,
+  ): Promise<string> {
+    const item = await this.options.catalogue.find(modelRef);
+    const { definition, record } = this.engineFor("gguf");
+    const modelPath = await this.modelPath(item.fileName);
+    const mmprojPath = await this.projectorFor(modelPath);
+    const server = this.serverFor(definition, record, { modelPath, role: "vision", mmprojPath });
+    const text = await server.describeImage(image, ocrPrompt(language), signal);
+    return text.trim();
+  }
+
+  /**
+   * A vision model is two files: the weights and the projector that turns pixels into tokens.
+   * They download together and sit side by side, so the projector is found by name rather than
+   * configured — one less thing for the user to get wrong.
+   */
+  private async projectorFor(modelPath: string): Promise<string> {
+    const directory = dirname(modelPath);
+    const entries = await readdir(directory).catch(() => [] as string[]);
+    const projectors = entries.filter((name) => PROJECTOR.test(name));
+    if (projectors.length === 0)
+      throw new AppError(
+        AppErrorCode.NOT_FOUND,
+        "Рядом с моделью нет файла mmproj: скачайте проектор в «Загрузках», без него распознавание не запустится",
+        { details: { directory } },
+      );
+    // With several projectors present, the one sharing the most of the model's name wins.
+    const stem = basename(modelPath).toLowerCase().replace(GGUF_SUFFIX, "");
+    const best = projectors.sort((left, right) => overlap(right, stem) - overlap(left, stem))[0]!;
+    return join(directory, best);
   }
 
   /** Whether anything installed can load this format — used to explain a refusal up front. */
@@ -218,13 +262,16 @@ export class RuntimeService {
     }
   }
 
+  /** Stops every server of a runtime, whichever role it was serving. */
   stop(runtimeId: string): boolean {
-    const server = this.#servers.get(runtimeId);
-    if (server === undefined) return false;
-    const wasRunning = server.running;
-    server.stop();
-    this.#servers.delete(runtimeId);
-    return wasRunning;
+    let stopped = false;
+    for (const [key, server] of [...this.#servers]) {
+      if (!key.startsWith(`${runtimeId}:`)) continue;
+      stopped ||= server.running;
+      server.stop();
+      this.#servers.delete(key);
+    }
+    return stopped;
   }
 
   dispose(): void {
@@ -255,23 +302,31 @@ export class RuntimeService {
     return { definition, record: installed[definition.id]! };
   }
 
+  /**
+   * One server per runtime and role. Embedding and vision cannot share a process — `--embeddings`
+   * puts llama.cpp in a pooling mode that cannot generate — but indexing a folder of scanned PDFs
+   * needs both at once, so the two run side by side rather than replacing each other.
+   */
   private serverFor(
     definition: RuntimeDefinition,
     record: InstalledRuntime,
-    modelPath: string,
+    want: { modelPath: string; role: LlamaServerRole; mmprojPath?: string },
   ): LlamaServer {
-    const existing = this.#servers.get(definition.id);
-    if (existing !== undefined && existing.modelPath === modelPath) return existing;
+    const key = `${definition.id}:${want.role}`;
+    const existing = this.#servers.get(key);
+    if (existing !== undefined && existing.modelPath === want.modelPath) return existing;
     existing?.stop();
     const options: LlamaServerOptions = {
       executablePath: record.executablePath,
-      modelPath,
+      modelPath: want.modelPath,
+      role: want.role,
+      ...(want.mmprojPath === undefined ? {} : { mmprojPath: want.mmprojPath }),
       gpuLayers: definition.accelerator === "cpu" ? 0 : 999,
       ...(this.options.contextSize === undefined ? {} : { contextSize: this.options.contextSize }),
       ...(this.options.logger === undefined ? {} : { logger: this.options.logger }),
     };
     const server = (this.options.createServer ?? ((given) => new LlamaServer(given)))(options);
-    this.#servers.set(definition.id, server);
+    this.#servers.set(key, server);
     return server;
   }
 
@@ -342,7 +397,7 @@ export class RuntimeService {
   ): RuntimeDto {
     const supported = definition.assets(this.platform, this.arch) !== undefined;
     const record = installed[definition.id];
-    const server = this.#servers.get(definition.id);
+    const server = this.#servers.get(`${definition.id}:embedding`);
     const refs = [...active].filter((ref) => parseRuntimeRef(ref)?.runtimeId === definition.id);
 
     const state: RuntimeState = !supported
@@ -422,6 +477,34 @@ export function parseRuntimeRef(
   const match = /^runtime:([a-z0-9-]+):(b\d+):(.+)$/.exec(ref);
   if (match === null) return undefined;
   return { runtimeId: match[1]!, tag: match[2]!, assetName: match[3]! };
+}
+
+const PROJECTOR = /^mmproj.*\.gguf$/i;
+const GGUF_SUFFIX = /\.gguf$/;
+
+const OCR_LANGUAGE_HINTS: Record<VectorOcrLanguage, string> = {
+  auto: "",
+  rus: " Текст на русском языке.",
+  eng: " The text is in English.",
+  "rus+eng": " В тексте есть и русский, и английский.",
+};
+
+/** Transcription, not description: the answer gets indexed, so anything added to it is noise. */
+export function ocrPrompt(language: VectorOcrLanguage): string {
+  return (
+    "Прочитай весь текст на изображении и выпиши его целиком, сохраняя порядок строк, " +
+    "абзацы и структуру таблиц. Не переводи, не пересказывай и не добавляй комментариев. " +
+    "Если текста нет, ответь пустой строкой." +
+    OCR_LANGUAGE_HINTS[language]
+  );
+}
+
+/** How much of the model's name a projector file repeats — the pairing heuristic. */
+function overlap(candidate: string, stem: string): number {
+  const name = candidate.toLowerCase();
+  let score = 0;
+  for (const part of stem.split(/[-_.]/)) if (part.length > 2 && name.includes(part)) score += 1;
+  return score;
 }
 
 function rank(accelerator: Accelerator): number {

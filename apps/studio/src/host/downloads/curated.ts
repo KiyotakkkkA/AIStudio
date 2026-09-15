@@ -20,6 +20,24 @@ export const CURATED_CATALOGUE: readonly CatalogueItem[] = [
     tags: ["Qwen", "OCR", "зрение", "Q4_K_M", "32k ctx"],
   },
   {
+    ref: "curated:model:qwen2.5-vl-7b-instruct-mmproj-q8_0",
+    kind: "model",
+    source: "curated",
+    name: "qwen2.5-vl:7b-mmproj",
+    displayName: "Qwen2.5-VL 7B — проектор mmproj",
+    description:
+      "Зрительная часть Qwen2.5-VL: без неё модель не видит изображение и распознавание не запустится. Скачивается в пару к самой модели и лежит рядом с ней.",
+    version: "Q8_0",
+    sizeBytes: 853_119_712,
+    fileName: "mmproj-Qwen2.5-VL-7B-Instruct-Q8_0.gguf",
+    url: "https://huggingface.co/ggml-org/Qwen2.5-VL-7B-Instruct-GGUF/resolve/main/mmproj-Qwen2.5-VL-7B-Instruct-Q8_0.gguf",
+    checksum: {
+      algorithm: "sha256",
+      value: "2ddb555391bae966e412deab9e07b58afa18bcc06930ba0f1c78a3695ab9e506",
+    },
+    tags: ["Qwen", "OCR", "проектор", "Q8_0"],
+  },
+  {
     ref: "curated:embedding:bge-m3-f16",
     kind: "embedding",
     source: "curated",

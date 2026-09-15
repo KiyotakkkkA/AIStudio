@@ -9,6 +9,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use zvs_core::{CancellationToken, Error, Result};
 
 use crate::{
+    document::{DOCUMENT_JOB, extract},
     download::{DOWNLOAD_JOB, download},
     protocol::Response,
 };
@@ -81,6 +82,7 @@ pub async fn dispatch(job: &str, params: Value, context: &JobContext) -> Result<
     match job {
         SLEEP_JOB => sleep(params, context).await,
         DOWNLOAD_JOB => download(params, context).await,
+        DOCUMENT_JOB => extract(params, context).await,
         unknown => Err(Error::InvalidInput(format!("Unknown job: {unknown}"))),
     }
 }

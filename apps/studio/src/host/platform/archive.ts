@@ -75,7 +75,98 @@ const CENTRAL_SIGNATURE = 0x02014b50;
 const ZIP64_LOCATOR_SIGNATURE = 0x07064b50;
 const MAX_COMMENT = 0xffff;
 
-/** Parses the central directory once, then reads each member's bytes by range. */
+/**
+ * Random access to the bytes of a zip, whether they are a file on disk or a buffer already in
+ * hand. An engine archive is hundreds of megabytes and is read by range; a `.docx` is small and
+ * arrives whole from the indexer. One reader serves both.
+ */
+interface ByteSource {
+  readonly size: number;
+  read(offset: number, length: number): Promise<Buffer>;
+}
+
+function bufferSource(bytes: Uint8Array): ByteSource {
+  const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return {
+    size: buffer.length,
+    read: (offset, length) =>
+      Promise.resolve(buffer.subarray(offset, offset + length) as unknown as Buffer),
+  };
+}
+
+/** Parses the central directory. Everything after this reads members by name or in order. */
+async function readDirectory(source: ByteSource): Promise<readonly ZipEntry[]> {
+  const tailLength = Math.min(source.size, MAX_COMMENT + 22);
+  const tail = await source.read(source.size - tailLength, tailLength);
+
+  let eocd = -1;
+  for (let at = tail.length - 22; at >= 0; at -= 1) {
+    if (tail.readUInt32LE(at) === EOCD_SIGNATURE) {
+      eocd = at;
+      break;
+    }
+  }
+  if (eocd < 0)
+    throw new AppError(AppErrorCode.UNSUPPORTED_FORMAT, "Архив повреждён: нет оглавления");
+  if (eocd >= 20 && tail.readUInt32LE(eocd - 20) === ZIP64_LOCATOR_SIGNATURE)
+    throw new AppError(AppErrorCode.UNSUPPORTED_FORMAT, "Архивы ZIP64 не поддерживаются");
+
+  const entryCount = tail.readUInt16LE(eocd + 10);
+  const directory = await source.read(tail.readUInt32LE(eocd + 16), tail.readUInt32LE(eocd + 12));
+
+  const entries: ZipEntry[] = [];
+  let cursor = 0;
+  for (let index = 0; index < entryCount && cursor + 46 <= directory.length; index += 1) {
+    if (directory.readUInt32LE(cursor) !== CENTRAL_SIGNATURE) break;
+    const nameLength = directory.readUInt16LE(cursor + 28);
+    const extraLength = directory.readUInt16LE(cursor + 30);
+    const commentLength = directory.readUInt16LE(cursor + 32);
+    const madeByUnix = directory.readUInt8(cursor + 5) === 3;
+    entries.push({
+      name: directory.toString("utf8", cursor + 46, cursor + 46 + nameLength),
+      method: directory.readUInt16LE(cursor + 10),
+      compressedSize: directory.readUInt32LE(cursor + 20),
+      localOffset: directory.readUInt32LE(cursor + 42),
+      mode: madeByUnix ? (directory.readUInt32LE(cursor + 38) >>> 16) & 0o7777 : 0,
+    });
+    cursor += 46 + nameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+
+async function readMember(source: ByteSource, entry: ZipEntry): Promise<Buffer> {
+  if (entry.method !== 0 && entry.method !== 8)
+    throw new AppError(AppErrorCode.UNSUPPORTED_FORMAT, "Неподдерживаемый метод сжатия", {
+      details: { name: entry.name, method: entry.method },
+    });
+  // The local header repeats the name and may carry a different extra field, so the data
+  // offset is read from it rather than assumed from the central directory.
+  const header = await source.read(entry.localOffset, 30);
+  const dataStart = entry.localOffset + 30 + header.readUInt16LE(26) + header.readUInt16LE(28);
+  const compressed =
+    entry.compressedSize > 0 ? await source.read(dataStart, entry.compressedSize) : Buffer.alloc(0);
+  return entry.method === 0 ? compressed : await inflate(compressed);
+}
+
+/**
+ * Reads named members out of a zip held in memory. OOXML formats — `.docx`, `.xlsx`, `.pptx` —
+ * are zips with an XML part inside, so an extractor needs a couple of entries by name and
+ * nothing else.
+ */
+export async function readZipEntries(
+  bytes: Uint8Array,
+  wanted: (name: string) => boolean,
+): Promise<Map<string, Buffer>> {
+  const source = bufferSource(bytes);
+  const entries = await readDirectory(source);
+  const found = new Map<string, Buffer>();
+  for (const entry of entries) {
+    if (entry.name.endsWith("/") || !wanted(entry.name)) continue;
+    found.set(entry.name, await readMember(source, entry));
+  }
+  return found;
+}
+
 async function extractZip(
   archivePath: string,
   targetDir: string,
@@ -84,45 +175,15 @@ async function extractZip(
   const handle = await open(archivePath, "r");
   try {
     const { size } = await handle.stat();
-    const tailLength = Math.min(size, MAX_COMMENT + 22);
-    const tail = Buffer.alloc(tailLength);
-    await handle.read(tail, 0, tailLength, size - tailLength);
-
-    let eocd = -1;
-    for (let at = tail.length - 22; at >= 0; at -= 1) {
-      if (tail.readUInt32LE(at) === EOCD_SIGNATURE) {
-        eocd = at;
-        break;
-      }
-    }
-    if (eocd < 0)
-      throw new AppError(AppErrorCode.UNSUPPORTED_FORMAT, "Архив повреждён: нет оглавления");
-    if (eocd >= 20 && tail.readUInt32LE(eocd - 20) === ZIP64_LOCATOR_SIGNATURE)
-      throw new AppError(AppErrorCode.UNSUPPORTED_FORMAT, "Архивы ZIP64 не поддерживаются");
-
-    const entryCount = tail.readUInt16LE(eocd + 10);
-    const directorySize = tail.readUInt32LE(eocd + 12);
-    const directoryOffset = tail.readUInt32LE(eocd + 16);
-    const directory = Buffer.alloc(directorySize);
-    await handle.read(directory, 0, directorySize, directoryOffset);
-
-    const entries: ZipEntry[] = [];
-    let cursor = 0;
-    for (let index = 0; index < entryCount && cursor + 46 <= directory.length; index += 1) {
-      if (directory.readUInt32LE(cursor) !== CENTRAL_SIGNATURE) break;
-      const nameLength = directory.readUInt16LE(cursor + 28);
-      const extraLength = directory.readUInt16LE(cursor + 30);
-      const commentLength = directory.readUInt16LE(cursor + 32);
-      const madeByUnix = directory.readUInt8(cursor + 5) === 3;
-      entries.push({
-        name: directory.toString("utf8", cursor + 46, cursor + 46 + nameLength),
-        method: directory.readUInt16LE(cursor + 10),
-        compressedSize: directory.readUInt32LE(cursor + 20),
-        localOffset: directory.readUInt32LE(cursor + 42),
-        mode: madeByUnix ? (directory.readUInt32LE(cursor + 38) >>> 16) & 0o7777 : 0,
-      });
-      cursor += 46 + nameLength + extraLength + commentLength;
-    }
+    const source: ByteSource = {
+      size,
+      read: async (offset, length) => {
+        const buffer = Buffer.alloc(length);
+        if (length > 0) await handle.read(buffer, 0, length, offset);
+        return buffer;
+      },
+    };
+    const entries = await readDirectory(source);
 
     let files = 0;
     let bytes = 0;
@@ -130,21 +191,7 @@ async function extractZip(
       options.signal?.throwIfAborted();
       const destination = safeMemberPath(targetDir, entry.name);
       if (destination === undefined) continue;
-      if (entry.method !== 0 && entry.method !== 8)
-        throw new AppError(AppErrorCode.UNSUPPORTED_FORMAT, "Неподдерживаемый метод сжатия", {
-          details: { name: entry.name, method: entry.method },
-        });
-
-      // The local header repeats the name and may carry a different extra field, so the data
-      // offset is read from it rather than assumed from the central directory.
-      const header = Buffer.alloc(30);
-      await handle.read(header, 0, 30, entry.localOffset);
-      const dataStart = entry.localOffset + 30 + header.readUInt16LE(26) + header.readUInt16LE(28);
-      const compressed = Buffer.alloc(entry.compressedSize);
-      if (entry.compressedSize > 0)
-        await handle.read(compressed, 0, entry.compressedSize, dataStart);
-      const content = entry.method === 0 ? compressed : await inflate(compressed);
-
+      const content = await readMember(source, entry);
       await writeMember(destination, content, entry.mode);
       files += 1;
       bytes += content.byteLength;

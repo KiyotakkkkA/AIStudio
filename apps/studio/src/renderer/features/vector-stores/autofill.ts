@@ -32,6 +32,12 @@ function matches(item: CatalogueItemDto, pattern: RegExp): boolean {
 
 const RERANK = /rerank|переранж/i;
 const OCR = /\bocr\b|-vl-|\bvl\b|vision|зрен/i;
+/**
+ * The multimodal projector ships beside a vision model and is tagged like one, but it is half a
+ * model — the runtime finds it by name. Offering it as something to choose would only let the
+ * user pick the wrong file.
+ */
+const PROJECTOR = /mmproj|проектор/i;
 
 export function rerankCandidates(
   catalogue: readonly CatalogueItemDto[],
@@ -41,7 +47,11 @@ export function rerankCandidates(
 
 export function ocrCandidates(catalogue: readonly CatalogueItemDto[]): readonly CatalogueItemDto[] {
   return installedItems(catalogue).filter(
-    (item) => !matches(item, RERANK) && matches(item, OCR) && item.kind === "model",
+    (item) =>
+      !matches(item, RERANK) &&
+      !matches(item, PROJECTOR) &&
+      matches(item, OCR) &&
+      item.kind === "model",
   );
 }
 

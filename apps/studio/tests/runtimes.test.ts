@@ -82,6 +82,7 @@ function device(gpu: DeviceProfileDto["gpu"]): DeviceProfileDto {
 let workspace: TemporaryDirectory;
 let settings: Map<string, unknown>;
 let offered: CatalogueItem[];
+let catalogueItems: CatalogueItem[];
 let started: string[];
 let downloads: DownloadDto[];
 
@@ -108,6 +109,11 @@ function makeService(options: {
         offered.push(item);
         return item;
       },
+      find: (ref) => {
+        const item = [...offered, ...catalogueItems].find((candidate) => candidate.ref === ref);
+        if (item === undefined) return Promise.reject(new Error(`No catalogue item: ${ref}`));
+        return Promise.resolve(item);
+      },
     },
     settings: {
       get: (key) =>
@@ -132,6 +138,7 @@ beforeEach(() => {
   workspace = temporaryDirectory("runtimes-");
   settings = new Map();
   offered = [];
+  catalogueItems = [];
   started = [];
   downloads = [];
 });

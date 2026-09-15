@@ -9,6 +9,7 @@ arrow-array.workspace = true
 arrow-schema.workspace = true
 futures.workspace = true
 lancedb.workspace = true
+pdf-extract.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 blake3.workspace = true

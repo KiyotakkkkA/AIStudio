@@ -183,9 +183,6 @@ function VectorStoreDetail() {
                     ? `${describeRef(detail.ocr.modelRef)} · язык: ${detail.ocr.language} · порог: ${detail.ocr.minCharsPerPage}`
                     : "выключен"}
                 </p>
-                <Button disabled={disabled} onClick={store.edit}>
-                  Изменить настройки
-                </Button>
               </>
             ) : (
               <>
