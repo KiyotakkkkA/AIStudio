@@ -509,3 +509,43 @@ test("nothing is sampled when the caller does not ask for it", async () => {
 
   expect(watching).toBe(0);
 });
+
+test("each document is reported as its vectors land, not only when the run ends", async () => {
+  write("first.md", "alpha beta gamma");
+  write("second.md", "delta epsilon zeta");
+  addFolder();
+  const seen: { path: string; chunks: number }[] = [];
+
+  const report = await indexing.index(
+    { storeId: store.id, full: false },
+    {
+      onDocument: (document) => {
+        seen.push({ path: document.sourcePath, chunks: document.chunkCount });
+      },
+    },
+  );
+
+  expect(report.indexed).toBe(2);
+  expect(seen).toHaveLength(2);
+  expect(seen.map((entry) => entry.path).sort()).toEqual(
+    [join(corpus, "first.md"), join(corpus, "second.md")].sort(),
+  );
+  expect(seen.every((entry) => entry.chunks > 0)).toBe(true);
+});
+
+test("a file that is skipped or unchanged is never reported as a document", async () => {
+  write("guide.md", "alpha beta gamma");
+  write("photo.png", "not text");
+  addFolder();
+  await indexing.index({ storeId: store.id, full: false });
+
+  const seen: string[] = [];
+  const report = await indexing.index(
+    { storeId: store.id, full: false },
+    { onDocument: (document) => seen.push(document.sourcePath) },
+  );
+
+  expect(report.unchanged).toBe(1);
+  expect(report.skipped).toBe(1);
+  expect(seen).toEqual([]);
+});

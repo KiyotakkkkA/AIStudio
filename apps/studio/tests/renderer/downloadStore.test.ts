@@ -151,7 +151,7 @@ test("the smoothed rate is a pure function that settles on the real throughput",
 
   const resumed = smoothRate(state, { value: 0, at: 22_000 });
   expect(resumed.perSecond).toBe(0);
-  expect(resumed.sample.bytes).toBe(0);
+  expect(resumed.sample.value).toBe(0);
 });
 
 test("the estimate is only offered while something is actually moving", () => {

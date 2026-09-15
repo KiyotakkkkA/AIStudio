@@ -12,12 +12,13 @@ import {
   type VectorSearchResultDto,
   type VectorSourceDto,
   type VectorSourceKind,
-  type VectorDocumentDto,
+  VectorDocumentDto,
   type DocumentId,
   ResourceSampleDto,
   type RunId,
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
+import { estimateEta, smoothRate, type RateState } from "../progressRate";
 import VectorStoreFormVm from "./VectorStoreFormVm";
 import { searchRows } from "./searchRows";
 
@@ -44,6 +45,7 @@ export default class VectorStoreStore {
   sourceExclude = "node_modules, .git, dist, build";
   indexRun: { id: RunId; done: number; total: number; note: string } | null = null;
   indexSample: ResourceSampleDto | null = null;
+  indexRate: RateState | null = null;
   documentsLoading = false;
   loading = false;
   loaded = false;
@@ -93,6 +95,19 @@ export default class VectorStoreStore {
   }
   get indexing() {
     return this.indexRun !== null;
+  }
+  /** Chunks embedded per second, smoothed so the estimate does not jump between reports. */
+  get indexChunksPerSecond(): number {
+    return this.indexRate?.perSecond ?? 0;
+  }
+  /**
+   * Milliseconds left, or `undefined` while there is nothing to base it on. The total is an
+   * estimate that converges as files are chunked, so this tightens as the run goes on.
+   */
+  get indexEtaMs(): number | undefined {
+    const run = this.indexRun;
+    if (!run) return undefined;
+    return estimateEta(run.done, run.total, this.indexChunksPerSecond);
   }
   async load() {
     if (this.loading) return;
@@ -350,6 +365,10 @@ export default class VectorStoreStore {
       runInAction(() => {
         this.indexRun = { id: handle.id, done: 0, total: 0, note: "Индексация запущена" };
         this.indexSample = null;
+        this.indexRate = null;
+        // A re-index rebuilds the list from what this run reports, so a document that has since
+        // been deleted from disk does not linger in it.
+        this.documents = [];
       });
       this.stopIndexStream?.();
       this.stopIndexStream =
@@ -372,12 +391,18 @@ export default class VectorStoreStore {
   private receiveIndexEvent(storeId: VectorStoreId, event: RoutedEvent) {
     runInAction(() => {
       if (!this.indexRun) return;
-      if (event.type === "progress")
+      if (event.type === "progress") {
         this.indexRun = { ...this.indexRun, done: event.done, total: event.total };
-      else if (event.type === "log" && typeof event.line.message === "string")
+        this.indexRate = smoothRate(this.indexRate ?? undefined, {
+          value: event.done,
+          at: event.ts,
+        });
+      } else if (event.type === "log" && typeof event.line.message === "string")
         this.indexRun = { ...this.indexRun, note: event.line.message };
       else if (event.type === "step" && event.step.domain === "resources")
         this.indexSample = readSample(event.step);
+      else if (event.type === "step" && event.step.domain === "document")
+        this.receiveDocument(event.step);
     });
     if (event.type !== "end") return;
     this.stopIndexStream?.();
@@ -385,10 +410,18 @@ export default class VectorStoreStore {
     runInAction(() => {
       this.indexRun = null;
       this.indexSample = null;
+      this.indexRate = null;
       if (event.outcome.status === "failed" && event.outcome.message !== undefined)
         this.error = event.outcome.message;
     });
     void this.refreshAfterIndex(storeId);
+  }
+  /** Newest first, and a re-indexed file moves rather than appearing twice. */
+  receiveDocument(step: Record<string, unknown>) {
+    const document = readDocument(step);
+    if (document === null) return;
+    const rest = this.documents.filter((known) => known.id !== document.id);
+    this.documents = [document, ...rest];
   }
   private async refreshAfterIndex(storeId: VectorStoreId) {
     try {
@@ -474,5 +507,14 @@ function errorCopy(error: unknown) {
  */
 function readSample(step: Record<string, unknown>): ResourceSampleDto | null {
   const parsed = ResourceSampleDto.safeParse(step);
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * A document step is a loose payload on the wire, so it is validated rather than trusted. A
+ * malformed one is dropped: the list is rebuilt from the database when the run ends anyway.
+ */
+function readDocument(step: Record<string, unknown>): VectorDocumentDto | null {
+  const parsed = VectorDocumentDto.safeParse(step);
   return parsed.success ? parsed.data : null;
 }

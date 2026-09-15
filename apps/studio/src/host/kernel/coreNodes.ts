@@ -87,6 +87,9 @@ export function registerCoreNodes(registry: NodeRegistry): NodeRegistry {
         onSample: (sample) => {
           context.emit({ type: "step", step: { domain: "resources", ...sample } });
         },
+        onDocument: (document) => {
+          context.emit({ type: "step", step: { domain: "document", ...document } });
+        },
       });
     },
   });

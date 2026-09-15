@@ -37,6 +37,11 @@ export interface IndexContext {
   onProgress?: (progress: IndexProgress) => void;
   /** Machine load while the pipeline runs, so the page can show what the work costs. */
   onSample?: (sample: ResourceSampleDto) => void;
+  /**
+   * Each document as its vectors land, so a long run fills the list it is building instead of
+   * showing an empty one until it finishes.
+   */
+  onDocument?: (document: VectorDocumentDto) => void;
 }
 
 /**
@@ -244,6 +249,7 @@ export class IndexingService {
           note: (message) => {
             this.note(tally, message);
           },
+          onDocument: (document) => context.onDocument?.(document),
         });
         if (outcome.status === "unchanged") tally.unchanged += 1;
         else if (outcome.status === "skipped") {
@@ -310,6 +316,7 @@ export class IndexingService {
       signal?: AbortSignal;
       onBatch: (embedded: number) => void;
       note: (message: string) => void;
+      onDocument: (document: VectorDocumentDto) => void;
     },
   ): Promise<{ status: "indexed" | "unchanged" | "skipped"; reason?: string }> {
     if (!this.extractors.supports(file.path))
@@ -348,7 +355,7 @@ export class IndexingService {
       const path = this.path(row);
       if (known) await this.options.core.deleteVectorsBySource(path, documentId);
       if (vectors.length > 0) await this.options.core.upsertVectors(path, vectors, context.signal);
-      this.documents.recordIndexed({
+      const recorded = this.documents.recordIndexed({
         id: documentId,
         storeId: row.id,
         sourcePath: file.path,
@@ -357,6 +364,7 @@ export class IndexingService {
         bytes: bytes.byteLength,
         indexedAt: this.now(),
       });
+      context.onDocument(VectorDocumentDto.parse(recorded));
     });
     return { status: "indexed" };
   }

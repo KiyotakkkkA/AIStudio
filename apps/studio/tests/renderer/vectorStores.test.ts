@@ -14,6 +14,10 @@ import VectorStoreStore from "../../src/renderer/features/vector-stores/VectorSt
 import VectorStoreFormVm from "../../src/renderer/features/vector-stores/VectorStoreFormVm";
 import { searchRows } from "../../src/renderer/features/vector-stores/searchRows";
 import {
+  formatDuration,
+  formatThroughput,
+} from "../../src/renderer/features/vector-stores/vectorPresentation";
+import {
   chunkPlan,
   ocrCandidates,
   rerankCandidates,
@@ -376,4 +380,47 @@ test("a missing downloads catalogue or device profile leaves the page usable", a
   store.create();
   store.form!.autofill();
   expect(store.form!.autofillNote).toContain("недоступен");
+});
+
+test("an estimate is coarsened as it grows, and reads as a dash when there is nothing to go on", () => {
+  expect(formatDuration(undefined)).toBe("—");
+  expect(formatDuration(Number.POSITIVE_INFINITY)).toBe("—");
+  expect(formatDuration(400)).toBe("1 с");
+  expect(formatDuration(45_000)).toBe("45 с");
+  expect(formatDuration(90_000)).toBe("2 мин");
+  expect(formatDuration(3_600_000)).toBe("1 ч");
+  expect(formatDuration(5_400_000)).toBe("1 ч 30 мин");
+});
+
+test("throughput is rounded to something readable and never shows a rate of zero", () => {
+  expect(formatThroughput(0)).toBe("— фрагм./с");
+  expect(formatThroughput(2.34)).toBe("2,3 фрагм./с");
+  expect(formatThroughput(148.6)).toBe("149 фрагм./с");
+});
+
+test("documents appear as the run reports them, newest first and never twice", () => {
+  const store = new VectorStoreStore(createIpcClient<Contract>(contract, createFakeBridge()));
+  const FIRST = "0199bb11-1111-7111-8111-0000000000a1";
+  const SECOND = "0199bb11-1111-7111-8111-0000000000a2";
+  const document = (id: string, path: string, chunks: number) => ({
+    id,
+    storeId: detail.id,
+    sourcePath: path,
+    contentHash: "h",
+    chunkCount: chunks,
+    bytes: 10,
+    indexedAt: 1,
+  });
+
+  store.receiveDocument(document(FIRST, "first.md", 3));
+  store.receiveDocument(document(SECOND, "second.md", 5));
+  expect(store.documents.map((row) => row.id)).toEqual([SECOND, FIRST]);
+
+  // A re-indexed file moves to the front rather than being listed a second time.
+  store.receiveDocument(document(FIRST, "first.md", 9));
+  expect(store.documents.map((row) => row.id)).toEqual([FIRST, SECOND]);
+  expect(store.documents[0]?.chunkCount).toBe(9);
+
+  store.receiveDocument({ nonsense: true });
+  expect(store.documents).toHaveLength(2);
 });

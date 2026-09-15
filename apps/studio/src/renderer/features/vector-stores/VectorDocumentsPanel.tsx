@@ -10,7 +10,12 @@ import TextInput from "../../ui/atoms/TextInput";
 import EmptyState from "../../ui/molecules/EmptyState";
 import Field from "../../ui/molecules/Field";
 import ResourceMeters from "./ResourceMeters";
-import { formatBytes, formatIndexedAt } from "./vectorPresentation";
+import {
+  formatBytes,
+  formatDuration,
+  formatIndexedAt,
+  formatThroughput,
+} from "./vectorPresentation";
 
 function VectorDocumentsPanel() {
   const { vectorStores: store } = useStore();
@@ -153,8 +158,16 @@ function VectorDocumentsPanel() {
             <span className="text-main-300">
               {run.done.toLocaleString("ru-RU")} из {run.total.toLocaleString("ru-RU")} фрагментов
               встроено
+              <span className="ml-2 text-main-500">{percent} %</span>
             </span>
             <span className="max-w-110 truncate font-mono text-main-500">{run.note}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10.5px] text-main-500">
+            <span>
+              осталось <span className="text-main-300">{formatDuration(store.indexEtaMs)}</span>
+            </span>
+            <span>{formatThroughput(store.indexChunksPerSecond)}</span>
+            <span>готово {store.documents.length.toLocaleString("ru-RU")} док.</span>
           </div>
           <div className="h-1 rounded bg-main-700">
             <div className="h-1 rounded bg-accent-dark" style={{ width: `${String(percent)}%` }} />
@@ -173,9 +186,17 @@ function VectorDocumentsPanel() {
           <EmptyState
             icon={mdiFileDocumentOutline}
             title={
-              store.documentsLoading ? "Загрузка документов…" : "Документы не проиндексированы"
+              run !== null
+                ? "Первый документ ещё не готов"
+                : store.documentsLoading
+                  ? "Загрузка документов…"
+                  : "Документы не проиндексированы"
             }
-            description="Добавьте источник и запустите индексацию — сюда попадут все файлы, чьи векторы лежат в хранилище."
+            description={
+              run !== null
+                ? "Файл попадает сюда, когда все его фрагменты встроены. Большой документ может занять несколько минут."
+                : "Добавьте источник и запустите индексацию — сюда попадут все файлы, чьи векторы лежат в хранилище."
+            }
           />
         </div>
       ) : (
