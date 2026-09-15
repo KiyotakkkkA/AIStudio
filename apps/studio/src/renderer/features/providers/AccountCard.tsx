@@ -2,7 +2,7 @@ import { mdiAccountPlusOutline, mdiLinkVariantOff, mdiRefresh } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { useState } from "react";
 import type { AccountDto } from "@zvs/shared";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";

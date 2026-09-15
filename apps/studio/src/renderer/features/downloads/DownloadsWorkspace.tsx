@@ -3,7 +3,7 @@ import { observer } from "mobx-react-lite";
 import { mdiPause, mdiRefresh, mdiTrayArrowDown } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import TextInput from "../../ui/atoms/TextInput";

@@ -1,7 +1,7 @@
 import { observer } from "mobx-react-lite";
 import { mdiTrayArrowDown } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import Toggle from "../../ui/atoms/Toggle";
 import EmptyState from "../../ui/molecules/EmptyState";

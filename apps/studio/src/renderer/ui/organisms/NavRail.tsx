@@ -60,13 +60,13 @@ export default function NavRail({
         )}
       </div>
 
-      <ScrollArea className="min-h-0 flex-1 px-2.5 py-3">
+      <ScrollArea className="min-h-0 flex-1 px-2 py-2.5">
         <nav className="flex flex-col gap-0.5">
           {groups.map((group, index) => (
             <div key={group.id} className="flex flex-col gap-0.5">
               {collapsed ? (
                 index === 0 ? null : (
-                  <div className="my-1.75 h-px bg-main-800" />
+                  <div className="my-1.5 h-px bg-main-800" />
                 )
               ) : (
                 <div

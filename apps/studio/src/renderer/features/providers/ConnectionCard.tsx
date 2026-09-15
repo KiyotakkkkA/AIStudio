@@ -9,7 +9,7 @@ import {
   type SecretId,
   isAccountFamily,
 } from "@zvs/shared";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import SelectInput from "../../ui/atoms/SelectInput";

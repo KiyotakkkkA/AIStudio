@@ -2,7 +2,7 @@ import { mdiAutoFix, mdiChevronDown, mdiChevronRight, mdiInformationOutline } fr
 import { observer } from "mobx-react-lite";
 import { Floating, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import SelectInput from "../../ui/atoms/SelectInput";
 import TextInput from "../../ui/atoms/TextInput";
@@ -10,7 +10,7 @@ import Field from "../../ui/molecules/Field";
 import TextArea from "../../ui/atoms/TextArea";
 import Chip from "../../ui/atoms/Chip";
 import VectorStoreAdvanced from "./VectorStoreAdvanced";
-import { InfoButton } from "../../ui/atoms/InfoButton";
+import { InfoButton } from "../../ui/atoms/buttons/InfoButton";
 
 const METRIC_OPTIONS = [
   { value: "cosine", label: "Косинусное сходство" },

@@ -1,6 +1,6 @@
 import { Modal } from "@kiyotakkkka/zvs-uikit-lib";
 import type { ReactNode } from "react";
-import Button, { type ButtonTone } from "../atoms/Button";
+import Button, { type ButtonTone } from "../atoms/buttons/Button";
 
 export interface ConfirmDialogProps {
   readonly open: boolean;

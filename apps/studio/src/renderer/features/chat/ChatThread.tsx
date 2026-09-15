@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import TextArea from "../../ui/atoms/TextArea";
 import ChatMessage from "./ChatMessage";
@@ -134,7 +134,6 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                 content={message.content}
                 reasoning={message.reasoning}
                 citations={message.citations}
-                storeIds={store.active?.attachedStoreIds ?? []}
                 stores={store.stores}
                 partial={message.partial}
                 usage={`${message.usageEstimated ? "~" : ""}${message.tokensIn} вход. · ${message.tokensOut} выход. · ${(message.durationMs / 1000).toFixed(1)} с`}
@@ -153,7 +152,6 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
               content={store.liveText}
               reasoning={store.liveReasoning}
               citations={store.liveCitations}
-              storeIds={store.searchedStoreIds}
               stores={store.stores}
               generating={store.generating}
               partial={store.outcome !== "ok"}

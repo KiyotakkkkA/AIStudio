@@ -1,9 +1,9 @@
 import { mdiRefresh, mdiStopCircleOutline } from "@mdi/js";
 import type { RunSummaryDto } from "@zvs/shared";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
-import IconButton from "../../ui/atoms/IconButton";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import StatusDot from "../../ui/atoms/StatusDot";
 import { STATUS_TONE_TEXT } from "../../ui/atoms/statusTone";
 import {

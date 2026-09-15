@@ -2,7 +2,7 @@ import { mdiClose, mdiPause, mdiPlay } from "@mdi/js";
 import type { DownloadDto } from "@zvs/shared";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
-import IconButton from "../../ui/atoms/IconButton";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import { STATUS_TONE_TEXT } from "../../ui/atoms/statusTone";
 import {
   formatBytes,

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, test, vi } from "vitest";
-import Button from "../../src/renderer/ui/atoms/Button";
+import Button from "../../src/renderer/ui/atoms/buttons/Button";
 
 beforeEach(() => {
   // jsdom has no layout; Modal filters focus targets by their rendered dimensions.

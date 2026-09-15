@@ -7,7 +7,7 @@ export interface AppShellProps {
 
 export default function AppShell({ rail, children }: AppShellProps) {
   return (
-    <div className="flex size-full min-h-0  overflow-hidden bg-main-800">
+    <div className="flex size-full min-h-0  overflow-hidden bg-main-900/35">
       {rail}
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </div>

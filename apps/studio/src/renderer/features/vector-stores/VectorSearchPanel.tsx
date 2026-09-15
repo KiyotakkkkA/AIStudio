@@ -1,7 +1,7 @@
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import TextInput from "../../ui/atoms/TextInput";
 import Field from "../../ui/molecules/Field";

@@ -1,16 +1,18 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Link } from "react-router-dom";
-import { mdiCogOutline } from "@mdi/js";
-import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
-import Button from "../../ui/atoms/Button";
+import { mdiClose, mdiCogOutline, mdiDatabaseOutline, mdiPaperclip, mdiUpload } from "@mdi/js";
+import { Dropdown, InputCheckBox, Modal } from "@kiyotakkkka/zvs-uikit-lib";
+import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
+import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import SelectInput from "../../ui/atoms/SelectInput";
 import TextArea from "../../ui/atoms/TextArea";
 import type ChatStore from "./ChatStore";
 
 export default observer(function ChatComposer({ store }: { readonly store: ChatStore }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const [storesOpen, setStoresOpen] = useState(false);
   const wasGenerating = useRef(store.generating);
 
   useEffect(() => {
@@ -42,6 +44,29 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
           }}
           className="space-y-3 rounded-xl border border-main-750 bg-main-900 p-3"
         >
+          {store.attachedStoreIds.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {store.stores
+                .filter((item) => store.attachedStoreIds.includes(item.id))
+                .map((item) => (
+                  <span
+                    key={item.id}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-main-750 px-2.5 text-[12px] text-main-100"
+                  >
+                    <Icon path={mdiDatabaseOutline} size={16} className="text-main-300" />
+                    <span className="max-w-40 truncate">{item.name}</span>
+                    <button
+                      type="button"
+                      aria-label={`Отключить хранилище ${item.name}`}
+                      className="text-main-500 hover:text-main-100"
+                      onClick={() => void store.toggleStore(item.id)}
+                    >
+                      <Icon path={mdiClose} size={15} />
+                    </button>
+                  </span>
+                ))}
+            </div>
+          )}
           <TextArea
             aria-label="Сообщение"
             noBorder
@@ -58,16 +83,50 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             }}
           />
           <div className="flex flex-wrap items-center gap-2">
-            <Dropdown menuWidth={300} menuPlacement="bottom-left">
-              <Dropdown.Trigger
+            <Dropdown menuWidth={300} menuPlacement="top-left">
+              <IconDropdownButton
+                label="Прикрепить файлы"
+                path={mdiPaperclip}
                 className="gap-0 p-0 size-8 justify-center"
                 rounded="rounded-lg"
-                aria-label="Настройки провайдера и модели"
-                title="Настройки провайдера и модели"
-                icon={<Icon path={mdiCogOutline} size={20} />}
+                iconSize={20}
+              />
+              <Dropdown.Menu
+                role="menu"
+                aria-label="Добавить контекст"
+                rounded="rounded-md"
+                className="rounded-card border-main-750"
               >
-                <></>
-              </Dropdown.Trigger>
+                <Dropdown.Item
+                  role="menuitem"
+                  rounded="rounded-md"
+                  className="text-[12.5px] text-main-100"
+                  onClick={() => setStoresOpen(true)}
+                >
+                  <span className="flex items-center gap-2">
+                    <Icon path={mdiUpload} size={17} className="text-main-400" />
+                    Загрузить с устройства
+                  </span>
+                </Dropdown.Item>
+                <Dropdown.Item
+                  role="menuitem"
+                  rounded="rounded-md"
+                  className="text-[12.5px] text-main-100"
+                >
+                  <span className="flex items-center gap-2">
+                    <Icon path={mdiDatabaseOutline} size={17} className="text-main-400" />
+                    Прдключить векторное хранилище
+                  </span>
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+            <Dropdown menuWidth={300} menuPlacement="top-left">
+              <IconDropdownButton
+                label="Настройки провайдера и модели"
+                path={mdiCogOutline}
+                className="gap-0 p-0 size-8 justify-center"
+                rounded="rounded-lg"
+              />
               <Dropdown.Menu
                 role="menu"
                 aria-label="Провайдер и модель"
@@ -132,6 +191,51 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
           </div>
         </form>
       )}
+      <Modal
+        open={storesOpen}
+        onClose={() => setStoresOpen(false)}
+        label="Источники из хранилища"
+        className="w-lg max-w-[92vw] rounded-card border border-main-750 bg-main-900 p-4.5"
+      >
+        <h2 className="text-[16px] font-semibold text-main-50">Источники из хранилища</h2>
+        <p className="mt-1 text-xs text-main-500">
+          Перед ответом будут найдены релевантные фрагменты документов.
+        </p>
+        <div className="mt-4 space-y-1.5">
+          {store.stores.map((item) => {
+            const selected = store.attachedStoreIds.includes(item.id);
+            return (
+              <label
+                key={item.id}
+                className={`flex cursor-pointer items-start gap-3 rounded-card border p-3 ${
+                  selected ? "border-accent-dark bg-main-750" : "border-main-800 bg-main-800"
+                }`}
+              >
+                <InputCheckBox
+                  aria-label={`Выбрать хранилище: ${item.name}`}
+                  checked={selected}
+                  disabled={!store.canConfigure}
+                  onChange={() => void store.toggleStore(item.id)}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-main-100">{item.name}</span>
+                  <span className="mt-1 block text-xs text-main-500">
+                    {item.description || "Описание не задано"} · {item.documents} документов
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+          {store.stores.length === 0 && (
+            <p className="py-5 text-center text-xs text-main-500">Хранилища не подключены.</p>
+          )}
+        </div>
+        <div className="mt-4 flex justify-end border-t border-main-750 pt-3">
+          <Button type="button" tone="secondary" onClick={() => setStoresOpen(false)}>
+            Готово
+          </Button>
+        </div>
+      </Modal>
       <p className="mt-2 text-center text-[10.5px] text-main-500">
         Enter — отправить · Shift+Enter — новая строка
       </p>

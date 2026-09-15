@@ -1,6 +1,6 @@
 import { Modal } from "@kiyotakkkka/zvs-uikit-lib";
 import type { ReactNode } from "react";
-import ButtonBase, { type ButtonTone } from "../atoms/ButtonBase";
+import ButtonBase, { type ButtonTone } from "../atoms/buttons/ButtonBase";
 
 export interface ConfirmModalSetup {
   readonly title: string;

@@ -1,7 +1,7 @@
 import { Floating } from "@kiyotakkkka/zvs-uikit-lib";
 import { mdiInformationOutline } from "@mdi/js";
 import type { ReactNode } from "react";
-import Icon from "./Icon";
+import Icon from "../Icon";
 
 export const InfoButton = ({
   label,

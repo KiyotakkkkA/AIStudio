@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import type ChatStore from "./ChatStore";
 
 export default observer(function ChatApprovals({ store }: { readonly store: ChatStore }) {

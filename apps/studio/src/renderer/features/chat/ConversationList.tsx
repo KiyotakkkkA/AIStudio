@@ -1,9 +1,10 @@
 import { observer } from "mobx-react-lite";
-import { mdiDotsVertical } from "@mdi/js";
+import { mdiDeleteOutline, mdiDotsVertical, mdiPencilOutline } from "@mdi/js";
 import { Dropdown, Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useState } from "react";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
+import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import TextInput from "../../ui/atoms/TextInput";
 import ConfirmModal from "../../ui/molecules/ConfirmModal";
 import type { ConversationDto } from "@zvs/shared";
@@ -70,16 +71,15 @@ export default observer(function ConversationList({ store }: { readonly store: C
                       <span className="truncate text-[12.5px]">{conversation.title}</span>
                     </div>
                     <Dropdown menuWidth={160} menuPlacement="bottom-right">
-                      <Dropdown.Trigger
+                      <IconDropdownButton
                         rounded="rounded-md"
                         aria-label={`Действия для ${conversation.title}`}
-                        title="Действия"
+                        label="Действия"
+                        path={mdiDotsVertical}
                         className="invisible group-hover:visible group-focus-within:visible gap-0 p-0 size-6 justify-center hover:border-transparent border-transparent bg-transparent hover:bg-main-750"
-                        icon={<Icon path={mdiDotsVertical} size={20} />}
+                        iconSize={20}
                         onClick={(event) => event.stopPropagation()}
-                      >
-                        <></>
-                      </Dropdown.Trigger>
+                      />
                       <Dropdown.Menu
                         role="menu"
                         aria-label="Действия диалога"
@@ -90,20 +90,30 @@ export default observer(function ConversationList({ store }: { readonly store: C
                           role="menuitem"
                           rounded="rounded-md"
                           className="text-[12.5px] text-main-100"
-                          onClick={() => {
+                          onClick={(event) => {
+                            event.stopPropagation();
                             setRenameTarget(conversation);
                             setRenameTitle(conversation.title);
                           }}
                         >
-                          Переименовать
+                          <span className="flex items-center gap-2">
+                            <Icon path={mdiPencilOutline} size={16} className="text-main-400" />
+                            Переименовать
+                          </span>
                         </Dropdown.Item>
                         <Dropdown.Item
                           role="menuitem"
                           rounded="rounded-md"
-                          className="text-[12.5px] text-red-300"
-                          onClick={() => setDeleteTarget(conversation)}
+                          className="text-[12.5px] text-red-300 hover:text-red-50 hover:bg-danger-light"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setDeleteTarget(conversation);
+                          }}
                         >
-                          Удалить
+                          <span className="flex items-center gap-2">
+                            <Icon path={mdiDeleteOutline} size={16} />
+                            Удалить
+                          </span>
                         </Dropdown.Item>
                       </Dropdown.Menu>
                     </Dropdown>

@@ -1,6 +1,6 @@
 import { mdiPlus } from "@mdi/js";
 import { observer } from "mobx-react-lite";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import TextInput from "../../ui/atoms/TextInput";
 import { useStore } from "../../stores/useStore";

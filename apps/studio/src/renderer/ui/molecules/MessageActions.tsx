@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { mdiCheck, mdiContentCopy, mdiDeleteOutline, mdiPencilOutline, mdiRefresh } from "@mdi/js";
-import IconButton from "../atoms/IconButton";
+import IconButton from "../atoms/buttons/IconButton";
 
 export default function MessageActions({
   content,

@@ -5,7 +5,7 @@ import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useSearchParams } from "react-router-dom";
 import { RunId, RunKind, RunStatus } from "@zvs/shared";
 import { useStore } from "../../stores/useStore";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import TextInput from "../../ui/atoms/TextInput";
 import EmptyState from "../../ui/molecules/EmptyState";

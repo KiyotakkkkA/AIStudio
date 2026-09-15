@@ -2,7 +2,7 @@ import { mdiArrowDown, mdiArrowUp, mdiClose } from "@mdi/js";
 import type { DownloadDto } from "@zvs/shared";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
-import IconButton from "../../ui/atoms/IconButton";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import { formatBytes, KIND_ICONS, KIND_LABELS } from "./downloadPresentation";
 
 export interface DownloadQueueRowProps {

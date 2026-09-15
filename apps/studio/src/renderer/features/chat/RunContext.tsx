@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import TextArea from "../../ui/atoms/TextArea";
 import type ChatStore from "./ChatStore";
 
@@ -19,33 +19,6 @@ export default observer(function RunContext({ store }: { readonly store: ChatSto
           <span className="min-[1101px]:hidden">
             <Button onClick={store.toggleContext}>Закрыть</Button>
           </span>
-        </div>
-        <h2 className="text-[11px] font-semibold tracking-wider text-main-400 uppercase">
-          Подключённые хранилища
-        </h2>
-        <div className="space-y-2">
-          {store.stores
-            .filter((item) => !locked || store.attachedStoreIds.includes(item.id))
-            .map((item) => (
-              <label
-                key={item.id}
-                className="flex items-center gap-2 rounded-card border border-main-750 bg-main-800 p-3"
-              >
-                <input
-                  type="checkbox"
-                  checked={store.attachedStoreIds.includes(item.id)}
-                  disabled={locked}
-                  onChange={() => store.composer.toggleStore(item.id)}
-                />
-                <span className="min-w-0">
-                  <span className="block wrap-break-word text-xs">{item.name}</span>
-                  <span className="font-mono text-[10.5px] text-main-500">top k 5 · мин. 0.00</span>
-                </span>
-              </label>
-            ))}
-          {store.attachedStoreIds.length === 0 && (
-            <p className="text-xs text-main-500">Хранилища не подключены.</p>
-          )}
         </div>
         <h2 className="text-[11px] font-semibold tracking-wider text-main-400 uppercase">
           Системная инструкция

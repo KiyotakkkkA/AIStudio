@@ -2,7 +2,7 @@ import { mdiFileDocumentOutline, mdiFolderOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import SegmentedControl from "../../ui/atoms/SegmentedControl";

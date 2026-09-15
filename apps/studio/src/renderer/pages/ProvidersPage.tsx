@@ -1,7 +1,7 @@
 import { mdiLayersOutline, mdiPlus, mdiRefresh } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
-import Button from "../ui/atoms/Button";
+import Button from "../ui/atoms/buttons/Button";
 import Chip from "../ui/atoms/Chip";
 import Icon from "../ui/atoms/Icon";
 import AccountLoginMenu from "../features/providers/AccountLoginMenu";

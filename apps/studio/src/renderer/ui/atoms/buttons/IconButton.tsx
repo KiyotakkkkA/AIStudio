@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes } from "react";
-import Icon from "./Icon";
+import Icon from "../Icon";
 
 export type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   readonly path: string;

@@ -129,6 +129,32 @@ export default class ChatStore {
     this.contextOpen = !this.contextOpen;
   }
 
+  async toggleStore(id: VectorStoreDto["id"]) {
+    if (!this.canConfigure) return;
+    const current = this.attachedStoreIds;
+    const attachedStoreIds = current.includes(id)
+      ? current.filter((value) => value !== id)
+      : [...current, id];
+    if (!this.active) {
+      this.composer.attachedStoreIds = attachedStoreIds;
+      return;
+    }
+    try {
+      const updated = await this.ipc.call("chat.conversations.updateStores", {
+        id: this.active.id,
+        attachedStoreIds,
+      });
+      runInAction(() => {
+        this.active = { ...this.active!, ...updated };
+        this.conversations = this.conversations.map((conversation) =>
+          conversation.id === updated.id ? updated : conversation,
+        );
+      });
+    } catch (error) {
+      this.error = errorCopy(error);
+    }
+  }
+
   async mount() {
     this.mounted = true;
     this.loading = true;

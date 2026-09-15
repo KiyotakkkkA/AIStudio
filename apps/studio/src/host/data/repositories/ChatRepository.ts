@@ -21,7 +21,10 @@ export class ChatRepository extends Repository {
   create(value: ConversationInsert) {
     return this.db.insert(conversation).values(value).returning().get();
   }
-  update(id: string, patch: Partial<Pick<ConversationInsert, "title" | "updatedAt">>) {
+  update(
+    id: string,
+    patch: Partial<Pick<ConversationInsert, "title" | "attachedStoreIds" | "updatedAt">>,
+  ) {
     return this.db.update(conversation).set(patch).where(eq(conversation.id, id)).returning().get();
   }
   remove(id: string): void {

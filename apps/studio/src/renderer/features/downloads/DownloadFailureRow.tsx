@@ -1,8 +1,8 @@
 import { mdiAlertCircleOutline, mdiClose, mdiRefresh } from "@mdi/js";
 import type { DownloadDto } from "@zvs/shared";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
-import IconButton from "../../ui/atoms/IconButton";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import { formatBytes } from "./downloadPresentation";
 
 export interface DownloadFailureRowProps {

@@ -2,11 +2,12 @@ import { mdiDatabaseOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea, Switcher } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import VectorSearchPanel from "./VectorSearchPanel";
 import VectorDocumentsPanel from "./VectorDocumentsPanel";
+import { formatBytes } from "../downloads/downloadPresentation";
 import { healthLabels } from "./vectorPresentation";
 import EmptyState from "../../ui/molecules/EmptyState";
 
@@ -43,7 +44,7 @@ function VectorStoreDetail() {
     [detail.vectors.toLocaleString(), "Векторы"],
     [String(detail.dimension), "Размерность"],
     [detail.indexType, `Индекс · ${detail.metric}`],
-    [detail.bytes.toLocaleString() + " B", "На диске"],
+    [formatBytes(detail.bytes), "На диске"],
     [
       detail.embeddingModelId,
       `Embedding · ${store.providers.find((p) => p.id === detail.embeddingProviderId)?.name ?? detail.embeddingProviderId}`,

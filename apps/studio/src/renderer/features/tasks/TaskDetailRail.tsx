@@ -3,7 +3,7 @@ import { mdiHistory } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../../app/routes";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import EmptyState from "../../ui/molecules/EmptyState";
 import JsonBlock from "./JsonBlock";

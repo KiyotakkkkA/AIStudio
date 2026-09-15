@@ -90,6 +90,10 @@ export const contract = defineContract({
     input: ConversationRef.extend({ title: z.string().trim().min(1).max(200) }),
     output: ConversationDto,
   },
+  "chat.conversations.updateStores": {
+    input: ConversationRef.extend({ attachedStoreIds: z.array(VectorStoreId).max(64) }),
+    output: ConversationDto,
+  },
   "chat.conversations.truncate": {
     input: TruncateConversationInput,
     output: ConversationDetailDto,

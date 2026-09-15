@@ -6,7 +6,7 @@ const TONES: Record<ButtonTone, string> = {
   primary: "bg-accent-dark text-main-900 hover:bg-accent-medium",
   secondary: "border border-main-750 bg-main-700 text-main-100 hover:border-main-500",
   ghost: "border border-main-750 bg-transparent text-main-300 hover:text-main-100",
-  danger: "border border-err-border bg-transparent text-err hover:border-err",
+  danger: "bg-danger-medium text-main-50 hover:bg-danger-light",
 };
 
 export type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> & {

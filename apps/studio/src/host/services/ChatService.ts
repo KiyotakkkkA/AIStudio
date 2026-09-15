@@ -166,6 +166,19 @@ export class ChatService {
       this.options.data.repositories.chat.update(id, { title: parsed, updatedAt: this.clock() }),
     );
   }
+  updateStores(id: string, attachedStoreIds: string[]): ConversationDto {
+    this.get(id);
+    const ids = z.array(z.string()).max(64).parse(attachedStoreIds);
+    for (const storeId of ids)
+      if (!this.options.data.repositories.vectorStores.findById(storeId))
+        throw new AppError(AppErrorCode.NOT_FOUND, "Vector store not found");
+    return ConversationDto.parse(
+      this.options.data.repositories.chat.update(id, {
+        attachedStoreIds: [...new Set(ids)],
+        updatedAt: this.clock(),
+      }),
+    );
+  }
   truncate(conversationId: string, messageId: string): ConversationDetailDto {
     const conversation = this.get(conversationId);
     this.requireIdle(conversationId);

@@ -3,7 +3,7 @@ import { Loader, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
 import type { AccountFamily } from "@zvs/shared";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import EmptyState from "../../ui/molecules/EmptyState";
 import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import { useAppNavigation } from "../../hooks/useAppNavigation";

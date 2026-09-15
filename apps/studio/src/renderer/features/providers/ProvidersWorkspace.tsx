@@ -2,7 +2,7 @@ import { mdiDeleteOutline, mdiImageOutline, mdiLayersOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useEffect } from "react";
-import Button from "../../ui/atoms/Button";
+import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import EmptyState from "../../ui/molecules/EmptyState";
