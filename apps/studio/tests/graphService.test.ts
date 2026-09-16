@@ -122,6 +122,19 @@ test("adding an edge writes the row and the engine half, metadata intact", async
   expect(contract["graphRelations.addEdge"].output.parse(edge)).toEqual(edge);
 });
 
+test("listing edges is scoped to one store and validates against the channel output", async () => {
+  await link(0, 1, "user_linked");
+  await link(1, 2, "cites");
+  const edges = service.listEdges(storeId);
+  expect(edges.map((row) => [row.fromDocumentId, row.toDocumentId])).toEqual([
+    [documents[0], documents[1]],
+    [documents[1], documents[2]],
+  ]);
+  expect(contract["graphRelations.listEdges"].output.parse(edges)).toEqual(edges);
+  expect(service.listEdges(otherStoreId)).toEqual([]);
+  expect(() => service.listEdges(createId())).toThrow();
+});
+
 test("a failing engine rolls the row back instead of leaving a half-written edge", async () => {
   vi.spyOn(core.graph, "addEdge").mockRejectedValueOnce(new Error("engine down"));
   await expect(link(0, 1)).rejects.toThrow("engine down");

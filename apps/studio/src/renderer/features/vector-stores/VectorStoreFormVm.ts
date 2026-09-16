@@ -35,7 +35,7 @@ export default class VectorStoreFormVm {
   ocrModelRef = "";
   ocrLanguage: VectorOcrLanguage = "auto";
   ocrMinCharsPerPage = "200";
-  advancedOpen = false;
+  advancedOpen = true;
   autofillNote = "";
   errors: Record<string, string> = {};
 
@@ -61,7 +61,6 @@ export default class VectorStoreFormVm {
       this.chunkOverlap = String(original.chunkOverlap);
       this.applyRerank(original.rerank);
       this.applyOcr(original.ocr);
-      this.advancedOpen = original.rerank.enabled || original.ocr.enabled;
     }
     makeAutoObservable(this, {}, { autoBind: true });
   }

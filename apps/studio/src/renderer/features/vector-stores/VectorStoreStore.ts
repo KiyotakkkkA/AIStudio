@@ -21,6 +21,8 @@ import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import { estimateEta, smoothRate, type RateState } from "../progressRate";
 import VectorStoreFormVm from "./VectorStoreFormVm";
 import { searchRows } from "./searchRows";
+import GraphRelationStore from "./GraphRelationStore";
+import { graphRows, type GraphExpansion } from "./graphExpansion";
 
 export default class VectorStoreStore {
   stores: VectorStoreDto[] = [];
@@ -37,6 +39,7 @@ export default class VectorStoreStore {
   k = "5";
   minScore = "0.35";
   result: VectorSearchResultDto | null = null;
+  graphExpansions: GraphExpansion[] = [];
   sources: VectorSourceDto[] = [];
   documents: VectorDocumentDto[] = [];
   sourceKind: VectorSourceKind = "folder";
@@ -52,6 +55,7 @@ export default class VectorStoreStore {
   busy = false;
   searching = false;
   error: string | null = null;
+  readonly graph: GraphRelationStore;
   private revision = 0;
 
   private stopIndexStream: (() => void) | null = null;
@@ -60,9 +64,10 @@ export default class VectorStoreStore {
     private readonly ipc: IpcClient<Contract>,
     private readonly events?: EventRouter,
   ) {
+    this.graph = new GraphRelationStore(ipc);
     makeAutoObservable<VectorStoreStore, "ipc" | "events">(
       this,
-      { ipc: false, events: false },
+      { ipc: false, events: false, graph: false },
       { autoBind: true },
     );
   }
@@ -75,6 +80,9 @@ export default class VectorStoreStore {
   }
   get hitCount() {
     return this.rows.filter((r) => !r.belowFloor).length;
+  }
+  get graphRows() {
+    return graphRows(this.graphExpansions, this.documents);
   }
   set(
     field:
@@ -164,9 +172,11 @@ export default class VectorStoreStore {
     this.selectedId = id;
     this.detail = null;
     this.result = null;
+    this.graphExpansions = [];
     this.sources = [];
     this.documents = [];
     this.searching = false;
+    this.graph.reset();
     this.error = null;
     try {
       const detail = await this.ipc.call("vectorStores.get", { id });
@@ -178,6 +188,7 @@ export default class VectorStoreStore {
       });
       if (revision === this.revision) {
         await this.loadDocuments(id);
+        await this.graph.load(id);
         await this.restoreIndex(id, revision);
       }
     } catch (error) {
@@ -255,7 +266,9 @@ export default class VectorStoreStore {
         if (this.selectedId === id) this.detail = detail;
         this.documents = [];
         this.result = null;
+        this.graphExpansions = [];
       });
+      await this.graph.load(id);
     });
   }
   async remove() {
@@ -269,7 +282,9 @@ export default class VectorStoreStore {
         this.selectedId = null;
         this.detail = null;
         this.result = null;
+        this.graphExpansions = [];
         this.form = null;
+        this.graph.reset();
       });
     });
   }
@@ -286,9 +301,11 @@ export default class VectorStoreStore {
       return;
     }
     const revision = ++this.revision;
+    const storeId = this.detail.id;
     this.searching = true;
     this.error = null;
     this.result = null;
+    this.graphExpansions = [];
     try {
       const result = await this.ipc.call("vectorStores.searchTimed", {
         ...input.data,
@@ -296,6 +313,10 @@ export default class VectorStoreStore {
       });
       runInAction(() => {
         if (revision === this.revision) this.result = result;
+      });
+      const expansions = await this.graph.expand(storeId, result.hits, this.documents);
+      runInAction(() => {
+        if (revision === this.revision) this.graphExpansions = expansions;
       });
     } catch (error) {
       runInAction(() => {
@@ -371,6 +392,7 @@ export default class VectorStoreStore {
         if (this.selectedId === storeId) this.detail = detail;
       });
       await this.loadDocuments(storeId);
+      await this.graph.load(storeId);
     });
   }
   async startIndex(full = false) {
@@ -478,6 +500,7 @@ export default class VectorStoreStore {
       /* the detail refresh is best effort; the store list stays as it was */
     }
     await this.loadDocuments(storeId);
+    await this.graph.load(storeId);
   }
   private async submitSource(storeId: VectorStoreId, path: string) {
     await this.ipc.call("vectorStores.sources.add", {

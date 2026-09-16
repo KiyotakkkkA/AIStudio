@@ -1,6 +1,6 @@
-import { mdiAutoFix, mdiChevronDown, mdiChevronRight, mdiInformationOutline } from "@mdi/js";
+import { mdiAutoFix, mdiInformationOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
-import { Floating, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import { Accordion, Floating, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
@@ -229,26 +229,25 @@ function VectorStoreForm() {
             </p>
           ) : null}
         </section>
-        <section className="flex flex-none flex-col gap-3.25 rounded-card border border-main-750 bg-main-900 p-4">
-          <button
-            type="button"
-            aria-expanded={vm.advancedOpen}
-            className="flex items-center gap-2 text-left"
-            onClick={vm.toggleAdvanced}
-          >
-            <Icon
-              path={vm.advancedOpen ? mdiChevronDown : mdiChevronRight}
-              size={16}
-              className="text-main-400"
-            />
-            <h2 className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
-              Расширенные настройки
-            </h2>
-            {vm.rerankEnabled ? <Chip>Переранжирование</Chip> : null}
-            {vm.ocrEnabled ? <Chip>OCR</Chip> : null}
-          </button>
-          {vm.advancedOpen ? <VectorStoreAdvanced vm={vm} disabled={store.busy} /> : null}
-        </section>
+        <Accordion
+          defaultOpen={vm.advancedOpen}
+          className="flex-none rounded-[9px] border border-main-750 bg-main-900"
+        >
+          <Accordion.Summary className="min-h-12 px-4 text-left text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase hover:text-main-200">
+            <div className="flex min-w-0 flex-1 items-center gap-2 justify-between">
+              <h2 className="min-w-0 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+                Расширенные настройки
+              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                {vm.rerankEnabled ? <Chip>Переранжирование</Chip> : null}
+                {vm.ocrEnabled ? <Chip>OCR</Chip> : null}
+              </div>
+            </div>
+          </Accordion.Summary>
+          <Accordion.Content className="flex flex-col gap-3.25 border-t border-main-750 p-4">
+            <VectorStoreAdvanced vm={vm} disabled={store.busy} />
+          </Accordion.Content>
+        </Accordion>
         <div className="flex flex-none items-center gap-3 rounded-card border border-main-750 bg-main-900 px-4 py-3">
           <Button type="submit" tone="primary" disabled={store.busy}>
             {store.busy ? "Сохранение…" : "Сохранить"}

@@ -4,6 +4,7 @@ import type { GraphService } from "../services/GraphService.ts";
 
 type GraphRelationChannels =
   | "graphRelations.list"
+  | "graphRelations.listEdges"
   | "graphRelations.addEdge"
   | "graphRelations.removeEdge"
   | "graphRelations.neighbors"
@@ -16,6 +17,7 @@ export function createGraphRelationHandlers(
 ): Pick<IpcHandlers<Contract>, GraphRelationChannels> {
   return {
     "graphRelations.list": () => service.listRelations(),
+    "graphRelations.listEdges": ({ id }) => service.listEdges(id),
     "graphRelations.addEdge": (input) => service.addEdge(input),
     "graphRelations.removeEdge": async (input) => {
       const removed = await service.removeEdge(input);

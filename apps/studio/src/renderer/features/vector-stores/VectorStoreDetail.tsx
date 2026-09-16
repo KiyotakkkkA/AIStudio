@@ -7,6 +7,7 @@ import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import VectorSearchPanel from "./VectorSearchPanel";
 import VectorDocumentsPanel from "./VectorDocumentsPanel";
+import VectorRelationsPanel from "./VectorRelationsPanel";
 import { formatBytes } from "../downloads/downloadPresentation";
 import { healthLabels } from "./vectorPresentation";
 import EmptyState from "../../ui/molecules/EmptyState";
@@ -14,6 +15,7 @@ import EmptyState from "../../ui/molecules/EmptyState";
 const VECTOR_STORE_TABS = [
   { value: "Overview", label: "Обзор" },
   { value: "Documents", label: "Документы" },
+  { value: "Relations", label: "Связи" },
   { value: "Test search", label: "Тестовый поиск" },
   { value: "Settings", label: "Настройки" },
 ] as const;
@@ -179,6 +181,8 @@ function VectorStoreDetail() {
           <VectorSearchPanel />
         ) : store.tab === "Documents" ? (
           <VectorDocumentsPanel />
+        ) : store.tab === "Relations" ? (
+          <VectorRelationsPanel />
         ) : (
           <ScrollArea role="tabpanel" className="space-y-3 p-4 text-xs text-main-300">
             {store.tab === "Settings" ? (

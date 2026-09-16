@@ -156,6 +156,7 @@ export const contract = defineContract({
   },
   "vectorStores.index": { input: VectorIndexInput, output: RunHandleDto },
   "graphRelations.list": { input: z.void(), output: z.array(GraphRelationTypeDto) },
+  "graphRelations.listEdges": { input: VectorStoreRef, output: z.array(GraphEdgeDto) },
   "graphRelations.addEdge": { input: AddGraphEdgeInput, output: GraphEdgeDto },
   "graphRelations.removeEdge": {
     input: RemoveGraphEdgeInput,

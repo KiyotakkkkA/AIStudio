@@ -9,6 +9,6 @@ export const RunDetailDto = z.object({
   summary: RunSummaryDto,
   steps: z.array(StepDto),
   logs: z.array(LogLineDto),
-  events: z.array(HostEvent),
+  events: z.array(HostEvent).default([]),
 });
 export type RunDetailDto = z.infer<typeof RunDetailDto>;

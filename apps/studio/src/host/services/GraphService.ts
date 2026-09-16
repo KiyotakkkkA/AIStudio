@@ -43,6 +43,11 @@ export class GraphService {
     return this.relations.list().map((row) => GraphRelationTypeDto.parse(row));
   }
 
+  listEdges(storeId: string): GraphEdgeDto[] {
+    const store = this.requireStore(storeId);
+    return this.edges.listByStore(store.id).map((row) => this.toDto(row));
+  }
+
   async addEdge(input: AddGraphEdgeRequest): Promise<GraphEdgeDto> {
     const draft = AddGraphEdgeInput.parse(input);
     const store = this.requireStore(draft.storeId);

@@ -1,13 +1,15 @@
 import { observer } from "mobx-react-lite";
-import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import { Accordion, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import TextInput from "../../ui/atoms/TextInput";
+import Toggle from "../../ui/atoms/Toggle";
 import Field from "../../ui/molecules/Field";
 
 function VectorSearchPanel() {
   const { vectorStores: store } = useStore();
+  const graph = store.graph;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
       <form
@@ -57,12 +59,48 @@ function VectorSearchPanel() {
           {store.searching ? "Поиск…" : "Найти"}
         </Button>
       </form>
+      <Accordion
+        defaultOpen={false}
+        className="flex-none rounded-[9px] border border-main-750 bg-main-900"
+      >
+        <Accordion.Summary className="min-h-12 px-4 text-left text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase hover:text-main-200">
+          Расширенные настройки
+        </Accordion.Summary>
+        <Accordion.Content className="flex flex-col gap-3.25 border-t border-main-750 p-4">
+          <Toggle
+            id="vs-search-expand-graph"
+            checked={graph.expandEnabled}
+            disabled={store.searching || store.busy}
+            label="Расширение поиска по графу"
+            onChange={graph.setExpandEnabled}
+          />
+          <p className="text-[11px] leading-relaxed text-main-500">
+            Добавляет к результатам поиска связанные документы. Они не ранжируются и отображаются
+            после основных результатов.
+          </p>
+          <Field
+            label="Максимум документов по графу"
+            htmlFor="vs-search-expand-max"
+            help="Жёсткий лимит документов, добавляемых за один поиск."
+          >
+            <TextInput
+              id="vs-search-expand-max"
+              value={graph.expandMax}
+              onChange={(event) => graph.set("expandMax", event.target.value)}
+              disabled={store.searching || store.busy || !graph.expandEnabled}
+              mono
+              inputMode="numeric"
+            />
+          </Field>
+        </Accordion.Content>
+      </Accordion>
       {store.result ? (
         <div className="flex flex-wrap items-center gap-2" role="status">
           <Chip tone="accent">
             {store.hitCount} результатов ·{" "}
             {(store.result.embeddingMs + store.result.searchMs).toFixed(1)} мс
           </Chip>
+          {graph.expandEnabled ? <Chip>по графу {store.graphRows.length}</Chip> : null}
           <Chip>embedding {store.result.embeddingMs.toFixed(1)} мс</Chip>
           <Chip>поиск {store.result.searchMs.toFixed(1)} мс</Chip>
         </div>
@@ -70,6 +108,12 @@ function VectorSearchPanel() {
       <p className="text-[11.5px] text-main-500">
         Результаты только для чтения. Чанки ниже порога показаны приглушёнными.
       </p>
+      {store.result && graph.expandEnabled && store.graphRows.length === 0 ? (
+        <p role="status" className="text-xs text-main-400">
+          Граф не добавил ничего нового: у найденных документов нет связей за пределами выдачи.
+          Свяжите документы на вкладке «Связи».
+        </p>
+      ) : null}
       {store.result && store.hitCount === 0 ? (
         <p role="status" className="text-xs text-main-400">
           Нет результатов выше порога. Попробуйте снизить минимальную оценку или изменить запрос.
@@ -91,6 +135,28 @@ function VectorSearchPanel() {
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <span className="break-all font-mono text-[11.5px] text-main-300">{row.path}</span>
                 <Chip>чанк {row.position}</Chip>
+              </div>
+              <p className="whitespace-pre-wrap wrap-break-word text-xs text-main-300">
+                {row.text}
+              </p>
+            </div>
+          </article>
+        ))}
+        {store.graphRows.map((row) => (
+          <article
+            key={row.id}
+            className="flex gap-3 rounded-card border border-dashed border-main-700 bg-main-800 px-3.25 py-3"
+          >
+            <div className="w-13 flex-none">
+              <Chip tone="raised" title={`Связь с результатом ${row.via}`}>
+                {row.relation}
+              </Chip>
+              <div className="mt-1.25 text-[10.5px] text-main-500">по графу</div>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <span className="break-all font-mono text-[11.5px] text-main-300">{row.path}</span>
+                <Chip>{row.position}</Chip>
               </div>
               <p className="whitespace-pre-wrap wrap-break-word text-xs text-main-300">
                 {row.text}
