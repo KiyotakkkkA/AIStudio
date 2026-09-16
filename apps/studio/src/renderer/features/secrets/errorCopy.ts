@@ -25,6 +25,8 @@ const COPY: Record<AppErrorCode, string> = {
   [AppErrorCode.RUN_FAILED]: "Операция завершилась ошибкой.",
   [AppErrorCode.APPROVAL_DENIED]: "Действие не подтверждено.",
   [AppErrorCode.SIDECAR_UNAVAILABLE]: "Фоновый сервис недоступен.",
+  [AppErrorCode.MCP_UNAVAILABLE]: "MCP-сервер недоступен.",
+  [AppErrorCode.MCP_TIMEOUT]: "MCP-сервер не ответил вовремя.",
   [AppErrorCode.NATIVE_ERROR]: "Сбой нативного модуля.",
   [AppErrorCode.DB_ERROR]: "Сбой локальной базы данных.",
   [AppErrorCode.UNSUPPORTED_FORMAT]: "Формат не поддерживается.",

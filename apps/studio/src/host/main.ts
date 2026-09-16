@@ -47,6 +47,7 @@ import { RunService } from "./services/RunService";
 import { RetentionService } from "./services/RetentionService";
 import { NodeRegistry } from "./kernel/NodeRegistry";
 import { ToolRegistry } from "./tools/ToolRegistry";
+import { McpService } from "./services/McpService";
 import { registerKernelTools } from "./tools/kernelTools";
 import { SidecarDriver } from "./drivers/sidecar/SidecarDriver";
 import { IndexingService } from "./indexing/IndexingService";
@@ -76,6 +77,7 @@ let retention: RetentionService | undefined;
 let sidecar: SidecarDriver | undefined;
 let downloads: DownloadService | undefined;
 let runtimes: RuntimeService | undefined;
+let mcp: McpService | undefined;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -102,6 +104,7 @@ if (!app.requestSingleInstanceLock()) {
       await runs?.dispose();
       await Promise.all([
         providers.dispose(),
+        mcp?.dispose(),
         healthCheck?.dispose(),
         accounts?.dispose(),
         sidecar?.dispose(),
@@ -296,6 +299,16 @@ if (!app.requestSingleInstanceLock()) {
       const nodes = registerDownloadNodes(registerJobNodes(registerCoreNodes(new NodeRegistry())));
       const tools = new ToolRegistry({ data: database, logger });
       registerKernelTools(nodes, tools);
+      mcp = new McpService({
+        data: database,
+        tools,
+        nodes,
+        secrets,
+        logger,
+        clientVersion: app.getVersion(),
+        // Chromium's certificate and proxy handling applies to remote MCP servers too.
+        fetch: (url, request) => net.fetch(url, { ...request, credentials: "omit" }),
+      });
       runs = new RunService({
         data: database,
         events: eventBus,
@@ -310,6 +323,7 @@ if (!app.requestSingleInstanceLock()) {
       retention.start();
       runs.recover();
       downloads.recover();
+      void mcp.startAutoStart();
       ipcServer = createIpcServer(
         contract,
         createHandlers({

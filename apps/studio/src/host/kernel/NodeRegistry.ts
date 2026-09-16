@@ -34,6 +34,10 @@ export class NodeRegistry {
       },
     });
   }
+  /** Withdraws a node whose provider is gone or has just re-announced itself. */
+  unregister(type: string): boolean {
+    return this.nodes.delete(type);
+  }
   list(): readonly (RegisteredNode & { type: string })[] {
     return [...this.nodes].map(([type, node]) => ({ ...node, type }));
   }
