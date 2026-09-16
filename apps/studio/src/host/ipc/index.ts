@@ -23,6 +23,8 @@ import { createGraphRelationHandlers } from "./graphRelations.ts";
 import type { IndexingService } from "../indexing/IndexingService.ts";
 import type { DownloadService } from "../downloads/DownloadService.ts";
 import { createDownloadHandlers } from "./downloads.ts";
+import type { ToolRegistry } from "../tools/ToolRegistry.ts";
+import { createToolHandlers } from "./tools.ts";
 import type { RuntimeService } from "../runtimes/RuntimeService.ts";
 import { createRuntimeHandlers } from "./runtimes.ts";
 
@@ -34,6 +36,7 @@ export interface HostIpcDependencies {
   indexing?: IndexingService;
   downloads?: DownloadService;
   runtimes?: RuntimeService;
+  tools?: ToolRegistry;
   pickSources?: SourcePicker;
   system: SystemService;
   accounts: AccountService;
@@ -59,6 +62,7 @@ export function createHandlers(dependencies: HostIpcDependencies): IpcHandlers<C
     ...createGraphRelationHandlers(dependencies.graph),
     ...createDownloadHandlers(dependencies.downloads),
     ...createRuntimeHandlers(dependencies.runtimes),
+    ...createToolHandlers(dependencies.tools),
     ...createSystemHandlers({
       system: dependencies.system,
       runs: dependencies.runs,

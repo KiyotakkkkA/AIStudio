@@ -1,6 +1,7 @@
 import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import type { ToolTier } from "@zvs/shared";
 
-export type PermissionTier = "auto" | "ask" | "off";
+export type PermissionTier = ToolTier;
 export const toolPermission = sqliteTable(
   "tool_permission",
   {

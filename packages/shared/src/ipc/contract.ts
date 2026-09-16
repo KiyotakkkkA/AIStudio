@@ -62,6 +62,15 @@ import {
   RemoveGraphEdgeInput,
 } from "../graph/index.js";
 import {
+  SetToolEnabledInput,
+  SetToolTierInput,
+  ToolDetailDto,
+  ToolDto,
+  ToolListFilter,
+  ToolRef,
+  ToolUsageDto,
+} from "../tools/index.js";
+import {
   CreateVectorStoreInput,
   UpdateVectorStoreInput,
   VectorStoreDto,
@@ -169,6 +178,11 @@ export const contract = defineContract({
   },
   "graphRelations.kHopSubgraph": { input: GraphSubgraphInput, output: GraphSubgraphDto },
   "graphRelations.reconcile": { input: VectorStoreRef, output: GraphReconcileDto },
+  "tools.list": { input: ToolListFilter, output: z.array(ToolDto) },
+  "tools.get": { input: ToolRef, output: ToolDetailDto },
+  "tools.setTier": { input: SetToolTierInput, output: ToolDto },
+  "tools.setEnabled": { input: SetToolEnabledInput, output: ToolDto },
+  "tools.usage": { input: ToolRef, output: ToolUsageDto },
   "downloads.list": { input: DownloadListFilter, output: z.array(DownloadDto) },
   "downloads.start": { input: StartDownloadInput, output: DownloadDto },
   "downloads.pause": { input: DownloadRef, output: DownloadDto },

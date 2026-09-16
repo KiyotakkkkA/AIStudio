@@ -173,7 +173,7 @@ test("edges group under both ends and removing one drops it from the list", asyn
   expect(groups[0]?.outgoing).toHaveLength(1);
   expect(groups[0]?.incoming).toHaveLength(0);
   expect(groups[1]?.incoming).toHaveLength(1);
-  expect(graph.relationName(LINKED)).toBe("user_linked");
+  expect(graph.relationName(LINKED)).toBe("Связано вручную");
   expect(await graph.removeEdge(groups[0]!.outgoing[0]!)).toBe(true);
   expect(graph.edges).toEqual([]);
   expect(graph.groups(documents)).toEqual([]);

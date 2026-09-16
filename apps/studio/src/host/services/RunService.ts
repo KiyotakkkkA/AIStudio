@@ -22,12 +22,15 @@ import type { UnitOfWork } from "../data/UnitOfWork.ts";
 import type { RunEntity } from "../data/schema/index.ts";
 import { encodeRunCursor } from "../data/repositories/RunRepository.ts";
 import { NodeRegistry } from "../kernel/NodeRegistry.ts";
+import type { ToolRegistry } from "../tools/ToolRegistry.ts";
 import { Scheduler, type SchedulerOptions } from "../kernel/Scheduler.ts";
+import type { PermissionRequirement, StepContext } from "../kernel/types.ts";
 import type { EventBus, StreamHandle } from "../platform/events.ts";
 import { createId } from "../platform/ids.ts";
 
 export interface RunServiceOptions extends Partial<Omit<SchedulerOptions, "data" | "registry">> {
   approvalTimeoutMs?: number;
+  tools?: Pick<ToolRegistry, "ceiling" | "recordUse">;
   attentionWindowMs?: number;
   data: UnitOfWork;
   events: EventBus;
@@ -69,43 +72,54 @@ export class RunService {
         dependencies.admit ??
         (async (requirement, context) => {
           if ("kind" in requirement) return;
-          const kind = this.get(context.runId).kind;
-          if (
-            kind === "chat" &&
-            (requirement.tool === "llm.generate" || requirement.tool === "vector.search")
-          )
-            return;
-          if (kind === "indexing" && requirement.tool === "vector.index") return;
-          if (kind === "download" && requirement.tool === "download.fetch") return;
-          const run = this.get(context.runId);
-          const scopes = [
-            ...(run.graph.permissionScopes ?? []),
-            ...(run.kind === "scenario" && run.subjectId ? [`scenario:${run.subjectId}`] : []),
-          ];
-          const admission = this.permissions.admitSubject(
-            requirement.tool,
-            { runId: run.id, scopes },
-            requirement.tier,
-          );
-          if (admission === "deny")
-            throw new AppError(AppErrorCode.PERMISSION_DENIED, "Permission denied");
-          if (admission === "ask") {
-            const request = this.approvals.create(run.id, requirement.tool, scopes[0] ?? "global");
-            const decision = await context.requestApproval(request);
-            if (decision !== "approved")
-              throw new AppError(AppErrorCode.APPROVAL_DENIED, "Approval denied");
-            if (
-              this.permissions.admitSubject(
-                requirement.tool,
-                { runId: run.id, scopes },
-                requirement.tier,
-              ) === "deny"
-            )
-              throw new AppError(AppErrorCode.PERMISSION_DENIED, "Permission revoked");
-          }
+          await this.admitTool(requirement, context);
+          dependencies.tools?.recordUse(requirement.tool, this.options.clock());
         }),
     };
   }
+  private async admitTool(
+    requirement: Extract<PermissionRequirement, { tool: string }>,
+    context: StepContext,
+  ): Promise<void> {
+    const kind = this.get(context.runId).kind;
+    if (
+      kind === "chat" &&
+      (requirement.tool === "llm.generate" || requirement.tool === "vector.search")
+    )
+      return;
+    if (kind === "indexing" && requirement.tool === "vector.index") return;
+    if (kind === "download" && requirement.tool === "download.fetch") return;
+    const registered = this.dependencies.tools?.ceiling(requirement.tool);
+    if (registered && (!registered.enabled || !registered.available))
+      throw new AppError(AppErrorCode.PERMISSION_DENIED, "Tool disabled");
+    const run = this.get(context.runId);
+    const scopes = [
+      ...(run.graph.permissionScopes ?? []),
+      ...(run.kind === "scenario" && run.subjectId ? [`scenario:${run.subjectId}`] : []),
+    ];
+    const admission = this.permissions.admitSubject(
+      requirement.tool,
+      { runId: run.id, scopes },
+      requirement.tier,
+    );
+    if (admission === "deny")
+      throw new AppError(AppErrorCode.PERMISSION_DENIED, "Permission denied");
+    if (admission === "ask") {
+      const request = this.approvals.create(run.id, requirement.tool, scopes[0] ?? "global");
+      const decision = await context.requestApproval(request);
+      if (decision !== "approved")
+        throw new AppError(AppErrorCode.APPROVAL_DENIED, "Approval denied");
+      if (
+        this.permissions.admitSubject(
+          requirement.tool,
+          { runId: run.id, scopes },
+          requirement.tier,
+        ) === "deny"
+      )
+        throw new AppError(AppErrorCode.PERMISSION_DENIED, "Permission revoked");
+    }
+  }
+
   approve(id: string, approvalId: string, always = false): void {
     this.approvals.decide(id, approvalId, "approved", always);
   }

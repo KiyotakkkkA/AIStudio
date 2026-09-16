@@ -34,6 +34,9 @@ export class NodeRegistry {
       },
     });
   }
+  list(): readonly (RegisteredNode & { type: string })[] {
+    return [...this.nodes].map(([type, node]) => ({ ...node, type }));
+  }
   resolve(type: string): RegisteredNode {
     return this.get(type);
   }

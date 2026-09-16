@@ -13,10 +13,13 @@ import { VectorSourceRepository } from "./VectorSourceRepository.ts";
 import { GraphRelationRepository } from "./GraphRelationRepository.ts";
 import { GraphEdgeRepository } from "./GraphEdgeRepository.ts";
 import { DownloadRepository } from "./DownloadRepository.ts";
+import { ToolRepository } from "./ToolRepository.ts";
 export { VectorStoreRepository, VectorDocumentRepository, VectorSourceRepository };
 export { GraphRelationRepository, GraphEdgeRepository };
 export type { GraphEdgeLookup } from "./GraphEdgeRepository.ts";
 export { DownloadRepository };
+export { ToolRepository };
+export type { ToolPatch } from "./ToolRepository.ts";
 export type { DownloadPatch } from "./DownloadRepository.ts";
 
 export { Repository } from "./Repository.ts";
@@ -39,6 +42,7 @@ export interface Repositories {
   readonly graphRelations: GraphRelationRepository;
   readonly graphEdges: GraphEdgeRepository;
   readonly downloads: DownloadRepository;
+  readonly tools: ToolRepository;
   readonly secrets: SecretRepository;
   readonly settings: SettingRepository;
   readonly providers: ProviderRepository;
@@ -57,6 +61,7 @@ export function createRepositories(db: DatabaseHandle): Repositories {
     graphRelations: new GraphRelationRepository(db),
     graphEdges: new GraphEdgeRepository(db),
     downloads: new DownloadRepository(db),
+    tools: new ToolRepository(db),
     secrets: new SecretRepository(db),
     settings: new SettingRepository(db),
     providers: new ProviderRepository(db),

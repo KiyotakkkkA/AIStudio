@@ -46,6 +46,8 @@ import { GraphService } from "./services/GraphService";
 import { RunService } from "./services/RunService";
 import { RetentionService } from "./services/RetentionService";
 import { NodeRegistry } from "./kernel/NodeRegistry";
+import { ToolRegistry } from "./tools/ToolRegistry";
+import { registerKernelTools } from "./tools/kernelTools";
 import { SidecarDriver } from "./drivers/sidecar/SidecarDriver";
 import { IndexingService } from "./indexing/IndexingService";
 import { createImageExtractor, createPdfExtractor, IMAGE_EXTENSIONS } from "./indexing/documents";
@@ -292,10 +294,13 @@ if (!app.requestSingleInstanceLock()) {
         embed: (model, texts, signal) => runtimes!.embed(model, texts, signal),
       });
       const nodes = registerDownloadNodes(registerJobNodes(registerCoreNodes(new NodeRegistry())));
+      const tools = new ToolRegistry({ data: database, logger });
+      registerKernelTools(nodes, tools);
       runs = new RunService({
         data: database,
         events: eventBus,
         registry: nodes,
+        tools,
         services: { providers: registry, vectorStores, jobs: sidecar, indexing, downloads },
         logger,
       });
@@ -315,6 +320,7 @@ if (!app.requestSingleInstanceLock()) {
           indexing,
           downloads,
           runtimes,
+          tools,
           pickSources: async (kind) => {
             const result = await dialog.showOpenDialog({
               properties:

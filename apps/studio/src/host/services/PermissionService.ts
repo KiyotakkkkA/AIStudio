@@ -45,9 +45,12 @@ export class PermissionService {
     context: PermissionContext,
     minimum: PermissionTier = "auto",
   ): "allow" | "ask" | "deny" {
+    const registered = this.data.repositories.tools.findByKey(subject);
+    if (registered && (!registered.enabled || !registered.available)) return "deny";
     const rows = this.data.repositories.permissions.list(subject);
     const ceiling = rows.find((row) => row.scope === "global");
     let tier: PermissionTier = ceiling?.tier ?? "ask";
+    if (registered && rank[registered.tier] > rank[tier]) tier = registered.tier;
     if (rank[minimum] > rank[tier]) tier = minimum;
     const applicable = rows.filter(
       (row) => row.scope === "global" || context.scopes.includes(row.scope),

@@ -9,6 +9,7 @@ export * from "./vectorDocument.ts";
 export * from "./vectorSource.ts";
 export * from "./graphRelationType.ts";
 export * from "./graphEdge.ts";
+export * from "./tool.ts";
 export * from "./download.ts";
 export * from "./run.ts";
 export * from "./step.ts";
