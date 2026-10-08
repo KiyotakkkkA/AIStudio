@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 import {
   AddVectorSourceInput,
   AppError,
@@ -222,8 +222,12 @@ export class IndexingService {
     report(`Найдено файлов: ${String(walked.files.length)}`, true);
 
     let cancelled = aborted(signal);
+    // A file is forgotten only when the walk saw where it lived and it was not there. An unplugged
+    // drive, an offline share or a cut-short walk says nothing about what was deleted.
+    const unseen = (path: string) =>
+      walked.truncated || walked.unreachable.some((root) => within(path, root));
     for (const [path, document] of known) {
-      if (discovered.has(path)) continue;
+      if (discovered.has(path) || unseen(path)) continue;
       if (cancelled) break;
       try {
         await this.forget(store, document);
@@ -555,6 +559,16 @@ function describe(error: unknown): string {
   return typeof detail === "string" && detail !== ""
     ? `${error.message}: ${detail}`
     : error.message;
+}
+
+/** `path` is `root` itself or lies under it. Windows paths compare without regard to case. */
+function within(path: string, root: string): boolean {
+  const fold = (value: string) => (process.platform === "win32" ? value.toLowerCase() : value);
+  const target = fold(path);
+  const base = fold(root);
+  if (target === base) return true;
+  const prefix = base.endsWith(sep) ? base : `${base}${sep}`;
+  return target.startsWith(prefix);
 }
 
 function aborted(signal?: AbortSignal): boolean {

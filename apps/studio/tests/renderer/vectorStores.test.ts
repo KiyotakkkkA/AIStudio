@@ -22,7 +22,14 @@ import {
   ocrCandidates,
   rerankCandidates,
 } from "../../src/renderer/features/vector-stores/autofill";
-import { EMBEDDER, MODEL, model, provider as providerDetail, summary } from "./providerFixtures";
+import {
+  EMBEDDER,
+  MODEL,
+  OLLAMA,
+  model,
+  provider as providerDetail,
+  summary,
+} from "./providerFixtures";
 
 const provider = summary({ id: EMBEDDER, capabilities: ["embedding"] });
 const detail = VectorStoreDto.parse({
@@ -423,4 +430,62 @@ test("documents appear as the run reports them, newest first and never twice", (
 
   store.receiveDocument({ nonsense: true });
   expect(store.documents).toHaveLength(2);
+});
+
+const LOCAL = "0199bb11-1111-7111-8111-000000000003" as typeof EMBEDDER;
+const localFile = (index: number, externalId: string) =>
+  model({
+    id: `0199bb11-2222-7111-8111-00000000010${String(index)}` as typeof MODEL,
+    providerId: LOCAL,
+    externalId,
+  });
+// What the local provider lists for a machine with the curated downloads: every weight file,
+// sorted the way the models table sorts them — uppercase first.
+const LOCAL_FILES = [
+  localFile(1, "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf"),
+  localFile(2, "bge-m3-FP16.gguf"),
+  localFile(3, "bge-reranker-v2-m3-FP16.gguf"),
+  localFile(4, "mmproj-Qwen2.5-VL-7B-Instruct-Q8_0.gguf"),
+];
+const ON_DISK: CatalogueItemDto = {
+  ...EMBEDDING_ITEM,
+  url: "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-FP16.gguf",
+};
+
+test("auto-fill recognises a downloaded embedding by the file the local provider lists", () => {
+  const chat = summary({ id: OLLAMA, capabilities: ["text"] });
+  const local = summary({ id: LOCAL, capabilities: ["embedding"] });
+  const vm = new VectorStoreFormVm(null, [chat, local], new Map([[LOCAL as string, LOCAL_FILES]]), {
+    catalogue: [RERANKER, OCR_MODEL, ON_DISK],
+    device: DEVICE,
+  });
+  vm.autofill();
+  // A provider that cannot embed is never offered, even when it comes first.
+  expect(vm.embeddingProviderId).toBe(LOCAL);
+  expect(vm.embeddingModelId).toBe("bge-m3-FP16.gguf");
+  expect(vm.dimension).toBe("1024");
+});
+
+test("auto-fill without a recognised download still skips vision models, projectors and rerankers", () => {
+  const local = summary({ id: LOCAL, capabilities: ["embedding"] });
+  const models = new Map([[LOCAL as string, LOCAL_FILES]]);
+  const vm = new VectorStoreFormVm(null, [local], models, { device: DEVICE });
+  vm.autofill();
+  expect(vm.embeddingModelId).toBe("bge-m3-FP16.gguf");
+
+  // A vision model left in the form by an earlier pick is not kept either.
+  const stale = new VectorStoreFormVm(null, [local], models, { device: DEVICE });
+  stale.set("embeddingProviderId", LOCAL);
+  stale.set("embeddingModelId", "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf");
+  stale.autofill();
+  expect(stale.embeddingModelId).toBe("bge-m3-FP16.gguf");
+
+  const onlyVision = new VectorStoreFormVm(
+    null,
+    [local],
+    new Map([[LOCAL as string, [LOCAL_FILES[0]!, LOCAL_FILES[3]!]]]),
+    { device: DEVICE },
+  );
+  onlyVision.autofill();
+  expect(onlyVision.embeddingModelId).toBe("");
 });

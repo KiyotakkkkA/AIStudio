@@ -400,13 +400,13 @@ export default class VectorStoreStore {
     if (!storeId || this.busy || this.indexRun) return false;
     return this.mutate(async () => {
       const handle = await this.ipc.call("vectorStores.index", { storeId, full });
+      // The document list is kept: a run reports only the files it re-embeds, which move to the
+      // top as they arrive. Clearing it would hide every unchanged document until the run ends
+      // and read as a wiped index; the refresh at the end drops whatever was removed from disk.
       runInAction(() => {
         this.indexRun = { id: handle.id, done: 0, total: 0, note: "Индексация запущена" };
         this.indexSample = null;
         this.indexRate = null;
-        // A re-index rebuilds the list from what this run reports, so a document that has since
-        // been deleted from disk does not linger in it.
-        this.documents = [];
       });
       this.stopIndexStream?.();
       this.stopIndexStream =

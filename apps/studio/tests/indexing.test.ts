@@ -221,6 +221,34 @@ test("a removed file loses its vectors and its metadata", async () => {
   expect(core.rowsFor(stores.storePath(store.id), removedDocument.id)).toEqual([]);
 });
 
+test("a source that cannot be reached keeps its documents instead of losing them", async () => {
+  write("keep.md", "one two three four");
+  const drive = join(workspace.path, "drive");
+  mkdirSync(drive, { recursive: true });
+  writeFileSync(join(drive, "remote.md"), "five six seven eight", "utf8");
+  addFolder();
+  await indexing.addSource({
+    storeId: store.id,
+    kind: "folder",
+    path: drive,
+    include: [],
+    exclude: [],
+    recursive: true,
+  });
+  await indexing.index({ storeId: store.id, full: false });
+  const remote = documents().find((row) => row.sourcePath === join(drive, "remote.md"))!;
+  const remoteRows = core.rowsFor(stores.storePath(store.id), remote.id);
+  expect(remoteRows.length).toBeGreaterThan(0);
+
+  // The drive is unplugged: its path no longer resolves, but nothing on it was deleted.
+  rmSync(drive, { recursive: true });
+  const report = await indexing.index({ storeId: store.id, full: false });
+  expect(report.removed).toBe(0);
+  expect(report.notes.some((note) => note.includes("Источник недоступен"))).toBe(true);
+  expect(documents().map((row) => row.sourcePath)).toContain(remote.sourcePath);
+  expect(core.rowsFor(stores.storePath(store.id), remote.id)).toEqual(remoteRows);
+});
+
 test("cancellation stops at a batch boundary and leaves the store consistent", async () => {
   for (let i = 0; i < 6; i += 1) write(`file-${String(i)}.md`, "alpha beta gamma delta epsilon");
   addFolder();

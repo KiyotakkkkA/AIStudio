@@ -71,6 +71,41 @@ function sameModel(externalId: string, catalogueName: string): boolean {
   return base(externalId) === base(catalogueName);
 }
 
+/** The file an item downloads to. The local provider lists weights by file name, not by model name. */
+function artefactFile(item: CatalogueItemDto): string | undefined {
+  try {
+    const last = new URL(item.url).pathname.split("/").pop();
+    return last ? decodeURIComponent(last).toLowerCase() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function serves(model: ModelDto, item: CatalogueItemDto): boolean {
+  const file = artefactFile(item);
+  if (file !== undefined && model.externalId.toLowerCase() === file) return true;
+  return sameModel(model.externalId, item.name);
+}
+
+/**
+ * A provider lists every model it has — the local one lists every weight file on disk, vision
+ * models, their projectors and rerankers included. None of those can embed text.
+ */
+const NOT_EMBEDDING = /rerank|mmproj|-vl-|\bvl\b|vision|\bocr\b/i;
+const EMBEDDING_HINT = /embed|bge|\be5\b|gte|nomic|minilm|mxbai|jina|arctic/i;
+
+function couldEmbed(model: ModelDto): boolean {
+  return (
+    !model.capabilities.includes("vision") &&
+    !NOT_EMBEDDING.test(model.externalId) &&
+    !NOT_EMBEDDING.test(model.displayName)
+  );
+}
+
+function looksLikeEmbedding(model: ModelDto): boolean {
+  return EMBEDDING_HINT.test(model.externalId) || EMBEDDING_HINT.test(model.displayName);
+}
+
 export interface ChunkPlan {
   chunkSize: number;
   chunkOverlap: number;
@@ -112,22 +147,33 @@ export function autofillPlan(input: AutofillInput): AutofillPlan {
   const { device, catalogue, providers, modelsByProvider, current } = input;
   const tier: DeviceTier = device?.tier ?? "low";
 
-  const usable = providers.filter((provider) => provider.enabled);
-  const provider =
-    usable.find((candidate) => candidate.id === current.embeddingProviderId) ?? usable[0];
-  const models = provider ? (modelsByProvider.get(provider.id) ?? []) : [];
+  const usable = providers.filter(
+    (provider) => provider.enabled && provider.capabilities.includes("embedding"),
+  );
   const embeddings = embeddingCandidates(catalogue);
+  const modelsOf = (id: string) => modelsByProvider.get(id) ?? [];
+  // Pair each provider with the first downloaded embedding artefact it serves: its dimension
+  // is then known rather than guessed.
+  const servedBy = (id: string) =>
+    embeddings
+      .map((item) => ({ item, model: modelsOf(id).find((candidate) => serves(candidate, item)) }))
+      .find((pair) => pair.model !== undefined);
 
-  // Prefer the provider model that serves an embedding artefact this machine already has:
-  // its dimension is then known rather than guessed.
-  const downloaded = embeddings
-    .map((item) => ({
-      item,
-      model: models.find((candidate) => sameModel(candidate.externalId, item.name)),
-    }))
-    .find((pair) => pair.model !== undefined);
-  const kept = models.find((candidate) => candidate.externalId === current.embeddingModelId);
-  const model = downloaded?.model ?? kept ?? models[0];
+  // A provider the user already picked stays; otherwise the one serving a downloaded model wins.
+  const provider =
+    usable.find((candidate) => candidate.id === current.embeddingProviderId) ??
+    usable.find((candidate) => servedBy(candidate.id) !== undefined) ??
+    usable[0];
+  const models = provider ? modelsOf(provider.id) : [];
+  const downloaded = provider ? servedBy(provider.id) : undefined;
+  const kept = models.find(
+    (candidate) => candidate.externalId === current.embeddingModelId && couldEmbed(candidate),
+  );
+  const model =
+    downloaded?.model ??
+    kept ??
+    models.find((candidate) => couldEmbed(candidate) && looksLikeEmbedding(candidate)) ??
+    models.find(couldEmbed);
   const dimension =
     downloaded?.model !== undefined && downloaded.item.dimension !== undefined
       ? String(downloaded.item.dimension)

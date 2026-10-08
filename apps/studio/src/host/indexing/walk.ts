@@ -21,6 +21,13 @@ const DEFAULT_MAX_FILE_BYTES = 8 * 1024 * 1024;
 export interface WalkOutcome {
   readonly files: DiscoveredFile[];
   readonly notes: string[];
+  /**
+   * Paths — a source, a folder or a file — the walk could not look into. A file under one of them
+   * may still be there; not finding it is not evidence that it was deleted.
+   */
+  readonly unreachable: string[];
+  /** The file limit cut the walk short, so anything may lie beyond it. */
+  readonly truncated: boolean;
 }
 
 /** A walk swallows its errors to keep going, so the note is the only place the cause shows. */
@@ -41,6 +48,8 @@ export async function walkSources(
   const maxFileBytes = limits.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES;
   const found = new Map<string, DiscoveredFile>();
   const notes: string[] = [];
+  const unreachable: string[] = [];
+  let truncated = false;
   const note = (message: string) => {
     if (notes.length < 200) notes.push(message);
   };
@@ -53,6 +62,7 @@ export async function walkSources(
       entry = await stat(toExtendedPath(root));
     } catch (error: unknown) {
       note(`Источник недоступен: ${source.path} — ${reason(error)}`);
+      unreachable.push(root);
       continue;
     }
     if (entry.isFile()) {
@@ -77,6 +87,7 @@ export async function walkSources(
         entries = await readdir(toExtendedPath(directory), { withFileTypes: true });
       } catch (error: unknown) {
         note(`Папка недоступна: ${directory} — ${reason(error)}`);
+        unreachable.push(directory);
         continue;
       }
       for (const child of entries) {
@@ -95,6 +106,7 @@ export async function walkSources(
           info = await stat(toExtendedPath(absolute));
         } catch (error: unknown) {
           note(`Файл недоступен: ${absolute} — ${reason(error)}`);
+          unreachable.push(absolute);
           continue;
         }
         if (info.size > maxFileBytes) {
@@ -104,11 +116,17 @@ export async function walkSources(
         found.set(absolute, { path: absolute, bytes: info.size, sourceId: source.id });
         if (found.size >= maxFiles) {
           note(`Достигнут предел в ${String(maxFiles)} файлов`);
+          truncated = true;
           queue.length = 0;
           break;
         }
       }
     }
   }
-  return { files: [...found.values()].sort((a, b) => a.path.localeCompare(b.path)), notes };
+  return {
+    files: [...found.values()].sort((a, b) => a.path.localeCompare(b.path)),
+    notes,
+    unreachable,
+    truncated,
+  };
 }
