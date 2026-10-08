@@ -65,7 +65,7 @@ function VectorStoreDetail() {
               <h2 className="wrap-break-word text-[15px] font-semibold">{detail.name}</h2>
               <Chip>{healthLabels[detail.status]}</Chip>
             </div>
-            <p className="mt-0.75 text-xs text-main-400">{detail.description}</p>
+            <p className="mt-0.75 text-[12px] text-main-400">{detail.description}</p>
           </div>
           <div className="flex gap-1.75">
             <Button disabled={disabled} onClick={store.edit}>
@@ -136,14 +136,14 @@ function VectorStoreDetail() {
               >
                 {detail.status === "broken" && i !== 2 && i !== 5 ? "—" : value}
               </div>
-              <div title={label} className="mt-px truncate text-[10.5px] text-main-500">
+              <div title={label} className="mt-px truncate text-[11px] text-main-500">
                 {label}
               </div>
             </div>
           ))}
         </div>
         {detail.status === "broken" ? (
-          <div role="alert" className="flex items-center gap-3 text-xs text-err">
+          <div role="alert" className="flex items-center gap-3 text-[12px] text-err">
             <span>
               Таблица недоступна. Статистика не подтверждена. Сверка не восстанавливает удалённые
               данные.
@@ -158,7 +158,7 @@ function VectorStoreDetail() {
             </Button>
           </div>
         ) : detail.status === "pending" || detail.vectors === 0 ? (
-          <p className="text-xs text-warn">
+          <p className="text-[12px] text-warn">
             Ожидает индексации. Добавьте источники на вкладке «Документы» и запустите индексацию.
           </p>
         ) : null}
@@ -173,8 +173,8 @@ function VectorStoreDetail() {
               store.set("tab", tab);
             }}
             rounded=""
-            className="gap-1 rounded-lg bg-transparent border-transparent"
-            classNames={{ tab: "rounded-[5px] px-[14px] py-[5px] text-[12px]" }}
+            className="gap-1 rounded-control bg-transparent border-transparent"
+            classNames={{ tab: "rounded-pill px-[14px] py-[5px] text-[12px]" }}
           />
         </div>
         {store.tab === "Test search" ? (
@@ -184,7 +184,7 @@ function VectorStoreDetail() {
         ) : store.tab === "Relations" ? (
           <VectorRelationsPanel />
         ) : (
-          <ScrollArea role="tabpanel" className="space-y-3 p-4 text-xs text-main-300">
+          <ScrollArea role="tabpanel" className="space-y-3 p-4 text-[12px] text-main-300">
             {store.tab === "Settings" ? (
               <>
                 <p>

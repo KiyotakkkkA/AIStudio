@@ -56,13 +56,13 @@ function AccountCard({
             src={account.avatarUrl ?? ""}
             alt=""
             referrerPolicy="no-referrer"
-            className="size-9 flex-none rounded-lg object-cover"
+            className="size-9 flex-none rounded-control object-cover"
             onError={() => {
               setAvatarBroken(true);
             }}
           />
         ) : (
-          <span className="flex size-9 flex-none items-center justify-center rounded-lg bg-main-700 text-[12px] font-semibold text-accent-medium">
+          <span className="flex size-9 flex-none items-center justify-center rounded-control bg-main-700 text-[12px] font-semibold text-accent-medium">
             {accountInitials(account)}
           </span>
         )}
@@ -74,7 +74,7 @@ function AccountCard({
             </span>
             <Chip tone="accent">{adapterLabel(account.adapter)}</Chip>
           </div>
-          <span className="truncate text-[11.5px] text-main-400">
+          <span className="truncate text-[12px] text-main-400">
             {account.emailMasked ?? "Почта не раскрыта вендором"}
           </span>
         </div>
@@ -84,7 +84,7 @@ function AccountCard({
         </span>
       </div>
 
-      <div className="flex flex-col gap-1 text-[11.5px]">
+      <div className="flex flex-col gap-1 text-[12px]">
         <span className={STATUS_TONE_TEXT[tone]}>{accountStatusLine(account)}</span>
         {expiry === null ? null : (
           <span className={STATUS_TONE_TEXT[expiry.tone]}>{expiry.text}</span>
@@ -140,7 +140,7 @@ function AccountCard({
         </Button>
         <button
           type="button"
-          className="text-[11.5px] text-main-400 hover:text-main-100"
+          className="text-[12px] text-main-400 hover:text-main-100"
           onClick={onOpenSites}
         >
           Сайты и куки

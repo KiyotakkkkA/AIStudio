@@ -137,11 +137,12 @@ test("isolated browser, navigation, cookie management and restart persistence", 
     const [width, height] = window.getContentSize();
     return { bounds: window.contentView.children[1]!.getBounds(), width, height };
   });
+  // The page panel sits inside the inset studio frame: rail 244px, 8px gutter, 1px border.
   expect(geometry.bounds).toEqual({
-    x: 248,
-    y: 136,
-    width: geometry.width! - 248,
-    height: geometry.height! - 164,
+    x: 245,
+    y: 157,
+    width: geometry.width! - 254,
+    height: geometry.height! - 194,
   });
   await studio.locator("aside").getByRole("button", { name: "Свернуть панель навигации" }).click();
   await expect
@@ -151,7 +152,7 @@ test("isolated browser, navigation, cookie management and restart persistence", 
           BrowserWindow.getAllWindows()[0]!.contentView.children[1]!.getBounds().x,
       ),
     )
-    .toBe(64);
+    .toBe(65);
   await studio
     .locator("aside")
     .getByRole("button", { name: "Развернуть панель навигации" })
@@ -163,7 +164,7 @@ test("isolated browser, navigation, cookie management and restart persistence", 
           BrowserWindow.getAllWindows()[0]!.contentView.children[1]!.getBounds().x,
       ),
     )
-    .toBe(248);
+    .toBe(245);
   await studio.locator("aside").getByText("Настройки", { exact: true }).click();
   await expect(studio.locator("h1")).toHaveText("Настройки");
   await expect

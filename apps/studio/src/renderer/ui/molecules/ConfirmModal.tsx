@@ -33,15 +33,17 @@ export default function ConfirmModal({
       open={open}
       onClose={onCancel}
       label={title}
-      className={`w-105 max-w-[92vw] rounded-card border bg-main-900 p-4.5 ${tone === "danger" ? "border-err-border" : "border-main-750"}`}
+      className={`w-110 max-w-[92vw] overflow-hidden rounded-card border bg-main-900 p-0 shadow-pop ${tone === "danger" ? "border-err-border" : "border-main-750"}`}
     >
-      <h2
-        className={`text-[14px] font-semibold ${tone === "danger" ? "text-err" : "text-main-50"}`}
-      >
-        {title}
-      </h2>
-      <div className="mt-2.5 text-[12px] leading-[1.6] text-main-400">{content}</div>
-      <div className="mt-4.5 flex justify-end gap-2">
+      <div className="px-5 pt-5">
+        <h2
+          className={`text-[15px] font-semibold tracking-[-0.01em] ${tone === "danger" ? "text-err" : "text-main-50"}`}
+        >
+          {title}
+        </h2>
+        <div className="mt-2 text-[13px] leading-relaxed text-main-400">{content}</div>
+      </div>
+      <div className="mt-5 flex justify-end gap-2 border-t border-main-750 bg-main-850 px-5 py-3">
         <ButtonBase type="button" onClick={onCancel}>
           {cancelLabel}
         </ButtonBase>

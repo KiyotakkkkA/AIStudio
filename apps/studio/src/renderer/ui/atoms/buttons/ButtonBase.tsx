@@ -3,10 +3,12 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 export type ButtonTone = "primary" | "secondary" | "ghost" | "danger";
 
 const TONES: Record<ButtonTone, string> = {
-  primary: "bg-accent-dark text-main-900 hover:bg-accent-medium",
-  secondary: "border border-main-750 bg-main-700 text-main-100 hover:border-main-500",
-  ghost: "border border-main-750 bg-transparent text-main-300 hover:text-main-100",
-  danger: "bg-danger-medium text-main-50 hover:bg-danger-light",
+  primary:
+    "border-transparent bg-accent-dark text-on-accent shadow-[inset_0_1px_0_rgb(255_255_255/0.14)] hover:bg-accent-medium",
+  secondary:
+    "border-main-750 bg-main-900 text-main-100 shadow-[0_1px_2px_rgb(40_25_10/0.05)] hover:border-main-600 hover:bg-main-850",
+  ghost: "border-transparent bg-transparent text-main-300 hover:bg-main-700 hover:text-main-50",
+  danger: "border-transparent bg-danger-medium text-white hover:bg-danger-dark",
 };
 
 export type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> & {
@@ -18,7 +20,7 @@ export default function ButtonBase({ tone = "secondary", children, ...props }: B
   return (
     <button
       {...props}
-      className={`inline-flex h-8 flex-none items-center justify-center gap-1.75 rounded-[6px] px-3.25 text-[12.5px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${TONES[tone]}`}
+      className={`inline-flex h-8 flex-none items-center justify-center gap-1.5 rounded-control border px-3 text-[13px] font-medium whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-45 ${TONES[tone]}`}
     >
       {children}
     </button>

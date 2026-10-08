@@ -15,7 +15,7 @@ export default function IconButton({
   return (
     <button
       type="button"
-      className={`flex size-7 items-center justify-center rounded-md text-main-400 hover:bg-main-700 hover:text-main-100 ${className}`}
+      className={`flex size-7 flex-none items-center justify-center rounded-control text-main-400 hover:bg-main-700 hover:text-main-50 disabled:pointer-events-none disabled:opacity-40 ${className}`}
       {...props}
     >
       <Icon path={path} size={iconSize} />

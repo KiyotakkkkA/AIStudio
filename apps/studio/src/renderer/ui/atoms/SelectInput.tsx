@@ -22,8 +22,8 @@ export default function SelectInput({
   menuPlacement = "bottom-left",
 }: SelectInputProps) {
   const trigger = [
-    "h-[34px] w-full gap-[8px] rounded-[6px] bg-main-900 px-[10px] py-0 text-[12.5px] text-main-100",
-    invalid ? "border-err" : "border-main-750 hover:border-main-500",
+    "h-9 w-full gap-2 rounded-control bg-main-900 px-3 py-0 text-[13px] text-main-100",
+    invalid ? "border-err" : "border-main-750 hover:border-main-600",
   ].join(" ");
 
   return (
@@ -37,8 +37,12 @@ export default function SelectInput({
       menuPlacement={menuPlacement}
     >
       <Select.Trigger className={trigger} rounded="" />
-      <Select.Menu label={label} rounded="rounded-md">
-        <Select.Options rounded="rounded-md" className="text-[12.5px]" />
+      <Select.Menu
+        label={label}
+        rounded="rounded-xl"
+        className="border-main-750 bg-main-900 p-1 shadow-pop"
+      >
+        <Select.Options rounded="rounded-md" className="text-[13px]" />
       </Select.Menu>
     </Select>
   );

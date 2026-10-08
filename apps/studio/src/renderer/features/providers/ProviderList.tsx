@@ -25,7 +25,7 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
 
   return (
     <div className="flex min-h-0 w-62.5 flex-none flex-col gap-2">
-      <div className="flex-none px-0.5 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+      <div className="flex-none px-0.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
         {CAPABILITY_LIST_HEADINGS[providers.capability]}
       </div>
 
@@ -38,7 +38,7 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
         ) : null}
 
         {providers.isEmpty ? (
-          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-750 bg-main-800/40 px-3">
+          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-850 px-3">
             <EmptyState
               icon={mdiLayersOutline}
               title="Подключений нет"
@@ -55,7 +55,7 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
               onSelect(summary.id);
             }}
             leading={
-              <span className="flex size-7.5 flex-none items-center justify-center rounded-lg bg-main-700 text-[11px] font-semibold text-accent-medium">
+              <span className="flex size-9 flex-none items-center justify-center rounded-control border border-main-750 bg-main-850 text-[11px] font-semibold text-accent-medium">
                 {providerInitials(summary.name, summary.kind)}
               </span>
             }
@@ -84,7 +84,7 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
           dashed
           onClick={onCreate}
           leading={
-            <span className="flex size-7.5 flex-none items-center justify-center rounded-lg border border-dashed border-main-750 text-main-400">
+            <span className="flex size-7.5 flex-none items-center justify-center rounded-control border border-dashed border-main-750 text-main-400">
               <Icon path={mdiPlus} size={14} />
             </span>
           }

@@ -63,7 +63,7 @@ function VectorSearchPanel() {
         defaultOpen={false}
         className="flex-none rounded-[9px] border border-main-750 bg-main-900"
       >
-        <Accordion.Summary className="min-h-12 px-4 text-left text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase hover:text-main-200">
+        <Accordion.Summary className="min-h-12 px-4 text-left text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase hover:text-main-200">
           Расширенные настройки
         </Accordion.Summary>
         <Accordion.Content className="flex flex-col gap-3.25 border-t border-main-750 p-4">
@@ -105,17 +105,17 @@ function VectorSearchPanel() {
           <Chip>поиск {store.result.searchMs.toFixed(1)} мс</Chip>
         </div>
       ) : null}
-      <p className="text-[11.5px] text-main-500">
+      <p className="text-[12px] text-main-500">
         Результаты только для чтения. Чанки ниже порога показаны приглушёнными.
       </p>
       {store.result && graph.expandEnabled && store.graphRows.length === 0 ? (
-        <p role="status" className="text-xs text-main-400">
+        <p role="status" className="text-[12px] text-main-400">
           Граф не добавил ничего нового: у найденных документов нет связей за пределами выдачи.
           Свяжите документы на вкладке «Связи».
         </p>
       ) : null}
       {store.result && store.hitCount === 0 ? (
-        <p role="status" className="text-xs text-main-400">
+        <p role="status" className="text-[12px] text-main-400">
           Нет результатов выше порога. Попробуйте снизить минимальную оценку или изменить запрос.
         </p>
       ) : null}
@@ -123,20 +123,22 @@ function VectorSearchPanel() {
         {store.rows.map((row) => (
           <article
             key={row.id}
-            className={`flex gap-3 rounded-card border border-main-750 bg-main-800 px-3.25 py-3 ${row.belowFloor ? "opacity-50" : ""}`}
+            className={`flex gap-3 rounded-card border border-main-750 bg-main-900 shadow-card px-3.25 py-3 ${row.belowFloor ? "opacity-50" : ""}`}
           >
             <div className="w-13 flex-none">
-              <div className="font-mono text-sm font-semibold text-accent-medium">{row.score}</div>
-              <div className="mt-1.25 h-0.75 rounded bg-main-700">
-                <div className="h-0.75 rounded bg-accent-dark" style={{ width: row.width }} />
+              <div className="font-mono text-[13px] font-semibold text-accent-medium">
+                {row.score}
+              </div>
+              <div className="mt-1.25 h-1 rounded bg-main-700">
+                <div className="h-1 rounded bg-accent-dark" style={{ width: row.width }} />
               </div>
             </div>
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex flex-wrap items-center gap-2">
-                <span className="break-all font-mono text-[11.5px] text-main-300">{row.path}</span>
+                <span className="break-all font-mono text-[12px] text-main-300">{row.path}</span>
                 <Chip>чанк {row.position}</Chip>
               </div>
-              <p className="whitespace-pre-wrap wrap-break-word text-xs text-main-300">
+              <p className="whitespace-pre-wrap wrap-break-word text-[12px] text-main-300">
                 {row.text}
               </p>
             </div>
@@ -151,14 +153,14 @@ function VectorSearchPanel() {
               <Chip tone="raised" title={`Связь с результатом ${row.via}`}>
                 {row.relation}
               </Chip>
-              <div className="mt-1.25 text-[10.5px] text-main-500">по графу</div>
+              <div className="mt-1.25 text-[11px] text-main-500">по графу</div>
             </div>
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex flex-wrap items-center gap-2">
-                <span className="break-all font-mono text-[11.5px] text-main-300">{row.path}</span>
+                <span className="break-all font-mono text-[12px] text-main-300">{row.path}</span>
                 <Chip>{row.position}</Chip>
               </div>
-              <p className="whitespace-pre-wrap wrap-break-word text-xs text-main-300">
+              <p className="whitespace-pre-wrap wrap-break-word text-[12px] text-main-300">
                 {row.text}
               </p>
             </div>

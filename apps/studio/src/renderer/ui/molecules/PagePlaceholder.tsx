@@ -10,19 +10,21 @@ export interface PagePlaceholderProps {
 
 export default function PagePlaceholder({ icon, title, description, task }: PagePlaceholderProps) {
   return (
-    <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-750 bg-main-800/40">
+    <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-850">
       <EmptyState
-        className="max-w-105 px-6 py-9 text-center"
+        className="max-w-110 border-0 bg-transparent px-6 py-10 text-center shadow-none"
         icon={
-          <span className="mx-auto flex size-10 items-center justify-center rounded-card bg-main-700 text-main-300">
-            <Icon path={icon} size={20} />
+          <span className="mx-auto flex size-12 items-center justify-center rounded-card border border-accent-line bg-accent-soft text-accent-medium">
+            <Icon path={icon} size={22} />
           </span>
         }
-        title={<span className="text-[14px] font-semibold text-main-100">{title}</span>}
+        title={
+          <span className="text-[15px] font-semibold tracking-[-0.01em] text-main-50">{title}</span>
+        }
         description={
-          <span className="block text-[12px] leading-[1.6] text-main-400">
+          <span className="block text-[13px] leading-relaxed text-main-400">
             {description}
-            <span className="mt-2.5 block font-mono text-[11px] text-main-500">
+            <span className="mt-3 inline-flex h-6 items-center rounded-full border border-main-750 bg-main-900 px-2.5 font-mono text-[11px] text-main-500">
               Экран будет собран в {task}
             </span>
           </span>

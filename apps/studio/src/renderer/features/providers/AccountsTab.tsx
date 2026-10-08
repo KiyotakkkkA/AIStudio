@@ -32,14 +32,14 @@ function AccountsTab() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {accounts.accounts.length > 0 ? (
-        <p className="text-[11.5px] text-main-400">
+        <p className="text-[12px] text-main-400">
           Сессии проверяются автоматически; новые данные входа сохраняются, когда вендор их выдаёт.
         </p>
       ) : null}
       {accounts.error === null ? null : (
         <div
           role="alert"
-          className="flex flex-none items-center gap-3 rounded-[6px] border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
+          className="flex flex-none items-center gap-3 rounded-control border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
         >
           <span className="flex-1">{accounts.error}</span>
           <button type="button" className="text-main-400" onClick={accounts.dismissError}>
@@ -54,7 +54,7 @@ function AccountsTab() {
             <>
               <div className="flex items-center gap-3">
                 <Loader className="size-4 flex-none text-accent-dark" />
-                <span className="flex-1 text-[12.5px] text-main-100">
+                <span className="flex-1 text-[13px] text-main-100">
                   Войдите в {adapterLabel(linking.adapter)} в браузере — мы ждём, пока вендор
                   подтвердит вход.
                 </span>
@@ -68,7 +68,7 @@ function AccountsTab() {
                   Отменить
                 </Button>
               </div>
-              <span className="text-[11.5px] text-main-400">
+              <span className="text-[12px] text-main-400">
                 Пароль вводится только на сайте вендора, в обычной вкладке браузера.{" "}
                 {secondsLeftLabel(linking.elapsedMs, linking.totalMs) ?? ""}
               </span>
@@ -77,7 +77,7 @@ function AccountsTab() {
 
           {linking.phase === "timeout" ? (
             <div className="flex items-center gap-3">
-              <span className="flex-1 text-[12.5px] text-warn">
+              <span className="flex-1 text-[13px] text-warn">
                 Вход не обнаружен. {adapterLabel(linking.adapter)} не подтвердил сессию за
                 отведённое время.
               </span>
@@ -98,7 +98,7 @@ function AccountsTab() {
 
           {linking.phase === "success" ? (
             <div className="flex items-center gap-3">
-              <span className="flex-1 text-[12.5px] text-ok">
+              <span className="flex-1 text-[13px] text-ok">
                 {adapterLabel(linking.adapter)} привязан.
                 {linking.detail === null ? "" : ` ${linking.detail}`}
               </span>
@@ -119,7 +119,7 @@ function AccountsTab() {
         ) : null}
 
         {accounts.isEmpty ? (
-          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-750 bg-main-800/40 px-3">
+          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-850 px-3">
             <EmptyState
               icon={mdiAccountCircleOutline}
               title="Аккаунтов пока нет"

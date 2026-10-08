@@ -55,7 +55,7 @@ function VectorStoresWorkspace() {
       {store.error ? (
         <div
           role="alert"
-          className="flex items-center gap-3 rounded border border-err-border p-3 text-xs text-err"
+          className="flex items-center gap-3 rounded border border-err-border p-3 text-[12px] text-err"
         >
           <span className="flex-1">{store.error}</span>
           <Button
@@ -70,7 +70,7 @@ function VectorStoresWorkspace() {
       ) : null}
       <div className="flex min-h-0 flex-1 gap-4.5">
         <aside className="flex min-h-0 w-62.5 flex-none flex-col gap-2">
-          <div className="flex-none px-0.5 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+          <div className="flex-none px-0.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             Хранилища
           </div>
           <ScrollArea className="flex min-h-0 flex-1 flex-col gap-2 pr-0.5">
@@ -99,14 +99,14 @@ function VectorStoresWorkspace() {
                   </span>
                   <Chip>{item.backend}</Chip>
                 </span>
-                <span className="text-[11.5px] text-main-400">{item.description}</span>
-                <span className="font-mono text-[10.5px] text-main-500">
+                <span className="text-[12px] text-main-400">{item.description}</span>
+                <span className="font-mono text-[11px] text-main-500">
                   {item.vectors.toLocaleString()} vectors · {item.dimension} dim
                 </span>
               </ListRow>
             ))}
             {store.loaded && store.visibleStores.length === 0 ? (
-              <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-750 bg-main-800/40 px-3">
+              <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-850 px-3">
                 <EmptyState
                   icon={store.stores.length ? mdiMagnify : mdiDatabaseOutline}
                   title={store.stores.length ? "Ничего не найдено" : "Хранилищ пока нет."}
@@ -124,7 +124,7 @@ function VectorStoresWorkspace() {
               disabled={store.busy || !!store.form}
               onClick={store.create}
               leading={
-                <span className="flex size-7.5 flex-none items-center justify-center rounded-lg border border-dashed border-main-750 text-main-400">
+                <span className="flex size-7.5 flex-none items-center justify-center rounded-control border border-dashed border-main-750 text-main-400">
                   <Icon path={mdiPlus} size={14} />
                 </span>
               }

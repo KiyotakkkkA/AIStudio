@@ -35,7 +35,7 @@ export default function SecretListItem({
       onClick={onSelect}
       leading={
         <span
-          className={`flex size-8 flex-none items-center justify-center rounded-lg bg-main-700 text-[11px] font-semibold ${
+          className={`flex size-8 flex-none items-center justify-center rounded-control bg-main-700 text-[11px] font-semibold ${
             selected ? "text-accent-medium" : "text-main-300"
           }`}
         >

@@ -9,8 +9,8 @@ import { useStore } from "../../stores/useStore";
 import { adapterLabel } from "./accountPresentation";
 
 const TRIGGER = [
-  "h-8 w-auto justify-center gap-1.75 rounded-[6px] border-0 px-3.25",
-  "bg-accent-dark text-[12.5px] font-semibold text-main-900 hover:bg-accent-medium",
+  "h-8 w-auto justify-center gap-1.75 rounded-control border-0 px-3.25",
+  "bg-accent-dark text-[13px] font-semibold text-on-accent hover:bg-accent-medium",
   "disabled:cursor-not-allowed disabled:opacity-50",
 ].join(" ");
 
@@ -52,8 +52,8 @@ function AccountLoginMenu() {
             <Dropdown.Item
               key={family}
               role="menuitem"
-              rounded="rounded-md"
-              className="text-[12.5px] text-main-100"
+              rounded="rounded-lg"
+              className="text-[13px] text-main-100"
               onClick={() => {
                 start(family);
               }}

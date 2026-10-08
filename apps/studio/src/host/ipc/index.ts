@@ -44,6 +44,8 @@ export interface HostIpcDependencies {
   secrets: SecretService;
   providers: ProviderService;
   healthCheck?: HealthCheckService;
+  /** Mirrors the saved `ui.theme` into the platform colour scheme. */
+  applyTheme?: (value: unknown) => void;
   events?: EventBus;
   clock?: () => number;
   intervalMs?: number;
@@ -70,7 +72,11 @@ export function createHandlers(dependencies: HostIpcDependencies): IpcHandlers<C
       clock: dependencies.clock,
       intervalMs: dependencies.intervalMs,
     }),
-    ...createSettingHandlers(dependencies.settings, dependencies.healthCheck),
+    ...createSettingHandlers(
+      dependencies.settings,
+      dependencies.healthCheck,
+      dependencies.applyTheme,
+    ),
     ...createSecretHandlers(dependencies.secrets),
     ...createProviderHandlers(dependencies.providers),
     ...createAccountHandlers(dependencies.accounts),

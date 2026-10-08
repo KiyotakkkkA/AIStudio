@@ -81,13 +81,13 @@ function VectorRelationsPanel() {
             граф требует сверки
           </Chip>
         ) : null}
-        <span className="text-[11.5px] text-main-500">
+        <span className="text-[12px] text-main-500">
           Связи задаются вручную и действуют внутри одного хранилища. Направление важно для всех
           типов, кроме «Встречается вместе». Направление важно для всех
         </span>
       </div>
       {graph.error === null ? null : (
-        <p role="alert" className="text-xs text-err">
+        <p role="alert" className="text-[12px] text-err">
           {graph.error}
         </p>
       )}
@@ -116,10 +116,10 @@ function VectorRelationsPanel() {
           {groups.map((group) => (
             <article
               key={group.document.id}
-              className="rounded-card border border-main-750 bg-main-800 px-3.25 py-3"
+              className="rounded-card border border-main-750 bg-main-900 shadow-card px-3.25 py-3"
             >
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="break-all font-mono text-[11.5px] text-main-200">
+                <span className="break-all font-mono text-[12px] text-main-200">
                   {group.document.sourcePath}
                 </span>
                 <Chip>{group.outgoing.length + group.incoming.length} связей</Chip>
@@ -178,7 +178,7 @@ function EdgeLine({ outgoing, relation, other, document, busy, onRemove }: EdgeL
         className="flex-none text-main-500"
       />
       <Chip tone="accent">{relation}</Chip>
-      <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-main-300" title={other}>
+      <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-main-300" title={other}>
         {other}
       </span>
       <Button

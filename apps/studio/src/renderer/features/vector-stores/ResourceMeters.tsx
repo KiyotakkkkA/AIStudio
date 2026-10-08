@@ -58,10 +58,10 @@ export default function ResourceMeters({ sample }: { readonly sample: ResourceSa
       {metersOf(sample).map((meter) => (
         <div key={meter.label} className="flex min-w-0 flex-col gap-1">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[10.5px] font-semibold tracking-[0.06em] text-main-400 uppercase">
+            <span className="text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
               {meter.label}
             </span>
-            <span className="font-mono text-[10.5px] text-main-500">
+            <span className="font-mono text-[11px] text-main-500">
               {meter.percent === null ? "н/д" : `${meter.percent.toFixed(0)} %`}
             </span>
           </div>
@@ -80,7 +80,7 @@ export default function ResourceMeters({ sample }: { readonly sample: ResourceSa
               />
             )}
           </div>
-          <span className="truncate font-mono text-[10px] text-main-600" title={meter.detail}>
+          <span className="truncate font-mono text-[10px] text-main-500" title={meter.detail}>
             {meter.detail}
           </span>
         </div>

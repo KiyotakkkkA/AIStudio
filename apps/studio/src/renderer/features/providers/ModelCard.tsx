@@ -32,7 +32,7 @@ export default function ModelCard({
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div
-            className="truncate font-mono text-[12.5px] font-medium text-main-50"
+            className="truncate font-mono text-[13px] font-medium text-main-50"
             title={row.externalId}
           >
             {row.externalId}

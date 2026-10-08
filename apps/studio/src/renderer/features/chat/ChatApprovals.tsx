@@ -9,9 +9,9 @@ export default observer(function ChatApprovals({ store }: { readonly store: Chat
         <div
           key={request.id}
           role="status"
-          className="space-y-2 rounded-card border border-main-750 bg-main-900 p-3"
+          className="mb-2 flex flex-wrap items-center gap-3 rounded-card border border-warn-line bg-warn-soft px-3.5 py-3"
         >
-          <p className="text-xs text-main-300">
+          <p className="min-w-0 flex-1 text-[13px] text-main-100">
             Разрешить{" "}
             {request.subject === "llm.generate"
               ? "модели создать ответ"

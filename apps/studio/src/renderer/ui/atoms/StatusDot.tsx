@@ -8,7 +8,7 @@ export interface StatusDotProps {
 export default function StatusDot({ tone, title }: StatusDotProps) {
   return (
     <span
-      className={`size-1.75 flex-none rounded-full ${STATUS_TONE_BACKGROUNDS[tone]}`}
+      className={`size-2 flex-none rounded-full ${STATUS_TONE_BACKGROUNDS[tone]}`}
       title={title}
     >
       {title === undefined ? null : <span className="sr-only">{title}</span>}

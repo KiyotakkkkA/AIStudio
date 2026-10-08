@@ -7,9 +7,11 @@ export interface AppShellProps {
 
 export default function AppShell({ rail, children }: AppShellProps) {
   return (
-    <div className="flex size-full min-h-0  overflow-hidden bg-main-900/35">
+    <div className="flex size-full min-h-0 overflow-hidden bg-main-950">
       {rail}
-      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+      <main className="my-2 mr-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-frame border border-main-750 bg-main-900 shadow-frame">
+        {children}
+      </main>
     </div>
   );
 }

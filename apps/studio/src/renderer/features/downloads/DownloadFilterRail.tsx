@@ -11,9 +11,9 @@ export default observer(function DownloadFilterRail({ store }: { readonly store:
   return (
     <aside
       aria-label="Фильтры загрузок"
-      className="flex w-54 flex-none flex-col gap-0.5 border-r border-main-750 p-2.5"
+      className="flex w-56 flex-none flex-col gap-0.5 border-r border-main-750 bg-main-850 p-3"
     >
-      <p className="px-2 pb-1.5 text-[10px] font-medium tracking-[0.09em] text-main-500 uppercase">
+      <p className="px-2 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
         Каталог
       </p>
       <FilterRailButton
@@ -32,7 +32,7 @@ export default observer(function DownloadFilterRail({ store }: { readonly store:
         />
       ))}
 
-      <p className="mt-4 px-2 pb-1.5 text-[10px] font-medium tracking-[0.09em] text-main-500 uppercase">
+      <p className="mt-4 px-2 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
         Состояние
       </p>
       {STATUS_FILTERS.map((state) => (

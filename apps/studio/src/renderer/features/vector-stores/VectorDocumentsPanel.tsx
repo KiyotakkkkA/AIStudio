@@ -96,21 +96,21 @@ function VectorDocumentsPanel() {
       </form>
       <div className="flex flex-wrap items-center gap-2">
         {store.sources.length === 0 ? (
-          <span className="text-[11.5px] text-main-500">
+          <span className="text-[12px] text-main-500">
             Источники не заданы. Добавьте папку или файл, чтобы запустить индексацию.
           </span>
         ) : (
           store.sources.map((source) => (
             <span
               key={source.id}
-              className="flex items-center gap-2 rounded-card border border-main-750 bg-main-800 py-1 pr-1 pl-2.5"
+              className="flex items-center gap-2 rounded-card border border-main-750 bg-main-900 shadow-card py-1 pr-1 pl-2.5"
             >
               <Icon
                 path={source.kind === "folder" ? mdiFolderOutline : mdiFileDocumentOutline}
                 size={15}
                 className="flex-none text-main-400"
               />
-              <span className="max-w-110 truncate font-mono text-[11.5px] text-main-300">
+              <span className="max-w-110 truncate font-mono text-[12px] text-main-300">
                 {source.path}
                 {source.include.length > 0 ? ` · ${source.include.join(" ")}` : ""}
               </span>
@@ -160,7 +160,7 @@ function VectorDocumentsPanel() {
       </div>
       {run ? (
         <div role="status" className="flex flex-col gap-1.5">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[11.5px]">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[12px]">
             <span className="text-main-300">
               {run.done.toLocaleString("ru-RU")} из {run.total.toLocaleString("ru-RU")} фрагментов
               встроено
@@ -168,7 +168,7 @@ function VectorDocumentsPanel() {
             </span>
             <span className="max-w-110 truncate font-mono text-main-500">{run.note}</span>
           </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10.5px] text-main-500">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-main-500">
             <span>
               осталось <span className="text-main-300">{formatDuration(store.indexEtaMs)}</span>
             </span>
@@ -179,9 +179,9 @@ function VectorDocumentsPanel() {
             <div className="h-1 rounded bg-accent-dark" style={{ width: `${String(percent)}%` }} />
           </div>
           {store.indexSample === null ? (
-            <span className="text-[10.5px] text-main-600">Замер нагрузки…</span>
+            <span className="text-[11px] text-main-500">Замер нагрузки…</span>
           ) : (
-            <div className="mt-1 rounded-card border border-main-750 bg-main-800 px-3 py-2.5">
+            <div className="mt-1 rounded-card border border-main-750 bg-main-900 shadow-card px-3 py-2.5">
               <ResourceMeters sample={store.indexSample} />
             </div>
           )}
@@ -237,16 +237,16 @@ function VectorDocumentsPanel() {
                 return (
                   <article
                     key={document.id}
-                    className="absolute right-0 left-0 flex h-12 items-center gap-3 rounded-card border border-main-750 bg-main-800 px-3.25 py-2.5"
+                    className="absolute inset-x-0  flex h-12 items-center gap-3 rounded-card border border-main-750 bg-main-900 shadow-card px-3.25 py-2.5"
                     style={{
                       top: `${String((firstIndex + visibleIndex) * DOCUMENT_ROW_HEIGHT)}px`,
                     }}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-mono text-[11.5px] text-main-200">
+                      <div className="truncate font-mono text-[12px] text-main-200">
                         {document.sourcePath}
                       </div>
-                      <div className="mt-0.5 text-[10.5px] text-main-500">
+                      <div className="mt-0.5 text-[11px] text-main-500">
                         {document.chunkCount.toLocaleString("ru-RU")} чанков ·{" "}
                         {formatBytes(document.bytes)} · {formatIndexedAt(document.indexedAt)}
                       </div>

@@ -18,7 +18,7 @@ export default function RunStepDetail({ step, expanded, pruned, onToggle }: RunS
   const tone = STEP_TONES[step.status] ?? "idle";
   const duration = formatDuration(Math.max(0, (step.finishedAt ?? step.startedAt) - step.startedAt));
   return (
-    <li className="list-none rounded-card border border-main-750 bg-main-800">
+    <li className="list-none rounded-card border border-main-750 bg-main-900 shadow-card">
       <button
         type="button"
         onClick={onToggle}
@@ -36,14 +36,14 @@ export default function RunStepDetail({ step, expanded, pruned, onToggle }: RunS
           <span className="font-mono">{step.type}</span>
         </Chip>
         {step.attempt > 1 ? <Chip>попытка {step.attempt}</Chip> : null}
-        <span className="flex-none font-mono text-[10.5px] text-main-500">
+        <span className="flex-none font-mono text-[11px] text-main-500">
           {formatTime(step.startedAt)} · {duration}
         </span>
       </button>
       {expanded ? (
         <div className="flex flex-col gap-2 border-t border-main-750 px-2.75 py-2.5">
           {step.error === undefined ? null : (
-            <p className={`m-0 text-[11.5px] ${STATUS_TONE_TEXT.err}`}>{step.error}</p>
+            <p className={`m-0 text-[12px] ${STATUS_TONE_TEXT.err}`}>{step.error}</p>
           )}
           {pruned ? (
             <p className="m-0 text-[11px] text-main-500">
@@ -51,11 +51,11 @@ export default function RunStepDetail({ step, expanded, pruned, onToggle }: RunS
             </p>
           ) : (
             <>
-              <p className="m-0 text-[10.5px] font-medium tracking-[0.08em] text-main-400 uppercase">
+              <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                 Вход
               </p>
               <JsonBlock value={step.input} empty="без входных данных" />
-              <p className="m-0 text-[10.5px] font-medium tracking-[0.08em] text-main-400 uppercase">
+              <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                 Выход
               </p>
               <JsonBlock value={step.output} empty="без результата" />

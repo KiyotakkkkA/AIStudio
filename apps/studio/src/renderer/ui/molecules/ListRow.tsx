@@ -20,10 +20,10 @@ export default function ListRow({
   children,
 }: ListRowProps) {
   const tone = dashed
-    ? "border-dashed border-main-750 bg-transparent hover:border-main-500"
+    ? "border-dashed border-main-600 bg-transparent text-main-400 hover:border-accent-line hover:bg-accent-soft hover:text-accent-medium"
     : selected
-      ? "border-accent-dark bg-main-750"
-      : "border-main-750 bg-main-800 hover:border-main-600";
+      ? "border-accent-line bg-accent-soft shadow-[inset_0_0_0_1px_var(--color-accent-line)]"
+      : "border-main-750 bg-main-900 hover:border-main-600";
 
   return (
     <button
@@ -31,10 +31,10 @@ export default function ListRow({
       disabled={disabled}
       aria-current={selected ? "true" : undefined}
       onClick={onClick}
-      className={`flex w-full gap-2.75 rounded-card border p-3 text-left ${tone} disabled:cursor-not-allowed disabled:opacity-50`}
+      className={`flex w-full gap-3 rounded-card border px-3.5 py-3 text-left ${tone} disabled:cursor-not-allowed disabled:opacity-50`}
     >
       {leading}
-      <div className="flex min-w-0 flex-1 flex-col gap-1.25">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">{children}</div>
       {trailing}
     </button>
   );

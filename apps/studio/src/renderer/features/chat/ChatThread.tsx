@@ -40,9 +40,9 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
   }, []);
   return (
     <section aria-label="Лента чата" className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <header className="shrink-0 border-b border-main-750 px-5">
-        <div className="mx-auto flex h-header w-full max-w-4xl items-center gap-3">
-          <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">
+      <header className="shrink-0 border-b border-main-750 px-6">
+        <div className="mx-auto flex h-12 w-full max-w-4xl items-center gap-3">
+          <h1 className="min-w-0 flex-1 truncate text-[14px] font-semibold text-main-100">
             {store.active?.title ?? "Новый чат"}
           </h1>
           <Chip>{store.attachedStoreIds.length} хр.</Chip>
@@ -63,18 +63,23 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           );
           setJump(!pinned.current);
         }}
-        className="min-h-0 flex-1 overflow-y-auto px-5 pt-6 [overflow-anchor:none]"
+        className="min-h-0 flex-1 overflow-y-auto px-6 pt-7 [overflow-anchor:none]"
       >
-        <div ref={content} className="mx-auto w-full max-w-4xl space-y-6 pb-5">
+        <div ref={content} className="mx-auto w-full max-w-4xl space-y-7 pb-6">
           {store.loading && (
-            <p role="status" className="text-xs text-main-400">
+            <p role="status" className="text-[12px] text-main-500">
               Загрузка диалога…
             </p>
           )}
           {!store.loading && !store.active?.messages.length && !store.generating && (
-            <div className="py-16 text-center">
-              <h2 className="mb-2 text-lg font-medium">Что хотите исследовать?</h2>
-              <p className="text-xs text-main-400">
+            <div className="flex flex-col items-center py-20 text-center">
+              <span className="mb-4 flex size-12 items-center justify-center rounded-card bg-linear-to-br from-accent-medium to-accent-dark text-[18px] font-semibold text-on-accent shadow-[0_6px_18px_rgb(180_80_20/0.25)]">
+                Z
+              </span>
+              <h2 className="mb-1.5 text-[20px] font-semibold tracking-[-0.02em] text-main-50">
+                Что хотите исследовать?
+              </h2>
+              <p className="max-w-100 text-[13px] leading-relaxed text-main-400">
                 Выберите модель и подключите хранилища, чтобы отвечать на основе ваших документов.
               </p>
             </div>
@@ -84,7 +89,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
               <div key={message.id} className="group flex justify-end">
                 <div className="flex max-w-[78%] flex-col items-end">
                   {editingId === message.id ? (
-                    <div className="w-[min(78vw,620px)] space-y-2 rounded-xl border border-main-750 bg-main-800 p-2">
+                    <div className="w-[min(78vw,620px)] space-y-2 rounded-card border border-main-750 bg-main-900 p-2.5 shadow-card">
                       <TextArea
                         aria-label="Редактировать сообщение"
                         value={editingText}
@@ -110,7 +115,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-xl rounded-br-sm border border-main-750 bg-main-700 px-3.5 py-3 text-[13.5px] leading-relaxed wrap-break-word whitespace-pre-wrap">
+                    <div className="rounded-[14px] rounded-br-sm border border-main-750 bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
                       {message.content}
                     </div>
                   )}
@@ -142,7 +147,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           )}
           {store.pendingUserText && (
             <div className="flex justify-end">
-              <div className="max-w-[78%] rounded-xl rounded-br-sm border border-main-750 bg-main-700 px-3.5 py-3 wrap-break-word whitespace-pre-wrap">
+              <div className="max-w-[78%] rounded-[14px] rounded-br-sm border border-main-750 bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
                 {store.pendingUserText}
               </div>
             </div>
@@ -158,14 +163,17 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
             />
           )}
           {store.outcome === "cancelled" && (
-            <p role="status" className="text-xs text-warn">
+            <p
+              role="status"
+              className="inline-flex rounded-full border border-warn-line bg-warn-soft px-3 py-1 text-[12px] text-warn"
+            >
               Генерация остановлена. Частичный ответ сохранён.
             </p>
           )}
           {store.error && (
             <div
               role="alert"
-              className="space-y-2 rounded-card border border-err-border p-3 text-xs text-err"
+              className="space-y-2.5 rounded-card border border-err-border bg-err-soft p-3.5 text-[13px] text-err"
             >
               <p>{store.error}</p>
               {store.canRetry ? (
@@ -185,19 +193,21 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
         </div>
       </ScrollArea>
       {jump && (
-        <div className="flex justify-center py-2">
-          <Button
-            onClick={() => {
-              pinned.current = true;
-              setJump(false);
-              scrollLatest();
-            }}
-          >
-            К последнему сообщению ↓
-          </Button>
+        <div className="pointer-events-none -mt-12 flex justify-center pb-2">
+          <span className="pointer-events-auto rounded-control shadow-pop">
+            <Button
+              onClick={() => {
+                pinned.current = true;
+                setJump(false);
+                scrollLatest();
+              }}
+            >
+              К последнему сообщению ↓
+            </Button>
+          </span>
         </div>
       )}
-      <div className="px-5">
+      <div className="px-6">
         <div className="mx-auto w-full max-w-4xl">
           <ChatApprovals store={store} />
         </div>

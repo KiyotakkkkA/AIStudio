@@ -41,7 +41,7 @@ test("the store restores rail and route from the host through the real bridge co
   assert.equal(ui.railWidth, 64);
   assert.deepEqual(
     bridge.calls.map((call) => call.channel),
-    ["settings.get", "settings.get"],
+    ["settings.get", "settings.get", "settings.get"],
   );
 });
 
@@ -81,6 +81,23 @@ test("changing the rail or the route writes through to the host once", async () 
   assert.equal(bridge.calls.filter((call) => call.channel === "settings.set").length, 2);
   assert.equal(stored.get("ui.rail.collapsed"), true);
   assert.equal(stored.get("ui.route.last"), ROUTES.tools);
+});
+
+test("the theme mode restores, rejects unknown values and writes through once", async () => {
+  const { bridge, stored } = settingsBridge({ "ui.theme": "dark" });
+  const ui = new UiStore(client(bridge));
+  await ui.restore();
+  assert.equal(ui.theme, "dark");
+
+  ui.setTheme("light");
+  ui.setTheme("light");
+  await Promise.resolve();
+  assert.equal(stored.get("ui.theme"), "light");
+  assert.equal(bridge.calls.filter((call) => call.channel === "settings.set").length, 1);
+
+  const fallback = new UiStore(client(settingsBridge({ "ui.theme": "sepia" }).bridge));
+  await fallback.restore();
+  assert.equal(fallback.theme, "system");
 });
 
 test("the viewer dock width is clamped to the documented bounds", () => {

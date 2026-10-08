@@ -24,7 +24,7 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
     return (
       <aside
         aria-label="Детали загрузки"
-        className="flex w-78.5 flex-none flex-col border-l border-main-750 bg-main-900"
+        className="flex w-78.5 flex-none flex-col border-l border-main-750 bg-main-850"
       >
         <div className="flex flex-1 items-center justify-center p-4">
           <EmptyState
@@ -51,19 +51,17 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
   return (
     <aside
       aria-label="Детали загрузки"
-      className="flex w-78.5 flex-none flex-col border-l border-main-750 bg-main-900"
+      className="flex w-78.5 flex-none flex-col border-l border-main-750 bg-main-850"
     >
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 p-3.5">
         {item?.kind === "runtime" && store.runtimes !== null ? (
-          <div className="flex flex-col gap-1 rounded-card border border-main-750 bg-main-800 px-3 py-2.5">
-            <span className="text-[11px] font-semibold tracking-[0.06em] text-main-400 uppercase">
+          <div className="flex flex-col gap-1 rounded-card border border-main-750 bg-main-900 shadow-card px-3 py-2.5">
+            <span className="text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
               Эта машина
             </span>
-            <p className="m-0 text-[11.5px] leading-normal text-main-300">
-              {store.runtimes.plan.reason}
-            </p>
+            <p className="m-0 text-xs/normal  text-main-300">{store.runtimes.plan.reason}</p>
             {store.runtimes.plan.gpu === null ? null : (
-              <span className="font-mono text-[10.5px] text-main-500">
+              <span className="font-mono text-[11px] text-main-500">
                 {store.runtimes.plan.gpu.vendor} {store.runtimes.plan.gpu.model}
                 {store.runtimes.plan.gpu.vramBytes === null
                   ? ""
@@ -80,7 +78,7 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
         <div className="flex flex-col gap-1">
           <h2 className="m-0 font-mono text-[13.5px] font-medium text-main-50">{title}</h2>
           {item === null ? null : (
-            <p className="m-0 text-[11.5px] leading-normal text-main-400">{item.description}</p>
+            <p className="m-0 text-xs/normal  text-main-400">{item.description}</p>
           )}
         </div>
 
@@ -98,16 +96,16 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
           )}
         </div>
 
-        <dl className="m-0 flex flex-col gap-2.25 rounded-card border border-main-750 bg-main-800 p-3 text-[11.5px]">
+        <dl className="m-0 flex flex-col gap-2.25 rounded-card border border-main-750 bg-main-900 shadow-card p-3 text-[12px]">
           <div className="flex justify-between gap-2">
             <dt className="text-main-400">Загружено</dt>
             <dd className="m-0 font-mono">
               {formatBytes(done)} / {formatBytes(size)}
             </dd>
           </div>
-          <div className="h-1.25 rounded-sm bg-main-700">
+          <div className="h-1.25 rounded-full bg-main-700">
             <span
-              className="block h-1.25 rounded-sm bg-accent-dark"
+              className="block h-1.25 rounded-full bg-accent-dark"
               style={{ width: `${String(percent)}%` }}
             />
           </div>
@@ -138,30 +136,30 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
         {download?.error === undefined ? null : (
           <p
             role="alert"
-            className="m-0 rounded-card border border-err-border bg-main-800 p-2.75 text-[11.5px] text-err"
+            className="m-0 rounded-card border border-err-border bg-err-soft p-2.75 text-[12px] text-err"
           >
             {download.error}
           </p>
         )}
 
-        <p className="m-0 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+        <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           Назначение
         </p>
-        <div className="flex flex-col gap-1.5 rounded-card border border-main-750 bg-main-800 p-2.75">
+        <div className="flex flex-col gap-1.5 rounded-card border border-main-750 bg-main-900 shadow-card p-2.75">
           <span className="font-mono text-[11px] break-all text-main-300">
             {download?.targetPath ?? store.disk?.root ?? "будет выбран при запуске"}
           </span>
-          <span className="font-mono text-[10.5px] text-main-500">
+          <span className="font-mono text-[11px] text-main-500">
             {checksum === undefined
               ? "контрольная сумма не опубликована"
               : shortChecksum(checksum.algorithm, checksum.value)}
           </span>
         </div>
 
-        <p className="m-0 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+        <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           После загрузки
         </p>
-        <div className="flex flex-col gap-2.25 rounded-card border border-main-750 bg-main-800 p-2.75">
+        <div className="flex flex-col gap-2.25 rounded-card border border-main-750 bg-main-900 shadow-card p-2.75">
           <Toggle
             checked={checksum !== undefined && options.verifyChecksum}
             disabled={checksum === undefined}

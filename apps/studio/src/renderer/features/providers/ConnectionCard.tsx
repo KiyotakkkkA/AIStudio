@@ -45,7 +45,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
   return (
     <section className="flex min-w-0 flex-[1.35] flex-col gap-3.25 rounded-card border border-main-750 bg-main-900 p-4">
       <div className="flex items-center gap-2">
-        <h2 className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+        <h2 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           Настройка подключения
         </h2>
         {summary === null ? null : (
@@ -126,14 +126,14 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
       ) : null}
 
       {vm.isLocal ? (
-        <p className="rounded-[6px] border border-dashed border-main-750 px-3 py-2.25 text-[12px] text-main-400">
+        <p className="rounded-control border border-dashed border-main-750 px-3 py-2.25 text-[12px] text-main-400">
           Модели читаются из папки загрузок этого компьютера. Ничего настраивать не нужно — нажмите
           «Найти модели», чтобы увидеть найденные файлы.
         </p>
       ) : vm.usesAccount ? (
         <Field label="Связанный аккаунт" error={vm.errorOf("accountId")}>
           {vm.accountOptions.length === 0 ? (
-            <div className="flex items-center gap-2.5 rounded-[6px] border border-dashed border-main-750 px-2.5 py-2 text-[12px] text-main-400">
+            <div className="flex items-center gap-2.5 rounded-control border border-dashed border-main-750 px-2.5 py-2 text-[12px] text-main-400">
               <Icon path={mdiAccountCircleOutline} size={16} className="flex-none text-main-500" />
               <span className="flex-1">
                 Нет привязанных аккаунтов для {ADAPTER_LABELS[vm.adapter]}.
@@ -141,7 +141,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
             </div>
           ) : (
             <div className="flex gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[6px] bg-main-900 px-2.5 py-1.5">
+              <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control bg-main-900 px-2.5 py-1.5">
                 <Icon
                   path={mdiAccountCircleOutline}
                   size={16}
@@ -272,7 +272,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
       {vm.banner === null ? null : (
         <p
           role="alert"
-          className="rounded-[6px] border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
+          className="rounded-control border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
         >
           {vm.banner}
         </p>

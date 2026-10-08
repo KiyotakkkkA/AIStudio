@@ -21,3 +21,5 @@ export interface RailIdentity {
   readonly name: string;
   readonly hint: string;
 }
+
+export type RailTheme = "system" | "light" | "dark";

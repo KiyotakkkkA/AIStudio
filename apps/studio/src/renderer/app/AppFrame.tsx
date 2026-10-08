@@ -36,6 +36,12 @@ function AppFrame() {
   }, [ui.restored, ui.activeRoute, navigation]);
 
   useEffect(() => {
+    const root = document.documentElement;
+    if (ui.theme === "system") delete root.dataset.theme;
+    else root.dataset.theme = ui.theme;
+  }, [ui.theme]);
+
+  useEffect(() => {
     if (!restoredOnce.current) return;
     ui.setActiveRoute(navigation.pathname);
   }, [ui, navigation.pathname]);
@@ -64,10 +70,12 @@ function AppFrame() {
           identity={RAIL_IDENTITY}
           version={APP_VERSION}
           collapsed={ui.railCollapsed}
+          theme={ui.theme}
           isActive={isActive}
           onSelect={select}
           onToggleCollapse={ui.toggleRail}
           onOpenIdentity={openSettings}
+          onThemeChange={ui.setTheme}
         />
       }
     >

@@ -26,7 +26,7 @@ function ProvidersWorkspace() {
 
   if (providers.loaded && providers.capability === "image" && !providers.capabilitySupported) {
     return (
-      <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-750 bg-main-800/40">
+      <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-850">
         <EmptyState
           icon={mdiImageOutline}
           title="Провайдеров изображений пока нет"
@@ -41,7 +41,7 @@ function ProvidersWorkspace() {
       {providers.error === null ? null : (
         <div
           role="alert"
-          className="flex flex-none items-center gap-3 rounded-[6px] border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
+          className="flex flex-none items-center gap-3 rounded-control border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
         >
           <span className="flex-1">{providers.error}</span>
           <button type="button" className="text-main-400" onClick={providers.dismissError}>

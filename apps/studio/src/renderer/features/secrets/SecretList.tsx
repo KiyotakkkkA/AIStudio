@@ -53,7 +53,7 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
         ) : null}
 
         {secrets.isEmpty ? (
-          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-750 bg-main-800/40 px-4">
+          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-850 px-4">
             <EmptyState
               icon={mdiKeyPlus}
               title="Секретов пока нет"
@@ -85,7 +85,7 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
           dashed
           onClick={onCreate}
           leading={
-            <span className="flex size-8 flex-none items-center justify-center rounded-lg border border-dashed border-main-750 text-main-400">
+            <span className="flex size-8 flex-none items-center justify-center rounded-control border border-dashed border-main-750 text-main-400">
               <Icon path={mdiPlus} size={15} />
             </span>
           }

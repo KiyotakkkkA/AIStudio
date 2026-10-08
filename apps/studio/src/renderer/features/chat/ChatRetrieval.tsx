@@ -16,9 +16,9 @@ export default function ChatRetrieval({
         return (
           <details
             key={id}
-            className="rounded-card border border-main-750 bg-main-900 p-3 text-xs text-main-300"
+            className="rounded-card border border-main-750 bg-main-850 px-3.5 py-2.5 text-[12px] text-main-300"
           >
-            <summary className="cursor-pointer">
+            <summary className="cursor-pointer marker:text-main-500">
               Searched{" "}
               <strong className="text-main-100">
                 {stores.find((store) => store.id === id)?.name ?? "Unavailable store"}
@@ -30,7 +30,7 @@ export default function ChatRetrieval({
                 <span
                   key={`${hit.documentId}:${hit.chunkIndex}`}
                   title={hit.sourcePath}
-                  className="max-w-full rounded-pill bg-main-700 px-2 py-1 font-mono text-[11px] break-all"
+                  className="max-w-full rounded-pill border border-main-750 bg-main-900 px-2 py-0.5 font-mono text-[11px] break-all text-main-400"
                 >
                   {hit.sourcePath} · {hit.score.toFixed(2)}
                 </span>

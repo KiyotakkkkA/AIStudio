@@ -69,7 +69,7 @@ export default function HostCheck() {
     >
       <div className="flex flex-col gap-0.5">
         <h2 className="text-[13px] font-semibold text-main-100">Проверка хоста</h2>
-        <p className="text-[11.5px] text-main-500">
+        <p className="text-[12px] text-main-500">
           Круговой вызов IPC, демонстрационный поток событий и задача в sidecar.
         </p>
       </div>
@@ -78,11 +78,11 @@ export default function HostCheck() {
           type="button"
           data-testid="ping-button"
           onClick={runPing}
-          className="rounded-[6px] border border-main-750 px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
+          className="rounded-control border border-main-750 px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
         >
           Пинг
         </button>
-        <span data-testid="ping-value" className="font-mono text-[11.5px] text-main-400">
+        <span data-testid="ping-value" className="font-mono text-[12px] text-main-400">
           {ping}
         </span>
       </div>
@@ -91,11 +91,11 @@ export default function HostCheck() {
           type="button"
           data-testid="stream-button"
           onClick={runStream}
-          className="rounded-[6px] border border-main-750 px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
+          className="rounded-control border border-main-750 px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
         >
           Поток
         </button>
-        <span data-testid="stream-value" className="font-mono text-[11.5px] text-main-400">
+        <span data-testid="stream-value" className="font-mono text-[12px] text-main-400">
           {stream}
         </span>
       </div>
@@ -104,11 +104,11 @@ export default function HostCheck() {
           type="button"
           data-testid="job-button"
           onClick={runJob}
-          className="rounded-[6px] border border-main-750 px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
+          className="rounded-control border border-main-750 px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
         >
           Задача
         </button>
-        <span data-testid="job-value" className="font-mono text-[11.5px] text-main-400">
+        <span data-testid="job-value" className="font-mono text-[12px] text-main-400">
           {job}
         </span>
       </div>

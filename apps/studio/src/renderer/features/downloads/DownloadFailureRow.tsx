@@ -24,7 +24,7 @@ export default function DownloadFailureRow({
 }: DownloadFailureRowProps) {
   return (
     <div
-      className={`flex items-center gap-3 border-b border-main-750 px-4 py-2.75 ${
+      className={`flex items-center gap-3 border-b border-main-750 px-5 py-3 ${
         selected ? "bg-main-750 shadow-[inset_2px_0_0_var(--color-err)]" : "hover:bg-main-800"
       }`}
     >
@@ -34,17 +34,17 @@ export default function DownloadFailureRow({
         aria-current={selected ? "true" : undefined}
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >
-        <span className="flex size-7.5 flex-none items-center justify-center rounded-lg bg-main-700 text-err">
+        <span className="flex size-9 flex-none items-center justify-center rounded-control border border-main-750 bg-main-850 text-err">
           <Icon path={mdiAlertCircleOutline} size={16} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.75">
-          <span className="truncate font-mono text-[12.5px] font-medium text-main-100">
+          <span className="truncate font-mono text-[13px] font-medium text-main-100">
             {download.displayName}
           </span>
-          <span className="truncate text-[10.5px] text-err" title={download.error}>
+          <span className="truncate text-[11px] text-err" title={download.error}>
             {download.error ?? "Загрузка прервалась"}
           </span>
-          <span className="font-mono text-[10.5px] text-main-500">
+          <span className="font-mono text-[11px] text-main-500">
             получено {formatBytes(download.bytesDone)} из {formatBytes(download.sizeBytes)}
           </span>
         </span>

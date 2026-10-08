@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 type ChipTone = "neutral" | "raised" | "accent" | "selected";
 
 const TONES: Record<ChipTone, string> = {
-  neutral: "bg-main-700 text-main-300",
-  raised: "bg-main-600 text-accent-light",
-  accent: "bg-main-700 text-accent-medium",
-  selected: "bg-accent-dark text-main-900",
+  neutral: "border-main-750 bg-main-800 text-main-300",
+  raised: "border-accent-line bg-accent-soft text-accent-medium",
+  accent: "border-transparent bg-accent-soft text-accent-medium",
+  selected: "border-transparent bg-accent-dark text-on-accent",
 };
 
 export interface ChipProps {
@@ -17,7 +17,7 @@ export interface ChipProps {
 }
 
 const BASE =
-  "inline-flex h-[20px] flex-none items-center gap-[5px] rounded-[5px] px-[7px] text-[10.5px] font-medium";
+  "inline-flex h-5 flex-none items-center gap-1 rounded-full border px-2 text-[11px] leading-none font-medium whitespace-nowrap";
 
 export default function Chip({ tone = "neutral", title, onClick, children }: ChipProps) {
   const className = `${BASE} ${TONES[tone]}`;

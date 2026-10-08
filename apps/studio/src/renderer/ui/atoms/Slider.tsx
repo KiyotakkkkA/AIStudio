@@ -29,11 +29,13 @@ export default function Slider({
   return (
     <div className={`min-w-0 ${disabled ? "opacity-50" : ""}`}>
       <div className="mb-2.25 flex items-baseline justify-between gap-2">
-        <label htmlFor={id} className="text-[11px] font-medium text-main-400">
+        <label htmlFor={id} className="text-[12px] font-medium text-main-300">
           {label}
         </label>
         {readout === undefined ? null : (
-          <span className="font-mono text-[11.5px] text-accent-medium">{readout}</span>
+          <span className="rounded-pill bg-accent-soft px-1.5 py-px font-mono text-[11.5px] text-accent-medium">
+            {readout}
+          </span>
         )}
       </div>
       <InputSlider
@@ -48,12 +50,12 @@ export default function Slider({
         onChange={onChange}
         className="w-full"
         classNames={{
-          track: "h-1 rounded-[2px] bg-main-700",
-          fill: "h-1 rounded-[2px] bg-accent-dark",
-          thumb: "size-3.5 rounded-full border-2 border-main-900 bg-accent-dark",
+          track: "h-1.5 rounded-full bg-main-600/70",
+          fill: "h-1.5 rounded-full bg-accent-dark",
+          thumb: "size-4 rounded-full border-2 border-accent-dark bg-main-900 shadow-card",
         }}
       />
-      {note === undefined ? null : <p className="mt-1.5 text-[11px] text-main-500">{note}</p>}
+      {note === undefined ? null : <p className="mt-2 text-[11.5px] text-main-500">{note}</p>}
     </div>
   );
 }

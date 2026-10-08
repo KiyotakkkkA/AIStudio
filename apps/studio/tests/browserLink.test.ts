@@ -20,6 +20,7 @@ vi.mock("electron", () => ({
       navigationHistory: { canGoBack: () => false, canGoForward: () => false },
     }) as unknown as Electron.WebContents;
     setBounds = vi.fn();
+    setBorderRadius = vi.fn();
     constructor(options?: { webContents?: Electron.WebContents }) {
       if (options?.webContents) this.webContents = options.webContents;
       views.push(this);

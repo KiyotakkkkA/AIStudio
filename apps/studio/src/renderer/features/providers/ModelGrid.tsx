@@ -18,7 +18,7 @@ function ModelGrid() {
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-3 rounded-card border border-main-750 bg-main-900 p-4">
       <div className="flex flex-none items-center gap-2.5">
-        <h2 className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+        <h2 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           Доступные модели
           <span className="ml-1.5 text-[11px] font-normal tracking-normal text-main-500 normal-case">
             {providers.rows.length === 0
@@ -57,7 +57,7 @@ function ModelGrid() {
       </div>
 
       {providers.rows.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-750 bg-main-800/40">
+        <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-850">
           <EmptyState
             icon={mdiCubeOutline}
             title="Моделей пока нет"

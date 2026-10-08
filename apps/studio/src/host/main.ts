@@ -3,7 +3,7 @@ import { registerJobNodes } from "./kernel/jobNodes.ts";
 import { registerDownloadNodes } from "./kernel/downloadNodes.ts";
 import { ChatService } from "./services/ChatService.ts";
 import { join } from "node:path";
-import { app, BrowserWindow, dialog, ipcMain, net, safeStorage } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, safeStorage } from "electron";
 import { contract } from "@zvs/shared";
 import { createIpcServer } from "@zvs/ipc";
 import type { IpcServer } from "@zvs/ipc";
@@ -13,6 +13,7 @@ import type { StudioPaths } from "./platform/paths";
 import { createLogger } from "./platform/logger";
 import { DeviceProbe } from "./platform/device";
 import { electronGpuProbe } from "./platform/gpu";
+import { applyThemeSource, THEME_SETTING_KEY } from "./platform/theme";
 import type { Logger } from "./platform/logger";
 import { createEventBus } from "./platform/events";
 import type { EventBus, WindowSender } from "./platform/events";
@@ -156,6 +157,7 @@ if (!app.requestSingleInstanceLock()) {
       }
 
       settings = new SettingService({ data: database });
+      applyThemeSource(settings.get(THEME_SETTING_KEY)?.value, nativeTheme);
       const crypto = new CryptoService(safeStorage);
       secrets = new SecretService({ data: database, crypto, logger });
       logger.log("info", "host", "Secret store ready", {
@@ -349,6 +351,7 @@ if (!app.requestSingleInstanceLock()) {
           secrets,
           providers,
           healthCheck,
+          applyTheme: (value) => applyThemeSource(value, nativeTheme),
           accounts,
           system: new SystemService(core, { device, resources }),
         }),

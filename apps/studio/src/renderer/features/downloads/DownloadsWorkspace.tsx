@@ -6,6 +6,7 @@ import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
+import PageHeader from "../../ui/organisms/PageHeader";
 import TextInput from "../../ui/atoms/TextInput";
 import EmptyState from "../../ui/molecules/EmptyState";
 import CatalogueRow from "./CatalogueRow";
@@ -28,39 +29,42 @@ export default observer(function DownloadsWorkspace() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <header className="flex h-header flex-none items-center gap-3 border-b border-main-750 bg-main-900 px-5">
-        <Icon path={mdiTrayArrowDown} size={20} className="flex-none text-accent-dark" />
-        <h1 className="m-0 flex-none text-xl/7 font-semibold tracking-[-0.01em] text-main-50">
-          Загрузки
-        </h1>
-        <span className="ml-1.5 truncate text-xs/4 text-main-400">
-          {store.runningCount} загружается · {store.queued.length} в очереди
-          {disk === null
-            ? ""
-            : ` · занято ${formatBytes(disk.usedBytes)} из ${formatBytes(disk.totalBytes)}`}
-        </span>
-        <div className="flex-1" />
-        <Button
-          tone="ghost"
-          disabled={busy || store.runningCount === 0}
-          onClick={() => {
-            void store.pauseAll();
-          }}
-        >
-          <Icon path={mdiPause} size={14} />
-          Приостановить всё
-        </Button>
-        <Button
-          tone="secondary"
-          disabled={store.refreshing}
-          onClick={() => {
-            void store.refresh();
-          }}
-        >
-          <Icon path={mdiRefresh} size={14} />
-          Обновить каталог
-        </Button>
-      </header>
+      <PageHeader
+        icon={mdiTrayArrowDown}
+        title="Загрузки"
+        subtitle={
+          <>
+            {store.runningCount} загружается · {store.queued.length} в очереди
+            {disk === null
+              ? ""
+              : ` · занято ${formatBytes(disk.usedBytes)} из ${formatBytes(disk.totalBytes)}`}
+          </>
+        }
+        actions={
+          <>
+            <Button
+              tone="ghost"
+              disabled={busy || store.runningCount === 0}
+              onClick={() => {
+                void store.pauseAll();
+              }}
+            >
+              <Icon path={mdiPause} size={14} />
+              Приостановить всё
+            </Button>
+            <Button
+              tone="secondary"
+              disabled={store.refreshing}
+              onClick={() => {
+                void store.refresh();
+              }}
+            >
+              <Icon path={mdiRefresh} size={14} />
+              Обновить каталог
+            </Button>
+          </>
+        }
+      />
 
       <div className="flex min-h-0 flex-1">
         <DownloadFilterRail store={store} />
@@ -69,7 +73,7 @@ export default observer(function DownloadsWorkspace() {
           {store.error === null ? null : (
             <div
               role="alert"
-              className="flex items-center gap-3 border-b border-err-border px-4 py-2.5 text-xs text-err"
+              className="flex items-center gap-3 border-b border-err-border bg-err-soft px-5 py-2.5 text-[12.5px] text-err"
             >
               <span className="min-w-0 flex-1">{store.error}</span>
               <Button
@@ -84,8 +88,8 @@ export default observer(function DownloadsWorkspace() {
           )}
 
           <ScrollArea className="flex min-h-0 flex-1 flex-col">
-            <div className="flex items-center gap-2.5 border-b border-main-750 bg-main-900/40 px-4 py-2.5">
-              <span className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+            <div className="flex items-center gap-2.5 border-b border-main-750 bg-main-850 px-5 py-2">
+              <span className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                 Выполняется
               </span>
               <Chip>
@@ -97,7 +101,7 @@ export default observer(function DownloadsWorkspace() {
             </div>
 
             {store.active.length === 0 ? (
-              <p className="border-b border-main-750 p-4  text-[11.5px] text-main-500">
+              <p className="border-b border-main-750 p-4  text-[12px] text-main-500">
                 Сейчас ничего не загружается. Выберите артефакт в каталоге ниже.
               </p>
             ) : (
@@ -133,8 +137,8 @@ export default observer(function DownloadsWorkspace() {
 
             {store.failed.length === 0 ? null : (
               <>
-                <div className="flex items-center gap-2.5 border-y border-main-750 bg-main-900/40 px-4 py-2.5">
-                  <span className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-err uppercase">
+                <div className="flex items-center gap-2.5 border-y border-main-750 bg-main-850 px-5 py-2">
+                  <span className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-err uppercase">
                     Не удалось
                   </span>
                   <Chip>{store.failed.length}</Chip>
@@ -153,8 +157,8 @@ export default observer(function DownloadsWorkspace() {
               </>
             )}
 
-            <div className="flex items-center gap-2.5 border-y border-main-750 bg-main-900/40 px-4 py-2.5">
-              <span className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+            <div className="flex items-center gap-2.5 border-y border-main-750 bg-main-850 px-5 py-2">
+              <span className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                 Каталог
               </span>
               <div className="w-45">

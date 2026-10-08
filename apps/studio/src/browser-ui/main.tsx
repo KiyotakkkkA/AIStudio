@@ -88,8 +88,10 @@ function BrowserApp() {
         <div className="page-heading">
           <div className="page-title">
             <Icon path={mdiWeb} />
-            <h1>Браузер</h1>
-            <span className="heading-subtitle">Рабочее пространство</span>
+            <div className="page-title-text">
+              <h1>Браузер</h1>
+              <span className="heading-subtitle">Рабочее пространство</span>
+            </div>
           </div>
           <span className="profile-chip">
             <span className="profile-dot" />

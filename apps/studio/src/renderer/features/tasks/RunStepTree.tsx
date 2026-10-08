@@ -36,7 +36,7 @@ function rowsOf(graph: RunGraph | null, steps: readonly StepDto[]): StepRow[] {
 export default function RunStepTree({ graph, steps, now }: RunStepTreeProps) {
   const rows = rowsOf(graph, steps);
   if (rows.length === 0)
-    return <p className="text-[11.5px] text-main-500">У этого запуска нет шагов.</p>;
+    return <p className="text-[12px] text-main-500">У этого запуска нет шагов.</p>;
   return (
     <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
       {rows.map((row) => {
@@ -51,7 +51,7 @@ export default function RunStepTree({ graph, steps, now }: RunStepTreeProps) {
         return (
           <li
             key={row.nodeId}
-            className={`flex items-center gap-2 text-[11.5px] ${pending ? "opacity-50" : ""}`}
+            className={`flex items-center gap-2 text-[12px] ${pending ? "opacity-50" : ""}`}
           >
             <StatusDot tone={step === undefined ? "idle" : (STEP_TONES[step.status] ?? "idle")} />
             <span
@@ -62,7 +62,7 @@ export default function RunStepTree({ graph, steps, now }: RunStepTreeProps) {
             >
               {row.nodeId}
             </span>
-            <span className="flex-none font-mono text-[10.5px] text-main-500">{timing}</span>
+            <span className="flex-none font-mono text-[11px] text-main-500">{timing}</span>
           </li>
         );
       })}

@@ -1,4 +1,4 @@
-import { BrowserWindow, session } from "electron";
+import { BrowserWindow, nativeTheme, session } from "electron";
 import type { StudioPaths } from "./paths.ts";
 import type { Logger } from "./logger.ts";
 import {
@@ -23,6 +23,11 @@ export function installContentSecurityPolicy(developmentUrl?: string): void {
   });
 }
 
+/** The warm canvas behind the studio frame, matching `--zvs-main-950` in theme.css. */
+function canvasColor(): string {
+  return nativeTheme.shouldUseDarkColors ? "#0f0d0b" : "#ece6dd";
+}
+
 export function createStudioWindow(
   paths: StudioPaths,
   logger: Logger,
@@ -34,7 +39,7 @@ export function createStudioWindow(
     ...state.bounds,
     minWidth: MIN_WINDOW_WIDTH,
     minHeight: MIN_WINDOW_HEIGHT,
-    backgroundColor: "#191b20",
+    backgroundColor: canvasColor(),
     show: false,
     title: "ZVS AI Studio",
     webPreferences: {
@@ -68,7 +73,7 @@ export function createRecoveryWindow(details: {
   const window = new BrowserWindow({
     width: 720,
     height: 480,
-    backgroundColor: "#191b20",
+    backgroundColor: canvasColor(),
     title: "ZVS AI Studio — восстановление",
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
@@ -98,14 +103,23 @@ function recoveryHtml(message: string, backupsDir: string): string {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
 <title>Восстановление</title>
 <style>
-  body { margin: 0; padding: 32px; background: #191b20; color: #e6e8ee;
-         font: 14px/1.6 system-ui, sans-serif; }
-  h1 { font-size: 18px; margin: 0 0 12px; }
-  p { margin: 0 0 12px; }
-  code { display: block; padding: 12px; border-radius: 6px; background: #23262e;
-         color: #f2b8b5; white-space: pre-wrap; word-break: break-word; }
-  button { margin-top: 24px; padding: 8px 20px; border: 0; border-radius: 6px;
-           background: #3b6ef2; color: #fff; font: inherit; cursor: pointer; }
+  :root { color-scheme: light dark; --bg: #ece6dd; --ink: #1e1915; --muted: #6c6258;
+          --well: #fbe9e6; --line: #efc0b9; --err: #bf3a30; --accent: #c2571c; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f0d0b; --ink: #f7f1e8; --muted: #a89b8d;
+            --well: rgb(236 107 95 / 0.13); --line: rgb(236 107 95 / 0.36); --err: #ec6b5f;
+            --accent: #e57532; }
+  }
+  body { margin: 0; padding: 32px; background: var(--bg); color: var(--ink);
+         font: 14px/1.6 "Segoe UI", system-ui, sans-serif; }
+  h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 12px; }
+  p { margin: 0 0 12px; color: var(--muted); }
+  code { display: block; padding: 12px; border: 1px solid var(--line); border-radius: 8px;
+         background: var(--well); color: var(--err); white-space: pre-wrap;
+         word-break: break-word; }
+  button { margin-top: 24px; height: 32px; padding: 0 14px; border: 0; border-radius: 8px;
+           background: var(--accent); color: #fff; font: inherit; font-weight: 500;
+           cursor: pointer; }
 </style>
 </head>
 <body>

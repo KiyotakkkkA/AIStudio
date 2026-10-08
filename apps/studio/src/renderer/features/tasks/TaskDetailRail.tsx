@@ -24,7 +24,7 @@ export default observer(function TaskDetailRail({ store }: { readonly store: Tas
   return (
     <aside
       aria-label="Детали запуска"
-      className="flex w-80 flex-none flex-col border-l border-main-750 bg-main-900"
+      className="flex w-80 flex-none flex-col border-l border-main-750 bg-main-850"
     >
       {run === null ? (
         <div className="flex flex-1 items-center justify-center p-4">
@@ -45,12 +45,12 @@ export default observer(function TaskDetailRail({ store }: { readonly store: Tas
                 <span className="font-mono">{shortRunId(run.id)}</span>
               </Chip>
             </div>
-            <p className="m-0 font-mono text-[10.5px] text-main-500">
+            <p className="m-0 font-mono text-[11px] text-main-500">
               {KIND_LABELS[run.kind]} · {formatDateTime(run.startedAt ?? run.createdAt)}
             </p>
           </div>
 
-          <dl className="m-0 flex flex-col gap-1.5 rounded-card border border-main-750 bg-main-800 p-2.75 text-[11.5px]">
+          <dl className="m-0 flex flex-col gap-1.5 rounded-card border border-main-750 bg-main-900 shadow-card p-2.75 text-[12px]">
             <div className="flex justify-between gap-2">
               <dt className="text-main-400">Статус</dt>
               <dd className="m-0 font-mono">{STATUS_LABELS[run.status]}</dd>
@@ -77,10 +77,10 @@ export default observer(function TaskDetailRail({ store }: { readonly store: Tas
 
           {run.approval === undefined ? null : (
             <div className="flex flex-col gap-2 rounded-card border border-warn/40 bg-main-800 p-2.75">
-              <p className="m-0 text-[11.5px] text-warn">
+              <p className="m-0 text-[12px] text-warn">
                 Требуется решение: {run.approval.subject}
               </p>
-              <p className="m-0 font-mono text-[10.5px] text-main-500">
+              <p className="m-0 font-mono text-[11px] text-main-500">
                 область {run.approval.scope} · до {formatDateTime(run.approval.expiresAt)}
               </p>
               <div className="flex gap-2">
@@ -106,14 +106,14 @@ export default observer(function TaskDetailRail({ store }: { readonly store: Tas
             </div>
           )}
 
-          <p className="m-0 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+          <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             Шаги
           </p>
-          <div className="rounded-card border border-main-750 bg-main-800 p-2.75">
+          <div className="rounded-card border border-main-750 bg-main-900 shadow-card p-2.75">
             <RunStepTree graph={store.graph} steps={store.steps} now={store.now} />
           </div>
 
-          <p className="m-0 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+          <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             Входные данные
           </p>
           <JsonBlock value={store.payload} empty="запуск стартовал без входных данных" />

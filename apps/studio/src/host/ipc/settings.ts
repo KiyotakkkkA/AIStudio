@@ -6,12 +6,14 @@ import {
   HEALTH_CHECK_INTERVAL_KEY,
   type HealthCheckService,
 } from "../services/HealthCheckService.ts";
+import { THEME_SETTING_KEY } from "../platform/theme.ts";
 
 export type SettingHandlers = Pick<IpcHandlers<Contract>, "settings.get" | "settings.set">;
 
 export function createSettingHandlers(
   settings: SettingService,
   healthCheck?: HealthCheckService,
+  applyTheme?: (value: unknown) => void,
 ): SettingHandlers {
   return {
     "settings.get": ({ key }) => settings.get(key) ?? { key },
@@ -21,6 +23,7 @@ export function createSettingHandlers(
         healthCheck?.stop();
         healthCheck?.start();
       }
+      if (key === THEME_SETTING_KEY) applyTheme?.(value);
       return result;
     },
   };

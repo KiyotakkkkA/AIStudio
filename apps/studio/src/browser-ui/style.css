@@ -1,8 +1,12 @@
-/* Foundations.dc.html: shared app tokens, 56px header, 32px controls, 10px cards. */
+/*
+ * Browser chrome in the ZVS Warm system: shares theme.css tokens, so it follows the same
+ * light/dark mode as the studio (via nativeTheme). 64px heading + 38px tabs + 46px toolbar
+ * = CHROME_HEIGHT (148) in host/browser/policy.ts; the 28px footer is STATUS_HEIGHT.
+ */
 :root {
-  font: 13px/1.45 var(--font-sans);
+  font: 13px/1.5 var(--font-sans);
   color: var(--color-main-50);
-  background: var(--color-main-800);
+  background: var(--color-main-900);
 }
 * {
   box-sizing: border-box;
@@ -10,7 +14,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--color-main-800);
+  background: var(--color-main-900);
 }
 button,
 input {
@@ -18,36 +22,38 @@ input {
 }
 button {
   display: inline-flex;
-  gap: 7px;
+  gap: 6px;
   align-items: center;
   justify-content: center;
   height: 32px;
   color: var(--color-main-100);
-  background: var(--color-main-700);
-  border: 1px solid var(--color-main-600);
+  background: var(--color-main-900);
+  border: 1px solid var(--color-main-750);
   border-radius: var(--radius-control);
   padding: 0 12px;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: 0 1px 2px rgb(40 25 10 / 0.05);
 }
 button:hover {
-  background: var(--color-main-600);
+  background: var(--color-main-850);
+  border-color: var(--color-main-600);
 }
 button:disabled {
   opacity: 0.4;
   cursor: default;
 }
-button:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--color-accent-dark);
-  outline-offset: 2px;
+button:focus-visible {
+  outline: 2px solid var(--color-accent-line);
+  outline-offset: -2px;
 }
 button.primary {
   background: var(--color-accent-dark);
-  border-color: var(--color-accent-dark);
-  color: var(--color-main-900);
+  border-color: transparent;
+  color: var(--color-on-accent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14);
 }
 button.primary:hover {
   background: var(--color-accent-medium);
@@ -55,65 +61,90 @@ button.primary:hover {
 input {
   min-width: 0;
   height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--color-main-600);
+  padding: 0 12px;
+  border: 1px solid var(--color-main-750);
   border-radius: var(--radius-control);
   background: var(--color-main-900);
   color: var(--color-main-100);
-  font-size: 12.5px;
+  font-size: 13px;
+  outline: none;
+  transition:
+    border-color 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+input::placeholder {
+  color: var(--color-main-500);
+}
+input:hover {
+  border-color: var(--color-main-600);
+}
+input:focus-visible {
+  border-color: var(--color-accent-dark);
+  box-shadow: inset 0 0 0 1px var(--color-accent-dark);
 }
 header {
-  height: 136px;
+  height: 148px;
   background: var(--color-main-900);
 }
 .page-heading {
-  height: 56px;
+  height: 64px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--color-main-700);
+  gap: 16px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--color-main-750);
 }
 .page-title {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 .page-title > svg {
   flex-shrink: 0;
-  color: var(--color-accent-dark);
-  width: 20px;
-  height: 20px;
+  box-sizing: content-box;
+  width: 18px;
+  height: 18px;
+  padding: 8px;
+  border: 1px solid var(--color-accent-line);
+  border-radius: var(--radius-control);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-medium);
+}
+.page-title-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
 }
 .page-title h1 {
   flex-shrink: 0;
-  font-size: 20px;
-  line-height: 28px;
+  font-size: 17px;
+  line-height: 24px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   margin: 0;
 }
 .heading-subtitle {
-  margin-left: 6px;
   font-size: 12px;
   line-height: 16px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--color-main-400);
+  color: var(--color-main-500);
 }
 .profile-chip {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
   gap: 7px;
-  padding: 5px 9px;
-  border: 1px solid var(--color-main-600);
-  border-radius: var(--radius-pill);
-  background: var(--color-main-700);
-  color: var(--color-main-300);
-  font: 10.5px var(--font-mono);
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--color-accent-line);
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-medium);
+  font: 500 11px var(--font-sans);
 }
 .profile-dot {
   width: 6px;
@@ -122,20 +153,22 @@ header {
   background: var(--color-accent-dark);
 }
 .tabs {
-  height: 36px;
+  height: 38px;
   display: flex;
-  gap: 4px;
+  gap: 2px;
   align-items: end;
-  padding: 4px 12px 0;
+  padding: 6px 16px 0;
   overflow-x: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  background: var(--color-main-850);
 }
 .tabs > button {
   flex: 0 0 28px;
   border: 0;
   background: transparent;
-  height: 28px;
-  margin-bottom: 2px;
+  box-shadow: none;
+  height: 26px;
+  margin-bottom: 3px;
   padding: 0;
   color: var(--color-main-400);
 }
@@ -143,13 +176,14 @@ header {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 0 5px 0 2px;
+  padding: 0 4px 0 2px;
   flex: 0 0 190px;
   max-width: 230px;
   height: 32px;
   background: transparent;
-  border-radius: 7px 7px 0 0;
-  border-top: 2px solid transparent;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
 }
 .tabs > button:hover,
 .tab:hover,
@@ -157,22 +191,25 @@ header {
   background: var(--color-main-700);
 }
 .tab.active {
-  background: var(--color-main-800);
+  background: var(--color-main-900);
+  border-color: var(--color-main-750);
+  box-shadow: inset 0 2px 0 var(--color-accent-dark);
 }
 .tab.active:hover,
 .tab.active:focus-within {
-  background: var(--color-main-750);
+  background: var(--color-main-900);
 }
 .tab button {
   height: 30px;
   background: transparent;
   border: 0;
+  box-shadow: none;
   color: var(--color-main-400);
   font-weight: 500;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .tab.active button {
-  color: var(--color-main-100);
+  color: var(--color-main-50);
 }
 .tab .tab-title {
   display: block;
@@ -188,7 +225,7 @@ header {
   width: 22px;
   height: 22px;
   padding: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--color-main-500);
 }
 .tab .tab-close svg {
@@ -204,30 +241,37 @@ header {
 }
 .tab .tab-close:hover {
   color: var(--color-main-50);
-  background: var(--color-main-600);
-}
-.tab button:focus-visible {
-  outline-offset: -2px;
+  background: var(--color-main-700);
 }
 .toolbar {
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 5px 12px 6px;
-  height: 44px;
-  background: var(--color-main-800);
-  border-bottom: 1px solid var(--color-main-600);
+  padding: 0 16px;
+  height: 46px;
+  background: var(--color-main-900);
+  border-top: 1px solid var(--color-main-750);
+  border-bottom: 1px solid var(--color-main-750);
+  margin-top: -1px;
 }
 .toolbar input {
   flex: 1;
-  font: 12px var(--font-mono);
+  height: 32px;
+  border-radius: 999px;
+  padding: 0 16px;
+  background: var(--color-main-850);
+  font: 12.5px var(--font-mono);
+}
+.toolbar input:focus-visible {
+  background: var(--color-main-900);
 }
 .toolbar > button:nth-child(-n + 3) {
-  width: 30px;
+  width: 32px;
   background: transparent;
   border-color: transparent;
+  box-shadow: none;
   padding: 0;
-  color: var(--color-main-300);
+  color: var(--color-main-400);
 }
 .toolbar > button {
   flex-shrink: 0;
@@ -237,29 +281,45 @@ header {
   color: var(--color-main-50);
 }
 .toolbar > button[aria-pressed="true"] {
-  border-color: var(--color-accent-dark);
+  border-color: var(--color-accent-line);
+  background: var(--color-accent-soft);
   color: var(--color-accent-medium);
 }
 .security {
   flex-shrink: 0;
-  padding: 0 4px;
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--color-main-750);
+  border-radius: 999px;
+  background: var(--color-main-850);
+  font-size: 10.5px;
+  font-weight: 500;
   color: var(--color-main-400);
-  max-width: 104px;
-  line-height: 1.35;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .security.https {
   color: var(--color-ok);
+  border-color: var(--color-ok-line);
+  background: var(--color-ok-soft);
 }
 .security.http {
   color: var(--color-warn);
+  border-color: var(--color-warn-line);
+  background: var(--color-warn-soft);
 }
 .security.error {
   color: var(--color-err);
+  border-color: var(--color-err-border);
+  background: var(--color-err-soft);
 }
 main {
   position: absolute;
-  inset: 136px 0 28px;
+  inset: 148px 0 28px;
   overflow: auto;
 }
 footer {
@@ -271,11 +331,11 @@ footer {
   justify-content: space-between;
   gap: 20px;
   align-items: center;
-  padding: 0 12px;
+  padding: 0 16px;
   font-size: 11px;
-  color: var(--color-main-400);
-  border-top: 1px solid var(--color-main-700);
-  background: var(--color-main-900);
+  color: var(--color-main-500);
+  border-top: 1px solid var(--color-main-750);
+  background: var(--color-main-850);
 }
 footer span:first-child {
   overflow: hidden;
@@ -289,55 +349,64 @@ footer span:last-child {
 h1 {
   font-size: 20px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   margin: 0 0 6px;
 }
 h2 {
   font-size: 15px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   margin: 0;
   overflow-wrap: anywhere;
 }
 p {
   color: var(--color-main-400);
   margin: 0;
-  font-size: 12.5px;
-  line-height: 1.62;
+  font-size: 13px;
+  line-height: 1.6;
 }
 .welcome {
-  max-width: 660px;
-  margin: 9vh auto;
+  max-width: 620px;
+  margin: 10vh auto;
   text-align: center;
   padding: 24px;
 }
 .welcome-icon {
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   margin: 20px auto;
-  border: 1px solid var(--color-main-600);
-  border-radius: 14px;
-  background: var(--color-main-900);
-  color: var(--color-accent-dark);
+  border: 1px solid var(--color-accent-line);
+  border-radius: var(--radius-card);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-medium);
 }
 .welcome-icon svg {
   width: 28px;
   height: 28px;
 }
 .badge {
-  color: var(--color-main-400);
-  letter-spacing: 0.08em;
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border: 1px solid var(--color-main-750);
+  border-radius: 999px;
+  background: var(--color-main-850);
+  color: var(--color-main-500);
+  letter-spacing: 0.12em;
+  font-size: 10.5px;
   font-weight: 600;
 }
 .site-avatar {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: var(--color-main-700);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-main-750);
+  background: var(--color-main-850);
   font-size: 16px;
   color: var(--color-accent-medium);
 }
@@ -352,11 +421,11 @@ p {
   color: var(--color-main-100);
 }
 .site-card small {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 400;
 }
 .sites {
-  padding: 18px 20px;
+  padding: 20px 24px;
   max-width: 1200px;
   margin: auto;
 }
@@ -367,7 +436,6 @@ p {
   gap: 20px;
 }
 .heading > button {
-  background: transparent;
   font-weight: 500;
 }
 .filters {
@@ -378,79 +446,100 @@ p {
 }
 .filters input {
   flex: 1;
+  height: 36px;
 }
 .filters > span {
-  font-size: 11px;
-  color: var(--color-main-400);
+  font-size: 12px;
+  color: var(--color-main-500);
 }
 article {
-  border: 1px solid var(--color-main-600);
+  border: 1px solid var(--color-main-750);
   border-radius: var(--radius-card);
-  margin: 14px 0;
-  padding: 14px;
+  background: var(--color-main-900);
+  box-shadow: var(--shadow-card);
+  margin: 12px 0;
+  overflow: hidden;
+}
+article > .heading {
+  padding: 12px 16px;
+  background: var(--color-main-850);
+  border-bottom: 1px solid var(--color-main-750);
 }
 article .heading h2 {
-  font: 12px var(--font-mono);
-  color: var(--color-main-200);
+  font: 500 12.5px var(--font-mono);
+  color: var(--color-main-100);
 }
 article .heading button,
 td button {
+  height: 28px;
   color: var(--color-err);
   background: transparent;
+  border-color: var(--color-err-border);
+  box-shadow: none;
+}
+article .heading button:hover,
+td button:hover {
+  background: var(--color-err-soft);
   border-color: var(--color-err-border);
 }
 table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 12px;
   table-layout: fixed;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 th,
 td {
   text-align: left;
-  padding: 10px;
-  border-bottom: 1px solid var(--color-main-700);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-main-750);
   overflow-wrap: anywhere;
 }
 th {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--color-main-400);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-main-500);
 }
 td:first-child {
-  font: 11px var(--font-mono);
+  font: 12px var(--font-mono);
 }
 tbody tr:last-child td {
   border-bottom: 0;
 }
+tbody tr:hover td {
+  background: var(--color-main-850);
+}
 small {
   display: block;
-  color: var(--color-main-400);
+  color: var(--color-main-500);
 }
 .empty {
   padding: 40px;
   text-align: center;
   border: 1px dashed var(--color-main-600);
   border-radius: var(--radius-card);
+  background: var(--color-main-850);
 }
 .overlay {
   position: fixed;
-  inset: 136px 0 28px;
-  background: #000a;
+  inset: 148px 0 28px;
+  background: rgb(20 14 8 / 0.45);
+  backdrop-filter: blur(2px);
   display: grid;
   place-items: center;
 }
 .overlay > div {
-  background: var(--color-main-800);
-  border: 1px solid var(--color-main-600);
+  background: var(--color-main-900);
+  border: 1px solid var(--color-main-750);
   border-radius: var(--radius-card);
-  padding: 24px;
-  max-width: 500px;
-  box-shadow: 0 16px 48px #0006;
+  padding: 20px;
+  max-width: 460px;
+  box-shadow: var(--shadow-pop);
 }
 .overlay p {
-  margin: 12px 0 20px;
+  margin: 8px 0 20px;
 }
 @media (max-width: 900px) {
   .heading-subtitle {

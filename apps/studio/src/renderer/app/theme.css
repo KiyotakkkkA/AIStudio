@@ -1,61 +1,228 @@
 @import "tailwindcss";
 @import "@kiyotakkkka/zvs-uikit-lib/styles.css";
+@import "@fontsource-variable/onest";
+@import "@fontsource-variable/jetbrains-mono";
 
 @source "../../../node_modules/@kiyotakkkka/zvs-uikit-lib/dist";
 
+/*
+ * ZVS Warm — the studio design system.
+ *
+ * Baseline follows the ZVS product family (Artifactory, ZVS ID, Testix): Onest type,
+ * 13px body, 11px tracked uppercase eyebrows, hairline borders, 8px controls, 12px cards,
+ * a 16px inset content frame and soft layered shadows. Colour stays warm — sand paper in
+ * the light theme, roasted umber in the dark one, an ember accent in both.
+ *
+ * `main-*` is an ink scale, not a lightness scale: 900 is the page surface, 50 is the
+ * strongest ink. Both themes keep that meaning, which is why the UI kit (built on the same
+ * scale) re-themes without overrides.
+ */
+
 @theme {
-  --color-main-50: #fbf1c7;
-  --color-main-100: #ebdbb2;
-  --color-main-200: #d5c4a1;
-  --color-main-300: #bdae93;
-  --color-main-400: #a89984;
-  --color-main-500: #928374;
-  --color-main-600: #665c54;
-  --color-main-700: #494441;
-  --color-main-750: #353230;
-  --color-main-800: #232323;
-  --color-main-900: #181818;
+  --color-main-50: var(--zvs-main-50);
+  --color-main-100: var(--zvs-main-100);
+  --color-main-200: var(--zvs-main-200);
+  --color-main-300: var(--zvs-main-300);
+  --color-main-400: var(--zvs-main-400);
+  --color-main-500: var(--zvs-main-500);
+  --color-main-600: var(--zvs-main-600);
+  --color-main-700: var(--zvs-main-700);
+  --color-main-750: var(--zvs-main-750);
+  --color-main-800: var(--zvs-main-800);
+  --color-main-850: var(--zvs-main-850);
+  --color-main-900: var(--zvs-main-900);
+  --color-main-950: var(--zvs-main-950);
 
-  --color-accent-light: #ffc06a;
-  --color-accent-medium: #f08a24;
-  --color-accent-dark: #d96512;
+  --color-accent-light: var(--zvs-accent-light);
+  --color-accent-medium: var(--zvs-accent-medium);
+  --color-accent-dark: var(--zvs-accent-dark);
+  --color-accent-soft: var(--zvs-accent-soft);
+  --color-accent-line: var(--zvs-accent-line);
+  --color-on-accent: var(--zvs-on-accent);
 
-  --color-ok: #b8bb26;
-  --color-warn: #fabd2f;
-  --color-err: #fb4934;
-  --color-error: #fb4934;
-  --color-err-border: #7c2f2a;
+  --color-ok: var(--zvs-ok);
+  --color-warn: var(--zvs-warn);
+  --color-err: var(--zvs-err);
+  --color-error: var(--zvs-err);
+  --color-err-border: var(--zvs-err-line);
+  --color-info: var(--zvs-info);
 
-  --color-success-light: #b8bb26;
-  --color-success-medium: #8ec07c;
-  --color-success-dark: #689d6a;
+  --color-ok-soft: var(--zvs-ok-soft);
+  --color-warn-soft: var(--zvs-warn-soft);
+  --color-err-soft: var(--zvs-err-soft);
+  --color-info-soft: var(--zvs-info-soft);
+  --color-ok-line: var(--zvs-ok-line);
+  --color-warn-line: var(--zvs-warn-line);
+  --color-info-line: var(--zvs-info-line);
 
-  --color-warning-light: #fabd2f;
-  --color-warning-medium: #d79921;
-  --color-warning-dark: #b57614;
+  --color-success-light: var(--zvs-ok-soft);
+  --color-success-medium: var(--zvs-ok);
+  --color-success-dark: var(--zvs-ok);
 
-  --color-danger-light: #fb4934;
-  --color-danger-medium: #cc241d;
-  --color-danger-dark: #9d0006;
+  --color-warning-light: var(--zvs-warn-soft);
+  --color-warning-medium: var(--zvs-warn);
+  --color-warning-dark: var(--zvs-warn);
 
-  --color-info-light: #83a598;
-  --color-info-medium: #458588;
-  --color-info-dark: #076678;
+  --color-danger-light: #e0564d;
+  --color-danger-medium: #c8372d;
+  --color-danger-dark: #a32a22;
 
-  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", Consolas, "Cascadia Mono", monospace;
+  --color-info-light: var(--zvs-info-soft);
+  --color-info-medium: var(--zvs-info);
+  --color-info-dark: var(--zvs-info);
 
-  --radius-card: 10px;
-  --radius-control: 6px;
-  --radius-pill: 5px;
+  --font-sans: "Onest Variable", "Onest", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", Consolas, "Cascadia Mono", monospace;
 
-  --spacing-rail: 248px;
+  --radius-frame: 16px;
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-pill: 6px;
+
+  --shadow-card: var(--zvs-shadow-card);
+  --shadow-pop: var(--zvs-shadow-pop);
+  --shadow-frame: var(--zvs-shadow-frame);
+
+  --spacing-rail: 244px;
   --spacing-rail-collapsed: 64px;
-  --spacing-header: 56px;
+  --spacing-header: 64px;
 }
 
-:root {
+/* Light — warm paper. */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --zvs-main-950: #ece6dd;
+  --zvs-main-900: #ffffff;
+  --zvs-main-850: #fdfbf8;
+  --zvs-main-800: #faf7f3;
+  --zvs-main-750: #ebe4da;
+  --zvs-main-700: #f2ede6;
+  --zvs-main-600: #ddd4c8;
+  --zvs-main-500: #8a7e71;
+  --zvs-main-400: #6c6258;
+  --zvs-main-300: #574e46;
+  --zvs-main-200: #453d36;
+  --zvs-main-100: #2f2924;
+  --zvs-main-50: #1e1915;
+
+  --zvs-accent-light: #9a4214;
+  --zvs-accent-medium: #b04c18;
+  --zvs-accent-dark: #c2571c;
+  --zvs-accent-soft: #fbece1;
+  --zvs-accent-line: #f0c9ad;
+  --zvs-on-accent: #ffffff;
+
+  --zvs-ok: #4d7a2a;
+  --zvs-warn: #a46b0d;
+  --zvs-err: #bf3a30;
+  --zvs-info: #3f6c84;
+  --zvs-ok-soft: #edf3e3;
+  --zvs-warn-soft: #faf0d9;
+  --zvs-err-soft: #fbe9e6;
+  --zvs-info-soft: #e7eff3;
+  --zvs-ok-line: #c9dcb3;
+  --zvs-warn-line: #ecd29c;
+  --zvs-err-line: #efc0b9;
+  --zvs-info-line: #bfd3de;
+
+  --zvs-shadow-card: 0 1px 2px rgb(60 40 20 / 0.04), 0 8px 24px rgb(60 40 20 / 0.05);
+  --zvs-shadow-pop: 0 2px 6px rgb(60 40 20 / 0.06), 0 18px 44px rgb(60 40 20 / 0.12);
+  --zvs-shadow-frame: 0 1px 2px rgb(60 40 20 / 0.04), 0 10px 30px rgb(60 40 20 / 0.06);
+  --zvs-shimmer: rgb(120 90 60 / 0.08);
+  --zvs-scrollbar: rgb(120 100 80 / 0.3);
+}
+
+/* Dark — roasted umber. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --zvs-main-950: #0f0d0b;
+    --zvs-main-900: #181513;
+    --zvs-main-850: #1c1916;
+    --zvs-main-800: #1f1b18;
+    --zvs-main-750: #302a25;
+    --zvs-main-700: #2a2521;
+    --zvs-main-600: #463e37;
+    --zvs-main-500: #8c8074;
+    --zvs-main-400: #a89b8d;
+    --zvs-main-300: #c3b7a9;
+    --zvs-main-200: #d8cec2;
+    --zvs-main-100: #ebe3d8;
+    --zvs-main-50: #f7f1e8;
+
+    --zvs-accent-light: #ffb27a;
+    --zvs-accent-medium: #f2914d;
+    --zvs-accent-dark: #e57532;
+    --zvs-accent-soft: rgb(229 117 50 / 0.14);
+    --zvs-accent-line: rgb(229 117 50 / 0.38);
+    --zvs-on-accent: #1a1007;
+
+    --zvs-ok: #a9be6a;
+    --zvs-warn: #e5b350;
+    --zvs-err: #ec6b5f;
+    --zvs-info: #8fb3c4;
+    --zvs-ok-soft: rgb(169 190 106 / 0.13);
+    --zvs-warn-soft: rgb(229 179 80 / 0.13);
+    --zvs-err-soft: rgb(236 107 95 / 0.13);
+    --zvs-info-soft: rgb(143 179 196 / 0.13);
+    --zvs-ok-line: rgb(169 190 106 / 0.32);
+    --zvs-warn-line: rgb(229 179 80 / 0.32);
+    --zvs-err-line: rgb(236 107 95 / 0.36);
+    --zvs-info-line: rgb(143 179 196 / 0.32);
+
+    --zvs-shadow-card: 0 1px 2px rgb(0 0 0 / 0.25);
+    --zvs-shadow-pop: 0 2px 6px rgb(0 0 0 / 0.3), 0 18px 44px rgb(0 0 0 / 0.45);
+    --zvs-shadow-frame: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.25);
+    --zvs-shimmer: rgb(255 240 220 / 0.06);
+    --zvs-scrollbar: rgb(200 180 160 / 0.22);
+  }
+}
+
+:root[data-theme="dark"] {
   color-scheme: dark;
+
+  --zvs-main-950: #0f0d0b;
+  --zvs-main-900: #181513;
+  --zvs-main-850: #1c1916;
+  --zvs-main-800: #1f1b18;
+  --zvs-main-750: #302a25;
+  --zvs-main-700: #2a2521;
+  --zvs-main-600: #463e37;
+  --zvs-main-500: #8c8074;
+  --zvs-main-400: #a89b8d;
+  --zvs-main-300: #c3b7a9;
+  --zvs-main-200: #d8cec2;
+  --zvs-main-100: #ebe3d8;
+  --zvs-main-50: #f7f1e8;
+
+  --zvs-accent-light: #ffb27a;
+  --zvs-accent-medium: #f2914d;
+  --zvs-accent-dark: #e57532;
+  --zvs-accent-soft: rgb(229 117 50 / 0.14);
+  --zvs-accent-line: rgb(229 117 50 / 0.38);
+  --zvs-on-accent: #1a1007;
+
+  --zvs-ok: #a9be6a;
+  --zvs-warn: #e5b350;
+  --zvs-err: #ec6b5f;
+  --zvs-info: #8fb3c4;
+  --zvs-ok-soft: rgb(169 190 106 / 0.13);
+  --zvs-warn-soft: rgb(229 179 80 / 0.13);
+  --zvs-err-soft: rgb(236 107 95 / 0.13);
+  --zvs-info-soft: rgb(143 179 196 / 0.13);
+  --zvs-ok-line: rgb(169 190 106 / 0.32);
+  --zvs-warn-line: rgb(229 179 80 / 0.32);
+  --zvs-err-line: rgb(236 107 95 / 0.36);
+  --zvs-info-line: rgb(143 179 196 / 0.32);
+
+  --zvs-shadow-card: 0 1px 2px rgb(0 0 0 / 0.25);
+  --zvs-shadow-pop: 0 2px 6px rgb(0 0 0 / 0.3), 0 18px 44px rgb(0 0 0 / 0.45);
+  --zvs-shadow-frame: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.25);
+  --zvs-shimmer: rgb(255 240 220 / 0.06);
+  --zvs-scrollbar: rgb(200 180 160 / 0.22);
 }
 
 html,
@@ -66,10 +233,54 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-main-800);
+  background: var(--color-main-950);
   color: var(--color-main-50);
   font-family: var(--font-sans);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
+  font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-main-50);
+}
+
+/* Inset so scroll containers never clip it; text fields draw their own focus border. */
+:focus-visible {
+  outline: 2px solid var(--color-accent-line);
+  outline-offset: -2px;
+  transition: none;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[contenteditable]:focus-visible {
+  outline: none;
+}
+
+.zvs-scroll-area {
+  scrollbar-color: var(--zvs-scrollbar) transparent;
+}
+
+.zvs-scroll-area::-webkit-scrollbar-thumb {
+  background: var(--zvs-scrollbar);
+  background-clip: padding-box;
+}
+
+.zvs-shimmer::after {
+  background: linear-gradient(90deg, transparent, var(--zvs-shimmer), transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  a,
+  [role="tab"] {
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: 120ms;
+    transition-timing-function: ease-out;
+  }
 }

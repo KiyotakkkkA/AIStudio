@@ -42,45 +42,49 @@ export default function ChatMessage({
     <article aria-label="Ответ ассистента" className="group flex min-w-0 gap-3">
       <span
         aria-hidden="true"
-        className="flex size-6.5 shrink-0 items-center justify-center rounded-[7px] bg-accent-dark font-semibold text-main-900"
+        className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-control bg-linear-to-br from-accent-medium to-accent-dark text-[12px] font-semibold text-on-accent shadow-[inset_0_1px_0_rgb(255_255_255/0.2)]"
       >
         Z
       </span>
       <div className="min-w-0 flex-1">
         <div className="space-y-3">
           {reasoning && (
-            <Accordion className="rounded-card border border-main-750 bg-main-800/40">
-              <Accordion.Summary className="w-full text-left text-xs text-main-400">
+            <Accordion className="rounded-card border border-main-750 bg-main-850 px-3.5 py-2.5">
+              <Accordion.Summary className="w-full text-left text-[12px] font-medium text-main-400">
                 Размышления
               </Accordion.Summary>
-              <Accordion.Content className="mt-2 text-xs/relaxed  whitespace-pre-wrap text-main-400">
+              <Accordion.Content className="mt-2 border-l-2 border-main-750 pl-3 text-[12.5px]/relaxed whitespace-pre-wrap text-main-400">
                 {reasoning}
               </Accordion.Content>
             </Accordion>
           )}
           <ChatMarkdown content={content} />
           {generating && (
-            <p role="status" className="text-xs text-accent-medium">
+            <p
+              role="status"
+              className="inline-flex items-center gap-2 text-[12px] font-medium text-accent-medium"
+            >
+              <span className="size-1.5 animate-pulse rounded-full bg-accent-dark" />
               Генерация…
             </p>
           )}
           {citations.length > 0 && (
             <button
               type="button"
-              className="inline-flex h-8 items-center gap-2 rounded-lg bg-main-800 px-3 text-xs text-main-300 hover:bg-main-750 hover:text-main-100"
+              className="inline-flex h-7.5 items-center gap-2 rounded-full border border-main-750 bg-main-900 pr-1.5 pl-3 text-[12px] font-medium text-main-300 shadow-[0_1px_2px_rgb(40_25_10/0.05)] hover:border-main-600 hover:text-main-50"
               onClick={() => setSourcesOpen(true)}
             >
-              <Icon path={mdiDatabaseOutline} size={16} />
+              <Icon path={mdiDatabaseOutline} size={15} className="text-accent-medium" />
               Источники
-              <span className="rounded-pill bg-main-700 px-1.5 py-0.5 text-[10px] text-main-100">
+              <span className="rounded-full bg-accent-soft px-1.75 py-0.5 text-[11px] text-accent-medium tabular-nums">
                 {citations.length}
               </span>
             </button>
           )}
           {partial && !generating && (
-            <p className="text-xs text-warn">Частичный ответ · генерация не завершена</p>
+            <p className="text-[12px] text-warn">Частичный ответ · генерация не завершена</p>
           )}
-          {usage && <p className="font-mono text-[10.5px] text-main-500">{usage}</p>}
+          {usage && <p className="font-mono text-[11px] text-main-500">{usage}</p>}
         </div>
         <div className="mt-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <MessageActions
@@ -96,21 +100,21 @@ export default function ChatMessage({
         onClose={() => setSourcesOpen(false)}
         label="Источники ответа"
         panelPlacement="right"
-        className="w-136 max-w-[92vw] border-l border-main-750 bg-main-900"
+        className="w-136 max-w-[92vw] border-l border-main-750 bg-main-850 shadow-pop"
       >
-        <SlidedPanel.Header className="border-b border-main-750 px-5 py-4">
+        <SlidedPanel.Header className="border-b border-main-750 px-6 py-4.5">
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <SlidedPanel.Title className="text-base font-semibold text-main-50">
+              <SlidedPanel.Title className="text-[16px] font-semibold tracking-[-0.01em] text-main-50">
                 Источники ответа
               </SlidedPanel.Title>
-              <SlidedPanel.Subtitle className="mt-1 text-xs text-main-500">
+              <SlidedPanel.Subtitle className="mt-0.5 text-[12px] text-main-500">
                 Внешние данные, использованные при подготовке ответа
               </SlidedPanel.Subtitle>
             </div>
           </div>
         </SlidedPanel.Header>
-        <SlidedPanel.Content className="flex min-h-0 flex-1 flex-col gap-4 p-4">
+        <SlidedPanel.Content className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-5">
           <Tabs
             value={selectedStoreId}
             onChange={(value) => {
@@ -122,24 +126,30 @@ export default function ChatMessage({
               label: stores.find((store) => store.id === id)?.name ?? "Хранилище",
             }))}
             label="Хранилища источников"
-            classNames={{ list: "flex-wrap", tab: "text-xs", activeTab: "text-xs" }}
+            classNames={{
+              list: "flex-wrap",
+              tab: "text-[12px]",
+              activeTab: "text-[12px] text-accent-medium",
+            }}
           />
           <ScrollArea className="min-h-0 flex-1" showScrollbar>
             <div className="space-y-2 pr-1">
               {selectedCitations.map((citation) => (
                 <article
                   key={`${citation.documentId}:${citation.chunkIndex}`}
-                  className="rounded-card border border-main-750 bg-main-800 p-3"
+                  className="rounded-card border border-main-750 bg-main-900 p-3.5"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <h3 className="min-w-0 truncate text-sm font-semibold text-main-100">
+                    <h3 className="min-w-0 truncate text-[13px] font-semibold text-main-100">
                       {citation.sourcePath}
                     </h3>
-                    <span className="shrink-0 text-xs font-semibold text-main-300">
+                    <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent-medium tabular-nums">
                       {(citation.score * 100).toFixed(0)}%
                     </span>
                   </div>
-                  <p className="mt-2 text-xs text-main-500">Фрагмент {citation.chunkIndex + 1}</p>
+                  <p className="mt-1.5 text-[12px] text-main-500">
+                    Фрагмент {citation.chunkIndex + 1}
+                  </p>
                 </article>
               ))}
             </div>

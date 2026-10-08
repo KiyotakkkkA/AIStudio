@@ -5,7 +5,7 @@ import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
-import Icon from "../../ui/atoms/Icon";
+import PageHeader from "../../ui/organisms/PageHeader";
 import EmptyState from "../../ui/molecules/EmptyState";
 import TaskDetailRail from "./TaskDetailRail";
 import TaskFilterRail from "./TaskFilterRail";
@@ -33,42 +33,45 @@ export default observer(function TasksWorkspace() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <header className="flex h-header flex-none items-center gap-3 border-b border-main-750 bg-main-900 px-5">
-        <Icon path={mdiClockOutline} size={20} className="flex-none text-accent-dark" />
-        <h1 className="m-0 flex-none text-xl/7 font-semibold tracking-[-0.01em] text-main-50">
-          Задачи
-        </h1>
-        <span className="ml-1.5 truncate text-xs/4 text-main-400">
-          {byStatus.running} выполняется · {byStatus.queued} в очереди · {byStatus.blocked} ждут
-          решения
-        </span>
-        <div className="flex-1" />
-        <Button
-          tone="secondary"
-          disabled={store.loading}
-          onClick={() => {
-            void store.load();
-          }}
-        >
-          Обновить
-        </Button>
-        <Button
-          tone="ghost"
-          disabled={store.clearing}
-          needConfirm
-          modalSetup={{
-            title: "Очистить историю завершённых запусков?",
-            content:
-              "Завершённые запуски и их шаги будут удалены. Запуски, на которые ссылаются сообщения чата, сохранятся.",
-            confirmLabel: "Очистить",
-          }}
-          onClick={() => {
-            void store.clearFinished();
-          }}
-        >
-          Очистить завершённые
-        </Button>
-      </header>
+      <PageHeader
+        icon={mdiClockOutline}
+        title="Задачи"
+        subtitle={
+          <>
+              {byStatus.running} выполняется · {byStatus.queued} в очереди · {byStatus.blocked} ждут
+              решения
+          </>
+        }
+        actions={
+          <>
+            <Button
+              tone="secondary"
+              disabled={store.loading}
+              onClick={() => {
+                void store.load();
+              }}
+            >
+              Обновить
+            </Button>
+            <Button
+              tone="ghost"
+              disabled={store.clearing}
+              needConfirm
+              modalSetup={{
+                title: "Очистить историю завершённых запусков?",
+                content:
+                  "Завершённые запуски и их шаги будут удалены. Запуски, на которые ссылаются сообщения чата, сохранятся.",
+                confirmLabel: "Очистить",
+              }}
+              onClick={() => {
+                void store.clearFinished();
+              }}
+            >
+              Очистить завершённые
+            </Button>
+          </>
+        }
+      />
 
       <div className="flex min-h-0 flex-1">
         <TaskFilterRail store={store} />
@@ -76,7 +79,7 @@ export default observer(function TasksWorkspace() {
           {store.error === null ? null : (
             <div
               role="alert"
-              className="flex items-center gap-3 border-b border-err-border px-4 py-2.5 text-xs text-err"
+              className="flex items-center gap-3 border-b border-err-border bg-err-soft px-5 py-2.5 text-[12.5px] text-err"
             >
               <span className="min-w-0 flex-1">{store.error}</span>
               <Button
@@ -92,8 +95,8 @@ export default observer(function TasksWorkspace() {
           <ScrollArea className="flex min-h-0 flex-1 flex-col">
             {sections.map((group) => (
               <section key={group}>
-                <div className="flex items-center gap-2.5 border-b border-main-750 bg-main-900/40 px-4 py-2.5">
-                  <span className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+                <div className="flex items-center gap-2.5 border-b border-main-750 bg-main-850 px-5 py-2">
+                  <span className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                     {GROUP_TITLES[group]}
                   </span>
                   <Chip>{groups[group].length}</Chip>

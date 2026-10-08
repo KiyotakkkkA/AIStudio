@@ -55,7 +55,7 @@ export default function TaskRow({
   const stoppable = live || run.status === "queued";
   return (
     <div
-      className={`flex items-center gap-3 border-b border-main-750 px-4 py-2.75 ${
+      className={`flex items-center gap-3 border-b border-main-750 px-5 py-3 ${
         selected ? "bg-main-750 shadow-[inset_2px_0_0_var(--color-accent-dark)]" : "hover:bg-main-800"
       }`}
     >
@@ -66,13 +66,13 @@ export default function TaskRow({
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >
         <span
-          className={`flex size-7.5 flex-none items-center justify-center rounded-lg bg-main-700 ${STATUS_TONE_TEXT[tone]}`}
+          className={`flex size-9 flex-none items-center justify-center rounded-control border border-main-750 bg-main-850 ${STATUS_TONE_TEXT[tone]}`}
         >
           <Icon path={KIND_ICONS[run.kind]} size={16} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.75">
           <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-[12.5px] font-semibold text-main-100">{run.title}</span>
+            <span className="truncate text-[13px] font-semibold text-main-100">{run.title}</span>
             <Chip>{KIND_LABELS[run.kind]}</Chip>
             <Chip title={run.id}>
               <span className="font-mono">{shortRunId(run.id)}</span>
@@ -80,15 +80,15 @@ export default function TaskRow({
             {run.retryOfId === undefined ? null : <Chip title={run.retryOfId}>повтор</Chip>}
           </span>
           <span className="flex min-w-0 items-center gap-2.25">
-            <span className="flex-none font-mono text-[10.5px] text-main-400">
+            <span className="flex-none font-mono text-[11px] text-main-400">
               {runSubline(run)}
             </span>
             {note ? (
-              <span className={`truncate text-[10.5px] ${STATUS_TONE_TEXT[tone]}`} title={note}>
+              <span className={`truncate text-[11px] ${STATUS_TONE_TEXT[tone]}`} title={note}>
                 {note}
               </span>
             ) : (
-              <span className="flex-none font-mono text-[10.5px] text-main-500">
+              <span className="flex-none font-mono text-[11px] text-main-500">
                 {run.startedAt === undefined
                   ? "ожидает запуска"
                   : `начат в ${new Date(run.startedAt).toLocaleTimeString("ru-RU", { hour12: false })}`}
@@ -96,9 +96,9 @@ export default function TaskRow({
             )}
           </span>
           {live ? (
-            <span className="mt-0.75 block h-0.75 w-full rounded-sm bg-main-700">
+            <span className="mt-0.75 block h-1 w-full rounded-full bg-main-700">
               <span
-                className={`block h-0.75 rounded-sm ${BAR_TONE[tone] ?? "bg-accent-dark"}`}
+                className={`block h-1 rounded-sm ${BAR_TONE[tone] ?? "bg-accent-dark"}`}
                 style={{ width: `${String(percent)}%` }}
               />
             </span>

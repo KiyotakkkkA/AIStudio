@@ -6,7 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { RunId, RunKind, RunStatus } from "@zvs/shared";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
-import Icon from "../../ui/atoms/Icon";
+import PageHeader from "../../ui/organisms/PageHeader";
 import TextInput from "../../ui/atoms/TextInput";
 import EmptyState from "../../ui/molecules/EmptyState";
 import RunDetailPanel from "./RunDetailPanel";
@@ -39,35 +39,38 @@ export default observer(function RunsWorkspace() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <header className="flex h-header flex-none items-center gap-3 border-b border-main-750 bg-main-900 px-5">
-        <Icon path={mdiHistory} size={20} className="flex-none text-accent-dark" />
-        <h1 className="m-0 flex-none text-xl/7 font-semibold tracking-[-0.01em] text-main-50">
-          Запуски и логи
-        </h1>
-        <span className="ml-1.5 truncate text-xs/4 text-main-400">
-          {store.counts.total} запусков в истории
-        </span>
-        <div className="flex-1" />
-        <div className="w-64">
-          <TextInput
-            preset="search"
-            aria-label="Поиск по запускам и шагам"
-            placeholder="Поиск по названию, id и шагам…"
-            value={store.query}
-            onChange={(event) => store.setQuery(event.target.value)}
-          />
-        </div>
-        <Button tone="ghost" disabled={!store.filtered} onClick={store.reset}>
-          Сбросить
-        </Button>
-      </header>
+      <PageHeader
+        icon={mdiHistory}
+        title="Запуски и логи"
+        subtitle={
+          <>
+              {store.counts.total} запусков в истории
+          </>
+        }
+        actions={
+          <>
+            <div className="w-64">
+              <TextInput
+                preset="search"
+                aria-label="Поиск по запускам и шагам"
+                placeholder="Поиск по названию, id и шагам…"
+                value={store.query}
+                onChange={(event) => store.setQuery(event.target.value)}
+              />
+            </div>
+            <Button tone="ghost" disabled={!store.filtered} onClick={store.reset}>
+              Сбросить
+            </Button>
+          </>
+        }
+      />
 
       <div className="flex min-h-0 flex-1">
         <aside
           aria-label="Фильтры истории"
-          className="flex w-54 flex-none flex-col gap-0.5 border-r border-main-750 p-2.5"
+          className="flex w-56 flex-none flex-col gap-0.5 border-r border-main-750 bg-main-850 p-3"
         >
-          <p className="px-2 pb-1.5 text-[10px] font-medium tracking-[0.09em] text-main-500 uppercase">
+          <p className="px-2 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             Период
           </p>
           {RANGES.map((range) => (
@@ -79,7 +82,7 @@ export default observer(function RunsWorkspace() {
               onClick={() => store.setRange(range.key)}
             />
           ))}
-          <p className="mt-3.5 px-2 pb-1.5 text-[10px] font-medium tracking-[0.09em] text-main-500 uppercase">
+          <p className="mt-3.5 px-2 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             Статус
           </p>
           {RunStatus.options.map((status) => (
@@ -92,7 +95,7 @@ export default observer(function RunsWorkspace() {
               onClick={() => store.toggleStatus(status)}
             />
           ))}
-          <p className="mt-3.5 px-2 pb-1.5 text-[10px] font-medium tracking-[0.09em] text-main-500 uppercase">
+          <p className="mt-3.5 px-2 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             Вид
           </p>
           {RunKind.options.map((kind) => (
@@ -110,7 +113,7 @@ export default observer(function RunsWorkspace() {
           {store.error === null ? null : (
             <div
               role="alert"
-              className="flex items-center gap-3 border-b border-err-border px-4 py-2.5 text-xs text-err"
+              className="flex items-center gap-3 border-b border-err-border bg-err-soft px-5 py-2.5 text-[12.5px] text-err"
             >
               <span className="min-w-0 flex-1">{store.error}</span>
               <Button

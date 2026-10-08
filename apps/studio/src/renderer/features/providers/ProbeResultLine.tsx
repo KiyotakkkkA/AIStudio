@@ -12,7 +12,7 @@ export interface ProbeResultLineProps {
 export default function ProbeResultLine({ result, probing }: ProbeResultLineProps) {
   if (probing) {
     return (
-      <span className="flex items-center gap-1.75 text-[11.5px] text-main-400">
+      <span className="flex items-center gap-1.75 text-[12px] text-main-400">
         <Icon path={mdiInformationOutline} size={14} className="flex-none" />
         Проверяем связь…
       </span>
@@ -21,7 +21,7 @@ export default function ProbeResultLine({ result, probing }: ProbeResultLineProp
 
   if (result === null) {
     return (
-      <span className="text-[11.5px] text-main-500">
+      <span className="text-[12px] text-main-500">
         Связь ещё не проверялась — модели появятся после проверки.
       </span>
     );
@@ -31,7 +31,7 @@ export default function ProbeResultLine({ result, probing }: ProbeResultLineProp
 
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="flex min-w-0 items-center gap-1.75 text-[11.5px]">
+      <span className="flex min-w-0 items-center gap-1.75 text-[12px]">
         <Icon
           path={line.tone === "ok" ? mdiCheck : mdiAlertCircleOutline}
           size={14}

@@ -103,6 +103,8 @@ export class BrowserViewManager {
         nodeIntegration: false,
       },
     });
+    // Matches the 16px studio frame (minus its 1px border) so the chrome sits inside its corners.
+    chrome.setBorderRadius(15);
     this.window = window;
     this.chrome = chrome;
     chrome.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

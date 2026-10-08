@@ -34,24 +34,24 @@ export default function RunHistoryRow({ run, selected, onSelect }: RunHistoryRow
       }`}
     >
       <span
-        className={`flex size-7 flex-none items-center justify-center rounded-lg bg-main-700 ${STATUS_TONE_TEXT[tone]}`}
+        className={`flex size-7 flex-none items-center justify-center rounded-control bg-main-700 ${STATUS_TONE_TEXT[tone]}`}
       >
         <Icon path={KIND_ICONS[run.kind]} size={15} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-[12.5px] font-medium text-main-100">{run.title}</span>
+          <span className="truncate text-[13px] font-medium text-main-100">{run.title}</span>
           <Chip>{KIND_LABELS[run.kind]}</Chip>
           <Chip title={run.id}>
             <span className="font-mono">{shortRunId(run.id)}</span>
           </Chip>
         </span>
         <span className="flex min-w-0 items-center gap-2">
-          <span className="flex-none font-mono text-[10.5px] text-main-500">
+          <span className="flex-none font-mono text-[11px] text-main-500">
             {formatDateTime(run.createdAt)}
           </span>
           {note ? (
-            <span className={`truncate text-[10.5px] ${STATUS_TONE_TEXT[tone]}`} title={note}>
+            <span className={`truncate text-[11px] ${STATUS_TONE_TEXT[tone]}`} title={note}>
               {note}
             </span>
           ) : null}

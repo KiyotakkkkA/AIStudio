@@ -43,7 +43,7 @@ export default function DownloadProgressRow({
   const tone = STATUS_TONES[download.status];
   return (
     <div
-      className={`flex items-center gap-3 border-b border-main-750 px-4 py-2.75 ${
+      className={`flex items-center gap-3 border-b border-main-750 px-5 py-3 ${
         selected
           ? "bg-main-750 shadow-[inset_2px_0_0_var(--color-accent-dark)]"
           : "hover:bg-main-800"
@@ -56,13 +56,13 @@ export default function DownloadProgressRow({
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >
         <span
-          className={`flex size-7.5 flex-none items-center justify-center rounded-lg bg-main-700 ${STATUS_TONE_TEXT[tone]}`}
+          className={`flex size-9 flex-none items-center justify-center rounded-control border border-main-750 bg-main-850 ${STATUS_TONE_TEXT[tone]}`}
         >
           <Icon path={KIND_ICONS[download.itemKind]} size={16} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.75">
           <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-mono text-[12.5px] font-medium text-main-100">
+            <span className="truncate font-mono text-[13px] font-medium text-main-100">
               {download.displayName}
             </span>
             <Chip>{KIND_LABELS[download.itemKind]}</Chip>
@@ -74,18 +74,18 @@ export default function DownloadProgressRow({
             {running ? null : <Chip tone="accent">{STATUS_LABELS[download.status]}</Chip>}
           </span>
           <span className="flex min-w-0 items-center gap-2.25">
-            <span className="flex-none font-mono text-[10.5px] text-main-300">
+            <span className="flex-none font-mono text-[11px] text-main-300">
               {formatBytes(download.bytesDone)} из {formatBytes(download.sizeBytes)}
             </span>
-            <span className="flex-none font-mono text-[10.5px] text-main-500">
+            <span className="flex-none font-mono text-[11px] text-main-500">
               {running
                 ? `${formatRate(rate)}${etaMs === undefined ? "" : ` · осталось ${formatEta(etaMs)}`}`
                 : "докачается с того же места"}
             </span>
           </span>
-          <span className="mt-0.75 block h-0.75 w-full rounded-sm bg-main-700">
+          <span className="mt-0.75 block h-1 w-full rounded-full bg-main-700">
             <span
-              className={`block h-0.75 rounded-sm ${running ? "bg-accent-dark" : "bg-warn"}`}
+              className={`block h-1 rounded-sm ${running ? "bg-accent-dark" : "bg-warn"}`}
               style={{ width: `${String(percent)}%` }}
             />
           </span>

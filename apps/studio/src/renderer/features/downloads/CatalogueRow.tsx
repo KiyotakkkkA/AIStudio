@@ -48,7 +48,7 @@ export default function CatalogueRow({
 
   return (
     <div
-      className={`flex items-center gap-3 border-b border-main-750 px-4 py-2.75 ${
+      className={`flex items-center gap-3 border-b border-main-750 px-5 py-3 ${
         selected
           ? "bg-main-750 shadow-[inset_2px_0_0_var(--color-accent-dark)]"
           : "hover:bg-main-800"
@@ -60,12 +60,12 @@ export default function CatalogueRow({
         aria-current={selected ? "true" : undefined}
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >
-        <span className="flex size-7.5 flex-none items-center justify-center rounded-lg bg-main-700 text-main-300">
+        <span className="flex size-9 flex-none items-center justify-center rounded-control border border-main-750 bg-main-850 text-main-300">
           <Icon path={KIND_ICONS[item.kind]} size={16} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.75">
           <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-mono text-[12.5px] font-medium text-main-100">
+            <span className="truncate font-mono text-[13px] font-medium text-main-100">
               {item.displayName}
             </span>
             <Chip>{KIND_LABELS[item.kind]}</Chip>
@@ -76,12 +76,12 @@ export default function CatalogueRow({
             )}
           </span>
           <span
-            className={`truncate font-mono text-[10.5px] ${updatable ? "text-warn" : "text-main-500"}`}
+            className={`truncate font-mono text-[11px] ${updatable ? "text-warn" : "text-main-500"}`}
           >
             {subline}
           </span>
           {blocked === undefined ? null : (
-            <span className="truncate text-[10.5px] text-err" title={blocked}>
+            <span className="truncate text-[11px] text-err" title={blocked}>
               {blocked}
             </span>
           )}

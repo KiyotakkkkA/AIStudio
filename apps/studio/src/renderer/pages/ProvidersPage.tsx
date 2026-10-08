@@ -63,7 +63,7 @@ function ProvidersPage() {
                 key={tab}
                 type="button"
                 aria-current={active ? "page" : undefined}
-                className={`inline-flex h-7.5 items-center gap-1.75 rounded-lg px-3 text-[12.5px] font-medium ${
+                className={`inline-flex h-7.5 items-center gap-1.75 rounded-control px-3 text-[13px] font-medium ${
                   active ? "bg-main-700 text-main-50" : "text-main-400 hover:text-main-100"
                 }`}
                 onClick={() => {

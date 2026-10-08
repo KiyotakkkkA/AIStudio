@@ -43,7 +43,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
           <h2 className="truncate text-[14px] font-semibold text-main-50">
             {vm.name.trim().length > 0 ? vm.name : "Новый секрет"}
           </h2>
-          <p className="mt-0.5 text-[11.5px] text-main-400">
+          <p className="mt-0.5 text-[12px] text-main-400">
             Поля ниже сгенерированы из схемы{" "}
             <span className="font-mono text-accent-dark">{vm.schemaChip}</span>.
           </p>
@@ -73,14 +73,14 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
         {vm.banner === null ? null : (
           <p
             role="alert"
-            className="rounded-[6px] border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
+            className="rounded-control border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
           >
             {vm.banner}
           </p>
         )}
 
         <section className="flex flex-col gap-3">
-          <h3 className="text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+          <h3 className="text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             Общее
           </h3>
           <div className="grid grid-cols-2 gap-3.5">
@@ -124,7 +124,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
 
         <section className="flex flex-col gap-3 rounded-[9px] border border-main-750 bg-main-800 p-3.5">
           <div className="flex items-center gap-2">
-            <h3 className="flex-1 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+            <h3 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
               {vm.schema.label}
             </h3>
             <Chip tone="accent">{`schema ${vm.schemaChip}`}</Chip>
@@ -178,7 +178,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
         </section>
 
         <section className="flex flex-col gap-3">
-          <h3 className="text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+          <h3 className="text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             Метаданные
           </h3>
           <div className="grid grid-cols-2 gap-3.5">
@@ -213,7 +213,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
       <div className="flex flex-none items-center gap-3 border-t border-main-750 px-4.5 py-3.5">
         <Icon path={mdiLockOutline} size={15} className="flex-none text-ok" />
         <span
-          className="line-clamp-2 min-w-0 flex-1 text-[11.5px] text-main-400"
+          className="line-clamp-2 min-w-0 flex-1 text-[12px] text-main-400"
           title="Значение шифруется хранилищем учётных данных операционной системы и не покидает эту машину, пока его не запросит провайдер."
         >
           Значение шифруется хранилищем учётных данных операционной системы и не покидает эту

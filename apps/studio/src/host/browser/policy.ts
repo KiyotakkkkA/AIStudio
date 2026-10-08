@@ -1,5 +1,5 @@
 export const BROWSER_PARTITION = "persist:browser-work";
-export const CHROME_HEIGHT = 136;
+export const CHROME_HEIGHT = 148;
 export const STATUS_HEIGHT = 28;
 
 export function isWebUrl(value: string): boolean {

@@ -30,11 +30,14 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
   }, [store.generating]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl shrink-0 px-5 pt-3 pb-4">
+    <div className="mx-auto w-full max-w-4xl shrink-0 px-6 pt-2 pb-4">
       {!store.available && !store.loading ? (
-        <div className="rounded-card border border-main-750 bg-main-900 p-4 text-main-300">
+        <div className="rounded-card border border-dashed border-main-600 bg-main-850 p-4 text-[13px] text-main-300">
           Выберите доступную текстовую модель, чтобы начать диалог.{" "}
-          <Link className="text-accent-medium underline" to="/providers">
+          <Link
+            className="font-medium text-accent-medium underline decoration-accent-line underline-offset-2 hover:decoration-accent-medium"
+            to="/providers"
+          >
             Открыть провайдеров ИИ
           </Link>
         </div>
@@ -49,22 +52,22 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             if ((event.target as HTMLElement).closest("button, a")) return;
             event.currentTarget.querySelector<HTMLTextAreaElement>("textarea")?.focus();
           }}
-          className="space-y-3 rounded-xl border border-main-750 bg-main-900 p-3"
+          className="space-y-2 rounded-[14px] border border-main-750 bg-main-900 p-2.5 shadow-pop"
         >
-          <div className="flex items-center gap-2 border-b border-main-750 pb-3">
+          <div className="flex items-center gap-2 rounded-control bg-main-850 py-1 pr-2.5 pl-1">
             <Dropdown menuWidth={320} menuPlacement="top-left">
               <IconDropdownButton
                 label="Контекстное окно"
                 path={mdiInformationOutline}
-                className="size-7 gap-0 justify-center rounded-lg p-0"
-                iconSize={16}
+                className="size-6 justify-center gap-0 rounded-[6px] border-transparent bg-transparent p-0 text-main-500 hover:bg-main-700 hover:text-main-100"
+                iconSize={15}
               />
               <Dropdown.Menu
                 rounded="rounded-lg"
-                className="w-80 border border-main-700 bg-main-850 p-3 text-xs text-main-300"
+                className="w-80 rounded-card border border-main-750 bg-main-900 p-3.5 text-[12px] text-main-300 shadow-pop"
               >
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-main-100">Контекстное окно</p>
+                <div className="space-y-2.5">
+                  <p className="text-[13px] font-semibold text-main-50">Контекстное окно</p>
                   <ProgressBar
                     value={store.sessionTokens}
                     max={store.model?.contextWindow || Math.max(1, store.sessionTokens)}
@@ -73,12 +76,12 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                     variant="info"
                     className="w-full"
                     classNames={{
-                      label: "text-xs text-main-400",
-                      track: "h-1.5 bg-main-700",
-                      indicator: "bg-info-light",
+                      label: "text-[12px] text-main-400",
+                      track: "h-1.5 rounded-full bg-main-700",
+                      indicator: "rounded-full bg-accent-dark",
                     }}
                   />
-                  <div className="flex justify-end text-[10.5px] text-main-400">
+                  <div className="flex justify-end font-mono text-[11px] text-main-500">
                     {store.sessionTokens.toLocaleString()} /{" "}
                     {store.model?.contextWindow?.toLocaleString() ?? "—"}
                   </div>
@@ -94,72 +97,74 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               className="min-w-0 flex-1"
               classNames={{
                 header: "hidden",
-                track: "h-1.5 bg-main-700",
-                indicator: "bg-info-light",
+                track: "h-1 rounded-full bg-main-700",
+                indicator: "rounded-full bg-accent-dark",
               }}
             />
-            <span className="shrink-0 text-[10.5px] text-main-400">
+            <span className="shrink-0 font-mono text-[11px] text-main-500">
               {store.sessionTokens.toLocaleString()} /{" "}
               {store.model?.contextWindow?.toLocaleString() ?? "—"}
             </span>
           </div>
           {store.attachedStoreIds.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 px-1">
               {store.stores
                 .filter((item) => store.attachedStoreIds.includes(item.id))
                 .map((item) => (
                   <span
                     key={item.id}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-main-750 px-2.5 text-[12px] text-main-100"
+                    className="inline-flex h-7 items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft pr-1.5 pl-2.5 text-[12px] font-medium text-accent-medium"
                   >
-                    <Icon path={mdiDatabaseOutline} size={16} className="text-main-300" />
+                    <Icon path={mdiDatabaseOutline} size={14} />
                     <span className="max-w-40 truncate">{item.name}</span>
                     <button
                       type="button"
                       aria-label={`Отключить хранилище ${item.name}`}
-                      className="text-main-500 hover:text-main-100"
+                      className="flex size-4.5 items-center justify-center rounded-full hover:bg-accent-dark hover:text-on-accent"
                       onClick={() => void store.toggleStore(item.id)}
                     >
-                      <Icon path={mdiClose} size={15} />
+                      <Icon path={mdiClose} size={13} />
                     </button>
                   </span>
                 ))}
             </div>
           )}
-          <TextArea
-            aria-label="Сообщение"
-            noBorder
-            placeholder="Задайте вопрос…"
-            value={store.composer.text}
-            maxLength={100000}
-            disabled={store.loading || store.generating}
-            onChange={(event) => store.composer.setText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                void store.send();
-              }
-            }}
-          />
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="px-0.5">
+            <TextArea
+              aria-label="Сообщение"
+              noBorder
+              placeholder="Задайте вопрос…"
+              value={store.composer.text}
+              maxLength={100000}
+              disabled={store.loading || store.generating}
+              onChange={(event) => store.composer.setText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  void store.send();
+                }
+              }}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
             <Dropdown menuWidth={300} menuPlacement="top-left">
               <IconDropdownButton
                 label="Прикрепить файлы"
                 path={mdiPaperclip}
-                className="gap-0 p-0 size-8 justify-center"
+                className="size-8 justify-center gap-0 border-transparent bg-transparent p-0 text-main-400 hover:bg-main-700 hover:text-main-100"
                 rounded="rounded-lg"
-                iconSize={20}
+                iconSize={18}
               />
               <Dropdown.Menu
                 role="menu"
                 aria-label="Добавить контекст"
-                rounded="rounded-md"
-                className="rounded-card border-main-750"
+                rounded="rounded-lg"
+                className="rounded-card border-main-750 bg-main-900 p-1 shadow-pop"
               >
                 <Dropdown.Item
                   role="menuitem"
-                  rounded="rounded-md"
-                  className="text-[12.5px] text-main-100"
+                  rounded="rounded-lg"
+                  className="text-[13px] text-main-100"
                 >
                   <span className="flex items-center gap-2">
                     <Icon path={mdiUpload} size={17} className="text-main-400" />
@@ -168,8 +173,8 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 </Dropdown.Item>
                 <Dropdown.Item
                   role="menuitem"
-                  rounded="rounded-md"
-                  className="text-[12.5px] text-main-100"
+                  rounded="rounded-lg"
+                  className="text-[13px] text-main-100"
                   onClick={() => setStoresOpen(true)}
                 >
                   <span className="flex items-center gap-2">
@@ -183,17 +188,18 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               <IconDropdownButton
                 label="Настройки провайдера и модели"
                 path={mdiCogOutline}
-                className="gap-0 p-0 size-8 justify-center"
+                className="size-8 justify-center gap-0 border-transparent bg-transparent p-0 text-main-400 hover:bg-main-700 hover:text-main-100"
                 rounded="rounded-lg"
+                iconSize={18}
               />
               <Dropdown.Menu
                 role="menu"
                 aria-label="Провайдер и модель"
                 rounded=""
-                className="space-y-3 rounded-card border-main-750 bg-main-900 p-3"
+                className="space-y-3.5 rounded-card border-main-750 bg-main-900 p-3.5 shadow-pop"
               >
                 <div>
-                  <p className="mb-1.5 text-[11px] font-medium tracking-wide text-main-400 uppercase">
+                  <p className="mb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                     Провайдер
                   </p>
                   <SelectInput
@@ -211,7 +217,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                   />
                 </div>
                 <div>
-                  <p className="mb-1.5 text-[11px] font-medium tracking-wide text-main-400 uppercase">
+                  <p className="mb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                     Модель
                   </p>
                   <SelectInput
@@ -229,7 +235,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 </div>
               </Dropdown.Menu>
             </Dropdown>
-            <span className="min-w-0 max-w-56 truncate text-sm text-main-400">
+            <span className="inline-flex h-7 max-w-56 min-w-0 items-center truncate rounded-full border border-main-750 bg-main-850 px-2.5 font-mono text-[11.5px] text-main-400">
               {store.model?.displayName || store.model?.externalId || store.modelId}
             </span>
             <span className="flex-1" />
@@ -254,20 +260,26 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
         open={storesOpen}
         onClose={() => setStoresOpen(false)}
         label="Источники из хранилища"
-        className="w-lg max-w-[92vw] rounded-card border border-main-750 bg-main-900 p-4.5"
+        className="w-lg max-w-[92vw] overflow-hidden rounded-card border border-main-750 bg-main-900 p-0 shadow-pop"
       >
-        <h2 className="text-[16px] font-semibold text-main-50">Источники из хранилища</h2>
-        <p className="mt-1 text-xs text-main-500">
-          Перед ответом будут найдены релевантные фрагменты документов.
-        </p>
-        <div className="mt-4 space-y-1.5">
+        <div className="px-5 pt-5">
+          <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-main-50">
+            Источники из хранилища
+          </h2>
+          <p className="mt-1 text-[12.5px] text-main-500">
+            Перед ответом будут найдены релевантные фрагменты документов.
+          </p>
+        </div>
+        <div className="mt-4 space-y-2 px-5">
           {store.stores.map((item) => {
             const selected = store.attachedStoreIds.includes(item.id);
             return (
               <label
                 key={item.id}
-                className={`flex cursor-pointer items-start gap-3 rounded-card border p-3 ${
-                  selected ? "border-accent-dark bg-main-750" : "border-main-800 bg-main-800"
+                className={`flex cursor-pointer items-start gap-3 rounded-card border p-3.5 ${
+                  selected
+                    ? "border-accent-line bg-accent-soft"
+                    : "border-main-750 bg-main-900 hover:border-main-600"
                 }`}
               >
                 <InputCheckBox
@@ -277,8 +289,8 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                   onChange={() => void store.toggleStore(item.id)}
                 />
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-main-100">{item.name}</span>
-                  <span className="mt-1 block text-xs text-main-500">
+                  <span className="block text-[13px] font-semibold text-main-100">{item.name}</span>
+                  <span className="mt-0.5 block text-[12px] text-main-500">
                     {item.description || "Описание не задано"} · {item.documents} документов
                   </span>
                 </span>
@@ -286,16 +298,18 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             );
           })}
           {store.stores.length === 0 && (
-            <p className="py-5 text-center text-xs text-main-500">Хранилища не подключены.</p>
+            <p className="rounded-card border border-dashed border-main-600 py-6 text-center text-[12.5px] text-main-500">
+              Хранилища не подключены.
+            </p>
           )}
         </div>
-        <div className="mt-4 flex justify-end border-t border-main-750 pt-3">
+        <div className="mt-5 flex justify-end border-t border-main-750 bg-main-850 px-5 py-3">
           <Button type="button" tone="secondary" onClick={() => setStoresOpen(false)}>
             Готово
           </Button>
         </div>
       </Modal>
-      <p className="mt-2 text-center text-[10.5px] text-main-500">
+      <p className="mt-2 text-center text-[11px] text-main-500 [&_kbd]:font-mono">
         Enter — отправить · Shift+Enter — новая строка
       </p>
     </div>

@@ -32,7 +32,7 @@ export default function DiskBreakdown({ disk }: DiskBreakdownProps) {
           {formatBytes(disk.usedBytes)} / {formatBytes(disk.totalBytes)}
         </span>
       </div>
-      <div className="flex h-1.5 overflow-hidden rounded-sm bg-main-700">
+      <div className="flex h-1.5 overflow-hidden rounded-full bg-main-700">
         {measured.map((entry) => (
           <span
             key={entry.category}
@@ -41,7 +41,7 @@ export default function DiskBreakdown({ disk }: DiskBreakdownProps) {
           />
         ))}
       </div>
-      <div className="flex flex-col gap-1 text-[10.5px] text-main-500">
+      <div className="flex flex-col gap-1 text-[11px] text-main-500">
         {measured.length === 0 ? (
           <span>Загруженных артефактов пока нет.</span>
         ) : (
@@ -54,7 +54,7 @@ export default function DiskBreakdown({ disk }: DiskBreakdownProps) {
             </span>
           ))
         )}
-        <span className="mt-0.5 font-mono text-main-600">
+        <span className="mt-0.5 font-mono text-main-500">
           свободно {formatBytes(disk.freeBytes)}
         </span>
       </div>

@@ -25,7 +25,7 @@ export default observer(function RunDetailPanel({
     return (
       <section
         aria-label="Детали запуска"
-        className="flex w-105 flex-none items-center justify-center border-l border-main-750 bg-main-900 p-4"
+        className="flex w-105 flex-none items-center justify-center border-l border-main-750 bg-main-850 p-4"
       >
         <EmptyState
           icon={mdiHistory}
@@ -38,7 +38,7 @@ export default observer(function RunDetailPanel({
   return (
     <section
       aria-label="Детали запуска"
-      className="flex w-105 flex-none flex-col border-l border-main-750 bg-main-900"
+      className="flex w-105 flex-none flex-col border-l border-main-750 bg-main-850"
     >
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 p-3.5">
         <div className="flex items-center gap-2">
@@ -49,7 +49,7 @@ export default observer(function RunDetailPanel({
             <span className="font-mono">{shortRunId(summary.id)}</span>
           </Chip>
         </div>
-        <dl className="m-0 flex flex-col gap-1.5 rounded-card border border-main-750 bg-main-800 p-2.75 text-[11.5px]">
+        <dl className="m-0 flex flex-col gap-1.5 rounded-card border border-main-750 bg-main-900 shadow-card p-2.75 text-[12px]">
           <div className="flex justify-between gap-2">
             <dt className="text-main-400">Вид</dt>
             <dd className="m-0 font-mono">{KIND_LABELS[summary.kind]}</dd>
@@ -80,16 +80,16 @@ export default observer(function RunDetailPanel({
           )}
         </dl>
         {summary.error === undefined ? null : (
-          <p className="m-0 rounded-card border border-err-border p-2.75 text-[11.5px] text-err">
+          <p className="m-0 rounded-card border border-err-border p-2.75 text-[12px] text-err">
             {summary.error}
           </p>
         )}
 
-        <p className="m-0 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+        <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           Шаги ({detail.steps.length})
         </p>
         {detail.steps.length === 0 ? (
-          <p className="m-0 text-[11.5px] text-main-500">Шагов не записано.</p>
+          <p className="m-0 text-[12px] text-main-500">Шагов не записано.</p>
         ) : (
           <ol className="m-0 flex flex-col gap-1.5 p-0">
             {detail.steps.map((step) => (
@@ -104,16 +104,16 @@ export default observer(function RunDetailPanel({
           </ol>
         )}
 
-        <p className="m-0 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+        <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           Входные данные
         </p>
         <JsonBlock value={detail.run.input} empty="запуск стартовал без входных данных" />
 
-        <p className="m-0 text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase">
+        <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           Журнал ({detail.logs.length})
         </p>
         {detail.logs.length === 0 ? (
-          <p className="m-0 text-[11.5px] text-main-500">
+          <p className="m-0 text-[12px] text-main-500">
             {summary.prunedAt === undefined
               ? "Журнал пуст."
               : "Журнал удалён политикой хранения."}
