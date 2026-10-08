@@ -9,7 +9,7 @@ import type { Logger } from "../platform/logger.ts";
  * the message. One server cannot do both — `--embeddings` puts llama.cpp in a pooling mode that
  * cannot generate — so the role is fixed when the process starts.
  */
-export type LlamaServerRole = "embedding" | "vision";
+export type LlamaServerRole = "embedding" | "vision" | "rerank";
 
 export interface LlamaServerOptions {
   executablePath: string;
@@ -34,6 +34,10 @@ interface EmbeddingResponse {
 
 interface ChatResponse {
   choices?: unknown;
+}
+
+interface RerankResponse {
+  results?: unknown;
 }
 
 /**
@@ -95,6 +99,18 @@ export class LlamaServer {
     return readEmbeddings(payload);
   }
 
+  async rerank(query: string, passages: readonly string[], signal: AbortSignal): Promise<number[]> {
+    if (passages.length === 0) return [];
+    const payload = (await this.post(
+      "/v1/rerank",
+      { model: this.options.modelPath, query, documents: [...passages], top_n: passages.length },
+      "переранжировать результаты",
+      signal,
+      false,
+    )) as RerankResponse;
+    return readRerankScores(payload, passages.length);
+  }
+
   /**
    * Reads an image with a vision model. The image rides as a data URI in the message, which is
    * what llama.cpp's multimodal endpoint accepts; nothing is written to disk on the way.
@@ -133,19 +149,27 @@ export class LlamaServer {
     body: unknown,
     what: string,
     signal: AbortSignal,
+    startWithSignal = true,
   ): Promise<unknown> {
-    const baseUrl = await this.start(signal);
+    const starting = this.start(startWithSignal ? signal : undefined);
+    const baseUrl = startWithSignal ? await starting : await abortable(starting, signal);
     this.touch();
     const request = this.options.fetch ?? globalThis.fetch;
-    const response = await request(`${baseUrl}${route}`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${this.#apiKey}`,
-      },
-      body: JSON.stringify(body),
-      signal,
-    });
+    let response: Response;
+    try {
+      response = await request(`${baseUrl}${route}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${this.#apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal,
+      });
+    } catch (error) {
+      if (!signal.aborted) this.stop();
+      throw error;
+    }
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
       throw new AppError(AppErrorCode.UNKNOWN, `Локальный движок не смог ${what}`, {
@@ -188,11 +212,11 @@ export class LlamaServer {
     const port = await (this.options.freePort ?? freeLoopbackPort)();
     this.#apiKey = randomBytes(24).toString("hex");
     this.#stderr = "";
-    const vision = this.role === "vision";
+    const pooled = this.role !== "vision";
     const argv = [
       "--model",
       this.options.modelPath,
-      ...(vision ? ["--mmproj", this.options.mmprojPath ?? ""] : ["--embeddings"]),
+      ...ROLE_FLAGS[this.role](this.options.mmprojPath ?? ""),
       "--host",
       "127.0.0.1",
       "--port",
@@ -205,12 +229,11 @@ export class LlamaServer {
       String(this.options.contextSize ?? 8192),
       "--batch-size",
       String(this.options.batchSize ?? 2048),
-      ...(this.role === "embedding"
-        ? ["--ubatch-size", String(this.options.batchSize ?? 2048)]
-        : []),
+      ...(pooled ? ["--ubatch-size", String(this.options.batchSize ?? 2048)] : []),
       ...(this.options.threads === undefined ? [] : ["--threads", String(this.options.threads)]),
     ];
-    this.options.logger?.log("info", "runtimes", "Starting the local embedding server", {
+    this.options.logger?.log("info", "runtimes", "Starting a local engine server", {
+      role: this.role,
       executable: this.options.executablePath,
       model: this.options.modelPath,
       gpuLayers: this.options.gpuLayers,
@@ -221,6 +244,12 @@ export class LlamaServer {
       stdio: ["ignore", "pipe", "pipe"],
     }) as unknown as ChildProcessWithoutNullStreams;
     this.#child = child;
+    child.once("exit", () => {
+      if (this.#child !== child) return;
+      this.#child = undefined;
+      this.#ready = undefined;
+      this.#baseUrl = undefined;
+    });
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     // llama-server logs to stderr; the tail is what a start failure has to explain itself with.
@@ -277,7 +306,8 @@ export class LlamaServer {
     if (idle <= 0) return;
     if (this.#idleTimer !== undefined) clearTimeout(this.#idleTimer);
     this.#idleTimer = setTimeout(() => {
-      this.options.logger?.log("info", "runtimes", "Stopping the idle embedding server", {
+      this.options.logger?.log("info", "runtimes", "Stopping an idle engine server", {
+        role: this.role,
         model: this.options.modelPath,
         baseUrl: this.#baseUrl,
       });
@@ -285,6 +315,54 @@ export class LlamaServer {
     }, idle);
     this.#idleTimer.unref();
   }
+}
+
+const ROLE_FLAGS: Record<LlamaServerRole, (mmprojPath: string) => string[]> = {
+  embedding: () => ["--embeddings"],
+  vision: (mmprojPath) => ["--mmproj", mmprojPath],
+  rerank: () => ["--reranking"],
+};
+
+function readRerankScores(payload: RerankResponse, count: number): number[] {
+  if (!Array.isArray(payload.results))
+    throw new AppError(AppErrorCode.VALIDATION_FAILED, "Движок вернул неожиданный ответ");
+  const scores = new Array<number>(count).fill(Number.NaN);
+  for (const entry of payload.results as { index?: unknown; relevance_score?: unknown }[]) {
+    const { index, relevance_score: score } = entry;
+    if (
+      typeof index !== "number" ||
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= count ||
+      typeof score !== "number" ||
+      !Number.isFinite(score)
+    )
+      throw new AppError(AppErrorCode.VALIDATION_FAILED, "Движок вернул неожиданную оценку");
+    scores[index] = score;
+  }
+  if (scores.some((score) => Number.isNaN(score)))
+    throw new AppError(AppErrorCode.VALIDATION_FAILED, "Движок оценил не все фрагменты");
+  return scores;
+}
+
+function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason as Error);
+  return new Promise((resolve, reject) => {
+    const onAbort = (): void => {
+      reject(signal.reason as Error);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error as Error);
+      },
+    );
+  });
 }
 
 function readChatText(payload: ChatResponse): string {

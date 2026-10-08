@@ -18,6 +18,15 @@ import type { Logger } from "../platform/logger.ts";
 import { createId } from "../platform/ids.ts";
 import { vectorStorePath } from "../platform/paths.ts";
 import { deriveVectorHealth } from "./vectorHealth.ts";
+import { applyRerank, MAX_RERANK_QUERY_CHARS, passageOf, type RerankerSource } from "./rerank.ts";
+
+export interface VectorSearchOptions {
+  k?: number;
+  minScore?: number;
+  rerank?: boolean;
+}
+
+export const DEFAULT_RERANK_TIMEOUT_MS = 20_000;
 
 export interface VectorStoreServiceOptions {
   data: UnitOfWork;
@@ -26,11 +35,20 @@ export interface VectorStoreServiceOptions {
   directory: string;
   logger?: Logger;
   clock?: () => number;
+  rerankers?: RerankerSource;
+  rerankTimeoutMs?: number;
 }
 
 export class VectorStoreService {
   private readonly busy = new Set<string>();
-  constructor(private readonly options: VectorStoreServiceOptions) {}
+  private rerankers: RerankerSource | undefined;
+  constructor(private readonly options: VectorStoreServiceOptions) {
+    this.rerankers = options.rerankers;
+  }
+
+  attachRerankers(source: RerankerSource): void {
+    this.rerankers = source;
+  }
 
   async create(input: CreateVectorStoreInput): Promise<VectorStoreDto> {
     const draft = CreateVectorStoreInput.parse(input);
@@ -206,7 +224,7 @@ export class VectorStoreService {
   async search(
     storeId: string,
     query: string,
-    options: { k?: number; minScore?: number } = {},
+    options: VectorSearchOptions = {},
     signal?: AbortSignal,
   ): Promise<VectorSearchHitDto[]> {
     return (await this.searchTimed(storeId, query, options, signal)).hits;
@@ -215,10 +233,11 @@ export class VectorStoreService {
   searchTimed(
     storeId: string,
     query: string,
-    options: { k?: number; minScore?: number } = {},
+    options: VectorSearchOptions = {},
     signal?: AbortSignal,
   ): Promise<VectorSearchResultDto> {
-    const input = VectorSearchInput.parse({ storeId, query, ...options });
+    const { rerank: allowRerank = true, ...search } = options;
+    const input = VectorSearchInput.parse({ storeId, query, ...search });
     return this.exclusive(storeId, async () => {
       signal?.throwIfAborted();
       const row = this.require(storeId);
@@ -249,16 +268,67 @@ export class VectorStoreService {
           "Embedding dimension does not match the store",
         );
       }
+      const reranking = allowRerank && row.rerank.enabled;
       const searchStart = performance.now();
       const hits = await this.options.core.searchVectors(
         this.path(storeId),
         Array.from(vector),
-        input.k,
-        input.minScore,
+        reranking ? Math.max(input.k, row.rerank.candidates) : input.k,
+        reranking ? 0 : input.minScore,
       );
       signal?.throwIfAborted();
-      return { hits, embeddingMs, searchMs: performance.now() - searchStart };
+      const searchMs = performance.now() - searchStart;
+      if (!reranking) return { hits, embeddingMs, searchMs };
+      const rerankStart = performance.now();
+      const reranked = await this.rerankHits(row, input.query, hits, signal);
+      const rerankMs = performance.now() - rerankStart;
+      const ordered = reranked ?? hits;
+      return {
+        hits: ordered.filter((hit) => hit.score >= input.minScore).slice(0, input.k),
+        embeddingMs,
+        searchMs,
+        rerankMs,
+        rerank: reranked === undefined ? ("fallback" as const) : ("applied" as const),
+      };
     });
+  }
+
+  private async rerankHits(
+    row: VectorStoreEntity,
+    query: string,
+    hits: readonly VectorSearchHitDto[],
+    signal: AbortSignal | undefined,
+  ): Promise<VectorSearchHitDto[] | undefined> {
+    if (hits.length === 0) return [];
+    if (this.rerankers === undefined) {
+      this.options.logger?.log("warn", "vectorStores", "Reranker unavailable, using vector order", {
+        storeId: row.id,
+        modelRef: row.rerank.modelRef,
+      });
+      return undefined;
+    }
+    const timeout = AbortSignal.timeout(this.options.rerankTimeoutMs ?? DEFAULT_RERANK_TIMEOUT_MS);
+    try {
+      const scores = await this.rerankers(row.rerank.modelRef).rerank(
+        query.slice(0, MAX_RERANK_QUERY_CHARS),
+        hits.map(passageOf),
+        signal ? AbortSignal.any([signal, timeout]) : timeout,
+      );
+      if (scores.length !== hits.length || !scores.every(Number.isFinite))
+        throw new AppError(AppErrorCode.VALIDATION_FAILED, "Reranker returned a malformed answer", {
+          details: { expected: hits.length, received: scores.length },
+        });
+      return applyRerank(hits, scores);
+    } catch (error) {
+      if (signal?.aborted === true) throw error;
+      this.options.logger?.log("warn", "vectorStores", "Reranking failed, using vector order", {
+        storeId: row.id,
+        modelRef: row.rerank.modelRef,
+        timedOut: timeout.aborted,
+        error: String(error),
+      });
+      return undefined;
+    }
   }
 
   withExclusiveStore<T>(id: string, work: (row: VectorStoreEntity) => Promise<T>): Promise<T> {

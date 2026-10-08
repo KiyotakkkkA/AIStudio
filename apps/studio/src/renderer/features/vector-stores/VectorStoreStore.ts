@@ -22,6 +22,7 @@ import { estimateEta, smoothRate, type RateState } from "../progressRate";
 import VectorStoreFormVm from "./VectorStoreFormVm";
 import { searchRows } from "./searchRows";
 import GraphRelationStore from "./GraphRelationStore";
+import VectorEvalStore from "./VectorEvalStore";
 import { graphRows, type GraphExpansion } from "./graphExpansion";
 
 export default class VectorStoreStore {
@@ -56,6 +57,7 @@ export default class VectorStoreStore {
   searching = false;
   error: string | null = null;
   readonly graph: GraphRelationStore;
+  readonly evaluation: VectorEvalStore;
   private revision = 0;
 
   private stopIndexStream: (() => void) | null = null;
@@ -65,9 +67,10 @@ export default class VectorStoreStore {
     private readonly events?: EventRouter,
   ) {
     this.graph = new GraphRelationStore(ipc);
+    this.evaluation = new VectorEvalStore(ipc);
     makeAutoObservable<VectorStoreStore, "ipc" | "events">(
       this,
-      { ipc: false, events: false, graph: false },
+      { ipc: false, events: false, graph: false, evaluation: false },
       { autoBind: true },
     );
   }
@@ -177,6 +180,7 @@ export default class VectorStoreStore {
     this.documents = [];
     this.searching = false;
     this.graph.reset();
+    this.evaluation.reset();
     this.error = null;
     try {
       const detail = await this.ipc.call("vectorStores.get", { id });
@@ -189,6 +193,7 @@ export default class VectorStoreStore {
       if (revision === this.revision) {
         await this.loadDocuments(id);
         await this.graph.load(id);
+        await this.evaluation.load(id);
         await this.restoreIndex(id, revision);
       }
     } catch (error) {
@@ -285,6 +290,7 @@ export default class VectorStoreStore {
         this.graphExpansions = [];
         this.form = null;
         this.graph.reset();
+        this.evaluation.reset();
       });
     });
   }

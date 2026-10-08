@@ -66,6 +66,7 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
       "0015_graph_relations",
       "0016_tool_registry",
       "0017_mcp_servers",
+      "0018_vector_eval",
     ]);
     const tables = database.client.db.$client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'")
@@ -115,6 +116,7 @@ test("a backup is written before migrating and only the last three are kept", ()
           "0015_graph_relations",
           "0016_tool_registry",
           "0017_mcp_servers",
+          "0018_vector_eval",
         ]);
         if (run === 0) assert.equal(report.backup, undefined);
         else assert.equal(typeof report.backup, "string");
@@ -133,6 +135,7 @@ test("a backup is written before migrating and only the last three are kept", ()
         client.db.$client.exec("DROP TABLE tool");
         client.db.$client.exec("DROP TABLE graph_edge");
         client.db.$client.exec("DROP TABLE graph_relation_type");
+        client.db.$client.exec("DROP TABLE vector_eval_case");
         client.db.$client.exec("DROP TABLE vector_source");
         client.db.$client.exec("DROP TABLE vector_document");
         client.db.$client.exec("DROP TABLE vector_store");
@@ -264,6 +267,7 @@ test("prepareDatabase opens and migrates in one step", () => {
         "0015_graph_relations",
         "0016_tool_registry",
         "0017_mcp_servers",
+        "0018_vector_eval",
       ]);
       assert.equal(prepared.client.repositories.settings.all().length, 0);
     } finally {

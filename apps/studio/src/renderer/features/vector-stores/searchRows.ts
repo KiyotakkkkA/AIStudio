@@ -9,6 +9,8 @@ export function searchRows(hits: readonly VectorSearchHitDto[], floor: number) {
     return {
       id: hit.id,
       score: hit.score.toFixed(2),
+      vectorScore: hit.vectorScore === undefined ? null : hit.vectorScore.toFixed(2),
+      rerankScore: hit.rerankScore === undefined ? null : hit.rerankScore.toFixed(2),
       width: `${Math.max(0, Math.min(1, hit.score)) * 100}%`,
       belowFloor: hit.score < floor,
       path: hit.path || hit.documentId,

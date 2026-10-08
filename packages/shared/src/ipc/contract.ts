@@ -85,6 +85,12 @@ import {
   PickVectorSourceInput,
   PickVectorSourceResult,
   VectorIndexInput,
+  AddVectorEvalCaseInput,
+  VectorEvalCaseDto,
+  VectorEvalCaseRef,
+  VectorEvalRunDto,
+  VectorEvalRunInput,
+  VectorEvalSetDto,
 } from "../vectorStores/index.js";
 
 export const SecretFilter = z.object({
@@ -164,6 +170,13 @@ export const contract = defineContract({
     output: z.object({ id: DocumentId, removed: z.literal(true) }),
   },
   "vectorStores.index": { input: VectorIndexInput, output: RunHandleDto },
+  "vectorStores.eval.list": { input: VectorStoreRef, output: VectorEvalSetDto },
+  "vectorStores.eval.add": { input: AddVectorEvalCaseInput, output: VectorEvalCaseDto },
+  "vectorStores.eval.remove": {
+    input: VectorEvalCaseRef,
+    output: VectorEvalCaseRef.pick({ id: true }).extend({ removed: z.literal(true) }),
+  },
+  "vectorStores.eval.run": { input: VectorEvalRunInput, output: VectorEvalRunDto },
   "graphRelations.list": { input: z.void(), output: z.array(GraphRelationTypeDto) },
   "graphRelations.listEdges": { input: VectorStoreRef, output: z.array(GraphEdgeDto) },
   "graphRelations.addEdge": { input: AddGraphEdgeInput, output: GraphEdgeDto },

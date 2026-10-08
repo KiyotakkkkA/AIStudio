@@ -3,6 +3,7 @@ import type { IpcHandlers } from "@zvs/ipc";
 import type { VectorStoreService } from "../services/VectorStoreService.ts";
 import type { IndexingService } from "../indexing/IndexingService.ts";
 import type { RunService } from "../services/RunService.ts";
+import type { VectorEvalService } from "../services/VectorEvalService.ts";
 
 export type SourcePicker = (kind: "file" | "folder") => Promise<string[]>;
 
@@ -10,6 +11,7 @@ export interface VectorStoreHandlerDependencies {
   service: VectorStoreService;
   indexing?: IndexingService;
   runs?: RunService;
+  evaluation?: VectorEvalService;
   pick?: SourcePicker;
 }
 
@@ -29,7 +31,11 @@ type VectorStoreChannels =
   | "vectorStores.sources.pick"
   | "vectorStores.documents.list"
   | "vectorStores.documents.remove"
-  | "vectorStores.index";
+  | "vectorStores.index"
+  | "vectorStores.eval.list"
+  | "vectorStores.eval.add"
+  | "vectorStores.eval.remove"
+  | "vectorStores.eval.run";
 
 export function createVectorStoreHandlers(
   dependencies: VectorStoreService | VectorStoreHandlerDependencies,
@@ -41,6 +47,11 @@ export function createVectorStoreHandlers(
     if (!options.indexing)
       throw new AppError(AppErrorCode.CONFLICT, "Сервис индексации недоступен");
     return options.indexing;
+  };
+  const evaluation = (): VectorEvalService => {
+    if (!options.evaluation)
+      throw new AppError(AppErrorCode.CONFLICT, "Проверка качества недоступна");
+    return options.evaluation;
   };
   return {
     "vectorStores.list": () => service.list(),
@@ -73,6 +84,13 @@ export function createVectorStoreHandlers(
       return { id, removed: true };
     },
     "vectorStores.index": (input) => startIndexRun(options, input),
+    "vectorStores.eval.list": ({ id }) => evaluation().list(id),
+    "vectorStores.eval.add": (input) => evaluation().add(input),
+    "vectorStores.eval.remove": (input) => {
+      evaluation().remove(input);
+      return { id: input.id, removed: true };
+    },
+    "vectorStores.eval.run": (input) => evaluation().run(input),
   };
 }
 

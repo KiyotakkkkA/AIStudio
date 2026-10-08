@@ -127,6 +127,13 @@
       "when": 1789559425675,
       "tag": "0017_mcp_servers",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1791500551603,
+      "tag": "0018_vector_eval",
+      "breakpoints": true
     }
   ]
 }

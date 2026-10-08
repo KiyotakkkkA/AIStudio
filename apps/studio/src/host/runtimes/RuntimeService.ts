@@ -325,6 +325,24 @@ export class RuntimeService {
     return text.trim();
   }
 
+  async rerank(
+    modelRef: string,
+    query: string,
+    passages: readonly string[],
+    signal: AbortSignal,
+  ): Promise<number[]> {
+    const item = await this.options.catalogue.find(modelRef);
+    if (formatOf(item.fileName) !== "gguf")
+      throw new AppError(
+        AppErrorCode.UNSUPPORTED_FORMAT,
+        `Формат файла «${basename(item.fileName)}» не поддерживается локальным движком`,
+      );
+    const { definition, record } = this.engineFor("gguf");
+    const modelPath = await this.modelPath(item.fileName);
+    const server = this.serverFor(definition, record, { modelPath, role: "rerank" });
+    return server.rerank(query, passages, signal);
+  }
+
   /**
    * A vision model is two files: the weights and the projector that turns pixels into tokens.
    * They download together and sit side by side, so the projector is found by name rather than

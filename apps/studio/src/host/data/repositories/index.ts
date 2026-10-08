@@ -10,12 +10,14 @@ import { AccountRepository } from "./AccountRepository.ts";
 import { VectorStoreRepository } from "./VectorStoreRepository.ts";
 import { VectorDocumentRepository } from "./VectorDocumentRepository.ts";
 import { VectorSourceRepository } from "./VectorSourceRepository.ts";
+import { VectorEvalCaseRepository } from "./VectorEvalCaseRepository.ts";
 import { GraphRelationRepository } from "./GraphRelationRepository.ts";
 import { GraphEdgeRepository } from "./GraphEdgeRepository.ts";
 import { DownloadRepository } from "./DownloadRepository.ts";
 import { ToolRepository } from "./ToolRepository.ts";
 import { McpServerRepository } from "./McpServerRepository.ts";
 export { VectorStoreRepository, VectorDocumentRepository, VectorSourceRepository };
+export { VectorEvalCaseRepository };
 export { GraphRelationRepository, GraphEdgeRepository };
 export type { GraphEdgeLookup } from "./GraphEdgeRepository.ts";
 export { DownloadRepository };
@@ -42,6 +44,7 @@ export interface Repositories {
   readonly vectorStores: VectorStoreRepository;
   readonly vectorDocuments: VectorDocumentRepository;
   readonly vectorSources: VectorSourceRepository;
+  readonly vectorEvalCases: VectorEvalCaseRepository;
   readonly graphRelations: GraphRelationRepository;
   readonly graphEdges: GraphEdgeRepository;
   readonly downloads: DownloadRepository;
@@ -62,6 +65,7 @@ export function createRepositories(db: DatabaseHandle): Repositories {
     vectorStores: new VectorStoreRepository(db),
     vectorDocuments: new VectorDocumentRepository(db),
     vectorSources: new VectorSourceRepository(db),
+    vectorEvalCases: new VectorEvalCaseRepository(db),
     graphRelations: new GraphRelationRepository(db),
     graphEdges: new GraphEdgeRepository(db),
     downloads: new DownloadRepository(db),

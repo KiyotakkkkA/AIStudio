@@ -1,5 +1,10 @@
 import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { VectorOcrConfig, VectorRerankConfig, VectorStoreDto } from "@zvs/shared";
+import type {
+  VectorEvalRunDto,
+  VectorOcrConfig,
+  VectorRerankConfig,
+  VectorStoreDto,
+} from "@zvs/shared";
 import { provider } from "./provider.ts";
 
 export const vectorStore = sqliteTable(
@@ -27,6 +32,7 @@ export const vectorStore = sqliteTable(
       .default({ enabled: false, modelRef: "", language: "auto", minCharsPerPage: 200 }),
     indexType: text("index_type").notNull().default("FLAT"),
     status: text("status").$type<VectorStoreDto["status"]>().notNull().default("pending"),
+    lastEval: text("last_eval", { mode: "json" }).$type<VectorEvalRunDto>(),
     graphStale: integer("graph_stale", { mode: "boolean" }).notNull().default(false),
     tableCreatedAt: integer("table_created_at"),
     lastIndexedAt: integer("last_indexed_at"),

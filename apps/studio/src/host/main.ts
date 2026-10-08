@@ -43,6 +43,8 @@ import { BrowserLifecycle } from "./browser/lifecycle";
 import { RustCore } from "./drivers/rust/RustCore";
 import { SystemService } from "./services/SystemService";
 import { VectorStoreService } from "./services/VectorStoreService";
+import { VectorEvalService } from "./services/VectorEvalService";
+import { localRerankers } from "./services/rerank";
 import { GraphService } from "./services/GraphService";
 import { RunService } from "./services/RunService";
 import { RetentionService } from "./services/RetentionService";
@@ -225,6 +227,7 @@ if (!app.requestSingleInstanceLock()) {
         directory: paths.vectorStoresDir,
         logger,
       });
+      const vectorEval = new VectorEvalService({ data: database, stores: vectorStores, logger });
       const graph = new GraphService({ data: database, core, logger });
       const indexing = new IndexingService({
         data: database,
@@ -298,6 +301,7 @@ if (!app.requestSingleInstanceLock()) {
       registry.attachLocalEngine({
         embed: (model, texts, signal) => runtimes!.embed(model, texts, signal),
       });
+      vectorStores.attachRerankers(localRerankers(runtimes));
       const nodes = registerDownloadNodes(registerJobNodes(registerCoreNodes(new NodeRegistry())));
       const tools = new ToolRegistry({ data: database, logger });
       registerKernelTools(nodes, tools);
@@ -332,6 +336,7 @@ if (!app.requestSingleInstanceLock()) {
           chat,
           runs,
           vectorStores,
+          vectorEval,
           graph,
           indexing,
           downloads,

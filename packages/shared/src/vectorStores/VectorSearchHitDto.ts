@@ -16,12 +16,19 @@ export const VectorSearchHitDto = z.object({
   documentId: z.string(),
   chunkIndex: z.number().int().nonnegative(),
   path: z.string(),
+  vectorScore: z.number().min(0).max(1).optional(),
+  rerankScore: z.number().min(0).max(1).optional(),
 });
 export type VectorSearchHitDto = z.infer<typeof VectorSearchHitDto>;
+
+export const VectorRerankOutcome = z.enum(["off", "applied", "fallback"]);
+export type VectorRerankOutcome = z.infer<typeof VectorRerankOutcome>;
 
 export const VectorSearchResultDto = z.object({
   hits: z.array(VectorSearchHitDto),
   embeddingMs: z.number().nonnegative(),
   searchMs: z.number().nonnegative(),
+  rerankMs: z.number().nonnegative().optional(),
+  rerank: VectorRerankOutcome.optional(),
 });
 export type VectorSearchResultDto = z.infer<typeof VectorSearchResultDto>;

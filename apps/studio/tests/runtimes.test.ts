@@ -502,3 +502,63 @@ test("a catalogue ref round-trips to its build id and ignores an archive ref", (
   expect(runtimeIdOfCatalogueRef(runtimeRef("llama-cpp-cuda", TAG, "a.zip"))).toBeUndefined();
   expect(runtimeIdOfCatalogueRef("curated:embedding:bge-m3-f16")).toBeUndefined();
 });
+
+test("reranking runs its own server over the catalogue model, beside the embedding one", async () => {
+  const spawned: { modelPath: string; gpuLayers: number; role?: string }[] = [];
+  const fake = (given: { modelPath: string; gpuLayers: number; role?: string }): LlamaServer => {
+    spawned.push(given);
+    return {
+      running: true,
+      modelPath: given.modelPath,
+      embed: () => Promise.resolve([Float32Array.from([0.5])]),
+      rerank: (_query: string, passages: readonly string[]) =>
+        Promise.resolve(passages.map((_, index) => index)),
+      start: () => Promise.resolve("http://127.0.0.1:1"),
+      stop: () => undefined,
+    } as unknown as LlamaServer;
+  };
+  catalogueItems.push({
+    ref: "curated:model:bge-reranker-v2-m3-f16",
+    kind: "model",
+    source: "curated",
+    name: "bge-reranker-v2-m3",
+    displayName: "BGE Reranker v2 M3",
+    description: "",
+    sizeBytes: 1,
+    fileName: "bge-reranker-v2-m3-FP16.gguf",
+    url: "https://example.test/reranker.gguf",
+    tags: [],
+  } as CatalogueItem);
+  mkdirSync(join(workspace.path, "models"), { recursive: true });
+  mkdirSync(join(workspace.path, "embeddings"), { recursive: true });
+  writeFileSync(join(workspace.path, "models", "bge-reranker-v2-m3-FP16.gguf"), "weights");
+  writeFileSync(join(workspace.path, "embeddings", "bge-m3-FP16.gguf"), "weights");
+  settings.set("runtimes.installed", {
+    "llama-cpp-cpu": {
+      tag: TAG,
+      installPath: join(workspace.path, "runtimes", "llama-cpp-cpu"),
+      executablePath: join(workspace.path, "runtimes", "llama-cpp-cpu", "llama-server.exe"),
+      sizeBytes: 10,
+    },
+  });
+  const runtimes = service({ createServer: fake });
+
+  await runtimes.embed("bge-m3-FP16.gguf", ["a"], AbortSignal.timeout(1_000));
+  const scores = await runtimes.rerank(
+    "curated:model:bge-reranker-v2-m3-f16",
+    "query",
+    ["a", "b"],
+    AbortSignal.timeout(1_000),
+  );
+  await runtimes.rerank(
+    "curated:model:bge-reranker-v2-m3-f16",
+    "again",
+    ["c"],
+    AbortSignal.timeout(1_000),
+  );
+
+  expect(scores).toEqual([0, 1]);
+  expect(spawned.map((given) => given.role)).toEqual(["embedding", "rerank"]);
+  expect(spawned[1]?.modelPath).toContain("bge-reranker-v2-m3-FP16.gguf");
+  expect(spawned[1]?.gpuLayers).toBe(0);
+});

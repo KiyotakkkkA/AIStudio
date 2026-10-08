@@ -17,6 +17,7 @@ import { createAccountHandlers } from "./accounts.ts";
 import type { AccountService } from "../services/AccountService.ts";
 import type { SystemService } from "../services/SystemService.ts";
 import type { VectorStoreService } from "../services/VectorStoreService.ts";
+import type { VectorEvalService } from "../services/VectorEvalService.ts";
 import { createVectorStoreHandlers, type SourcePicker } from "./vectorStores.ts";
 import type { GraphService } from "../services/GraphService.ts";
 import { createGraphRelationHandlers } from "./graphRelations.ts";
@@ -32,6 +33,7 @@ export interface HostIpcDependencies {
   chat: ChatService;
   runs: RunService;
   vectorStores: VectorStoreService;
+  vectorEval?: VectorEvalService;
   graph: GraphService;
   indexing?: IndexingService;
   downloads?: DownloadService;
@@ -59,6 +61,7 @@ export function createHandlers(dependencies: HostIpcDependencies): IpcHandlers<C
       service: dependencies.vectorStores,
       indexing: dependencies.indexing,
       runs: dependencies.runs,
+      evaluation: dependencies.vectorEval,
       pick: dependencies.pickSources,
     }),
     ...createGraphRelationHandlers(dependencies.graph),

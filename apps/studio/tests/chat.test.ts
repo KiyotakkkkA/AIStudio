@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
   CreateConversationInput,
+  CreateVectorStoreInput,
   HostEvent,
   VectorStoreId,
   contract,
@@ -17,6 +18,8 @@ import { ChatService } from "../src/host/services/ChatService.ts";
 import { estimateTokens, windowChatHistory } from "../src/host/services/chatHistory.ts";
 import { createChatHandlers } from "../src/host/ipc/chat.ts";
 import { openDatabase } from "../src/host/data/client.ts";
+import { FakeVectorCore } from "../../../test/helpers/FakeVectorCore.ts";
+import { VectorStoreService } from "../src/host/services/VectorStoreService.ts";
 
 let db: TemporaryDatabase;
 let driver: FakeDriver;
@@ -325,4 +328,68 @@ test("chat generation does not require tool approval and completes normally", as
   expect(runs.get(handle.id).status).toBe("succeeded");
   expect(driver.requests).toHaveLength(1);
   expect(chat.get(created.id).messages[1]).toMatchObject({ partial: false });
+});
+
+test("a store with reranking on hands chat reranked citations", async () => {
+  const core = new FakeVectorCore();
+  const vectorStores = new VectorStoreService({
+    data: db.client,
+    core,
+    drivers: { ephemeralDriver: async () => driver },
+    directory: db.directory,
+    rerankers: () => ({
+      rerank: async (_query, passages) => passages.map((text) => (text === "The answer." ? 5 : -5)),
+    }),
+  });
+  const reranking = await vectorStores.create(
+    CreateVectorStoreInput.parse({
+      name: "Reranked",
+      embeddingProviderId: providerId,
+      embeddingModelId: "embed",
+      dimension: 1,
+      rerank: { enabled: true, modelRef: "curated:model:bge-reranker-v2-m3-f16", candidates: 50 },
+    }),
+  );
+  await core.upsertVectors(
+    vectorStores.storePath(reranking.id),
+    ["Noise one.", "Noise two.", "Noise three.", "Noise four.", "Noise five.", "The answer."].map(
+      (text, index) => ({
+        id: `doc${String(index)}:0`,
+        vector: [0],
+        documentId: `doc${String(index)}`,
+        chunkIndex: 0,
+        path: `docs/${String(index)}.md`,
+        payload: { text },
+      }),
+    ),
+  );
+  const registry = registerCoreNodes(new NodeRegistry());
+  const reranked = new RunService({
+    data: db.client,
+    registry,
+    events: bus,
+    services: {
+      providers: { text: async () => driver.text, ephemeralDriver: async () => driver },
+      vectorStores,
+    },
+  });
+  reranked.permissions.grant("llm.generate", "global", "auto", "test");
+  reranked.permissions.grant("vector.search", "global", "auto", "test");
+  const rerankedChat = new ChatService({
+    data: db.client,
+    registry,
+    runs: reranked,
+  });
+  try {
+    const created = rerankedChat.create(
+      CreateConversationInput.parse({ providerId, modelId, attachedStoreIds: [reranking.id] }),
+    );
+    const handle = rerankedChat.sendMessage(created.id, "Where is the answer?");
+    await reranked.wait(handle.id);
+    const citations = rerankedChat.get(created.id).messages[1]!.citations;
+    expect(citations[0]).toMatchObject({ documentId: "doc5", sourcePath: "docs/5.md" });
+    expect(citations[0]!.score).toBeGreaterThan(0.99);
+  } finally {
+    await reranked.dispose();
+  }
 });

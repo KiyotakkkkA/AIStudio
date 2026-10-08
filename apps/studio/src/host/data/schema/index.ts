@@ -7,6 +7,7 @@ export * from "./model.ts";
 export * from "./vectorStore.ts";
 export * from "./vectorDocument.ts";
 export * from "./vectorSource.ts";
+export * from "./vectorEvalCase.ts";
 export * from "./graphRelationType.ts";
 export * from "./graphEdge.ts";
 export * from "./tool.ts";
