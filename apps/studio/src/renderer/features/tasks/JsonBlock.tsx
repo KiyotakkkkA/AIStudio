@@ -1,3 +1,4 @@
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import type { Json } from "@zvs/shared";
 
 export interface JsonBlockProps {
@@ -14,10 +15,13 @@ export default function JsonBlock({
   if (value === undefined || value === null)
     return <p className="font-mono text-[11px] text-main-500">{empty}</p>;
   return (
-    <pre
-      className={`m-0 overflow-auto rounded-card border border-main-750 bg-main-900 p-2.5 font-mono text-[11px] leading-[1.7] text-main-300 ${maxHeight}`}
+    <ScrollArea
+      orientation="both"
+      className={`rounded-card border border-main-750 bg-main-900 p-2.5 ${maxHeight}`}
     >
-      {JSON.stringify(value, null, 2)}
-    </pre>
+      <pre className="m-0 font-mono text-[11px] leading-[1.7] text-main-300">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    </ScrollArea>
   );
 }

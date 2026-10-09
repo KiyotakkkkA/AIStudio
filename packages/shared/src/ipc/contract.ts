@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ChatEnabledTools,
   ChatSendInput,
   ConversationDetailDto,
   TruncateConversationInput,
@@ -145,6 +146,10 @@ export const contract = defineContract({
   },
   "chat.conversations.updateRelations": {
     input: ConversationRef.extend({ useRelations: z.boolean() }),
+    output: ConversationDto,
+  },
+  "chat.conversations.updateTools": {
+    input: ConversationRef.extend({ enabledTools: ChatEnabledTools }),
     output: ConversationDto,
   },
   "chat.conversations.truncate": {

@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { ApprovalRequestDto, HostEventDraft, RunId } from "@zvs/shared";
+import type { ApprovalRequestDto, HostEventDraft, Json, RunId } from "@zvs/shared";
 import type { ProviderRegistry } from "../drivers/ai/ProviderRegistry.ts";
 import type { VectorStoreService } from "../services/VectorStoreService.ts";
 import type { SidecarJobsPort } from "../drivers/sidecar/SidecarDriver.ts";
@@ -10,10 +10,22 @@ import type { GraphService } from "../services/GraphService.ts";
 export type PermissionRequirement =
   { tool: string; tier?: "auto" | "ask" | "off" } | { kind: "none" };
 export type ApprovalDecision = "approved" | "denied";
+export type AdmissionOrigin = "graph" | "model";
+export interface ToolStepRequest {
+  key: string;
+  input: Json;
+  label: string;
+  minimumTier?: "auto" | "ask";
+  onApproval?: (request: ApprovalRequestDto, decision: ApprovalDecision | null) => void;
+}
+export interface ToolStepResult {
+  stepId: string;
+  output: Json;
+}
 export interface KernelServices {
   providers?: Pick<ProviderRegistry, "ephemeralDriver" | "text">;
   vectorStores?: Pick<VectorStoreService, "search"> &
-    Partial<Pick<VectorStoreService, "chunks" | "relatedChunks">>;
+    Partial<Pick<VectorStoreService, "chunks" | "relatedChunks" | "list">>;
   graph?: Pick<GraphService, "neighbors">;
   jobs?: SidecarJobsPort;
   indexing?: Pick<IndexingService, "index">;
@@ -24,6 +36,7 @@ export interface StepContext {
   signal: AbortSignal;
   emit(event: HostEventDraft): void;
   requestApproval(req: ApprovalRequestDto): Promise<ApprovalDecision>;
+  invokeTool?(request: ToolStepRequest): Promise<ToolStepResult>;
   services: KernelServices;
 }
 export type NodeDef<I, O> = {

@@ -4,12 +4,24 @@ import { Json } from "../primitives/json.js";
 import { VectorSearchMode } from "./VectorStoreDto.js";
 
 export const VectorSearchInput = z.object({
-  storeId: VectorStoreId,
-  query: z.string().trim().min(1).max(100000),
-  k: z.number().int().min(1).max(1000).default(10),
-  minScore: z.number().min(0).max(1).default(0),
-  mode: VectorSearchMode.optional(),
+  storeId: VectorStoreId.describe("UUID of the vector store, as returned by vector.list"),
+  query: z.string().trim().min(1).max(100000).describe("Natural-language search query"),
+  k: z.number().int().min(1).max(1000).default(10).describe("Number of fragments to return"),
+  minScore: z.number().min(0).max(1).default(0).describe("Drop fragments scoring below this"),
+  mode: VectorSearchMode.optional().describe(
+    "hybrid: vectors plus keywords; vector: vectors only. Omit to use the store's own setting",
+  ),
 });
+
+export const VectorStoreListEntryDto = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  documents: z.number().int().nonnegative(),
+  status: z.string(),
+  searchMode: z.string(),
+});
+export type VectorStoreListEntryDto = z.infer<typeof VectorStoreListEntryDto>;
 export type VectorSearchInput = z.infer<typeof VectorSearchInput>;
 export const VectorHitProvenance = z.enum(["vector", "keyword", "both"]);
 export type VectorHitProvenance = z.infer<typeof VectorHitProvenance>;

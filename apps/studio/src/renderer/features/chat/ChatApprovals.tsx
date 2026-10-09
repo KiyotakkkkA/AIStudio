@@ -5,7 +5,7 @@ import type ChatStore from "./ChatStore";
 export default observer(function ChatApprovals({ store }: { readonly store: ChatStore }) {
   return (
     <div className="space-y-2">
-      {store.approvals.map((request) => (
+      {store.standaloneApprovals.map((request) => (
         <div
           key={request.id}
           role="status"

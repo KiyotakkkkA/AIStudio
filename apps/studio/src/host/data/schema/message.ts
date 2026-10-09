@@ -1,5 +1,5 @@
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import type { ChatCitationDto } from "@zvs/shared";
+import type { ChatCitationDto, ChatToolCallDto } from "@zvs/shared";
 import { conversation } from "./conversation.ts";
 import { run } from "./run.ts";
 
@@ -14,6 +14,10 @@ export const message = sqliteTable(
     content: text("content").notNull(),
     reasoning: text("reasoning").notNull().default(""),
     citations: text("citations", { mode: "json" }).$type<ChatCitationDto[]>().notNull(),
+    toolCalls: text("tool_calls", { mode: "json" })
+      .$type<ChatToolCallDto[]>()
+      .notNull()
+      .default([]),
     tokensIn: integer("tokens_in").notNull(),
     tokensOut: integer("tokens_out").notNull(),
     usageEstimated: integer("usage_estimated", { mode: "boolean" }).notNull().default(true),

@@ -341,6 +341,7 @@ test("kernel nodes register themselves as built-in capabilities exactly once", (
   expect(tools.list().map((row) => row.key)).toEqual([
     "mail.send",
     "vector.index",
+    "vector.list",
     "vector.search",
   ]);
   const index = tools.list().find((row) => row.key === "vector.index");

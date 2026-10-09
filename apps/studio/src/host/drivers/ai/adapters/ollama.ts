@@ -8,6 +8,7 @@ import type {
   TextDelta,
   TextGenerationDriver,
   TokenUsage,
+  ToolCall,
 } from "../ports.ts";
 import type { RequestSpec, Transport } from "../transport/Transport.ts";
 
@@ -19,9 +20,15 @@ export const OLLAMA_CAPABILITIES = {
   embedding: false,
   image: false,
   honours: { temperature: true, topK: true, topP: true, maxOutputTokens: true },
+  tools: "native" as const,
 };
 
-type OllamaMessage = { role?: unknown; content?: unknown; thinking?: unknown };
+type OllamaMessage = {
+  role?: unknown;
+  content?: unknown;
+  thinking?: unknown;
+  tool_calls?: unknown;
+};
 type OllamaFrame = {
   model?: unknown;
   message?: OllamaMessage;
@@ -75,15 +82,25 @@ export class OllamaAdapter implements TextGenerationDriver {
     let model = request.model;
     let usage: TokenUsage | null = null;
     let finishReason: GenerateResult["finishReason"] = "unknown";
+    const toolCalls: ToolCall[] = [];
     for await (const delta of this.streamWithSummary(request, signal, (frame) => {
       if (typeof frame.model === "string") model = frame.model;
       usage = usageOf(frame) ?? usage;
       if (frame.done === true) finishReason = frame.done_reason === "length" ? "length" : "stop";
     })) {
-      if (delta.kind === "reasoning") reasoning += delta.text;
+      if (delta.kind === "tool_call") toolCalls.push(delta.call);
+      else if (delta.kind === "reasoning") reasoning += delta.text;
       else text += delta.text;
     }
-    return { model, text, reasoning: reasoning || null, finishReason, usage };
+    if (toolCalls.length > 0) finishReason = "tool_calls";
+    return {
+      model,
+      text,
+      reasoning: reasoning || null,
+      finishReason,
+      usage,
+      ...(toolCalls.length === 0 ? {} : { toolCalls }),
+    };
   }
 
   stream(request: GenerateRequest, signal: AbortSignal): AsyncIterable<TextDelta> {
@@ -103,8 +120,20 @@ export class OllamaAdapter implements TextGenerationDriver {
         model: request.model,
         messages: [
           ...(request.system ? [{ role: "system", content: request.system }] : []),
-          ...request.messages,
+          ...request.messages.map(wireMessage),
         ],
+        ...(request.tools !== undefined && request.tools.length > 0
+          ? {
+              tools: request.tools.map((tool) => ({
+                type: "function",
+                function: {
+                  name: tool.name,
+                  description: tool.description,
+                  parameters: tool.parameters,
+                },
+              })),
+            }
+          : {}),
         stream: true,
         options: {
           ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
@@ -116,6 +145,7 @@ export class OllamaAdapter implements TextGenerationDriver {
         },
       },
     };
+    let calls = 0;
     try {
       for await (const line of ndjson(this.transport.stream(spec, signal))) {
         if (signal.aborted) throw cancelled();
@@ -126,6 +156,10 @@ export class OllamaAdapter implements TextGenerationDriver {
           yield { text: message.thinking, kind: "reasoning" };
         if (typeof message?.content === "string" && message.content.length > 0)
           yield { text: message.content, kind: "text" };
+        for (const call of toolCallsOf(message?.tool_calls)) {
+          calls += 1;
+          yield { kind: "tool_call", call: { ...call, id: call.id || `call_${String(calls)}` } };
+        }
       }
     } catch (error: unknown) {
       throw isCancellation(error) ? cancelled() : toAppError(error);
@@ -140,6 +174,44 @@ export class OllamaAdapter implements TextGenerationDriver {
       throw isCancellation(error) ? cancelled() : toAppError(error);
     }
   }
+}
+
+function wireMessage(message: GenerateRequest["messages"][number]): Record<string, unknown> {
+  if (message.role === "assistant" && message.toolCalls !== undefined && message.toolCalls.length)
+    return {
+      role: "assistant",
+      content: message.content,
+      tool_calls: message.toolCalls.map((call) => ({
+        function: { name: call.name, arguments: parseArguments(call.arguments) },
+      })),
+    };
+  return { role: message.role, content: message.content };
+}
+
+function parseArguments(raw: string): unknown {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return {};
+  }
+}
+
+function toolCallsOf(raw: unknown): ToolCall[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry: unknown) => {
+    if (entry === null || typeof entry !== "object") return [];
+    const record = entry as { id?: unknown; function?: { name?: unknown; arguments?: unknown } };
+    const name = record.function?.name;
+    if (typeof name !== "string" || name.length === 0) return [];
+    const args = record.function?.arguments;
+    return [
+      {
+        id: typeof record.id === "string" ? record.id : "",
+        name,
+        arguments: typeof args === "string" ? args : JSON.stringify(args ?? {}),
+      },
+    ];
+  });
 }
 
 async function* ndjson(chunks: AsyncIterable<Uint8Array>): AsyncIterable<string> {

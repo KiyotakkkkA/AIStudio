@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { ChatCitationDto, VectorStoreDto, VectorStoreId } from "@zvs/shared";
 import { Accordion, ScrollArea, SlidedPanel, Tabs } from "@kiyotakkkka/zvs-uikit-lib";
 import { mdiDatabaseOutline, mdiThoughtBubbleOutline } from "@mdi/js";
@@ -14,6 +14,7 @@ export default function ChatMessage({
   partial = false,
   generating = false,
   usage,
+  tools,
   onEdit,
   onRefresh,
   onDelete,
@@ -25,6 +26,7 @@ export default function ChatMessage({
   readonly partial?: boolean;
   readonly generating?: boolean;
   readonly usage?: string;
+  readonly tools?: ReactNode;
   readonly onEdit?: () => void;
   readonly onRefresh?: () => void;
   readonly onDelete?: () => void;
@@ -70,12 +72,13 @@ export default function ChatMessage({
                 </span>
               </Accordion.Summary>
               <Accordion.Content className="border-main-750 px-3 pt-2.5 pb-3">
-                <div className="max-h-80 overflow-y-auto border-l-2 border-accent-line pr-1 pl-3 text-[12.5px]/relaxed whitespace-pre-wrap text-main-400">
+                <ScrollArea className="max-h-80 border-l-2 border-accent-line pr-1 pl-3 text-[12.5px]/relaxed whitespace-pre-wrap text-main-400">
                   {reasoning}
-                </div>
+                </ScrollArea>
               </Accordion.Content>
             </Accordion>
           )}
+          {tools}
           <ChatMarkdown content={content} />
           {generating && (
             <p

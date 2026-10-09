@@ -26,6 +26,7 @@ export const ADAPTERS: AdapterDescriptorDto[] = [
     embedding: true,
     image: false,
     honours: { temperature: true, topK: false, topP: true, maxOutputTokens: true },
+    tools: "native",
     implemented: true,
   },
   {
@@ -36,6 +37,7 @@ export const ADAPTERS: AdapterDescriptorDto[] = [
     embedding: false,
     image: false,
     honours: { temperature: false, topK: false, topP: false, maxOutputTokens: false },
+    tools: "injected",
     implemented: true,
   },
   {
@@ -46,6 +48,7 @@ export const ADAPTERS: AdapterDescriptorDto[] = [
     embedding: false,
     image: false,
     honours: { temperature: false, topK: false, topP: false, maxOutputTokens: false },
+    tools: "injected",
     implemented: true,
   },
   {
@@ -56,6 +59,7 @@ export const ADAPTERS: AdapterDescriptorDto[] = [
     embedding: true,
     image: false,
     honours: { temperature: false, topK: false, topP: false, maxOutputTokens: false },
+    tools: "native",
     implemented: true,
   },
 ];
@@ -130,6 +134,7 @@ export function provider(overrides: Partial<ProviderDto> = {}): ProviderDto {
       embedding: true,
       image: false,
       honours: { temperature: true, topK: false, topP: true, maxOutputTokens: true },
+      tools: "native",
     },
     models: [model({ id: MODEL }), model({ id: OTHER_MODEL, externalId: "qwen3-coder:480b" })],
     ...overrides,

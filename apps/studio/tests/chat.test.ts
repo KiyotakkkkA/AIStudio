@@ -143,7 +143,7 @@ test("a storeless channel turn returns before tokens, skips retrieval, persists 
   expect(search).not.toHaveBeenCalled();
   expect(runs.steps(handle.id).map((step) => step.type)).toEqual([
     "chat.prepare",
-    "llm.generate",
+    "chat.generate",
     "chat.persist",
   ]);
   const detail = await handlers["chat.conversations.get"]({ id: created.id });

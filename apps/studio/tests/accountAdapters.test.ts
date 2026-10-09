@@ -283,11 +283,11 @@ test("the qwen family opens a chat and streams reasoning and answer as distinct 
     ["reasoning", "reasoning", "text", "text", "text"],
   );
   assert.deepEqual(
-    deltas.filter((delta) => delta.kind === "text").map((delta) => delta.text),
+    deltas.flatMap((delta) => (delta.kind === "text" ? [delta.text] : [])),
     ["Привет", ", мир", "!"],
   );
   assert.deepEqual(
-    deltas.filter((delta) => delta.kind === "reasoning").map((delta) => delta.text),
+    deltas.flatMap((delta) => (delta.kind === "reasoning" ? [delta.text] : [])),
     [
       "Пользователь здоровается.\nОтвечу коротким приветствием.",
       "Достаточно одного предложения без лишних деталей.",

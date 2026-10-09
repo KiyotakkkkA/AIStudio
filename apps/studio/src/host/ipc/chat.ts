@@ -13,6 +13,7 @@ export function createChatHandlers(
   | "chat.conversations.rename"
   | "chat.conversations.updateStores"
   | "chat.conversations.updateRelations"
+  | "chat.conversations.updateTools"
   | "chat.conversations.truncate"
   | "chat.send"
   | "chat.cancel"
@@ -27,6 +28,8 @@ export function createChatHandlers(
       service.updateStores(id, attachedStoreIds),
     "chat.conversations.updateRelations": ({ id, useRelations }) =>
       service.updateRelations(id, useRelations),
+    "chat.conversations.updateTools": ({ id, enabledTools }) =>
+      service.updateTools(id, enabledTools),
     "chat.conversations.truncate": ({ id, messageId }) => service.truncate(id, messageId),
     "chat.send": ({ conversationId, text, providerId, modelId, settings }) =>
       service.sendMessage(conversationId, text, { providerId, modelId, settings }),

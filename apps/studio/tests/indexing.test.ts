@@ -60,6 +60,7 @@ const embedding: EmbeddingDriver = {
     embedding: true,
     image: false,
     honours: { temperature: false, topK: false, topP: false, maxOutputTokens: false },
+    tools: "native",
   }),
 };
 

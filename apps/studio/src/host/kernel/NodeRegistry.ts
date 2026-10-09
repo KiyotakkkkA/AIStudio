@@ -41,6 +41,12 @@ export class NodeRegistry {
   list(): readonly (RegisteredNode & { type: string })[] {
     return [...this.nodes].map(([type, node]) => ({ ...node, type }));
   }
+  forTool(key: string): (RegisteredNode & { type: string }) | undefined {
+    const candidates = this.list().filter(
+      (node) => "tool" in node.permission && node.permission.tool === key,
+    );
+    return candidates.find((node) => node.type === key) ?? candidates[0];
+  }
   resolve(type: string): RegisteredNode {
     return this.get(type);
   }

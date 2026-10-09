@@ -6,6 +6,8 @@ import {
   RunId,
   VectorStoreId,
 } from "./primitives/branded.js";
+import { Json } from "./primitives/json.js";
+import { ToolKey } from "./tools/ToolDto.js";
 
 export const ChatSettings = z.object({
   temperature: z.number().min(0).max(2).optional(),
@@ -25,6 +27,33 @@ export const ChatCitationDto = z.object({
   related: z.string().nullable().default(null),
 });
 export type ChatCitationDto = z.infer<typeof ChatCitationDto>;
+export const CHAT_TOOL_CALL_STATUSES = [
+  "running",
+  "awaiting-approval",
+  "succeeded",
+  "failed",
+  "refused",
+  "denied",
+  "cancelled",
+] as const;
+export const ChatToolCallStatus = z.enum(CHAT_TOOL_CALL_STATUSES);
+export type ChatToolCallStatus = z.infer<typeof ChatToolCallStatus>;
+export const ChatToolCallDto = z.object({
+  id: z.string().min(1).max(128),
+  key: z.string().min(1).max(200),
+  name: z.string().min(1).max(200),
+  round: z.number().int().nonnegative(),
+  arguments: Json,
+  status: ChatToolCallStatus,
+  result: z.string().nullable().default(null),
+  truncated: z.boolean().default(false),
+  error: z.string().nullable().default(null),
+  approvalId: z.string().nullable().default(null),
+  stepId: z.string().nullable().default(null),
+  durationMs: z.number().int().nonnegative().default(0),
+});
+export type ChatToolCallDto = z.infer<typeof ChatToolCallDto>;
+export const ChatEnabledTools = z.array(ToolKey).max(64);
 export const CreateConversationInput = z.object({
   title: z.string().trim().min(1).max(200).default("New conversation"),
   providerId: ProviderId,
@@ -33,6 +62,7 @@ export const CreateConversationInput = z.object({
   systemPrompt: z.string().max(100000).default(""),
   attachedStoreIds: z.array(VectorStoreId).max(64).default([]),
   useRelations: z.boolean().default(false),
+  enabledTools: ChatEnabledTools.default([]),
 });
 export type CreateConversationInput = z.infer<typeof CreateConversationInput>;
 export const ConversationRef = z.object({ id: ConversationId });
@@ -49,6 +79,7 @@ export const MessageDto = z.object({
   content: z.string(),
   reasoning: z.string().default(""),
   citations: z.array(ChatCitationDto),
+  toolCalls: z.array(ChatToolCallDto).default([]),
   tokensIn: z.number().int().nonnegative(),
   tokensOut: z.number().int().nonnegative(),
   usageEstimated: z.boolean(),

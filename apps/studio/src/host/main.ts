@@ -327,7 +327,7 @@ if (!app.requestSingleInstanceLock()) {
       });
       downloads.attach(runs);
       const toolInvoker = new ToolInvoker({ tools, nodes, runs });
-      const chat = new ChatService({ data: database, runs, registry: nodes, logger });
+      const chat = new ChatService({ data: database, runs, registry: nodes, tools, logger });
       retention = new RetentionService({ data: database, settings, logger });
       retention.start();
       runs.recover();

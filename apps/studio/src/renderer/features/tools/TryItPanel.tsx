@@ -1,5 +1,6 @@
 import { mdiPlay, mdiRestore } from "@mdi/js";
 import { observer } from "mobx-react-lite";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../../app/routes";
 import Button from "../../ui/atoms/buttons/Button";
@@ -82,9 +83,11 @@ function TryItPanel({ store }: { readonly store: ToolStore }) {
           {result.ok || result.error === null ? null : (
             <p className="m-0 text-[11.5px] wrap-break-word text-err">{result.error}</p>
           )}
-          <pre className="m-0 max-h-56 overflow-auto rounded-control border border-main-750 bg-main-850 px-2.5 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap wrap-break-word text-main-300">
-            {resultPreview(result)}
-          </pre>
+          <ScrollArea className="max-h-56 rounded-control border border-main-750 bg-main-850 px-2.5 py-2">
+            <pre className="m-0 font-mono text-[11px] leading-relaxed whitespace-pre-wrap wrap-break-word text-main-300">
+              {resultPreview(result)}
+            </pre>
+          </ScrollArea>
           <button
             type="button"
             className="self-start text-[11.5px] font-medium text-accent-medium hover:underline"

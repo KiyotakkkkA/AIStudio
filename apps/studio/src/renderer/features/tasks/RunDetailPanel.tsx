@@ -15,11 +15,7 @@ import {
 } from "./runPresentation";
 import type RunHistoryStore from "./RunHistoryStore";
 
-export default observer(function RunDetailPanel({
-  store,
-}: {
-  readonly store: RunHistoryStore;
-}) {
+export default observer(function RunDetailPanel({ store }: { readonly store: RunHistoryStore }) {
   const detail = store.detail;
   if (detail === null)
     return (
@@ -114,14 +110,17 @@ export default observer(function RunDetailPanel({
         </p>
         {detail.logs.length === 0 ? (
           <p className="m-0 text-[12px] text-main-500">
-            {summary.prunedAt === undefined
-              ? "Журнал пуст."
-              : "Журнал удалён политикой хранения."}
+            {summary.prunedAt === undefined ? "Журнал пуст." : "Журнал удалён политикой хранения."}
           </p>
         ) : (
-          <pre className="m-0 max-h-80 overflow-auto rounded-card border border-main-750 bg-main-900 p-2.5 font-mono text-[11px] leading-[1.7] text-main-300">
-            {detail.logs.map((line) => JSON.stringify(line)).join("\n")}
-          </pre>
+          <ScrollArea
+            orientation="both"
+            className="max-h-80 rounded-card border border-main-750 bg-main-900 p-2.5"
+          >
+            <pre className="m-0 font-mono text-[11px] leading-[1.7] text-main-300">
+              {detail.logs.map((line) => JSON.stringify(line)).join("\n")}
+            </pre>
+          </ScrollArea>
         )}
       </ScrollArea>
     </section>

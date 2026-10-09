@@ -69,6 +69,7 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
       "0018_vector_eval",
       "0019_index_schema_v2",
       "0020_chat_min_score",
+      "0021_chat_tool_calls",
     ]);
     const tables = database.client.db.$client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'")
@@ -121,6 +122,7 @@ test("a backup is written before migrating and only the last three are kept", ()
           "0018_vector_eval",
           "0019_index_schema_v2",
           "0020_chat_min_score",
+          "0021_chat_tool_calls",
         ]);
         if (run === 0) assert.equal(report.backup, undefined);
         else assert.equal(typeof report.backup, "string");
@@ -274,6 +276,7 @@ test("prepareDatabase opens and migrates in one step", () => {
         "0018_vector_eval",
         "0019_index_schema_v2",
         "0020_chat_min_score",
+        "0021_chat_tool_calls",
       ]);
       assert.equal(prepared.client.repositories.settings.all().length, 0);
     } finally {

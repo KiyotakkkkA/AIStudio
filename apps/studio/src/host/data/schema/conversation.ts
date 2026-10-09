@@ -10,6 +10,7 @@ export const conversation = sqliteTable("conversation", {
   systemPrompt: text("system_prompt").notNull(),
   attachedStoreIds: text("attached_store_ids", { mode: "json" }).$type<string[]>().notNull(),
   useRelations: integer("use_relations", { mode: "boolean" }).notNull().default(false),
+  enabledTools: text("enabled_tools", { mode: "json" }).$type<string[]>().notNull().default([]),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });

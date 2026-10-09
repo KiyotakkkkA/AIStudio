@@ -2,11 +2,15 @@ import { z } from "zod";
 import {
   AppError,
   AppErrorCode,
+  ChatEnabledTools,
   ChatSendInput,
+  type ChatToolCallDto,
   ConversationDetailDto,
   DEFAULT_CHAT_MIN_SCORE,
   GRAPH_EXPANSION_DEFAULT_MAX,
   mergeGraphNeighbors,
+  modelToolSupport,
+  resolveToolMode,
   type GraphNeighborhood,
   ConversationDto,
   CreateConversationInput,
@@ -16,6 +20,13 @@ import {
   type HostEvent,
   type RunHandleDto,
 } from "@zvs/shared";
+import { withInjectedTools } from "../drivers/ai/injectedTools.ts";
+import type {
+  ChatMessage,
+  GenerateRequest,
+  TextGenerationDriver,
+  ToolCall,
+} from "../drivers/ai/ports.ts";
 import type { UnitOfWork } from "../data/UnitOfWork.ts";
 import { GenerateNodeInput } from "../kernel/coreNodes.ts";
 import type { NodeRegistry } from "../kernel/NodeRegistry.ts";
@@ -31,13 +42,45 @@ import {
 } from "./chatHistory.ts";
 import { CHAT_FETCH_K, mergeRetrieval } from "./retrievalMerge.ts";
 import { retrievalQuery } from "./retrievalQuery.ts";
+import type { ToolRegistry } from "../tools/ToolRegistry.ts";
+import {
+  CHAT_TOOL_CALLS,
+  CHAT_TOOL_ROUNDS,
+  OfferedTool,
+  TOOL_BUDGET_NOTE,
+  TOOL_PREVIEW_CHARS,
+  TOOL_RESULTS_INSTRUCTION,
+  capText,
+  fenceToolResult,
+  offeredTools,
+  parseToolArguments,
+  toolResultBudget,
+  toolResultText,
+  toolSpecs,
+} from "./chatTools.ts";
 
 export const CHAT_RELATED_MAX = 3;
+const BUDGET_EXHAUSTED = "Бюджет вызовов инструментов на этот ход исчерпан";
+
+export const ChatGenerateRequest = GenerateNodeInput.extend({
+  assistantId: z.string(),
+  tools: z.array(OfferedTool).default([]),
+  modelTools: z.boolean().nullable().default(null),
+  toolResultChars: z.number().int().positive().default(4000),
+});
+export type ChatGenerateRequest = z.infer<typeof ChatGenerateRequest>;
+
+interface RoundOutput {
+  text: string;
+  reasoning: string;
+  toolCalls: ToolCall[];
+}
 
 export interface ChatServiceOptions {
   data: UnitOfWork;
   runs: RunService;
   registry: NodeRegistry;
+  tools?: Pick<ToolRegistry, "list">;
   logger?: Logger;
   clock?: () => number;
 }
@@ -63,7 +106,7 @@ export class ChatService {
           }),
         })
         .catchall(z.array(VectorSearchHitDto)),
-      output: GenerateNodeInput,
+      output: ChatGenerateRequest,
       permission: { kind: "none" },
       sideEffect: true,
       run: async (context, input) => {
@@ -93,10 +136,13 @@ export class ChatService {
           conversation.useRelations && ranked.length > 0
             ? await this.relatedSources(context, input.query ?? user.content, ranked)
             : [];
+        const offered = offeredTools(conversation.enabledTools, this.options.tools?.list() ?? []);
         const prepared = windowChatHistory(
-          conversation.systemPrompt,
-          history,
-          user,
+          offered.length > 0
+            ? `${conversation.systemPrompt}\n\n${TOOL_RESULTS_INSTRUCTION}\n${JSON.stringify(toolSpecs(offered))}`
+            : conversation.systemPrompt,
+          history.map(({ role, content }) => ({ role, content })),
+          { role: user.role, content: user.content },
           model.contextWindow,
           model.maxOutputTokens,
           sources,
@@ -147,12 +193,28 @@ export class ChatService {
         return {
           providerId: conversation.providerId,
           model: model.externalId,
-          messages: prepared.messages,
+          messages: prepared.messages.flatMap(({ role, content }) =>
+            role === "tool" ? [] : [{ role, content }],
+          ),
           system: conversation.systemPrompt,
           ...input.settings,
           maxOutputTokens: model.maxOutputTokens,
+          assistantId: input.assistantId,
+          tools: offered,
+          modelTools: model.supportsTools,
+          toolResultChars: toolResultBudget(
+            model.contextWindow - model.maxOutputTokens - prepared.tokensIn,
+          ),
         };
       },
+    });
+    options.registry.register({
+      type: "chat.generate",
+      input: z.object({ request: ChatGenerateRequest }),
+      output: z.object({ text: z.string(), reasoning: z.string() }),
+      permission: { tool: "llm.generate" },
+      sideEffect: true,
+      run: async (context, { request }) => this.respond(context, request),
     });
     options.registry.register({
       type: "chat.persist",
@@ -195,10 +257,12 @@ export class ChatService {
     for (const id of input.attachedStoreIds)
       if (!this.options.data.repositories.vectorStores.findById(id))
         throw new AppError(AppErrorCode.NOT_FOUND, "Vector store not found");
+    this.requireTools(input.enabledTools);
     return ConversationDto.parse(
       this.options.data.repositories.chat.create({
         ...input,
         attachedStoreIds: [...new Set(input.attachedStoreIds)],
+        enabledTools: [...new Set(input.enabledTools)],
         id: createId(),
         createdAt: this.clock(),
         updatedAt: this.clock(),
@@ -221,6 +285,17 @@ export class ChatService {
     return ConversationDto.parse(
       this.options.data.repositories.chat.update(id, {
         attachedStoreIds: [...new Set(ids)],
+        updatedAt: this.clock(),
+      }),
+    );
+  }
+  updateTools(id: string, enabledTools: string[]): ConversationDto {
+    this.get(id);
+    const keys = [...new Set(ChatEnabledTools.parse(enabledTools))];
+    this.requireTools(keys);
+    return ConversationDto.parse(
+      this.options.data.repositories.chat.update(id, {
+        enabledTools: keys,
         updatedAt: this.clock(),
       }),
     );
@@ -292,7 +367,7 @@ export class ChatService {
         },
         {
           id: "generate",
-          type: "llm.generate",
+          type: "chat.generate",
           dependencies: ["prepare"],
           input: {},
           bindings: { request: { source: "node", nodeId: "prepare" } },
@@ -466,6 +541,224 @@ export class ChatService {
     }
     return related;
   }
+  private requireTools(keys: readonly string[]): void {
+    if (keys.length === 0) return;
+    const known = new Set(this.options.data.repositories.tools.list().map((tool) => tool.key));
+    for (const key of keys)
+      if (!known.has(key))
+        throw new AppError(AppErrorCode.NOT_FOUND, "Инструмент не найден", { details: { key } });
+  }
+  private async respond(
+    context: StepContext,
+    request: ChatGenerateRequest,
+  ): Promise<{ text: string; reasoning: string }> {
+    const {
+      providerId,
+      assistantId,
+      tools,
+      modelTools,
+      toolResultChars,
+      messages: initial,
+      system: prompt,
+      ...base
+    } = request;
+    if (!context.services.providers)
+      throw new AppError(AppErrorCode.CONFLICT, "Provider service unavailable");
+    const raw = await context.services.providers.text(providerId);
+    const mode =
+      tools.length === 0 ? "none" : resolveToolMode(raw.capabilities().tools, modelTools);
+    const offered = mode === "none" ? [] : tools;
+    const driver = mode === "injected" ? withInjectedTools(raw) : raw;
+    const specs = toolSpecs(offered);
+    const byName = new Map(offered.map((tool) => [tool.name, tool]));
+    if (tools.length > 0 && offered.length === 0)
+      context.emit({
+        type: "log",
+        line: { message: "The model does not support tool calling; tools were not offered" },
+      });
+    const system =
+      specs.length > 0
+        ? [prompt ?? "", TOOL_RESULTS_INSTRUCTION].filter((part) => part.trim()).join("\n\n")
+        : prompt;
+    const messages: ChatMessage[] = [...initial];
+    const calls: ChatToolCallDto[] = [];
+    let text = "";
+    let reasoning = "";
+    let executed = 0;
+    let round = 0;
+    try {
+      for (;;) {
+        const final = round >= CHAT_TOOL_ROUNDS || executed >= CHAT_TOOL_CALLS;
+        if (final && specs.length > 0) messages.push({ role: "user", content: TOOL_BUDGET_NOTE });
+        const output = await this.generateRound(
+          context,
+          driver,
+          {
+            ...base,
+            ...(system === undefined ? {} : { system }),
+            messages: [...messages],
+            ...(specs.length > 0 ? { tools: specs } : {}),
+          },
+          text,
+        );
+        text += output.text;
+        reasoning += output.reasoning;
+        if (output.toolCalls.length === 0 || specs.length === 0) break;
+        messages.push({ role: "assistant", content: output.text, toolCalls: output.toolCalls });
+        for (const call of output.toolCalls) {
+          const record: ChatToolCallDto = {
+            id: call.id,
+            key: byName.get(call.name)?.key ?? call.name,
+            name: call.name,
+            round,
+            arguments: parseToolArguments(call.arguments) ?? call.arguments,
+            status: "running",
+            result: null,
+            truncated: false,
+            error: null,
+            approvalId: null,
+            stepId: null,
+            durationMs: 0,
+          };
+          calls.push(record);
+          const refuse = final || executed >= CHAT_TOOL_CALLS ? BUDGET_EXHAUSTED : undefined;
+          if (refuse === undefined) executed += 1;
+          const content = await this.callTool(context, assistantId, calls, record, {
+            tool: byName.get(call.name),
+            label: `call${String(calls.length)}`,
+            limit: toolResultChars,
+            ...(refuse === undefined ? {} : { refuse }),
+          });
+          messages.push({
+            role: "tool",
+            toolCallId: call.id,
+            content:
+              mode === "native" ? fenceToolResult(call.name, record.status, content) : content,
+          });
+        }
+        if (final) break;
+        round += 1;
+      }
+    } catch (error) {
+      for (const call of calls)
+        if (call.status === "running" || call.status === "awaiting-approval") {
+          call.status = "cancelled";
+          call.error = context.signal.aborted
+            ? "Выполнение отменено"
+            : error instanceof Error
+              ? error.message
+              : String(error);
+        }
+      this.saveToolCalls(context, assistantId, calls);
+      throw error;
+    }
+    return { text, reasoning };
+  }
+  private async generateRound(
+    context: StepContext,
+    driver: TextGenerationDriver,
+    request: GenerateRequest,
+    before: string,
+  ): Promise<RoundOutput> {
+    let text = "";
+    let reasoning = "";
+    const toolCalls: ToolCall[] = [];
+    for await (const delta of driver.stream(request, context.signal)) {
+      context.signal.throwIfAborted();
+      if (delta.kind === "tool_call") {
+        toolCalls.push({
+          ...delta.call,
+          id: delta.call.id || `call_${String(toolCalls.length + 1)}`,
+        });
+        continue;
+      }
+      if (delta.text.length === 0) continue;
+      if (delta.kind === "reasoning") {
+        reasoning += delta.text;
+        context.emit({ type: "token", delta: delta.text, kind: "reasoning" });
+        continue;
+      }
+      if (text === "" && before !== "" && !before.endsWith("\n")) {
+        text += "\n\n";
+        context.emit({ type: "token", delta: "\n\n", kind: "text" });
+      }
+      text += delta.text;
+      context.emit({ type: "token", delta: delta.text, kind: "text" });
+    }
+    return { text, reasoning, toolCalls };
+  }
+  private async callTool(
+    context: StepContext,
+    assistantId: string,
+    calls: ChatToolCallDto[],
+    record: ChatToolCallDto,
+    options: { tool: OfferedTool | undefined; label: string; limit: number; refuse?: string },
+  ): Promise<string> {
+    const started = this.clock();
+    const settle = (
+      status: ChatToolCallDto["status"],
+      error: string | null,
+      result: string | null,
+    ): string => {
+      const preview = result === null ? null : capText(result, TOOL_PREVIEW_CHARS);
+      record.status = status;
+      record.error = error;
+      record.result = preview?.text ?? null;
+      record.truncated = preview?.truncated ?? false;
+      record.durationMs = Math.max(0, Math.round(this.clock() - started));
+      this.saveToolCalls(context, assistantId, calls);
+      if (result === null) return `Tool call ${status}: ${error ?? "no result"}`;
+      const capped = capText(result, options.limit);
+      return capped.truncated
+        ? `${capped.text}\n[result truncated to ${String(options.limit)} characters]`
+        : capped.text;
+    };
+    this.saveToolCalls(context, assistantId, calls);
+    if (options.refuse !== undefined) return settle("refused", options.refuse, null);
+    if (options.tool === undefined)
+      return settle("refused", "Модель вызвала инструмент, который не был ей предложен", null);
+    if (record.arguments === null || typeof record.arguments !== "object")
+      return settle("failed", "Аргументы вызова не являются JSON-объектом", null);
+    if (context.invokeTool === undefined)
+      return settle("refused", "Вызов инструментов недоступен в этом запуске", null);
+    try {
+      const { stepId, output } = await context.invokeTool({
+        key: options.tool.key,
+        input: record.arguments,
+        label: options.label,
+        ...(options.tool.destructive ? { minimumTier: "ask" as const } : {}),
+        onApproval: (approval, decision) => {
+          record.approvalId = typeof approval.id === "string" ? approval.id : null;
+          record.status = decision === null ? "awaiting-approval" : "running";
+          this.saveToolCalls(context, assistantId, calls);
+        },
+      });
+      record.stepId = stepId;
+      const result = toolResultText(output);
+      return settle(
+        result.isError ? "failed" : "succeeded",
+        result.isError ? "Инструмент вернул ошибку" : null,
+        result.text,
+      );
+    } catch (error) {
+      if (context.signal.aborted) throw error;
+      if (error instanceof AppError && error.code === AppErrorCode.APPROVAL_DENIED)
+        return settle("denied", "Вызов отклонён пользователем", null);
+      if (error instanceof AppError && error.code === AppErrorCode.PERMISSION_DENIED)
+        return settle("refused", "Инструмент запрещён разрешением", null);
+      return settle("failed", error instanceof Error ? error.message : String(error), null);
+    }
+  }
+  private saveToolCalls(
+    context: StepContext,
+    assistantId: string,
+    calls: readonly ChatToolCallDto[],
+  ): void {
+    if (calls.length === 0) return;
+    const snapshot = calls.map((call) => ({ ...call }));
+    this.options.data.repositories.chat.updateMessage(assistantId, { toolCalls: snapshot });
+    context.emit({ type: "step", step: { domain: "tool-calls", calls: snapshot } });
+  }
   private requireIdle(id: string): void {
     if (
       this.options.data.repositories.runs
@@ -500,6 +793,7 @@ export class ChatService {
       .find((model) => model.id === modelId || model.externalId === modelId);
     if (!model?.available)
       throw new AppError(AppErrorCode.VALIDATION_FAILED, "Text model unavailable");
+    const supportsTools = modelToolSupport(model, repositories.models.listByProvider(provider.id));
     const contextWindow = model.contextWindow ?? 8192;
     const maxOutputTokens =
       settings.maxOutputTokens ??
@@ -509,6 +803,6 @@ export class ChatService {
       (model.maxOutput !== null && maxOutputTokens > model.maxOutput)
     )
       throw new AppError(AppErrorCode.VALIDATION_FAILED, "Output budget exceeds model limits");
-    return { externalId: model.externalId, contextWindow, maxOutputTokens };
+    return { externalId: model.externalId, contextWindow, maxOutputTokens, supportsTools };
   }
 }

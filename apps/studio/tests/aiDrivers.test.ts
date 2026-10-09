@@ -292,7 +292,7 @@ test("the openai-compatible adapter turns SSE frames into deltas and maps discov
 
   const deltas: string[] = [];
   for await (const delta of adapter.stream(request, new AbortController().signal)) {
-    deltas.push(delta.text);
+    if (delta.kind !== "tool_call") deltas.push(delta.text);
   }
   assert.deepEqual(deltas, ["При", "вет", "!"]);
   assert.equal(transport.calls.at(-1)?.streamed, true);
@@ -699,7 +699,7 @@ test("aborting a transport stream aborts the vendor request itself", async () =>
   await assert.rejects(
     async () => {
       for await (const delta of adapter.stream(request, controller.signal)) {
-        seen.push(delta.text);
+        if (delta.kind !== "tool_call") seen.push(delta.text);
         controller.abort();
       }
     },

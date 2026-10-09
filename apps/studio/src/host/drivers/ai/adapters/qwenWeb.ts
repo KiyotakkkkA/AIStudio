@@ -48,6 +48,7 @@ export const QWEN_WEB_CAPABILITIES: AdapterCapabilities = {
   embedding: false,
   image: false,
   honours: { temperature: false, topK: false, topP: false, maxOutputTokens: false },
+  tools: "injected",
 };
 
 const positive = z.number().int().positive().nullish();
@@ -173,7 +174,7 @@ export class QwenWebAdapter extends AccountFamilyAdapter {
     let reasoning = "";
     for await (const delta of this.#run(request, signal, summary)) {
       if (delta.kind === "reasoning") reasoning += delta.text;
-      else text += delta.text;
+      else if (delta.kind === "text") text += delta.text;
     }
     return {
       model: request.model,

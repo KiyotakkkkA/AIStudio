@@ -18,7 +18,7 @@ export async function streamToEvents(
   let outcome: RunOutcomeDto = { status: "ok" };
   try {
     for await (const delta of deltas) {
-      if (delta.text.length === 0) continue;
+      if (delta.kind === "tool_call" || delta.text.length === 0) continue;
       if (delta.kind === "reasoning") {
         reasoning += delta.text;
         stream.emit({ type: "token", delta: delta.text, kind: "reasoning" });

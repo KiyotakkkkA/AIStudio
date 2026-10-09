@@ -8,6 +8,7 @@ import ChatMessage from "./ChatMessage";
 import MessageActions from "../../ui/molecules/MessageActions";
 import ChatComposer from "./ChatComposer";
 import ChatApprovals from "./ChatApprovals";
+import ChatToolCalls from "./ChatToolCalls";
 import { shouldPinToBottom } from "./scroll";
 import type ChatStore from "./ChatStore";
 
@@ -29,7 +30,13 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
   }, [store.active?.id]);
   useLayoutEffect(() => {
     if (pinned.current) scrollLatest();
-  }, [store.liveText, store.active?.messages.length, store.generating, store.liveCitations.length]);
+  }, [
+    store.liveText,
+    store.active?.messages.length,
+    store.generating,
+    store.liveCitations.length,
+    store.liveToolCalls,
+  ]);
   useEffect(() => {
     if (!content.current || typeof ResizeObserver === "undefined") return;
     const resize = new ResizeObserver(() => {
@@ -63,7 +70,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           );
           setJump(!pinned.current);
         }}
-        className="min-h-0 flex-1 overflow-y-auto px-6 pt-7 [overflow-anchor:none]"
+        className="min-h-0 flex-1 px-6 pt-7 [overflow-anchor:none]"
       >
         <div ref={content} className="mx-auto w-full max-w-4xl space-y-7 pb-6">
           {store.loading && (
@@ -141,6 +148,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                 citations={message.citations}
                 stores={store.stores}
                 partial={message.partial}
+                tools={<ChatToolCalls calls={message.toolCalls} />}
                 usage={`${message.usageEstimated ? "~" : ""}${message.tokensIn} вход. · ${message.tokensOut} выход. · ${(message.durationMs / 1000).toFixed(1)} с`}
               />
             ),
@@ -160,6 +168,13 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
               stores={store.stores}
               generating={store.generating}
               partial={store.outcome !== "ok"}
+              tools={
+                <ChatToolCalls
+                  calls={store.liveToolCalls}
+                  approvalFor={store.approvalFor}
+                  onDecide={(id, approve) => void store.decideApproval(id, approve)}
+                />
+              }
             />
           )}
           {store.outcome === "cancelled" && (

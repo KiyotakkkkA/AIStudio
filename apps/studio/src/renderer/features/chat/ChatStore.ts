@@ -1,8 +1,12 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
+  ChatToolCallDto,
   MessageDto,
   VectorSearchHitDto,
+  modelToolSupport,
+  resolveToolMode,
+  type ToolMode,
   type ChatCitationDto,
   type Contract,
   type ConversationDetailDto,
@@ -11,6 +15,7 @@ import {
   type MessageId,
   type ProviderDto,
   type RunHandleDto,
+  type ToolDto,
   type VectorStoreDto,
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
@@ -21,6 +26,7 @@ export default class ChatStore {
   active: ConversationDetailDto | null = null;
   providers: ProviderDto[] = [];
   stores: VectorStoreDto[] = [];
+  tools: ToolDto[] = [];
   composer = new ConversationVm();
   query = "";
   contextOpen = false;
@@ -32,6 +38,7 @@ export default class ChatStore {
   liveText = "";
   liveReasoning = "";
   liveCitations: ChatCitationDto[] = [];
+  liveToolCalls: ChatToolCallDto[] = [];
   searchedStoreIds: VectorStoreDto["id"][] = [];
   approvals: { id: string; subject: string; busy: boolean }[] = [];
   pendingTurn = false;
@@ -99,6 +106,42 @@ export default class ChatStore {
   get useRelations() {
     return this.active?.useRelations ?? this.composer.useRelations;
   }
+  get toolMode(): ToolMode {
+    const provider = this.provider;
+    const model = this.model;
+    if (!provider || !model) return "none";
+    return resolveToolMode(
+      provider.adapterCapabilities.tools,
+      modelToolSupport(model, provider.models),
+    );
+  }
+  get enabledTools() {
+    return this.active?.enabledTools ?? this.composer.enabledTools;
+  }
+  get selectableTools() {
+    return this.tools
+      .filter((tool) => tool.available || this.enabledTools.includes(tool.key))
+      .slice()
+      .sort((left, right) => left.key.localeCompare(right.key));
+  }
+  get offeredToolCount() {
+    return this.tools.filter(
+      (tool) =>
+        this.enabledTools.includes(tool.key) &&
+        tool.available &&
+        tool.enabled &&
+        tool.tier !== "off",
+    ).length;
+  }
+  get standaloneApprovals() {
+    const attached = new Set(
+      this.liveToolCalls.flatMap((call) => (call.approvalId === null ? [] : [call.approvalId])),
+    );
+    return this.approvals.filter((request) => !attached.has(request.id));
+  }
+  approvalFor(id: string | null) {
+    return id === null ? undefined : this.approvals.find((request) => request.id === id);
+  }
   get available() {
     return this.provider?.enabled === true && this.model?.available === true;
   }
@@ -158,6 +201,43 @@ export default class ChatStore {
     }
   }
 
+  async toggleTool(key: ToolDto["key"]) {
+    if (!this.canConfigure) return;
+    const current = this.enabledTools;
+    const enabledTools = current.includes(key)
+      ? current.filter((value) => value !== key)
+      : [...current, key];
+    if (!this.active) {
+      this.composer.setEnabledTools(enabledTools);
+      return;
+    }
+    try {
+      const updated = await this.ipc.call("chat.conversations.updateTools", {
+        id: this.active.id,
+        enabledTools,
+      });
+      runInAction(() => {
+        this.active = { ...this.active!, ...updated };
+        this.conversations = this.conversations.map((conversation) =>
+          conversation.id === updated.id ? updated : conversation,
+        );
+      });
+    } catch (error) {
+      this.error = errorCopy(error);
+    }
+  }
+
+  async refreshTools() {
+    try {
+      const tools = await this.ipc.call("tools.list", { includeUnavailable: true });
+      runInAction(() => {
+        this.tools = tools;
+      });
+    } catch (error) {
+      this.error = errorCopy(error);
+    }
+  }
+
   async toggleRelations() {
     if (!this.canConfigure) return;
     const useRelations = !this.useRelations;
@@ -187,10 +267,13 @@ export default class ChatStore {
     this.error = null;
     const revision = ++this.revision;
     try {
-      const [conversations, summaries, stores] = await Promise.all([
+      const [conversations, summaries, stores, tools] = await Promise.all([
         this.ipc.call("chat.conversations.list", undefined),
         this.ipc.call("providers.list", { capability: "text", enabled: true }),
         this.ipc.call("vectorStores.list", undefined),
+        this.ipc
+          .call("tools.list", { includeUnavailable: true })
+          .catch((): ToolDto[] => this.tools),
       ]);
       const providers = await Promise.all(
         summaries.map((provider) =>
@@ -202,6 +285,7 @@ export default class ChatStore {
         this.conversations = conversations;
         this.providers = providers;
         this.stores = stores;
+        this.tools = tools;
         if (!this.composer.providerId && providers[0]) this.composer.selectProvider(providers[0]);
         this.loading = false;
       });
@@ -236,6 +320,7 @@ export default class ChatStore {
         this.liveText = "";
         this.liveReasoning = "";
         this.liveCitations = [];
+        this.liveToolCalls = [];
         this.outcome = null;
         this.retryText = "";
         this.pendingTurn = false;
@@ -262,6 +347,7 @@ export default class ChatStore {
     this.liveText = "";
     this.liveReasoning = "";
     this.liveCitations = [];
+    this.liveToolCalls = [];
     this.retryText = "";
     this.pendingTurn = false;
     this.composer.setText("");
@@ -306,6 +392,7 @@ export default class ChatStore {
     this.retryText = text;
     this.liveText = "";
     this.liveCitations = [];
+    this.liveToolCalls = [];
     this.searchedStoreIds = [];
     this.pendingTurn = true;
     try {
@@ -318,6 +405,7 @@ export default class ChatStore {
           systemPrompt: this.composer.systemPrompt,
           attachedStoreIds: [...this.composer.attachedStoreIds],
           useRelations: this.composer.useRelations,
+          enabledTools: [...this.composer.enabledTools],
         });
         runInAction(() => {
           this.active = { ...conversation, messages: [] };
@@ -364,6 +452,7 @@ export default class ChatStore {
         this.liveText = "";
         this.liveReasoning = "";
         this.liveCitations = [];
+        this.liveToolCalls = [];
         this.pendingTurn = false;
         this.retryText = "";
       });
@@ -449,6 +538,10 @@ export default class ChatStore {
         this.timer ??= setTimeout(this.flush, 32);
       }
     }
+    if (event.type === "step" && event.step.domain === "tool-calls") {
+      const calls = ChatToolCallDto.array().safeParse(event.step.calls);
+      if (calls.success) this.liveToolCalls = calls.data;
+    }
     if (event.type === "step" && event.step.status === "succeeded") {
       const nodeId = event.step.nodeId;
       if (typeof nodeId === "string" && /^store\d+$/.test(nodeId)) {
@@ -520,6 +613,7 @@ export default class ChatStore {
         this.liveText = "";
         this.liveReasoning = "";
         this.liveCitations = [];
+        this.liveToolCalls = [];
         this.pendingTurn = false;
       });
     } catch (error) {

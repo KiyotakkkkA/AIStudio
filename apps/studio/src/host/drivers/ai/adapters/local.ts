@@ -13,6 +13,7 @@ export const LOCAL_CAPABILITIES: AdapterCapabilities = {
   embedding: true,
   image: false,
   honours: { temperature: false, topK: false, topP: false, maxOutputTokens: false },
+  tools: "native",
 };
 
 const WEIGHT_EXTENSIONS = new Set([".gguf", ".safetensors", ".bin", ".onnx"]);

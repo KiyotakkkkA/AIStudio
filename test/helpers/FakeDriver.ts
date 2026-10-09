@@ -21,6 +21,7 @@ export const FAKE_CAPABILITIES: AdapterCapabilities = {
   embedding: true,
   image: true,
   honours: { temperature: true, topK: false, topP: true, maxOutputTokens: true },
+  tools: "native",
 };
 
 export interface FakeDriverScript {

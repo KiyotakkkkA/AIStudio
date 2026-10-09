@@ -3,11 +3,12 @@ import {
   TUNABLE_PARAMETERS,
   type AdapterFamily,
   type AuthMode,
+  type ToolMode,
   type TunableParameter,
 } from "@zvs/shared";
 
 export { ADAPTER_FAMILIES, TUNABLE_PARAMETERS };
-export type { AuthMode, TunableParameter };
+export type { AuthMode, ToolMode, TunableParameter };
 
 export interface AdapterCapabilities {
   readonly family: AdapterFamily;
@@ -18,6 +19,7 @@ export interface AdapterCapabilities {
   /** Image generation through ImageDriver; not image/vision input. */
   readonly image: boolean;
   readonly honours: Readonly<Record<TunableParameter, boolean>>;
+  readonly tools: ToolMode;
 }
 
 export function supportsAuthMode(capabilities: AdapterCapabilities, mode: AuthMode): boolean {

@@ -1,13 +1,27 @@
-import type { DeltaKind } from "@zvs/shared";
+import type { DeltaKind, Json } from "@zvs/shared";
 import type { ModelCapability } from "../../data/schema/index.ts";
 import type { AdapterCapabilities } from "./AdapterCapabilities.ts";
 
-export const CHAT_ROLES = ["system", "user", "assistant"] as const;
+export const CHAT_ROLES = ["system", "user", "assistant", "tool"] as const;
 export type ChatRole = (typeof CHAT_ROLES)[number];
+
+export interface ToolCall {
+  readonly id: string;
+  readonly name: string;
+  readonly arguments: string;
+}
 
 export interface ChatMessage {
   readonly role: ChatRole;
   readonly content: string;
+  readonly toolCallId?: string;
+  readonly toolCalls?: readonly ToolCall[];
+}
+
+export interface ToolSpec {
+  readonly name: string;
+  readonly description: string;
+  readonly parameters: Json;
 }
 
 interface GenerationSettings {
@@ -21,9 +35,10 @@ export interface GenerateRequest extends GenerationSettings {
   readonly model: string;
   readonly messages: readonly ChatMessage[];
   readonly system?: string;
+  readonly tools?: readonly ToolSpec[];
 }
 
-export const FINISH_REASONS = ["stop", "length", "cancelled", "unknown"] as const;
+export const FINISH_REASONS = ["stop", "length", "tool_calls", "cancelled", "unknown"] as const;
 export type FinishReason = (typeof FINISH_REASONS)[number];
 
 export interface TokenUsage {
@@ -38,12 +53,12 @@ export interface GenerateResult {
   readonly reasoning: string | null;
   readonly finishReason: FinishReason;
   readonly usage: TokenUsage | null;
+  readonly toolCalls?: readonly ToolCall[];
 }
 
-export interface TextDelta {
-  readonly text: string;
-  readonly kind: DeltaKind;
-}
+export type TextDelta =
+  | { readonly text: string; readonly kind: DeltaKind }
+  | { readonly kind: "tool_call"; readonly call: ToolCall };
 
 export interface DiscoveredModel {
   readonly isFree?: boolean | null;

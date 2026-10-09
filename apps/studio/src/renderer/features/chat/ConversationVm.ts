@@ -9,6 +9,7 @@ export default class ConversationVm {
   systemPrompt = "";
   attachedStoreIds: VectorStoreId[] = [];
   useRelations = false;
+  enabledTools: string[] = [];
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true });
@@ -28,6 +29,9 @@ export default class ConversationVm {
   }
   setUseRelations(value: boolean) {
     this.useRelations = value;
+  }
+  setEnabledTools(value: readonly string[]) {
+    this.enabledTools = [...new Set(value)];
   }
   selectProvider(provider: ProviderDto) {
     this.providerId = provider.id;

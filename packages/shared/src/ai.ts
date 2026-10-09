@@ -28,6 +28,23 @@ export const TUNABLE_PARAMETERS = ["temperature", "topK", "topP", "maxOutputToke
 export const TunableParameter = z.enum(TUNABLE_PARAMETERS);
 export type TunableParameter = z.infer<typeof TunableParameter>;
 
+export const TOOL_MODES = ["native", "injected", "none"] as const;
+export const ToolMode = z.enum(TOOL_MODES);
+export type ToolMode = z.infer<typeof ToolMode>;
+
+export function resolveToolMode(adapter: ToolMode, modelSupportsTools: boolean | null): ToolMode {
+  if (adapter === "native" && modelSupportsTools === false) return "none";
+  return adapter;
+}
+
+export function modelToolSupport(
+  model: { readonly capabilities: readonly string[] },
+  siblings: readonly { readonly capabilities: readonly string[] }[],
+): boolean | null {
+  if (model.capabilities.includes("tools")) return true;
+  return siblings.some((candidate) => candidate.capabilities.includes("tools")) ? false : null;
+}
+
 export const AdapterCapabilitiesDto = z.object({
   family: AdapterFamily,
   authModes: z.array(AuthMode),
@@ -36,6 +53,7 @@ export const AdapterCapabilitiesDto = z.object({
   embedding: z.boolean(),
   image: z.boolean(),
   honours: z.record(TunableParameter, z.boolean()),
+  tools: ToolMode,
 });
 export type AdapterCapabilitiesDto = z.infer<typeof AdapterCapabilitiesDto>;
 

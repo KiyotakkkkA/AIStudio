@@ -24,7 +24,7 @@ import { encodeRunCursor } from "../data/repositories/RunRepository.ts";
 import { NodeRegistry } from "../kernel/NodeRegistry.ts";
 import type { ToolRegistry } from "../tools/ToolRegistry.ts";
 import { Scheduler, type SchedulerOptions } from "../kernel/Scheduler.ts";
-import type { PermissionRequirement, StepContext } from "../kernel/types.ts";
+import type { AdmissionOrigin, PermissionRequirement, StepContext } from "../kernel/types.ts";
 import type { EventBus, StreamHandle } from "../platform/events.ts";
 import { createId } from "../platform/ids.ts";
 
@@ -70,9 +70,9 @@ export class RunService {
         dependencies.approval ?? ((request, signal) => this.approvals.wait(request, signal)),
       admit:
         dependencies.admit ??
-        (async (requirement, context) => {
+        (async (requirement, context, origin) => {
           if ("kind" in requirement) return;
-          await this.admitTool(requirement, context);
+          await this.admitTool(requirement, context, origin);
           dependencies.tools?.recordUse(requirement.tool, this.options.clock());
         }),
     };
@@ -80,15 +80,18 @@ export class RunService {
   private async admitTool(
     requirement: Extract<PermissionRequirement, { tool: string }>,
     context: StepContext,
+    origin: AdmissionOrigin = "graph",
   ): Promise<void> {
     const kind = this.get(context.runId).kind;
-    if (
-      kind === "chat" &&
-      (requirement.tool === "llm.generate" || requirement.tool === "vector.search")
-    )
-      return;
-    if (kind === "indexing" && requirement.tool === "vector.index") return;
-    if (kind === "download" && requirement.tool === "download.fetch") return;
+    if (origin === "graph") {
+      if (
+        kind === "chat" &&
+        (requirement.tool === "llm.generate" || requirement.tool === "vector.search")
+      )
+        return;
+      if (kind === "indexing" && requirement.tool === "vector.index") return;
+      if (kind === "download" && requirement.tool === "download.fetch") return;
+    }
     const registered = this.dependencies.tools?.ceiling(requirement.tool);
     if (registered && (!registered.enabled || !registered.available))
       throw new AppError(AppErrorCode.PERMISSION_DENIED, "Tool disabled");
@@ -286,7 +289,10 @@ export class RunService {
         subjectId: row.subjectId ?? undefined,
         title: row.title ?? row.subjectId ?? row.id,
         status: row.status,
-        progress: { done: succeeded.get(row.id) ?? 0, total: row.graph.nodes.length },
+        progress: {
+          done: Math.min(succeeded.get(row.id) ?? 0, row.graph.nodes.length),
+          total: row.graph.nodes.length,
+        },
         activeNodeId: active.get(row.id),
         approval: approvals.get(row.id),
         outcome: row.outcome ?? undefined,

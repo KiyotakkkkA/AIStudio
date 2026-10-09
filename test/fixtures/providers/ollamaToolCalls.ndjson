@@ -1,0 +1,2 @@
+{"model": "qwen3:8b", "created_at": "2026-10-09T21:10:01.112Z", "message": {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "docs__search", "arguments": {"query": "rotate token", "k": 3}}}]}, "done": false}
+{"model": "qwen3:8b", "created_at": "2026-10-09T21:10:01.240Z", "message": {"role": "assistant", "content": ""}, "done": true, "done_reason": "stop", "prompt_eval_count": 180, "eval_count": 24}

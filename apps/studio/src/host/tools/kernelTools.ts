@@ -14,7 +14,13 @@ const NOT_TOOLS: ReadonlySet<string> = new Set(["llm.generate"]);
 const BUILTIN: Record<string, BuiltinToolMeta> = {
   "vector.search": {
     displayName: "vector.search",
-    description: "Семантический поиск по векторному хранилищу; возвращает фрагменты с оценками.",
+    description:
+      "Семантический поиск по векторному хранилищу; возвращает фрагменты с оценками. storeId — UUID из vector.list.",
+  },
+  "vector.list": {
+    displayName: "vector.list",
+    description:
+      "Список векторных хранилищ: UUID, название, описание и число документов. UUID передаётся в vector.search как storeId.",
   },
   "vector.index": {
     displayName: "vector.index",

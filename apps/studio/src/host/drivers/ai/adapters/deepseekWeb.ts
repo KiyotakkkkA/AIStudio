@@ -27,6 +27,7 @@ export const DEEPSEEK_WEB_CAPABILITIES: AdapterCapabilities = {
   embedding: false,
   image: false,
   honours: { temperature: false, topK: false, topP: false, maxOutputTokens: false },
+  tools: "injected",
 };
 
 export const DEEPSEEK_CURATED_MODELS: readonly DiscoveredModel[] = [

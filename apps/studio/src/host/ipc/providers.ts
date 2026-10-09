@@ -14,6 +14,7 @@ function adapterDescriptors(): AdapterDescriptorDto[] {
       embedding: entry.capabilities.embedding,
       image: entry.capabilities.image,
       honours: { ...entry.capabilities.honours },
+      tools: entry.capabilities.tools,
       implemented: entry.implemented,
     };
   });

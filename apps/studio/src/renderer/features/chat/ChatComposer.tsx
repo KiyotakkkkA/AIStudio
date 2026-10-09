@@ -8,6 +8,7 @@ import {
   mdiInformationOutline,
   mdiPaperclip,
   mdiUpload,
+  mdiWrenchOutline,
 } from "@mdi/js";
 import { Dropdown, InputCheckBox, Modal, ProgressBar } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
@@ -16,6 +17,7 @@ import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import SelectInput from "../../ui/atoms/SelectInput";
 import TextArea from "../../ui/atoms/TextArea";
 import Toggle from "../../ui/atoms/Toggle";
+import ChatToolPicker from "./ChatToolPicker";
 import type ChatStore from "./ChatStore";
 
 export default observer(function ChatComposer({ store }: { readonly store: ChatStore }) {
@@ -107,7 +109,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               {store.model?.contextWindow?.toLocaleString() ?? "—"}
             </span>
           </div>
-          {store.attachedStoreIds.length > 0 && (
+          {(store.attachedStoreIds.length > 0 || store.enabledTools.length > 0) && (
             <div className="flex flex-wrap gap-1.5 px-1">
               {store.stores
                 .filter((item) => store.attachedStoreIds.includes(item.id))
@@ -128,6 +130,40 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                     </button>
                   </span>
                 ))}
+              {store.enabledTools.map((key) => {
+                const tool = store.tools.find((item) => item.key === key);
+                const blocked =
+                  tool === undefined || !tool.available || !tool.enabled || tool.tier === "off";
+                return (
+                  <span
+                    key={key}
+                    title={
+                      blocked
+                        ? "Инструмент сейчас недоступен и не будет предложен модели"
+                        : store.toolMode === "none"
+                          ? "Модель не поддерживает вызов инструментов"
+                          : undefined
+                    }
+                    className={`inline-flex h-7 items-center gap-1.5 rounded-full border pr-1.5 pl-2.5 text-[12px] font-medium ${
+                      blocked || store.toolMode === "none"
+                        ? "border-dashed border-main-600 bg-main-850 text-main-400"
+                        : "border-accent-line bg-accent-soft text-accent-medium"
+                    }`}
+                  >
+                    <Icon path={mdiWrenchOutline} size={13} />
+                    <span className="max-w-48 truncate font-mono text-[11.5px]">{key}</span>
+                    <button
+                      type="button"
+                      aria-label={`Не предлагать инструмент ${key}`}
+                      disabled={!store.canConfigure}
+                      className="flex size-4.5 items-center justify-center rounded-full hover:bg-accent-dark hover:text-on-accent disabled:opacity-50"
+                      onClick={() => void store.toggleTool(key)}
+                    >
+                      <Icon path={mdiClose} size={13} />
+                    </button>
+                  </span>
+                );
+              })}
             </div>
           )}
           <div className="px-0.5">
@@ -236,6 +272,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 </div>
               </Dropdown.Menu>
             </Dropdown>
+            <ChatToolPicker store={store} />
             <span className="inline-flex h-7 max-w-56 min-w-0 items-center truncate rounded-full border border-main-750 bg-main-850 px-2.5 font-mono text-[11.5px] text-main-400">
               {store.model?.displayName || store.model?.externalId || store.modelId}
             </span>

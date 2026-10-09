@@ -48,6 +48,7 @@ const FALLBACK_DESCRIPTOR: AdapterDescriptorDto = {
   embedding: true,
   image: false,
   honours: { temperature: true, topK: false, topP: true, maxOutputTokens: true },
+  tools: "native",
   implemented: true,
 };
 

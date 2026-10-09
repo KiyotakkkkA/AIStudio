@@ -1,0 +1,12 @@
+data: {"response.created": {"chat_id": "1a77c526-b841-4fef-805c-8096a2b5e4c3", "parent_id": "ca8ef2b6-93c6-43b6-bc5a-0b96e4fab5ef", "response_id": "5c1f0b7e-8a42-4e0e-9d55-3f0a1c2b9e10", "response_index": "0"}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "```json\n{\"zvs_", "phase": "answer", "status": "typing"}}], "response_id": "5c1f0b7e-8a42-4e0e-9d55-3f0a1c2b9e10", "usage": {"input_tokens": 540, "output_tokens": 20, "characters": 0, "total_tokens": 560}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "call_tool\": \"docs__search\", ", "phase": "answer", "status": "typing"}}], "response_id": "5c1f0b7e-8a42-4e0e-9d55-3f0a1c2b9e10", "usage": {"input_tokens": 540, "output_tokens": 20, "characters": 0, "total_tokens": 560}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "\"arguments\": {\"query\": \"rotate token\"}}", "phase": "answer", "status": "typing"}}], "response_id": "5c1f0b7e-8a42-4e0e-9d55-3f0a1c2b9e10", "usage": {"input_tokens": 540, "output_tokens": 20, "characters": 0, "total_tokens": 560}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "\n```", "phase": "answer", "status": "typing"}}], "response_id": "5c1f0b7e-8a42-4e0e-9d55-3f0a1c2b9e10", "usage": {"input_tokens": 540, "output_tokens": 20, "characters": 0, "total_tokens": 560}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "answer", "status": "finished"}}], "response_id": "5c1f0b7e-8a42-4e0e-9d55-3f0a1c2b9e10", "usage": {"input_tokens": 540, "output_tokens": 20, "characters": 0, "total_tokens": 560}}
+

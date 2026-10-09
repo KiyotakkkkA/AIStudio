@@ -21,6 +21,7 @@ import type {
   TextDelta,
   TextGenerationDriver,
   TokenUsage,
+  ToolCall,
 } from "../ports.ts";
 import type { RequestSpec, Transport, TransportResponse } from "../transport/Transport.ts";
 import { sseData } from "./sse.ts";
@@ -33,12 +34,20 @@ export const OPENAI_COMPATIBLE_CAPABILITIES: AdapterCapabilities = {
   embedding: true,
   image: false,
   honours: { temperature: true, topK: false, topP: true, maxOutputTokens: true },
+  tools: "native",
 };
+
+interface WireToolCall {
+  index?: unknown;
+  id?: unknown;
+  function?: { name?: unknown; arguments?: unknown };
+}
 
 interface ChatContent {
   content?: unknown;
   reasoning_content?: unknown;
   reasoning?: unknown;
+  tool_calls?: unknown;
 }
 
 interface ChatChoice {
@@ -118,12 +127,16 @@ export class OpenAiCompatibleAdapter implements TextGenerationDriver, EmbeddingD
     const response = await this.#post("/chat/completions", this.#body(request, false), signal);
     const payload = decode<ChatResponse>(response.text);
     const choice = payload.choices?.[0];
+    const calls = new ToolCallAssembler();
+    calls.add(choice?.message?.tool_calls);
+    const toolCalls = calls.finish();
     return {
       model: typeof payload.model === "string" ? payload.model : request.model,
       text: typeof choice?.message?.content === "string" ? choice.message.content : "",
       reasoning: reasoningOf(choice?.message),
       finishReason: finishReason(choice?.finish_reason),
       usage: usage(payload.usage),
+      ...(toolCalls.length === 0 ? {} : { toolCalls }),
     };
   }
 
@@ -132,6 +145,7 @@ export class OpenAiCompatibleAdapter implements TextGenerationDriver, EmbeddingD
     const transport = this.#transport;
     return {
       async *[Symbol.asyncIterator](): AsyncIterator<TextDelta> {
+        const calls = new ToolCallAssembler();
         try {
           for await (const payload of sseData(transport.stream(spec, signal))) {
             if (signal.aborted) throw cancelled();
@@ -142,7 +156,9 @@ export class OpenAiCompatibleAdapter implements TextGenerationDriver, EmbeddingD
             if (typeof content === "string" && content.length > 0) {
               yield { text: content, kind: "text" };
             }
+            calls.add(delta?.tool_calls);
           }
+          for (const call of calls.finish()) yield { kind: "tool_call", call };
         } catch (error: unknown) {
           throw isCancellation(error) ? cancelled() : toAppError(error);
         }
@@ -238,9 +254,14 @@ export class OpenAiCompatibleAdapter implements TextGenerationDriver, EmbeddingD
     this.#dropUnsupported(request);
     const messages = [
       ...(request.system === undefined ? [] : [{ role: "system", content: request.system }]),
-      ...request.messages.map((message) => ({ role: message.role, content: message.content })),
+      ...request.messages.map(wireMessage),
     ];
     const body: Record<string, unknown> = { model: request.model, messages, stream };
+    if (request.tools !== undefined && request.tools.length > 0)
+      body.tools = request.tools.map((tool) => ({
+        type: "function",
+        function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+      }));
     if (request.temperature !== undefined) body.temperature = request.temperature;
     if (request.topP !== undefined) body.top_p = request.topP;
     if (request.maxOutputTokens !== undefined) body.max_tokens = request.maxOutputTokens;
@@ -275,6 +296,53 @@ export class OpenAiCompatibleAdapter implements TextGenerationDriver, EmbeddingD
     } catch (error: unknown) {
       throw isCancellation(error) ? cancelled() : toAppError(error);
     }
+  }
+}
+
+function wireMessage(message: GenerateRequest["messages"][number]): Record<string, unknown> {
+  if (message.role === "tool")
+    return { role: "tool", tool_call_id: message.toolCallId ?? "", content: message.content };
+  if (message.role === "assistant" && message.toolCalls !== undefined && message.toolCalls.length)
+    return {
+      role: "assistant",
+      content: message.content.length === 0 ? null : message.content,
+      tool_calls: message.toolCalls.map((call) => ({
+        id: call.id,
+        type: "function",
+        function: { name: call.name, arguments: call.arguments },
+      })),
+    };
+  return { role: message.role, content: message.content };
+}
+
+export class ToolCallAssembler {
+  readonly #parts = new Map<number, { id: string; name: string; arguments: string }>();
+
+  add(raw: unknown): void {
+    if (!Array.isArray(raw)) return;
+    for (const [position, entry] of (raw as WireToolCall[]).entries()) {
+      if (entry === null || typeof entry !== "object") continue;
+      const index = typeof entry.index === "number" ? entry.index : position;
+      const part = this.#parts.get(index) ?? { id: "", name: "", arguments: "" };
+      if (typeof entry.id === "string" && entry.id.length > 0) part.id = entry.id;
+      const name = entry.function?.name;
+      if (typeof name === "string") part.name += name;
+      const args = entry.function?.arguments;
+      if (typeof args === "string") part.arguments += args;
+      else if (args !== undefined && args !== null) part.arguments += JSON.stringify(args);
+      this.#parts.set(index, part);
+    }
+  }
+
+  finish(): ToolCall[] {
+    return [...this.#parts.entries()]
+      .sort(([left], [right]) => left - right)
+      .filter(([, part]) => part.name.length > 0)
+      .map(([index, part]) => ({
+        id: part.id.length > 0 ? part.id : `call_${String(index)}`,
+        name: part.name,
+        arguments: part.arguments.trim().length > 0 ? part.arguments : "{}",
+      }));
   }
 }
 
@@ -349,6 +417,7 @@ function firstNumber(...values: unknown[]): number | null {
 function finishReason(raw: unknown): FinishReason {
   if (raw === "stop" || raw === "end_turn") return "stop";
   if (raw === "length" || raw === "max_tokens") return "length";
+  if (raw === "tool_calls" || raw === "function_call") return "tool_calls";
   if (raw === "cancelled" || raw === "aborted") return "cancelled";
   return "unknown";
 }

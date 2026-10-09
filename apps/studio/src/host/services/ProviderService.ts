@@ -436,6 +436,7 @@ function toCapabilitiesDto(capabilities: AdapterCapabilities): ProviderDto["adap
     embedding: capabilities.embedding,
     image: capabilities.image,
     honours: { ...capabilities.honours },
+    tools: capabilities.tools,
   };
 }
 

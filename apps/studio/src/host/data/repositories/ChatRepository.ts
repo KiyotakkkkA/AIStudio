@@ -24,7 +24,10 @@ export class ChatRepository extends Repository {
   update(
     id: string,
     patch: Partial<
-      Pick<ConversationInsert, "title" | "attachedStoreIds" | "useRelations" | "updatedAt">
+      Pick<
+        ConversationInsert,
+        "title" | "attachedStoreIds" | "useRelations" | "enabledTools" | "updatedAt"
+      >
     >,
   ) {
     return this.db.update(conversation).set(patch).where(eq(conversation.id, id)).returning().get();

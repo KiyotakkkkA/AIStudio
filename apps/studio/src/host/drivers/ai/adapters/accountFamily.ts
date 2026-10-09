@@ -24,6 +24,7 @@ export const ROLE_LABELS: Readonly<Record<ChatRole, string>> = {
   system: "System",
   user: "User",
   assistant: "Assistant",
+  tool: "Tool",
 };
 
 export interface AccountAdapterOptions {

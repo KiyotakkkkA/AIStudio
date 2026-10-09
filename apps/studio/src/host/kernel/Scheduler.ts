@@ -17,10 +17,13 @@ import type { Logger } from "../platform/logger.ts";
 import { createId } from "../platform/ids.ts";
 import type { NodeRegistry } from "./NodeRegistry.ts";
 import type {
+  AdmissionOrigin,
   ApprovalDecision,
   KernelServices,
   PermissionRequirement,
   StepContext,
+  ToolStepRequest,
+  ToolStepResult,
 } from "./types.ts";
 
 export interface SchedulerOptions {
@@ -31,7 +34,11 @@ export interface SchedulerOptions {
   graceMs: number;
   logger?: Logger;
   approval?: (request: ApprovalRequestDto, signal: AbortSignal) => Promise<ApprovalDecision>;
-  admit?: (permission: PermissionRequirement, context: StepContext) => Promise<void>;
+  admit?: (
+    permission: PermissionRequirement,
+    context: StepContext,
+    origin?: AdmissionOrigin,
+  ) => Promise<void>;
 }
 const failureText = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -111,7 +118,9 @@ export class Scheduler {
 
   async execute(): Promise<void> {
     try {
+      const graphIds = new Set(this.run.graph.nodes.map((node) => node.id));
       for (const step of this.options.data.repositories.runs.steps(this.run.id)) {
+        if (!graphIds.has(step.nodeId)) continue;
         if (step.attempt > (this.latest.get(step.nodeId)?.attempt ?? 0))
           this.latest.set(step.nodeId, step);
         this.attempts.set(step.nodeId, Math.max(this.attempts.get(step.nodeId) ?? 0, step.attempt));
@@ -206,6 +215,74 @@ export class Scheduler {
     };
   }
 
+  private async invokeTool(
+    parent: GraphNode,
+    context: StepContext,
+    request: ToolStepRequest,
+  ): Promise<ToolStepResult> {
+    const { data, clock, registry } = this.options;
+    const signal = this.controller.signal;
+    signal.throwIfAborted();
+    const definition = registry.forTool(request.key);
+    if (definition === undefined || "kind" in definition.permission)
+      throw new AppError(
+        AppErrorCode.NOT_FOUND,
+        "Инструмент нельзя вызвать: источник не предоставил для него исполняемый узел",
+        { details: { key: request.key } },
+      );
+    const step: StepEntity = {
+      id: createId(),
+      runId: this.run.id,
+      nodeId: `${parent.id}.${request.label}`,
+      type: definition.type,
+      status: "running",
+      input: request.input,
+      output: null,
+      error: null,
+      startedAt: clock(),
+      finishedAt: null,
+      attempt: 1,
+    };
+    data.transaction(({ runs }) => {
+      runs.addStep(step);
+      this.emit({ type: "step", step: { ...step } });
+    });
+    const permission = definition.permission;
+    const requirement: PermissionRequirement =
+      request.minimumTier === "ask" && permission.tier !== "off"
+        ? { ...permission, tier: "ask" }
+        : permission;
+    const admission: StepContext = {
+      ...context,
+      requestApproval: async (approval) => {
+        request.onApproval?.(approval, null);
+        const decision = await context.requestApproval(approval);
+        request.onApproval?.(approval, decision);
+        return decision;
+      },
+    };
+    try {
+      if (this.options.admit) await this.options.admit(requirement, admission, "model");
+      else throw new AppError(AppErrorCode.PERMISSION_DENIED, "Сервис разрешений недоступен");
+      signal.throwIfAborted();
+      const output = await definition.execute(context, request.input);
+      signal.throwIfAborted();
+      step.status = "succeeded";
+      step.output = output;
+      return { stepId: step.id, output };
+    } catch (error) {
+      step.status = signal.aborted ? "cancelled" : "failed";
+      step.error = signal.aborted ? "Выполнение отменено" : failureText(error);
+      throw error;
+    } finally {
+      step.finishedAt = clock();
+      data.transaction(({ runs }) => {
+        runs.updateStep(step.id, step);
+        this.emit({ type: "step", step: { ...step } });
+      });
+    }
+  }
+
   private async executeNode(node: GraphNode): Promise<void> {
     const { data, clock, registry } = this.options;
     const signal = this.controller.signal;
@@ -270,6 +347,13 @@ export class Scheduler {
               this.pendingApprovals--;
               if (live && !signal.aborted && !this.pendingApprovals) this.status("running");
             }
+          },
+          invokeTool: (request) => {
+            if (!live || signal.aborted)
+              return Promise.reject(
+                new AppError(AppErrorCode.RUN_CANCELLED, "Выполнение отменено"),
+              );
+            return this.invokeTool(node, context, request);
           },
         };
         const definition = registry.get(node.type);

@@ -6,6 +6,7 @@ import {
   VectorIndexReportDto,
   VectorSearchHitDto,
   VectorSearchInput,
+  VectorStoreListEntryDto,
 } from "@zvs/shared";
 import { NodeRegistry } from "./NodeRegistry.ts";
 
@@ -38,6 +39,7 @@ export function registerCoreNodes(registry: NodeRegistry): NodeRegistry {
       let reasoning = "";
       for await (const delta of driver.stream(request, context.signal)) {
         context.signal.throwIfAborted();
+        if (delta.kind === "tool_call") continue;
         if (delta.kind === "reasoning") reasoning += delta.text;
         else text += delta.text;
         context.emit({ type: "token", delta: delta.text, kind: delta.kind });
@@ -63,6 +65,28 @@ export function registerCoreNodes(registry: NodeRegistry): NodeRegistry {
       );
       context.signal.throwIfAborted();
       return hits;
+    },
+  });
+  registry.register({
+    type: "vector.list",
+    input: z.object({}).default({}),
+    output: z.array(VectorStoreListEntryDto),
+    permission: { tool: "vector.list" },
+    sideEffect: false,
+    async run(context) {
+      context.signal.throwIfAborted();
+      const list = context.services.vectorStores?.list;
+      if (list === undefined)
+        throw new AppError(AppErrorCode.CONFLICT, "Vector service unavailable");
+      const stores = await list.call(context.services.vectorStores);
+      return stores.map((store) => ({
+        id: store.id,
+        name: store.name,
+        description: store.description,
+        documents: store.documents,
+        status: store.status,
+        searchMode: store.searchMode,
+      }));
     },
   });
   registry.register({

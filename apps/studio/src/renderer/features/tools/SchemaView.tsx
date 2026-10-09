@@ -1,3 +1,4 @@
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import type { Json } from "@zvs/shared";
 import { describeSchema } from "./schemaFields";
 
@@ -15,15 +16,19 @@ export default function SchemaView({ schema }: { readonly schema: Json }) {
 
   if (view.kind === "raw")
     return (
-      <pre className="m-0 max-h-56 overflow-auto rounded-card border border-main-750 bg-main-850 px-3 py-2.75 font-mono text-[11px] leading-relaxed text-main-300">
-        {view.raw}
-      </pre>
+      <ScrollArea
+        orientation="both"
+        className="max-h-56 rounded-card border border-main-750 bg-main-850 px-3 py-2.75"
+      >
+        <pre className="m-0 font-mono text-[11px] leading-relaxed text-main-300">{view.raw}</pre>
+      </ScrollArea>
     );
 
   return (
-    <div
+    <ScrollArea
+      orientation="both"
       aria-label="Входная схема"
-      className="max-h-64 overflow-auto rounded-card border border-main-750 bg-main-850 px-3 py-2.75 font-mono text-[11px] leading-[1.75] text-main-300"
+      className="max-h-64 rounded-card border border-main-750 bg-main-850 px-3 py-2.75 font-mono text-[11px] leading-[1.75] text-main-300"
     >
       <div className="text-main-500">{"{"}</div>
       {view.fields.map((field) => (
@@ -47,6 +52,6 @@ export default function SchemaView({ schema }: { readonly schema: Json }) {
         </div>
       ))}
       <div className="text-main-500">{"}"}</div>
-    </div>
+    </ScrollArea>
   );
 }
