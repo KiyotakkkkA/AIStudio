@@ -128,6 +128,7 @@ export const McpHealthDto = z.object({
   status: McpServerStatus,
   uptimeMs: z.number().int().nonnegative().nullable(),
   restarts: z.number().int().nonnegative(),
+  restarting: z.boolean(),
   calls: z.number().int().nonnegative(),
   errors: z.number().int().nonnegative(),
   medianLatencyMs: z.number().int().nonnegative().nullable(),

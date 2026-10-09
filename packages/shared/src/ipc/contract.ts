@@ -14,7 +14,13 @@ import { StepDto } from "../runs/StepDto.js";
 import { StreamId } from "../primitives/branded.js";
 import { Timestamp } from "../primitives/time.js";
 import { Json } from "../primitives/json.js";
-import { DocumentId, DownloadId, SecretId, VectorStoreId } from "../primitives/branded.js";
+import {
+  DocumentId,
+  DownloadId,
+  McpServerId,
+  SecretId,
+  VectorStoreId,
+} from "../primitives/branded.js";
 import {
   CatalogueFilter,
   CatalogueItemDto,
@@ -61,6 +67,15 @@ import {
   GraphSubgraphInput,
   RemoveGraphEdgeInput,
 } from "../graph/index.js";
+import {
+  CreateMcpServerInput,
+  McpHealthDto,
+  McpServerDetailDto,
+  McpServerDto,
+  McpServerRef,
+  McpTestResultDto,
+  UpdateMcpServerInput,
+} from "../mcp/index.js";
 import {
   SetToolEnabledInput,
   SetToolTierInput,
@@ -203,6 +218,18 @@ export const contract = defineContract({
   "tools.setTier": { input: SetToolTierInput, output: ToolDto },
   "tools.setEnabled": { input: SetToolEnabledInput, output: ToolDto },
   "tools.usage": { input: ToolRef, output: ToolUsageDto },
+  "mcp.list": { input: z.void(), output: z.array(McpServerDto) },
+  "mcp.get": { input: McpServerRef, output: McpServerDetailDto },
+  "mcp.create": { input: CreateMcpServerInput, output: McpServerDto },
+  "mcp.update": { input: UpdateMcpServerInput, output: McpServerDto },
+  "mcp.remove": {
+    input: McpServerRef,
+    output: z.object({ id: McpServerId, removed: z.literal(true) }),
+  },
+  "mcp.start": { input: McpServerRef, output: McpServerDto },
+  "mcp.stop": { input: McpServerRef, output: McpServerDto },
+  "mcp.test": { input: McpServerRef, output: McpTestResultDto },
+  "mcp.health": { input: McpServerRef, output: McpHealthDto },
   "downloads.list": { input: DownloadListFilter, output: z.array(DownloadDto) },
   "downloads.start": { input: StartDownloadInput, output: DownloadDto },
   "downloads.pause": { input: DownloadRef, output: DownloadDto },

@@ -364,6 +364,7 @@ export class McpService {
           ? null
           : Math.max(0, Math.round(this.#now() - supervisor.startedAt)),
       restarts: supervisor.restarts,
+      restarting: supervisor.retry !== undefined,
       calls: recent.length,
       errors: recent.filter((call) => call.failed).length,
       medianLatencyMs: durations.length === 0 ? null : Math.round(median(durations)),

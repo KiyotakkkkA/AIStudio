@@ -342,6 +342,7 @@ if (!app.requestSingleInstanceLock()) {
           downloads,
           runtimes,
           tools,
+          mcp,
           pickSources: async (kind) => {
             const result = await dialog.showOpenDialog({
               properties:

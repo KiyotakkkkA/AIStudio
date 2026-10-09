@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { AppErrorCode, StartRunInput, type Json } from "@zvs/shared";
+import { AppErrorCode, contract, StartRunInput, type Json } from "@zvs/shared";
 import { REPO_ROOT } from "../../../test/helpers/paths.ts";
 import { temporaryDatabase, type TemporaryDatabase } from "../../../test/helpers/tempDb.ts";
 import { createSecretService } from "../../../test/helpers/secretService.ts";
@@ -11,6 +11,8 @@ import { ToolRegistry } from "../src/host/tools/ToolRegistry.ts";
 import { deriveNamespace, McpService, toolKey } from "../src/host/services/McpService.ts";
 import type { SecretService } from "../src/host/services/SecretService.ts";
 import type { LogLevel } from "../src/host/platform/logger.ts";
+import { createMcpHandlers } from "../src/host/ipc/mcp.ts";
+import { createToolHandlers } from "../src/host/ipc/tools.ts";
 
 const SERVER = join(REPO_ROOT, "test", "helpers", "fakeMcpServer.mjs");
 
@@ -412,4 +414,71 @@ test("a call made while the server is down brings it back rather than failing", 
   >);
   expect(result.isError).toBe(false);
   expect(mcp.get(server.id).status).toBe("connected");
+});
+
+test("the page's channels round-trip through the contract", async () => {
+  const handlers = createMcpHandlers(mcp);
+  const created = contract["mcp.create"].output.parse(
+    handlers["mcp.create"](
+      contract["mcp.create"].input.parse({
+        name: "qdrant",
+        transport: "stdio",
+        command: process.execPath,
+        args: [SERVER],
+      }),
+    ),
+  );
+  expect(contract["mcp.list"].output.parse(handlers["mcp.list"]())).toHaveLength(1);
+  const result = contract["mcp.test"].output.parse(await handlers["mcp.test"]({ id: created.id }));
+  expect(result).toMatchObject({ ok: true, toolCount: 6 });
+  const detail = contract["mcp.get"].output.parse(handlers["mcp.get"]({ id: created.id }));
+  expect(detail.capabilities.filter((row) => row.kind === "tool")).toHaveLength(6);
+  const health = contract["mcp.health"].output.parse(handlers["mcp.health"]({ id: created.id }));
+  expect(health).toMatchObject({ status: "connected", restarting: false });
+  const stopped = contract["mcp.stop"].output.parse(await handlers["mcp.stop"]({ id: created.id }));
+  expect(stopped.status).toBe("stopped");
+  const started = contract["mcp.start"].output.parse(
+    await handlers["mcp.start"]({ id: created.id }),
+  );
+  expect(started.status).toBe("connected");
+  const updated = contract["mcp.update"].output.parse(
+    await handlers["mcp.update"]({ id: created.id, enabled: false }),
+  );
+  expect(updated.status).toBe("disabled");
+  const refused = contract["mcp.start"].output.parse(
+    await handlers["mcp.start"]({ id: created.id }),
+  );
+  expect(refused.status).toBe("disabled");
+  expect(
+    contract["mcp.remove"].output.parse(await handlers["mcp.remove"]({ id: created.id })),
+  ).toEqual({ id: created.id, removed: true });
+  expect(handlers["mcp.list"]()).toEqual([]);
+});
+
+test("a tier set through the tools channel is what the registry holds for an MCP tool", async () => {
+  const server = stdioServer("qdrant");
+  await mcp.test(server.id);
+  const key = mcp.get(server.id).capabilities.find((row) => row.name === "search")?.toolKey;
+  const tool = tools
+    .list({ source: "mcp", includeUnavailable: true })
+    .find((row) => row.key === key);
+  expect(tool?.sourceRef).toBe(server.id);
+  const handlers = createToolHandlers(tools);
+  handlers["tools.setTier"]({ id: tool!.id, tier: "off" });
+  handlers["tools.setEnabled"]({ id: tool!.id, enabled: false });
+  await mcp.test(server.id);
+  expect(tools.get(tool!.id)).toMatchObject({ tier: "off", enabled: false, available: true });
+});
+
+test("health says a crashed server is waiting to restart", async () => {
+  await mcp.dispose();
+  mcp = service({ backoffMs: 5_000, maxBackoffMs: 5_000 });
+  const server = stdioServer("qdrant");
+  await mcp.start(server.id);
+  await expect(mcp.call({ serverId: server.id, tool: "crash" }, {})).rejects.toBeDefined();
+  await vi.waitFor(() => {
+    expect(mcp.health(server.id)).toMatchObject({ status: "failed", restarting: true });
+  });
+  await mcp.stop(server.id);
+  expect(mcp.health(server.id).restarting).toBe(false);
 });
