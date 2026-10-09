@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ChatCitationDto, VectorStoreDto, VectorStoreId } from "@zvs/shared";
 import { Accordion, ScrollArea, SlidedPanel, Tabs } from "@kiyotakkkka/zvs-uikit-lib";
-import { mdiDatabaseOutline } from "@mdi/js";
+import { mdiDatabaseOutline, mdiThoughtBubbleOutline } from "@mdi/js";
 import ChatMarkdown from "./ChatMarkdown";
 import MessageActions from "../../ui/molecules/MessageActions";
 import Icon from "../../ui/atoms/Icon";
@@ -37,6 +37,7 @@ export default function ChatMessage({
       ? activeStoreId
       : (citationStoreIds[0] ?? "");
   const selectedCitations = citations.filter((citation) => citation.storeId === selectedStoreId);
+  const thinking = generating && content === "";
 
   return (
     <article aria-label="Ответ ассистента" className="group flex min-w-0 gap-3">
@@ -49,12 +50,29 @@ export default function ChatMessage({
       <div className="min-w-0 flex-1">
         <div className="space-y-3">
           {reasoning && (
-            <Accordion className="rounded-card border border-main-750 bg-main-850 px-3.5 py-2.5">
-              <Accordion.Summary className="w-full text-left text-[12px] font-medium text-main-400">
-                Размышления
+            <Accordion className="rounded-card border border-main-750 bg-main-850">
+              <Accordion.Summary className="min-h-9.5 gap-2.5 rounded-card px-3 py-1.5 text-[12px] font-medium text-main-300 transition-colors hover:text-main-50">
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-accent-medium"
+                  >
+                    <Icon
+                      path={mdiThoughtBubbleOutline}
+                      size={14}
+                      className={thinking ? "animate-pulse" : undefined}
+                    />
+                  </span>
+                  <span className="truncate">{thinking ? "Размышляет…" : "Размышления"}</span>
+                  <span className="shrink-0 font-mono text-[11px] font-normal text-main-500 tabular-nums">
+                    {reasoningWords(reasoning)} сл.
+                  </span>
+                </span>
               </Accordion.Summary>
-              <Accordion.Content className="mt-2 border-l-2 border-main-750 pl-3 text-[12.5px]/relaxed whitespace-pre-wrap text-main-400">
-                {reasoning}
+              <Accordion.Content className="border-main-750 px-3 pt-2.5 pb-3">
+                <div className="max-h-80 overflow-y-auto border-l-2 border-accent-line pr-1 pl-3 text-[12.5px]/relaxed whitespace-pre-wrap text-main-400">
+                  {reasoning}
+                </div>
               </Accordion.Content>
             </Accordion>
           )}
@@ -165,6 +183,10 @@ export default function ChatMessage({
       </SlidedPanel>
     </article>
   );
+}
+
+function reasoningWords(reasoning: string): number {
+  return reasoning.split(/\s+/u).filter(Boolean).length;
 }
 
 function citationPlace(citation: ChatCitationDto): string {
