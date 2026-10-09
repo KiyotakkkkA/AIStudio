@@ -6,6 +6,7 @@ import Chip from "../../ui/atoms/Chip";
 import TextInput from "../../ui/atoms/TextInput";
 import Toggle from "../../ui/atoms/Toggle";
 import Field from "../../ui/molecules/Field";
+import SelectInput from "../../ui/atoms/SelectInput";
 import VectorEvalSection from "./VectorEvalSection";
 
 function VectorSearchPanel() {
@@ -38,6 +39,20 @@ function VectorSearchPanel() {
               onChange={(e) => store.set("k", e.target.value)}
               disabled={store.searching}
               mono
+            />
+          </Field>
+        </div>
+        <div className="w-44">
+          <Field label="Режим">
+            <SelectInput
+              label="Режим поиска"
+              value={store.hybridAvailable ? store.searchMode : "vector"}
+              options={[
+                { value: "hybrid", label: "Гибридный" },
+                { value: "vector", label: "Только векторы" },
+              ]}
+              disabled={store.searching || !store.hybridAvailable}
+              onChange={store.setSearchMode}
             />
           </Field>
         </div>
@@ -107,6 +122,9 @@ function VectorSearchPanel() {
             ).toFixed(1)}{" "}
             мс
           </Chip>
+          {store.result.mode === undefined ? null : (
+            <Chip>{store.result.mode === "hybrid" ? "гибридный" : "векторный"}</Chip>
+          )}
           {graph.expandEnabled ? <Chip>по графу {store.graphRows.length}</Chip> : null}
           <Chip>embedding {store.result.embeddingMs.toFixed(1)} мс</Chip>
           <Chip>поиск {store.result.searchMs.toFixed(1)} мс</Chip>
@@ -124,7 +142,8 @@ function VectorSearchPanel() {
         </div>
       ) : null}
       <p className="text-[12px] text-main-500">
-        Результаты только для чтения. Чанки ниже порога показаны приглушёнными.
+        Результаты только для чтения. Чанки ниже порога показаны приглушёнными; найденные только по
+        ключевым словам порогом не отсекаются.
       </p>
       {store.result && graph.expandEnabled && store.graphRows.length === 0 ? (
         <p role="status" className="text-[12px] text-main-400">
@@ -150,10 +169,17 @@ function VectorSearchPanel() {
               <div className="mt-1.25 h-1 rounded bg-main-700">
                 <div className="h-1 rounded bg-accent-dark" style={{ width: row.width }} />
               </div>
-              {row.rerankScore === null ? null : (
+              {row.rerankScore === null && row.keywordScore === null ? null : (
                 <div className="mt-1.5 flex flex-col gap-0.5 font-mono text-[10.5px] text-main-500">
-                  <span title="Оценка кросс-энкодера">rr {row.rerankScore}</span>
-                  <span title="Косинусная близость векторов">vec {row.vectorScore}</span>
+                  {row.rerankScore === null ? null : (
+                    <span title="Оценка кросс-энкодера">rr {row.rerankScore}</span>
+                  )}
+                  {row.rerankScore === null ? null : (
+                    <span title="Косинусная близость векторов">vec {row.vectorScore}</span>
+                  )}
+                  {row.keywordScore === null ? null : (
+                    <span title="Оценка BM25 по ключевым словам">bm25 {row.keywordScore}</span>
+                  )}
                 </div>
               )}
             </div>
@@ -161,10 +187,55 @@ function VectorSearchPanel() {
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <span className="break-all font-mono text-[12px] text-main-300">{row.path}</span>
                 <Chip>чанк {row.position}</Chip>
+                {row.place === null ? null : <Chip>{row.place}</Chip>}
+                {row.provenance === null ? null : (
+                  <Chip tone="accent" title={row.provenanceTitle ?? undefined}>
+                    {row.provenance}
+                  </Chip>
+                )}
+                <button
+                  type="button"
+                  className="ml-auto text-[11px] text-main-500 hover:text-main-200 disabled:opacity-50"
+                  disabled={store.neighboursLoading !== null && store.neighboursLoading !== row.id}
+                  onClick={() => void store.toggleNeighbours(row.id)}
+                >
+                  {store.neighbours.has(row.id)
+                    ? "Скрыть соседние"
+                    : store.neighboursLoading === row.id
+                      ? "Загрузка…"
+                      : "Соседние фрагменты"}
+                </button>
               </div>
+              {store
+                .neighbourRowsFor(row.id)
+                ?.filter((neighbour) => neighbour.before)
+                .map((neighbour) => (
+                  <p
+                    key={neighbour.id}
+                    title={neighbour.label}
+                    className="mb-1.5 border-l-2 border-main-700 pl-2 whitespace-pre-wrap wrap-break-word text-[11.5px] text-main-500"
+                  >
+                    {neighbour.text}
+                  </p>
+                ))}
               <p className="whitespace-pre-wrap wrap-break-word text-[12px] text-main-300">
                 {row.text}
               </p>
+              {store
+                .neighbourRowsFor(row.id)
+                ?.filter((neighbour) => !neighbour.before)
+                .map((neighbour) => (
+                  <p
+                    key={neighbour.id}
+                    title={neighbour.label}
+                    className="mt-1.5 border-l-2 border-main-700 pl-2 whitespace-pre-wrap wrap-break-word text-[11.5px] text-main-500"
+                  >
+                    {neighbour.text}
+                  </p>
+                ))}
+              {store.neighbourRowsFor(row.id)?.length === 0 ? (
+                <p className="mt-1.5 text-[11px] text-main-500">Соседних фрагментов нет.</p>
+              ) : null}
             </div>
           </article>
         ))}

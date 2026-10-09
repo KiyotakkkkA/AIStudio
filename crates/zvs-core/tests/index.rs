@@ -12,6 +12,9 @@ fn row(id: &str, document: &str, vector: Vec<f32>) -> VectorRow {
         document_id: document.into(),
         chunk_index: 7,
         path: "C:/docs/Привет.txt".into(),
+        text: format!("chunk {id}"),
+        section: String::new(),
+        page: None,
     }
 }
 
@@ -56,6 +59,7 @@ async fn round_trip_upsert_filter_delete_and_stats() {
     assert_eq!(hits[0].document_id, "doc'1");
     assert_eq!(hits[0].chunk_index, 7);
     assert_eq!(hits[0].path, rows[0].path);
+    assert_eq!(hits[0].text, "chunk a");
     let filtered = index
         .search(&[1.0, 0.0], 1, 0.0, Some("document_id = 'doc2'"))
         .await

@@ -30,18 +30,21 @@ export function normaliseRerankScore(raw: number): number {
   return exp / (1 + exp);
 }
 
-export function passageOf(hit: VectorSearchHitDto): string {
+export function hitText(hit: Pick<VectorSearchHitDto, "text" | "payload">): string {
+  if (typeof hit.text === "string" && hit.text !== "") return hit.text;
   const payload = hit.payload;
-  const text =
-    typeof payload === "string"
-      ? payload
-      : payload !== null &&
-          typeof payload === "object" &&
-          !Array.isArray(payload) &&
-          typeof payload.text === "string"
-        ? payload.text
-        : hit.path;
-  return text.slice(0, MAX_RERANK_PASSAGE_CHARS);
+  if (typeof payload === "string") return payload;
+  return payload !== null &&
+    typeof payload === "object" &&
+    !Array.isArray(payload) &&
+    typeof payload.text === "string"
+    ? payload.text
+    : "";
+}
+
+export function passageOf(hit: VectorSearchHitDto): string {
+  const text = hitText(hit);
+  return (text === "" ? hit.path : text).slice(0, MAX_RERANK_PASSAGE_CHARS);
 }
 
 export function applyRerank(

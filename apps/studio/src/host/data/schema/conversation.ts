@@ -9,6 +9,7 @@ export const conversation = sqliteTable("conversation", {
   settings: text("settings", { mode: "json" }).$type<ChatSettings>().notNull(),
   systemPrompt: text("system_prompt").notNull(),
   attachedStoreIds: text("attached_store_ids", { mode: "json" }).$type<string[]>().notNull(),
+  useRelations: integer("use_relations", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });

@@ -15,6 +15,7 @@ import Icon from "../../ui/atoms/Icon";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import SelectInput from "../../ui/atoms/SelectInput";
 import TextArea from "../../ui/atoms/TextArea";
+import Toggle from "../../ui/atoms/Toggle";
 import type ChatStore from "./ChatStore";
 
 export default observer(function ChatComposer({ store }: { readonly store: ChatStore }) {
@@ -302,6 +303,19 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               Хранилища не подключены.
             </p>
           )}
+          <div className="rounded-card border border-main-750 bg-main-850 p-3.5">
+            <Toggle
+              id="chat-use-relations"
+              checked={store.useRelations}
+              disabled={!store.canConfigure}
+              label="Использовать связи"
+              onChange={() => void store.toggleRelations()}
+            />
+            <p className="mt-1.5 text-[12px] text-main-500">
+              Документы, связанные с найденными на вкладке «Связи», добавляются в контекст ниже
+              основных источников и помечаются как связанные.
+            </p>
+          </div>
         </div>
         <div className="mt-5 flex justify-end border-t border-main-750 bg-main-850 px-5 py-3">
           <Button type="button" tone="secondary" onClick={() => setStoresOpen(false)}>

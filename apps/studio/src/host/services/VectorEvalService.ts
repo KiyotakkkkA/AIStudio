@@ -6,6 +6,7 @@ import {
   VectorEvalRunDto,
   VectorEvalRunInput,
   VectorEvalSetDto,
+  VECTOR_SCHEMA_VERSION,
   type VectorEvalCaseRef,
   type VectorEvalCaseResultDto,
   type VectorEvalMode,
@@ -85,7 +86,7 @@ export class VectorEvalService {
     this.running.add(input.storeId);
     const started = performance.now();
     try {
-      const modes: VectorEvalMode[] = store.rerank.enabled ? ["vector", "rerank"] : ["vector"];
+      const modes = evalModes(store.schemaVersion >= VECTOR_SCHEMA_VERSION, store.rerank.enabled);
       const results: VectorEvalModeResultDto[] = [];
       for (const mode of modes)
         results.push(await this.runMode(input.storeId, mode, cases, input.k, signal));
@@ -123,7 +124,12 @@ export class VectorEvalService {
         const result = await this.options.stores.searchTimed(
           storeId,
           entry.question,
-          { k, minScore: 0, rerank: mode === "rerank" },
+          {
+            k,
+            minScore: 0,
+            rerank: mode === "rerank" || mode === "hybrid-rerank",
+            mode: mode === "hybrid" || mode === "hybrid-rerank" ? "hybrid" : "vector",
+          },
           signal,
         );
         if (result.rerank === "fallback") fallbacks += 1;
@@ -152,6 +158,11 @@ export class VectorEvalService {
   private now() {
     return (this.options.clock ?? Date.now)();
   }
+}
+
+export function evalModes(hybrid: boolean, rerank: boolean): VectorEvalMode[] {
+  if (!hybrid) return rerank ? ["vector", "rerank"] : ["vector"];
+  return rerank ? ["vector", "hybrid", "hybrid-rerank"] : ["vector", "hybrid"];
 }
 
 function toDto(row: VectorEvalCaseEntity): VectorEvalCaseDto {

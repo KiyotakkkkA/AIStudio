@@ -5,13 +5,16 @@ import type { VectorStoreService } from "../services/VectorStoreService.ts";
 import type { SidecarJobsPort } from "../drivers/sidecar/SidecarDriver.ts";
 import type { IndexingService } from "../indexing/IndexingService.ts";
 import type { DownloadService } from "../downloads/DownloadService.ts";
+import type { GraphService } from "../services/GraphService.ts";
 
 export type PermissionRequirement =
   { tool: string; tier?: "auto" | "ask" | "off" } | { kind: "none" };
 export type ApprovalDecision = "approved" | "denied";
 export interface KernelServices {
   providers?: Pick<ProviderRegistry, "ephemeralDriver" | "text">;
-  vectorStores?: Pick<VectorStoreService, "search">;
+  vectorStores?: Pick<VectorStoreService, "search"> &
+    Partial<Pick<VectorStoreService, "chunks" | "relatedChunks">>;
+  graph?: Pick<GraphService, "neighbors">;
   jobs?: SidecarJobsPort;
   indexing?: Pick<IndexingService, "index">;
   downloads?: Pick<DownloadService, "execute">;

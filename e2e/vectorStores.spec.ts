@@ -90,7 +90,10 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
         documentId: "manual",
         chunkIndex: 0,
         path: "secrets/rotation.md#L42",
-        payload: { text: "Rotating a token replaces the stored value in place.", chunkCount: 2 },
+        text: "Rotating a token replaces the stored value in place.",
+        section: "",
+        page: null,
+        payload: { chunkCount: 2 },
       },
       {
         id: "b",
@@ -98,7 +101,10 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
         documentId: "manual",
         chunkIndex: 1,
         path: "faq/general.md#L96",
-        payload: { text: "Secrets are stored per workspace.", chunkCount: 2 },
+        text: "Secrets are stored per workspace.",
+        section: "",
+        page: null,
+        payload: { chunkCount: 2 },
       },
     ]);
     await page.getByRole("button", { name: "Полная переиндексация", exact: true }).last().click();

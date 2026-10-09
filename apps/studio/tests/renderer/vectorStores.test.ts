@@ -19,6 +19,7 @@ import {
 } from "../../src/renderer/features/vector-stores/vectorPresentation";
 import {
   chunkPlan,
+  embeddingPrefixesFor,
   ocrCandidates,
   rerankCandidates,
 } from "../../src/renderer/features/vector-stores/autofill";
@@ -60,9 +61,22 @@ const result: VectorSearchResultDto = {
       documentId: "doc",
       chunkIndex: 1,
       path: "manual.md",
-      payload: { text: "Hello", chunkCount: 5 },
+      text: "Hello",
+      section: "",
+      page: null,
+      payload: { chunkCount: 5 },
     },
-    { id: "b", score: 0.1, documentId: "doc", chunkIndex: 0, path: "manual.md", payload: null },
+    {
+      id: "b",
+      score: 0.1,
+      documentId: "doc",
+      chunkIndex: 0,
+      path: "manual.md",
+      text: "",
+      section: "",
+      page: null,
+      payload: null,
+    },
   ],
   embeddingMs: 18,
   searchMs: 45,
@@ -124,6 +138,7 @@ test("editing preserves immutable configuration and indexed chunk settings", () 
     description: "Manuals",
     rerank: { enabled: false, modelRef: "", candidates: 50 },
     ocr: { enabled: false, modelRef: "", language: "auto", minCharsPerPage: 200 },
+    searchMode: "hybrid",
   });
 });
 
@@ -150,6 +165,7 @@ test("load uses reconciled detail; search maps timings, positions and below-floo
     query: "hello",
     k: 5,
     minScore: 0,
+    mode: "vector",
   });
   await store.reconcile();
   expect(store.detail?.status).toBe("broken");
@@ -222,6 +238,7 @@ test("create and edit use real contract inputs; failures preserve the form", asy
       description: "Manuals",
       rerank: { enabled: false, modelRef: "", candidates: 50 },
       ocr: { enabled: false, modelRef: "", language: "auto", minCharsPerPage: 200 },
+      searchMode: "hybrid",
     });
     return { ...detail, ...input };
   });
@@ -230,11 +247,14 @@ test("create and edit use real contract inputs; failures preserve the form", asy
 
 test("payload mapping does not invent text or chunk totals", () => {
   const hit = result.hits[0]!;
-  expect(searchRows([{ ...hit, payload: "plain" }], 0)[0]).toMatchObject({
+  expect(searchRows([{ ...hit, text: "", payload: "plain" }], 0)[0]).toMatchObject({
     text: "plain",
     position: "2",
   });
-  expect(searchRows([{ ...hit, payload: { chunkCount: 1 } }], 0)[0]?.text).toContain("отсутствует");
+  expect(searchRows([{ ...hit, text: "", payload: { text: "v1" } }], 0)[0]?.text).toBe("v1");
+  expect(searchRows([{ ...hit, text: "", payload: { chunkCount: 1 } }], 0)[0]?.text).toContain(
+    "отсутствует",
+  );
 });
 
 const RERANKER: CatalogueItemDto = {
@@ -488,4 +508,98 @@ test("auto-fill without a recognised download still skips vision models, project
   );
   onlyVision.autofill();
   expect(onlyVision.embeddingModelId).toBe("");
+});
+
+test("a v2 store searches in its own mode, shows provenance and loads neighbours on demand", async () => {
+  const { store, bridge } = setup();
+  const v2 = { ...detail, schemaVersion: 2, searchMode: "hybrid" as const };
+  bridge.handle("vectorStores.get", ({ id }) => ({ ...v2, id }));
+  bridge.handle("vectorStores.searchTimed", () => ({
+    ...result,
+    mode: "hybrid" as const,
+    hits: [
+      {
+        ...result.hits[0]!,
+        page: 4,
+        section: "Отпуск › Порядок",
+        provenance: "keyword" as const,
+        keywordScore: 3.25,
+        score: 0.2,
+      },
+    ],
+  }));
+  bridge.handle("vectorStores.chunks", (input) => {
+    expect(input).toEqual({ storeId: detail.id, documentId: "doc", indices: [0, 2] });
+    return [
+      {
+        id: "doc:0",
+        payload: {},
+        documentId: "doc",
+        chunkIndex: 0,
+        path: "manual.md",
+        text: "Before",
+        section: "",
+        page: 3,
+      },
+      {
+        id: "doc:2",
+        payload: {},
+        documentId: "doc",
+        chunkIndex: 2,
+        path: "manual.md",
+        text: "After",
+        section: "",
+        page: 4,
+      },
+    ];
+  });
+  await store.load();
+  expect(store.hybridAvailable).toBe(true);
+  store.set("query", "КНД-1151020");
+  await store.search();
+  expect(bridge.calls.find((c) => c.channel === "vectorStores.searchTimed")?.payload).toMatchObject(
+    {
+      mode: "hybrid",
+    },
+  );
+  expect(store.rows[0]).toMatchObject({
+    provenance: "ключевые слова",
+    keywordScore: "3.25",
+    place: "стр. 4 · Отпуск › Порядок",
+    belowFloor: false,
+  });
+
+  await store.toggleNeighbours("a");
+  expect(store.neighbourRowsFor("a")).toEqual([
+    { id: "doc:0", before: true, label: "Предыдущий фрагмент 1", place: "стр. 3", text: "Before" },
+    { id: "doc:2", before: false, label: "Следующий фрагмент 3", place: "стр. 4", text: "After" },
+  ]);
+  await store.toggleNeighbours("a");
+  expect(store.neighbourRowsFor("a")).toBeNull();
+
+  store.setSearchMode("vector");
+  await store.search();
+  expect(
+    bridge.calls.filter((c) => c.channel === "vectorStores.searchTimed").at(-1)?.payload,
+  ).toMatchObject({
+    mode: "vector",
+  });
+});
+
+test("a model that needs prefixes fills them, from the catalogue first", () => {
+  const vm = new VectorStoreFormVm(null, [provider]);
+  vm.set("embeddingModelId", "multilingual-e5-large");
+  expect([vm.queryPrefix, vm.documentPrefix]).toEqual(["query: ", "passage: "]);
+  vm.set("embeddingModelId", "bge-m3:latest");
+  expect([vm.queryPrefix, vm.documentPrefix]).toEqual(["", ""]);
+  expect(embeddingPrefixesFor("nomic-embed-text")).toEqual({
+    queryPrefix: "search_query: ",
+    documentPrefix: "search_document: ",
+  });
+  expect(
+    embeddingPrefixesFor("custom", { ...RERANKER, name: "custom", queryPrefix: "Q: " }),
+  ).toEqual({ queryPrefix: "Q: ", documentPrefix: "" });
+  const locked = new VectorStoreFormVm({ ...detail, queryPrefix: "query: " }, [provider]);
+  locked.set("embeddingModelId", "nomic-embed-text");
+  expect(locked.queryPrefix).toBe("query: ");
 });

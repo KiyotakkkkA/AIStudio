@@ -49,7 +49,7 @@ export const VectorEvalCaseResultDto = z.object({
 });
 export type VectorEvalCaseResultDto = z.infer<typeof VectorEvalCaseResultDto>;
 
-export const VectorEvalMode = z.enum(["vector", "rerank"]);
+export const VectorEvalMode = z.enum(["vector", "rerank", "hybrid", "hybrid-rerank"]);
 export type VectorEvalMode = z.infer<typeof VectorEvalMode>;
 
 export const VectorEvalModeResultDto = z.object({

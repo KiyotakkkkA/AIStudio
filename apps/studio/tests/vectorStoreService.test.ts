@@ -11,7 +11,7 @@ import { temporaryDatabase, type TemporaryDatabase } from "../../../test/helpers
 import { FakeVectorCore } from "../../../test/helpers/FakeVectorCore.ts";
 import { createFakeDriver } from "../../../test/helpers/FakeDriver.ts";
 import { createId } from "../src/host/platform/ids.ts";
-import { VectorStoreService } from "../src/host/services/VectorStoreService.ts";
+import { effectiveMode, VectorStoreService } from "../src/host/services/VectorStoreService.ts";
 import { deriveVectorHealth } from "../src/host/services/vectorHealth.ts";
 import { createVectorStoreHandlers } from "../src/host/ipc/vectorStores.ts";
 import type { AiDriver } from "../src/host/drivers/ai/ports.ts";
@@ -84,7 +84,7 @@ test("timed search measures embedding and native search separately", async () =>
     .mockReturnValueOnce(165);
   try {
     const result = await service.searchTimed(store.id, "hello");
-    expect(result).toEqual({ hits: [], embeddingMs: 18, searchMs: 45 });
+    expect(result).toEqual({ hits: [], embeddingMs: 18, searchMs: 45, mode: "hybrid" });
   } finally {
     timer.mockRestore();
   }
@@ -189,6 +189,8 @@ test("health distinguishes uncreated, lost, mismatched and corrupt tables", asyn
     dimension: 3,
     metric: "cosine" as const,
     indexType: "FLAT",
+    schemaVersion: 2,
+    keywordIndex: true,
   };
   expect(deriveVectorHealth(row, null)).toBe("pending");
   expect(deriveVectorHealth({ ...row, tableCreatedAt: 1 }, null)).toBe("broken");
@@ -218,7 +220,13 @@ test("search embeds with the saved provider and external model then passes the v
     db.client.repositories.providers.findById(store.embeddingProviderId),
   ]);
   expect(embed).toHaveBeenCalledWith(["question"], "embed-model", expect.any(AbortSignal));
-  expect(search).toHaveBeenCalledWith(join(db.directory, store.id), [1, 0, 0], 5, 0.3);
+  expect(search).toHaveBeenCalledWith(join(db.directory, store.id), {
+    vector: [1, 0, 0],
+    k: 5,
+    minScore: 0.3,
+    mode: "hybrid",
+    query: "question",
+  });
   embed.mockResolvedValueOnce([new Float32Array([1])]);
   await expect(service.search(store.id, "question")).rejects.toMatchObject({
     code: AppErrorCode.VALIDATION_FAILED,
@@ -226,6 +234,85 @@ test("search embeds with the saved provider and external model then passes the v
   db.client.repositories.providers.update(store.embeddingProviderId, { enabled: false });
   await expect(service.search(store.id, "question")).rejects.toMatchObject({
     code: AppErrorCode.CONFLICT,
+  });
+});
+
+test("the query prefix reaches the embedder and the mode follows the store unless overridden", async () => {
+  const store = await service.create(
+    CreateVectorStoreInput.parse({ ...input, queryPrefix: "query: ", searchMode: "vector" }),
+  );
+  expect(store).toMatchObject({ queryPrefix: "query: ", searchMode: "vector", schemaVersion: 2 });
+  const search = vi.spyOn(core, "searchVectors");
+
+  const plain = await service.searchTimed(store.id, "отпуск");
+  expect(embed).toHaveBeenLastCalledWith(["query: отпуск"], "embed-model", expect.any(AbortSignal));
+  expect(plain.mode).toBe("vector");
+  expect(search.mock.lastCall?.[1]).toMatchObject({ mode: "vector" });
+
+  const hybrid = await service.searchTimed(store.id, "отпуск", { mode: "hybrid" });
+  expect(hybrid.mode).toBe("hybrid");
+  expect(search.mock.lastCall?.[1]).toMatchObject({ mode: "hybrid", query: "отпуск" });
+});
+
+test("a v1 store searches by vectors only, whatever its mode says", async () => {
+  const store = await service.create(input);
+  core.setSchemaVersion(join(db.directory, store.id), 1);
+  expect((await service.reconcile(store.id)).schemaVersion).toBe(1);
+
+  const result = await service.searchTimed(store.id, "q", { mode: "hybrid" });
+
+  expect(result.mode).toBe("vector");
+  expect(effectiveMode({ searchMode: "hybrid", schemaVersion: 2 })).toBe("hybrid");
+  expect(effectiveMode({ searchMode: "hybrid", schemaVersion: 2 }, "vector")).toBe("vector");
+  expect(effectiveMode({ searchMode: "hybrid", schemaVersion: 1 })).toBe("vector");
+});
+
+test("prefixes are frozen once the store holds vectors; the search mode is not", async () => {
+  const store = await service.create(input);
+  const updated = await service.update({ id: store.id, queryPrefix: "q: ", documentPrefix: "d: " });
+  expect(updated).toMatchObject({ queryPrefix: "q: ", documentPrefix: "d: " });
+  db.client.repositories.vectorStores.update(store.id, { lastIndexedAt: 5 });
+
+  await expect(service.update({ id: store.id, queryPrefix: "other: " })).rejects.toMatchObject({
+    code: AppErrorCode.CONFLICT,
+  });
+  expect((await service.update({ id: store.id, searchMode: "vector" })).searchMode).toBe("vector");
+});
+
+test("neighbour chunks and the best chunk of a related document are read from the index", async () => {
+  const store = await service.create(input);
+  const path = join(db.directory, store.id);
+  const row = (documentId: string, chunkIndex: number, text: string) => ({
+    id: `${documentId}:${String(chunkIndex)}`,
+    vector: [1, 0, 0],
+    documentId,
+    chunkIndex,
+    path: `${documentId}.md`,
+    text,
+    section: "Раздел",
+    page: chunkIndex + 1,
+    payload: { chunkCount: 3 },
+  });
+  await core.upsertVectors(path, [
+    row("a", 0, "first"),
+    row("a", 1, "second"),
+    row("a", 2, "third"),
+    row("b", 0, "other"),
+  ]);
+
+  const chunks = await service.chunks(store.id, "a", [2, 0, 0, -1]);
+  expect(chunks.map((chunk) => [chunk.chunkIndex, chunk.text, chunk.page])).toEqual([
+    [0, "first", 1],
+    [2, "third", 3],
+  ]);
+  expect(await service.chunks(store.id, "a", [])).toEqual([]);
+
+  const related = await service.relatedChunks(store.id, "q", ["b", "b", "missing"]);
+  expect(related.map((hit) => hit.id)).toEqual(["b:0"]);
+  expect(core.searches.at(-1)?.request).toMatchObject({
+    k: 1,
+    mode: "vector",
+    documentIds: ["missing"],
   });
 });
 

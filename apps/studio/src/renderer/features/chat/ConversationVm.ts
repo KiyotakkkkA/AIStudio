@@ -8,6 +8,7 @@ export default class ConversationVm {
   temperature = 0.7;
   systemPrompt = "";
   attachedStoreIds: VectorStoreId[] = [];
+  useRelations = false;
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true });
@@ -24,6 +25,9 @@ export default class ConversationVm {
   }
   setSystemPrompt(value: string) {
     this.systemPrompt = value;
+  }
+  setUseRelations(value: boolean) {
+    this.useRelations = value;
   }
   selectProvider(provider: ProviderDto) {
     this.providerId = provider.id;

@@ -7,6 +7,8 @@ import {
   type DeviceProfileDto,
   type ModelDto,
   type ProviderSummaryDto,
+  type VectorChunkDto,
+  type VectorSearchMode,
   type VectorStoreDto,
   type VectorStoreId,
   type VectorSearchResultDto,
@@ -20,7 +22,7 @@ import {
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import { estimateEta, smoothRate, type RateState } from "../progressRate";
 import VectorStoreFormVm from "./VectorStoreFormVm";
-import { searchRows } from "./searchRows";
+import { neighbourRows, searchRows } from "./searchRows";
 import GraphRelationStore from "./GraphRelationStore";
 import VectorEvalStore from "./VectorEvalStore";
 import { graphRows, type GraphExpansion } from "./graphExpansion";
@@ -39,7 +41,10 @@ export default class VectorStoreStore {
   query = "";
   k = "5";
   minScore = "0.35";
+  searchMode: VectorSearchMode = "hybrid";
   result: VectorSearchResultDto | null = null;
+  neighbours = new Map<string, readonly VectorChunkDto[]>();
+  neighboursLoading: string | null = null;
   graphExpansions: GraphExpansion[] = [];
   sources: VectorSourceDto[] = [];
   documents: VectorDocumentDto[] = [];
@@ -83,6 +88,46 @@ export default class VectorStoreStore {
   }
   get hitCount() {
     return this.rows.filter((r) => !r.belowFloor).length;
+  }
+  get hybridAvailable() {
+    return (this.detail?.schemaVersion ?? 1) >= 2;
+  }
+  setSearchMode(mode: string) {
+    if (mode === "hybrid" || mode === "vector") this.searchMode = mode;
+  }
+  neighbourRowsFor(id: string) {
+    const row = this.rows.find((candidate) => candidate.id === id);
+    const chunks = this.neighbours.get(id);
+    return row === undefined || chunks === undefined ? null : neighbourRows(row, chunks);
+  }
+  async toggleNeighbours(id: string) {
+    if (this.neighbours.has(id)) {
+      this.neighbours.delete(id);
+      return;
+    }
+    const row = this.rows.find((candidate) => candidate.id === id);
+    const storeId = this.detail?.id;
+    if (row === undefined || storeId === undefined || this.neighboursLoading !== null) return;
+    const revision = this.revision;
+    this.neighboursLoading = id;
+    try {
+      const chunks = await this.ipc.call("vectorStores.chunks", {
+        storeId,
+        documentId: row.documentId,
+        indices: [row.chunkIndex - 1, row.chunkIndex + 1].filter((index) => index >= 0),
+      });
+      runInAction(() => {
+        if (revision === this.revision) this.neighbours.set(id, chunks);
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.error = errorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.neighboursLoading = null;
+      });
+    }
   }
   get graphRows() {
     return graphRows(this.graphExpansions, this.documents);
@@ -187,6 +232,7 @@ export default class VectorStoreStore {
       runInAction(() => {
         if (revision === this.revision) {
           this.detail = detail;
+          this.searchMode = detail.searchMode;
           this.merge(detail);
         }
       });
@@ -312,10 +358,12 @@ export default class VectorStoreStore {
     this.error = null;
     this.result = null;
     this.graphExpansions = [];
+    this.neighbours = new Map();
     try {
       const result = await this.ipc.call("vectorStores.searchTimed", {
         ...input.data,
         minScore: 0,
+        mode: this.hybridAvailable ? this.searchMode : "vector",
       });
       runInAction(() => {
         if (revision === this.revision) this.result = result;

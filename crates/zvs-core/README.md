@@ -32,6 +32,30 @@ Sentence endings recognize `.`, `!`, `?`, their CJK equivalents, and common
 closing quotes or brackets. This is a punctuation heuristic, not language-aware
 sentence parsing. Without a suitable boundary, the size limit wins.
 
+### Structure-aware chunking (schema v2)
+
+`chunk::chunk_segments` is what indexing uses since TASK_028_EXTRA_6. Its input is
+the extractor's segments — `{ text, section, page }`, one per Markdown/Word section,
+PDF page or slide — and it returns owned chunks carrying the `section` path and
+`page` of the segment they start in. Byte ranges refer to the segments joined with
+`"\n\n"`.
+
+- A chunk never crosses a top-level section boundary: consecutive segments with
+  the same `section[0]` form one group, and groups are chunked separately. Pages
+  without sections form a single group, so a sentence that runs across a page
+  break stays whole.
+- Units are UAX#29 sentences (line breaks are sentence boundaries too). A
+  sentence longer than `size` is split by words; only its first piece counts as a
+  sentence start.
+- `size` and `overlap` are counted in estimated model tokens, not words:
+  `chunk::estimate_tokens` counts non-whitespace characters as Cyrillic ≈ 3 per
+  token, Latin and everything else ≈ 4, CJK/Hangul 1. It is a conservative
+  heuristic, not a tokenizer.
+- The next chunk starts at the earliest sentence start whose tail fits in
+  `overlap` and still leaves room for the next unit, so overlap always begins at a
+  sentence start; with no such start the next chunk begins right after the
+  previous one.
+
 ## Hashing and errors
 
 `hash::content_hash` returns the lowercase, 64-character BLAKE3 digest of raw bytes,
@@ -90,16 +114,45 @@ schema and checked when reopening. A mismatch rejects with `VALIDATION_FAILED`.
 `vectorStoresDir` and `vectorStorePath` in `platform/paths.ts`.
 
 Rows contain a unique nonempty ID, finite float32 vector, JSON payload, document
-ID, chunk index and source path. Upsert validates the complete input, then uses
+ID, chunk index and source path. Schema v2 (`zvs.schema = 2` in the Arrow
+metadata) adds `text` (the bare chunk shown to users), `section` (the section
+path joined with `›`) and a nullable `page`; the payload keeps only what has no
+column. A table without `zvs.schema` is v1: it opens and searches (text comes from
+`payload.text`, section is empty, page null, keyword search returns nothing) but
+rejects upserts with `VALIDATION_FAILED` until it is recreated by a full
+re-index. `create` always makes v2. Upsert validates the complete input, then uses
 merge-insert in batches of 256, replacing all fields for an existing ID. Duplicate
 IDs within one request are rejected. Cancellation is checked during validation,
 between batches and before returning. A running commit finishes atomically before
 cancellation takes effect; the entire request is not a transaction.
 
-Search performs an exact FLAT scan with the stored metric, applies an optional
-Lance SQL predicate before selecting top-k, then applies the inclusive score
-floor. Filter fields include `document_id`, `chunk_index`, `path`, `id` and
-`payload`; filters are host-controlled SQL expressions, not renderer input.
+Search uses the stored metric, applies an optional Lance SQL predicate before
+selecting top-k, then applies the inclusive score floor. Below the ANN threshold
+it is an exact FLAT scan; once a vector index exists it uses it (`nprobes` 32,
+`refine_factor` 4), and rows appended after the index was trained are still
+scanned. Filter fields include `document_id`, `chunk_index`, `path`, `id`,
+`payload` and, for v2, `text`, `section` and `page`; filters are host-controlled
+SQL expressions, not renderer input.
+
+Keyword search (`keyword_search`) queries a BM25 full-text index on `text`,
+created with the table: Russian stemming and stop words, lower-casing and ASCII
+folding. Rows added after the index was built are searched without it until
+`maintain` folds them in, and deleted rows never match. `hybrid_search` fetches
+`k` from each side and fuses them with Reciprocal Rank Fusion
+(`reciprocal_rank_fusion`, k = 60): each list contributes `1 / (60 + rank)`. Ties
+go to the entry with a keyword rank, then the better rank, then the id, so an
+exact identifier that vector search missed outranks the vector top hit it ties
+with. Fused hits keep the vector similarity as `score` (computed for keyword-only
+hits too), add `keywordScore` (raw BM25), `fusedScore` and `provenance`
+(`vector` / `keyword` / `both`), and keyword hits are exempt from the score floor.
+On a v1 table hybrid degrades to vector search.
+
+`chunks(document_id, indices)` reads specific chunks of one document in index
+order, for neighbour expansion. `maintain(ann_threshold)` creates the full-text
+index if missing, trains an `IVF_HNSW_SQ` vector index once the table holds at
+least `ann_threshold` rows (the host passes 100 000) and otherwise optimizes the
+existing indexes to cover new rows. Stats report `schemaVersion`, whether the
+keyword index exists, and `indexType` as `FLAT` or the trained vector index type.
 
 Scores always range from 0 to 1, with higher scores better:
 
@@ -116,14 +169,17 @@ embedding models and metrics. These semantics are documented here instead of
 code comments at the user's request.
 
 Delete methods quote IDs as SQL literals. Stats report live row count, stored
-dimension and metric, `FLAT` index type, and physical file bytes within this
-table's `vectors.lance` directory, including retained versions. No HNSW index is
-created or claimed. Store descriptions, embedding providers and document counts
+dimension and metric, index type, schema version and physical file bytes within
+this table's `vectors.lance` directory, including retained versions. Store descriptions, embedding providers and document counts
 remain owned by the host's SQLite repositories.
 
 The addon accepts JSON through async `vectorCall` and catches panics across all
-future polls. `RustCore` exposes typed create/open/upsert/search/delete/stats
-methods through `VectorCorePort`. Upsert bridges `AbortSignal` through async
+future polls. A `search` request takes an optional `mode` (`vector` default,
+`hybrid`), the `query` text for the keyword side and `documentIds`, which the
+addon turns into a quoted `document_id IN (...)` predicate. `chunks` and
+`maintain` are separate operations. `RustCore` exposes typed
+create/open/upsert/search/chunks/maintain/delete/stats methods through
+`VectorCorePort`, and `chunkSegments` beside `chunk`. Upsert bridges `AbortSignal` through async
 operation-token allocation, cancellation and release; release also handles JSON
 serialization failures before the native call starts.
 

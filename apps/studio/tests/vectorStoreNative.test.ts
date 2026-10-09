@@ -57,7 +57,10 @@ test("channels create, search a manually seeded LanceDB table, detect loss and r
       {
         id: "a",
         vector: [1, 0, 0],
-        payload: { text: "A" },
+        text: "A",
+        section: "",
+        page: null,
+        payload: {},
         documentId: "doc-a",
         chunkIndex: 0,
         path: "a.md",
@@ -65,7 +68,10 @@ test("channels create, search a manually seeded LanceDB table, detect loss and r
       {
         id: "b",
         vector: [0.9, 0.1, 0],
-        payload: { text: "B" },
+        text: "B",
+        section: "",
+        page: null,
+        payload: {},
         documentId: "doc-a",
         chunkIndex: 1,
         path: "a.md",
@@ -73,7 +79,10 @@ test("channels create, search a manually seeded LanceDB table, detect loss and r
       {
         id: "c",
         vector: [0, 1, 0],
-        payload: { text: "C" },
+        text: "C",
+        section: "",
+        page: null,
+        payload: {},
         documentId: "doc-b",
         chunkIndex: 0,
         path: "b.md",
@@ -93,6 +102,33 @@ test("channels create, search a manually seeded LanceDB table, detect loss and r
       minScore: 0.5,
     });
     expect(timed.hits).toEqual(hits);
+    expect(timed.mode).toBe("hybrid");
+    expect(hits[0]).toMatchObject({ text: "A", provenance: "both" });
+    expect(
+      (
+        await handlers["vectorStores.chunks"]({
+          storeId: store.id,
+          documentId: "doc-a",
+          indices: [1],
+        })
+      )[0],
+    ).toMatchObject({ id: "b", text: "B" });
+    const vectorOnly = await handlers["vectorStores.searchTimed"]({
+      storeId: store.id,
+      query: "C",
+      k: 1,
+      minScore: 0,
+      mode: "vector",
+    });
+    expect(vectorOnly.hits[0]?.id).toBe("a");
+    const hybrid = await handlers["vectorStores.searchTimed"]({
+      storeId: store.id,
+      query: "C",
+      k: 1,
+      minScore: 0,
+      mode: "hybrid",
+    });
+    expect(hybrid.hits[0]).toMatchObject({ id: "c", provenance: "keyword" });
     expect(timed.embeddingMs).toBeGreaterThanOrEqual(0);
     expect(timed.searchMs).toBeGreaterThan(0);
     expect((await handlers["vectorStores.list"](undefined))[0]?.status).toBe("stale");

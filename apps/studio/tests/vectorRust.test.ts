@@ -15,6 +15,8 @@ const stats = {
   metric: "cosine",
   onDiskBytes: 123,
   indexType: "FLAT",
+  schemaVersion: 2,
+  keywordIndex: true,
 };
 
 const graphStats = { nodeCount: 0, edgeCount: 0, documentCount: 0, chunkCount: 0 };
@@ -22,6 +24,9 @@ const graphStats = { nodeCount: 0, edgeCount: 0, documentCount: 0, chunkCount: 0
 function native(overrides: Partial<NativeAddon> = {}): NativeAddon {
   return {
     async chunkText() {
+      return [];
+    },
+    async chunkSegments() {
       return [];
     },
     async hashBytes() {
@@ -75,6 +80,19 @@ test("vector wrapper transports typed operations and validates native results", 
         requests.push(value);
         if (value.operation.startsWith("delete") || value.operation === "remove") return "null";
         if (value.operation === "search") return "[]";
+        if (value.operation === "chunks")
+          return JSON.stringify([
+            {
+              id: "d:1",
+              payload: {},
+              documentId: "d",
+              chunkIndex: 1,
+              path: "d.md",
+              text: "t",
+              section: "",
+              page: null,
+            },
+          ]);
         return JSON.stringify(stats);
       },
     }),
@@ -83,7 +101,30 @@ test("vector wrapper transports typed operations and validates native results", 
   assert.deepEqual(await core.createVectorIndex("store", 1024), stats);
   assert.deepEqual(await core.openVectorIndex("store"), stats);
   assert.deepEqual(await core.vectorStats("store"), stats);
-  assert.deepEqual(await core.searchVectors("store", [1, 0], 3, 0.8, "chunk_index > 2"), []);
+  assert.deepEqual(
+    await core.searchVectors("store", {
+      vector: [1, 0],
+      k: 3,
+      minScore: 0.8,
+      mode: "hybrid",
+      query: "E-4512",
+      documentIds: ["d"],
+    }),
+    [],
+  );
+  assert.deepEqual(await core.vectorChunks("store", "d", [0, 2]), [
+    {
+      id: "d:1",
+      payload: {},
+      documentId: "d",
+      chunkIndex: 1,
+      path: "d.md",
+      text: "t",
+      section: "",
+      page: null,
+    },
+  ]);
+  assert.deepEqual(await core.maintainVectorIndex("store", 100_000), stats);
   await core.deleteVectorsByIds("store", ["a"]);
   await core.deleteVectorsBySource("store", "doc");
   await core.removeVectorIndex("store");
@@ -97,8 +138,12 @@ test("vector wrapper transports typed operations and validates native results", 
       vector: [1, 0],
       k: 3,
       minScore: 0.8,
-      filter: "chunk_index > 2",
+      mode: "hybrid",
+      query: "E-4512",
+      documentIds: ["d"],
     },
+    { operation: "chunks", path: "store", documentId: "d", indices: [0, 2] },
+    { operation: "maintain", path: "store", annThreshold: 100_000 },
     { operation: "deleteByIds", path: "store", ids: ["a"] },
     { operation: "deleteBySource", path: "store", documentId: "doc" },
     { operation: "remove", path: "store" },

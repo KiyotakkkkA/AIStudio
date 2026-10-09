@@ -9,6 +9,8 @@ import type {
 export const EVAL_MODE_LABELS: Record<VectorEvalMode, string> = {
   vector: "Только векторы",
   rerank: "С переранжированием",
+  hybrid: "Гибридный",
+  "hybrid-rerank": "Гибридный + переранжирование",
 };
 
 export interface EvalMetricRow {

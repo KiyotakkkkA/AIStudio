@@ -78,6 +78,8 @@ import {
   VectorSearchInput,
   VectorSearchHitDto,
   VectorSearchResultDto,
+  VectorChunksInput,
+  VectorChunkDto,
   VectorDocumentDto,
   VectorSourceDto,
   VectorSourceRef,
@@ -123,6 +125,10 @@ export const contract = defineContract({
     input: ConversationRef.extend({ attachedStoreIds: z.array(VectorStoreId).max(64) }),
     output: ConversationDto,
   },
+  "chat.conversations.updateRelations": {
+    input: ConversationRef.extend({ useRelations: z.boolean() }),
+    output: ConversationDto,
+  },
   "chat.conversations.truncate": {
     input: TruncateConversationInput,
     output: ConversationDetailDto,
@@ -155,6 +161,7 @@ export const contract = defineContract({
   },
   "vectorStores.search": { input: VectorSearchInput, output: z.array(VectorSearchHitDto) },
   "vectorStores.searchTimed": { input: VectorSearchInput, output: VectorSearchResultDto },
+  "vectorStores.chunks": { input: VectorChunksInput, output: z.array(VectorChunkDto) },
   "vectorStores.reconcile": { input: VectorStoreRef, output: VectorStoreDto },
   "vectorStores.clear": { input: VectorStoreRef, output: VectorStoreDto },
   "vectorStores.sources.list": { input: VectorStoreRef, output: z.array(VectorSourceDto) },

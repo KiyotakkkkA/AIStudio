@@ -20,6 +20,9 @@ export const ChatCitationDto = z.object({
   sourcePath: z.string(),
   chunkIndex: z.number().int().nonnegative(),
   score: z.number().min(0).max(1),
+  section: z.string().default(""),
+  page: z.number().int().positive().nullable().default(null),
+  related: z.string().nullable().default(null),
 });
 export type ChatCitationDto = z.infer<typeof ChatCitationDto>;
 export const CreateConversationInput = z.object({
@@ -29,6 +32,7 @@ export const CreateConversationInput = z.object({
   settings: ChatSettings.default({}),
   systemPrompt: z.string().max(100000).default(""),
   attachedStoreIds: z.array(VectorStoreId).max(64).default([]),
+  useRelations: z.boolean().default(false),
 });
 export type CreateConversationInput = z.infer<typeof CreateConversationInput>;
 export const ConversationRef = z.object({ id: ConversationId });

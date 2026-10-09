@@ -32,7 +32,10 @@ function hit(id: string, score: number, text: string, documentId = id): VectorHi
     documentId,
     chunkIndex: 0,
     path: `${documentId}.md`,
-    payload: { text, chunkCount: 1 },
+    text,
+    section: "",
+    page: null,
+    payload: { chunkCount: 1 },
   };
 }
 
@@ -107,7 +110,9 @@ test("logits are squashed into [0, 1] monotonically and without overflow", () =>
 });
 
 test("the passage is the chunk text, capped so one long chunk cannot fill the context", () => {
-  expect(passageOf({ ...hit("a", 1, "text"), payload: "raw string" })).toBe("raw string");
+  expect(passageOf(hit("a", 1, "column text"))).toBe("column text");
+  expect(passageOf({ ...hit("a", 1, ""), payload: "raw string" })).toBe("raw string");
+  expect(passageOf({ ...hit("a", 1, ""), payload: { text: "v1 payload" } })).toBe("v1 payload");
   expect(passageOf(hit("a", 1, "x".repeat(10_000)))).toHaveLength(MAX_RERANK_PASSAGE_CHARS);
   expect(passageOf({ ...hit("a", 1, ""), payload: null })).toBe("a.md");
 });
@@ -125,7 +130,10 @@ test("a store with reranking on fetches the candidates, reranks them and returns
 
   const result = await service.searchTimed(store.id, "which one is the answer?", { k: 2 });
 
-  expect(core.searchVectors).toHaveBeenCalledWith(expect.any(String), [1, 0, 0], 30, 0);
+  expect(core.searchVectors).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({ vector: [1, 0, 0], k: 30, minScore: 0, mode: "hybrid" }),
+  );
   expect(rerankers).toHaveBeenCalledWith("curated:model:bge-reranker-v2-m3-f16");
   expect(rerank.mock.calls[0]?.[0]).toBe("which one is the answer?");
   expect(rerank.mock.calls[0]?.[1]).toEqual(["about cats", "about dogs", "the answer", "noise"]);
@@ -147,13 +155,19 @@ test("k larger than the candidate count still fetches k", async () => {
   const store = await rerankingStore(2);
   rerank.mockResolvedValue([0, 0, 0, 0]);
   await service.search(store.id, "q", { k: 4 });
-  expect(core.searchVectors).toHaveBeenCalledWith(expect.any(String), [1, 0, 0], 4, 0);
+  expect(core.searchVectors).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({ vector: [1, 0, 0], k: 4, minScore: 0 }),
+  );
 });
 
 test("a store with reranking off never touches the reranker", async () => {
   const store = await service.create(input);
   const result = await service.searchTimed(store.id, "q", { k: 3, minScore: 0.1 });
-  expect(core.searchVectors).toHaveBeenCalledWith(expect.any(String), [1, 0, 0], 3, 0.1);
+  expect(core.searchVectors).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({ vector: [1, 0, 0], k: 3, minScore: 0.1 }),
+  );
   expect(rerankers).not.toHaveBeenCalled();
   expect(result.rerank).toBeUndefined();
   expect(result.rerankMs).toBeUndefined();

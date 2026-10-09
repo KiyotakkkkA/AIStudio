@@ -4,6 +4,9 @@ import {
   AppErrorCode,
   ChatSendInput,
   ConversationDetailDto,
+  GRAPH_EXPANSION_DEFAULT_MAX,
+  mergeGraphNeighbors,
+  type GraphNeighborhood,
   ConversationDto,
   CreateConversationInput,
   MessageDto,
@@ -15,10 +18,18 @@ import {
 import type { UnitOfWork } from "../data/UnitOfWork.ts";
 import { GenerateNodeInput } from "../kernel/coreNodes.ts";
 import type { NodeRegistry } from "../kernel/NodeRegistry.ts";
+import type { StepContext } from "../kernel/types.ts";
 import type { Logger } from "../platform/logger.ts";
 import { createId } from "../platform/ids.ts";
 import type { RunService } from "./RunService.ts";
-import { estimateTokens, windowChatHistory } from "./chatHistory.ts";
+import {
+  estimateTokens,
+  windowChatHistory,
+  type RelatedSource,
+  type RetrievedSource,
+} from "./chatHistory.ts";
+
+export const CHAT_RELATED_MAX = 3;
 
 export interface ChatServiceOptions {
   data: UnitOfWork;
@@ -63,9 +74,13 @@ export class ChatService {
           input.modelId ?? conversation.modelId,
           input.settings,
         );
-        const sources = conversation.attachedStoreIds.flatMap((storeId, index) =>
+        const ranked = conversation.attachedStoreIds.flatMap((storeId, index) =>
           (input[`store${index}`] ?? []).map((hit) => ({ storeId, hit })),
         );
+        const sources = await this.withNeighbours(context, ranked);
+        const related = conversation.useRelations
+          ? await this.relatedSources(context, user.content, ranked)
+          : [];
         const prepared = windowChatHistory(
           conversation.systemPrompt,
           history,
@@ -73,7 +88,19 @@ export class ChatService {
           model.contextWindow,
           model.maxOutputTokens,
           sources,
+          related,
         );
+        if (prepared.citations.length > 0) {
+          const line = {
+            message: "Retrieval context assembled",
+            conversationId: conversation.id,
+            sources: prepared.citations.length - prepared.related,
+            neighbours: prepared.neighbours,
+            related: prepared.related,
+          };
+          context.emit({ type: "log", line });
+          this.options.logger?.log("info", "chat", line.message, { ...line, runId: context.runId });
+        }
         if (prepared.trimmed) {
           const line = {
             message: "Chat history trimmed",
@@ -175,6 +202,15 @@ export class ChatService {
     return ConversationDto.parse(
       this.options.data.repositories.chat.update(id, {
         attachedStoreIds: [...new Set(ids)],
+        updatedAt: this.clock(),
+      }),
+    );
+  }
+  updateRelations(id: string, useRelations: boolean): ConversationDto {
+    this.get(id);
+    return ConversationDto.parse(
+      this.options.data.repositories.chat.update(id, {
+        useRelations: z.boolean().parse(useRelations),
         updatedAt: this.clock(),
       }),
     );
@@ -312,6 +348,102 @@ export class ChatService {
       if (renamed !== undefined && message.runId !== null)
         this.options.data.repositories.runs.update(message.runId, { title: renamed });
     }
+  }
+  private async withNeighbours(
+    context: StepContext,
+    ranked: readonly RetrievedSource[],
+  ): Promise<RetrievedSource[]> {
+    const chunks = context.services.vectorStores?.chunks;
+    if (chunks === undefined || ranked.length === 0) return [...ranked];
+    const wanted = new Map<string, { storeId: string; documentId: string; indices: Set<number> }>();
+    for (const { storeId, hit } of ranked) {
+      const key = `${storeId}\u0000${hit.documentId}`;
+      const entry = wanted.get(key) ?? { storeId, documentId: hit.documentId, indices: new Set() };
+      for (const index of [hit.chunkIndex - 1, hit.chunkIndex + 1])
+        if (index >= 0) entry.indices.add(index);
+      wanted.set(key, entry);
+    }
+    const found = new Map<string, Awaited<ReturnType<typeof chunks>>>();
+    for (const [key, entry] of wanted) {
+      context.signal.throwIfAborted();
+      try {
+        found.set(
+          key,
+          await chunks.call(context.services.vectorStores, entry.storeId, entry.documentId, [
+            ...entry.indices,
+          ]),
+        );
+      } catch (error) {
+        this.options.logger?.log("warn", "chat", "Could not fetch neighbouring chunks", {
+          runId: context.runId,
+          storeId: entry.storeId,
+          error: String(error),
+        });
+      }
+    }
+    return ranked.map((source) => ({
+      ...source,
+      neighbours: (found.get(`${source.storeId}\u0000${source.hit.documentId}`) ?? []).filter(
+        (chunk) => Math.abs(chunk.chunkIndex - source.hit.chunkIndex) === 1,
+      ),
+    }));
+  }
+  private async relatedSources(
+    context: StepContext,
+    query: string,
+    ranked: readonly RetrievedSource[],
+  ): Promise<RelatedSource[]> {
+    const graph = context.services.graph;
+    const vectorStores = context.services.vectorStores;
+    if (graph === undefined || vectorStores?.relatedChunks === undefined) return [];
+    const related: RelatedSource[] = [];
+    const storeIds = [...new Set(ranked.map((source) => source.storeId))];
+    for (const storeId of storeIds) {
+      context.signal.throwIfAborted();
+      const hits = ranked
+        .filter((source) => source.storeId === storeId)
+        .map((source) => source.hit);
+      try {
+        const neighborhoods: GraphNeighborhood[] = [];
+        for (const documentId of [...new Set(hits.map((hit) => hit.documentId))])
+          neighborhoods.push({
+            documentId,
+            neighbors: await graph.neighbors({ storeId, documentId, direction: "both" }),
+          });
+        const documents = this.options.data.repositories.vectorDocuments.listByStore(storeId);
+        const expansions = mergeGraphNeighbors(
+          hits,
+          neighborhoods,
+          documents,
+          Math.min(CHAT_RELATED_MAX, GRAPH_EXPANSION_DEFAULT_MAX),
+        );
+        if (expansions.length === 0) continue;
+        const best = await vectorStores.relatedChunks.call(
+          vectorStores,
+          storeId,
+          query,
+          expansions.map((expansion) => expansion.documentId),
+          context.signal,
+        );
+        for (const expansion of expansions) {
+          const hit = best.find((candidate) => candidate.documentId === expansion.documentId);
+          if (hit !== undefined)
+            related.push({
+              storeId: storeId as RetrievedSource["storeId"],
+              hit,
+              relation: expansion.relation,
+            });
+        }
+      } catch (error) {
+        if (context.signal.aborted) throw error;
+        this.options.logger?.log("warn", "chat", "Could not expand sources through the graph", {
+          runId: context.runId,
+          storeId,
+          error: String(error),
+        });
+      }
+    }
+    return related;
   }
   private requireIdle(id: string): void {
     if (

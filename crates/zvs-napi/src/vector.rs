@@ -13,7 +13,7 @@ use napi_derive::napi;
 use serde::Deserialize;
 use zvs_core::{
     CancellationToken, Error,
-    index::{Metric, VectorIndex, VectorRow},
+    index::{DEFAULT_ANN_THRESHOLD, Metric, SearchMode, VectorIndex, VectorRow, literal},
 };
 
 use crate::{CoreFailure, guarded, native_error};
@@ -50,6 +50,23 @@ enum Request {
         #[serde(rename = "minScore")]
         min_score: f32,
         filter: Option<String>,
+        #[serde(default)]
+        mode: Option<SearchMode>,
+        #[serde(default)]
+        query: Option<String>,
+        #[serde(default, rename = "documentIds")]
+        document_ids: Option<Vec<String>>,
+    },
+    Chunks {
+        path: String,
+        #[serde(rename = "documentId")]
+        document_id: String,
+        indices: Vec<u32>,
+    },
+    Maintain {
+        path: String,
+        #[serde(default, rename = "annThreshold")]
+        ann_threshold: Option<usize>,
     },
     DeleteByIds {
         path: String,
@@ -118,11 +135,55 @@ async fn execute(request: Request) -> zvs_core::Result<serde_json::Value> {
             k,
             min_score,
             filter,
+            mode,
+            query,
+            document_ids,
+        } => {
+            let index = VectorIndex::open(Path::new(&path)).await?;
+            let scope = document_ids.map(|ids| {
+                format!(
+                    "document_id IN ({})",
+                    ids.iter()
+                        .map(|id| literal(id))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            });
+            let filter = match (filter, scope) {
+                (Some(filter), Some(scope)) => Some(format!("({filter}) AND {scope}")),
+                (filter, scope) => filter.or(scope),
+            };
+            let hits = match (mode.unwrap_or_default(), query) {
+                (SearchMode::Hybrid, Some(query)) => {
+                    index
+                        .hybrid_search(&vector, &query, k, min_score, filter.as_deref())
+                        .await?
+                }
+                _ => {
+                    index
+                        .search(&vector, k, min_score, filter.as_deref())
+                        .await?
+                }
+            };
+            serde_json::to_value(hits).map_err(|e| Error::Backend(e.to_string()))
+        }
+        Request::Chunks {
+            path,
+            document_id,
+            indices,
+        } => {
+            let index = VectorIndex::open(Path::new(&path)).await?;
+            serde_json::to_value(index.chunks(&document_id, &indices).await?)
+                .map_err(|e| Error::Backend(e.to_string()))
+        }
+        Request::Maintain {
+            path,
+            ann_threshold,
         } => {
             let index = VectorIndex::open(Path::new(&path)).await?;
             serde_json::to_value(
                 index
-                    .search(&vector, k, min_score, filter.as_deref())
+                    .maintain(ann_threshold.unwrap_or(DEFAULT_ANN_THRESHOLD))
                     .await?,
             )
             .map_err(|e| Error::Backend(e.to_string()))

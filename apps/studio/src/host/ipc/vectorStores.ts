@@ -23,6 +23,7 @@ type VectorStoreChannels =
   | "vectorStores.remove"
   | "vectorStores.search"
   | "vectorStores.searchTimed"
+  | "vectorStores.chunks"
   | "vectorStores.reconcile"
   | "vectorStores.clear"
   | "vectorStores.sources.list"
@@ -62,10 +63,12 @@ export function createVectorStoreHandlers(
       await service.remove(id);
       return { id, removed: true };
     },
-    "vectorStores.search": ({ storeId, query, k, minScore }) =>
-      service.search(storeId, query, { k, minScore }),
-    "vectorStores.searchTimed": ({ storeId, query, k, minScore }) =>
-      service.searchTimed(storeId, query, { k, minScore }),
+    "vectorStores.search": ({ storeId, query, k, minScore, mode }) =>
+      service.search(storeId, query, { k, minScore, ...(mode === undefined ? {} : { mode }) }),
+    "vectorStores.searchTimed": ({ storeId, query, k, minScore, mode }) =>
+      service.searchTimed(storeId, query, { k, minScore, ...(mode === undefined ? {} : { mode }) }),
+    "vectorStores.chunks": ({ storeId, documentId, indices }) =>
+      service.chunks(storeId, documentId, indices),
     "vectorStores.clear": ({ id }) => service.clear(id),
     "vectorStores.reconcile": ({ id }) => service.reconcile(id),
     "vectorStores.sources.list": ({ id }) => indexing().listSources(id),

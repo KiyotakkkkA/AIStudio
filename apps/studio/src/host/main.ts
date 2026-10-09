@@ -320,7 +320,7 @@ if (!app.requestSingleInstanceLock()) {
         events: eventBus,
         registry: nodes,
         tools,
-        services: { providers: registry, vectorStores, jobs: sidecar, indexing, downloads },
+        services: { providers: registry, vectorStores, graph, jobs: sidecar, indexing, downloads },
         logger,
       });
       downloads.attach(runs);

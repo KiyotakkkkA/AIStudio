@@ -15,7 +15,9 @@ async function rpc<T>(page: Page, channel: string, payload?: unknown): Promise<T
   return result.data;
 }
 
-test("chat streams grounded answers, preserves scroll, cancels and fits a narrow thread", async ({ browserName }, testInfo) => {
+test("chat streams grounded answers, preserves scroll, cancels and fits a narrow thread", async ({
+  browserName,
+}, testInfo) => {
   expect(browserName).toBe("chromium");
   const directory = temporaryDirectory("studio-chat-ui-");
   let turn = 0;
@@ -115,10 +117,10 @@ test("chat streams grounded answers, preserves scroll, cancels and fits a narrow
         documentId: "manual",
         chunkIndex: 0,
         path: "secrets/rotation.md#L42",
-        payload: {
-          text: "Running scenarios keep their connection. The next request uses the new key.",
-          chunkCount: 1,
-        },
+        text: "Running scenarios keep their connection. The next request uses the new key.",
+        section: "",
+        page: null,
+        payload: { chunkCount: 1 },
       },
     ]);
     await page.locator("nav").getByText("Секреты", { exact: true }).click();

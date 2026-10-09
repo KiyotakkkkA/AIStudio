@@ -14,9 +14,10 @@ import {
   VectorStoreService,
   type VectorSearchOptions,
 } from "../src/host/services/VectorStoreService.ts";
-import { VectorEvalService } from "../src/host/services/VectorEvalService.ts";
+import { evalModes, VectorEvalService } from "../src/host/services/VectorEvalService.ts";
 import { createVectorStoreHandlers } from "../src/host/ipc/vectorStores.ts";
 
+let core: FakeVectorCore;
 let db: TemporaryDatabase;
 let stores: VectorStoreService;
 let evaluation: VectorEvalService;
@@ -35,7 +36,7 @@ beforeEach(async () => {
   });
   stores = new VectorStoreService({
     data: db.client,
-    core: new FakeVectorCore(),
+    core: (core = new FakeVectorCore()),
     drivers: { ephemeralDriver: () => Promise.resolve(createFakeDriver()) },
     directory: db.directory,
     clock: () => 1000,
@@ -72,6 +73,9 @@ function result(order: readonly string[], rerank?: VectorSearchResultDto["rerank
       documentId,
       chunkIndex: 0,
       path: documentId,
+      text: "",
+      section: "",
+      page: null,
     })),
     embeddingMs: 1,
     searchMs: 1,
@@ -120,7 +124,16 @@ test("running with nothing to check says so", async () => {
   });
 });
 
-test("a run without reranking reports vector-only metrics and is kept with the store", async () => {
+test("the modes compared follow what the store can do", () => {
+  expect(evalModes(false, false)).toEqual(["vector"]);
+  expect(evalModes(false, true)).toEqual(["vector", "rerank"]);
+  expect(evalModes(true, false)).toEqual(["vector", "hybrid"]);
+  expect(evalModes(true, true)).toEqual(["vector", "hybrid", "hybrid-rerank"]);
+});
+
+test("a v1 store without reranking reports vector-only metrics and is kept with the store", async () => {
+  core.setSchemaVersion(stores.storePath(store.id), 1);
+  await stores.reconcile(store.id);
   evaluation.add({
     storeId: store.id,
     question: "cats",
@@ -144,7 +157,7 @@ test("a run without reranking reports vector-only metrics and is kept with the s
   const run = await evaluation.run({ storeId: store.id, k: 10 });
 
   expect(search).toHaveBeenCalledTimes(2);
-  expect(search.mock.calls[0]?.[2]).toEqual({ k: 10, minScore: 0, rerank: false });
+  expect(search.mock.calls[0]?.[2]).toEqual({ k: 10, minScore: 0, rerank: false, mode: "vector" });
   expect(run.modes.map((mode) => mode.mode)).toEqual(["vector"]);
   expect(run.modes[0]?.cases.map((entry) => entry.rank)).toEqual([2, 1]);
   expect(run.modes[0]?.metrics).toMatchObject({ cases: 2, hitAt1: 0.5, hitAt5: 1, mrr: 0.75 });
@@ -152,7 +165,45 @@ test("a run without reranking reports vector-only metrics and is kept with the s
   expect(evaluation.list(store.id).lastRun).toEqual(run);
 });
 
-test("a reranking store is measured both ways so the gain is visible", async () => {
+test("a v2 store is measured as vector, hybrid and hybrid with reranking", async () => {
+  await stores.update({
+    id: store.id,
+    rerank: { enabled: true, modelRef: "curated:model:bge-reranker-v2-m3-f16", candidates: 50 },
+  });
+  evaluation.add({
+    storeId: store.id,
+    question: "cats",
+    expectedDocumentIds: [documents.cats] as never,
+  });
+  const search = vi
+    .spyOn(stores, "searchTimed")
+    .mockImplementation((_id: string, _query: string, options: VectorSearchOptions = {}) =>
+      Promise.resolve(
+        options.rerank === true
+          ? result([documents.cats], "applied")
+          : options.mode === "hybrid"
+            ? result([documents.dogs, documents.cats])
+            : result([documents.dogs, documents.birds, documents.cats]),
+      ),
+    );
+
+  const run = await evaluation.run({ storeId: store.id, k: 5 });
+
+  expect(search.mock.calls.map((call) => call[2])).toEqual([
+    { k: 5, minScore: 0, rerank: false, mode: "vector" },
+    { k: 5, minScore: 0, rerank: false, mode: "hybrid" },
+    { k: 5, minScore: 0, rerank: true, mode: "hybrid" },
+  ]);
+  expect(run.modes.map((mode) => [mode.mode, mode.metrics.mrr])).toEqual([
+    ["vector", 1 / 3],
+    ["hybrid", 1 / 2],
+    ["hybrid-rerank", 1],
+  ]);
+});
+
+test("a reranking v1 store is measured both ways so the gain is visible", async () => {
+  core.setSchemaVersion(stores.storePath(store.id), 1);
+  await stores.reconcile(store.id);
   await stores.update({
     id: store.id,
     rerank: { enabled: true, modelRef: "curated:model:bge-reranker-v2-m3-f16", candidates: 50 },
@@ -205,7 +256,7 @@ test("fallbacks and failed searches are reported per case instead of sinking the
   );
 
   const run = await evaluation.run({ storeId: store.id, k: 5 });
-  const reranked = run.modes.find((mode) => mode.mode === "rerank")!;
+  const reranked = run.modes.find((mode) => mode.mode === "hybrid-rerank")!;
 
   expect(reranked.fallbacks).toBe(1);
   expect(reranked.cases[1]).toMatchObject({

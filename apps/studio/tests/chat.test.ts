@@ -15,7 +15,12 @@ import { createEventBus, type EventBus } from "../src/host/platform/events.ts";
 import { createId } from "../src/host/platform/ids.ts";
 import { RunService } from "../src/host/services/RunService.ts";
 import { ChatService } from "../src/host/services/ChatService.ts";
-import { estimateTokens, windowChatHistory } from "../src/host/services/chatHistory.ts";
+import {
+  estimateTokens,
+  joinChunks,
+  RELATED_HEADING,
+  windowChatHistory,
+} from "../src/host/services/chatHistory.ts";
 import { createChatHandlers } from "../src/host/ipc/chat.ts";
 import { openDatabase } from "../src/host/data/client.ts";
 import { FakeVectorCore } from "../../../test/helpers/FakeVectorCore.ts";
@@ -104,7 +109,10 @@ const hit: VectorSearchHitDto = {
   path: "docs/source.md",
   chunkIndex: 3,
   score: 0.9,
-  payload: { text: "A retrieved fact." },
+  text: "A retrieved fact.",
+  section: "",
+  page: null,
+  payload: {},
 };
 
 test("a storeless channel turn returns before tokens, skips retrieval, persists usage and monotonic events", async () => {
@@ -180,6 +188,9 @@ test("attached stores search in parallel and only supplied passages become persi
       sourcePath: hit.path,
       chunkIndex: 3,
       score: 0.9,
+      section: "",
+      page: null,
+      related: null,
     })),
   );
   expect(
@@ -298,7 +309,7 @@ test("retrieval excludes passages that cannot fit and does not cite omitted cont
   const prepared = windowChatHistory("system", [], { role: "user", content: "current" }, 100, 20, [
     {
       storeId: VectorStoreId.parse(createId()),
-      hit: { ...hit, payload: { text: "x".repeat(1000) } },
+      hit: { ...hit, text: "x".repeat(1000) },
     },
   ]);
   expect(prepared.citations).toEqual([]);
@@ -359,7 +370,10 @@ test("a store with reranking on hands chat reranked citations", async () => {
         documentId: `doc${String(index)}`,
         chunkIndex: 0,
         path: `docs/${String(index)}.md`,
-        payload: { text },
+        text,
+        section: "",
+        page: null,
+        payload: {},
       }),
     ),
   );
@@ -391,5 +405,225 @@ test("a store with reranking on hands chat reranked citations", async () => {
     expect(citations[0]!.score).toBeGreaterThan(0.99);
   } finally {
     await reranked.dispose();
+  }
+});
+
+function chunk(
+  documentId: string,
+  chunkIndex: number,
+  text: string,
+  byteStart: number,
+  byteEnd: number,
+) {
+  return {
+    id: `${documentId}:${String(chunkIndex)}`,
+    documentId,
+    chunkIndex,
+    path: `docs/${documentId}.md`,
+    text,
+    section: "Отпуск › Порядок",
+    page: chunkIndex + 1,
+    payload: { byteStart, byteEnd },
+  };
+}
+
+test("overlapping neighbours are stitched without repeating the shared sentence", () => {
+  expect(
+    joinChunks([
+      { text: "One. Two.", payload: { byteStart: 0, byteEnd: 9 } },
+      { text: "Two. Three.", payload: { byteStart: 5, byteEnd: 16 } },
+      { text: "Four.", payload: { byteStart: 17, byteEnd: 22 } },
+    ]),
+  ).toBe("One. Two. Three.\nFour.");
+  expect(
+    joinChunks([
+      { text: "a", payload: null },
+      { text: "b", payload: null },
+    ]),
+  ).toBe("a\nb");
+  expect(
+    joinChunks([
+      { text: "Привет. Мир.", payload: { byteStart: 0, byteEnd: 21 } },
+      { text: "Мир. Дом.", payload: { byteStart: 14, byteEnd: 30 } },
+    ]),
+  ).toBe("Привет. Мир. Дом.");
+});
+
+test("neighbours join their hit as one passage, citations stay on the matched chunk", () => {
+  const storeId = VectorStoreId.parse(createId());
+  const matched = { ...chunk("a", 1, "Second part.", 13, 25), score: 0.8 };
+  const other = { ...chunk("a", 2, "Third part.", 26, 37), score: 0.6 };
+  const far = { ...chunk("b", 0, "Elsewhere.", 0, 10), score: 0.5 };
+  const prepared = windowChatHistory("system", [], { role: "user", content: "q" }, 10_000, 100, [
+    { storeId, hit: matched, neighbours: [chunk("a", 0, "First part.", 0, 12), other] },
+    { storeId, hit: far, neighbours: [] },
+    { storeId, hit: other, neighbours: [matched, chunk("a", 3, "Fourth.", 38, 45)] },
+  ]);
+
+  expect(prepared.citations.map((citation) => [citation.documentId, citation.chunkIndex])).toEqual([
+    ["a", 1],
+    ["b", 0],
+  ]);
+  expect(prepared.citations[0]).toMatchObject({
+    section: "Отпуск › Порядок",
+    page: 2,
+    related: null,
+  });
+  expect(prepared.neighbours).toBe(2);
+  const block = prepared.messages[0]!.content;
+  expect(block).toContain(
+    "[1] docs/a.md · стр. 2 · Отпуск › Порядок\nFirst part.\nSecond part.\nThird part.\nFourth.",
+  );
+  expect(block).toContain("[2] docs/b.md · стр. 1 · Отпуск › Порядок\nElsewhere.");
+});
+
+test("neighbours only take budget the ranked sources left over", () => {
+  const storeId = VectorStoreId.parse(createId());
+  const matched = { ...chunk("a", 1, "Key.", 0, 4), score: 0.9 };
+  const big = chunk("a", 2, "y".repeat(400), 5, 405);
+  const prepared = windowChatHistory("system", [], { role: "user", content: "q" }, 300, 50, [
+    { storeId, hit: matched, neighbours: [big, chunk("a", 0, "Lead.", 0, 0)] },
+  ]);
+  expect(prepared.citations).toHaveLength(1);
+  expect(prepared.neighbours).toBe(1);
+  expect(prepared.messages[0]!.content).not.toContain("yyyy");
+  expect(prepared.tokensIn).toBeLessThanOrEqual(250);
+});
+
+test("related documents follow the ranked sources, marked by their relation", () => {
+  const storeId = VectorStoreId.parse(createId());
+  const ranked = { ...chunk("a", 0, "Ranked.", 0, 7), score: 0.9 };
+  const prepared = windowChatHistory(
+    "system",
+    [],
+    { role: "user", content: "q" },
+    10_000,
+    100,
+    [{ storeId, hit: ranked }],
+    [
+      { storeId, hit: { ...chunk("b", 4, "Linked.", 0, 7), score: 0.4 }, relation: "references" },
+      { storeId, hit: { ...chunk("a", 3, "Same doc.", 0, 9), score: 0.4 }, relation: "duplicate" },
+    ],
+  );
+  expect(prepared.citations.map((citation) => citation.related)).toEqual([null, "references"]);
+  expect(prepared.related).toBe(1);
+  const block = prepared.messages[0]!.content;
+  expect(block.indexOf("[1] docs/a.md")).toBeLessThan(block.indexOf(RELATED_HEADING));
+  expect(block).toContain(
+    `${RELATED_HEADING}\n[2] docs/b.md · стр. 5 · Отпуск › Порядок — связь «references»\nLinked.`,
+  );
+  expect(block).not.toContain("Same doc.");
+});
+
+test("chat brings neighbours always and related documents only when the conversation asks", async () => {
+  const core = new FakeVectorCore();
+  const vectorStores = new VectorStoreService({
+    data: db.client,
+    core,
+    drivers: { ephemeralDriver: async () => driver },
+    directory: db.directory,
+  });
+  const created = await vectorStores.create(
+    CreateVectorStoreInput.parse({
+      name: "Graphed",
+      embeddingProviderId: providerId,
+      embeddingModelId: "embed",
+      dimension: 1,
+    }),
+  );
+  const row = (documentId: string, chunkIndex: number, text: string) => ({
+    id: `${documentId}:${String(chunkIndex)}`,
+    vector: [1],
+    documentId,
+    chunkIndex,
+    path: `docs/${documentId}.md`,
+    text,
+    section: "",
+    page: null,
+    payload: {},
+  });
+  await core.upsertVectors(vectorStores.storePath(created.id), [
+    row("a", 1, "Matched."),
+    row("a", 0, "Before."),
+    row("a", 2, "After."),
+    row("b", 0, "Linked document."),
+  ]);
+  const record = (id: string) =>
+    db.client.repositories.vectorDocuments.recordIndexed({
+      id,
+      storeId: created.id,
+      sourcePath: `docs/${id}.md`,
+      contentHash: id,
+      chunkCount: 1,
+      bytes: 1,
+      indexedAt: 1,
+    });
+  record("a");
+  record("b");
+  const neighbors = vi.fn(async ({ documentId }: { documentId: string }) =>
+    documentId === "a"
+      ? [
+          {
+            node: { id: "b", kind: "document" as const },
+            edge: { from: "a", to: "b", relation: "references", weight: null, metadata: null },
+            direction: "outgoing" as const,
+          },
+        ]
+      : [],
+  );
+  const ranked = vi.fn(async () => [
+    { ...row("a", 1, "Matched."), score: 0.9 } as VectorSearchHitDto,
+  ]);
+  const registry = registerCoreNodes(new NodeRegistry());
+  const graphRuns = new RunService({
+    data: db.client,
+    registry,
+    events: bus,
+    services: {
+      providers: { text: async () => driver.text, ephemeralDriver: async () => driver },
+      vectorStores: {
+        search: ranked,
+        chunks: vectorStores.chunks.bind(vectorStores),
+        relatedChunks: vectorStores.relatedChunks.bind(vectorStores),
+      },
+      graph: { neighbors },
+    },
+  });
+  graphRuns.permissions.grant("llm.generate", "global", "auto", "test");
+  graphRuns.permissions.grant("vector.search", "global", "auto", "test");
+  const graphChat = new ChatService({ data: db.client, registry, runs: graphRuns });
+  const handlers = createChatHandlers(graphChat);
+  try {
+    const conversationDto = graphChat.create(
+      CreateConversationInput.parse({ providerId, modelId, attachedStoreIds: [created.id] }),
+    );
+    expect(conversationDto.useRelations).toBe(false);
+    const first = graphChat.sendMessage(conversationDto.id, "What is matched?");
+    await graphRuns.wait(first.id);
+    expect(neighbors).not.toHaveBeenCalled();
+    const firstAnswer = graphChat.get(conversationDto.id).messages[1]!;
+    expect(firstAnswer.citations.map((citation) => citation.documentId)).toEqual(["a"]);
+    expect(driver.requests[0]!.messages.at(-2)!.content).toContain("Before.\nMatched.\nAfter.");
+
+    const updated = await handlers["chat.conversations.updateRelations"]({
+      id: conversationDto.id,
+      useRelations: true,
+    });
+    expect(updated.useRelations).toBe(true);
+    const second = graphChat.sendMessage(conversationDto.id, "And what is linked?");
+    await graphRuns.wait(second.id);
+    expect(neighbors).toHaveBeenCalledWith({
+      storeId: created.id,
+      documentId: "a",
+      direction: "both",
+    });
+    const answer = graphChat.get(conversationDto.id).messages[3]!;
+    expect(answer.citations.map((citation) => [citation.documentId, citation.related])).toEqual([
+      ["a", null],
+      ["b", "references"],
+    ]);
+    expect(driver.requests[1]!.messages.at(-2)!.content).toContain("Linked document.");
+  } finally {
+    await graphRuns.dispose();
   }
 });

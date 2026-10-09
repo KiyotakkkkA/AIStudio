@@ -1,11 +1,13 @@
 import { AppError, AppErrorCode } from "@zvs/shared";
 import { z } from "zod";
 import {
+  VectorChunkSchema,
   VectorHitSchema,
   VectorStatsSchema,
   type VectorCorePort,
   type VectorMetric,
   type VectorRow,
+  type VectorSearchRequest,
 } from "./vectorTypes.ts";
 import {
   GraphEdgeSchema,
@@ -29,9 +31,25 @@ import {
 } from "./graphTypes.ts";
 import { loadAddon, type NativeAddon } from "./addon.ts";
 import type { StudioPaths } from "../../platform/paths.ts";
-import type { ChunkConfig, RustCorePort, TextChunk } from "./ports.ts";
+import type { ChunkConfig, RustCorePort, SectionChunk, TextChunk, TextSegment } from "./ports.ts";
 
 const codes = new Set<string>(Object.values(AppErrorCode));
+
+function validChunkConfig(config: ChunkConfig): void {
+  if (
+    !Number.isInteger(config.size) ||
+    config.size <= 0 ||
+    config.size > 0xffffffff ||
+    !Number.isInteger(config.overlap) ||
+    config.overlap < 0 ||
+    config.overlap >= config.size
+  ) {
+    throw new AppError(
+      AppErrorCode.VALIDATION_FAILED,
+      "Некорректный размер или перекрытие фрагментов",
+    );
+  }
+}
 
 function nativeError(cause: unknown): AppError {
   if (cause instanceof AppError) return cause;
@@ -72,21 +90,27 @@ export class RustCore implements RustCorePort, VectorCorePort, GraphCorePort {
     text: string,
     config: ChunkConfig = { size: 256, overlap: 32 },
   ): Promise<TextChunk[]> {
-    if (
-      !Number.isInteger(config.size) ||
-      config.size <= 0 ||
-      config.size > 0xffffffff ||
-      !Number.isInteger(config.overlap) ||
-      config.overlap < 0 ||
-      config.overlap >= config.size
-    ) {
-      throw new AppError(
-        AppErrorCode.VALIDATION_FAILED,
-        "Некорректный размер или перекрытие фрагментов",
-      );
-    }
+    validChunkConfig(config);
     try {
       return await this.addon().chunkText(text, config);
+    } catch (cause) {
+      throw nativeError(cause);
+    }
+  }
+
+  async chunkSegments(
+    segments: readonly TextSegment[],
+    config: ChunkConfig,
+  ): Promise<SectionChunk[]> {
+    validChunkConfig(config);
+    const input = segments.map((segment) => ({
+      text: segment.text,
+      section: [...segment.section],
+      ...(segment.page === undefined ? {} : { page: segment.page }),
+    }));
+    try {
+      const chunks = await this.addon().chunkSegments(input, config);
+      return chunks.map((chunk) => ({ ...chunk, page: chunk.page ?? null }));
     } catch (cause) {
       throw nativeError(cause);
     }
@@ -153,17 +177,19 @@ export class RustCore implements RustCorePort, VectorCorePort, GraphCorePort {
     }
   }
 
-  async searchVectors(
-    path: string,
-    vector: number[],
-    k: number,
-    minScore: number,
-    filter?: string,
-  ) {
+  async searchVectors(path: string, request: VectorSearchRequest) {
+    return this.vectorCall({ operation: "search", path, ...request }, VectorHitSchema.array());
+  }
+
+  async vectorChunks(path: string, documentId: string, indices: number[]) {
     return this.vectorCall(
-      { operation: "search", path, vector, k, minScore, filter },
-      VectorHitSchema.array(),
+      { operation: "chunks", path, documentId, indices },
+      VectorChunkSchema.array(),
     );
+  }
+
+  async maintainVectorIndex(path: string, annThreshold: number) {
+    return this.vectorCall({ operation: "maintain", path, annThreshold }, VectorStatsSchema);
   }
 
   async deleteVectorsByIds(path: string, ids: string[]): Promise<void> {

@@ -106,7 +106,17 @@ test("case rows show where the expected document landed and name missing documen
 test("search rows carry both scores only when the hit was reranked", () => {
   const [plain, reranked] = searchRows(
     [
-      { id: "a", score: 0.9, documentId: CATS, chunkIndex: 0, path: "a", payload: null },
+      {
+        id: "a",
+        score: 0.9,
+        documentId: CATS,
+        chunkIndex: 0,
+        path: "a",
+        payload: null,
+        text: "",
+        section: "",
+        page: null,
+      },
       {
         id: "b",
         score: 0.7,
@@ -116,6 +126,9 @@ test("search rows carry both scores only when the hit was reranked", () => {
         chunkIndex: 0,
         path: "b",
         payload: null,
+        text: "",
+        section: "",
+        page: null,
       },
     ],
     0,

@@ -96,6 +96,9 @@ export default class ChatStore {
   get attachedStoreIds() {
     return this.active?.attachedStoreIds ?? this.composer.attachedStoreIds;
   }
+  get useRelations() {
+    return this.active?.useRelations ?? this.composer.useRelations;
+  }
   get available() {
     return this.provider?.enabled === true && this.model?.available === true;
   }
@@ -143,6 +146,29 @@ export default class ChatStore {
       const updated = await this.ipc.call("chat.conversations.updateStores", {
         id: this.active.id,
         attachedStoreIds,
+      });
+      runInAction(() => {
+        this.active = { ...this.active!, ...updated };
+        this.conversations = this.conversations.map((conversation) =>
+          conversation.id === updated.id ? updated : conversation,
+        );
+      });
+    } catch (error) {
+      this.error = errorCopy(error);
+    }
+  }
+
+  async toggleRelations() {
+    if (!this.canConfigure) return;
+    const useRelations = !this.useRelations;
+    if (!this.active) {
+      this.composer.setUseRelations(useRelations);
+      return;
+    }
+    try {
+      const updated = await this.ipc.call("chat.conversations.updateRelations", {
+        id: this.active.id,
+        useRelations,
       });
       runInAction(() => {
         this.active = { ...this.active!, ...updated };
@@ -291,6 +317,7 @@ export default class ChatStore {
           settings: { temperature: this.composer.temperature },
           systemPrompt: this.composer.systemPrompt,
           attachedStoreIds: [...this.composer.attachedStoreIds],
+          useRelations: this.composer.useRelations,
         });
         runInAction(() => {
           this.active = { ...conversation, messages: [] };
@@ -438,6 +465,9 @@ export default class ChatStore {
               sourcePath: hit.path,
               chunkIndex: hit.chunkIndex,
               score: hit.score,
+              section: hit.section,
+              page: hit.page,
+              related: null,
             })),
           ];
       }

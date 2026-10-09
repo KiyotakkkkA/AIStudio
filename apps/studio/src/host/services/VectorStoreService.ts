@@ -3,11 +3,14 @@ import {
   AppErrorCode,
   CreateVectorStoreInput,
   UpdateVectorStoreInput,
+  VECTOR_SCHEMA_VERSION,
+  VectorChunkDto,
   VectorStoreDto,
+  VectorSearchHitDto,
   VectorSearchInput,
   type VectorOcrConfig,
   type VectorRerankConfig,
-  type VectorSearchHitDto,
+  type VectorSearchMode,
   type VectorSearchResultDto,
 } from "@zvs/shared";
 import type { UnitOfWork } from "../data/UnitOfWork.ts";
@@ -24,6 +27,7 @@ export interface VectorSearchOptions {
   k?: number;
   minScore?: number;
   rerank?: boolean;
+  mode?: VectorSearchMode;
 }
 
 export const DEFAULT_RERANK_TIMEOUT_MS = 20_000;
@@ -120,7 +124,9 @@ export class VectorStoreService {
       }
       if (
         (patch.chunkSize !== undefined && patch.chunkSize !== row.chunkSize) ||
-        (patch.chunkOverlap !== undefined && patch.chunkOverlap !== row.chunkOverlap)
+        (patch.chunkOverlap !== undefined && patch.chunkOverlap !== row.chunkOverlap) ||
+        (patch.queryPrefix !== undefined && patch.queryPrefix !== row.queryPrefix) ||
+        (patch.documentPrefix !== undefined && patch.documentPrefix !== row.documentPrefix)
       ) {
         if (
           row.vectors > 0 ||
@@ -129,7 +135,7 @@ export class VectorStoreService {
         ) {
           throw new AppError(
             AppErrorCode.CONFLICT,
-            "Chunk settings can only change before indexing",
+            "Chunk and prefix settings can only change before indexing",
           );
         }
         const observed = await this.observe(row);
@@ -178,20 +184,7 @@ export class VectorStoreService {
     return this.exclusive(id, async () => {
       const row = this.require(id);
       this.requireBackend(row);
-      const path = this.path(id);
-      try {
-        await this.options.core.removeVectorIndex(path);
-        await this.options.core.createVectorIndex(path, row.dimension, row.metric);
-      } catch (cause) {
-        // A store that lost its table and could not get a new one is broken, and says so rather
-        // than reporting a successful reset.
-        this.stores.update(id, { status: "broken", updatedAt: this.now() });
-        this.options.logger?.log("error", "vectorStores", "Could not reset the vector store", {
-          storeId: id,
-          error: String(cause),
-        });
-        throw new AppError(AppErrorCode.NATIVE_ERROR, "Не удалось очистить хранилище", { cause });
-      }
+      await this.replaceTable(row);
       const removed = this.options.data.repositories.vectorDocuments.removeByStore(id);
       const updated = this.stores.update(id, {
         documents: 0,
@@ -207,6 +200,36 @@ export class VectorStoreService {
       });
       return this.toDto(updated);
     });
+  }
+
+  recreateTable(id: string): Promise<VectorStoreDto> {
+    return this.exclusive(id, async () => {
+      const row = this.require(id);
+      this.requireBackend(row);
+      const stats = await this.replaceTable(row);
+      this.options.logger?.log("info", "vectorStores", "Recreated the vector table", {
+        storeId: id,
+        schemaVersion: stats.schemaVersion,
+      });
+      return this.repair(row, stats);
+    });
+  }
+
+  private async replaceTable(row: VectorStoreEntity): Promise<VectorStats> {
+    const path = this.path(row.id);
+    try {
+      await this.options.core.removeVectorIndex(path);
+      return await this.options.core.createVectorIndex(path, row.dimension, row.metric);
+    } catch (cause) {
+      // A store that lost its table and could not get a new one is broken, and says so rather
+      // than reporting a successful reset.
+      this.stores.update(row.id, { status: "broken", updatedAt: this.now() });
+      this.options.logger?.log("error", "vectorStores", "Could not reset the vector store", {
+        storeId: row.id,
+        error: String(cause),
+      });
+      throw new AppError(AppErrorCode.NATIVE_ERROR, "Не удалось очистить хранилище", { cause });
+    }
   }
 
   reconcile(id: string): Promise<VectorStoreDto> {
@@ -242,43 +265,24 @@ export class VectorStoreService {
       signal?.throwIfAborted();
       const row = this.require(storeId);
       this.requireBackend(row);
-      const provider = this.requireProvider(row.embeddingProviderId);
-      const driver = await this.options.drivers.ephemeralDriver(provider);
-      signal?.throwIfAborted();
-      if (driver.embedding === null)
-        throw new AppError(AppErrorCode.CONFLICT, "Provider does not support embeddings");
       const embeddingStart = performance.now();
-      const timeout = AbortSignal.timeout((provider.settings.timeoutSeconds ?? 30) * 1000);
-      const vectors = await driver.embedding.embed(
-        [input.query],
-        row.embeddingModelId,
-        signal ? AbortSignal.any([signal, timeout]) : timeout,
-      );
-      signal?.throwIfAborted();
+      const vector = await this.embedQuery(row, input.query, signal);
       const embeddingMs = performance.now() - embeddingStart;
-      const vector = vectors[0];
-      if (
-        vectors.length !== 1 ||
-        vector === undefined ||
-        vector.length !== row.dimension ||
-        !vector.every(Number.isFinite)
-      ) {
-        throw new AppError(
-          AppErrorCode.VALIDATION_FAILED,
-          "Embedding dimension does not match the store",
-        );
-      }
+      const mode = effectiveMode(row, input.mode);
       const reranking = allowRerank && row.rerank.enabled;
       const searchStart = performance.now();
-      const hits = await this.options.core.searchVectors(
-        this.path(storeId),
-        Array.from(vector),
-        reranking ? Math.max(input.k, row.rerank.candidates) : input.k,
-        reranking ? 0 : input.minScore,
-      );
+      const hits = (
+        await this.options.core.searchVectors(this.path(storeId), {
+          vector,
+          k: reranking ? Math.max(input.k, row.rerank.candidates) : input.k,
+          minScore: reranking ? 0 : input.minScore,
+          mode,
+          query: input.query,
+        })
+      ).map((hit) => VectorSearchHitDto.parse(hit));
       signal?.throwIfAborted();
       const searchMs = performance.now() - searchStart;
-      if (!reranking) return { hits, embeddingMs, searchMs };
+      if (!reranking) return { hits, embeddingMs, searchMs, mode };
       const rerankStart = performance.now();
       const reranked = await this.rerankHits(row, input.query, hits, signal);
       const rerankMs = performance.now() - rerankStart;
@@ -289,8 +293,84 @@ export class VectorStoreService {
         searchMs,
         rerankMs,
         rerank: reranked === undefined ? ("fallback" as const) : ("applied" as const),
+        mode,
       };
     });
+  }
+
+  chunks(
+    storeId: string,
+    documentId: string,
+    indices: readonly number[],
+  ): Promise<VectorChunkDto[]> {
+    return this.exclusive(storeId, async () => {
+      const row = this.require(storeId);
+      this.requireBackend(row);
+      const wanted = [...new Set(indices.filter((index) => Number.isInteger(index) && index >= 0))];
+      if (wanted.length === 0) return [];
+      const chunks = await this.options.core.vectorChunks(this.path(storeId), documentId, wanted);
+      return chunks.map((chunk) => VectorChunkDto.parse(chunk));
+    });
+  }
+
+  relatedChunks(
+    storeId: string,
+    query: string,
+    documentIds: readonly string[],
+    signal?: AbortSignal,
+  ): Promise<VectorSearchHitDto[]> {
+    return this.exclusive(storeId, async () => {
+      const row = this.require(storeId);
+      this.requireBackend(row);
+      const ids = [...new Set(documentIds)];
+      if (ids.length === 0) return [];
+      const vector = await this.embedQuery(row, query, signal);
+      const hits: VectorSearchHitDto[] = [];
+      for (const documentId of ids) {
+        signal?.throwIfAborted();
+        const [best] = await this.options.core.searchVectors(this.path(storeId), {
+          vector,
+          k: 1,
+          minScore: 0,
+          mode: "vector",
+          documentIds: [documentId],
+        });
+        if (best !== undefined) hits.push(VectorSearchHitDto.parse(best));
+      }
+      return hits;
+    });
+  }
+
+  private async embedQuery(
+    row: VectorStoreEntity,
+    query: string,
+    signal: AbortSignal | undefined,
+  ): Promise<number[]> {
+    const provider = this.requireProvider(row.embeddingProviderId);
+    const driver = await this.options.drivers.ephemeralDriver(provider);
+    signal?.throwIfAborted();
+    if (driver.embedding === null)
+      throw new AppError(AppErrorCode.CONFLICT, "Provider does not support embeddings");
+    const timeout = AbortSignal.timeout((provider.settings.timeoutSeconds ?? 30) * 1000);
+    const vectors = await driver.embedding.embed(
+      [`${row.queryPrefix}${query}`],
+      row.embeddingModelId,
+      signal ? AbortSignal.any([signal, timeout]) : timeout,
+    );
+    signal?.throwIfAborted();
+    const vector = vectors[0];
+    if (
+      vectors.length !== 1 ||
+      vector === undefined ||
+      vector.length !== row.dimension ||
+      !vector.every(Number.isFinite)
+    ) {
+      throw new AppError(
+        AppErrorCode.VALIDATION_FAILED,
+        "Embedding dimension does not match the store",
+      );
+    }
+    return Array.from(vector);
   }
 
   private async rerankHits(
@@ -367,6 +447,7 @@ export class VectorStoreService {
         vectors: stats.rowCount,
         bytes: stats.onDiskBytes,
         indexType: stats.indexType,
+        schemaVersion: stats.schemaVersion,
         status: "healthy",
         tableCreatedAt: row.tableCreatedAt ?? now,
         updatedAt: now,
@@ -426,4 +507,12 @@ export class VectorStoreService {
   private get stores() {
     return this.options.data.repositories.vectorStores;
   }
+}
+
+export function effectiveMode(
+  row: Pick<VectorStoreEntity, "searchMode" | "schemaVersion">,
+  requested?: VectorSearchMode,
+): VectorSearchMode {
+  const mode = requested ?? row.searchMode;
+  return mode === "hybrid" && row.schemaVersion < VECTOR_SCHEMA_VERSION ? "vector" : mode;
 }
