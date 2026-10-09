@@ -312,6 +312,7 @@ if (!app.requestSingleInstanceLock()) {
         secrets,
         logger,
         clientVersion: app.getVersion(),
+        toolchainDir: join(app.getPath("userData"), "mcp-toolchain"),
         // Chromium's certificate and proxy handling applies to remote MCP servers too.
         fetch: (url, request) => net.fetch(url, { ...request, credentials: "omit" }),
       });

@@ -17,3 +17,4 @@ export type {
   McpResourceDescriptor,
   McpToolDescriptor,
 } from "./protocol.ts";
+export { isolatedToolchainEnv } from "./toolchainEnv.ts";

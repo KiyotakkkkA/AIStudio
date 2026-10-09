@@ -482,3 +482,38 @@ test("health says a crashed server is waiting to restart", async () => {
   await mcp.stop(server.id);
   expect(mcp.health(server.id).restarting).toBe(false);
 });
+
+test("a command that cannot start fails once and is not restarted", async () => {
+  const server = mcp.create({
+    name: "ghost",
+    transport: "stdio",
+    command: "zvs-definitely-not-a-command",
+  });
+  const result = await mcp.test(server.id);
+  expect(result.ok).toBe(false);
+  expect(result.error).toContain("ENOENT");
+  await new Promise((done) => setTimeout(done, 120));
+  expect(mcp.get(server.id).status).toBe("failed");
+  expect(mcp.health(server.id)).toMatchObject({ restarts: 0, restarting: false });
+});
+
+test("stdio servers get the isolated toolchain env, and a server's own env wins", async () => {
+  await mcp.dispose();
+  const seen: NodeJS.ProcessEnv[] = [];
+  mcp = service({
+    toolchainDir: join("C:", "data", "mcp-toolchain"),
+    spawn: (_command, _args, options) => {
+      seen.push(options.env);
+      throw Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" });
+    },
+  });
+  const server = mcp.create({
+    name: "npx",
+    transport: "stdio",
+    command: "npx",
+    env: { UV_CACHE_DIR: { kind: "literal", value: "D:/mine" } },
+  });
+  await mcp.test(server.id);
+  expect(seen[0]?.npm_config_cache).toBe(join("C:", "data", "mcp-toolchain", "npm-cache"));
+  expect(seen[0]?.UV_CACHE_DIR).toBe("D:/mine");
+});

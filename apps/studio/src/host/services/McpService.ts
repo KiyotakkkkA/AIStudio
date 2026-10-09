@@ -23,6 +23,7 @@ import type { McpServerPatch } from "../data/repositories/index.ts";
 import type { McpCapabilityEntity, McpServerEntity } from "../data/schema/index.ts";
 import {
   HttpTransport,
+  isolatedToolchainEnv,
   inferDestructive,
   inferReadOnly,
   McpClient,
@@ -58,6 +59,7 @@ export interface McpServiceOptions {
   maxBackoffMs?: number;
   maxRestarts?: number;
   clientVersion?: string;
+  toolchainDir?: string;
 }
 
 interface Supervisor {
@@ -453,7 +455,10 @@ export class McpService {
       return new StdioTransport({
         command: row.command,
         args: row.args,
-        env,
+        env:
+          this.options.toolchainDir === undefined
+            ? env
+            : { ...isolatedToolchainEnv(this.options.toolchainDir), ...env },
         ...(this.options.spawn === undefined ? {} : { spawn: this.options.spawn }),
       });
     }
@@ -588,7 +593,7 @@ export class McpService {
 
   #died(id: string, reason: string): void {
     const supervisor = this.#supervisors.get(id);
-    if (!supervisor) return;
+    if (!supervisor || supervisor.starting !== undefined) return;
     supervisor.client = undefined;
     supervisor.startedAt = undefined;
     if (supervisor.intentional || this.#closed) return;

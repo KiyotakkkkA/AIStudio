@@ -148,6 +148,10 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
               namePlaceholder="API_KEY"
               empty="Переменных окружения нет."
             />
+            <p className="mt-1.5 text-[11.5px] leading-snug text-main-500">
+              Пакеты npx и uvx скачиваются в папку приложения, а не в систему. Сами Node.js и uv
+              должны быть установлены.
+            </p>
           </div>
         </>
       ) : (
