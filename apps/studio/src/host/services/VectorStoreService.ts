@@ -253,7 +253,7 @@ export class VectorStoreService {
     return (await this.searchTimed(storeId, query, options, signal)).hits;
   }
 
-  searchTimed(
+  async searchTimed(
     storeId: string,
     query: string,
     options: VectorSearchOptions = {},
@@ -261,13 +261,15 @@ export class VectorStoreService {
   ): Promise<VectorSearchResultDto> {
     const { rerank: allowRerank = true, ...search } = options;
     const input = VectorSearchInput.parse({ storeId, query, ...search });
-    return this.exclusive(storeId, async () => {
+    signal?.throwIfAborted();
+    const embedded = this.require(storeId);
+    this.requireBackend(embedded);
+    const embeddingStart = performance.now();
+    const vector = await this.embedQuery(embedded, input.query, signal);
+    const embeddingMs = performance.now() - embeddingStart;
+    const { row, hits, searchMs, mode, reranking } = await this.exclusive(storeId, async () => {
       signal?.throwIfAborted();
-      const row = this.require(storeId);
-      this.requireBackend(row);
-      const embeddingStart = performance.now();
-      const vector = await this.embedQuery(row, input.query, signal);
-      const embeddingMs = performance.now() - embeddingStart;
+      const row = this.requireEmbeddedWith(storeId, embedded);
       const mode = effectiveMode(row, input.mode);
       const reranking = allowRerank && row.rerank.enabled;
       const searchStart = performance.now();
@@ -280,22 +282,22 @@ export class VectorStoreService {
           query: input.query,
         })
       ).map((hit) => VectorSearchHitDto.parse(hit));
-      signal?.throwIfAborted();
-      const searchMs = performance.now() - searchStart;
-      if (!reranking) return { hits, embeddingMs, searchMs, mode };
-      const rerankStart = performance.now();
-      const reranked = await this.rerankHits(row, input.query, hits, signal);
-      const rerankMs = performance.now() - rerankStart;
-      const ordered = reranked ?? hits;
-      return {
-        hits: ordered.filter((hit) => hit.score >= input.minScore).slice(0, input.k),
-        embeddingMs,
-        searchMs,
-        rerankMs,
-        rerank: reranked === undefined ? ("fallback" as const) : ("applied" as const),
-        mode,
-      };
+      return { row, hits, searchMs: performance.now() - searchStart, mode, reranking };
     });
+    signal?.throwIfAborted();
+    if (!reranking) return { hits, embeddingMs, searchMs, mode };
+    const rerankStart = performance.now();
+    const reranked = await this.rerankHits(row, input.query, hits, signal);
+    const rerankMs = performance.now() - rerankStart;
+    const ordered = reranked ?? hits;
+    return {
+      hits: ordered.filter((hit) => hit.score >= input.minScore).slice(0, input.k),
+      embeddingMs,
+      searchMs,
+      rerankMs,
+      rerank: reranked === undefined ? ("fallback" as const) : ("applied" as const),
+      mode,
+    };
   }
 
   chunks(
@@ -313,18 +315,19 @@ export class VectorStoreService {
     });
   }
 
-  relatedChunks(
+  async relatedChunks(
     storeId: string,
     query: string,
     documentIds: readonly string[],
     signal?: AbortSignal,
   ): Promise<VectorSearchHitDto[]> {
+    const embedded = this.require(storeId);
+    this.requireBackend(embedded);
+    const ids = [...new Set(documentIds)];
+    if (ids.length === 0) return [];
+    const vector = await this.embedQuery(embedded, query, signal);
     return this.exclusive(storeId, async () => {
-      const row = this.require(storeId);
-      this.requireBackend(row);
-      const ids = [...new Set(documentIds)];
-      if (ids.length === 0) return [];
-      const vector = await this.embedQuery(row, query, signal);
+      this.requireEmbeddedWith(storeId, embedded);
       const hits: VectorSearchHitDto[] = [];
       for (const documentId of ids) {
         signal?.throwIfAborted();
@@ -471,6 +474,18 @@ export class VectorStoreService {
       throw new AppError(AppErrorCode.VALIDATION_FAILED, "Выберите модель переранжирования");
     if (ocr.enabled && ocr.modelRef.trim() === "")
       throw new AppError(AppErrorCode.VALIDATION_FAILED, "Выберите модель OCR");
+  }
+  private requireEmbeddedWith(id: string, embedded: VectorStoreEntity): VectorStoreEntity {
+    const row = this.require(id);
+    this.requireBackend(row);
+    if (
+      row.embeddingProviderId !== embedded.embeddingProviderId ||
+      row.embeddingModelId !== embedded.embeddingModelId ||
+      row.dimension !== embedded.dimension ||
+      row.queryPrefix !== embedded.queryPrefix
+    )
+      throw new AppError(AppErrorCode.CONFLICT, "Vector store changed during the search");
+    return row;
   }
   private requireBackend(row: VectorStoreEntity) {
     if (row.backend !== "lancedb")

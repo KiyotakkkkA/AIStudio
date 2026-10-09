@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type {
   VectorEvalRunDto,
   VectorOcrConfig,
@@ -36,6 +36,7 @@ export const vectorStore = sqliteTable(
       .$type<VectorStoreDto["searchMode"]>()
       .notNull()
       .default("hybrid"),
+    chatMinScore: real("chat_min_score").notNull().default(0.3),
     schemaVersion: integer("schema_version").notNull().default(1),
     indexType: text("index_type").notNull().default("FLAT"),
     status: text("status").$type<VectorStoreDto["status"]>().notNull().default("pending"),

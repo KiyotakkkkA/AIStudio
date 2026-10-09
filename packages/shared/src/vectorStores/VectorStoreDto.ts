@@ -10,6 +10,8 @@ export const VectorSearchMode = z.enum(["hybrid", "vector"]);
 export type VectorSearchMode = z.infer<typeof VectorSearchMode>;
 export const VECTOR_SCHEMA_VERSION = 2;
 export const VectorPrefix = z.string().max(512);
+export const DEFAULT_CHAT_MIN_SCORE = 0.3;
+export const ChatMinScore = z.number().min(0).max(1);
 
 /**
  * Reranking and OCR are optional stages around the embedding one: a cross-encoder that
@@ -55,6 +57,7 @@ export const VectorStoreDto = z.object({
   queryPrefix: VectorPrefix.default(""),
   documentPrefix: VectorPrefix.default(""),
   searchMode: VectorSearchMode.default("hybrid"),
+  chatMinScore: ChatMinScore.default(DEFAULT_CHAT_MIN_SCORE),
   schemaVersion: z.number().int().positive().default(1),
   indexType: z.string().min(1),
   status: VectorHealth,
@@ -86,6 +89,7 @@ export const CreateVectorStoreInput = VectorStoreDto.pick({
     queryPrefix: VectorPrefix.default(""),
     documentPrefix: VectorPrefix.default(""),
     searchMode: VectorSearchMode.default("hybrid"),
+    chatMinScore: ChatMinScore.default(DEFAULT_CHAT_MIN_SCORE),
     indexType: z.literal("FLAT").default("FLAT"),
   })
   .refine((input) => input.chunkOverlap < input.chunkSize, {
@@ -104,5 +108,6 @@ export const UpdateVectorStoreInput = VectorStoreRef.extend({
   queryPrefix: VectorPrefix.optional(),
   documentPrefix: VectorPrefix.optional(),
   searchMode: VectorSearchMode.optional(),
+  chatMinScore: ChatMinScore.optional(),
 });
 export type UpdateVectorStoreInput = z.infer<typeof UpdateVectorStoreInput>;

@@ -6,6 +6,8 @@ import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
+import TextInput from "../../ui/atoms/TextInput";
+import Field from "../../ui/molecules/Field";
 import VectorSearchPanel from "./VectorSearchPanel";
 import VectorDocumentsPanel from "./VectorDocumentsPanel";
 import VectorRelationsPanel from "./VectorRelationsPanel";
@@ -219,6 +221,36 @@ function VectorStoreDetail() {
                     ? `${describeRef(detail.ocr.modelRef)} · язык: ${detail.ocr.language} · порог: ${detail.ocr.minCharsPerPage}`
                     : "выключен"}
                 </p>
+                <form
+                  className="flex max-w-md items-end gap-2.5 pt-1"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void store.saveChatMinScore();
+                  }}
+                >
+                  <div className="min-w-0 flex-1">
+                    <Field
+                      label="Порог релевантности для чата"
+                      htmlFor="vs-settings-chat-min-score"
+                      help="Ниже порога фрагмент не попадает в ответ чата. Тестовый поиск приглушает такие строки."
+                    >
+                      <TextInput
+                        id="vs-settings-chat-min-score"
+                        value={store.chatMinScore}
+                        mono
+                        disabled={disabled}
+                        onChange={(e) => store.set("chatMinScore", e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                  <Button
+                    type="submit"
+                    tone="primary"
+                    disabled={disabled || !store.chatMinScoreChanged}
+                  >
+                    Сохранить
+                  </Button>
+                </form>
               </>
             ) : (
               <>

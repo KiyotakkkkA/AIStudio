@@ -139,6 +139,7 @@ test("editing preserves immutable configuration and indexed chunk settings", () 
     rerank: { enabled: false, modelRef: "", candidates: 50 },
     ocr: { enabled: false, modelRef: "", language: "auto", minCharsPerPage: 200 },
     searchMode: "hybrid",
+    chatMinScore: 0.3,
   });
 });
 
@@ -239,6 +240,7 @@ test("create and edit use real contract inputs; failures preserve the form", asy
       rerank: { enabled: false, modelRef: "", candidates: 50 },
       ocr: { enabled: false, modelRef: "", language: "auto", minCharsPerPage: 200 },
       searchMode: "hybrid",
+      chatMinScore: 0.3,
     });
     return { ...detail, ...input };
   });
@@ -602,4 +604,29 @@ test("a model that needs prefixes fills them, from the catalogue first", () => {
   const locked = new VectorStoreFormVm({ ...detail, queryPrefix: "query: " }, [provider]);
   locked.set("embeddingModelId", "nomic-embed-text");
   expect(locked.queryPrefix).toBe("query: ");
+});
+
+test("test search marks rows under the chat floor, which the Settings tab edits", async () => {
+  const { store, bridge } = setup();
+  bridge.handle("vectorStores.get", ({ id }) => ({ ...detail, id, chatMinScore: 0.95 }));
+  await store.load();
+  expect(store.minScore).toBe("0.95");
+  expect(store.chatMinScore).toBe("0.95");
+  store.set("query", "hello");
+  await store.search();
+  expect(store.rows.map((row) => row.belowFloor)).toEqual([true, true]);
+
+  expect(store.chatMinScoreChanged).toBe(false);
+  store.set("chatMinScore", "1.5");
+  expect(await store.saveChatMinScore()).toBe(false);
+  expect(store.error).toContain("от 0 до 1");
+  store.set("chatMinScore", "0,5");
+  bridge.handle("vectorStores.update", (input) => {
+    expect(input).toEqual({ id: detail.id, chatMinScore: 0.5 });
+    return { ...detail, chatMinScore: 0.5 };
+  });
+  expect(await store.saveChatMinScore()).toBe(true);
+  expect(store.detail?.chatMinScore).toBe(0.5);
+  expect(store.minScore).toBe("0.5");
+  expect(store.rows.map((row) => row.belowFloor)).toEqual([false, true]);
 });

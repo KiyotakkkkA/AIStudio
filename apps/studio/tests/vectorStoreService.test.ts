@@ -425,3 +425,28 @@ test("advanced stages round-trip and an enabled stage without a model is refused
     }),
   ).rejects.toMatchObject({ code: AppErrorCode.VALIDATION_FAILED });
 });
+
+test("a slow query embedding does not hold the store lock", async () => {
+  const store = await service.create(input);
+  const fake = createFakeDriver({ manual: true, vectors: [[1, 0, 0]] });
+  driverSource.mockResolvedValueOnce(fake);
+  const searching = service.searchTimed(store.id, "query");
+  await fake.whenHolding();
+  await expect(service.withExclusiveStore(store.id, async (row) => row.id)).resolves.toBe(store.id);
+  await expect(service.update({ id: store.id, chatMinScore: 0.5 })).resolves.toMatchObject({
+    chatMinScore: 0.5,
+  });
+  fake.release();
+  await expect(searching).resolves.toMatchObject({ hits: [] });
+});
+
+test("a search whose store changed while embedding is refused", async () => {
+  const store = await service.create(input);
+  const fake = createFakeDriver({ manual: true, vectors: [[1, 0, 0]] });
+  driverSource.mockResolvedValueOnce(fake);
+  const searching = service.searchTimed(store.id, "query");
+  await fake.whenHolding();
+  db.client.repositories.vectorStores.update(store.id, { queryPrefix: "query: " });
+  fake.release();
+  await expect(searching).rejects.toMatchObject({ code: AppErrorCode.CONFLICT });
+});

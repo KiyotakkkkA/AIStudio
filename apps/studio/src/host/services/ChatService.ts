@@ -4,6 +4,7 @@ import {
   AppErrorCode,
   ChatSendInput,
   ConversationDetailDto,
+  DEFAULT_CHAT_MIN_SCORE,
   GRAPH_EXPANSION_DEFAULT_MAX,
   mergeGraphNeighbors,
   type GraphNeighborhood,
@@ -28,6 +29,8 @@ import {
   type RelatedSource,
   type RetrievedSource,
 } from "./chatHistory.ts";
+import { CHAT_FETCH_K, mergeRetrieval } from "./retrievalMerge.ts";
+import { retrievalQuery } from "./retrievalQuery.ts";
 
 export const CHAT_RELATED_MAX = 3;
 
@@ -51,6 +54,7 @@ export class ChatService {
           assistantId: z.string(),
           providerId: z.string(),
           modelId: z.string(),
+          query: z.string().optional(),
           settings: z.object({
             temperature: z.number().optional(),
             topK: z.number().int().positive().optional(),
@@ -74,13 +78,21 @@ export class ChatService {
           input.modelId ?? conversation.modelId,
           input.settings,
         );
-        const ranked = conversation.attachedStoreIds.flatMap((storeId, index) =>
-          (input[`store${index}`] ?? []).map((hit) => ({ storeId, hit })),
+        const merged = mergeRetrieval(
+          conversation.attachedStoreIds.map((storeId, index) => ({
+            storeId,
+            hits: input[`store${index}`] ?? [],
+            floor:
+              this.options.data.repositories.vectorStores.findById(storeId)?.chatMinScore ??
+              DEFAULT_CHAT_MIN_SCORE,
+          })),
         );
+        const ranked = merged.hits;
         const sources = await this.withNeighbours(context, ranked);
-        const related = conversation.useRelations
-          ? await this.relatedSources(context, user.content, ranked)
-          : [];
+        const related =
+          conversation.useRelations && ranked.length > 0
+            ? await this.relatedSources(context, input.query ?? user.content, ranked)
+            : [];
         const prepared = windowChatHistory(
           conversation.systemPrompt,
           history,
@@ -90,11 +102,18 @@ export class ChatService {
           sources,
           related,
         );
-        if (prepared.citations.length > 0) {
+        if (conversation.attachedStoreIds.length > 0) {
           const line = {
             message: "Retrieval context assembled",
             conversationId: conversation.id,
-            sources: prepared.citations.length - prepared.related,
+            query: input.query ?? user.content,
+            fetched: merged.stats.fetched,
+            belowFloor: merged.stats.belowFloor,
+            duplicates: merged.stats.duplicates,
+            overDocumentCap: merged.stats.overCap,
+            overLimit: merged.stats.overLimit,
+            injected: prepared.citations.length - prepared.related,
+            droppedByBudget: prepared.droppedByBudget,
             neighbours: prepared.neighbours,
             related: prepared.related,
           };
@@ -252,10 +271,12 @@ export class ChatService {
     );
     const userId = createId();
     const assistantId = createId();
+    const previousUser = conversation.messages.findLast((message) => message.role === "user");
+    const query = retrievalQuery(input.text, previousUser?.content);
     const retrieval = conversation.attachedStoreIds.map((storeId, index) => ({
       id: `store${index}`,
       type: "vector.search",
-      input: { storeId, query: input.text, k: 5 },
+      input: { storeId, query, k: CHAT_FETCH_K },
     }));
     const graph = {
       nodes: [
@@ -264,7 +285,7 @@ export class ChatService {
           id: "prepare",
           type: "chat.prepare",
           dependencies: retrieval.map((node) => node.id),
-          input: { conversationId, userId, assistantId, providerId, modelId, settings },
+          input: { conversationId, userId, assistantId, providerId, modelId, query, settings },
           bindings: Object.fromEntries(
             retrieval.map((node) => [node.id, { source: "node", nodeId: node.id }]),
           ),

@@ -1,6 +1,8 @@
 import { makeAutoObservable } from "mobx";
 import {
+  ChatMinScore,
   CreateVectorStoreInput,
+  DEFAULT_CHAT_MIN_SCORE,
   type CatalogueItemDto,
   type DeviceProfileDto,
   type ModelDto,
@@ -38,6 +40,7 @@ export default class VectorStoreFormVm {
   queryPrefix = "";
   documentPrefix = "";
   searchMode: VectorSearchMode = "hybrid";
+  chatMinScore = String(DEFAULT_CHAT_MIN_SCORE);
   rerankEnabled = false;
   rerankModelRef = "";
   rerankCandidatesCount = "50";
@@ -72,6 +75,7 @@ export default class VectorStoreFormVm {
       this.queryPrefix = original.queryPrefix;
       this.documentPrefix = original.documentPrefix;
       this.searchMode = original.searchMode;
+      this.chatMinScore = String(original.chatMinScore);
       this.applyRerank(original.rerank);
       this.applyOcr(original.ocr);
     }
@@ -111,6 +115,7 @@ export default class VectorStoreFormVm {
       | "chunkOverlap"
       | "queryPrefix"
       | "documentPrefix"
+      | "chatMinScore"
       | "rerankModelRef"
       | "rerankCandidatesCount"
       | "ocrModelRef"
@@ -208,12 +213,17 @@ export default class VectorStoreFormVm {
       )
     )
       errors.embeddingProviderId = "Выберите включённый embedding-провайдер.";
+    if (!this.chatMinScore.trim() || !ChatMinScore.safeParse(this.chatMinScoreValue).success)
+      errors.chatMinScore = "Укажите порог от 0 до 1.";
     if (this.rerankEnabled && this.rerankModelRef.trim() === "")
       errors.rerank = "Выберите установленную модель переранжирования.";
     if (this.ocrEnabled && this.ocrModelRef.trim() === "")
       errors.ocr = "Выберите установленную модель OCR.";
     this.errors = errors;
     return Object.keys(errors).length === 0;
+  }
+  private get chatMinScoreValue() {
+    return Number(this.chatMinScore.replace(",", "."));
   }
   private rerank(): VectorRerankConfig {
     return {
@@ -259,6 +269,7 @@ export default class VectorStoreFormVm {
       queryPrefix: this.queryPrefix,
       documentPrefix: this.documentPrefix,
       searchMode: this.searchMode,
+      chatMinScore: this.chatMinScoreValue,
       rerank: this.rerank(),
       ocr: this.ocr(),
       backend: "lancedb" as const,
@@ -277,6 +288,7 @@ export default class VectorStoreFormVm {
       rerank: this.rerank(),
       ocr: this.ocr(),
       searchMode: this.searchMode,
+      chatMinScore: this.chatMinScoreValue,
       ...(this.chunkLocked
         ? {}
         : {

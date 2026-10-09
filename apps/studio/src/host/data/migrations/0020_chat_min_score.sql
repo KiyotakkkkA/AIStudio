@@ -1,0 +1,1 @@
+ALTER TABLE `vector_store` ADD `chat_min_score` real DEFAULT 0.3 NOT NULL;

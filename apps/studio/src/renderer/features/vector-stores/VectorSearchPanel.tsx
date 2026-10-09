@@ -143,7 +143,8 @@ function VectorSearchPanel() {
       ) : null}
       <p className="text-[12px] text-main-500">
         Результаты только для чтения. Чанки ниже порога показаны приглушёнными; найденные только по
-        ключевым словам порогом не отсекаются.
+        ключевым словам порогом не отсекаются. По умолчанию порог равен порогу релевантности чата (
+        {store.detail?.chatMinScore ?? "—"}): приглушённые строки чат не увидит.
       </p>
       {store.result && graph.expandEnabled && store.graphRows.length === 0 ? (
         <p role="status" className="text-[12px] text-main-400">

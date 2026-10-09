@@ -1,4 +1,9 @@
-import type { VectorChunkDto, VectorHitProvenance, VectorSearchHitDto } from "@zvs/shared";
+import {
+  belowRelevanceFloor,
+  type VectorChunkDto,
+  type VectorHitProvenance,
+  type VectorSearchHitDto,
+} from "@zvs/shared";
 
 export const PROVENANCE_LABELS: Record<VectorHitProvenance, string> = {
   vector: "векторы",
@@ -46,7 +51,7 @@ export function searchRows(hits: readonly VectorSearchHitDto[], floor: number) {
       provenance: hit.provenance === undefined ? null : PROVENANCE_LABELS[hit.provenance],
       provenanceTitle: hit.provenance === undefined ? null : PROVENANCE_TITLES[hit.provenance],
       width: `${Math.max(0, Math.min(1, hit.score)) * 100}%`,
-      belowFloor: hit.score < floor && hit.provenance !== "keyword",
+      belowFloor: belowRelevanceFloor(hit, floor),
       path: hit.path || hit.documentId,
       place: placeOf(hit),
       position: `${hit.chunkIndex + 1}${typeof total === "number" && Number.isInteger(total) && total > hit.chunkIndex ? `/${total}` : ""}`,

@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
+  ChatMinScore,
   VectorSearchInput,
   type CatalogueItemDto,
   type Contract,
@@ -42,6 +43,7 @@ export default class VectorStoreStore {
   k = "5";
   minScore = "0.35";
   searchMode: VectorSearchMode = "hybrid";
+  chatMinScore = "";
   result: VectorSearchResultDto | null = null;
   neighbours = new Map<string, readonly VectorChunkDto[]>();
   neighboursLoading: string | null = null;
@@ -138,6 +140,7 @@ export default class VectorStoreStore {
       | "query"
       | "k"
       | "minScore"
+      | "chatMinScore"
       | "tab"
       | "sourcePath"
       | "sourceInclude"
@@ -233,6 +236,8 @@ export default class VectorStoreStore {
         if (revision === this.revision) {
           this.detail = detail;
           this.searchMode = detail.searchMode;
+          this.minScore = String(detail.chatMinScore);
+          this.chatMinScore = String(detail.chatMinScore);
           this.merge(detail);
         }
       });
@@ -290,6 +295,8 @@ export default class VectorStoreStore {
         this.merge(detail);
         this.selectedId = detail.id;
         this.detail = detail;
+        this.chatMinScore = String(detail.chatMinScore);
+        this.minScore = String(detail.chatMinScore);
         this.form = null;
         this.result = null;
       });
@@ -381,6 +388,31 @@ export default class VectorStoreStore {
         if (revision === this.revision) this.searching = false;
       });
     }
+  }
+  get chatMinScoreChanged() {
+    return this.detail !== null && this.chatMinScore.trim() !== String(this.detail.chatMinScore);
+  }
+  async saveChatMinScore() {
+    const detail = this.detail;
+    const value = ChatMinScore.safeParse(Number(this.chatMinScore.replace(",", ".")));
+    if (!detail || !this.chatMinScore.trim() || !value.success) {
+      this.error = "Порог для чата — число от 0 до 1.";
+      return false;
+    }
+    return this.mutate(async () => {
+      const saved = await this.ipc.call("vectorStores.update", {
+        id: detail.id,
+        chatMinScore: value.data,
+      });
+      runInAction(() => {
+        this.merge(saved);
+        if (this.selectedId === saved.id) {
+          this.detail = saved;
+          this.chatMinScore = String(saved.chatMinScore);
+          this.minScore = String(saved.chatMinScore);
+        }
+      });
+    });
   }
   async loadDocuments(id: VectorStoreId | null = this.selectedId) {
     if (!id) return;

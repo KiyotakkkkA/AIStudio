@@ -45,6 +45,20 @@ function VectorStoreAdvanced({
             onChange={vm.setSearchMode}
           />
         </Field>
+        <Field
+          label="Порог релевантности для чата"
+          htmlFor="vs-chat-min-score"
+          error={vm.errors.chatMinScore}
+          help="Фрагменты с оценкой ниже порога не попадают в контекст чата. Найденные только по ключевым словам не отсекаются."
+        >
+          <TextInput
+            id="vs-chat-min-score"
+            value={vm.chatMinScore}
+            mono
+            disabled={disabled}
+            onChange={(e) => vm.set("chatMinScore", e.target.value)}
+          />
+        </Field>
         <div className="grid grid-cols-1 gap-3.25 lg:grid-cols-2">
           <Field
             label="Префикс запроса"

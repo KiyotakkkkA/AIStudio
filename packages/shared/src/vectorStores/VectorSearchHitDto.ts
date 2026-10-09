@@ -32,6 +32,13 @@ export const VectorSearchHitDto = z.object({
 });
 export type VectorSearchHitDto = z.infer<typeof VectorSearchHitDto>;
 
+export function belowRelevanceFloor(
+  hit: Pick<VectorSearchHitDto, "score" | "provenance">,
+  floor: number,
+): boolean {
+  return hit.score < floor && hit.provenance !== "keyword";
+}
+
 export const VectorRerankOutcome = z.enum(["off", "applied", "fallback"]);
 export type VectorRerankOutcome = z.infer<typeof VectorRerankOutcome>;
 
