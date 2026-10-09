@@ -25,6 +25,7 @@ import type { IndexingService } from "../indexing/IndexingService.ts";
 import type { DownloadService } from "../downloads/DownloadService.ts";
 import { createDownloadHandlers } from "./downloads.ts";
 import type { ToolRegistry } from "../tools/ToolRegistry.ts";
+import type { ToolInvoker } from "../tools/ToolInvoker.ts";
 import { createToolHandlers } from "./tools.ts";
 import type { McpService } from "../services/McpService.ts";
 import { createMcpHandlers } from "./mcp.ts";
@@ -41,6 +42,7 @@ export interface HostIpcDependencies {
   downloads?: DownloadService;
   runtimes?: RuntimeService;
   tools?: ToolRegistry;
+  toolInvoker?: ToolInvoker;
   mcp?: McpService;
   pickSources?: SourcePicker;
   system: SystemService;
@@ -70,7 +72,7 @@ export function createHandlers(dependencies: HostIpcDependencies): IpcHandlers<C
     ...createGraphRelationHandlers(dependencies.graph),
     ...createDownloadHandlers(dependencies.downloads),
     ...createRuntimeHandlers(dependencies.runtimes),
-    ...createToolHandlers(dependencies.tools),
+    ...createToolHandlers(dependencies.tools, dependencies.toolInvoker),
     ...createMcpHandlers(dependencies.mcp),
     ...createSystemHandlers({
       system: dependencies.system,

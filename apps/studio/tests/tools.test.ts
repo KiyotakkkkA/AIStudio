@@ -9,6 +9,8 @@ import { createEventBus, type EventBus } from "../src/host/platform/events.ts";
 import { createToolHandlers } from "../src/host/ipc/tools.ts";
 import { defaultToolTier, ToolRegistry } from "../src/host/tools/ToolRegistry.ts";
 import { registerKernelTools } from "../src/host/tools/kernelTools.ts";
+import { ToolInvoker } from "../src/host/tools/ToolInvoker.ts";
+import { SettingService } from "../src/host/services/SettingService.ts";
 
 let db: TemporaryDatabase;
 let nodes: NodeRegistry;
@@ -370,5 +372,126 @@ test("the channels expose the registry and match the contract", () => {
   ).toMatchObject({ key: "mail.send", callCount: 0 });
   expect(() =>
     handlers["tools.get"](contract["tools.get"].input.parse({ id: crypto.randomUUID() })),
+  ).toThrow();
+});
+
+function invoker() {
+  return new ToolInvoker({ tools, nodes, runs });
+}
+
+test("permission defaults apply to newly registered tools only", () => {
+  const settings = new SettingService({ data: db.client });
+  tools = new ToolRegistry({ data: db.client, settings, clock: () => now });
+  const turnedOff = tools.register(descriptor());
+  tools.setTier(turnedOff.id, "off");
+  const disabled = tools.register(descriptor({ key: "mail.archive" }));
+  tools.setEnabled(disabled.id, false);
+  const withdrawn = tools.register(
+    descriptor({ key: "mail.forward", source: "mcp", sourceRef: "s" }),
+  );
+  tools.setTier(withdrawn.id, "off");
+  tools.deregisterSource("mcp", "s");
+
+  expect(tools.defaults().builtin).toBe("inferred");
+  tools.setDefaults({ builtin: "auto", mcp: "auto" });
+  expect(new ToolRegistry({ data: db.client, settings }).defaults()).toMatchObject({
+    builtin: "auto",
+    mcp: "auto",
+    skill: "inferred",
+  });
+
+  expect(tools.register(descriptor()).tier).toBe("off");
+  expect(tools.register(descriptor({ key: "mail.archive" }))).toMatchObject({
+    tier: "ask",
+    enabled: false,
+  });
+  expect(
+    tools.register(descriptor({ key: "mail.forward", source: "mcp", sourceRef: "s" })).tier,
+  ).toBe("off");
+  expect(tools.register(descriptor({ key: "mail.reply" })).tier).toBe("auto");
+  expect(tools.register(descriptor({ key: "mail.purge", destructive: true })).tier).toBe("off");
+  expect(
+    tools.register(descriptor({ key: "web.fetch", source: "browser", readOnly: true })).tier,
+  ).toBe("auto");
+  tools.setDefaults({ browser: "ask" });
+  expect(
+    tools.register(descriptor({ key: "web.read", source: "browser", readOnly: true })).tier,
+  ).toBe("ask");
+  expect(runs.permissions.admitSubject("mail.send", { runId: "r", scopes: [] })).toBe("deny");
+});
+
+test("try-it refuses a tool that is off, disabled or unavailable without running it", async () => {
+  const registered = tools.register(descriptor({ readOnly: true }));
+  tools.setTier(registered.id, "off");
+  await expect(invoker().invoke({ id: registered.id, input: {} })).rejects.toMatchObject({
+    code: AppErrorCode.PERMISSION_DENIED,
+  });
+  tools.setTier(registered.id, "auto");
+  tools.setEnabled(registered.id, false);
+  await expect(
+    invoker().invoke({ id: registered.id, input: {}, confirmed: true }),
+  ).rejects.toMatchObject({ code: AppErrorCode.PERMISSION_DENIED });
+  tools.setEnabled(registered.id, true);
+  tools.deregister("mail.send");
+  await expect(invoker().invoke({ id: registered.id, input: {} })).rejects.toMatchObject({
+    code: AppErrorCode.CONFLICT,
+  });
+  expect(execute).not.toHaveBeenCalled();
+});
+
+test("a destructive tool needs an explicit confirm before try-it runs it", async () => {
+  const registered = tools.register(descriptor({ destructive: true }));
+  expect(registered.tier).toBe("off");
+  tools.setTier(registered.id, "auto");
+  await expect(invoker().invoke({ id: registered.id, input: {} })).rejects.toMatchObject({
+    code: AppErrorCode.APPROVAL_DENIED,
+  });
+  expect(execute).not.toHaveBeenCalled();
+  expect(runs.list().items).toHaveLength(0);
+
+  const result = await invoker().invoke({ id: registered.id, input: { to: "a" }, confirmed: true });
+  expect(result).toMatchObject({ ok: true, output: "executed", error: null });
+  expect(execute).toHaveBeenCalledOnce();
+  expect(runs.get(result.runId)).toMatchObject({ kind: "job", status: "succeeded" });
+  expect(tools.get(registered.id).callCount).toBe(1);
+});
+
+test("an ask-tier tool is approved by the try-it confirm, exactly as a run approval", async () => {
+  const registered = tools.register(descriptor());
+  expect(registered.tier).toBe("ask");
+  await expect(invoker().invoke({ id: registered.id, input: {} })).rejects.toMatchObject({
+    code: AppErrorCode.APPROVAL_DENIED,
+  });
+  const result = await invoker().invoke({ id: registered.id, input: {}, confirmed: true });
+  expect(result.ok).toBe(true);
+  expect(events.some((event) => event.type === "approval")).toBe(true);
+  expect(db.client.repositories.permissions.list("mail.send")).toHaveLength(1);
+});
+
+test("a failing tool reports the error and the timing instead of throwing", async () => {
+  const registered = tools.register(descriptor({ readOnly: true }));
+  execute.mockRejectedValueOnce(new Error("upstream exploded"));
+  const result = await invoker().invoke({ id: registered.id, input: {} });
+  expect(result.ok).toBe(false);
+  expect(result.error).toContain("upstream exploded");
+  expect(result.durationMs).toBeGreaterThanOrEqual(0);
+  expect(runs.get(result.runId).status).toBe("failed");
+});
+
+test("the try-it and defaults channels match the contract", async () => {
+  const handlers = createToolHandlers(tools, invoker());
+  const registered = tools.register(descriptor({ readOnly: true }));
+  const result = await handlers["tools.invoke"](
+    contract["tools.invoke"].input.parse({ id: registered.id }),
+  );
+  expect(contract["tools.invoke"].output.parse(result).ok).toBe(true);
+  expect(
+    contract["tools.setDefaults"].output.parse(
+      handlers["tools.setDefaults"](contract["tools.setDefaults"].input.parse({ mcp: "off" })),
+    ).mcp,
+  ).toBe("off");
+  expect(contract["tools.defaults"].output.parse(handlers["tools.defaults"]()).mcp).toBe("off");
+  expect(() =>
+    createToolHandlers(tools)["tools.invoke"]({ id: registered.id, input: {}, confirmed: false }),
   ).toThrow();
 });

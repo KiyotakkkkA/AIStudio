@@ -3,6 +3,9 @@ import {
   AppError,
   AppErrorCode,
   Json,
+  ToolDefaultsDto,
+  type ToolDefaultsRequest,
+  type ToolDefaultTier,
   ToolDetailDto,
   ToolDto,
   ToolKey,
@@ -18,6 +21,7 @@ import type { UnitOfWork } from "../data/UnitOfWork.ts";
 import type { Repositories } from "../data/repositories/index.ts";
 import type { ToolEntity, ToolReferenceEntity } from "../data/schema/index.ts";
 import type { Logger } from "../platform/logger.ts";
+import type { SettingService } from "../services/SettingService.ts";
 import { createId } from "../platform/ids.ts";
 
 export const ToolDescriptor = z.object({
@@ -49,19 +53,41 @@ export interface ToolCeiling {
 
 export interface ToolRegistryOptions {
   data: UnitOfWork;
+  settings?: Pick<SettingService, "get" | "set">;
   logger?: Logger;
   clock?: () => number;
 }
 
+export const TOOL_DEFAULTS_KEY = "tools.defaults";
+
 export function defaultToolTier(
   descriptor: Pick<ToolDescriptor, "readOnly" | "destructive">,
+  preference: ToolDefaultTier = "inferred",
 ): ToolTier {
   if (descriptor.destructive) return ToolTier.enum.off;
+  if (preference !== "inferred") return preference;
   return descriptor.readOnly ? ToolTier.enum.auto : ToolTier.enum.ask;
 }
 
 export class ToolRegistry {
+  #defaults: ToolDefaultsDto = ToolDefaultsDto.parse({});
+
   constructor(private readonly options: ToolRegistryOptions) {}
+
+  defaults(): ToolDefaultsDto {
+    const stored = this.options.settings?.get(TOOL_DEFAULTS_KEY);
+    if (stored === undefined) return this.#defaults;
+    const parsed = ToolDefaultsDto.safeParse(stored.value);
+    return parsed.success ? parsed.data : this.#defaults;
+  }
+
+  setDefaults(input: ToolDefaultsRequest): ToolDefaultsDto {
+    const next = ToolDefaultsDto.parse(input);
+    this.options.settings?.set(TOOL_DEFAULTS_KEY, next);
+    this.#defaults = next;
+    this.options.logger?.log("info", "tools", "Changed the default tiers for new tools", next);
+    return next;
+  }
 
   register(input: ToolDescriptorRequest): ToolDto {
     const descriptor = ToolDescriptor.parse(input);
@@ -69,7 +95,7 @@ export class ToolRegistry {
     const row = this.options.data.transaction((repositories) => {
       const existing = repositories.tools.findByKey(descriptor.key);
       if (!existing) {
-        const tier = defaultToolTier(descriptor);
+        const tier = defaultToolTier(descriptor, this.defaults()[descriptor.source]);
         const created = repositories.tools.insert({
           id: createId(),
           key: descriptor.key,

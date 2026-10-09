@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ToolId } from "../primitives/branded.js";
+import { RunId, ToolId } from "../primitives/branded.js";
 import { Json } from "../primitives/json.js";
 import { Timestamp } from "../primitives/time.js";
 
@@ -76,3 +76,36 @@ export type SetToolTierInput = z.infer<typeof SetToolTierInput>;
 
 export const SetToolEnabledInput = ToolRef.extend({ enabled: z.boolean() });
 export type SetToolEnabledInput = z.infer<typeof SetToolEnabledInput>;
+
+export const ToolDefaultTier = z.enum(["inferred", "auto", "ask", "off"]);
+export type ToolDefaultTier = z.infer<typeof ToolDefaultTier>;
+
+export const ToolDefaultsDto = z.object({
+  builtin: ToolDefaultTier.default("inferred"),
+  mcp: ToolDefaultTier.default("inferred"),
+  skill: ToolDefaultTier.default("inferred"),
+  integration: ToolDefaultTier.default("inferred"),
+  browser: ToolDefaultTier.default("inferred"),
+});
+export type ToolDefaultsDto = z.infer<typeof ToolDefaultsDto>;
+export type ToolDefaultsRequest = z.input<typeof ToolDefaultsDto>;
+
+export const ToolInvokeInput = ToolRef.extend({
+  input: Json.default({}),
+  confirmed: z.boolean().default(false),
+});
+export type ToolInvokeInput = z.infer<typeof ToolInvokeInput>;
+export type ToolInvokeRequest = z.input<typeof ToolInvokeInput>;
+
+export const ToolInvokeResultDto = z.object({
+  runId: RunId,
+  ok: z.boolean(),
+  durationMs: z.number().int().nonnegative(),
+  output: Json,
+  error: z.string().nullable(),
+});
+export type ToolInvokeResultDto = z.infer<typeof ToolInvokeResultDto>;
+
+export function toolNeedsConfirmation(tool: Pick<ToolDto, "tier" | "destructive">): boolean {
+  return tool.destructive || tool.tier === "ask";
+}

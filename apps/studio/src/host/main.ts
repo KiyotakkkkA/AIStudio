@@ -52,6 +52,7 @@ import { NodeRegistry } from "./kernel/NodeRegistry";
 import { ToolRegistry } from "./tools/ToolRegistry";
 import { McpService } from "./services/McpService";
 import { registerKernelTools } from "./tools/kernelTools";
+import { ToolInvoker } from "./tools/ToolInvoker";
 import { SidecarDriver } from "./drivers/sidecar/SidecarDriver";
 import { IndexingService } from "./indexing/IndexingService";
 import { createImageExtractor, createPdfExtractor, IMAGE_EXTENSIONS } from "./indexing/documents";
@@ -303,7 +304,7 @@ if (!app.requestSingleInstanceLock()) {
       });
       vectorStores.attachRerankers(localRerankers(runtimes));
       const nodes = registerDownloadNodes(registerJobNodes(registerCoreNodes(new NodeRegistry())));
-      const tools = new ToolRegistry({ data: database, logger });
+      const tools = new ToolRegistry({ data: database, settings, logger });
       registerKernelTools(nodes, tools);
       mcp = new McpService({
         data: database,
@@ -325,6 +326,7 @@ if (!app.requestSingleInstanceLock()) {
         logger,
       });
       downloads.attach(runs);
+      const toolInvoker = new ToolInvoker({ tools, nodes, runs });
       const chat = new ChatService({ data: database, runs, registry: nodes, logger });
       retention = new RetentionService({ data: database, settings, logger });
       retention.start();
@@ -343,6 +345,7 @@ if (!app.requestSingleInstanceLock()) {
           downloads,
           runtimes,
           tools,
+          toolInvoker,
           mcp,
           pickSources: async (kind) => {
             const result = await dialog.showOpenDialog({

@@ -1,20 +1,5 @@
-import { mdiWrenchOutline } from "@mdi/js";
-import PagePlaceholder from "../ui/molecules/PagePlaceholder";
-import PageShell from "../ui/templates/PageShell";
+import ToolsWorkspace from "../features/tools/ToolsWorkspace";
 
 export default function ToolsPage() {
-  return (
-    <PageShell
-      icon={mdiWrenchOutline}
-      title="Инструменты"
-      subtitle="Реестр инструментов и потолок разрешений"
-    >
-      <PagePlaceholder
-        icon={mdiWrenchOutline}
-        title="Инструментов пока нет"
-        description="Реестр инструментов из всех источников и режимы auto / ask / off появятся здесь."
-        task="TASK_034"
-      />
-    </PageShell>
-  );
+  return <ToolsWorkspace />;
 }
