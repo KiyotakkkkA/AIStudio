@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import { AppError, AppErrorCode } from "@zvs/shared";
 import type { StudioPaths } from "../../platform/paths.ts";
-import type { ChunkConfig, TextChunk } from "./ports.ts";
+import type { ChunkConfig, SectionChunk, TextChunk } from "./ports.ts";
 
 export interface NativeAddon {
   vectorCall(request: string): Promise<string>;
@@ -9,6 +9,10 @@ export interface NativeAddon {
   vectorCancel(operationId: string): Promise<void>;
   vectorRelease(operationId: string): Promise<void>;
   chunkText(text: string, config: ChunkConfig): Promise<TextChunk[]>;
+  chunkSegments(
+    segments: { text: string; section: string[]; page?: number }[],
+    config: ChunkConfig,
+  ): Promise<(Omit<SectionChunk, "page"> & { page?: number | null })[]>;
   hashBytes(bytes: Buffer): Promise<string>;
   graphHydrate(graphId: string, content: string): Promise<string>;
   graphStats(graphId: string): Promise<string>;
@@ -40,6 +44,7 @@ export function loadAddon(paths: Pick<StudioPaths, "nativeAddonPath">): NativeAd
     )
       throw new Error("Native addon exports do not match the RustCore interface");
     for (const name of [
+      "chunkSegments",
       "vectorCall",
       "vectorBeginUpsert",
       "vectorCancel",

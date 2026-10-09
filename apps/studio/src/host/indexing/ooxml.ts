@@ -1,6 +1,6 @@
 import { AppError, AppErrorCode } from "@zvs/shared";
 import { readZipEntries } from "../platform/archive.ts";
-import type { Extractor } from "./extraction.ts";
+import { plainSegments, type Extractor, type Segment } from "./extraction.ts";
 
 /**
  * `.docx`, `.xlsx` and `.pptx` are zips with XML inside, so extracting their text needs a zip
@@ -74,15 +74,81 @@ async function parts(
  * chunker wants anyway.
  */
 export const docxExtractor: Extractor = async ({ bytes }) => {
-  const found = await parts(bytes, (name) => name === "word/document.xml", "word/document.xml");
-  const xml = found.get("word/document.xml") ?? "";
+  const found = await parts(
+    bytes,
+    (name) => name === "word/document.xml" || name === "word/styles.xml",
+    "word/document.xml",
+  );
+  const xml = found.get("word/document.xml");
+  if (xml === undefined)
+    throw new AppError(AppErrorCode.UNSUPPORTED_FORMAT, "В файле нет части word/document.xml");
+  const levels = headingLevels(found.get("word/styles.xml") ?? "");
   // A tab stop is its own element, outside any `w:t`. Rewriting it as a text run is what keeps
   // it in reading order instead of dropping it.
-  const lines = blocks(xml, "</w:p>").map((paragraph) =>
-    textRuns(paragraph.replace(/<w:tab\b[^>]*\/?>/g, "<w:t>\t</w:t>"), "w:t").join(""),
-  );
-  return tidy(lines);
+  const segments: Segment[] = [];
+  const path: string[] = [];
+  let section: string[] = [];
+  let lines: string[] = [];
+  const flush = () => {
+    const text = tidy(lines);
+    if (text !== "") segments.push({ text, section });
+    lines = [];
+  };
+  for (const paragraph of blocks(xml, "</w:p>")) {
+    const line = textRuns(paragraph.replace(/<w:tab\b[^>]*\/?>/g, "<w:t>\t</w:t>"), "w:t").join("");
+    const level = paragraphLevel(paragraph, levels);
+    if (level !== undefined && line.trim() !== "") {
+      flush();
+      path.length = Math.min(path.length, level - 1);
+      path[level - 1] = line.trim();
+      section = path.filter((part) => part !== undefined && part !== "");
+    }
+    lines.push(line);
+  }
+  flush();
+  return segments;
 };
+
+const BODY_OUTLINE_LEVEL = 9;
+
+function outlineLevel(xml: string): number | undefined {
+  const value = /<w:outlineLvl\b[^>]*w:val="(\d+)"/.exec(xml)?.[1];
+  if (value === undefined) return undefined;
+  const level = Number.parseInt(value, 10);
+  return level >= BODY_OUTLINE_LEVEL ? undefined : level + 1;
+}
+
+export function headingLevels(styles: string): Map<string, number> {
+  const levels = new Map<string, number>();
+  for (const match of styles.matchAll(/<w:style\b([^>]*)>([\s\S]*?)<\/w:style>/g)) {
+    const id = /w:styleId="([^"]+)"/.exec(match[1] ?? "")?.[1];
+    const body = match[2] ?? "";
+    if (id === undefined) continue;
+    const name = /<w:name\b[^>]*w:val="([^"]+)"/.exec(body)?.[1]?.toLowerCase() ?? "";
+    const named = /^heading (\d)$/.exec(name)?.[1];
+    const level =
+      named !== undefined ? Number.parseInt(named, 10) : name === "title" ? 1 : outlineLevel(body);
+    if (level !== undefined) levels.set(id, level);
+  }
+  return levels;
+}
+
+function paragraphLevel(
+  paragraph: string,
+  levels: ReadonlyMap<string, number>,
+): number | undefined {
+  const properties = /<w:pPr\b[^>]*>([\s\S]*?)<\/w:pPr>/.exec(paragraph)?.[1] ?? "";
+  const direct = outlineLevel(properties);
+  if (direct !== undefined) return direct;
+  const style = /<w:pStyle\b[^>]*w:val="([^"]+)"/.exec(properties)?.[1];
+  if (style === undefined) return undefined;
+  return levels.get(style) ?? fallbackLevel(style);
+}
+
+function fallbackLevel(style: string): number | undefined {
+  const level = /^(?:heading|заголовок)\s*(\d)$/i.exec(style)?.[1];
+  return level === undefined ? undefined : Number.parseInt(level, 10);
+}
 
 /**
  * Excel stores repeated text once in `sharedStrings.xml` and refers to it by index, so both
@@ -119,7 +185,7 @@ export const xlsxExtractor: Extractor = async ({ bytes }) => {
       if (line.trim() !== "") lines.push(line);
     }
   }
-  return tidy(lines);
+  return plainSegments(tidy(lines));
 };
 
 /** PowerPoint puts the visible text of every shape in `a:t` runs, one slide per part. */
@@ -130,15 +196,30 @@ export const pptxExtractor: Extractor = async ({ bytes }) => {
     "ppt/slides",
   );
   const slides = [...found.keys()].sort((left, right) => slideNumber(left) - slideNumber(right));
-  const lines: string[] = [];
+  const segments: Segment[] = [];
   for (const [index, slide] of slides.entries()) {
-    lines.push(`Слайд ${String(index + 1)}`);
-    for (const paragraph of blocks(found.get(slide) ?? "", "</a:p>"))
-      lines.push(textRuns(paragraph, "a:t").join(""));
-    lines.push("");
+    const xml = found.get(slide) ?? "";
+    const text = tidy(
+      blocks(xml, "</a:p>").map((paragraph) => textRuns(paragraph, "a:t").join("")),
+    );
+    if (text === "") continue;
+    const title = slideTitle(xml);
+    segments.push({ text, section: title === "" ? [] : [title], page: index + 1 });
   }
-  return tidy(lines);
+  return segments;
 };
+
+function slideTitle(xml: string): string {
+  for (const shape of xml.split("</p:sp>")) {
+    if (!/<p:ph\b[^>]*type="(?:title|ctrTitle)"/.test(shape)) continue;
+    return blocks(shape, "</a:p>")
+      .map((paragraph) => textRuns(paragraph, "a:t").join(""))
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  return "";
+}
 
 function slideNumber(name: string): number {
   return Number.parseInt(/slide(\d+)\.xml$/.exec(name)?.[1] ?? "0", 10);

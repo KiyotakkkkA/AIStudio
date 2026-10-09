@@ -68,6 +68,60 @@ pub async fn chunk_text(text: String, config: ChunkConfig) -> napi::Result<Vec<T
     })
 }
 
+#[napi(object)]
+pub struct TextSegment {
+    pub text: String,
+    pub section: Vec<String>,
+    pub page: Option<u32>,
+}
+
+#[napi(object)]
+pub struct SectionChunk {
+    pub text: String,
+    pub byte_start: u32,
+    pub byte_end: u32,
+    pub token_count: u32,
+    pub section: Vec<String>,
+    pub page: Option<u32>,
+}
+
+#[napi]
+pub async fn chunk_segments(
+    segments: Vec<TextSegment>,
+    config: ChunkConfig,
+) -> napi::Result<Vec<SectionChunk>> {
+    guarded(|| {
+        let segments: Vec<chunk::Segment> = segments
+            .into_iter()
+            .map(|segment| chunk::Segment {
+                text: segment.text,
+                section: segment.section,
+                page: segment.page,
+            })
+            .collect();
+        chunk::chunk_segments(
+            &segments,
+            chunk::ChunkConfig {
+                size: config.size as usize,
+                overlap: config.overlap as usize,
+            },
+            &CancellationToken::new(),
+        )?
+        .into_iter()
+        .map(|chunk| {
+            Ok(SectionChunk {
+                text: chunk.text,
+                byte_start: number(chunk.byte_range.start)?,
+                byte_end: number(chunk.byte_range.end)?,
+                token_count: number(chunk.token_count)?,
+                section: chunk.section,
+                page: chunk.page,
+            })
+        })
+        .collect()
+    })
+}
+
 #[napi]
 pub async fn hash_bytes(bytes: Buffer) -> napi::Result<String> {
     guarded(|| hash::content_hash(&bytes, &CancellationToken::new()))

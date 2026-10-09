@@ -34,6 +34,9 @@ function native(overrides: Partial<NativeAddon> = {}): NativeAddon {
     async chunkText() {
       return [];
     },
+    async chunkSegments() {
+      return [];
+    },
     async hashBytes() {
       return "hash";
     },

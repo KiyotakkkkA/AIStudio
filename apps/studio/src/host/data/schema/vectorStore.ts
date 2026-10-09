@@ -30,6 +30,13 @@ export const vectorStore = sqliteTable(
       .$type<VectorOcrConfig>()
       .notNull()
       .default({ enabled: false, modelRef: "", language: "auto", minCharsPerPage: 200 }),
+    queryPrefix: text("query_prefix").notNull().default(""),
+    documentPrefix: text("document_prefix").notNull().default(""),
+    searchMode: text("search_mode")
+      .$type<VectorStoreDto["searchMode"]>()
+      .notNull()
+      .default("hybrid"),
+    schemaVersion: integer("schema_version").notNull().default(1),
     indexType: text("index_type").notNull().default("FLAT"),
     status: text("status").$type<VectorStoreDto["status"]>().notNull().default("pending"),
     lastEval: text("last_eval", { mode: "json" }).$type<VectorEvalRunDto>(),

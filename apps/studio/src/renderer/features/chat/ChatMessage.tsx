@@ -143,13 +143,20 @@ export default function ChatMessage({
                     <h3 className="min-w-0 truncate text-[13px] font-semibold text-main-100">
                       {citation.sourcePath}
                     </h3>
-                    <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent-medium tabular-nums">
-                      {(citation.score * 100).toFixed(0)}%
-                    </span>
+                    {citation.related === null ? (
+                      <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent-medium tabular-nums">
+                        {(citation.score * 100).toFixed(0)}%
+                      </span>
+                    ) : (
+                      <span
+                        title="Документ добавлен по связи с найденным источником, он не ранжировался"
+                        className="shrink-0 rounded-full border border-dashed border-main-600 px-2 py-0.5 text-[11px] text-main-400"
+                      >
+                        связь «{citation.related}»
+                      </span>
+                    )}
                   </div>
-                  <p className="mt-1.5 text-[12px] text-main-500">
-                    Фрагмент {citation.chunkIndex + 1}
-                  </p>
+                  <p className="mt-1.5 text-[12px] text-main-500">{citationPlace(citation)}</p>
                 </article>
               ))}
             </div>
@@ -158,4 +165,12 @@ export default function ChatMessage({
       </SlidedPanel>
     </article>
   );
+}
+
+function citationPlace(citation: ChatCitationDto): string {
+  return [
+    `Фрагмент ${String(citation.chunkIndex + 1)}`,
+    ...(citation.page === null ? [] : [`стр. ${String(citation.page)}`]),
+    ...(citation.section === "" ? [] : [citation.section]),
+  ].join(" · ");
 }

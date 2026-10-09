@@ -72,6 +72,8 @@ export const CatalogueItemDto = z.object({
   checksum: ChecksumDto.optional(),
   tags: z.array(z.string().max(48)).max(16).default([]),
   dimension: z.number().int().positive().optional(),
+  queryPrefix: z.string().max(512).optional(),
+  documentPrefix: z.string().max(512).optional(),
   state: CatalogueItemState,
   downloadable: z.boolean(),
   blockedReason: z.string().max(400).optional(),

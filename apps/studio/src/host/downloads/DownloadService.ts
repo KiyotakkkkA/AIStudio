@@ -203,6 +203,8 @@ export class DownloadService {
           ...(installedVersion === undefined ? {} : { installedVersion }),
           ...(item.checksum === undefined ? {} : { checksum: item.checksum }),
           ...(item.dimension === undefined ? {} : { dimension: item.dimension }),
+          ...(item.queryPrefix === undefined ? {} : { queryPrefix: item.queryPrefix }),
+          ...(item.documentPrefix === undefined ? {} : { documentPrefix: item.documentPrefix }),
           ...(blocked === undefined ? {} : { blockedReason: blocked }),
           ...(running === undefined ? {} : { downloadId: running.id }),
         });

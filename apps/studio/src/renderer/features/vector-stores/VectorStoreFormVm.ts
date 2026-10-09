@@ -8,10 +8,17 @@ import {
   type VectorOcrConfig,
   type VectorOcrLanguage,
   type VectorRerankConfig,
+  type VectorSearchMode,
   type VectorStoreDto,
   type UpdateVectorStoreInput,
 } from "@zvs/shared";
-import { autofillPlan, ocrCandidates, rerankCandidates } from "./autofill";
+import {
+  autofillPlan,
+  embeddingCandidates,
+  embeddingPrefixesFor,
+  ocrCandidates,
+  rerankCandidates,
+} from "./autofill";
 
 export interface VectorStoreFormContext {
   /** The Downloads catalogue, so the advanced sections offer what is actually on disk. */
@@ -28,6 +35,9 @@ export default class VectorStoreFormVm {
   metric: "cosine" | "l2" | "dot" = "cosine";
   chunkSize = "256";
   chunkOverlap = "32";
+  queryPrefix = "";
+  documentPrefix = "";
+  searchMode: VectorSearchMode = "hybrid";
   rerankEnabled = false;
   rerankModelRef = "";
   rerankCandidatesCount = "50";
@@ -59,6 +69,9 @@ export default class VectorStoreFormVm {
       this.metric = original.metric;
       this.chunkSize = String(original.chunkSize);
       this.chunkOverlap = String(original.chunkOverlap);
+      this.queryPrefix = original.queryPrefix;
+      this.documentPrefix = original.documentPrefix;
+      this.searchMode = original.searchMode;
       this.applyRerank(original.rerank);
       this.applyOcr(original.ocr);
     }
@@ -96,6 +109,8 @@ export default class VectorStoreFormVm {
       | "dimension"
       | "chunkSize"
       | "chunkOverlap"
+      | "queryPrefix"
+      | "documentPrefix"
       | "rerankModelRef"
       | "rerankCandidatesCount"
       | "ocrModelRef"
@@ -105,8 +120,19 @@ export default class VectorStoreFormVm {
     if (field === "embeddingProviderId" && value !== this.embeddingProviderId) {
       this.embeddingModelId = "";
     }
+    if (field === "embeddingModelId" && value !== this.embeddingModelId && !this.chunkLocked) {
+      const item = embeddingCandidates(this.catalogue).find(
+        (candidate) => candidate.name.toLowerCase() === value.toLowerCase().split(":")[0],
+      );
+      const prefixes = embeddingPrefixesFor(value, item);
+      this.queryPrefix = prefixes.queryPrefix;
+      this.documentPrefix = prefixes.documentPrefix;
+    }
     this[field] = value;
     this.errors = {};
+  }
+  setSearchMode(value: string) {
+    if (value === "hybrid" || value === "vector") this.searchMode = value;
   }
   setMetric(value: string) {
     if (value === "cosine" || value === "l2" || value === "dot") this.metric = value;
@@ -156,6 +182,8 @@ export default class VectorStoreFormVm {
     if (!this.chunkLocked) {
       this.chunkSize = plan.chunkSize;
       this.chunkOverlap = plan.chunkOverlap;
+      this.queryPrefix = plan.queryPrefix;
+      this.documentPrefix = plan.documentPrefix;
     }
     this.applyRerank(plan.rerank);
     this.applyOcr(plan.ocr);
@@ -228,6 +256,9 @@ export default class VectorStoreFormVm {
       metric: this.metric,
       chunkSize: Number(this.chunkSize),
       chunkOverlap: Number(this.chunkOverlap),
+      queryPrefix: this.queryPrefix,
+      documentPrefix: this.documentPrefix,
+      searchMode: this.searchMode,
       rerank: this.rerank(),
       ocr: this.ocr(),
       backend: "lancedb" as const,
@@ -245,9 +276,15 @@ export default class VectorStoreFormVm {
       description: this.description,
       rerank: this.rerank(),
       ocr: this.ocr(),
+      searchMode: this.searchMode,
       ...(this.chunkLocked
         ? {}
-        : { chunkSize: Number(this.chunkSize), chunkOverlap: Number(this.chunkOverlap) }),
+        : {
+            chunkSize: Number(this.chunkSize),
+            chunkOverlap: Number(this.chunkOverlap),
+            queryPrefix: this.queryPrefix,
+            documentPrefix: this.documentPrefix,
+          }),
     };
   }
 }

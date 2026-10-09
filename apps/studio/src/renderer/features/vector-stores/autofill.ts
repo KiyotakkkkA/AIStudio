@@ -1,11 +1,12 @@
-import type {
-  CatalogueItemDto,
-  DeviceProfileDto,
-  DeviceTier,
-  ModelDto,
-  ProviderSummaryDto,
-  VectorOcrConfig,
-  VectorRerankConfig,
+import {
+  knownEmbeddingPrefixes,
+  type CatalogueItemDto,
+  type DeviceProfileDto,
+  type DeviceTier,
+  type ModelDto,
+  type ProviderSummaryDto,
+  type VectorOcrConfig,
+  type VectorRerankConfig,
 } from "@zvs/shared";
 
 /**
@@ -137,6 +138,8 @@ export interface AutofillPlan {
   metric: "cosine";
   chunkSize: string;
   chunkOverlap: string;
+  queryPrefix: string;
+  documentPrefix: string;
   rerank: VectorRerankConfig;
   ocr: VectorOcrConfig;
   /** One line telling the user what the choice was based on. */
@@ -195,6 +198,7 @@ export function autofillPlan(input: AutofillInput): AutofillPlan {
     metric: "cosine",
     chunkSize: String(chunks.chunkSize),
     chunkOverlap: String(chunks.chunkOverlap),
+    ...embeddingPrefixesFor(model?.externalId ?? "", downloaded?.item),
     rerank: {
       enabled: reranker !== undefined && tier !== "low",
       modelRef: reranker?.ref ?? "",
@@ -207,6 +211,17 @@ export function autofillPlan(input: AutofillInput): AutofillPlan {
       minCharsPerPage: 200,
     },
     note: describe(device, reranker, ocrModel, ocrAffordable),
+  };
+}
+
+export function embeddingPrefixesFor(
+  modelId: string,
+  item?: CatalogueItemDto,
+): { queryPrefix: string; documentPrefix: string } {
+  const known = knownEmbeddingPrefixes(item?.name ?? modelId);
+  return {
+    queryPrefix: item?.queryPrefix ?? known.queryPrefix,
+    documentPrefix: item?.documentPrefix ?? known.documentPrefix,
   };
 }
 

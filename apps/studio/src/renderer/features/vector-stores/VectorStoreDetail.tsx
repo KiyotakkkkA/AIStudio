@@ -1,6 +1,7 @@
 import { mdiDatabaseOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea, Switcher } from "@kiyotakkkka/zvs-uikit-lib";
+import { VECTOR_SCHEMA_VERSION } from "@zvs/shared";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
@@ -41,11 +42,15 @@ function VectorStoreDetail() {
         />
       </div>
     );
+  const outdated = detail.schemaVersion < VECTOR_SCHEMA_VERSION;
   const stats = [
     [detail.documents.toLocaleString(), "Документы"],
     [detail.vectors.toLocaleString(), "Векторы"],
     [String(detail.dimension), "Размерность"],
-    [detail.indexType, `Индекс · ${detail.metric}`],
+    [
+      detail.indexType,
+      `Индекс · ${detail.metric} · ${detail.searchMode === "hybrid" && !outdated ? "гибридный" : "векторный"}`,
+    ],
     [formatBytes(detail.bytes), "На диске"],
     [
       detail.embeddingModelId,
@@ -64,6 +69,9 @@ function VectorStoreDetail() {
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="wrap-break-word text-[15px] font-semibold">{detail.name}</h2>
               <Chip>{healthLabels[detail.status]}</Chip>
+              {outdated && detail.vectors > 0 ? (
+                <Chip tone="raised">Требуется переиндексация</Chip>
+              ) : null}
             </div>
             <p className="mt-0.75 text-[12px] text-main-400">{detail.description}</p>
           </div>
@@ -160,6 +168,12 @@ function VectorStoreDetail() {
         ) : detail.status === "pending" || detail.vectors === 0 ? (
           <p className="text-[12px] text-warn">
             Ожидает индексации. Добавьте источники на вкладке «Документы» и запустите индексацию.
+          </p>
+        ) : outdated ? (
+          <p role="status" className="text-[12px] text-warn">
+            Требуется переиндексация: хранилище создано в старом формате индекса. Поиск работает
+            только по векторам, без ключевых слов, страниц и разделов. «Полная переиндексация»
+            пересоберёт таблицу в новом формате.
           </p>
         ) : null}
       </div>

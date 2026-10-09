@@ -29,6 +29,8 @@ export interface CatalogueItem {
   readonly digest?: string;
   readonly tags: readonly string[];
   readonly dimension?: number;
+  readonly queryPrefix?: string;
+  readonly documentPrefix?: string;
   /**
    * Set by a source that knows its own install state better than the download table does. An
    * engine is a group of archives unpacked into a directory, so "is it installed" is a question

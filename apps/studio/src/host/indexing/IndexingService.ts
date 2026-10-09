@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises";
-import { resolve, sep } from "node:path";
+import { basename, extname, resolve, sep } from "node:path";
 import {
   AddVectorSourceInput,
   AppError,
   AppErrorCode,
+  VECTOR_SCHEMA_VERSION,
   VectorDocumentDto,
   VectorIndexInput,
   VectorIndexReportDto,
@@ -17,14 +18,14 @@ import type {
   VectorStoreEntity,
 } from "../data/schema/index.ts";
 import type { EmbeddingDriver } from "../drivers/ai/ports.ts";
-import type { RustCorePort, TextChunk } from "../drivers/rust/ports.ts";
+import type { RustCorePort, SectionChunk } from "../drivers/rust/ports.ts";
 import type { VectorCorePort, VectorRow } from "../drivers/rust/vectorTypes.ts";
 import type { Logger } from "../platform/logger.ts";
 import { createId } from "../platform/ids.ts";
 import { fromExtendedPath, toExtendedPath } from "../platform/longPath.ts";
 import type { DriverSource } from "../services/ProviderService.ts";
 import type { VectorStoreService } from "../services/VectorStoreService.ts";
-import { createExtractorRegistry, type ExtractorRegistry } from "./extraction.ts";
+import { createExtractorRegistry, type ExtractorRegistry, type Segment } from "./extraction.ts";
 import { walkSources, type DiscoveredFile, type WalkLimits } from "./walk.ts";
 
 export interface IndexProgress {
@@ -71,6 +72,21 @@ export interface IndexingServiceOptions {
   resources?: ResourceSampler;
   sampleIntervalMs?: number;
   readFile?: (path: string) => Promise<Uint8Array>;
+  annThreshold?: number;
+}
+
+export const DEFAULT_ANN_THRESHOLD = 100_000;
+export const SECTION_SEPARATOR = " › ";
+
+export function embeddingInput(
+  path: string,
+  section: readonly string[],
+  text: string,
+  documentPrefix = "",
+): string {
+  const title = basename(path, extname(path)) || basename(path);
+  const header = [title, ...section].join(SECTION_SEPARATOR);
+  return `${documentPrefix}${header}\n${text}`;
 }
 
 interface Tally {
@@ -164,6 +180,7 @@ export class IndexingService {
       await this.options.core.deleteVectorsBySource(this.path(store), row.id);
       this.documents.remove(row.id);
     });
+    await this.maintain(storeId);
     await this.options.stores.reconcile(storeId);
   }
 
@@ -190,14 +207,15 @@ export class IndexingService {
   }
 
   private async pipeline(
-    store: VectorStoreEntity,
+    current: VectorStoreEntity,
     full: boolean,
     context: IndexContext,
   ): Promise<VectorIndexReportDto> {
     const signal = context.signal;
-    const sources = this.sources.listByStore(store.id);
+    const sources = this.sources.listByStore(current.id);
     if (sources.length === 0)
       throw new AppError(AppErrorCode.CONFLICT, "У хранилища нет источников для индексации");
+    const store = await this.upgrade(current, full);
     const embedding = await this.embedding(store, signal);
     const walked = await walkSources(sources, this.options.limits, signal);
     const tally: Tally = {
@@ -294,8 +312,10 @@ export class IndexingService {
       true,
     );
 
-    if (tally.indexed > 0 || tally.removed > 0)
+    if (tally.indexed > 0 || tally.removed > 0) {
       this.stores.update(store.id, { lastIndexedAt: this.now(), updatedAt: this.now() });
+      await this.maintain(store.id);
+    }
     await this.options.stores.reconcile(store.id).catch((error: unknown) => {
       this.options.logger?.log("warn", "indexing", "Could not reconcile after indexing", {
         storeId: store.id,
@@ -336,9 +356,9 @@ export class IndexingService {
     const bytes = await (this.options.readFile ?? defaultRead)(file.path);
     const contentHash = await this.options.core.hash(bytes);
     if (!full && known && known.contentHash === contentHash) return { status: "unchanged" };
-    let text: string;
+    let segments: Segment[];
     try {
-      text = await this.extractors.extract({
+      segments = await this.extractors.extract({
         path: file.path,
         bytes,
         context: {
@@ -356,11 +376,16 @@ export class IndexingService {
     }
     // A document that reads as nothing — a blank scan, a page of images the model saw nothing in
     // — would otherwise be recorded as indexed with no vectors, and never looked at again.
-    if (text.trim() === "") return { status: "skipped", reason: "не удалось извлечь текст" };
-    const chunks = await this.options.core.chunk(text, {
-      size: store.chunkSize,
-      overlap: store.chunkOverlap,
-    });
+    if (segments.every((segment) => segment.text.trim() === ""))
+      return { status: "skipped", reason: "не удалось извлечь текст" };
+    const chunks = await this.options.core.chunkSegments(
+      segments.map((segment) => ({
+        text: segment.text,
+        section: [...segment.section],
+        ...(segment.page === undefined ? {} : { page: segment.page }),
+      })),
+      { size: store.chunkSize, overlap: store.chunkOverlap },
+    );
     context.onChunks(chunks.length);
     const documentId = known?.id ?? createId();
     const vectors = await this.embed(store, embedding, chunks, file, documentId, context);
@@ -385,13 +410,13 @@ export class IndexingService {
   private async embed(
     store: VectorStoreEntity,
     embedding: EmbeddingDriver,
-    chunks: readonly TextChunk[],
+    chunks: readonly SectionChunk[],
     file: DiscoveredFile,
     documentId: string,
     context: { signal?: AbortSignal; onBatch: (embedded: number) => void },
   ): Promise<VectorRow[]> {
     const size = this.options.batchSize ?? 32;
-    const batches: { start: number; chunks: TextChunk[] }[] = [];
+    const batches: { start: number; chunks: SectionChunk[] }[] = [];
     for (let start = 0; start < chunks.length; start += size)
       batches.push({ start, chunks: chunks.slice(start, start + size) });
     const rows: VectorRow[] = [];
@@ -406,7 +431,9 @@ export class IndexingService {
         const embedded = await this.embedBatch(
           embedding,
           store,
-          batch.chunks.map((chunk) => chunk.text),
+          batch.chunks.map((chunk) =>
+            embeddingInput(file.path, chunk.section, chunk.text, store.documentPrefix),
+          ),
           context.signal,
         );
         for (const [offset, vector] of embedded.entries()) {
@@ -418,10 +445,10 @@ export class IndexingService {
             documentId,
             chunkIndex: index,
             path: file.path,
+            text: chunk.text,
+            section: chunk.section.join(SECTION_SEPARATOR),
+            page: chunk.page,
             payload: {
-              text: chunk.text,
-              path: file.path,
-              chunkIndex: index,
               chunkCount: chunks.length,
               byteStart: chunk.byteStart,
               byteEnd: chunk.byteEnd,
@@ -476,6 +503,38 @@ export class IndexingService {
         });
         await sleep(delay, signal);
       }
+    }
+  }
+
+  private async upgrade(store: VectorStoreEntity, full: boolean): Promise<VectorStoreEntity> {
+    const stats = await this.options.core.vectorStats(this.path(store));
+    if (stats.schemaVersion >= VECTOR_SCHEMA_VERSION) return store;
+    if (!full)
+      throw new AppError(
+        AppErrorCode.CONFLICT,
+        "Хранилище создано в старом формате индекса — запустите полную переиндексацию",
+      );
+    this.options.logger?.log("info", "indexing", "Rebuilding a v1 vector store as schema v2", {
+      storeId: store.id,
+      from: stats.schemaVersion,
+    });
+    await this.options.stores.recreateTable(store.id);
+    return this.options.stores.requireStore(store.id);
+  }
+
+  private async maintain(storeId: string): Promise<void> {
+    try {
+      await this.options.stores.withExclusiveStore(storeId, (row) =>
+        this.options.core.maintainVectorIndex(
+          this.path(row),
+          this.options.annThreshold ?? DEFAULT_ANN_THRESHOLD,
+        ),
+      );
+    } catch (error) {
+      this.options.logger?.log("warn", "indexing", "Could not refresh the search indexes", {
+        storeId,
+        error: describe(error),
+      });
     }
   }
 

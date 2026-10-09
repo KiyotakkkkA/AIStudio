@@ -5,7 +5,7 @@ import type { SidecarJobsPort } from "../drivers/sidecar/SidecarDriver.ts";
 import type { Logger } from "../platform/logger.ts";
 import { createId } from "../platform/ids.ts";
 import { toExtendedPath } from "../platform/longPath.ts";
-import type { ExtractionInput, Extractor } from "./extraction.ts";
+import { plainSegments, type ExtractionInput, type Extractor, type Segment } from "./extraction.ts";
 
 export const DOCUMENT_JOB = "job.document.extract";
 
@@ -56,7 +56,7 @@ interface DocumentReport {
  * costs one job rather than the window. See `crates/zvs-core/src/pdf.rs`.
  */
 export function createPdfExtractor(options: DocumentExtractorOptions): Extractor {
-  return async (input: ExtractionInput): Promise<string> => {
+  return async (input: ExtractionInput): Promise<Segment[]> => {
     const ocr = usableOcr(input, options);
     const scratch = ocr === undefined ? undefined : join(options.scratchDir, createId());
     try {
@@ -82,7 +82,7 @@ export function createPdfExtractor(options: DocumentExtractorOptions): Extractor
  * PDF page — straight to the vision model, with no extraction step in front of it.
  */
 export function createImageExtractor(options: DocumentExtractorOptions): Extractor {
-  return async (input: ExtractionInput): Promise<string> => {
+  return async (input: ExtractionInput): Promise<Segment[]> => {
     const ocr = usableOcr(input, options);
     if (ocr === undefined)
       throw new AppError(
@@ -102,7 +102,7 @@ export function createImageExtractor(options: DocumentExtractorOptions): Extract
       path: input.path,
       chars: text.length,
     });
-    return text;
+    return plainSegments(text);
   };
 }
 
@@ -196,11 +196,14 @@ async function recogniseAll(
 function assemble(
   pages: readonly ExtractedPage[],
   recognised: ReadonlyMap<number, string>,
-): string {
+): Segment[] {
   return pages
-    .map((page) => recognised.get(page.number) ?? page.text)
-    .filter((text) => text.trim() !== "")
-    .join("\n\n");
+    .map((page) => ({
+      text: recognised.get(page.number) ?? page.text,
+      section: [],
+      ...(Number.isInteger(page.number) && page.number > 0 ? { page: page.number } : {}),
+    }))
+    .filter((segment) => segment.text.trim() !== "");
 }
 
 function describe(error: unknown): string {

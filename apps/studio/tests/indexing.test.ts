@@ -12,7 +12,11 @@ import { temporaryDatabase, type TemporaryDatabase } from "../../../test/helpers
 import { temporaryDirectory, type TemporaryDirectory } from "../../../test/helpers/paths.ts";
 import { FakeCore } from "../../../test/helpers/FakeCore.ts";
 import { VectorStoreService } from "../src/host/services/VectorStoreService.ts";
-import { IndexingService } from "../src/host/indexing/IndexingService.ts";
+import {
+  DEFAULT_ANN_THRESHOLD,
+  embeddingInput,
+  IndexingService,
+} from "../src/host/indexing/IndexingService.ts";
 import { createExtractorRegistry } from "../src/host/indexing/extraction.ts";
 import { accepts } from "../src/host/indexing/patterns.ts";
 import { createVectorStoreHandlers } from "../src/host/ipc/vectorStores.ts";
@@ -398,20 +402,87 @@ test("the extractor registry accepts new formats without editing the pipeline", 
   const registry = createExtractorRegistry();
   expect(registry.supports("a.pdf")).toBe(false);
   expect(registry.reason("a.pdf")).toContain(".pdf");
-  registry.register([".pdf"], async ({ bytes }) => `extracted ${String(bytes.byteLength)}`);
+  registry.register([".pdf"], async ({ bytes }) => [
+    { text: `extracted ${String(bytes.byteLength)}`, section: [] },
+  ]);
   expect(registry.supports("a.pdf")).toBe(true);
-  await expect(registry.extract({ path: "a.pdf", bytes: new Uint8Array([1, 2, 3]) })).resolves.toBe(
-    "extracted 3",
-  );
+  await expect(
+    registry.extract({ path: "a.pdf", bytes: new Uint8Array([1, 2, 3]) }),
+  ).resolves.toEqual([{ text: "extracted 3", section: [] }]);
 });
 
 test("csv rows are extracted as labelled lines", async () => {
   const registry = createExtractorRegistry();
-  const text = await registry.extract({
+  const segments = await registry.extract({
     path: "people.csv",
     bytes: new TextEncoder().encode('name,role\n"ana, b",support\nbo,design'),
   });
-  expect(text).toBe("name: ana, b; role: support\nname: bo; role: design");
+  expect(segments).toEqual([
+    { text: "name: ana, b; role: support\nname: bo; role: design", section: [] },
+  ]);
+});
+
+test("the embedded text carries the title and section path, the stored text stays bare", () => {
+  expect(embeddingInput("C:/docs/handbook.md", ["Отпуск", "Порядок"], "Подайте заявление.")).toBe(
+    "handbook › Отпуск › Порядок\nПодайте заявление.",
+  );
+  expect(embeddingInput("/notes/readme", [], "text", "passage: ")).toBe("passage: readme\ntext");
+});
+
+test("rows carry text, section and page as columns and the document prefix reaches the embedder", async () => {
+  db.client.repositories.vectorStores.update(store.id, { documentPrefix: "passage: " });
+  write("handbook.md", "# Отпуск\nalpha beta gamma\n## Порядок\ndelta epsilon zeta");
+  addFolder();
+  await indexing.index({ storeId: store.id, full: false });
+
+  const rows = vectorRows().sort((left, right) => left.chunkIndex - right.chunkIndex);
+  expect(rows.map((row) => row.section)).toEqual(["Отпуск", "Отпуск › Порядок"]);
+  expect(rows[0]).toMatchObject({ text: "Отпуск alpha beta gamma", page: null });
+  expect(rows[0]?.payload).toEqual({ chunkCount: 2, byteStart: 0, byteEnd: 4, tokenCount: 4 });
+  const inputs = embed.mock.calls.flatMap(([texts]) => texts);
+  expect(inputs).toContain("passage: handbook › Отпуск\nОтпуск alpha beta gamma");
+  expect(inputs).toContain("passage: handbook › Отпуск › Порядок\nПорядок delta epsilon zeta");
+});
+
+test("the search indexes are refreshed once a run changed something", async () => {
+  write("a.md", "one two three");
+  addFolder();
+  await indexing.index({ storeId: store.id, full: false });
+  expect(core.maintained).toEqual([
+    { path: stores.storePath(store.id), annThreshold: DEFAULT_ANN_THRESHOLD },
+  ]);
+
+  await indexing.index({ storeId: store.id, full: false });
+  expect(core.maintained).toHaveLength(1);
+});
+
+test("a v1 store refuses an incremental run and is rebuilt as v2 by a full one", async () => {
+  write("a.md", "one two three");
+  write("b.md", "four five six");
+  addFolder();
+  await indexing.index({ storeId: store.id, full: false });
+  const before = documents()
+    .map((row) => row.id)
+    .sort();
+  const path = stores.storePath(store.id);
+  core.setSchemaVersion(path, 1);
+  await stores.reconcile(store.id);
+  expect((await stores.get(store.id)).schemaVersion).toBe(1);
+
+  await expect(indexing.index({ storeId: store.id, full: false })).rejects.toMatchObject({
+    code: AppErrorCode.CONFLICT,
+  });
+
+  const report = await indexing.index({ storeId: store.id, full: true });
+  expect(report.indexed).toBe(2);
+  expect((await stores.get(store.id)).schemaVersion).toBe(2);
+  expect(
+    documents()
+      .map((row) => row.id)
+      .sort(),
+  ).toEqual(before);
+  expect(vectorRows()).toHaveLength(report.chunks);
+  expect(vectorRows().every((row) => row.text !== "")).toBe(true);
 });
 
 test("patterns match by segment and treat a bare name as any depth", () => {

@@ -2,7 +2,9 @@ import { createHash } from "node:crypto";
 import type {
   ChunkConfig,
   RustCorePort,
+  SectionChunk,
   TextChunk,
+  TextSegment,
 } from "../../apps/studio/src/host/drivers/rust/ports.ts";
 import { FakeVectorCore } from "./FakeVectorCore.ts";
 
@@ -22,6 +24,16 @@ export class FakeCore extends FakeVectorCore implements RustCorePort {
       });
       if (start + config.size >= words.length) break;
     }
+    return chunks;
+  }
+  async chunkSegments(
+    segments: readonly TextSegment[],
+    config: ChunkConfig,
+  ): Promise<SectionChunk[]> {
+    const chunks: SectionChunk[] = [];
+    for (const segment of segments)
+      for (const chunk of await this.chunk(segment.text, config))
+        chunks.push({ ...chunk, section: [...segment.section], page: segment.page ?? null });
     return chunks;
   }
   async hash(bytes: Uint8Array): Promise<string> {

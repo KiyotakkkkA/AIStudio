@@ -134,6 +134,13 @@
       "when": 1791500551603,
       "tag": "0018_vector_eval",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1791557775447,
+      "tag": "0019_index_schema_v2",
+      "breakpoints": true
     }
   ]
 }

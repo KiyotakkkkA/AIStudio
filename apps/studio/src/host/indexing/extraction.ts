@@ -19,7 +19,61 @@ export interface ExtractionInput {
   readonly context?: ExtractionContext;
 }
 
-export type Extractor = (input: ExtractionInput) => Promise<string>;
+export interface Segment {
+  readonly text: string;
+  readonly section: readonly string[];
+  readonly page?: number;
+}
+
+export type Extractor = (input: ExtractionInput) => Promise<Segment[]>;
+
+export function plainSegments(text: string): Segment[] {
+  return text.trim() === "" ? [] : [{ text, section: [] }];
+}
+
+export function segmentsText(segments: readonly Segment[]): string {
+  return segments.map((segment) => segment.text).join("\n\n");
+}
+
+const ATX_HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/;
+const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+
+export function markdownSegments(source: string): Segment[] {
+  const segments: Segment[] = [];
+  const path: string[] = [];
+  let lines: string[] = [];
+  let section: string[] = [];
+  let fence: string | null = null;
+  const flush = () => {
+    const text = lines.join("\n").replace(/^\n+|\s+$/g, "");
+    if (text.trim() !== "") segments.push({ text, section });
+    lines = [];
+  };
+  for (const line of source.split(/\r?\n/)) {
+    const marker = FENCE.exec(line)?.[1];
+    if (marker !== undefined) {
+      if (fence === null) fence = marker[0]!;
+      else if (marker[0] === fence) fence = null;
+      lines.push(line);
+      continue;
+    }
+    const heading = fence === null ? ATX_HEADING.exec(line) : null;
+    if (heading === null) {
+      lines.push(line);
+      continue;
+    }
+    const title = (heading[2] ?? "").trim();
+    flush();
+    if (title === "") continue;
+    const level = heading[1]!.length;
+    path.length = Math.min(path.length, level - 1);
+    path[level - 1] = title;
+    section = path.filter((part) => part !== undefined && part !== "");
+    lines.push(title);
+  }
+  flush();
+  return segments;
+}
 
 const decoder = new TextDecoder("utf-8", { fatal: false });
 
@@ -50,7 +104,9 @@ function splitCsvLine(line: string, separator: string): string[] {
   return cells.map((value) => value.trim());
 }
 
-export const plainTextExtractor: Extractor = async ({ bytes }) => decode(bytes);
+export const plainTextExtractor: Extractor = async ({ bytes }) => plainSegments(decode(bytes));
+
+export const markdownExtractor: Extractor = async ({ bytes }) => markdownSegments(decode(bytes));
 
 export const csvExtractor: Extractor = async ({ path, bytes }) => {
   const separator = extname(path).toLowerCase() === ".tsv" ? "\t" : ",";
@@ -58,25 +114,24 @@ export const csvExtractor: Extractor = async ({ path, bytes }) => {
     .split(/\r?\n/)
     .filter((line) => line.trim().length > 0);
   const header = lines.shift();
-  if (header === undefined) return "";
+  if (header === undefined) return [];
   const columns = splitCsvLine(header, separator);
-  if (lines.length === 0) return columns.join(", ");
-  return lines
-    .map((line) =>
-      splitCsvLine(line, separator)
-        .map((value, index) => `${columns[index] ?? `column ${String(index + 1)}`}: ${value}`)
-        .join("; "),
-    )
-    .join("\n");
+  if (lines.length === 0) return plainSegments(columns.join(", "));
+  return plainSegments(
+    lines
+      .map((line) =>
+        splitCsvLine(line, separator)
+          .map((value, index) => `${columns[index] ?? `column ${String(index + 1)}`}: ${value}`)
+          .join("; "),
+      )
+      .join("\n"),
+  );
 };
 
 const TEXT_EXTENSIONS = [
   ".txt",
   ".text",
   ".log",
-  ".md",
-  ".markdown",
-  ".mdx",
   ".rst",
   ".adoc",
   ".json",
@@ -122,6 +177,8 @@ const TEXT_EXTENSIONS = [
   ".proto",
 ];
 
+const MARKDOWN_EXTENSIONS = [".md", ".markdown", ".mdx"];
+
 /**
  * Formats with no reader yet. The legacy binary Office formats share nothing with their OOXML
  * successors — a different container, a different encoding — so they stay deferred rather than
@@ -154,7 +211,7 @@ export class ExtractorRegistry {
     if (this.deferred.has(extension)) return `формат ${extension} пока не поддерживается`;
     return extension === "" ? "файл без расширения" : `неизвестный формат ${extension}`;
   }
-  async extract(input: ExtractionInput): Promise<string> {
+  async extract(input: ExtractionInput): Promise<Segment[]> {
     const extractor = this.extractors.get(extname(input.path).toLowerCase());
     if (!extractor) throw new AppError(AppErrorCode.UNSUPPORTED_FORMAT, this.reason(input.path));
     return extractor(input);
@@ -164,6 +221,7 @@ export class ExtractorRegistry {
 export function createExtractorRegistry(): ExtractorRegistry {
   return new ExtractorRegistry()
     .register(TEXT_EXTENSIONS, plainTextExtractor)
+    .register(MARKDOWN_EXTENSIONS, markdownExtractor)
     .register([".csv", ".tsv"], csvExtractor)
     .register([".docx"], docxExtractor)
     .register([".xlsx"], xlsxExtractor)

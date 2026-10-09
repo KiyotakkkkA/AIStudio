@@ -11,8 +11,12 @@ import {
   IMAGE_EXTENSIONS,
   type OcrPort,
 } from "../src/host/indexing/documents.ts";
-import { createExtractorRegistry } from "../src/host/indexing/extraction.ts";
-import { docxExtractor, decodeXmlText } from "../src/host/indexing/ooxml.ts";
+import {
+  createExtractorRegistry,
+  markdownSegments,
+  segmentsText,
+} from "../src/host/indexing/extraction.ts";
+import { docxExtractor, decodeXmlText, headingLevels } from "../src/host/indexing/ooxml.ts";
 
 let workspace: TemporaryDirectory;
 
@@ -77,8 +81,11 @@ const DOCX = zip([
 ]);
 
 test("a docx is read paragraph by paragraph, with entities decoded", async () => {
-  const text = await docxExtractor({ path: "a.docx", bytes: DOCX });
+  const segments = await docxExtractor({ path: "a.docx", bytes: DOCX });
+  const text = segmentsText(segments);
 
+  expect(segments).toHaveLength(1);
+  expect(segments[0]?.section).toEqual([]);
   expect(text).toContain("Договор № 42");
   expect(text).toContain('Сторона A\tООО "Ромашка"');
   expect(text).toContain("Итого: 100 < 200");
@@ -106,9 +113,9 @@ test("an xlsx resolves shared strings and joins a row with tabs", async () => {
   ]);
 
   const registry = createExtractorRegistry();
-  const text = await registry.extract({ path: "prices.xlsx", bytes });
+  const segments = await registry.extract({ path: "prices.xlsx", bytes });
 
-  expect(text).toBe("Позиция\tЦена\nБолт\t19.5");
+  expect(segments).toEqual([{ text: "Позиция\tЦена\nБолт\t19.5", section: [] }]);
 });
 
 test("a pptx is read slide by slide", async () => {
@@ -124,10 +131,93 @@ test("a pptx is read slide by slide", async () => {
   ]);
 
   const registry = createExtractorRegistry();
-  const text = await registry.extract({ path: "deck.pptx", bytes });
+  const segments = await registry.extract({ path: "deck.pptx", bytes });
 
-  // Slide 10 must not sort before slide 2, which a plain string sort would do.
-  expect(text).toBe("Слайд 1\nПервая\n\nСлайд 2\nВторая");
+  expect(segments).toEqual([
+    { text: "Первая", section: [], page: 1 },
+    { text: "Вторая", section: [], page: 2 },
+  ]);
+});
+
+test("a pptx slide title becomes its section", async () => {
+  const bytes = zip([
+    {
+      name: "ppt/slides/slide1.xml",
+      body: `<p:sld><p:sp><p:nvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>
+        <a:p><a:r><a:t>Отпуск</a:t></a:r></a:p></p:sp>
+        <p:sp><a:p><a:r><a:t>28 дней в году</a:t></a:r></a:p></p:sp></p:sld>`,
+    },
+  ]);
+
+  const segments = await createExtractorRegistry().extract({ path: "deck.pptx", bytes });
+
+  expect(segments).toEqual([{ text: "Отпуск\n28 дней в году", section: ["Отпуск"], page: 1 }]);
+});
+
+test("docx headings, by style name or outline level, open nested sections", async () => {
+  const styles = `<w:styles>
+    <w:style w:type="paragraph" w:styleId="1"><w:name w:val="heading 1"/></w:style>
+    <w:style w:type="paragraph" w:styleId="Sub"><w:name w:val="Подзаголовок"/>
+      <w:pPr><w:outlineLvl w:val="1"/></w:pPr></w:style>
+    <w:style w:type="paragraph" w:styleId="Body"><w:name w:val="Normal"/>
+      <w:pPr><w:outlineLvl w:val="9"/></w:pPr></w:style>
+  </w:styles>`;
+  expect([...headingLevels(styles)]).toEqual([
+    ["1", 1],
+    ["Sub", 2],
+  ]);
+  const bytes = zip([
+    {
+      name: "word/document.xml",
+      body: `<w:document><w:body>
+        <w:p><w:r><w:t>Вступление</w:t></w:r></w:p>
+        <w:p><w:pPr><w:pStyle w:val="1"/></w:pPr><w:r><w:t>Отпуск</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Общие правила.</w:t></w:r></w:p>
+        <w:p><w:pPr><w:pStyle w:val="Sub"/></w:pPr><w:r><w:t>Порядок</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Заявление за 14 дней.</w:t></w:r></w:p>
+        <w:p><w:pPr><w:outlineLvl w:val="0"/></w:pPr><w:r><w:t>Больничный</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Справка.</w:t></w:r></w:p>
+      </w:body></w:document>`,
+    },
+    { name: "word/styles.xml", body: styles },
+  ]);
+
+  const segments = await docxExtractor({ path: "a.docx", bytes });
+
+  expect(segments).toEqual([
+    { text: "Вступление", section: [] },
+    { text: "Отпуск\nОбщие правила.", section: ["Отпуск"] },
+    { text: "Порядок\nЗаявление за 14 дней.", section: ["Отпуск", "Порядок"] },
+    { text: "Больничный\nСправка.", section: ["Больничный"] },
+  ]);
+});
+
+test("markdown headings open sections, and a fenced block cannot fake one", () => {
+  const source = [
+    "Preface line.",
+    "",
+    "# Guide",
+    "Intro.",
+    "## Install ##",
+    "```",
+    "# not a heading",
+    "```",
+    "### Windows",
+    "Run it.",
+    "## Use",
+    "Go.",
+    "#",
+    "# Appendix",
+  ].join("\n");
+
+  expect(markdownSegments(source)).toEqual([
+    { text: "Preface line.", section: [] },
+    { text: "Guide\nIntro.", section: ["Guide"] },
+    { text: "Install\n```\n# not a heading\n```", section: ["Guide", "Install"] },
+    { text: "Windows\nRun it.", section: ["Guide", "Install", "Windows"] },
+    { text: "Use\nGo.", section: ["Guide", "Use"] },
+    { text: "Appendix", section: ["Appendix"] },
+  ]);
 });
 
 test("the office formats are registered and the legacy binary ones stay deferred", () => {
@@ -182,9 +272,12 @@ test("a pdf with a text layer is returned as-is, and OCR is never asked for", as
   const ocr: OcrPort = { readImage: vi.fn() };
   const extract = createPdfExtractor({ jobs, ocr, scratchDir: workspace.path });
 
-  const text = await extract({ path: "a.pdf", bytes: new Uint8Array(), context: {} });
+  const segments = await extract({ path: "a.pdf", bytes: new Uint8Array(), context: {} });
 
-  expect(text).toBe("Первая страница\n\nВторая страница");
+  expect(segments).toEqual([
+    { text: "Первая страница", section: [], page: 1 },
+    { text: "Вторая страница", section: [], page: 2 },
+  ]);
   expect(ocr.readImage).not.toHaveBeenCalled();
   // With OCR off, the sidecar is told not to bother extracting images either.
   expect(jobs.calls[0]?.job).toBe(DOCUMENT_JOB);
@@ -210,12 +303,14 @@ test("a scanned page is replaced by what the vision model read, not merged with 
     scratchDir: workspace.path,
   });
 
-  const text = await extract({
+  const segments = await extract({
     path: "scan.pdf",
     bytes: new Uint8Array(),
     context: { ocr: ocrConfig({ language: "rus" }) },
   });
+  const text = segmentsText(segments);
 
+  expect(segments[1]).toEqual({ text: "Распознанный текст скана", section: [], page: 2 });
   expect(text).toContain("Распознанный текст скана");
   expect(text).not.toContain("стр. 2");
   expect(jobs.calls[0]?.params).toMatchObject({ minCharsPerPage: 200 });
@@ -245,13 +340,13 @@ test("a page the model cannot read is noted, and the rest of the document surviv
     scratchDir: workspace.path,
   });
 
-  const text = await extract({
+  const segments = await extract({
     path: "scan.pdf",
     bytes: new Uint8Array(),
     context: { ocr: ocrConfig(), note: (message) => notes.push(message) },
   });
 
-  expect(text).toBe("Читаемая страница");
+  expect(segments).toEqual([{ text: "Читаемая страница", section: [], page: 1 }]);
   expect(notes).toHaveLength(2);
   expect(notes.some((note) => note.includes("с. 3"))).toBe(true);
   expect(notes.some((note) => note.includes("модель не запустилась"))).toBe(true);
@@ -286,9 +381,9 @@ test("an image file is read by the vision model, and refused when OCR is off", a
   const bytes = Buffer.from("png-bytes");
 
   expect(IMAGE_EXTENSIONS).toContain(".png");
-  expect(await extract({ path: "photo.png", bytes, context: { ocr: ocrConfig() } })).toBe(
-    "Текст с фотографии",
-  );
+  expect(await extract({ path: "photo.png", bytes, context: { ocr: ocrConfig() } })).toEqual([
+    { text: "Текст с фотографии", section: [] },
+  ]);
   expect(readImage.mock.calls[0]?.[1]).toMatchObject({ mediaType: "image/png" });
 
   // Declining is UNSUPPORTED_FORMAT, which the pipeline counts as a skip rather than a failure.

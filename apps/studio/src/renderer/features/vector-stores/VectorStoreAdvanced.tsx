@@ -6,6 +6,11 @@ import Toggle from "../../ui/atoms/Toggle";
 import Field from "../../ui/molecules/Field";
 import type VectorStoreFormVm from "./VectorStoreFormVm";
 
+const SEARCH_MODES = [
+  { value: "hybrid", label: "Гибридный: векторы и ключевые слова" },
+  { value: "vector", label: "Только векторы" },
+];
+
 const LANGUAGES: { value: VectorOcrLanguage; label: string }[] = [
   { value: "auto", label: "Определять автоматически" },
   { value: "rus", label: "Русский" },
@@ -27,6 +32,50 @@ function VectorStoreAdvanced({
 }) {
   return (
     <div className="flex flex-col gap-3.25">
+      <div className="flex flex-col gap-3.25 rounded-[9px] border border-main-750 bg-main-800 p-3.5">
+        <Field
+          label="Режим поиска"
+          help="Гибридный поиск находит точные коды, номера статей и имена, которые векторы ранжируют низко."
+        >
+          <SelectInput
+            label="Режим поиска"
+            value={vm.searchMode}
+            options={SEARCH_MODES}
+            disabled={disabled}
+            onChange={vm.setSearchMode}
+          />
+        </Field>
+        <div className="grid grid-cols-1 gap-3.25 lg:grid-cols-2">
+          <Field
+            label="Префикс запроса"
+            htmlFor="vs-query-prefix"
+            optionalHint
+            help="Добавляется к запросу перед эмбеддингом. Задаётся моделью, меняется только до индексации."
+          >
+            <TextInput
+              id="vs-query-prefix"
+              value={vm.queryPrefix}
+              mono
+              disabled={disabled || vm.chunkLocked}
+              onChange={(e) => vm.set("queryPrefix", e.target.value)}
+            />
+          </Field>
+          <Field
+            label="Префикс документа"
+            htmlFor="vs-document-prefix"
+            optionalHint
+            help="Добавляется к каждому фрагменту при индексации."
+          >
+            <TextInput
+              id="vs-document-prefix"
+              value={vm.documentPrefix}
+              mono
+              disabled={disabled || vm.chunkLocked}
+              onChange={(e) => vm.set("documentPrefix", e.target.value)}
+            />
+          </Field>
+        </div>
+      </div>
       <div className="flex flex-col gap-3.25 rounded-[9px] border border-main-750 bg-main-800 p-3.5">
         <Toggle
           id="vs-rerank"

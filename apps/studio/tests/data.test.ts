@@ -67,6 +67,7 @@ test("migrations apply once to an empty file and are a no-op afterwards", () => 
       "0016_tool_registry",
       "0017_mcp_servers",
       "0018_vector_eval",
+      "0019_index_schema_v2",
     ]);
     const tables = database.client.db.$client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'setting'")
@@ -117,6 +118,7 @@ test("a backup is written before migrating and only the last three are kept", ()
           "0016_tool_registry",
           "0017_mcp_servers",
           "0018_vector_eval",
+          "0019_index_schema_v2",
         ]);
         if (run === 0) assert.equal(report.backup, undefined);
         else assert.equal(typeof report.backup, "string");
@@ -268,6 +270,7 @@ test("prepareDatabase opens and migrates in one step", () => {
         "0016_tool_registry",
         "0017_mcp_servers",
         "0018_vector_eval",
+        "0019_index_schema_v2",
       ]);
       assert.equal(prepared.client.repositories.settings.all().length, 0);
     } finally {

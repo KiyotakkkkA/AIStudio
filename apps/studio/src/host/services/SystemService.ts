@@ -13,7 +13,7 @@ export class SystemService {
   private readonly resources: ResourceMonitor;
 
   constructor(
-    private readonly rust: RustCorePort,
+    private readonly rust: Pick<RustCorePort, "chunk" | "hash">,
     options: SystemServiceOptions = {},
   ) {
     this.device = options.device ?? new DeviceProbe();

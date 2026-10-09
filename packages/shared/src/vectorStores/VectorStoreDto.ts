@@ -6,6 +6,10 @@ export const VectorBackend = z.enum(["lancedb", "qdrant", "pgvector"]);
 export const VectorMetric = z.enum(["cosine", "l2", "dot"]);
 export const VectorHealth = z.enum(["healthy", "stale", "pending", "broken"]);
 export type VectorHealth = z.infer<typeof VectorHealth>;
+export const VectorSearchMode = z.enum(["hybrid", "vector"]);
+export type VectorSearchMode = z.infer<typeof VectorSearchMode>;
+export const VECTOR_SCHEMA_VERSION = 2;
+export const VectorPrefix = z.string().max(512);
 
 /**
  * Reranking and OCR are optional stages around the embedding one: a cross-encoder that
@@ -48,6 +52,10 @@ export const VectorStoreDto = z.object({
   // Prefaulted rather than required: a row written before these settings existed still reads.
   rerank: VectorRerankConfig.prefault({}),
   ocr: VectorOcrConfig.prefault({}),
+  queryPrefix: VectorPrefix.default(""),
+  documentPrefix: VectorPrefix.default(""),
+  searchMode: VectorSearchMode.default("hybrid"),
+  schemaVersion: z.number().int().positive().default(1),
   indexType: z.string().min(1),
   status: VectorHealth,
   graphStale: z.boolean().prefault(false),
@@ -75,6 +83,9 @@ export const CreateVectorStoreInput = VectorStoreDto.pick({
     chunkOverlap: VectorStoreDto.shape.chunkOverlap.default(32),
     rerank: VectorRerankConfig.prefault({}),
     ocr: VectorOcrConfig.prefault({}),
+    queryPrefix: VectorPrefix.default(""),
+    documentPrefix: VectorPrefix.default(""),
+    searchMode: VectorSearchMode.default("hybrid"),
     indexType: z.literal("FLAT").default("FLAT"),
   })
   .refine((input) => input.chunkOverlap < input.chunkSize, {
@@ -90,5 +101,8 @@ export const UpdateVectorStoreInput = VectorStoreRef.extend({
   chunkOverlap: VectorStoreDto.shape.chunkOverlap.optional(),
   rerank: VectorRerankConfig.optional(),
   ocr: VectorOcrConfig.optional(),
+  queryPrefix: VectorPrefix.optional(),
+  documentPrefix: VectorPrefix.optional(),
+  searchMode: VectorSearchMode.optional(),
 });
 export type UpdateVectorStoreInput = z.infer<typeof UpdateVectorStoreInput>;

@@ -42,6 +42,9 @@ const unusedGraphExports = {
 
 const unusedVectorExports = {
   ...unusedGraphExports,
+  async chunkSegments() {
+    throw new Error("unused");
+  },
   async vectorCall() {
     throw new Error("unused");
   },

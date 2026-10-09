@@ -32,7 +32,8 @@ export default function ChatRetrieval({
                   title={hit.sourcePath}
                   className="max-w-full rounded-pill border border-main-750 bg-main-900 px-2 py-0.5 font-mono text-[11px] break-all text-main-400"
                 >
-                  {hit.sourcePath} · {hit.score.toFixed(2)}
+                  {hit.sourcePath}
+                  {hit.page === null ? "" : ` · стр. ${String(hit.page)}`} · {hit.score.toFixed(2)}
                 </span>
               ))}
               {hits.length === 0 && <span>Подходящих источников нет.</span>}
