@@ -1,0 +1,28 @@
+[package]
+name = "zvs-studio"
+version = "0.0.0"
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "zvs_studio_lib"
+
+[[bin]]
+name = "zvs-studio"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "=2.7.1", features = ["isolation"] }
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tauri = { version = "=2.12.1", features = ["isolation", "unstable"] }
+tauri-plugin-single-instance = "=2.5.2"
+
+[lints.rust]
+warnings = "deny"
+unsafe_code = "deny"
+
+[lints.clippy]
+all = "deny"

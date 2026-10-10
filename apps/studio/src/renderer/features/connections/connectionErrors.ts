@@ -10,6 +10,7 @@ const COPY: Partial<Record<AppErrorCode, string>> = {
   [AppErrorCode.SECRET_MISSING]: "У выбранного секрета нет сохранённого значения.",
   [AppErrorCode.SECRET_DECRYPT_FAILED]: "Хранилище ключей недоступно — значение нельзя прочитать.",
   [AppErrorCode.DB_ERROR]: "Сбой локальной базы данных.",
+  [AppErrorCode.NOT_IMPLEMENTED]: "Эта функция ещё не перенесена в новую оболочку приложения.",
 };
 
 const HOST_WORDED = new Set<AppErrorCode>([

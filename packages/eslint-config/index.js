@@ -50,6 +50,7 @@ export function createConfig(root) {
         "**/out/**",
         "**/build/**",
         "**/target/**",
+        "**/src-tauri/gen/**",
         "**/.turbo/**",
         "**/coverage/**",
         "design/**",

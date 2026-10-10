@@ -1,5 +1,10 @@
 # Data layer
 
+> **Superseded by revision 2.0 (PASSPORT D2, D10).** SQLite now belongs to the Rust host
+> (`crates/zvs-host/src/data`, `rusqlite`, embedded SQL migrations starting from a baseline
+> squashed from `0000`–`0021`, TASK_061). This TypeScript layer is frozen until TASK_076
+> deletes it. Do not add migrations here.
+
 TypeScript owns SQLite, alone (PASSPORT decision D2). Rust never opens the database: it returns
 results across the boundary and the host persists them through a repository. One writer, one
 schema owner, one migration tool.

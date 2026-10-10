@@ -13,6 +13,7 @@ target/
 *.node
 apps/studio/resources/native/
 apps/studio/resources/sidecar/
+apps/studio/src-tauri/gen/
 .turbo/
 .env*
 coverage/

@@ -1,10 +1,36 @@
 # ZVS AI Studio
 
 Local-first desktop automation studio. The binding architecture is in
-[docs/PASSPORT.md](docs/PASSPORT.md). The workspace includes a sandboxed Electron shell
-and a minimal React renderer. IPC implementations and Rust crates arrive in later tasks.
+[docs/PASSPORT.md](docs/PASSPORT.md); the backlog and the rules for running a task are in
+`tasks/INDEX.md`.
 
-Use Node 26 and pnpm 12.3.4 (the exact package manager is recorded in `package.json`).
+## Moving to Tauri
+
+On 2026-10-10 we decided to move the studio from Electron to **Tauri 2 with the whole host
+rewritten in Rust** (PASSPORT D10). Phase M of the backlog (TASK_058 – TASK_076) does the
+move one domain at a time. Until TASK_076 lands, two apps live in this repository:
+
+|       | Electron (current, frozen)            | Tauri (target, growing)                         |
+| ----- | ------------------------------------- | ----------------------------------------------- |
+| Run   | `pnpm dev`                            | `pnpm dev:tauri`                                |
+| Shell | `apps/studio/src/host/main.ts`        | `apps/studio/src-tauri` (`zvs-studio`)          |
+| Host  | TypeScript in `apps/studio/src/host/` | Rust in `crates/zvs-host`                       |
+| Data  | `%APPDATA%\ZVS AI Studio`             | `%APPDATA%\<bundle identifier>`, starting empty |
+
+The TypeScript host is **frozen**. No feature work goes into it, because it is the behavioural
+specification the Rust port is checked against. Channels not yet ported answer
+`NOT_IMPLEMENTED` in the Tauri app. TASK_076 deletes Electron, the TS host, the napi addon,
+Drizzle and `better-sqlite3`, and makes `pnpm dev` the Tauri app.
+
+## Requirements
+
+- Node 26 and pnpm 12.3.4 (pinned in `package.json`). They are dev tooling only and do not
+  ship with the app.
+- Rust stable (the version in PASSPORT §3), with the MSVC build tools on Windows.
+- `protoc` (verified with 36.1), needed by LanceDB. See `crates/zvs-core/README.md`.
+- WebView2 runtime. It ships with Windows 11 and current Windows 10.
+
+## Commands
 
 ```sh
 pnpm install --frozen-lockfile
@@ -13,55 +39,25 @@ pnpm lint
 pnpm build
 pnpm test
 pnpm format:check
+cargo fmt --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 ```
 
-`pnpm dev` (or `pnpm --filter studio dev`) opens the studio with renderer HMR.
-After building, `pnpm --filter studio start` opens the unpackaged production build.
-Installation runs `install-electron` to download Electron's runtime (required by Electron 44).
-`pnpm format` formats maintained source and configuration. The Cargo workspace is
-intentionally empty until TASK_017, so Cargo gates are deferred.
+`pnpm test:e2e` runs the Playwright suite against the built app. After TASK_075 it attaches
+over WebView2's DevTools Protocol to a build with the `e2e` cargo feature.
 
-`apps/studio/src` reserves host, preload, renderer, and browser UI directories.
-`packages/shared` builds the temporary shared export; `packages/ipc` is reserved.
-Shared TypeScript and ESLint configuration live in their own workspace packages.
-New TypeScript packages should extend `@zvs/tsconfig/base.json`, use a package-local
-`rootDir`, and declare project references for their dependencies. Add new projects to
-the root solution config. Studio has separate host, preload, renderer, and build-config
-TypeScript projects. Host/config skip checking upstream declaration files because Electron
-references DOM types and electron-vite references optional SWC types; application source
-remains strictly checked, and the host does not gain DOM globals.
+## Layout
 
-The host composition root resolves platform paths, starts logging, and creates the window.
-Persistent data lives under Electron's `userData` directory for `ZVS AI Studio`; logs are
-JSON lines in `logs/studio.jsonl`, rotating at 5 MiB with three backups. Each line includes
-an epoch timestamp, level, and scope. The platform logger takes its directory and clock as
-dependencies. UUID v7 identifiers come from `host/platform/ids.ts`.
+```
+apps/studio/src           renderer (React + MobX), browser-ui chrome; the frozen TS host until TASK_076
+apps/studio/src-tauri     zvs-studio: Tauri shell, composition root, webviews, OS ports
+crates/zvs-host           the Rust host: IPC server, services, kernel, repositories, drivers
+crates/zvs-contract       serde mirror of packages/shared, bound by golden fixtures
+crates/zvs-core           pure compute: chunking, embedding, LanceDB, graph
+crates/zvs-jobd           sidecar for long or crash-prone jobs
+packages/shared           Zod DTOs, the IPC contract, error codes, events, fixtures
+packages/ipc              typed renderer client over the bridge
+```
 
-The preload exposes nothing until TASK_004. CSP permits local scripts/styles only and adds
-the local Vite WebSocket origin only in development. CSS is linked as a local file so it
-does not need inline-style exceptions. Vite HMR remounts the placeholder React root;
-React Fast Refresh and state preservation are not configured yet.
-
-The root lint task scans all application files, including directories without a package
-manifest. It runs without caching, and builds depend on lint. Path resolution honors
-application TypeScript configs, including aliases. Missing imports also fail lint.
-Shared cannot import applications; host and renderer cannot import one another; UI
-cannot import features or stores. Only host repositories may import
-`apps/studio/src/host/data/client.ts`. Keep that entry point when implementing TASK_006.
-Its composition and transaction API must preserve the repository boundary.
-
-Boundary regression tests use Node's test runner and temporary fixtures, checking both
-allowed and forbidden dependencies. The application test harness arrives in TASK_008.
-
-Tool versions are exact. TypeScript 6.0.3 and ESLint 9.39.5 are the newest releases
-compatible with the installed `typescript-eslint` and `eslint-plugin-import` peer ranges
-at bootstrap; revisit these together when upgrading. pnpm settings such as `saveExact`
-and the resolver build allowance live in `pnpm-workspace.yaml`; `.npmrc` holds the public
-registry configuration.
-
-Electron 44.2.0 and electron-vite 5.0.0 were resolved at installation time. Vite 7.3.6 is
-the latest compatible major for electron-vite 5; Vite 8 is outside its peer range.
-
-CI runs the install and gates on Windows for pushes and pull requests. The existing
-ignore policy keeps `tasks`, `design`, and `references` local; task status and handoffs
-are maintained locally as well.
+`tasks`, `design` and `references` are kept local (see `.gitignore`).

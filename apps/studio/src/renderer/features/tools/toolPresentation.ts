@@ -160,6 +160,7 @@ const COPY: Partial<Record<AppErrorCode, string>> = {
   [AppErrorCode.VALIDATION_FAILED]: "Входные данные не подходят под схему инструмента.",
   [AppErrorCode.NOT_FOUND]: "Инструмент не найден — возможно, он уже удалён из реестра.",
   [AppErrorCode.DB_ERROR]: "Сбой локальной базы данных.",
+  [AppErrorCode.NOT_IMPLEMENTED]: "Эта функция ещё не перенесена в новую оболочку приложения.",
 };
 
 const HOST_WORDED = new Set<AppErrorCode>([

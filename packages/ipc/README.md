@@ -1,5 +1,9 @@
 # IPC runtimes
 
+> **Revision 2.0 (PASSPORT D10).** The host end is now `zvs-host::ipc::IpcServer` in Rust,
+> reached through the Tauri command `ipc_call`. `createIpcServer` below serves only the
+> frozen Electron host and is deleted in TASK_076. The client is unchanged and stays.
+
 The two halves of the process boundary, both derived from the one contract in
 `@zvs/shared` (PASSPORT §7). Nothing here knows about a feature: add a channel to the
 contract, add a handler, done.

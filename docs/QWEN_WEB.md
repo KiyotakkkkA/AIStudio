@@ -1,7 +1,9 @@
 # Qwen web adapter
 
-The adapter implements text generation and streaming over the linked Electron
-account session. It is an unofficial web protocol integration, not the Qwen OAuth
+The adapter implements text generation and streaming over the linked browser
+account session. Under Electron that session was the `persist:browser-work` partition. After
+the Tauri migration (PASSPORT D10, TASK_066–TASK_067), requests run as `fetch()` inside a
+hidden webview of the browser's work profile, so the vendor's cookies are never copied out. It is an unofficial web protocol integration, not the Qwen OAuth
 or Qwen Code API.
 
 ## Model capabilities and thinking
@@ -64,5 +66,6 @@ pnpm exec vitest run apps/studio/tests/liveQwen.test.ts
 This opt-in test checks identity and discovery, then requests one short generation
 for each of the Thinking and Fast model categories. It can create two vendor
 chats. It prints endpoint status and counts, never credentials or response bodies.
-It uses direct fetch without Electron's cookie jar, so browser verification can
-block it even with a valid token. Without the environment variable it is skipped.
+It uses direct fetch without the browser profile's cookies, so browser verification
+can block it even with a valid token. After TASK_067 this test is an `#[ignore]`d Rust test
+(`cargo test -p zvs-host -- --ignored live_qwen`) with the same behaviour. Without the environment variable it is skipped.

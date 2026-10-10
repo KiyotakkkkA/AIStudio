@@ -1,3 +1,4 @@
+import "./app/tauriBridge";
 import { createRoot } from "react-dom/client";
 import { createEventRouter } from "./app/EventRouter";
 import { createReplayHook } from "./app/replay";

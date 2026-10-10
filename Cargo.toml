@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/zvs-core", "crates/zvs-jobd", "crates/zvs-napi"]
+members = ["apps/studio/src-tauri", "crates/zvs-core", "crates/zvs-jobd", "crates/zvs-napi"]
 
 [workspace.package]
 edition = "2024"

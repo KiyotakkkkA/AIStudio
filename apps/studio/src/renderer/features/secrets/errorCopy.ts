@@ -31,6 +31,7 @@ const COPY: Record<AppErrorCode, string> = {
   [AppErrorCode.DB_ERROR]: "Сбой локальной базы данных.",
   [AppErrorCode.UNSUPPORTED_FORMAT]: "Формат не поддерживается.",
   [AppErrorCode.LIMIT_EXCEEDED]: "Превышен допустимый предел запроса.",
+  [AppErrorCode.NOT_IMPLEMENTED]: "Эта функция ещё не перенесена в новую оболочку приложения.",
 };
 
 const ISSUE_COPY: Record<string, string> = {

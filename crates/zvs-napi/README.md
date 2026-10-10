@@ -1,5 +1,10 @@
 # Rust addon
 
+> **Deprecated (PASSPORT D1, D10).** The Rust host links `zvs-core` directly (TASK_068), so
+> this addon only serves the frozen Electron host and is deleted in TASK_076. The semantics
+> below (async everywhere, panic isolation, the cancellation lifecycle, error envelopes) are
+> what `zvs-host::drivers::core` must keep.
+
 Run `pnpm build:rust` from the repository root. This invokes napi build with
 `--platform --release --target <rustc-host> --locked` through the napi CLI API.
 Outputs live in `apps/studio/resources/native/<triple>/`; `zvs-core.node` is the

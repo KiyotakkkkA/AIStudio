@@ -8,7 +8,9 @@
   },
   "scripts": {
     "dev": "turbo run dev",
+    "dev:tauri": "pnpm --filter studio dev:tauri",
     "build": "turbo run build",
+    "build:tauri": "pnpm --filter studio build:tauri",
     "build:rust": "node scripts/build-rust.mjs",
     "build:rust:debug": "node scripts/build-rust.mjs --debug-panic",
     "test:rust": "pnpm build:rust && pnpm build:rust:debug && node --test test/native/",

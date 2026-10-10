@@ -1,7 +1,12 @@
 # zvs-core
 
-Shared Rust logic for the napi addon and job sidecar. Adapters own transport and
+Shared Rust logic for the host and the job sidecar. Adapters own transport and
 runtime integration; this crate never opens SQLite.
+
+> **Revision 2.0 (PASSPORT D1, D10).** The Rust host (`crates/zvs-host`) links this crate
+> directly through its `drivers::core` ports (TASK_068). The napi addon mentioned below serves
+> only the frozen Electron host until TASK_076 deletes it. The JSON transport notes describe
+> that addon, not this crate's API.
 
 ## Cancellation
 

@@ -1,5 +1,9 @@
 # Execution kernel
 
+> **Frozen specification (PASSPORT D10).** This is the TypeScript kernel the Rust port in
+> `crates/zvs-host/src/kernel/` must reproduce (TASK_070, chat in TASK_074). Do not change
+> behaviour here. TASK_076 moves this document next to the Rust code.
+
 `RunService` owns admission, inspection, cancellation and boot recovery. `Scheduler` runs
 one graph with one abort controller and a per-run concurrency cap. Register node definitions
 in `NodeRegistry` before calling `recover()`. Production registers `llm.generate`, `vector.search`, `flow.branch`, `flow.map`, `chat.prepare` and `chat.persist`.

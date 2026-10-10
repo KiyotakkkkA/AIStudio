@@ -1,5 +1,13 @@
 # Studio app
 
+> **Migration in progress (PASSPORT D10, Phase M).** This file describes the Electron shell and
+> the TypeScript host, which are frozen and serve as the behavioural specification for the Rust
+> port. The Tauri shell lives in `src-tauri/` and the Rust host in `crates/zvs-host`. The event
+> semantics below (`seq` per stream, drop-after-end, the recorder and the renderer
+> `EventRouter`) carry over unchanged; TASK_060 re-implements the host end. The preload
+> section is replaced by capabilities and `src/renderer/app/tauriBridge.ts` (TASK_058).
+> TASK_076 rewrites this file for Tauri only.
+
 The Electron shell: host process, preload bridge and renderer. Architecture and the decisions
 behind it live in `/docs/PASSPORT.md`; this file records what the runtime pieces do.
 

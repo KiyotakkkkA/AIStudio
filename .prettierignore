@@ -3,6 +3,7 @@ build/
 node_modules/
 out/
 target/
+apps/studio/src-tauri/gen/
 .turbo/
 coverage/
 pnpm-lock.yaml

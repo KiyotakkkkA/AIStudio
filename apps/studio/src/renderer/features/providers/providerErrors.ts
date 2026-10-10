@@ -15,6 +15,7 @@ const COPY: Partial<Record<AppErrorCode, string>> = {
   [AppErrorCode.PROVIDER_SESSION_EXPIRED]: "Сессия истекла — войдите в аккаунт заново.",
   [AppErrorCode.RATE_LIMITED]: "Слишком много запросов, попробуйте позже.",
   [AppErrorCode.DB_ERROR]: "Сбой локальной базы данных.",
+  [AppErrorCode.NOT_IMPLEMENTED]: "Эта функция ещё не перенесена в новую оболочку приложения.",
 };
 
 export function providerErrorCopy(error: unknown): string {
