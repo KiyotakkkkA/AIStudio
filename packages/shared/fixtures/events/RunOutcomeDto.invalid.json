@@ -1,0 +1,26 @@
+[
+  {
+    "name": "unknown status",
+    "value": {
+      "status": "weird"
+    }
+  },
+  {
+    "name": "unknown code",
+    "value": {
+      "status": "failed",
+      "code": "NOPE"
+    }
+  },
+  {
+    "name": "null message",
+    "value": {
+      "status": "failed",
+      "message": null
+    }
+  },
+  {
+    "name": "missing status",
+    "value": {}
+  }
+]

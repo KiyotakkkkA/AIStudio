@@ -1,0 +1,37 @@
+[
+  {
+    "name": "missing vramBytes",
+    "value": {
+      "vendor": "NVIDIA",
+      "model": "GeForce RTX 4070",
+      "discrete": true
+    }
+  },
+  {
+    "name": "negative vramBytes",
+    "value": {
+      "vendor": "NVIDIA",
+      "model": "GeForce RTX 4070",
+      "vramBytes": -1,
+      "discrete": true
+    }
+  },
+  {
+    "name": "vendor too long",
+    "value": {
+      "vendor": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "model": "GeForce RTX 4070",
+      "vramBytes": 12884901888,
+      "discrete": true
+    }
+  },
+  {
+    "name": "discrete as string",
+    "value": {
+      "vendor": "NVIDIA",
+      "model": "GeForce RTX 4070",
+      "vramBytes": 12884901888,
+      "discrete": "yes"
+    }
+  }
+]

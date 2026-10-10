@@ -1,0 +1,136 @@
+[
+  {
+    "name": "missing gpu",
+    "value": {
+      "platform": "win32",
+      "arch": "x64",
+      "cpuModel": "AMD Ryzen 7 7800X3D",
+      "cpuCores": 16,
+      "totalMemoryBytes": 34359738368,
+      "freeMemoryBytes": 17179869184,
+      "freeDiskBytes": 512000000000,
+      "tier": "high",
+      "measuredAt": 1700000000000
+    }
+  },
+  {
+    "name": "unknown tier",
+    "value": {
+      "platform": "win32",
+      "arch": "x64",
+      "cpuModel": "AMD Ryzen 7 7800X3D",
+      "cpuCores": 16,
+      "totalMemoryBytes": 34359738368,
+      "freeMemoryBytes": 17179869184,
+      "freeDiskBytes": 512000000000,
+      "gpu": {
+        "vendor": "NVIDIA",
+        "model": "GeForce RTX 4070",
+        "vramBytes": 12884901888,
+        "discrete": true
+      },
+      "tier": "ultra",
+      "measuredAt": 1700000000000
+    }
+  },
+  {
+    "name": "platform too long",
+    "value": {
+      "platform": "ppppppppppppppppppppppppppppppppp",
+      "arch": "x64",
+      "cpuModel": "AMD Ryzen 7 7800X3D",
+      "cpuCores": 16,
+      "totalMemoryBytes": 34359738368,
+      "freeMemoryBytes": 17179869184,
+      "freeDiskBytes": 512000000000,
+      "gpu": {
+        "vendor": "NVIDIA",
+        "model": "GeForce RTX 4070",
+        "vramBytes": 12884901888,
+        "discrete": true
+      },
+      "tier": "high",
+      "measuredAt": 1700000000000
+    }
+  },
+  {
+    "name": "negative measuredAt",
+    "value": {
+      "platform": "win32",
+      "arch": "x64",
+      "cpuModel": "AMD Ryzen 7 7800X3D",
+      "cpuCores": 16,
+      "totalMemoryBytes": 34359738368,
+      "freeMemoryBytes": 17179869184,
+      "freeDiskBytes": 512000000000,
+      "gpu": {
+        "vendor": "NVIDIA",
+        "model": "GeForce RTX 4070",
+        "vramBytes": 12884901888,
+        "discrete": true
+      },
+      "tier": "high",
+      "measuredAt": -1
+    }
+  },
+  {
+    "name": "fractional cpuCores",
+    "value": {
+      "platform": "win32",
+      "arch": "x64",
+      "cpuModel": "AMD Ryzen 7 7800X3D",
+      "cpuCores": 7.5,
+      "totalMemoryBytes": 34359738368,
+      "freeMemoryBytes": 17179869184,
+      "freeDiskBytes": 512000000000,
+      "gpu": {
+        "vendor": "NVIDIA",
+        "model": "GeForce RTX 4070",
+        "vramBytes": 12884901888,
+        "discrete": true
+      },
+      "tier": "high",
+      "measuredAt": 1700000000000
+    }
+  },
+  {
+    "name": "invalid nested gpu",
+    "value": {
+      "platform": "win32",
+      "arch": "x64",
+      "cpuModel": "AMD Ryzen 7 7800X3D",
+      "cpuCores": 16,
+      "totalMemoryBytes": 34359738368,
+      "freeMemoryBytes": 17179869184,
+      "freeDiskBytes": 512000000000,
+      "gpu": {
+        "vendor": "NVIDIA",
+        "model": 1,
+        "vramBytes": 12884901888,
+        "discrete": true
+      },
+      "tier": "high",
+      "measuredAt": 1700000000000
+    }
+  },
+  {
+    "name": "snake_case field",
+    "value": {
+      "platform": "win32",
+      "arch": "x64",
+      "cpuCores": 16,
+      "totalMemoryBytes": 34359738368,
+      "freeMemoryBytes": 17179869184,
+      "freeDiskBytes": 512000000000,
+      "gpu": {
+        "vendor": "NVIDIA",
+        "model": "GeForce RTX 4070",
+        "vramBytes": 12884901888,
+        "discrete": true
+      },
+      "tier": "high",
+      "measuredAt": 1700000000000,
+      "cpu_model": "x"
+    }
+  }
+]

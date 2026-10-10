@@ -67,6 +67,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm build
+      - run: node scripts/contract-channels.mjs --check
       - run: pnpm build:rust:debug
       - run: node --test test/native/addon.test.mjs
       - run: pnpm test:coverage

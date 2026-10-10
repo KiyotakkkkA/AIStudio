@@ -46,3 +46,13 @@ tightens the step and log shapes and TASK_023 tightens the approval request. `Ru
 is already closed: `status` is `ok | cancelled | failed` with an optional `AppErrorCode` and
 message. Adding a variant is a breaking change for every subscriber — extend the payload of
 an existing one where that is possible.
+
+## The Rust mirror and golden fixtures
+
+Every DTO also exists as a serde type in `crates/zvs-contract` under the same name (PASSPORT §6).
+`fixtures/<domain>/<Name>.valid.json` and `<Name>.invalid.json` bind the two definitions:
+`tests/fixtures.test.ts` parses each case with Zod, and `cargo test -p zvs-contract` deserialises,
+validates and re-serialises each one. A fixture without a schema on either side fails both suites.
+`contract.channels.json` is the sorted channel list generated from `src/ipc/contract.ts`; run
+`pnpm contract:channels` after adding a channel, and CI fails on drift through
+`pnpm contract:channels:check`. The per-DTO recipe is in `crates/zvs-contract/README.md`.

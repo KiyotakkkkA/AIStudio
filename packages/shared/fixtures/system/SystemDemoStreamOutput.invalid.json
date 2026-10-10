@@ -1,0 +1,12 @@
+[
+  {
+    "name": "non-uuid stream",
+    "value": {
+      "streamId": "s"
+    }
+  },
+  {
+    "name": "missing streamId",
+    "value": {}
+  }
+]

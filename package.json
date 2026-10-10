@@ -14,6 +14,8 @@
     "build:rust": "node scripts/build-rust.mjs",
     "build:rust:debug": "node scripts/build-rust.mjs --debug-panic",
     "test:rust": "pnpm build:rust && pnpm build:rust:debug && node --test test/native/",
+    "contract:channels": "node scripts/contract-channels.mjs",
+    "contract:channels:check": "node scripts/contract-channels.mjs --check",
     "typecheck": "turbo run typecheck",
     "typecheck:root": "tsc -p tsconfig.test.json",
     "lint": "turbo run lint",

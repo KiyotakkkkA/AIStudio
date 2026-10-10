@@ -1,0 +1,29 @@
+[
+  {
+    "name": "above max steps",
+    "value": {
+      "steps": 1001
+    }
+  },
+  {
+    "name": "interval above max",
+    "value": {
+      "steps": 1,
+      "intervalMs": 5001
+    }
+  },
+  {
+    "name": "negative interval",
+    "value": {
+      "steps": 1,
+      "intervalMs": -1
+    }
+  },
+  {
+    "name": "null interval",
+    "value": {
+      "steps": 1,
+      "intervalMs": null
+    }
+  }
+]

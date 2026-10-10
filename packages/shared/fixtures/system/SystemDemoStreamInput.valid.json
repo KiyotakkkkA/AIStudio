@@ -1,0 +1,14 @@
+[
+  {
+    "name": "lowest",
+    "value": {
+      "steps": 1
+    }
+  },
+  {
+    "name": "highest",
+    "value": {
+      "steps": 100
+    }
+  }
+]

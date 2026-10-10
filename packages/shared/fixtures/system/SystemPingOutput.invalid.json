@@ -1,0 +1,25 @@
+[
+  {
+    "name": "pong false",
+    "value": {
+      "pong": false,
+      "hostTime": 1,
+      "roundTripHint": 0.5
+    }
+  },
+  {
+    "name": "missing roundTripHint",
+    "value": {
+      "pong": true,
+      "hostTime": 1
+    }
+  },
+  {
+    "name": "negative hostTime",
+    "value": {
+      "pong": true,
+      "hostTime": -1,
+      "roundTripHint": 0.5
+    }
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "zero",
+    "value": {
+      "steps": 0
+    }
+  },
+  {
+    "name": "above max",
+    "value": {
+      "steps": 101
+    }
+  },
+  {
+    "name": "fractional",
+    "value": {
+      "steps": 2.5
+    }
+  }
+]

@@ -1,0 +1,15 @@
+[
+  {
+    "name": "full",
+    "value": {
+      "steps": 1000,
+      "intervalMs": 5000
+    }
+  },
+  {
+    "name": "minimal",
+    "value": {
+      "steps": 1
+    }
+  }
+]

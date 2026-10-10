@@ -1,0 +1,14 @@
+[
+  {
+    "name": "string refresh",
+    "value": {
+      "refresh": "yes"
+    }
+  },
+  {
+    "name": "null refresh",
+    "value": {
+      "refresh": null
+    }
+  }
+]

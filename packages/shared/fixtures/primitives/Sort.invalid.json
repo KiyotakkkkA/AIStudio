@@ -1,0 +1,22 @@
+[
+  {
+    "name": "upper-case direction",
+    "value": {
+      "field": "name",
+      "direction": "DESC"
+    }
+  },
+  {
+    "name": "missing direction",
+    "value": {
+      "field": "name"
+    }
+  },
+  {
+    "name": "numeric field",
+    "value": {
+      "field": 1,
+      "direction": "asc"
+    }
+  }
+]

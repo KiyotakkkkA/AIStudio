@@ -1,0 +1,24 @@
+[
+  {
+    "name": "ok",
+    "value": {
+      "status": "ok"
+    }
+  },
+  {
+    "name": "cancelled",
+    "value": {
+      "status": "cancelled",
+      "code": "RUN_CANCELLED",
+      "message": "Запуск отменён"
+    }
+  },
+  {
+    "name": "failed",
+    "value": {
+      "status": "failed",
+      "code": "RUN_FAILED",
+      "message": "Запуск завершился ошибкой"
+    }
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "name": "negative",
+    "value": {
+      "count": -1
+    }
+  },
+  {
+    "name": "fractional",
+    "value": {
+      "count": 1.5
+    }
+  }
+]

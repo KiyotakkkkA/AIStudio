@@ -1,0 +1,21 @@
+[
+  {
+    "name": "full",
+    "value": {
+      "items": [
+        1,
+        "two",
+        {
+          "three": 3
+        }
+      ],
+      "nextCursor": "next"
+    }
+  },
+  {
+    "name": "minimal",
+    "value": {
+      "items": []
+    }
+  }
+]

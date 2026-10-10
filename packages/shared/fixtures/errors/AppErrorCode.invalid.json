@@ -1,0 +1,14 @@
+[
+  {
+    "name": "lower-case",
+    "value": "not_found"
+  },
+  {
+    "name": "unknown",
+    "value": "NOPE"
+  },
+  {
+    "name": "empty",
+    "value": ""
+  }
+]

@@ -1,0 +1,10 @@
+[
+  {
+    "name": "pong",
+    "value": {
+      "pong": true,
+      "hostTime": 1700000000250,
+      "roundTripHint": 250.5
+    }
+  }
+]

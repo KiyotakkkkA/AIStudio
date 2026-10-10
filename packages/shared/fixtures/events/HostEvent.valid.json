@@ -1,0 +1,116 @@
+[
+  {
+    "name": "token with kind",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "token",
+      "delta": "размышляю",
+      "kind": "reasoning"
+    }
+  },
+  {
+    "name": "token minimal",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "token",
+      "delta": "пр"
+    }
+  },
+  {
+    "name": "progress",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "progress",
+      "done": 3,
+      "total": 10
+    }
+  },
+  {
+    "name": "step",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "step",
+      "step": {
+        "node": "fetch",
+        "state": "running"
+      }
+    }
+  },
+  {
+    "name": "log",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "log",
+      "line": {
+        "level": "info",
+        "message": "hi"
+      }
+    }
+  },
+  {
+    "name": "approval",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "approval",
+      "request": {
+        "action": "submit",
+        "tool": "fs.write",
+        "args": {
+          "path": "a.txt"
+        }
+      }
+    }
+  },
+  {
+    "name": "end ok",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "end",
+      "outcome": {
+        "status": "ok"
+      }
+    }
+  },
+  {
+    "name": "end cancelled",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "end",
+      "outcome": {
+        "status": "cancelled",
+        "code": "RUN_CANCELLED",
+        "message": "Запуск отменён"
+      }
+    }
+  },
+  {
+    "name": "end failed",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "end",
+      "outcome": {
+        "status": "failed",
+        "code": "RUN_FAILED",
+        "message": "boom"
+      }
+    }
+  }
+]

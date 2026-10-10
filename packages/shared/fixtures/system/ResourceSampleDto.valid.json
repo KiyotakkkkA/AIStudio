@@ -1,0 +1,30 @@
+[
+  {
+    "name": "with gpu counters",
+    "value": {
+      "at": 1700000000500,
+      "cpuPercent": 37.5,
+      "memoryUsedBytes": 17179869184,
+      "memoryTotalBytes": 34359738368,
+      "processMemoryBytes": 268435456,
+      "gpuName": "GeForce RTX 4070",
+      "gpuPercent": 12.25,
+      "vramUsedBytes": 2147483648,
+      "vramTotalBytes": 12884901888
+    }
+  },
+  {
+    "name": "without gpu counters",
+    "value": {
+      "at": 1700000000500,
+      "cpuPercent": 37.5,
+      "memoryUsedBytes": 17179869184,
+      "memoryTotalBytes": 34359738368,
+      "processMemoryBytes": 268435456,
+      "gpuName": null,
+      "gpuPercent": null,
+      "vramUsedBytes": null,
+      "vramTotalBytes": null
+    }
+  }
+]

@@ -1,0 +1,15 @@
+[
+  {
+    "name": "full",
+    "value": {
+      "limit": 50,
+      "cursor": "opaque-cursor"
+    }
+  },
+  {
+    "name": "minimal",
+    "value": {
+      "limit": 1
+    }
+  }
+]

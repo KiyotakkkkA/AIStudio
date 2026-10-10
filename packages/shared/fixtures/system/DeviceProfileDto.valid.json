@@ -1,0 +1,37 @@
+[
+  {
+    "name": "with gpu",
+    "value": {
+      "platform": "win32",
+      "arch": "x64",
+      "cpuModel": "AMD Ryzen 7 7800X3D",
+      "cpuCores": 16,
+      "totalMemoryBytes": 34359738368,
+      "freeMemoryBytes": 17179869184,
+      "freeDiskBytes": 512000000000,
+      "gpu": {
+        "vendor": "NVIDIA",
+        "model": "GeForce RTX 4070",
+        "vramBytes": 12884901888,
+        "discrete": true
+      },
+      "tier": "high",
+      "measuredAt": 1700000000000
+    }
+  },
+  {
+    "name": "without gpu",
+    "value": {
+      "platform": "win32",
+      "arch": "x64",
+      "cpuModel": "AMD Ryzen 7 7800X3D",
+      "cpuCores": 16,
+      "totalMemoryBytes": 34359738368,
+      "freeMemoryBytes": 17179869184,
+      "freeDiskBytes": 0,
+      "gpu": null,
+      "tier": "low",
+      "measuredAt": 1700000000000
+    }
+  }
+]

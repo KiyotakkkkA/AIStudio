@@ -1,0 +1,44 @@
+[
+  {
+    "name": "zero limit",
+    "value": {
+      "limit": 0
+    }
+  },
+  {
+    "name": "fractional limit",
+    "value": {
+      "limit": 1.5
+    }
+  },
+  {
+    "name": "negative limit",
+    "value": {
+      "limit": -1
+    }
+  },
+  {
+    "name": "unsafe limit",
+    "value": {
+      "limit": 9007199254740992
+    }
+  },
+  {
+    "name": "empty cursor",
+    "value": {
+      "limit": 1,
+      "cursor": ""
+    }
+  },
+  {
+    "name": "null cursor",
+    "value": {
+      "limit": 1,
+      "cursor": null
+    }
+  },
+  {
+    "name": "missing limit",
+    "value": {}
+  }
+]

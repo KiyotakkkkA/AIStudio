@@ -1,0 +1,14 @@
+[
+  {
+    "name": "text",
+    "value": {
+      "text": "Привет, мир 😀"
+    }
+  },
+  {
+    "name": "empty",
+    "value": {
+      "text": ""
+    }
+  }
+]

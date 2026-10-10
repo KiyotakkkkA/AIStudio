@@ -1,0 +1,26 @@
+[
+  {
+    "name": "items not an array",
+    "value": {
+      "items": {}
+    }
+  },
+  {
+    "name": "empty cursor",
+    "value": {
+      "items": [],
+      "nextCursor": ""
+    }
+  },
+  {
+    "name": "null cursor",
+    "value": {
+      "items": [],
+      "nextCursor": null
+    }
+  },
+  {
+    "name": "missing items",
+    "value": {}
+  }
+]

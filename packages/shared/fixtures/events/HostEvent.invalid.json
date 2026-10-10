@@ -1,0 +1,152 @@
+[
+  {
+    "name": "unknown type",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "nope"
+    }
+  },
+  {
+    "name": "missing type",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "delta": ""
+    }
+  },
+  {
+    "name": "fractional seq",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 1.5,
+      "ts": 1700000000000,
+      "type": "token",
+      "delta": ""
+    }
+  },
+  {
+    "name": "negative seq",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": -1,
+      "ts": 1700000000000,
+      "type": "token",
+      "delta": ""
+    }
+  },
+  {
+    "name": "unsafe seq",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 9007199254740992,
+      "ts": 1700000000000,
+      "type": "token",
+      "delta": ""
+    }
+  },
+  {
+    "name": "negative ts",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": -1,
+      "type": "token",
+      "delta": ""
+    }
+  },
+  {
+    "name": "missing seq",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "ts": 0,
+      "type": "token",
+      "delta": ""
+    }
+  },
+  {
+    "name": "non-uuid stream",
+    "value": {
+      "streamId": "nope",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "token",
+      "delta": ""
+    }
+  },
+  {
+    "name": "null kind",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "token",
+      "delta": "",
+      "kind": null
+    }
+  },
+  {
+    "name": "unknown kind",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "token",
+      "delta": "",
+      "kind": "image"
+    }
+  },
+  {
+    "name": "token without delta",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "token"
+    }
+  },
+  {
+    "name": "negative progress",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "progress",
+      "done": -1,
+      "total": 10
+    }
+  },
+  {
+    "name": "step not an object",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "step",
+      "step": []
+    }
+  },
+  {
+    "name": "end with unknown status",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "end",
+      "outcome": {
+        "status": "weird"
+      }
+    }
+  },
+  {
+    "name": "end without outcome",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "end"
+    }
+  }
+]

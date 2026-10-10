@@ -1,0 +1,84 @@
+[
+  {
+    "name": "cpuPercent above 100",
+    "value": {
+      "at": 1700000000500,
+      "cpuPercent": 100.5,
+      "memoryUsedBytes": 17179869184,
+      "memoryTotalBytes": 34359738368,
+      "processMemoryBytes": 268435456,
+      "gpuName": "GeForce RTX 4070",
+      "gpuPercent": 12.25,
+      "vramUsedBytes": 2147483648,
+      "vramTotalBytes": 12884901888
+    }
+  },
+  {
+    "name": "negative cpuPercent",
+    "value": {
+      "at": 1700000000500,
+      "cpuPercent": -0.5,
+      "memoryUsedBytes": 17179869184,
+      "memoryTotalBytes": 34359738368,
+      "processMemoryBytes": 268435456,
+      "gpuName": "GeForce RTX 4070",
+      "gpuPercent": 12.25,
+      "vramUsedBytes": 2147483648,
+      "vramTotalBytes": 12884901888
+    }
+  },
+  {
+    "name": "gpuPercent above 100",
+    "value": {
+      "at": 1700000000500,
+      "cpuPercent": 37.5,
+      "memoryUsedBytes": 17179869184,
+      "memoryTotalBytes": 34359738368,
+      "processMemoryBytes": 268435456,
+      "gpuName": "GeForce RTX 4070",
+      "gpuPercent": 101.5,
+      "vramUsedBytes": 2147483648,
+      "vramTotalBytes": 12884901888
+    }
+  },
+  {
+    "name": "missing gpuName",
+    "value": {
+      "at": 1700000000500,
+      "cpuPercent": 37.5,
+      "memoryUsedBytes": 17179869184,
+      "memoryTotalBytes": 34359738368,
+      "processMemoryBytes": 268435456,
+      "gpuPercent": null,
+      "vramUsedBytes": null,
+      "vramTotalBytes": null
+    }
+  },
+  {
+    "name": "missing vramTotalBytes",
+    "value": {
+      "at": 1700000000500,
+      "cpuPercent": 37.5,
+      "memoryUsedBytes": 17179869184,
+      "memoryTotalBytes": 34359738368,
+      "processMemoryBytes": 268435456,
+      "gpuName": null,
+      "gpuPercent": null,
+      "vramUsedBytes": null
+    }
+  },
+  {
+    "name": "gpuName too long",
+    "value": {
+      "at": 1700000000500,
+      "cpuPercent": 37.5,
+      "memoryUsedBytes": 17179869184,
+      "memoryTotalBytes": 34359738368,
+      "processMemoryBytes": 268435456,
+      "gpuName": "ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+      "gpuPercent": 12.25,
+      "vramUsedBytes": 2147483648,
+      "vramTotalBytes": 12884901888
+    }
+  }
+]

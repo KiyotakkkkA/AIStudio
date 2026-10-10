@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["apps/studio/src-tauri", "crates/zvs-core", "crates/zvs-jobd", "crates/zvs-napi"]
+members = ["apps/studio/src-tauri", "crates/zvs-contract", "crates/zvs-core", "crates/zvs-jobd", "crates/zvs-napi"]
 
 [workspace.package]
 edition = "2024"
@@ -26,6 +26,7 @@ serde_json = "=1.0.151"
 thiserror = "=2.0.20"
 tokio-util = { version = "=0.7.19", features = ["rt"] }
 unicode-segmentation = "=1.13.3"
+uuid = { version = "=1.26.1", default-features = false, features = ["std"] }
 
 [workspace.lints.rust]
 warnings = "deny"

@@ -1,0 +1,18 @@
+[
+  {
+    "name": "missing sentAt",
+    "value": {}
+  },
+  {
+    "name": "negative sentAt",
+    "value": {
+      "sentAt": -1
+    }
+  },
+  {
+    "name": "string sentAt",
+    "value": {
+      "sentAt": "now"
+    }
+  }
+]

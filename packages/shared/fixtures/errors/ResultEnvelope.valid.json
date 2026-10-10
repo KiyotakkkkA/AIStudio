@@ -1,0 +1,43 @@
+[
+  {
+    "name": "success with object data",
+    "value": {
+      "ok": true,
+      "data": {
+        "pong": true,
+        "hostTime": 1
+      }
+    }
+  },
+  {
+    "name": "success with null data",
+    "value": {
+      "ok": true,
+      "data": null
+    }
+  },
+  {
+    "name": "failure with details",
+    "value": {
+      "ok": false,
+      "error": {
+        "code": "VALIDATION_FAILED",
+        "message": "Некорректные данные запроса",
+        "details": {
+          "field": "limit",
+          "rule": "range"
+        }
+      }
+    }
+  },
+  {
+    "name": "failure without details",
+    "value": {
+      "ok": false,
+      "error": {
+        "code": "NOT_IMPLEMENTED",
+        "message": "Канал «x.y» ещё не перенесён в Tauri-хост"
+      }
+    }
+  }
+]

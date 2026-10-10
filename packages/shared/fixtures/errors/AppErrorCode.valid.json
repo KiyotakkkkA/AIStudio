@@ -1,0 +1,90 @@
+[
+  {
+    "name": "UNKNOWN",
+    "value": "UNKNOWN"
+  },
+  {
+    "name": "VALIDATION_FAILED",
+    "value": "VALIDATION_FAILED"
+  },
+  {
+    "name": "NOT_FOUND",
+    "value": "NOT_FOUND"
+  },
+  {
+    "name": "CONFLICT",
+    "value": "CONFLICT"
+  },
+  {
+    "name": "PERMISSION_DENIED",
+    "value": "PERMISSION_DENIED"
+  },
+  {
+    "name": "SECRET_MISSING",
+    "value": "SECRET_MISSING"
+  },
+  {
+    "name": "SECRET_DECRYPT_FAILED",
+    "value": "SECRET_DECRYPT_FAILED"
+  },
+  {
+    "name": "PROVIDER_UNREACHABLE",
+    "value": "PROVIDER_UNREACHABLE"
+  },
+  {
+    "name": "PROVIDER_AUTH_FAILED",
+    "value": "PROVIDER_AUTH_FAILED"
+  },
+  {
+    "name": "PROVIDER_SESSION_EXPIRED",
+    "value": "PROVIDER_SESSION_EXPIRED"
+  },
+  {
+    "name": "RATE_LIMITED",
+    "value": "RATE_LIMITED"
+  },
+  {
+    "name": "RUN_CANCELLED",
+    "value": "RUN_CANCELLED"
+  },
+  {
+    "name": "RUN_FAILED",
+    "value": "RUN_FAILED"
+  },
+  {
+    "name": "APPROVAL_DENIED",
+    "value": "APPROVAL_DENIED"
+  },
+  {
+    "name": "SIDECAR_UNAVAILABLE",
+    "value": "SIDECAR_UNAVAILABLE"
+  },
+  {
+    "name": "MCP_UNAVAILABLE",
+    "value": "MCP_UNAVAILABLE"
+  },
+  {
+    "name": "MCP_TIMEOUT",
+    "value": "MCP_TIMEOUT"
+  },
+  {
+    "name": "NATIVE_ERROR",
+    "value": "NATIVE_ERROR"
+  },
+  {
+    "name": "DB_ERROR",
+    "value": "DB_ERROR"
+  },
+  {
+    "name": "UNSUPPORTED_FORMAT",
+    "value": "UNSUPPORTED_FORMAT"
+  },
+  {
+    "name": "LIMIT_EXCEEDED",
+    "value": "LIMIT_EXCEEDED"
+  },
+  {
+    "name": "NOT_IMPLEMENTED",
+    "value": "NOT_IMPLEMENTED"
+  }
+]

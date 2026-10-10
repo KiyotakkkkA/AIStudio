@@ -1,0 +1,12 @@
+[
+  {
+    "name": "numeric text",
+    "value": {
+      "text": 1
+    }
+  },
+  {
+    "name": "missing text",
+    "value": {}
+  }
+]

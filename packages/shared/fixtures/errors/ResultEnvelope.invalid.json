@@ -1,0 +1,68 @@
+[
+  {
+    "name": "missing ok",
+    "value": {
+      "data": 1
+    }
+  },
+  {
+    "name": "string ok",
+    "value": {
+      "ok": "true",
+      "data": 1
+    }
+  },
+  {
+    "name": "success without data",
+    "value": {
+      "ok": true
+    }
+  },
+  {
+    "name": "failure without error",
+    "value": {
+      "ok": false
+    }
+  },
+  {
+    "name": "unknown code",
+    "value": {
+      "ok": false,
+      "error": {
+        "code": "NOPE",
+        "message": ""
+      }
+    }
+  },
+  {
+    "name": "null details",
+    "value": {
+      "ok": false,
+      "error": {
+        "code": "UNKNOWN",
+        "message": "",
+        "details": null
+      }
+    }
+  },
+  {
+    "name": "array details",
+    "value": {
+      "ok": false,
+      "error": {
+        "code": "UNKNOWN",
+        "message": "",
+        "details": []
+      }
+    }
+  },
+  {
+    "name": "missing message",
+    "value": {
+      "ok": false,
+      "error": {
+        "code": "UNKNOWN"
+      }
+    }
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "full",
+    "value": {
+      "vendor": "NVIDIA",
+      "model": "GeForce RTX 4070",
+      "vramBytes": 12884901888,
+      "discrete": true
+    }
+  },
+  {
+    "name": "unknown vram",
+    "value": {
+      "vendor": "NVIDIA",
+      "model": "GeForce RTX 4070",
+      "vramBytes": null,
+      "discrete": false
+    }
+  }
+]
