@@ -1,0 +1,26 @@
+[package]
+name = "zvs-host"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[features]
+testing = ["dep:tempfile"]
+
+[dependencies]
+futures.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile = { workspace = true, optional = true }
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt", "time"] }
+uuid = { workspace = true, features = ["v7"] }
+zvs-contract = { path = "../zvs-contract" }
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["rt", "time", "macros", "test-util"] }
+
+[lints]
+workspace = true

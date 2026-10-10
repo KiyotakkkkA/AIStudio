@@ -62,7 +62,7 @@ macro_rules! no_refinements {
 }
 pub(crate) use no_refinements;
 
-no_refinements!(Value, String, bool, AppError, AppErrorCode);
+no_refinements!((), Value, String, bool, AppError, AppErrorCode);
 
 pub mod check {
     use crate::errors::AppError;

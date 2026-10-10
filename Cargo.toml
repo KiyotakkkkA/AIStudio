@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["apps/studio/src-tauri", "crates/zvs-contract", "crates/zvs-core", "crates/zvs-jobd", "crates/zvs-napi"]
+members = ["apps/studio/src-tauri", "crates/zvs-contract", "crates/zvs-host", "crates/zvs-core", "crates/zvs-jobd", "crates/zvs-napi"]
 
 [workspace.package]
 edition = "2024"
@@ -17,6 +17,7 @@ tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "time"] 
 blake3 = "=1.8.7"
 pdf-extract = "=0.12.0"
 petgraph = "=0.8.3"
+regex = "=1.13.1"
 napi = { version = "=3.12.4", default-features = false, features = ["napi8", "tokio_rt"] }
 napi-derive = "=3.6.5"
 napi-build = "=2.4.2"
