@@ -1,0 +1,28 @@
+[
+  {
+    "name": "negative x",
+    "value": {
+      "x": -1,
+      "y": 0,
+      "width": 10,
+      "height": 10
+    }
+  },
+  {
+    "name": "missing height",
+    "value": {
+      "x": 0,
+      "y": 0,
+      "width": 10
+    }
+  },
+  {
+    "name": "string width",
+    "value": {
+      "x": 0,
+      "y": 0,
+      "width": "10",
+      "height": 10
+    }
+  }
+]

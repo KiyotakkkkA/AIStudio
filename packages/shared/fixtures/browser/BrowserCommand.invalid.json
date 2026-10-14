@@ -1,0 +1,14 @@
+[
+  { "name": "unknown action", "value": { "action": "execute", "script": "alert(1)" } },
+  { "name": "missing action", "value": {} },
+  { "name": "empty domain", "value": { "action": "clearSite", "domain": "" } },
+  { "name": "tab id not a uuid", "value": { "action": "switch", "id": "not-a-tab" } },
+  {
+    "name": "negative index",
+    "value": { "action": "reorder", "id": "0199aa11-1111-7111-8111-111111111111", "index": -1 }
+  },
+  { "name": "empty navigate url", "value": { "action": "navigate", "url": "" } },
+  { "name": "null new url", "value": { "action": "new", "url": null } },
+  { "name": "sites without visibility", "value": { "action": "sites" } },
+  { "name": "empty cookie id", "value": { "action": "removeCookie", "id": "" } }
+]

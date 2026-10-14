@@ -155,10 +155,7 @@ pub fn create_recovery<R: Runtime>(
 }
 
 pub fn focus_studio<R: Runtime>(app: &AppHandle<R>) {
-    let Some(window) = app
-        .get_webview_window(STUDIO)
-        .or_else(|| app.get_webview_window(RECOVERY))
-    else {
+    let Some(window) = app.get_window(STUDIO).or_else(|| app.get_window(RECOVERY)) else {
         return;
     };
     if window.is_minimized().unwrap_or(false) {
@@ -175,7 +172,7 @@ fn canvas_color(theme: Theme) -> Color {
     }
 }
 
-fn app_origin<R: Runtime>(app: &AppHandle<R>, use_https_scheme: bool) -> Option<Url> {
+pub fn app_origin<R: Runtime>(app: &AppHandle<R>, use_https_scheme: bool) -> Option<Url> {
     if tauri::is_dev()
         && let Some(url) = &app.config().build.dev_url
     {
@@ -190,7 +187,7 @@ fn app_origin<R: Runtime>(app: &AppHandle<R>, use_https_scheme: bool) -> Option<
     Url::parse(&origin).ok()
 }
 
-fn same_origin(url: &Url, origin: &Url) -> bool {
+pub fn same_origin(url: &Url, origin: &Url) -> bool {
     url.scheme() == origin.scheme()
         && url.host_str() == origin.host_str()
         && url.port_or_known_default() == origin.port_or_known_default()

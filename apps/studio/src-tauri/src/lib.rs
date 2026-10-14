@@ -1,3 +1,4 @@
+mod browser;
 mod commands;
 mod platform;
 mod theme;
@@ -8,6 +9,7 @@ use std::sync::Arc;
 
 use serde_json::json;
 use tauri::{App, AppHandle, Manager, RunEvent};
+use zvs_host::browser::{BrowserLifecycle, profile_dir};
 use zvs_host::data::repositories::SecretFilter;
 use zvs_host::data::{MigrationFailed, PrepareOptions, prepare_database};
 use zvs_host::drivers::ai::adapters::FileSystemModelStore;
@@ -32,6 +34,7 @@ use zvs_host::services::{
 };
 use zvs_host::{IpcServer, ipc};
 
+use crate::browser::BrowserWorkspace;
 use crate::commands::Host;
 use crate::theme::TauriTheme;
 
@@ -58,7 +61,9 @@ pub fn run() {
         }))
         .invoke_handler(tauri::generate_handler![
             commands::ipc_call,
-            commands::events_subscribe
+            commands::events_subscribe,
+            commands::browser_command,
+            commands::browser_subscribe
         ])
         .setup(|app| {
             match compose(app)? {
@@ -69,6 +74,13 @@ pub fn run() {
                     lifecycle,
                 } => {
                     let services = Arc::clone(&host.services);
+                    let lifecycle_events = BrowserLifecycle::new();
+                    app.manage(BrowserWorkspace::new(
+                        app.handle().clone(),
+                        profile_dir(&app.path().app_data_dir()?),
+                        lifecycle_events.clone(),
+                    ));
+                    app.manage(lifecycle_events);
                     app.manage(host);
                     app.manage(lifecycle);
                     window::create_studio(app.handle(), window, move |state| {

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Permissions</title>
+  </head>
+  <body>
+    <h1>Permissions</h1>
+    <ul id="results"></ul>
+    <script>
+      const results = document.getElementById("results");
+      const report = (name, outcome) => {
+        const item = document.createElement("li");
+        item.textContent = `${name}: ${outcome}`;
+        results.append(item);
+      };
+      navigator.geolocation.getCurrentPosition(
+        () => report("geolocation", "allowed"),
+        (error) => report("geolocation", `denied (${error.code})`),
+      );
+      navigator.mediaDevices
+        .getUserMedia({ video: true, audio: true })
+        .then(() => report("camera", "allowed"))
+        .catch((error) => report("camera", `denied (${error.name})`));
+      Notification.requestPermission().then((state) => report("notifications", state));
+    </script>
+  </body>
+</html>

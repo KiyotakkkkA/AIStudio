@@ -25,7 +25,9 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 | `services::health_check` | `HealthCheckService`, the `providers.healthcheck.*` settings keys                           |
 | `drivers::ai`            | AI ports, `HttpClient`, transports, adapters, `ProviderRegistry` (see below)                |
 | `testing`                | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, `FakeDriver`, … |
-| `kernel`, `browser`      | Empty until their port tasks                                                                |
+| `browser::policy`        | `is_web_url`, `navigation_url`, `profile_dir`, the chrome and status heights, `TAB_LIMIT`   |
+| `browser::lifecycle`     | `BrowserLifecycle`, `BrowserLifecycleEvent`, `LifecycleSubscription`                        |
+| `kernel`                 | Empty until its port task                                                                   |
 
 `testing` is compiled for this crate's own tests and behind the `testing` feature for other
 crates' tests.
@@ -164,3 +166,12 @@ run, which ends with `AppHandle::exit`; calls during the run keep preventing it;
 exit goes through and `RunEvent::Exit` logs `Shutdown`. Today it holds `health-check.stop`
 (`Stop`) and `providers` and `health-check` (`Dispose`). Later ports register their own tasks
 in the stage `main.ts` used for them.
+
+## Browser
+
+`browser::policy` holds the rules the browser workspace in `zvs-studio` enforces. Only
+`http:`/`https:` URLs without credentials are web URLs, and `navigation_url` turns typed text
+into one (`example.com` and `localhost:8123` get `https://`). The work profile is the WebView2
+user-data directory `<app data>/browser/work`. `BrowserLifecycle` delivers `link-finished`,
+`link-tab-closed`, `workspace-closed` and `cookies-cleared` to subscribers; dropping the
+`LifecycleSubscription` unsubscribes.

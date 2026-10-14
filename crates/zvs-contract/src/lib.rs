@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod browser;
 pub mod channels;
 pub mod enums;
 pub mod envelope;
@@ -17,6 +18,10 @@ pub use ai::{
     AccountFamily, AccountStatus, AdapterCapabilitiesDto, AdapterDescriptorDto, AdapterFamily,
     AuthMode, HonoursDto, LOCAL_BASE_URL, ProvidersAdaptersOutput, ToolMode, TunableParameter,
     model_tool_support, resolve_tool_mode,
+};
+pub use browser::{
+    BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie, BrowserSecurity,
+    BrowserState, BrowserTab,
 };
 pub use channels::{CHANNELS, is_channel};
 pub use enums::WireEnum;

@@ -1,0 +1,28 @@
+[
+  { "name": "state", "value": { "action": "state" } },
+  { "name": "new blank tab", "value": { "action": "new" } },
+  { "name": "new tab with address", "value": { "action": "new", "url": "example.com" } },
+  { "name": "navigate", "value": { "action": "navigate", "url": "https://example.com/" } },
+  {
+    "name": "switch",
+    "value": { "action": "switch", "id": "0199aa11-1111-7111-8111-111111111111" }
+  },
+  {
+    "name": "close",
+    "value": { "action": "close", "id": "0199aa11-1111-7111-8111-111111111111" }
+  },
+  {
+    "name": "reorder",
+    "value": { "action": "reorder", "id": "0199aa11-1111-7111-8111-111111111111", "index": 2 }
+  },
+  { "name": "back", "value": { "action": "back" } },
+  { "name": "forward", "value": { "action": "forward" } },
+  { "name": "reload", "value": { "action": "reload" } },
+  { "name": "show sites", "value": { "action": "sites", "visible": true } },
+  { "name": "cookies", "value": { "action": "cookies" } },
+  {
+    "name": "remove cookie",
+    "value": { "action": "removeCookie", "id": "[\"example.com\",\"/\",\"sid\",true]" }
+  },
+  { "name": "clear site", "value": { "action": "clearSite", "domain": ".example.com" } }
+]

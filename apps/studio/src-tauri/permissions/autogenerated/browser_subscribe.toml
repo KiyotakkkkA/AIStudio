@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-browser-subscribe"
+description = "Enables the browser_subscribe command without any pre-configured scope."
+commands.allow = ["browser_subscribe"]
+
+[[permission]]
+identifier = "deny-browser-subscribe"
+description = "Denies the browser_subscribe command without any pre-configured scope."
+commands.deny = ["browser_subscribe"]

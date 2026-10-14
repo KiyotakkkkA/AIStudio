@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Opener</title>
+  </head>
+  <body>
+    <h1>Opener</h1>
+    <p id="globals"></p>
+    <button id="close" type="button">window.close</button>
+    <script>
+      document.getElementById("globals").textContent = JSON.stringify({
+        opener: Boolean(window.opener),
+        internals: typeof window.__TAURI_INTERNALS__,
+        webview: typeof window.chrome?.webview,
+      });
+      window.opener?.postMessage("opener-ok", location.origin);
+      document.getElementById("close").addEventListener("click", () => window.close());
+    </script>
+  </body>
+</html>

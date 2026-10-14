@@ -24,7 +24,14 @@ zeroize = { workspace = true }
 zvs-host = { path = "../../../crates/zvs-host" }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "=0.62.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Cryptography"] }
+webview2-com = "=0.39.1"
+windows = { version = "=0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_Security_Cryptography",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [lints.rust]
 warnings = "deny"

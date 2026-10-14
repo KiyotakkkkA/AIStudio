@@ -7,6 +7,8 @@ import {
   AdapterCapabilitiesDto,
   AdapterDescriptorDto,
   AppErrorCode,
+  BrowserBounds,
+  BrowserCommand,
   contract,
   DeviceGpuDto,
   DeviceProfileDto,
@@ -89,6 +91,8 @@ const schemas: Record<string, z.ZodType> = {
   "providers/ProbeOutcomeDto": ProbeOutcomeDto,
   "providers/ProbeRequest": contract["providers.probe"].input,
   "providers/ProbeResultDto": contract["providers.probe"].output,
+  "browser/BrowserBounds": BrowserBounds,
+  "browser/BrowserCommand": BrowserCommand,
 };
 
 const root = fileURLToPath(new URL("../fixtures/", import.meta.url));
