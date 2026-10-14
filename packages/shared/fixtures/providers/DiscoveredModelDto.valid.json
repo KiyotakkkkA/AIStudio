@@ -1,0 +1,28 @@
+[
+  {
+    "name": "a catalog entry",
+    "value": {
+      "isFree": true,
+      "noTraining": null,
+      "externalId": "openai/gpt-4o-mini",
+      "displayName": "GPT-4o mini",
+      "family": "gpt-4o",
+      "contextWindow": 128000,
+      "maxOutput": 16384,
+      "sizeBytes": null,
+      "capabilities": ["tools", "vision", "streaming"]
+    }
+  },
+  {
+    "name": "a bare local tag",
+    "value": {
+      "externalId": "llama3.2:3b",
+      "displayName": "llama3.2:3b",
+      "family": null,
+      "contextWindow": null,
+      "maxOutput": null,
+      "sizeBytes": 2019393189,
+      "capabilities": []
+    }
+  }
+]

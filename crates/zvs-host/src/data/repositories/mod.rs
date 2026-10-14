@@ -1,3 +1,4 @@
+pub mod account;
 pub mod model;
 pub mod provider;
 pub mod secret;
@@ -5,6 +6,7 @@ pub mod setting;
 
 use rusqlite::Connection;
 
+pub use account::AccountRepository;
 pub use model::{ModelDraft, ModelRepository};
 pub use provider::{ProviderDraft, ProviderFilter, ProviderPatch, ProviderRepository};
 pub use secret::{
@@ -17,6 +19,7 @@ pub struct Repositories<'c> {
     pub secrets: SecretRepository<'c>,
     pub providers: ProviderRepository<'c>,
     pub models: ModelRepository<'c>,
+    pub accounts: AccountRepository<'c>,
 }
 
 impl<'c> Repositories<'c> {
@@ -26,6 +29,7 @@ impl<'c> Repositories<'c> {
             secrets: SecretRepository::new(connection),
             providers: ProviderRepository::new(connection),
             models: ModelRepository::new(connection),
+            accounts: AccountRepository::new(connection),
         }
     }
 }

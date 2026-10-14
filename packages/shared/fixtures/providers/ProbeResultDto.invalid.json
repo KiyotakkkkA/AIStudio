@@ -1,0 +1,40 @@
+[
+  {
+    "name": "a missing provider key",
+    "value": {
+      "providerId": null,
+      "outcome": {
+        "kind": "auth-failed"
+      },
+      "status": "failed",
+      "statusDetail": "Ключ отклонён — исправьте учётные данные",
+      "checkedAt": 1700000000000
+    }
+  },
+  {
+    "name": "an unknown outcome",
+    "value": {
+      "providerId": null,
+      "outcome": {
+        "kind": "fine"
+      },
+      "status": "failed",
+      "statusDetail": "Ключ отклонён — исправьте учётные данные",
+      "checkedAt": 1700000000000,
+      "provider": null
+    }
+  },
+  {
+    "name": "an unknown status",
+    "value": {
+      "providerId": null,
+      "outcome": {
+        "kind": "auth-failed"
+      },
+      "status": "green",
+      "statusDetail": "Ключ отклонён — исправьте учётные данные",
+      "checkedAt": 1700000000000,
+      "provider": null
+    }
+  }
+]

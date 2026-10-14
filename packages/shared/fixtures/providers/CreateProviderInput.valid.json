@@ -1,0 +1,29 @@
+[
+  {
+    "name": "minimal",
+    "value": {
+      "kind": "ollama",
+      "baseUrl": "http://localhost:11434",
+      "capabilities": ["text"],
+      "name": "Local"
+    }
+  },
+  {
+    "name": "disabled with everything",
+    "value": {
+      "kind": "openrouter",
+      "adapter": "openai-compatible",
+      "authMode": "api",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "secretId": "0199aa11-3333-7333-8333-333333333333",
+      "accountId": null,
+      "capabilities": ["text", "embedding"],
+      "settings": {
+        "temperature": 0.3,
+        "timeoutSeconds": 45
+      },
+      "name": "OpenRouter",
+      "enabled": false
+    }
+  }
+]

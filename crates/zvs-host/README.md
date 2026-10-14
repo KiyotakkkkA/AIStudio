@@ -5,24 +5,27 @@ The Rust host. Every service, repository, driver and the execution kernel will l
 without a window. Shell capabilities reach it through port traits that `zvs-studio`
 implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that builds it.
 
-| Module                   | Contents                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------- |
-| `ipc`                    | `IpcServer`, `register`, and one file of thin handlers per domain               |
-| `services`               | `Services`, the handlers' only dependency, and the business logic               |
-| `data`                   | `Database`, migrations, row structs and repositories (see `src/data/README.md`) |
-| `platform::paths`        | `PathEnvironment` → `StudioPaths`, plus the validated path builders             |
-| `platform::logger`       | `Logger` trait, `FileLogger` (JSON lines, rotation, redaction), `silent_logger` |
-| `platform::ids`          | UUID v7 ids and the injectable `IdGenerator`                                    |
-| `platform::clock`        | `Clock`, `SystemClock`, `FakeClock`                                             |
-| `platform::events`       | `EventBus`, `StreamHandle`, the `EventSink` and `EventRecorder` ports           |
-| `platform::recorder`     | `FileEventRecorder` and the `ZVS_RECORD_EVENTS` flag                            |
-| `platform::theme`        | `ThemePort`, `ThemeSource`, `apply_theme_source`, `THEME_SETTING_KEY`           |
-| `platform::window_state` | `read_window_state`, `capture_window_state`, `WINDOW_STATE_KEY`                 |
-| `services::crypto`       | `CryptoBackend`, `CryptoService`, `Plaintext`, `UnavailableBackend`             |
-| `services::secrets`      | `SecretService`, the summary and DTO mapping, `secret_policy`, `secret_fields`  |
-| `drivers::ai`            | AI ports, `HttpClient`, transports, adapters, `ProviderRegistry` (see below)    |
-| `testing`                | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, …   |
-| `kernel`, `browser`      | Empty until their port tasks                                                    |
+| Module                   | Contents                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------- |
+| `ipc`                    | `IpcServer`, `register`, and one file of thin handlers per domain                           |
+| `services`               | `Services`, the handlers' only dependency, and the business logic                           |
+| `data`                   | `Database`, migrations, row structs and repositories (see `src/data/README.md`)             |
+| `platform::paths`        | `PathEnvironment` → `StudioPaths`, plus the validated path builders                         |
+| `platform::logger`       | `Logger` trait, `FileLogger` (JSON lines, rotation, redaction), `silent_logger`             |
+| `platform::ids`          | UUID v7 ids and the injectable `IdGenerator`                                                |
+| `platform::clock`        | `Clock`, `SystemClock`, `FakeClock`                                                         |
+| `platform::events`       | `EventBus`, `StreamHandle`, the `EventSink` and `EventRecorder` ports                       |
+| `platform::recorder`     | `FileEventRecorder` and the `ZVS_RECORD_EVENTS` flag                                        |
+| `platform::theme`        | `ThemePort`, `ThemeSource`, `apply_theme_source`, `THEME_SETTING_KEY`                       |
+| `platform::window_state` | `read_window_state`, `capture_window_state`, `WINDOW_STATE_KEY`                             |
+| `platform::shutdown`     | `ShutdownCoordinator`, `ShutdownStage`, `ExitDecision`                                      |
+| `services::crypto`       | `CryptoBackend`, `CryptoService`, `Plaintext`, `UnavailableBackend`                         |
+| `services::secrets`      | `SecretService`, the summary and DTO mapping, `secret_policy`, `secret_fields`              |
+| `services::providers`    | `ProviderService`, `DriverSource`, `probe_outcome`, `provider_status`                       |
+| `services::health_check` | `HealthCheckService`, the `providers.healthcheck.*` settings keys                           |
+| `drivers::ai`            | AI ports, `HttpClient`, transports, adapters, `ProviderRegistry` (see below)                |
+| `testing`                | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, `FakeDriver`, … |
+| `kernel`, `browser`      | Empty until their port tasks                                                                |
 
 `testing` is compiled for this crate's own tests and behind the `testing` feature for other
 crates' tests.
@@ -118,3 +121,46 @@ Adapter tests run against `mock::MockServer`, a local axum server, so the whole 
 talk to real endpoints: `LIVE_BASE_URL` + `LIVE_API_KEY` (+ `LIVE_MODEL`) for any
 OpenAI-dialect vendor, and `ZVS_LIVE_OLLAMA=http://127.0.0.1:11434`
 (+ `ZVS_LIVE_OLLAMA_MODEL`) for a local Ollama.
+
+## Providers
+
+`ProviderService` is `ProviderService.ts`. It reads and writes `provider` and `model` through
+the repositories, always inside `database.transaction`, and reaches drivers only through the
+`DriverSource` port (`ephemeral_driver`, `invalidate`), which `ProviderRegistry` implements.
+The service never branches on the auth mode; a test scans its source to keep it that way.
+
+A probe lists models through the first port the driver has (text, then embedding, then image)
+and races it against the provider timeout (`settings.timeoutSeconds`, else 30 s), the caller's
+`CancellationToken` and the service's own shutdown token. The timeout covers building the
+driver too. The result is a `ProbeOutcome` (`probe_outcome.rs`): `ok`, `ok-empty`,
+`auth-failed`, `account-not-linked`, `session-expired`, `unreachable`, `rate-limited` or
+`error`. Vendor messages never reach the outcome; they go to the `warn` line
+`Probe did not succeed` as `raw`. `provider_status.rs` turns the outcome and the credential
+lifetimes (secret `rotatesAt`, account `token_expires_at` in seconds) into the card status.
+
+A saved probe runs as a spawned task keyed by provider id, so a second caller joins the first
+and `update` and `remove` answer `CONFLICT` while it runs. A successful probe replaces the
+model list and the status in one transaction; a failed one keeps the models. A draft probe
+writes nothing. `dispose` refuses new probes, cancels running ones and waits for them.
+
+Account rows are read through a minimal `AccountRepository::find_by_id`. Until account linking
+exists (TASK_067), an account-mode provider without a linked account reports
+`session-expired`, and the registry's `UnlinkedAccounts` port answers `account-not-linked`.
+
+`HealthCheckService` is off unless `providers.healthcheck.enabled` is `true`. It sweeps every
+enabled, idle provider every `providers.healthcheck.minutes` (default 15, at least 1) on a
+`tokio` interval, reports `progress` on its own event stream and ends it `ok` or `failed`.
+`stop` bumps a generation and cancels the running sweep; `dispose` also waits for it.
+`settings.set` on either key restarts it.
+
+## Shutdown
+
+`ShutdownCoordinator` replaces `before-quit`. Services register named tasks in a stage:
+`Stop`, then `Drain`, then `Dispose`. Stages run in that order, the tasks of one stage run
+together, and the whole run is capped at `DEFAULT_SHUTDOWN_CAP` (5 s). Every stage logs
+`Shutdown stage started` and `Shutdown stage finished` under `host`. `zvs-studio` calls
+`request_exit` from `RunEvent::ExitRequested`: the first call prevents the exit and starts the
+run, which ends with `AppHandle::exit`; calls during the run keep preventing it; afterwards the
+exit goes through and `RunEvent::Exit` logs `Shutdown`. Today it holds `health-check.stop`
+(`Stop`) and `providers` and `health-check` (`Dispose`). Later ports register their own tasks
+in the stage `main.ts` used for them.

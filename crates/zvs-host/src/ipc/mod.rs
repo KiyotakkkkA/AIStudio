@@ -1,3 +1,5 @@
+pub mod accounts;
+pub mod providers;
 pub mod secrets;
 mod server;
 pub mod settings;
@@ -9,6 +11,8 @@ pub fn register(server: &mut IpcServer) {
     system::register(server);
     settings::register(server);
     secrets::register(server);
+    providers::register(server);
+    accounts::register(server);
 }
 
 #[cfg(test)]
@@ -40,6 +44,16 @@ mod tests {
         assert_eq!(
             server.channels(),
             [
+                "accounts.list",
+                "providers.adapters",
+                "providers.create",
+                "providers.get",
+                "providers.list",
+                "providers.probe",
+                "providers.refreshAll",
+                "providers.remove",
+                "providers.setDefaultModel",
+                "providers.update",
                 "secrets.create",
                 "secrets.get",
                 "secrets.list",

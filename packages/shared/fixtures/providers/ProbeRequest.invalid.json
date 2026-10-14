@@ -1,0 +1,22 @@
+[
+  {
+    "name": "neither",
+    "value": {}
+  },
+  {
+    "name": "a draft without capabilities",
+    "value": {
+      "draft": {
+        "kind": "ollama",
+        "baseUrl": "http://localhost:11434",
+        "capabilities": []
+      }
+    }
+  },
+  {
+    "name": "a slug id",
+    "value": {
+      "id": "openrouter"
+    }
+  }
+]

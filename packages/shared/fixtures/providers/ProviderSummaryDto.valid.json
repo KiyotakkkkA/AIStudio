@@ -1,0 +1,59 @@
+[
+  {
+    "name": "probed",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "openrouter",
+      "adapter": "openai-compatible",
+      "authMode": "api",
+      "name": "OpenRouter",
+      "capabilities": ["text", "embedding"],
+      "enabled": true,
+      "status": "ok",
+      "statusDetail": null,
+      "lastProbeAt": 1700000000000,
+      "lastLatencyMs": 412,
+      "modelCount": 2,
+      "defaultModelId": "0199aa11-2222-7222-8222-222222222222",
+      "updatedAt": 1700000000000
+    }
+  },
+  {
+    "name": "never probed",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "ollama",
+      "adapter": "openai-compatible",
+      "authMode": "api",
+      "name": "Local",
+      "capabilities": ["text"],
+      "enabled": true,
+      "status": "unknown",
+      "statusDetail": null,
+      "lastProbeAt": null,
+      "lastLatencyMs": null,
+      "modelCount": 0,
+      "defaultModelId": null,
+      "updatedAt": 1700000000000
+    }
+  },
+  {
+    "name": "degraded with a detail",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "openrouter",
+      "adapter": "openai-compatible",
+      "authMode": "api",
+      "name": "OpenRouter",
+      "capabilities": ["text", "embedding"],
+      "enabled": true,
+      "status": "degraded",
+      "statusDetail": "Истекает через 2 дн.",
+      "lastProbeAt": 1700000000000,
+      "lastLatencyMs": 412,
+      "modelCount": 2,
+      "defaultModelId": "0199aa11-2222-7222-8222-222222222222",
+      "updatedAt": 1700000000000
+    }
+  }
+]

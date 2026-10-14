@@ -1,0 +1,55 @@
+[
+  {
+    "name": "no capabilities",
+    "value": {
+      "kind": "ollama",
+      "baseUrl": "http://localhost:11434",
+      "capabilities": [],
+      "name": "X"
+    }
+  },
+  {
+    "name": "a base URL that is not a URL",
+    "value": {
+      "kind": "ollama",
+      "baseUrl": "localhost 11434",
+      "capabilities": ["text"],
+      "name": "X"
+    }
+  },
+  {
+    "name": "an unknown kind",
+    "value": {
+      "kind": "gemini",
+      "baseUrl": "http://localhost:11434",
+      "capabilities": ["text"],
+      "name": "X"
+    }
+  },
+  {
+    "name": "a missing name",
+    "value": {
+      "kind": "ollama",
+      "baseUrl": "http://localhost:11434",
+      "capabilities": ["text"]
+    }
+  },
+  {
+    "name": "a blank name",
+    "value": {
+      "kind": "ollama",
+      "baseUrl": "http://localhost:11434",
+      "capabilities": ["text"],
+      "name": "  "
+    }
+  },
+  {
+    "name": "a name over 128 characters",
+    "value": {
+      "kind": "ollama",
+      "baseUrl": "http://localhost:11434",
+      "capabilities": ["text"],
+      "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+    }
+  }
+]

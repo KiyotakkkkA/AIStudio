@@ -1,0 +1,44 @@
+[
+  {
+    "name": "an unknown kind",
+    "value": {
+      "kind": "maybe"
+    }
+  },
+  {
+    "name": "ok without models",
+    "value": {
+      "kind": "ok",
+      "latencyMs": 1,
+      "live": true
+    }
+  },
+  {
+    "name": "a negative latency",
+    "value": {
+      "kind": "ok-empty",
+      "latencyMs": -1
+    }
+  },
+  {
+    "name": "an unknown error code",
+    "value": {
+      "kind": "error",
+      "code": "TEAPOT",
+      "detail": "x"
+    }
+  },
+  {
+    "name": "a fractional retry",
+    "value": {
+      "kind": "rate-limited",
+      "retryAfter": 1.5
+    }
+  },
+  {
+    "name": "unreachable without detail",
+    "value": {
+      "kind": "unreachable"
+    }
+  }
+]

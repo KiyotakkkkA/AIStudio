@@ -1,0 +1,108 @@
+[
+  {
+    "name": "an API provider with models",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "openrouter",
+      "adapter": "openai-compatible",
+      "authMode": "api",
+      "name": "OpenRouter",
+      "capabilities": ["text", "embedding"],
+      "enabled": true,
+      "status": "ok",
+      "statusDetail": null,
+      "lastProbeAt": 1700000000000,
+      "lastLatencyMs": 412,
+      "modelCount": 2,
+      "defaultModelId": "0199aa11-2222-7222-8222-222222222222",
+      "updatedAt": 1700000000000,
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "secretId": "0199aa11-3333-7333-8333-333333333333",
+      "secretName": "OpenRouter — main",
+      "accountId": null,
+      "accountLabel": null,
+      "settings": {
+        "selectedModelIds": ["gpt-4o-mini", "text-embedding-3-small"],
+        "temperature": 0.7,
+        "topK": 40,
+        "topP": 0.95,
+        "maxOutputTokens": 4096,
+        "timeoutSeconds": 60
+      },
+      "adapterCapabilities": {
+        "family": "openai-compatible",
+        "authModes": ["api"],
+        "streaming": true,
+        "liveModelList": true,
+        "embedding": true,
+        "image": false,
+        "honours": {
+          "temperature": true,
+          "topK": false,
+          "topP": true,
+          "maxOutputTokens": true
+        },
+        "tools": "native"
+      },
+      "models": [
+        {
+          "isFree": null,
+          "noTraining": null,
+          "id": "0199aa11-2222-7222-8222-222222222222",
+          "providerId": "0199aa11-1111-7111-8111-111111111111",
+          "externalId": "openai/gpt-4o-mini",
+          "displayName": "GPT-4o mini",
+          "family": null,
+          "contextWindow": 128000,
+          "maxOutput": null,
+          "sizeBytes": null,
+          "capabilities": ["tools"],
+          "available": true,
+          "unavailableReason": null,
+          "discoveredAt": 1700000000000
+        }
+      ]
+    }
+  },
+  {
+    "name": "an account provider",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "openai-compatible",
+      "adapter": "qwen-web",
+      "authMode": "account",
+      "name": "Qwen",
+      "capabilities": ["text"],
+      "enabled": true,
+      "status": "failed",
+      "statusDetail": "Сессия истекла — войдите заново",
+      "lastProbeAt": null,
+      "lastLatencyMs": null,
+      "modelCount": 0,
+      "defaultModelId": null,
+      "updatedAt": 1700000000000,
+      "baseUrl": "https://chat.qwen.ai",
+      "secretId": null,
+      "secretName": null,
+      "accountId": "0199aa11-4444-7444-8444-444444444444",
+      "accountLabel": "a***@example.com",
+      "settings": {},
+      "adapterCapabilities": {
+        "family": "qwen-web",
+        "authModes": ["account"],
+        "streaming": true,
+        "liveModelList": true,
+        "embedding": false,
+        "image": false,
+        "honours": {
+          "temperature": false,
+          "topK": false,
+          "topP": false,
+          "maxOutputTokens": false
+        },
+        "tools": "injected"
+      },
+      "models": []
+    }
+  }
+]

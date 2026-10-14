@@ -1,0 +1,13 @@
+[
+  {
+    "name": "no filter",
+    "value": {}
+  },
+  {
+    "name": "by capability and state",
+    "value": {
+      "capability": "embedding",
+      "enabled": true
+    }
+  }
+]

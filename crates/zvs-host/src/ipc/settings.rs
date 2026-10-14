@@ -5,6 +5,7 @@ use zvs_contract::{SettingsGetInput, SettingsGetOutput, SettingsSetInput};
 use super::IpcServer;
 use crate::platform::theme::{THEME_SETTING_KEY, apply_theme_source};
 use crate::services::Services;
+use crate::services::health_check::is_health_check_key;
 
 pub fn register(server: &mut IpcServer) {
     server
@@ -25,6 +26,10 @@ pub fn register(server: &mut IpcServer) {
             "settings.set",
             |services: Arc<Services>, input: SettingsSetInput| async move {
                 let result = services.settings.set(&input.key, &input.value)?;
+                if is_health_check_key(&input.key) {
+                    services.health.stop();
+                    services.health.start();
+                }
                 if input.key == THEME_SETTING_KEY {
                     apply_theme_source(Some(&input.value), services.theme.as_ref());
                 }
@@ -103,6 +108,26 @@ mod tests {
             assert_eq!(response["ok"], json!(true));
         }
         assert_eq!(host.theme.applied(), [ThemeSource::Light]);
+    }
+
+    #[tokio::test]
+    async fn saving_a_health_check_setting_restarts_the_background_check() {
+        let (host, server) = server();
+        assert!(!host.health.running());
+        for (key, value, running) in [
+            ("providers.healthcheck.minutes", json!(2), false),
+            ("providers.healthcheck.enabled", json!(true), true),
+            ("providers.healthcheck.minutes", json!(5), true),
+            ("ui.rail.collapsed", json!(true), true),
+            ("providers.healthcheck.enabled", json!(false), false),
+        ] {
+            let response = server
+                .dispatch("settings.set", json!({ "key": key, "value": value }))
+                .await;
+            assert_eq!(response["ok"], json!(true));
+            assert_eq!(host.health.running(), running, "{key}");
+        }
+        assert_eq!(host.health.interval_minutes(), 5);
     }
 
     #[tokio::test]

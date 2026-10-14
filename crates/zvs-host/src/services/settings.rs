@@ -9,6 +9,7 @@ use crate::platform::clock::SharedClock;
 
 pub type SettingDto = SettingsSetOutput;
 
+#[derive(Clone)]
 pub struct SettingService {
     database: Arc<Database>,
     clock: SharedClock,

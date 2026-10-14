@@ -1,4 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 use crate::enums::wire_enum;
+use crate::validate::no_refinements;
 
 wire_enum!(AdapterFamily {
     OpenaiCompatible => "openai-compatible",
@@ -37,6 +40,40 @@ wire_enum!(AccountStatus {
 });
 
 pub const LOCAL_BASE_URL: &str = "local://models";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HonoursDto {
+    pub temperature: bool,
+    pub top_k: bool,
+    pub top_p: bool,
+    pub max_output_tokens: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdapterCapabilitiesDto {
+    pub family: AdapterFamily,
+    pub auth_modes: Vec<AuthMode>,
+    pub streaming: bool,
+    pub live_model_list: bool,
+    pub embedding: bool,
+    pub image: bool,
+    pub honours: HonoursDto,
+    pub tools: ToolMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdapterDescriptorDto {
+    #[serde(flatten)]
+    pub capabilities: AdapterCapabilitiesDto,
+    pub implemented: bool,
+}
+
+pub type ProvidersAdaptersOutput = Vec<AdapterDescriptorDto>;
+
+no_refinements!(HonoursDto, AdapterCapabilitiesDto, AdapterDescriptorDto);
 
 impl AdapterFamily {
     pub const fn is_local(self) -> bool {

@@ -1,3 +1,5 @@
+pub mod fake_driver;
+
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -7,6 +9,7 @@ use serde_json::{Map, Value};
 use tempfile::TempDir;
 use zvs_contract::HostEvent;
 
+pub use self::fake_driver::{FAKE_CAPABILITIES, FakeDriver, FakeDriverSource, FakeScript};
 use crate::data::{BACKUPS_KEPT, Database, MIGRATIONS, MigrateOptions, migrate};
 pub use crate::platform::clock::{CLOCK_ORIGIN, FakeClock};
 use crate::platform::events::EventSink;
@@ -14,7 +17,9 @@ use crate::platform::logger::{Field, LogLevel, Logger, SharedLogger, silent_logg
 use crate::platform::theme::{ThemePort, ThemeSource};
 use crate::services::crypto::BackendFailure;
 use crate::services::{
-    CryptoBackend, CryptoService, Plaintext, SecretService, Services, SettingService, SystemService,
+    CryptoBackend, CryptoService, HealthCheckOptions, HealthCheckService, Plaintext,
+    ProviderService, ProviderServiceOptions, SecretService, Services, SettingService,
+    SystemService,
 };
 
 fn normalise(path: &Path) -> String {
@@ -141,6 +146,7 @@ pub struct TestServices {
     pub theme: Arc<RecordingTheme>,
     pub clock: Arc<FakeClock>,
     pub crypto: Arc<FakeCrypto>,
+    pub drivers: Arc<FakeDriverSource>,
     pub database: TemporaryDatabase,
 }
 
@@ -163,21 +169,42 @@ pub fn test_services(system: SystemService) -> TestServices {
     let clock = Arc::new(FakeClock::default());
     let theme = RecordingTheme::shared();
     let crypto = FakeCrypto::shared();
+    let drivers = FakeDriverSource::shared(FakeDriver::with_models(Vec::new()));
+    let settings = SettingService::new(database.shared(), clock.clone());
+    let secrets = Arc::new(SecretService::new(
+        database.shared(),
+        Arc::new(CryptoService::new(crypto.clone())),
+        clock.clone(),
+        silent_logger(),
+    ));
+    let providers = ProviderService::new(ProviderServiceOptions::new(
+        database.shared(),
+        drivers.clone(),
+        Arc::clone(&secrets),
+        silent_logger(),
+        clock.clone(),
+    ));
+    let health = HealthCheckService::new(HealthCheckOptions {
+        providers: providers.clone(),
+        settings: settings.clone(),
+        logger: silent_logger(),
+        clock: clock.clone(),
+        events: None,
+        runtime: None,
+    });
     TestServices {
         services: Arc::new(Services {
             system,
-            settings: SettingService::new(database.shared(), clock.clone()),
-            secrets: SecretService::new(
-                database.shared(),
-                Arc::new(CryptoService::new(crypto.clone())),
-                clock.clone(),
-                silent_logger(),
-            ),
+            settings,
+            secrets,
+            providers,
+            health,
             theme: theme.clone(),
         }),
         theme,
         clock,
         crypto,
+        drivers,
         database,
     }
 }

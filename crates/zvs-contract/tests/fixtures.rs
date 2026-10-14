@@ -6,13 +6,18 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use zvs_contract::{
-    AppErrorCode, CreateSecretInput, DeviceGpuDto, DeviceProfileDto, DeviceTier, HostEvent, Json,
-    Page, PageRequest, ProviderId, ResourceSampleDto, ResultEnvelope, RunOutcomeDto, SecretDto,
-    SecretFilter, SecretRef, SecretSummaryDto, SecretTypeSchema, SecretsRemoveOutput,
-    SecretsTypesOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput,
+    AdapterCapabilitiesDto, AdapterDescriptorDto, AppErrorCode, CreateProviderInput,
+    CreateSecretInput, DeviceGpuDto, DeviceProfileDto, DeviceTier, DiscoveredModelDto, HostEvent,
+    Json, ModelDto, Page, PageRequest, ProbeOutcomeDto, ProbeRequest, ProbeResultDto,
+    ProviderConnectionInput, ProviderDto, ProviderId, ProviderListFilter, ProviderRef,
+    ProviderSettingsDto, ProviderSummaryDto, ProvidersGetInput, ProvidersRemoveOutput,
+    ResourceSampleDto, ResultEnvelope, RunOutcomeDto, SecretDto, SecretFilter, SecretRef,
+    SecretSummaryDto, SecretTypeSchema, SecretsRemoveOutput, SecretsTypesOutput,
+    SetDefaultModelInput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput,
     Sort, SortDirection, StreamId, SystemDemoJobInput, SystemDemoStreamInput,
     SystemDemoStreamOutput, SystemDeviceInput, SystemNativePingInput, SystemNativePingOutput,
-    SystemPingInput, SystemPingOutput, UpdateSecretInput, Validate, secret_type_registry,
+    SystemPingInput, SystemPingOutput, UpdateProviderInput, UpdateSecretInput, Validate,
+    secret_type_registry,
 };
 
 type Check = fn(Value) -> Result<Value, String>;
@@ -80,6 +85,60 @@ const TABLE: &[(&str, Check)] = &[
         "secrets/SecretsRemoveOutput",
         round_trip::<SecretsRemoveOutput>,
     ),
+    (
+        "ai/AdapterCapabilitiesDto",
+        round_trip::<AdapterCapabilitiesDto>,
+    ),
+    (
+        "ai/AdapterDescriptorDto",
+        round_trip::<AdapterDescriptorDto>,
+    ),
+    (
+        "providers/ProviderSettingsDto",
+        round_trip::<ProviderSettingsDto>,
+    ),
+    (
+        "providers/DiscoveredModelDto",
+        round_trip::<DiscoveredModelDto>,
+    ),
+    ("providers/ModelDto", round_trip::<ModelDto>),
+    (
+        "providers/ProviderSummaryDto",
+        round_trip::<ProviderSummaryDto>,
+    ),
+    ("providers/ProviderDto", round_trip::<ProviderDto>),
+    (
+        "providers/ProviderConnectionInput",
+        round_trip::<ProviderConnectionInput>,
+    ),
+    (
+        "providers/CreateProviderInput",
+        round_trip::<CreateProviderInput>,
+    ),
+    (
+        "providers/UpdateProviderInput",
+        round_trip::<UpdateProviderInput>,
+    ),
+    (
+        "providers/ProviderListFilter",
+        round_trip::<ProviderListFilter>,
+    ),
+    ("providers/ProviderRef", round_trip::<ProviderRef>),
+    (
+        "providers/ProvidersGetInput",
+        round_trip::<ProvidersGetInput>,
+    ),
+    (
+        "providers/SetDefaultModelInput",
+        round_trip::<SetDefaultModelInput>,
+    ),
+    (
+        "providers/ProvidersRemoveOutput",
+        round_trip::<ProvidersRemoveOutput>,
+    ),
+    ("providers/ProbeOutcomeDto", round_trip::<ProbeOutcomeDto>),
+    ("providers/ProbeRequest", round_trip::<ProbeRequest>),
+    ("providers/ProbeResultDto", round_trip::<ProbeResultDto>),
 ];
 
 const SECRET_OUTPUTS: &[&str] = &[

@@ -7,19 +7,29 @@ use std::error::Error;
 use std::sync::Arc;
 
 use serde_json::json;
-use tauri::{App, Manager};
+use tauri::{App, AppHandle, Manager, RunEvent};
 use zvs_host::data::repositories::SecretFilter;
 use zvs_host::data::{MigrationFailed, PrepareOptions, prepare_database};
+use zvs_host::drivers::ai::adapters::FileSystemModelStore;
+use zvs_host::drivers::ai::{
+    DatabaseProviders, HttpClient, ProviderRegistry, ProviderRegistryOptions,
+};
 use zvs_host::platform::clock::{SharedClock, SystemClock};
 use zvs_host::platform::events::{EventBus, EventBusOptions, EventRecorder};
 use zvs_host::platform::ids::system_ids;
 use zvs_host::platform::logger::{FileLogger, LogLevel, LoggerOptions, SharedLogger};
 use zvs_host::platform::paths::{PathEnvironment, StudioPaths};
 use zvs_host::platform::recorder::{FileEventRecorder, recording_enabled_from_env};
+use zvs_host::platform::shutdown::{
+    DEFAULT_SHUTDOWN_CAP, ExitDecision, ShutdownCoordinator, ShutdownStage,
+};
 use zvs_host::platform::theme::{SharedThemePort, THEME_SETTING_KEY, apply_theme_source};
 use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_window_state};
 use zvs_host::services::system::DEMO_INTERVAL;
-use zvs_host::services::{CryptoService, SecretService, Services, SettingService, SystemService};
+use zvs_host::services::{
+    CryptoService, HealthCheckOptions, HealthCheckService, ProviderService, ProviderServiceOptions,
+    SecretService, Services, SettingService, SystemService,
+};
 use zvs_host::{IpcServer, ipc};
 
 use crate::commands::Host;
@@ -30,8 +40,15 @@ enum Boot {
         host: Host,
         window: WindowState,
         logger: SharedLogger,
+        lifecycle: Lifecycle,
     },
     Recovery(MigrationFailed),
+}
+
+struct Lifecycle {
+    shutdown: Arc<ShutdownCoordinator>,
+    logger: SharedLogger,
+    events: EventBus,
 }
 
 pub fn run() {
@@ -49,9 +66,11 @@ pub fn run() {
                     host,
                     window,
                     logger,
+                    lifecycle,
                 } => {
                     let services = Arc::clone(&host.services);
                     app.manage(host);
+                    app.manage(lifecycle);
                     window::create_studio(app.handle(), window, move |state| {
                         let stored = serde_json::to_value(state)
                             .map_err(|error| error.to_string())
@@ -75,8 +94,37 @@ pub fn run() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("ZVS AI Studio failed to start");
+        .build(tauri::generate_context!())
+        .expect("ZVS AI Studio failed to start")
+        .run(on_run_event);
+}
+
+fn on_run_event(app: &AppHandle, event: RunEvent) {
+    let Some(lifecycle) = app.try_state::<Lifecycle>() else {
+        return;
+    };
+    match event {
+        RunEvent::ExitRequested { api, .. } => match lifecycle.shutdown.request_exit() {
+            ExitDecision::Begin => {
+                api.prevent_exit();
+                let shutdown = Arc::clone(&lifecycle.shutdown);
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    shutdown.run().await;
+                    app.exit(0);
+                });
+            }
+            ExitDecision::Wait => api.prevent_exit(),
+            ExitDecision::Exit => {}
+        },
+        RunEvent::Exit => {
+            lifecycle
+                .logger
+                .log(LogLevel::Info, "host", "Shutdown", &[]);
+            lifecycle.events.dispose();
+        }
+        _ => {}
+    }
 }
 
 fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
@@ -131,7 +179,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     );
 
     let crypto = Arc::new(CryptoService::new(platform::crypto_backend()));
-    let secrets = SecretService::new(database, crypto, clock.clone(), logger.clone());
+    let secrets = Arc::new(SecretService::new(
+        Arc::clone(&database),
+        crypto,
+        clock.clone(),
+        logger.clone(),
+    ));
     logger.log(
         LogLevel::Info,
         "host",
@@ -168,23 +221,83 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         &[("recording", json!(recording))],
     );
 
+    let mut registry = ProviderRegistryOptions::new(
+        Arc::new(DatabaseProviders::new(Arc::clone(&database))),
+        secrets.clone(),
+        HttpClient::new()?,
+    );
+    registry.local_models = Some(Arc::new(FileSystemModelStore::new(
+        paths.downloads_dir.clone(),
+    )));
+    registry.logger = logger.clone();
+    let providers = ProviderService::new(ProviderServiceOptions::new(
+        Arc::clone(&database),
+        Arc::new(ProviderRegistry::new(registry)),
+        Arc::clone(&secrets),
+        logger.clone(),
+        clock.clone(),
+    ));
+    let health = HealthCheckService::new(HealthCheckOptions {
+        providers: providers.clone(),
+        settings: settings.clone(),
+        logger: logger.clone(),
+        clock: clock.clone(),
+        events: Some(events.clone()),
+        runtime: Some(tauri::async_runtime::handle().inner().clone()),
+    });
+
+    let shutdown = Arc::new(ShutdownCoordinator::new(
+        logger.clone(),
+        DEFAULT_SHUTDOWN_CAP,
+    ));
+    {
+        let health = health.clone();
+        shutdown.register(
+            ShutdownStage::Stop,
+            "health-check.stop",
+            move || async move {
+                health.stop();
+            },
+        );
+    }
+    {
+        let providers = providers.clone();
+        shutdown.register(ShutdownStage::Dispose, "providers", move || async move {
+            providers.dispose().await;
+        });
+    }
+    {
+        let health = health.clone();
+        shutdown.register(ShutdownStage::Dispose, "health-check", move || async move {
+            health.dispose().await;
+        });
+    }
+
     let services = Arc::new(Services {
         system: SystemService::new(clock, events.clone(), DEMO_INTERVAL),
         settings,
         secrets,
+        providers,
+        health,
         theme,
     });
     let mut server = IpcServer::new(Arc::clone(&services), logger.clone());
     ipc::register(&mut server);
     server.finish();
+    services.health.start();
 
     Ok(Boot::Studio {
         host: Host {
             server,
-            events,
+            events: events.clone(),
             services,
         },
         window,
-        logger,
+        logger: logger.clone(),
+        lifecycle: Lifecycle {
+            shutdown,
+            logger,
+            events,
+        },
     })
 }

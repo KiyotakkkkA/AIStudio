@@ -133,6 +133,31 @@ pub mod check {
             Err(invalid(field, "literal"))
         }
     }
+
+    pub fn trimmed_name(field: &str, value: &str, max: usize) -> Result<(), AppError> {
+        let trimmed = super::js_trim(value);
+        non_empty(field, trimmed)?;
+        max_len(field, trimmed, max)
+    }
+
+    pub fn url(field: &str, value: &str, max: usize) -> Result<(), AppError> {
+        let normalized = super::normalize_url(value);
+        if url::Url::parse(super::js_trim(value)).is_err() {
+            return Err(invalid(field, "url"));
+        }
+        max_len(field, &normalized, max)
+    }
+}
+
+pub fn js_trim(value: &str) -> &str {
+    value.trim_matches(|character: char| character.is_whitespace() || character == '\u{feff}')
+}
+
+pub fn normalize_url(value: &str) -> String {
+    js_trim(value)
+        .chars()
+        .filter(|character| !matches!(character, '\t' | '\n' | '\r'))
+        .collect()
 }
 
 #[cfg(test)]

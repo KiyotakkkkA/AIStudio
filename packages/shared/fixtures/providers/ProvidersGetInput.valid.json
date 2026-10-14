@@ -1,0 +1,15 @@
+[
+  {
+    "name": "an id",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111"
+    }
+  },
+  {
+    "name": "selected models only",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "selectedOnly": true
+    }
+  }
+]

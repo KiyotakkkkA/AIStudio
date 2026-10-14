@@ -1,0 +1,39 @@
+[
+  {
+    "name": "missing implemented",
+    "value": {
+      "family": "openai-compatible",
+      "authModes": ["api"],
+      "streaming": true,
+      "liveModelList": true,
+      "embedding": true,
+      "image": false,
+      "honours": {
+        "temperature": true,
+        "topK": false,
+        "topP": true,
+        "maxOutputTokens": true
+      },
+      "tools": "native"
+    }
+  },
+  {
+    "name": "implemented as text",
+    "value": {
+      "family": "openai-compatible",
+      "authModes": ["api"],
+      "streaming": true,
+      "liveModelList": true,
+      "embedding": true,
+      "image": false,
+      "honours": {
+        "temperature": true,
+        "topK": false,
+        "topP": true,
+        "maxOutputTokens": true
+      },
+      "tools": "native",
+      "implemented": "yes"
+    }
+  }
+]

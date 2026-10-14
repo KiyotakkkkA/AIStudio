@@ -14,8 +14,9 @@ pub mod validate;
 pub mod wire;
 
 pub use ai::{
-    AccountFamily, AccountStatus, AdapterFamily, AuthMode, LOCAL_BASE_URL, ToolMode,
-    TunableParameter, model_tool_support, resolve_tool_mode,
+    AccountFamily, AccountStatus, AdapterCapabilitiesDto, AdapterDescriptorDto, AdapterFamily,
+    AuthMode, HonoursDto, LOCAL_BASE_URL, ProvidersAdaptersOutput, ToolMode, TunableParameter,
+    model_tool_support, resolve_tool_mode,
 };
 pub use channels::{CHANNELS, is_channel};
 pub use enums::WireEnum;
@@ -27,7 +28,13 @@ pub use events::{
 };
 pub use ids::*;
 pub use primitives::{Json, MAX_SAFE_INTEGER, Page, PageRequest, Sort, SortDirection, Timestamp};
-pub use providers::{ModelCapability, ProviderCapability, ProviderKind, ProviderStatus};
+pub use providers::{
+    CreateProviderInput, DiscoveredModelDto, ModelCapability, ModelDto, ProbeOutcomeDto,
+    ProbeRequest, ProbeResultDto, ProviderCapability, ProviderConnectionInput, ProviderDto,
+    ProviderKind, ProviderListFilter, ProviderRef, ProviderSettingsDto, ProviderStatus,
+    ProviderSummaryDto, ProvidersGetInput, ProvidersListOutput, ProvidersRemoveOutput,
+    SetDefaultModelInput, UpdateProviderInput,
+};
 pub use secrets::{
     CreateSecretInput, FieldDefault, FieldDescriptor, FieldKind, FieldOption, RotationStatus,
     SecretDto, SecretFields, SecretFilter, SecretInput, SecretRef, SecretScope, SecretSummaryDto,

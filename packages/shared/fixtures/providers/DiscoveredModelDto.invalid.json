@@ -1,0 +1,57 @@
+[
+  {
+    "name": "an empty external id",
+    "value": {
+      "isFree": true,
+      "noTraining": null,
+      "externalId": "",
+      "displayName": "GPT-4o mini",
+      "family": "gpt-4o",
+      "contextWindow": 128000,
+      "maxOutput": 16384,
+      "sizeBytes": null,
+      "capabilities": ["tools", "vision", "streaming"]
+    }
+  },
+  {
+    "name": "a negative context window",
+    "value": {
+      "isFree": true,
+      "noTraining": null,
+      "externalId": "openai/gpt-4o-mini",
+      "displayName": "GPT-4o mini",
+      "family": "gpt-4o",
+      "contextWindow": -1,
+      "maxOutput": 16384,
+      "sizeBytes": null,
+      "capabilities": ["tools", "vision", "streaming"]
+    }
+  },
+  {
+    "name": "a missing family key",
+    "value": {
+      "isFree": true,
+      "noTraining": null,
+      "externalId": "openai/gpt-4o-mini",
+      "displayName": "GPT-4o mini",
+      "contextWindow": 128000,
+      "maxOutput": 16384,
+      "sizeBytes": null,
+      "capabilities": ["tools", "vision", "streaming"]
+    }
+  },
+  {
+    "name": "an unknown capability",
+    "value": {
+      "isFree": true,
+      "noTraining": null,
+      "externalId": "openai/gpt-4o-mini",
+      "displayName": "GPT-4o mini",
+      "family": "gpt-4o",
+      "contextWindow": 128000,
+      "maxOutput": 16384,
+      "sizeBytes": null,
+      "capabilities": ["telepathy"]
+    }
+  }
+]

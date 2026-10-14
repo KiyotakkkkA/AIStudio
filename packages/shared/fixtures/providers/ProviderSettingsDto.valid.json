@@ -1,0 +1,23 @@
+[
+  {
+    "name": "empty",
+    "value": {}
+  },
+  {
+    "name": "every knob",
+    "value": {
+      "selectedModelIds": ["gpt-4o-mini", "text-embedding-3-small"],
+      "temperature": 0.7,
+      "topK": 40,
+      "topP": 0.95,
+      "maxOutputTokens": 4096,
+      "timeoutSeconds": 60
+    }
+  },
+  {
+    "name": "only a selection",
+    "value": {
+      "selectedModelIds": []
+    }
+  }
+]

@@ -1,0 +1,77 @@
+[
+  {
+    "name": "a blank name",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "openrouter",
+      "adapter": "openai-compatible",
+      "authMode": "api",
+      "name": "   ",
+      "capabilities": ["text", "embedding"],
+      "enabled": true,
+      "status": "ok",
+      "statusDetail": null,
+      "lastProbeAt": 1700000000000,
+      "lastLatencyMs": 412,
+      "modelCount": 2,
+      "defaultModelId": "0199aa11-2222-7222-8222-222222222222",
+      "updatedAt": 1700000000000
+    }
+  },
+  {
+    "name": "an unknown status",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "openrouter",
+      "adapter": "openai-compatible",
+      "authMode": "api",
+      "name": "OpenRouter",
+      "capabilities": ["text", "embedding"],
+      "enabled": true,
+      "status": "broken",
+      "statusDetail": null,
+      "lastProbeAt": 1700000000000,
+      "lastLatencyMs": 412,
+      "modelCount": 2,
+      "defaultModelId": "0199aa11-2222-7222-8222-222222222222",
+      "updatedAt": 1700000000000
+    }
+  },
+  {
+    "name": "a missing modelCount",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "openrouter",
+      "adapter": "openai-compatible",
+      "authMode": "api",
+      "name": "OpenRouter",
+      "capabilities": ["text", "embedding"],
+      "enabled": true,
+      "status": "ok",
+      "statusDetail": null,
+      "lastProbeAt": 1700000000000,
+      "lastLatencyMs": 412,
+      "defaultModelId": "0199aa11-2222-7222-8222-222222222222",
+      "updatedAt": 1700000000000
+    }
+  },
+  {
+    "name": "a negative latency",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "openrouter",
+      "adapter": "openai-compatible",
+      "authMode": "api",
+      "name": "OpenRouter",
+      "capabilities": ["text", "embedding"],
+      "enabled": true,
+      "status": "ok",
+      "statusDetail": null,
+      "lastProbeAt": 1700000000000,
+      "lastLatencyMs": -1,
+      "modelCount": 2,
+      "defaultModelId": "0199aa11-2222-7222-8222-222222222222",
+      "updatedAt": 1700000000000
+    }
+  }
+]

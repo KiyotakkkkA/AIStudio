@@ -1,0 +1,40 @@
+[
+  {
+    "name": "implemented",
+    "value": {
+      "family": "openai-compatible",
+      "authModes": ["api"],
+      "streaming": true,
+      "liveModelList": true,
+      "embedding": true,
+      "image": false,
+      "honours": {
+        "temperature": true,
+        "topK": false,
+        "topP": true,
+        "maxOutputTokens": true
+      },
+      "tools": "native",
+      "implemented": true
+    }
+  },
+  {
+    "name": "declared only",
+    "value": {
+      "family": "deepseek-web",
+      "authModes": ["account"],
+      "streaming": false,
+      "liveModelList": false,
+      "embedding": false,
+      "image": false,
+      "honours": {
+        "temperature": false,
+        "topK": false,
+        "topP": false,
+        "maxOutputTokens": false
+      },
+      "tools": "injected",
+      "implemented": false
+    }
+  }
+]

@@ -1,0 +1,36 @@
+[
+  {
+    "name": "a saved provider",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111"
+    }
+  },
+  {
+    "name": "a minimal draft",
+    "value": {
+      "draft": {
+        "kind": "ollama",
+        "baseUrl": "http://localhost:11434",
+        "capabilities": ["text"]
+      }
+    }
+  },
+  {
+    "name": "a full draft",
+    "value": {
+      "draft": {
+        "kind": "openrouter",
+        "adapter": "openai-compatible",
+        "authMode": "api",
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "secretId": "0199aa11-3333-7333-8333-333333333333",
+        "accountId": null,
+        "capabilities": ["text", "embedding"],
+        "settings": {
+          "temperature": 0.3,
+          "timeoutSeconds": 45
+        }
+      }
+    }
+  }
+]

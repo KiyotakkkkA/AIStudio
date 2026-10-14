@@ -1,0 +1,15 @@
+[
+  {
+    "name": "a text flag",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "selectedOnly": "yes"
+    }
+  },
+  {
+    "name": "no id",
+    "value": {
+      "selectedOnly": false
+    }
+  }
+]

@@ -1,0 +1,50 @@
+[
+  {
+    "name": "temperature above two",
+    "value": {
+      "temperature": 2.5
+    }
+  },
+  {
+    "name": "a fractional topK",
+    "value": {
+      "topK": 4.5
+    }
+  },
+  {
+    "name": "topK above the cap",
+    "value": {
+      "topK": 5000
+    }
+  },
+  {
+    "name": "topP above one",
+    "value": {
+      "topP": 1.5
+    }
+  },
+  {
+    "name": "a zero timeout",
+    "value": {
+      "timeoutSeconds": 0
+    }
+  },
+  {
+    "name": "a timeout above ten minutes",
+    "value": {
+      "timeoutSeconds": 601
+    }
+  },
+  {
+    "name": "an empty selected id",
+    "value": {
+      "selectedModelIds": [""]
+    }
+  },
+  {
+    "name": "a null temperature",
+    "value": {
+      "temperature": null
+    }
+  }
+]

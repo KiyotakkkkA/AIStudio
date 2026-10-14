@@ -1,0 +1,39 @@
+[
+  {
+    "name": "only an id",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111"
+    }
+  },
+  {
+    "name": "a rename",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "name": "Renamed"
+    }
+  },
+  {
+    "name": "clearing references",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "secretId": null,
+      "accountId": null
+    }
+  },
+  {
+    "name": "everything",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "name": "Main",
+      "adapter": "openai-compatible",
+      "authMode": "api",
+      "baseUrl": "https://api.mistral.ai/v1",
+      "secretId": "0199aa11-3333-7333-8333-333333333333",
+      "capabilities": ["text"],
+      "settings": {
+        "selectedModelIds": []
+      },
+      "enabled": false
+    }
+  }
+]

@@ -1,0 +1,113 @@
+[
+  {
+    "name": "a saved probe",
+    "value": {
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "outcome": {
+        "kind": "ok",
+        "latencyMs": 231,
+        "models": [
+          {
+            "isFree": true,
+            "noTraining": null,
+            "externalId": "openai/gpt-4o-mini",
+            "displayName": "GPT-4o mini",
+            "family": "gpt-4o",
+            "contextWindow": 128000,
+            "maxOutput": 16384,
+            "sizeBytes": null,
+            "capabilities": ["tools", "vision", "streaming"]
+          },
+          {
+            "externalId": "llama3.2:3b",
+            "displayName": "llama3.2:3b",
+            "family": null,
+            "contextWindow": null,
+            "maxOutput": null,
+            "sizeBytes": 2019393189,
+            "capabilities": []
+          }
+        ],
+        "live": true
+      },
+      "status": "ok",
+      "statusDetail": null,
+      "checkedAt": 1700000000000,
+      "provider": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "kind": "openrouter",
+        "adapter": "openai-compatible",
+        "authMode": "api",
+        "name": "OpenRouter",
+        "capabilities": ["text", "embedding"],
+        "enabled": true,
+        "status": "ok",
+        "statusDetail": null,
+        "lastProbeAt": 1700000000000,
+        "lastLatencyMs": 412,
+        "modelCount": 2,
+        "defaultModelId": "0199aa11-2222-7222-8222-222222222222",
+        "updatedAt": 1700000000000,
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "secretId": "0199aa11-3333-7333-8333-333333333333",
+        "secretName": "OpenRouter — main",
+        "accountId": null,
+        "accountLabel": null,
+        "settings": {
+          "selectedModelIds": ["gpt-4o-mini", "text-embedding-3-small"],
+          "temperature": 0.7,
+          "topK": 40,
+          "topP": 0.95,
+          "maxOutputTokens": 4096,
+          "timeoutSeconds": 60
+        },
+        "adapterCapabilities": {
+          "family": "openai-compatible",
+          "authModes": ["api"],
+          "streaming": true,
+          "liveModelList": true,
+          "embedding": true,
+          "image": false,
+          "honours": {
+            "temperature": true,
+            "topK": false,
+            "topP": true,
+            "maxOutputTokens": true
+          },
+          "tools": "native"
+        },
+        "models": [
+          {
+            "isFree": null,
+            "noTraining": null,
+            "id": "0199aa11-2222-7222-8222-222222222222",
+            "providerId": "0199aa11-1111-7111-8111-111111111111",
+            "externalId": "openai/gpt-4o-mini",
+            "displayName": "GPT-4o mini",
+            "family": null,
+            "contextWindow": 128000,
+            "maxOutput": null,
+            "sizeBytes": null,
+            "capabilities": ["tools"],
+            "available": true,
+            "unavailableReason": null,
+            "discoveredAt": 1700000000000
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "a failed draft probe",
+    "value": {
+      "providerId": null,
+      "outcome": {
+        "kind": "auth-failed"
+      },
+      "status": "failed",
+      "statusDetail": "Ключ отклонён — исправьте учётные данные",
+      "checkedAt": 1700000000000,
+      "provider": null
+    }
+  }
+]

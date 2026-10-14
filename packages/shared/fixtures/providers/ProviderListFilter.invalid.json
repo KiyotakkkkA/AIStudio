@@ -1,0 +1,14 @@
+[
+  {
+    "name": "an unknown capability",
+    "value": {
+      "capability": "audio"
+    }
+  },
+  {
+    "name": "a null enabled flag",
+    "value": {
+      "enabled": null
+    }
+  }
+]

@@ -7,22 +7,22 @@ exists here under the **same name** as its Zod schema. The crate is pure data. I
 
 What lives here today:
 
-| Module       | Contents                                                                          |
-| ------------ | --------------------------------------------------------------------------------- |
-| `ids`        | Branded ids (`ProviderId`, `StreamId`, …) as `#[serde(transparent)]` newtypes     |
-| `primitives` | `Timestamp`, `Json`, `PageRequest`, `Page<T>`, `Sort<F>`, `SortDirection`         |
-| `errors`     | `AppErrorCode`, `AppError`, `ErrorDetails`                                        |
-| `envelope`   | `ResultEnvelope<T>`, the `{ ok, data }` / `{ ok, error }` wire envelope           |
-| `events`     | `HostEvent`, `HostEventDraft`, `RunOutcomeDto`, `DeltaKind`, `EVENT_CHANNEL`      |
-| `secrets`    | The secret DTOs, `SecretInput`, the type registry and the `secrets.*` channel I/O |
-| `settings`   | `SettingKey` validation and the `settings.*` channel inputs/outputs               |
-| `system`     | `DeviceProfileDto`, `ResourceSampleDto` and the `system.*` channel inputs/outputs |
-| `ai`         | `AdapterFamily`, `AuthMode`, `ToolMode`, `TunableParameter`, `resolve_tool_mode`  |
-| `providers`  | `ProviderKind`, `ProviderCapability`, `ProviderStatus`, `ModelCapability`         |
-| `enums`      | `WireEnum` and `wire_enum!`, for string enums with `ALL`, `as_str` and `parse`    |
-| `channels`   | `CHANNELS`, generated from `packages/shared/contract.channels.json`               |
-| `validate`   | The `Validate` trait, `parse`, and the `check::*` refinement helpers              |
-| `wire`       | `present` and `nullable`, the two field deserialisers the wire rules need         |
+| Module       | Contents                                                                                  |
+| ------------ | ----------------------------------------------------------------------------------------- |
+| `ids`        | Branded ids (`ProviderId`, `StreamId`, …) as `#[serde(transparent)]` newtypes             |
+| `primitives` | `Timestamp`, `Json`, `PageRequest`, `Page<T>`, `Sort<F>`, `SortDirection`                 |
+| `errors`     | `AppErrorCode`, `AppError`, `ErrorDetails`                                                |
+| `envelope`   | `ResultEnvelope<T>`, the `{ ok, data }` / `{ ok, error }` wire envelope                   |
+| `events`     | `HostEvent`, `HostEventDraft`, `RunOutcomeDto`, `DeltaKind`, `EVENT_CHANNEL`              |
+| `secrets`    | The secret DTOs, `SecretInput`, the type registry and the `secrets.*` channel I/O         |
+| `settings`   | `SettingKey` validation and the `settings.*` channel inputs/outputs                       |
+| `system`     | `DeviceProfileDto`, `ResourceSampleDto` and the `system.*` channel inputs/outputs         |
+| `ai`         | `AdapterFamily`, `AuthMode`, `ToolMode`, `AdapterCapabilitiesDto`, `AdapterDescriptorDto` |
+| `providers`  | The provider enums and DTOs, `ProbeOutcomeDto`, `ProbeRequest` and the `providers.*` I/O  |
+| `enums`      | `WireEnum` and `wire_enum!`, for string enums with `ALL`, `as_str` and `parse`            |
+| `channels`   | `CHANNELS`, generated from `packages/shared/contract.channels.json`                       |
+| `validate`   | The `Validate` trait, `parse`, the `check::*` helpers, `js_trim`, `normalize_url`         |
+| `wire`       | `present` and `nullable`, the two field deserialisers the wire rules need                 |
 
 Domain DTOs arrive with their port task (TASK_061 – TASK_074), following the recipe below.
 

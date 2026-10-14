@@ -1,0 +1,38 @@
+[
+  {
+    "name": "openai-compatible",
+    "value": {
+      "family": "openai-compatible",
+      "authModes": ["api"],
+      "streaming": true,
+      "liveModelList": true,
+      "embedding": true,
+      "image": false,
+      "honours": {
+        "temperature": true,
+        "topK": false,
+        "topP": true,
+        "maxOutputTokens": true
+      },
+      "tools": "native"
+    }
+  },
+  {
+    "name": "an account family",
+    "value": {
+      "family": "qwen-web",
+      "authModes": ["account"],
+      "streaming": true,
+      "liveModelList": true,
+      "embedding": false,
+      "image": false,
+      "honours": {
+        "temperature": false,
+        "topK": false,
+        "topP": false,
+        "maxOutputTokens": false
+      },
+      "tools": "injected"
+    }
+  }
+]

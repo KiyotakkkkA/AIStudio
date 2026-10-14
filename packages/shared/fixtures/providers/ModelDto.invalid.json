@@ -1,0 +1,58 @@
+[
+  {
+    "name": "a non-uuid id",
+    "value": {
+      "isFree": null,
+      "noTraining": null,
+      "id": "gpt-4o-mini",
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "externalId": "openai/gpt-4o-mini",
+      "displayName": "GPT-4o mini",
+      "family": null,
+      "contextWindow": 128000,
+      "maxOutput": null,
+      "sizeBytes": null,
+      "capabilities": ["tools"],
+      "available": true,
+      "unavailableReason": null,
+      "discoveredAt": 1700000000000
+    }
+  },
+  {
+    "name": "a missing discoveredAt",
+    "value": {
+      "isFree": null,
+      "noTraining": null,
+      "id": "0199aa11-2222-7222-8222-222222222222",
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "externalId": "openai/gpt-4o-mini",
+      "displayName": "GPT-4o mini",
+      "family": null,
+      "contextWindow": 128000,
+      "maxOutput": null,
+      "sizeBytes": null,
+      "capabilities": ["tools"],
+      "available": true,
+      "unavailableReason": null
+    }
+  },
+  {
+    "name": "a negative size",
+    "value": {
+      "isFree": null,
+      "noTraining": null,
+      "id": "0199aa11-2222-7222-8222-222222222222",
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "externalId": "openai/gpt-4o-mini",
+      "displayName": "GPT-4o mini",
+      "family": null,
+      "contextWindow": 128000,
+      "maxOutput": null,
+      "sizeBytes": -5,
+      "capabilities": ["tools"],
+      "available": true,
+      "unavailableReason": null,
+      "discoveredAt": 1700000000000
+    }
+  }
+]

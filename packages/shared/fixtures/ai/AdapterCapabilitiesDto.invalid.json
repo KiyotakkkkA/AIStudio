@@ -1,0 +1,53 @@
+[
+  {
+    "name": "a partial honours record",
+    "value": {
+      "family": "openai-compatible",
+      "authModes": ["api"],
+      "streaming": true,
+      "liveModelList": true,
+      "embedding": true,
+      "image": false,
+      "honours": {
+        "temperature": true
+      },
+      "tools": "native"
+    }
+  },
+  {
+    "name": "an unknown tool mode",
+    "value": {
+      "family": "openai-compatible",
+      "authModes": ["api"],
+      "streaming": true,
+      "liveModelList": true,
+      "embedding": true,
+      "image": false,
+      "honours": {
+        "temperature": true,
+        "topK": false,
+        "topP": true,
+        "maxOutputTokens": true
+      },
+      "tools": "always"
+    }
+  },
+  {
+    "name": "an unknown family",
+    "value": {
+      "family": "gemini",
+      "authModes": ["api"],
+      "streaming": true,
+      "liveModelList": true,
+      "embedding": true,
+      "image": false,
+      "honours": {
+        "temperature": true,
+        "topK": false,
+        "topP": true,
+        "maxOutputTokens": true
+      },
+      "tools": "native"
+    }
+  }
+]
