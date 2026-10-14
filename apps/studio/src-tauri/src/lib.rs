@@ -1,4 +1,4 @@
-mod browser;
+pub mod browser;
 mod commands;
 mod platform;
 mod theme;
@@ -8,7 +8,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use serde_json::json;
-use tauri::{App, AppHandle, Manager, RunEvent};
+use tauri::{App, AppHandle, Manager, RunEvent, WindowEvent};
 use zvs_host::browser::{BrowserLifecycle, profile_dir};
 use zvs_host::data::repositories::SecretFilter;
 use zvs_host::data::{MigrationFailed, PrepareOptions, prepare_database};
@@ -34,7 +34,8 @@ use zvs_host::services::{
 };
 use zvs_host::{IpcServer, ipc};
 
-use crate::browser::BrowserWorkspace;
+use crate::browser::gateway::GatewayOptions;
+use crate::browser::{AccountGateway, BearerTokens, BrowserWorkspace, WebviewPages};
 use crate::commands::Host;
 use crate::theme::TauriTheme;
 
@@ -75,11 +76,33 @@ pub fn run() {
                 } => {
                     let services = Arc::clone(&host.services);
                     let lifecycle_events = BrowserLifecycle::new();
+                    let profile = profile_dir(&app.path().app_data_dir()?);
+                    let tokens = BearerTokens::default();
                     app.manage(BrowserWorkspace::new(
                         app.handle().clone(),
-                        profile_dir(&app.path().app_data_dir()?),
+                        profile.clone(),
                         lifecycle_events.clone(),
+                        tokens.clone(),
                     ));
+                    let gateway = Arc::new(AccountGateway::with_options(
+                        Arc::new(WebviewPages::new(app.handle().clone(), profile)),
+                        tokens,
+                        GatewayOptions::default(),
+                        logger.clone(),
+                    ));
+                    {
+                        let gateway = Arc::clone(&gateway);
+                        lifecycle.shutdown.register(
+                            ShutdownStage::Dispose,
+                            "account-gateway",
+                            move || async move {
+                                gateway.dispose();
+                            },
+                        );
+                    }
+                    #[cfg(feature = "e2e")]
+                    probe_gateway(Arc::clone(&gateway), logger.clone());
+                    app.manage(Arc::clone(&gateway));
                     app.manage(lifecycle_events);
                     app.manage(host);
                     app.manage(lifecycle);
@@ -101,6 +124,13 @@ pub fn run() {
                             );
                         }
                     })?;
+                    if let Some(studio) = app.get_window(window::STUDIO) {
+                        studio.on_window_event(move |event| {
+                            if let WindowEvent::Destroyed = event {
+                                gateway.dispose();
+                            }
+                        });
+                    }
                 }
                 Boot::Recovery(failure) => window::create_recovery(app.handle(), &failure)?,
             }
@@ -109,6 +139,45 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("ZVS AI Studio failed to start")
         .run(on_run_event);
+}
+
+#[cfg(feature = "e2e")]
+fn probe_gateway(gateway: Arc<AccountGateway>, logger: SharedLogger) {
+    use zvs_host::drivers::ai::{SessionGateway, SessionRequest};
+
+    let Ok(url) = std::env::var("ZVS_E2E_GATEWAY_PROBE") else {
+        return;
+    };
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let mut request = SessionRequest::new("GET").with_header("accept", "application/json");
+            let bearer = gateway.account_token(&url);
+            if let Some(token) = &bearer {
+                request = request.with_header("authorization", token.authorization());
+            }
+            let outcome = gateway
+                .fetch(&url, request, &tokio_util::sync::CancellationToken::new())
+                .await;
+            logger.log(
+                LogLevel::Info,
+                "browser",
+                "Gateway probe",
+                &[
+                    ("url", json!(url)),
+                    ("bearer", json!(bearer.is_some())),
+                    (
+                        "status",
+                        json!(outcome.as_ref().ok().map(|response| response.status)),
+                    ),
+                    (
+                        "error",
+                        json!(outcome.as_ref().err().map(|error| error.code)),
+                    ),
+                ],
+            );
+            tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+        }
+    });
 }
 
 fn on_run_event(app: &AppHandle, event: RunEvent) {

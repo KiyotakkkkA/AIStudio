@@ -5,6 +5,7 @@ use regex::Regex;
 use url::Url;
 use zvs_contract::validate::js_trim;
 
+pub const BROWSER_PARTITION: &str = "persist:browser-work";
 pub const PROFILE_DIR: [&str; 2] = ["browser", "work"];
 pub const CHROME_HEIGHT: f64 = 148.0;
 pub const STATUS_HEIGHT: f64 = 28.0;

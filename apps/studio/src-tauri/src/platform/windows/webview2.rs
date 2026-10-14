@@ -8,26 +8,33 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use ::windows::Win32::Foundation::{HWND, RECT};
 use ::windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, DeleteObject, SetWindowRgn};
 use ::windows::Win32::UI::WindowsAndMessaging::GetClientRect;
-use ::windows::core::{BOOL, Error, HSTRING, Interface, PCWSTR, PWSTR};
+use ::windows::core::{BOOL, Error, HSTRING, Interface, PCWSTR, PWSTR, w};
 use tauri::webview::PlatformWebview;
 use webview2_com::Microsoft::Web::WebView2::Win32::{
     COREWEBVIEW2_NAVIGATION_KIND, COREWEBVIEW2_NAVIGATION_KIND_BACK_OR_FORWARD,
     COREWEBVIEW2_WEB_ERROR_STATUS, COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED,
-    COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN, ICoreWebView2, ICoreWebView2_2, ICoreWebView2Cookie,
-    ICoreWebView2CookieList, ICoreWebView2NavigationStartingEventArgs,
-    ICoreWebView2NavigationStartingEventArgs3,
+    COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
+    COREWEBVIEW2_WEB_RESOURCE_REQUEST_SOURCE_KINDS_DOCUMENT, ICoreWebView2, ICoreWebView2_2,
+    ICoreWebView2_22, ICoreWebView2Cookie, ICoreWebView2CookieList,
+    ICoreWebView2NavigationStartingEventArgs, ICoreWebView2NavigationStartingEventArgs3,
+    ICoreWebView2Settings2,
 };
 use webview2_com::{
+    CallDevToolsProtocolMethodCompletedHandler, DevToolsProtocolEventReceivedEventHandler,
     DocumentTitleChangedEventHandler, GetCookiesCompletedHandler, HistoryChangedEventHandler,
     NavigationCompletedEventHandler, NavigationStartingEventHandler, ProcessFailedEventHandler,
-    SourceChangedEventHandler, WindowCloseRequestedEventHandler, take_pwstr,
+    SourceChangedEventHandler, WebResourceRequestedEventHandler, WindowCloseRequestedEventHandler,
+    take_pwstr,
 };
 use zvs_host::browser::is_web_url;
 
+use crate::browser::bearer::Sighting;
+use crate::browser::cdp::{CdpEventSink, CdpReply};
 use crate::browser::cookies::CookieMeta;
 use crate::browser::model::{LoadFailure, PageSignal, PageSnapshot};
 
 pub type SignalSink = Arc<dyn Fn(PageSignal) + Send + Sync>;
+pub type SightingSink = Arc<dyn Fn(Sighting) + Send + Sync>;
 pub type CookieReply = Box<dyn FnOnce(Result<Vec<CookieMeta>, String>)>;
 pub type CookieFilter = Box<dyn Fn(&CookieMeta) -> bool + Send>;
 
@@ -349,6 +356,112 @@ pub fn delete_cookies(platform: &PlatformWebview, filter: CookieFilter, reply: C
     {
         reply(Err(error.to_string()));
     }
+}
+
+pub fn call_devtools(platform: &PlatformWebview, method: &str, params: &str, reply: CdpReply) {
+    let reply = Rc::new(RefCell::new(Some(reply)));
+    let answer = Rc::clone(&reply);
+    let handler =
+        CallDevToolsProtocolMethodCompletedHandler::create(Box::new(move |result, json| {
+            if let Some(reply) = answer.borrow_mut().take() {
+                reply(match result {
+                    Ok(()) => Ok(json),
+                    Err(error) if json.is_empty() => Err(error.to_string()),
+                    Err(_) => Err(json),
+                });
+            }
+            Ok(())
+        }));
+    let started = core(platform).and_then(|webview| unsafe {
+        webview.CallDevToolsProtocolMethod(&HSTRING::from(method), &HSTRING::from(params), &handler)
+    });
+    if let Err(error) = started
+        && let Some(reply) = reply.borrow_mut().take()
+    {
+        reply(Err(error.to_string()));
+    }
+}
+
+pub fn listen_devtools(
+    platform: &PlatformWebview,
+    event: &str,
+    sink: CdpEventSink,
+) -> ::windows::core::Result<()> {
+    let webview = core(platform)?;
+    let mut token = 0_i64;
+    unsafe {
+        let receiver = webview.GetDevToolsProtocolEventReceiver(&HSTRING::from(event))?;
+        receiver.add_DevToolsProtocolEventReceived(
+            &DevToolsProtocolEventReceivedEventHandler::create(Box::new(move |_, args| {
+                if let Some(args) = args {
+                    sink(string(|value| args.ParameterObjectAsJson(value)));
+                }
+                Ok(())
+            })),
+            &raw mut token,
+        )
+    }
+}
+
+pub fn observe_bearer(
+    platform: &PlatformWebview,
+    origins: &[String],
+    sink: SightingSink,
+) -> ::windows::core::Result<()> {
+    let webview = core(platform)?;
+    let scoped = webview.cast::<ICoreWebView2_22>().ok();
+    let mut token = 0_i64;
+    unsafe {
+        for origin in origins {
+            let filter = HSTRING::from(format!("{origin}/*"));
+            match &scoped {
+                Some(scoped) => scoped.AddWebResourceRequestedFilterWithRequestSourceKinds(
+                    &filter,
+                    COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
+                    COREWEBVIEW2_WEB_RESOURCE_REQUEST_SOURCE_KINDS_DOCUMENT,
+                )?,
+                None => {
+                    webview.AddWebResourceRequestedFilter(
+                        &filter,
+                        COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
+                    )?;
+                }
+            }
+        }
+        webview.add_WebResourceRequested(
+            &WebResourceRequestedEventHandler::create(Box::new(move |sender, args| {
+                let (Some(sender), Some(args)) = (sender, args) else {
+                    return Ok(());
+                };
+                let request = args.Request()?;
+                let headers = request.Headers()?;
+                let authorization = if flag(|value| headers.Contains(w!("Authorization"), value)) {
+                    Some(string(|value| {
+                        headers.GetHeader(w!("Authorization"), value)
+                    }))
+                } else {
+                    None
+                };
+                sink(Sighting {
+                    request_url: string(|value| request.Uri(value)),
+                    page_url: string(|value| sender.Source(value)),
+                    authorization,
+                });
+                Ok(())
+            })),
+            &raw mut token,
+        )
+    }
+}
+
+pub fn user_agent(platform: &PlatformWebview) -> ::windows::core::Result<String> {
+    let settings = unsafe {
+        core(platform)?
+            .Settings()?
+            .cast::<ICoreWebView2Settings2>()?
+    };
+    let agent = unsafe { string(|value| settings.UserAgent(value)) };
+    Ok(agent)
 }
 
 #[cfg(test)]

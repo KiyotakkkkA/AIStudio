@@ -11,10 +11,15 @@ use zvs_contract::AppError;
 use super::errors::{Headers, request_failed};
 
 pub mod api;
+pub mod session;
 
 pub use api::{
     ApiKey, ApiTransport, ApiTransportOptions, DEFAULT_TIMEOUT_SECONDS, SecretResolver,
     SharedSecretResolver, normalise_timeout,
+};
+pub use session::{
+    AccountToken, DEFAULT_TOKEN_TYPE, SessionGateway, SessionRequest, SessionResponse,
+    SharedSessionGateway,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

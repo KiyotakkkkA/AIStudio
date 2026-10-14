@@ -28,6 +28,7 @@ pub use registry::{
 };
 pub use stream_to_events::{StreamToEventsResult, stream_to_events};
 pub use transport::{
-    ApiKey, ApiTransport, ApiTransportOptions, DEFAULT_TIMEOUT_SECONDS, RequestSpec,
-    SecretResolver, SharedSecretResolver, SharedTransport, Transport, TransportResponse,
+    AccountToken, ApiKey, ApiTransport, ApiTransportOptions, ByteStream, DEFAULT_TIMEOUT_SECONDS,
+    RequestSpec, SecretResolver, SessionGateway, SessionRequest, SessionResponse,
+    SharedSecretResolver, SharedSessionGateway, SharedTransport, Transport, TransportResponse,
 };

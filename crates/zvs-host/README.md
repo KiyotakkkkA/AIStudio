@@ -5,29 +5,29 @@ The Rust host. Every service, repository, driver and the execution kernel will l
 without a window. Shell capabilities reach it through port traits that `zvs-studio`
 implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that builds it.
 
-| Module                   | Contents                                                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------- |
-| `ipc`                    | `IpcServer`, `register`, and one file of thin handlers per domain                           |
-| `services`               | `Services`, the handlers' only dependency, and the business logic                           |
-| `data`                   | `Database`, migrations, row structs and repositories (see `src/data/README.md`)             |
-| `platform::paths`        | `PathEnvironment` → `StudioPaths`, plus the validated path builders                         |
-| `platform::logger`       | `Logger` trait, `FileLogger` (JSON lines, rotation, redaction), `silent_logger`             |
-| `platform::ids`          | UUID v7 ids and the injectable `IdGenerator`                                                |
-| `platform::clock`        | `Clock`, `SystemClock`, `FakeClock`                                                         |
-| `platform::events`       | `EventBus`, `StreamHandle`, the `EventSink` and `EventRecorder` ports                       |
-| `platform::recorder`     | `FileEventRecorder` and the `ZVS_RECORD_EVENTS` flag                                        |
-| `platform::theme`        | `ThemePort`, `ThemeSource`, `apply_theme_source`, `THEME_SETTING_KEY`                       |
-| `platform::window_state` | `read_window_state`, `capture_window_state`, `WINDOW_STATE_KEY`                             |
-| `platform::shutdown`     | `ShutdownCoordinator`, `ShutdownStage`, `ExitDecision`                                      |
-| `services::crypto`       | `CryptoBackend`, `CryptoService`, `Plaintext`, `UnavailableBackend`                         |
-| `services::secrets`      | `SecretService`, the summary and DTO mapping, `secret_policy`, `secret_fields`              |
-| `services::providers`    | `ProviderService`, `DriverSource`, `probe_outcome`, `provider_status`                       |
-| `services::health_check` | `HealthCheckService`, the `providers.healthcheck.*` settings keys                           |
-| `drivers::ai`            | AI ports, `HttpClient`, transports, adapters, `ProviderRegistry` (see below)                |
-| `testing`                | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, `FakeDriver`, … |
-| `browser::policy`        | `is_web_url`, `navigation_url`, `profile_dir`, the chrome and status heights, `TAB_LIMIT`   |
-| `browser::lifecycle`     | `BrowserLifecycle`, `BrowserLifecycleEvent`, `LifecycleSubscription`                        |
-| `kernel`                 | Empty until its port task                                                                   |
+| Module                   | Contents                                                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `ipc`                    | `IpcServer`, `register`, and one file of thin handlers per domain                                                 |
+| `services`               | `Services`, the handlers' only dependency, and the business logic                                                 |
+| `data`                   | `Database`, migrations, row structs and repositories (see `src/data/README.md`)                                   |
+| `platform::paths`        | `PathEnvironment` → `StudioPaths`, plus the validated path builders                                               |
+| `platform::logger`       | `Logger` trait, `FileLogger` (JSON lines, rotation, redaction), `silent_logger`                                   |
+| `platform::ids`          | UUID v7 ids and the injectable `IdGenerator`                                                                      |
+| `platform::clock`        | `Clock`, `SystemClock`, `FakeClock`                                                                               |
+| `platform::events`       | `EventBus`, `StreamHandle`, the `EventSink` and `EventRecorder` ports                                             |
+| `platform::recorder`     | `FileEventRecorder` and the `ZVS_RECORD_EVENTS` flag                                                              |
+| `platform::theme`        | `ThemePort`, `ThemeSource`, `apply_theme_source`, `THEME_SETTING_KEY`                                             |
+| `platform::window_state` | `read_window_state`, `capture_window_state`, `WINDOW_STATE_KEY`                                                   |
+| `platform::shutdown`     | `ShutdownCoordinator`, `ShutdownStage`, `ExitDecision`                                                            |
+| `services::crypto`       | `CryptoBackend`, `CryptoService`, `Plaintext`, `UnavailableBackend`                                               |
+| `services::secrets`      | `SecretService`, the summary and DTO mapping, `secret_policy`, `secret_fields`                                    |
+| `services::providers`    | `ProviderService`, `DriverSource`, `probe_outcome`, `provider_status`                                             |
+| `services::health_check` | `HealthCheckService`, the `providers.healthcheck.*` settings keys                                                 |
+| `drivers::ai`            | AI ports, `HttpClient`, transports, adapters, `ProviderRegistry` (see below)                                      |
+| `testing`                | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, `FakeDriver`, `FakeSessionGateway`, … |
+| `browser::policy`        | `is_web_url`, `navigation_url`, `profile_dir`, `BROWSER_PARTITION`, the heights, `TAB_LIMIT`                      |
+| `browser::lifecycle`     | `BrowserLifecycle`, `BrowserLifecycleEvent`, `LifecycleSubscription`                                              |
+| `kernel`                 | Empty until its port task                                                                                         |
 
 `testing` is compiled for this crate's own tests and behind the `testing` feature for other
 crates' tests.
@@ -86,15 +86,16 @@ follow-ups. Field validation against a type schema (`services::secret_fields`) r
 
 ## AI drivers
 
-`drivers::ai` is the API-mode half of `host/drivers/ai` (PASSPORT §12). Account mode
-(`AccountTransport`, `qwen-web`, `deepseek-web`, identity probes) lands in TASK_065 – TASK_067.
+`drivers::ai` is the API-mode half of `host/drivers/ai` (PASSPORT §12), plus the
+`SessionGateway` port account mode is built on. `AccountTransport`, `qwen-web`,
+`deepseek-web` and the identity probes land in TASK_067.
 
 | Module             | Contents                                                                                       |
 | ------------------ | ---------------------------------------------------------------------------------------------- |
 | `ports`            | `TextGenerationDriver`, `EmbeddingDriver`, `ImageDriver`, `AiDriver`, the request/result types |
 | `capabilities`     | `AdapterCapabilities`, `Honours`, `supports_auth_mode`, `unsupported_parameters`               |
 | `http`             | `HttpClient`: one `reqwest::Client`, rustls with the OS roots, the system proxy, no cookies    |
-| `transport`        | `Transport`, `RequestSpec`, `TransportResponse`, `join_url`; `transport::api::ApiTransport`    |
+| `transport`        | `Transport`, `RequestSpec`, `TransportResponse`, `join_url`, `ApiTransport`, `SessionGateway`  |
 | `sse`              | Streaming UTF-8 decoding, `sse_data` (stops at `[DONE]`) and `ndjson_lines`                    |
 | `errors`           | `http_failure`, `network_failure`, `cancelled`, `timed_out`, `session_expired`, raw text       |
 | `adapters`         | `openai-compatible`, `ollama`, `local`, and the family table (`adapter_entry`)                 |
@@ -123,6 +124,17 @@ Adapter tests run against `mock::MockServer`, a local axum server, so the whole 
 talk to real endpoints: `LIVE_BASE_URL` + `LIVE_API_KEY` (+ `LIVE_MODEL`) for any
 OpenAI-dialect vendor, and `ZVS_LIVE_OLLAMA=http://127.0.0.1:11434`
 (+ `ZVS_LIVE_OLLAMA_MODEL`) for a local Ollama.
+
+### Session gateway
+
+`transport::session::SessionGateway` is `SessionGateway.ts`: `partition()`, `user_agent()`,
+`account_token(url)` and `fetch(url, SessionRequest, &CancellationToken)`. The response is a
+`SessionResponse` with the status, lower-cased headers and the body as a `ByteStream`, which
+`bytes()` and `text()` collect. `AccountToken` and `SessionRequest` print no secret values.
+The host never holds a cookie: `zvs-studio`'s `AccountGateway` runs every request as `fetch()`
+inside the browser profile (see `apps/studio/src-tauri/src/browser/gateway/README.md`).
+`testing::FakeSessionGateway` answers from a responder closure, records requests and holds
+tokens per origin.
 
 ## Providers
 
@@ -164,7 +176,7 @@ together, and the whole run is capped at `DEFAULT_SHUTDOWN_CAP` (5 s). Every sta
 `request_exit` from `RunEvent::ExitRequested`: the first call prevents the exit and starts the
 run, which ends with `AppHandle::exit`; calls during the run keep preventing it; afterwards the
 exit goes through and `RunEvent::Exit` logs `Shutdown`. Today it holds `health-check.stop`
-(`Stop`) and `providers` and `health-check` (`Dispose`). Later ports register their own tasks
+(`Stop`) and `providers`, `health-check` and `account-gateway` (`Dispose`). Later ports register their own tasks
 in the stage `main.ts` used for them.
 
 ## Browser

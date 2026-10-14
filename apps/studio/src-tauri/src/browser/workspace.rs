@@ -16,6 +16,7 @@ use zvs_contract::{
 use zvs_host::browser::{BrowserLifecycle, BrowserLifecycleEvent, navigation_url};
 use zvs_host::platform::ids::new_id;
 
+use crate::browser::bearer::{BearerTokens, request_filters};
 use crate::browser::cookies::{CookieMeta, cleared_domains};
 use crate::browser::model::{Model, NO_ACTIVE_TAB, PageSignal, Rect, TAB_LIMIT_REACHED, Tab};
 use crate::platform::site;
@@ -39,6 +40,7 @@ struct Inner {
     app: AppHandle,
     profile: PathBuf,
     lifecycle: BrowserLifecycle,
+    tokens: BearerTokens,
     model: Mutex<Model>,
     chrome: Mutex<Option<Webview>>,
     sites: Mutex<HashMap<String, Webview>>,
@@ -72,12 +74,18 @@ fn blank() -> WebviewUrl {
 }
 
 impl BrowserWorkspace {
-    pub fn new(app: AppHandle, profile: PathBuf, lifecycle: BrowserLifecycle) -> Self {
+    pub fn new(
+        app: AppHandle,
+        profile: PathBuf,
+        lifecycle: BrowserLifecycle,
+        tokens: BearerTokens,
+    ) -> Self {
         let (sender, receiver) = mpsc::channel();
         let workspace = Self(Arc::new(Inner {
             app,
             profile,
             lifecycle,
+            tokens,
             model: Mutex::default(),
             chrome: Mutex::default(),
             sites: Mutex::default(),
@@ -282,10 +290,15 @@ impl BrowserWorkspace {
 
     fn harden(&self, webview: &Webview, label: &str) -> Result<(), String> {
         let sink = self.sink(label);
+        let tokens = self.0.tokens.clone();
+        let sightings: site::SightingSink = Arc::new(move |sighting| {
+            tokens.observe(&sighting);
+        });
         webview
             .with_webview(move |platform| {
                 let _ = site::strip_host_bridge(&platform);
                 let _ = site::observe_site(&platform, sink);
+                let _ = site::observe_bearer(&platform, &request_filters(), sightings);
             })
             .map_err(failed)
     }

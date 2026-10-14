@@ -1,4 +1,5 @@
 pub mod fake_driver;
+pub mod fake_session;
 
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -10,6 +11,7 @@ use tempfile::TempDir;
 use zvs_contract::HostEvent;
 
 pub use self::fake_driver::{FAKE_CAPABILITIES, FakeDriver, FakeDriverSource, FakeScript};
+pub use self::fake_session::{FakeReply, FakeSessionGateway, RecordedSessionRequest};
 use crate::data::{BACKUPS_KEPT, Database, MIGRATIONS, MigrateOptions, migrate};
 pub use crate::platform::clock::{CLOCK_ORIGIN, FakeClock};
 use crate::platform::events::EventSink;
