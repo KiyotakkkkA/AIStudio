@@ -36,7 +36,7 @@ function AccountLoginMenu() {
           disabled={disabled}
           icon={<Icon path={mdiChevronDown} size={14} />}
         >
-          <span className="inline-flex items-center gap-1.75">
+          <span className="flex items-center gap-1.75 leading-none">
             <Icon path={mdiAccountPlusOutline} size={15} />
             Войти
           </span>
