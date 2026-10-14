@@ -247,25 +247,34 @@ stream
             "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_owned(),
         ];
 
-        let mut out = String::from("%PDF-1.4
-");
+        let mut out = String::from(
+            "%PDF-1.4
+",
+        );
         let mut offsets = Vec::new();
         for (index, object) in body.iter().enumerate() {
             offsets.push(out.len());
-            out.push_str(&format!("{} 0 obj
+            out.push_str(&format!(
+                "{} 0 obj
 {object}
 endobj
-", index + 1));
+",
+                index + 1
+            ));
         }
         let xref = out.len();
         let size = body.len() + 1;
-        out.push_str(&format!("xref
+        out.push_str(&format!(
+            "xref
 0 {size}
 0000000000 65535 f 
-"));
+"
+        ));
         for offset in &offsets {
-            out.push_str(&format!("{offset:010} 00000 n 
-"));
+            out.push_str(&format!(
+                "{offset:010} 00000 n 
+"
+            ));
         }
         out.push_str(&format!(
             "trailer

@@ -112,24 +112,17 @@
       "indexes": {
         "secret_type_idx": {
           "name": "secret_type_idx",
-          "columns": [
-            "type"
-          ],
+          "columns": ["type"],
           "isUnique": false
         },
         "secret_scope_idx": {
           "name": "secret_scope_idx",
-          "columns": [
-            "scope"
-          ],
+          "columns": ["scope"],
           "isUnique": false
         },
         "secret_name_type_unq": {
           "name": "secret_name_type_unq",
-          "columns": [
-            "name",
-            "type"
-          ],
+          "columns": ["name", "type"],
           "isUnique": true
         }
       },
@@ -176,23 +169,15 @@
           "name": "secret_usage_secret_id_secret_id_fk",
           "tableFrom": "secret_usage",
           "tableTo": "secret",
-          "columnsFrom": [
-            "secret_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["secret_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {
         "secret_usage_pk": {
-          "columns": [
-            "secret_id",
-            "consumer_kind",
-            "consumer_id"
-          ],
+          "columns": ["secret_id", "consumer_kind", "consumer_id"],
           "name": "secret_usage_pk"
         }
       },
@@ -336,17 +321,12 @@
       "indexes": {
         "account_adapter_external_unq": {
           "name": "account_adapter_external_unq",
-          "columns": [
-            "adapter",
-            "external_id"
-          ],
+          "columns": ["adapter", "external_id"],
           "isUnique": true
         },
         "account_adapter_idx": {
           "name": "account_adapter_idx",
-          "columns": [
-            "adapter"
-          ],
+          "columns": ["adapter"],
           "isUnique": false
         }
       },
@@ -355,12 +335,8 @@
           "name": "account_token_secret_id_secret_id_fk",
           "tableFrom": "account",
           "tableTo": "secret",
-          "columnsFrom": [
-            "token_secret_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["token_secret_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -531,31 +507,22 @@
       "indexes": {
         "provider_kind_name_unq": {
           "name": "provider_kind_name_unq",
-          "columns": [
-            "kind",
-            "name"
-          ],
+          "columns": ["kind", "name"],
           "isUnique": true
         },
         "provider_cap_text_idx": {
           "name": "provider_cap_text_idx",
-          "columns": [
-            "cap_text"
-          ],
+          "columns": ["cap_text"],
           "isUnique": false
         },
         "provider_cap_embedding_idx": {
           "name": "provider_cap_embedding_idx",
-          "columns": [
-            "cap_embedding"
-          ],
+          "columns": ["cap_embedding"],
           "isUnique": false
         },
         "provider_cap_image_idx": {
           "name": "provider_cap_image_idx",
-          "columns": [
-            "cap_image"
-          ],
+          "columns": ["cap_image"],
           "isUnique": false
         }
       },
@@ -564,12 +531,8 @@
           "name": "provider_secret_id_secret_id_fk",
           "tableFrom": "provider",
           "tableTo": "secret",
-          "columnsFrom": [
-            "secret_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["secret_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -577,12 +540,8 @@
           "name": "provider_account_id_account_id_fk",
           "tableFrom": "provider",
           "tableTo": "account",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -698,10 +657,7 @@
       "indexes": {
         "model_provider_external_unq": {
           "name": "model_provider_external_unq",
-          "columns": [
-            "provider_id",
-            "external_id"
-          ],
+          "columns": ["provider_id", "external_id"],
           "isUnique": true
         }
       },
@@ -710,12 +666,8 @@
           "name": "model_provider_id_provider_id_fk",
           "tableFrom": "model",
           "tableTo": "provider",
-          "columnsFrom": [
-            "provider_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["provider_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -871,9 +823,7 @@
       "indexes": {
         "vector_store_name_unq": {
           "name": "vector_store_name_unq",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },
@@ -882,12 +832,8 @@
           "name": "vector_store_embedding_provider_id_provider_id_fk",
           "tableFrom": "vector_store",
           "tableTo": "provider",
-          "columnsFrom": [
-            "embedding_provider_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["embedding_provider_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -952,10 +898,7 @@
       "indexes": {
         "vector_document_store_path_unq": {
           "name": "vector_document_store_path_unq",
-          "columns": [
-            "store_id",
-            "source_path"
-          ],
+          "columns": ["store_id", "source_path"],
           "isUnique": true
         }
       },
@@ -964,12 +907,8 @@
           "name": "vector_document_store_id_vector_store_id_fk",
           "tableFrom": "vector_document",
           "tableTo": "vector_store",
-          "columnsFrom": [
-            "store_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["store_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1076,16 +1015,12 @@
       "indexes": {
         "run_stream_id_unique": {
           "name": "run_stream_id_unique",
-          "columns": [
-            "stream_id"
-          ],
+          "columns": ["stream_id"],
           "isUnique": true
         },
         "run_status_idx": {
           "name": "run_status_idx",
-          "columns": [
-            "status"
-          ],
+          "columns": ["status"],
           "isUnique": false
         }
       },
@@ -1178,11 +1113,7 @@
       "indexes": {
         "step_attempt_unq": {
           "name": "step_attempt_unq",
-          "columns": [
-            "run_id",
-            "node_id",
-            "attempt"
-          ],
+          "columns": ["run_id", "node_id", "attempt"],
           "isUnique": true
         }
       },
@@ -1191,12 +1122,8 @@
           "name": "step_run_id_run_id_fk",
           "tableFrom": "step",
           "tableTo": "run",
-          "columnsFrom": [
-            "run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1236,22 +1163,15 @@
           "name": "run_event_run_id_run_id_fk",
           "tableFrom": "run_event",
           "tableTo": "run",
-          "columnsFrom": [
-            "run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "run_event_run_id_seq_pk": {
-          "columns": [
-            "run_id",
-            "seq"
-          ],
+          "columns": ["run_id", "seq"],
           "name": "run_event_run_id_seq_pk"
         }
       },

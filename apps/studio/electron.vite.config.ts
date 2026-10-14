@@ -70,6 +70,7 @@ export default defineConfig({
       },
     ],
     build: {
+      assetsInlineLimit: 0,
       rollupOptions: { input: { studio: "src/index.html", browser: "src/browser-ui/index.html" } },
     },
   },

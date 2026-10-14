@@ -17,6 +17,10 @@ import {
   ResourceSampleDto,
   Result,
   RunOutcomeDto,
+  SECRET_TYPE_REGISTRY,
+  SecretDto,
+  SecretSummaryDto,
+  SecretTypeSchema,
   Sort,
   SortDirection,
   StreamId,
@@ -49,6 +53,15 @@ const schemas: Record<string, z.ZodType> = {
   "settings/SettingsGetOutput": contract["settings.get"].output,
   "settings/SettingsSetInput": contract["settings.set"].input,
   "settings/SettingsSetOutput": contract["settings.set"].output,
+  "secrets/SecretTypeSchema": SecretTypeSchema,
+  "secrets/SecretsTypesOutput": contract["secrets.types"].output,
+  "secrets/SecretFilter": contract["secrets.list"].input,
+  "secrets/SecretRef": contract["secrets.get"].input,
+  "secrets/CreateSecretInput": contract["secrets.create"].input,
+  "secrets/UpdateSecretInput": contract["secrets.update"].input,
+  "secrets/SecretSummaryDto": SecretSummaryDto,
+  "secrets/SecretDto": SecretDto,
+  "secrets/SecretsRemoveOutput": contract["secrets.remove"].output,
 };
 
 const root = fileURLToPath(new URL("../fixtures/", import.meta.url));
@@ -119,5 +132,10 @@ describe("golden fixtures", () => {
   it("lists every AppErrorCode in order", () => {
     const listed = cases(join(root, "errors/AppErrorCode.valid.json")).map((c) => c.value);
     expect(listed).toEqual(Object.values(AppErrorCode));
+  });
+
+  it("holds the secret type registry exactly as secrets.types returns it", () => {
+    const [registry] = cases(join(root, "secrets/SecretsTypesOutput.valid.json"));
+    expect(registry?.value).toEqual(SECRET_TYPE_REGISTRY);
   });
 });

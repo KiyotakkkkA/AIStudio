@@ -18,7 +18,9 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 | `platform::recorder`           | `FileEventRecorder` and the `ZVS_RECORD_EVENTS` flag                            |
 | `platform::theme`              | `ThemePort`, `ThemeSource`, `apply_theme_source`, `THEME_SETTING_KEY`           |
 | `platform::window_state`       | `read_window_state`, `capture_window_state`, `WINDOW_STATE_KEY`                 |
-| `testing`                      | `temporary_directory`, `temporary_database`, `test_services`, `MemoryLogger`, … |
+| `services::crypto`             | `CryptoBackend`, `CryptoService`, `Plaintext`, `UnavailableBackend`             |
+| `services::secrets`            | `SecretService`, the summary and DTO mapping, `secret_policy`, `secret_fields`  |
+| `testing`                      | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, …   |
 | `kernel`, `drivers`, `browser` | Empty until their port tasks                                                    |
 
 `testing` is compiled for this crate's own tests and behind the `testing` feature for other
@@ -60,3 +62,18 @@ logged at `error` and dropped. Nothing panics. Delivery goes through the attache
 `EventSink`; with none attached, events are logged at `debug` and dropped. The recorder, when
 present, sees every event before delivery. In the studio, the `Channel` handed over by
 `events_subscribe` is the sink.
+
+## Secrets
+
+Values are write-only (PASSPORT §18.4). `SecretService::resolve` is the one way back to a
+plaintext and is for host services only; no handler in `ipc::secrets` calls it. It returns
+`Plaintext`, which zeroises on drop, prints `Plaintext([redacted])` under `Debug` and has no
+`Serialize`. Inbound values arrive as `zvs_contract::SecretInput`, which behaves the same way.
+Row structs never select `cipher` except `SecretCipherRow`, and its `Debug` prints the length.
+
+`CryptoBackend` is the platform port. `zvs-studio` supplies `DpapiBackend` on Windows
+(`CryptProtectData` / `CryptUnprotectData`, current user, ciphertext prefixed with version byte
+`0x01`) and `UnavailableBackend` elsewhere, which makes `CryptoService` refuse with
+`SECRET_DECRYPT_FAILED` rather than store anything. macOS Keychain and Linux Secret Service are
+follow-ups. Field validation against a type schema (`services::secret_fields`) reproduces
+`buildFieldsSchema`: strict keys, defaults, and `z.url()` through the WHATWG `url` crate.

@@ -4,6 +4,7 @@ pub mod errors;
 pub mod events;
 pub mod ids;
 pub mod primitives;
+pub mod secrets;
 pub mod settings;
 pub mod system;
 pub mod validate;
@@ -18,6 +19,12 @@ pub use events::{
 };
 pub use ids::*;
 pub use primitives::{Json, MAX_SAFE_INTEGER, Page, PageRequest, Sort, SortDirection, Timestamp};
+pub use secrets::{
+    CreateSecretInput, FieldDefault, FieldDescriptor, FieldKind, FieldOption, RotationStatus,
+    SecretDto, SecretFields, SecretFilter, SecretInput, SecretRef, SecretScope, SecretSummaryDto,
+    SecretTypeKey, SecretTypeSchema, SecretsListOutput, SecretsRemoveOutput, SecretsTypesOutput,
+    UpdateSecretInput, find_secret_type_schema, is_secret_type_key, secret_type_registry,
+};
 pub use settings::{
     SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, check_setting_key,
 };

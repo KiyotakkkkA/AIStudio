@@ -57,6 +57,9 @@ Use these rather than rolling your own — `test/helpers/`:
   user-data database.
 - `paths.ts` — `temporaryDirectory()` and `assertTemporaryPath()`. Anything a test writes to
   or deletes must sit under the OS temp directory; the assertion fails loudly if it does not.
+  On Windows, `dispose()` tolerates a file another process still holds (`EPERM`, `EBUSY`,
+  `ENOTEMPTY`): the directory stays under the temp root and is removed again when the process
+  exits. Any other failure still throws.
 - `fakeBridge.ts` — `createFakeBridge()` is an in-memory preload bridge. Renderer stores can
   be tested against the real IPC contract without Electron: register handlers with `handle`,
   push events with `emit`.

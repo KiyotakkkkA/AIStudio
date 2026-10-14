@@ -6,11 +6,13 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use zvs_contract::{
-    AppErrorCode, DeviceGpuDto, DeviceProfileDto, DeviceTier, HostEvent, Json, Page, PageRequest,
-    ProviderId, ResourceSampleDto, ResultEnvelope, RunOutcomeDto, SettingsGetInput,
-    SettingsGetOutput, SettingsSetInput, SettingsSetOutput, Sort, SortDirection, StreamId,
-    SystemDemoJobInput, SystemDemoStreamInput, SystemDemoStreamOutput, SystemDeviceInput,
-    SystemNativePingInput, SystemNativePingOutput, SystemPingInput, SystemPingOutput, Validate,
+    AppErrorCode, CreateSecretInput, DeviceGpuDto, DeviceProfileDto, DeviceTier, HostEvent, Json,
+    Page, PageRequest, ProviderId, ResourceSampleDto, ResultEnvelope, RunOutcomeDto, SecretDto,
+    SecretFilter, SecretRef, SecretSummaryDto, SecretTypeSchema, SecretsRemoveOutput,
+    SecretsTypesOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput,
+    Sort, SortDirection, StreamId, SystemDemoJobInput, SystemDemoStreamInput,
+    SystemDemoStreamOutput, SystemDeviceInput, SystemNativePingInput, SystemNativePingOutput,
+    SystemPingInput, SystemPingOutput, UpdateSecretInput, Validate, secret_type_registry,
 };
 
 type Check = fn(Value) -> Result<Value, String>;
@@ -63,7 +65,32 @@ const TABLE: &[(&str, Check)] = &[
         "settings/SettingsSetOutput",
         round_trip::<SettingsSetOutput>,
     ),
+    ("secrets/SecretTypeSchema", round_trip::<SecretTypeSchema>),
+    (
+        "secrets/SecretsTypesOutput",
+        round_trip::<SecretsTypesOutput>,
+    ),
+    ("secrets/SecretFilter", round_trip::<SecretFilter>),
+    ("secrets/SecretRef", round_trip::<SecretRef>),
+    ("secrets/CreateSecretInput", round_trip::<CreateSecretInput>),
+    ("secrets/UpdateSecretInput", round_trip::<UpdateSecretInput>),
+    ("secrets/SecretSummaryDto", round_trip::<SecretSummaryDto>),
+    ("secrets/SecretDto", round_trip::<SecretDto>),
+    (
+        "secrets/SecretsRemoveOutput",
+        round_trip::<SecretsRemoveOutput>,
+    ),
 ];
+
+const SECRET_OUTPUTS: &[&str] = &[
+    "secrets/SecretsTypesOutput",
+    "secrets/SecretTypeSchema",
+    "secrets/SecretSummaryDto",
+    "secrets/SecretDto",
+    "secrets/SecretsRemoveOutput",
+];
+
+const PLAINTEXT_KEYS: &[&str] = &["value", "cipher", "plaintext", "secret", "apiKey"];
 
 fn round_trip<T: DeserializeOwned + Serialize + Validate>(value: Value) -> Result<Value, String> {
     let parsed: T = serde_json::from_value(value).map_err(|error| error.to_string())?;
@@ -256,4 +283,77 @@ fn every_host_event_variant_and_outcome_has_a_fixture() {
             "no end fixture with status {status}"
         );
     }
+}
+
+fn plaintext_keys(value: &Value, path: &str, found: &mut Vec<String>) {
+    match value {
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                plaintext_keys(item, &format!("{path}.{index}"), found);
+            }
+        }
+        Value::Object(entries) => {
+            for (key, entry) in entries {
+                if key == "options" {
+                    continue;
+                }
+                if PLAINTEXT_KEYS.contains(&key.as_str()) {
+                    found.push(format!("{path}.{key}"));
+                }
+                plaintext_keys(entry, &format!("{path}.{key}"), found);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[test]
+fn no_secrets_output_fixture_carries_a_value_field() {
+    let mut problems = Vec::new();
+    for fixture in all_fixtures()
+        .iter()
+        .filter(|fixture| fixture.kind == Kind::Valid)
+        .filter(|fixture| fixture.name.starts_with("secrets/"))
+    {
+        let is_output = SECRET_OUTPUTS.contains(&fixture.name.as_str());
+        let is_input = fixture.name.ends_with("Input")
+            || matches!(
+                fixture.name.as_str(),
+                "secrets/SecretFilter" | "secrets/SecretRef"
+            );
+        assert!(
+            is_output || is_input,
+            "{} is neither a known secrets output nor an input",
+            fixture.name
+        );
+        if !is_output {
+            continue;
+        }
+        for (case, value) in cases(&fixture.path) {
+            let mut found = Vec::new();
+            plaintext_keys(&value, "", &mut found);
+            if !found.is_empty() {
+                problems.push(format!("{} / {case}: {found:?}", fixture.name));
+            }
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "
+{}",
+        problems.join(
+            "
+"
+        )
+    );
+}
+
+#[test]
+fn the_rust_registry_matches_the_registry_fixture() {
+    let path = fixtures_root().join("secrets/SecretsTypesOutput.valid.json");
+    let (_, fixture) = cases(&path).remove(0);
+    assert_eq!(
+        serde_json::to_value(secret_type_registry()).expect("serialises"),
+        fixture
+    );
 }

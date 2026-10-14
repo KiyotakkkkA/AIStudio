@@ -31,13 +31,45 @@ export interface TemporaryDirectory {
   dispose(): void;
 }
 
+const WINDOWS_LOCK_CODES = new Set(["EPERM", "EBUSY", "ENOTEMPTY"]);
+const lockedOnDispose = new Set<string>();
+
+function removeTree(path: string): void {
+  rmSync(path, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
+}
+
+function isWindowsLock(error: unknown): boolean {
+  return (
+    process.platform === "win32" &&
+    error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    WINDOWS_LOCK_CODES.has(error.code)
+  );
+}
+
+process.once("exit", () => {
+  for (const path of lockedOnDispose) {
+    try {
+      removeTree(path);
+    } catch {
+      continue;
+    }
+  }
+});
+
 export function temporaryDirectory(prefix = "studio-"): TemporaryDirectory {
   const path = assertTemporaryPath(mkdtempSync(join(realpathSync(tmpdir()), prefix)));
   return {
     path,
     dispose(): void {
       assertTemporaryPath(path);
-      rmSync(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+      try {
+        removeTree(path);
+      } catch (error: unknown) {
+        if (!isWindowsLock(error)) throw error;
+        lockedOnDispose.add(path);
+      }
     },
   };
 }

@@ -1,4 +1,5 @@
 mod commands;
+mod platform;
 mod theme;
 mod window;
 
@@ -7,6 +8,7 @@ use std::sync::Arc;
 
 use serde_json::json;
 use tauri::{App, Manager};
+use zvs_host::data::repositories::SecretFilter;
 use zvs_host::data::{MigrationFailed, PrepareOptions, prepare_database};
 use zvs_host::platform::clock::{SharedClock, SystemClock};
 use zvs_host::platform::events::{EventBus, EventBusOptions, EventRecorder};
@@ -17,7 +19,7 @@ use zvs_host::platform::recorder::{FileEventRecorder, recording_enabled_from_env
 use zvs_host::platform::theme::{SharedThemePort, THEME_SETTING_KEY, apply_theme_source};
 use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_window_state};
 use zvs_host::services::system::DEMO_INTERVAL;
-use zvs_host::services::{Services, SettingService, SystemService};
+use zvs_host::services::{CryptoService, SecretService, Services, SettingService, SystemService};
 use zvs_host::{IpcServer, ipc};
 
 use crate::commands::Host;
@@ -113,7 +115,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let database = Arc::new(database);
 
     let theme: SharedThemePort = Arc::new(TauriTheme::new(app.handle().clone()));
-    let settings = SettingService::new(database, clock.clone());
+    let settings = SettingService::new(Arc::clone(&database), clock.clone());
     apply_theme_source(
         settings
             .get(THEME_SETTING_KEY)?
@@ -126,6 +128,21 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             .get(WINDOW_STATE_KEY)?
             .map(|setting| setting.value)
             .as_ref(),
+    );
+
+    let crypto = Arc::new(CryptoService::new(platform::crypto_backend()));
+    let secrets = SecretService::new(database, crypto, clock.clone(), logger.clone());
+    logger.log(
+        LogLevel::Info,
+        "host",
+        "Secret store ready",
+        &[
+            ("encryption", json!(secrets.is_encryption_available())),
+            (
+                "count",
+                json!(secrets.list(&SecretFilter::default())?.len()),
+            ),
+        ],
     );
 
     let recording = recording_enabled_from_env();
@@ -154,6 +171,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let services = Arc::new(Services {
         system: SystemService::new(clock, events.clone(), DEMO_INTERVAL),
         settings,
+        secrets,
         theme,
     });
     let mut server = IpcServer::new(Arc::clone(&services), logger.clone());

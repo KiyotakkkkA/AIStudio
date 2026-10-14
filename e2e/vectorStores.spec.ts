@@ -19,11 +19,15 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
     requests.push(body);
     response.setHeader("Content-Type", "application/json");
     response.end(
-      JSON.stringify({
-        embeddings: [[1, 0, 0]],
-        embedding: [1, 0, 0],
-        data: [{ embedding: [1, 0, 0], index: 0 }],
-      }),
+      JSON.stringify(
+        request.method === "GET"
+          ? { data: [{ id: "fixture-embedding" }] }
+          : {
+              embeddings: [[1, 0, 0]],
+              embedding: [1, 0, 0],
+              data: [{ embedding: [1, 0, 0], index: 0 }],
+            },
+      ),
     );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -51,16 +55,23 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
       async (port) =>
         window.zvs.call("providers.create", {
           name: "UI embedding fixture",
-          kind: "ollama",
+          kind: "openai-compatible",
           adapter: "openai-compatible",
           authMode: "api",
           baseUrl: `http://127.0.0.1:${port}`,
           capabilities: ["embedding"],
           enabled: true,
+          settings: { selectedModelIds: ["fixture-embedding"] },
         }),
       address.port,
     );
     expect(provider).toMatchObject({ ok: true });
+    const providerId = (provider as { data: { id: string } }).data.id;
+    const probe = await page.evaluate(
+      (id) => window.zvs.call("providers.probe", { id }),
+      providerId,
+    );
+    expect(probe).toMatchObject({ ok: true, data: { outcome: { kind: "ok" } } });
     await page.locator("nav").getByText("Векторные хранилища", { exact: true }).click();
     await expect(page.getByText("Хранилищ пока нет.", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Новое хранилище", exact: true }).click();
@@ -68,10 +79,11 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
     await page
       .locator("#vs-description")
       .fill("Manuals, changelogs and FAQ for the ZVS toolchain.");
-    await page.locator("#vs-embeddingModelId").fill("fixture-embedding");
-    await page.locator("#vs-dimension").fill("3");
     await page.getByText("Выберите провайдер", { exact: true }).click();
     await page.getByText("UI embedding fixture", { exact: true }).click();
+    await page.getByText("Выберите модель", { exact: true }).click();
+    await page.getByText("fixture-embedding", { exact: true }).click();
+    await page.locator("#vs-dimension").fill("3");
     await page.getByRole("button", { name: "Сохранить", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Product knowledge base" })).toBeVisible();
     await expect(page.getByText("Ожидает индексации.", { exact: false })).toBeVisible();
@@ -107,7 +119,7 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
         payload: { chunkCount: 2 },
       },
     ]);
-    await page.getByRole("button", { name: "Полная переиндексация", exact: true }).last().click();
+    await page.getByRole("button", { name: "Сверить", exact: true }).click();
     await page.locator("#vs-query").fill("How do I rotate a token?");
     await page.getByRole("button", { name: "Найти", exact: true }).click();
     await expect(
@@ -123,9 +135,9 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
     await page.getByRole("button", { name: "Сохранить", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Renamed knowledge base" })).toBeVisible();
     await rm(assertTemporaryPath(path), { recursive: true });
-    await page.getByRole("button", { name: "Полная переиндексация", exact: true }).last().click();
+    await page.getByRole("button", { name: "Сверить", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Таблица недоступна");
-    await expect(page.getByRole("button", { name: "Сверить", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Сверить", exact: true })).toHaveCount(2);
     await page.getByRole("button", { name: "Удалить", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Удалить", exact: true }).click();
     await expect(page.getByText("Хранилищ пока нет.", { exact: true })).toBeVisible();

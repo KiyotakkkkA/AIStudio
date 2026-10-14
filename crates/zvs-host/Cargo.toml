@@ -17,7 +17,9 @@ sha2.workspace = true
 tempfile = { workspace = true, optional = true }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["rt", "time"] }
+url.workspace = true
 uuid = { workspace = true, features = ["v7"] }
+zeroize.workspace = true
 zvs-contract = { path = "../zvs-contract" }
 
 [dev-dependencies]

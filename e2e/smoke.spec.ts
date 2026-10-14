@@ -164,7 +164,7 @@ test("the secret channels answer the renderer without ever carrying a value", as
         name: "Ollama — e2e",
         scope: "personal",
         value,
-        fields: { organization: "zvs-lab" },
+        fields: { baseUrl: "https://ollama.com/api" },
         tags: ["e2e"],
       }),
     VALUE,

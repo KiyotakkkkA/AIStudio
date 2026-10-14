@@ -16,6 +16,14 @@ where
     Option::<T>::deserialize(deserializer)
 }
 
+pub fn optional_nullable<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
 #[cfg(test)]
 mod tests {
     use serde::{Deserialize, Serialize};
@@ -57,5 +65,29 @@ mod tests {
             json!({ "knownOrNull": null })
         );
         assert!(serde_json::from_value::<Sample>(json!({})).is_err());
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Patch {
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "super::optional_nullable"
+        )]
+        days: Option<Option<u64>>,
+    }
+
+    #[test]
+    fn an_optional_nullable_field_tells_absent_from_null() {
+        for (wire, parsed) in [
+            (json!({}), None),
+            (json!({ "days": null }), Some(None)),
+            (json!({ "days": 3 }), Some(Some(3))),
+        ] {
+            let patch: Patch = serde_json::from_value(wire.clone()).expect("parses");
+            assert_eq!(patch.days, parsed);
+            assert_eq!(serde_json::to_value(&patch).expect("serialises"), wire);
+        }
     }
 }

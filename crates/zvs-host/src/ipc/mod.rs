@@ -1,3 +1,4 @@
+pub mod secrets;
 mod server;
 pub mod settings;
 pub mod system;
@@ -7,6 +8,7 @@ pub use server::{Coverage, INTERNAL_MESSAGE, IpcServer};
 pub fn register(server: &mut IpcServer) {
     system::register(server);
     settings::register(server);
+    secrets::register(server);
 }
 
 #[cfg(test)]
@@ -38,6 +40,12 @@ mod tests {
         assert_eq!(
             server.channels(),
             [
+                "secrets.create",
+                "secrets.get",
+                "secrets.list",
+                "secrets.remove",
+                "secrets.types",
+                "secrets.update",
                 "settings.get",
                 "settings.set",
                 "system.demoStream",

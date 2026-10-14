@@ -1,5 +1,6 @@
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use serde_json::{Map, Value};
@@ -11,7 +12,10 @@ pub use crate::platform::clock::{CLOCK_ORIGIN, FakeClock};
 use crate::platform::events::EventSink;
 use crate::platform::logger::{Field, LogLevel, Logger, SharedLogger, silent_logger};
 use crate::platform::theme::{ThemePort, ThemeSource};
-use crate::services::{Services, SettingService, SystemService};
+use crate::services::crypto::BackendFailure;
+use crate::services::{
+    CryptoBackend, CryptoService, Plaintext, SecretService, Services, SettingService, SystemService,
+};
 
 fn normalise(path: &Path) -> String {
     let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
@@ -136,6 +140,7 @@ pub struct TestServices {
     services: Arc<Services>,
     pub theme: Arc<RecordingTheme>,
     pub clock: Arc<FakeClock>,
+    pub crypto: Arc<FakeCrypto>,
     pub database: TemporaryDatabase,
 }
 
@@ -157,15 +162,100 @@ pub fn test_services(system: SystemService) -> TestServices {
     let database = temporary_database();
     let clock = Arc::new(FakeClock::default());
     let theme = RecordingTheme::shared();
+    let crypto = FakeCrypto::shared();
     TestServices {
         services: Arc::new(Services {
             system,
             settings: SettingService::new(database.shared(), clock.clone()),
+            secrets: SecretService::new(
+                database.shared(),
+                Arc::new(CryptoService::new(crypto.clone())),
+                clock.clone(),
+                silent_logger(),
+            ),
             theme: theme.clone(),
         }),
         theme,
         clock,
+        crypto,
         database,
+    }
+}
+
+const FAKE_CRYPTO_MASK: u8 = 0x5a;
+
+#[derive(Debug)]
+pub struct FakeCrypto {
+    available: AtomicBool,
+    fail_next: AtomicBool,
+    encrypt_calls: AtomicUsize,
+    decrypt_calls: AtomicUsize,
+}
+
+impl Default for FakeCrypto {
+    fn default() -> Self {
+        Self {
+            available: AtomicBool::new(true),
+            fail_next: AtomicBool::new(false),
+            encrypt_calls: AtomicUsize::new(0),
+            decrypt_calls: AtomicUsize::new(0),
+        }
+    }
+}
+
+impl FakeCrypto {
+    pub fn shared() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn set_available(&self, available: bool) {
+        self.available.store(available, Ordering::SeqCst);
+    }
+
+    pub fn fail_next(&self) {
+        self.fail_next.store(true, Ordering::SeqCst);
+    }
+
+    pub fn encrypt_calls(&self) -> usize {
+        self.encrypt_calls.load(Ordering::SeqCst)
+    }
+
+    pub fn decrypt_calls(&self) -> usize {
+        self.decrypt_calls.load(Ordering::SeqCst)
+    }
+
+    fn failing(&self, direction: &str) -> Result<(), BackendFailure> {
+        if self.fail_next.swap(false, Ordering::SeqCst) {
+            Err(BackendFailure::new(format!(
+                "keychain refused the {direction}"
+            )))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn mask(bytes: &[u8]) -> Vec<u8> {
+        bytes.iter().map(|byte| byte ^ FAKE_CRYPTO_MASK).collect()
+    }
+}
+
+impl CryptoBackend for FakeCrypto {
+    fn is_available(&self) -> bool {
+        self.available.load(Ordering::SeqCst)
+    }
+
+    fn encrypt(&self, plaintext: &str) -> Result<Vec<u8>, BackendFailure> {
+        self.encrypt_calls.fetch_add(1, Ordering::SeqCst);
+        self.failing("write")?;
+        Ok(Self::mask(plaintext.as_bytes()))
+    }
+
+    fn decrypt(&self, cipher: &[u8]) -> Result<Plaintext, BackendFailure> {
+        self.decrypt_calls.fetch_add(1, Ordering::SeqCst);
+        self.failing("read")?;
+        String::from_utf8(Self::mask(cipher))
+            .map(Plaintext::new)
+            .map_err(|_| BackendFailure::new("not UTF-8"))
     }
 }
 

@@ -2,7 +2,7 @@
 
 The serde mirror of `packages/shared`: every DTO that crosses `ipc_call` or the event channel
 exists here under the **same name** as its Zod schema. The crate is pure data. It depends on
-`serde`, `serde_json`, `uuid` and `thiserror` and never on Tauri, so the IPC server
+`serde`, `serde_json`, `uuid`, `thiserror` and `zeroize` and never on Tauri, so the IPC server
 (TASK_060) and every port task can share it.
 
 What lives here today:
@@ -14,6 +14,7 @@ What lives here today:
 | `errors`     | `AppErrorCode`, `AppError`, `ErrorDetails`                                        |
 | `envelope`   | `ResultEnvelope<T>`, the `{ ok, data }` / `{ ok, error }` wire envelope           |
 | `events`     | `HostEvent`, `HostEventDraft`, `RunOutcomeDto`, `DeltaKind`, `EVENT_CHANNEL`      |
+| `secrets`    | The secret DTOs, `SecretInput`, the type registry and the `secrets.*` channel I/O |
 | `settings`   | `SettingKey` validation and the `settings.*` channel inputs/outputs               |
 | `system`     | `DeviceProfileDto`, `ResourceSampleDto` and the `system.*` channel inputs/outputs |
 | `channels`   | `CHANNELS`, generated from `packages/shared/contract.channels.json`               |

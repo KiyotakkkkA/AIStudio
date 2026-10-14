@@ -93,12 +93,13 @@ test("chat streams grounded answers, preserves scroll, cancels and fits a narrow
     ).toBeVisible();
     const provider = await rpc<{ id: string }>(page, "providers.create", {
       name: "Local chat fixture",
-      kind: "ollama",
+      kind: "openai-compatible",
       adapter: "openai-compatible",
       authMode: "api",
       baseUrl: `http://127.0.0.1:${address.port}`,
       capabilities: ["text", "embedding"],
       enabled: true,
+      settings: { selectedModelIds: ["fixture-chat"] },
     });
     await rpc(page, "providers.probe", { id: provider.id });
     const store = await rpc<{ id: string }>(page, "vectorStores.create", {
@@ -125,13 +126,15 @@ test("chat streams grounded answers, preserves scroll, cancels and fits a narrow
     ]);
     await page.locator("nav").getByText("Секреты", { exact: true }).click();
     await page.locator("nav").getByText("Чат", { exact: true }).click();
-    await page.getByRole("checkbox", { name: /Product knowledge base/ }).check();
+    await page.getByRole("button", { name: "Прикрепить файлы", exact: true }).press("Enter");
+    await page.getByRole("menuitem", { name: /Подключить векторное хранилище/ }).click();
+    const sources = page.getByRole("dialog", { name: "Источники из хранилища" });
+    await sources.getByText("Product knowledge base", { exact: true }).click();
+    await expect(sources.getByRole("checkbox", { name: /Product knowledge base/ })).toBeChecked();
+    await sources.getByRole("button", { name: "Готово", exact: true }).click();
     const input = page.getByRole("textbox", { name: /Message|Сообщение/ });
     await input.fill("Is rotation safe?");
     await input.press("Enter");
-    const allow = page.getByRole("button", { name: /Allow once|Разрешить один раз/ });
-    await allow.click();
-    await allow.click();
     await expect(page.getByText("Paragraph 8:", { exact: false })).toBeVisible();
     const viewport = page
       .locator('[aria-label="Лента чата"], [aria-label="Chat thread"]')
@@ -146,9 +149,16 @@ test("chat streams grounded answers, preserves scroll, cancels and fits a narrow
     ).toBeVisible();
     await expect(input).toBeEnabled();
     expect(await viewport.evaluate((element) => element.scrollTop)).toBe(0);
-    await expect(page.locator("summary").first()).toContainText("Product knowledge base");
-    await expect(page.getByText("secrets/rotation.md#L42", { exact: false }).last()).toBeVisible();
     expect(await page.locator("article img, article script").count()).toBe(0);
+    await page
+      .getByRole("button", { name: /Источники/ })
+      .first()
+      .click();
+    const panel = page.getByRole("dialog", { name: "Источники ответа" });
+    await expect(panel.getByRole("tab", { name: "Product knowledge base" })).toBeVisible();
+    await expect(panel.getByText("secrets/rotation.md#L42", { exact: false })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
     await page.screenshot({ path: testInfo.outputPath("chat-1440.png") });
     for (const width of [1100, 966]) {
       await page.setViewportSize({ width, height: 900 });
@@ -163,8 +173,6 @@ test("chat streams grounded answers, preserves scroll, cancels and fits a narrow
     }
     await input.fill("Continue");
     await input.press("Enter");
-    await allow.click();
-    await allow.click();
     await expect(page.getByText("Partial response continues.", { exact: false })).toBeVisible();
     await page.getByRole("button", { name: /^(Stop|Остановить|Стоп)$/ }).click();
     await expect(input).toBeEnabled();

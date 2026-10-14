@@ -20,7 +20,11 @@ serde_json = { workspace = true }
 tauri = { version = "=2.12.1", features = ["isolation", "unstable"] }
 tauri-plugin-single-instance = "=2.5.2"
 zvs-contract = { path = "../../../crates/zvs-contract" }
+zeroize = { workspace = true }
 zvs-host = { path = "../../../crates/zvs-host" }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Cryptography"] }
 
 [lints.rust]
 warnings = "deny"
