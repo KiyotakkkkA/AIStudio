@@ -1,0 +1,56 @@
+[
+  {
+    "name": "linked",
+    "value": {
+      "status": "linked",
+      "account": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "adapter": "qwen-web",
+        "emailMasked": "p***@example.com",
+        "displayName": "Person",
+        "avatarUrl": "https://cdn.example.com/a.png",
+        "status": "linked",
+        "detail": null,
+        "expiresAt": 2000000000000,
+        "lastCheckedAt": 1700000000000,
+        "linkedProvidersCount": 2
+      },
+      "replacedPreviousIdentity": false,
+      "detail": null
+    }
+  },
+  {
+    "name": "linked over another identity",
+    "value": {
+      "status": "linked",
+      "account": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "adapter": "deepseek-web",
+        "emailMasked": null,
+        "displayName": null,
+        "avatarUrl": null,
+        "status": "needs-relink",
+        "detail": "Browser cookies cleared — sign in again",
+        "expiresAt": null,
+        "lastCheckedAt": null,
+        "linkedProvidersCount": 0
+      },
+      "replacedPreviousIdentity": true,
+      "detail": "Previous identity replaced; only one browser session per vendor can be active. Previous providers need an account linked."
+    }
+  },
+  {
+    "name": "cancelled",
+    "value": {
+      "status": "cancelled",
+      "detail": "No sign-in detected"
+    }
+  },
+  {
+    "name": "timeout",
+    "value": {
+      "status": "timeout",
+      "detail": "No sign-in detected"
+    }
+  }
+]

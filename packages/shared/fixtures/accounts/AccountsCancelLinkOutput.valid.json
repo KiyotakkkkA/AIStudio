@@ -1,0 +1,14 @@
+[
+  {
+    "name": "cancelled",
+    "value": {
+      "cancelled": true
+    }
+  },
+  {
+    "name": "nothing to cancel",
+    "value": {
+      "cancelled": false
+    }
+  }
+]

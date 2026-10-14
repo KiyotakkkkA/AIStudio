@@ -243,8 +243,8 @@ mod tests {
             families,
             [
                 json!(["openai-compatible", true]),
-                json!(["qwen-web", false]),
-                json!(["deepseek-web", false]),
+                json!(["qwen-web", true]),
+                json!(["deepseek-web", true]),
                 json!(["local", true]),
             ]
         );

@@ -1,0 +1,25 @@
+[
+  {
+    "name": "not removed",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "removed": false,
+      "browserSessionPreserved": true
+    }
+  },
+  {
+    "name": "session not preserved",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "removed": true,
+      "browserSessionPreserved": false
+    }
+  },
+  {
+    "name": "a missing flag",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "removed": true
+    }
+  }
+]

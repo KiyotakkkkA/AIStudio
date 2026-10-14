@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
+  AccountDto,
   AdapterCapabilitiesDto,
   AdapterDescriptorDto,
   AppErrorCode,
@@ -93,6 +94,12 @@ const schemas: Record<string, z.ZodType> = {
   "providers/ProbeResultDto": contract["providers.probe"].output,
   "browser/BrowserBounds": BrowserBounds,
   "browser/BrowserCommand": BrowserCommand,
+  "accounts/AccountDto": AccountDto,
+  "accounts/AccountLinkInput": contract["accounts.link"].input,
+  "accounts/AccountRef": contract["accounts.refresh"].input,
+  "accounts/AccountLinkResult": contract["accounts.link"].output,
+  "accounts/AccountsCancelLinkOutput": contract["accounts.cancelLink"].output,
+  "accounts/AccountsUnlinkOutput": contract["accounts.unlink"].output,
 };
 
 const root = fileURLToPath(new URL("../fixtures/", import.meta.url));

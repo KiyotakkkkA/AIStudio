@@ -1,0 +1,32 @@
+[
+  {
+    "name": "a linked qwen account",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "adapter": "qwen-web",
+      "emailMasked": "p***@example.com",
+      "displayName": "Person",
+      "avatarUrl": "https://cdn.example.com/a.png",
+      "status": "linked",
+      "detail": null,
+      "expiresAt": 2000000000000,
+      "lastCheckedAt": 1700000000000,
+      "linkedProvidersCount": 2
+    }
+  },
+  {
+    "name": "a deepseek account that needs a re-link",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "adapter": "deepseek-web",
+      "emailMasked": null,
+      "displayName": null,
+      "avatarUrl": null,
+      "status": "needs-relink",
+      "detail": "Browser cookies cleared — sign in again",
+      "expiresAt": null,
+      "lastCheckedAt": null,
+      "linkedProvidersCount": 0
+    }
+  }
+]

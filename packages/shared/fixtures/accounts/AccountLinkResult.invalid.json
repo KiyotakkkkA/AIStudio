@@ -1,0 +1,49 @@
+[
+  {
+    "name": "linked without an account",
+    "value": {
+      "status": "linked",
+      "replacedPreviousIdentity": false,
+      "detail": null
+    }
+  },
+  {
+    "name": "linked without detail",
+    "value": {
+      "status": "linked",
+      "account": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "adapter": "qwen-web",
+        "emailMasked": "p***@example.com",
+        "displayName": "Person",
+        "avatarUrl": "https://cdn.example.com/a.png",
+        "status": "linked",
+        "detail": null,
+        "expiresAt": 2000000000000,
+        "lastCheckedAt": 1700000000000,
+        "linkedProvidersCount": 2
+      },
+      "replacedPreviousIdentity": false
+    }
+  },
+  {
+    "name": "a cancellation without detail",
+    "value": {
+      "status": "cancelled"
+    }
+  },
+  {
+    "name": "a null cancellation detail",
+    "value": {
+      "status": "timeout",
+      "detail": null
+    }
+  },
+  {
+    "name": "an unknown status",
+    "value": {
+      "status": "failed",
+      "detail": "x"
+    }
+  }
+]

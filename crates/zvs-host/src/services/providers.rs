@@ -692,8 +692,8 @@ async fn cancelled_or_pending(signal: Option<&CancellationToken>) {
     }
 }
 
-fn seconds_to_millis(seconds: f64) -> Timestamp {
-    (seconds * 1000.0) as Timestamp
+fn seconds_to_millis(seconds: i64) -> Timestamp {
+    seconds.saturating_mul(1000)
 }
 
 fn not_found(provider_id: &str) -> AppError {

@@ -1,12 +1,17 @@
+pub mod account_family;
+pub mod deepseek_web;
 pub mod local;
 pub mod ollama;
 pub mod openai_compatible;
+pub mod qwen_web;
 pub mod wire;
 
 use std::sync::Arc;
 
-use zvs_contract::{AdapterFamily, AppError, AppErrorCode, AuthMode, ToolMode};
+use zvs_contract::{AdapterFamily, AppError, AppErrorCode};
 
+pub use account_family::{AccountAdapterCore, AccountAdapterOptions, flatten_prompt};
+pub use deepseek_web::{DEEPSEEK_WEB_CAPABILITIES, DeepSeekWebAdapter, deepseek_curated_models};
 pub use local::{
     FileSystemModelStore, LOCAL_CAPABILITIES, LocalEmbeddingAdapter, LocalEmbeddingEngine,
     LocalModelStore, SharedEmbeddingEngine, SharedModelStore,
@@ -15,33 +20,12 @@ pub use ollama::{OLLAMA_CAPABILITIES, OllamaAdapter};
 pub use openai_compatible::{
     OPENAI_COMPATIBLE_CAPABILITIES, OpenAiCompatibleAdapter, ToolCallAssembler,
 };
+pub use qwen_web::{QWEN_WEB_CAPABILITIES, QwenWebAdapter, map_qwen_models};
 
-use super::capabilities::{AdapterCapabilities, Honours};
+use super::capabilities::AdapterCapabilities;
 use super::ports::AiDriver;
 use super::transport::SharedTransport;
 use crate::platform::logger::{SharedLogger, silent_logger};
-
-pub const QWEN_WEB_CAPABILITIES: AdapterCapabilities = AdapterCapabilities {
-    family: AdapterFamily::QwenWeb,
-    auth_modes: &[AuthMode::Account],
-    streaming: true,
-    live_model_list: true,
-    embedding: false,
-    image: false,
-    honours: Honours::NONE,
-    tools: ToolMode::Injected,
-};
-
-pub const DEEPSEEK_WEB_CAPABILITIES: AdapterCapabilities = AdapterCapabilities {
-    family: AdapterFamily::DeepseekWeb,
-    auth_modes: &[AuthMode::Account],
-    streaming: false,
-    live_model_list: false,
-    embedding: false,
-    image: false,
-    honours: Honours::NONE,
-    tools: ToolMode::Injected,
-};
 
 #[derive(Clone)]
 pub struct AdapterContext {
@@ -74,6 +58,13 @@ impl AdapterContext {
         self.transport
             .clone()
             .ok_or_else(|| AppError::new(AppErrorCode::Conflict, "Адаптеру нужен транспорт"))
+    }
+
+    fn account_options(&self) -> Result<AccountAdapterOptions, AppError> {
+        Ok(AccountAdapterOptions {
+            logger: self.logger.clone(),
+            ..AccountAdapterOptions::new(self.require_transport()?)
+        })
     }
 }
 
@@ -123,10 +114,18 @@ impl AdapterFamilyEntry {
                     image: None,
                 })
             }
-            AdapterFamily::QwenWeb | AdapterFamily::DeepseekWeb => {
-                context.require_transport()?;
-                Err(not_implemented(family.as_str()))
-            }
+            AdapterFamily::QwenWeb => Ok(AiDriver {
+                text: Some(Arc::new(QwenWebAdapter::new(context.account_options()?))),
+                embedding: None,
+                image: None,
+            }),
+            AdapterFamily::DeepseekWeb => Ok(AiDriver {
+                text: Some(Arc::new(DeepSeekWebAdapter::new(
+                    context.account_options()?,
+                ))),
+                embedding: None,
+                image: None,
+            }),
         }
     }
 }
@@ -143,11 +142,11 @@ pub const fn adapter_entry(family: AdapterFamily) -> AdapterFamilyEntry {
         },
         AdapterFamily::QwenWeb => AdapterFamilyEntry {
             capabilities: QWEN_WEB_CAPABILITIES,
-            implemented: false,
+            implemented: true,
         },
         AdapterFamily::DeepseekWeb => AdapterFamilyEntry {
             capabilities: DEEPSEEK_WEB_CAPABILITIES,
-            implemented: false,
+            implemented: true,
         },
     }
 }
@@ -167,16 +166,16 @@ mod tests {
     use super::*;
     use crate::drivers::ai::mock::transport_for;
     use crate::testing::temporary_directory;
+    use zvs_contract::AuthMode;
 
     #[test]
     fn every_family_has_an_entry_and_an_unknown_one_is_refused() {
         for family in AdapterFamily::ALL {
             assert_eq!(adapter_entry(*family).capabilities.family, *family);
         }
-        assert!(adapter_entry(AdapterFamily::OpenaiCompatible).implemented);
-        assert!(adapter_entry(AdapterFamily::Local).implemented);
-        assert!(!adapter_entry(AdapterFamily::QwenWeb).implemented);
-        assert!(!adapter_entry(AdapterFamily::DeepseekWeb).implemented);
+        for family in AdapterFamily::ALL {
+            assert!(adapter_entry(*family).implemented, "{family}");
+        }
         assert!(adapter_capabilities(AdapterFamily::Local).embedding);
         assert!(!adapter_capabilities(AdapterFamily::Local).streaming);
         let error = adapter_entry_named("made-up").expect_err("refuses");
@@ -236,12 +235,24 @@ mod tests {
     }
 
     #[test]
-    fn account_families_wait_for_their_port() {
-        let error = adapter_entry(AdapterFamily::QwenWeb)
-            .build(&AdapterContext::with_transport(transport_for(
-                "http://127.0.0.1:9",
-            )))
-            .expect_err("not yet");
-        assert_eq!(error.message, "adapter qwen-web is not implemented yet");
+    fn both_account_families_build_a_text_only_driver_over_their_transport() {
+        for family in [AdapterFamily::QwenWeb, AdapterFamily::DeepseekWeb] {
+            let entry = adapter_entry(family);
+            let driver = entry
+                .build(&AdapterContext::with_transport(transport_for(
+                    "http://127.0.0.1:9",
+                )))
+                .expect("builds");
+            assert!(driver.text.is_some());
+            assert!(driver.embedding.is_none());
+            assert!(driver.image.is_none());
+            assert_eq!(
+                entry
+                    .build(&AdapterContext::default())
+                    .expect_err("refuses")
+                    .message,
+                "Адаптеру нужен транспорт"
+            );
+        }
     }
 }

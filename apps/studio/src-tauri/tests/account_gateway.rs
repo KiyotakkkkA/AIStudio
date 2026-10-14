@@ -308,6 +308,7 @@ async fn scenario(app: AppHandle, profile: PathBuf, port: u16, fixture: Arc<Fixt
         profile.clone(),
         BrowserLifecycle::new(),
         tokens.clone(),
+        Arc::new(zvs_host::platform::events::EventBus::default()),
     );
     let options = GatewayOptions {
         head_timeout: Duration::from_secs(3),

@@ -6,13 +6,14 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use zvs_contract::{
-    AdapterCapabilitiesDto, AdapterDescriptorDto, AppErrorCode, BrowserBounds, BrowserCommand,
-    CreateProviderInput, CreateSecretInput, DeviceGpuDto, DeviceProfileDto, DeviceTier,
-    DiscoveredModelDto, HostEvent, Json, ModelDto, Page, PageRequest, ProbeOutcomeDto,
-    ProbeRequest, ProbeResultDto, ProviderConnectionInput, ProviderDto, ProviderId,
-    ProviderListFilter, ProviderRef, ProviderSettingsDto, ProviderSummaryDto, ProvidersGetInput,
-    ProvidersRemoveOutput, ResourceSampleDto, ResultEnvelope, RunOutcomeDto, SecretDto,
-    SecretFilter, SecretRef, SecretSummaryDto, SecretTypeSchema, SecretsRemoveOutput,
+    AccountDto, AccountLinkInput, AccountLinkResult, AccountRef, AccountsCancelLinkOutput,
+    AccountsUnlinkOutput, AdapterCapabilitiesDto, AdapterDescriptorDto, AppErrorCode,
+    BrowserBounds, BrowserCommand, CreateProviderInput, CreateSecretInput, DeviceGpuDto,
+    DeviceProfileDto, DeviceTier, DiscoveredModelDto, HostEvent, Json, ModelDto, Page, PageRequest,
+    ProbeOutcomeDto, ProbeRequest, ProbeResultDto, ProviderConnectionInput, ProviderDto,
+    ProviderId, ProviderListFilter, ProviderRef, ProviderSettingsDto, ProviderSummaryDto,
+    ProvidersGetInput, ProvidersRemoveOutput, ResourceSampleDto, ResultEnvelope, RunOutcomeDto,
+    SecretDto, SecretFilter, SecretRef, SecretSummaryDto, SecretTypeSchema, SecretsRemoveOutput,
     SecretsTypesOutput, SetDefaultModelInput, SettingsGetInput, SettingsGetOutput,
     SettingsSetInput, SettingsSetOutput, Sort, SortDirection, StreamId, SystemDemoJobInput,
     SystemDemoStreamInput, SystemDemoStreamOutput, SystemDeviceInput, SystemNativePingInput,
@@ -141,6 +142,21 @@ const TABLE: &[(&str, Check)] = &[
     ("providers/ProbeResultDto", round_trip::<ProbeResultDto>),
     ("browser/BrowserBounds", round_trip::<BrowserBounds>),
     ("browser/BrowserCommand", round_trip::<BrowserCommand>),
+    ("accounts/AccountDto", round_trip::<AccountDto>),
+    ("accounts/AccountLinkInput", round_trip::<AccountLinkInput>),
+    ("accounts/AccountRef", round_trip::<AccountRef>),
+    (
+        "accounts/AccountLinkResult",
+        round_trip::<AccountLinkResult>,
+    ),
+    (
+        "accounts/AccountsCancelLinkOutput",
+        round_trip::<AccountsCancelLinkOutput>,
+    ),
+    (
+        "accounts/AccountsUnlinkOutput",
+        round_trip::<AccountsUnlinkOutput>,
+    ),
 ];
 
 const SECRET_OUTPUTS: &[&str] = &[

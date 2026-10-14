@@ -10,9 +10,13 @@ use zvs_contract::AppError;
 
 use super::errors::{Headers, request_failed};
 
+pub mod account;
 pub mod api;
 pub mod session;
 
+pub use account::{
+    AccountCredentials, AccountTransport, AccountTransportOptions, SharedAccountCredentials,
+};
 pub use api::{
     ApiKey, ApiTransport, ApiTransportOptions, DEFAULT_TIMEOUT_SECONDS, SecretResolver,
     SharedSecretResolver, normalise_timeout,

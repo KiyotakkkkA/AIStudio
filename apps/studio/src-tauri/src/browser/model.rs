@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use zvs_contract::{BrowserBounds, BrowserSecurity, BrowserState, BrowserTab};
 use zvs_host::browser::{CHROME_HEIGHT, NAVIGATION_BLOCKED, STATUS_HEIGHT, TAB_LIMIT};
 
@@ -282,9 +284,48 @@ impl Model {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct LinkTabs(HashMap<String, String>);
+
+impl LinkTabs {
+    pub fn opened(&mut self, label: impl Into<String>, url: impl Into<String>) {
+        self.0.insert(label.into(), url.into());
+    }
+
+    pub fn closed(&mut self, label: &str) -> Option<String> {
+        self.0.remove(label)
+    }
+
+    pub fn finished(&mut self, url: &str) {
+        self.0.retain(|_, linked| linked != url);
+    }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_link_tab_is_reported_once_when_it_closes_and_forgotten_when_linking_finishes() {
+        let mut links = LinkTabs::default();
+        links.opened("browser-site-1", "https://chat.qwen.ai/");
+        links.opened("browser-site-2", "https://chat.deepseek.com/");
+        assert_eq!(links.closed("browser-site-9"), None);
+        assert_eq!(
+            links.closed("browser-site-1").as_deref(),
+            Some("https://chat.qwen.ai/")
+        );
+        assert_eq!(links.closed("browser-site-1"), None);
+        links.finished("https://chat.deepseek.com/");
+        assert_eq!(links.closed("browser-site-2"), None);
+        links.opened("browser-site-3", "https://chat.qwen.ai/");
+        links.clear();
+        assert_eq!(links.closed("browser-site-3"), None);
+    }
 
     const A: &str = "0199aa11-1111-7111-8111-00000000000a";
     const B: &str = "0199aa11-1111-7111-8111-00000000000b";

@@ -95,7 +95,7 @@ impl Fixture {
             .expect("a draft probe resolves")
     }
 
-    fn insert_account(&self, status: &str, email: Option<&str>, expires: Option<f64>) -> String {
+    fn insert_account(&self, status: &str, email: Option<&str>, expires: Option<i64>) -> String {
         let id = new_id().hyphenated().to_string();
         self.database
             .with_connection(|connection| {
@@ -392,7 +392,7 @@ async fn draft_discovery_does_not_write_and_dtos_contain_references_only() {
 #[tokio::test]
 async fn account_expiry_uses_seconds_from_the_account_row_and_displays_a_masked_identity() {
     let fixture = Fixture::new();
-    let expires = (NOW + 2 * DAY_MS) as f64 / 1000.0;
+    let expires = (NOW + 2 * DAY_MS) / 1000;
     let account_id = fixture.insert_account("linked", Some("a***@example.com"), Some(expires));
     let row = fixture.insert_account_provider(account_id);
     let result = fixture
@@ -703,12 +703,154 @@ fn adapter_descriptors_list_every_family_with_its_wiring_state() {
             .collect::<Vec<_>>(),
         [
             (AdapterFamily::OpenaiCompatible, true),
-            (AdapterFamily::QwenWeb, false),
-            (AdapterFamily::DeepseekWeb, false),
+            (AdapterFamily::QwenWeb, true),
+            (AdapterFamily::DeepseekWeb, true),
             (AdapterFamily::Local, true),
         ]
     );
     let local = &descriptors[3].capabilities;
     assert!(local.embedding);
     assert!(!local.streaming);
+}
+
+struct CredentialCheckingDriver {
+    credentials: Arc<crate::drivers::ai::identity::ProbeAccountCredentials>,
+}
+
+#[async_trait]
+impl crate::drivers::ai::ports::TextGenerationDriver for CredentialCheckingDriver {
+    fn capabilities(&self) -> AdapterCapabilities {
+        crate::testing::FAKE_CAPABILITIES
+    }
+
+    async fn generate(
+        &self,
+        _request: &crate::drivers::ai::ports::GenerateRequest,
+        _cancel: &CancellationToken,
+    ) -> Result<crate::drivers::ai::ports::GenerateResult, AppError> {
+        Err(cancelled())
+    }
+
+    fn stream(
+        &self,
+        _request: &crate::drivers::ai::ports::GenerateRequest,
+        _cancel: &CancellationToken,
+    ) -> crate::drivers::ai::ports::DeltaStream {
+        Box::pin(futures::stream::empty())
+    }
+
+    async fn list_models(
+        &self,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<DiscoveredModel>, AppError> {
+        use crate::drivers::ai::transport::AccountCredentials;
+        self.credentials.current(cancel).await?;
+        Ok(vec![model("model-1")])
+    }
+}
+
+struct CredentialCheckingDrivers(Arc<CredentialCheckingDriver>);
+
+#[async_trait]
+impl DriverSource for CredentialCheckingDrivers {
+    async fn ephemeral_driver(&self, _row: &ProviderRow) -> Result<AiDriver, AppError> {
+        Ok(AiDriver {
+            text: Some(self.0.clone()),
+            embedding: None,
+            image: None,
+        })
+    }
+
+    fn invalidate(&self, _provider_id: &str) {}
+}
+
+#[tokio::test]
+async fn account_draft_credentials_verify_identity_without_changing_the_database() {
+    use crate::data::repositories::{AccountDraft, SecretFilter};
+    use crate::drivers::ai::identity::ProbeAccountCredentials;
+    use crate::testing::{FakeIdentityProbes, FakeSessionGateway, ProbeStep, fake_identity};
+    use zvs_contract::AccountFamily;
+
+    let fixture = Fixture::new();
+    let account = fixture
+        .database
+        .transaction(|transaction| {
+            Ok(Repositories::new(transaction)
+                .accounts
+                .create(&AccountDraft::new(
+                    AccountFamily::QwenWeb,
+                    "persist:browser-work",
+                    "same-id",
+                    NOW,
+                ))?)
+        })
+        .expect("an account");
+    let probes = FakeIdentityProbes::shared();
+    probes.always(ProbeStep::Identity(fake_identity(
+        "same-id",
+        "private-token",
+    )));
+    let credentials = Arc::new(ProbeAccountCredentials::with_probe(
+        account.clone(),
+        FakeSessionGateway::shared(),
+        fixture.secrets.clone(),
+        (probes.factory())(AccountFamily::QwenWeb),
+    ));
+    let actual = fixture.with_drivers(
+        Arc::new(CredentialCheckingDrivers(Arc::new(
+            CredentialCheckingDriver { credentials },
+        ))),
+        DEFAULT_PROBE_TIMEOUT_SECONDS,
+    );
+    let draft = create_input(json!({
+        "adapter": "qwen-web",
+        "authMode": "account",
+        "accountId": account.id,
+    }));
+    let result = actual
+        .probe(ProbeInput::Draft(draft.clone().into()), None)
+        .await
+        .expect("probes")
+        .to_dto()
+        .expect("a dto");
+    assert_eq!(result.outcome.kind(), "ok");
+    assert!(
+        !serde_json::to_string(&result)
+            .expect("serialises")
+            .contains("private-token")
+    );
+    let stored = |id: &str| {
+        fixture
+            .database
+            .with_connection(|connection| {
+                Ok(Repositories::new(connection).accounts.find_by_id(id)?)
+            })
+            .expect("reads")
+    };
+    assert_eq!(stored(&account.id), Some(account.clone()));
+    assert!(
+        fixture
+            .secrets
+            .list(&SecretFilter::default())
+            .expect("lists")
+            .is_empty()
+    );
+    assert!(
+        fixture
+            .service
+            .list(&ProviderListFilter::default())
+            .expect("lists")
+            .is_empty()
+    );
+    probes.always(ProbeStep::Identity(fake_identity(
+        "different-id",
+        "private-token",
+    )));
+    let mismatch = actual
+        .probe(ProbeInput::Draft(draft.into()), None)
+        .await
+        .expect("probes");
+    assert_eq!(mismatch.outcome.kind(), "session-expired");
+    assert_eq!(stored(&account.id), Some(account));
+    actual.dispose().await;
 }

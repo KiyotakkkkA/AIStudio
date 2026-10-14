@@ -13,12 +13,17 @@ use tauri::{
 use zvs_contract::{
     BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie, BrowserState,
 };
-use zvs_host::browser::{BrowserLifecycle, BrowserLifecycleEvent, navigation_url};
+use zvs_host::browser::{
+    BrowserLifecycle, BrowserLifecycleEvent, LifecycleSubscription, navigation_url,
+};
 use zvs_host::platform::ids::new_id;
+use zvs_host::platform::navigation::{SharedNavigator, WorkspaceRoute};
 
 use crate::browser::bearer::{BearerTokens, request_filters};
 use crate::browser::cookies::{CookieMeta, cleared_domains};
-use crate::browser::model::{Model, NO_ACTIVE_TAB, PageSignal, Rect, TAB_LIMIT_REACHED, Tab};
+use crate::browser::model::{
+    LinkTabs, Model, NO_ACTIVE_TAB, PageSignal, Rect, TAB_LIMIT_REACHED, Tab,
+};
 use crate::platform::site;
 use crate::window::{STUDIO, app_origin, same_origin};
 
@@ -41,6 +46,9 @@ struct Inner {
     profile: PathBuf,
     lifecycle: BrowserLifecycle,
     tokens: BearerTokens,
+    navigator: SharedNavigator,
+    links: Mutex<LinkTabs>,
+    subscription: Mutex<Option<LifecycleSubscription>>,
     model: Mutex<Model>,
     chrome: Mutex<Option<Webview>>,
     sites: Mutex<HashMap<String, Webview>>,
@@ -79,6 +87,7 @@ impl BrowserWorkspace {
         profile: PathBuf,
         lifecycle: BrowserLifecycle,
         tokens: BearerTokens,
+        navigator: SharedNavigator,
     ) -> Self {
         let (sender, receiver) = mpsc::channel();
         let workspace = Self(Arc::new(Inner {
@@ -86,6 +95,9 @@ impl BrowserWorkspace {
             profile,
             lifecycle,
             tokens,
+            navigator,
+            links: Mutex::default(),
+            subscription: Mutex::default(),
             model: Mutex::default(),
             chrome: Mutex::default(),
             sites: Mutex::default(),
@@ -95,6 +107,15 @@ impl BrowserWorkspace {
             labels: AtomicU64::new(0),
             hooked: AtomicBool::new(false),
         }));
+        let finished = Arc::downgrade(&workspace.0);
+        let subscription = workspace.0.lifecycle.subscribe(move |event| {
+            if let BrowserLifecycleEvent::LinkFinished { url } = event
+                && let Some(inner) = finished.upgrade()
+            {
+                lock(&inner.links).finished(url);
+            }
+        });
+        *lock(&workspace.0.subscription) = Some(subscription);
         let weak = Arc::downgrade(&workspace.0);
         std::thread::Builder::new()
             .name("browser-workspace".to_owned())
@@ -110,6 +131,14 @@ impl BrowserWorkspace {
             self.open_tab(None)?;
         }
         self.publish();
+        Ok(())
+    }
+
+    pub fn open_link_tab(&self, url: &str) -> Result<(), String> {
+        self.0.navigator.navigate(WorkspaceRoute::Browser);
+        self.ensure_chrome()?;
+        let label = self.open_tab(Some(url))?;
+        lock(&self.0.links).opened(label, url);
         Ok(())
     }
 
@@ -134,12 +163,14 @@ impl BrowserWorkspace {
             BrowserCommand::Navigate { url } => {
                 let url = Url::parse(&navigation_url(&url)?).map_err(failed)?;
                 let webview = self.active_webview().ok_or(NO_ACTIVE_TAB)?;
+                self.link_closed(webview.label());
                 lock(&self.0.model).set_sites_visible(false);
                 webview.navigate(url).map_err(failed)?;
             }
             BrowserCommand::Switch { id } => lock(&self.0.model).switch(&id)?,
             BrowserCommand::Close { id } => {
                 let removed = lock(&self.0.model).close(&id)?;
+                self.link_closed(&removed.label);
                 self.discard(&removed.label);
                 self.refill()?;
             }
@@ -303,7 +334,16 @@ impl BrowserWorkspace {
             .map_err(failed)
     }
 
-    fn open_tab(&self, url: Option<&str>) -> Result<(), String> {
+    fn link_closed(&self, label: &str) {
+        let url = lock(&self.0.links).closed(label);
+        if let Some(url) = url {
+            self.0
+                .lifecycle
+                .emit(&BrowserLifecycleEvent::LinkTabClosed { url });
+        }
+    }
+
+    fn open_tab(&self, url: Option<&str>) -> Result<String, String> {
         let destination = match url {
             Some(url) => Some(Url::parse(&navigation_url(url)?).map_err(failed)?),
             None => None,
@@ -327,12 +367,12 @@ impl BrowserWorkspace {
             let _ = webview.close();
             return Err(error.to_owned());
         }
-        lock(&self.0.sites).insert(label, webview.clone());
+        lock(&self.0.sites).insert(label.clone(), webview.clone());
         if let Some(destination) = destination {
             webview.navigate(destination).map_err(failed)?;
         }
         self.publish();
-        Ok(())
+        Ok(label)
     }
 
     fn adopt_popup(
@@ -415,12 +455,16 @@ impl BrowserWorkspace {
         if lock(&self.0.model).forget(label).is_none() {
             return;
         }
+        self.link_closed(label);
         self.discard(label);
         let _ = self.refill();
         self.publish();
     }
 
     fn signal(&self, label: &str, signal: PageSignal) {
+        if signal == PageSignal::Crashed {
+            self.link_closed(label);
+        }
         if signal == PageSignal::CloseRequested {
             self.close_label(label);
         } else if lock(&self.0.model).apply(label, signal) {
@@ -480,6 +524,7 @@ impl BrowserWorkspace {
         self.0
             .lifecycle
             .emit(&BrowserLifecycleEvent::WorkspaceClosed);
+        lock(&self.0.links).clear();
         lock(&self.0.model).clear();
         lock(&self.0.sites).clear();
         lock(&self.0.subscribers).clear();

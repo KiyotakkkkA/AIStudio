@@ -10,7 +10,7 @@ use crate::data::repositories::{
     SecretDraft, SecretFilter, SecretPatch, SecretUsageDraft, secret_in_use,
 };
 use crate::data::schema::{SecretConsumerKind, SecretRow};
-use crate::data::{Database, Repositories};
+use crate::data::{DataError, Database, Repositories};
 use crate::platform::clock::SharedClock;
 use crate::platform::logger::{LogLevel, SharedLogger};
 use crate::services::crypto::{CryptoService, Plaintext};
@@ -138,31 +138,98 @@ impl SecretService {
     }
 
     pub fn create(&self, input: SecretCreateInput) -> Result<SecretSummary, AppError> {
+        let (draft, now) = self.create_draft(input)?;
+        let created = self.database.with_connection(|connection| {
+            Ok(Repositories::new(connection).secrets.create(&draft)?)
+        })?;
+        self.created(created, now)
+    }
+
+    pub fn create_in(
+        &self,
+        repositories: &Repositories<'_>,
+        input: SecretCreateInput,
+    ) -> Result<SecretSummary, DataError> {
+        let (draft, now) = self.create_draft(input)?;
+        let created = repositories.secrets.create(&draft)?;
+        Ok(self.created(created, now)?)
+    }
+
+    pub fn update(&self, id: &str, input: SecretUpdateInput) -> Result<SecretSummary, AppError> {
+        self.require(id)?;
+        let (patch, now, replaced_value) = self.update_patch(input)?;
+        let (updated, count) = self.database.transaction(|transaction| {
+            Self::apply_update(&Repositories::new(transaction), id, &patch)
+        })?;
+        self.updated(id, updated, now, count, replaced_value)
+    }
+
+    pub fn update_in(
+        &self,
+        repositories: &Repositories<'_>,
+        id: &str,
+        input: SecretUpdateInput,
+    ) -> Result<SecretSummary, DataError> {
+        repositories
+            .secrets
+            .find_by_id(id)?
+            .ok_or_else(|| not_found(id))?;
+        let (patch, now, replaced_value) = self.update_patch(input)?;
+        let (updated, count) = Self::apply_update(repositories, id, &patch)?;
+        Ok(self.updated(id, updated, now, count, replaced_value)?)
+    }
+
+    pub fn remove(&self, id: &str) -> Result<(), AppError> {
+        self.database
+            .transaction(|transaction| self.remove_in(&Repositories::new(transaction), id))
+    }
+
+    pub fn remove_in(&self, repositories: &Repositories<'_>, id: &str) -> Result<(), DataError> {
+        let secrets = &repositories.secrets;
+        secrets.find_by_id(id)?.ok_or_else(|| not_found(id))?;
+        let usage = secrets.list_usage(id)?;
+        if !usage.is_empty() {
+            return Err(secret_in_use(id, &usage).into());
+        }
+        secrets.remove(id)?;
+        self.logger.log(
+            LogLevel::Info,
+            "secrets",
+            "Removed a secret",
+            &[("secretId", json!(id))],
+        );
+        Ok(())
+    }
+
+    fn create_draft(&self, input: SecretCreateInput) -> Result<(SecretDraft, Timestamp), AppError> {
         let name = require_text(&input.name, "name")?;
         let value = input.value.as_ref().map(require_value).transpose()?;
         let now = self.clock.now();
         let cipher = value.map(|value| self.crypto.encrypt(value)).transpose()?;
-        let draft = SecretDraft {
-            id: None,
-            r#type: input.r#type,
-            name,
-            scope: input.scope,
-            cipher,
-            cipher_version: CIPHER_VERSION,
-            hint: value.map(|value| compute_hint(value.expose())),
-            fields: Value::Object(input.fields).to_string(),
-            tags: json!(input.tags).to_string(),
-            note: input.note,
-            rotation_days: input.rotation_days,
-            rotates_at: input
-                .rotates_at
-                .or_else(|| rotation_due_at(input.rotation_days, now)),
-            created_at: now,
-            updated_at: now,
-        };
-        let created = self.database.with_connection(|connection| {
-            Ok(Repositories::new(connection).secrets.create(&draft)?)
-        })?;
+        Ok((
+            SecretDraft {
+                id: None,
+                r#type: input.r#type,
+                name,
+                scope: input.scope,
+                cipher,
+                cipher_version: CIPHER_VERSION,
+                hint: value.map(|value| compute_hint(value.expose())),
+                fields: Value::Object(input.fields).to_string(),
+                tags: json!(input.tags).to_string(),
+                note: input.note,
+                rotation_days: input.rotation_days,
+                rotates_at: input
+                    .rotates_at
+                    .or_else(|| rotation_due_at(input.rotation_days, now)),
+                created_at: now,
+                updated_at: now,
+            },
+            now,
+        ))
+    }
+
+    fn created(&self, created: SecretRow, now: Timestamp) -> Result<SecretSummary, AppError> {
         self.logger.log(
             LogLevel::Info,
             "secrets",
@@ -175,8 +242,10 @@ impl SecretService {
         to_summary(created, now, 0)
     }
 
-    pub fn update(&self, id: &str, input: SecretUpdateInput) -> Result<SecretSummary, AppError> {
-        self.require(id)?;
+    fn update_patch(
+        &self,
+        input: SecretUpdateInput,
+    ) -> Result<(SecretPatch, Timestamp, bool), AppError> {
         let now = self.clock.now();
         let mut patch = SecretPatch {
             updated_at: Some(now),
@@ -206,11 +275,29 @@ impl SecretService {
             patch.cipher = Some(Some(self.crypto.encrypt(value)?));
             patch.hint = Some(Some(compute_hint(value.expose())));
         }
-        let (updated, count) = self.database.transaction(|transaction| {
-            let secrets = Repositories::new(transaction).secrets;
-            let updated = secrets.update(id, &patch)?.ok_or_else(|| not_found(id))?;
-            Ok((updated, secrets.count_usage(id)?))
-        })?;
+        Ok((patch, now, replaced_value))
+    }
+
+    fn apply_update(
+        repositories: &Repositories<'_>,
+        id: &str,
+        patch: &SecretPatch,
+    ) -> Result<(SecretRow, u64), DataError> {
+        let updated = repositories
+            .secrets
+            .update(id, patch)?
+            .ok_or_else(|| not_found(id))?;
+        Ok((updated, repositories.secrets.count_usage(id)?))
+    }
+
+    fn updated(
+        &self,
+        id: &str,
+        updated: SecretRow,
+        now: Timestamp,
+        count: u64,
+        replaced_value: bool,
+    ) -> Result<SecretSummary, AppError> {
         self.logger.log(
             LogLevel::Info,
             "secrets",
@@ -221,25 +308,6 @@ impl SecretService {
             ],
         );
         to_summary(updated, now, count)
-    }
-
-    pub fn remove(&self, id: &str) -> Result<(), AppError> {
-        self.database.transaction(|transaction| {
-            let secrets = Repositories::new(transaction).secrets;
-            secrets.find_by_id(id)?.ok_or_else(|| not_found(id))?;
-            let usage = secrets.list_usage(id)?;
-            if !usage.is_empty() {
-                return Err(secret_in_use(id, &usage).into());
-            }
-            secrets.remove(id)
-        })?;
-        self.logger.log(
-            LogLevel::Info,
-            "secrets",
-            "Removed a secret",
-            &[("secretId", json!(id))],
-        );
-        Ok(())
     }
 
     pub fn usage(&self, id: &str) -> Result<Vec<SecretConsumer>, AppError> {

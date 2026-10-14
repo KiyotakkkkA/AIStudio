@@ -1,0 +1,12 @@
+[
+  {
+    "name": "a string",
+    "value": {
+      "cancelled": "yes"
+    }
+  },
+  {
+    "name": "nothing",
+    "value": {}
+  }
+]

@@ -1,3 +1,4 @@
+pub mod accounts;
 pub mod crypto;
 pub mod health_check;
 pub mod probe_outcome;
@@ -9,6 +10,7 @@ pub mod secrets;
 pub mod settings;
 pub mod system;
 
+pub use accounts::{AccountBrowser, AccountService, AccountServiceOptions, SharedAccountBrowser};
 pub use crypto::{
     CryptoBackend, CryptoService, Plaintext, SharedCryptoBackend, UnavailableBackend,
 };
@@ -27,6 +29,7 @@ use crate::platform::theme::SharedThemePort;
 
 pub struct Services {
     pub system: SystemService,
+    pub accounts: AccountService,
     pub settings: SettingService,
     pub secrets: Arc<SecretService>,
     pub providers: ProviderService,

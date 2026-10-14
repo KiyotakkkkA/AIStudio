@@ -44,7 +44,11 @@ mod tests {
         assert_eq!(
             server.channels(),
             [
+                "accounts.cancelLink",
+                "accounts.link",
                 "accounts.list",
+                "accounts.refresh",
+                "accounts.unlink",
                 "providers.adapters",
                 "providers.create",
                 "providers.get",

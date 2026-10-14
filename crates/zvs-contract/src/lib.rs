@@ -1,3 +1,4 @@
+pub mod accounts;
 pub mod ai;
 pub mod browser;
 pub mod channels;
@@ -14,6 +15,10 @@ pub mod system;
 pub mod validate;
 pub mod wire;
 
+pub use accounts::{
+    AccountDto, AccountLinkInput, AccountLinkResult, AccountRef, AccountsCancelLinkOutput,
+    AccountsListOutput, AccountsUnlinkOutput,
+};
 pub use ai::{
     AccountFamily, AccountStatus, AdapterCapabilitiesDto, AdapterDescriptorDto, AdapterFamily,
     AuthMode, HonoursDto, LOCAL_BASE_URL, ProvidersAdaptersOutput, ToolMode, TunableParameter,

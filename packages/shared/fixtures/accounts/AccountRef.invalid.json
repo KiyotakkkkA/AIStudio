@@ -1,0 +1,12 @@
+[
+  {
+    "name": "a slug",
+    "value": {
+      "id": "qwen-web"
+    }
+  },
+  {
+    "name": "nothing",
+    "value": {}
+  }
+]

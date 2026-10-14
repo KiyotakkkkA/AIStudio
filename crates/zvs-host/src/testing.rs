@@ -1,3 +1,4 @@
+pub mod fake_accounts;
 pub mod fake_driver;
 pub mod fake_session;
 
@@ -10,18 +11,26 @@ use serde_json::{Map, Value};
 use tempfile::TempDir;
 use zvs_contract::HostEvent;
 
+pub use self::fake_accounts::{
+    FakeIdentityProbes, ProbeStep, RecordingBrowser, RecordingNavigator, TokioClock, fake_identity,
+    signed_out,
+};
 pub use self::fake_driver::{FAKE_CAPABILITIES, FakeDriver, FakeDriverSource, FakeScript};
 pub use self::fake_session::{FakeReply, FakeSessionGateway, RecordedSessionRequest};
+use crate::browser::BrowserLifecycle;
 use crate::data::{BACKUPS_KEPT, Database, MIGRATIONS, MigrateOptions, migrate};
+use crate::drivers::ai::registry::SessionFactory;
+use crate::drivers::ai::transport::SharedSessionGateway;
 pub use crate::platform::clock::{CLOCK_ORIGIN, FakeClock};
+use crate::platform::events::EventBus;
 use crate::platform::events::EventSink;
 use crate::platform::logger::{Field, LogLevel, Logger, SharedLogger, silent_logger};
 use crate::platform::theme::{ThemePort, ThemeSource};
 use crate::services::crypto::BackendFailure;
 use crate::services::{
-    CryptoBackend, CryptoService, HealthCheckOptions, HealthCheckService, Plaintext,
-    ProviderService, ProviderServiceOptions, SecretService, Services, SettingService,
-    SystemService,
+    AccountService, AccountServiceOptions, CryptoBackend, CryptoService, HealthCheckOptions,
+    HealthCheckService, Plaintext, ProviderService, ProviderServiceOptions, SecretService,
+    Services, SettingService, SystemService,
 };
 
 fn normalise(path: &Path) -> String {
@@ -149,6 +158,11 @@ pub struct TestServices {
     pub clock: Arc<FakeClock>,
     pub crypto: Arc<FakeCrypto>,
     pub drivers: Arc<FakeDriverSource>,
+    pub probes: Arc<FakeIdentityProbes>,
+    pub browser: Arc<RecordingBrowser>,
+    pub navigator: Arc<RecordingNavigator>,
+    pub lifecycle: BrowserLifecycle,
+    pub account_events: Arc<MemorySink>,
     pub database: TemporaryDatabase,
 }
 
@@ -194,9 +208,33 @@ pub fn test_services(system: SystemService) -> TestServices {
         events: None,
         runtime: None,
     });
+    let probes = FakeIdentityProbes::shared();
+    let browser = RecordingBrowser::shared();
+    let navigator = RecordingNavigator::shared();
+    let lifecycle = BrowserLifecycle::new();
+    let account_events = MemorySink::shared();
+    let events = EventBus::default();
+    events.attach(account_events.clone());
+    let session: SharedSessionGateway = FakeSessionGateway::shared();
+    let sessions: SessionFactory = Arc::new(move |_partition: &str| session.clone());
+    let accounts = AccountService::new(AccountServiceOptions {
+        probes: probes.factory(),
+        clock: clock.clone(),
+        random: Arc::new(|| 0.5),
+        ..AccountServiceOptions::new(
+            database.shared(),
+            Arc::clone(&secrets),
+            sessions,
+            browser.clone(),
+            lifecycle.clone(),
+            events,
+            navigator.clone(),
+        )
+    });
     TestServices {
         services: Arc::new(Services {
             system,
+            accounts,
             settings,
             secrets,
             providers,
@@ -207,6 +245,11 @@ pub fn test_services(system: SystemService) -> TestServices {
         clock,
         crypto,
         drivers,
+        probes,
+        browser,
+        navigator,
+        lifecycle,
+        account_events,
         database,
     }
 }

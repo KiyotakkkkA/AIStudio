@@ -6,7 +6,9 @@ pub mod setting;
 
 use rusqlite::Connection;
 
-pub use account::AccountRepository;
+pub use account::{
+    AccountDraft, AccountPatch, AccountRemoval, AccountRepository, NO_ACCOUNT_LINKED,
+};
 pub use model::{ModelDraft, ModelRepository};
 pub use provider::{ProviderDraft, ProviderFilter, ProviderPatch, ProviderRepository};
 pub use secret::{

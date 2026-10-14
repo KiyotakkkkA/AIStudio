@@ -395,6 +395,13 @@ impl<'c> ProviderRepository<'c> {
         Ok(Some(row))
     }
 
+    pub fn count_by_account(&self, account_id: &str) -> rusqlite::Result<u64> {
+        self.connection
+            .prepare_cached("SELECT count(*) FROM provider WHERE account_id = ?1")?
+            .query_row([account_id], |row| row.get::<_, i64>(0))
+            .map(i64::unsigned_abs)
+    }
+
     pub fn remove(&self, id: &str) -> rusqlite::Result<()> {
         if let Some(secret_id) = self.find_by_id(id)?.and_then(|row| row.secret_id) {
             SecretRepository::new(self.connection).remove_usage(

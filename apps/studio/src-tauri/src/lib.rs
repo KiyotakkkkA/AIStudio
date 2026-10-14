@@ -14,12 +14,13 @@ use zvs_host::data::repositories::SecretFilter;
 use zvs_host::data::{MigrationFailed, PrepareOptions, prepare_database};
 use zvs_host::drivers::ai::adapters::FileSystemModelStore;
 use zvs_host::drivers::ai::{
-    DatabaseProviders, HttpClient, ProviderRegistry, ProviderRegistryOptions,
+    DatabaseAccounts, DatabaseProviders, HttpClient, ProviderRegistry, ProviderRegistryOptions,
 };
 use zvs_host::platform::clock::{SharedClock, SystemClock};
 use zvs_host::platform::events::{EventBus, EventBusOptions, EventRecorder};
 use zvs_host::platform::ids::system_ids;
 use zvs_host::platform::logger::{FileLogger, LogLevel, LoggerOptions, SharedLogger};
+use zvs_host::platform::navigation::SharedNavigator;
 use zvs_host::platform::paths::{PathEnvironment, StudioPaths};
 use zvs_host::platform::recorder::{FileEventRecorder, recording_enabled_from_env};
 use zvs_host::platform::shutdown::{
@@ -29,13 +30,16 @@ use zvs_host::platform::theme::{SharedThemePort, THEME_SETTING_KEY, apply_theme_
 use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_window_state};
 use zvs_host::services::system::DEMO_INTERVAL;
 use zvs_host::services::{
-    CryptoService, HealthCheckOptions, HealthCheckService, ProviderService, ProviderServiceOptions,
-    SecretService, Services, SettingService, SystemService,
+    AccountService, AccountServiceOptions, CryptoService, HealthCheckOptions, HealthCheckService,
+    ProviderService, ProviderServiceOptions, SecretService, Services, SettingService,
+    SystemService,
 };
 use zvs_host::{IpcServer, ipc};
 
 use crate::browser::gateway::GatewayOptions;
-use crate::browser::{AccountGateway, BearerTokens, BrowserWorkspace, WebviewPages};
+use crate::browser::{
+    AccountGateway, BearerTokens, BrowserWorkspace, WebviewPages, WorkspaceOpener, gateway_sessions,
+};
 use crate::commands::Host;
 use crate::theme::TauriTheme;
 
@@ -45,8 +49,15 @@ enum Boot {
         window: WindowState,
         logger: SharedLogger,
         lifecycle: Lifecycle,
+        browser: Browser,
     },
     Recovery(MigrationFailed),
+}
+
+struct Browser {
+    workspace: BrowserWorkspace,
+    gateway: Arc<AccountGateway>,
+    events: BrowserLifecycle,
 }
 
 struct Lifecycle {
@@ -73,37 +84,15 @@ pub fn run() {
                     window,
                     logger,
                     lifecycle,
+                    browser,
                 } => {
                     let services = Arc::clone(&host.services);
-                    let lifecycle_events = BrowserLifecycle::new();
-                    let profile = profile_dir(&app.path().app_data_dir()?);
-                    let tokens = BearerTokens::default();
-                    app.manage(BrowserWorkspace::new(
-                        app.handle().clone(),
-                        profile.clone(),
-                        lifecycle_events.clone(),
-                        tokens.clone(),
-                    ));
-                    let gateway = Arc::new(AccountGateway::with_options(
-                        Arc::new(WebviewPages::new(app.handle().clone(), profile)),
-                        tokens,
-                        GatewayOptions::default(),
-                        logger.clone(),
-                    ));
-                    {
-                        let gateway = Arc::clone(&gateway);
-                        lifecycle.shutdown.register(
-                            ShutdownStage::Dispose,
-                            "account-gateway",
-                            move || async move {
-                                gateway.dispose();
-                            },
-                        );
-                    }
+                    let gateway = browser.gateway;
                     #[cfg(feature = "e2e")]
                     probe_gateway(Arc::clone(&gateway), logger.clone());
+                    app.manage(browser.workspace);
                     app.manage(Arc::clone(&gateway));
-                    app.manage(lifecycle_events);
+                    app.manage(browser.events);
                     app.manage(host);
                     app.manage(lifecycle);
                     window::create_studio(app.handle(), window, move |state| {
@@ -302,11 +291,36 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         &[("recording", json!(recording))],
     );
 
+    let browser_events = BrowserLifecycle::new();
+    let profile = profile_dir(&app.path().app_data_dir()?);
+    let tokens = BearerTokens::default();
+    let navigator: SharedNavigator = Arc::new(events.clone());
+    let workspace = BrowserWorkspace::new(
+        app.handle().clone(),
+        profile.clone(),
+        browser_events.clone(),
+        tokens.clone(),
+        navigator.clone(),
+    );
+    let gateway = Arc::new(AccountGateway::with_options(
+        Arc::new(WebviewPages::new(app.handle().clone(), profile)),
+        tokens,
+        GatewayOptions::default(),
+        logger.clone(),
+    ));
+    let sessions = gateway_sessions(Arc::clone(&gateway));
+
     let mut registry = ProviderRegistryOptions::new(
         Arc::new(DatabaseProviders::new(Arc::clone(&database))),
         secrets.clone(),
         HttpClient::new()?,
     );
+    registry.accounts = Arc::new(DatabaseAccounts::new(
+        Arc::clone(&database),
+        Some(sessions.clone()),
+        secrets.clone(),
+        logger.clone(),
+    ));
     registry.local_models = Some(Arc::new(FileSystemModelStore::new(
         paths.downloads_dir.clone(),
     )));
@@ -318,13 +332,28 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger.clone(),
         clock.clone(),
     ));
+    let runtime = tauri::async_runtime::handle().inner().clone();
+    let accounts = AccountService::new(AccountServiceOptions {
+        clock: clock.clone(),
+        logger: logger.clone(),
+        runtime: Some(runtime.clone()),
+        ..AccountServiceOptions::new(
+            Arc::clone(&database),
+            Arc::clone(&secrets),
+            sessions,
+            Arc::new(WorkspaceOpener(workspace.clone())),
+            browser_events.clone(),
+            events.clone(),
+            navigator,
+        )
+    });
     let health = HealthCheckService::new(HealthCheckOptions {
         providers: providers.clone(),
         settings: settings.clone(),
         logger: logger.clone(),
         clock: clock.clone(),
         events: Some(events.clone()),
-        runtime: Some(tauri::async_runtime::handle().inner().clone()),
+        runtime: Some(runtime),
     });
 
     let shutdown = Arc::new(ShutdownCoordinator::new(
@@ -353,9 +382,26 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             health.dispose().await;
         });
     }
+    {
+        let accounts = accounts.clone();
+        shutdown.register(ShutdownStage::Dispose, "accounts", move || async move {
+            accounts.dispose().await;
+        });
+    }
+    {
+        let gateway = Arc::clone(&gateway);
+        shutdown.register(
+            ShutdownStage::Dispose,
+            "account-gateway",
+            move || async move {
+                gateway.dispose();
+            },
+        );
+    }
 
     let services = Arc::new(Services {
         system: SystemService::new(clock, events.clone(), DEMO_INTERVAL),
+        accounts,
         settings,
         secrets,
         providers,
@@ -365,6 +411,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let mut server = IpcServer::new(Arc::clone(&services), logger.clone());
     ipc::register(&mut server);
     server.finish();
+    services.accounts.start_auto_refresh()?;
     services.health.start();
 
     Ok(Boot::Studio {
@@ -379,6 +426,11 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             shutdown,
             logger,
             events,
+        },
+        browser: Browser {
+            workspace,
+            gateway,
+            events: browser_events,
         },
     })
 }

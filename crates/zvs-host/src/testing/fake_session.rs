@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use async_trait::async_trait;
-use futures::stream;
+use futures::{StreamExt, stream};
 use tokio_util::sync::CancellationToken;
 use url::Url;
 use zvs_contract::AppError;
@@ -27,18 +27,25 @@ pub enum FakeReply {
         status: u16,
         headers: Headers,
         chunks: Vec<Result<Vec<u8>, AppError>>,
+        hold: bool,
     },
     Failure(AppError),
+    Stall,
 }
 
 impl FakeReply {
     pub fn json(status: u16, body: &serde_json::Value) -> Self {
+        Self::text(status, "application/json", body.to_string())
+    }
+
+    pub fn text(status: u16, content_type: &str, body: impl Into<String>) -> Self {
         let mut headers = Headers::new();
-        headers.insert("content-type".to_owned(), "application/json".to_owned());
+        headers.insert("content-type".to_owned(), content_type.to_owned());
         Self::Response {
             status,
             headers,
-            chunks: vec![Ok(body.to_string().into_bytes())],
+            chunks: vec![Ok(body.into().into_bytes())],
+            hold: false,
         }
     }
 
@@ -47,6 +54,25 @@ impl FakeReply {
             status,
             headers,
             chunks: chunks.into_iter().map(Ok).collect(),
+            hold: false,
+        }
+    }
+
+    #[must_use]
+    pub fn holding(self) -> Self {
+        match self {
+            Self::Response {
+                status,
+                headers,
+                chunks,
+                ..
+            } => Self::Response {
+                status,
+                headers,
+                chunks,
+                hold: true,
+            },
+            other => other,
         }
     }
 }
@@ -58,6 +84,8 @@ pub struct FakeSessionGateway {
     user_agent: String,
     tokens: Mutex<HashMap<String, AccountToken>>,
     requests: Mutex<Vec<RecordedSessionRequest>>,
+    scopes: Mutex<Vec<CancellationToken>>,
+    queued: Mutex<HashMap<String, Vec<FakeReply>>>,
     responder: Mutex<Responder>,
 }
 
@@ -78,6 +106,8 @@ impl Default for FakeSessionGateway {
             user_agent: FAKE_USER_AGENT.to_owned(),
             tokens: Mutex::default(),
             requests: Mutex::default(),
+            scopes: Mutex::default(),
+            queued: Mutex::default(),
             responder: Mutex::new(Box::new(|_| FakeReply::json(404, &serde_json::json!({})))),
         }
     }
@@ -93,6 +123,42 @@ impl FakeSessionGateway {
         responder: impl Fn(&RecordedSessionRequest) -> FakeReply + Send + Sync + 'static,
     ) {
         *lock(&self.responder) = Box::new(responder);
+    }
+
+    pub fn queue(&self, url: &str, replies: Vec<FakeReply>) -> &Self {
+        lock(&self.queued).insert(url.to_owned(), replies);
+        self
+    }
+
+    pub fn reset(&self) {
+        lock(&self.requests).clear();
+        lock(&self.scopes).clear();
+        lock(&self.queued).clear();
+    }
+
+    pub fn scopes(&self) -> Vec<CancellationToken> {
+        lock(&self.scopes).clone()
+    }
+
+    pub fn requests_to(&self, url: &str) -> Vec<RecordedSessionRequest> {
+        self.requests()
+            .into_iter()
+            .filter(|recorded| recorded.url == url)
+            .collect()
+    }
+
+    fn take(&self, recorded: &RecordedSessionRequest) -> FakeReply {
+        let queued = {
+            let mut queued = lock(&self.queued);
+            queued.get_mut(&recorded.url).and_then(|replies| {
+                if replies.len() > 1 {
+                    Some(replies.remove(0))
+                } else {
+                    replies.first().cloned()
+                }
+            })
+        };
+        queued.unwrap_or_else(|| (lock(&self.responder))(recorded))
     }
 
     pub fn observe(&self, url: &str, token: AccountToken) {
@@ -144,15 +210,25 @@ impl SessionGateway for FakeSessionGateway {
             request,
         };
         lock(&self.requests).push(recorded.clone());
-        let reply = (lock(&self.responder))(&recorded);
+        lock(&self.scopes).push(cancel.clone());
+        let reply = self.take(&recorded);
         match reply {
             FakeReply::Failure(error) => Err(error),
+            FakeReply::Stall => {
+                cancel.cancelled().await;
+                Err(cancelled())
+            }
             FakeReply::Response {
                 status,
                 headers,
                 chunks,
+                hold,
             } => {
-                let body: ByteStream = Box::pin(stream::iter(chunks));
+                let body: ByteStream = if hold {
+                    Box::pin(stream::iter(chunks).chain(stream::pending()))
+                } else {
+                    Box::pin(stream::iter(chunks))
+                };
                 Ok(SessionResponse::new(status, headers, body))
             }
         }

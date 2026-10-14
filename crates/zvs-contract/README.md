@@ -19,6 +19,7 @@ What lives here today:
 | `system`     | `DeviceProfileDto`, `ResourceSampleDto` and the `system.*` channel inputs/outputs         |
 | `ai`         | `AdapterFamily`, `AuthMode`, `ToolMode`, `AdapterCapabilitiesDto`, `AdapterDescriptorDto` |
 | `providers`  | The provider enums and DTOs, `ProbeOutcomeDto`, `ProbeRequest` and the `providers.*` I/O  |
+| `accounts`   | `AccountDto`, `AccountLinkResult` (tagged on `status`) and the `accounts.*` I/O           |
 | `enums`      | `WireEnum` and `wire_enum!`, for string enums with `ALL`, `as_str` and `parse`            |
 | `channels`   | `CHANNELS`, generated from `packages/shared/contract.channels.json`                       |
 | `validate`   | The `Validate` trait, `parse`, the `check::*` helpers, `js_trim`, `normalize_url`         |

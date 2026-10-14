@@ -1,0 +1,12 @@
+[
+  {
+    "name": "an api family",
+    "value": {
+      "adapter": "openai-compatible"
+    }
+  },
+  {
+    "name": "nothing",
+    "value": {}
+  }
+]

@@ -2,6 +2,7 @@ pub mod adapters;
 pub mod capabilities;
 pub mod errors;
 pub mod http;
+pub mod identity;
 pub mod injected_tools;
 pub mod ports;
 pub mod registry;
@@ -23,12 +24,13 @@ pub use ports::{
     ToolCall, ToolSpec,
 };
 pub use registry::{
-    AccountPort, AccountSnapshot, DatabaseProviders, ProviderRegistry, ProviderRegistryOptions,
-    ProviderSource, UnlinkedAccounts,
+    AccountPort, AccountSnapshot, DatabaseAccounts, DatabaseProviders, ProviderRegistry,
+    ProviderRegistryOptions, ProviderSource, SessionFactory, UnlinkedAccounts,
 };
 pub use stream_to_events::{StreamToEventsResult, stream_to_events};
 pub use transport::{
-    AccountToken, ApiKey, ApiTransport, ApiTransportOptions, ByteStream, DEFAULT_TIMEOUT_SECONDS,
-    RequestSpec, SecretResolver, SessionGateway, SessionRequest, SessionResponse,
-    SharedSecretResolver, SharedSessionGateway, SharedTransport, Transport, TransportResponse,
+    AccountCredentials, AccountToken, AccountTransport, AccountTransportOptions, ApiKey,
+    ApiTransport, ApiTransportOptions, ByteStream, DEFAULT_TIMEOUT_SECONDS, RequestSpec,
+    SecretResolver, SessionGateway, SessionRequest, SessionResponse, SharedSecretResolver,
+    SharedSessionGateway, SharedTransport, Transport, TransportResponse,
 };

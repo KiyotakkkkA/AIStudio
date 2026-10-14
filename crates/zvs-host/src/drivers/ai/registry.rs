@@ -11,10 +11,13 @@ use super::adapters::{
 use super::capabilities::AdapterCapabilities;
 use super::errors::session_expired;
 use super::http::HttpClient;
+use super::identity::ProbeAccountCredentials;
 use super::ports::{AiDriver, SharedEmbeddingDriver, SharedImageDriver, SharedTextDriver};
-use super::transport::SharedTransport;
-use super::transport::{ApiKey, ApiTransport, ApiTransportOptions, SharedSecretResolver};
-use crate::data::schema::ProviderRow;
+use super::transport::{
+    AccountTransport, AccountTransportOptions, ApiKey, ApiTransport, ApiTransportOptions,
+    SharedSecretResolver, SharedSessionGateway, SharedTransport,
+};
+use crate::data::schema::{AccountRow, ProviderRow};
 use crate::data::{Database, Repositories};
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 
@@ -60,6 +63,95 @@ pub fn account_not_linked(provider: &ProviderRow) -> AppError {
     }
     details.insert("reason".to_owned(), json!(ACCOUNT_NOT_LINKED));
     session_expired(details)
+}
+
+pub type SessionFactory = Arc<dyn Fn(&str) -> SharedSessionGateway + Send + Sync>;
+
+pub const BROWSER_SESSION_UNAVAILABLE: &str = "Сессия браузера недоступна";
+
+pub struct DatabaseAccounts {
+    database: Arc<Database>,
+    sessions: Option<SessionFactory>,
+    secrets: SharedSecretResolver,
+    logger: SharedLogger,
+}
+
+impl DatabaseAccounts {
+    pub fn new(
+        database: Arc<Database>,
+        sessions: Option<SessionFactory>,
+        secrets: SharedSecretResolver,
+        logger: SharedLogger,
+    ) -> Self {
+        Self {
+            database,
+            sessions,
+            secrets,
+            logger,
+        }
+    }
+
+    fn find(&self, account_id: &str) -> Result<Option<AccountRow>, AppError> {
+        self.database.with_connection(|connection| {
+            Ok(Repositories::new(connection)
+                .accounts
+                .find_by_id(account_id)?)
+        })
+    }
+
+    fn linked(&self, provider: &ProviderRow) -> Result<AccountRow, AppError> {
+        let Some(account_id) = &provider.account_id else {
+            return Err(account_not_linked(provider));
+        };
+        let Some(account) = self.find(account_id)? else {
+            return Err(account_not_linked(provider));
+        };
+        if !account.is_linked() {
+            let mut details = ErrorDetails::new();
+            details.insert("providerId".to_owned(), json!(provider.id));
+            details.insert("accountId".to_owned(), json!(account.id));
+            details.insert("status".to_owned(), json!(account.status));
+            if let Some(detail) = &account.status_detail {
+                details.insert("statusDetail".to_owned(), json!(detail));
+            }
+            return Err(session_expired(details));
+        }
+        Ok(account)
+    }
+}
+
+impl AccountPort for DatabaseAccounts {
+    fn snapshot(&self, account_id: &str) -> Option<AccountSnapshot> {
+        self.find(account_id)
+            .ok()
+            .flatten()
+            .map(|account| AccountSnapshot {
+                status: account.status,
+                updated_at: account.updated_at,
+            })
+    }
+
+    fn transport(&self, provider: &ProviderRow) -> Result<SharedTransport, AppError> {
+        let account = self.linked(provider)?;
+        let Some(sessions) = &self.sessions else {
+            return Err(
+                AppError::new(AppErrorCode::ValidationFailed, BROWSER_SESSION_UNAVAILABLE)
+                    .with_detail("accountId", account.id.clone())
+                    .with_detail("partition", account.partition.clone()),
+            );
+        };
+        let session = sessions(&account.partition);
+        let credentials =
+            ProbeAccountCredentials::new(account, session.clone(), Arc::clone(&self.secrets))?;
+        Ok(Arc::new(AccountTransport::new(AccountTransportOptions {
+            base_url: provider.base_url.clone(),
+            session,
+            credentials: Some(Arc::new(credentials)),
+            timeout_seconds: provider.settings.timeout_seconds(),
+            headers: Vec::new(),
+            logger: self.logger.clone(),
+        })))
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -793,6 +885,144 @@ mod tests {
         assert_eq!(providers.size(), 1);
         providers.invalidate_by_account("account-1");
         assert_eq!(providers.size(), 0);
+    }
+
+    #[test]
+    fn an_account_mode_provider_without_a_live_account_never_reaches_the_network() {
+        use crate::data::repositories::AccountDraft;
+        use crate::testing::FakeSessionGateway;
+        use zvs_contract::{AccountFamily, AccountStatus};
+
+        let fixture = Fixture::new();
+        let session = FakeSessionGateway::shared();
+        let account = fixture
+            .database
+            .transaction(|transaction| {
+                Ok(Repositories::new(transaction)
+                    .accounts
+                    .create(&AccountDraft::new(
+                        AccountFamily::DeepseekWeb,
+                        "persist:browser-work",
+                        "user-1",
+                        100,
+                    ))?)
+            })
+            .expect("an account");
+        let linked = fixture.create(&ProviderDraft {
+            kind: ProviderKind::OpenaiCompatible,
+            name: "DeepSeek".to_owned(),
+            adapter: AdapterFamily::DeepseekWeb,
+            auth_mode: AuthMode::Account,
+            base_url: "https://chat.deepseek.com/api/v0".to_owned(),
+            account_id: Some(account.id.clone()),
+            ..draft()
+        });
+        let sessions: SessionFactory = {
+            let session = session.clone();
+            Arc::new(move |_partition: &str| -> SharedSessionGateway { session.clone() })
+        };
+        let registry = |sessions: Option<SessionFactory>| {
+            ProviderRegistry::new(ProviderRegistryOptions {
+                accounts: Arc::new(DatabaseAccounts::new(
+                    fixture.database.shared(),
+                    sessions,
+                    fixture.key.clone(),
+                    silent_logger(),
+                )),
+                ..ProviderRegistryOptions::new(
+                    Arc::new(DatabaseProviders::new(fixture.database.shared())),
+                    fixture.key.clone(),
+                    direct_http(),
+                )
+            })
+        };
+        let providers = registry(Some(sessions.clone()));
+        assert!(
+            providers.driver(&linked.id).expect("builds").text.is_some(),
+            "a linked account must get as far as a built adapter"
+        );
+
+        fixture
+            .database
+            .transaction(|transaction| {
+                Ok(Repositories::new(transaction).accounts.update_status(
+                    &account.id,
+                    AccountStatus::NeedsRelink,
+                    Some("Куки очищены".to_owned()),
+                    900,
+                )?)
+            })
+            .expect("updates");
+        let expired = providers.driver(&linked.id).expect_err("expired");
+        assert_eq!(expired.code, AppErrorCode::ProviderSessionExpired);
+        assert_eq!(
+            expired.details.map(Value::Object),
+            Some(json!({
+                "providerId": linked.id,
+                "accountId": account.id,
+                "status": "needs-relink",
+                "statusDetail": "Куки очищены",
+            }))
+        );
+
+        fixture
+            .database
+            .transaction(|transaction| {
+                Ok(Repositories::new(transaction)
+                    .accounts
+                    .remove(&account.id, 1000)?)
+            })
+            .expect("removes");
+        let detached = fixture
+            .database
+            .with_connection(|connection| {
+                Ok(Repositories::new(connection)
+                    .providers
+                    .find_by_id(&linked.id)?)
+            })
+            .expect("reads")
+            .expect("kept");
+        assert_eq!(detached.account_id, None);
+        assert_eq!(
+            providers.driver(&linked.id).expect_err("detached").code,
+            AppErrorCode::ProviderSessionExpired
+        );
+        assert!(session.requests().is_empty());
+
+        let relinked = fixture
+            .database
+            .transaction(|transaction| {
+                Ok(Repositories::new(transaction)
+                    .accounts
+                    .create(&AccountDraft::new(
+                        AccountFamily::DeepseekWeb,
+                        "persist:browser-work",
+                        "user-2",
+                        1100,
+                    ))?)
+            })
+            .expect("an account");
+        fixture.update(
+            &linked.id,
+            &ProviderPatch {
+                account_id: Some(Some(relinked.id.clone())),
+                status: Some(ProviderStatus::Unknown),
+                updated_at: Some(1200),
+                ..ProviderPatch::default()
+            },
+        );
+        assert!(
+            providers
+                .driver(&linked.id)
+                .expect("rebuilds")
+                .text
+                .is_some()
+        );
+        let without_sessions = registry(None).driver(&linked.id).expect_err("refuses");
+        assert_eq!(without_sessions.code, AppErrorCode::ValidationFailed);
+        assert_eq!(without_sessions.message, BROWSER_SESSION_UNAVAILABLE);
+        assert!(session.requests().is_empty());
+        assert_eq!(fixture.key.calls(), 0);
     }
 
     #[test]
