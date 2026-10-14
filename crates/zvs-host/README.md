@@ -5,23 +5,24 @@ The Rust host. Every service, repository, driver and the execution kernel will l
 without a window. Shell capabilities reach it through port traits that `zvs-studio`
 implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that builds it.
 
-| Module                         | Contents                                                                        |
-| ------------------------------ | ------------------------------------------------------------------------------- |
-| `ipc`                          | `IpcServer`, `register`, and one file of thin handlers per domain               |
-| `services`                     | `Services`, the handlers' only dependency, and the business logic               |
-| `data`                         | `Database`, migrations, row structs and repositories (see `src/data/README.md`) |
-| `platform::paths`              | `PathEnvironment` → `StudioPaths`, plus the validated path builders             |
-| `platform::logger`             | `Logger` trait, `FileLogger` (JSON lines, rotation, redaction), `silent_logger` |
-| `platform::ids`                | UUID v7 ids and the injectable `IdGenerator`                                    |
-| `platform::clock`              | `Clock`, `SystemClock`, `FakeClock`                                             |
-| `platform::events`             | `EventBus`, `StreamHandle`, the `EventSink` and `EventRecorder` ports           |
-| `platform::recorder`           | `FileEventRecorder` and the `ZVS_RECORD_EVENTS` flag                            |
-| `platform::theme`              | `ThemePort`, `ThemeSource`, `apply_theme_source`, `THEME_SETTING_KEY`           |
-| `platform::window_state`       | `read_window_state`, `capture_window_state`, `WINDOW_STATE_KEY`                 |
-| `services::crypto`             | `CryptoBackend`, `CryptoService`, `Plaintext`, `UnavailableBackend`             |
-| `services::secrets`            | `SecretService`, the summary and DTO mapping, `secret_policy`, `secret_fields`  |
-| `testing`                      | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, …   |
-| `kernel`, `drivers`, `browser` | Empty until their port tasks                                                    |
+| Module                   | Contents                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `ipc`                    | `IpcServer`, `register`, and one file of thin handlers per domain               |
+| `services`               | `Services`, the handlers' only dependency, and the business logic               |
+| `data`                   | `Database`, migrations, row structs and repositories (see `src/data/README.md`) |
+| `platform::paths`        | `PathEnvironment` → `StudioPaths`, plus the validated path builders             |
+| `platform::logger`       | `Logger` trait, `FileLogger` (JSON lines, rotation, redaction), `silent_logger` |
+| `platform::ids`          | UUID v7 ids and the injectable `IdGenerator`                                    |
+| `platform::clock`        | `Clock`, `SystemClock`, `FakeClock`                                             |
+| `platform::events`       | `EventBus`, `StreamHandle`, the `EventSink` and `EventRecorder` ports           |
+| `platform::recorder`     | `FileEventRecorder` and the `ZVS_RECORD_EVENTS` flag                            |
+| `platform::theme`        | `ThemePort`, `ThemeSource`, `apply_theme_source`, `THEME_SETTING_KEY`           |
+| `platform::window_state` | `read_window_state`, `capture_window_state`, `WINDOW_STATE_KEY`                 |
+| `services::crypto`       | `CryptoBackend`, `CryptoService`, `Plaintext`, `UnavailableBackend`             |
+| `services::secrets`      | `SecretService`, the summary and DTO mapping, `secret_policy`, `secret_fields`  |
+| `drivers::ai`            | AI ports, `HttpClient`, transports, adapters, `ProviderRegistry` (see below)    |
+| `testing`                | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, …   |
+| `kernel`, `browser`      | Empty until their port tasks                                                    |
 
 `testing` is compiled for this crate's own tests and behind the `testing` feature for other
 crates' tests.
@@ -77,3 +78,43 @@ Row structs never select `cipher` except `SecretCipherRow`, and its `Debug` prin
 `SECRET_DECRYPT_FAILED` rather than store anything. macOS Keychain and Linux Secret Service are
 follow-ups. Field validation against a type schema (`services::secret_fields`) reproduces
 `buildFieldsSchema`: strict keys, defaults, and `z.url()` through the WHATWG `url` crate.
+
+## AI drivers
+
+`drivers::ai` is the API-mode half of `host/drivers/ai` (PASSPORT §12). Account mode
+(`AccountTransport`, `qwen-web`, `deepseek-web`, identity probes) lands in TASK_065 – TASK_067.
+
+| Module             | Contents                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------- |
+| `ports`            | `TextGenerationDriver`, `EmbeddingDriver`, `ImageDriver`, `AiDriver`, the request/result types |
+| `capabilities`     | `AdapterCapabilities`, `Honours`, `supports_auth_mode`, `unsupported_parameters`               |
+| `http`             | `HttpClient`: one `reqwest::Client`, rustls with the OS roots, the system proxy, no cookies    |
+| `transport`        | `Transport`, `RequestSpec`, `TransportResponse`, `join_url`; `transport::api::ApiTransport`    |
+| `sse`              | Streaming UTF-8 decoding, `sse_data` (stops at `[DONE]`) and `ndjson_lines`                    |
+| `errors`           | `http_failure`, `network_failure`, `cancelled`, `timed_out`, `session_expired`, raw text       |
+| `adapters`         | `openai-compatible`, `ollama`, `local`, and the family table (`adapter_entry`)                 |
+| `injected_tools`   | The `zvs_call_tool` prompt protocol and `with_injected_tools`                                  |
+| `stream_to_events` | Deltas re-emitted as `token` events, ended with the run outcome                                |
+| `registry`         | `ProviderRegistry`, `ProviderSource`, `AccountPort`, `UnlinkedAccounts`                        |
+
+Every driver call takes a `tokio_util::sync::CancellationToken`. A fired token ends a request
+or a stream with `RUN_CANCELLED` and drops the `reqwest` response, which aborts the vendor
+request. The provider timeout (default 60 s) is one deadline from the send, covering the body
+and every stream chunk, as `AbortSignal.timeout` did.
+
+`ApiTransport` holds the secret **id** and a `SecretResolver`, never the key. Each request
+resolves it, builds a sensitive `Authorization` header and drops the plaintext before the call
+returns. `ProviderRegistry` caches drivers per provider and drops them on a fingerprint change
+(adapter, auth mode, base URL, secret id, timeout, `updated_at`, account status), on
+`invalidate_by_secret` and on `invalidate_by_account`. Building a driver resolves nothing.
+
+`HttpClient::new()` honours the system proxy: reqwest's `system-proxy` feature reads
+`HTTP(S)_PROXY`/`NO_PROXY` and, on Windows, `HKCU\…\Internet Settings` (`ProxyEnable`,
+`ProxyServer`, `ProxyOverride`). `the_default_client_honours_the_proxy_the_operating_system_reports`
+proves it in a child process.
+
+Adapter tests run against `mock::MockServer`, a local axum server, so the whole stack
+(`HttpClient` → `ApiTransport` → adapter) is exercised. Two `#[ignore]`d tests in `live.rs`
+talk to real endpoints: `LIVE_BASE_URL` + `LIVE_API_KEY` (+ `LIVE_MODEL`) for any
+OpenAI-dialect vendor, and `ZVS_LIVE_OLLAMA=http://127.0.0.1:11434`
+(+ `ZVS_LIVE_OLLAMA_MODEL`) for a local Ollama.

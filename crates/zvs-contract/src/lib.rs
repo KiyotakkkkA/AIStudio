@@ -1,16 +1,24 @@
+pub mod ai;
 pub mod channels;
+pub mod enums;
 pub mod envelope;
 pub mod errors;
 pub mod events;
 pub mod ids;
 pub mod primitives;
+pub mod providers;
 pub mod secrets;
 pub mod settings;
 pub mod system;
 pub mod validate;
 pub mod wire;
 
+pub use ai::{
+    AccountFamily, AccountStatus, AdapterFamily, AuthMode, LOCAL_BASE_URL, ToolMode,
+    TunableParameter, model_tool_support, resolve_tool_mode,
+};
 pub use channels::{CHANNELS, is_channel};
+pub use enums::WireEnum;
 pub use envelope::ResultEnvelope;
 pub use errors::{AppError, AppErrorCode, ErrorDetails};
 pub use events::{
@@ -19,6 +27,7 @@ pub use events::{
 };
 pub use ids::*;
 pub use primitives::{Json, MAX_SAFE_INTEGER, Page, PageRequest, Sort, SortDirection, Timestamp};
+pub use providers::{ModelCapability, ProviderCapability, ProviderKind, ProviderStatus};
 pub use secrets::{
     CreateSecretInput, FieldDefault, FieldDescriptor, FieldKind, FieldOption, RotationStatus,
     SecretDto, SecretFields, SecretFilter, SecretInput, SecretRef, SecretScope, SecretSummaryDto,

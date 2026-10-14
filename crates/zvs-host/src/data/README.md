@@ -36,6 +36,13 @@ The connection is opened with `journal_mode = WAL`, `foreign_keys = ON`,
 
 `SettingRepository` is the template every later repository copies.
 
+`ProviderRepository::create`, `update` and `remove` keep `secret_usage` in step, and
+`ModelRepository::replace_for_provider` deletes, reinserts and may clear the default model.
+Each writes more than one row, so a service calls them inside `database.transaction`. The
+auth-mode integrity rule is checked before the first write, so a refused row leaves nothing
+behind even outside a transaction. `provider.adapter` and `provider.auth_mode` stay `String` in
+`ProviderRow`, so an unknown value reaches the registry and fails there with the TS message.
+
 ## Errors
 
 Closures passed to `with_connection` and `transaction` return `Result<T, DataError>`, so both

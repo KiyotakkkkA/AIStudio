@@ -17,6 +17,9 @@ What lives here today:
 | `secrets`    | The secret DTOs, `SecretInput`, the type registry and the `secrets.*` channel I/O |
 | `settings`   | `SettingKey` validation and the `settings.*` channel inputs/outputs               |
 | `system`     | `DeviceProfileDto`, `ResourceSampleDto` and the `system.*` channel inputs/outputs |
+| `ai`         | `AdapterFamily`, `AuthMode`, `ToolMode`, `TunableParameter`, `resolve_tool_mode`  |
+| `providers`  | `ProviderKind`, `ProviderCapability`, `ProviderStatus`, `ModelCapability`         |
+| `enums`      | `WireEnum` and `wire_enum!`, for string enums with `ALL`, `as_str` and `parse`    |
 | `channels`   | `CHANNELS`, generated from `packages/shared/contract.channels.json`               |
 | `validate`   | The `Validate` trait, `parse`, and the `check::*` refinement helpers              |
 | `wire`       | `present` and `nullable`, the two field deserialisers the wire rules need         |
