@@ -45,6 +45,10 @@ const schemas: Record<string, z.ZodType> = {
   "system/SystemDeviceInput": contract["system.device"].input,
   "system/SystemNativePingInput": contract["system.nativePing"].input,
   "system/SystemNativePingOutput": contract["system.nativePing"].output,
+  "settings/SettingsGetInput": contract["settings.get"].input,
+  "settings/SettingsGetOutput": contract["settings.get"].output,
+  "settings/SettingsSetInput": contract["settings.set"].input,
+  "settings/SettingsSetOutput": contract["settings.set"].output,
 };
 
 const root = fileURLToPath(new URL("../fixtures/", import.meta.url));

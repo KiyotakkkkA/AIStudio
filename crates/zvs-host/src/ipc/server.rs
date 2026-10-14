@@ -248,28 +248,27 @@ mod tests {
     use crate::platform::clock::FakeClock;
     use crate::platform::events::EventBus;
     use crate::services::SystemService;
-    use crate::testing::MemoryLogger;
+    use crate::testing::{MemoryLogger, TestServices, test_services};
 
-    fn services() -> Arc<Services> {
-        Arc::new(Services {
-            system: SystemService::new(
-                Arc::new(FakeClock::new(1_250)),
-                EventBus::default(),
-                Duration::ZERO,
-            ),
-        })
+    fn services() -> TestServices {
+        test_services(SystemService::new(
+            Arc::new(FakeClock::new(1_250)),
+            EventBus::default(),
+            Duration::ZERO,
+        ))
     }
 
-    fn server() -> (IpcServer, Arc<MemoryLogger>) {
+    fn server() -> (TestServices, IpcServer, Arc<MemoryLogger>) {
+        let host = services();
         let logger = MemoryLogger::shared();
-        let mut server = IpcServer::new(services(), logger.clone()).with_output_validation(true);
+        let mut server = IpcServer::new(host.shared(), logger.clone()).with_output_validation(true);
         server.handle(
             "system.ping",
             |services: Arc<Services>, input: SystemPingInput| async move {
                 Ok(services.system.ping(input.sent_at))
             },
         );
-        (server, logger)
+        (host, server, logger)
     }
 
     fn native_failing(
@@ -287,7 +286,7 @@ mod tests {
 
     #[tokio::test]
     async fn round_trips_a_valid_call() {
-        let (server, _logger) = server();
+        let (_host, server, _logger) = server();
         assert_eq!(
             server
                 .dispatch("system.ping", json!({ "sentAt": 1_000 }))
@@ -301,7 +300,8 @@ mod tests {
         let logger = MemoryLogger::shared();
         let calls = Arc::new(AtomicUsize::new(0));
         let counted = Arc::clone(&calls);
-        let mut server = IpcServer::new(services(), logger.clone());
+        let host = services();
+        let mut server = IpcServer::new(host.shared(), logger.clone());
         server.handle(
             "system.ping",
             move |services: Arc<Services>, input: SystemPingInput| {
@@ -330,7 +330,7 @@ mod tests {
 
     #[tokio::test]
     async fn maps_an_app_error_to_its_code_and_keeps_details() {
-        let (mut server, logger) = server();
+        let (_host, mut server, logger) = server();
         native_failing(&mut server, || {
             AppError::new(AppErrorCode::NotFound, "Запись не найдена").with_detail("id", "7")
         });
@@ -352,7 +352,7 @@ mod tests {
     #[tokio::test]
     async fn a_panicking_handler_costs_one_call_and_never_sends_the_detail() {
         let secret = "C:/host/only/secret-path.rs";
-        let (mut server, logger) = server();
+        let (_host, mut server, logger) = server();
         server.handle(
             "system.nativePing",
             move |_services: Arc<Services>, _input: SystemNativePingInput| async move {
@@ -388,9 +388,10 @@ mod tests {
     #[tokio::test]
     async fn catches_output_that_drifts_from_the_contract_when_validation_is_on() {
         let drifting = |validate: bool| {
+            let host = services();
             let logger = MemoryLogger::shared();
             let mut server =
-                IpcServer::new(services(), logger.clone()).with_output_validation(validate);
+                IpcServer::new(host.shared(), logger.clone()).with_output_validation(validate);
             server.handle(
                 "system.ping",
                 |_services: Arc<Services>, _input: SystemPingInput| async move {
@@ -401,9 +402,9 @@ mod tests {
                     })
                 },
             );
-            (server, logger)
+            (host, server, logger)
         };
-        let (validating, logger) = drifting(true);
+        let (_validating_host, validating, logger) = drifting(true);
         assert_eq!(
             validating
                 .dispatch("system.ping", json!({ "sentAt": 1 }))
@@ -416,7 +417,7 @@ mod tests {
                 .len(),
             1
         );
-        let (trusting, _logger) = drifting(false);
+        let (_trusting_host, trusting, _logger) = drifting(false);
         assert_eq!(
             trusting
                 .dispatch("system.ping", json!({ "sentAt": 1 }))
@@ -428,7 +429,8 @@ mod tests {
     #[tokio::test]
     async fn a_void_output_omits_data_and_a_void_input_accepts_nothing() {
         let logger = MemoryLogger::shared();
-        let mut server = IpcServer::new(services(), logger);
+        let host = services();
+        let mut server = IpcServer::new(host.shared(), logger);
         server.handle(
             "system.resources",
             |_services: Arc<Services>, _input: ()| async move { Ok(()) },
@@ -451,7 +453,7 @@ mod tests {
 
     #[tokio::test]
     async fn an_unregistered_channel_answers_not_implemented() {
-        let (server, logger) = server();
+        let (_host, server, logger) = server();
         for channel in ["providers.list", "system.demoStream", "unknown"] {
             let response = server.dispatch(channel, Value::Null).await;
             assert_eq!(response["ok"], json!(false));
@@ -467,7 +469,7 @@ mod tests {
 
     #[test]
     fn finish_lists_every_missing_channel_in_one_line() {
-        let (server, logger) = server();
+        let (_host, server, logger) = server();
         let coverage = server.finish();
         assert_eq!(coverage.missing.len(), CHANNELS.len() - 1);
         assert!(!coverage.missing.contains(&"system.ping"));
@@ -481,7 +483,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "is not a contract channel")]
     fn registering_a_channel_outside_the_contract_panics_at_startup() {
-        let (mut server, _logger) = server();
+        let (_host, mut server, _logger) = server();
         server.handle(
             "system.nope",
             |_services: Arc<Services>, _input: ()| async move { Ok(()) },
@@ -491,7 +493,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "registered twice")]
     fn registering_a_channel_twice_panics_at_startup() {
-        let (mut server, _logger) = server();
+        let (_host, mut server, _logger) = server();
         server.handle(
             "system.ping",
             |_services: Arc<Services>, _input: ()| async move { Ok(()) },

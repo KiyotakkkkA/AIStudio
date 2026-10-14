@@ -4,6 +4,7 @@ pub mod errors;
 pub mod events;
 pub mod ids;
 pub mod primitives;
+pub mod settings;
 pub mod system;
 pub mod validate;
 pub mod wire;
@@ -17,6 +18,9 @@ pub use events::{
 };
 pub use ids::*;
 pub use primitives::{Json, MAX_SAFE_INTEGER, Page, PageRequest, Sort, SortDirection, Timestamp};
+pub use settings::{
+    SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, check_setting_key,
+};
 pub use system::{
     DeviceGpuDto, DeviceProfileDto, DeviceTier, ResourceSampleDto, SystemDemoJobInput,
     SystemDemoStreamInput, SystemDemoStreamOutput, SystemDeviceInput, SystemNativePingInput,

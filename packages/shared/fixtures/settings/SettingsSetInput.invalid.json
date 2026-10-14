@@ -1,0 +1,21 @@
+[
+  {
+    "name": "missing value",
+    "value": {
+      "key": "ui.theme"
+    }
+  },
+  {
+    "name": "bad key",
+    "value": {
+      "key": "ui.Theme",
+      "value": "dark"
+    }
+  },
+  {
+    "name": "missing key",
+    "value": {
+      "value": "dark"
+    }
+  }
+]

@@ -10,8 +10,10 @@ testing = ["dep:tempfile"]
 [dependencies]
 futures.workspace = true
 regex.workspace = true
+rusqlite.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 tempfile = { workspace = true, optional = true }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["rt", "time"] }

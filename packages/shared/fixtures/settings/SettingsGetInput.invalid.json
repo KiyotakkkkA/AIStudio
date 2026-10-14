@@ -1,0 +1,48 @@
+[
+  {
+    "name": "missing key",
+    "value": {}
+  },
+  {
+    "name": "empty key",
+    "value": {
+      "key": ""
+    }
+  },
+  {
+    "name": "uppercase",
+    "value": {
+      "key": "UI.theme"
+    }
+  },
+  {
+    "name": "leading digit",
+    "value": {
+      "key": "1ui"
+    }
+  },
+  {
+    "name": "empty segment",
+    "value": {
+      "key": "ui..theme"
+    }
+  },
+  {
+    "name": "dash",
+    "value": {
+      "key": "ui-theme"
+    }
+  },
+  {
+    "name": "too long",
+    "value": {
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  {
+    "name": "number key",
+    "value": {
+      "key": 1
+    }
+  }
+]

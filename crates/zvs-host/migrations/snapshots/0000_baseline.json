@@ -1,0 +1,344 @@
+[
+  {
+    "type": "table",
+    "name": "setting",
+    "tbl_name": "setting",
+    "sql": "CREATE TABLE `setting` (\n\t`key` text PRIMARY KEY NOT NULL,\n\t`value` text NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+  },
+  {
+    "type": "table",
+    "name": "secret",
+    "tbl_name": "secret",
+    "sql": "CREATE TABLE `secret` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`type` text NOT NULL,\n\t`name` text NOT NULL,\n\t`scope` text NOT NULL,\n\t`cipher` blob,\n\t`cipher_version` integer DEFAULT 1 NOT NULL,\n\t`hint` text,\n\t`fields` text DEFAULT '{}' NOT NULL,\n\t`tags` text DEFAULT '[]' NOT NULL,\n\t`note` text,\n\t`rotation_days` integer,\n\t`rotates_at` integer,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+  },
+  {
+    "type": "index",
+    "name": "secret_type_idx",
+    "tbl_name": "secret",
+    "sql": "CREATE INDEX `secret_type_idx` ON `secret` (`type`)"
+  },
+  {
+    "type": "index",
+    "name": "secret_scope_idx",
+    "tbl_name": "secret",
+    "sql": "CREATE INDEX `secret_scope_idx` ON `secret` (`scope`)"
+  },
+  {
+    "type": "index",
+    "name": "secret_name_type_unq",
+    "tbl_name": "secret",
+    "sql": "CREATE UNIQUE INDEX `secret_name_type_unq` ON `secret` (`name`,`type`)"
+  },
+  {
+    "type": "table",
+    "name": "secret_usage",
+    "tbl_name": "secret_usage",
+    "sql": "CREATE TABLE `secret_usage` (\n\t`secret_id` text NOT NULL,\n\t`consumer_kind` text NOT NULL,\n\t`consumer_id` text NOT NULL,\n\t`created_at` integer NOT NULL,\n\tPRIMARY KEY(`secret_id`, `consumer_kind`, `consumer_id`),\n\tFOREIGN KEY (`secret_id`) REFERENCES `secret`(`id`) ON UPDATE cascade ON DELETE restrict\n)"
+  },
+  {
+    "type": "table",
+    "name": "provider",
+    "tbl_name": "provider",
+    "sql": "CREATE TABLE `provider` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`kind` text NOT NULL,\n\t`name` text NOT NULL,\n\t`base_url` text NOT NULL,\n\t`secret_id` text,\n\t`capabilities` text NOT NULL,\n\t`cap_text` integer DEFAULT false NOT NULL,\n\t`cap_embedding` integer DEFAULT false NOT NULL,\n\t`cap_image` integer DEFAULT false NOT NULL,\n\t`enabled` integer DEFAULT true NOT NULL,\n\t`settings` text DEFAULT '{}' NOT NULL,\n\t`default_model_id` text,\n\t`status` text DEFAULT 'unknown' NOT NULL,\n\t`status_detail` text,\n\t`last_probe_at` integer,\n\t`last_latency_ms` integer,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL, `adapter` text DEFAULT 'openai-compatible' NOT NULL, `auth_mode` text DEFAULT 'api' NOT NULL, `account_id` text REFERENCES account(id),\n\tFOREIGN KEY (`secret_id`) REFERENCES `secret`(`id`) ON UPDATE no action ON DELETE restrict\n)"
+  },
+  {
+    "type": "index",
+    "name": "provider_kind_name_unq",
+    "tbl_name": "provider",
+    "sql": "CREATE UNIQUE INDEX `provider_kind_name_unq` ON `provider` (`kind`,`name`)"
+  },
+  {
+    "type": "index",
+    "name": "provider_cap_text_idx",
+    "tbl_name": "provider",
+    "sql": "CREATE INDEX `provider_cap_text_idx` ON `provider` (`cap_text`)"
+  },
+  {
+    "type": "index",
+    "name": "provider_cap_embedding_idx",
+    "tbl_name": "provider",
+    "sql": "CREATE INDEX `provider_cap_embedding_idx` ON `provider` (`cap_embedding`)"
+  },
+  {
+    "type": "index",
+    "name": "provider_cap_image_idx",
+    "tbl_name": "provider",
+    "sql": "CREATE INDEX `provider_cap_image_idx` ON `provider` (`cap_image`)"
+  },
+  {
+    "type": "table",
+    "name": "model",
+    "tbl_name": "model",
+    "sql": "CREATE TABLE `model` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`provider_id` text NOT NULL,\n\t`external_id` text NOT NULL,\n\t`display_name` text NOT NULL,\n\t`family` text,\n\t`context_window` integer,\n\t`max_output` integer,\n\t`size_bytes` integer,\n\t`capabilities` text DEFAULT '[]' NOT NULL,\n\t`available` integer DEFAULT true NOT NULL,\n\t`unavailable_reason` text,\n\t`discovered_at` integer NOT NULL, `is_free` integer, `no_training` integer,\n\tFOREIGN KEY (`provider_id`) REFERENCES `provider`(`id`) ON UPDATE no action ON DELETE cascade\n)"
+  },
+  {
+    "type": "index",
+    "name": "model_provider_external_unq",
+    "tbl_name": "model",
+    "sql": "CREATE UNIQUE INDEX `model_provider_external_unq` ON `model` (`provider_id`,`external_id`)"
+  },
+  {
+    "type": "table",
+    "name": "account",
+    "tbl_name": "account",
+    "sql": "CREATE TABLE `account` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`adapter` text NOT NULL,\n\t`partition` text NOT NULL,\n\t`external_id` text NOT NULL,\n\t`email_masked` text,\n\t`display_name` text,\n\t`avatar_url` text,\n\t`token_secret_id` text,\n\t`token_expires_at` integer,\n\t`status` text DEFAULT 'linked' NOT NULL,\n\t`status_detail` text,\n\t`last_checked_at` integer,\n\t`linked_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL,\n\tFOREIGN KEY (`token_secret_id`) REFERENCES `secret`(`id`) ON UPDATE no action ON DELETE set null\n)"
+  },
+  {
+    "type": "index",
+    "name": "account_adapter_external_unq",
+    "tbl_name": "account",
+    "sql": "CREATE UNIQUE INDEX `account_adapter_external_unq` ON `account` (`adapter`,`external_id`)"
+  },
+  {
+    "type": "index",
+    "name": "account_adapter_idx",
+    "tbl_name": "account",
+    "sql": "CREATE INDEX `account_adapter_idx` ON `account` (`adapter`)"
+  },
+  {
+    "type": "table",
+    "name": "vector_store",
+    "tbl_name": "vector_store",
+    "sql": "CREATE TABLE `vector_store` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`name` text NOT NULL,\n\t`description` text DEFAULT '' NOT NULL,\n\t`backend` text DEFAULT 'lancedb' NOT NULL,\n\t`embedding_provider_id` text NOT NULL,\n\t`embedding_model_id` text NOT NULL,\n\t`dimension` integer NOT NULL,\n\t`metric` text NOT NULL,\n\t`chunk_size` integer NOT NULL,\n\t`chunk_overlap` integer NOT NULL,\n\t`index_type` text DEFAULT 'FLAT' NOT NULL,\n\t`status` text DEFAULT 'pending' NOT NULL,\n\t`table_created_at` integer,\n\t`last_indexed_at` integer,\n\t`documents` integer DEFAULT 0 NOT NULL,\n\t`vectors` integer DEFAULT 0 NOT NULL,\n\t`bytes` integer DEFAULT 0 NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL, `rerank` text DEFAULT '{\"enabled\":false,\"modelRef\":\"\",\"candidates\":50}' NOT NULL, `ocr` text DEFAULT '{\"enabled\":false,\"modelRef\":\"\",\"language\":\"auto\",\"minCharsPerPage\":200}' NOT NULL, `graph_stale` integer DEFAULT false NOT NULL, `last_eval` text, `query_prefix` text DEFAULT '' NOT NULL, `document_prefix` text DEFAULT '' NOT NULL, `search_mode` text DEFAULT 'hybrid' NOT NULL, `schema_version` integer DEFAULT 1 NOT NULL, `chat_min_score` real DEFAULT 0.3 NOT NULL,\n\tFOREIGN KEY (`embedding_provider_id`) REFERENCES `provider`(`id`) ON UPDATE no action ON DELETE restrict\n)"
+  },
+  {
+    "type": "index",
+    "name": "vector_store_name_unq",
+    "tbl_name": "vector_store",
+    "sql": "CREATE UNIQUE INDEX `vector_store_name_unq` ON `vector_store` (`name`)"
+  },
+  {
+    "type": "table",
+    "name": "vector_document",
+    "tbl_name": "vector_document",
+    "sql": "CREATE TABLE `vector_document` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`store_id` text NOT NULL,\n\t`source_path` text NOT NULL,\n\t`content_hash` text NOT NULL,\n\t`chunk_count` integer NOT NULL,\n\t`bytes` integer NOT NULL,\n\t`indexed_at` integer NOT NULL,\n\tFOREIGN KEY (`store_id`) REFERENCES `vector_store`(`id`) ON UPDATE no action ON DELETE cascade\n)"
+  },
+  {
+    "type": "index",
+    "name": "vector_document_store_path_unq",
+    "tbl_name": "vector_document",
+    "sql": "CREATE UNIQUE INDEX `vector_document_store_path_unq` ON `vector_document` (`store_id`,`source_path`)"
+  },
+  {
+    "type": "table",
+    "name": "run",
+    "tbl_name": "run",
+    "sql": "CREATE TABLE `run` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`kind` text NOT NULL,\n\t`subject_id` text,\n\t`status` text NOT NULL,\n\t`graph` text NOT NULL,\n\t`input` text,\n\t`outcome` text,\n\t`stream_id` text NOT NULL,\n\t`concurrency` integer NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`started_at` integer,\n\t`finished_at` integer,\n\t`error` text\n, `title` text, `retry_of_id` text, `pruned_at` integer)"
+  },
+  {
+    "type": "index",
+    "name": "run_stream_id_unique",
+    "tbl_name": "run",
+    "sql": "CREATE UNIQUE INDEX `run_stream_id_unique` ON `run` (`stream_id`)"
+  },
+  {
+    "type": "index",
+    "name": "run_status_idx",
+    "tbl_name": "run",
+    "sql": "CREATE INDEX `run_status_idx` ON `run` (`status`)"
+  },
+  {
+    "type": "table",
+    "name": "step",
+    "tbl_name": "step",
+    "sql": "CREATE TABLE `step` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`run_id` text NOT NULL,\n\t`node_id` text NOT NULL,\n\t`type` text NOT NULL,\n\t`status` text NOT NULL,\n\t`input` text,\n\t`output` text,\n\t`error` text,\n\t`started_at` integer NOT NULL,\n\t`finished_at` integer,\n\t`attempt` integer NOT NULL,\n\tFOREIGN KEY (`run_id`) REFERENCES `run`(`id`) ON UPDATE no action ON DELETE cascade\n)"
+  },
+  {
+    "type": "index",
+    "name": "step_attempt_unq",
+    "tbl_name": "step",
+    "sql": "CREATE UNIQUE INDEX `step_attempt_unq` ON `step` (`run_id`,`node_id`,`attempt`)"
+  },
+  {
+    "type": "table",
+    "name": "run_event",
+    "tbl_name": "run_event",
+    "sql": "CREATE TABLE `run_event` (\n\t`run_id` text NOT NULL,\n\t`seq` integer NOT NULL,\n\t`event` text NOT NULL,\n\tPRIMARY KEY(`run_id`, `seq`),\n\tFOREIGN KEY (`run_id`) REFERENCES `run`(`id`) ON UPDATE no action ON DELETE cascade\n)"
+  },
+  {
+    "type": "table",
+    "name": "pending_approval",
+    "tbl_name": "pending_approval",
+    "sql": "CREATE TABLE `pending_approval` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`run_id` text NOT NULL,\n\t`subject` text NOT NULL,\n\t`scope` text NOT NULL,\n\t`expires_at` integer NOT NULL,\n\t`decision` text\n)"
+  },
+  {
+    "type": "table",
+    "name": "permission_use",
+    "tbl_name": "permission_use",
+    "sql": "CREATE TABLE `permission_use` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`grant_id` text NOT NULL,\n\t`run_id` text NOT NULL,\n\t`used_at` integer NOT NULL,\n\t`subject` text NOT NULL,\n\t`scope` text NOT NULL,\n\t`tier` text NOT NULL,\n\t`granted_by` text NOT NULL,\n\t`granted_at` integer NOT NULL\n)"
+  },
+  {
+    "type": "table",
+    "name": "tool_permission",
+    "tbl_name": "tool_permission",
+    "sql": "CREATE TABLE `tool_permission` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`subject` text NOT NULL,\n\t`scope` text NOT NULL,\n\t`tier` text NOT NULL,\n\t`granted_at` integer NOT NULL,\n\t`granted_by` text NOT NULL\n)"
+  },
+  {
+    "type": "index",
+    "name": "tool_permission_subject_scope",
+    "tbl_name": "tool_permission",
+    "sql": "CREATE UNIQUE INDEX `tool_permission_subject_scope` ON `tool_permission` (`subject`,`scope`)"
+  },
+  {
+    "type": "table",
+    "name": "conversation",
+    "tbl_name": "conversation",
+    "sql": "CREATE TABLE `conversation` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`title` text NOT NULL,\n\t`provider_id` text NOT NULL,\n\t`model_id` text NOT NULL,\n\t`settings` text NOT NULL,\n\t`system_prompt` text NOT NULL,\n\t`attached_store_ids` text NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n, `use_relations` integer DEFAULT false NOT NULL, `enabled_tools` text DEFAULT '[]' NOT NULL)"
+  },
+  {
+    "type": "table",
+    "name": "message",
+    "tbl_name": "message",
+    "sql": "CREATE TABLE `message` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`conversation_id` text NOT NULL,\n\t`role` text NOT NULL,\n\t`content` text NOT NULL,\n\t`citations` text NOT NULL,\n\t`tokens_in` integer NOT NULL,\n\t`tokens_out` integer NOT NULL,\n\t`usage_estimated` integer DEFAULT true NOT NULL,\n\t`duration_ms` integer NOT NULL,\n\t`run_id` text,\n\t`partial` integer DEFAULT false NOT NULL,\n\t`created_at` integer NOT NULL, `reasoning` text DEFAULT '' NOT NULL, `tool_calls` text DEFAULT '[]' NOT NULL,\n\tFOREIGN KEY (`conversation_id`) REFERENCES `conversation`(`id`) ON UPDATE no action ON DELETE cascade,\n\tFOREIGN KEY (`run_id`) REFERENCES `run`(`id`) ON UPDATE no action ON DELETE set null\n)"
+  },
+  {
+    "type": "index",
+    "name": "message_conversation_created_idx",
+    "tbl_name": "message",
+    "sql": "CREATE INDEX `message_conversation_created_idx` ON `message` (`conversation_id`,`created_at`,`id`)"
+  },
+  {
+    "type": "index",
+    "name": "run_created_idx",
+    "tbl_name": "run",
+    "sql": "CREATE INDEX `run_created_idx` ON `run` (`created_at`,`id`)"
+  },
+  {
+    "type": "index",
+    "name": "run_finished_idx",
+    "tbl_name": "run",
+    "sql": "CREATE INDEX `run_finished_idx` ON `run` (`finished_at`)"
+  },
+  {
+    "type": "table",
+    "name": "vector_source",
+    "tbl_name": "vector_source",
+    "sql": "CREATE TABLE `vector_source` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`store_id` text NOT NULL,\n\t`kind` text NOT NULL,\n\t`path` text NOT NULL,\n\t`include` text NOT NULL,\n\t`exclude` text NOT NULL,\n\t`recursive` integer DEFAULT true NOT NULL,\n\t`created_at` integer NOT NULL,\n\tFOREIGN KEY (`store_id`) REFERENCES `vector_store`(`id`) ON UPDATE no action ON DELETE cascade\n)"
+  },
+  {
+    "type": "index",
+    "name": "vector_source_store_path_unq",
+    "tbl_name": "vector_source",
+    "sql": "CREATE UNIQUE INDEX `vector_source_store_path_unq` ON `vector_source` (`store_id`,`path`)"
+  },
+  {
+    "type": "table",
+    "name": "download",
+    "tbl_name": "download",
+    "sql": "CREATE TABLE `download` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`item_kind` text NOT NULL,\n\t`item_ref` text NOT NULL,\n\t`display_name` text NOT NULL,\n\t`version` text,\n\t`size_bytes` integer DEFAULT 0 NOT NULL,\n\t`bytes_done` integer DEFAULT 0 NOT NULL,\n\t`status` text NOT NULL,\n\t`priority` integer DEFAULT 5 NOT NULL,\n\t`target_path` text NOT NULL,\n\t`url` text NOT NULL,\n\t`checksum_algorithm` text,\n\t`checksum_value` text,\n\t`error` text,\n\t`run_id` text,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`started_at` integer,\n\t`finished_at` integer\n)"
+  },
+  {
+    "type": "index",
+    "name": "download_status_idx",
+    "tbl_name": "download",
+    "sql": "CREATE INDEX `download_status_idx` ON `download` (`status`)"
+  },
+  {
+    "type": "index",
+    "name": "download_item_ref_idx",
+    "tbl_name": "download",
+    "sql": "CREATE INDEX `download_item_ref_idx` ON `download` (`item_ref`)"
+  },
+  {
+    "type": "table",
+    "name": "graph_relation_type",
+    "tbl_name": "graph_relation_type",
+    "sql": "CREATE TABLE `graph_relation_type` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`name` text NOT NULL,\n\t`description` text DEFAULT '' NOT NULL,\n\t`directed` integer DEFAULT true NOT NULL\n)"
+  },
+  {
+    "type": "index",
+    "name": "graph_relation_type_name_unq",
+    "tbl_name": "graph_relation_type",
+    "sql": "CREATE UNIQUE INDEX `graph_relation_type_name_unq` ON `graph_relation_type` (`name`)"
+  },
+  {
+    "type": "table",
+    "name": "graph_edge",
+    "tbl_name": "graph_edge",
+    "sql": "CREATE TABLE `graph_edge` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`store_id` text NOT NULL,\n\t`from_document_id` text NOT NULL,\n\t`to_document_id` text NOT NULL,\n\t`relation_type_id` text NOT NULL,\n\t`weight` real,\n\t`metadata` text,\n\t`created_at` integer NOT NULL,\n\tFOREIGN KEY (`store_id`) REFERENCES `vector_store`(`id`) ON UPDATE no action ON DELETE cascade,\n\tFOREIGN KEY (`from_document_id`) REFERENCES `vector_document`(`id`) ON UPDATE no action ON DELETE cascade,\n\tFOREIGN KEY (`to_document_id`) REFERENCES `vector_document`(`id`) ON UPDATE no action ON DELETE cascade,\n\tFOREIGN KEY (`relation_type_id`) REFERENCES `graph_relation_type`(`id`) ON UPDATE no action ON DELETE restrict\n)"
+  },
+  {
+    "type": "index",
+    "name": "graph_edge_unq",
+    "tbl_name": "graph_edge",
+    "sql": "CREATE UNIQUE INDEX `graph_edge_unq` ON `graph_edge` (`store_id`,`from_document_id`,`to_document_id`,`relation_type_id`)"
+  },
+  {
+    "type": "table",
+    "name": "tool",
+    "tbl_name": "tool",
+    "sql": "CREATE TABLE `tool` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`key` text NOT NULL,\n\t`source` text NOT NULL,\n\t`source_ref` text,\n\t`display_name` text NOT NULL,\n\t`description` text DEFAULT '' NOT NULL,\n\t`input_schema` text,\n\t`read_only` integer DEFAULT false NOT NULL,\n\t`destructive` integer DEFAULT false NOT NULL,\n\t`tier` text NOT NULL,\n\t`enabled` integer DEFAULT true NOT NULL,\n\t`available` integer DEFAULT true NOT NULL,\n\t`last_used_at` integer,\n\t`call_count` integer DEFAULT 0 NOT NULL,\n\t`registered_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+  },
+  {
+    "type": "index",
+    "name": "tool_key_unq",
+    "tbl_name": "tool",
+    "sql": "CREATE UNIQUE INDEX `tool_key_unq` ON `tool` (`key`)"
+  },
+  {
+    "type": "table",
+    "name": "tool_reference",
+    "tbl_name": "tool_reference",
+    "sql": "CREATE TABLE `tool_reference` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`tool_id` text NOT NULL,\n\t`kind` text NOT NULL,\n\t`ref_id` text NOT NULL,\n\t`name` text NOT NULL,\n\tFOREIGN KEY (`tool_id`) REFERENCES `tool`(`id`) ON UPDATE no action ON DELETE cascade\n)"
+  },
+  {
+    "type": "index",
+    "name": "tool_reference_unq",
+    "tbl_name": "tool_reference",
+    "sql": "CREATE UNIQUE INDEX `tool_reference_unq` ON `tool_reference` (`tool_id`,`kind`,`ref_id`)"
+  },
+  {
+    "type": "table",
+    "name": "mcp_capability",
+    "tbl_name": "mcp_capability",
+    "sql": "CREATE TABLE `mcp_capability` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`server_id` text NOT NULL,\n\t`kind` text NOT NULL,\n\t`name` text NOT NULL,\n\t`title` text,\n\t`description` text DEFAULT '' NOT NULL,\n\t`tool_key` text,\n\t`uri` text,\n\t`mime_type` text,\n\t`schema` text,\n\t`read_only` integer DEFAULT false NOT NULL,\n\t`destructive` integer DEFAULT false NOT NULL,\n\t`discovered_at` integer NOT NULL,\n\tFOREIGN KEY (`server_id`) REFERENCES `mcp_server`(`id`) ON UPDATE no action ON DELETE cascade\n)"
+  },
+  {
+    "type": "index",
+    "name": "mcp_capability_unq",
+    "tbl_name": "mcp_capability",
+    "sql": "CREATE UNIQUE INDEX `mcp_capability_unq` ON `mcp_capability` (`server_id`,`kind`,`name`)"
+  },
+  {
+    "type": "index",
+    "name": "mcp_capability_tool_key_idx",
+    "tbl_name": "mcp_capability",
+    "sql": "CREATE INDEX `mcp_capability_tool_key_idx` ON `mcp_capability` (`tool_key`)"
+  },
+  {
+    "type": "table",
+    "name": "mcp_server",
+    "tbl_name": "mcp_server",
+    "sql": "CREATE TABLE `mcp_server` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`name` text NOT NULL,\n\t`namespace` text NOT NULL,\n\t`transport` text NOT NULL,\n\t`command` text,\n\t`args` text DEFAULT '[]' NOT NULL,\n\t`env` text DEFAULT '{}' NOT NULL,\n\t`url` text,\n\t`headers` text DEFAULT '{}' NOT NULL,\n\t`enabled` integer DEFAULT true NOT NULL,\n\t`startup` text DEFAULT 'manual' NOT NULL,\n\t`status` text DEFAULT 'stopped' NOT NULL,\n\t`protocol_version` text,\n\t`server_name` text,\n\t`server_version` text,\n\t`last_error` text,\n\t`last_connected_at` integer,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+  },
+  {
+    "type": "index",
+    "name": "mcp_server_name_unq",
+    "tbl_name": "mcp_server",
+    "sql": "CREATE UNIQUE INDEX `mcp_server_name_unq` ON `mcp_server` (`name`)"
+  },
+  {
+    "type": "index",
+    "name": "mcp_server_namespace_unq",
+    "tbl_name": "mcp_server",
+    "sql": "CREATE UNIQUE INDEX `mcp_server_namespace_unq` ON `mcp_server` (`namespace`)"
+  },
+  {
+    "type": "index",
+    "name": "mcp_server_startup_idx",
+    "tbl_name": "mcp_server",
+    "sql": "CREATE INDEX `mcp_server_startup_idx` ON `mcp_server` (`startup`)"
+  },
+  {
+    "type": "table",
+    "name": "vector_eval_case",
+    "tbl_name": "vector_eval_case",
+    "sql": "CREATE TABLE `vector_eval_case` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`store_id` text NOT NULL,\n\t`question` text NOT NULL,\n\t`expected_document_ids` text NOT NULL,\n\t`created_at` integer NOT NULL,\n\tFOREIGN KEY (`store_id`) REFERENCES `vector_store`(`id`) ON UPDATE no action ON DELETE cascade\n)"
+  },
+  {
+    "type": "index",
+    "name": "vector_eval_case_store_idx",
+    "tbl_name": "vector_eval_case",
+    "sql": "CREATE INDEX `vector_eval_case_store_idx` ON `vector_eval_case` (`store_id`,`created_at`)"
+  }
+]

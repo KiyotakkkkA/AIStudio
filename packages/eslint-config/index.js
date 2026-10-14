@@ -22,6 +22,7 @@ export function createConfig(root) {
       "./packages",
       "./apps/studio/src/preload",
       "./apps/studio/src/browser-ui",
+      "./apps/studio/src/recovery",
       "./apps/studio/src/renderer",
       "./apps/studio/src/host/browser",
       "./apps/studio/src/host/documents",

@@ -1,0 +1,637 @@
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
+use std::path::{Path, PathBuf};
+
+use rusqlite::{Connection, params};
+use serde_json::json;
+use sha2::{Digest, Sha256};
+use zvs_contract::{AppError, AppErrorCode};
+
+use super::database::{DataError, Database};
+use crate::platform::clock::SharedClock;
+use crate::platform::logger::{LogLevel, SharedLogger};
+use crate::platform::paths::{backup_file_path, is_backup_file};
+
+pub const BACKUPS_KEPT: usize = 3;
+
+const JOURNAL: &str = "CREATE TABLE IF NOT EXISTS __migrations (\
+    id INTEGER PRIMARY KEY NOT NULL, \
+    name TEXT NOT NULL, \
+    checksum TEXT NOT NULL, \
+    applied_at INTEGER NOT NULL\
+)";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Migration<'a> {
+    pub id: u32,
+    pub name: &'a str,
+    pub sql: &'a str,
+}
+
+impl Migration<'_> {
+    pub fn normalised_sql(&self) -> String {
+        self.sql.replace("\r\n", "\n")
+    }
+
+    pub fn checksum(&self) -> String {
+        let digest = Sha256::digest(self.normalised_sql().as_bytes());
+        digest
+            .iter()
+            .fold(String::with_capacity(64), |mut text, byte| {
+                let _ = write!(text, "{byte:02x}");
+                text
+            })
+    }
+}
+
+pub const MIGRATIONS: &[Migration<'static>] = &[Migration {
+    id: 0,
+    name: "0000_baseline",
+    sql: include_str!("../../migrations/0000_baseline.sql"),
+}];
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{message}")]
+pub struct MigrationFailed {
+    pub message: String,
+    pub backups_dir: PathBuf,
+}
+
+impl MigrationFailed {
+    fn new(message: impl Into<String>, backups_dir: &Path) -> Self {
+        Self {
+            message: message.into(),
+            backups_dir: backups_dir.to_path_buf(),
+        }
+    }
+}
+
+impl From<MigrationFailed> for AppError {
+    fn from(failure: MigrationFailed) -> Self {
+        Self::new(AppErrorCode::DbError, failure.message).with_detail(
+            "backupsDir",
+            failure.backups_dir.to_string_lossy().into_owned(),
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct MigrateReport {
+    pub applied: Vec<String>,
+    pub backup: Option<PathBuf>,
+}
+
+pub struct MigrateOptions<'a> {
+    pub backups_dir: &'a Path,
+    pub logger: SharedLogger,
+    pub clock: SharedClock,
+    pub keep: usize,
+}
+
+pub struct PrepareOptions<'a> {
+    pub file: &'a Path,
+    pub backups_dir: &'a Path,
+    pub logger: SharedLogger,
+    pub clock: SharedClock,
+}
+
+pub fn prepare_database(
+    options: &PrepareOptions<'_>,
+) -> Result<(Database, MigrateReport), MigrationFailed> {
+    prepare_with(options, MIGRATIONS)
+}
+
+pub fn prepare_with(
+    options: &PrepareOptions<'_>,
+    migrations: &[Migration<'_>],
+) -> Result<(Database, MigrateReport), MigrationFailed> {
+    let database = Database::open(options.file, options.logger.clone()).map_err(|error| {
+        options.logger.log(
+            LogLevel::Error,
+            "data",
+            "Could not open the database",
+            &[
+                ("file", json!(options.file.to_string_lossy())),
+                ("error", json!(error.to_string())),
+            ],
+        );
+        MigrationFailed::new(error.to_string(), options.backups_dir)
+    })?;
+    let report = migrate(
+        &database,
+        migrations,
+        &MigrateOptions {
+            backups_dir: options.backups_dir,
+            logger: options.logger.clone(),
+            clock: options.clock.clone(),
+            keep: BACKUPS_KEPT,
+        },
+    )?;
+    Ok((database, report))
+}
+
+pub fn migrate(
+    database: &Database,
+    migrations: &[Migration<'_>],
+    options: &MigrateOptions<'_>,
+) -> Result<MigrateReport, MigrationFailed> {
+    let mut connection = database.lock();
+    run(&mut connection, migrations, options).map_err(|error| {
+        let message = match error {
+            DataError::App(error) => error.message,
+            DataError::Sqlite(error) => error.to_string(),
+            DataError::Io(error) => error.to_string(),
+        };
+        options.logger.log(
+            LogLevel::Error,
+            "data",
+            "Migration failed",
+            &[("error", json!(message))],
+        );
+        MigrationFailed::new(message, options.backups_dir)
+    })
+}
+
+fn run(
+    connection: &mut Connection,
+    migrations: &[Migration<'_>],
+    options: &MigrateOptions<'_>,
+) -> Result<MigrateReport, DataError> {
+    check_order(migrations)?;
+    let tables = user_tables(connection)?;
+    let applied = if tables.contains("__migrations") {
+        journal(connection)?
+    } else {
+        BTreeMap::new()
+    };
+    for migration in migrations {
+        if let Some(checksum) = applied.get(&migration.id)
+            && *checksum != migration.checksum()
+        {
+            return Err(failure(format!(
+                "Миграция {} изменена после применения: контрольная сумма не совпадает",
+                migration.name
+            )));
+        }
+    }
+
+    let pending: Vec<&Migration<'_>> = migrations
+        .iter()
+        .filter(|migration| !applied.contains_key(&migration.id))
+        .collect();
+    if pending.is_empty() {
+        options
+            .logger
+            .log(LogLevel::Info, "data", "Schema is up to date", &[]);
+        return Ok(MigrateReport::default());
+    }
+
+    let backup = if tables.is_empty() {
+        None
+    } else {
+        let backup = back_up(connection, options)?;
+        prune_backups(options.backups_dir, options.keep)?;
+        options.logger.log(
+            LogLevel::Info,
+            "data",
+            "Backed up the database before migrating",
+            &[("backup", json!(backup.to_string_lossy()))],
+        );
+        Some(backup)
+    };
+
+    let mut report = MigrateReport {
+        applied: Vec::with_capacity(pending.len()),
+        backup,
+    };
+    for migration in pending {
+        let transaction = connection.transaction()?;
+        transaction.execute_batch(JOURNAL)?;
+        transaction.execute_batch(&migration.normalised_sql())?;
+        transaction.execute(
+            "INSERT INTO __migrations (id, name, checksum, applied_at) VALUES (?1, ?2, ?3, ?4)",
+            params![
+                migration.id,
+                migration.name,
+                migration.checksum(),
+                options.clock.now()
+            ],
+        )?;
+        transaction.commit()?;
+        options.logger.log(
+            LogLevel::Info,
+            "data",
+            "Applied migration",
+            &[("migration", json!(migration.name))],
+        );
+        report.applied.push(migration.name.to_owned());
+    }
+    Ok(report)
+}
+
+fn failure(message: String) -> DataError {
+    DataError::App(AppError::new(AppErrorCode::DbError, message))
+}
+
+fn check_order(migrations: &[Migration<'_>]) -> Result<(), DataError> {
+    let ascending = migrations.windows(2).all(|pair| pair[0].id < pair[1].id);
+    let names: BTreeSet<&str> = migrations.iter().map(|migration| migration.name).collect();
+    if ascending && names.len() == migrations.len() {
+        Ok(())
+    } else {
+        Err(failure(
+            "Список миграций должен идти по возрастанию id без повторов имён".to_owned(),
+        ))
+    }
+}
+
+fn user_tables(connection: &Connection) -> Result<BTreeSet<String>, DataError> {
+    let mut statement = connection.prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+    )?;
+    let names = statement
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(names)
+}
+
+fn journal(connection: &Connection) -> Result<BTreeMap<u32, String>, DataError> {
+    let mut statement = connection.prepare("SELECT id, checksum FROM __migrations")?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, u32>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
+fn back_up(connection: &Connection, options: &MigrateOptions<'_>) -> Result<PathBuf, DataError> {
+    std::fs::create_dir_all(options.backups_dir)?;
+    let target = backup_file_path(options.backups_dir, options.clock.now());
+    if target.exists() {
+        std::fs::remove_file(&target)?;
+    }
+    connection.execute("VACUUM INTO ?1", [target.to_string_lossy()])?;
+    Ok(target)
+}
+
+fn prune_backups(backups_dir: &Path, keep: usize) -> Result<(), DataError> {
+    let mut backups: Vec<PathBuf> = std::fs::read_dir(backups_dir)?
+        .filter_map(Result::ok)
+        .filter(|entry| is_backup_file(&entry.file_name().to_string_lossy()))
+        .map(|entry| entry.path())
+        .collect();
+    backups.sort_unstable_by(|left, right| right.cmp(left));
+    for stale in backups.into_iter().skip(keep) {
+        std::fs::remove_file(stale)?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use serde_json::{Value, json};
+
+    use super::*;
+    use crate::platform::clock::{Clock, FakeClock};
+    use crate::platform::logger::silent_logger;
+    use crate::testing::{
+        MemoryLogger, TemporaryDatabase, temporary_directory, unmigrated_database,
+    };
+
+    const SNAPSHOT: &str = include_str!("../../migrations/snapshots/0000_baseline.json");
+
+    fn options<'a>(backups_dir: &'a Path, clock: &Arc<FakeClock>) -> MigrateOptions<'a> {
+        MigrateOptions {
+            backups_dir,
+            logger: silent_logger(),
+            clock: clock.clone(),
+            keep: BACKUPS_KEPT,
+        }
+    }
+
+    fn names(connection: &Connection, sql: &str) -> rusqlite::Result<Vec<String>> {
+        let mut statement = connection.prepare(sql)?;
+        statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect()
+    }
+
+    fn query(database: &Database, sql: &str) -> Vec<String> {
+        database
+            .with_connection(|connection| Ok(names(connection, sql)?))
+            .expect("query")
+    }
+
+    const TABLES: &str = "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name";
+
+    fn tables(database: &Database) -> Vec<String> {
+        query(database, TABLES)
+    }
+
+    fn journal_names(database: &Database) -> Vec<String> {
+        query(database, "SELECT name FROM __migrations ORDER BY id")
+    }
+
+    fn fresh() -> (TemporaryDatabase, Arc<FakeClock>) {
+        (unmigrated_database(), Arc::new(FakeClock::default()))
+    }
+
+    fn sql_migration(id: u32, name: &'static str, sql: &'static str) -> Migration<'static> {
+        Migration { id, name, sql }
+    }
+
+    #[test]
+    fn the_baseline_applies_once_to_an_empty_file_and_is_a_no_op_afterwards() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        let first = migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        assert_eq!(
+            first,
+            MigrateReport {
+                applied: vec!["0000_baseline".to_owned()],
+                backup: None,
+            }
+        );
+        assert!(tables(&database).contains(&"setting".to_owned()));
+        assert_eq!(journal_names(&database), ["0000_baseline"]);
+
+        let second = migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("no-op");
+        assert_eq!(second, MigrateReport::default());
+        assert!(!backups.exists());
+    }
+
+    #[test]
+    fn the_baseline_schema_equals_the_drizzle_schema_snapshot() {
+        let (database, clock) = fresh();
+        migrate(
+            &database,
+            MIGRATIONS,
+            &options(&database.backups_dir(), &clock),
+        )
+        .expect("applies");
+        let actual = database
+            .with_connection(|connection| {
+                let mut statement = connection.prepare(
+                    "SELECT type, name, tbl_name, sql FROM sqlite_master \
+                     WHERE name NOT LIKE 'sqlite_%' AND name <> '__migrations' ORDER BY rowid",
+                )?;
+                let rows = statement
+                    .query_map([], |row| {
+                        Ok(json!({
+                            "type": row.get::<_, String>(0)?,
+                            "name": row.get::<_, String>(1)?,
+                            "tbl_name": row.get::<_, String>(2)?,
+                            "sql": row.get::<_, Option<String>>(3)?,
+                        }))
+                    })?
+                    .collect::<rusqlite::Result<Vec<Value>>>()?;
+                Ok(rows)
+            })
+            .expect("reads the schema");
+        let expected: Vec<Value> = serde_json::from_str(SNAPSHOT).expect("a snapshot");
+        for (index, (actual, expected)) in actual.iter().zip(&expected).enumerate() {
+            assert_eq!(actual, expected, "schema entry {index}");
+        }
+        assert_eq!(actual.len(), expected.len());
+    }
+
+    #[test]
+    fn the_baseline_keeps_every_foreign_key_and_has_no_violations() {
+        let (database, clock) = fresh();
+        migrate(
+            &database,
+            MIGRATIONS,
+            &options(&database.backups_dir(), &clock),
+        )
+        .expect("applies");
+        let references = query(
+            &database,
+            "SELECT m.name || '.' || p.\"from\" || '->' || p.\"table\" || '.' || coalesce(p.\"to\", '') \
+             FROM sqlite_master m, pragma_foreign_key_list(m.name) p \
+             WHERE m.type = 'table' ORDER BY m.name, p.id, p.seq",
+        );
+        assert!(
+            references.contains(&"graph_edge.relation_type_id->graph_relation_type.id".to_owned())
+        );
+        assert!(references.contains(&"provider.account_id->account.id".to_owned()));
+        assert!(references.contains(&"message.run_id->run.id".to_owned()));
+        assert!(query(&database, "SELECT \"table\" FROM pragma_foreign_key_check").is_empty());
+    }
+
+    #[test]
+    fn already_applied_migrations_are_skipped_and_a_populated_database_is_backed_up() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        let first = sql_migration(
+            0,
+            "0000_first",
+            "CREATE TABLE first (id INTEGER PRIMARY KEY);",
+        );
+        let second = sql_migration(
+            1,
+            "0001_second",
+            "CREATE TABLE second (id INTEGER PRIMARY KEY);",
+        );
+        migrate(&database, &[first], &options(&backups, &clock)).expect("applies");
+        let report =
+            migrate(&database, &[first, second], &options(&backups, &clock)).expect("applies");
+        assert_eq!(report.applied, ["0001_second"]);
+        let backup = report.backup.expect("a backup");
+        assert_eq!(backup, backup_file_path(&backups, clock.now()));
+        let copy = Database::open(&backup, silent_logger()).expect("opens the backup");
+        assert_eq!(tables(&copy), ["__migrations", "first"]);
+        assert_eq!(journal_names(&database), ["0000_first", "0001_second"]);
+    }
+
+    #[test]
+    fn a_backup_is_written_before_migrating_and_only_the_last_three_are_kept() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        let mut written = Vec::new();
+        for run in 0..BACKUPS_KEPT + 2 {
+            clock.advance(60_000);
+            let report =
+                migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+            assert_eq!(report.applied, ["0000_baseline"]);
+            match report.backup {
+                None => assert_eq!(run, 0),
+                Some(backup) => written.push(backup),
+            }
+            database
+                .with_connection(|connection| {
+                    connection.execute_batch("PRAGMA foreign_keys = OFF")?;
+                    for table in names(connection, TABLES)? {
+                        connection.execute_batch(&format!("DROP TABLE \"{table}\""))?;
+                    }
+                    connection.execute_batch(
+                        "PRAGMA foreign_keys = ON; CREATE TABLE keepalive (id INTEGER PRIMARY KEY)",
+                    )?;
+                    Ok(())
+                })
+                .expect("resets the schema");
+        }
+        assert_eq!(written.len(), BACKUPS_KEPT + 1);
+        let mut kept: Vec<PathBuf> = std::fs::read_dir(&backups)
+            .expect("backups")
+            .map(|entry| entry.expect("an entry").path())
+            .collect();
+        kept.sort();
+        assert_eq!(kept, written[written.len() - BACKUPS_KEPT..]);
+    }
+
+    #[test]
+    fn a_broken_migration_fails_and_leaves_the_database_untouched() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        let logger = MemoryLogger::shared();
+        let broken = sql_migration(
+            0,
+            "0000_setting",
+            "CREATE TABLE setting (key TEXT);\nCREATE TABLE (this is not sql;\n",
+        );
+        let failure = migrate(
+            &database,
+            &[broken],
+            &MigrateOptions {
+                logger: logger.clone(),
+                ..options(&backups, &clock)
+            },
+        )
+        .expect_err("fails");
+        assert_eq!(failure.backups_dir, backups);
+        assert!(
+            failure.message.contains("syntax error"),
+            "{}",
+            failure.message
+        );
+        assert!(tables(&database).is_empty());
+        assert_eq!(logger.matching("Migration failed").len(), 1);
+    }
+
+    #[test]
+    fn a_failure_keeps_earlier_migrations_and_rolls_back_only_the_failing_one() {
+        let (database, clock) = fresh();
+        let migrations = [
+            sql_migration(0, "0000_ok", "CREATE TABLE ok (id INTEGER PRIMARY KEY);"),
+            sql_migration(
+                1,
+                "0001_broken",
+                "CREATE TABLE half (id INTEGER PRIMARY KEY); INSERT INTO nowhere VALUES (1);",
+            ),
+        ];
+        migrate(
+            &database,
+            &migrations,
+            &options(&database.backups_dir(), &clock),
+        )
+        .expect_err("fails");
+        assert_eq!(tables(&database), ["__migrations", "ok"]);
+        assert_eq!(journal_names(&database), ["0000_ok"]);
+    }
+
+    #[test]
+    fn an_applied_migration_whose_checksum_changed_is_a_hard_failure() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        let original = sql_migration(
+            0,
+            "0000_first",
+            "CREATE TABLE first (id INTEGER PRIMARY KEY);",
+        );
+        migrate(&database, &[original], &options(&backups, &clock)).expect("applies");
+        let edited = Migration {
+            sql: "CREATE TABLE first (id INTEGER PRIMARY KEY, extra TEXT);",
+            ..original
+        };
+        let pending = sql_migration(
+            1,
+            "0001_second",
+            "CREATE TABLE second (id INTEGER PRIMARY KEY);",
+        );
+        let failure =
+            migrate(&database, &[edited, pending], &options(&backups, &clock)).expect_err("fails");
+        assert!(
+            failure.message.contains("0000_first"),
+            "{}",
+            failure.message
+        );
+        assert_eq!(tables(&database), ["__migrations", "first"]);
+        assert!(!backups.exists());
+    }
+
+    #[test]
+    fn line_endings_do_not_change_a_checksum() {
+        let unix = sql_migration(0, "0000_a", "CREATE TABLE a (\n  id INTEGER\n);\n");
+        let windows = Migration {
+            sql: "CREATE TABLE a (\r\n  id INTEGER\r\n);\r\n",
+            ..unix
+        };
+        assert_eq!(unix.checksum(), windows.checksum());
+        assert_eq!(unix.checksum().len(), 64);
+        let other = Migration {
+            sql: "CREATE TABLE b (id INTEGER);",
+            ..unix
+        };
+        assert_ne!(unix.checksum(), other.checksum());
+    }
+
+    #[test]
+    fn the_embedded_migrations_are_ordered_and_uniquely_named() {
+        assert!(check_order(MIGRATIONS).is_ok());
+        assert_eq!(MIGRATIONS[0].name, "0000_baseline");
+        let unordered = [MIGRATIONS[0], sql_migration(0, "0000_again", "")];
+        assert!(check_order(&unordered).is_err());
+        let renamed = [MIGRATIONS[0], sql_migration(1, "0000_baseline", "")];
+        assert!(check_order(&renamed).is_err());
+    }
+
+    #[test]
+    fn a_corrupt_database_file_is_refused_at_open_as_a_migration_failure() {
+        let directory = temporary_directory("studio-corrupt-");
+        let file = directory.join("studio.sqlite");
+        std::fs::write(&file, "not a database at all, just junk bytes").expect("writes");
+        let backups = directory.join("backups");
+        let failure = prepare_database(&PrepareOptions {
+            file: &file,
+            backups_dir: &backups,
+            logger: silent_logger(),
+            clock: Arc::new(FakeClock::default()),
+        })
+        .err()
+        .expect("fails");
+        assert_eq!(failure.backups_dir, backups);
+    }
+
+    #[test]
+    fn prepare_database_opens_and_migrates_in_one_step() {
+        let directory = temporary_directory("studio-prepare-");
+        let file = directory.join("studio.sqlite");
+        let (database, report) = prepare_database(&PrepareOptions {
+            file: &file,
+            backups_dir: &directory.join("backups"),
+            logger: silent_logger(),
+            clock: Arc::new(FakeClock::default()),
+        })
+        .expect("prepares");
+        assert_eq!(report.applied, ["0000_baseline"]);
+        assert_eq!(database.file(), file);
+        assert!(file.exists());
+        assert!(query(&database, "SELECT key FROM setting").is_empty());
+    }
+
+    #[test]
+    fn a_migration_failure_maps_to_db_error_with_the_backups_dir() {
+        let error = AppError::from(MigrationFailed::new("boom", Path::new("backups")));
+        assert_eq!(error.code, AppErrorCode::DbError);
+        assert_eq!(error.message, "boom");
+        assert_eq!(
+            error
+                .details
+                .and_then(|details| details.get("backupsDir").cloned()),
+            Some(json!("backups"))
+        );
+    }
+}

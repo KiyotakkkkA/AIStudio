@@ -14,6 +14,7 @@ What lives here today:
 | `errors`     | `AppErrorCode`, `AppError`, `ErrorDetails`                                        |
 | `envelope`   | `ResultEnvelope<T>`, the `{ ok, data }` / `{ ok, error }` wire envelope           |
 | `events`     | `HostEvent`, `HostEventDraft`, `RunOutcomeDto`, `DeltaKind`, `EVENT_CHANNEL`      |
+| `settings`   | `SettingKey` validation and the `settings.*` channel inputs/outputs               |
 | `system`     | `DeviceProfileDto`, `ResourceSampleDto` and the `system.*` channel inputs/outputs |
 | `channels`   | `CHANNELS`, generated from `packages/shared/contract.channels.json`               |
 | `validate`   | The `Validate` trait, `parse`, and the `check::*` refinement helpers              |

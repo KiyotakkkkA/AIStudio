@@ -1,0 +1,11 @@
+{
+  "extends": "@zvs/tsconfig/base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true,
+    "rootDir": "src/recovery",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"]
+  },
+  "include": ["src/recovery/**/*.ts"]
+}

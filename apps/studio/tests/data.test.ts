@@ -3,8 +3,9 @@ import { createRunService } from "../../../test/helpers/runService.ts";
 import { createSystemService } from "../../../test/helpers/systemService.ts";
 import { createProviderService } from "../../../test/helpers/providerService.ts";
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "vitest";
 import { AppErrorCode } from "@zvs/shared";
 import { openDatabase } from "../src/host/data/client.ts";
@@ -408,6 +409,23 @@ test("the database file and its migration journal both exist on disk", () => {
   try {
     assert.equal(existsSync(database.file), true);
     assert.equal(existsSync(join(MIGRATIONS_DIR, "meta", "_journal.json")), true);
+  } finally {
+    database.dispose();
+  }
+});
+
+test("the Rust baseline snapshot equals the schema the Drizzle migrations produce", () => {
+  const snapshot = fileURLToPath(
+    new URL("../../../crates/zvs-host/migrations/snapshots/0000_baseline.json", import.meta.url),
+  );
+  const database = temporaryDatabase();
+  try {
+    const actual = database.client.db.$client
+      .prepare(
+        "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND name <> '__drizzle_migrations' ORDER BY rowid",
+      )
+      .all();
+    assert.deepEqual(actual, JSON.parse(readFileSync(snapshot, "utf8")));
   } finally {
     database.dispose();
   }

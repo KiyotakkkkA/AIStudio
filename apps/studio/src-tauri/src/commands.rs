@@ -4,14 +4,15 @@ use serde_json::Value;
 use tauri::ipc::Channel;
 use tauri::{Runtime, State, Webview};
 use zvs_contract::HostEvent;
-use zvs_host::IpcServer;
 use zvs_host::platform::events::{EventBus, EventSink};
+use zvs_host::{IpcServer, Services};
 
 use crate::window::STUDIO;
 
 pub struct Host {
     pub server: IpcServer,
     pub events: EventBus,
+    pub services: Arc<Services>,
 }
 
 struct ChannelSink(Channel<HostEvent>);

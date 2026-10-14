@@ -1,0 +1,14 @@
+[
+  {
+    "name": "theme key",
+    "value": {
+      "key": "ui.theme"
+    }
+  },
+  {
+    "name": "single segment with digits",
+    "value": {
+      "key": "a1.b2.3c"
+    }
+  }
+]

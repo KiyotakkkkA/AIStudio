@@ -1,13 +1,17 @@
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use serde_json::{Map, Value};
 use tempfile::TempDir;
 use zvs_contract::HostEvent;
 
+use crate::data::{BACKUPS_KEPT, Database, MIGRATIONS, MigrateOptions, migrate};
 pub use crate::platform::clock::{CLOCK_ORIGIN, FakeClock};
 use crate::platform::events::EventSink;
-use crate::platform::logger::{Field, LogLevel, Logger};
+use crate::platform::logger::{Field, LogLevel, Logger, SharedLogger, silent_logger};
+use crate::platform::theme::{ThemePort, ThemeSource};
+use crate::services::{Services, SettingService, SystemService};
 
 fn normalise(path: &Path) -> String {
     let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
@@ -51,6 +55,118 @@ pub fn temporary_directory(prefix: &str) -> TemporaryDirectory {
         .expect("a temporary directory");
     assert_temporary_path(directory.path());
     TemporaryDirectory(directory)
+}
+
+pub struct TemporaryDatabase {
+    database: Arc<Database>,
+    directory: TemporaryDirectory,
+}
+
+impl TemporaryDatabase {
+    pub fn shared(&self) -> Arc<Database> {
+        Arc::clone(&self.database)
+    }
+
+    pub fn directory(&self) -> &Path {
+        self.directory.path()
+    }
+
+    pub fn backups_dir(&self) -> PathBuf {
+        self.directory.join("backups")
+    }
+}
+
+impl Deref for TemporaryDatabase {
+    type Target = Database;
+
+    fn deref(&self) -> &Database {
+        &self.database
+    }
+}
+
+pub struct TemporaryDatabaseOptions {
+    pub migrate: bool,
+    pub logger: SharedLogger,
+}
+
+impl Default for TemporaryDatabaseOptions {
+    fn default() -> Self {
+        Self {
+            migrate: true,
+            logger: silent_logger(),
+        }
+    }
+}
+
+pub fn temporary_database_with(options: TemporaryDatabaseOptions) -> TemporaryDatabase {
+    let directory = temporary_directory("studio-db-");
+    let database = Database::open(&directory.join("studio.sqlite"), options.logger.clone())
+        .expect("a temporary database");
+    if options.migrate {
+        migrate(
+            &database,
+            MIGRATIONS,
+            &MigrateOptions {
+                backups_dir: &directory.join("backups"),
+                logger: options.logger,
+                clock: Arc::new(FakeClock::default()),
+                keep: BACKUPS_KEPT,
+            },
+        )
+        .expect("the bundled migrations apply");
+    }
+    TemporaryDatabase {
+        database: Arc::new(database),
+        directory,
+    }
+}
+
+pub fn temporary_database() -> TemporaryDatabase {
+    temporary_database_with(TemporaryDatabaseOptions::default())
+}
+
+pub fn unmigrated_database() -> TemporaryDatabase {
+    temporary_database_with(TemporaryDatabaseOptions {
+        migrate: false,
+        ..TemporaryDatabaseOptions::default()
+    })
+}
+
+pub struct TestServices {
+    services: Arc<Services>,
+    pub theme: Arc<RecordingTheme>,
+    pub clock: Arc<FakeClock>,
+    pub database: TemporaryDatabase,
+}
+
+impl TestServices {
+    pub fn shared(&self) -> Arc<Services> {
+        Arc::clone(&self.services)
+    }
+}
+
+impl Deref for TestServices {
+    type Target = Services;
+
+    fn deref(&self) -> &Services {
+        &self.services
+    }
+}
+
+pub fn test_services(system: SystemService) -> TestServices {
+    let database = temporary_database();
+    let clock = Arc::new(FakeClock::default());
+    let theme = RecordingTheme::shared();
+    TestServices {
+        services: Arc::new(Services {
+            system,
+            settings: SettingService::new(database.shared(), clock.clone()),
+            theme: theme.clone(),
+        }),
+        theme,
+        clock,
+        database,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -115,6 +231,31 @@ impl EventSink for MemorySink {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct RecordingTheme(Mutex<Vec<ThemeSource>>);
+
+impl RecordingTheme {
+    pub fn shared() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn applied(&self) -> Vec<ThemeSource> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
+
+impl ThemePort for RecordingTheme {
+    fn apply(&self, source: ThemeSource) {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(source);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,5 +274,24 @@ mod tests {
     fn a_path_outside_the_temp_dir_is_refused() {
         let outside = std::env::current_dir().expect("a working directory");
         assert_temporary_path(&outside);
+    }
+
+    #[test]
+    fn a_temporary_database_is_migrated_and_removed_on_drop() {
+        let database = temporary_database();
+        let directory = database.directory().to_path_buf();
+        assert!(directory.join("studio.sqlite").exists());
+        let tables = database
+            .with_connection(|connection| {
+                Ok(connection.query_row(
+                    "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'setting'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )?)
+            })
+            .expect("counts");
+        assert_eq!(tables, 1);
+        drop(database);
+        assert!(!directory.exists());
     }
 }

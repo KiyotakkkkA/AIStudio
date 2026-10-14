@@ -1,0 +1,38 @@
+[
+  {
+    "name": "null updatedAt",
+    "value": {
+      "key": "ui.theme",
+      "value": "dark",
+      "updatedAt": null
+    }
+  },
+  {
+    "name": "negative updatedAt",
+    "value": {
+      "key": "ui.theme",
+      "value": "dark",
+      "updatedAt": -1
+    }
+  },
+  {
+    "name": "fractional updatedAt",
+    "value": {
+      "key": "ui.theme",
+      "value": "dark",
+      "updatedAt": 1.5
+    }
+  },
+  {
+    "name": "bad key",
+    "value": {
+      "key": "Ui"
+    }
+  },
+  {
+    "name": "missing key",
+    "value": {
+      "value": "dark"
+    }
+  }
+]

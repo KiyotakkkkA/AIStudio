@@ -75,7 +75,13 @@ export default defineConfig(({ command }) => {
       outDir: "../dist",
       emptyOutDir: true,
       assetsInlineLimit: 0,
-      rollupOptions: { input: { studio: "src/index.html", browser: "src/browser-ui/index.html" } },
+      rollupOptions: {
+        input: {
+          studio: "src/index.html",
+          browser: "src/browser-ui/index.html",
+          recovery: "src/recovery/index.html",
+        },
+      },
     },
   };
 });

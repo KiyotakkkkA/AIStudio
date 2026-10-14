@@ -5,18 +5,21 @@ The Rust host. Every service, repository, driver and the execution kernel will l
 without a window. Shell capabilities reach it through port traits that `zvs-studio`
 implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that builds it.
 
-| Module                                 | Contents                                                                        |
-| -------------------------------------- | ------------------------------------------------------------------------------- |
-| `ipc`                                  | `IpcServer`, `register`, and one file of thin handlers per domain               |
-| `services`                             | `Services`, the handlers' only dependency, and the business logic               |
-| `platform::paths`                      | `PathEnvironment` → `StudioPaths`, plus the validated path builders             |
-| `platform::logger`                     | `Logger` trait, `FileLogger` (JSON lines, rotation, redaction), `silent_logger` |
-| `platform::ids`                        | UUID v7 ids and the injectable `IdGenerator`                                    |
-| `platform::clock`                      | `Clock`, `SystemClock`, `FakeClock`                                             |
-| `platform::events`                     | `EventBus`, `StreamHandle`, the `EventSink` and `EventRecorder` ports           |
-| `platform::recorder`                   | `FileEventRecorder` and the `ZVS_RECORD_EVENTS` flag                            |
-| `testing`                              | `temporary_directory`, `MemoryLogger`, `MemorySink`, `FakeClock`                |
-| `kernel`, `data`, `drivers`, `browser` | Empty until their port tasks (TASK_061 onwards)                                 |
+| Module                         | Contents                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------- |
+| `ipc`                          | `IpcServer`, `register`, and one file of thin handlers per domain               |
+| `services`                     | `Services`, the handlers' only dependency, and the business logic               |
+| `data`                         | `Database`, migrations, row structs and repositories (see `src/data/README.md`) |
+| `platform::paths`              | `PathEnvironment` → `StudioPaths`, plus the validated path builders             |
+| `platform::logger`             | `Logger` trait, `FileLogger` (JSON lines, rotation, redaction), `silent_logger` |
+| `platform::ids`                | UUID v7 ids and the injectable `IdGenerator`                                    |
+| `platform::clock`              | `Clock`, `SystemClock`, `FakeClock`                                             |
+| `platform::events`             | `EventBus`, `StreamHandle`, the `EventSink` and `EventRecorder` ports           |
+| `platform::recorder`           | `FileEventRecorder` and the `ZVS_RECORD_EVENTS` flag                            |
+| `platform::theme`              | `ThemePort`, `ThemeSource`, `apply_theme_source`, `THEME_SETTING_KEY`           |
+| `platform::window_state`       | `read_window_state`, `capture_window_state`, `WINDOW_STATE_KEY`                 |
+| `testing`                      | `temporary_directory`, `temporary_database`, `test_services`, `MemoryLogger`, … |
+| `kernel`, `drivers`, `browser` | Empty until their port tasks                                                    |
 
 `testing` is compiled for this crate's own tests and behind the `testing` feature for other
 crates' tests.

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "missing updatedAt",
+    "value": {
+      "key": "ui.theme",
+      "value": "dark"
+    }
+  },
+  {
+    "name": "missing value",
+    "value": {
+      "key": "ui.theme",
+      "updatedAt": 1
+    }
+  },
+  {
+    "name": "negative updatedAt",
+    "value": {
+      "key": "ui.theme",
+      "value": "dark",
+      "updatedAt": -5
+    }
+  },
+  {
+    "name": "bad key",
+    "value": {
+      "key": "ui theme",
+      "value": "dark",
+      "updatedAt": 1
+    }
+  }
+]

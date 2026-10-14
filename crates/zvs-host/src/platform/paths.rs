@@ -156,6 +156,25 @@ pub fn stream_file_path(directory: &Path, at: Timestamp) -> PathBuf {
     directory.join(format!("{}.jsonl", utc_date(at)))
 }
 
+pub const BACKUP_PREFIX: &str = "db-";
+pub const BACKUP_SUFFIX: &str = ".sqlite";
+
+pub fn backup_file_path(directory: &Path, at: Timestamp) -> PathBuf {
+    let time = at.rem_euclid(86_400_000);
+    directory.join(format!(
+        "{BACKUP_PREFIX}{}T{:02}-{:02}-{:02}-{:03}Z{BACKUP_SUFFIX}",
+        utc_date(at),
+        time / 3_600_000,
+        time / 60_000 % 60,
+        time / 1_000 % 60,
+        time % 1_000
+    ))
+}
+
+pub fn is_backup_file(name: &str) -> bool {
+    name.starts_with(BACKUP_PREFIX) && name.ends_with(BACKUP_SUFFIX)
+}
+
 fn utc_date(at: Timestamp) -> String {
     let days = at.div_euclid(86_400_000);
     let shifted = days + 719_468;
@@ -298,5 +317,21 @@ mod tests {
         assert_eq!(utc_date(1_709_251_199_999), "2024-02-29");
         assert_eq!(utc_date(1_735_689_600_000), "2025-01-01");
         assert_eq!(utc_date(-1), "1969-12-31");
+    }
+
+    #[test]
+    fn backups_are_named_like_the_typescript_iso_stamp() {
+        let root = Path::new("backups");
+        assert_eq!(
+            backup_file_path(root, 1_700_000_000_000),
+            root.join("db-2023-11-14T22-13-20-000Z.sqlite")
+        );
+        assert_eq!(
+            backup_file_path(root, 1_709_251_199_999),
+            root.join("db-2024-02-29T23-59-59-999Z.sqlite")
+        );
+        assert!(is_backup_file("db-2023-11-14T22-13-20-000Z.sqlite"));
+        assert!(!is_backup_file("studio.sqlite"));
+        assert!(!is_backup_file("db-notes.txt"));
     }
 }

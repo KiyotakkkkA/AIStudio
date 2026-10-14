@@ -7,7 +7,8 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use zvs_contract::{
     AppErrorCode, DeviceGpuDto, DeviceProfileDto, DeviceTier, HostEvent, Json, Page, PageRequest,
-    ProviderId, ResourceSampleDto, ResultEnvelope, RunOutcomeDto, Sort, SortDirection, StreamId,
+    ProviderId, ResourceSampleDto, ResultEnvelope, RunOutcomeDto, SettingsGetInput,
+    SettingsGetOutput, SettingsSetInput, SettingsSetOutput, Sort, SortDirection, StreamId,
     SystemDemoJobInput, SystemDemoStreamInput, SystemDemoStreamOutput, SystemDeviceInput,
     SystemNativePingInput, SystemNativePingOutput, SystemPingInput, SystemPingOutput, Validate,
 };
@@ -51,6 +52,16 @@ const TABLE: &[(&str, Check)] = &[
     (
         "system/SystemNativePingOutput",
         round_trip::<SystemNativePingOutput>,
+    ),
+    ("settings/SettingsGetInput", round_trip::<SettingsGetInput>),
+    (
+        "settings/SettingsGetOutput",
+        round_trip::<SettingsGetOutput>,
+    ),
+    ("settings/SettingsSetInput", round_trip::<SettingsSetInput>),
+    (
+        "settings/SettingsSetOutput",
+        round_trip::<SettingsSetOutput>,
     ),
 ];
 

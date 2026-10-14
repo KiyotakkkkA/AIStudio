@@ -34,20 +34,23 @@ mod tests {
     use crate::platform::events::EventBus;
     use crate::platform::logger::silent_logger;
     use crate::services::SystemService;
-    use crate::testing::MemorySink;
+    use crate::testing::{MemorySink, TestServices, test_services};
 
-    fn server(events: EventBus, interval: Duration) -> IpcServer {
-        let services = Arc::new(Services {
-            system: SystemService::new(Arc::new(FakeClock::new(1_250)), events, interval),
-        });
-        let mut server = IpcServer::new(services, silent_logger()).with_output_validation(true);
+    fn server(events: EventBus, interval: Duration) -> (TestServices, IpcServer) {
+        let host = test_services(SystemService::new(
+            Arc::new(FakeClock::new(1_250)),
+            events,
+            interval,
+        ));
+        let mut server =
+            IpcServer::new(host.shared(), silent_logger()).with_output_validation(true);
         register(&mut server);
-        server
+        (host, server)
     }
 
     #[tokio::test]
     async fn system_ping_answers_with_host_time_and_round_trip_hint() {
-        let server = server(EventBus::default(), Duration::ZERO);
+        let (_host, server) = server(EventBus::default(), Duration::ZERO);
         assert_eq!(
             server
                 .dispatch("system.ping", json!({ "sentAt": 1_000 }))
@@ -61,7 +64,7 @@ mod tests {
         let events = EventBus::default();
         let sink = MemorySink::shared();
         events.attach(sink.clone());
-        let server = server(events.clone(), Duration::from_millis(200));
+        let (_host, server) = server(events.clone(), Duration::from_millis(200));
         let response = server
             .dispatch("system.demoStream", json!({ "steps": 10 }))
             .await;
@@ -97,7 +100,7 @@ mod tests {
     #[tokio::test]
     async fn system_demo_stream_validates_the_step_count() {
         let events = EventBus::default();
-        let server = server(events.clone(), Duration::ZERO);
+        let (_host, server) = server(events.clone(), Duration::ZERO);
         for steps in [0, 101] {
             let response = server
                 .dispatch("system.demoStream", json!({ "steps": steps }))

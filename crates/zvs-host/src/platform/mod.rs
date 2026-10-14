@@ -4,3 +4,5 @@ pub mod ids;
 pub mod logger;
 pub mod paths;
 pub mod recorder;
+pub mod theme;
+pub mod window_state;
