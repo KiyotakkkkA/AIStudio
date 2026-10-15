@@ -67,7 +67,10 @@ mod tests {
                 "settings.get",
                 "settings.set",
                 "system.demoStream",
-                "system.ping"
+                "system.device",
+                "system.nativePing",
+                "system.ping",
+                "system.resources"
             ]
         );
     }

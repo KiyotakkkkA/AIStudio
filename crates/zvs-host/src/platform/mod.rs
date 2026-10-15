@@ -1,7 +1,11 @@
 pub mod clock;
+pub mod device;
+pub mod disk;
 pub mod events;
+pub mod gpu;
 pub mod ids;
 pub mod logger;
+pub mod metrics;
 pub mod navigation;
 pub mod paths;
 pub mod recorder;

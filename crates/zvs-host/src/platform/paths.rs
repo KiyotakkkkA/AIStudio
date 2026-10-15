@@ -6,6 +6,7 @@ use zvs_contract::Timestamp;
 pub struct PathEnvironment {
     pub data_dir: PathBuf,
     pub resource_dir: PathBuf,
+    pub executable_dir: PathBuf,
     pub packaged: bool,
 }
 
@@ -20,7 +21,22 @@ pub struct StudioPaths {
     pub vector_stores_dir: PathBuf,
     pub downloads_dir: PathBuf,
     pub resources_dir: PathBuf,
+    pub sidecar_path: PathBuf,
     pub packaged: bool,
+}
+
+pub const SIDECAR_NAME: &str = "zvs-jobd";
+
+pub fn sidecar_file_name(windows: bool) -> String {
+    if windows {
+        format!("{SIDECAR_NAME}.exe")
+    } else {
+        SIDECAR_NAME.to_owned()
+    }
+}
+
+pub fn sidecar_path(executable_dir: &Path, windows: bool) -> PathBuf {
+    executable_dir.join(sidecar_file_name(windows))
 }
 
 impl StudioPaths {
@@ -37,6 +53,7 @@ impl StudioPaths {
             vector_stores_dir: data.join("vectors"),
             downloads_dir: data.join("downloads"),
             resources_dir: env.resource_dir.clone(),
+            sidecar_path: sidecar_path(&env.executable_dir, cfg!(windows)),
             packaged: env.packaged,
         }
     }
@@ -203,6 +220,7 @@ mod tests {
         PathEnvironment {
             data_dir: root.join("user"),
             resource_dir: root.join("bundle"),
+            executable_dir: root.join("target").join("debug"),
             packaged: false,
         }
     }
@@ -220,7 +238,32 @@ mod tests {
         assert_eq!(paths.vector_stores_dir, env.data_dir.join("vectors"));
         assert_eq!(paths.downloads_dir, env.data_dir.join("downloads"));
         assert_eq!(paths.resources_dir, env.resource_dir);
+        assert_eq!(
+            paths.sidecar_path,
+            env.executable_dir.join(sidecar_file_name(cfg!(windows)))
+        );
         assert!(!paths.packaged);
+    }
+
+    #[test]
+    fn the_sidecar_sits_next_to_the_main_executable_in_both_layouts() {
+        let root = std::env::temp_dir();
+        let development = root.join("target").join("debug");
+        assert_eq!(
+            sidecar_path(&development, true),
+            development.join("zvs-jobd.exe")
+        );
+        let installed = root.join("ZVS AI Studio");
+        assert_eq!(sidecar_path(&installed, false), installed.join("zvs-jobd"));
+        let packaged = StudioPaths::resolve(&PathEnvironment {
+            executable_dir: installed.clone(),
+            packaged: true,
+            ..env()
+        });
+        assert_eq!(
+            packaged.sidecar_path,
+            installed.join(sidecar_file_name(cfg!(windows)))
+        );
     }
 
     #[test]

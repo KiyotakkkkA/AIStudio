@@ -17,6 +17,19 @@ use crate::{
 };
 
 pub const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
+#[cfg(debug_assertions)]
+pub const DEAF_FLAG: &str = "--deaf";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ServeOptions {
+    pub answer_ping: bool,
+}
+
+impl Default for ServeOptions {
+    fn default() -> Self {
+        Self { answer_ping: true }
+    }
+}
 
 type Jobs = Arc<Mutex<HashMap<String, CancellationToken>>>;
 
@@ -34,6 +47,14 @@ where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
 {
+    serve_with(input, output, ServeOptions::default()).await
+}
+
+pub async fn serve_with<R, W>(input: R, output: W, options: ServeOptions) -> io::Result<()>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
     let (sender, mut responses) = unbounded_channel::<Response>();
     let jobs: Jobs = Jobs::default();
 
@@ -46,7 +67,7 @@ where
                 if line.trim().is_empty() {
                     continue;
                 }
-                accept(&line, &jobs, &sender);
+                accept(&line, &jobs, &sender, options);
             }
             for token in held(&jobs).values() {
                 token.cancel();
@@ -71,7 +92,7 @@ where
     read.and(written)
 }
 
-fn accept(line: &str, jobs: &Jobs, sender: &UnboundedSender<Response>) {
+fn accept(line: &str, jobs: &Jobs, sender: &UnboundedSender<Response>, options: ServeOptions) {
     let request = match serde_json::from_str::<Request>(line) {
         Ok(request) => request,
         Err(error) => {
@@ -85,7 +106,9 @@ fn accept(line: &str, jobs: &Jobs, sender: &UnboundedSender<Response>) {
     };
     match request {
         Request::Ping { id } => {
-            let _ = sender.send(Response::Ping { id });
+            if options.answer_ping {
+                let _ = sender.send(Response::Ping { id });
+            }
         }
         Request::JobCancel { id } => {
             if let Some(token) = held(jobs).get(&id) {

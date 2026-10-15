@@ -23,3 +23,8 @@ message per `PROGRESS_INTERVAL`; the first and last report always go out.
 
 `job.sleep` is a demo job kept permanently as a smoke test for the whole path — it counts to
 `steps`, reporting progress, and is cancellable between steps.
+
+Debug builds (`debug_assertions`, so the test profile) add two jobs and a flag for the host
+driver's fault tests in `tests/driver.rs`: `debug.crash` exits the process mid-job,
+`debug.hang` never finishes and ignores cancellation, and `--deaf` stops answering `ping`.
+Release builds have none of them.

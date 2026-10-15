@@ -6,6 +6,7 @@ mod site_stub;
 
 use std::sync::Arc;
 
+use zvs_host::platform::gpu::SharedGpuProbe;
 use zvs_host::services::SharedCryptoBackend;
 
 #[cfg(windows)]
@@ -22,4 +23,14 @@ pub fn crypto_backend() -> SharedCryptoBackend {
 #[cfg(not(windows))]
 pub fn crypto_backend() -> SharedCryptoBackend {
     Arc::new(zvs_host::services::UnavailableBackend)
+}
+
+#[cfg(windows)]
+pub fn gpu_probe() -> SharedGpuProbe {
+    Arc::new(windows::dxgi::DxgiProbe)
+}
+
+#[cfg(not(windows))]
+pub fn gpu_probe() -> SharedGpuProbe {
+    Arc::new(zvs_host::platform::gpu::NoGpu)
 }

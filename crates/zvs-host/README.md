@@ -20,19 +20,65 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 | `platform::window_state` | `read_window_state`, `capture_window_state`, `WINDOW_STATE_KEY`                                                   |
 | `platform::shutdown`     | `ShutdownCoordinator`, `ShutdownStage`, `ExitDecision`                                                            |
 | `platform::navigation`   | `WorkspaceRoute`, the `WorkspaceNavigator` port (implemented by `EventBus`)                                       |
+| `platform::device`       | `DeviceProbe`, `DeviceReadings`, `os_readings`, `device_tier`                                                     |
+| `platform::gpu`          | The `GpuProbe` port, `GpuAdapter`, `select_gpu`, `NoGpu`                                                          |
+| `platform::metrics`      | `ResourceMonitor`, `ResourceCounters` (`SysinfoCounters`), the `GpuSampler` port, `NvidiaSmi`                     |
+| `platform::disk`         | `free_bytes`                                                                                                      |
 | `services::crypto`       | `CryptoBackend`, `CryptoService`, `Plaintext`, `UnavailableBackend`                                               |
 | `services::secrets`      | `SecretService`, the summary and DTO mapping, `secret_policy`, `secret_fields`                                    |
 | `services::providers`    | `ProviderService`, `DriverSource`, `probe_outcome`, `provider_status`                                             |
 | `services::health_check` | `HealthCheckService`, the `providers.healthcheck.*` settings keys                                                 |
 | `services::accounts`     | `AccountService`, the `AccountBrowser` port, `mask_email`                                                         |
 | `drivers::ai`            | AI ports, `HttpClient`, transports, adapters, `ProviderRegistry` (see below)                                      |
+| `drivers::core`          | `TextCore`, `VectorCore`, `GraphCore`, `InProcessCore`, `GraphRegistry`                                           |
+| `drivers::sidecar`       | `SidecarDriver`, `SidecarJobs`, `JobRunOptions`, the NDJSON protocol                                              |
 | `testing`                | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, `FakeDriver`, `FakeSessionGateway`, … |
 | `browser::policy`        | `is_web_url`, `navigation_url`, `profile_dir`, `BROWSER_PARTITION`, the heights, `TAB_LIMIT`                      |
 | `browser::lifecycle`     | `BrowserLifecycle`, `BrowserLifecycleEvent`, `LifecycleSubscription`                                              |
 | `kernel`                 | Empty until its port task                                                                                         |
 
 `testing` is compiled for this crate's own tests and behind the `testing` feature for other
-crates' tests.
+crates' tests. `debug-panic` adds `InProcessCore::debug_panic`, `vector_debug_panic` and
+`graph_debug_panic` for the panic-recovery test; release builds never enable it.
+
+## Core and sidecar
+
+`zvs-core` is linked in-process and reached only through the `drivers::core` ports (PASSPORT
+§10). `InProcessCore` implements all three. Synchronous work (chunking, hashing, every graph
+call, removing a vector store) runs on `spawn_blocking`; vector calls are LanceDB futures. Each
+call is wrapped in `catch_unwind`, so a panic answers `NATIVE_ERROR` («Rust operation
+panicked») and the next call works. Core errors keep their code (`core_error`), as the addon's
+JSON envelope did. `ChunkConfig` is validated before the core is reached
+(`VALIDATION_FAILED`, «Некорректный размер или перекрытие фрагментов»), and graph ids, nodes,
+edges and queries are trimmed and checked against `MAX_HOPS` and `MAX_NODE_BUDGET`
+(«Некорректный запрос к графу»). `upsert` takes the caller's `CancellationToken` and passes it
+into `VectorIndex::upsert`; a token that is already cancelled answers `RUN_CANCELLED` without
+touching the store. The graph registry keyed by `graphId` lives in `InProcessCore`, so the
+composition root's single instance is the process-wide registry.
+
+`SidecarDriver` is `SidecarDriver.ts` over `tokio::process`: the child is spawned on demand
+with `CREATE_NO_WINDOW`, requests and answers are newline-delimited JSON (a line over 8 MiB
+kills the child), stderr is logged as `Sidecar diagnostics`, and a ping every 5 s (2 s timeout)
+kills a silent child. `run(job, params, JobRunOptions { cancel, on_progress })` sends
+`job.cancel` when the token fires and kills the process if the job is still running after the
+2 s grace. An exit fails every pending job with `SIDECAR_UNAVAILABLE` and schedules the next
+spawn after `250 ms × 2^restarts` (capped at 30 s); a ping answer resets the count. `dispose`
+kills the child and waits for it, after which `run` answers `CONFLICT`.
+`StudioPaths::sidecar_path` is `zvs-jobd(.exe)` next to the main executable: `target/<profile>`
+in development, the `externalBin` copy when packaged. The driver's tests live in
+`crates/zvs-jobd/tests/driver.rs`, so they run against the real binary Cargo built for them.
+
+## System
+
+`SystemService` answers `system.nativePing` (an in-process chunk count with the default
+config), `system.device` and `system.resources`. `DeviceProbe` measures once, caches, and
+measures again on `refresh`; a failing GPU or disk probe costs only its own field. The tier
+rule is the TypeScript one: ≥ 30 GiB and ≥ 12 cores is `high`, ≥ 14 GiB and ≥ 6 cores is
+`medium`, and a discrete GPU lifts the tier one step. `select_gpu` drops software adapters,
+picks the adapter with the most dedicated memory, and calls it discrete when it is NVIDIA, has
+at least 2 GiB, or sits beside a weaker adapter. `ResourceMonitor` reads CPU, memory and the
+process's resident memory through `sysinfo`, and GPU counters through `nvidia-smi`, which is
+tried once and then left alone on a machine without it; a missing reading is `null`, never 0.
 
 ## IPC server
 
@@ -258,7 +304,7 @@ together, and the whole run is capped at `DEFAULT_SHUTDOWN_CAP` (5 s). Every sta
 `request_exit` from `RunEvent::ExitRequested`: the first call prevents the exit and starts the
 run, which ends with `AppHandle::exit`; calls during the run keep preventing it; afterwards the
 exit goes through and `RunEvent::Exit` logs `Shutdown`. Today it holds `health-check.stop`
-(`Stop`) and `providers`, `health-check`, `accounts` and `account-gateway` (`Dispose`). Later ports register their own tasks
+(`Stop`) and `providers`, `health-check`, `accounts`, `account-gateway` and `sidecar` (`Dispose`). Later ports register their own tasks
 in the stage `main.ts` used for them.
 
 ## Browser

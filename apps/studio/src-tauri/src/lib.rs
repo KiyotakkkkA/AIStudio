@@ -5,6 +5,7 @@ mod theme;
 mod window;
 
 use std::error::Error;
+use std::path::Path;
 use std::sync::Arc;
 
 use serde_json::json;
@@ -16,10 +17,15 @@ use zvs_host::drivers::ai::adapters::FileSystemModelStore;
 use zvs_host::drivers::ai::{
     DatabaseAccounts, DatabaseProviders, HttpClient, ProviderRegistry, ProviderRegistryOptions,
 };
+use zvs_host::drivers::core::InProcessCore;
+use zvs_host::drivers::sidecar::{SidecarDriver, SidecarOptions};
 use zvs_host::platform::clock::{SharedClock, SystemClock};
+use zvs_host::platform::device::{DeviceProbe, DeviceProbeOptions};
+use zvs_host::platform::disk::free_bytes;
 use zvs_host::platform::events::{EventBus, EventBusOptions, EventRecorder};
 use zvs_host::platform::ids::system_ids;
 use zvs_host::platform::logger::{FileLogger, LogLevel, LoggerOptions, SharedLogger};
+use zvs_host::platform::metrics::nvidia_monitor;
 use zvs_host::platform::navigation::SharedNavigator;
 use zvs_host::platform::paths::{PathEnvironment, StudioPaths};
 use zvs_host::platform::recorder::{FileEventRecorder, recording_enabled_from_env};
@@ -169,6 +175,19 @@ fn probe_gateway(gateway: Arc<AccountGateway>, logger: SharedLogger) {
     });
 }
 
+fn warm_sidecar(sidecar: SidecarDriver, logger: SharedLogger) {
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = sidecar.ping().await {
+            logger.log(
+                LogLevel::Warn,
+                "sidecar",
+                "The sidecar is unavailable",
+                &[("code", json!(error.code)), ("error", json!(error.message))],
+            );
+        }
+    });
+}
+
 fn on_run_event(app: &AppHandle, event: RunEvent) {
     let Some(lifecycle) = app.try_state::<Lifecycle>() else {
         return;
@@ -201,6 +220,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let paths = StudioPaths::resolve(&PathEnvironment {
         data_dir: app.path().app_data_dir()?,
         resource_dir: app.path().resource_dir()?,
+        executable_dir: std::env::current_exe()?
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default(),
         packaged: !tauri::is_dev(),
     });
     let clock: SharedClock = Arc::new(SystemClock);
@@ -356,6 +379,25 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         runtime: Some(runtime),
     });
 
+    let sidecar = SidecarDriver::new(SidecarOptions {
+        logger: logger.clone(),
+        ..SidecarOptions::new(paths.sidecar_path.clone())
+    });
+    let device = Arc::new(DeviceProbe::new(DeviceProbeOptions {
+        gpu: Some(platform::gpu_probe()),
+        free_disk: Some({
+            let downloads = paths.downloads_dir.clone();
+            Arc::new(move || free_bytes(&downloads))
+        }),
+        logger: logger.clone(),
+        ..DeviceProbeOptions::new(clock.clone())
+    }));
+    let resources = Arc::new(nvidia_monitor(clock.clone(), logger.clone()));
+    let system = SystemService::new(clock.clone(), events.clone(), DEMO_INTERVAL)
+        .with_core(InProcessCore::shared())
+        .with_device(device)
+        .with_resources(resources);
+
     let shutdown = Arc::new(ShutdownCoordinator::new(
         logger.clone(),
         DEFAULT_SHUTDOWN_CAP,
@@ -398,9 +440,15 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             },
         );
     }
+    {
+        let sidecar = sidecar.clone();
+        shutdown.register(ShutdownStage::Dispose, "sidecar", move || async move {
+            sidecar.dispose().await;
+        });
+    }
 
     let services = Arc::new(Services {
-        system: SystemService::new(clock, events.clone(), DEMO_INTERVAL),
+        system,
         accounts,
         settings,
         secrets,
@@ -413,6 +461,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     server.finish();
     services.accounts.start_auto_refresh()?;
     services.health.start();
+    warm_sidecar(sidecar, logger.clone());
 
     Ok(Boot::Studio {
         host: Host {

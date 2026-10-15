@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use zvs_contract::{SystemDemoStreamInput, SystemDemoStreamOutput, SystemPingInput};
+use zvs_contract::{
+    SystemDemoStreamInput, SystemDemoStreamOutput, SystemDeviceInput, SystemNativePingInput,
+    SystemPingInput,
+};
 
 use super::IpcServer;
 use crate::services::Services;
@@ -19,6 +22,24 @@ pub fn register(server: &mut IpcServer) {
                 let stream_id = services.system.demo_stream(input.steps)?;
                 Ok(SystemDemoStreamOutput { stream_id })
             },
+        )
+        .handle(
+            "system.nativePing",
+            |services: Arc<Services>, input: SystemNativePingInput| async move {
+                services.system.native_ping(input.text).await
+            },
+        )
+        .handle(
+            "system.device",
+            |services: Arc<Services>, input: SystemDeviceInput| async move {
+                services.system.device_profile(input.refresh()).await
+            },
+        )
+        .handle(
+            "system.resources",
+            |services: Arc<Services>, _input: ()| async move {
+                services.system.resource_sample().await
+            },
         );
 }
 
@@ -29,23 +50,207 @@ mod tests {
     use serde_json::json;
     use zvs_contract::{HostEventDraft, StreamId};
 
+    use zvs_contract::AppError;
+
     use super::*;
+    use crate::drivers::core::{ChunkConfig, SectionChunk, TextChunk, TextCore, TextSegment};
     use crate::platform::clock::FakeClock;
+    use crate::platform::device::{DeviceProbe, DeviceProbeOptions, DeviceReadings};
     use crate::platform::events::EventBus;
+    use crate::platform::gpu::{GpuAdapter, GpuProbe, VENDOR_NVIDIA};
     use crate::platform::logger::silent_logger;
+    use crate::platform::metrics::{
+        MemoryReading, ResourceCounters, ResourceMonitor, ResourceMonitorOptions,
+    };
     use crate::services::SystemService;
     use crate::testing::{MemorySink, TestServices, test_services};
 
     fn server(events: EventBus, interval: Duration) -> (TestServices, IpcServer) {
-        let host = test_services(SystemService::new(
+        serve(SystemService::new(
             Arc::new(FakeClock::new(1_250)),
             events,
             interval,
-        ));
+        ))
+    }
+
+    fn serve(system: SystemService) -> (TestServices, IpcServer) {
+        let host = test_services(system);
         let mut server =
             IpcServer::new(host.shared(), silent_logger()).with_output_validation(true);
         register(&mut server);
         (host, server)
+    }
+
+    fn system() -> SystemService {
+        SystemService::new(
+            Arc::new(FakeClock::new(1_250)),
+            EventBus::default(),
+            Duration::ZERO,
+        )
+    }
+
+    struct CountingCore(std::sync::Mutex<Vec<String>>);
+
+    #[async_trait::async_trait]
+    impl TextCore for CountingCore {
+        async fn chunk(
+            &self,
+            text: String,
+            config: ChunkConfig,
+        ) -> Result<Vec<TextChunk>, AppError> {
+            assert_eq!(config, ChunkConfig::default());
+            self.0.lock().expect("calls").push(text.clone());
+            Ok(vec![TextChunk {
+                byte_end: u32::try_from(text.len()).expect("small"),
+                text,
+                byte_start: 0,
+                token_count: 1,
+            }])
+        }
+
+        async fn chunk_segments(
+            &self,
+            _segments: Vec<TextSegment>,
+            _config: ChunkConfig,
+        ) -> Result<Vec<SectionChunk>, AppError> {
+            unreachable!("unused")
+        }
+
+        async fn hash(&self, _bytes: Vec<u8>) -> Result<String, AppError> {
+            unreachable!("unused")
+        }
+    }
+
+    #[tokio::test]
+    async fn native_ping_delegates_through_the_core_port_and_satisfies_the_contract() {
+        let core = Arc::new(CountingCore(std::sync::Mutex::new(Vec::new())));
+        let (_host, server) = serve(system().with_core(core.clone()));
+        assert_eq!(
+            server
+                .dispatch("system.nativePing", json!({ "text": "sample" }))
+                .await,
+            json!({ "ok": true, "data": { "count": 1 } })
+        );
+        assert_eq!(*core.0.lock().expect("calls"), ["sample"]);
+        let refused = server
+            .dispatch("system.nativePing", json!({ "text": 3 }))
+            .await;
+        assert_eq!(refused["error"]["code"], json!("VALIDATION_FAILED"));
+    }
+
+    #[tokio::test]
+    async fn native_ping_counts_chunks_in_process() {
+        let (_host, server) = serve(system());
+        assert_eq!(
+            server
+                .dispatch("system.nativePing", json!({ "text": "word ".repeat(600) }))
+                .await,
+            json!({ "ok": true, "data": { "count": 3 } })
+        );
+    }
+
+    struct Adapters;
+
+    impl GpuProbe for Adapters {
+        fn adapters(&self) -> Result<Vec<GpuAdapter>, String> {
+            Ok(vec![GpuAdapter {
+                vendor_id: VENDOR_NVIDIA,
+                device_id: 0x2786,
+                description: "NVIDIA GeForce RTX 4070".to_owned(),
+                dedicated_video_memory: 12 * 1024 * 1024 * 1024,
+                software: false,
+            }])
+        }
+    }
+
+    #[tokio::test]
+    async fn the_device_profile_is_cached_until_a_refresh_is_asked_for() {
+        let clock = Arc::new(FakeClock::new(5_000));
+        let device = Arc::new(DeviceProbe::new(DeviceProbeOptions {
+            readings: Arc::new(|| DeviceReadings {
+                platform: "win32".to_owned(),
+                arch: "x64".to_owned(),
+                cpu_model: "Test CPU".to_owned(),
+                cpu_cores: 8,
+                total_memory_bytes: 16 * 1024 * 1024 * 1024,
+                free_memory_bytes: 4 * 1024 * 1024 * 1024,
+            }),
+            gpu: Some(Arc::new(Adapters)),
+            free_disk: Some(Arc::new(|| Ok(42))),
+            ..DeviceProbeOptions::new(clock.clone())
+        }));
+        let (_host, server) = serve(system().with_device(device));
+        let first = server.dispatch("system.device", json!({})).await;
+        assert_eq!(first["ok"], json!(true));
+        assert_eq!(
+            first["data"]["gpu"],
+            json!({
+                "vendor": "NVIDIA",
+                "model": "NVIDIA GeForce RTX 4070",
+                "vramBytes": 12_u64 * 1024 * 1024 * 1024,
+                "discrete": true
+            })
+        );
+        assert_eq!(first["data"]["tier"], json!("high"));
+        assert_eq!(first["data"]["freeDiskBytes"], json!(42));
+        assert_eq!(first["data"]["measuredAt"], json!(5_000));
+        clock.advance(10);
+        assert_eq!(
+            server
+                .dispatch("system.device", json!({ "refresh": false }))
+                .await["data"]["measuredAt"],
+            json!(5_000)
+        );
+        assert_eq!(
+            server
+                .dispatch("system.device", json!({ "refresh": true }))
+                .await["data"]["measuredAt"],
+            json!(5_010)
+        );
+    }
+
+    struct Quiet;
+
+    impl ResourceCounters for Quiet {
+        fn cpu_percent(&mut self) -> f64 {
+            12.34
+        }
+
+        fn memory(&mut self) -> MemoryReading {
+            MemoryReading {
+                free_bytes: 1_000,
+                total_bytes: 4_000,
+            }
+        }
+
+        fn process_memory(&mut self) -> u64 {
+            500
+        }
+    }
+
+    #[tokio::test]
+    async fn a_resource_sample_is_one_reading_of_the_machine() {
+        let resources = Arc::new(ResourceMonitor::new(ResourceMonitorOptions {
+            counters: Box::new(Quiet),
+            gpu: None,
+            clock: Arc::new(FakeClock::new(7_000)),
+            gpu_ttl: Duration::ZERO,
+        }));
+        let (_host, server) = serve(system().with_resources(resources));
+        assert_eq!(
+            server.dispatch("system.resources", json!(null)).await,
+            json!({ "ok": true, "data": {
+                "at": 7_000,
+                "cpuPercent": 12.3,
+                "memoryUsedBytes": 3_000,
+                "memoryTotalBytes": 4_000,
+                "processMemoryBytes": 500,
+                "gpuName": null,
+                "gpuPercent": null,
+                "vramUsedBytes": null,
+                "vramTotalBytes": null
+            } })
+        );
     }
 
     #[tokio::test]

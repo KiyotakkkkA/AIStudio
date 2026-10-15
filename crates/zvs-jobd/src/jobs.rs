@@ -15,6 +15,10 @@ use crate::{
 };
 
 pub const SLEEP_JOB: &str = "job.sleep";
+#[cfg(debug_assertions)]
+pub const DEBUG_CRASH_JOB: &str = "debug.crash";
+#[cfg(debug_assertions)]
+pub const DEBUG_HANG_JOB: &str = "debug.hang";
 pub const MAX_SLEEP_STEPS: u64 = 100_000;
 pub const MAX_INTERVAL_MS: u64 = 60_000;
 
@@ -83,6 +87,17 @@ pub async fn dispatch(job: &str, params: Value, context: &JobContext) -> Result<
         SLEEP_JOB => sleep(params, context).await,
         DOWNLOAD_JOB => download(params, context).await,
         DOCUMENT_JOB => extract(params, context).await,
+        #[cfg(debug_assertions)]
+        DEBUG_CRASH_JOB => {
+            context.progress(0, 2, Some(job.to_owned()));
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            std::process::exit(1)
+        }
+        #[cfg(debug_assertions)]
+        DEBUG_HANG_JOB => {
+            context.progress(0, 2, Some(job.to_owned()));
+            std::future::pending().await
+        }
         unknown => Err(Error::InvalidInput(format!("Unknown job: {unknown}"))),
     }
 }

@@ -1,12 +1,17 @@
+use std::sync::Arc;
 use std::time::Duration;
 
+use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, HostEventDraft, RunOutcomeDto, RunOutcomeStatus, StreamId, SystemPingOutput,
-    Timestamp,
+    AppError, DeviceProfileDto, HostEventDraft, ResourceSampleDto, RunOutcomeDto, RunOutcomeStatus,
+    StreamId, SystemNativePingOutput, SystemPingOutput, Timestamp,
 };
 
+use crate::drivers::core::{ChunkConfig, InProcessCore, SharedTextCore};
 use crate::platform::clock::SharedClock;
+use crate::platform::device::{DeviceProbe, DeviceProbeOptions};
 use crate::platform::events::EventBus;
+use crate::platform::metrics::{ResourceMonitor, ResourceMonitorOptions};
 
 pub const DEMO_INTERVAL: Duration = Duration::from_millis(200);
 
@@ -14,15 +19,64 @@ pub struct SystemService {
     clock: SharedClock,
     events: EventBus,
     demo_interval: Duration,
+    core: SharedTextCore,
+    device: Arc<DeviceProbe>,
+    resources: Arc<ResourceMonitor>,
 }
 
 impl SystemService {
-    pub const fn new(clock: SharedClock, events: EventBus, demo_interval: Duration) -> Self {
+    pub fn new(clock: SharedClock, events: EventBus, demo_interval: Duration) -> Self {
         Self {
+            core: InProcessCore::shared(),
+            device: Arc::new(DeviceProbe::new(DeviceProbeOptions::new(clock.clone()))),
+            resources: Arc::new(ResourceMonitor::new(ResourceMonitorOptions::new(
+                clock.clone(),
+            ))),
             clock,
             events,
             demo_interval,
         }
+    }
+
+    #[must_use]
+    pub fn with_core(mut self, core: SharedTextCore) -> Self {
+        self.core = core;
+        self
+    }
+
+    #[must_use]
+    pub fn with_device(mut self, device: Arc<DeviceProbe>) -> Self {
+        self.device = device;
+        self
+    }
+
+    #[must_use]
+    pub fn with_resources(mut self, resources: Arc<ResourceMonitor>) -> Self {
+        self.resources = resources;
+        self
+    }
+
+    pub fn device(&self) -> Arc<DeviceProbe> {
+        Arc::clone(&self.device)
+    }
+
+    pub fn resources(&self) -> Arc<ResourceMonitor> {
+        Arc::clone(&self.resources)
+    }
+
+    pub async fn native_ping(&self, text: String) -> Result<SystemNativePingOutput, AppError> {
+        let chunks = self.core.chunk(text, ChunkConfig::default()).await?;
+        Ok(SystemNativePingOutput {
+            count: chunks.len() as u64,
+        })
+    }
+
+    pub async fn device_profile(&self, refresh: bool) -> Result<DeviceProfileDto, AppError> {
+        self.device.profile(refresh).await
+    }
+
+    pub async fn resource_sample(&self) -> Result<ResourceSampleDto, AppError> {
+        self.resources.sample(&CancellationToken::new()).await
     }
 
     pub fn ping(&self, sent_at: Timestamp) -> SystemPingOutput {

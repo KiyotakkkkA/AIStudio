@@ -24,8 +24,12 @@ tokio-util.workspace = true
 zvs-core = { path = "../zvs-core" }
 
 [dev-dependencies]
+serde_json.workspace = true
 tempfile.workspace = true
-tokio = { workspace = true, features = ["fs", "io-util", "net", "sync"] }
+tokio = { workspace = true, features = ["fs", "io-util", "net", "sync", "time", "macros"] }
+tokio-util.workspace = true
+zvs-contract = { path = "../zvs-contract" }
+zvs-host = { path = "../zvs-host", features = ["testing"] }
 
 [lints]
 workspace = true
