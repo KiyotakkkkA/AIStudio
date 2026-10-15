@@ -1,0 +1,28 @@
+[
+  {
+    "name": "a chunk",
+    "value": {
+      "id": "a:0",
+      "payload": null,
+      "documentId": "a",
+      "chunkIndex": 0,
+      "path": "a.md",
+      "text": "first",
+      "section": "",
+      "page": null
+    }
+  },
+  {
+    "name": "paged",
+    "value": {
+      "id": "a:0",
+      "payload": null,
+      "documentId": "a",
+      "chunkIndex": 0,
+      "path": "a.md",
+      "text": "first",
+      "section": "Глава",
+      "page": 3
+    }
+  }
+]

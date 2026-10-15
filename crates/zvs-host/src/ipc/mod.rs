@@ -1,9 +1,11 @@
 pub mod accounts;
+pub mod graph_relations;
 pub mod providers;
 pub mod secrets;
 mod server;
 pub mod settings;
 pub mod system;
+pub mod vector_stores;
 
 pub use server::{Coverage, INTERNAL_MESSAGE, IpcServer};
 
@@ -13,6 +15,8 @@ pub fn register(server: &mut IpcServer) {
     secrets::register(server);
     providers::register(server);
     accounts::register(server);
+    vector_stores::register(server);
+    graph_relations::register(server);
 }
 
 #[cfg(test)]
@@ -49,6 +53,14 @@ mod tests {
                 "accounts.list",
                 "accounts.refresh",
                 "accounts.unlink",
+                "graphRelations.addEdge",
+                "graphRelations.kHopSubgraph",
+                "graphRelations.list",
+                "graphRelations.listEdges",
+                "graphRelations.neighbors",
+                "graphRelations.reconcile",
+                "graphRelations.removeEdge",
+                "graphRelations.shortestPath",
                 "providers.adapters",
                 "providers.create",
                 "providers.get",
@@ -70,7 +82,27 @@ mod tests {
                 "system.device",
                 "system.nativePing",
                 "system.ping",
-                "system.resources"
+                "system.resources",
+                "vectorStores.chunks",
+                "vectorStores.clear",
+                "vectorStores.create",
+                "vectorStores.documents.list",
+                "vectorStores.documents.remove",
+                "vectorStores.eval.add",
+                "vectorStores.eval.list",
+                "vectorStores.eval.remove",
+                "vectorStores.eval.run",
+                "vectorStores.get",
+                "vectorStores.list",
+                "vectorStores.reconcile",
+                "vectorStores.remove",
+                "vectorStores.search",
+                "vectorStores.searchTimed",
+                "vectorStores.sources.add",
+                "vectorStores.sources.list",
+                "vectorStores.sources.pick",
+                "vectorStores.sources.remove",
+                "vectorStores.update"
             ]
         );
     }

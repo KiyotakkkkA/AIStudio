@@ -1,0 +1,27 @@
+[
+  {
+    "name": "page zero",
+    "value": {
+      "id": "a:0",
+      "payload": null,
+      "documentId": "a",
+      "chunkIndex": 0,
+      "path": "a.md",
+      "text": "first",
+      "section": "",
+      "page": 0
+    }
+  },
+  {
+    "name": "missing path",
+    "value": {
+      "id": "a:0",
+      "payload": null,
+      "documentId": "a",
+      "chunkIndex": 0,
+      "text": "first",
+      "section": "",
+      "page": null
+    }
+  }
+]

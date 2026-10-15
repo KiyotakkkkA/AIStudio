@@ -6,6 +6,7 @@ pub mod enums;
 pub mod envelope;
 pub mod errors;
 pub mod events;
+pub mod graph;
 pub mod ids;
 pub mod primitives;
 pub mod providers;
@@ -13,6 +14,7 @@ pub mod secrets;
 pub mod settings;
 pub mod system;
 pub mod validate;
+pub mod vector_stores;
 pub mod wire;
 
 pub use accounts::{
@@ -35,6 +37,14 @@ pub use errors::{AppError, AppErrorCode, ErrorDetails};
 pub use events::{
     ApprovalRequestDto, DeltaKind, EVENT_CHANNEL, EventSeq, HostEvent, HostEventDraft, LogLineDto,
     RunOutcomeDto, RunOutcomeStatus, StepEventDto,
+};
+pub use graph::{
+    AddGraphEdgeInput, GRAPH_MAX_HOPS, GraphDirection, GraphEdgeDto, GraphEdgeKey,
+    GraphEdgesListOutput, GraphLinkDto, GraphNeighborDto, GraphNeighborsInput,
+    GraphNeighborsOutput, GraphNodeDto, GraphNodeKind, GraphPathDto, GraphReconcileDto,
+    GraphRelationTypeDto, GraphRelationsListOutput, GraphRemoveEdgeOutput, GraphShortestPathInput,
+    GraphShortestPathOutput, GraphSubgraphDto, GraphSubgraphInput, GraphSubgraphNodeDto,
+    RemoveGraphEdgeInput, is_relation_name,
 };
 pub use ids::*;
 pub use primitives::{Json, MAX_SAFE_INTEGER, Page, PageRequest, Sort, SortDirection, Timestamp};
@@ -60,3 +70,17 @@ pub use system::{
     SystemNativePingOutput, SystemPingInput, SystemPingOutput,
 };
 pub use validate::{VALIDATION_MESSAGE, Validate, parse};
+pub use vector_stores::{
+    AddVectorEvalCaseInput, AddVectorSourceInput, CreateVectorStoreInput, PickVectorSourceInput,
+    PickVectorSourceResult, UpdateVectorStoreInput, VECTOR_SCHEMA_VERSION, VectorBackend,
+    VectorChunkDto, VectorChunksInput, VectorDocumentDto, VectorDocumentsListOutput,
+    VectorDocumentsRemoveInput, VectorDocumentsRemoveOutput, VectorEvalCaseDto, VectorEvalCaseRef,
+    VectorEvalCaseResultDto, VectorEvalMetricsDto, VectorEvalMode, VectorEvalModeResultDto,
+    VectorEvalRemoveOutput, VectorEvalRunDto, VectorEvalRunInput, VectorEvalSetDto, VectorHealth,
+    VectorHitProvenance, VectorMetric, VectorOcrConfig, VectorOcrLanguage, VectorRerankConfig,
+    VectorRerankOutcome, VectorSearchHitDto, VectorSearchInput, VectorSearchMode,
+    VectorSearchResultDto, VectorSourceDto, VectorSourceKind, VectorSourceRef,
+    VectorSourcesListOutput, VectorSourcesRemoveOutput, VectorStoreDto, VectorStoreRef,
+    VectorStoresChunksOutput, VectorStoresListOutput, VectorStoresRemoveOutput,
+    VectorStoresSearchOutput, below_relevance_floor,
+};

@@ -1,5 +1,6 @@
 pub mod browser;
 mod commands;
+mod picker;
 mod platform;
 mod theme;
 mod window;
@@ -36,9 +37,10 @@ use zvs_host::platform::theme::{SharedThemePort, THEME_SETTING_KEY, apply_theme_
 use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_window_state};
 use zvs_host::services::system::DEMO_INTERVAL;
 use zvs_host::services::{
-    AccountService, AccountServiceOptions, CryptoService, HealthCheckOptions, HealthCheckService,
-    ProviderService, ProviderServiceOptions, SecretService, Services, SettingService,
-    SystemService,
+    AccountService, AccountServiceOptions, CryptoService, GraphService, GraphServiceOptions,
+    HealthCheckOptions, HealthCheckService, ProviderService, ProviderServiceOptions, SecretService,
+    Services, SettingService, SystemService, VectorEvalService, VectorEvalServiceOptions,
+    VectorSourceService, VectorSourceServiceOptions, VectorStoreService, VectorStoreServiceOptions,
 };
 use zvs_host::{IpcServer, ipc};
 
@@ -47,6 +49,7 @@ use crate::browser::{
     AccountGateway, BearerTokens, BrowserWorkspace, WebviewPages, WorkspaceOpener, gateway_sessions,
 };
 use crate::commands::Host;
+use crate::picker::DialogPicker;
 use crate::theme::TauriTheme;
 
 enum Boot {
@@ -77,6 +80,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             window::focus_studio(app);
         }))
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::ipc_call,
             commands::events_subscribe,
@@ -348,9 +352,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         paths.downloads_dir.clone(),
     )));
     registry.logger = logger.clone();
+    let registry = Arc::new(ProviderRegistry::new(registry));
     let providers = ProviderService::new(ProviderServiceOptions::new(
         Arc::clone(&database),
-        Arc::new(ProviderRegistry::new(registry)),
+        registry.clone(),
         Arc::clone(&secrets),
         logger.clone(),
         clock.clone(),
@@ -393,8 +398,35 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         ..DeviceProbeOptions::new(clock.clone())
     }));
     let resources = Arc::new(nvidia_monitor(clock.clone(), logger.clone()));
+    let core = InProcessCore::shared();
+    let vector_stores = VectorStoreService::new(VectorStoreServiceOptions::new(
+        Arc::clone(&database),
+        core.clone(),
+        registry,
+        paths.vector_stores_dir.clone(),
+        logger.clone(),
+        clock.clone(),
+    ));
+    let vector_sources = VectorSourceService::new(VectorSourceServiceOptions::new(
+        Arc::clone(&database),
+        vector_stores.clone(),
+        logger.clone(),
+        clock.clone(),
+    ));
+    let vector_eval = VectorEvalService::new(VectorEvalServiceOptions::new(
+        Arc::clone(&database),
+        Arc::new(vector_stores.clone()),
+        logger.clone(),
+        clock.clone(),
+    ));
+    let graph = GraphService::new(GraphServiceOptions {
+        database: Arc::clone(&database),
+        core: core.clone(),
+        logger: logger.clone(),
+        clock: clock.clone(),
+    });
     let system = SystemService::new(clock.clone(), events.clone(), DEMO_INTERVAL)
-        .with_core(InProcessCore::shared())
+        .with_core(core)
         .with_device(device)
         .with_resources(resources);
 
@@ -455,6 +487,11 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         providers,
         health,
         theme,
+        vector_stores,
+        vector_sources,
+        vector_eval,
+        graph,
+        picker: Some(Arc::new(DialogPicker::new(app.handle().clone()))),
     });
     let mut server = IpcServer::new(Arc::clone(&services), logger.clone());
     ipc::register(&mut server);

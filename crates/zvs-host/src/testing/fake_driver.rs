@@ -41,6 +41,7 @@ pub struct FakeScript {
     pub fail_with: Option<AppError>,
     pub delay: Option<Duration>,
     pub manual: Option<bool>,
+    pub vectors: Option<Vec<Vec<f32>>>,
 }
 
 #[derive(Default)]
@@ -48,6 +49,7 @@ struct FakeState {
     script: FakeScript,
     gate: Option<oneshot::Sender<()>>,
     requests: Vec<GenerateRequest>,
+    embeddings: Vec<(Vec<String>, String)>,
     list_calls: usize,
 }
 
@@ -93,6 +95,9 @@ impl FakeDriver {
         if next.manual.is_some() {
             script.manual = next.manual;
         }
+        if next.vectors.is_some() {
+            script.vectors = next.vectors;
+        }
     }
 
     pub fn clear_failure(&self) {
@@ -101,6 +106,17 @@ impl FakeDriver {
 
     pub fn requests(&self) -> Vec<GenerateRequest> {
         self.state().requests.clone()
+    }
+
+    pub fn with_vectors(vectors: Vec<Vec<f32>>) -> Arc<Self> {
+        Self::shared(FakeScript {
+            vectors: Some(vectors),
+            ..FakeScript::default()
+        })
+    }
+
+    pub fn embeddings(&self) -> Vec<(Vec<String>, String)> {
+        self.state().embeddings.clone()
     }
 
     pub fn list_calls(&self) -> usize {
@@ -234,12 +250,20 @@ impl EmbeddingDriver for FakeDriver {
     async fn embed(
         &self,
         texts: &[String],
-        _model: &str,
+        model: &str,
         cancel: &CancellationToken,
     ) -> Result<Vec<Vec<f32>>, AppError> {
+        self.state()
+            .embeddings
+            .push((texts.to_vec(), model.to_owned()));
         self.hold(cancel).await?;
         self.failure()?;
-        Ok(texts.iter().map(|_| vec![0.0]).collect())
+        Ok(self
+            .state()
+            .script
+            .vectors
+            .clone()
+            .unwrap_or_else(|| texts.iter().map(|_| vec![0.0]).collect()))
     }
 
     fn dimensions(&self) -> Option<usize> {

@@ -1,0 +1,37 @@
+[
+  {
+    "name": "every field",
+    "value": {
+      "id": "a:0",
+      "score": 0.75,
+      "payload": {
+        "chunkCount": 2
+      },
+      "documentId": "a",
+      "chunkIndex": 0,
+      "path": "C:/docs/a.md",
+      "text": "first",
+      "section": "Раздел",
+      "page": 1,
+      "vectorScore": 0.5,
+      "rerankScore": 0.75,
+      "keywordScore": 3.25,
+      "fusedScore": 0.03125,
+      "provenance": "both"
+    }
+  },
+  {
+    "name": "minimal",
+    "value": {
+      "id": "b:1",
+      "score": 0.5,
+      "payload": null,
+      "documentId": "b",
+      "chunkIndex": 1,
+      "path": "b.md",
+      "text": "",
+      "section": "",
+      "page": null
+    }
+  }
+]

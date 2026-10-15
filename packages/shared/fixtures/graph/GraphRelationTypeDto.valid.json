@@ -1,0 +1,20 @@
+[
+  {
+    "name": "cites",
+    "value": {
+      "id": "01999a00-0001-7000-8000-000000000001",
+      "name": "cites",
+      "description": "Документ ссылается на другой документ",
+      "directed": true
+    }
+  },
+  {
+    "name": "undirected",
+    "value": {
+      "id": "01999a00-0001-7000-8000-000000000001",
+      "name": "co_occurs",
+      "description": "",
+      "directed": false
+    }
+  }
+]

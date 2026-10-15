@@ -1,0 +1,12 @@
+[
+  {
+    "name": "empty",
+    "value": {
+      "id": ""
+    }
+  },
+  {
+    "name": "nothing",
+    "value": {}
+  }
+]

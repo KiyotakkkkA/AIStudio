@@ -1,0 +1,18 @@
+[
+  {
+    "name": "every field",
+    "value": {
+      "enabled": true,
+      "modelRef": "curated:model:bge-reranker-v2-m3-f16",
+      "candidates": 80
+    }
+  },
+  {
+    "name": "off",
+    "value": {
+      "enabled": false,
+      "modelRef": "",
+      "candidates": 50
+    }
+  }
+]

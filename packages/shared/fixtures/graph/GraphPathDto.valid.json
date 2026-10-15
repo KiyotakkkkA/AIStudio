@@ -1,0 +1,33 @@
+[
+  {
+    "name": "two hops",
+    "value": {
+      "nodes": [
+        {
+          "id": "0199aa11-3333-7111-8111-111111111111",
+          "kind": "document"
+        },
+        {
+          "id": "0199aa11-4444-7111-8111-111111111111",
+          "kind": "document"
+        }
+      ],
+      "edges": [
+        {
+          "from": "0199aa11-3333-7111-8111-111111111111",
+          "to": "0199aa11-4444-7111-8111-111111111111",
+          "relation": "cites",
+          "weight": null,
+          "metadata": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty",
+    "value": {
+      "nodes": [],
+      "edges": []
+    }
+  }
+]

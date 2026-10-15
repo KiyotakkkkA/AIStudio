@@ -30,6 +30,19 @@ pub fn json_column<T: DeserializeOwned>(row: &Row<'_>, name: &str) -> rusqlite::
     })
 }
 
+pub fn optional_json_column<T: DeserializeOwned>(
+    row: &Row<'_>,
+    name: &str,
+) -> rusqlite::Result<Option<T>> {
+    let Some(text) = row.get::<_, Option<String>>(name)? else {
+        return Ok(None);
+    };
+    let index = row.as_ref().column_index(name)?;
+    serde_json::from_str(&text).map(Some).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(index, Type::Text, Box::new(error))
+    })
+}
+
 pub fn json_text<T: Serialize>(value: &T) -> rusqlite::Result<String> {
     serde_json::to_string(value)
         .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))

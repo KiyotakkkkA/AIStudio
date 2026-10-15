@@ -7,18 +7,27 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use zvs_contract::{
     AccountDto, AccountLinkInput, AccountLinkResult, AccountRef, AccountsCancelLinkOutput,
-    AccountsUnlinkOutput, AdapterCapabilitiesDto, AdapterDescriptorDto, AppErrorCode,
-    BrowserBounds, BrowserCommand, CreateProviderInput, CreateSecretInput, DeviceGpuDto,
-    DeviceProfileDto, DeviceTier, DiscoveredModelDto, HostEvent, Json, ModelDto, Page, PageRequest,
-    ProbeOutcomeDto, ProbeRequest, ProbeResultDto, ProviderConnectionInput, ProviderDto,
-    ProviderId, ProviderListFilter, ProviderRef, ProviderSettingsDto, ProviderSummaryDto,
-    ProvidersGetInput, ProvidersRemoveOutput, ResourceSampleDto, ResultEnvelope, RunOutcomeDto,
-    SecretDto, SecretFilter, SecretRef, SecretSummaryDto, SecretTypeSchema, SecretsRemoveOutput,
+    AccountsUnlinkOutput, AdapterCapabilitiesDto, AdapterDescriptorDto, AddGraphEdgeInput,
+    AddVectorEvalCaseInput, AddVectorSourceInput, AppErrorCode, BrowserBounds, BrowserCommand,
+    CreateProviderInput, CreateSecretInput, CreateVectorStoreInput, DeviceGpuDto, DeviceProfileDto,
+    DeviceTier, DiscoveredModelDto, GraphEdgeDto, GraphNeighborDto, GraphNeighborsInput,
+    GraphPathDto, GraphReconcileDto, GraphRelationTypeDto, GraphRemoveEdgeOutput,
+    GraphShortestPathInput, GraphSubgraphDto, GraphSubgraphInput, HostEvent, Json, ModelDto, Page,
+    PageRequest, PickVectorSourceInput, PickVectorSourceResult, ProbeOutcomeDto, ProbeRequest,
+    ProbeResultDto, ProviderConnectionInput, ProviderDto, ProviderId, ProviderListFilter,
+    ProviderRef, ProviderSettingsDto, ProviderSummaryDto, ProvidersGetInput, ProvidersRemoveOutput,
+    RemoveGraphEdgeInput, ResourceSampleDto, ResultEnvelope, RunOutcomeDto, SecretDto,
+    SecretFilter, SecretRef, SecretSummaryDto, SecretTypeSchema, SecretsRemoveOutput,
     SecretsTypesOutput, SetDefaultModelInput, SettingsGetInput, SettingsGetOutput,
     SettingsSetInput, SettingsSetOutput, Sort, SortDirection, StreamId, SystemDemoJobInput,
     SystemDemoStreamInput, SystemDemoStreamOutput, SystemDeviceInput, SystemNativePingInput,
     SystemNativePingOutput, SystemPingInput, SystemPingOutput, UpdateProviderInput,
-    UpdateSecretInput, Validate, secret_type_registry,
+    UpdateSecretInput, UpdateVectorStoreInput, Validate, VectorChunkDto, VectorChunksInput,
+    VectorDocumentDto, VectorDocumentsRemoveInput, VectorDocumentsRemoveOutput, VectorEvalCaseDto,
+    VectorEvalCaseRef, VectorEvalRemoveOutput, VectorEvalRunDto, VectorEvalRunInput,
+    VectorEvalSetDto, VectorOcrConfig, VectorRerankConfig, VectorSearchHitDto, VectorSearchInput,
+    VectorSearchResultDto, VectorSourceDto, VectorSourceRef, VectorSourcesRemoveOutput,
+    VectorStoreDto, VectorStoreRef, VectorStoresRemoveOutput, secret_type_registry,
 };
 
 type Check = fn(Value) -> Result<Value, String>;
@@ -157,6 +166,140 @@ const TABLE: &[(&str, Check)] = &[
         "accounts/AccountsUnlinkOutput",
         round_trip::<AccountsUnlinkOutput>,
     ),
+    (
+        "vectorStores/VectorRerankConfig",
+        round_trip::<VectorRerankConfig>,
+    ),
+    (
+        "vectorStores/VectorOcrConfig",
+        round_trip::<VectorOcrConfig>,
+    ),
+    ("vectorStores/VectorStoreDto", round_trip::<VectorStoreDto>),
+    ("vectorStores/VectorStoreRef", round_trip::<VectorStoreRef>),
+    (
+        "vectorStores/CreateVectorStoreInput",
+        round_trip::<CreateVectorStoreInput>,
+    ),
+    (
+        "vectorStores/UpdateVectorStoreInput",
+        round_trip::<UpdateVectorStoreInput>,
+    ),
+    (
+        "vectorStores/VectorStoresRemoveOutput",
+        round_trip::<VectorStoresRemoveOutput>,
+    ),
+    (
+        "vectorStores/VectorSearchInput",
+        round_trip::<VectorSearchInput>,
+    ),
+    (
+        "vectorStores/VectorSearchHitDto",
+        round_trip::<VectorSearchHitDto>,
+    ),
+    (
+        "vectorStores/VectorSearchResultDto",
+        round_trip::<VectorSearchResultDto>,
+    ),
+    (
+        "vectorStores/VectorChunksInput",
+        round_trip::<VectorChunksInput>,
+    ),
+    ("vectorStores/VectorChunkDto", round_trip::<VectorChunkDto>),
+    (
+        "vectorStores/VectorSourceDto",
+        round_trip::<VectorSourceDto>,
+    ),
+    (
+        "vectorStores/AddVectorSourceInput",
+        round_trip::<AddVectorSourceInput>,
+    ),
+    (
+        "vectorStores/VectorSourceRef",
+        round_trip::<VectorSourceRef>,
+    ),
+    (
+        "vectorStores/VectorSourcesRemoveOutput",
+        round_trip::<VectorSourcesRemoveOutput>,
+    ),
+    (
+        "vectorStores/PickVectorSourceInput",
+        round_trip::<PickVectorSourceInput>,
+    ),
+    (
+        "vectorStores/PickVectorSourceResult",
+        round_trip::<PickVectorSourceResult>,
+    ),
+    (
+        "vectorStores/VectorDocumentDto",
+        round_trip::<VectorDocumentDto>,
+    ),
+    (
+        "vectorStores/VectorDocumentsRemoveInput",
+        round_trip::<VectorDocumentsRemoveInput>,
+    ),
+    (
+        "vectorStores/VectorDocumentsRemoveOutput",
+        round_trip::<VectorDocumentsRemoveOutput>,
+    ),
+    (
+        "vectorStores/VectorEvalCaseDto",
+        round_trip::<VectorEvalCaseDto>,
+    ),
+    (
+        "vectorStores/AddVectorEvalCaseInput",
+        round_trip::<AddVectorEvalCaseInput>,
+    ),
+    (
+        "vectorStores/VectorEvalCaseRef",
+        round_trip::<VectorEvalCaseRef>,
+    ),
+    (
+        "vectorStores/VectorEvalRemoveOutput",
+        round_trip::<VectorEvalRemoveOutput>,
+    ),
+    (
+        "vectorStores/VectorEvalRunInput",
+        round_trip::<VectorEvalRunInput>,
+    ),
+    (
+        "vectorStores/VectorEvalRunDto",
+        round_trip::<VectorEvalRunDto>,
+    ),
+    (
+        "vectorStores/VectorEvalSetDto",
+        round_trip::<VectorEvalSetDto>,
+    ),
+    (
+        "graph/GraphRelationTypeDto",
+        round_trip::<GraphRelationTypeDto>,
+    ),
+    ("graph/GraphEdgeDto", round_trip::<GraphEdgeDto>),
+    ("graph/AddGraphEdgeInput", round_trip::<AddGraphEdgeInput>),
+    (
+        "graph/RemoveGraphEdgeInput",
+        round_trip::<RemoveGraphEdgeInput>,
+    ),
+    (
+        "graph/GraphRemoveEdgeOutput",
+        round_trip::<GraphRemoveEdgeOutput>,
+    ),
+    ("graph/GraphNeighborDto", round_trip::<GraphNeighborDto>),
+    ("graph/GraphPathDto", round_trip::<GraphPathDto>),
+    (
+        "graph/GraphShortestPathOutput",
+        round_trip::<Option<GraphPathDto>>,
+    ),
+    ("graph/GraphSubgraphDto", round_trip::<GraphSubgraphDto>),
+    (
+        "graph/GraphNeighborsInput",
+        round_trip::<GraphNeighborsInput>,
+    ),
+    (
+        "graph/GraphShortestPathInput",
+        round_trip::<GraphShortestPathInput>,
+    ),
+    ("graph/GraphSubgraphInput", round_trip::<GraphSubgraphInput>),
+    ("graph/GraphReconcileDto", round_trip::<GraphReconcileDto>),
 ];
 
 const SECRET_OUTPUTS: &[&str] = &[

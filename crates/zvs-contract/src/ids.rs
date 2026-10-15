@@ -63,6 +63,7 @@ branded_ids!(
     TaskId,
     StreamId,
     AccountId,
+    VectorEvalCaseId,
 );
 
 pub fn is_wire_uuid(value: &str) -> bool {

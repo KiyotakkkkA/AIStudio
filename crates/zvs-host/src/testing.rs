@@ -21,6 +21,7 @@ use crate::browser::BrowserLifecycle;
 use crate::data::{BACKUPS_KEPT, Database, MIGRATIONS, MigrateOptions, migrate};
 use crate::drivers::ai::registry::SessionFactory;
 use crate::drivers::ai::transport::SharedSessionGateway;
+use crate::drivers::core::InProcessCore;
 pub use crate::platform::clock::{CLOCK_ORIGIN, FakeClock};
 use crate::platform::events::EventBus;
 use crate::platform::events::EventSink;
@@ -28,9 +29,11 @@ use crate::platform::logger::{Field, LogLevel, Logger, SharedLogger, silent_logg
 use crate::platform::theme::{ThemePort, ThemeSource};
 use crate::services::crypto::BackendFailure;
 use crate::services::{
-    AccountService, AccountServiceOptions, CryptoBackend, CryptoService, HealthCheckOptions,
-    HealthCheckService, Plaintext, ProviderService, ProviderServiceOptions, SecretService,
-    Services, SettingService, SystemService,
+    AccountService, AccountServiceOptions, CryptoBackend, CryptoService, GraphService,
+    GraphServiceOptions, HealthCheckOptions, HealthCheckService, Plaintext, ProviderService,
+    ProviderServiceOptions, SecretService, Services, SettingService, SystemService,
+    VectorEvalService, VectorEvalServiceOptions, VectorSourceService, VectorSourceServiceOptions,
+    VectorStoreService, VectorStoreServiceOptions,
 };
 
 fn normalise(path: &Path) -> String {
@@ -145,6 +148,20 @@ pub fn temporary_database() -> TemporaryDatabase {
     temporary_database_with(TemporaryDatabaseOptions::default())
 }
 
+pub fn seed_embedding_provider(connection: &rusqlite::Connection) -> String {
+    crate::data::Repositories::new(connection)
+        .providers
+        .create(&crate::data::repositories::ProviderDraft::new(
+            zvs_contract::ProviderKind::Ollama,
+            "Embedding",
+            "http://localhost:11434",
+            vec![zvs_contract::ProviderCapability::Embedding],
+            1,
+        ))
+        .expect("an embedding provider")
+        .id
+}
+
 pub fn unmigrated_database() -> TemporaryDatabase {
     temporary_database_with(TemporaryDatabaseOptions {
         migrate: false,
@@ -163,6 +180,8 @@ pub struct TestServices {
     pub navigator: Arc<RecordingNavigator>,
     pub lifecycle: BrowserLifecycle,
     pub account_events: Arc<MemorySink>,
+    pub core: Arc<InProcessCore>,
+    pub picker: Arc<FakePicker>,
     pub database: TemporaryDatabase,
 }
 
@@ -231,6 +250,34 @@ pub fn test_services(system: SystemService) -> TestServices {
             navigator.clone(),
         )
     });
+    let core = InProcessCore::shared();
+    let vector_stores = VectorStoreService::new(VectorStoreServiceOptions::new(
+        database.shared(),
+        core.clone(),
+        drivers.clone(),
+        database.directory().join("vector-stores"),
+        silent_logger(),
+        clock.clone(),
+    ));
+    let vector_sources = VectorSourceService::new(VectorSourceServiceOptions::new(
+        database.shared(),
+        vector_stores.clone(),
+        silent_logger(),
+        clock.clone(),
+    ));
+    let vector_eval = VectorEvalService::new(VectorEvalServiceOptions::new(
+        database.shared(),
+        Arc::new(vector_stores.clone()),
+        silent_logger(),
+        clock.clone(),
+    ));
+    let graph = GraphService::new(GraphServiceOptions {
+        database: database.shared(),
+        core: core.clone(),
+        logger: silent_logger(),
+        clock: clock.clone(),
+    });
+    let picker = FakePicker::shared();
     TestServices {
         services: Arc::new(Services {
             system,
@@ -240,6 +287,11 @@ pub fn test_services(system: SystemService) -> TestServices {
             providers,
             health,
             theme: theme.clone(),
+            vector_stores,
+            vector_sources,
+            vector_eval,
+            graph,
+            picker: Some(picker.clone()),
         }),
         theme,
         clock,
@@ -250,7 +302,43 @@ pub fn test_services(system: SystemService) -> TestServices {
         navigator,
         lifecycle,
         account_events,
+        core,
+        picker,
         database,
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct FakePicker(Mutex<(Vec<String>, Vec<zvs_contract::VectorSourceKind>)>);
+
+impl FakePicker {
+    pub fn shared() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn answer(&self, paths: &[&str]) {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).0 =
+            paths.iter().map(|path| (*path).to_owned()).collect();
+    }
+
+    pub fn asked(&self) -> Vec<zvs_contract::VectorSourceKind> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .1
+            .clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::platform::picker::PickerPort for FakePicker {
+    async fn pick(
+        &self,
+        kind: zvs_contract::VectorSourceKind,
+    ) -> Result<Vec<String>, zvs_contract::AppError> {
+        let mut state = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        state.1.push(kind);
+        Ok(state.0.clone())
     }
 }
 

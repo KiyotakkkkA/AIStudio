@@ -8,6 +8,7 @@ pub mod logger;
 pub mod metrics;
 pub mod navigation;
 pub mod paths;
+pub mod picker;
 pub mod recorder;
 pub mod shutdown;
 pub mod theme;

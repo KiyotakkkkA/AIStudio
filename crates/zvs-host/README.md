@@ -5,37 +5,45 @@ The Rust host. Every service, repository, driver and the execution kernel will l
 without a window. Shell capabilities reach it through port traits that `zvs-studio`
 implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that builds it.
 
-| Module                   | Contents                                                                                                          |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `ipc`                    | `IpcServer`, `register`, and one file of thin handlers per domain                                                 |
-| `services`               | `Services`, the handlers' only dependency, and the business logic                                                 |
-| `data`                   | `Database`, migrations, row structs and repositories (see `src/data/README.md`)                                   |
-| `platform::paths`        | `PathEnvironment` → `StudioPaths`, plus the validated path builders                                               |
-| `platform::logger`       | `Logger` trait, `FileLogger` (JSON lines, rotation, redaction), `silent_logger`                                   |
-| `platform::ids`          | UUID v7 ids and the injectable `IdGenerator`                                                                      |
-| `platform::clock`        | `Clock`, `SystemClock`, `FakeClock`                                                                               |
-| `platform::events`       | `EventBus`, `StreamHandle`, the `EventSink` and `EventRecorder` ports                                             |
-| `platform::recorder`     | `FileEventRecorder` and the `ZVS_RECORD_EVENTS` flag                                                              |
-| `platform::theme`        | `ThemePort`, `ThemeSource`, `apply_theme_source`, `THEME_SETTING_KEY`                                             |
-| `platform::window_state` | `read_window_state`, `capture_window_state`, `WINDOW_STATE_KEY`                                                   |
-| `platform::shutdown`     | `ShutdownCoordinator`, `ShutdownStage`, `ExitDecision`                                                            |
-| `platform::navigation`   | `WorkspaceRoute`, the `WorkspaceNavigator` port (implemented by `EventBus`)                                       |
-| `platform::device`       | `DeviceProbe`, `DeviceReadings`, `os_readings`, `device_tier`                                                     |
-| `platform::gpu`          | The `GpuProbe` port, `GpuAdapter`, `select_gpu`, `NoGpu`                                                          |
-| `platform::metrics`      | `ResourceMonitor`, `ResourceCounters` (`SysinfoCounters`), the `GpuSampler` port, `NvidiaSmi`                     |
-| `platform::disk`         | `free_bytes`                                                                                                      |
-| `services::crypto`       | `CryptoBackend`, `CryptoService`, `Plaintext`, `UnavailableBackend`                                               |
-| `services::secrets`      | `SecretService`, the summary and DTO mapping, `secret_policy`, `secret_fields`                                    |
-| `services::providers`    | `ProviderService`, `DriverSource`, `probe_outcome`, `provider_status`                                             |
-| `services::health_check` | `HealthCheckService`, the `providers.healthcheck.*` settings keys                                                 |
-| `services::accounts`     | `AccountService`, the `AccountBrowser` port, `mask_email`                                                         |
-| `drivers::ai`            | AI ports, `HttpClient`, transports, adapters, `ProviderRegistry` (see below)                                      |
-| `drivers::core`          | `TextCore`, `VectorCore`, `GraphCore`, `InProcessCore`, `GraphRegistry`                                           |
-| `drivers::sidecar`       | `SidecarDriver`, `SidecarJobs`, `JobRunOptions`, the NDJSON protocol                                              |
-| `testing`                | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, `FakeDriver`, `FakeSessionGateway`, … |
-| `browser::policy`        | `is_web_url`, `navigation_url`, `profile_dir`, `BROWSER_PARTITION`, the heights, `TAB_LIMIT`                      |
-| `browser::lifecycle`     | `BrowserLifecycle`, `BrowserLifecycleEvent`, `LifecycleSubscription`                                              |
-| `kernel`                 | Empty until its port task                                                                                         |
+| Module                     | Contents                                                                                                          |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `ipc`                      | `IpcServer`, `register`, and one file of thin handlers per domain                                                 |
+| `services`                 | `Services`, the handlers' only dependency, and the business logic                                                 |
+| `data`                     | `Database`, migrations, row structs and repositories (see `src/data/README.md`)                                   |
+| `platform::paths`          | `PathEnvironment` → `StudioPaths`, plus the validated path builders                                               |
+| `platform::logger`         | `Logger` trait, `FileLogger` (JSON lines, rotation, redaction), `silent_logger`                                   |
+| `platform::ids`            | UUID v7 ids and the injectable `IdGenerator`                                                                      |
+| `platform::clock`          | `Clock`, `SystemClock`, `FakeClock`                                                                               |
+| `platform::events`         | `EventBus`, `StreamHandle`, the `EventSink` and `EventRecorder` ports                                             |
+| `platform::recorder`       | `FileEventRecorder` and the `ZVS_RECORD_EVENTS` flag                                                              |
+| `platform::theme`          | `ThemePort`, `ThemeSource`, `apply_theme_source`, `THEME_SETTING_KEY`                                             |
+| `platform::window_state`   | `read_window_state`, `capture_window_state`, `WINDOW_STATE_KEY`                                                   |
+| `platform::shutdown`       | `ShutdownCoordinator`, `ShutdownStage`, `ExitDecision`                                                            |
+| `platform::navigation`     | `WorkspaceRoute`, the `WorkspaceNavigator` port (implemented by `EventBus`)                                       |
+| `platform::device`         | `DeviceProbe`, `DeviceReadings`, `os_readings`, `device_tier`                                                     |
+| `platform::gpu`            | The `GpuProbe` port, `GpuAdapter`, `select_gpu`, `NoGpu`                                                          |
+| `platform::metrics`        | `ResourceMonitor`, `ResourceCounters` (`SysinfoCounters`), the `GpuSampler` port, `NvidiaSmi`                     |
+| `platform::disk`           | `free_bytes`                                                                                                      |
+| `platform::picker`         | The `PickerPort` behind `vectorStores.sources.pick` (`tauri-plugin-dialog` in `zvs-studio`)                       |
+| `services::crypto`         | `CryptoBackend`, `CryptoService`, `Plaintext`, `UnavailableBackend`                                               |
+| `services::secrets`        | `SecretService`, the summary and DTO mapping, `secret_policy`, `secret_fields`                                    |
+| `services::providers`      | `ProviderService`, `DriverSource`, `probe_outcome`, `provider_status`                                             |
+| `services::health_check`   | `HealthCheckService`, the `providers.healthcheck.*` settings keys                                                 |
+| `services::vector_stores`  | `VectorStoreService`, `VectorSearchOptions`, `effective_mode`, `StoreLease`, `Stopwatch`                          |
+| `services::vector_sources` | `VectorSourceService`: sources, documents, `resolve_path`, `from_extended_path`                                   |
+| `services::vector_eval`    | `VectorEvalService`, the `EvalSearch` port, `eval_modes`, the parity run (`parity.rs`, tests only)                |
+| `services::graph`          | `GraphService`: relation catalogue, edges, hydrate-on-first-use, reconcile, traversals                            |
+| `services::rerank`         | The `Reranker` port, `RerankerSource`, `local_rerankers`, `normalise_rerank_score`, `apply_rerank`                |
+| `services::retrieval_*`    | `merge_retrieval` (floor, ±1 collapse, per-document cap, top N), `retrieval_metrics`, `retrieval_query`           |
+| `services::vector_health`  | `derive_vector_health`, the metric mapping between the contract and `zvs-core`                                    |
+| `services::accounts`       | `AccountService`, the `AccountBrowser` port, `mask_email`                                                         |
+| `drivers::ai`              | AI ports, `HttpClient`, transports, adapters, `ProviderRegistry` (see below)                                      |
+| `drivers::core`            | `TextCore`, `VectorCore`, `GraphCore`, `InProcessCore`, `GraphRegistry`                                           |
+| `drivers::sidecar`         | `SidecarDriver`, `SidecarJobs`, `JobRunOptions`, the NDJSON protocol                                              |
+| `testing`                  | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, `FakeDriver`, `FakeSessionGateway`, … |
+| `browser::policy`          | `is_web_url`, `navigation_url`, `profile_dir`, `BROWSER_PARTITION`, the heights, `TAB_LIMIT`                      |
+| `browser::lifecycle`       | `BrowserLifecycle`, `BrowserLifecycleEvent`, `LifecycleSubscription`                                              |
+| `kernel`                   | Empty until its port task                                                                                         |
 
 `testing` is compiled for this crate's own tests and behind the `testing` feature for other
 crates' tests. `debug-panic` adds `InProcessCore::debug_panic`, `vector_debug_panic` and
@@ -79,6 +87,45 @@ picks the adapter with the most dedicated memory, and calls it discrete when it 
 at least 2 GiB, or sits beside a weaker adapter. `ResourceMonitor` reads CPU, memory and the
 process's resident memory through `sysinfo`, and GPU counters through `nvidia-smi`, which is
 tried once and then left alone on a machine without it; a missing reading is `null`, never 0.
+
+## Vector stores and graph
+
+`VectorStoreService` is `VectorStoreService.ts` over `VectorCore`. A store row is written as
+`pending` before `create_index`; a failed creation removes the table and the row, and a
+failed cleanup marks the row `broken` («Store creation and cleanup failed; metadata retained
+for removal»). `list` reports drift without writing (a busy store keeps its stored status),
+`get` and `reconcile` repair the counts from `stats`, `clear` drops and recreates the table
+and deletes the document rows, and a failed reset marks the store `broken`. Mutations take a
+per-store lease (`CONFLICT` «Vector store is busy»); `lease` hands one to other services.
+Chunk size, overlap and both prefixes change only before indexing.
+
+`search_timed` embeds the query (prefix included, the provider's `timeoutSeconds` or 30 s)
+**before** taking the lease, then re-reads the row and refuses (`CONFLICT` «Vector store
+changed during the search») if the provider, model, dimension or query prefix moved. Only the
+LanceDB read runs under the lease. `effective_mode` turns `hybrid` into `vector` below
+schema v2. With reranking on, the search fetches `max(k, candidates)` without a floor, the
+`Reranker` scores `passage_of` each hit (2000 UTF-16 units, query 1000), scores are
+sigmoid-normalised, and the floor and `k` apply afterwards. No reranker, an error, a malformed
+answer or the 20 s timeout fall back to vector order with a `warn`; a cancelled caller gets
+the cancellation. Local rerankers attach through `attach_rerankers` once the runtime service
+exists (TASK_071). Durations come from the injectable `Stopwatch`.
+
+`VectorSourceService` is the non-indexing half of `IndexingService.ts`: sources (paths
+trimmed, the `\\?\` prefix stripped and resolved like `path.resolve`), documents, and
+`remove_document` (delete the vectors under the lease, drop the row, `maintain`, reconcile).
+`vectorStores.index` stays unregistered until TASK_072. `VectorEvalService` runs every case in
+each mode `eval_modes` allows and stores the run as `last_eval`; a failed case is reported, not
+fatal. `GraphService` is `GraphService.ts`: the catalogue comes from migration
+`0001_graph_relation_seed`, the engine graph of a store is hydrated from the ledger on first
+use (`tokio::sync::OnceCell`, retried after a failure), a failed engine write rolls the row
+back, a failed engine removal keeps the row and sets `graph_stale`. Engine weights are `f32`;
+they come back with their shortest decimal spelling (`stored::widen`), as the addon's JSON did.
+
+Search hit scores are the core's `f32` widened with `f64::from`, which is what the addon's
+`serde_json::Value` round trip produced. The parity test
+(`services::vector_eval::parity`) and `apps/studio/tests/vectorEvalParity.test.ts` run the
+same corpus (`test/fixtures/retrieval/eval-corpus.json`) through each host and assert the
+metrics pinned in it.
 
 ## IPC server
 

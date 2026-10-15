@@ -153,6 +153,17 @@ pub fn js_trim(value: &str) -> &str {
     value.trim_matches(|character: char| character.is_whitespace() || character == '\u{feff}')
 }
 
+pub fn js_slice(value: &str, units: usize) -> &str {
+    let mut used = 0;
+    for (index, character) in value.char_indices() {
+        used += character.len_utf16();
+        if used > units {
+            return &value[..index];
+        }
+    }
+    value
+}
+
 pub fn normalize_url(value: &str) -> String {
     js_trim(value)
         .chars()
@@ -205,6 +216,15 @@ mod tests {
         assert!(check::max_len("x", "😀", 2).is_ok());
         assert!(check::max_len("x", "😀", 1).is_err());
         assert!(check::max_len("x", "ж", 1).is_ok());
+    }
+
+    #[test]
+    fn a_slice_counts_utf16_code_units_like_javascript() {
+        assert_eq!(js_slice("абвгд", 3), "абв");
+        assert_eq!(js_slice("ab", 10), "ab");
+        assert_eq!(js_slice("a😀b", 2), "a");
+        assert_eq!(js_slice("a😀b", 3), "a😀");
+        assert_eq!(js_slice("", 0), "");
     }
 
     #[test]

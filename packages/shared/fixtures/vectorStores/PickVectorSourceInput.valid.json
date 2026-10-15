@@ -1,0 +1,14 @@
+[
+  {
+    "name": "folder",
+    "value": {
+      "kind": "folder"
+    }
+  },
+  {
+    "name": "file",
+    "value": {
+      "kind": "file"
+    }
+  }
+]

@@ -1,0 +1,29 @@
+[
+  {
+    "name": "capitalised",
+    "value": {
+      "id": "01999a00-0001-7000-8000-000000000001",
+      "name": "Cites",
+      "description": "Документ ссылается на другой документ",
+      "directed": true
+    }
+  },
+  {
+    "name": "hyphen",
+    "value": {
+      "id": "01999a00-0001-7000-8000-000000000001",
+      "name": "co-occurs",
+      "description": "Документ ссылается на другой документ",
+      "directed": true
+    }
+  },
+  {
+    "name": "long description",
+    "value": {
+      "id": "01999a00-0001-7000-8000-000000000001",
+      "name": "cites",
+      "description": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "directed": true
+    }
+  }
+]

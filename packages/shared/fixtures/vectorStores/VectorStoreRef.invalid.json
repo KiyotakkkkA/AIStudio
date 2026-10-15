@@ -1,0 +1,12 @@
+[
+  {
+    "name": "not a uuid",
+    "value": {
+      "id": "store"
+    }
+  },
+  {
+    "name": "nothing",
+    "value": {}
+  }
+]

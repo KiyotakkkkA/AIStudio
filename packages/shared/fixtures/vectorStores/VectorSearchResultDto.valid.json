@@ -1,0 +1,40 @@
+[
+  {
+    "name": "reranked",
+    "value": {
+      "hits": [
+        {
+          "id": "a:0",
+          "score": 0.75,
+          "payload": {
+            "chunkCount": 2
+          },
+          "documentId": "a",
+          "chunkIndex": 0,
+          "path": "C:/docs/a.md",
+          "text": "first",
+          "section": "Раздел",
+          "page": 1,
+          "vectorScore": 0.5,
+          "rerankScore": 0.75,
+          "keywordScore": 3.25,
+          "fusedScore": 0.03125,
+          "provenance": "both"
+        }
+      ],
+      "embeddingMs": 18.5,
+      "searchMs": 45.25,
+      "rerankMs": 3.5,
+      "rerank": "applied",
+      "mode": "hybrid"
+    }
+  },
+  {
+    "name": "plain",
+    "value": {
+      "hits": [],
+      "embeddingMs": 1.5,
+      "searchMs": 0.5
+    }
+  }
+]

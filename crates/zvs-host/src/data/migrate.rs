@@ -44,11 +44,18 @@ impl Migration<'_> {
     }
 }
 
-pub const MIGRATIONS: &[Migration<'static>] = &[Migration {
-    id: 0,
-    name: "0000_baseline",
-    sql: include_str!("../../migrations/0000_baseline.sql"),
-}];
+pub const MIGRATIONS: &[Migration<'static>] = &[
+    Migration {
+        id: 0,
+        name: "0000_baseline",
+        sql: include_str!("../../migrations/0000_baseline.sql"),
+    },
+    Migration {
+        id: 1,
+        name: "0001_graph_relation_seed",
+        sql: include_str!("../../migrations/0001_graph_relation_seed.sql"),
+    },
+];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{message}")]
@@ -339,6 +346,13 @@ mod tests {
         (unmigrated_database(), Arc::new(FakeClock::default()))
     }
 
+    fn bundled() -> Vec<String> {
+        MIGRATIONS
+            .iter()
+            .map(|migration| migration.name.to_owned())
+            .collect()
+    }
+
     fn sql_migration(id: u32, name: &'static str, sql: &'static str) -> Migration<'static> {
         Migration { id, name, sql }
     }
@@ -351,12 +365,12 @@ mod tests {
         assert_eq!(
             first,
             MigrateReport {
-                applied: vec!["0000_baseline".to_owned()],
+                applied: bundled(),
                 backup: None,
             }
         );
         assert!(tables(&database).contains(&"setting".to_owned()));
-        assert_eq!(journal_names(&database), ["0000_baseline"]);
+        assert_eq!(journal_names(&database), bundled());
 
         let second = migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("no-op");
         assert_eq!(second, MigrateReport::default());
@@ -455,7 +469,7 @@ mod tests {
             clock.advance(60_000);
             let report =
                 migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
-            assert_eq!(report.applied, ["0000_baseline"]);
+            assert_eq!(report.applied, bundled());
             match report.backup {
                 None => assert_eq!(run, 0),
                 Some(backup) => written.push(backup),
@@ -616,7 +630,7 @@ mod tests {
             clock: Arc::new(FakeClock::default()),
         })
         .expect("prepares");
-        assert_eq!(report.applied, ["0000_baseline"]);
+        assert_eq!(report.applied, bundled());
         assert_eq!(database.file(), file);
         assert!(file.exists());
         assert!(query(&database, "SELECT key FROM setting").is_empty());

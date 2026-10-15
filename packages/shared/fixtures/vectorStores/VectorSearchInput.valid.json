@@ -1,0 +1,19 @@
+[
+  {
+    "name": "minimal",
+    "value": {
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "query": "отпуск"
+    }
+  },
+  {
+    "name": "every field",
+    "value": {
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "query": "q",
+      "k": 5,
+      "minScore": 0.25,
+      "mode": "vector"
+    }
+  }
+]

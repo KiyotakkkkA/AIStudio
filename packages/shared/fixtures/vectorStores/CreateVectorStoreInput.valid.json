@@ -1,0 +1,40 @@
+[
+  {
+    "name": "minimal",
+    "value": {
+      "name": "Knowledge",
+      "embeddingProviderId": "0199aa11-2222-7111-8111-111111111111",
+      "embeddingModelId": "bge-m3"
+    }
+  },
+  {
+    "name": "every field",
+    "value": {
+      "name": "Knowledge",
+      "embeddingProviderId": "0199aa11-2222-7111-8111-111111111111",
+      "embeddingModelId": "bge-m3",
+      "description": "Законы",
+      "backend": "lancedb",
+      "dimension": 3,
+      "metric": "dot",
+      "chunkSize": 512,
+      "chunkOverlap": 64,
+      "rerank": {
+        "enabled": true,
+        "modelRef": "curated:model:bge-reranker-v2-m3-f16",
+        "candidates": 80
+      },
+      "ocr": {
+        "enabled": true,
+        "modelRef": "curated:model:qwen2.5-vl",
+        "language": "rus+eng",
+        "minCharsPerPage": 120
+      },
+      "queryPrefix": "query: ",
+      "documentPrefix": "passage: ",
+      "searchMode": "vector",
+      "chatMinScore": 0.5,
+      "indexType": "FLAT"
+    }
+  }
+]

@@ -1,0 +1,41 @@
+[
+  {
+    "name": "blank path",
+    "value": {
+      "id": "src-1",
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "folder",
+      "path": " ",
+      "include": ["*.md"],
+      "exclude": ["drafts/**"],
+      "recursive": true,
+      "createdAt": 1700000000000
+    }
+  },
+  {
+    "name": "blank pattern",
+    "value": {
+      "id": "src-1",
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "folder",
+      "path": "C:/docs",
+      "include": [" "],
+      "exclude": ["drafts/**"],
+      "recursive": true,
+      "createdAt": 1700000000000
+    }
+  },
+  {
+    "name": "unknown kind",
+    "value": {
+      "id": "src-1",
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "url",
+      "path": "C:/docs",
+      "include": ["*.md"],
+      "exclude": ["drafts/**"],
+      "recursive": true,
+      "createdAt": 1700000000000
+    }
+  }
+]

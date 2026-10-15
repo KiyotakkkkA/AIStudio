@@ -1,0 +1,33 @@
+[
+  {
+    "name": "minimal",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111"
+    }
+  },
+  {
+    "name": "every field",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "name": "New",
+      "description": "d",
+      "chunkSize": 128,
+      "chunkOverlap": 16,
+      "rerank": {
+        "enabled": true,
+        "modelRef": "curated:model:bge-reranker-v2-m3-f16",
+        "candidates": 80
+      },
+      "ocr": {
+        "enabled": true,
+        "modelRef": "curated:model:qwen2.5-vl",
+        "language": "rus+eng",
+        "minCharsPerPage": 120
+      },
+      "queryPrefix": "q: ",
+      "documentPrefix": "d: ",
+      "searchMode": "hybrid",
+      "chatMinScore": 0.25
+    }
+  }
+]

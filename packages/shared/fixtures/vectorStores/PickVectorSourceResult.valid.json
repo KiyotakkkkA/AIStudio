@@ -1,0 +1,14 @@
+[
+  {
+    "name": "paths",
+    "value": {
+      "paths": ["C:/docs"]
+    }
+  },
+  {
+    "name": "cancelled",
+    "value": {
+      "paths": []
+    }
+  }
+]

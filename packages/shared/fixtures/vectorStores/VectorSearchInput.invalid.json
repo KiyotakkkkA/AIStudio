@@ -1,0 +1,49 @@
+[
+  {
+    "name": "blank query",
+    "value": {
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "query": "  "
+    }
+  },
+  {
+    "name": "k zero",
+    "value": {
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "query": "q",
+      "k": 0
+    }
+  },
+  {
+    "name": "k too large",
+    "value": {
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "query": "q",
+      "k": 1001
+    }
+  },
+  {
+    "name": "score above one",
+    "value": {
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "query": "q",
+      "minScore": 1.5
+    }
+  },
+  {
+    "name": "unknown mode",
+    "value": {
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "query": "q",
+      "mode": "keyword"
+    }
+  },
+  {
+    "name": "null mode",
+    "value": {
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "query": "q",
+      "mode": null
+    }
+  }
+]

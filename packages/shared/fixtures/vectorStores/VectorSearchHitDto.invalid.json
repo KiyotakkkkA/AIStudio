@@ -1,0 +1,104 @@
+[
+  {
+    "name": "score above one",
+    "value": {
+      "id": "a:0",
+      "score": 1.5,
+      "payload": {
+        "chunkCount": 2
+      },
+      "documentId": "a",
+      "chunkIndex": 0,
+      "path": "C:/docs/a.md",
+      "text": "first",
+      "section": "Раздел",
+      "page": 1,
+      "vectorScore": 0.5,
+      "rerankScore": 0.75,
+      "keywordScore": 3.25,
+      "fusedScore": 0.03125,
+      "provenance": "both"
+    }
+  },
+  {
+    "name": "page zero",
+    "value": {
+      "id": "a:0",
+      "score": 0.75,
+      "payload": {
+        "chunkCount": 2
+      },
+      "documentId": "a",
+      "chunkIndex": 0,
+      "path": "C:/docs/a.md",
+      "text": "first",
+      "section": "Раздел",
+      "page": 0,
+      "vectorScore": 0.5,
+      "rerankScore": 0.75,
+      "keywordScore": 3.25,
+      "fusedScore": 0.03125,
+      "provenance": "both"
+    }
+  },
+  {
+    "name": "negative keyword score",
+    "value": {
+      "id": "a:0",
+      "score": 0.75,
+      "payload": {
+        "chunkCount": 2
+      },
+      "documentId": "a",
+      "chunkIndex": 0,
+      "path": "C:/docs/a.md",
+      "text": "first",
+      "section": "Раздел",
+      "page": 1,
+      "vectorScore": 0.5,
+      "rerankScore": 0.75,
+      "keywordScore": -1.5,
+      "fusedScore": 0.03125,
+      "provenance": "both"
+    }
+  },
+  {
+    "name": "missing payload",
+    "value": {
+      "id": "a:0",
+      "score": 0.75,
+      "documentId": "a",
+      "chunkIndex": 0,
+      "path": "C:/docs/a.md",
+      "text": "first",
+      "section": "Раздел",
+      "page": 1,
+      "vectorScore": 0.5,
+      "rerankScore": 0.75,
+      "keywordScore": 3.25,
+      "fusedScore": 0.03125,
+      "provenance": "both"
+    }
+  },
+  {
+    "name": "null provenance",
+    "value": {
+      "id": "a:0",
+      "score": 0.75,
+      "payload": {
+        "chunkCount": 2
+      },
+      "documentId": "a",
+      "chunkIndex": 0,
+      "path": "C:/docs/a.md",
+      "text": "first",
+      "section": "Раздел",
+      "page": 1,
+      "vectorScore": 0.5,
+      "rerankScore": 0.75,
+      "keywordScore": 3.25,
+      "fusedScore": 0.03125,
+      "provenance": null
+    }
+  }
+]

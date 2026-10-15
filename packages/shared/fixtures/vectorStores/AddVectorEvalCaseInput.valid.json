@@ -1,0 +1,10 @@
+[
+  {
+    "name": "a case",
+    "value": {
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "question": "Who purrs?",
+      "expectedDocumentIds": ["0199aa11-3333-7111-8111-111111111111"]
+    }
+  }
+]

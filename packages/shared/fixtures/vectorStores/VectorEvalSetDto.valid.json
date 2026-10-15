@@ -1,0 +1,60 @@
+[
+  {
+    "name": "with a run",
+    "value": {
+      "cases": [
+        {
+          "id": "0199aa11-6666-7111-8111-111111111111",
+          "storeId": "0199aa11-1111-7111-8111-111111111111",
+          "question": "Who purrs?",
+          "expectedDocumentIds": [
+            "0199aa11-3333-7111-8111-111111111111",
+            "0199aa11-4444-7111-8111-111111111111"
+          ],
+          "createdAt": 1700000000000
+        }
+      ],
+      "lastRun": {
+        "storeId": "0199aa11-1111-7111-8111-111111111111",
+        "k": 10,
+        "ranAt": 1700000000000,
+        "durationMs": 12.5,
+        "modes": [
+          {
+            "mode": "hybrid-rerank",
+            "metrics": {
+              "cases": 2,
+              "hitAt1": 0.5,
+              "hitAt5": 1.0,
+              "recallAtK": 0.75,
+              "mrr": 0.75
+            },
+            "cases": [
+              {
+                "caseId": "0199aa11-6666-7111-8111-111111111111",
+                "rank": 2,
+                "found": 1,
+                "expected": 1
+              },
+              {
+                "caseId": "0199aa11-6666-7111-8111-111111111111",
+                "rank": null,
+                "found": 0,
+                "expected": 1,
+                "error": "embedding provider is down"
+              }
+            ],
+            "fallbacks": 1
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "empty",
+    "value": {
+      "cases": [],
+      "lastRun": null
+    }
+  }
+]

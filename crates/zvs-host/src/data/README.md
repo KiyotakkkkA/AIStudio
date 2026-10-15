@@ -43,6 +43,11 @@ auth-mode integrity rule is checked before the first write, so a refused row lea
 behind even outside a transaction. `provider.adapter` and `provider.auth_mode` stay `String` in
 `ProviderRow`, so an unknown value reaches the registry and fails there with the TS message.
 
+`0001_graph_relation_seed` inserts the four starter relations Drizzle `0015` seeded
+(`INSERT OR IGNORE`, same ids). The baseline snapshot holds only `sqlite_master`, so the rows
+had to come back as data. `VectorStoreRepository::update` writes only the columns a
+`VectorStorePatch` sets, `updated_at` included, as the Drizzle `update` did.
+
 ## Errors
 
 Closures passed to `with_connection` and `transaction` return `Result<T, DataError>`, so both

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "every field",
+    "value": {
+      "enabled": true,
+      "modelRef": "curated:model:qwen2.5-vl",
+      "language": "rus+eng",
+      "minCharsPerPage": 120
+    }
+  },
+  {
+    "name": "off",
+    "value": {
+      "enabled": false,
+      "modelRef": "",
+      "language": "auto",
+      "minCharsPerPage": 200
+    }
+  }
+]

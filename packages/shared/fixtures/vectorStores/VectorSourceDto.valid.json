@@ -1,0 +1,28 @@
+[
+  {
+    "name": "a folder",
+    "value": {
+      "id": "src-1",
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "folder",
+      "path": "C:/docs",
+      "include": ["*.md"],
+      "exclude": ["drafts/**"],
+      "recursive": true,
+      "createdAt": 1700000000000
+    }
+  },
+  {
+    "name": "a file",
+    "value": {
+      "id": "src-1",
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "file",
+      "path": "C:/docs",
+      "include": [],
+      "exclude": [],
+      "recursive": false,
+      "createdAt": 1700000000000
+    }
+  }
+]

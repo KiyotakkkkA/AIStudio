@@ -1,0 +1,19 @@
+[
+  {
+    "name": "negative time",
+    "value": {
+      "hits": [],
+      "embeddingMs": -1.5,
+      "searchMs": 0.5
+    }
+  },
+  {
+    "name": "unknown outcome",
+    "value": {
+      "hits": [],
+      "embeddingMs": 1.5,
+      "searchMs": 0.5,
+      "rerank": "skipped"
+    }
+  }
+]

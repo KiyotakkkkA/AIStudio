@@ -7,23 +7,25 @@ exists here under the **same name** as its Zod schema. The crate is pure data. I
 
 What lives here today:
 
-| Module       | Contents                                                                                  |
-| ------------ | ----------------------------------------------------------------------------------------- |
-| `ids`        | Branded ids (`ProviderId`, `StreamId`, …) as `#[serde(transparent)]` newtypes             |
-| `primitives` | `Timestamp`, `Json`, `PageRequest`, `Page<T>`, `Sort<F>`, `SortDirection`                 |
-| `errors`     | `AppErrorCode`, `AppError`, `ErrorDetails`                                                |
-| `envelope`   | `ResultEnvelope<T>`, the `{ ok, data }` / `{ ok, error }` wire envelope                   |
-| `events`     | `HostEvent`, `HostEventDraft`, `RunOutcomeDto`, `DeltaKind`, `EVENT_CHANNEL`              |
-| `secrets`    | The secret DTOs, `SecretInput`, the type registry and the `secrets.*` channel I/O         |
-| `settings`   | `SettingKey` validation and the `settings.*` channel inputs/outputs                       |
-| `system`     | `DeviceProfileDto`, `ResourceSampleDto` and the `system.*` channel inputs/outputs         |
-| `ai`         | `AdapterFamily`, `AuthMode`, `ToolMode`, `AdapterCapabilitiesDto`, `AdapterDescriptorDto` |
-| `providers`  | The provider enums and DTOs, `ProbeOutcomeDto`, `ProbeRequest` and the `providers.*` I/O  |
-| `accounts`   | `AccountDto`, `AccountLinkResult` (tagged on `status`) and the `accounts.*` I/O           |
-| `enums`      | `WireEnum` and `wire_enum!`, for string enums with `ALL`, `as_str` and `parse`            |
-| `channels`   | `CHANNELS`, generated from `packages/shared/contract.channels.json`                       |
-| `validate`   | The `Validate` trait, `parse`, the `check::*` helpers, `js_trim`, `normalize_url`         |
-| `wire`       | `present` and `nullable`, the two field deserialisers the wire rules need                 |
+| Module          | Contents                                                                                           |
+| --------------- | -------------------------------------------------------------------------------------------------- |
+| `ids`           | Branded ids (`ProviderId`, `StreamId`, …) as `#[serde(transparent)]` newtypes                      |
+| `primitives`    | `Timestamp`, `Json`, `PageRequest`, `Page<T>`, `Sort<F>`, `SortDirection`                          |
+| `errors`        | `AppErrorCode`, `AppError`, `ErrorDetails`                                                         |
+| `envelope`      | `ResultEnvelope<T>`, the `{ ok, data }` / `{ ok, error }` wire envelope                            |
+| `events`        | `HostEvent`, `HostEventDraft`, `RunOutcomeDto`, `DeltaKind`, `EVENT_CHANNEL`                       |
+| `secrets`       | The secret DTOs, `SecretInput`, the type registry and the `secrets.*` channel I/O                  |
+| `settings`      | `SettingKey` validation and the `settings.*` channel inputs/outputs                                |
+| `system`        | `DeviceProfileDto`, `ResourceSampleDto` and the `system.*` channel inputs/outputs                  |
+| `ai`            | `AdapterFamily`, `AuthMode`, `ToolMode`, `AdapterCapabilitiesDto`, `AdapterDescriptorDto`          |
+| `providers`     | The provider enums and DTOs, `ProbeOutcomeDto`, `ProbeRequest` and the `providers.*` I/O           |
+| `vector_stores` | The vector store, source, document, search, chunk and evaluation DTOs and the `vectorStores.*` I/O |
+| `graph`         | The relation, edge, traversal and reconcile DTOs and the `graphRelations.*` I/O                    |
+| `accounts`      | `AccountDto`, `AccountLinkResult` (tagged on `status`) and the `accounts.*` I/O                    |
+| `enums`         | `WireEnum` and `wire_enum!`, for string enums with `ALL`, `as_str` and `parse`                     |
+| `channels`      | `CHANNELS`, generated from `packages/shared/contract.channels.json`                                |
+| `validate`      | The `Validate` trait, `parse`, the `check::*` helpers, `js_trim`, `normalize_url`                  |
+| `wire`          | `present` and `nullable`, the two field deserialisers the wire rules need                          |
 
 Domain DTOs arrive with their port task (TASK_061 – TASK_074), following the recipe below.
 
@@ -72,6 +74,11 @@ in use:
   enforce `0..=2^53-1`; neither crate has that rule.
 - UUID strictness, optional-versus-nullable and literal values are already handled by serde
   attributes, which leaves too little for a derive crate to earn its proc-macro dependency.
+
+Output DTOs whose Zod schema defaults a field (`VectorStoreDto.rerank`, `VectorSearchHitDto.text`,
+`VectorEvalModeResultDto.fallbacks`, the `VectorRerankConfig`/`VectorOcrConfig` fields) use
+`#[serde(default)]` and always serialise the field, because the host always has the value.
+Their fixtures therefore spell every defaulted field out.
 
 ## Golden fixtures
 

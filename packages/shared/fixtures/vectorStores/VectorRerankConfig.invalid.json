@@ -1,0 +1,34 @@
+[
+  {
+    "name": "candidates zero",
+    "value": {
+      "enabled": true,
+      "modelRef": "curated:model:bge-reranker-v2-m3-f16",
+      "candidates": 0
+    }
+  },
+  {
+    "name": "candidates too many",
+    "value": {
+      "enabled": true,
+      "modelRef": "curated:model:bge-reranker-v2-m3-f16",
+      "candidates": 501
+    }
+  },
+  {
+    "name": "enabled null",
+    "value": {
+      "enabled": null,
+      "modelRef": "curated:model:bge-reranker-v2-m3-f16",
+      "candidates": 80
+    }
+  },
+  {
+    "name": "long model",
+    "value": {
+      "enabled": true,
+      "modelRef": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "candidates": 80
+    }
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "name": "a document",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111111",
+      "storeId": "0199aa11-1111-7111-8111-111111111111",
+      "sourcePath": "C:/docs/a.md",
+      "contentHash": "abc",
+      "chunkCount": 2,
+      "bytes": 12,
+      "indexedAt": 1700000000000
+    }
+  }
+]
