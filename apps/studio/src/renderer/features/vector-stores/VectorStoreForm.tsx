@@ -187,7 +187,7 @@ function VectorStoreForm() {
                     <button
                       type="button"
                       aria-label="Что означают метрики"
-                      className="flex size-7 items-center justify-center rounded-full text-main-400 transition-colors hover:bg-main-750 hover:text-main-100 focus-visible:outline-2 focus-visible:outline-accent-dark"
+                      className="flex size-7 items-center justify-center rounded-lg text-main-400 transition-colors hover:bg-main-750 hover:text-main-100 focus-visible:outline-2 focus-visible:outline-accent-dark"
                     >
                       <Icon path={mdiInformationOutline} size={16} />
                     </button>
