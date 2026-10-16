@@ -37,6 +37,21 @@ macro_rules! branded_ids {
             }
         }
 
+        #[cfg(feature = "schema")]
+        impl schemars::JsonSchema for $name {
+            fn inline_schema() -> bool {
+                true
+            }
+
+            fn schema_name() -> std::borrow::Cow<'static, str> {
+                stringify!($name).into()
+            }
+
+            fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+                schemars::json_schema!({ "type": "string", "format": "uuid" })
+            }
+        }
+
         no_refinements!($name);
     )+};
 }

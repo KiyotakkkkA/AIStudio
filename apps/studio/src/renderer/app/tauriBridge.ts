@@ -1,4 +1,5 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
+import { restoreEnvelope } from "./tauriEnvelope";
 
 type EventHandler = (event: unknown) => void;
 type ZvsBridge = Window["zvs"];
@@ -19,8 +20,8 @@ function createTauriBridge(): ZvsBridge {
   };
 
   return Object.freeze({
-    call: (channel: string, payload: unknown): Promise<unknown> =>
-      invoke("ipc_call", { channel, payload }),
+    call: async (channel: string, payload: unknown): Promise<unknown> =>
+      restoreEnvelope(await invoke("ipc_call", { channel, payload })),
     subscribe: (handler: EventHandler): (() => void) => {
       const listener: EventHandler = (event) => handler(event);
       handlers.add(listener);

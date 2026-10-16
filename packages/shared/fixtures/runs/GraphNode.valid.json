@@ -1,0 +1,39 @@
+[
+  {
+    "name": "minimal",
+    "value": {
+      "id": "a",
+      "type": "work"
+    }
+  },
+  {
+    "name": "every field",
+    "value": {
+      "id": "d",
+      "type": "d",
+      "dependencies": ["b"],
+      "input": {},
+      "bindings": {
+        "left": {
+          "source": "node",
+          "nodeId": "b"
+        },
+        "original": {
+          "source": "run"
+        }
+      },
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 15
+      }
+    }
+  },
+  {
+    "name": "null input",
+    "value": {
+      "id": "a",
+      "type": "work",
+      "input": null
+    }
+  }
+]

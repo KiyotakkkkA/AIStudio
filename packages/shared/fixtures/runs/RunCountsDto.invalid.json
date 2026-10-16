@@ -1,0 +1,45 @@
+[
+  {
+    "name": "missing status",
+    "value": {
+      "total": 0,
+      "byStatus": {
+        "queued": 0
+      },
+      "byKind": {
+        "chat": 0,
+        "scenario": 0,
+        "agentic": 0,
+        "job": 0,
+        "indexing": 0,
+        "download": 0,
+        "browser": 0
+      }
+    }
+  },
+  {
+    "name": "unknown kind",
+    "value": {
+      "total": 0,
+      "byStatus": {
+        "queued": 0,
+        "running": 0,
+        "blocked": 0,
+        "succeeded": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "interrupted": 0
+      },
+      "byKind": {
+        "chat": 0,
+        "scenario": 0,
+        "agentic": 0,
+        "job": 0,
+        "indexing": 0,
+        "download": 0,
+        "browser": 0,
+        "task": 0
+      }
+    }
+  }
+]

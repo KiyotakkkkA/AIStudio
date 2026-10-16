@@ -22,6 +22,7 @@ use crate::data::{BACKUPS_KEPT, Database, MIGRATIONS, MigrateOptions, migrate};
 use crate::drivers::ai::registry::SessionFactory;
 use crate::drivers::ai::transport::SharedSessionGateway;
 use crate::drivers::core::InProcessCore;
+use crate::kernel::NodeRegistry;
 pub use crate::platform::clock::{CLOCK_ORIGIN, FakeClock};
 use crate::platform::events::EventBus;
 use crate::platform::events::EventSink;
@@ -31,9 +32,9 @@ use crate::services::crypto::BackendFailure;
 use crate::services::{
     AccountService, AccountServiceOptions, CryptoBackend, CryptoService, GraphService,
     GraphServiceOptions, HealthCheckOptions, HealthCheckService, Plaintext, ProviderService,
-    ProviderServiceOptions, SecretService, Services, SettingService, SystemService,
-    VectorEvalService, VectorEvalServiceOptions, VectorSourceService, VectorSourceServiceOptions,
-    VectorStoreService, VectorStoreServiceOptions,
+    ProviderServiceOptions, RunService, RunServiceOptions, SecretService, Services, SettingService,
+    SystemService, VectorEvalService, VectorEvalServiceOptions, VectorSourceService,
+    VectorSourceServiceOptions, VectorStoreService, VectorStoreServiceOptions,
 };
 
 fn normalise(path: &Path) -> String {
@@ -182,6 +183,9 @@ pub struct TestServices {
     pub account_events: Arc<MemorySink>,
     pub core: Arc<InProcessCore>,
     pub picker: Arc<FakePicker>,
+    pub nodes: Arc<NodeRegistry>,
+    pub run_events: Arc<MemorySink>,
+    pub jobs: Arc<FakeJobs>,
     pub database: TemporaryDatabase,
 }
 
@@ -277,6 +281,20 @@ pub fn test_services(system: SystemService) -> TestServices {
         logger: silent_logger(),
         clock: clock.clone(),
     });
+    let run_events = MemorySink::shared();
+    let run_bus = EventBus::default();
+    run_bus.attach(run_events.clone());
+    let nodes = Arc::new(NodeRegistry::new());
+    let jobs = FakeJobs::shared();
+    let runs = RunService::new(RunServiceOptions {
+        clock: clock.clone(),
+        services: crate::kernel::KernelServices {
+            jobs: Some(jobs.clone()),
+            ..crate::kernel::KernelServices::default()
+        },
+        ..RunServiceOptions::new(database.shared(), run_bus, Arc::clone(&nodes))
+    })
+    .expect("a run service");
     let picker = FakePicker::shared();
     TestServices {
         services: Arc::new(Services {
@@ -291,8 +309,12 @@ pub fn test_services(system: SystemService) -> TestServices {
             vector_sources,
             vector_eval,
             graph,
+            runs,
             picker: Some(picker.clone()),
         }),
+        nodes,
+        run_events,
+        jobs,
         theme,
         clock,
         crypto,
@@ -305,6 +327,59 @@ pub fn test_services(system: SystemService) -> TestServices {
         core,
         picker,
         database,
+    }
+}
+
+#[derive(Default)]
+pub struct FakeJobs(Mutex<Vec<(String, Value)>>);
+
+impl FakeJobs {
+    pub fn shared() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn calls(&self) -> Vec<(String, Value)> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::drivers::sidecar::SidecarJobs for FakeJobs {
+    async fn run(
+        &self,
+        job: &str,
+        params: Value,
+        options: crate::drivers::sidecar::JobRunOptions,
+    ) -> Result<Value, zvs_contract::AppError> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push((job.to_owned(), params.clone()));
+        let steps = params.get("steps").and_then(Value::as_u64).unwrap_or(0);
+        for done in 1..=steps {
+            if options
+                .cancel
+                .as_ref()
+                .is_some_and(|cancel| cancel.is_cancelled())
+            {
+                return Err(zvs_contract::AppError::new(
+                    zvs_contract::AppErrorCode::RunCancelled,
+                    crate::drivers::sidecar::CANCELLED_MESSAGE,
+                ));
+            }
+            if let Some(progress) = &options.on_progress {
+                progress(crate::drivers::sidecar::JobProgress {
+                    done,
+                    total: steps,
+                    rate: None,
+                    message: (done == steps).then(|| "готово".to_owned()),
+                });
+            }
+        }
+        Ok(serde_json::json!({ "slept": steps }))
     }
 }
 

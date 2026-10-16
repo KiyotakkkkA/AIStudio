@@ -1,0 +1,56 @@
+[
+  {
+    "name": "zero limit",
+    "value": {
+      "limit": 0
+    }
+  },
+  {
+    "name": "big limit",
+    "value": {
+      "limit": 201
+    }
+  },
+  {
+    "name": "long query",
+    "value": {
+      "query": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+  },
+  {
+    "name": "empty cursor",
+    "value": {
+      "cursor": ""
+    }
+  },
+  {
+    "name": "long cursor",
+    "value": {
+      "cursor": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+  },
+  {
+    "name": "negative from",
+    "value": {
+      "from": -1
+    }
+  },
+  {
+    "name": "unknown status",
+    "value": {
+      "statuses": ["paused"]
+    }
+  },
+  {
+    "name": "too many kinds",
+    "value": {
+      "kinds": ["job", "job", "job", "job", "job", "job", "job", "job"]
+    }
+  },
+  {
+    "name": "null live",
+    "value": {
+      "live": null
+    }
+  }
+]

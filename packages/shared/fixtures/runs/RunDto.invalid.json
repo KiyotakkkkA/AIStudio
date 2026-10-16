@@ -1,0 +1,62 @@
+[
+  {
+    "name": "missing input",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "streamId": "0199aa11-2222-7111-8111-111111111111",
+      "kind": "chat",
+      "status": "queued",
+      "graph": {
+        "nodes": []
+      },
+      "concurrency": 1,
+      "createdAt": 1
+    }
+  },
+  {
+    "name": "zero concurrency",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "streamId": "0199aa11-2222-7111-8111-111111111111",
+      "kind": "chat",
+      "status": "queued",
+      "graph": {
+        "nodes": []
+      },
+      "input": null,
+      "concurrency": 0,
+      "createdAt": 1
+    }
+  },
+  {
+    "name": "unknown status",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "streamId": "0199aa11-2222-7111-8111-111111111111",
+      "kind": "chat",
+      "status": "paused",
+      "graph": {
+        "nodes": []
+      },
+      "input": null,
+      "concurrency": 1,
+      "createdAt": 1
+    }
+  },
+  {
+    "name": "null title",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "streamId": "0199aa11-2222-7111-8111-111111111111",
+      "kind": "chat",
+      "status": "queued",
+      "graph": {
+        "nodes": []
+      },
+      "input": null,
+      "concurrency": 1,
+      "createdAt": 1,
+      "title": null
+    }
+  }
+]

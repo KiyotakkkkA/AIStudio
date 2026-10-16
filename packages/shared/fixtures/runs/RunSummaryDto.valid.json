@@ -1,0 +1,50 @@
+[
+  {
+    "name": "minimal",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "streamId": "0199aa11-2222-7111-8111-111111111111",
+      "kind": "job",
+      "title": "T",
+      "status": "running",
+      "progress": {
+        "done": 0,
+        "total": 1
+      },
+      "createdAt": 1
+    }
+  },
+  {
+    "name": "every field",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "streamId": "0199aa11-2222-7111-8111-111111111111",
+      "kind": "job",
+      "title": "T",
+      "status": "running",
+      "progress": {
+        "done": 0,
+        "total": 1
+      },
+      "createdAt": 1,
+      "subjectId": "s",
+      "activeNodeId": "a",
+      "approval": {
+        "id": "0199aa11-4444-7111-8111-111111111111",
+        "subject": "mail.send",
+        "scope": "global",
+        "expiresAt": 5
+      },
+      "outcome": {
+        "status": "failed",
+        "code": "APPROVAL_DENIED",
+        "message": "Approval denied"
+      },
+      "error": "e",
+      "retryOfId": "0199aa11-1111-7111-8111-111111111111",
+      "startedAt": 2,
+      "finishedAt": 3,
+      "prunedAt": 4
+    }
+  }
+]

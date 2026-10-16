@@ -43,6 +43,52 @@ const TABLE: &[(&str, Check)] = &[
     ("errors/ResultEnvelope", round_trip::<ResultEnvelope<Json>>),
     ("events/RunOutcomeDto", round_trip::<RunOutcomeDto>),
     ("events/HostEvent", round_trip::<HostEvent>),
+    ("runs/RunStatus", round_trip::<zvs_contract::RunStatus>),
+    ("runs/RunKind", round_trip::<zvs_contract::RunKind>),
+    ("runs/StepStatus", round_trip::<zvs_contract::StepStatus>),
+    ("runs/GraphNode", round_trip::<zvs_contract::GraphNode>),
+    ("runs/RunGraph", round_trip::<zvs_contract::RunGraph>),
+    (
+        "runs/StartRunInput",
+        round_trip::<zvs_contract::StartRunInput>,
+    ),
+    ("runs/RunIdInput", round_trip::<zvs_contract::RunIdInput>),
+    (
+        "runs/RunHandleDto",
+        round_trip::<zvs_contract::RunHandleDto>,
+    ),
+    (
+        "runs/RunsApproveInput",
+        round_trip::<zvs_contract::RunsApproveInput>,
+    ),
+    (
+        "runs/RunsDenyInput",
+        round_trip::<zvs_contract::RunsDenyInput>,
+    ),
+    ("runs/RunDto", round_trip::<zvs_contract::RunDto>),
+    ("runs/StepDto", round_trip::<zvs_contract::StepDto>),
+    (
+        "runs/RunListFilter",
+        round_trip::<zvs_contract::RunListFilter>,
+    ),
+    (
+        "runs/RunCountsDto",
+        round_trip::<zvs_contract::RunCountsDto>,
+    ),
+    (
+        "runs/RunSummaryDto",
+        round_trip::<zvs_contract::RunSummaryDto>,
+    ),
+    ("runs/RunPageDto", round_trip::<zvs_contract::RunPageDto>),
+    (
+        "runs/RunDetailDto",
+        round_trip::<zvs_contract::RunDetailDto>,
+    ),
+    (
+        "runs/RunsClearFinishedOutput",
+        round_trip::<zvs_contract::RunsClearFinishedOutput>,
+    ),
+    ("tools/ToolTier", round_trip::<zvs_contract::ToolTier>),
     ("system/DeviceTier", round_trip::<DeviceTier>),
     ("system/DeviceGpuDto", round_trip::<DeviceGpuDto>),
     ("system/DeviceProfileDto", round_trip::<DeviceProfileDto>),

@@ -1,0 +1,12 @@
+[
+  {
+    "name": "bad id",
+    "value": {
+      "id": "x"
+    }
+  },
+  {
+    "name": "missing",
+    "value": {}
+  }
+]

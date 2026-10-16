@@ -1,0 +1,150 @@
+[
+  {
+    "name": "every field",
+    "value": {
+      "run": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "streamId": "0199aa11-2222-7111-8111-111111111111",
+        "kind": "job",
+        "subjectId": "s",
+        "title": "T",
+        "retryOfId": "0199aa11-1111-7111-8111-111111111111",
+        "status": "failed",
+        "graph": {
+          "nodes": [
+            {
+              "id": "d",
+              "type": "d",
+              "dependencies": ["b"],
+              "input": {},
+              "bindings": {
+                "left": {
+                  "source": "node",
+                  "nodeId": "b"
+                },
+                "original": {
+                  "source": "run"
+                }
+              },
+              "retry": {
+                "maxAttempts": 3,
+                "backoffMs": 15
+              }
+            }
+          ]
+        },
+        "input": {
+          "q": 1
+        },
+        "outcome": {
+          "status": "failed",
+          "code": "APPROVAL_DENIED",
+          "message": "Approval denied"
+        },
+        "concurrency": 4,
+        "createdAt": 1,
+        "startedAt": 2,
+        "finishedAt": 3,
+        "prunedAt": 4,
+        "error": "Approval denied"
+      },
+      "summary": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "streamId": "0199aa11-2222-7111-8111-111111111111",
+        "kind": "job",
+        "title": "T",
+        "status": "running",
+        "progress": {
+          "done": 0,
+          "total": 1
+        },
+        "createdAt": 1,
+        "subjectId": "s",
+        "activeNodeId": "a",
+        "approval": {
+          "id": "0199aa11-4444-7111-8111-111111111111",
+          "subject": "mail.send",
+          "scope": "global",
+          "expiresAt": 5
+        },
+        "outcome": {
+          "status": "failed",
+          "code": "APPROVAL_DENIED",
+          "message": "Approval denied"
+        },
+        "error": "e",
+        "retryOfId": "0199aa11-1111-7111-8111-111111111111",
+        "startedAt": 2,
+        "finishedAt": 3,
+        "prunedAt": 4
+      },
+      "steps": [
+        {
+          "id": "0199aa11-3333-7111-8111-111111111111",
+          "runId": "0199aa11-1111-7111-8111-111111111111",
+          "nodeId": "a",
+          "type": "work",
+          "status": "succeeded",
+          "input": {
+            "q": 1
+          },
+          "startedAt": 1,
+          "attempt": 2,
+          "output": "done",
+          "error": "x",
+          "finishedAt": 2
+        }
+      ],
+      "logs": [
+        {
+          "runId": "0199aa11-1111-7111-8111-111111111111",
+          "status": "queued"
+        }
+      ],
+      "events": [
+        {
+          "streamId": "0199aa11-2222-7111-8111-111111111111",
+          "seq": 0,
+          "ts": 1,
+          "type": "log",
+          "line": {
+            "runId": "0199aa11-1111-7111-8111-111111111111",
+            "status": "queued"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "no events",
+    "value": {
+      "run": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "streamId": "0199aa11-2222-7111-8111-111111111111",
+        "kind": "chat",
+        "status": "queued",
+        "graph": {
+          "nodes": []
+        },
+        "input": null,
+        "concurrency": 1,
+        "createdAt": 1
+      },
+      "summary": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "streamId": "0199aa11-2222-7111-8111-111111111111",
+        "kind": "job",
+        "title": "T",
+        "status": "running",
+        "progress": {
+          "done": 0,
+          "total": 1
+        },
+        "createdAt": 1
+      },
+      "steps": [],
+      "logs": [],
+      "events": []
+    }
+  }
+]

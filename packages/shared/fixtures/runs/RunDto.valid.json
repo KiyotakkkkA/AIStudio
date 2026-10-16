@@ -1,0 +1,66 @@
+[
+  {
+    "name": "minimal",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "streamId": "0199aa11-2222-7111-8111-111111111111",
+      "kind": "chat",
+      "status": "queued",
+      "graph": {
+        "nodes": []
+      },
+      "input": null,
+      "concurrency": 1,
+      "createdAt": 1
+    }
+  },
+  {
+    "name": "every field",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "streamId": "0199aa11-2222-7111-8111-111111111111",
+      "kind": "job",
+      "subjectId": "s",
+      "title": "T",
+      "retryOfId": "0199aa11-1111-7111-8111-111111111111",
+      "status": "failed",
+      "graph": {
+        "nodes": [
+          {
+            "id": "d",
+            "type": "d",
+            "dependencies": ["b"],
+            "input": {},
+            "bindings": {
+              "left": {
+                "source": "node",
+                "nodeId": "b"
+              },
+              "original": {
+                "source": "run"
+              }
+            },
+            "retry": {
+              "maxAttempts": 3,
+              "backoffMs": 15
+            }
+          }
+        ]
+      },
+      "input": {
+        "q": 1
+      },
+      "outcome": {
+        "status": "failed",
+        "code": "APPROVAL_DENIED",
+        "message": "Approval denied"
+      },
+      "concurrency": 4,
+      "createdAt": 1,
+      "startedAt": 2,
+      "finishedAt": 3,
+      "prunedAt": 4,
+      "error": "Approval denied"
+    }
+  }
+]

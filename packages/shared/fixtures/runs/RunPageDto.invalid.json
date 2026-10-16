@@ -1,0 +1,36 @@
+[
+  {
+    "name": "empty cursor",
+    "value": {
+      "items": [],
+      "nextCursor": "",
+      "counts": {
+        "total": 2,
+        "byStatus": {
+          "queued": 0,
+          "running": 0,
+          "blocked": 0,
+          "succeeded": 1,
+          "failed": 1,
+          "cancelled": 0,
+          "interrupted": 0
+        },
+        "byKind": {
+          "chat": 0,
+          "scenario": 0,
+          "agentic": 0,
+          "job": 2,
+          "indexing": 0,
+          "download": 0,
+          "browser": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "missing counts",
+    "value": {
+      "items": []
+    }
+  }
+]

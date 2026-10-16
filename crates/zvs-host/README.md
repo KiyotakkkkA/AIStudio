@@ -43,7 +43,11 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 | `testing`                  | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, `FakeDriver`, `FakeSessionGateway`, … |
 | `browser::policy`          | `is_web_url`, `navigation_url`, `profile_dir`, `BROWSER_PARTITION`, the heights, `TAB_LIMIT`                      |
 | `browser::lifecycle`       | `BrowserLifecycle`, `BrowserLifecycleEvent`, `LifecycleSubscription`                                              |
-| `kernel`                   | Empty until its port task                                                                                         |
+| `kernel`                   | `NodeDef`, `NodeRegistry`, `Scheduler`, `RunStream`, `StepContext`, the core and job nodes (see below)            |
+| `services::runs`           | `RunService`: start, inspect, list, retry, clear, cancel, recover, subscribe, dispose                             |
+| `services::permissions`    | `PermissionService`: grants, revocation, `admit` / `admit_subject` with `off > ask > auto`                        |
+| `services::approvals`      | `ApprovalService`: persisted pending approvals, timeout, decisions, `always` grants                               |
+| `services::retention`      | `RetentionService`: prunes step payloads and events past `runs.retention.days`                                    |
 
 `testing` is compiled for this crate's own tests and behind the `testing` feature for other
 crates' tests. `debug-panic` adds `InProcessCore::debug_panic`, `vector_debug_panic` and
@@ -126,6 +130,41 @@ Search hit scores are the core's `f32` widened with `f64::from`, which is what t
 (`services::vector_eval::parity`) and `apps/studio/tests/vectorEvalParity.test.ts` run the
 same corpus (`test/fixtures/retrieval/eval-corpus.json`) through each host and assert the
 metrics pinned in it.
+
+## Kernel
+
+The kernel is `apps/studio/src/host/kernel/README.md` in Rust; that file stays the
+specification until TASK_076 moves it here. A node is written once as a typed `NodeDef`
+(`Input: DeserializeOwned + JsonSchema + Validate`, `Output: Serialize + JsonSchema +
+Validate`, a `PermissionRequirement` and a mandatory `side_effect`) and registered type-erased
+over `serde_json::Value`. Registration records the input and output JSON Schema
+(`schemars`, draft 2020-12, subschemas inlined, `null` stripped from optional input
+properties because they are absent-or-set like Zod's `.optional()`); TASK_073 hands those to
+models. `FnNode` wraps a closure for small nodes and tests. `NodeRegistry` keeps insertion
+order, which `for_tool` relies on.
+
+`Scheduler` runs one graph. Every node runs in its own task; the scheduler races it against
+the run's `CancellationToken` and, after cancellation, waits `grace` (500 ms by default) before
+marking the step `abandoned`. The task is detached, not aborted, and a `live` flag drops its
+late events, approvals and output. Retries, backoff, the concurrency cap, bindings and the
+sibling abort follow `Scheduler.ts`. Run, step and event writes go through `RunStream::commit`:
+the rows and the `run_event` rows of the drafts commit in one SQLite transaction, then the
+events are delivered and synchronous observers (`RunService::subscribe`) are called. Delivery
+and observers run after the database lock is released, so an observer may write to the
+database but must not emit on the run it observes. `StreamHandle::publish_with` is the hook
+that assigns sequence numbers inside that transaction.
+
+`RunService` admits graphs (`registry.validate` before any row exists), returns `{ id,
+streamId }` before the scheduler task first runs, and drives `runs.*`. Admission composes the
+node requirement, the global ceiling, any registered tool row and every matching scope; chat,
+indexing and download runs admit their own core tools. An `ask` persists a pending approval,
+emits it, blocks scheduling, and waits for `runs.approve` / `runs.deny`, the timeout (60 s) or
+cancellation. `recover()` abandons in-flight steps, fails runs with an interrupted approval
+(`APPROVAL_DENIED`), resumes side-effect-free graphs on their original stream and marks the
+rest `interrupted`; the composition root calls it after the registry is complete. `dispose()`
+suspends every run with the same grace and drains them in the `Drain` stage, before services
+and SQLite close. `system.demoJob` starts one `job.run` over `job.sleep`; like every
+`job.run`, it needs a `job.run` grant or an approval.
 
 ## IPC server
 
@@ -350,8 +389,8 @@ together, and the whole run is capped at `DEFAULT_SHUTDOWN_CAP` (5 s). Every sta
 `Shutdown stage started` and `Shutdown stage finished` under `host`. `zvs-studio` calls
 `request_exit` from `RunEvent::ExitRequested`: the first call prevents the exit and starts the
 run, which ends with `AppHandle::exit`; calls during the run keep preventing it; afterwards the
-exit goes through and `RunEvent::Exit` logs `Shutdown`. Today it holds `health-check.stop`
-(`Stop`) and `providers`, `health-check`, `accounts`, `account-gateway` and `sidecar` (`Dispose`). Later ports register their own tasks
+exit goes through and `RunEvent::Exit` logs `Shutdown`. Today it holds `health-check.stop` and
+`retention.stop` (`Stop`), `runs` (`Drain`) and `providers`, `health-check`, `accounts`, `account-gateway` and `sidecar` (`Dispose`). Later ports register their own tasks
 in the stage `main.ts` used for them.
 
 ## Browser

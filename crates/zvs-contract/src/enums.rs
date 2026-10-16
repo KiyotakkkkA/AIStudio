@@ -14,6 +14,7 @@ pub trait WireEnum: Copy + Eq + 'static {
 macro_rules! wire_enum {
     ($(#[$meta:meta])* $name:ident { $($variant:ident => $text:literal),+ $(,)? }) => {
         $(#[$meta])*
+        #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
         #[derive(
             Debug,
             Clone,

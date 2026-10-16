@@ -1,0 +1,76 @@
+[
+  {
+    "name": "empty id",
+    "value": {
+      "id": "",
+      "type": "work"
+    }
+  },
+  {
+    "name": "long type",
+    "value": {
+      "id": "a",
+      "type": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+  },
+  {
+    "name": "missing type",
+    "value": {
+      "id": "a"
+    }
+  },
+  {
+    "name": "zero attempts",
+    "value": {
+      "id": "a",
+      "type": "w",
+      "retry": {
+        "maxAttempts": 0,
+        "backoffMs": 0
+      }
+    }
+  },
+  {
+    "name": "long backoff",
+    "value": {
+      "id": "a",
+      "type": "w",
+      "retry": {
+        "maxAttempts": 1,
+        "backoffMs": 60001
+      }
+    }
+  },
+  {
+    "name": "binding without node",
+    "value": {
+      "id": "a",
+      "type": "w",
+      "bindings": {
+        "x": {
+          "source": "node"
+        }
+      }
+    }
+  },
+  {
+    "name": "unknown binding",
+    "value": {
+      "id": "a",
+      "type": "w",
+      "bindings": {
+        "x": {
+          "source": "step"
+        }
+      }
+    }
+  },
+  {
+    "name": "null dependencies",
+    "value": {
+      "id": "a",
+      "type": "w",
+      "dependencies": null
+    }
+  }
+]

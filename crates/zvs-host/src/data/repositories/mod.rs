@@ -2,7 +2,9 @@ pub mod account;
 pub mod graph_edge;
 pub mod graph_relation;
 pub mod model;
+pub mod permission;
 pub mod provider;
+pub mod run;
 pub mod secret;
 pub mod setting;
 pub mod vector_document;
@@ -18,7 +20,12 @@ pub use account::{
 pub use graph_edge::{GraphEdgeDraft, GraphEdgeLookup, GraphEdgeRepository};
 pub use graph_relation::GraphRelationRepository;
 pub use model::{ModelDraft, ModelRepository};
+pub use permission::PermissionRepository;
 pub use provider::{ProviderDraft, ProviderFilter, ProviderPatch, ProviderRepository};
+pub use run::{
+    RunCounts, RunCursor, RunDraft, RunPageQuery, RunPatch, RunRepository, RunningNode,
+    decode_run_cursor, encode_run_cursor,
+};
 pub use secret::{
     SecretDraft, SecretFilter, SecretPatch, SecretRepository, SecretUsageDraft, secret_in_use,
 };
@@ -40,6 +47,8 @@ pub struct Repositories<'c> {
     pub vector_eval_cases: VectorEvalCaseRepository<'c>,
     pub graph_relations: GraphRelationRepository<'c>,
     pub graph_edges: GraphEdgeRepository<'c>,
+    pub runs: RunRepository<'c>,
+    pub permissions: PermissionRepository<'c>,
 }
 
 impl<'c> Repositories<'c> {
@@ -56,6 +65,8 @@ impl<'c> Repositories<'c> {
             vector_eval_cases: VectorEvalCaseRepository::new(connection),
             graph_relations: GraphRelationRepository::new(connection),
             graph_edges: GraphEdgeRepository::new(connection),
+            runs: RunRepository::new(connection),
+            permissions: PermissionRepository::new(connection),
         }
     }
 }

@@ -1,0 +1,30 @@
+[
+  {
+    "name": "chat",
+    "value": "chat"
+  },
+  {
+    "name": "scenario",
+    "value": "scenario"
+  },
+  {
+    "name": "agentic",
+    "value": "agentic"
+  },
+  {
+    "name": "job",
+    "value": "job"
+  },
+  {
+    "name": "indexing",
+    "value": "indexing"
+  },
+  {
+    "name": "download",
+    "value": "download"
+  },
+  {
+    "name": "browser",
+    "value": "browser"
+  }
+]

@@ -1,12 +1,40 @@
 use std::sync::Arc;
 
+use serde_json::{Map, Value, json};
 use zvs_contract::{
+    GraphNode, RetryPolicy, RunGraph, RunKind, StartRunInput, SystemDemoJobInput,
     SystemDemoStreamInput, SystemDemoStreamOutput, SystemDeviceInput, SystemNativePingInput,
     SystemPingInput,
 };
 
 use super::IpcServer;
 use crate::services::Services;
+
+pub const DEMO_JOB_TITLE: &str = "Демонстрационная задача";
+
+pub fn demo_job(input: &SystemDemoJobInput) -> StartRunInput {
+    let mut params = Map::new();
+    params.insert("steps".to_owned(), json!(input.steps));
+    if let Some(interval) = input.interval_ms {
+        params.insert("intervalMs".to_owned(), json!(interval));
+    }
+    let node = GraphNode {
+        dependencies: Some(Vec::new()),
+        bindings: Some(Default::default()),
+        retry: Some(RetryPolicy {
+            max_attempts: 1,
+            backoff_ms: 0,
+        }),
+        input: Some(json!({ "job": "job.sleep", "params": Value::Object(params) })),
+        ..GraphNode::new("sleep", "job.run")
+    };
+    StartRunInput {
+        title: Some(DEMO_JOB_TITLE.to_owned()),
+        input: Some(Value::Null),
+        concurrency: Some(1),
+        ..StartRunInput::new(RunKind::Job, RunGraph::new(vec![node]))
+    }
+}
 
 pub fn register(server: &mut IpcServer) {
     server
@@ -21,6 +49,12 @@ pub fn register(server: &mut IpcServer) {
             |services: Arc<Services>, input: SystemDemoStreamInput| async move {
                 let stream_id = services.system.demo_stream(input.steps)?;
                 Ok(SystemDemoStreamOutput { stream_id })
+            },
+        )
+        .handle(
+            "system.demoJob",
+            |services: Arc<Services>, input: SystemDemoJobInput| async move {
+                services.runs.start(demo_job(&input))
             },
         )
         .handle(

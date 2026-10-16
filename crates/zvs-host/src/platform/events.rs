@@ -224,6 +224,49 @@ impl StreamHandle {
         self.publish(HostEventDraft::End { outcome }, true);
     }
 
+    pub fn publish_with<E>(
+        &self,
+        drafts: Vec<HostEventDraft>,
+        persist: impl FnOnce(&[HostEvent]) -> Result<(), E>,
+    ) -> Result<Vec<HostEvent>, E> {
+        let Ok(mut state) = self.state.lock() else {
+            return persist(&[]).map(|()| Vec::new());
+        };
+        let mut seq = state.seq;
+        let mut closed = state.closed;
+        let mut events = Vec::with_capacity(drafts.len());
+        for draft in drafts {
+            if closed {
+                self.bus.logger.log(
+                    LogLevel::Error,
+                    "events",
+                    "Emitted on a stream that already ended",
+                    &[
+                        ("streamId", json!(self.id)),
+                        ("type", json!(type_of(&draft))),
+                    ],
+                );
+                continue;
+            }
+            closed = matches!(draft, HostEventDraft::End { .. });
+            events.push(HostEvent::new(self.id, seq, self.bus.clock.now(), draft));
+            seq += 1;
+        }
+        persist(&events)?;
+        state.seq = seq;
+        state.closed = closed;
+        for event in &events {
+            if let Some(record) = &self.record {
+                record(event);
+            }
+            if matches!(event.body, HostEventDraft::End { .. }) {
+                self.bus.release(self.id);
+            }
+            self.bus.deliver(event);
+        }
+        Ok(events)
+    }
+
     fn publish(&self, draft: HostEventDraft, ending: bool) {
         let Ok(mut state) = self.state.lock() else {
             return;
@@ -471,6 +514,49 @@ mod tests {
             })
             .is_ok()
         );
+    }
+
+    #[test]
+    fn a_batch_is_persisted_before_delivery_and_a_failed_persist_publishes_nothing() {
+        let sink = Arc::new(MemorySink::default());
+        let bus = bus_with(silent_logger(), None);
+        bus.attach(sink.clone());
+        let stream = bus.open_stream().expect("opens");
+        let refused = stream.publish_with(vec![token("lost")], |events| {
+            assert_eq!(events[0].seq, 0);
+            Err("disk full")
+        });
+        assert_eq!(refused.err(), Some("disk full"));
+        assert!(sink.events().is_empty());
+
+        let mut persisted = Vec::new();
+        let published = stream
+            .publish_with(
+                vec![
+                    token("a"),
+                    HostEventDraft::End {
+                        outcome: outcome(RunOutcomeStatus::Ok),
+                    },
+                    token("late"),
+                ],
+                |events| {
+                    persisted.extend(events.iter().map(|event| event.seq));
+                    Ok::<(), ()>(())
+                },
+            )
+            .expect("publishes");
+        assert_eq!(persisted, [0, 1]);
+        assert_eq!(published.len(), 2);
+        assert_eq!(sink.events(), published);
+        assert!(stream.closed());
+        assert_eq!(bus.open(), 0);
+        let after = stream
+            .publish_with(vec![token("b")], |events| {
+                assert!(events.is_empty());
+                Ok::<(), ()>(())
+            })
+            .expect("runs the persist step");
+        assert!(after.is_empty());
     }
 
     #[test]

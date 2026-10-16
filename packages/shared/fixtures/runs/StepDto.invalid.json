@@ -1,0 +1,53 @@
+[
+  {
+    "name": "zero attempt",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111111",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "nodeId": "a",
+      "type": "work",
+      "status": "running",
+      "input": null,
+      "startedAt": 1,
+      "attempt": 0
+    }
+  },
+  {
+    "name": "bad id",
+    "value": {
+      "id": "x",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "nodeId": "a",
+      "type": "work",
+      "status": "running",
+      "input": null,
+      "startedAt": 1,
+      "attempt": 1
+    }
+  },
+  {
+    "name": "unknown status",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111111",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "nodeId": "a",
+      "type": "work",
+      "status": "queued",
+      "input": null,
+      "startedAt": 1,
+      "attempt": 1
+    }
+  },
+  {
+    "name": "missing input",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111111",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "nodeId": "a",
+      "type": "work",
+      "status": "running",
+      "startedAt": 1,
+      "attempt": 1
+    }
+  }
+]

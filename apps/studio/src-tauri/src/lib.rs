@@ -20,6 +20,7 @@ use zvs_host::drivers::ai::{
 };
 use zvs_host::drivers::core::InProcessCore;
 use zvs_host::drivers::sidecar::{SidecarDriver, SidecarOptions};
+use zvs_host::kernel::{KernelServices, NodeRegistry, register_core_nodes, register_job_nodes};
 use zvs_host::platform::clock::{SharedClock, SystemClock};
 use zvs_host::platform::device::{DeviceProbe, DeviceProbeOptions};
 use zvs_host::platform::disk::free_bytes;
@@ -38,7 +39,8 @@ use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_windo
 use zvs_host::services::system::DEMO_INTERVAL;
 use zvs_host::services::{
     AccountService, AccountServiceOptions, CryptoService, GraphService, GraphServiceOptions,
-    HealthCheckOptions, HealthCheckService, ProviderService, ProviderServiceOptions, SecretService,
+    HealthCheckOptions, HealthCheckService, ProviderService, ProviderServiceOptions,
+    RetentionService, RetentionServiceOptions, RunService, RunServiceOptions, SecretService,
     Services, SettingService, SystemService, VectorEvalService, VectorEvalServiceOptions,
     VectorSourceService, VectorSourceServiceOptions, VectorStoreService, VectorStoreServiceOptions,
 };
@@ -381,7 +383,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger: logger.clone(),
         clock: clock.clone(),
         events: Some(events.clone()),
-        runtime: Some(runtime),
+        runtime: Some(runtime.clone()),
     });
 
     let sidecar = SidecarDriver::new(SidecarOptions {
@@ -402,7 +404,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let vector_stores = VectorStoreService::new(VectorStoreServiceOptions::new(
         Arc::clone(&database),
         core.clone(),
-        registry,
+        registry.clone(),
         paths.vector_stores_dir.clone(),
         logger.clone(),
         clock.clone(),
@@ -425,6 +427,27 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger: logger.clone(),
         clock: clock.clone(),
     });
+    let nodes = Arc::new(NodeRegistry::new());
+    register_core_nodes(&nodes)?;
+    register_job_nodes(&nodes)?;
+    let runs = RunService::new(RunServiceOptions {
+        services: KernelServices {
+            providers: Some(registry),
+            vector_stores: Some(Arc::new(vector_stores.clone())),
+            jobs: Some(Arc::new(sidecar.clone())),
+        },
+        clock: clock.clone(),
+        logger: logger.clone(),
+        runtime: Some(runtime.clone()),
+        ..RunServiceOptions::new(Arc::clone(&database), events.clone(), nodes)
+    })?;
+    let retention = RetentionService::new(RetentionServiceOptions {
+        settings: Some(settings.clone()),
+        logger: logger.clone(),
+        clock: clock.clone(),
+        runtime: Some(runtime.clone()),
+        ..RetentionServiceOptions::new(Arc::clone(&database))
+    });
     let system = SystemService::new(clock.clone(), events.clone(), DEMO_INTERVAL)
         .with_core(core)
         .with_device(device)
@@ -443,6 +466,18 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
                 health.stop();
             },
         );
+    }
+    {
+        let retention = retention.clone();
+        shutdown.register(ShutdownStage::Stop, "retention.stop", move || async move {
+            retention.stop();
+        });
+    }
+    {
+        let runs = runs.clone();
+        shutdown.register(ShutdownStage::Drain, "runs", move || async move {
+            runs.dispose().await;
+        });
     }
     {
         let providers = providers.clone();
@@ -491,6 +526,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         vector_sources,
         vector_eval,
         graph,
+        runs,
         picker: Some(Arc::new(DialogPicker::new(app.handle().clone()))),
     });
     let mut server = IpcServer::new(Arc::clone(&services), logger.clone());
@@ -498,6 +534,8 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     server.finish();
     services.accounts.start_auto_refresh()?;
     services.health.start();
+    retention.start();
+    services.runs.recover()?;
     warm_sidecar(sidecar, logger.clone());
 
     Ok(Boot::Studio {

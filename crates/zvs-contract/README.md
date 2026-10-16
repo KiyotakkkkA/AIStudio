@@ -5,27 +5,33 @@ exists here under the **same name** as its Zod schema. The crate is pure data. I
 `serde`, `serde_json`, `uuid`, `thiserror` and `zeroize` and never on Tauri, so the IPC server
 (TASK_060) and every port task can share it.
 
+The optional `schema` feature adds `schemars` (pinned) and derives `JsonSchema` for the
+branded ids, every `wire_enum!` enum, `VectorSearchInput` and `VectorSearchHitDto`, so kernel
+nodes built on them publish a JSON Schema. `zvs-host` enables it.
+
 What lives here today:
 
-| Module          | Contents                                                                                           |
-| --------------- | -------------------------------------------------------------------------------------------------- |
-| `ids`           | Branded ids (`ProviderId`, `StreamId`, …) as `#[serde(transparent)]` newtypes                      |
-| `primitives`    | `Timestamp`, `Json`, `PageRequest`, `Page<T>`, `Sort<F>`, `SortDirection`                          |
-| `errors`        | `AppErrorCode`, `AppError`, `ErrorDetails`                                                         |
-| `envelope`      | `ResultEnvelope<T>`, the `{ ok, data }` / `{ ok, error }` wire envelope                            |
-| `events`        | `HostEvent`, `HostEventDraft`, `RunOutcomeDto`, `DeltaKind`, `EVENT_CHANNEL`                       |
-| `secrets`       | The secret DTOs, `SecretInput`, the type registry and the `secrets.*` channel I/O                  |
-| `settings`      | `SettingKey` validation and the `settings.*` channel inputs/outputs                                |
-| `system`        | `DeviceProfileDto`, `ResourceSampleDto` and the `system.*` channel inputs/outputs                  |
-| `ai`            | `AdapterFamily`, `AuthMode`, `ToolMode`, `AdapterCapabilitiesDto`, `AdapterDescriptorDto`          |
-| `providers`     | The provider enums and DTOs, `ProbeOutcomeDto`, `ProbeRequest` and the `providers.*` I/O           |
-| `vector_stores` | The vector store, source, document, search, chunk and evaluation DTOs and the `vectorStores.*` I/O |
-| `graph`         | The relation, edge, traversal and reconcile DTOs and the `graphRelations.*` I/O                    |
-| `accounts`      | `AccountDto`, `AccountLinkResult` (tagged on `status`) and the `accounts.*` I/O                    |
-| `enums`         | `WireEnum` and `wire_enum!`, for string enums with `ALL`, `as_str` and `parse`                     |
-| `channels`      | `CHANNELS`, generated from `packages/shared/contract.channels.json`                                |
-| `validate`      | The `Validate` trait, `parse`, the `check::*` helpers, `js_trim`, `normalize_url`                  |
-| `wire`          | `present` and `nullable`, the two field deserialisers the wire rules need                          |
+| Module          | Contents                                                                                             |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| `ids`           | Branded ids (`ProviderId`, `StreamId`, …) as `#[serde(transparent)]` newtypes                        |
+| `primitives`    | `Timestamp`, `Json`, `PageRequest`, `Page<T>`, `Sort<F>`, `SortDirection`                            |
+| `errors`        | `AppErrorCode`, `AppError`, `ErrorDetails`                                                           |
+| `envelope`      | `ResultEnvelope<T>`, the `{ ok, data }` / `{ ok, error }` wire envelope                              |
+| `events`        | `HostEvent`, `HostEventDraft`, `RunOutcomeDto`, `DeltaKind`, `EVENT_CHANNEL`                         |
+| `secrets`       | The secret DTOs, `SecretInput`, the type registry and the `secrets.*` channel I/O                    |
+| `settings`      | `SettingKey` validation and the `settings.*` channel inputs/outputs                                  |
+| `system`        | `DeviceProfileDto`, `ResourceSampleDto` and the `system.*` channel inputs/outputs                    |
+| `ai`            | `AdapterFamily`, `AuthMode`, `ToolMode`, `AdapterCapabilitiesDto`, `AdapterDescriptorDto`            |
+| `providers`     | The provider enums and DTOs, `ProbeOutcomeDto`, `ProbeRequest` and the `providers.*` I/O             |
+| `vector_stores` | The vector store, source, document, search, chunk and evaluation DTOs and the `vectorStores.*` I/O   |
+| `graph`         | The relation, edge, traversal and reconcile DTOs and the `graphRelations.*` I/O                      |
+| `runs`          | `StartRunInput`, `RunGraph`, `GraphNode`, the run, step, summary, page and detail DTOs, `runs.*` I/O |
+| `tools`         | `ToolTier`                                                                                           |
+| `accounts`      | `AccountDto`, `AccountLinkResult` (tagged on `status`) and the `accounts.*` I/O                      |
+| `enums`         | `WireEnum` and `wire_enum!`, for string enums with `ALL`, `as_str` and `parse`                       |
+| `channels`      | `CHANNELS`, generated from `packages/shared/contract.channels.json`                                  |
+| `validate`      | The `Validate` trait, `parse`, the `check::*` helpers, `js_trim`, `normalize_url`                    |
+| `wire`          | `present` and `nullable`, the two field deserialisers the wire rules need                            |
 
 Domain DTOs arrive with their port task (TASK_061 – TASK_074), following the recipe below.
 
@@ -52,7 +58,10 @@ These mirror PASSPORT §6. Review enforces them; the golden fixtures catch what 
 - Loose JSON records (`z.record(z.string(), z.json())`) are `serde_json::Map<String, Value>`.
 - Unknown fields are ignored, never denied: Zod objects strip them.
 - `ResultEnvelope<T>` omits `data` only when `T` is zero-sized (`()`, i.e. a `z.void()`
-  output). A `null` from a nullable output is kept.
+  output). A `null` from a nullable output is kept. JSON cannot carry `undefined`, and Zod 4 requires the
+  `data` key even for `z.void()`, so the Tauri bridge (`restoreEnvelope` in
+  `renderer/app/tauriEnvelope.ts`) adds `data: undefined` to a success without it, as Electron's
+  structured clone did.
 - `HostEvent` is the envelope (`streamId`, `seq`, `ts`) with a flattened `HostEventDraft`,
   an internally tagged enum (`#[serde(tag = "type")]`) with the same variant names as Zod.
 

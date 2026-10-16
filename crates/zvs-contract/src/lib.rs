@@ -10,9 +10,11 @@ pub mod graph;
 pub mod ids;
 pub mod primitives;
 pub mod providers;
+pub mod runs;
 pub mod secrets;
 pub mod settings;
 pub mod system;
+pub mod tools;
 pub mod validate;
 pub mod vector_stores;
 pub mod wire;
@@ -55,6 +57,13 @@ pub use providers::{
     ProviderSummaryDto, ProvidersGetInput, ProvidersListOutput, ProvidersRemoveOutput,
     SetDefaultModelInput, UpdateProviderInput,
 };
+pub use runs::{
+    DEFAULT_CONCURRENCY, DEFAULT_RUN_LIST_LIMIT, GRAPH_MAX_NODES, GraphBinding, GraphNode,
+    RetryPolicy, RunApprovalDto, RunCountsDto, RunDetailDto, RunDto, RunGraph, RunHandleDto,
+    RunIdInput, RunKind, RunListFilter, RunPageDto, RunProgressDto, RunStatus, RunSummaryDto,
+    RunsApproveInput, RunsClearFinishedOutput, RunsDenyInput, RunsStepsOutput, StartRunInput,
+    StepDto, StepStatus, is_permission_scope, log_line,
+};
 pub use secrets::{
     CreateSecretInput, FieldDefault, FieldDescriptor, FieldKind, FieldOption, RotationStatus,
     SecretDto, SecretFields, SecretFilter, SecretInput, SecretRef, SecretScope, SecretSummaryDto,
@@ -69,6 +78,7 @@ pub use system::{
     SystemDemoStreamInput, SystemDemoStreamOutput, SystemDeviceInput, SystemNativePingInput,
     SystemNativePingOutput, SystemPingInput, SystemPingOutput,
 };
+pub use tools::ToolTier;
 pub use validate::{VALIDATION_MESSAGE, Validate, parse};
 pub use vector_stores::{
     AddVectorEvalCaseInput, AddVectorSourceInput, CreateVectorStoreInput, PickVectorSourceInput,

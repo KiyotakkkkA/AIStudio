@@ -1,0 +1,22 @@
+[
+  {
+    "name": "running",
+    "value": "running"
+  },
+  {
+    "name": "succeeded",
+    "value": "succeeded"
+  },
+  {
+    "name": "failed",
+    "value": "failed"
+  },
+  {
+    "name": "cancelled",
+    "value": "cancelled"
+  },
+  {
+    "name": "abandoned",
+    "value": "abandoned"
+  }
+]

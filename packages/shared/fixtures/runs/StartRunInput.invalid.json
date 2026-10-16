@@ -1,0 +1,77 @@
+[
+  {
+    "name": "blank title",
+    "value": {
+      "kind": "job",
+      "title": "   ",
+      "graph": {
+        "nodes": []
+      }
+    }
+  },
+  {
+    "name": "long title",
+    "value": {
+      "kind": "job",
+      "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "graph": {
+        "nodes": []
+      }
+    }
+  },
+  {
+    "name": "empty subject",
+    "value": {
+      "kind": "job",
+      "subjectId": "",
+      "graph": {
+        "nodes": []
+      }
+    }
+  },
+  {
+    "name": "zero concurrency",
+    "value": {
+      "kind": "job",
+      "graph": {
+        "nodes": []
+      },
+      "concurrency": 0
+    }
+  },
+  {
+    "name": "crowded",
+    "value": {
+      "kind": "job",
+      "graph": {
+        "nodes": []
+      },
+      "concurrency": 65
+    }
+  },
+  {
+    "name": "bad retry id",
+    "value": {
+      "kind": "job",
+      "retryOfId": "x",
+      "graph": {
+        "nodes": []
+      }
+    }
+  },
+  {
+    "name": "unknown kind",
+    "value": {
+      "kind": "task",
+      "graph": {
+        "nodes": []
+      }
+    }
+  },
+  {
+    "name": "missing graph",
+    "value": {
+      "kind": "job"
+    }
+  }
+]

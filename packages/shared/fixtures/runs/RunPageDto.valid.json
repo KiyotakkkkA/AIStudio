@@ -1,0 +1,88 @@
+[
+  {
+    "name": "minimal",
+    "value": {
+      "items": [],
+      "counts": {
+        "total": 2,
+        "byStatus": {
+          "queued": 0,
+          "running": 0,
+          "blocked": 0,
+          "succeeded": 1,
+          "failed": 1,
+          "cancelled": 0,
+          "interrupted": 0
+        },
+        "byKind": {
+          "chat": 0,
+          "scenario": 0,
+          "agentic": 0,
+          "job": 2,
+          "indexing": 0,
+          "download": 0,
+          "browser": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "every field",
+    "value": {
+      "items": [
+        {
+          "id": "0199aa11-1111-7111-8111-111111111111",
+          "streamId": "0199aa11-2222-7111-8111-111111111111",
+          "kind": "job",
+          "title": "T",
+          "status": "running",
+          "progress": {
+            "done": 0,
+            "total": 1
+          },
+          "createdAt": 1,
+          "subjectId": "s",
+          "activeNodeId": "a",
+          "approval": {
+            "id": "0199aa11-4444-7111-8111-111111111111",
+            "subject": "mail.send",
+            "scope": "global",
+            "expiresAt": 5
+          },
+          "outcome": {
+            "status": "failed",
+            "code": "APPROVAL_DENIED",
+            "message": "Approval denied"
+          },
+          "error": "e",
+          "retryOfId": "0199aa11-1111-7111-8111-111111111111",
+          "startedAt": 2,
+          "finishedAt": 3,
+          "prunedAt": 4
+        }
+      ],
+      "nextCursor": "1:a",
+      "counts": {
+        "total": 2,
+        "byStatus": {
+          "queued": 0,
+          "running": 0,
+          "blocked": 0,
+          "succeeded": 1,
+          "failed": 1,
+          "cancelled": 0,
+          "interrupted": 0
+        },
+        "byKind": {
+          "chat": 0,
+          "scenario": 0,
+          "agentic": 0,
+          "job": 2,
+          "indexing": 0,
+          "download": 0,
+          "browser": 0
+        }
+      }
+    }
+  }
+]

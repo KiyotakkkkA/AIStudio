@@ -1,0 +1,12 @@
+[
+  {
+    "name": "negative",
+    "value": {
+      "removed": -1
+    }
+  },
+  {
+    "name": "missing",
+    "value": {}
+  }
+]

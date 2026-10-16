@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod graph_relations;
 pub mod providers;
+pub mod runs;
 pub mod secrets;
 mod server;
 pub mod settings;
@@ -17,6 +18,7 @@ pub fn register(server: &mut IpcServer) {
     accounts::register(server);
     vector_stores::register(server);
     graph_relations::register(server);
+    runs::register(server);
 }
 
 #[cfg(test)]
@@ -70,6 +72,16 @@ mod tests {
                 "providers.remove",
                 "providers.setDefaultModel",
                 "providers.update",
+                "runs.approve",
+                "runs.cancel",
+                "runs.clearFinished",
+                "runs.deny",
+                "runs.detail",
+                "runs.get",
+                "runs.list",
+                "runs.retry",
+                "runs.start",
+                "runs.steps",
                 "secrets.create",
                 "secrets.get",
                 "secrets.list",
@@ -78,6 +90,7 @@ mod tests {
                 "secrets.update",
                 "settings.get",
                 "settings.set",
+                "system.demoJob",
                 "system.demoStream",
                 "system.device",
                 "system.nativePing",

@@ -1,0 +1,35 @@
+[
+  {
+    "name": "minimal",
+    "value": {
+      "nodes": []
+    }
+  },
+  {
+    "name": "every field",
+    "value": {
+      "nodes": [
+        {
+          "id": "d",
+          "type": "d",
+          "dependencies": ["b"],
+          "input": {},
+          "bindings": {
+            "left": {
+              "source": "node",
+              "nodeId": "b"
+            },
+            "original": {
+              "source": "run"
+            }
+          },
+          "retry": {
+            "maxAttempts": 3,
+            "backoffMs": 15
+          }
+        }
+      ],
+      "permissionScopes": ["skill:a", "scenario:1", "site:https://example.com"]
+    }
+  }
+]

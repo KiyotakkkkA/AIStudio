@@ -1,0 +1,63 @@
+[
+  {
+    "name": "missing summary",
+    "value": {
+      "run": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "streamId": "0199aa11-2222-7111-8111-111111111111",
+        "kind": "chat",
+        "status": "queued",
+        "graph": {
+          "nodes": []
+        },
+        "input": null,
+        "concurrency": 1,
+        "createdAt": 1
+      },
+      "steps": [],
+      "logs": []
+    }
+  },
+  {
+    "name": "bad step",
+    "value": {
+      "run": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "streamId": "0199aa11-2222-7111-8111-111111111111",
+        "kind": "chat",
+        "status": "queued",
+        "graph": {
+          "nodes": []
+        },
+        "input": null,
+        "concurrency": 1,
+        "createdAt": 1
+      },
+      "summary": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "streamId": "0199aa11-2222-7111-8111-111111111111",
+        "kind": "job",
+        "title": "T",
+        "status": "running",
+        "progress": {
+          "done": 0,
+          "total": 1
+        },
+        "createdAt": 1
+      },
+      "steps": [
+        {
+          "id": "0199aa11-3333-7111-8111-111111111111",
+          "runId": "0199aa11-1111-7111-8111-111111111111",
+          "nodeId": "a",
+          "type": "work",
+          "status": "running",
+          "input": null,
+          "startedAt": 1,
+          "attempt": 0
+        }
+      ],
+      "logs": []
+    }
+  }
+]

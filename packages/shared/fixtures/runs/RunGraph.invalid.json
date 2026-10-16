@@ -1,0 +1,27 @@
+[
+  {
+    "name": "bad scope",
+    "value": {
+      "nodes": [],
+      "permissionScopes": ["global"]
+    }
+  },
+  {
+    "name": "empty scope",
+    "value": {
+      "nodes": [],
+      "permissionScopes": ["skill:"]
+    }
+  },
+  {
+    "name": "missing nodes",
+    "value": {}
+  },
+  {
+    "name": "null scopes",
+    "value": {
+      "nodes": [],
+      "permissionScopes": null
+    }
+  }
+]

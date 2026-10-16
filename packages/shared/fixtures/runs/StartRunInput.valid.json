@@ -1,0 +1,47 @@
+[
+  {
+    "name": "minimal",
+    "value": {
+      "kind": "job",
+      "graph": {
+        "nodes": []
+      }
+    }
+  },
+  {
+    "name": "every field",
+    "value": {
+      "kind": "scenario",
+      "subjectId": "s1",
+      "title": "Отчёт",
+      "retryOfId": "0199aa11-1111-7111-8111-111111111111",
+      "graph": {
+        "nodes": [
+          {
+            "id": "d",
+            "type": "d",
+            "dependencies": ["b"],
+            "input": {},
+            "bindings": {
+              "left": {
+                "source": "node",
+                "nodeId": "b"
+              },
+              "original": {
+                "source": "run"
+              }
+            },
+            "retry": {
+              "maxAttempts": 3,
+              "backoffMs": 15
+            }
+          }
+        ]
+      },
+      "input": {
+        "q": 1
+      },
+      "concurrency": 64
+    }
+  }
+]
