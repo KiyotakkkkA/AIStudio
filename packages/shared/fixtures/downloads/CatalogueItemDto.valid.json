@@ -1,0 +1,67 @@
+[
+  {
+    "name": "a curated embedding",
+    "value": {
+      "ref": "curated:embedding:bge-m3-f16",
+      "kind": "embedding",
+      "source": "curated",
+      "name": "bge-m3",
+      "displayName": "BGE-M3",
+      "description": "Многоязычная модель эмбеддингов",
+      "version": "F16",
+      "sizeBytes": 1157671200,
+      "url": "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-FP16.gguf",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c"
+      },
+      "tags": ["BAAI", "1024 dim"],
+      "dimension": 1024,
+      "state": "available",
+      "downloadable": true
+    }
+  },
+  {
+    "name": "an installed engine build",
+    "value": {
+      "ref": "runtime:llama-cpp-vulkan",
+      "kind": "runtime",
+      "source": "github",
+      "name": "llama-cpp-vulkan",
+      "displayName": "llama.cpp · Vulkan (GPU)",
+      "description": "",
+      "sizeBytes": 32000000,
+      "url": "https://github.com/ggml-org/llama.cpp/releases",
+      "tags": [],
+      "state": "installed",
+      "downloadable": false
+    }
+  },
+  {
+    "name": "blocked and in flight",
+    "value": {
+      "ref": "curated:model:qwen2.5-vl-7b",
+      "kind": "model",
+      "source": "curated",
+      "name": "qwen2.5-vl:7b",
+      "displayName": "Qwen2.5-VL 7B",
+      "description": "Многоязычная модель эмбеддингов",
+      "version": "F16",
+      "sizeBytes": 1157671200,
+      "url": "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-FP16.gguf",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c"
+      },
+      "tags": ["BAAI", "1024 dim"],
+      "dimension": 1024,
+      "state": "update",
+      "downloadable": false,
+      "blockedReason": "Недостаточно места на диске: нужно 5.4 ГБ, свободно 1.0 ГБ",
+      "queryPrefix": "query: ",
+      "documentPrefix": "passage: ",
+      "installedVersion": "Q4_K_M",
+      "downloadId": "0199aa11-1111-7111-8111-111111111111"
+    }
+  }
+]

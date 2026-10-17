@@ -1,0 +1,10 @@
+[
+  {
+    "name": "gguf",
+    "value": "gguf"
+  },
+  {
+    "name": "onnx",
+    "value": "onnx"
+  }
+]

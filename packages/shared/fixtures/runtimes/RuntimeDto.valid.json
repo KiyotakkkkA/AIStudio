@@ -1,0 +1,54 @@
+[
+  {
+    "name": "installed",
+    "value": {
+      "id": "llama-cpp-vulkan",
+      "engine": "llama-cpp",
+      "accelerator": "vulkan",
+      "displayName": "llama.cpp · Vulkan (GPU)",
+      "description": "Тот же движок с расчётом на видеокарте через Vulkan.",
+      "formats": ["gguf"],
+      "state": "installed",
+      "installedVersion": "b10970",
+      "installPath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan",
+      "executablePath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan\\llama-server.exe",
+      "sizeBytes": 31675940,
+      "recommended": true,
+      "refs": []
+    }
+  },
+  {
+    "name": "unsupported",
+    "value": {
+      "id": "llama-cpp-metal",
+      "engine": "llama-cpp",
+      "accelerator": "metal",
+      "displayName": "llama.cpp · Metal (Apple)",
+      "description": "",
+      "formats": ["gguf"],
+      "state": "unsupported",
+      "sizeBytes": 12000000,
+      "recommended": false,
+      "blockedReason": "Для этой операционной системы такой сборки не существует",
+      "refs": []
+    }
+  },
+  {
+    "name": "installing",
+    "value": {
+      "id": "llama-cpp-cuda",
+      "engine": "llama-cpp",
+      "accelerator": "cuda",
+      "displayName": "llama.cpp · CUDA (NVIDIA)",
+      "description": "",
+      "formats": ["gguf"],
+      "state": "installing",
+      "sizeBytes": 12000000,
+      "recommended": false,
+      "refs": [
+        "runtime:llama-cpp-cuda:b10970:llama-b10970-bin-win-cuda-13.3-x64.zip",
+        "runtime:llama-cpp-cuda:b10970:cudart-llama-bin-win-cuda-13.3-x64.zip"
+      ]
+    }
+  }
+]

@@ -1,0 +1,10 @@
+[
+  {
+    "name": "llama-cpp",
+    "value": "llama-cpp"
+  },
+  {
+    "name": "onnxruntime",
+    "value": "onnxruntime"
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "name": "sha256",
+    "value": {
+      "algorithm": "sha256",
+      "value": "d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12"
+    }
+  },
+  {
+    "name": "blake3 at the 32-digit minimum",
+    "value": {
+      "algorithm": "blake3",
+      "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  }
+]

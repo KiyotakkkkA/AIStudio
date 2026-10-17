@@ -2,6 +2,7 @@ pub mod accounts;
 pub mod ai;
 pub mod browser;
 pub mod channels;
+pub mod downloads;
 pub mod enums;
 pub mod envelope;
 pub mod errors;
@@ -11,6 +12,7 @@ pub mod ids;
 pub mod primitives;
 pub mod providers;
 pub mod runs;
+pub mod runtimes;
 pub mod secrets;
 pub mod settings;
 pub mod system;
@@ -33,6 +35,13 @@ pub use browser::{
     BrowserState, BrowserTab,
 };
 pub use channels::{CHANNELS, is_channel};
+pub use downloads::{
+    CatalogueFilter, CatalogueItemDto, CatalogueItemState, CatalogueSource, ChecksumAlgorithm,
+    ChecksumDto, DiskCategory, DiskCategoryUsage, DiskUsageDto, DownloadDto, DownloadFetchInput,
+    DownloadItemKind, DownloadListFilter, DownloadRef, DownloadReportDto, DownloadStatus,
+    DownloadsCatalogueOutput, DownloadsDiskInput, DownloadsListOutput, DownloadsRemoveOutput,
+    PrioritiseDownloadInput, StartDownloadInput,
+};
 pub use enums::WireEnum;
 pub use envelope::ResultEnvelope;
 pub use errors::{AppError, AppErrorCode, ErrorDetails};
@@ -63,6 +72,10 @@ pub use runs::{
     RunIdInput, RunKind, RunListFilter, RunPageDto, RunProgressDto, RunStatus, RunSummaryDto,
     RunsApproveInput, RunsClearFinishedOutput, RunsDenyInput, RunsStepsOutput, StartRunInput,
     StepDto, StepStatus, is_permission_scope, log_line,
+};
+pub use runtimes::{
+    Accelerator, InstallRuntimeInput, ModelFormat, RuntimeDto, RuntimeEngine, RuntimeOverviewDto,
+    RuntimePlanDto, RuntimeRef, RuntimeState, RuntimesRemoveOutput, RuntimesStopOutput,
 };
 pub use secrets::{
     CreateSecretInput, FieldDefault, FieldDescriptor, FieldKind, FieldOption, RotationStatus,

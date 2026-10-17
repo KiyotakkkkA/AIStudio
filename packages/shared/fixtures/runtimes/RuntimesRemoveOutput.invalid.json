@@ -1,0 +1,9 @@
+[
+  {
+    "name": "not removed",
+    "value": {
+      "id": "llama-cpp-vulkan",
+      "removed": false
+    }
+  }
+]

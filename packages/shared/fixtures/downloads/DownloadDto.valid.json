@@ -1,0 +1,48 @@
+[
+  {
+    "name": "running with a rate",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "itemKind": "embedding",
+      "itemRef": "curated:embedding:bge-m3-f16",
+      "displayName": "BGE-M3",
+      "sizeBytes": 1157671200,
+      "bytesDone": 524288000,
+      "status": "running",
+      "priority": 6,
+      "targetPath": "C:\\Users\\me\\AppData\\Roaming\\zvs\\downloads\\embeddings\\bge-m3-FP16.gguf",
+      "url": "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-FP16.gguf",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c"
+      },
+      "version": "F16",
+      "runId": "0199aa11-2222-7111-8111-111111111111",
+      "rateBytesPerSecond": 10485760.5,
+      "etaMs": 60000,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000001000,
+      "startedAt": 1760000000500
+    }
+  },
+  {
+    "name": "failed",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "itemKind": "mcp",
+      "itemRef": "curated:mcp:fs",
+      "displayName": "fs",
+      "sizeBytes": 0,
+      "bytesDone": 0,
+      "status": "failed",
+      "priority": 7,
+      "targetPath": "/home/me/.zvs/downloads/mcp/fs.tgz",
+      "url": "https://example.test/fs.tgz",
+      "error": "Checksum mismatch",
+      "rateBytesPerSecond": 0.5,
+      "createdAt": 1,
+      "updatedAt": 2,
+      "finishedAt": 2
+    }
+  }
+]

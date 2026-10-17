@@ -1,0 +1,20 @@
+[
+  {
+    "name": "query too long",
+    "value": {
+      "query": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+  },
+  {
+    "name": "refresh as a string",
+    "value": {
+      "refresh": "yes"
+    }
+  },
+  {
+    "name": "unknown state",
+    "value": {
+      "states": ["missing"]
+    }
+  }
+]

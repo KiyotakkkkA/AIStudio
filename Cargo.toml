@@ -18,6 +18,7 @@ serde = { version = "=1.0.228", features = ["derive"] }
 tempfile = "=3.27.0"
 tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "time"] }
 blake3 = "=1.8.7"
+flate2 = "=1.1.10"
 pdf-extract = "=0.12.0"
 petgraph = "=0.8.3"
 regex = "=1.13.1"
@@ -29,6 +30,7 @@ napi-build = "=2.4.2"
 reqwest = { version = "=0.12.28", default-features = false, features = ["rustls-tls-native-roots", "stream", "http2", "charset"] }
 sha2 = "=0.11.0"
 serde_json = { version = "=1.0.151", features = ["preserve_order"] }
+tar = { version = "=0.4.46", default-features = false }
 sysinfo = { version = "=0.38.4", default-features = false, features = ["system", "disk"] }
 thiserror = "=2.0.20"
 tokio-util = { version = "=0.7.19", features = ["rt"] }

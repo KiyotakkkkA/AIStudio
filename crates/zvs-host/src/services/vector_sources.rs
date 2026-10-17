@@ -16,20 +16,11 @@ use crate::data::{Database, Repositories};
 use crate::platform::clock::SharedClock;
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger};
+pub use crate::platform::long_path::from_extended_path;
 
 pub const DEFAULT_ANN_THRESHOLD: usize = 100_000;
 pub const SOURCE_NOT_FOUND: &str = "Источник не найден";
 pub const DOCUMENT_NOT_FOUND: &str = "Документ не найден";
-
-const EXTENDED: &str = r"\\?\";
-const EXTENDED_UNC: &str = r"\\?\UNC\";
-
-pub fn from_extended_path(path: &str) -> String {
-    if let Some(rest) = path.strip_prefix(EXTENDED_UNC) {
-        return format!(r"\\{rest}");
-    }
-    path.strip_prefix(EXTENDED).unwrap_or(path).to_owned()
-}
 
 pub fn resolve_path(path: &str, working_directory: &Path) -> PathBuf {
     let candidate = Path::new(path);

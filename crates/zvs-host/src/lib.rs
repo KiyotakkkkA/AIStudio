@@ -2,10 +2,12 @@
 
 pub mod browser;
 pub mod data;
+pub mod downloads;
 pub mod drivers;
 pub mod ipc;
 pub mod kernel;
 pub mod platform;
+pub mod runtimes;
 pub mod services;
 
 #[cfg(any(test, feature = "testing"))]

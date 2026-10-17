@@ -48,6 +48,7 @@ export default function CatalogueRow({
 
   return (
     <div
+      onClick={onSelect}
       className={`flex items-center gap-3 border-b border-main-750 px-5 py-3 ${
         selected
           ? "bg-main-750 shadow-[inset_2px_0_0_var(--color-accent-dark)]"
@@ -56,7 +57,6 @@ export default function CatalogueRow({
     >
       <button
         type="button"
-        onClick={onSelect}
         aria-current={selected ? "true" : undefined}
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >

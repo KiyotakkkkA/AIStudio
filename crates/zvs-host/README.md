@@ -24,6 +24,8 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 | `platform::gpu`            | The `GpuProbe` port, `GpuAdapter`, `select_gpu`, `NoGpu`                                                          |
 | `platform::metrics`        | `ResourceMonitor`, `ResourceCounters` (`SysinfoCounters`), the `GpuSampler` port, `NvidiaSmi`                     |
 | `platform::disk`           | `free_bytes`                                                                                                      |
+| `platform::archive`        | `extract_archive` (zip over `flate2`, tar.gz over `tar`), `safe_member_path`, `read_zip_entries`                  |
+| `platform::long_path`      | `to_extended_path`, `from_extended_path`, `extended` (the `\\?\` prefix)                                          |
 | `platform::picker`         | The `PickerPort` behind `vectorStores.sources.pick` (`tauri-plugin-dialog` in `zvs-studio`)                       |
 | `services::crypto`         | `CryptoBackend`, `CryptoService`, `Plaintext`, `UnavailableBackend`                                               |
 | `services::secrets`        | `SecretService`, the summary and DTO mapping, `secret_policy`, `secret_fields`                                    |
@@ -37,6 +39,8 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 | `services::retrieval_*`    | `merge_retrieval` (floor, ±1 collapse, per-document cap, top N), `retrieval_metrics`, `retrieval_query`           |
 | `services::vector_health`  | `derive_vector_health`, the metric mapping between the contract and `zvs-core`                                    |
 | `services::accounts`       | `AccountService`, the `AccountBrowser` port, `mask_email`                                                         |
+| `downloads`                | `DownloadService`, `CatalogueService` (curated, Ollama, engine builds), `DiskService`, the `DownloadRunner` port  |
+| `runtimes`                 | `RuntimeService`, `LlamaServer`, `ReleaseResolver`, the engine definitions and `plan_accelerator`                 |
 | `drivers::ai`              | AI ports, `HttpClient`, transports, adapters, `ProviderRegistry` (see below)                                      |
 | `drivers::core`            | `TextCore`, `VectorCore`, `GraphCore`, `InProcessCore`, `GraphRegistry`                                           |
 | `drivers::sidecar`         | `SidecarDriver`, `SidecarJobs`, `JobRunOptions`, the NDJSON protocol                                              |
@@ -389,9 +393,55 @@ together, and the whole run is capped at `DEFAULT_SHUTDOWN_CAP` (5 s). Every sta
 `Shutdown stage started` and `Shutdown stage finished` under `host`. `zvs-studio` calls
 `request_exit` from `RunEvent::ExitRequested`: the first call prevents the exit and starts the
 run, which ends with `AppHandle::exit`; calls during the run keep preventing it; afterwards the
-exit goes through and `RunEvent::Exit` logs `Shutdown`. Today it holds `health-check.stop` and
-`retention.stop` (`Stop`), `runs` (`Drain`) and `providers`, `health-check`, `accounts`, `account-gateway` and `sidecar` (`Dispose`). Later ports register their own tasks
+exit goes through and `RunEvent::Exit` logs `Shutdown`. Today it holds `health-check.stop`,
+`retention.stop`, `downloads` and `runtimes` (`Stop`), `runs` (`Drain`) and `providers`, `health-check`, `accounts`, `account-gateway` and `sidecar` (`Dispose`). Later ports register their own tasks
 in the stage `main.ts` used for them.
+
+## Downloads
+
+`DownloadService` is `DownloadService.ts`. A download is a `download` run with one
+`download.fetch` node; the node calls `DownloadService::execute`, which runs `job.download` in the
+sidecar (resume from `<target>.part`, checksum before the rename). The queue holds at most
+`downloads.concurrency` (1–8, default 2) running rows and fills free slots by priority, then
+size, then age (`DownloadRepository::next_queued`); pumping is serialised and re-entrant safe.
+A start is refused when the catalogue does not know the ref, the item is already active, or the
+volume lacks the artefact plus 1 GiB (`Недостаточно места на диске: …`). Pause and cancel record
+an intent and cancel the run; a cancellation with no intent is a shutdown and leaves the row
+`paused` with its partial. `recover()` requeues rows still `running` after a crash. Byte counts
+reach the database at most once per second. An installer (`RuntimeService`) runs after the
+transfer and before the row turns `succeeded`.
+
+`CatalogueService` merges its providers, caches the list and the installed snapshot for 60 s,
+skips live providers unless `refresh`, keeps the previous list when a refresh reaches nothing,
+and answers `find` from `offer`ed engine archives first. `OllamaProvider` reads `/api/tags`
+from the first enabled Ollama provider. `DiskService` caches a measurement for 30 s and shares
+one measurement between concurrent callers.
+
+`platform::archive` reads zip archives itself (central directory, stored and deflated members,
+ZIP64 refused) and tar.gz through `tar` + `flate2`. Every member name goes through
+`safe_member_path`: `..` that escapes, drive letters and directory entries are dropped, rooted
+names are re-anchored under the target. Tar links and devices are skipped; a zip symlink entry
+is written as a plain file. Rust's `std` already adds the `\\?\` prefix to long absolute paths;
+`long_path` keeps the explicit helpers for callers that need the spelling.
+
+## Runtimes
+
+`RuntimeService` is `RuntimeService.ts`. The installed builds live in the `runtimes.installed`
+setting. `install` resolves today's llama.cpp release (`ReleaseResolver`, cached 6 h, the cache
+kept when GitHub is unreachable, 403 is `RATE_LIMITED`), offers each asset to the catalogue and
+queues it; `unpack_download` extracts an engine archive, deletes it and records the tag and the
+`llama-server` it found. `embed`, `read_image` (the OCR entry point, projector found by name
+overlap) and `rerank` pick the installed build that loads the format (an accelerated one first)
+and keep one `LlamaServer` per build and role. The registry gets the service as its
+`LocalEmbeddingEngine` and the vector store service gets `local_rerankers` over it.
+
+`LlamaServer` spawns `llama-server` with `CREATE_NO_WINDOW` and `kill_on_drop`, on a free
+loopback port with a random API key, polls `/health` every 250 ms up to 180 s, keeps the last
+4000 characters of stderr for start failures, stops itself after 5 idle minutes, and resets when
+the process exits on its own (logged as `A local engine server exited`). Concurrent callers join
+one launch. A rerank caller that gives up does not stop a model that is still loading; an
+embedding or vision caller that gives up does. The local engine client has no proxy. Its tests
+re-run the test binary as a stub `llama-server` (`runtimes::llama_server::tests::llama_stub`).
 
 ## Browser
 

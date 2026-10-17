@@ -1,4 +1,5 @@
 pub mod fake_accounts;
+pub mod fake_downloads;
 pub mod fake_driver;
 pub mod fake_session;
 
@@ -15,9 +16,20 @@ pub use self::fake_accounts::{
     FakeIdentityProbes, ProbeStep, RecordingBrowser, RecordingNavigator, TokioClock, fake_identity,
     signed_out,
 };
+pub use self::fake_downloads::{DownloadAttempt, FakeDownloadJobs, FixedDiskProbe, sha256_hex};
 pub use self::fake_driver::{FAKE_CAPABILITIES, FakeDriver, FakeDriverSource, FakeScript};
 pub use self::fake_session::{FakeReply, FakeSessionGateway, RecordedSessionRequest};
 use crate::browser::BrowserLifecycle;
+use crate::downloads::{
+    CatalogueService, CatalogueServiceOptions, DiskService, DiskServiceOptions, DownloadService,
+    DownloadServiceOptions,
+};
+use crate::drivers::ai::{HttpClient, HttpClientOptions, ProxyMode};
+use crate::runtimes::{
+    ReleaseResolver, ReleaseResolverOptions, RuntimeService, RuntimeServiceOptions,
+};
+
+const GIB: u64 = 1024 * 1024 * 1024;
 use crate::data::{BACKUPS_KEPT, Database, MIGRATIONS, MigrateOptions, migrate};
 use crate::drivers::ai::registry::SessionFactory;
 use crate::drivers::ai::transport::SharedSessionGateway;
@@ -186,12 +198,19 @@ pub struct TestServices {
     pub nodes: Arc<NodeRegistry>,
     pub run_events: Arc<MemorySink>,
     pub jobs: Arc<FakeJobs>,
+    pub download_jobs: Arc<FakeDownloadJobs>,
+    pub disk_probe: Arc<FixedDiskProbe>,
+    pub workspace: TemporaryDirectory,
     pub database: TemporaryDatabase,
 }
 
 impl TestServices {
     pub fn shared(&self) -> Arc<Services> {
         Arc::clone(&self.services)
+    }
+
+    pub fn downloads_dir(&self) -> PathBuf {
+        self.workspace.join("downloads")
     }
 }
 
@@ -286,15 +305,67 @@ pub fn test_services(system: SystemService) -> TestServices {
     run_bus.attach(run_events.clone());
     let nodes = Arc::new(NodeRegistry::new());
     let jobs = FakeJobs::shared();
+    let workspace = temporary_directory("studio-host-");
+    let downloads_dir = workspace.join("downloads");
+    let download_jobs = FakeDownloadJobs::shared();
+    let disk_probe = FixedDiskProbe::shared(1000 * GIB, 100 * GIB);
+    let disk = DiskService::new(DiskServiceOptions {
+        probe: disk_probe.clone(),
+        ..DiskServiceOptions::new(
+            downloads_dir.clone(),
+            database.directory().join("vector-stores"),
+            workspace.path().to_path_buf(),
+            clock.clone(),
+        )
+    });
+    let catalogue =
+        CatalogueService::new(CatalogueServiceOptions::new(clock.clone(), silent_logger()));
+    let downloads = DownloadService::new(DownloadServiceOptions {
+        settings: Some(settings.clone()),
+        ..DownloadServiceOptions::new(
+            database.shared(),
+            download_jobs.clone(),
+            disk,
+            catalogue.clone(),
+            downloads_dir.clone(),
+            silent_logger(),
+            clock.clone(),
+        )
+    });
+    let local_http = HttpClient::with_options(HttpClientOptions {
+        proxy: ProxyMode::Off,
+        ..HttpClientOptions::default()
+    })
+    .expect("a client");
+    let runtimes = RuntimeService::new(RuntimeServiceOptions {
+        downloads: Arc::new(downloads.clone()),
+        catalogue: Arc::new(catalogue.clone()),
+        settings: settings.clone(),
+        downloads_dir,
+        device: None,
+        resolver: ReleaseResolver::new(ReleaseResolverOptions {
+            url: "http://127.0.0.1:9/releases".to_owned(),
+            ..ReleaseResolverOptions::new(local_http.clone(), clock.clone(), silent_logger())
+        }),
+        http: local_http,
+        logger: silent_logger(),
+        create_server: None,
+        context_size: None,
+    });
+    downloads.attach_installer(Arc::new(runtimes.clone()));
+    catalogue.add_provider(runtimes.catalogue_provider());
+    crate::kernel::register_download_nodes(&nodes).expect("registers the download nodes");
     let runs = RunService::new(RunServiceOptions {
         clock: clock.clone(),
         services: crate::kernel::KernelServices {
             jobs: Some(jobs.clone()),
+            downloads: Some(Arc::new(downloads.clone())),
             ..crate::kernel::KernelServices::default()
         },
         ..RunServiceOptions::new(database.shared(), run_bus, Arc::clone(&nodes))
     })
     .expect("a run service");
+    downloads.attach(Arc::new(runs.clone()));
     let picker = FakePicker::shared();
     TestServices {
         services: Arc::new(Services {
@@ -310,11 +381,16 @@ pub fn test_services(system: SystemService) -> TestServices {
             vector_eval,
             graph,
             runs,
+            downloads,
+            runtimes,
             picker: Some(picker.clone()),
         }),
         nodes,
         run_events,
         jobs,
+        download_jobs,
+        disk_probe,
+        workspace,
         theme,
         clock,
         crypto,

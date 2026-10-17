@@ -1,0 +1,30 @@
+[
+  {
+    "name": "empty path",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "bytes": 36,
+      "resumedFrom": 12,
+      "path": ""
+    }
+  },
+  {
+    "name": "negative bytes",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "bytes": -1,
+      "resumedFrom": 12,
+      "path": "C:\\zvs\\downloads\\models\\alpha.bin"
+    }
+  },
+  {
+    "name": "null checksum",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "bytes": 36,
+      "resumedFrom": 12,
+      "path": "C:\\zvs\\downloads\\models\\alpha.bin",
+      "checksum": null
+    }
+  }
+]

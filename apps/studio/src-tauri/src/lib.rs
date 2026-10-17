@@ -12,15 +12,23 @@ use std::sync::Arc;
 use serde_json::json;
 use tauri::{App, AppHandle, Manager, RunEvent, WindowEvent};
 use zvs_host::browser::{BrowserLifecycle, profile_dir};
-use zvs_host::data::repositories::SecretFilter;
+use zvs_host::data::Repositories;
+use zvs_host::data::repositories::{ProviderFilter, SecretFilter};
 use zvs_host::data::{MigrationFailed, PrepareOptions, prepare_database};
+use zvs_host::downloads::{
+    CatalogueService, CatalogueServiceOptions, CuratedProvider, DiskService, DiskServiceOptions,
+    DownloadService, DownloadServiceOptions, OllamaProvider,
+};
 use zvs_host::drivers::ai::adapters::FileSystemModelStore;
 use zvs_host::drivers::ai::{
-    DatabaseAccounts, DatabaseProviders, HttpClient, ProviderRegistry, ProviderRegistryOptions,
+    DatabaseAccounts, DatabaseProviders, HttpClient, HttpClientOptions, ProviderRegistry,
+    ProviderRegistryOptions, ProxyMode,
 };
 use zvs_host::drivers::core::InProcessCore;
 use zvs_host::drivers::sidecar::{SidecarDriver, SidecarOptions};
-use zvs_host::kernel::{KernelServices, NodeRegistry, register_core_nodes, register_job_nodes};
+use zvs_host::kernel::{
+    KernelServices, NodeRegistry, register_core_nodes, register_download_nodes, register_job_nodes,
+};
 use zvs_host::platform::clock::{SharedClock, SystemClock};
 use zvs_host::platform::device::{DeviceProbe, DeviceProbeOptions};
 use zvs_host::platform::disk::free_bytes;
@@ -36,6 +44,10 @@ use zvs_host::platform::shutdown::{
 };
 use zvs_host::platform::theme::{SharedThemePort, THEME_SETTING_KEY, apply_theme_source};
 use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_window_state};
+use zvs_host::runtimes::{
+    ReleaseResolver, ReleaseResolverOptions, RuntimeService, RuntimeServiceOptions,
+};
+use zvs_host::services::rerank::local_rerankers;
 use zvs_host::services::system::DEMO_INTERVAL;
 use zvs_host::services::{
     AccountService, AccountServiceOptions, CryptoService, GraphService, GraphServiceOptions,
@@ -339,10 +351,11 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     ));
     let sessions = gateway_sessions(Arc::clone(&gateway));
 
+    let http = HttpClient::new()?;
     let mut registry = ProviderRegistryOptions::new(
         Arc::new(DatabaseProviders::new(Arc::clone(&database))),
         secrets.clone(),
-        HttpClient::new()?,
+        http.clone(),
     );
     registry.accounts = Arc::new(DatabaseAccounts::new(
         Arc::clone(&database),
@@ -427,20 +440,96 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger: logger.clone(),
         clock: clock.clone(),
     });
+    let disk = DiskService::new(DiskServiceOptions::new(
+        paths.downloads_dir.clone(),
+        paths.vector_stores_dir.clone(),
+        paths.data_dir.clone(),
+        clock.clone(),
+    ));
+    let ollama_base_url = {
+        let database = Arc::clone(&database);
+        Arc::new(move || {
+            database
+                .with_connection(|connection| {
+                    Ok(Repositories::new(connection)
+                        .providers
+                        .list(&ProviderFilter {
+                            capability: None,
+                            enabled: None,
+                        })?)
+                })
+                .ok()?
+                .into_iter()
+                .find(|provider| {
+                    provider.kind == zvs_contract::ProviderKind::Ollama && provider.enabled
+                })
+                .map(|provider| provider.base_url)
+                .filter(|base_url| !base_url.is_empty())
+        })
+    };
+    let catalogue = CatalogueService::new(CatalogueServiceOptions {
+        providers: vec![
+            Arc::new(CuratedProvider),
+            Arc::new(OllamaProvider::new(
+                ollama_base_url,
+                http.clone(),
+                logger.clone(),
+            )),
+        ],
+        ..CatalogueServiceOptions::new(clock.clone(), logger.clone())
+    });
+    let downloads = DownloadService::new(DownloadServiceOptions {
+        settings: Some(settings.clone()),
+        ..DownloadServiceOptions::new(
+            Arc::clone(&database),
+            Arc::new(sidecar.clone()),
+            disk,
+            catalogue.clone(),
+            paths.downloads_dir.clone(),
+            logger.clone(),
+            clock.clone(),
+        )
+    });
+    let runtimes = RuntimeService::new(RuntimeServiceOptions {
+        downloads: Arc::new(downloads.clone()),
+        catalogue: Arc::new(catalogue.clone()),
+        settings: settings.clone(),
+        downloads_dir: paths.downloads_dir.clone(),
+        device: Some(device.clone()),
+        resolver: ReleaseResolver::new(ReleaseResolverOptions::new(
+            http,
+            clock.clone(),
+            logger.clone(),
+        )),
+        http: HttpClient::with_options(HttpClientOptions {
+            proxy: ProxyMode::Off,
+            ..HttpClientOptions::default()
+        })?,
+        logger: logger.clone(),
+        create_server: None,
+        context_size: None,
+    });
+    downloads.attach_installer(Arc::new(runtimes.clone()));
+    catalogue.add_provider(runtimes.catalogue_provider());
+    registry.attach_local_engine(Arc::new(runtimes.clone()));
+    vector_stores.attach_rerankers(local_rerankers(Arc::new(runtimes.clone())));
     let nodes = Arc::new(NodeRegistry::new());
     register_core_nodes(&nodes)?;
     register_job_nodes(&nodes)?;
+    register_download_nodes(&nodes)?;
     let runs = RunService::new(RunServiceOptions {
         services: KernelServices {
             providers: Some(registry),
             vector_stores: Some(Arc::new(vector_stores.clone())),
             jobs: Some(Arc::new(sidecar.clone())),
+            downloads: Some(Arc::new(downloads.clone())),
         },
         clock: clock.clone(),
         logger: logger.clone(),
         runtime: Some(runtime.clone()),
         ..RunServiceOptions::new(Arc::clone(&database), events.clone(), nodes)
     })?;
+    downloads.attach(Arc::new(runs.clone()));
     let retention = RetentionService::new(RetentionServiceOptions {
         settings: Some(settings.clone()),
         logger: logger.clone(),
@@ -471,6 +560,18 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         let retention = retention.clone();
         shutdown.register(ShutdownStage::Stop, "retention.stop", move || async move {
             retention.stop();
+        });
+    }
+    {
+        let downloads = downloads.clone();
+        shutdown.register(ShutdownStage::Stop, "downloads", move || async move {
+            downloads.dispose();
+        });
+    }
+    {
+        let runtimes = runtimes.clone();
+        shutdown.register(ShutdownStage::Stop, "runtimes", move || async move {
+            runtimes.dispose().await;
         });
     }
     {
@@ -527,6 +628,8 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         vector_eval,
         graph,
         runs,
+        downloads,
+        runtimes,
         picker: Some(Arc::new(DialogPicker::new(app.handle().clone()))),
     });
     let mut server = IpcServer::new(Arc::clone(&services), logger.clone());
@@ -536,6 +639,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     services.health.start();
     retention.start();
     services.runs.recover()?;
+    services.downloads.recover()?;
     warm_sidecar(sidecar, logger.clone());
 
     Ok(Boot::Studio {

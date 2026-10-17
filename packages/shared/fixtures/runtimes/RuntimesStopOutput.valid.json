@@ -1,0 +1,14 @@
+[
+  {
+    "name": "stopped",
+    "value": {
+      "stopped": true
+    }
+  },
+  {
+    "name": "nothing running",
+    "value": {
+      "stopped": false
+    }
+  }
+]

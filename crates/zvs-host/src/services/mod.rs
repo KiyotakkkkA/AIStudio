@@ -47,8 +47,10 @@ pub use vector_stores::{VectorSearchOptions, VectorStoreService, VectorStoreServ
 
 use std::sync::Arc;
 
+use crate::downloads::DownloadService;
 use crate::platform::picker::SharedPicker;
 use crate::platform::theme::SharedThemePort;
+use crate::runtimes::RuntimeService;
 
 pub struct Services {
     pub system: SystemService,
@@ -63,5 +65,7 @@ pub struct Services {
     pub vector_eval: VectorEvalService,
     pub graph: GraphService,
     pub runs: RunService,
+    pub downloads: DownloadService,
+    pub runtimes: RuntimeService,
     pub picker: Option<SharedPicker>,
 }

@@ -1,0 +1,25 @@
+[
+  {
+    "name": "a discrete gpu",
+    "value": {
+      "accelerator": "vulkan",
+      "reason": "Обнаружена дискретная видеокарта NVIDIA GeForce RTX 4070. Vulkan ускоряет расчёт и не требует CUDA.",
+      "gpu": {
+        "vendor": "NVIDIA",
+        "model": "GeForce RTX 4070",
+        "vramBytes": 12884901888,
+        "discrete": true
+      },
+      "ready": true
+    }
+  },
+  {
+    "name": "no gpu",
+    "value": {
+      "accelerator": "cpu",
+      "reason": "Обнаружена дискретная видеокарта NVIDIA GeForce RTX 4070. Vulkan ускоряет расчёт и не требует CUDA.",
+      "gpu": null,
+      "ready": false
+    }
+  }
+]

@@ -1,0 +1,37 @@
+[
+  {
+    "name": "measured",
+    "value": {
+      "root": "C:\\zvs\\downloads",
+      "totalBytes": 1000,
+      "freeBytes": 400,
+      "usedBytes": 600,
+      "categories": [
+        {
+          "category": "models",
+          "bytes": 300
+        },
+        {
+          "category": "vectors",
+          "bytes": 120
+        },
+        {
+          "category": "other",
+          "bytes": 70
+        }
+      ],
+      "measuredAt": 1760000000000
+    }
+  },
+  {
+    "name": "nothing measured",
+    "value": {
+      "root": "C:\\zvs\\downloads",
+      "totalBytes": 1000,
+      "freeBytes": 400,
+      "usedBytes": 600,
+      "categories": [],
+      "measuredAt": 1760000000000
+    }
+  }
+]

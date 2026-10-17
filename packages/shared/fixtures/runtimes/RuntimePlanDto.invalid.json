@@ -1,0 +1,24 @@
+[
+  {
+    "name": "missing gpu",
+    "value": {
+      "accelerator": "vulkan",
+      "reason": "Обнаружена дискретная видеокарта NVIDIA GeForce RTX 4070. Vulkan ускоряет расчёт и не требует CUDA.",
+      "ready": true
+    }
+  },
+  {
+    "name": "reason too long",
+    "value": {
+      "accelerator": "vulkan",
+      "reason": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "gpu": {
+        "vendor": "NVIDIA",
+        "model": "GeForce RTX 4070",
+        "vramBytes": 12884901888,
+        "discrete": true
+      },
+      "ready": true
+    }
+  }
+]

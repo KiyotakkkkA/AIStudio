@@ -1,0 +1,26 @@
+[
+  {
+    "name": "ref too short after trimming",
+    "value": {
+      "ref": "  ab  "
+    }
+  },
+  {
+    "name": "priority above 9",
+    "value": {
+      "ref": "curated:model:alpha",
+      "priority": 10
+    }
+  },
+  {
+    "name": "null priority",
+    "value": {
+      "ref": "curated:model:alpha",
+      "priority": null
+    }
+  },
+  {
+    "name": "missing ref",
+    "value": {}
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "unknown status",
+    "value": {
+      "statuses": ["done"]
+    }
+  },
+  {
+    "name": "more statuses than exist",
+    "value": {
+      "statuses": ["queued", "queued", "queued", "queued", "queued", "queued", "queued"]
+    }
+  },
+  {
+    "name": "null kinds",
+    "value": {
+      "kinds": null
+    }
+  }
+]

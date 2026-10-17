@@ -1,0 +1,26 @@
+[
+  {
+    "name": "queued",
+    "value": "queued"
+  },
+  {
+    "name": "running",
+    "value": "running"
+  },
+  {
+    "name": "paused",
+    "value": "paused"
+  },
+  {
+    "name": "succeeded",
+    "value": "succeeded"
+  },
+  {
+    "name": "failed",
+    "value": "failed"
+  },
+  {
+    "name": "cancelled",
+    "value": "cancelled"
+  }
+]

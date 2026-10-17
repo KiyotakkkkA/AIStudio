@@ -1,4 +1,5 @@
 pub mod account;
+pub mod download;
 pub mod graph_edge;
 pub mod graph_relation;
 pub mod model;
@@ -17,6 +18,7 @@ use rusqlite::Connection;
 pub use account::{
     AccountDraft, AccountPatch, AccountRemoval, AccountRepository, NO_ACCOUNT_LINKED,
 };
+pub use download::{DownloadPatch, DownloadRepository};
 pub use graph_edge::{GraphEdgeDraft, GraphEdgeLookup, GraphEdgeRepository};
 pub use graph_relation::GraphRelationRepository;
 pub use model::{ModelDraft, ModelRepository};
@@ -49,6 +51,7 @@ pub struct Repositories<'c> {
     pub graph_edges: GraphEdgeRepository<'c>,
     pub runs: RunRepository<'c>,
     pub permissions: PermissionRepository<'c>,
+    pub downloads: DownloadRepository<'c>,
 }
 
 impl<'c> Repositories<'c> {
@@ -67,6 +70,7 @@ impl<'c> Repositories<'c> {
             graph_edges: GraphEdgeRepository::new(connection),
             runs: RunRepository::new(connection),
             permissions: PermissionRepository::new(connection),
+            downloads: DownloadRepository::new(connection),
         }
     }
 }

@@ -1,7 +1,9 @@
 pub mod accounts;
+pub mod downloads;
 pub mod graph_relations;
 pub mod providers;
 pub mod runs;
+pub mod runtimes;
 pub mod secrets;
 mod server;
 pub mod settings;
@@ -19,6 +21,8 @@ pub fn register(server: &mut IpcServer) {
     vector_stores::register(server);
     graph_relations::register(server);
     runs::register(server);
+    downloads::register(server);
+    runtimes::register(server);
 }
 
 #[cfg(test)]
@@ -55,6 +59,15 @@ mod tests {
                 "accounts.list",
                 "accounts.refresh",
                 "accounts.unlink",
+                "downloads.cancel",
+                "downloads.catalogue",
+                "downloads.disk",
+                "downloads.list",
+                "downloads.pause",
+                "downloads.prioritise",
+                "downloads.remove",
+                "downloads.resume",
+                "downloads.start",
                 "graphRelations.addEdge",
                 "graphRelations.kHopSubgraph",
                 "graphRelations.list",
@@ -82,6 +95,10 @@ mod tests {
                 "runs.retry",
                 "runs.start",
                 "runs.steps",
+                "runtimes.install",
+                "runtimes.list",
+                "runtimes.remove",
+                "runtimes.stop",
                 "secrets.create",
                 "secrets.get",
                 "secrets.list",

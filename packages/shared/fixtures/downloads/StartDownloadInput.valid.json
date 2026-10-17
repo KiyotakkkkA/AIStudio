@@ -1,0 +1,15 @@
+[
+  {
+    "name": "a ref",
+    "value": {
+      "ref": "curated:model:alpha"
+    }
+  },
+  {
+    "name": "with a priority",
+    "value": {
+      "ref": "runtime:llama-cpp-cpu:b10970:a.zip",
+      "priority": 8
+    }
+  }
+]

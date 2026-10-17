@@ -1,0 +1,30 @@
+[
+  {
+    "name": "unsupported",
+    "value": "unsupported"
+  },
+  {
+    "name": "available",
+    "value": "available"
+  },
+  {
+    "name": "installing",
+    "value": "installing"
+  },
+  {
+    "name": "installed",
+    "value": "installed"
+  },
+  {
+    "name": "starting",
+    "value": "starting"
+  },
+  {
+    "name": "ready",
+    "value": "ready"
+  },
+  {
+    "name": "failed",
+    "value": "failed"
+  }
+]

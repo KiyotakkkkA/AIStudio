@@ -1,0 +1,21 @@
+[
+  {
+    "name": "the page",
+    "value": {}
+  },
+  {
+    "name": "a live refresh",
+    "value": {
+      "refresh": true
+    }
+  },
+  {
+    "name": "filtered",
+    "value": {
+      "kinds": ["model"],
+      "states": ["available"],
+      "query": "qwen",
+      "refresh": false
+    }
+  }
+]

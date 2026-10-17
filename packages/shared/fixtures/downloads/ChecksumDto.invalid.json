@@ -1,0 +1,30 @@
+[
+  {
+    "name": "too short",
+    "value": {
+      "algorithm": "sha256",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  {
+    "name": "not hex",
+    "value": {
+      "algorithm": "sha256",
+      "value": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+    }
+  },
+  {
+    "name": "too long",
+    "value": {
+      "algorithm": "sha256",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  {
+    "name": "unknown algorithm",
+    "value": {
+      "algorithm": "md5",
+      "value": "d02fe9b69ad8cadbbd228e387667af66612c44bed29ffc8eb1e7caf9ac486c12"
+    }
+  }
+]

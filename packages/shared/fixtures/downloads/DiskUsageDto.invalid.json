@@ -1,0 +1,66 @@
+[
+  {
+    "name": "empty root",
+    "value": {
+      "root": "",
+      "totalBytes": 1000,
+      "freeBytes": 400,
+      "usedBytes": 600,
+      "categories": [
+        {
+          "category": "models",
+          "bytes": 300
+        },
+        {
+          "category": "vectors",
+          "bytes": 120
+        },
+        {
+          "category": "other",
+          "bytes": 70
+        }
+      ],
+      "measuredAt": 1760000000000
+    }
+  },
+  {
+    "name": "unknown category",
+    "value": {
+      "root": "C:\\zvs\\downloads",
+      "totalBytes": 1000,
+      "freeBytes": 400,
+      "usedBytes": 600,
+      "categories": [
+        {
+          "category": "cache",
+          "bytes": 1
+        }
+      ],
+      "measuredAt": 1760000000000
+    }
+  },
+  {
+    "name": "negative free",
+    "value": {
+      "root": "C:\\zvs\\downloads",
+      "totalBytes": 1000,
+      "freeBytes": -1,
+      "usedBytes": 600,
+      "categories": [
+        {
+          "category": "models",
+          "bytes": 300
+        },
+        {
+          "category": "vectors",
+          "bytes": 120
+        },
+        {
+          "category": "other",
+          "bytes": 70
+        }
+      ],
+      "measuredAt": 1760000000000
+    }
+  }
+]

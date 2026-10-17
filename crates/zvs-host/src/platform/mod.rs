@@ -1,3 +1,4 @@
+pub mod archive;
 pub mod clock;
 pub mod device;
 pub mod disk;
@@ -5,6 +6,7 @@ pub mod events;
 pub mod gpu;
 pub mod ids;
 pub mod logger;
+pub mod long_path;
 pub mod metrics;
 pub mod navigation;
 pub mod paths;

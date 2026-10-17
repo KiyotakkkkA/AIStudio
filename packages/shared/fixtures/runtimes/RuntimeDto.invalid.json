@@ -1,0 +1,102 @@
+[
+  {
+    "name": "no formats",
+    "value": {
+      "id": "llama-cpp-vulkan",
+      "engine": "llama-cpp",
+      "accelerator": "vulkan",
+      "displayName": "llama.cpp · Vulkan (GPU)",
+      "description": "Тот же движок с расчётом на видеокарте через Vulkan.",
+      "formats": [],
+      "state": "installed",
+      "installedVersion": "b10970",
+      "installPath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan",
+      "executablePath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan\\llama-server.exe",
+      "sizeBytes": 31675940,
+      "recommended": true,
+      "refs": []
+    }
+  },
+  {
+    "name": "id too short",
+    "value": {
+      "id": "ab",
+      "engine": "llama-cpp",
+      "accelerator": "vulkan",
+      "displayName": "llama.cpp · Vulkan (GPU)",
+      "description": "Тот же движок с расчётом на видеокарте через Vulkan.",
+      "formats": ["gguf"],
+      "state": "installed",
+      "installedVersion": "b10970",
+      "installPath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan",
+      "executablePath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan\\llama-server.exe",
+      "sizeBytes": 31675940,
+      "recommended": true,
+      "refs": []
+    }
+  },
+  {
+    "name": "too many refs",
+    "value": {
+      "id": "llama-cpp-vulkan",
+      "engine": "llama-cpp",
+      "accelerator": "vulkan",
+      "displayName": "llama.cpp · Vulkan (GPU)",
+      "description": "Тот же движок с расчётом на видеокарте через Vulkan.",
+      "formats": ["gguf"],
+      "state": "installed",
+      "installedVersion": "b10970",
+      "installPath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan",
+      "executablePath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan\\llama-server.exe",
+      "sizeBytes": 31675940,
+      "recommended": true,
+      "refs": [
+        "runtime:llama-cpp-cpu",
+        "runtime:llama-cpp-cpu",
+        "runtime:llama-cpp-cpu",
+        "runtime:llama-cpp-cpu",
+        "runtime:llama-cpp-cpu",
+        "runtime:llama-cpp-cpu",
+        "runtime:llama-cpp-cpu",
+        "runtime:llama-cpp-cpu",
+        "runtime:llama-cpp-cpu"
+      ]
+    }
+  },
+  {
+    "name": "unknown state",
+    "value": {
+      "id": "llama-cpp-vulkan",
+      "engine": "llama-cpp",
+      "accelerator": "vulkan",
+      "displayName": "llama.cpp · Vulkan (GPU)",
+      "description": "Тот же движок с расчётом на видеокарте через Vulkan.",
+      "formats": ["gguf"],
+      "state": "stopped",
+      "installedVersion": "b10970",
+      "installPath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan",
+      "executablePath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan\\llama-server.exe",
+      "sizeBytes": 31675940,
+      "recommended": true,
+      "refs": []
+    }
+  },
+  {
+    "name": "ref too short",
+    "value": {
+      "id": "llama-cpp-vulkan",
+      "engine": "llama-cpp",
+      "accelerator": "vulkan",
+      "displayName": "llama.cpp · Vulkan (GPU)",
+      "description": "Тот же движок с расчётом на видеокарте через Vulkan.",
+      "formats": ["gguf"],
+      "state": "installed",
+      "installedVersion": "b10970",
+      "installPath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan",
+      "executablePath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan\\llama-server.exe",
+      "sizeBytes": 31675940,
+      "recommended": true,
+      "refs": ["ab"]
+    }
+  }
+]

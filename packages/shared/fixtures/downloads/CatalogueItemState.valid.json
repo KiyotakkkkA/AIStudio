@@ -1,0 +1,22 @@
+[
+  {
+    "name": "installed",
+    "value": "installed"
+  },
+  {
+    "name": "update",
+    "value": "update"
+  },
+  {
+    "name": "available",
+    "value": "available"
+  },
+  {
+    "name": "downloading",
+    "value": "downloading"
+  },
+  {
+    "name": "queued",
+    "value": "queued"
+  }
+]

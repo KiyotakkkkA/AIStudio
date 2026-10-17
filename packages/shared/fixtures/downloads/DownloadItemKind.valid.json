@@ -1,0 +1,22 @@
+[
+  {
+    "name": "model",
+    "value": "model"
+  },
+  {
+    "name": "embedding",
+    "value": "embedding"
+  },
+  {
+    "name": "runtime",
+    "value": "runtime"
+  },
+  {
+    "name": "mcp",
+    "value": "mcp"
+  },
+  {
+    "name": "skill",
+    "value": "skill"
+  }
+]

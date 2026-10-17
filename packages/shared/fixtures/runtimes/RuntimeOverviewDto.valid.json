@@ -1,0 +1,62 @@
+[
+  {
+    "name": "an overview",
+    "value": {
+      "plan": {
+        "accelerator": "vulkan",
+        "reason": "Обнаружена дискретная видеокарта NVIDIA GeForce RTX 4070. Vulkan ускоряет расчёт и не требует CUDA.",
+        "gpu": {
+          "vendor": "NVIDIA",
+          "model": "GeForce RTX 4070",
+          "vramBytes": 12884901888,
+          "discrete": true
+        },
+        "ready": true
+      },
+      "runtimes": [
+        {
+          "id": "llama-cpp-vulkan",
+          "engine": "llama-cpp",
+          "accelerator": "vulkan",
+          "displayName": "llama.cpp · Vulkan (GPU)",
+          "description": "Тот же движок с расчётом на видеокарте через Vulkan.",
+          "formats": ["gguf"],
+          "state": "installed",
+          "installedVersion": "b10970",
+          "installPath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan",
+          "executablePath": "C:\\zvs\\downloads\\runtimes\\llama-cpp-vulkan\\llama-server.exe",
+          "sizeBytes": 31675940,
+          "recommended": true,
+          "refs": []
+        },
+        {
+          "id": "llama-cpp-metal",
+          "engine": "llama-cpp",
+          "accelerator": "metal",
+          "displayName": "llama.cpp · Metal (Apple)",
+          "description": "",
+          "formats": ["gguf"],
+          "state": "unsupported",
+          "sizeBytes": 12000000,
+          "recommended": false,
+          "blockedReason": "Для этой операционной системы такой сборки не существует",
+          "refs": []
+        }
+      ],
+      "recommendedModels": ["curated:embedding:bge-m3-f16"]
+    }
+  },
+  {
+    "name": "nothing offered",
+    "value": {
+      "plan": {
+        "accelerator": "vulkan",
+        "reason": "Обнаружена дискретная видеокарта NVIDIA GeForce RTX 4070. Vulkan ускоряет расчёт и не требует CUDA.",
+        "gpu": null,
+        "ready": true
+      },
+      "runtimes": [],
+      "recommendedModels": []
+    }
+  }
+]

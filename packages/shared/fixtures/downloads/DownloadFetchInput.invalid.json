@@ -1,0 +1,12 @@
+[
+  {
+    "name": "not a uuid",
+    "value": {
+      "downloadId": "x"
+    }
+  },
+  {
+    "name": "missing",
+    "value": {}
+  }
+]

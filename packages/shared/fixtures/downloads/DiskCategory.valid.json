@@ -1,0 +1,30 @@
+[
+  {
+    "name": "models",
+    "value": "models"
+  },
+  {
+    "name": "embeddings",
+    "value": "embeddings"
+  },
+  {
+    "name": "runtimes",
+    "value": "runtimes"
+  },
+  {
+    "name": "mcp",
+    "value": "mcp"
+  },
+  {
+    "name": "skills",
+    "value": "skills"
+  },
+  {
+    "name": "vectors",
+    "value": "vectors"
+  },
+  {
+    "name": "other",
+    "value": "other"
+  }
+]

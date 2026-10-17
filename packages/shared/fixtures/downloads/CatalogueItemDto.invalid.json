@@ -1,0 +1,155 @@
+[
+  {
+    "name": "ref too short",
+    "value": {
+      "ref": "ab",
+      "kind": "embedding",
+      "source": "curated",
+      "name": "bge-m3",
+      "displayName": "BGE-M3",
+      "description": "Многоязычная модель эмбеддингов",
+      "version": "F16",
+      "sizeBytes": 1157671200,
+      "url": "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-FP16.gguf",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c"
+      },
+      "tags": ["BAAI", "1024 dim"],
+      "dimension": 1024,
+      "state": "available",
+      "downloadable": true
+    }
+  },
+  {
+    "name": "unknown kind",
+    "value": {
+      "ref": "curated:embedding:bge-m3-f16",
+      "kind": "plugin",
+      "source": "curated",
+      "name": "bge-m3",
+      "displayName": "BGE-M3",
+      "description": "Многоязычная модель эмбеддингов",
+      "version": "F16",
+      "sizeBytes": 1157671200,
+      "url": "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-FP16.gguf",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c"
+      },
+      "tags": ["BAAI", "1024 dim"],
+      "dimension": 1024,
+      "state": "available",
+      "downloadable": true
+    }
+  },
+  {
+    "name": "zero dimension",
+    "value": {
+      "ref": "curated:embedding:bge-m3-f16",
+      "kind": "embedding",
+      "source": "curated",
+      "name": "bge-m3",
+      "displayName": "BGE-M3",
+      "description": "Многоязычная модель эмбеддингов",
+      "version": "F16",
+      "sizeBytes": 1157671200,
+      "url": "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-FP16.gguf",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c"
+      },
+      "tags": ["BAAI", "1024 dim"],
+      "dimension": 0,
+      "state": "available",
+      "downloadable": true
+    }
+  },
+  {
+    "name": "not a url",
+    "value": {
+      "ref": "curated:embedding:bge-m3-f16",
+      "kind": "embedding",
+      "source": "curated",
+      "name": "bge-m3",
+      "displayName": "BGE-M3",
+      "description": "Многоязычная модель эмбеддингов",
+      "version": "F16",
+      "sizeBytes": 1157671200,
+      "url": "not a url",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c"
+      },
+      "tags": ["BAAI", "1024 dim"],
+      "dimension": 1024,
+      "state": "available",
+      "downloadable": true
+    }
+  },
+  {
+    "name": "too many tags",
+    "value": {
+      "ref": "curated:embedding:bge-m3-f16",
+      "kind": "embedding",
+      "source": "curated",
+      "name": "bge-m3",
+      "displayName": "BGE-M3",
+      "description": "Многоязычная модель эмбеддингов",
+      "version": "F16",
+      "sizeBytes": 1157671200,
+      "url": "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-FP16.gguf",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c"
+      },
+      "tags": ["t", "t", "t", "t", "t", "t", "t", "t", "t", "t", "t", "t", "t", "t", "t", "t", "t"],
+      "dimension": 1024,
+      "state": "available",
+      "downloadable": true
+    }
+  },
+  {
+    "name": "missing state",
+    "value": {
+      "ref": "curated:embedding:bge-m3-f16",
+      "kind": "embedding",
+      "source": "curated",
+      "name": "bge-m3",
+      "displayName": "BGE-M3",
+      "description": "Многоязычная модель эмбеддингов",
+      "version": "F16",
+      "sizeBytes": 1157671200,
+      "url": "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-FP16.gguf",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c"
+      },
+      "tags": ["BAAI", "1024 dim"],
+      "dimension": 1024,
+      "downloadable": true
+    }
+  },
+  {
+    "name": "null version",
+    "value": {
+      "ref": "curated:embedding:bge-m3-f16",
+      "kind": "embedding",
+      "source": "curated",
+      "name": "bge-m3",
+      "displayName": "BGE-M3",
+      "description": "Многоязычная модель эмбеддингов",
+      "version": null,
+      "sizeBytes": 1157671200,
+      "url": "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-FP16.gguf",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c"
+      },
+      "tags": ["BAAI", "1024 dim"],
+      "dimension": 1024,
+      "state": "available",
+      "downloadable": true
+    }
+  }
+]

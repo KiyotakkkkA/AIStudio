@@ -14,6 +14,7 @@ use zvs_contract::{
 };
 
 pub use crate::data::schema::ApprovalDecision;
+use crate::downloads::SharedDownloadExecutor;
 use crate::drivers::ai::ProviderRegistry;
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::sidecar::SharedSidecarJobs;
@@ -99,6 +100,7 @@ pub struct KernelServices {
     pub providers: Option<Arc<dyn TextDrivers>>,
     pub vector_stores: Option<Arc<dyn VectorSearch>>,
     pub jobs: Option<SharedSidecarJobs>,
+    pub downloads: Option<SharedDownloadExecutor>,
 }
 
 pub trait StepLink: Send + Sync {

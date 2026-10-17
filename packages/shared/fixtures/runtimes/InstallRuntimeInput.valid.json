@@ -1,0 +1,12 @@
+[
+  {
+    "name": "the recommended build",
+    "value": {}
+  },
+  {
+    "name": "a named build",
+    "value": {
+      "id": "llama-cpp-cuda"
+    }
+  }
+]

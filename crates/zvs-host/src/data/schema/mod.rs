@@ -1,5 +1,6 @@
 pub mod account;
 pub mod columns;
+pub mod download;
 pub mod graph_edge;
 pub mod graph_relation;
 pub mod model;
@@ -16,6 +17,7 @@ pub mod vector_store;
 
 pub use account::AccountRow;
 pub use columns::EnumColumn;
+pub use download::DownloadRow;
 pub use graph_edge::GraphEdgeRow;
 pub use graph_relation::GraphRelationRow;
 pub use model::ModelRow;

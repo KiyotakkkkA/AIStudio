@@ -1,0 +1,13 @@
+[
+  {
+    "name": "everything",
+    "value": {}
+  },
+  {
+    "name": "by status and kind",
+    "value": {
+      "statuses": ["queued", "running"],
+      "kinds": ["runtime"]
+    }
+  }
+]
