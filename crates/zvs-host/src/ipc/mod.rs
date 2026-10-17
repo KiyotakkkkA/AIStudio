@@ -123,6 +123,7 @@ mod tests {
                 "vectorStores.eval.remove",
                 "vectorStores.eval.run",
                 "vectorStores.get",
+                "vectorStores.index",
                 "vectorStores.list",
                 "vectorStores.reconcile",
                 "vectorStores.remove",

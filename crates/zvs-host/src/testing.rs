@@ -300,6 +300,15 @@ pub fn test_services(system: SystemService) -> TestServices {
         logger: silent_logger(),
         clock: clock.clone(),
     });
+    let indexing =
+        crate::indexing::IndexingService::new(crate::indexing::IndexingServiceOptions::new(
+            database.shared(),
+            core.clone(),
+            drivers.clone(),
+            vector_stores.clone(),
+            silent_logger(),
+            clock.clone(),
+        ));
     let run_events = MemorySink::shared();
     let run_bus = EventBus::default();
     run_bus.attach(run_events.clone());
@@ -355,11 +364,15 @@ pub fn test_services(system: SystemService) -> TestServices {
     downloads.attach_installer(Arc::new(runtimes.clone()));
     catalogue.add_provider(runtimes.catalogue_provider());
     crate::kernel::register_download_nodes(&nodes).expect("registers the download nodes");
+    nodes
+        .register(crate::kernel::nodes::VectorIndexNode)
+        .expect("registers the index node");
     let runs = RunService::new(RunServiceOptions {
         clock: clock.clone(),
         services: crate::kernel::KernelServices {
             jobs: Some(jobs.clone()),
             downloads: Some(Arc::new(downloads.clone())),
+            indexing: Some(Arc::new(indexing.clone())),
             ..crate::kernel::KernelServices::default()
         },
         ..RunServiceOptions::new(database.shared(), run_bus, Arc::clone(&nodes))
@@ -379,6 +392,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             vector_stores,
             vector_sources,
             vector_eval,
+            indexing,
             graph,
             runs,
             downloads,

@@ -933,6 +933,72 @@ impl Validate for PickVectorSourceResult {
     }
 }
 
+pub const INDEX_NOTES_MAX: usize = 200;
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VectorIndexInput {
+    pub store_id: VectorStoreId,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub full: Option<bool>,
+}
+
+impl VectorIndexInput {
+    pub const fn new(store_id: VectorStoreId, full: bool) -> Self {
+        Self {
+            store_id,
+            full: Some(full),
+        }
+    }
+
+    pub fn full(&self) -> bool {
+        self.full.unwrap_or(false)
+    }
+}
+
+impl Validate for VectorIndexInput {
+    fn validate(&self) -> Result<(), AppError> {
+        Ok(())
+    }
+}
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VectorIndexReportDto {
+    pub store_id: VectorStoreId,
+    pub files: u64,
+    pub indexed: u64,
+    pub unchanged: u64,
+    pub removed: u64,
+    pub skipped: u64,
+    pub failed: u64,
+    pub chunks: u64,
+    pub cancelled: bool,
+    pub notes: Vec<String>,
+}
+
+impl Validate for VectorIndexReportDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::safe_integer("files", self.files)?;
+        check::safe_integer("indexed", self.indexed)?;
+        check::safe_integer("unchanged", self.unchanged)?;
+        check::safe_integer("removed", self.removed)?;
+        check::safe_integer("skipped", self.skipped)?;
+        check::safe_integer("failed", self.failed)?;
+        check::safe_integer("chunks", self.chunks)?;
+        if self.notes.len() > INDEX_NOTES_MAX {
+            return Err(invalid("notes", "maxItems"));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VectorDocumentDto {

@@ -276,6 +276,14 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<PickVectorSourceResult>,
     ),
     (
+        "vectorStores/VectorIndexInput",
+        round_trip::<zvs_contract::VectorIndexInput>,
+    ),
+    (
+        "vectorStores/VectorIndexReportDto",
+        round_trip::<zvs_contract::VectorIndexReportDto>,
+    ),
+    (
         "vectorStores/VectorDocumentDto",
         round_trip::<VectorDocumentDto>,
     ),

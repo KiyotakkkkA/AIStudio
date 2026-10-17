@@ -1,0 +1,46 @@
+[
+  {
+    "name": "negative count",
+    "value": {
+      "storeId": "0192f0c4-6b1e-7c2a-9d3e-4f5a6b7c8d9e",
+      "files": -1,
+      "indexed": 0,
+      "unchanged": 0,
+      "removed": 0,
+      "skipped": 0,
+      "failed": 0,
+      "chunks": 0,
+      "cancelled": false,
+      "notes": []
+    }
+  },
+  {
+    "name": "fractional count",
+    "value": {
+      "storeId": "0192f0c4-6b1e-7c2a-9d3e-4f5a6b7c8d9e",
+      "files": 1.5,
+      "indexed": 0,
+      "unchanged": 0,
+      "removed": 0,
+      "skipped": 0,
+      "failed": 0,
+      "chunks": 0,
+      "cancelled": false,
+      "notes": []
+    }
+  },
+  {
+    "name": "no cancelled flag",
+    "value": {
+      "storeId": "0192f0c4-6b1e-7c2a-9d3e-4f5a6b7c8d9e",
+      "files": 0,
+      "indexed": 0,
+      "unchanged": 0,
+      "removed": 0,
+      "skipped": 0,
+      "failed": 0,
+      "chunks": 0,
+      "notes": []
+    }
+  }
+]

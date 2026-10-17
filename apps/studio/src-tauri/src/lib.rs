@@ -26,6 +26,10 @@ use zvs_host::drivers::ai::{
 };
 use zvs_host::drivers::core::InProcessCore;
 use zvs_host::drivers::sidecar::{SidecarDriver, SidecarOptions};
+use zvs_host::indexing::{
+    DocumentExtractorOptions, ImageExtractor, IndexingService, IndexingServiceOptions,
+    PdfExtractor, image_extensions,
+};
 use zvs_host::kernel::{
     KernelServices, NodeRegistry, register_core_nodes, register_download_nodes, register_job_nodes,
 };
@@ -440,6 +444,17 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger: logger.clone(),
         clock: clock.clone(),
     });
+    let indexing = IndexingService::new(IndexingServiceOptions {
+        resources: Some(Arc::new(Arc::clone(&resources))),
+        ..IndexingServiceOptions::new(
+            Arc::clone(&database),
+            core.clone(),
+            registry.clone(),
+            vector_stores.clone(),
+            logger.clone(),
+            clock.clone(),
+        )
+    });
     let disk = DiskService::new(DiskServiceOptions::new(
         paths.downloads_dir.clone(),
         paths.vector_stores_dir.clone(),
@@ -513,6 +528,19 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     catalogue.add_provider(runtimes.catalogue_provider());
     registry.attach_local_engine(Arc::new(runtimes.clone()));
     vector_stores.attach_rerankers(local_rerankers(Arc::new(runtimes.clone())));
+    let documents = DocumentExtractorOptions {
+        jobs: Arc::new(sidecar.clone()),
+        ocr: Some(Arc::new(runtimes.clone())),
+        scratch_dir: paths.cache_dir.join("documents"),
+        logger: logger.clone(),
+    };
+    indexing
+        .registry()
+        .register(&[".pdf"], Arc::new(PdfExtractor::new(documents.clone())))
+        .register(
+            &image_extensions(),
+            Arc::new(ImageExtractor::new(documents)),
+        );
     let nodes = Arc::new(NodeRegistry::new());
     register_core_nodes(&nodes)?;
     register_job_nodes(&nodes)?;
@@ -523,6 +551,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             vector_stores: Some(Arc::new(vector_stores.clone())),
             jobs: Some(Arc::new(sidecar.clone())),
             downloads: Some(Arc::new(downloads.clone())),
+            indexing: Some(Arc::new(indexing.clone())),
         },
         clock: clock.clone(),
         logger: logger.clone(),
@@ -626,6 +655,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         vector_stores,
         vector_sources,
         vector_eval,
+        indexing,
         graph,
         runs,
         downloads,

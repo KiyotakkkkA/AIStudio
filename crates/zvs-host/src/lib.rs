@@ -4,6 +4,7 @@ pub mod browser;
 pub mod data;
 pub mod downloads;
 pub mod drivers;
+pub mod indexing;
 pub mod ipc;
 pub mod kernel;
 pub mod platform;

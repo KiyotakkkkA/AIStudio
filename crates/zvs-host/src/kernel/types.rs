@@ -10,7 +10,7 @@ use serde::de::DeserializeOwned;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, AppErrorCode, ApprovalRequestDto, HostEventDraft, RunId, ToolTier, Validate,
-    VectorSearchHitDto,
+    VectorIndexInput, VectorIndexReportDto, VectorSearchHitDto,
 };
 
 pub use crate::data::schema::ApprovalDecision;
@@ -18,6 +18,7 @@ use crate::downloads::SharedDownloadExecutor;
 use crate::drivers::ai::ProviderRegistry;
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::sidecar::SharedSidecarJobs;
+use crate::indexing::{IndexContext, IndexingService};
 use crate::services::vector_stores::{VectorSearchOptions, VectorStoreService};
 
 pub const CANCELLED_MESSAGE: &str = "Выполнение отменено";
@@ -95,12 +96,33 @@ impl VectorSearch for VectorStoreService {
     }
 }
 
+#[async_trait]
+pub trait VectorIndexer: Send + Sync {
+    async fn index(
+        &self,
+        input: &VectorIndexInput,
+        context: IndexContext,
+    ) -> Result<VectorIndexReportDto, AppError>;
+}
+
+#[async_trait]
+impl VectorIndexer for IndexingService {
+    async fn index(
+        &self,
+        input: &VectorIndexInput,
+        context: IndexContext,
+    ) -> Result<VectorIndexReportDto, AppError> {
+        Self::index(self, input, context).await
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct KernelServices {
     pub providers: Option<Arc<dyn TextDrivers>>,
     pub vector_stores: Option<Arc<dyn VectorSearch>>,
     pub jobs: Option<SharedSidecarJobs>,
     pub downloads: Option<SharedDownloadExecutor>,
+    pub indexing: Option<Arc<dyn VectorIndexer>>,
 }
 
 pub trait StepLink: Send + Sync {

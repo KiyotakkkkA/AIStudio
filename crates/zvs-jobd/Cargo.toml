@@ -24,6 +24,8 @@ tokio-util.workspace = true
 zvs-core = { path = "../zvs-core" }
 
 [dev-dependencies]
+async-trait.workspace = true
+regex.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util", "net", "sync", "time", "macros"] }

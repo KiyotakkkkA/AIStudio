@@ -15,5 +15,5 @@ pub use scheduler::{AdmitHook, ApprovalHook, Finish, Scheduler, SchedulerOptions
 pub use stream::{Observers, RunObserver, RunStream, Subscription};
 pub use types::{
     AdmissionOrigin, ApprovalDecision, FnNode, KernelServices, NodeDef, PermissionRequirement,
-    StepContext, StepLink, TextDrivers, VectorSearch,
+    StepContext, StepLink, TextDrivers, VectorIndexer, VectorSearch,
 };

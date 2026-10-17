@@ -396,13 +396,45 @@ async fn the_eval_channels_round_trip_through_the_contract() {
 }
 
 #[tokio::test]
-async fn indexing_is_left_to_its_own_port() {
-    let (_host, server, _provider) = server();
-    let response = server
-        .dispatch(
-            "vectorStores.index",
-            json!({ "storeId": "0199aa11-1111-7111-8111-111111111111" }),
-        )
-        .await;
-    assert_eq!(response["error"]["code"], json!("NOT_IMPLEMENTED"));
+async fn the_index_channel_starts_an_indexing_run_that_fills_the_documents_tab() {
+    let (host, server, provider) = server();
+    let error = fail(
+        &server,
+        "vectorStores.index",
+        json!({ "storeId": "0199aa11-1111-7111-8111-111111111111" }),
+    )
+    .await;
+    assert_eq!(error["code"], json!("NOT_FOUND"));
+
+    let id = create(&server, &provider, "Indexed").await;
+    let corpus = host.workspace.join("corpus");
+    std::fs::create_dir_all(&corpus).expect("creates");
+    std::fs::write(corpus.join("guide.md"), "alpha beta gamma").expect("writes");
+    call(
+        &server,
+        "vectorStores.sources.add",
+        json!({ "storeId": id, "path": corpus.to_string_lossy() }),
+    )
+    .await;
+
+    let handle = call(&server, "vectorStores.index", json!({ "storeId": id })).await;
+    let run_id =
+        zvs_contract::RunId::parse(handle["id"].as_str().expect("an id")).expect("a run id");
+    host.runs.wait(&run_id).await;
+    let run = host.runs.get(&run_id).expect("a run");
+    assert_eq!(run.kind, zvs_contract::RunKind::Indexing);
+    assert_eq!(run.title.as_deref(), Some("Индексация «Indexed»"));
+    assert_eq!(run.status, zvs_contract::RunStatus::Succeeded);
+    let steps = host.runs.steps(&run_id).expect("steps");
+    assert_eq!(steps[0].step_type, "vector.index");
+    assert_eq!(
+        steps[0].output.as_ref().expect("an output")["indexed"],
+        json!(1)
+    );
+
+    let documents = call(&server, "vectorStores.documents.list", json!({ "id": id })).await;
+    assert_eq!(
+        documents[0]["sourcePath"],
+        json!(corpus.join("guide.md").to_string_lossy())
+    );
 }

@@ -1,0 +1,19 @@
+[
+  {
+    "name": "not an id",
+    "value": {
+      "storeId": "store-1"
+    }
+  },
+  {
+    "name": "null full",
+    "value": {
+      "storeId": "0192f0c4-6b1e-7c2a-9d3e-4f5a6b7c8d9e",
+      "full": null
+    }
+  },
+  {
+    "name": "nothing",
+    "value": {}
+  }
+]

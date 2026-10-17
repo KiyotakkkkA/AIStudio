@@ -1,20 +1,23 @@
 #[cfg(test)]
 mod tests;
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AddVectorEvalCaseInput, AddVectorSourceInput, AppError, AppErrorCode, CreateVectorStoreInput,
-    PickVectorSourceInput, PickVectorSourceResult, UpdateVectorStoreInput, VectorChunksInput,
-    VectorDocumentsRemoveInput, VectorDocumentsRemoveOutput, VectorEvalCaseRef,
-    VectorEvalRemoveOutput, VectorEvalRunInput, VectorSearchInput, VectorSourceRef,
-    VectorSourcesRemoveOutput, VectorStoreRef, VectorStoresRemoveOutput,
+    GraphNode, PickVectorSourceInput, PickVectorSourceResult, RetryPolicy, RunGraph, RunHandleDto,
+    RunKind, StartRunInput, UpdateVectorStoreInput, VectorChunksInput, VectorDocumentsRemoveInput,
+    VectorDocumentsRemoveOutput, VectorEvalCaseRef, VectorEvalRemoveOutput, VectorEvalRunInput,
+    VectorIndexInput, VectorSearchInput, VectorSourceRef, VectorSourcesRemoveOutput,
+    VectorStoreRef, VectorStoresRemoveOutput,
 };
 
 use super::IpcServer;
-use crate::services::Services;
 use crate::services::vector_stores::VectorSearchOptions;
+use crate::services::{RunService, Services, VectorStoreService};
 
 pub const PICKER_UNAVAILABLE: &str = "Выбор файлов недоступен";
 
@@ -25,6 +28,31 @@ fn options(input: &VectorSearchInput) -> VectorSearchOptions {
         mode: input.mode,
         ..VectorSearchOptions::default()
     }
+}
+
+pub fn start_index_run(
+    stores: &VectorStoreService,
+    runs: &RunService,
+    input: &VectorIndexInput,
+) -> Result<RunHandleDto, AppError> {
+    let store = stores.require_store(&input.store_id.to_string())?;
+    let mut node = GraphNode::new("index", "vector.index");
+    node.dependencies = Some(Vec::new());
+    node.bindings = Some(BTreeMap::new());
+    node.input = Some(json!({ "storeId": input.store_id, "full": input.full() }));
+    node.retry = Some(RetryPolicy::default());
+    let mut start = StartRunInput::new(
+        RunKind::Indexing,
+        RunGraph {
+            nodes: vec![node],
+            permission_scopes: None,
+        },
+    );
+    start.subject_id = Some(store.id.clone());
+    start.title = Some(format!("Индексация «{}»", store.name));
+    start.input = Some(Value::Null);
+    start.concurrency = Some(1);
+    runs.start(start)
 }
 
 pub fn register(server: &mut IpcServer) {
@@ -165,6 +193,12 @@ pub fn register(server: &mut IpcServer) {
                     id: input.id,
                     removed: true,
                 })
+            },
+        )
+        .handle(
+            "vectorStores.index",
+            |services: Arc<Services>, input: VectorIndexInput| async move {
+                start_index_run(&services.vector_stores, &services.runs, &input)
             },
         )
         .handle(

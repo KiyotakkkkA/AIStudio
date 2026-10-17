@@ -7,19 +7,21 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use zvs_contract::validate::check;
 use zvs_contract::{
-    AppError, AppErrorCode, HostEventDraft, Validate, VectorSearchHitDto, VectorSearchInput,
-    log_line,
+    AppError, AppErrorCode, HostEventDraft, Validate, VectorIndexInput, VectorIndexReportDto,
+    VectorSearchHitDto, VectorSearchInput, log_line,
 };
 
 use super::registry::NodeRegistry;
 use super::types::{NodeDef, PermissionRequirement, StepContext};
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta};
 use crate::drivers::sidecar::{JobProgress, JobRunOptions};
+use crate::indexing::{IndexContext, IndexProgress};
 use crate::services::vector_stores::VectorSearchOptions;
 
 pub const PROVIDERS_UNAVAILABLE: &str = "Provider service unavailable";
 pub const VECTORS_UNAVAILABLE: &str = "Vector service unavailable";
 pub const JOBS_UNAVAILABLE: &str = "Сервис задач недоступен";
+pub const INDEXING_UNAVAILABLE: &str = "Сервис индексации недоступен";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -268,6 +270,78 @@ impl NodeDef for VectorSearchNode {
     }
 }
 
+fn step_event(domain: &str, value: &impl Serialize) -> HostEventDraft {
+    let mut step = serde_json::Map::new();
+    step.insert("domain".to_owned(), json!(domain));
+    if let Ok(Value::Object(fields)) = serde_json::to_value(value) {
+        step.extend(fields);
+    }
+    HostEventDraft::Step { step }
+}
+
+pub struct VectorIndexNode;
+
+#[async_trait]
+impl NodeDef for VectorIndexNode {
+    type Input = VectorIndexInput;
+    type Output = VectorIndexReportDto;
+
+    fn node_type(&self) -> &str {
+        "vector.index"
+    }
+
+    fn permission(&self) -> PermissionRequirement {
+        PermissionRequirement::tool("vector.index")
+    }
+
+    fn side_effect(&self) -> bool {
+        true
+    }
+
+    async fn run(
+        &self,
+        context: &StepContext,
+        input: VectorIndexInput,
+    ) -> Result<VectorIndexReportDto, AppError> {
+        context.check_cancelled()?;
+        let Some(indexing) = &context.services.indexing else {
+            return Err(AppError::new(AppErrorCode::Conflict, INDEXING_UNAVAILABLE));
+        };
+        let store_id = input.store_id.to_string();
+        let progress = context.clone();
+        let samples = context.clone();
+        let documents = context.clone();
+        indexing
+            .index(
+                &input,
+                IndexContext {
+                    cancel: context.cancel.clone(),
+                    on_progress: Some(Arc::new(move |update: IndexProgress| {
+                        let _ = progress.emit(HostEventDraft::Progress {
+                            done: update.done,
+                            total: update.total,
+                        });
+                        if let Some(message) = update.message {
+                            let _ = progress.emit(HostEventDraft::Log {
+                                line: log_line(&[
+                                    ("storeId", json!(store_id)),
+                                    ("message", json!(message)),
+                                ]),
+                            });
+                        }
+                    })),
+                    on_sample: Some(Arc::new(move |sample| {
+                        let _ = samples.emit(step_event("resources", &sample));
+                    })),
+                    on_document: Some(Arc::new(move |document| {
+                        let _ = documents.emit(step_event("document", &document));
+                    })),
+                },
+            )
+            .await
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BranchInput {
@@ -457,6 +531,7 @@ impl NodeDef for JobRunNode {
 pub fn register_core_nodes(registry: &NodeRegistry) -> Result<(), AppError> {
     registry.register(GenerateNode)?;
     registry.register(VectorSearchNode)?;
+    registry.register(VectorIndexNode)?;
     registry.register(BranchNode)?;
     registry.register(MapNode)
 }
