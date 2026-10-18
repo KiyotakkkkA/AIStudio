@@ -9,6 +9,7 @@ pub mod errors;
 pub mod events;
 pub mod graph;
 pub mod ids;
+pub mod mcp;
 pub mod primitives;
 pub mod providers;
 pub mod runs;
@@ -58,6 +59,12 @@ pub use graph::{
     RemoveGraphEdgeInput, is_relation_name,
 };
 pub use ids::*;
+pub use mcp::{
+    CreateMcpServerInput, McpCallResultDto, McpCapabilityDto, McpCapabilityKind, McpContentDto,
+    McpEnv, McpHeaders, McpHealthDto, McpLogLevel, McpLogLineDto, McpRemoveOutput,
+    McpServerDetailDto, McpServerDto, McpServerRef, McpServerStatus, McpStartup, McpTestResultDto,
+    McpTransport, McpValue, UpdateMcpServerInput,
+};
 pub use primitives::{Json, MAX_SAFE_INTEGER, Page, PageRequest, Sort, SortDirection, Timestamp};
 pub use providers::{
     CreateProviderInput, DiscoveredModelDto, ModelCapability, ModelDto, ProbeOutcomeDto,
@@ -91,7 +98,11 @@ pub use system::{
     SystemDemoStreamInput, SystemDemoStreamOutput, SystemDeviceInput, SystemNativePingInput,
     SystemNativePingOutput, SystemPingInput, SystemPingOutput,
 };
-pub use tools::ToolTier;
+pub use tools::{
+    SetToolEnabledInput, SetToolTierInput, ToolDefaultTier, ToolDefaultsDto, ToolDetailDto,
+    ToolDto, ToolInvokeInput, ToolInvokeResultDto, ToolListFilter, ToolRef, ToolReferenceDto,
+    ToolReferenceKind, ToolSource, ToolTier, ToolUsageDto, is_tool_key, tool_needs_confirmation,
+};
 pub use validate::{VALIDATION_MESSAGE, Validate, parse};
 pub use vector_stores::{
     AddVectorEvalCaseInput, AddVectorSourceInput, CreateVectorStoreInput, PickVectorSourceInput,

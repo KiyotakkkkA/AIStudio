@@ -10,7 +10,7 @@ use serde::de::DeserializeOwned;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, AppErrorCode, ApprovalRequestDto, HostEventDraft, RunId, ToolTier, Validate,
-    VectorIndexInput, VectorIndexReportDto, VectorSearchHitDto,
+    VectorIndexInput, VectorIndexReportDto, VectorSearchHitDto, VectorStoreDto,
 };
 
 pub use crate::data::schema::ApprovalDecision;
@@ -81,6 +81,13 @@ pub trait VectorSearch: Send + Sync {
         options: VectorSearchOptions,
         cancel: &CancellationToken,
     ) -> Result<Vec<VectorSearchHitDto>, AppError>;
+
+    async fn list(&self) -> Result<Vec<VectorStoreDto>, AppError> {
+        Err(AppError::new(
+            AppErrorCode::Conflict,
+            "Vector service unavailable",
+        ))
+    }
 }
 
 #[async_trait]
@@ -93,6 +100,10 @@ impl VectorSearch for VectorStoreService {
         cancel: &CancellationToken,
     ) -> Result<Vec<VectorSearchHitDto>, AppError> {
         Self::search(self, store_id, query, options, cancel).await
+    }
+
+    async fn list(&self) -> Result<Vec<VectorStoreDto>, AppError> {
+        Self::list(self).await
     }
 }
 

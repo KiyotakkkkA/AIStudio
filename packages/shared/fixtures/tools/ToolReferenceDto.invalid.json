@@ -1,0 +1,25 @@
+[
+  {
+    "name": "empty ref",
+    "value": {
+      "kind": "scenario",
+      "refId": "",
+      "name": "Триаж"
+    }
+  },
+  {
+    "name": "long name",
+    "value": {
+      "kind": "scenario",
+      "refId": "s1",
+      "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+  },
+  {
+    "name": "missing kind",
+    "value": {
+      "refId": "s1",
+      "name": "Триаж"
+    }
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "name": "literal",
+    "value": {
+      "kind": "literal",
+      "value": "product-knowledge-base"
+    }
+  },
+  {
+    "name": "secret",
+    "value": {
+      "kind": "secret",
+      "secretId": "0199aa33-3333-7333-8333-333333333333"
+    }
+  }
+]

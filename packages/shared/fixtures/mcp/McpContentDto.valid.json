@@ -1,0 +1,21 @@
+[
+  {
+    "name": "text",
+    "value": {
+      "type": "text",
+      "text": "search:{\"query\":\"вопрос\"}",
+      "data": null
+    }
+  },
+  {
+    "name": "image",
+    "value": {
+      "type": "image",
+      "text": null,
+      "data": {
+        "data": "aGk=",
+        "mimeType": "image/png"
+      }
+    }
+  }
+]

@@ -367,8 +367,15 @@ pub fn test_services(system: SystemService) -> TestServices {
     nodes
         .register(crate::kernel::nodes::VectorIndexNode)
         .expect("registers the index node");
+    let tools = crate::tools::ToolRegistry::new(crate::tools::ToolRegistryOptions {
+        settings: Some(settings.clone()),
+        clock: clock.clone(),
+        ..crate::tools::ToolRegistryOptions::new(database.shared())
+    });
+    crate::tools::register_kernel_tools(&nodes, &tools).expect("registers the kernel tools");
     let runs = RunService::new(RunServiceOptions {
         clock: clock.clone(),
+        tools: Some(tools.clone()),
         services: crate::kernel::KernelServices {
             jobs: Some(jobs.clone()),
             downloads: Some(Arc::new(downloads.clone())),
@@ -379,6 +386,24 @@ pub fn test_services(system: SystemService) -> TestServices {
     })
     .expect("a run service");
     downloads.attach(Arc::new(runs.clone()));
+    let tool_invoker = crate::tools::ToolInvoker::new(
+        tools.clone(),
+        Arc::clone(&nodes),
+        runs.clone(),
+        clock.clone(),
+    );
+    let mcp = crate::services::McpService::new(crate::services::McpServiceOptions {
+        clock: clock.clone(),
+        request_timeout: std::time::Duration::from_secs(5),
+        call_timeout: std::time::Duration::from_secs(5),
+        ..crate::services::McpServiceOptions::new(
+            database.shared(),
+            tools.clone(),
+            Arc::clone(&nodes),
+            Arc::clone(&secrets),
+            reqwest::Client::new(),
+        )
+    });
     let picker = FakePicker::shared();
     TestServices {
         services: Arc::new(Services {
@@ -397,6 +422,9 @@ pub fn test_services(system: SystemService) -> TestServices {
             runs,
             downloads,
             runtimes,
+            tools,
+            tool_invoker,
+            mcp,
             picker: Some(picker.clone()),
         }),
         nodes,

@@ -1,0 +1,40 @@
+[
+  {
+    "name": "tool",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "serverId": "0199aa22-2222-7222-8222-222222222222",
+      "kind": "tool",
+      "name": "search",
+      "title": "search",
+      "description": "Семантический поиск по коллекции.",
+      "toolKey": "qdrant.search",
+      "uri": null,
+      "mimeType": null,
+      "schema": {
+        "type": "object"
+      },
+      "readOnly": true,
+      "destructive": false,
+      "discoveredAt": 1760000000000
+    }
+  },
+  {
+    "name": "resource",
+    "value": {
+      "id": "0199aa33-3333-7333-8333-333333333333",
+      "serverId": "0199aa22-2222-7222-8222-222222222222",
+      "kind": "resource",
+      "name": "collections",
+      "title": null,
+      "description": "Список коллекций.",
+      "toolKey": null,
+      "uri": "qdrant://collections",
+      "mimeType": "application/json",
+      "schema": null,
+      "readOnly": true,
+      "destructive": false,
+      "discoveredAt": 1760000000000
+    }
+  }
+]

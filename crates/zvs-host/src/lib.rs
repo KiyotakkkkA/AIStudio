@@ -10,6 +10,7 @@ pub mod kernel;
 pub mod platform;
 pub mod runtimes;
 pub mod services;
+pub mod tools;
 
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;

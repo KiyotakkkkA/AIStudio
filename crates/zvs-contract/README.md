@@ -26,7 +26,8 @@ What lives here today:
 | `vector_stores` | The vector store, source, document, search, chunk and evaluation DTOs and the `vectorStores.*` I/O   |
 | `graph`         | The relation, edge, traversal and reconcile DTOs and the `graphRelations.*` I/O                      |
 | `runs`          | `StartRunInput`, `RunGraph`, `GraphNode`, the run, step, summary, page and detail DTOs, `runs.*` I/O |
-| `tools`         | `ToolTier`                                                                                           |
+| `tools`         | `ToolTier`, `ToolSource`, the tool, detail, usage, defaults and invoke DTOs and the `tools.*` I/O    |
+| `mcp`           | `McpValue`, the server, capability, test, health and call-result DTOs and the `mcp.*` I/O            |
 | `accounts`      | `AccountDto`, `AccountLinkResult` (tagged on `status`) and the `accounts.*` I/O                      |
 | `enums`         | `WireEnum` and `wire_enum!`, for string enums with `ALL`, `as_str` and `parse`                       |
 | `channels`      | `CHANNELS`, generated from `packages/shared/contract.channels.json`                                  |

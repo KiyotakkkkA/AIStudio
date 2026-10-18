@@ -1,0 +1,28 @@
+[
+  {
+    "name": "used",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "mail.send",
+      "callCount": 2,
+      "lastUsedAt": 1760000000000,
+      "references": [
+        {
+          "kind": "scenario",
+          "refId": "s1",
+          "name": "Триаж"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unused",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "mail.send",
+      "callCount": 0,
+      "lastUsedAt": null,
+      "references": []
+    }
+  }
+]

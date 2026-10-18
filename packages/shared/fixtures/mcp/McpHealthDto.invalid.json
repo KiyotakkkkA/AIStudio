@@ -1,0 +1,41 @@
+[
+  {
+    "name": "missing uptime",
+    "value": {
+      "serverId": "0199aa22-2222-7222-8222-222222222222",
+      "status": "connected",
+      "restarts": 1,
+      "restarting": false,
+      "calls": 3,
+      "errors": 0,
+      "medianLatencyMs": 4,
+      "recentLog": [
+        {
+          "at": 1760000000000,
+          "level": "info",
+          "line": "initialize protocol 2025-06-18"
+        }
+      ]
+    }
+  },
+  {
+    "name": "bad log",
+    "value": {
+      "serverId": "0199aa22-2222-7222-8222-222222222222",
+      "status": "connected",
+      "uptimeMs": 1500,
+      "restarts": 1,
+      "restarting": false,
+      "calls": 3,
+      "errors": 0,
+      "medianLatencyMs": 4,
+      "recentLog": [
+        {
+          "at": 1760000000000,
+          "level": "trace",
+          "line": "initialize protocol 2025-06-18"
+        }
+      ]
+    }
+  }
+]

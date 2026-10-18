@@ -1,0 +1,15 @@
+[
+  {
+    "name": "missing id",
+    "value": {
+      "input": {}
+    }
+  },
+  {
+    "name": "null confirmed",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "confirmed": null
+    }
+  }
+]

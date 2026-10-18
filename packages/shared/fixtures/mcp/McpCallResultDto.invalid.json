@@ -1,0 +1,30 @@
+[
+  {
+    "name": "missing isError",
+    "value": {
+      "content": [
+        {
+          "type": "text",
+          "text": "search:{\"query\":\"вопрос\"}",
+          "data": null
+        }
+      ],
+      "text": "search:{\"query\":\"вопрос\"}",
+      "structured": null
+    }
+  },
+  {
+    "name": "bad content",
+    "value": {
+      "content": [
+        {
+          "type": "text",
+          "data": null
+        }
+      ],
+      "text": "search:{\"query\":\"вопрос\"}",
+      "structured": null,
+      "isError": false
+    }
+  }
+]

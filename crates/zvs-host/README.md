@@ -52,6 +52,9 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 | `services::permissions`    | `PermissionService`: grants, revocation, `admit` / `admit_subject` with `off > ask > auto`                        |
 | `services::approvals`      | `ApprovalService`: persisted pending approvals, timeout, decisions, `always` grants                               |
 | `services::retention`      | `RetentionService`: prunes step payloads and events past `runs.retention.days`                                    |
+| `tools`                    | `ToolRegistry` (tiers, ceiling, defaults, usage, references), `ToolInvoker`, `register_kernel_tools`              |
+| `services::mcp`            | `McpService`: servers, supervision, discovery into the registry, health, autostart, `derive_namespace`            |
+| `drivers::mcp`             | The `rmcp` client, `StdioTransport`, `McpHttpClient`, Windows `.cmd` launch, the isolated toolchain env           |
 
 `testing` is compiled for this crate's own tests and behind the `testing` feature for other
 crates' tests. `debug-panic` adds `InProcessCore::debug_panic`, `vector_debug_panic` and
@@ -442,6 +445,32 @@ the process exits on its own (logged as `A local engine server exited`). Concurr
 one launch. A rerank caller that gives up does not stop a model that is still loading; an
 embedding or vision caller that gives up does. The local engine client has no proxy. Its tests
 re-run the test binary as a stub `llama-server` (`runtimes::llama_server::tests::llama_stub`).
+
+## Tools and MCP
+
+`ToolRegistry` is `ToolRegistry.ts`. A tool row's tier is the permission ceiling: registering
+writes the `global` grant (`granted_by = registry`), `set_tier` rewrites it, and `RunService`
+(given `tools`) refuses a disabled or unavailable tool before composing scopes and counts a use
+after every admitted step. `register_kernel_tools` registers every tool-gated kernel node except
+`llm.generate`, with its `schemars` input schema. `ToolInvoker` runs `tools.invoke` as a one-node
+`job` run and approves its own `ask` admission when the call was confirmed.
+
+`McpService` is `McpService.ts` over the official SDK, `rmcp =3.5.0` (client side only, no
+default features). `rmcp` speaks the protocol (handshake, requests, timeouts with
+`notifications/cancelled`, sessions); the transports are ours. `StdioTransport` spawns through
+`default_spawn` (Windows: `PATH`/`PATHEXT` resolution and `cmd.exe /d /s /c` with quoted,
+caret-escaped arguments for `.cmd`/`.bat`, `CREATE_NO_WINDOW`), feeds stderr to the health rail,
+logs unreadable lines, reports a message that is not JSON-RPC host-side only, and stops the whole
+tree (`taskkill /T /F`) after a 2 s grace. `McpHttpClient` implements `rmcp`'s
+`StreamableHttpClient` over the shared `reqwest` client, sends static headers verbatim (secret
+values resolved at launch, never stored or logged) and names a 401/403 in the error. The client
+asks for `2025-06-18` and accepts the three versions the TS host accepted. Stdio servers get the
+`mcp-toolchain` env under app data, a server's own env wins. A start that fails is never
+restarted; a server that dies is restarted with backoff (1 s doubling to 60 s, five attempts).
+Discovered tools are registered as `mcp` tools and kernel nodes under `namespace.tool`;
+`dispose()` (shutdown stage `Dispose`) stops every server. Tests drive
+`test/helpers/fakeMcpServer.mjs` with `node` (stdio, including a `.cmd` shim) and an axum
+endpoint (HTTP).
 
 ## Browser
 

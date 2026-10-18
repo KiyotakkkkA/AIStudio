@@ -1,0 +1,30 @@
+[
+  {
+    "name": "ok",
+    "value": {
+      "ok": true,
+      "latencyMs": 128,
+      "protocolVersion": "2025-06-18",
+      "serverName": "fake-qdrant",
+      "serverVersion": "0.8.1",
+      "toolCount": 6,
+      "resourceCount": 1,
+      "promptCount": 1,
+      "error": null
+    }
+  },
+  {
+    "name": "failed",
+    "value": {
+      "ok": false,
+      "latencyMs": 0,
+      "protocolVersion": null,
+      "serverName": null,
+      "serverVersion": null,
+      "toolCount": 0,
+      "resourceCount": 0,
+      "promptCount": 0,
+      "error": "Не удалось запустить MCP-сервер: zvs — команда «zvs» не найдена (ENOENT)"
+    }
+  }
+]

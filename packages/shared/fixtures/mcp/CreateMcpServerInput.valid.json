@@ -1,0 +1,30 @@
+[
+  {
+    "name": "full",
+    "value": {
+      "name": "qdrant",
+      "namespace": "qdrant",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-server-qdrant"],
+      "env": {
+        "QDRANT_URL": {
+          "kind": "literal",
+          "value": "http://localhost:6333"
+        }
+      },
+      "url": null,
+      "headers": {},
+      "enabled": true,
+      "startup": "launch"
+    }
+  },
+  {
+    "name": "minimal",
+    "value": {
+      "name": "github",
+      "transport": "http",
+      "url": "https://mcp.example.com/mcp"
+    }
+  }
+]

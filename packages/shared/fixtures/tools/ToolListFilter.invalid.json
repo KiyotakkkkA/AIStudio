@@ -1,0 +1,20 @@
+[
+  {
+    "name": "null query",
+    "value": {
+      "query": null
+    }
+  },
+  {
+    "name": "long query",
+    "value": {
+      "query": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+  },
+  {
+    "name": "unknown source",
+    "value": {
+      "source": "plugin"
+    }
+  }
+]

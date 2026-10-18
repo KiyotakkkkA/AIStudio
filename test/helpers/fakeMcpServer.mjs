@@ -1,8 +1,11 @@
 // A minimal MCP server over stdio, driven by env so one script covers every failure mode the
 // driver has to survive. Started by apps/studio/tests/mcp.test.ts, never by the app.
+import { writeFileSync } from "node:fs";
 import process from "node:process";
 
 const PROTOCOL = process.env.FAKE_MCP_PROTOCOL ?? "2025-06-18";
+if (process.env.FAKE_MCP_PID_FILE)
+  writeFileSync(process.env.FAKE_MCP_PID_FILE, String(process.pid));
 
 const TOOLS = [
   {

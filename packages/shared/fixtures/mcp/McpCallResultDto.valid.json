@@ -1,0 +1,28 @@
+[
+  {
+    "name": "ok",
+    "value": {
+      "content": [
+        {
+          "type": "text",
+          "text": "search:{\"query\":\"вопрос\"}",
+          "data": null
+        }
+      ],
+      "text": "search:{\"query\":\"вопрос\"}",
+      "structured": null,
+      "isError": false
+    }
+  },
+  {
+    "name": "error",
+    "value": {
+      "content": [],
+      "text": "",
+      "structured": {
+        "code": 1
+      },
+      "isError": true
+    }
+  }
+]

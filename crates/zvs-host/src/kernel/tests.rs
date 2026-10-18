@@ -1198,6 +1198,7 @@ fn typed_nodes_publish_json_schema_for_tool_exposure() {
         [
             ("llm.generate".to_owned(), true),
             ("vector.search".to_owned(), false),
+            ("vector.list".to_owned(), false),
             ("vector.index".to_owned(), true),
             ("flow.branch".to_owned(), false),
             ("flow.map".to_owned(), false),

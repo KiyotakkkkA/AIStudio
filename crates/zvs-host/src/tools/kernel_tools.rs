@@ -1,0 +1,101 @@
+use std::collections::BTreeMap;
+
+use zvs_contract::{AppError, ToolDto, ToolSource};
+
+use super::registry::{ToolDescriptor, ToolRegistry};
+use crate::kernel::{NodeRegistry, PermissionRequirement};
+
+const NOT_TOOLS: &[&str] = &["llm.generate"];
+
+struct BuiltinToolMeta {
+    display_name: &'static str,
+    description: &'static str,
+    destructive: bool,
+}
+
+const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
+    (
+        "vector.search",
+        BuiltinToolMeta {
+            display_name: "vector.search",
+            description: "Семантический поиск по векторному хранилищу; возвращает фрагменты с оценками. storeId — UUID из vector.list.",
+            destructive: false,
+        },
+    ),
+    (
+        "vector.list",
+        BuiltinToolMeta {
+            display_name: "vector.list",
+            description: "Список векторных хранилищ: UUID, название, описание и число документов. UUID передаётся в vector.search как storeId.",
+            destructive: false,
+        },
+    ),
+    (
+        "vector.index",
+        BuiltinToolMeta {
+            display_name: "vector.index",
+            description: "Индексация источников хранилища: извлечение текста, нарезка и эмбеддинги.",
+            destructive: false,
+        },
+    ),
+    (
+        "download.fetch",
+        BuiltinToolMeta {
+            display_name: "download.fetch",
+            description: "Загрузка файла из очереди загрузок с докачкой и проверкой контрольной суммы.",
+            destructive: false,
+        },
+    ),
+    (
+        "job.run",
+        BuiltinToolMeta {
+            display_name: "job.run",
+            description: "Запуск задания в сайдкаре с передачей прогресса в поток выполнения.",
+            destructive: false,
+        },
+    ),
+];
+
+fn meta(key: &str) -> Option<&'static BuiltinToolMeta> {
+    BUILTIN
+        .iter()
+        .find(|(candidate, _)| *candidate == key)
+        .map(|(_, meta)| meta)
+}
+
+pub fn register_kernel_tools(
+    nodes: &NodeRegistry,
+    tools: &ToolRegistry,
+) -> Result<Vec<ToolDto>, AppError> {
+    let mut registered: BTreeMap<String, ToolDto> = BTreeMap::new();
+    let mut order: Vec<String> = Vec::new();
+    for node in nodes.list() {
+        let PermissionRequirement::Tool { tool: key, .. } = node.permission() else {
+            continue;
+        };
+        if NOT_TOOLS.contains(&key.as_str()) {
+            continue;
+        }
+        let previous = registered.get(key).is_none_or(|dto| dto.read_only);
+        let meta = meta(key);
+        let dto = tools.register(&ToolDescriptor {
+            source_ref: None,
+            display_name: Some(
+                meta.map_or_else(|| key.clone(), |meta| meta.display_name.to_owned()),
+            ),
+            description: meta.map_or_else(String::new, |meta| meta.description.to_owned()),
+            input_schema: node.input_schema().clone(),
+            read_only: node.side_effect_free() && previous,
+            destructive: meta.is_some_and(|meta| meta.destructive),
+            ..ToolDescriptor::new(key.clone(), ToolSource::Builtin)
+        })?;
+        if !order.contains(key) {
+            order.push(key.clone());
+        }
+        registered.insert(key.clone(), dto);
+    }
+    Ok(order
+        .into_iter()
+        .filter_map(|key| registered.remove(&key))
+        .collect())
+}

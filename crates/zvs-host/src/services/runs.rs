@@ -30,6 +30,7 @@ use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::events::{EventBus, StreamOptions};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
+use crate::tools::ToolRegistry;
 
 pub const DEFAULT_GRACE: Duration = Duration::from_millis(500);
 pub const MAX_GRACE: Duration = Duration::from_millis(30_000);
@@ -58,6 +59,7 @@ pub struct RunServiceOptions {
     pub approval: Option<ApprovalHook>,
     pub admit: Option<AdmitHook>,
     pub runtime: Option<Handle>,
+    pub tools: Option<ToolRegistry>,
 }
 
 impl RunServiceOptions {
@@ -75,6 +77,7 @@ impl RunServiceOptions {
             approval: None,
             admit: None,
             runtime: None,
+            tools: None,
         }
     }
 }
@@ -90,6 +93,8 @@ struct Gate {
     database: Arc<Database>,
     permissions: Arc<PermissionService>,
     approvals: Arc<ApprovalService>,
+    tools: Option<ToolRegistry>,
+    clock: SharedClock,
 }
 
 impl Gate {
@@ -111,6 +116,16 @@ impl Gate {
             if shortcut {
                 return Ok(());
             }
+        }
+        if let Some(tools) = &self.tools
+            && tools
+                .ceiling(&tool)?
+                .is_some_and(|ceiling| !ceiling.enabled || !ceiling.available)
+        {
+            return Err(AppError::new(
+                AppErrorCode::PermissionDenied,
+                "Tool disabled",
+            ));
         }
         let mut scopes = run.graph.permission_scopes().to_vec();
         if run.kind == RunKind::Scenario
@@ -262,6 +277,8 @@ impl RunService {
                 database: Arc::clone(&options.database),
                 permissions: Arc::clone(&permissions),
                 approvals: Arc::clone(&approvals),
+                tools: options.tools.clone(),
+                clock: options.clock.clone(),
             });
             Arc::new(move |requirement, context, origin| {
                 let gate = Arc::clone(&gate);
@@ -269,7 +286,11 @@ impl RunService {
                     match requirement {
                         PermissionRequirement::None => Ok(()),
                         PermissionRequirement::Tool { tool, tier } => {
-                            gate.admit_tool(tool, tier, context, origin).await
+                            gate.admit_tool(tool.clone(), tier, context, origin).await?;
+                            if let Some(tools) = &gate.tools {
+                                tools.record_use(&tool, gate.clock.now())?;
+                            }
+                            Ok(())
                         }
                     }
                 }

@@ -15,11 +15,13 @@ flate2.workspace = true
 futures.workspace = true
 regex.workspace = true
 reqwest = { workspace = true, features = ["system-proxy"] }
+rmcp.workspace = true
 rusqlite.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+sse-stream.workspace = true
 sysinfo.workspace = true
 tar.workspace = true
 tempfile = { workspace = true, optional = true }

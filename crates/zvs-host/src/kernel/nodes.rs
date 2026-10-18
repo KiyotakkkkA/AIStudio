@@ -270,6 +270,82 @@ impl NodeDef for VectorSearchNode {
     }
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct VectorListInput {}
+
+impl<'de> Deserialize<'de> for VectorListInput {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Option::<serde_json::Map<String, Value>>::deserialize(deserializer).map(|_| Self {})
+    }
+}
+
+impl Validate for VectorListInput {
+    fn validate(&self) -> Result<(), AppError> {
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct VectorStoreListEntry {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub documents: u64,
+    pub status: String,
+    pub search_mode: String,
+}
+
+impl Validate for VectorStoreListEntry {
+    fn validate(&self) -> Result<(), AppError> {
+        check::safe_integer("documents", self.documents)
+    }
+}
+
+pub struct VectorListNode;
+
+#[async_trait]
+impl NodeDef for VectorListNode {
+    type Input = VectorListInput;
+    type Output = Vec<VectorStoreListEntry>;
+
+    fn node_type(&self) -> &str {
+        "vector.list"
+    }
+
+    fn permission(&self) -> PermissionRequirement {
+        PermissionRequirement::tool("vector.list")
+    }
+
+    fn side_effect(&self) -> bool {
+        false
+    }
+
+    async fn run(
+        &self,
+        context: &StepContext,
+        _input: VectorListInput,
+    ) -> Result<Vec<VectorStoreListEntry>, AppError> {
+        context.check_cancelled()?;
+        let Some(vectors) = &context.services.vector_stores else {
+            return Err(AppError::new(AppErrorCode::Conflict, VECTORS_UNAVAILABLE));
+        };
+        Ok(vectors
+            .list()
+            .await?
+            .into_iter()
+            .map(|store| VectorStoreListEntry {
+                id: store.id.to_string(),
+                name: store.name,
+                description: store.description,
+                documents: store.documents,
+                status: store.status.as_str().to_owned(),
+                search_mode: store.search_mode.as_str().to_owned(),
+            })
+            .collect())
+    }
+}
+
 fn step_event(domain: &str, value: &impl Serialize) -> HostEventDraft {
     let mut step = serde_json::Map::new();
     step.insert("domain".to_owned(), json!(domain));
@@ -531,6 +607,7 @@ impl NodeDef for JobRunNode {
 pub fn register_core_nodes(registry: &NodeRegistry) -> Result<(), AppError> {
     registry.register(GenerateNode)?;
     registry.register(VectorSearchNode)?;
+    registry.register(VectorListNode)?;
     registry.register(VectorIndexNode)?;
     registry.register(BranchNode)?;
     registry.register(MapNode)

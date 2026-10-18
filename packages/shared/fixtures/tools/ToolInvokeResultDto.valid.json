@@ -1,0 +1,22 @@
+[
+  {
+    "name": "ok",
+    "value": {
+      "runId": "0199aa22-2222-7222-8222-222222222222",
+      "ok": true,
+      "durationMs": 12,
+      "output": "executed",
+      "error": null
+    }
+  },
+  {
+    "name": "failed",
+    "value": {
+      "runId": "0199aa22-2222-7222-8222-222222222222",
+      "ok": false,
+      "durationMs": 12,
+      "output": null,
+      "error": "upstream exploded"
+    }
+  }
+]

@@ -1,0 +1,83 @@
+[
+  {
+    "name": "missing transport",
+    "value": {
+      "name": "x"
+    }
+  },
+  {
+    "name": "bad url",
+    "value": {
+      "name": "x",
+      "transport": "http",
+      "url": "not a url"
+    }
+  },
+  {
+    "name": "blank name",
+    "value": {
+      "name": "  ",
+      "transport": "stdio"
+    }
+  },
+  {
+    "name": "bad namespace",
+    "value": {
+      "name": "qdrant",
+      "namespace": "Qdrant",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-server-qdrant"],
+      "env": {
+        "QDRANT_URL": {
+          "kind": "literal",
+          "value": "http://localhost:6333"
+        }
+      },
+      "url": null,
+      "headers": {},
+      "enabled": true,
+      "startup": "launch"
+    }
+  },
+  {
+    "name": "null args",
+    "value": {
+      "name": "qdrant",
+      "namespace": "qdrant",
+      "transport": "stdio",
+      "command": "npx",
+      "args": null,
+      "env": {
+        "QDRANT_URL": {
+          "kind": "literal",
+          "value": "http://localhost:6333"
+        }
+      },
+      "url": null,
+      "headers": {},
+      "enabled": true,
+      "startup": "launch"
+    }
+  },
+  {
+    "name": "bad env",
+    "value": {
+      "name": "qdrant",
+      "namespace": "qdrant",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-server-qdrant"],
+      "env": {
+        "A-B": {
+          "kind": "literal",
+          "value": "x"
+        }
+      },
+      "url": null,
+      "headers": {},
+      "enabled": true,
+      "startup": "launch"
+    }
+  }
+]

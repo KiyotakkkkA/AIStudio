@@ -1,0 +1,12 @@
+[
+  {
+    "name": "spelled out",
+    "value": {
+      "builtin": "inferred",
+      "mcp": "off",
+      "skill": "inferred",
+      "integration": "ask",
+      "browser": "auto"
+    }
+  }
+]

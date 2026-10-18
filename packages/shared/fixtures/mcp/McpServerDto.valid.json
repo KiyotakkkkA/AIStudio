@@ -1,0 +1,70 @@
+[
+  {
+    "name": "stdio",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "name": "qdrant",
+      "namespace": "qdrant",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-server-qdrant"],
+      "env": {
+        "QDRANT_API_KEY": {
+          "kind": "secret",
+          "secretId": "0199aa33-3333-7333-8333-333333333333"
+        },
+        "QDRANT_COLLECTION": {
+          "kind": "literal",
+          "value": "kb"
+        }
+      },
+      "url": null,
+      "headers": {},
+      "enabled": true,
+      "startup": "launch",
+      "status": "connected",
+      "protocolVersion": "2025-06-18",
+      "serverName": "fake-qdrant",
+      "serverVersion": "0.8.1",
+      "lastError": null,
+      "lastConnectedAt": 1760000000000,
+      "toolCount": 6,
+      "resourceCount": 1,
+      "promptCount": 1,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "http",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "name": "github",
+      "namespace": "github",
+      "transport": "http",
+      "command": null,
+      "args": [],
+      "env": {},
+      "url": "https://mcp.example.com/mcp",
+      "headers": {
+        "Authorization": {
+          "kind": "secret",
+          "secretId": "0199aa33-3333-7333-8333-333333333333"
+        }
+      },
+      "enabled": true,
+      "startup": "manual",
+      "status": "failed",
+      "protocolVersion": null,
+      "serverName": null,
+      "serverVersion": null,
+      "lastError": "MCP-сервер отклонил учётные данные (401)",
+      "lastConnectedAt": null,
+      "toolCount": 0,
+      "resourceCount": 0,
+      "promptCount": 0,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  }
+]

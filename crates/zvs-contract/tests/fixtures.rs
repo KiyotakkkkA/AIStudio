@@ -89,6 +89,103 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::RunsClearFinishedOutput>,
     ),
     ("tools/ToolTier", round_trip::<zvs_contract::ToolTier>),
+    ("tools/ToolSource", round_trip::<zvs_contract::ToolSource>),
+    (
+        "tools/ToolReferenceKind",
+        round_trip::<zvs_contract::ToolReferenceKind>,
+    ),
+    (
+        "tools/ToolDefaultTier",
+        round_trip::<zvs_contract::ToolDefaultTier>,
+    ),
+    (
+        "tools/ToolReferenceDto",
+        round_trip::<zvs_contract::ToolReferenceDto>,
+    ),
+    ("tools/ToolDto", round_trip::<zvs_contract::ToolDto>),
+    (
+        "tools/ToolDetailDto",
+        round_trip::<zvs_contract::ToolDetailDto>,
+    ),
+    (
+        "tools/ToolUsageDto",
+        round_trip::<zvs_contract::ToolUsageDto>,
+    ),
+    ("tools/ToolRef", round_trip::<zvs_contract::ToolRef>),
+    (
+        "tools/ToolListFilter",
+        round_trip::<zvs_contract::ToolListFilter>,
+    ),
+    (
+        "tools/SetToolTierInput",
+        round_trip::<zvs_contract::SetToolTierInput>,
+    ),
+    (
+        "tools/SetToolEnabledInput",
+        round_trip::<zvs_contract::SetToolEnabledInput>,
+    ),
+    (
+        "tools/ToolDefaultsDto",
+        round_trip::<zvs_contract::ToolDefaultsDto>,
+    ),
+    (
+        "tools/ToolInvokeInput",
+        round_trip::<zvs_contract::ToolInvokeInput>,
+    ),
+    (
+        "tools/ToolInvokeResultDto",
+        round_trip::<zvs_contract::ToolInvokeResultDto>,
+    ),
+    ("mcp/McpTransport", round_trip::<zvs_contract::McpTransport>),
+    ("mcp/McpStartup", round_trip::<zvs_contract::McpStartup>),
+    (
+        "mcp/McpServerStatus",
+        round_trip::<zvs_contract::McpServerStatus>,
+    ),
+    (
+        "mcp/McpCapabilityKind",
+        round_trip::<zvs_contract::McpCapabilityKind>,
+    ),
+    ("mcp/McpValue", round_trip::<zvs_contract::McpValue>),
+    ("mcp/McpServerDto", round_trip::<zvs_contract::McpServerDto>),
+    (
+        "mcp/McpCapabilityDto",
+        round_trip::<zvs_contract::McpCapabilityDto>,
+    ),
+    (
+        "mcp/McpServerDetailDto",
+        round_trip::<zvs_contract::McpServerDetailDto>,
+    ),
+    (
+        "mcp/McpTestResultDto",
+        round_trip::<zvs_contract::McpTestResultDto>,
+    ),
+    (
+        "mcp/McpLogLineDto",
+        round_trip::<zvs_contract::McpLogLineDto>,
+    ),
+    ("mcp/McpHealthDto", round_trip::<zvs_contract::McpHealthDto>),
+    ("mcp/McpServerRef", round_trip::<zvs_contract::McpServerRef>),
+    (
+        "mcp/CreateMcpServerInput",
+        round_trip::<zvs_contract::CreateMcpServerInput>,
+    ),
+    (
+        "mcp/UpdateMcpServerInput",
+        round_trip::<zvs_contract::UpdateMcpServerInput>,
+    ),
+    (
+        "mcp/McpContentDto",
+        round_trip::<zvs_contract::McpContentDto>,
+    ),
+    (
+        "mcp/McpCallResultDto",
+        round_trip::<zvs_contract::McpCallResultDto>,
+    ),
+    (
+        "mcp/McpRemoveOutput",
+        round_trip::<zvs_contract::McpRemoveOutput>,
+    ),
     ("system/DeviceTier", round_trip::<DeviceTier>),
     ("system/DeviceGpuDto", round_trip::<DeviceGpuDto>),
     ("system/DeviceProfileDto", round_trip::<DeviceProfileDto>),

@@ -1,0 +1,19 @@
+[
+  {
+    "name": "enable only",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "enabled": false
+    }
+  },
+  {
+    "name": "clear command",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "command": null,
+      "transport": "http",
+      "url": "https://mcp.example.com/mcp",
+      "headers": {}
+    }
+  }
+]

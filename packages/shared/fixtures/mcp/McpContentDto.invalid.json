@@ -1,0 +1,17 @@
+[
+  {
+    "name": "missing data",
+    "value": {
+      "type": "text",
+      "text": "search:{\"query\":\"вопрос\"}"
+    }
+  },
+  {
+    "name": "long type",
+    "value": {
+      "type": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "text": "search:{\"query\":\"вопрос\"}",
+      "data": null
+    }
+  }
+]

@@ -1,0 +1,189 @@
+[
+  {
+    "name": "bad key",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "Mail",
+      "source": "mcp",
+      "sourceRef": "0199aa22-2222-7222-8222-222222222222",
+      "displayName": "mail.send",
+      "description": "Отправляет письмо",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "readOnly": false,
+      "destructive": false,
+      "tier": "ask",
+      "enabled": true,
+      "available": true,
+      "lastUsedAt": 1760000000000,
+      "callCount": 3,
+      "registeredAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "single segment",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "mail",
+      "source": "mcp",
+      "sourceRef": "0199aa22-2222-7222-8222-222222222222",
+      "displayName": "mail.send",
+      "description": "Отправляет письмо",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "readOnly": false,
+      "destructive": false,
+      "tier": "ask",
+      "enabled": true,
+      "available": true,
+      "lastUsedAt": 1760000000000,
+      "callCount": 3,
+      "registeredAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "empty display name",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "mail.send",
+      "source": "mcp",
+      "sourceRef": "0199aa22-2222-7222-8222-222222222222",
+      "displayName": "",
+      "description": "Отправляет письмо",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "readOnly": false,
+      "destructive": false,
+      "tier": "ask",
+      "enabled": true,
+      "available": true,
+      "lastUsedAt": 1760000000000,
+      "callCount": 3,
+      "registeredAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "missing sourceRef",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "mail.send",
+      "source": "mcp",
+      "displayName": "mail.send",
+      "description": "Отправляет письмо",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "readOnly": false,
+      "destructive": false,
+      "tier": "ask",
+      "enabled": true,
+      "available": true,
+      "lastUsedAt": 1760000000000,
+      "callCount": 3,
+      "registeredAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "unknown tier",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "mail.send",
+      "source": "mcp",
+      "sourceRef": "0199aa22-2222-7222-8222-222222222222",
+      "displayName": "mail.send",
+      "description": "Отправляет письмо",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "readOnly": false,
+      "destructive": false,
+      "tier": "never",
+      "enabled": true,
+      "available": true,
+      "lastUsedAt": 1760000000000,
+      "callCount": 3,
+      "registeredAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "negative count",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "mail.send",
+      "source": "mcp",
+      "sourceRef": "0199aa22-2222-7222-8222-222222222222",
+      "displayName": "mail.send",
+      "description": "Отправляет письмо",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "readOnly": false,
+      "destructive": false,
+      "tier": "ask",
+      "enabled": true,
+      "available": true,
+      "lastUsedAt": 1760000000000,
+      "callCount": -1,
+      "registeredAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "missing inputSchema",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "mail.send",
+      "source": "mcp",
+      "sourceRef": "0199aa22-2222-7222-8222-222222222222",
+      "displayName": "mail.send",
+      "description": "Отправляет письмо",
+      "readOnly": false,
+      "destructive": false,
+      "tier": "ask",
+      "enabled": true,
+      "available": true,
+      "lastUsedAt": 1760000000000,
+      "callCount": 3,
+      "registeredAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  }
+]

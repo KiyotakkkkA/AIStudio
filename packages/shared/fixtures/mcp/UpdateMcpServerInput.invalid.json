@@ -1,0 +1,22 @@
+[
+  {
+    "name": "missing id",
+    "value": {
+      "enabled": false
+    }
+  },
+  {
+    "name": "null name",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "name": null
+    }
+  },
+  {
+    "name": "bad url",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "url": "nope"
+    }
+  }
+]

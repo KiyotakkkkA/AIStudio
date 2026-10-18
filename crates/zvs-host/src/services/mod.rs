@@ -3,6 +3,7 @@ pub mod approvals;
 pub mod crypto;
 pub mod graph;
 pub mod health_check;
+pub mod mcp;
 pub mod permissions;
 pub mod probe_outcome;
 pub mod provider_status;
@@ -31,6 +32,7 @@ pub use crypto::{
 };
 pub use graph::{GraphService, GraphServiceOptions};
 pub use health_check::{HealthCheckOptions, HealthCheckService};
+pub use mcp::{McpService, McpServiceOptions};
 pub use permissions::{Admission, PermissionContext, PermissionService};
 pub use providers::{
     DriverSource, ProbeInput, ProbeResult, ProviderDraftInput, ProviderService,
@@ -52,6 +54,7 @@ use crate::indexing::IndexingService;
 use crate::platform::picker::SharedPicker;
 use crate::platform::theme::SharedThemePort;
 use crate::runtimes::RuntimeService;
+use crate::tools::{ToolInvoker, ToolRegistry};
 
 pub struct Services {
     pub system: SystemService,
@@ -69,5 +72,8 @@ pub struct Services {
     pub runs: RunService,
     pub downloads: DownloadService,
     pub runtimes: RuntimeService,
+    pub tools: ToolRegistry,
+    pub tool_invoker: ToolInvoker,
+    pub mcp: McpService,
     pub picker: Option<SharedPicker>,
 }

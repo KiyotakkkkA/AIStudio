@@ -1,0 +1,22 @@
+[
+  {
+    "name": "builtin",
+    "value": "builtin"
+  },
+  {
+    "name": "mcp",
+    "value": "mcp"
+  },
+  {
+    "name": "skill",
+    "value": "skill"
+  },
+  {
+    "name": "integration",
+    "value": "integration"
+  },
+  {
+    "name": "browser",
+    "value": "browser"
+  }
+]

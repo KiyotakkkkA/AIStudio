@@ -1,0 +1,18 @@
+[
+  {
+    "name": "inferred",
+    "value": "inferred"
+  },
+  {
+    "name": "auto",
+    "value": "auto"
+  },
+  {
+    "name": "ask",
+    "value": "ask"
+  },
+  {
+    "name": "off",
+    "value": "off"
+  }
+]

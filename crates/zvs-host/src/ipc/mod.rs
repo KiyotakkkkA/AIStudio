@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod downloads;
 pub mod graph_relations;
+pub mod mcp;
 pub mod providers;
 pub mod runs;
 pub mod runtimes;
@@ -8,6 +9,7 @@ pub mod secrets;
 mod server;
 pub mod settings;
 pub mod system;
+pub mod tools;
 pub mod vector_stores;
 
 pub use server::{Coverage, INTERNAL_MESSAGE, IpcServer};
@@ -23,6 +25,8 @@ pub fn register(server: &mut IpcServer) {
     runs::register(server);
     downloads::register(server);
     runtimes::register(server);
+    tools::register(server);
+    mcp::register(server);
 }
 
 #[cfg(test)]
@@ -76,6 +80,15 @@ mod tests {
                 "graphRelations.reconcile",
                 "graphRelations.removeEdge",
                 "graphRelations.shortestPath",
+                "mcp.create",
+                "mcp.get",
+                "mcp.health",
+                "mcp.list",
+                "mcp.remove",
+                "mcp.start",
+                "mcp.stop",
+                "mcp.test",
+                "mcp.update",
                 "providers.adapters",
                 "providers.create",
                 "providers.get",
@@ -113,6 +126,14 @@ mod tests {
                 "system.nativePing",
                 "system.ping",
                 "system.resources",
+                "tools.defaults",
+                "tools.get",
+                "tools.invoke",
+                "tools.list",
+                "tools.setDefaults",
+                "tools.setEnabled",
+                "tools.setTier",
+                "tools.usage",
                 "vectorStores.chunks",
                 "vectorStores.clear",
                 "vectorStores.create",

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "unknown tier",
+    "value": {
+      "builtin": "inferred",
+      "mcp": "never",
+      "skill": "inferred",
+      "integration": "ask",
+      "browser": "auto"
+    }
+  },
+  {
+    "name": "null",
+    "value": {
+      "builtin": "inferred",
+      "mcp": "off",
+      "skill": null,
+      "integration": "ask",
+      "browser": "auto"
+    }
+  }
+]

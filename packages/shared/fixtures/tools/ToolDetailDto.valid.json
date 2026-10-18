@@ -1,0 +1,59 @@
+[
+  {
+    "name": "with references",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "mail.send",
+      "source": "mcp",
+      "sourceRef": "0199aa22-2222-7222-8222-222222222222",
+      "displayName": "mail.send",
+      "description": "Отправляет письмо",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "readOnly": false,
+      "destructive": false,
+      "tier": "ask",
+      "enabled": true,
+      "available": true,
+      "lastUsedAt": 1760000000000,
+      "callCount": 3,
+      "registeredAt": 1760000000000,
+      "updatedAt": 1760000000000,
+      "references": [
+        {
+          "kind": "scenario",
+          "refId": "s1",
+          "name": "Триаж"
+        }
+      ]
+    }
+  },
+  {
+    "name": "no references",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "mail.send",
+      "source": "builtin",
+      "sourceRef": null,
+      "displayName": "mail.send",
+      "description": "",
+      "inputSchema": null,
+      "readOnly": false,
+      "destructive": false,
+      "tier": "ask",
+      "enabled": true,
+      "available": true,
+      "lastUsedAt": null,
+      "callCount": 0,
+      "registeredAt": 1760000000000,
+      "updatedAt": 1760000000000,
+      "references": []
+    }
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "disabled",
+    "value": "disabled"
+  },
+  {
+    "name": "stopped",
+    "value": "stopped"
+  },
+  {
+    "name": "starting",
+    "value": "starting"
+  },
+  {
+    "name": "connected",
+    "value": "connected"
+  },
+  {
+    "name": "failed",
+    "value": "failed"
+  }
+]

@@ -1,0 +1,29 @@
+[
+  {
+    "name": "missing error",
+    "value": {
+      "ok": true,
+      "latencyMs": 128,
+      "protocolVersion": "2025-06-18",
+      "serverName": "fake-qdrant",
+      "serverVersion": "0.8.1",
+      "toolCount": 6,
+      "resourceCount": 1,
+      "promptCount": 1
+    }
+  },
+  {
+    "name": "negative latency",
+    "value": {
+      "ok": true,
+      "latencyMs": -1,
+      "protocolVersion": "2025-06-18",
+      "serverName": "fake-qdrant",
+      "serverVersion": "0.8.1",
+      "toolCount": 6,
+      "resourceCount": 1,
+      "promptCount": 1,
+      "error": null
+    }
+  }
+]

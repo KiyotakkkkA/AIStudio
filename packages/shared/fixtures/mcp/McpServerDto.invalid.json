@@ -1,0 +1,245 @@
+[
+  {
+    "name": "bad namespace",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "name": "qdrant",
+      "namespace": "Qdrant",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-server-qdrant"],
+      "env": {
+        "QDRANT_API_KEY": {
+          "kind": "secret",
+          "secretId": "0199aa33-3333-7333-8333-333333333333"
+        },
+        "QDRANT_COLLECTION": {
+          "kind": "literal",
+          "value": "kb"
+        }
+      },
+      "url": null,
+      "headers": {},
+      "enabled": true,
+      "startup": "launch",
+      "status": "connected",
+      "protocolVersion": "2025-06-18",
+      "serverName": "fake-qdrant",
+      "serverVersion": "0.8.1",
+      "lastError": null,
+      "lastConnectedAt": 1760000000000,
+      "toolCount": 6,
+      "resourceCount": 1,
+      "promptCount": 1,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "bad env name",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "name": "qdrant",
+      "namespace": "qdrant",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-server-qdrant"],
+      "env": {
+        "1KEY": {
+          "kind": "literal",
+          "value": "x"
+        }
+      },
+      "url": null,
+      "headers": {},
+      "enabled": true,
+      "startup": "launch",
+      "status": "connected",
+      "protocolVersion": "2025-06-18",
+      "serverName": "fake-qdrant",
+      "serverVersion": "0.8.1",
+      "lastError": null,
+      "lastConnectedAt": 1760000000000,
+      "toolCount": 6,
+      "resourceCount": 1,
+      "promptCount": 1,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "bad header name",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "name": "github",
+      "namespace": "github",
+      "transport": "http",
+      "command": null,
+      "args": [],
+      "env": {},
+      "url": "https://mcp.example.com/mcp",
+      "headers": {
+        "X Key": {
+          "kind": "literal",
+          "value": "x"
+        }
+      },
+      "enabled": true,
+      "startup": "manual",
+      "status": "failed",
+      "protocolVersion": null,
+      "serverName": null,
+      "serverVersion": null,
+      "lastError": "MCP-сервер отклонил учётные данные (401)",
+      "lastConnectedAt": null,
+      "toolCount": 0,
+      "resourceCount": 0,
+      "promptCount": 0,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "missing url",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "name": "qdrant",
+      "namespace": "qdrant",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-server-qdrant"],
+      "env": {
+        "QDRANT_API_KEY": {
+          "kind": "secret",
+          "secretId": "0199aa33-3333-7333-8333-333333333333"
+        },
+        "QDRANT_COLLECTION": {
+          "kind": "literal",
+          "value": "kb"
+        }
+      },
+      "headers": {},
+      "enabled": true,
+      "startup": "launch",
+      "status": "connected",
+      "protocolVersion": "2025-06-18",
+      "serverName": "fake-qdrant",
+      "serverVersion": "0.8.1",
+      "lastError": null,
+      "lastConnectedAt": 1760000000000,
+      "toolCount": 6,
+      "resourceCount": 1,
+      "promptCount": 1,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "unknown status",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "name": "qdrant",
+      "namespace": "qdrant",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-server-qdrant"],
+      "env": {
+        "QDRANT_API_KEY": {
+          "kind": "secret",
+          "secretId": "0199aa33-3333-7333-8333-333333333333"
+        },
+        "QDRANT_COLLECTION": {
+          "kind": "literal",
+          "value": "kb"
+        }
+      },
+      "url": null,
+      "headers": {},
+      "enabled": true,
+      "startup": "launch",
+      "status": "running",
+      "protocolVersion": "2025-06-18",
+      "serverName": "fake-qdrant",
+      "serverVersion": "0.8.1",
+      "lastError": null,
+      "lastConnectedAt": 1760000000000,
+      "toolCount": 6,
+      "resourceCount": 1,
+      "promptCount": 1,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "long error",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "name": "qdrant",
+      "namespace": "qdrant",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-server-qdrant"],
+      "env": {
+        "QDRANT_API_KEY": {
+          "kind": "secret",
+          "secretId": "0199aa33-3333-7333-8333-333333333333"
+        },
+        "QDRANT_COLLECTION": {
+          "kind": "literal",
+          "value": "kb"
+        }
+      },
+      "url": null,
+      "headers": {},
+      "enabled": true,
+      "startup": "launch",
+      "status": "connected",
+      "protocolVersion": "2025-06-18",
+      "serverName": "fake-qdrant",
+      "serverVersion": "0.8.1",
+      "lastError": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "lastConnectedAt": 1760000000000,
+      "toolCount": 6,
+      "resourceCount": 1,
+      "promptCount": 1,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "name": "empty name",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "name": "",
+      "namespace": "qdrant",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-server-qdrant"],
+      "env": {
+        "QDRANT_API_KEY": {
+          "kind": "secret",
+          "secretId": "0199aa33-3333-7333-8333-333333333333"
+        },
+        "QDRANT_COLLECTION": {
+          "kind": "literal",
+          "value": "kb"
+        }
+      },
+      "url": null,
+      "headers": {},
+      "enabled": true,
+      "startup": "launch",
+      "status": "connected",
+      "protocolVersion": "2025-06-18",
+      "serverName": "fake-qdrant",
+      "serverVersion": "0.8.1",
+      "lastError": null,
+      "lastConnectedAt": 1760000000000,
+      "toolCount": 6,
+      "resourceCount": 1,
+      "promptCount": 1,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  }
+]

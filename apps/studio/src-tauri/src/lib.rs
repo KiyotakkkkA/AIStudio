@@ -25,6 +25,7 @@ use zvs_host::drivers::ai::{
     ProviderRegistryOptions, ProxyMode,
 };
 use zvs_host::drivers::core::InProcessCore;
+use zvs_host::drivers::mcp::TOOLCHAIN_DIR;
 use zvs_host::drivers::sidecar::{SidecarDriver, SidecarOptions};
 use zvs_host::indexing::{
     DocumentExtractorOptions, ImageExtractor, IndexingService, IndexingServiceOptions,
@@ -55,11 +56,13 @@ use zvs_host::services::rerank::local_rerankers;
 use zvs_host::services::system::DEMO_INTERVAL;
 use zvs_host::services::{
     AccountService, AccountServiceOptions, CryptoService, GraphService, GraphServiceOptions,
-    HealthCheckOptions, HealthCheckService, ProviderService, ProviderServiceOptions,
-    RetentionService, RetentionServiceOptions, RunService, RunServiceOptions, SecretService,
-    Services, SettingService, SystemService, VectorEvalService, VectorEvalServiceOptions,
-    VectorSourceService, VectorSourceServiceOptions, VectorStoreService, VectorStoreServiceOptions,
+    HealthCheckOptions, HealthCheckService, McpService, McpServiceOptions, ProviderService,
+    ProviderServiceOptions, RetentionService, RetentionServiceOptions, RunService,
+    RunServiceOptions, SecretService, Services, SettingService, SystemService, VectorEvalService,
+    VectorEvalServiceOptions, VectorSourceService, VectorSourceServiceOptions, VectorStoreService,
+    VectorStoreServiceOptions,
 };
+use zvs_host::tools::{ToolInvoker, ToolRegistry, ToolRegistryOptions, register_kernel_tools};
 use zvs_host::{IpcServer, ipc};
 
 use crate::browser::gateway::GatewayOptions;
@@ -356,6 +359,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let sessions = gateway_sessions(Arc::clone(&gateway));
 
     let http = HttpClient::new()?;
+    let mcp_http = http.client().clone();
     let mut registry = ProviderRegistryOptions::new(
         Arc::new(DatabaseProviders::new(Arc::clone(&database))),
         secrets.clone(),
@@ -545,6 +549,27 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     register_core_nodes(&nodes)?;
     register_job_nodes(&nodes)?;
     register_download_nodes(&nodes)?;
+    let tools = ToolRegistry::new(ToolRegistryOptions {
+        settings: Some(settings.clone()),
+        logger: logger.clone(),
+        clock: clock.clone(),
+        ..ToolRegistryOptions::new(Arc::clone(&database))
+    });
+    register_kernel_tools(&nodes, &tools)?;
+    let mcp = McpService::new(McpServiceOptions {
+        logger: logger.clone(),
+        clock: clock.clone(),
+        client_version: app.package_info().version.to_string(),
+        toolchain_dir: Some(paths.data_dir.join(TOOLCHAIN_DIR)),
+        runtime: Some(runtime.clone()),
+        ..McpServiceOptions::new(
+            Arc::clone(&database),
+            tools.clone(),
+            Arc::clone(&nodes),
+            Arc::clone(&secrets),
+            mcp_http,
+        )
+    });
     let runs = RunService::new(RunServiceOptions {
         services: KernelServices {
             providers: Some(registry),
@@ -556,8 +581,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         clock: clock.clone(),
         logger: logger.clone(),
         runtime: Some(runtime.clone()),
-        ..RunServiceOptions::new(Arc::clone(&database), events.clone(), nodes)
+        tools: Some(tools.clone()),
+        ..RunServiceOptions::new(Arc::clone(&database), events.clone(), Arc::clone(&nodes))
     })?;
+    let tool_invoker = ToolInvoker::new(tools.clone(), nodes, runs.clone(), clock.clone());
     downloads.attach(Arc::new(runs.clone()));
     let retention = RetentionService::new(RetentionServiceOptions {
         settings: Some(settings.clone()),
@@ -616,6 +643,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         });
     }
     {
+        let mcp = mcp.clone();
+        shutdown.register(ShutdownStage::Dispose, "mcp", move || async move {
+            mcp.dispose().await;
+        });
+    }
+    {
         let health = health.clone();
         shutdown.register(ShutdownStage::Dispose, "health-check", move || async move {
             health.dispose().await;
@@ -660,6 +693,9 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         runs,
         downloads,
         runtimes,
+        tools,
+        tool_invoker,
+        mcp,
         picker: Some(Arc::new(DialogPicker::new(app.handle().clone()))),
     });
     let mut server = IpcServer::new(Arc::clone(&services), logger.clone());
@@ -670,6 +706,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     retention.start();
     services.runs.recover()?;
     services.downloads.recover()?;
+    {
+        let mcp = services.mcp.clone();
+        tauri::async_runtime::spawn(async move {
+            let _ = mcp.start_auto_start().await;
+        });
+    }
     warm_sidecar(sidecar, logger.clone());
 
     Ok(Boot::Studio {

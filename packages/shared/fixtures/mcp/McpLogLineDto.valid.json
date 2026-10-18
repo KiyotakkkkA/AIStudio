@@ -1,0 +1,18 @@
+[
+  {
+    "name": "info",
+    "value": {
+      "at": 1760000000000,
+      "level": "info",
+      "line": "initialize protocol 2025-06-18"
+    }
+  },
+  {
+    "name": "error",
+    "value": {
+      "at": 1760000000000,
+      "level": "error",
+      "line": "tools/call hang — timeout"
+    }
+  }
+]
