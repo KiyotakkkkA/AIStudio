@@ -45,7 +45,7 @@ export default observer(function ChatToolPicker({ store }: { readonly store: Cha
       <Dropdown.Menu
         aria-label="Инструменты для модели"
         rounded=""
-        className="rounded-card border-main-750 bg-main-900 p-3 shadow-pop"
+        className="rounded-card border-line bg-main-900 p-3 shadow-pop"
       >
         <div className="mb-2.5 px-0.5">
           <p className="text-[13px] font-semibold text-main-50">Инструменты для модели</p>
@@ -59,7 +59,7 @@ export default observer(function ChatToolPicker({ store }: { readonly store: Cha
               <label
                 key={tool.id}
                 className={`flex items-start gap-2.5 rounded-control border px-2.5 py-2 ${
-                  selected ? "border-accent-line bg-accent-soft" : "border-transparent"
+                  selected ? "border-transparent bg-accent-soft" : "border-transparent"
                 } ${blocked && !selected ? "opacity-60" : "cursor-pointer hover:bg-main-850"}`}
               >
                 <InputCheckBox
@@ -91,12 +91,12 @@ export default observer(function ChatToolPicker({ store }: { readonly store: Cha
             );
           })}
           {store.selectableTools.length === 0 && (
-            <p className="rounded-control border border-dashed border-main-600 py-5 text-center text-[12px] text-main-500">
+            <p className="rounded-control bg-main-800 py-5 text-center text-[12px] text-main-500">
               Инструменты не зарегистрированы.
             </p>
           )}
         </ScrollArea>
-        <p className="mt-2.5 border-t border-main-750 px-0.5 pt-2.5 text-[11.5px] text-main-500">
+        <p className="mt-2.5 px-0.5 pt-1 text-[11.5px] text-main-500">
           Разрешения задаются на{" "}
           <Link
             className="font-medium text-accent-medium underline decoration-accent-line underline-offset-2 hover:decoration-accent-medium"

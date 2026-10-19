@@ -23,7 +23,7 @@ export default function PageShell({
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader icon={icon} title={title} subtitle={subtitle} actions={actions} />
       {toolbar ? (
-        <div className="flex h-12 flex-none items-center gap-2 border-b border-main-750 bg-main-850 px-6">
+        <div className="flex h-12 flex-none items-center gap-2 border-b border-line bg-main-850 px-6">
           {toolbar}
         </div>
       ) : null}

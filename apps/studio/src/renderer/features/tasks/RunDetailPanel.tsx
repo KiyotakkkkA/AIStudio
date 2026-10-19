@@ -21,7 +21,7 @@ export default observer(function RunDetailPanel({ store }: { readonly store: Run
     return (
       <section
         aria-label="Детали запуска"
-        className="flex w-105 flex-none items-center justify-center border-l border-main-750 bg-main-850 p-4"
+        className="flex w-105 flex-none items-center justify-center bg-main-800 p-4"
       >
         <EmptyState
           icon={mdiHistory}
@@ -34,7 +34,7 @@ export default observer(function RunDetailPanel({ store }: { readonly store: Run
   return (
     <section
       aria-label="Детали запуска"
-      className="flex w-105 flex-none flex-col border-l border-main-750 bg-main-850"
+      className="flex w-105 flex-none flex-col bg-main-800"
     >
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 p-3.5">
         <div className="flex items-center gap-2">
@@ -45,7 +45,7 @@ export default observer(function RunDetailPanel({ store }: { readonly store: Run
             <span className="font-mono">{shortRunId(summary.id)}</span>
           </Chip>
         </div>
-        <dl className="m-0 flex flex-col gap-1.5 rounded-card border border-main-750 bg-main-900 shadow-card p-2.75 text-[12px]">
+        <dl className="m-0 flex flex-col gap-1.5 rounded-card bg-main-900 shadow-card p-2.75 text-[12px]">
           <div className="flex justify-between gap-2">
             <dt className="text-main-400">Вид</dt>
             <dd className="m-0 font-mono">{KIND_LABELS[summary.kind]}</dd>
@@ -76,7 +76,7 @@ export default observer(function RunDetailPanel({ store }: { readonly store: Run
           )}
         </dl>
         {summary.error === undefined ? null : (
-          <p className="m-0 rounded-card border border-err-border p-2.75 text-[12px] text-err">
+          <p className="m-0 rounded-card bg-err-soft p-2.75 text-[12px] text-err">
             {summary.error}
           </p>
         )}
@@ -115,7 +115,7 @@ export default observer(function RunDetailPanel({ store }: { readonly store: Run
         ) : (
           <ScrollArea
             orientation="both"
-            className="max-h-80 rounded-card border border-main-750 bg-main-900 p-2.5"
+            className="max-h-80 rounded-card border border-line bg-main-900 p-2.5"
           >
             <pre className="m-0 font-mono text-[11px] leading-[1.7] text-main-300">
               {detail.logs.map((line) => JSON.stringify(line)).join("\n")}

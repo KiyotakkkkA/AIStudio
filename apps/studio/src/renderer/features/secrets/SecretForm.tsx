@@ -32,13 +32,13 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
 
   return (
     <form
-      className="flex min-h-0 min-w-0 flex-1 flex-col rounded-card border border-main-750 bg-main-900"
+      className="flex min-h-0 min-w-0 flex-1 flex-col rounded-card border border-line bg-main-900"
       onSubmit={(event) => {
         event.preventDefault();
         onSave();
       }}
     >
-      <div className="flex flex-none items-center gap-2.5 border-b border-main-750 px-4.5 py-4">
+      <div className="flex flex-none items-center gap-2.5 border-b border-line px-4.5 py-4">
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[14px] font-semibold text-main-50">
             {vm.name.trim().length > 0 ? vm.name : "Новый секрет"}
@@ -71,10 +71,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
 
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-5 p-4.5">
         {vm.banner === null ? null : (
-          <p
-            role="alert"
-            className="rounded-control border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
-          >
+          <p role="alert" className="rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err">
             {vm.banner}
           </p>
         )}
@@ -122,7 +119,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
           </Field>
         </section>
 
-        <section className="flex flex-col gap-3 rounded-[9px] border border-main-750 bg-main-800 p-3.5">
+        <section className="flex flex-col gap-3 rounded-[9px] bg-main-800 p-3.5">
           <div className="flex items-center gap-2">
             <h3 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
               {vm.schema.label}
@@ -210,7 +207,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
         </section>
       </ScrollArea>
 
-      <div className="flex flex-none items-center gap-3 border-t border-main-750 px-4.5 py-3.5">
+      <div className="flex flex-none items-center gap-3 border-t border-line px-4.5 py-3.5">
         <Icon path={mdiLockOutline} size={15} className="flex-none text-ok" />
         <span
           className="line-clamp-2 min-w-0 flex-1 text-[12px] text-main-400"

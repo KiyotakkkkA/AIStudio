@@ -13,7 +13,7 @@ export interface DiskBreakdownProps {
 export default function DiskBreakdown({ disk }: DiskBreakdownProps) {
   if (disk === null) {
     return (
-      <div className="rounded-card border border-main-750 bg-main-900 p-3 text-[11px] text-main-500">
+      <div className="rounded-card border border-line bg-main-900 p-3 text-[11px] text-main-500">
         Занятое место ещё не измерено.
       </div>
     );
@@ -25,7 +25,7 @@ export default function DiskBreakdown({ disk }: DiskBreakdownProps) {
   })).filter((entry) => entry.bytes > 0);
 
   return (
-    <div className="flex flex-col gap-2 rounded-card border border-main-750 bg-main-900 p-3">
+    <div className="flex flex-col gap-2 rounded-card border border-line bg-main-900 p-3">
       <div className="flex justify-between text-[11px] text-main-400">
         <span>Диск</span>
         <span className="font-mono">

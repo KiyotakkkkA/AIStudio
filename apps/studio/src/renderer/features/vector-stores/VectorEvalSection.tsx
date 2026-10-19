@@ -25,7 +25,7 @@ function VectorEvalSection() {
   return (
     <Accordion
       defaultOpen={false}
-      className="flex-none rounded-[9px] border border-main-750 bg-main-900"
+      className="flex-none rounded-[9px] border border-line bg-main-900"
     >
       <Accordion.Summary className="min-h-12 px-4 text-left text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase hover:text-main-200">
         Проверка качества
@@ -38,7 +38,7 @@ function VectorEvalSection() {
           </span>
         ) : null}
       </Accordion.Summary>
-      <Accordion.Content className="border-t border-main-750">
+      <Accordion.Content className="border-t border-line">
         <ScrollArea className="flex max-h-[46vh] flex-col gap-3.25 p-4">
           <p className="text-[11px] leading-relaxed text-main-500">
             Вопросы с заранее известным ответом. Прогон ищет каждый вопрос и смотрит, на каком месте
@@ -95,7 +95,7 @@ function VectorEvalSection() {
               </div>
             ) : null}
           </form>
-          <div className="flex flex-wrap items-end gap-2.5 border-t border-main-750 pt-3.25">
+          <div className="flex flex-wrap items-end gap-2.5 border-t border-line pt-3.25">
             <div className="w-30">
               <Field label="Глубина, чанков" htmlFor="vs-eval-k">
                 <TextInput
@@ -130,10 +130,10 @@ function VectorEvalSection() {
             </p>
           )}
           {run === null ? null : (
-            <ScrollArea orientation="horizontal" className="rounded-card border border-main-750">
+            <ScrollArea orientation="horizontal" className="rounded-card border border-line">
               <table className="w-full text-[12px]">
                 <thead>
-                  <tr className="border-b border-main-750 text-left text-[10.5px] tracking-[0.12em] text-main-500 uppercase">
+                  <tr className="border-b border-line text-left text-[10.5px] tracking-[0.12em] text-main-500 uppercase">
                     <th className="px-3 py-2 font-semibold">Метрика</th>
                     {run.modes.map((mode) => (
                       <th key={mode.mode} className="px-3 py-2 font-semibold">
@@ -145,7 +145,7 @@ function VectorEvalSection() {
                 </thead>
                 <tbody>
                   {metrics.map((row) => (
-                    <tr key={row.key} className="border-b border-main-750 last:border-b-0">
+                    <tr key={row.key} className="border-b border-line last:border-b-0">
                       <td className="px-3 py-1.75 font-mono text-main-300">{row.label}</td>
                       {row.values.map((value, index) => (
                         <td key={index} className="px-3 py-1.75 font-mono text-main-100">
@@ -183,7 +183,7 @@ function VectorEvalSection() {
               {cases.map((row) => (
                 <div
                   key={row.id}
-                  className="flex items-start gap-3 rounded-card border border-main-750 bg-main-900 px-3.25 py-2.5"
+                  className="flex items-start gap-3 rounded-card border border-line bg-main-900 px-3.25 py-2.5"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-[12.5px] text-main-200">{row.question}</p>

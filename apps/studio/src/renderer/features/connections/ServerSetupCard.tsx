@@ -40,7 +40,7 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
   const running = state === "connected" || state === "starting" || state === "restarting";
 
   return (
-    <section className="flex flex-none flex-col gap-3.25 rounded-card border border-main-750 bg-main-900 p-4">
+    <section className="flex flex-none flex-col gap-3.25 rounded-card border border-line bg-main-900 p-4">
       <div className="flex items-center gap-2.25">
         <h2 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           Настройка сервера
@@ -188,7 +188,7 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
       )}
 
       {vm.preset?.note === undefined ? null : (
-        <p className="rounded-control border border-dashed border-main-750 px-3 py-2 text-[12px] text-main-400">
+        <p className="rounded-control bg-main-800 px-3 py-2 text-[12px] text-main-400">
           {vm.preset.note}
         </p>
       )}
@@ -241,10 +241,7 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
       </div>
 
       {vm.banner === null ? null : (
-        <p
-          role="alert"
-          className="rounded-control border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
-        >
+        <p role="alert" className="rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err">
           {vm.banner}
         </p>
       )}

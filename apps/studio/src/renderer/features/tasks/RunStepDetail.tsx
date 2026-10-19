@@ -18,7 +18,7 @@ export default function RunStepDetail({ step, expanded, pruned, onToggle }: RunS
   const tone = STEP_TONES[step.status] ?? "idle";
   const duration = formatDuration(Math.max(0, (step.finishedAt ?? step.startedAt) - step.startedAt));
   return (
-    <li className="list-none rounded-card border border-main-750 bg-main-900 shadow-card">
+    <li className="list-none rounded-card bg-main-900 shadow-card">
       <button
         type="button"
         onClick={onToggle}
@@ -41,7 +41,7 @@ export default function RunStepDetail({ step, expanded, pruned, onToggle }: RunS
         </span>
       </button>
       {expanded ? (
-        <div className="flex flex-col gap-2 border-t border-main-750 px-2.75 py-2.5">
+        <div className="flex flex-col gap-2 border-t border-line px-2.75 py-2.5">
           {step.error === undefined ? null : (
             <p className={`m-0 text-[12px] ${STATUS_TONE_TEXT.err}`}>{step.error}</p>
           )}

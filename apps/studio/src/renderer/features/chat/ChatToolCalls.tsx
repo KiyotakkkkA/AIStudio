@@ -56,8 +56,8 @@ export default function ChatToolCalls({
         return (
           <li
             key={call.id}
-            className={`overflow-hidden rounded-card border bg-main-850 ${
-              approval ? "border-warn-line" : "border-main-750"
+            className={`overflow-hidden rounded-card bg-main-800 ${
+              approval ? "shadow-[inset_0_0_0_1px_var(--color-warn-line)]" : ""
             }`}
           >
             <details open={approval !== undefined} className="group/call">
@@ -75,7 +75,9 @@ export default function ChatToolCalls({
                   {toolArgumentsSummary(call.arguments)}
                 </span>
                 <span
-                  className={`inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium ${STATUS_TONE_TEXT[status.tone]}`}
+                  className={`inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium ${STATUS_TONE_TEXT[status.tone]} ${
+                    call.status === "running" ? "zvs-shimmer-text" : ""
+                  }`}
                 >
                   <span
                     aria-hidden="true"
@@ -93,7 +95,7 @@ export default function ChatToolCalls({
                   </span>
                 )}
               </summary>
-              <div className="space-y-2.5 border-t border-main-750 px-3 pt-2.5 pb-3 text-[12px]">
+              <div className="space-y-2.5 px-3 pt-1 pb-3 text-[12px]">
                 <div>
                   <p className="mb-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                     Аргументы
@@ -120,7 +122,7 @@ export default function ChatToolCalls({
                 {approval && (
                   <div
                     role="status"
-                    className="flex flex-wrap items-center gap-3 rounded-control border border-warn-line bg-warn-soft px-3 py-2.5"
+                    className="flex flex-wrap items-center gap-3 rounded-control bg-warn-soft px-3 py-2.5"
                   >
                     <p className="min-w-0 flex-1 text-[12.5px] text-main-100">
                       Модель хочет вызвать <span className="font-mono">{call.key}</span>. Разрешить

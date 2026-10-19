@@ -18,7 +18,7 @@ export default observer(function TaskFilterRail({ store }: { readonly store: Tas
   return (
     <aside
       aria-label="Фильтры задач"
-      className="flex w-56 flex-none flex-col gap-0.5 border-r border-main-750 bg-main-850 p-3"
+      className="flex w-56 flex-none flex-col gap-0.5 bg-main-800 p-3"
     >
       <p className="px-2 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
         Статус
@@ -52,7 +52,7 @@ export default observer(function TaskFilterRail({ store }: { readonly store: Tas
         />
       ))}
       <div className="flex-1" />
-      <p className="rounded-card border border-main-750 bg-main-900 p-2.75 text-[12px] leading-[1.55] text-main-400">
+      <p className="rounded-card border border-line bg-main-900 p-2.75 text-[12px] leading-[1.55] text-main-400">
         Задачи — это то, что происходит сейчас. Завершённая работа и её журналы живут в разделе
         «Запуски и логи».
       </p>

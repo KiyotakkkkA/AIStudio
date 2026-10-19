@@ -11,8 +11,8 @@ function ExposedToolsCard({ store }: { readonly store: ConnectionStore }) {
   const isNew = store.form?.isNew === true;
 
   return (
-    <section className="flex min-h-60 flex-none flex-col rounded-card border border-main-750 bg-main-900">
-      <div className="flex h-10.5 flex-none items-center gap-2.5 border-b border-main-750 px-3.75">
+    <section className="flex min-h-60 flex-none flex-col rounded-card border border-line bg-main-900">
+      <div className="flex h-10.5 flex-none items-center gap-2.5 border-b border-line px-3.75">
         <h2 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           Инструменты
           <span className="ml-1.5 font-normal tracking-normal text-main-500 normal-case">

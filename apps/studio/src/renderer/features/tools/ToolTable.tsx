@@ -22,7 +22,7 @@ function ToolTable({ store }: { readonly store: ToolStore }) {
 
   return (
     <section aria-label="Реестр инструментов" className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex flex-none items-center gap-3 border-b border-main-750 px-3.75 py-2.75">
+      <div className="flex flex-none items-center gap-3 border-b border-line px-3.75 py-2.75">
         <span className={`flex-1 ${HEAD}`}>Инструмент</span>
         <span className={`w-26 flex-none ${HEAD}`}>Источник</span>
         <span className={`w-18.5 flex-none ${HEAD}`}>Разрешение</span>
@@ -73,7 +73,7 @@ function ToolTable({ store }: { readonly store: ToolStore }) {
                       void store.select(tool.id);
                     }
                   }}
-                  className={`flex cursor-pointer items-center gap-3 border-b border-main-800 px-3.75 py-2.5 outline-none focus-visible:bg-main-700 ${
+                  className={`flex cursor-pointer items-center gap-3 border-b border-line px-3.75 py-2.5 outline-none focus-visible:bg-main-700 ${
                     selected
                       ? "bg-accent-soft shadow-[inset_2px_0_0_var(--color-accent-dark)]"
                       : "hover:bg-main-850"
@@ -102,7 +102,7 @@ function ToolTable({ store }: { readonly store: ToolStore }) {
                   <span className={`flex w-18.5 flex-none ${dimmed ? "opacity-55" : ""}`}>
                     <span
                       title={TIER_HINTS[tier]}
-                      className={`inline-flex h-5 items-center rounded-full border border-main-750 bg-main-800 px-2 font-mono text-[11px] font-medium ${TIER_TEXT[tier]}`}
+                      className={`inline-flex h-5 items-center rounded-full bg-main-800 px-2 font-mono text-[11px] font-medium ${TIER_TEXT[tier]}`}
                     >
                       {TIER_LABELS[tier]}
                     </span>

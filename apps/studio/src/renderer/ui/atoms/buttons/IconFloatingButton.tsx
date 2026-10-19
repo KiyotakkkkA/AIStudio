@@ -26,7 +26,7 @@ export const IconFloatingButton = ({
         </button>
       </Floating.Trigger>
       <Floating.Content
-        className={`${className} rounded-card border border-main-750 bg-main-900 p-3.5 text-xs/relaxed  text-main-300 shadow-pop`}
+        className={`${className} rounded-card border border-line bg-main-900 p-3.5 text-xs/relaxed  text-main-300 shadow-pop`}
       >
         {children}
       </Floating.Content>

@@ -40,6 +40,9 @@
   --color-accent-line: var(--zvs-accent-line);
   --color-on-accent: var(--zvs-on-accent);
 
+  --color-line: var(--zvs-line);
+  --color-line-strong: var(--zvs-line-strong);
+
   --color-ok: var(--zvs-ok);
   --color-warn: var(--zvs-warn);
   --color-err: var(--zvs-err);
@@ -86,6 +89,41 @@
   --spacing-rail: 244px;
   --spacing-rail-collapsed: 64px;
   --spacing-header: 64px;
+
+  --animate-zvs-rise: zvs-rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-zvs-shimmer-text: zvs-shimmer-text 2.4s linear infinite;
+  --animate-zvs-sweep: zvs-sweep 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+
+  @keyframes zvs-rise {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+      filter: blur(2px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: none;
+    }
+  }
+
+  @keyframes zvs-shimmer-text {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: 0% 0;
+    }
+  }
+
+  @keyframes zvs-sweep {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(250%);
+    }
+  }
 }
 
 /* Light — warm paper. */
@@ -113,6 +151,8 @@
   --zvs-accent-soft: #fbece1;
   --zvs-accent-line: #f0c9ad;
   --zvs-on-accent: #ffffff;
+  --zvs-line: rgb(90 60 30 / 0.085);
+  --zvs-line-strong: rgb(90 60 30 / 0.16);
 
   --zvs-ok: #4d7a2a;
   --zvs-warn: #a46b0d;
@@ -159,6 +199,8 @@
     --zvs-accent-soft: rgb(229 117 50 / 0.14);
     --zvs-accent-line: rgb(229 117 50 / 0.38);
     --zvs-on-accent: #1a1007;
+    --zvs-line: rgb(255 235 210 / 0.065);
+    --zvs-line-strong: rgb(255 235 210 / 0.13);
 
     --zvs-ok: #a9be6a;
     --zvs-warn: #e5b350;
@@ -204,6 +246,8 @@
   --zvs-accent-soft: rgb(229 117 50 / 0.14);
   --zvs-accent-line: rgb(229 117 50 / 0.38);
   --zvs-on-accent: #1a1007;
+  --zvs-line: rgb(255 235 210 / 0.065);
+  --zvs-line-strong: rgb(255 235 210 / 0.13);
 
   --zvs-ok: #a9be6a;
   --zvs-warn: #e5b350;
@@ -269,6 +313,54 @@ select:focus-visible,
 .zvs-scroll-area::-webkit-scrollbar-thumb {
   background: var(--zvs-scrollbar);
   background-clip: padding-box;
+}
+
+.zvs-shimmer-text {
+  background: linear-gradient(
+      90deg,
+      var(--color-main-500) 0%,
+      var(--color-main-500) 38%,
+      var(--color-main-50) 50%,
+      var(--color-main-500) 62%,
+      var(--color-main-500) 100%
+    )
+    0 0 / 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: var(--animate-zvs-shimmer-text);
+}
+
+.zvs-trace {
+  stroke-dasharray: 30 200;
+  animation: zvs-trace 1.5s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;
+}
+
+@keyframes zvs-trace {
+  from {
+    stroke-dashoffset: 18;
+  }
+  to {
+    stroke-dashoffset: -88;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zvs-shimmer-text {
+    animation: none;
+    background: none;
+    color: var(--color-main-400);
+  }
+
+  .zvs-trace {
+    stroke-dasharray: none;
+    animation: none;
+  }
+
+  .animate-zvs-rise,
+  .animate-zvs-sweep {
+    animation: none;
+  }
 }
 
 .zvs-shimmer::after {

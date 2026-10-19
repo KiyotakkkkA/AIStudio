@@ -31,7 +31,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
           <h1 className="text-[16px] font-semibold tracking-[-0.01em] text-main-50">
             Интерфейс не удалось отрисовать
           </h1>
-          <p className="rounded-control border border-err-border bg-err-soft px-3 py-2 font-mono text-[12px] wrap-break-word text-err">
+          <p className="rounded-control bg-err-soft px-3 py-2 font-mono text-[12px] wrap-break-word text-err">
             {this.state.message}
           </p>
           <p className="text-[13px] text-main-400">

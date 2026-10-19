@@ -9,17 +9,14 @@ export default function SchemaView({ schema }: { readonly schema: Json }) {
 
   if (view.kind === "none")
     return (
-      <div className="rounded-card border border-main-750 bg-main-850 px-3 py-2.75 text-[12px] text-main-400">
+      <div className="rounded-card bg-main-800 px-3 py-2.75 text-[12px] text-main-400">
         Инструмент не принимает параметров.
       </div>
     );
 
   if (view.kind === "raw")
     return (
-      <ScrollArea
-        orientation="both"
-        className="max-h-56 rounded-card border border-main-750 bg-main-850 px-3 py-2.75"
-      >
+      <ScrollArea orientation="both" className="max-h-56 rounded-card bg-main-800 px-3 py-2.75">
         <pre className="m-0 font-mono text-[11px] leading-relaxed text-main-300">{view.raw}</pre>
       </ScrollArea>
     );
@@ -28,7 +25,7 @@ export default function SchemaView({ schema }: { readonly schema: Json }) {
     <ScrollArea
       orientation="both"
       aria-label="Входная схема"
-      className="max-h-64 rounded-card border border-main-750 bg-main-850 px-3 py-2.75 font-mono text-[11px] leading-[1.75] text-main-300"
+      className="max-h-64 rounded-card bg-main-800 px-3 py-2.75 font-mono text-[11px] leading-[1.75] text-main-300"
     >
       <div className="text-main-500">{"{"}</div>
       {view.fields.map((field) => (

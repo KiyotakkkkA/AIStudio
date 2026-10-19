@@ -14,7 +14,7 @@ export default function EmptyState({ icon, title, description, action }: EmptySt
     <KitEmptyState
       className="max-w-110 border-0 bg-transparent px-6 py-10 text-center shadow-none"
       icon={
-        <span className="mx-auto flex size-12 items-center justify-center rounded-card border border-accent-line bg-accent-soft text-accent-medium">
+        <span className="mx-auto flex size-12 items-center justify-center rounded-card bg-accent-soft text-accent-medium">
           <Icon path={icon} size={22} />
         </span>
       }

@@ -19,7 +19,7 @@ function TryItPanel({ store }: { readonly store: ToolStore }) {
   if (tool === null) return null;
 
   return (
-    <div className="flex flex-none flex-col gap-2.5 rounded-card border border-main-750 bg-main-900 p-3">
+    <div className="flex flex-none flex-col gap-2.5 rounded-card border border-line bg-main-900 p-3">
       <textarea
         aria-label="Входные данные (JSON)"
         spellCheck={false}
@@ -29,7 +29,7 @@ function TryItPanel({ store }: { readonly store: ToolStore }) {
         }}
         rows={Math.min(10, Math.max(3, store.inputText.split("\n").length))}
         className={`w-full resize-y rounded-control border bg-main-850 px-2.5 py-2.25 font-mono text-[11px] leading-[1.7] text-main-200 outline-none ${
-          parsed.ok ? "border-main-750 focus:border-accent-dark" : "border-err focus:border-err"
+          parsed.ok ? "border-line focus:border-accent-dark" : "border-err focus:border-err"
         }`}
       />
       {parsed.ok ? null : <p className="m-0 text-[11px] text-err">{parsed.error}</p>}
@@ -72,7 +72,7 @@ function TryItPanel({ store }: { readonly store: ToolStore }) {
       {store.runError === null ? null : (
         <p
           role="alert"
-          className="m-0 rounded-control border border-err-border bg-err-soft px-2.5 py-2 text-[11.5px] text-err"
+          className="m-0 rounded-control bg-err-soft px-2.5 py-2 text-[11.5px] text-err"
         >
           {store.runError}
         </p>
@@ -83,7 +83,7 @@ function TryItPanel({ store }: { readonly store: ToolStore }) {
           {result.ok || result.error === null ? null : (
             <p className="m-0 text-[11.5px] wrap-break-word text-err">{result.error}</p>
           )}
-          <ScrollArea className="max-h-56 rounded-control border border-main-750 bg-main-850 px-2.5 py-2">
+          <ScrollArea className="max-h-56 rounded-control bg-main-700 px-2.5 py-2">
             <pre className="m-0 font-mono text-[11px] leading-relaxed whitespace-pre-wrap wrap-break-word text-main-300">
               {resultPreview(result)}
             </pre>

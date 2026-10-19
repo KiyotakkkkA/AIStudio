@@ -16,7 +16,7 @@ function ModelGrid() {
   const curated = outcome?.kind === "ok" && !outcome.live;
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col gap-3 rounded-card border border-main-750 bg-main-900 p-4">
+    <section className="flex min-h-0 flex-1 flex-col gap-3 rounded-card border border-line bg-main-900 p-4">
       <div className="flex flex-none items-center gap-2.5">
         <h2 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           Доступные модели
@@ -57,7 +57,7 @@ function ModelGrid() {
       </div>
 
       {providers.rows.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-850">
+        <div className="flex flex-1 items-center justify-center rounded-card bg-main-800">
           <EmptyState
             icon={mdiCubeOutline}
             title="Моделей пока нет"
@@ -65,7 +65,7 @@ function ModelGrid() {
           />
         </div>
       ) : rows.length === 0 ? (
-        <p className="rounded-card border border-dashed border-main-750 px-3 py-4.5 text-center text-[12px] text-main-400">
+        <p className="rounded-card bg-main-800 px-3 py-4.5 text-center text-[12px] text-main-400">
           Ничего не найдено по фильтру.
         </p>
       ) : (

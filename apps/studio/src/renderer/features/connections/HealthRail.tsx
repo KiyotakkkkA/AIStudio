@@ -21,10 +21,7 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
 
   if (server === null || store.form?.isNew === true) {
     return (
-      <aside
-        aria-label="Состояние сервера"
-        className="flex w-71.5 flex-none flex-col border-l border-main-750 bg-main-850"
-      >
+      <aside aria-label="Состояние сервера" className="flex w-71.5 flex-none flex-col bg-main-800">
         <div className="flex flex-1 items-center justify-center p-4">
           <EmptyState
             icon={mdiHeartPulse}
@@ -53,10 +50,10 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
   return (
     <aside
       aria-label="Состояние сервера"
-      className="flex min-h-0 w-71.5 flex-none flex-col gap-3 border-l border-main-750 bg-main-850 px-3.5 py-4"
+      className="flex min-h-0 w-71.5 flex-none flex-col gap-3 bg-main-800 px-3.5 py-4"
     >
       <div className={HEADING}>Состояние</div>
-      <div className="flex flex-none flex-col gap-2.25 rounded-card border border-main-750 bg-main-900 p-3">
+      <div className="flex flex-none flex-col gap-2.25 rounded-card border border-line bg-main-900 p-3">
         {metrics.map((metric) => (
           <div key={metric.label} className="flex justify-between gap-2 text-[11.5px]">
             <span className="text-main-400">{metric.label}</span>
@@ -69,13 +66,13 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
 
       <div className={`mt-0.5 ${HEADING}`}>Используется</div>
       {usedBy.scenarios === 0 && usedBy.skills === 0 ? (
-        <div className="flex-none rounded-card border border-dashed border-main-750 px-2.75 py-2.5 text-[12px] text-main-500">
+        <div className="flex-none rounded-card bg-main-800 px-2.75 py-2.5 text-[12px] text-main-500">
           Ни сценарии, ни навыки не ссылаются на инструменты этого сервера.
         </div>
       ) : (
         <>
           {usedBy.scenarios === 0 ? null : (
-            <div className="flex flex-none items-center gap-2.25 rounded-card border border-main-750 bg-main-900 px-2.75 py-2.5">
+            <div className="flex flex-none items-center gap-2.25 rounded-card border border-line bg-main-900 px-2.75 py-2.5">
               <Icon path={mdiSitemapOutline} size={15} className="text-main-400" />
               <span className="flex-1 text-[12px] text-main-100">
                 {scenariosWord(usedBy.scenarios)}
@@ -83,7 +80,7 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
             </div>
           )}
           {usedBy.skills === 0 ? null : (
-            <div className="flex flex-none items-center gap-2.25 rounded-card border border-main-750 bg-main-900 px-2.75 py-2.5">
+            <div className="flex flex-none items-center gap-2.25 rounded-card border border-line bg-main-900 px-2.75 py-2.5">
               <Icon path={mdiBookOpenOutline} size={15} className="text-main-400" />
               <span className="flex-1 text-[12px] text-main-100">{skillsWord(usedBy.skills)}</span>
             </div>
@@ -92,7 +89,7 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
       )}
 
       <div className={`mt-0.5 ${HEADING}`}>Журнал</div>
-      <ScrollArea className="flex min-h-40 flex-1 flex-col rounded-card border border-main-750 bg-main-900 px-2.75 py-2.5 font-mono text-[10.5px]/[1.8]">
+      <ScrollArea className="flex min-h-40 flex-1 flex-col rounded-card border border-line bg-main-900 px-2.75 py-2.5 font-mono text-[10.5px]/[1.8]">
         {log.length === 0 ? (
           <span className="text-main-500">Сервер пока ничего не писал в этой сессии.</span>
         ) : (

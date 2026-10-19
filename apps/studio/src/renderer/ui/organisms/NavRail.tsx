@@ -1,12 +1,12 @@
 import {
   mdiCogOutline,
   mdiDockLeft,
-  mdiLightningBolt,
   mdiMonitor,
   mdiWeatherNight,
   mdiWhiteBalanceSunny,
 } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import AppLogo from "../atoms/AppLogo";
 import Icon from "../atoms/Icon";
 import NavRailItem from "../molecules/NavRailItem";
 import type { NavGroupModel, NavItemModel, RailIdentity, RailTheme } from "./NavRailTypes";
@@ -56,9 +56,7 @@ export default function NavRail({
           collapsed ? "justify-center px-0" : "pr-2 pl-4.5"
         }`}
       >
-        <div className="flex size-8 flex-none items-center justify-center rounded-control bg-linear-to-br from-accent-medium to-accent-dark text-on-accent shadow-[inset_0_1px_0_rgb(255_255_255/0.2),0_2px_6px_rgb(180_80_20/0.25)]">
-          <Icon path={mdiLightningBolt} size={17} />
-        </div>
+        <AppLogo size={32} className="drop-shadow-[0_2px_6px_rgb(180_80_20/0.25)]" />
         {collapsed ? null : (
           <>
             <div className="flex min-w-0 flex-1 flex-col leading-tight">
@@ -116,7 +114,7 @@ export default function NavRail({
           <div
             role="radiogroup"
             aria-label="Тема оформления"
-            className="flex gap-0.5 rounded-control border border-main-750 bg-main-900/60 p-0.75"
+            className="flex gap-0.5 rounded-control bg-main-900/60 p-0.75"
           >
             {THEME_OPTIONS.map((option) => (
               <button
@@ -141,12 +139,10 @@ export default function NavRail({
 
         <div
           className={`flex items-center gap-2.5 ${
-            collapsed
-              ? "justify-center"
-              : "rounded-card border border-main-750 bg-main-900/60 py-2 pr-1.5 pl-2"
+            collapsed ? "justify-center" : "rounded-card bg-main-900/60 py-2 pr-1.5 pl-2"
           }`}
         >
-          <div className="flex size-8 flex-none items-center justify-center rounded-full bg-accent-soft text-[11.5px] font-semibold text-accent-medium ring-1 ring-accent-line">
+          <div className="flex size-8 flex-none items-center justify-center rounded-full bg-accent-soft text-[11.5px] font-semibold text-accent-medium">
             {identity.initials}
           </div>
           {collapsed ? null : (

@@ -28,7 +28,7 @@ function ValueTable({ vm, table, secrets, namePlaceholder, empty }: ValueTablePr
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="overflow-hidden rounded-card border border-main-750">
+      <div className="overflow-hidden rounded-card border border-line">
         {rows.length === 0 ? (
           <div className="px-3 py-2.5 text-[12px] text-main-500">{empty}</div>
         ) : (
@@ -37,7 +37,7 @@ function ValueTable({ vm, table, secrets, namePlaceholder, empty }: ValueTablePr
             return (
               <div
                 key={row.id}
-                className={`flex flex-col gap-1 px-2.75 py-2 ${index > 0 ? "border-t border-main-750" : ""}`}
+                className={`flex flex-col gap-1 px-2.75 py-2 ${index > 0 ? "border-t border-line" : ""}`}
               >
                 <div className="flex items-center gap-2.5">
                   <span className="w-42.5 flex-none">

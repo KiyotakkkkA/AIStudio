@@ -73,7 +73,7 @@ export default observer(function DownloadsWorkspace() {
           {store.error === null ? null : (
             <div
               role="alert"
-              className="flex items-center gap-3 border-b border-err-border bg-err-soft px-5 py-2.5 text-[12.5px] text-err"
+              className="flex items-center gap-3 bg-err-soft px-5 py-2.5 text-[12.5px] text-err"
             >
               <span className="min-w-0 flex-1">{store.error}</span>
               <Button
@@ -88,7 +88,7 @@ export default observer(function DownloadsWorkspace() {
           )}
 
           <ScrollArea className="flex min-h-0 flex-1 flex-col">
-            <div className="flex items-center gap-2.5 border-b border-main-750 bg-main-850 px-5 py-2">
+            <div className="flex items-center gap-2.5 border-b border-line bg-main-850 px-5 py-2">
               <span className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                 Выполняется
               </span>
@@ -101,7 +101,7 @@ export default observer(function DownloadsWorkspace() {
             </div>
 
             {store.active.length === 0 ? (
-              <p className="border-b border-main-750 p-4  text-[12px] text-main-500">
+              <p className="border-b border-line p-4  text-[12px] text-main-500">
                 Сейчас ничего не загружается. Выберите артефакт в каталоге ниже.
               </p>
             ) : (
@@ -137,7 +137,7 @@ export default observer(function DownloadsWorkspace() {
 
             {store.failed.length === 0 ? null : (
               <>
-                <div className="flex items-center gap-2.5 border-y border-main-750 bg-main-850 px-5 py-2">
+                <div className="flex items-center gap-2.5 border-y border-line bg-main-850 px-5 py-2">
                   <span className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-err uppercase">
                     Не удалось
                   </span>
@@ -157,7 +157,7 @@ export default observer(function DownloadsWorkspace() {
               </>
             )}
 
-            <div className="flex items-center gap-2.5 border-y border-main-750 bg-main-850 px-5 py-2">
+            <div className="flex items-center gap-2.5 border-y border-line bg-main-850 px-5 py-2">
               <span className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                 Каталог
               </span>

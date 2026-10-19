@@ -28,7 +28,7 @@ function VectorStoreDetail() {
   const detail = store.detail;
   if (!detail)
     return (
-      <div className="flex min-w-0 flex-1 items-center justify-center rounded-card border border-main-750 bg-main-900">
+      <div className="flex min-w-0 flex-1 items-center justify-center rounded-card border border-line bg-main-900">
         <EmptyState
           icon={mdiDatabaseOutline}
           title={
@@ -62,7 +62,7 @@ function VectorStoreDetail() {
   const disabled = store.busy || store.searching;
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5">
-      <div className="flex flex-none flex-col gap-3.5 rounded-card border border-main-750 bg-main-900 px-4.5 py-4">
+      <div className="flex flex-none flex-col gap-3.5 rounded-card border border-line bg-main-900 px-4.5 py-4">
         <div className="flex flex-wrap items-start gap-3">
           <div className="flex size-9.5  flex-none items-center justify-center rounded-card bg-main-700 text-accent-medium">
             <Icon path={mdiDatabaseOutline} size={19} />
@@ -134,11 +134,11 @@ function VectorStoreDetail() {
             </Button>
           </div>
         </div>
-        <div className="flex overflow-hidden rounded-[9px] border border-main-750 bg-main-800">
+        <div className="flex overflow-hidden rounded-[9px] bg-main-800">
           {stats.map(([value, label], i) => (
             <div
               key={label}
-              className={`min-w-0 flex-1 border-r border-main-750 px-3.25 py-2.75 last:border-r-0 ${i === 5 ? "grow-[1.6]" : ""}`}
+              className={`min-w-0 flex-1 border-r border-line px-3.25 py-2.75 last:border-r-0 ${i === 5 ? "grow-[1.6]" : ""}`}
             >
               <div
                 title={value}
@@ -179,8 +179,8 @@ function VectorStoreDetail() {
           </p>
         ) : null}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col rounded-card border border-main-750 bg-main-900">
-        <div className="flex h-11 flex-none items-center border-b border-main-750 px-3.5">
+      <div className="flex min-h-0 flex-1 flex-col rounded-card border border-line bg-main-900">
+        <div className="flex h-11 flex-none items-center border-b border-line px-3.5">
           <Switcher
             value={store.tab}
             label="Раздел хранилища"

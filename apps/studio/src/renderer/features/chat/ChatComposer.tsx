@@ -35,7 +35,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
   return (
     <div className="mx-auto w-full max-w-4xl shrink-0 px-6 pt-2 pb-4">
       {!store.available && !store.loading ? (
-        <div className="rounded-card border border-dashed border-main-600 bg-main-850 p-4 text-[13px] text-main-300">
+        <div className="rounded-card bg-main-800 p-4 text-[13px] text-main-300">
           Выберите доступную текстовую модель, чтобы начать диалог.{" "}
           <Link
             className="font-medium text-accent-medium underline decoration-accent-line underline-offset-2 hover:decoration-accent-medium"
@@ -69,9 +69,17 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             if ((event.target as HTMLElement).closest("button, a")) return;
             event.currentTarget.querySelector<HTMLTextAreaElement>("textarea")?.focus();
           }}
-          className="space-y-2 rounded-[14px] border border-main-750 bg-main-900 p-2.5 shadow-pop"
+          className="relative space-y-2 rounded-[18px] bg-main-900 p-2.5 shadow-pop"
         >
-          <div className="flex items-center gap-2 rounded-control bg-main-850 py-1 pr-2.5 pl-1">
+          {store.generating ? (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-6 top-0 h-px overflow-hidden"
+            >
+              <span className="block h-full w-2/5 animate-zvs-sweep bg-linear-to-r from-transparent via-accent-dark to-transparent" />
+            </span>
+          ) : null}
+          <div className="flex items-center gap-2 rounded-control bg-main-800 py-1 pr-2.5 pl-1">
             <Dropdown menuWidth={320} menuPlacement="top-left">
               <IconDropdownButton
                 label="Контекстное окно"
@@ -81,7 +89,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               />
               <Dropdown.Menu
                 rounded="rounded-lg"
-                className="w-80 rounded-card border border-main-750 bg-main-900 p-3.5 text-[12px] text-main-300 shadow-pop"
+                className="w-80 rounded-card border border-line bg-main-900 p-3.5 text-[12px] text-main-300 shadow-pop"
               >
                 <div className="space-y-2.5">
                   <p className="text-[13px] font-semibold text-main-50">Контекстное окно</p>
@@ -130,7 +138,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 .map((item) => (
                   <span
                     key={item.id}
-                    className="inline-flex h-7 items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft pr-1.5 pl-2.5 text-[12px] font-medium text-accent-medium"
+                    className="inline-flex h-7 items-center gap-1.5 rounded-full bg-accent-soft pr-1.5 pl-2.5 text-[12px] font-medium text-accent-medium"
                   >
                     <Icon path={mdiDatabaseOutline} size={14} />
                     <span className="max-w-40 truncate">{item.name}</span>
@@ -160,8 +168,8 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                     }
                     className={`inline-flex h-7 items-center gap-1.5 rounded-full border pr-1.5 pl-2.5 text-[12px] font-medium ${
                       blocked || store.toolMode === "none"
-                        ? "border-dashed border-main-600 bg-main-850 text-main-400"
-                        : "border-accent-line bg-accent-soft text-accent-medium"
+                        ? "border-dashed border-line-strong bg-transparent text-main-400"
+                        : "border-transparent bg-accent-soft text-accent-medium"
                     }`}
                   >
                     <Icon path={mdiWrenchOutline} size={13} />
@@ -210,7 +218,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 role="menu"
                 aria-label="Добавить контекст"
                 rounded="rounded-lg"
-                className="rounded-card border-main-750 bg-main-900 p-1 shadow-pop"
+                className="rounded-card border-line bg-main-900 p-1 shadow-pop"
               >
                 <Dropdown.Item
                   role="menuitem"
@@ -247,7 +255,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 role="menu"
                 aria-label="Провайдер и модель"
                 rounded=""
-                className="space-y-3.5 rounded-card border-main-750 bg-main-900 p-3.5 shadow-pop"
+                className="space-y-3.5 rounded-card border-line bg-main-900 p-3.5 shadow-pop"
               >
                 <div>
                   <p className="mb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
@@ -298,7 +306,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               </Dropdown.Menu>
             </Dropdown>
             <ChatToolPicker store={store} />
-            <span className="inline-flex h-7 max-w-56 min-w-0 items-center truncate rounded-full border border-main-750 bg-main-850 px-2.5 font-mono text-[11.5px] text-main-400">
+            <span className="inline-flex h-7 max-w-56 min-w-0 items-center truncate rounded-full bg-main-800 px-2.5 font-mono text-[11.5px] text-main-400">
               {store.model?.displayName || store.model?.externalId || store.modelId}
             </span>
             <span className="flex-1" />
@@ -323,7 +331,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
         open={storesOpen}
         onClose={() => setStoresOpen(false)}
         label="Источники из хранилища"
-        className="w-lg max-w-[92vw] overflow-hidden rounded-card border border-main-750 bg-main-900 p-0 shadow-pop"
+        className="w-lg max-w-[92vw] overflow-hidden rounded-card border border-line bg-main-900 p-0 shadow-pop"
       >
         <div className="px-5 pt-5">
           <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-main-50">
@@ -341,8 +349,8 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 key={item.id}
                 className={`flex cursor-pointer items-start gap-3 rounded-card border p-3.5 ${
                   selected
-                    ? "border-accent-line bg-accent-soft"
-                    : "border-main-750 bg-main-900 hover:border-main-600"
+                    ? "border-transparent bg-accent-soft"
+                    : "border-transparent bg-main-800 hover:bg-main-700"
                 }`}
               >
                 <InputCheckBox
@@ -361,11 +369,11 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             );
           })}
           {store.stores.length === 0 && (
-            <p className="rounded-card border border-dashed border-main-600 py-6 text-center text-[12.5px] text-main-500">
+            <p className="rounded-card bg-main-800 py-6 text-center text-[12.5px] text-main-500">
               Хранилища не подключены.
             </p>
           )}
-          <div className="rounded-card border border-main-750 bg-main-850 p-3.5">
+          <div className="rounded-card bg-main-800 p-3.5">
             <Toggle
               id="chat-use-relations"
               checked={store.useRelations}
@@ -379,7 +387,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             </p>
           </div>
         </div>
-        <div className="mt-5 flex justify-end border-t border-main-750 bg-main-850 px-5 py-3">
+        <div className="mt-5 flex justify-end bg-main-850 px-5 py-3">
           <Button type="button" tone="secondary" onClick={() => setStoresOpen(false)}>
             Готово
           </Button>

@@ -22,10 +22,7 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
 
   if (item === null && download === null) {
     return (
-      <aside
-        aria-label="Детали загрузки"
-        className="flex w-78.5 flex-none flex-col border-l border-main-750 bg-main-850"
-      >
+      <aside aria-label="Детали загрузки" className="flex w-78.5 flex-none flex-col bg-main-800">
         <div className="flex flex-1 items-center justify-center p-4">
           <EmptyState
             icon={mdiTrayArrowDown}
@@ -49,13 +46,10 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
   const busy = store.busyId !== null;
 
   return (
-    <aside
-      aria-label="Детали загрузки"
-      className="flex w-78.5 flex-none flex-col border-l border-main-750 bg-main-850"
-    >
+    <aside aria-label="Детали загрузки" className="flex w-78.5 flex-none flex-col bg-main-800">
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 p-3.5">
         {item?.kind === "runtime" && store.runtimes !== null ? (
-          <div className="flex flex-col gap-1 rounded-card border border-main-750 bg-main-900 shadow-card px-3 py-2.5">
+          <div className="flex flex-col gap-1 rounded-card bg-main-900 shadow-card px-3 py-2.5">
             <span className="text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
               Эта машина
             </span>
@@ -96,7 +90,7 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
           )}
         </div>
 
-        <dl className="m-0 flex flex-col gap-2.25 rounded-card border border-main-750 bg-main-900 shadow-card p-3 text-[12px]">
+        <dl className="m-0 flex flex-col gap-2.25 rounded-card bg-main-900 shadow-card p-3 text-[12px]">
           <div className="flex justify-between gap-2">
             <dt className="text-main-400">Загружено</dt>
             <dd className="m-0 font-mono">
@@ -134,10 +128,7 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
         </dl>
 
         {download?.error === undefined ? null : (
-          <p
-            role="alert"
-            className="m-0 rounded-card border border-err-border bg-err-soft p-2.75 text-[12px] text-err"
-          >
+          <p role="alert" className="m-0 rounded-card bg-err-soft p-2.75 text-[12px] text-err">
             {download.error}
           </p>
         )}
@@ -145,7 +136,7 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
         <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           Назначение
         </p>
-        <div className="flex flex-col gap-1.5 rounded-card border border-main-750 bg-main-900 shadow-card p-2.75">
+        <div className="flex flex-col gap-1.5 rounded-card bg-main-900 shadow-card p-2.75">
           <span className="font-mono text-[11px] break-all text-main-300">
             {download?.targetPath ?? store.disk?.root ?? "будет выбран при запуске"}
           </span>
@@ -159,7 +150,7 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
         <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           После загрузки
         </p>
-        <div className="flex flex-col gap-2.25 rounded-card border border-main-750 bg-main-900 shadow-card p-2.75">
+        <div className="flex flex-col gap-2.25 rounded-card bg-main-900 shadow-card p-2.75">
           <Toggle
             checked={checksum !== undefined && options.verifyChecksum}
             disabled={checksum === undefined}

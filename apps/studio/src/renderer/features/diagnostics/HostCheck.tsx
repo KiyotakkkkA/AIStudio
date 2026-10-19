@@ -65,7 +65,7 @@ export default function HostCheck() {
   return (
     <section
       data-testid="host-check"
-      className="flex flex-none flex-col gap-3 rounded-card border border-main-750 bg-main-900 p-4"
+      className="flex flex-none flex-col gap-3 rounded-card border border-line bg-main-900 p-4"
     >
       <div className="flex flex-col gap-0.5">
         <h2 className="text-[13px] font-semibold text-main-100">Проверка хоста</h2>
@@ -78,7 +78,7 @@ export default function HostCheck() {
           type="button"
           data-testid="ping-button"
           onClick={runPing}
-          className="rounded-control border border-main-750 px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
+          className="rounded-control border border-line px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
         >
           Пинг
         </button>
@@ -91,7 +91,7 @@ export default function HostCheck() {
           type="button"
           data-testid="stream-button"
           onClick={runStream}
-          className="rounded-control border border-main-750 px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
+          className="rounded-control border border-line px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
         >
           Поток
         </button>
@@ -104,7 +104,7 @@ export default function HostCheck() {
           type="button"
           data-testid="job-button"
           onClick={runJob}
-          className="rounded-control border border-main-750 px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
+          className="rounded-control border border-line px-3 py-1.5 text-[12px] text-main-200 hover:bg-main-800"
         >
           Задача
         </button>

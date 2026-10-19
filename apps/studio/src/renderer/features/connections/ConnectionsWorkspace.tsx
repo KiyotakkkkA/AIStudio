@@ -53,7 +53,7 @@ function ConnectionsWorkspace() {
       {store.error === null ? null : (
         <div
           role="alert"
-          className="mx-6 mt-3 flex flex-none items-center gap-3 rounded-control border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
+          className="mx-6 mt-3 flex flex-none items-center gap-3 rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err"
         >
           <span className="flex-1">{store.error}</span>
           <button type="button" className="text-main-400" onClick={store.dismissError}>
@@ -90,7 +90,7 @@ function ConnectionsWorkspace() {
             <ServerSetupCard store={store} vm={form} />
             <ExposedToolsCard store={store} />
 
-            <div className="flex flex-none items-center gap-3 rounded-card border border-main-750 bg-main-900 px-4 py-3">
+            <div className="flex flex-none items-center gap-3 rounded-card border border-line bg-main-900 px-4 py-3">
               {form.isNew ? null : (
                 <Button
                   key={form.serverId}

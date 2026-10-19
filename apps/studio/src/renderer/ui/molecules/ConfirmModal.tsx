@@ -33,7 +33,7 @@ export default function ConfirmModal({
       open={open}
       onClose={onCancel}
       label={title}
-      className={`w-110 max-w-[92vw] overflow-hidden rounded-card border bg-main-900 p-0 shadow-pop ${tone === "danger" ? "border-err-border" : "border-main-750"}`}
+      className={`w-110 max-w-[92vw] overflow-hidden rounded-card border bg-main-900 p-0 shadow-pop ${tone === "danger" ? "border-err-border" : "border-line"}`}
     >
       <div className="px-5 pt-5">
         <h2
@@ -43,7 +43,7 @@ export default function ConfirmModal({
         </h2>
         <div className="mt-2 text-[13px] leading-relaxed text-main-400">{content}</div>
       </div>
-      <div className="mt-5 flex justify-end gap-2 border-t border-main-750 bg-main-850 px-5 py-3">
+      <div className="mt-5 flex justify-end gap-2 bg-main-850 px-5 py-3">
         <ButtonBase type="button" onClick={onCancel}>
           {cancelLabel}
         </ButtonBase>

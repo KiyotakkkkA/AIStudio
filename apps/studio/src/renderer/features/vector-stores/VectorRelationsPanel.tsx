@@ -116,7 +116,7 @@ function VectorRelationsPanel() {
           {groups.map((group) => (
             <article
               key={group.document.id}
-              className="rounded-card border border-main-750 bg-main-900 shadow-card px-3.25 py-3"
+              className="rounded-card bg-main-900 shadow-card px-3.25 py-3"
             >
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="break-all font-mono text-[12px] text-main-200">

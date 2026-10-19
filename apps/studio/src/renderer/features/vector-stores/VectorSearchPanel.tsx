@@ -77,12 +77,12 @@ function VectorSearchPanel() {
       </form>
       <Accordion
         defaultOpen={false}
-        className="flex-none rounded-[9px] border border-main-750 bg-main-900"
+        className="flex-none rounded-[9px] border border-line bg-main-900"
       >
         <Accordion.Summary className="min-h-12 px-4 text-left text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase hover:text-main-200">
           Расширенные настройки
         </Accordion.Summary>
-        <Accordion.Content className="flex flex-col gap-3.25 border-t border-main-750 p-4">
+        <Accordion.Content className="flex flex-col gap-3.25 border-t border-line p-4">
           <Toggle
             id="vs-search-expand-graph"
             checked={graph.expandEnabled}
@@ -161,7 +161,7 @@ function VectorSearchPanel() {
         {store.rows.map((row) => (
           <article
             key={row.id}
-            className={`flex gap-3 rounded-card border border-main-750 bg-main-900 shadow-card px-3.25 py-3 ${row.belowFloor ? "opacity-50" : ""}`}
+            className={`flex gap-3 rounded-card bg-main-900 shadow-card px-3.25 py-3 ${row.belowFloor ? "opacity-50" : ""}`}
           >
             <div className="w-13 flex-none">
               <div className="font-mono text-[13px] font-semibold text-accent-medium">
@@ -214,7 +214,7 @@ function VectorSearchPanel() {
                   <p
                     key={neighbour.id}
                     title={neighbour.label}
-                    className="mb-1.5 border-l-2 border-main-700 pl-2 whitespace-pre-wrap wrap-break-word text-[11.5px] text-main-500"
+                    className="mb-1.5 border-l-2 border-line-strong pl-2 whitespace-pre-wrap wrap-break-word text-[11.5px] text-main-500"
                   >
                     {neighbour.text}
                   </p>
@@ -229,7 +229,7 @@ function VectorSearchPanel() {
                   <p
                     key={neighbour.id}
                     title={neighbour.label}
-                    className="mt-1.5 border-l-2 border-main-700 pl-2 whitespace-pre-wrap wrap-break-word text-[11.5px] text-main-500"
+                    className="mt-1.5 border-l-2 border-line-strong pl-2 whitespace-pre-wrap wrap-break-word text-[11.5px] text-main-500"
                   >
                     {neighbour.text}
                   </p>
@@ -243,7 +243,7 @@ function VectorSearchPanel() {
         {store.graphRows.map((row) => (
           <article
             key={row.id}
-            className="flex gap-3 rounded-card border border-dashed border-main-700 bg-main-800 px-3.25 py-3"
+            className="flex gap-3 rounded-card bg-main-800 bg-main-800 px-3.25 py-3"
           >
             <div className="w-13 flex-none">
               <Chip tone="raised" title={`Связь с результатом ${row.via}`}>

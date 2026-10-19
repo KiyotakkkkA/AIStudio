@@ -16,7 +16,7 @@ export default function TextArea({ invalid = false, noBorder = false, ...props }
       ? "border-0 bg-transparent shadow-none focus:border-0"
       : invalid
         ? "border-err focus:border-err focus:shadow-[inset_0_0_0_1px_var(--color-err)]"
-        : "border-main-750 hover:border-main-600 focus:border-accent-dark focus:shadow-[inset_0_0_0_1px_var(--color-accent-dark)]",
+        : "border-line hover:border-line-strong focus:border-accent-dark focus:shadow-[inset_0_0_0_1px_var(--color-accent-dark)]",
   ].join(" ");
 
   return <InputBig {...props} rows={2} className="w-full" classNames={{ textarea }} />;

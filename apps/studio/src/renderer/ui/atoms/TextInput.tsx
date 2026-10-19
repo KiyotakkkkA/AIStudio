@@ -11,7 +11,7 @@ export default function TextInput({ mono = false, invalid = false, ...props }: T
     "",
     invalid
       ? "border-err focus-visible:border-err focus-visible:shadow-[inset_0_0_0_1px_var(--color-err)]"
-      : "border-main-750 hover:border-main-600 focus-visible:border-accent-dark focus-visible:shadow-[inset_0_0_0_1px_var(--color-accent-dark)]",
+      : "border-line hover:border-line-strong focus-visible:border-accent-dark focus-visible:shadow-[inset_0_0_0_1px_var(--color-accent-dark)]",
     "focus-visible:ring-0",
     mono ? "font-mono text-[12.5px]" : "",
   ].join(" ");

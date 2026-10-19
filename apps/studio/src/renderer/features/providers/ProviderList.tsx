@@ -38,7 +38,7 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
         ) : null}
 
         {providers.isEmpty ? (
-          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-main-600 bg-main-850 px-3">
+          <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">
             <EmptyState
               icon={mdiLayersOutline}
               title="Подключений нет"
@@ -55,7 +55,7 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
               onSelect(summary.id);
             }}
             leading={
-              <span className="flex size-9 flex-none items-center justify-center rounded-control border border-main-750 bg-main-850 text-[11px] font-semibold text-accent-medium">
+              <span className="flex size-9 flex-none items-center justify-center rounded-control bg-main-700 text-[11px] font-semibold text-accent-medium">
                 {providerInitials(summary.name, summary.kind)}
               </span>
             }
@@ -84,7 +84,7 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
           dashed
           onClick={onCreate}
           leading={
-            <span className="flex size-7.5 flex-none items-center justify-center rounded-control border border-dashed border-main-750 text-main-400">
+            <span className="flex size-7.5 flex-none items-center justify-center rounded-control bg-main-700 text-main-400">
               <Icon path={mdiPlus} size={14} />
             </span>
           }

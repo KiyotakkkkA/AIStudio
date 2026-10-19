@@ -20,7 +20,7 @@ function PermissionDefaultsDialog({ store }: { readonly store: ToolStore }) {
       open={store.defaultsOpen}
       onClose={store.closeDefaults}
       label="Разрешения по умолчанию"
-      className="w-130 max-w-[92vw] overflow-visible rounded-card border border-main-750 bg-main-900 p-0 shadow-pop"
+      className="w-130 max-w-[92vw] overflow-visible rounded-card border border-line bg-main-900 p-0 shadow-pop"
     >
       <div className="px-5 pt-5 pb-3">
         <h2 className="m-0 text-[15px] font-semibold tracking-[-0.01em] text-main-50">
@@ -59,7 +59,7 @@ function PermissionDefaultsDialog({ store }: { readonly store: ToolStore }) {
         <p className="m-0 text-[11.5px] text-main-500">{DEFAULT_TIER_HINT}</p>
       </div>
 
-      <div className="flex justify-end gap-2 border-t border-main-750 bg-main-850 px-5 py-3">
+      <div className="flex justify-end gap-2 bg-main-850 px-5 py-3">
         <Button type="button" tone="secondary" onClick={store.closeDefaults}>
           Отмена
         </Button>

@@ -29,7 +29,7 @@ export default function RunHistoryRow({ run, selected, onSelect }: RunHistoryRow
       type="button"
       onClick={onSelect}
       aria-current={selected ? "true" : undefined}
-      className={`flex w-full items-center gap-3 border-b border-main-750 px-4 py-2.5 text-left ${
+      className={`flex w-full items-center gap-3 border-b border-line px-4 py-2.5 text-left ${
         selected ? "bg-main-750" : "hover:bg-main-800"
       }`}
     >

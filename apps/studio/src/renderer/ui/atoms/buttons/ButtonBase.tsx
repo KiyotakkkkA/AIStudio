@@ -6,7 +6,7 @@ const TONES: Record<ButtonTone, string> = {
   primary:
     "border-transparent bg-accent-dark text-on-accent shadow-[inset_0_1px_0_rgb(255_255_255/0.14)] hover:bg-accent-medium",
   secondary:
-    "border-main-750 bg-main-900 text-main-100 shadow-[0_1px_2px_rgb(40_25_10/0.05)] hover:border-main-600 hover:bg-main-850",
+    "border-line bg-main-900 text-main-100 shadow-[0_1px_2px_rgb(40_25_10/0.05)] hover:border-line-strong hover:bg-main-850",
   ghost: "border-transparent bg-transparent text-main-300 hover:bg-main-700 hover:text-main-50",
   danger: "border-transparent bg-danger-medium text-white hover:bg-danger-dark",
 };

@@ -34,10 +34,7 @@ function ToolDetailRail({ store }: { readonly store: ToolStore }) {
   const references = store.detail?.id === tool?.id ? (store.detail?.references ?? null) : null;
 
   return (
-    <aside
-      aria-label="Инструмент"
-      className="flex min-h-0 w-85 flex-none flex-col border-l border-main-750 bg-main-900"
-    >
+    <aside aria-label="Инструмент" className="flex min-h-0 w-85 flex-none flex-col bg-main-800">
       {tool === null || tier === null ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
@@ -73,7 +70,7 @@ function ToolDetailRail({ store }: { readonly store: ToolStore }) {
           {problem === null ? null : (
             <div
               role="status"
-              className="flex gap-2 rounded-card border border-warn-border bg-warn-soft px-3 py-2.5 text-[12px]"
+              className="flex gap-2 rounded-card bg-warn-soft px-3 py-2.5 text-[12px]"
             >
               <Icon path={mdiAlertCircleOutline} size={15} className="mt-px flex-none text-warn" />
               <div className="flex min-w-0 flex-col gap-0.5">
@@ -129,7 +126,7 @@ function ToolDetailRail({ store }: { readonly store: ToolStore }) {
                 <button
                   key={`${reference.kind}:${reference.refId}`}
                   type="button"
-                  className="flex items-center gap-2.25 rounded-card border border-main-750 bg-main-900 px-2.75 py-2.25 text-left hover:border-accent-line hover:bg-accent-soft"
+                  className="flex items-center gap-2.25 rounded-card border border-line bg-main-900 px-2.75 py-2.25 text-left hover:border-accent-line hover:bg-accent-soft"
                   onClick={() =>
                     void navigate(
                       `${reference.kind === "scenario" ? ROUTES.scenarios : ROUTES.skills}?id=${encodeURIComponent(reference.refId)}`,

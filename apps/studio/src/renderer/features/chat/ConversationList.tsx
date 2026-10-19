@@ -1,9 +1,16 @@
 import { observer } from "mobx-react-lite";
-import { mdiDeleteOutline, mdiDotsVertical, mdiPencilOutline, mdiPlus } from "@mdi/js";
+import {
+  mdiChatOutline,
+  mdiDeleteOutline,
+  mdiDotsVertical,
+  mdiPencilOutline,
+  mdiSquareEditOutline,
+} from "@mdi/js";
 import { Dropdown, Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useState } from "react";
 import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import TextInput from "../../ui/atoms/TextInput";
 import ConfirmModal from "../../ui/molecules/ConfirmModal";
@@ -34,13 +41,25 @@ export default observer(function ConversationList({ store }: { readonly store: C
   return (
     <aside
       aria-label="Диалоги"
-      className="flex w-66 shrink-0 flex-col border-r border-main-750 bg-main-850 max-[850px]:w-50"
+      className="flex w-66 shrink-0 flex-col bg-main-800 max-[850px]:w-50"
     >
-      <div className="flex shrink-0 flex-col gap-2.5 p-3">
-        <Button tone="primary" onClick={store.newChat} disabled={store.generating}>
-          <Icon path={mdiPlus} size={16} />
-          Новый чат
-        </Button>
+      <div className="flex h-14 shrink-0 items-center gap-2.5 pr-2.5 pl-4">
+        <span className="flex size-7 flex-none items-center justify-center rounded-control bg-accent-soft text-accent-medium">
+          <Icon path={mdiChatOutline} size={15} />
+        </span>
+        <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em] text-main-50">
+          Чат
+        </h1>
+        <IconButton
+          aria-label="Новый чат"
+          title="Новый чат"
+          path={mdiSquareEditOutline}
+          iconSize={17}
+          disabled={store.generating}
+          onClick={store.newChat}
+        />
+      </div>
+      <div className="shrink-0 px-3 pb-2">
         <TextInput
           preset="search"
           aria-label=""
@@ -63,7 +82,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
                     key={conversation.id}
                     className={`group mb-0.5 flex h-8.5 w-full cursor-pointer items-center rounded-control pr-1 pl-2.5 ${
                       store.active?.id === conversation.id
-                        ? "bg-main-900 text-main-50 shadow-[0_1px_2px_rgb(40_25_10/0.08)] ring-1 ring-main-750 ring-inset"
+                        ? "bg-main-900 text-main-50 shadow-[0_1px_3px_rgb(40_25_10/0.08)]"
                         : "text-main-300 hover:bg-main-700 hover:text-main-100"
                     }`}
                   >
@@ -87,7 +106,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
                         role="menu"
                         aria-label="Действия диалога"
                         rounded="rounded-lg"
-                        className="rounded-card border-main-750 bg-main-900 p-1 shadow-pop"
+                        className="rounded-card border-line bg-main-900 p-1 shadow-pop"
                       >
                         <Dropdown.Item
                           role="menuitem"
@@ -135,7 +154,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
         open={renameTarget !== null}
         onClose={() => setRenameTarget(null)}
         label="Переименовать диалог"
-        className="w-110 max-w-[92vw] overflow-hidden rounded-card border border-main-750 bg-main-900 p-0 shadow-pop"
+        className="w-110 max-w-[92vw] overflow-hidden rounded-card border border-line bg-main-900 p-0 shadow-pop"
       >
         <div className="px-5 pt-5">
           <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-main-50">
@@ -157,7 +176,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
             }}
           />
         </div>
-        <div className="mt-5 flex justify-end gap-2 border-t border-main-750 bg-main-850 px-5 py-3">
+        <div className="mt-5 flex justify-end gap-2 bg-main-850 px-5 py-3">
           <Button type="button" tone="secondary" onClick={() => setRenameTarget(null)}>
             Отмена
           </Button>

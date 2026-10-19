@@ -22,7 +22,7 @@ export default function SecretConflictDialog({ conflict, onClose }: SecretConfli
         {(conflict?.consumers ?? []).map((consumer) => (
           <li
             key={`${consumer.kind}:${consumer.id}`}
-            className="rounded-control border border-main-750 bg-main-800 px-2.5 py-1.75 text-main-300"
+            className="rounded-control bg-main-800 px-2.5 py-1.75 text-main-300"
           >
             <span className="text-main-100">{consumerLabel(consumer.kind)}</span>
             <span className="ml-2 font-mono text-[11px] text-main-500">{consumer.id}</span>

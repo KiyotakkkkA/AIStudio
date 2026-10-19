@@ -43,7 +43,7 @@ export default function DownloadProgressRow({
   const tone = STATUS_TONES[download.status];
   return (
     <div
-      className={`flex items-center gap-3 border-b border-main-750 px-5 py-3 ${
+      className={`flex items-center gap-3 border-b border-line px-5 py-3 ${
         selected
           ? "bg-main-750 shadow-[inset_2px_0_0_var(--color-accent-dark)]"
           : "hover:bg-main-800"
@@ -56,7 +56,7 @@ export default function DownloadProgressRow({
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >
         <span
-          className={`flex size-9 flex-none items-center justify-center rounded-control border border-main-750 bg-main-850 ${STATUS_TONE_TEXT[tone]}`}
+          className={`flex size-9 flex-none items-center justify-center rounded-control bg-main-700 ${STATUS_TONE_TEXT[tone]}`}
         >
           <Icon path={KIND_ICONS[download.itemKind]} size={16} />
         </span>

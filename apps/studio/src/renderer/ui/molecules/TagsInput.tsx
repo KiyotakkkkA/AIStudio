@@ -38,7 +38,7 @@ export default function TagsInput({
   };
 
   return (
-    <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-control border border-main-750 bg-main-900 px-2.5 py-1.5 text-[13px] focus-within:border-accent-dark focus-within:shadow-[inset_0_0_0_1px_var(--color-accent-dark)] hover:border-main-600">
+    <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-control border border-line bg-main-900 px-2.5 py-1.5 text-[13px] focus-within:border-accent-dark focus-within:shadow-[inset_0_0_0_1px_var(--color-accent-dark)] hover:border-line-strong">
       {tags.map((tag) => (
         <Chip
           key={tag}

@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 type ChipTone = "neutral" | "raised" | "accent" | "selected";
 
 const TONES: Record<ChipTone, string> = {
-  neutral: "border-main-750 bg-main-800 text-main-300",
-  raised: "border-accent-line bg-accent-soft text-accent-medium",
+  neutral: "border-transparent bg-main-700 text-main-300",
+  raised: "border-transparent bg-accent-soft font-semibold text-accent-light",
   accent: "border-transparent bg-accent-soft text-accent-medium",
   selected: "border-transparent bg-accent-dark text-on-accent",
 };

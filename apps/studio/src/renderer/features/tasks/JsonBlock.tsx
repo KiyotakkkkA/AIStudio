@@ -17,7 +17,7 @@ export default function JsonBlock({
   return (
     <ScrollArea
       orientation="both"
-      className={`rounded-card border border-main-750 bg-main-900 p-2.5 ${maxHeight}`}
+      className={`rounded-card border border-line bg-main-900 p-2.5 ${maxHeight}`}
     >
       <pre className="m-0 font-mono text-[11px] leading-[1.7] text-main-300">
         {JSON.stringify(value, null, 2)}

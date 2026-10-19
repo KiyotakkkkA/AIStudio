@@ -68,7 +68,7 @@ export default observer(function RunsWorkspace() {
       <div className="flex min-h-0 flex-1">
         <aside
           aria-label="Фильтры истории"
-          className="flex w-56 flex-none flex-col gap-0.5 border-r border-main-750 bg-main-850 p-3"
+          className="flex w-56 flex-none flex-col gap-0.5 bg-main-800 p-3"
         >
           <p className="px-2 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             Период
@@ -113,7 +113,7 @@ export default observer(function RunsWorkspace() {
           {store.error === null ? null : (
             <div
               role="alert"
-              className="flex items-center gap-3 border-b border-err-border bg-err-soft px-5 py-2.5 text-[12.5px] text-err"
+              className="flex items-center gap-3 bg-err-soft px-5 py-2.5 text-[12.5px] text-err"
             >
               <span className="min-w-0 flex-1">{store.error}</span>
               <Button

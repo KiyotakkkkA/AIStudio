@@ -32,7 +32,7 @@ function VectorStoreAdvanced({
 }) {
   return (
     <div className="flex flex-col gap-3.25">
-      <div className="flex flex-col gap-3.25 rounded-[9px] border border-main-750 bg-main-800 p-3.5">
+      <div className="flex flex-col gap-3.25 rounded-[9px] bg-main-800 p-3.5">
         <Field
           label="Режим поиска"
           help="Гибридный поиск находит точные коды, номера статей и имена, которые векторы ранжируют низко."
@@ -90,7 +90,7 @@ function VectorStoreAdvanced({
           </Field>
         </div>
       </div>
-      <div className="flex flex-col gap-3.25 rounded-[9px] border border-main-750 bg-main-800 p-3.5">
+      <div className="flex flex-col gap-3.25 rounded-[9px] bg-main-800 p-3.5">
         <Toggle
           id="vs-rerank"
           checked={vm.rerankEnabled}
@@ -141,7 +141,7 @@ function VectorStoreAdvanced({
           </div>
         ) : null}
       </div>
-      <div className="flex flex-col gap-3.25 rounded-[9px] border border-main-750 bg-main-800 p-3.5">
+      <div className="flex flex-col gap-3.25 rounded-[9px] bg-main-800 p-3.5">
         <Toggle
           id="vs-ocr"
           checked={vm.ocrEnabled}

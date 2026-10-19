@@ -19,7 +19,7 @@ export default function TierPicker({ tier, disabled = false, onChange }: TierPic
         rounded=""
         disabled={disabled}
         title={TIER_HINTS[tier]}
-        className={`h-5 w-auto gap-0.5 rounded-full border border-main-750 bg-main-800 px-2 font-mono text-[11px] font-medium ${TIER_TEXT[tier]} disabled:cursor-not-allowed disabled:opacity-50`}
+        className={`h-5 w-auto gap-0.5 rounded-full bg-main-800 px-2 font-mono text-[11px] font-medium ${TIER_TEXT[tier]} disabled:cursor-not-allowed disabled:opacity-50`}
         icon={<Icon path={mdiChevronDown} size={11} />}
       >
         {TIER_LABELS[tier]}
@@ -28,7 +28,7 @@ export default function TierPicker({ tier, disabled = false, onChange }: TierPic
         role="menu"
         aria-label="Уровень разрешения"
         rounded=""
-        className="rounded-card border-main-750"
+        className="rounded-card border-line"
       >
         {TIERS.map((entry) => (
           <Dropdown.Item

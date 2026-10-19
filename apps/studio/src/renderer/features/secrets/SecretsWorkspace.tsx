@@ -20,7 +20,7 @@ function SecretsWorkspace() {
       {secrets.error === null ? null : (
         <div
           role="alert"
-          className="flex flex-none items-center gap-3 rounded-control border border-err-border bg-main-800 px-3 py-2.25 text-[12px] text-err"
+          className="flex flex-none items-center gap-3 rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err"
         >
           <span className="flex-1">{secrets.error}</span>
           <button type="button" className="text-main-400" onClick={secrets.dismissError}>
@@ -33,7 +33,7 @@ function SecretsWorkspace() {
         <SecretList onSelect={secrets.requestSelect} onCreate={secrets.requestCreate} />
 
         {secrets.form === null ? (
-          <div className="flex min-w-0 flex-1 items-center justify-center rounded-card border border-main-750 bg-main-900">
+          <div className="flex min-w-0 flex-1 items-center justify-center rounded-card border border-line bg-main-900">
             <EmptyState
               icon={mdiKeyOutline}
               title="Секрет не выбран"

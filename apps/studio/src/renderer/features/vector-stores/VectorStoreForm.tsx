@@ -36,7 +36,7 @@ function VectorStoreForm() {
       }}
     >
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3.5">
-        <section className="flex flex-none flex-col gap-3.25 rounded-card border border-main-750 bg-main-900 p-4">
+        <section className="flex flex-none flex-col gap-3.25 rounded-card border border-line bg-main-900 p-4">
           <div className="flex items-center gap-2">
             <h2 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
               {vm.isNew ? "Новое хранилище" : "Настройки хранилища"}
@@ -71,7 +71,7 @@ function VectorStoreForm() {
             />
           </Field>
         </section>
-        <section className="flex flex-none flex-col gap-3.25 rounded-card border border-main-750 bg-main-900 p-4">
+        <section className="flex flex-none flex-col gap-3.25 rounded-card border border-line bg-main-900 p-4">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
               Эмбеддинги и индексация
@@ -192,7 +192,7 @@ function VectorStoreForm() {
                       <Icon path={mdiInformationOutline} size={16} />
                     </button>
                   </Floating.Trigger>
-                  <Floating.Content className="w-72 border border-main-700 bg-main-850 p-3 text-[11px] leading-relaxed text-main-200 shadow-pop">
+                  <Floating.Content className="w-72 border border-line-strong bg-main-850 p-3 text-[11px] leading-relaxed text-main-200 shadow-pop">
                     <p className="mb-2 font-medium text-main-50">Как сравниваются фрагменты</p>
                     <p>
                       <strong>Косинусное сходство</strong> сравнивает направление смыслов. Обычно
@@ -223,7 +223,7 @@ function VectorStoreForm() {
           {vm.isNew && !vm.providers.some((p) => p.enabled) ? (
             <p
               role="status"
-              className="rounded-control border border-dashed border-main-750 px-3 py-2.5 text-[12px] text-warn"
+              className="rounded-control bg-main-800 px-3 py-2.5 text-[12px] text-warn"
             >
               Сначала добавьте включённый embedding-провайдер на странице «AI-провайдеры».
             </p>
@@ -231,7 +231,7 @@ function VectorStoreForm() {
         </section>
         <Accordion
           defaultOpen={vm.advancedOpen}
-          className="flex-none rounded-[9px] border border-main-750 bg-main-900"
+          className="flex-none rounded-[9px] border border-line bg-main-900"
         >
           <Accordion.Summary className="min-h-12 px-4 text-left text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase hover:text-main-200">
             <div className="flex min-w-0 flex-1 items-center gap-2 justify-between">
@@ -244,11 +244,11 @@ function VectorStoreForm() {
               </div>
             </div>
           </Accordion.Summary>
-          <Accordion.Content className="flex flex-col gap-3.25 border-t border-main-750 p-4">
+          <Accordion.Content className="flex flex-col gap-3.25 border-t border-line p-4">
             <VectorStoreAdvanced vm={vm} disabled={store.busy} />
           </Accordion.Content>
         </Accordion>
-        <div className="flex flex-none items-center gap-3 rounded-card border border-main-750 bg-main-900 px-4 py-3">
+        <div className="flex flex-none items-center gap-3 rounded-card border border-line bg-main-900 px-4 py-3">
           <Button type="submit" tone="primary" disabled={store.busy}>
             {store.busy ? "Сохранение…" : "Сохранить"}
           </Button>

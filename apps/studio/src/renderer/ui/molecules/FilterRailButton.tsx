@@ -23,7 +23,7 @@ export default function FilterRailButton({
       aria-pressed={active}
       className={`flex h-8 items-center gap-2.5 rounded-control px-2.5 text-[13px] ${
         active
-          ? "bg-main-900 font-medium text-main-50 shadow-[0_1px_2px_rgb(40_25_10/0.08)] ring-1 ring-main-750 ring-inset"
+          ? "bg-main-900 font-medium text-main-50 shadow-[0_1px_2px_rgb(40_25_10/0.08)] ring-1 ring-line ring-inset"
           : "text-main-300 hover:bg-main-700 hover:text-main-100"
       }`}
     >

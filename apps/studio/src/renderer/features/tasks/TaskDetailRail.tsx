@@ -24,7 +24,7 @@ export default observer(function TaskDetailRail({ store }: { readonly store: Tas
   return (
     <aside
       aria-label="Детали запуска"
-      className="flex w-80 flex-none flex-col border-l border-main-750 bg-main-850"
+      className="flex w-80 flex-none flex-col bg-main-800"
     >
       {run === null ? (
         <div className="flex flex-1 items-center justify-center p-4">
@@ -50,7 +50,7 @@ export default observer(function TaskDetailRail({ store }: { readonly store: Tas
             </p>
           </div>
 
-          <dl className="m-0 flex flex-col gap-1.5 rounded-card border border-main-750 bg-main-900 shadow-card p-2.75 text-[12px]">
+          <dl className="m-0 flex flex-col gap-1.5 rounded-card bg-main-900 shadow-card p-2.75 text-[12px]">
             <div className="flex justify-between gap-2">
               <dt className="text-main-400">Статус</dt>
               <dd className="m-0 font-mono">{STATUS_LABELS[run.status]}</dd>
@@ -109,7 +109,7 @@ export default observer(function TaskDetailRail({ store }: { readonly store: Tas
           <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             Шаги
           </p>
-          <div className="rounded-card border border-main-750 bg-main-900 shadow-card p-2.75">
+          <div className="rounded-card bg-main-900 shadow-card p-2.75">
             <RunStepTree graph={store.graph} steps={store.steps} now={store.now} />
           </div>
 

@@ -2,7 +2,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
+import { mdiDatabaseOutline, mdiTuneVariant } from "@mdi/js";
 import Chip from "../../ui/atoms/Chip";
+import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
+import Icon from "../../ui/atoms/Icon";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import TextArea from "../../ui/atoms/TextArea";
 import ChatMessage from "./ChatMessage";
 import MessageActions from "../../ui/molecules/MessageActions";
@@ -47,16 +51,27 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
   }, []);
   return (
     <section aria-label="Лента чата" className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <header className="shrink-0 border-b border-main-750 px-6">
-        <div className="mx-auto flex h-12 w-full max-w-4xl items-center gap-3">
-          <h1 className="min-w-0 flex-1 truncate text-[14px] font-semibold text-main-100">
-            {store.active?.title ?? "Новый чат"}
-          </h1>
-          <Chip>{store.attachedStoreIds.length} хр.</Chip>
-          <span className="min-[1101px]:hidden">
-            <Button onClick={store.toggleContext}>Контекст</Button>
+      <header className="flex h-14 shrink-0 items-center gap-2.5 px-6">
+        <h2 className="min-w-0 flex-1 truncate text-[14px] font-medium text-main-100">
+          {store.active?.title ?? "Новый чат"}
+        </h2>
+        {store.attachedStoreIds.length > 0 ? (
+          <span title={`Подключено хранилищ: ${String(store.attachedStoreIds.length)}`}>
+            <Chip tone="accent">
+              <Icon path={mdiDatabaseOutline} size={12} />
+              {store.attachedStoreIds.length}
+            </Chip>
           </span>
-        </div>
+        ) : null}
+        <span className="min-[1101px]:hidden">
+          <IconButton
+            aria-label="Контекст запуска"
+            title="Контекст запуска"
+            path={mdiTuneVariant}
+            iconSize={17}
+            onClick={store.toggleContext}
+          />
+        </span>
       </header>
       <ScrollArea
         ref={viewport}
@@ -80,9 +95,10 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           )}
           {!store.loading && !store.active?.messages.length && !store.generating && (
             <div className="flex flex-col items-center py-20 text-center">
-              <span className="mb-4 flex size-12 items-center justify-center rounded-card bg-linear-to-br from-accent-medium to-accent-dark text-[18px] font-semibold text-on-accent shadow-[0_6px_18px_rgb(180_80_20/0.25)]">
-                Z
-              </span>
+              <AssistantAvatar
+                size={56}
+                className="mb-4 drop-shadow-[0_8px_20px_rgb(180_80_20/0.3)]"
+              />
               <h2 className="mb-1.5 text-[20px] font-semibold tracking-[-0.02em] text-main-50">
                 Что хотите исследовать?
               </h2>
@@ -96,7 +112,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
               <div key={message.id} className="group flex justify-end">
                 <div className="flex max-w-[78%] flex-col items-end">
                   {editingId === message.id ? (
-                    <div className="w-[min(78vw,620px)] space-y-2 rounded-card border border-main-750 bg-main-900 p-2.5 shadow-card">
+                    <div className="w-[min(78vw,620px)] space-y-2 rounded-card bg-main-900 p-2.5 shadow-pop">
                       <TextArea
                         aria-label="Редактировать сообщение"
                         value={editingText}
@@ -122,7 +138,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-[14px] rounded-br-sm border border-main-750 bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
+                    <div className="rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
                       {message.content}
                     </div>
                   )}
@@ -155,7 +171,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           )}
           {store.pendingUserText && (
             <div className="flex justify-end">
-              <div className="max-w-[78%] rounded-[14px] rounded-br-sm border border-main-750 bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
+              <div className="max-w-[78%] animate-zvs-rise rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
                 {store.pendingUserText}
               </div>
             </div>
@@ -167,6 +183,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
               citations={store.liveCitations}
               stores={store.stores}
               generating={store.generating}
+              status={generationPhase(store)}
               partial={store.outcome !== "ok"}
               tools={
                 <ChatToolCalls
@@ -180,7 +197,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           {store.outcome === "cancelled" && (
             <p
               role="status"
-              className="inline-flex rounded-full border border-warn-line bg-warn-soft px-3 py-1 text-[12px] text-warn"
+              className="inline-flex rounded-full bg-warn-soft px-3 py-1 text-[12px] text-warn"
             >
               Генерация остановлена. Частичный ответ сохранён.
             </p>
@@ -188,7 +205,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           {store.error && (
             <div
               role="alert"
-              className="space-y-2.5 rounded-card border border-err-border bg-err-soft p-3.5 text-[13px] text-err"
+              className="space-y-2.5 rounded-card bg-err-soft p-3.5 text-[13px] text-err"
             >
               <p>{store.error}</p>
               {store.canRetry ? (
@@ -231,3 +248,14 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
     </section>
   );
 });
+
+function generationPhase(store: ChatStore): string {
+  if (store.standaloneApprovals.length > 0) return "Ждёт вашего решения";
+  if (store.liveToolCalls.some((call) => call.status === "awaiting-approval"))
+    return "Ждёт вашего решения";
+  const running = store.liveToolCalls.find((call) => call.status === "running");
+  if (running) return `Вызывает ${running.key}`;
+  if (store.liveText) return "Пишет ответ";
+  if (store.liveReasoning) return "Размышляет";
+  return "Думает";
+}

@@ -103,7 +103,7 @@ function VectorDocumentsPanel() {
           store.sources.map((source) => (
             <span
               key={source.id}
-              className="flex items-center gap-2 rounded-card border border-main-750 bg-main-900 shadow-card py-1 pr-1 pl-2.5"
+              className="flex items-center gap-2 rounded-card bg-main-900 shadow-card py-1 pr-1 pl-2.5"
             >
               <Icon
                 path={source.kind === "folder" ? mdiFolderOutline : mdiFileDocumentOutline}
@@ -127,7 +127,7 @@ function VectorDocumentsPanel() {
           ))
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2 border-t border-main-750 pt-3">
+      <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
         <Button
           tone="primary"
           disabled={busy || store.sources.length === 0}
@@ -181,7 +181,7 @@ function VectorDocumentsPanel() {
           {store.indexSample === null ? (
             <span className="text-[11px] text-main-500">Замер нагрузки…</span>
           ) : (
-            <div className="mt-1 rounded-card border border-main-750 bg-main-900 shadow-card px-3 py-2.5">
+            <div className="mt-1 rounded-card bg-main-900 shadow-card px-3 py-2.5">
               <ResourceMeters sample={store.indexSample} />
             </div>
           )}
@@ -237,7 +237,7 @@ function VectorDocumentsPanel() {
                 return (
                   <article
                     key={document.id}
-                    className="absolute inset-x-0  flex h-12 items-center gap-3 rounded-card border border-main-750 bg-main-900 shadow-card px-3.25 py-2.5"
+                    className="absolute inset-x-0  flex h-12 items-center gap-3 rounded-card bg-main-900 shadow-card px-3.25 py-2.5"
                     style={{
                       top: `${String((firstIndex + visibleIndex) * DOCUMENT_ROW_HEIGHT)}px`,
                     }}

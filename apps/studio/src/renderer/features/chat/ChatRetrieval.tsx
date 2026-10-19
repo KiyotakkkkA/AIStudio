@@ -16,7 +16,7 @@ export default function ChatRetrieval({
         return (
           <details
             key={id}
-            className="rounded-card border border-main-750 bg-main-850 px-3.5 py-2.5 text-[12px] text-main-300"
+            className="rounded-card bg-main-800 px-3.5 py-2.5 text-[12px] text-main-300"
           >
             <summary className="cursor-pointer marker:text-main-500">
               Searched{" "}
@@ -30,7 +30,7 @@ export default function ChatRetrieval({
                 <span
                   key={`${hit.documentId}:${hit.chunkIndex}`}
                   title={hit.sourcePath}
-                  className="max-w-full rounded-pill border border-main-750 bg-main-900 px-2 py-0.5 font-mono text-[11px] break-all text-main-400"
+                  className="max-w-full rounded-pill bg-main-900 px-2 py-0.5 font-mono text-[11px] break-all text-main-400"
                 >
                   {hit.sourcePath}
                   {hit.page === null ? "" : ` · стр. ${String(hit.page)}`} · {hit.score.toFixed(2)}

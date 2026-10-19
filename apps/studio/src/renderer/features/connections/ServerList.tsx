@@ -13,7 +13,7 @@ import { serverLine, STATE_LABELS, STATE_TONES } from "./connectionPresentation"
 
 function ServerList({ store }: { readonly store: ConnectionStore }) {
   return (
-    <div className="flex min-h-0 w-65.5 flex-none flex-col gap-2 border-r border-main-750 py-3.5 pl-3 pr-2.5">
+    <div className="flex min-h-0 w-65.5 flex-none flex-col gap-2 border-r border-line py-3.5 pl-3 pr-2.5">
       <div className="flex-none px-0.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
         MCP-серверы
       </div>
@@ -27,7 +27,7 @@ function ServerList({ store }: { readonly store: ConnectionStore }) {
         ) : null}
 
         {store.isEmpty && store.form === null ? (
-          <div className="flex items-center justify-center rounded-card border border-dashed border-main-600 bg-main-850 px-2">
+          <div className="flex items-center justify-center rounded-card bg-main-800 px-2">
             <EmptyState
               icon={mdiPowerPlugOutline}
               title="Серверов нет"
@@ -85,7 +85,7 @@ function ServerList({ store }: { readonly store: ConnectionStore }) {
           dashed
           onClick={store.openRegistry}
           leading={
-            <span className="flex size-7.5 flex-none items-center justify-center rounded-control border border-dashed border-main-750 text-main-400">
+            <span className="flex size-7.5 flex-none items-center justify-center rounded-control bg-main-700 text-main-400">
               <Icon path={mdiPlus} size={14} />
             </span>
           }

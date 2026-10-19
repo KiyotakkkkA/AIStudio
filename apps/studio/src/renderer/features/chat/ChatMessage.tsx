@@ -4,7 +4,9 @@ import { Accordion, ScrollArea, SlidedPanel, Tabs } from "@kiyotakkkka/zvs-uikit
 import { mdiDatabaseOutline, mdiThoughtBubbleOutline } from "@mdi/js";
 import ChatMarkdown from "./ChatMarkdown";
 import MessageActions from "../../ui/molecules/MessageActions";
+import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
 import Icon from "../../ui/atoms/Icon";
+import GenerationStatus from "../../ui/molecules/GenerationStatus";
 
 export default function ChatMessage({
   content,
@@ -13,6 +15,7 @@ export default function ChatMessage({
   stores,
   partial = false,
   generating = false,
+  status = "Думает",
   usage,
   tools,
   onEdit,
@@ -25,6 +28,7 @@ export default function ChatMessage({
   readonly stores: readonly VectorStoreDto[];
   readonly partial?: boolean;
   readonly generating?: boolean;
+  readonly status?: string;
   readonly usage?: string;
   readonly tools?: ReactNode;
   readonly onEdit?: () => void;
@@ -43,35 +47,28 @@ export default function ChatMessage({
 
   return (
     <article aria-label="Ответ ассистента" className="group flex min-w-0 gap-3">
-      <span
-        aria-hidden="true"
-        className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-control bg-linear-to-br from-accent-medium to-accent-dark text-[12px] font-semibold text-on-accent shadow-[inset_0_1px_0_rgb(255_255_255/0.2)]"
-      >
-        Z
-      </span>
+      <AssistantAvatar size={28} live={generating} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <div className="space-y-3">
           {reasoning && (
-            <Accordion className="rounded-card border border-main-750 bg-main-850">
+            <Accordion className="rounded-card bg-main-800">
               <Accordion.Summary className="min-h-9.5 gap-2.5 rounded-card px-3 py-1.5 text-[12px] font-medium text-main-300 transition-colors hover:text-main-50">
                 <span className="flex min-w-0 items-center gap-2.5">
                   <span
                     aria-hidden="true"
                     className="flex size-6 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-accent-medium"
                   >
-                    <Icon
-                      path={mdiThoughtBubbleOutline}
-                      size={14}
-                      className={thinking ? "animate-pulse" : undefined}
-                    />
+                    <Icon path={mdiThoughtBubbleOutline} size={14} />
                   </span>
-                  <span className="truncate">{thinking ? "Размышляет…" : "Размышления"}</span>
+                  <span className={`truncate ${thinking ? "zvs-shimmer-text" : ""}`}>
+                    {thinking ? "Размышляет…" : "Размышления"}
+                  </span>
                   <span className="shrink-0 font-mono text-[11px] font-normal text-main-500 tabular-nums">
                     {reasoningWords(reasoning)} сл.
                   </span>
                 </span>
               </Accordion.Summary>
-              <Accordion.Content className="border-main-750 px-3 pt-2.5 pb-3">
+              <Accordion.Content className="border-transparent px-3 pt-1 pb-3">
                 <ScrollArea className="max-h-80 border-l-2 border-accent-line pr-1 pl-3 text-[12.5px]/relaxed whitespace-pre-wrap text-main-400">
                   {reasoning}
                 </ScrollArea>
@@ -79,20 +76,12 @@ export default function ChatMessage({
             </Accordion>
           )}
           {tools}
-          <ChatMarkdown content={content} />
-          {generating && (
-            <p
-              role="status"
-              className="inline-flex items-center gap-2 text-[12px] font-medium text-accent-medium"
-            >
-              <span className="size-1.5 animate-pulse rounded-full bg-accent-dark" />
-              Генерация…
-            </p>
-          )}
+          <ChatMarkdown content={content} streaming={generating} />
+          {generating && <GenerationStatus label={status} />}
           {citations.length > 0 && (
             <button
               type="button"
-              className="inline-flex h-7.5 items-center gap-2 rounded-full border border-main-750 bg-main-900 pr-1.5 pl-3 text-[12px] font-medium text-main-300 shadow-[0_1px_2px_rgb(40_25_10/0.05)] hover:border-main-600 hover:text-main-50"
+              className="inline-flex h-7.5 items-center gap-2 rounded-full bg-main-800 pr-1.5 pl-3 text-[12px] font-medium text-main-300 hover:bg-main-700 hover:text-main-50"
               onClick={() => setSourcesOpen(true)}
             >
               <Icon path={mdiDatabaseOutline} size={15} className="text-accent-medium" />
@@ -121,9 +110,9 @@ export default function ChatMessage({
         onClose={() => setSourcesOpen(false)}
         label="Источники ответа"
         panelPlacement="right"
-        className="w-136 max-w-[92vw] border-l border-main-750 bg-main-850 shadow-pop"
+        className="w-136 max-w-[92vw] bg-main-800 shadow-pop"
       >
-        <SlidedPanel.Header className="border-b border-main-750 px-6 py-4.5">
+        <SlidedPanel.Header className="border-b border-line px-6 py-4.5">
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <SlidedPanel.Title className="text-[16px] font-semibold tracking-[-0.01em] text-main-50">
@@ -158,7 +147,7 @@ export default function ChatMessage({
               {selectedCitations.map((citation) => (
                 <article
                   key={`${citation.documentId}:${citation.chunkIndex}`}
-                  className="rounded-card border border-main-750 bg-main-900 p-3.5"
+                  className="rounded-card border border-line bg-main-900 p-3.5"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <h3 className="min-w-0 truncate text-[13px] font-semibold text-main-100">
@@ -171,7 +160,7 @@ export default function ChatMessage({
                     ) : (
                       <span
                         title="Документ добавлен по связи с найденным источником, он не ранжировался"
-                        className="shrink-0 rounded-full border border-dashed border-main-600 px-2 py-0.5 text-[11px] text-main-400"
+                        className="shrink-0 rounded-full border border-dashed border-line-strong px-2 py-0.5 text-[11px] text-main-400"
                       >
                         связь «{citation.related}»
                       </span>
