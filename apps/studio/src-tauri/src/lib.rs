@@ -1,5 +1,6 @@
 pub mod browser;
 mod commands;
+mod e2e;
 mod picker;
 mod platform;
 mod theme;
@@ -96,11 +97,22 @@ struct Lifecycle {
     events: EventBus,
 }
 
+const _: () = assert!(
+    !cfg!(feature = "e2e") || cfg!(debug_assertions) || option_env!("ZVS_E2E_BUILD").is_some(),
+    "the e2e feature ships only in debug builds or builds made by the e2e launcher"
+);
+
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    e2e::clear_webview2_variables_before_any_thread();
+    let builder = tauri::Builder::default();
+    let builder = if e2e::data_dir().is_some() {
+        builder
+    } else {
+        builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             window::focus_studio(app);
         }))
+    };
+    builder
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::ipc_call,
@@ -242,8 +254,12 @@ fn on_run_event(app: &AppHandle, event: RunEvent) {
 }
 
 fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
+    let data_dir = match e2e::data_dir() {
+        Some(dir) => dir,
+        None => app.path().app_data_dir()?,
+    };
     let paths = StudioPaths::resolve(&PathEnvironment {
-        data_dir: app.path().app_data_dir()?,
+        data_dir: data_dir.clone(),
         resource_dir: app.path().resource_dir()?,
         executable_dir: std::env::current_exe()?
             .parent()
@@ -340,7 +356,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     );
 
     let browser_events = BrowserLifecycle::new();
-    let profile = profile_dir(&app.path().app_data_dir()?);
+    let profile = profile_dir(&data_dir);
     let tokens = BearerTokens::default();
     let navigator: SharedNavigator = Arc::new(events.clone());
     let workspace = BrowserWorkspace::new(

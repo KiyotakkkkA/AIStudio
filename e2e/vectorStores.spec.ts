@@ -1,11 +1,11 @@
 import { createServer } from "node:http";
-import { createRequire } from "node:module";
 import { join } from "node:path";
 import { rm } from "node:fs/promises";
-import { _electron as electron, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { STUDIO_ROOT, temporaryDirectory, assertTemporaryPath } from "../test/helpers/paths.ts";
 import { RustCore } from "../apps/studio/src/host/drivers/rust/RustCore.ts";
 import { nativeTargetTriple } from "../apps/studio/src/host/platform/paths.ts";
+import { launchStudio } from "./launch.ts";
 
 test("vector stores UI creates, searches native data, edits, detects loss and confirms deletion", async ({
   browserName,
@@ -33,21 +33,9 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("No server address");
-  const environment: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: "production" };
-  delete environment.ELECTRON_RENDERER_URL;
-  const app = await electron.launch({
-    executablePath: createRequire(join(STUDIO_ROOT, "package.json"))("electron") as string,
-    cwd: STUDIO_ROOT,
-    args: [STUDIO_ROOT, `--user-data-dir=${directory.path}`],
-    env: { ...environment, NODE_ENV: "production" },
-  });
+  const app = await launchStudio(directory.path);
   try {
-    const page = await app.firstWindow();
-    await app.evaluate(({ BrowserWindow }) => {
-      const window = BrowserWindow.getAllWindows()[0]!;
-      window.unmaximize();
-      window.setContentSize(1440, 900);
-    });
+    const page = app.page;
     await page.setViewportSize({ width: 1440, height: 900 });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -135,7 +123,7 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
     await page.getByRole("button", { name: "Сохранить", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Renamed knowledge base" })).toBeVisible();
     await rm(assertTemporaryPath(path), { recursive: true });
-    await page.getByRole("button", { name: "Сверить", exact: true }).click();
+    await page.getByTitle("Сверить статистику с таблицей", { exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Таблица недоступна");
     await expect(page.getByRole("button", { name: "Сверить", exact: true })).toHaveCount(2);
     await page.getByRole("button", { name: "Удалить", exact: true }).click();

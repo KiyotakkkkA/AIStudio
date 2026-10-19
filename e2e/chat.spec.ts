@@ -1,19 +1,10 @@
 import { createServer } from "node:http";
-import { createRequire } from "node:module";
 import { join } from "node:path";
-import { _electron as electron, expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { STUDIO_ROOT, temporaryDirectory, assertTemporaryPath } from "../test/helpers/paths.ts";
 import { RustCore } from "../apps/studio/src/host/drivers/rust/RustCore.ts";
 import { nativeTargetTriple } from "../apps/studio/src/host/platform/paths.ts";
-
-async function rpc<T>(page: Page, channel: string, payload?: unknown): Promise<T> {
-  const result = (await page.evaluate(({ channel, payload }) => window.zvs.call(channel, payload), {
-    channel,
-    payload,
-  })) as { ok: boolean; data: T };
-  expect(result).toMatchObject({ ok: true });
-  return result.data;
-}
+import { launchStudio, rpc } from "./launch.ts";
 
 test("chat streams grounded answers, preserves scroll, cancels and fits a narrow thread", async ({
   browserName,
@@ -69,23 +60,11 @@ test("chat streams grounded answers, preserves scroll, cancels and fits a narrow
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("No server address");
-  const environment: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: "production" };
-  delete environment.ELECTRON_RENDERER_URL;
-  const app = await electron.launch({
-    executablePath: createRequire(join(STUDIO_ROOT, "package.json"))("electron") as string,
-    cwd: STUDIO_ROOT,
-    args: [STUDIO_ROOT, `--user-data-dir=${directory.path}`],
-    env: { ...environment, NODE_ENV: "production" },
-  });
+  const app = await launchStudio(directory.path);
   try {
-    const page = await app.firstWindow();
+    const page = app.page;
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await app.evaluate(({ BrowserWindow }) => {
-      const window = BrowserWindow.getAllWindows()[0]!;
-      window.unmaximize();
-      window.setContentSize(1440, 900);
-    });
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.locator("nav").getByText("Чат", { exact: true }).click();
     await expect(

@@ -51,6 +51,7 @@ struct Inner {
     subscription: Mutex<Option<LifecycleSubscription>>,
     model: Mutex<Model>,
     chrome: Mutex<Option<Webview>>,
+    creating: Mutex<()>,
     sites: Mutex<HashMap<String, Webview>>,
     shown: Mutex<Option<String>>,
     subscribers: Mutex<Vec<Channel<BrowserState>>>,
@@ -100,6 +101,7 @@ impl BrowserWorkspace {
             subscription: Mutex::default(),
             model: Mutex::default(),
             chrome: Mutex::default(),
+            creating: Mutex::default(),
             sites: Mutex::default(),
             shown: Mutex::default(),
             subscribers: Mutex::default(),
@@ -125,6 +127,7 @@ impl BrowserWorkspace {
     }
 
     pub fn mount(&self, bounds: BrowserBounds) -> Result<(), String> {
+        let _creating = lock(&self.0.creating);
         lock(&self.0.model).mount(bounds);
         self.ensure_chrome()?;
         if lock(&self.0.model).is_empty() {
@@ -136,6 +139,7 @@ impl BrowserWorkspace {
 
     pub fn open_link_tab(&self, url: &str) -> Result<(), String> {
         self.0.navigator.navigate(WorkspaceRoute::Browser);
+        let _creating = lock(&self.0.creating);
         self.ensure_chrome()?;
         let label = self.open_tab(Some(url))?;
         lock(&self.0.links).opened(label, url);
@@ -270,7 +274,7 @@ impl BrowserWorkspace {
         self.hook(&window);
         let origin = app_origin(&self.0.app, false);
         let publisher = Arc::downgrade(&self.0);
-        let builder = WebviewBuilder::new(BROWSER_UI, WebviewUrl::App(CHROME_PAGE.into()))
+        let mut builder = WebviewBuilder::new(BROWSER_UI, WebviewUrl::App(CHROME_PAGE.into()))
             .devtools(cfg!(debug_assertions))
             .on_navigation(move |url| {
                 origin
@@ -285,6 +289,12 @@ impl BrowserWorkspace {
                     BrowserWorkspace(inner).post(Work::Layout);
                 }
             });
+        if let Some(args) = crate::e2e::browser_args() {
+            builder = builder.additional_browser_args(&args);
+        }
+        if let Some(dir) = crate::e2e::webview_dir() {
+            builder = builder.data_directory(dir);
+        }
         let chrome = window
             .add_child(
                 builder,

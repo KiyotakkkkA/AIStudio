@@ -1,24 +1,15 @@
-import { existsSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import {
-  _electron as electron,
-  expect,
-  test,
-  type ElectronApplication,
-  type Page,
-} from "@playwright/test";
+import { setTimeout as delay } from "node:timers/promises";
+import { expect, test, type Page } from "@playwright/test";
 import { temporaryDirectory, type TemporaryDirectory } from "../test/helpers/paths.ts";
-
-declare global {
-  interface Window {
-    readonly zvs: { call(channel: string, payload: unknown): Promise<unknown> };
-  }
-}
-
-const STUDIO_ROOT = fileURLToPath(new URL("../apps/studio", import.meta.url));
-const MAIN_BUNDLE = join(STUDIO_ROOT, "out", "host", "main.js");
+import {
+  freePort,
+  launchStudio,
+  listening,
+  readLog,
+  startStudio,
+  stopStudio,
+  type Studio,
+} from "./launch.ts";
 
 /** All fifteen rail entries stay within the studio window. */
 const RAIL_ITEMS = [
@@ -45,49 +36,23 @@ const ROUTE_HEADERS = [
   { item: "Настройки", header: "Настройки" },
 ];
 
-/** Strips the dev-server URL so the host loads the built bundle, exactly as it ships. */
-function productionEnvironment(): NodeJS.ProcessEnv {
-  const environment = { ...process.env };
-  delete environment.ELECTRON_RENDERER_URL;
-  return environment;
-}
-
-const electronExecutable = (): string =>
-  createRequire(pathToFileURL(join(STUDIO_ROOT, "package.json")).href)("electron") as string;
-
-let app: ElectronApplication;
+let studio: Studio;
 let page: Page;
 let userData: TemporaryDirectory;
 const problems: string[] = [];
 
 test.beforeAll(async () => {
-  expect(
-    existsSync(MAIN_BUNDLE),
-    `${MAIN_BUNDLE} is missing — run \`pnpm build\` before \`pnpm test:e2e\``,
-  ).toBe(true);
-
   userData = temporaryDirectory("studio-e2e-");
-  app = await electron.launch({
-    executablePath: electronExecutable(),
-    cwd: STUDIO_ROOT,
-    args: [STUDIO_ROOT, `--user-data-dir=${userData.path}`],
-    env: { ...productionEnvironment(), NODE_ENV: "production" },
+  studio = await launchStudio(userData.path);
+  page = studio.page;
+  page.on("console", (message) => {
+    if (message.type() === "error") problems.push(`console: ${message.text()}`);
   });
-
-  const watch = (opened: Page): void => {
-    opened.on("console", (message) => {
-      if (message.type() === "error") problems.push(`console: ${message.text()}`);
-    });
-    opened.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
-  };
-  app.on("window", watch);
-  page = await app.firstWindow();
-  watch(page);
-  await page.waitForLoadState("domcontentloaded");
+  page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
 });
 
 test.afterAll(async () => {
-  await app?.close();
+  await studio?.close();
   userData?.dispose();
 });
 
@@ -100,7 +65,10 @@ test("renderer calls the real Rust chunker through nativePing", async () => {
 
 test("the built app opens a window with the whole navigation rail", async () => {
   await expect(page.locator("#root")).toBeVisible();
-  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+  expect(studio.pages().filter((opened) => opened.url().includes("tauri.localhost"))).toHaveLength(
+    1,
+  );
+  expect(studio.surfaces()).toEqual({ windows: 1, webviews: 1 });
   expect(await page.title()).toBe("ZVS AI Studio");
 
   const rail = page.locator("aside");
@@ -118,16 +86,52 @@ test("the rail routes between pages and each page renders its own header", async
   }
 });
 
-test("startup logs the provider migration exactly once", () => {
-  const lines = readFileSync(join(userData.path, "logs", "studio.jsonl"), "utf8")
-    .trim()
-    .split("\n")
-    .map((line) => JSON.parse(line) as { message: string; migration?: string });
-  expect(
-    lines.filter(
-      (line) => line.message === "Applied migration" && line.migration === "0002_provider_model",
-    ),
-  ).toHaveLength(1);
+test("startup applies every migration exactly once", () => {
+  const applied = readLog(userData.path)
+    .filter((line) => line.message === "Applied migration")
+    .map((line) => line.migration);
+  expect(applied).toEqual([
+    "0000_baseline",
+    "0001_graph_relation_seed",
+    "0002_remove_deepseek_web",
+  ]);
+});
+
+test("every rail page renders under the Tauri shell without an error boundary", async () => {
+  for (const label of RAIL_ITEMS) {
+    await page.locator("aside nav").getByText(label, { exact: true }).click();
+    await expect(page.locator("main")).toBeVisible();
+    await expect(page.getByText("Интерфейс не удалось отрисовать", { exact: true })).toHaveCount(0);
+  }
+  await page.locator("aside").getByText("Настройки", { exact: true }).click();
+});
+
+test("every channel group answers from the Rust host", async () => {
+  const calls: [string, unknown][] = [
+    ["accounts.list", undefined],
+    ["chat.conversations.list", undefined],
+    ["downloads.list", {}],
+    ["graphRelations.list", undefined],
+    ["mcp.list", undefined],
+    ["providers.list", {}],
+    ["providers.adapters", undefined],
+    ["runs.list", {}],
+    ["runtimes.list", undefined],
+    ["secrets.list", {}],
+    ["settings.get", { key: "ui.theme" }],
+    ["system.device", { refresh: false }],
+    ["tools.list", {}],
+    ["vectorStores.list", undefined],
+  ];
+  const failed: string[] = [];
+  for (const [channel, payload] of calls) {
+    const result = (await page.evaluate(
+      ({ channel, payload }) => window.zvs.call(channel, payload),
+      { channel, payload },
+    )) as { ok: boolean };
+    if (!result.ok) failed.push(`${channel}: ${JSON.stringify(result)}`);
+  }
+  expect(failed).toEqual([]);
 });
 
 test("system.ping round-trips from the renderer to the host", async () => {
@@ -191,4 +195,30 @@ test("the secret channels answer the renderer without ever carrying a value", as
 
 test("nothing logged a console error or a content security policy violation", () => {
   expect(problems, problems.join("\n")).toEqual([]);
+});
+
+test("a WEBVIEW2_* variable from the environment never opens a debugging port", async () => {
+  const directory = temporaryDirectory("studio-e2e-hardening-");
+  const port = await freePort();
+  const child = startStudio(directory.path, {
+    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
+  });
+  try {
+    await expect
+      .poll(
+        () => readLog(directory.path).some((line) => line.message === "Opened the event channel"),
+        {
+          timeout: 60_000,
+        },
+      )
+      .toBe(true);
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      expect(await listening(port)).toBe(false);
+      await delay(500);
+    }
+    expect(child.exitCode).toBeNull();
+  } finally {
+    await stopStudio(child);
+    directory.dispose();
+  }
 });

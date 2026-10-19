@@ -1,12 +1,9 @@
 import { defineConfig } from "@playwright/test";
 
-/**
- * The e2e suite drives the built application from `apps/studio/out`, never the dev
- * server, so it exercises the bundle, the preload path and the production CSP.
- */
 export default defineConfig({
   testDir: "e2e",
-  timeout: 60_000,
+  globalSetup: "./e2e/launch.ts",
+  timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1,

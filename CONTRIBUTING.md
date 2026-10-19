@@ -31,19 +31,24 @@ copy.
 
 ## The suite
 
-| Command                  | What it runs                                                                                            |
-| ------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `pnpm test`              | Every unit test: `packages/*`, host and renderer, in one Vitest run                                     |
-| `pnpm test:watch`        | The same suite in watch mode                                                                            |
-| `pnpm test:coverage`     | The suite plus a coverage report in `coverage/`                                                         |
-| `pnpm test:e2e`          | The Playwright e2e suite against the built app (Electron until TASK_075; Tauri over WebView2 CDP after) |
-| `cargo test --workspace` | Rust host, contract, core and sidecar tests                                                             |
+| Command                  | What it runs                                                           |
+| ------------------------ | ---------------------------------------------------------------------- |
+| `pnpm test`              | Every unit test: `packages/*`, host and renderer, in one Vitest run    |
+| `pnpm test:watch`        | The same suite in watch mode                                           |
+| `pnpm test:coverage`     | The suite plus a coverage report in `coverage/`                        |
+| `pnpm test:e2e`          | The Playwright e2e suite against the built Tauri app over WebView2 CDP |
+| `cargo test --workspace` | Rust host, contract, core and sidecar tests                            |
 
 Vitest projects live in `vitest.config.ts`: `packages` and `host` run in a Node environment,
 `renderer` runs in jsdom. The `host` project disappears at TASK_076, when its tests exist in
 Rust. Workspace packages resolve to source, so `pnpm test` needs no
-build. `pnpm test:e2e` **does** — run `pnpm build` first; it drives `apps/studio/out`, not
-the dev server, so that it exercises what actually ships.
+build. `pnpm test:e2e` **does**: its global setup runs `pnpm build:tauri -- --features e2e`
+once (skip it with `ZVS_E2E_PREBUILT=1` when the build is fresh) and drives
+`target/release/zvs-studio.exe`, not the dev server, so that it exercises what actually ships.
+`e2e/launch.ts` starts the app with `ZVS_DATA_DIR` in a temp folder and a free
+`ZVS_E2E_CDP_PORT`, then attaches with `chromium.connectOverCDP`. Both variables exist only in
+builds with the `e2e` cargo feature. Site webviews have no debugging port, so their behaviour is
+asserted through fixture pages that report to the test's local server.
 
 Coverage is reported, never gated. A threshold chosen this early would reward writing tests
 for the wrong things; TASK_057 decides one when the codebase has a settled shape.

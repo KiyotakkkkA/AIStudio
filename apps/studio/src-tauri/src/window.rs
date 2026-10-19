@@ -76,6 +76,12 @@ pub fn create_studio<R: Runtime>(
     if let (Some(x), Some(y)) = (state.bounds.x, state.bounds.y) {
         builder = builder.position(x as f64, y as f64);
     }
+    if let Some(args) = crate::e2e::browser_args() {
+        builder = builder.additional_browser_args(&args);
+    }
+    if let Some(dir) = crate::e2e::webview_dir() {
+        builder = builder.data_directory(dir);
+    }
     let window = builder
         .on_navigation(move |url| {
             origin

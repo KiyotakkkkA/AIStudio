@@ -80,7 +80,7 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: e2e smoke (Windows)
+    name: e2e on Tauri (Windows)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -95,10 +95,12 @@ jobs:
           node-version: 26
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm build:rust:debug
-      - run: node --test test/native/addon.test.mjs
+      - run: pnpm --filter "studio^..." build
+      - run: pnpm build:rust
+      - run: pnpm build:tauri -- --features e2e
       - run: pnpm test:e2e
+        env:
+          ZVS_E2E_PREBUILT: "1"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
