@@ -16,13 +16,14 @@ use url::Url;
 use zvs_contract::{AppError, AppErrorCode};
 use zvs_host::browser::BROWSER_PARTITION;
 use zvs_host::drivers::ai::errors::{
-    Headers, UNREACHABLE_MESSAGE, cancelled, request_failed, timed_out,
+    Headers, UNREACHABLE_MESSAGE, browser_verification, cancelled, request_failed, timed_out,
 };
 use zvs_host::drivers::ai::{
     AccountToken, ByteStream, SessionGateway, SessionRequest, SessionResponse,
 };
 use zvs_host::platform::ids::new_id;
 use zvs_host::platform::logger::{LogLevel, SharedLogger, silent_logger};
+use zvs_qwen_web::{PagePlan, PageTransport};
 
 use self::routes::{PageMessage, Routes, SharedRoutes};
 use crate::browser::bearer::{BearerTokens, account_origin, origin_of};
@@ -71,6 +72,11 @@ pub struct GatewayOptions {
     pub chunk_size: usize,
     pub window: u32,
     pub ack_every: u32,
+    /// A watched request still without a response after this long is shown to the user,
+    /// since the vendor may be waiting for a verification nobody can see.
+    pub reveal_after: Duration,
+    /// How long a shown verification may take before the request fails.
+    pub challenge_timeout: Duration,
 }
 
 impl Default for GatewayOptions {
@@ -82,6 +88,8 @@ impl Default for GatewayOptions {
             chunk_size: 32 * 1024,
             window: 8,
             ack_every: 4,
+            reveal_after: Duration::from_secs(10),
+            challenge_timeout: Duration::from_secs(300),
         }
     }
 }
@@ -91,6 +99,12 @@ pub trait GatewayPage: Send + Sync {
     async fn command(&self, command: Value) -> Result<Value, String>;
 
     fn healthy(&self) -> bool;
+
+    /// Show the page so a person can complete a verification the vendor asks for.
+    fn reveal(&self) {}
+
+    /// Hide the page again once the request it was shown for has an answer.
+    fn conceal(&self) {}
 
     fn close(&self);
 }
@@ -148,7 +162,26 @@ fn seconds(duration: Duration) -> f64 {
 }
 
 pub fn page_url(origin: &str) -> Option<Url> {
-    Url::parse(origin).ok()?.join(PAGE_PATH).ok()
+    let origin = Url::parse(origin).ok()?;
+    let path = if origin.origin().ascii_serialization() == "https://chat.qwen.ai" {
+        "/"
+    } else {
+        PAGE_PATH
+    };
+    origin.join(path).ok()
+}
+
+/// Qwen requests go out the way its client sends them; other origins use plain fetch.
+fn page_plan(origin: &str, url: &str) -> PagePlan {
+    if origin == zvs_qwen_web::protocol::ORIGIN {
+        zvs_qwen_web::page_plan(url)
+    } else {
+        PagePlan {
+            transport: PageTransport::Fetch,
+            challenge_pattern: None,
+            page_bearer_key: None,
+        }
+    }
 }
 
 fn page_headers(request: &SessionRequest) -> Vec<(String, String)> {
@@ -249,13 +282,19 @@ impl Body {
         if self.finished {
             return None;
         }
-        let message = tokio::select! {
-            biased;
-            () = self.cancel.cancelled() => return self.fail(cancelled()),
-            () = tokio::time::sleep(self.options.idle_timeout) => {
-                return self.fail(timed_out(seconds(self.options.idle_timeout)));
+        let message = loop {
+            let message = tokio::select! {
+                biased;
+                () = self.cancel.cancelled() => return self.fail(cancelled()),
+                () = tokio::time::sleep(self.options.idle_timeout) => {
+                    return self.fail(timed_out(seconds(self.options.idle_timeout)));
+                }
+                message = self.receiver.recv() => message,
+            };
+            // A dialog that appears once the response is streaming does not hold it up.
+            if message != Some(PageMessage::Challenge) {
+                break message;
             }
-            message = self.receiver.recv() => message,
         };
         match message {
             Some(PageMessage::Chunk { data }) => match STANDARD.decode(data.as_bytes()) {
@@ -274,7 +313,9 @@ impl Body {
                 self.exchange.settle();
                 self.fail(unreachable())
             }
-            Some(PageMessage::Head { .. }) => self.fail(protocol_violation()),
+            Some(PageMessage::Head { .. } | PageMessage::Challenge) => {
+                self.fail(protocol_violation())
+            }
             None => {
                 self.exchange.settle();
                 self.fail(unreachable())
@@ -386,6 +427,7 @@ impl AccountGateway {
         page: &Url,
         url: &str,
         request: &SessionRequest,
+        plan: PagePlan,
         cancel: &CancellationToken,
     ) -> Result<(Exchange, mpsc::UnboundedReceiver<PageMessage>), AppError> {
         let mut attempts = 0;
@@ -421,6 +463,9 @@ impl AccountGateway {
                 "page": page.as_str(),
                 "chunk": self.options.chunk_size,
                 "window": self.options.window,
+                "transport": plan.transport.as_str(),
+                "challenge": plan.challenge_pattern,
+                "bearer_key": plan.page_bearer_key,
             });
             let started = tokio::select! {
                 biased;
@@ -449,6 +494,88 @@ impl AccountGateway {
     }
 }
 
+type Head = (u16, Vec<(String, String)>, Option<String>, bool);
+
+impl AccountGateway {
+    /// Wait for the response head. While a watched request waits, a verification dialog (or a
+    /// silence long enough to suggest one) shows the page to the user; the request goes on once
+    /// the vendor accepts it, and the page is hidden again.
+    async fn head(
+        &self,
+        origin: &str,
+        exchange: &mut Exchange,
+        plan: PagePlan,
+        receiver: &mut mpsc::UnboundedReceiver<PageMessage>,
+        cancel: &CancellationToken,
+    ) -> Result<Head, AppError> {
+        let watched = plan.challenge_pattern.is_some();
+        let started = tokio::time::Instant::now();
+        let reveal_at = started + self.options.reveal_after;
+        let mut deadline = started + self.options.head_timeout;
+        let mut revealed = false;
+        let outcome = loop {
+            let reveal = async {
+                if watched && !revealed {
+                    tokio::time::sleep_until(reveal_at).await;
+                } else {
+                    std::future::pending::<()>().await;
+                }
+            };
+            let message = tokio::select! {
+                biased;
+                () = cancel.cancelled() => break Err(cancelled()),
+                () = tokio::time::sleep_until(deadline) => {
+                    break Err(if revealed {
+                        let mut details = zvs_contract::ErrorDetails::new();
+                        details.insert("reason".to_owned(), json!("browser-verification"));
+                        details.insert("origin".to_owned(), json!(origin));
+                        browser_verification(details)
+                    } else {
+                        timed_out(seconds(self.options.head_timeout))
+                    });
+                }
+                () = reveal => None,
+                message = receiver.recv() => Some(message),
+            };
+            match message {
+                None | Some(Some(PageMessage::Challenge)) => {
+                    if !revealed {
+                        revealed = true;
+                        deadline = tokio::time::Instant::now() + self.options.challenge_timeout;
+                        exchange.page.reveal();
+                        self.logger.log(
+                            LogLevel::Warn,
+                            "browser",
+                            "The account page is shown for a verification",
+                            &[
+                                ("origin", json!(origin)),
+                                ("dialog", json!(message.is_some())),
+                            ],
+                        );
+                    }
+                }
+                Some(Some(PageMessage::Head {
+                    status,
+                    headers,
+                    final_url,
+                    redirected,
+                })) => break Ok((status, headers, final_url, redirected)),
+                Some(Some(PageMessage::Error { .. }) | None) => {
+                    exchange.settle();
+                    break Err(unreachable());
+                }
+                Some(Some(PageMessage::Chunk { .. } | PageMessage::End)) => {
+                    break Err(protocol_violation());
+                }
+            }
+        };
+        if revealed {
+            exchange.page.conceal();
+        }
+        outcome
+    }
+}
+
 #[async_trait]
 impl SessionGateway for AccountGateway {
     fn partition(&self) -> &str {
@@ -474,24 +601,14 @@ impl SessionGateway for AccountGateway {
         if cancel.is_cancelled() {
             return Err(cancelled());
         }
-        let (mut exchange, mut receiver) =
-            self.start(&origin, &page, url, &request, cancel).await?;
-        let head = tokio::select! {
-            biased;
-            () = cancel.cancelled() => Err(cancelled()),
-            () = tokio::time::sleep(self.options.head_timeout) => {
-                Err(timed_out(seconds(self.options.head_timeout)))
-            }
-            message = receiver.recv() => match message {
-                Some(PageMessage::Head { status, headers }) => Ok((status, headers)),
-                Some(PageMessage::Error { .. }) | None => {
-                    exchange.settle();
-                    Err(unreachable())
-                }
-                Some(PageMessage::Chunk { .. } | PageMessage::End) => Err(protocol_violation()),
-            },
-        };
-        let (status, headers) = match head {
+        let plan = page_plan(&origin, url);
+        let (mut exchange, mut receiver) = self
+            .start(&origin, &page, url, &request, plan, cancel)
+            .await?;
+        let (status, headers, final_url, redirected) = match self
+            .head(&origin, &mut exchange, plan, &mut receiver, cancel)
+            .await
+        {
             Ok(head) => head,
             Err(error) => {
                 exchange.abort();
@@ -512,11 +629,10 @@ impl SessionGateway for AccountGateway {
             })
             .fuse(),
         );
-        Ok(SessionResponse::new(
-            status,
-            response_headers(headers),
-            body,
-        ))
+        Ok(
+            SessionResponse::new(status, response_headers(headers), body)
+                .with_response_url(final_url, redirected),
+        )
     }
 }
 

@@ -15,8 +15,8 @@ use super::{
     TransportResponse, join_url, normalise_timeout,
 };
 use crate::drivers::ai::errors::{
-    HttpFailure, browser_verification, cancelled, http_failure, is_html, is_signed_out_response,
-    request_failed, session_expired, timed_out,
+    HttpFailure, account_page_error, auth_envelope_code, cancelled, html_title, http_failure,
+    is_html, request_failed, session_expired, timed_out,
 };
 use crate::drivers::ai::transport::AccountToken;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
@@ -245,8 +245,81 @@ impl AccountTransport {
             }),
         };
         let guard = scope.drop_guard();
+        let mut response = outcome?;
+        if is_html(&response.headers) || (300..400).contains(&response.status) {
+            let mut prefix = Vec::new();
+            while prefix.len() < 32 * 1024 {
+                let next = tokio::select! {
+                    biased;
+                    () = cancel.cancelled() => return Err(cancelled()),
+                    () = sleep_until(deadline) => return Err(self.abort_reason(cancel)),
+                    chunk = response.body.next() => chunk,
+                };
+                let Some(chunk) = next else { break };
+                let chunk = chunk?;
+                let remaining = 32 * 1024 - prefix.len();
+                prefix.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
+            }
+            let mut details = zvs_contract::ErrorDetails::new();
+            details.insert("path".to_owned(), json!(url.path()));
+            let page = String::from_utf8_lossy(&prefix);
+            let title = html_title(&page);
+            if let Some(title) = &title {
+                details.insert("htmlTitle".to_owned(), json!(title));
+            }
+            if let Some(error) = account_page_error(
+                response.status,
+                &response.headers,
+                &page,
+                response.final_url.as_deref(),
+                response.redirected,
+                details,
+            ) {
+                self.logger.log(
+                    LogLevel::Warn,
+                    "ai",
+                    "The account endpoint returned a page instead of an API response",
+                    &[
+                        ("status", json!(response.status)),
+                        ("origin", json!(self.origin)),
+                        ("path", json!(url.path())),
+                        ("redirected", json!(response.redirected)),
+                        (
+                            "contentType",
+                            json!(
+                                response
+                                    .headers
+                                    .get("content-type")
+                                    .cloned()
+                                    .unwrap_or_default()
+                            ),
+                        ),
+                        ("htmlTitle", json!(title)),
+                        (
+                            "finalPath",
+                            error
+                                .details
+                                .as_ref()
+                                .and_then(|details| details.get("finalPath"))
+                                .cloned()
+                                .unwrap_or(Value::Null),
+                        ),
+                        (
+                            "reason",
+                            error
+                                .details
+                                .as_ref()
+                                .and_then(|details| details.get("reason"))
+                                .cloned()
+                                .unwrap_or(Value::Null),
+                        ),
+                    ],
+                );
+                return Err(error);
+            }
+        }
         Ok(Attempt {
-            response: outcome?,
+            response,
             deadline,
             authorised: token.is_some(),
             scope: guard,
@@ -276,33 +349,6 @@ impl AccountTransport {
         }
     }
 
-    fn guard(
-        &self,
-        status: u16,
-        headers: &crate::drivers::ai::errors::Headers,
-    ) -> Result<(), AppError> {
-        if !is_signed_out_response(status, headers) {
-            return Ok(());
-        }
-        let mut details = zvs_contract::ErrorDetails::new();
-        details.insert("status".to_owned(), json!(status));
-        details.insert(
-            "partition".to_owned(),
-            Value::from(self.session.partition()),
-        );
-        if (200..300).contains(&status) && is_html(headers) {
-            details.insert("reason".to_owned(), json!("browser-verification"));
-            self.logger.log(
-                LogLevel::Warn,
-                "ai",
-                "The vendor answered an API call with a browser-verification page",
-                &[("status", json!(status)), ("origin", json!(self.origin))],
-            );
-            return Err(browser_verification(details));
-        }
-        Err(session_expired(details))
-    }
-
     fn failure(
         status: u16,
         headers: crate::drivers::ai::errors::Headers,
@@ -317,6 +363,110 @@ impl AccountTransport {
     }
 }
 
+/// How far a request has gone in recovering from a bearer rejected inside a 2xx answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Recovery {
+    Initial,
+    Refreshed,
+    CookieOnly,
+}
+
+impl Recovery {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Initial => "initial",
+            Self::Refreshed => "refreshed-bearer",
+            Self::CookieOnly => "cookie-only",
+        }
+    }
+}
+
+enum Settled {
+    Text(u16, crate::drivers::ai::errors::Headers, String),
+    Live(Attempt),
+}
+
+fn is_json(headers: &crate::drivers::ai::errors::Headers) -> bool {
+    headers
+        .get("content-type")
+        .is_some_and(|value| value.to_ascii_lowercase().contains("json"))
+}
+
+impl AccountTransport {
+    /// Send `spec` and settle a bearer the vendor rejects inside a 2xx JSON answer (Qwen:
+    /// `{"success": false, "data": {"code": "unauthorized"}}`): refresh the token and retry,
+    /// then retry on the profile's cookie session alone, which the vendor also accepts.
+    /// A streamed answer that is not JSON is handed back unread.
+    async fn settle(
+        &self,
+        spec: &RequestSpec,
+        accept: &str,
+        cancel: &CancellationToken,
+        streaming: bool,
+    ) -> Result<Settled, AppError> {
+        let mut attempt = self.attempt(spec, accept, cancel).await?;
+        let mut recovery = Recovery::Initial;
+        loop {
+            let status = attempt.response.status;
+            let headers = attempt.response.headers.clone();
+            if !attempt.response.ok() {
+                let text = self.read(attempt, cancel).await?;
+                return Err(Self::failure(status, headers, text));
+            }
+            if streaming && !is_json(&headers) {
+                return Ok(Settled::Live(attempt));
+            }
+            let authorised = attempt.authorised;
+            let text = self.read(attempt, cancel).await?;
+            let Some(code) = auth_envelope_code(&text) else {
+                if recovery != Recovery::Initial {
+                    self.logger.log(
+                        LogLevel::Info,
+                        "ai",
+                        "The account request succeeded after a rejected bearer",
+                        &[
+                            ("origin", json!(self.origin)),
+                            ("path", json!(spec.path)),
+                            ("via", json!(recovery.as_str())),
+                        ],
+                    );
+                }
+                return Ok(Settled::Text(status, headers, text));
+            };
+            self.logger.log(
+                LogLevel::Warn,
+                "ai",
+                "The vendor rejected the account request in a successful response",
+                &[
+                    ("origin", json!(self.origin)),
+                    ("path", json!(spec.path)),
+                    ("vendorCode", json!(code)),
+                    ("attempt", json!(recovery.as_str())),
+                ],
+            );
+            let next = match recovery {
+                Recovery::Initial => match self.token(cancel, TokenMode::Refresh).await {
+                    Ok(Some(token)) => Some((Recovery::Refreshed, Some(token))),
+                    Err(error) if cancel.is_cancelled() => return Err(error),
+                    Ok(None) | Err(_) => authorised.then_some((Recovery::CookieOnly, None)),
+                },
+                Recovery::Refreshed => Some((Recovery::CookieOnly, None)),
+                Recovery::CookieOnly => None,
+            };
+            let Some((step, token)) = next else {
+                let mut details = zvs_contract::ErrorDetails::new();
+                details.insert("status".to_owned(), json!(status));
+                details.insert("vendorCode".to_owned(), json!(code));
+                details.insert("reason".to_owned(), json!("token-rejected"));
+                details.insert("attempt".to_owned(), json!(recovery.as_str()));
+                return Err(session_expired(details));
+            };
+            recovery = step;
+            attempt = self.send(spec, accept, cancel, token).await?;
+        }
+    }
+}
+
 #[async_trait]
 impl Transport for AccountTransport {
     fn base_url(&self) -> &str {
@@ -328,16 +478,17 @@ impl Transport for AccountTransport {
         spec: &RequestSpec,
         cancel: &CancellationToken,
     ) -> Result<TransportResponse, AppError> {
-        let attempt = self.attempt(spec, "application/json", cancel).await?;
-        let status = attempt.response.status;
-        let headers = attempt.response.headers.clone();
-        let ok = attempt.response.ok();
-        let text = self.read(attempt, cancel).await?;
-        self.guard(status, &headers)?;
-        if !ok {
-            return Err(Self::failure(status, headers, text));
+        match self.settle(spec, "application/json", cancel, false).await? {
+            Settled::Text(status, headers, text) => {
+                Ok(TransportResponse::new(status, headers, text))
+            }
+            Settled::Live(attempt) => {
+                let status = attempt.response.status;
+                let headers = attempt.response.headers.clone();
+                let text = self.read(attempt, cancel).await?;
+                Ok(TransportResponse::new(status, headers, text))
+            }
         }
-        Ok(TransportResponse::new(status, headers, text))
     }
 
     async fn stream(
@@ -345,15 +496,13 @@ impl Transport for AccountTransport {
         spec: &RequestSpec,
         cancel: &CancellationToken,
     ) -> Result<ByteStream, AppError> {
-        let attempt = self.attempt(spec, "text/event-stream", cancel).await?;
-        let status = attempt.response.status;
-        let headers = attempt.response.headers.clone();
-        if !attempt.response.ok() {
-            let body = self.read(attempt, cancel).await?;
-            self.guard(status, &headers)?;
-            return Err(Self::failure(status, headers, body));
-        }
-        self.guard(status, &headers)?;
+        let attempt = match self.settle(spec, "text/event-stream", cancel, true).await? {
+            // A JSON answer to a streamed call (a vendor error frame) goes to the decoder whole.
+            Settled::Text(_, _, text) => {
+                return Ok(futures::stream::once(async move { Ok(text.into_bytes()) }).boxed());
+            }
+            Settled::Live(attempt) => attempt,
+        };
         let pump = Pump {
             body: attempt.response.body,
             cancel: cancel.clone(),

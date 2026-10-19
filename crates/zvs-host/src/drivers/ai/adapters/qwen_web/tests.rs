@@ -117,6 +117,12 @@ async fn the_qwen_family_lists_models_from_the_recorded_payload() {
     let call = server.last();
     assert_eq!(call.method, "GET");
     assert_eq!(call.path, "/api/v2/models/");
+    assert_eq!(call.header("version").as_deref(), Some(QWEN_WEB_VERSION));
+    assert_eq!(call.header("source").as_deref(), Some("web"));
+    assert!(
+        call.header("referer")
+            .is_some_and(|value| value.ends_with('/'))
+    );
     assert_eq!(
         models,
         vec![
@@ -152,7 +158,7 @@ async fn the_qwen_family_lists_models_from_the_recorded_payload() {
 async fn a_hostile_or_malformed_qwen_payload_fails_as_unknown_without_leaking_the_body() {
     let secret = "eyJhbGciOi.SUPERSECRET.signature";
     for body in [
-        json!({ "success": true, "data": { "data": [{ "id": 42, "token": secret }] } }),
+        json!({ "success": true, "data": { "data": "not-a-list", "token": secret } }),
         json!({ "success": true, "data": "not-a-list" }),
         json!({ "success": false, "data": { "data": [] } }),
     ] {
@@ -176,10 +182,13 @@ async fn a_hostile_or_malformed_qwen_payload_fails_as_unknown_without_leaking_th
         let entries = logger.entries();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].scope, "ai");
-        assert_eq!(
-            Value::Object(entries[0].fields.clone()),
-            json!({ "family": "qwen-web", "endpoint": QWEN_MODELS_PATH })
-        );
+        let fields = Value::Object(entries[0].fields.clone());
+        assert_eq!(fields["family"], json!("qwen-web"));
+        assert_eq!(fields["endpoint"], json!(QWEN_MODELS_PATH));
+        assert_eq!(fields["status"], json!(200));
+        assert_eq!(fields["contentType"], json!("application/json"));
+        assert_eq!(fields["payloadShape"], json!("object"));
+        assert!(fields["rootFields"].as_array().is_some());
         assert!(!format!("{:?}", entries[0]).contains(secret));
     }
     let broken = MockServer::start().await;
@@ -192,6 +201,32 @@ async fn a_hostile_or_malformed_qwen_payload_fails_as_unknown_without_leaking_th
             .code,
         AppErrorCode::Unknown
     );
+}
+
+#[test]
+fn malformed_model_entries_are_skipped_without_discarding_valid_models() {
+    let models = map_qwen_models(&json!({
+        "success": true,
+        "data": {
+            "data": [
+                { "id": 42, "name": "malformed" },
+                {
+                    "id": "qwen3.7-plus",
+                    "name": "Qwen3.7-Plus",
+                    "info": { "meta": { "max_context_length": "unknown" } }
+                },
+                {
+                    "id": "qwen3.5-plus",
+                    "name": "Qwen3.5-Plus",
+                    "info": { "is_active": true }
+                }
+            ]
+        }
+    }))
+    .expect("the valid envelope survives malformed individual rows");
+
+    assert_eq!(models.len(), 1);
+    assert_eq!(models[0].external_id, "qwen3.5-plus");
 }
 
 #[tokio::test]
@@ -207,6 +242,79 @@ async fn a_rejected_account_session_surfaces_as_session_expired() {
     assert_eq!(
         qwen.list_models(&token()).await.expect_err("expired").code,
         AppErrorCode::ProviderSessionExpired
+    );
+}
+
+#[tokio::test]
+async fn unknown_model_capability_values_default_to_fast_mode() {
+    let server = MockServer::start().await;
+    server.reply(
+        &route(QWEN_MODELS_PATH),
+        Reply::json(json!({
+            "success": true,
+            "data": {
+                "data": [{
+                    "id": "qwen3.7-plus",
+                    "info": {
+                        "meta": {
+                            "capabilities": { "thinking": "enabled" }
+                        }
+                    }
+                }]
+            }
+        })),
+    );
+    server.reply(
+        &route(QWEN_CHATS_NEW_PATH),
+        Reply::json(fixture("qwenChatCreated.json")),
+    );
+    server.reply(
+        &route(QWEN_COMPLETIONS_PATH),
+        Reply::chunks(fixture_frames("qwenStream.sse")),
+    );
+    let logger = MemoryLogger::shared();
+    let qwen = QwenWebAdapter::new(AccountAdapterOptions {
+        logger: logger.clone(),
+        ..options(&server)
+    });
+
+    let result = qwen
+        .generate(&prompt(), &token())
+        .await
+        .expect("generation proceeds with conservative defaults");
+
+    assert_eq!(result.text, "Привет, мир!");
+    assert_eq!(
+        server.last_body()["messages"][0]["feature_config"]["thinking_mode"],
+        json!("Fast")
+    );
+    assert!(!logger.entries().iter().any(|entry| {
+        entry.message == "Qwen returned model entries with an unsupported schema"
+    }));
+}
+
+#[tokio::test]
+async fn qwen_error_envelopes_do_not_fall_back_to_generation() {
+    let server = MockServer::start().await;
+    server.reply(
+        &route(QWEN_MODELS_PATH),
+        Reply::json(json!({
+            "success": false,
+            "error": "upstream temporarily unavailable"
+        })),
+    );
+    let qwen = adapter(&server);
+
+    let error = qwen
+        .generate(&prompt(), &token())
+        .await
+        .expect_err("an explicit upstream error must stop generation");
+
+    assert_eq!(error.message, MALFORMED_MODELS_MESSAGE);
+    assert_eq!(server.calls().len(), 1);
+    assert_eq!(
+        error.details.expect("response diagnostics")["rootFields"],
+        json!(["success", "error"])
     );
 }
 
@@ -261,17 +369,34 @@ async fn the_qwen_family_opens_a_chat_and_streams_reasoning_and_answer_as_distin
         create.json(),
         json!({
             "chatId": "",
-            "chat_mode": "local",
+            "chat_mode": "normal",
             "chat_type": "t2t",
             "models": ["qwen3.7-plus"],
             "project_id": "",
             "timestamp": FIXED_NOW,
         })
     );
+    assert_eq!(create.header("version").as_deref(), Some(QWEN_WEB_VERSION));
+    assert_eq!(create.header("source").as_deref(), Some("web"));
+    assert!(
+        create
+            .header("referer")
+            .is_some_and(|value| value.ends_with("/c/new-chat"))
+    );
     let completion = &calls[2];
     assert_eq!(
         completion.header("accept").as_deref(),
         Some("text/event-stream")
+    );
+    assert_eq!(
+        completion.header("version").as_deref(),
+        Some(QWEN_WEB_VERSION)
+    );
+    assert_eq!(completion.header("source").as_deref(), Some("web"));
+    assert!(
+        completion
+            .header("referer")
+            .is_some_and(|value| value.ends_with(&format!("/c/{QWEN_CHAT_ID}")))
     );
     assert_eq!(
         with_query(completion),
@@ -299,10 +424,10 @@ async fn the_qwen_family_opens_a_chat_and_streams_reasoning_and_answer_as_distin
             .next()
             .expect("a prefix"),
         format!(
-            r#"{{"chatId":"{QWEN_CHAT_ID}","chat_id":"{QWEN_CHAT_ID}","chat_mode":"local","chat_type":"t2t","incremental_output":true,"#
+            r#"{{"chatId":"{QWEN_CHAT_ID}","chat_id":"{QWEN_CHAT_ID}","chat_mode":"normal","chat_type":"t2t","incremental_output":true,"#
         )
     );
-    assert_eq!(QWEN_GENERATION_OBSERVATION.observed_at, "2026-09-10");
+    assert_eq!(QWEN_GENERATION_OBSERVATION.observed_at, "2026-10-19");
 }
 
 #[tokio::test]

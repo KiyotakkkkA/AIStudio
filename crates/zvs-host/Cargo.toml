@@ -33,6 +33,7 @@ uuid = { workspace = true, features = ["v4", "v7"] }
 zeroize.workspace = true
 zvs-contract = { path = "../zvs-contract", features = ["schema"] }
 zvs-core = { path = "../zvs-core" }
+zvs-qwen-web = { path = "../zvs-qwen-web" }
 
 [dev-dependencies]
 axum.workspace = true

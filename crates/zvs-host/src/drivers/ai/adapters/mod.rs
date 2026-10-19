@@ -18,7 +18,9 @@ pub use ollama::{OLLAMA_CAPABILITIES, OllamaAdapter};
 pub use openai_compatible::{
     OPENAI_COMPATIBLE_CAPABILITIES, OpenAiCompatibleAdapter, ToolCallAssembler,
 };
-pub use qwen_web::{QWEN_WEB_CAPABILITIES, QwenWebAdapter, map_qwen_models};
+pub use qwen_web::{
+    QWEN_DEFAULT_TIMEOUT_SECONDS, QWEN_WEB_CAPABILITIES, QwenWebAdapter, map_qwen_models,
+};
 
 use super::capabilities::AdapterCapabilities;
 use super::ports::AiDriver;

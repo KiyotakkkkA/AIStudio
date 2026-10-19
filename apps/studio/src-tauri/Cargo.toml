@@ -37,6 +37,7 @@ tokio-util = { workspace = true }
 url = { workspace = true }
 zeroize = { workspace = true }
 zvs-host = { path = "../../../crates/zvs-host" }
+zvs-qwen-web = { path = "../../../crates/zvs-qwen-web" }
 
 [dev-dependencies]
 axum = { workspace = true }

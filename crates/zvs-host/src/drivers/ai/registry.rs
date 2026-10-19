@@ -2,11 +2,13 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock};
 
 use serde_json::json;
-use zvs_contract::{AppError, AppErrorCode, AuthMode, ErrorDetails, ProviderKind, Timestamp};
+use zvs_contract::{
+    AdapterFamily, AppError, AppErrorCode, AuthMode, ErrorDetails, ProviderKind, Timestamp,
+};
 
 use super::adapters::{
-    AdapterContext, OLLAMA_CAPABILITIES, OllamaAdapter, SharedEmbeddingEngine, SharedModelStore,
-    adapter_entry_named,
+    AdapterContext, OLLAMA_CAPABILITIES, OllamaAdapter, QWEN_DEFAULT_TIMEOUT_SECONDS,
+    SharedEmbeddingEngine, SharedModelStore, adapter_entry_named,
 };
 use super::capabilities::AdapterCapabilities;
 use super::errors::session_expired;
@@ -65,6 +67,13 @@ pub fn account_not_linked(provider: &ProviderRow) -> AppError {
     session_expired(details)
 }
 
+fn account_timeout_seconds(provider: &ProviderRow) -> Option<f64> {
+    provider.settings.timeout_seconds().or_else(|| {
+        (provider.adapter == AdapterFamily::QwenWeb.as_str())
+            .then_some(QWEN_DEFAULT_TIMEOUT_SECONDS)
+    })
+}
+
 pub type SessionFactory = Arc<dyn Fn(&str) -> SharedSessionGateway + Send + Sync>;
 
 pub const BROWSER_SESSION_UNAVAILABLE: &str = "Сессия браузера недоступна";
@@ -99,9 +108,48 @@ impl DatabaseAccounts {
         })
     }
 
+    /// An account-mode provider without an account uses the family's only linked account,
+    /// and is bound to it, so a relink never leaves the user to reattach providers by hand.
+    fn adopt(&self, provider: &ProviderRow) -> Result<Option<AccountRow>, AppError> {
+        let Some(family) = zvs_contract::AccountFamily::parse(&provider.adapter) else {
+            return Ok(None);
+        };
+        let now = crate::platform::clock::Clock::now(&crate::platform::clock::SystemClock);
+        let adopted = self.database.transaction(|transaction| {
+            let repositories = Repositories::new(transaction);
+            let linked = repositories
+                .accounts
+                .list_by_adapter(family)?
+                .into_iter()
+                .filter(AccountRow::is_linked)
+                .collect::<Vec<_>>();
+            let [account] = linked.as_slice() else {
+                return Ok(None);
+            };
+            let attached = repositories
+                .accounts
+                .attach_orphans(family, &account.id, now)?;
+            Ok(attached.contains(&provider.id).then(|| account.clone()))
+        })?;
+        if let Some(account) = &adopted {
+            self.logger.log(
+                LogLevel::Info,
+                "providers",
+                "Attached a provider to the family's linked account",
+                &[
+                    ("providerId", json!(provider.id)),
+                    ("accountId", json!(account.id)),
+                ],
+            );
+        }
+        Ok(adopted)
+    }
+
     fn linked(&self, provider: &ProviderRow) -> Result<AccountRow, AppError> {
         let Some(account_id) = &provider.account_id else {
-            return Err(account_not_linked(provider));
+            return self
+                .adopt(provider)?
+                .ok_or_else(|| account_not_linked(provider));
         };
         let Some(account) = self.find(account_id)? else {
             return Err(account_not_linked(provider));
@@ -147,7 +195,7 @@ impl AccountPort for DatabaseAccounts {
             base_url: provider.base_url.clone(),
             session,
             credentials: Some(Arc::new(credentials)),
-            timeout_seconds: provider.settings.timeout_seconds(),
+            timeout_seconds: account_timeout_seconds(provider),
             headers: Vec::new(),
             logger: self.logger.clone(),
         })))
@@ -549,6 +597,36 @@ mod tests {
             vec![ProviderCapability::Text],
             100,
         )
+    }
+
+    #[test]
+    fn qwen_account_timeout_defaults_to_ten_minutes_and_keeps_explicit_values() {
+        let fixture = Fixture::new();
+        let qwen = fixture.create(&ProviderDraft {
+            kind: ProviderKind::OpenaiCompatible,
+            name: "Qwen".to_owned(),
+            adapter: AdapterFamily::QwenWeb,
+            auth_mode: AuthMode::Account,
+            base_url: "https://chat.qwen.ai/api/v2".to_owned(),
+            status: ProviderStatus::NeedsRelink,
+            ..draft()
+        });
+        assert_eq!(
+            account_timeout_seconds(&qwen),
+            Some(QWEN_DEFAULT_TIMEOUT_SECONDS)
+        );
+
+        let explicit = ProviderRow {
+            settings: qwen
+                .settings
+                .clone()
+                .with(ProviderSettings::TIMEOUT_SECONDS, json!(180)),
+            ..qwen
+        };
+        assert_eq!(account_timeout_seconds(&explicit), Some(180.0));
+
+        let other = fixture.create(&draft());
+        assert_eq!(account_timeout_seconds(&other), None);
     }
 
     fn router(base_url: String) -> ProviderDraft {

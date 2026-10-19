@@ -10,6 +10,8 @@ interface Message {
   readonly kind: "head" | "chunk" | "end" | "error";
   readonly status?: number;
   readonly headers?: [string, string][];
+  readonly final_url?: string | null;
+  readonly redirected?: boolean;
   readonly data?: string;
   readonly aborted?: boolean;
   readonly message?: string;
@@ -54,6 +56,10 @@ beforeAll(async () => {
             body: text,
           }),
         );
+      } else if (path === "/redirect") {
+        response.writeHead(302, { location: "/login" }).end();
+      } else if (path === "/login") {
+        response.writeHead(200, { "content-type": "text/html" }).end("<html>Sign in</html>");
       } else if (path === "/big") {
         response.writeHead(200, { "content-type": "application/octet-stream" }).end(big);
       } else if (path === "/busy") {
@@ -158,6 +164,8 @@ test("a request runs with its method, headers, body and referrer, and hides cook
   await until(() => settled("echo"));
   const head = messages.find((message) => message.kind === "head");
   expect(head?.status).toBe(200);
+  expect(head?.final_url).toBe(`${origin}/echo`);
+  expect(head?.redirected).toBe(false);
   expect(head?.headers).toContainEqual(["x-trace", "abc"]);
   expect(head?.headers?.some(([name]) => name === "set-cookie")).toBe(false);
   expect(JSON.parse(decoded("echo").toString("utf8"))).toEqual({
@@ -167,6 +175,45 @@ test("a request runs with its method, headers, body and referrer, and hides cook
     body: '{"a":1}',
   });
   expect(messages.at(-1)).toEqual({ id: "echo", kind: "end" });
+});
+
+test("a redirect preserves the final login URL alongside the HTML response", async () => {
+  start("redirect", "/redirect");
+  await until(() => settled("redirect"));
+  expect(messages[0]).toMatchObject({
+    kind: "head",
+    status: 200,
+    final_url: `${origin}/login`,
+    redirected: true,
+  });
+  expect(decoded("redirect").toString("utf8")).toBe("<html>Sign in</html>");
+});
+
+test("Qwen permits SPA paths on its own origin but rejects other origins", async () => {
+  scope.location = { href: "https://chat.qwen.ai/c/chat-id" };
+  expect(start("qwen", "/echo", { page: "https://chat.qwen.ai/" })).toBe(true);
+  await until(() => settled("qwen"));
+  scope.location = { href: "https://other.example/" };
+  expect(() => start("other", "/echo", { page: "https://chat.qwen.ai/" })).toThrow(
+    "The gateway page moved",
+  );
+});
+
+test("a bearer request uses the page's current token and cookie-only requests stay so", async () => {
+  scope.localStorage = { getItem: (key: string) => (key === "token" ? "page-token" : null) };
+  try {
+    start("paged", "/echo", {
+      headers: [["authorization", "Bearer stale"]],
+      bearer_key: "token",
+    });
+    await until(() => settled("paged"));
+    expect(JSON.parse(decoded("paged").toString("utf8")).authorization).toBe("Bearer page-token");
+    start("cookies", "/echo", { headers: [], bearer_key: "token" });
+    await until(() => settled("cookies"));
+    expect(JSON.parse(decoded("cookies").toString("utf8")).authorization).toBeNull();
+  } finally {
+    delete scope.localStorage;
+  }
 });
 
 test("a large body arrives in bounded chunks that wait for credit", async () => {
@@ -231,4 +278,127 @@ test("the page refuses requests once it moved, duplicates and unknown commands",
   expect(() => start("moved", "/echo")).toThrow("The gateway page moved");
   gateway({ op: "abort", id: "first" });
   await until(() => settled("first"));
+});
+
+class FakeXhr {
+  static last: FakeXhr | undefined;
+  sent: { method: string; url: string; headers: [string, string][]; body: unknown } = {
+    method: "",
+    url: "",
+    headers: [],
+    body: null,
+  };
+  withCredentials = false;
+  responseType = "";
+  status = 0;
+  response: ArrayBuffer | null = null;
+  responseURL = "";
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  ontimeout: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+
+  open(method: string, url: string): void {
+    this.sent.method = method;
+    this.sent.url = url;
+  }
+
+  setRequestHeader(name: string, value: string): void {
+    this.sent.headers.push([name, value]);
+  }
+
+  send(body: unknown): void {
+    this.sent.body = body;
+    FakeXhr.last = this;
+  }
+
+  abort(): void {
+    this.onabort?.();
+  }
+
+  getAllResponseHeaders(): string {
+    return "Content-Type: application/json\r\nSet-Cookie: fresh=1\r\n";
+  }
+
+  answer(status: number, text: string): void {
+    this.status = status;
+    this.response = new TextEncoder().encode(text).buffer;
+    this.responseURL = this.sent.url;
+    this.onload?.();
+  }
+}
+
+test("an xhr request goes through the page's XMLHttpRequest and hides cookies", async () => {
+  scope.XMLHttpRequest = FakeXhr;
+  try {
+    start("xhr", "/api/v2/chats/new", {
+      transport: "xhr",
+      method: "POST",
+      headers: [["content-type", "application/json"]],
+      body: '{"chat_mode":"normal"}',
+    });
+    const xhr = FakeXhr.last;
+    expect(xhr?.sent).toEqual({
+      method: "POST",
+      url: `${origin}/api/v2/chats/new`,
+      headers: [["content-type", "application/json"]],
+      body: '{"chat_mode":"normal"}',
+    });
+    expect(xhr?.withCredentials).toBe(true);
+    xhr?.answer(200, '{"success":true}');
+    await until(() => settled("xhr"));
+    expect(messages[0]).toEqual({
+      id: "xhr",
+      kind: "head",
+      status: 200,
+      headers: [["content-type", "application/json"]],
+      final_url: `${origin}/api/v2/chats/new`,
+      redirected: false,
+    });
+    expect(decoded("xhr").toString("utf8")).toBe('{"success":true}');
+    expect(messages.at(-1)).toEqual({ id: "xhr", kind: "end" });
+
+    start("aborted", "/api/v2/chats/new", { transport: "xhr" });
+    gateway({ op: "abort", id: "aborted" });
+    await until(() => settled("aborted"));
+    expect(messages.at(-1)).toMatchObject({ id: "aborted", kind: "error", aborted: true });
+  } finally {
+    delete scope.XMLHttpRequest;
+  }
+});
+
+test("a verification dialog added while waiting is reported once", async () => {
+  let notify: ((records: { addedNodes: unknown[] }[]) => void) | undefined;
+  let disconnected = false;
+  const element = (attributes: Record<string, string>, children: unknown[] = []) => ({
+    nodeType: 1,
+    getAttribute: (name: string) => attributes[name] ?? null,
+    querySelectorAll: () => children,
+  });
+  scope.document = { readyState: "complete", body: {} };
+  scope.MutationObserver = class {
+    constructor(callback: (records: { addedNodes: unknown[] }[]) => void) {
+      notify = callback;
+    }
+    observe(): void {}
+    disconnect(): void {
+      disconnected = true;
+    }
+  };
+  scope.XMLHttpRequest = FakeXhr;
+  try {
+    start("watched", "/api/v2/chats/new", { transport: "xhr", challenge: "baxia|punish" });
+    notify?.([{ addedNodes: [element({ class: "toast" })] }]);
+    expect(messages).toEqual([]);
+    const dialog = element({ id: "wrapper" }, [element({ id: "baxia-dialog-content" })]);
+    notify?.([{ addedNodes: [dialog] }]);
+    notify?.([{ addedNodes: [element({ src: "https://x/punish?x5" })] }]);
+    expect(messages).toEqual([{ id: "watched", kind: "challenge" }]);
+    FakeXhr.last?.answer(200, "{}");
+    await until(() => settled("watched"));
+    expect(disconnected).toBe(true);
+  } finally {
+    delete scope.MutationObserver;
+    delete scope.XMLHttpRequest;
+  }
 });

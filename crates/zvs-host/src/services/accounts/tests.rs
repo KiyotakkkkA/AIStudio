@@ -555,10 +555,15 @@ async fn a_different_identity_replaces_the_previous_account_and_deletes_its_toke
     ));
     assert_eq!(harness.list().len(), 1);
     assert_eq!(harness.row(&old.id.to_string()), None);
-    let detached = harness.provider(&provider.id);
-    assert_eq!(detached.account_id, None);
-    assert_eq!(detached.status, ProviderStatus::Failed);
-    assert_eq!(detached.status_detail.as_deref(), Some("no account linked"));
+    // The provider follows the new identity instead of waiting to be reattached.
+    let current = harness.first();
+    let attached = harness.provider(&provider.id);
+    assert_eq!(
+        attached.account_id.as_deref(),
+        Some(current.id.to_string().as_str())
+    );
+    assert_eq!(attached.status, ProviderStatus::Unknown);
+    assert_eq!(attached.status_detail, None);
     assert_eq!(harness.secret_count(), 1);
 }
 

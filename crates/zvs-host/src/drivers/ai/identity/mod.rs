@@ -7,6 +7,7 @@ use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use serde_json::{Map, Value, json};
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
@@ -20,9 +21,7 @@ pub use store::{
     ACCOUNT_TOKEN_SECRET_TYPE, AccountCredentialStore, TOKEN_SKEW_SECONDS, to_identity,
 };
 
-use super::errors::{
-    HttpFailure, cancelled, http_failure, is_signed_out_response, session_expired, timed_out,
-};
+use super::errors::{HttpFailure, account_page_error, cancelled, http_failure, is_html, timed_out};
 use super::transport::{AccountToken, SessionGateway, SessionRequest};
 
 pub const IDENTITY_TIMEOUT_SECONDS: f64 = 20.0;
@@ -127,17 +126,41 @@ pub async fn fetch_identity(
     let status = response.status;
     let ok = response.ok();
     let headers = response.headers.clone();
+    let final_url = response.final_url.clone();
+    let redirected = response.redirected;
     let body = tokio::select! {
         biased;
         () = cancel.cancelled() => return Err(cancelled()),
         () = sleep(limit) => String::new(),
-        text = response.text() => text.unwrap_or_default(),
+        text = async {
+            if !is_html(&headers) {
+                return response.text().await;
+            }
+            let mut stream = response.body;
+            let mut prefix = Vec::new();
+            while prefix.len() < 32 * 1024 {
+                let Some(chunk) = stream.next().await else { break };
+                let chunk = chunk?;
+                let remaining = 32 * 1024 - prefix.len();
+                prefix.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
+            }
+            Ok(String::from_utf8_lossy(&prefix).into_owned())
+        } => text.unwrap_or_default(),
     };
-    if is_signed_out_response(status, &headers) {
-        let mut details = family_details(family);
-        details.insert("status".to_owned(), json!(status));
-        details.insert("partition".to_owned(), json!(session.partition()));
-        return Err(session_expired(details));
+    let mut details = family_details(family);
+    details.insert("partition".to_owned(), json!(session.partition()));
+    if let Ok(url) = Url::parse(endpoint) {
+        details.insert("path".to_owned(), json!(url.path()));
+    }
+    if let Some(error) = account_page_error(
+        status,
+        &headers,
+        &body,
+        final_url.as_deref(),
+        redirected,
+        details,
+    ) {
+        return Err(error);
     }
     if !ok {
         return Err(http_failure(HttpFailure {

@@ -84,6 +84,17 @@ test("switching the secret or the auth mode clears the probe result too", () => 
   assert.equal(vm.probeResult, null);
 });
 
+test("Qwen web uses a ten-minute default request timeout while other providers keep one minute", () => {
+  const vm = formFor();
+  assert.equal(vm.settingOf("timeoutSeconds"), 60);
+
+  vm.setAdapter("qwen-web");
+  assert.equal(vm.settingOf("timeoutSeconds"), 600);
+
+  vm.setSetting("timeoutSeconds", 180);
+  assert.equal(vm.settingOf("timeoutSeconds"), 180);
+});
+
 test("settings round-trip through the form untouched", () => {
   const vm = formFor(true);
 

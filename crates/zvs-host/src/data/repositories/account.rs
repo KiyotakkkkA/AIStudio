@@ -281,6 +281,32 @@ impl<'c> AccountRepository<'c> {
         self.update(id, &AccountPatch::status(status, detail, now), now)
     }
 
+    /// Bind every account-mode provider of `adapter` left without an account to `account_id`.
+    /// A profile holds one browser session per vendor, so that account is the only one such a
+    /// provider can use. Returns the ids of the providers it bound.
+    pub fn attach_orphans(
+        &self,
+        adapter: AccountFamily,
+        account_id: &str,
+        now: Timestamp,
+    ) -> rusqlite::Result<Vec<String>> {
+        self.connection
+            .prepare_cached(
+                "UPDATE provider SET account_id = ?1, status = ?2, status_detail = NULL, updated_at = ?3 \
+                 WHERE account_id IS NULL AND auth_mode = 'account' AND adapter = ?4 RETURNING id",
+            )?
+            .query_map(
+                params![
+                    account_id,
+                    ProviderStatus::Unknown.as_str(),
+                    now,
+                    adapter.as_str()
+                ],
+                |row| row.get::<_, String>(0),
+            )?
+            .collect()
+    }
+
     pub fn remove(&self, id: &str, now: Timestamp) -> rusqlite::Result<AccountRemoval> {
         let Some(row) = self.find_by_id(id)? else {
             return Ok(AccountRemoval::default());

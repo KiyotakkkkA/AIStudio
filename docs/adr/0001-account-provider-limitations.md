@@ -1,6 +1,7 @@
 # ADR 0001 — Account-mode providers: Qwen only, no DeepSeek web account
 
-- **Status:** accepted, 2026-10-19
+- **Status:** accepted, 2026-10-19; decisions 4–5 and the Qwen clarification superseded for
+  `qwen-web` by [ADR 0002](0002-qwen-web-browser-client-emulation.md)
 - **Task:** TASK_074_EXTRA_1
 - **Supersedes:** the `deepseek-web` adapter family declared in TASK_014_EXTRA_2
 
@@ -57,3 +58,14 @@ for this use too.
   called natively, and the wire format can change without notice (the observations carry
   their dates).
 - Re-adding DeepSeek web is a new decision, not a bug fix.
+
+## Qwen transport clarification, 2026-10-19
+
+The follow-up Qwen fix loads the vendor application in the existing browser profile
+and uses its main JavaScript context instead of an isolated `/robots.txt` page.
+Cookies alone had not reproduced the application context. This change does not add
+a challenge solver. A user may complete a browser check manually and retry.
+HTML alone is not evidence of verification: login pages, verification pages and
+unrecognized HTML now have distinct diagnostics. The earlier statement that any
+such response makes account generation unavailable is not a permanent capability
+decision. See `docs/QWEN_WEB.md` for the revised behavior and validation limits.

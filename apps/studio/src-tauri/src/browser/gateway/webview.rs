@@ -7,8 +7,10 @@ use async_trait::async_trait;
 use serde_json::{Value, json};
 use tauri::webview::{NewWindowResponse, PermissionResponse, WebviewBuilder};
 use tauri::window::WindowBuilder;
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Webview, WebviewUrl, Window};
-use tokio::sync::mpsc;
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager, Webview, WebviewUrl, Window, WindowEvent,
+};
+use tokio::sync::{mpsc, oneshot};
 use url::Url;
 
 use super::routes::SharedRoutes;
@@ -16,25 +18,48 @@ use super::{BINDING, GatewayPage, PAGE_SCRIPT, PageFactory, SharedPage, WORLD};
 use crate::browser::cdp::{
     BindingCalled, CallFunctionOn, CdpClient, DEFAULT_CALL_TIMEOUT, WebviewCdp,
 };
-use crate::browser::model::PageSignal;
+use crate::browser::model::{LoadFailure, PageSignal};
 use crate::platform::site;
 
 pub const HOST_WINDOW: &str = "account-gateway";
 const PAGE_PREFIX: &str = "account-gateway-";
 const BLANK: &str = "about:blank";
+const VERIFY_TITLE: &str = "Проверка аккаунта";
+const VERIFY_SIZE: (f64, f64) = (480.0, 720.0);
 
 static LABELS: AtomicU64 = AtomicU64::new(0);
+
+// Qwen is a SPA: same-origin history changes keep the execution context alive.
+// Other providers and test fixtures keep the static-page policy.
+fn application_page(page: &Url) -> bool {
+    page.as_str() == "https://chat.qwen.ai/"
+}
+
+fn allowed_location(page: &Url, location: &str) -> bool {
+    if application_page(page) {
+        Url::parse(location).is_ok_and(|url| url.origin() == page.origin())
+    } else {
+        location == page.as_str()
+    }
+}
+
+fn main_context(event: &Value, frame: &str) -> Option<i64> {
+    let context = event.get("context")?;
+    let auxiliary = context.get("auxData")?;
+    (auxiliary.get("isDefault")?.as_bool()? && auxiliary.get("frameId")?.as_str()? == frame)
+        .then(|| context.get("id")?.as_i64())?
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Watch {
     Loaded,
-    Failed,
+    Failed(LoadFailure),
     Broken,
 }
 
 #[derive(Debug)]
 pub struct PageWatch {
-    page: String,
+    page: Url,
     current: String,
     ready: bool,
     broken: bool,
@@ -43,7 +68,7 @@ pub struct PageWatch {
 impl PageWatch {
     pub fn new(page: &Url) -> Self {
         Self {
-            page: page.as_str().to_owned(),
+            page: page.clone(),
             current: String::new(),
             ready: false,
             broken: false,
@@ -63,13 +88,16 @@ impl PageWatch {
             PageSignal::Started if self.ready => Some(Watch::Broken),
             PageSignal::Snapshot(snapshot) => {
                 self.current.clone_from(&snapshot.url);
-                (self.ready && snapshot.url != self.page).then_some(Watch::Broken)
+                (self.ready && !allowed_location(&self.page, &snapshot.url))
+                    .then_some(Watch::Broken)
             }
-            PageSignal::Finished(None) if !self.ready && self.current == self.page => {
+            PageSignal::Finished(None)
+                if !self.ready && allowed_location(&self.page, &self.current) =>
+            {
                 Some(Watch::Loaded)
             }
-            PageSignal::Finished(Some(_)) if !self.ready && self.current != BLANK => {
-                Some(Watch::Failed)
+            PageSignal::Finished(Some(failure)) if !self.ready && self.current != BLANK => {
+                Some(Watch::Failed(*failure))
             }
             PageSignal::Finished(_) if self.ready => Some(Watch::Broken),
             _ => None,
@@ -78,6 +106,12 @@ impl PageWatch {
             self.broken = true;
         }
         outcome
+    }
+
+    fn current_location(&self) -> String {
+        Url::parse(&self.current)
+            .map(|url| format!("{}{}", url.origin().ascii_serialization(), url.path()))
+            .unwrap_or_else(|_| "unknown".to_owned())
     }
 }
 
@@ -100,12 +134,23 @@ fn host_window(app: &AppHandle) -> Result<Window, String> {
     if let Some(window) = app.get_window(HOST_WINDOW) {
         return Ok(window);
     }
-    WindowBuilder::new(app, HOST_WINDOW)
+    let window = WindowBuilder::new(app, HOST_WINDOW)
+        .title(VERIFY_TITLE)
         .visible(false)
         .skip_taskbar(true)
         .focused(false)
         .build()
-        .map_err(failed)
+        .map_err(failed)?;
+    // Closing a shown verification only hides it: the pages it hosts stay alive.
+    let hidden = window.clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            let _ = hidden.hide();
+            let _ = hidden.set_skip_taskbar(true);
+        }
+    });
+    Ok(window)
 }
 
 impl WebviewPages {
@@ -126,7 +171,7 @@ impl WebviewPages {
         )
         .data_directory(self.profile.clone())
         .devtools(false)
-        .on_navigation(move |url| url == &allowed || url.as_str() == BLANK)
+        .on_navigation(move |url| allowed_location(&allowed, url.as_str()) || url.as_str() == BLANK)
         .on_new_window(|_, _| NewWindowResponse::Deny)
         .on_download(|_, _| false)
         .on_permission_request(|_, _| PermissionResponse::Deny)
@@ -172,39 +217,80 @@ impl WebviewPages {
                 }
             })
         };
+        let (configured, configuration) = oneshot::channel();
         webview
             .with_webview(move |platform| {
-                let _ = site::strip_host_bridge(&platform);
-                let _ = site::observe_site(&platform, sink);
+                let result = site::strip_host_bridge(&platform)
+                    .map_err(failed)
+                    .and_then(|()| site::observe_site(&platform, sink).map_err(failed));
+                let _ = configured.send(result);
             })
             .map_err(failed)?;
+        // Do not load vendor scripts until disabling the host bridge has succeeded.
+        configuration.await.map_err(failed)??;
         webview.navigate(page.clone()).map_err(failed)?;
         match loaded.recv().await {
             Some(Watch::Loaded) => {}
-            _ => return Err(format!("{page} did not load")),
+            Some(Watch::Failed(failure)) => {
+                let location = lock(&watch).current_location();
+                return Err(format!(
+                    "The gateway page failed to load ({failure:?}) at {location}"
+                ));
+            }
+            Some(Watch::Broken) => {
+                return Err("The gateway webview stopped while loading".to_owned());
+            }
+            None => return Err("The gateway page load observer closed".to_owned()),
         }
 
         let cdp = WebviewCdp::client(webview.clone(), self.call_timeout);
         let mut calls = cdp.binding_calls().map_err(failed)?;
+        // Subscribe before enabling Runtime: existing contexts are announced by enable.
+        let mut contexts = cdp
+            .subscribe("Runtime.executionContextCreated")
+            .map_err(failed)?;
+        let frame = cdp.main_frame().await.map_err(failed)?;
+        cdp.runtime_enable().await.map_err(failed)?;
+        let context = if application_page(page) {
+            let context = tokio::time::timeout(self.call_timeout, async {
+                while let Some(event) = contexts.next().await {
+                    if let Some(context) = main_context(&event, &frame) {
+                        return Ok(context);
+                    }
+                }
+                Err("the gateway main context is missing".to_owned())
+            })
+            .await
+            .map_err(failed)??;
+            // This binding accepts response messages only; never expose the Tauri bridge.
+            cdp.send(
+                "Runtime.addBinding",
+                json!({
+                    "name": BINDING, "executionContextId": context
+                }),
+            )
+            .await
+            .map_err(failed)?;
+            context
+        } else {
+            cdp.add_binding(BINDING, Some(WORLD))
+                .await
+                .map_err(failed)?;
+            cdp.create_isolated_world(&frame, WORLD)
+                .await
+                .map_err(failed)?
+        };
         let deliver = Arc::clone(routes);
         tauri::async_runtime::spawn(async move {
             while let Some(call) = calls.next_as::<BindingCalled>().await {
                 if let Ok(call) = call
                     && call.name == BINDING
+                    && call.execution_context_id == context
                 {
                     deliver.deliver(&call.payload);
                 }
             }
         });
-        cdp.runtime_enable().await.map_err(failed)?;
-        cdp.add_binding(BINDING, Some(WORLD))
-            .await
-            .map_err(failed)?;
-        let frame = cdp.main_frame().await.map_err(failed)?;
-        let context = cdp
-            .create_isolated_world(&frame, WORLD)
-            .await
-            .map_err(failed)?;
         let probe = cdp
             .call_function_on(CallFunctionOn::new(
                 *PAGE_SCRIPT,
@@ -218,9 +304,19 @@ impl WebviewPages {
             .as_ref()
             .and_then(|value| value.get("href"))
             .and_then(Value::as_str);
-        if href != Some(page.as_str()) {
+        if !href.is_some_and(|href| allowed_location(page, href)) {
             cdp.close();
             return Err(format!("the gateway page is at {href:?}"));
+        }
+        if probe
+            .value
+            .as_ref()
+            .and_then(|value| value.get("readyState"))
+            .and_then(Value::as_str)
+            != Some("complete")
+        {
+            cdp.close();
+            return Err("the gateway document has not finished loading".to_owned());
         }
         lock(&watch).mark_ready();
         self.remember_agent(webview);
@@ -309,6 +405,25 @@ impl GatewayPage for WebviewPage {
         self.healthy.load(Ordering::SeqCst) && !self.cdp.is_closed()
     }
 
+    fn reveal(&self) {
+        let window = self.webview.window();
+        let size = LogicalSize::new(VERIFY_SIZE.0, VERIFY_SIZE.1);
+        let _ = window.set_size(size);
+        let _ = self.webview.set_position(LogicalPosition::new(0.0, 0.0));
+        let _ = self.webview.set_size(size);
+        let _ = window.center();
+        let _ = window.set_skip_taskbar(false);
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+
+    fn conceal(&self) {
+        let window = self.webview.window();
+        let _ = window.hide();
+        let _ = window.set_skip_taskbar(true);
+        let _ = self.webview.set_size(LogicalSize::new(1.0, 1.0));
+    }
+
     fn close(&self) {
         self.healthy.store(false, Ordering::SeqCst);
         self.routes.fail_all();
@@ -336,6 +451,52 @@ mod tests {
     }
 
     #[test]
+    fn qwen_uses_the_app_but_fixtures_keep_the_static_page() {
+        assert_eq!(
+            super::super::page_url("https://chat.qwen.ai")
+                .unwrap()
+                .as_str(),
+            "https://chat.qwen.ai/"
+        );
+        assert_eq!(
+            super::super::page_url("http://127.0.0.1:1234")
+                .unwrap()
+                .path(),
+            "/robots.txt"
+        );
+    }
+
+    #[test]
+    fn app_history_changes_are_allowed_but_reloads_and_other_origins_break_it() {
+        let page = Url::parse("https://chat.qwen.ai/").unwrap();
+        let mut watch = PageWatch::new(&page);
+        watch.apply(&at("https://chat.qwen.ai/c/123"));
+        assert_eq!(
+            watch.apply(&PageSignal::Finished(None)),
+            Some(Watch::Loaded)
+        );
+        watch.mark_ready();
+        assert_eq!(watch.apply(&at("https://chat.qwen.ai/c/456")), None);
+        assert_eq!(watch.apply(&PageSignal::Started), Some(Watch::Broken));
+        assert!(!allowed_location(&page, "https://chat.qwen.ai.evil.test/"));
+        assert!(!allowed_location(&page, "http://chat.qwen.ai/"));
+        assert!(!allowed_location(&page, "https://other.example/"));
+    }
+
+    #[test]
+    fn only_the_main_frames_default_context_is_selected() {
+        let event = |frame: &str, default: bool| {
+            json!({"context": {
+                "id": 7, "auxData": {"frameId": frame, "isDefault": default}
+            }})
+        };
+        assert_eq!(main_context(&event("main", true), "main"), Some(7));
+        assert_eq!(main_context(&event("child", true), "main"), None);
+        assert_eq!(main_context(&event("main", false), "main"), None);
+        assert_eq!(main_context(&json!({}), "main"), None);
+    }
+
+    #[test]
     fn the_page_is_loaded_once_it_finishes_at_the_static_url() {
         let mut watch = PageWatch::new(&page());
         assert_eq!(watch.apply(&at(BLANK)), None);
@@ -354,11 +515,22 @@ mod tests {
         failed.apply(&at("https://chat.qwen.ai/robots.txt"));
         assert_eq!(
             failed.apply(&PageSignal::Finished(Some(LoadFailure::Other(3)))),
-            Some(Watch::Failed)
+            Some(Watch::Failed(LoadFailure::Other(3)))
         );
         let mut moved = PageWatch::new(&page());
         moved.apply(&at("https://chat.qwen.ai/login"));
         assert_eq!(moved.apply(&PageSignal::Finished(None)), None);
+    }
+
+    #[test]
+    fn a_failed_load_reports_its_code_without_logging_url_queries() {
+        let mut failed = PageWatch::new(&page());
+        failed.apply(&at("https://chat.qwen.ai/login?token=private"));
+        assert_eq!(
+            failed.apply(&PageSignal::Finished(Some(LoadFailure::Other(-105)))),
+            Some(Watch::Failed(LoadFailure::Other(-105)))
+        );
+        assert_eq!(failed.current_location(), "https://chat.qwen.ai/login");
     }
 
     #[test]

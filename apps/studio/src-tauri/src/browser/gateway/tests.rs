@@ -3,12 +3,15 @@ use std::sync::atomic::{AtomicBool, AtomicI64, AtomicUsize, Ordering};
 
 use futures::StreamExt;
 use tokio::sync::Notify;
-use zvs_host::drivers::ai::errors::{CANCELLED_MESSAGE, TIMED_OUT_MESSAGE};
+use zvs_host::drivers::ai::errors::{
+    BROWSER_VERIFICATION_MESSAGE, CANCELLED_MESSAGE, TIMED_OUT_MESSAGE,
+};
 
 use super::*;
 use crate::browser::bearer::Sighting;
 
 const QWEN: &str = "https://chat.qwen.ai/api/v2/chat/completions";
+const QWEN_NEW_CHAT: &str = "https://chat.qwen.ai/api/v2/chats/new";
 const FIXTURE: &str = "http://127.0.0.1:4100/api/v1/auths/";
 
 #[derive(Clone)]
@@ -23,6 +26,8 @@ enum Plan {
     FailAfter(Vec<Vec<u8>>),
     Refuse,
     Silent,
+    /// Post a verification dialog first, then follow the inner plan once released.
+    ChallengeThen(Box<Plan>),
 }
 
 fn respond(status: u16, reads: Vec<Vec<u8>>) -> Plan {
@@ -48,6 +53,9 @@ struct FakePage {
     flows: Mutex<HashMap<String, Arc<Flow>>>,
     outstanding: AtomicI64,
     peak: AtomicI64,
+    revealed: AtomicUsize,
+    concealed: AtomicUsize,
+    passed: Notify,
 }
 
 impl FakePage {
@@ -88,6 +96,14 @@ impl FakePage {
         let aborted = |page: &Self| {
             page.post(&json!({ "id": id, "kind": "error", "aborted": true, "message": "aborted" }));
         };
+        let plan = match plan {
+            Plan::ChallengeThen(inner) => {
+                self.post(&json!({ "id": id, "kind": "challenge" }));
+                self.passed.notified().await;
+                *inner
+            }
+            plan => plan,
+        };
         let (status, headers, reads, stall_after, fail) = match plan {
             Plan::Respond {
                 status,
@@ -100,7 +116,7 @@ impl FakePage {
                 self.post(&json!({ "id": id, "kind": "error", "aborted": false, "message": "Failed to fetch" }));
                 return;
             }
-            Plan::Silent | Plan::Refuse => return,
+            Plan::Silent | Plan::Refuse | Plan::ChallengeThen(_) => return,
         };
         self.post(&json!({ "id": id, "kind": "head", "status": status, "headers": headers }));
         let mut sent = 0;
@@ -174,6 +190,14 @@ impl GatewayPage for Arc<FakePage> {
         self.healthy.load(Ordering::SeqCst)
     }
 
+    fn reveal(&self) {
+        self.revealed.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn conceal(&self) {
+        self.concealed.fetch_add(1, Ordering::SeqCst);
+    }
+
     fn close(&self) {
         self.healthy.store(false, Ordering::SeqCst);
         self.routes.fail_all();
@@ -230,7 +254,7 @@ impl PageFactory for FakePages {
         page: &Url,
         routes: SharedRoutes,
     ) -> Result<SharedPage, String> {
-        assert_eq!(page.path(), PAGE_PATH);
+        assert_eq!(Some(page), page_url(origin).as_ref());
         assert_eq!(page.origin().ascii_serialization(), origin);
         if self.hang.load(Ordering::SeqCst) {
             std::future::pending::<()>().await;
@@ -252,6 +276,9 @@ impl PageFactory for FakePages {
             flows: Mutex::default(),
             outstanding: AtomicI64::new(0),
             peak: AtomicI64::new(0),
+            revealed: AtomicUsize::new(0),
+            concealed: AtomicUsize::new(0),
+            passed: Notify::new(),
         });
         lock(&self.pages).push((origin.to_owned(), Arc::clone(&fake)));
         Ok(Arc::new(fake))
@@ -274,6 +301,8 @@ fn options() -> GatewayOptions {
         chunk_size: 1024,
         window: 4,
         ack_every: 2,
+        reveal_after: Duration::from_secs(60),
+        challenge_timeout: Duration::from_secs(120),
     }
 }
 
@@ -345,7 +374,7 @@ async fn the_request_is_passed_as_data_with_browser_owned_headers_removed() {
     assert_eq!(start["url"], QWEN);
     assert_eq!(start["method"], "POST");
     assert_eq!(start["body"], r#"{"stream":true}"#);
-    assert_eq!(start["page"], "https://chat.qwen.ai/robots.txt");
+    assert_eq!(start["page"], "https://chat.qwen.ai/");
     assert_eq!(start["referrer"], "https://chat.qwen.ai/");
     assert_eq!(
         start["headers"],
@@ -758,4 +787,102 @@ fn the_page_script_is_one_function_expression() {
         page_url("http://127.0.0.1:4100").map(String::from),
         Some("http://127.0.0.1:4100/robots.txt".to_owned())
     );
+}
+
+#[tokio::test]
+async fn qwen_chats_are_created_over_xhr_with_a_challenge_watch() {
+    let pages = FakePages::shared(respond(200, vec![b"{}".to_vec()]));
+    let gateway = gateway(&pages);
+    gateway
+        .fetch(QWEN_NEW_CHAT, request(), &CancellationToken::new())
+        .await
+        .expect("responds");
+    gateway
+        .fetch(QWEN, request(), &CancellationToken::new())
+        .await
+        .expect("responds");
+    let starts = pages.page(0).commands("start");
+    assert_eq!(starts[0]["transport"], "xhr");
+    assert_eq!(starts[1]["transport"], "fetch");
+    assert_eq!(starts[0]["challenge"], zvs_qwen_web::CHALLENGE_PATTERN);
+}
+
+#[tokio::test]
+async fn other_origins_use_fetch_without_a_challenge_watch() {
+    let pages = FakePages::shared(respond(200, vec![b"{}".to_vec()]));
+    gateway(&pages)
+        .fetch(FIXTURE, request(), &CancellationToken::new())
+        .await
+        .expect("responds");
+    let start = &pages.page(0).commands("start")[0];
+    assert_eq!(start["transport"], "fetch");
+    assert_eq!(start["challenge"], Value::Null);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_verification_dialog_shows_the_page_until_the_vendor_answers() {
+    let pages = FakePages::shared(Plan::ChallengeThen(Box::new(respond(
+        200,
+        vec![b"ok".to_vec()],
+    ))));
+    let gateway = Arc::new(gateway(&pages));
+    let pending = tokio::spawn({
+        let gateway = Arc::clone(&gateway);
+        async move {
+            gateway
+                .fetch(QWEN_NEW_CHAT, request(), &CancellationToken::new())
+                .await
+        }
+    });
+    // Longer than the head timeout: a shown verification waits for the person.
+    tokio::time::sleep(Duration::from_secs(90)).await;
+    let page = pages.page(0);
+    assert_eq!(page.revealed.load(Ordering::SeqCst), 1);
+    assert_eq!(page.concealed.load(Ordering::SeqCst), 0);
+    page.passed.notify_waiters();
+    let response = pending.await.expect("joins").expect("responds");
+    assert_eq!(response.status, 200);
+    assert_eq!(page.concealed.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_unanswered_verification_fails_as_browser_verification() {
+    let pages = FakePages::shared(Plan::ChallengeThen(Box::new(Plan::Silent)));
+    let error = gateway(&pages)
+        .fetch(QWEN_NEW_CHAT, request(), &CancellationToken::new())
+        .await
+        .expect_err("gives up");
+    assert_eq!(error.message, BROWSER_VERIFICATION_MESSAGE);
+    let page = pages.page(0);
+    assert_eq!(page.revealed.load(Ordering::SeqCst), 1);
+    assert_eq!(page.concealed.load(Ordering::SeqCst), 1);
+    // The abort is sent from a spawned task.
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    assert_eq!(page.commands("abort").len(), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_long_silence_on_a_watched_request_shows_the_page() {
+    let pages = FakePages::shared(Plan::Silent);
+    let gateway = AccountGateway::with_options(
+        pages.clone(),
+        BearerTokens::default(),
+        GatewayOptions {
+            reveal_after: Duration::from_secs(5),
+            ..options()
+        },
+        silent_logger(),
+    );
+    let error = gateway
+        .fetch(QWEN_NEW_CHAT, request(), &CancellationToken::new())
+        .await
+        .expect_err("gives up");
+    assert_eq!(error.message, BROWSER_VERIFICATION_MESSAGE);
+    assert_eq!(pages.page(0).revealed.load(Ordering::SeqCst), 1);
+    let fixture = gateway
+        .fetch(FIXTURE, request(), &CancellationToken::new())
+        .await
+        .expect_err("times out");
+    assert_eq!(fixture.message, TIMED_OUT_MESSAGE);
+    assert_eq!(pages.page(1).revealed.load(Ordering::SeqCst), 0);
 }

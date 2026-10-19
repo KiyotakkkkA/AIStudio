@@ -94,6 +94,8 @@ impl fmt::Debug for SessionRequest {
 pub struct SessionResponse {
     pub status: u16,
     pub headers: Headers,
+    pub final_url: Option<String>,
+    pub redirected: bool,
     pub body: ByteStream,
 }
 
@@ -102,8 +104,17 @@ impl SessionResponse {
         Self {
             status,
             headers,
+            final_url: None,
+            redirected: false,
             body,
         }
+    }
+
+    #[must_use]
+    pub fn with_response_url(mut self, final_url: Option<String>, redirected: bool) -> Self {
+        self.final_url = final_url;
+        self.redirected = redirected;
+        self
     }
 
     pub const fn ok(&self) -> bool {
@@ -130,6 +141,7 @@ impl fmt::Debug for SessionResponse {
         formatter
             .debug_struct("SessionResponse")
             .field("status", &self.status)
+            .field("redirected", &self.redirected)
             .field("headers", &self.headers)
             .finish_non_exhaustive()
     }
@@ -177,6 +189,20 @@ mod tests {
         assert!(printed.contains("Authorization"));
         assert_eq!(request.header("AUTHORIZATION"), Some("Bearer newer"));
         assert_eq!(request.header("cookie"), None);
+    }
+
+    #[test]
+    fn response_metadata_defaults_and_keeps_the_url_out_of_debug() {
+        let response = SessionResponse::new(200, Headers::new(), Box::pin(stream::empty()));
+        assert_eq!(response.final_url, None);
+        assert!(!response.redirected);
+        let response = response.with_response_url(
+            Some("https://chat.qwen.ai/login?token=secret-value".to_owned()),
+            true,
+        );
+        assert!(response.redirected);
+        assert!(!format!("{response:?}").contains("secret-value"));
+        assert!(response.final_url.as_deref().unwrap().contains("/login"));
     }
 
     #[tokio::test]

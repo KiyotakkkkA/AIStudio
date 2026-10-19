@@ -1,0 +1,42 @@
+/// Where and when a part of the vendor's wire format was observed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Observation {
+    pub source: &'static str,
+    pub observed_at: &'static str,
+}
+
+pub const ORIGIN: &str = "https://chat.qwen.ai";
+pub const API_BASE: &str = "https://chat.qwen.ai/api/v2";
+/// The application root the gateway loads; the vendor's own scripts run there.
+pub const APP_PAGE: &str = "https://chat.qwen.ai/";
+
+pub const MODELS_PATH: &str = "/models/";
+pub const CHATS_NEW_PATH: &str = "/chats/new";
+pub const COMPLETIONS_PATH: &str = "/chat/completions";
+
+pub const MODELS_REFERER_PATH: &str = "/";
+pub const NEW_CHAT_REFERER_PATH: &str = "/c/new-chat";
+
+pub const CHAT_MODE: &str = "normal";
+pub const CHAT_TYPE: &str = "t2t";
+pub const API_VERSION: &str = "2.1";
+/// The frontend build the client announces in its `Version` header.
+pub const WEB_VERSION: &str = "0.3.20";
+pub const SOURCE: &str = "web";
+
+/// Thinking turns can run for minutes before the first answer token.
+pub const DEFAULT_TIMEOUT_SECONDS: f64 = 600.0;
+
+pub const MODELS_OBSERVATION: Observation = Observation {
+    source: "https://chat.qwen.ai/api/v2/models/",
+    observed_at: "2026-09-10",
+};
+
+pub const GENERATION_OBSERVATION: Observation = Observation {
+    source: "https://chat.qwen.ai/api/v2/chats/new then POST /api/v2/chat/completions?chat_id=… (SSE, FE Version 0.3.20)",
+    observed_at: "2026-10-19",
+};
+
+pub fn chat_referer_path(chat_id: &str) -> String {
+    format!("/c/{chat_id}")
+}

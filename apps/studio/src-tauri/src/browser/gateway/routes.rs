@@ -13,10 +13,16 @@ pub enum PageMessage {
     Head {
         status: u16,
         headers: Vec<(String, String)>,
+        #[serde(default)]
+        final_url: Option<String>,
+        #[serde(default)]
+        redirected: bool,
     },
     Chunk {
         data: String,
     },
+    /// The page shows a verification dialog; the response stays pending until it is passed.
+    Challenge,
     End,
     Error {
         aborted: bool,
@@ -125,7 +131,9 @@ mod tests {
             first.try_recv().expect("head"),
             PageMessage::Head {
                 status: 200,
-                headers: vec![("x".to_owned(), "1".to_owned())]
+                headers: vec![("x".to_owned(), "1".to_owned())],
+                final_url: None,
+                redirected: false,
             }
         );
         assert!(first.try_recv().is_err());
@@ -133,6 +141,30 @@ mod tests {
             second.try_recv().expect("chunk"),
             PageMessage::Chunk {
                 data: "AA==".to_owned()
+            }
+        );
+    }
+
+    #[test]
+    fn response_metadata_reaches_the_request() {
+        let routes = Routes::shared();
+        let mut receiver = routes.register("redirect").expect("registers");
+        assert!(
+            routes.deliver(
+                &json!({
+                    "id": "redirect", "kind": "head", "status": 200, "headers": [],
+                    "final_url": "https://chat.qwen.ai/login", "redirected": true
+                })
+                .to_string()
+            )
+        );
+        assert_eq!(
+            receiver.try_recv().expect("head"),
+            PageMessage::Head {
+                status: 200,
+                headers: Vec::new(),
+                final_url: Some("https://chat.qwen.ai/login".to_owned()),
+                redirected: true,
             }
         );
     }

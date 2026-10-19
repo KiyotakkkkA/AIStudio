@@ -9468,6 +9468,7 @@ dependencies = [
  "zeroize",
  "zvs-contract",
  "zvs-core",
+ "zvs-qwen-web",
 ]
 
 [[package]]
@@ -9504,6 +9505,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "zvs-qwen-web"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "zvs-studio"
 version = "0.0.0"
 dependencies = [
@@ -9525,4 +9534,5 @@ dependencies = [
  "zeroize",
  "zvs-contract",
  "zvs-host",
+ "zvs-qwen-web",
 ]

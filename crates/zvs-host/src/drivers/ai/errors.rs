@@ -15,7 +15,7 @@ pub const TIMED_OUT_MESSAGE: &str = "Провайдер не ответил во
 pub const UNREACHABLE_MESSAGE: &str = "Провайдер недоступен";
 pub const REQUEST_FAILED_MESSAGE: &str = "Не удалось выполнить запрос к провайдеру";
 pub const SESSION_EXPIRED_MESSAGE: &str = "Сессия аккаунта истекла — требуется повторная привязка";
-pub const BROWSER_VERIFICATION_MESSAGE: &str = "Вендор вернул страницу проверки браузера (антибот-защита) вместо ответа API — генерация через аккаунт недоступна, подключите вендора по официальному API";
+pub const BROWSER_VERIFICATION_MESSAGE: &str = "Провайдер запросил проверку браузера. Откройте страницу аккаунта, завершите проверку и повторите запрос";
 
 const MAX_CAUSE_DEPTH: usize = 8;
 
@@ -115,6 +115,151 @@ pub fn is_not_found_response(error: &AppError) -> bool {
 
 pub fn is_signed_out_response(status: u16, headers: &Headers) -> bool {
     (300..400).contains(&status) || is_html(headers)
+}
+
+const MAX_TITLE_CHARS: usize = 120;
+const MAX_ENVELOPE_BYTES: usize = 64 * 1024;
+const MAX_CODE_CHARS: usize = 64;
+
+/// The code of a JSON error envelope that rejects the bearer token while answering HTTP 2xx,
+/// as Qwen does: `{"success": false, "data": {"code": "unauthorized", ...}}`.
+pub fn auth_envelope_code(text: &str) -> Option<String> {
+    if text.len() > MAX_ENVELOPE_BYTES {
+        return None;
+    }
+    let value = serde_json::from_str::<Value>(text).ok()?;
+    if value.get("success") != Some(&Value::Bool(false)) {
+        return None;
+    }
+    let code = match value
+        .get("data")
+        .and_then(|data| data.get("code"))
+        .or_else(|| value.get("code"))?
+    {
+        Value::String(code) if code.len() <= MAX_CODE_CHARS => code.clone(),
+        Value::Number(code) => code.to_string(),
+        _ => return None,
+    };
+    let lower = code.to_ascii_lowercase();
+    let rejected = matches!(lower.as_str(), "401" | "403")
+        || [
+            "unauth",
+            "not_login",
+            "notlogin",
+            "token",
+            "expire",
+            "forbidden",
+        ]
+        .iter()
+        .any(|needle| lower.contains(needle));
+    rejected.then_some(code)
+}
+
+/// The `<title>` of an HTML page, which tells a login, verification or error page apart.
+pub fn html_title(text: &str) -> Option<String> {
+    let lower = text.to_ascii_lowercase();
+    let open = lower.find("<title")?;
+    let start = open + lower[open..].find('>')? + 1;
+    let end = start + lower[start..].find("</title")?;
+    let title = text
+        .get(start..end)?
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    (!title.is_empty()).then(|| title.chars().take(MAX_TITLE_CHARS).collect())
+}
+
+/// Inspect page evidence without exposing HTML or URL query credentials.
+pub fn account_page_error(
+    status: u16,
+    headers: &Headers,
+    body: &str,
+    final_url: Option<&str>,
+    redirected: bool,
+    mut details: ErrorDetails,
+) -> Option<AppError> {
+    if !is_signed_out_response(status, headers) {
+        return None;
+    }
+    details.insert("status".to_owned(), json!(status));
+    details.insert("redirected".to_owned(), json!(redirected));
+    let destination = if (300..400).contains(&status) {
+        headers.get("location").map(String::as_str).or(final_url)
+    } else {
+        final_url
+    };
+    let path = destination.and_then(|value| {
+        url::Url::parse(value)
+            .ok()
+            .map(|url| url.path().to_owned())
+            .or_else(|| {
+                value.starts_with('/').then(|| {
+                    value
+                        .split(['?', '#'])
+                        .next()
+                        .unwrap_or_default()
+                        .to_owned()
+                })
+            })
+    });
+    if let Some(path) = &path {
+        details.insert("finalPath".to_owned(), json!(path));
+    }
+    let prefix =
+        String::from_utf8_lossy(&body.as_bytes()[..body.len().min(32 * 1024)]).to_ascii_lowercase();
+    let challenge = [
+        "cf-chl-",
+        "/cdn-cgi/challenge-platform/",
+        "id=\"baxia-dialog\"",
+        "id='baxia-dialog'",
+        "baxia-punish",
+        "<title>verify you are human</title>",
+        "<title>checking your browser</title>",
+        "<title>security verification</title>",
+    ]
+    .iter()
+    .any(|marker| prefix.contains(marker));
+    if challenge {
+        details.insert("reason".to_owned(), json!("browser-verification"));
+        return Some(browser_verification(details));
+    }
+    let login = path.as_deref().is_some_and(|path| {
+        path.split('/').any(|part| {
+            matches!(
+                part.to_ascii_lowercase().as_str(),
+                "login" | "signin" | "sign-in" | "auth"
+            )
+        })
+    }) || [
+        "<title>sign in</title>",
+        "<title>log in</title>",
+        "<title>login</title>",
+    ]
+    .iter()
+    .any(|marker| prefix.contains(marker));
+    if login {
+        details.insert("reason".to_owned(), json!("login-required"));
+        return Some(session_expired(details));
+    }
+    details.insert(
+        "reason".to_owned(),
+        json!(if is_html(headers) {
+            "unexpected-html"
+        } else {
+            "unexpected-redirect"
+        }),
+    );
+    Some(
+        AppError::new(
+            AppErrorCode::ProviderUnreachable,
+            if is_html(headers) {
+                "Провайдер вернул HTML вместо ответа API"
+            } else {
+                "Провайдер перенаправил запрос вместо ответа API"
+            },
+        )
+        .with_details(details),
+    )
 }
 
 pub fn http_failure(failure: HttpFailure) -> AppError {
@@ -565,5 +710,37 @@ mod tests {
             200,
             &Headers::from([("content-type".to_owned(), "application/json".to_owned())])
         ));
+    }
+
+    #[test]
+    fn html_classification_uses_login_destination_and_strong_challenge_evidence() {
+        let headers = Headers::from([("content-type".to_owned(), "text/html".to_owned())]);
+        for (body, url, reason) in [
+            ("<html>gateway secret</html>", None, "unexpected-html"),
+            (
+                "<script>const label = 'security verification';</script>",
+                None,
+                "unexpected-html",
+            ),
+            (
+                "<html><title>Checking your browser</title></html>",
+                None,
+                "browser-verification",
+            ),
+            (
+                "<html>app</html>",
+                Some("https://chat.qwen.ai/auth?token=secret"),
+                "login-required",
+            ),
+        ] {
+            let error =
+                account_page_error(200, &headers, body, url, true, ErrorDetails::new()).unwrap();
+            assert_eq!(detail(&error, "reason"), Some(&json!(reason)));
+            assert!(!format!("{error:?}").contains("secret"));
+        }
+        assert!(
+            account_page_error(200, &Headers::new(), "{}", None, false, ErrorDetails::new())
+                .is_none()
+        );
     }
 }

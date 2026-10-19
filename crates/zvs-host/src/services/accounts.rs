@@ -52,7 +52,7 @@ pub const ACCOUNT_NOT_FOUND: &str = "Account not found";
 pub const VENDOR_UNCHECKED: &str = "Could not check the vendor session";
 pub const OPERATION_CANCELLED: &str = "Account operation cancelled";
 pub const NO_SIGN_IN: &str = "No sign-in detected";
-pub const IDENTITY_REPLACED: &str = "Previous identity replaced; only one browser session per vendor can be active. Previous providers need an account linked.";
+pub const IDENTITY_REPLACED: &str = "Previous identity replaced; only one browser session per vendor can be active. Its providers now use the new account.";
 pub const DIFFERENT_ACCOUNT: &str = "Browser is signed in to a different account";
 pub const SESSION_EXPIRED_DETAIL: &str = "Session expired — sign in again";
 pub const COOKIES_CLEARED_DETAIL: &str = "Browser cookies cleared — sign in again";
@@ -943,6 +943,18 @@ impl Inner {
                 && token_secret_id.is_none()
             {
                 self.secrets.remove_in(&repositories, secret_id)?;
+            }
+            // Providers left without an account (by a replaced identity or earlier) follow it.
+            let attached = repositories
+                .accounts
+                .attach_orphans(adapter, &row.id, now)?;
+            if !attached.is_empty() {
+                self.logger.log(
+                    LogLevel::Info,
+                    "accounts",
+                    "Attached providers to the linked account",
+                    &[("accountId", json!(row.id)), ("providers", json!(attached))],
+                );
             }
             Ok((row, replaced))
         })?;

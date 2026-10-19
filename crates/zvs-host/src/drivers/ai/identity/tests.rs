@@ -738,7 +738,14 @@ async fn the_account_transport_guards_redirects_html_and_server_errors() {
     );
     assert!(session.scopes().iter().all(CancellationToken::is_cancelled));
 
-    session.queue(&format!("{base}/chat"), vec![html(200)]);
+    session.queue(
+        &format!("{base}/chat"),
+        vec![FakeReply::text(
+            200,
+            "text/html",
+            "<title>Checking your browser</title>",
+        )],
+    );
     let error = transport
         .stream(&RequestSpec::post("chat", json!({})), &token())
         .await
@@ -764,6 +771,50 @@ async fn the_account_transport_guards_redirects_html_and_server_errors() {
             .header("accept"),
         Some("text/event-stream")
     );
+}
+
+#[tokio::test]
+async fn html_failures_do_not_refresh_credentials_or_leak_page_content() {
+    struct Credentials;
+    #[async_trait]
+    impl AccountCredentials for Credentials {
+        async fn current(&self, _: &CancellationToken) -> Result<Option<AccountToken>, AppError> {
+            Ok(Some(AccountToken::bearer("secret")))
+        }
+        async fn refresh(&self, _: &CancellationToken) -> Result<Option<AccountToken>, AppError> {
+            panic!("an HTML response must not refresh authentication");
+        }
+    }
+    for (status, body, reason) in [
+        (
+            403,
+            "<html><title>Checking your browser</title>secret</html>",
+            "browser-verification",
+        ),
+        (200, "<html>gateway secret</html>", "unexpected-html"),
+        (403, "<title>Sign in</title>", "login-required"),
+    ] {
+        let session = FakeSessionGateway::shared();
+        session.queue(QWEN_CHAT, vec![FakeReply::text(status, "text/html", body)]);
+        let mut options =
+            AccountTransportOptions::new("https://chat.qwen.ai/api/v2", session.clone());
+        options.credentials = Some(Arc::new(Credentials));
+        let transport = AccountTransport::new(options);
+        let error = transport
+            .stream(&RequestSpec::get("chat/completions"), &token())
+            .await
+            .err()
+            .expect("rejects page");
+        assert_eq!(
+            error
+                .details
+                .as_ref()
+                .and_then(|details| details.get("reason")),
+            Some(&json!(reason))
+        );
+        assert!(!format!("{error:?}").contains("secret"));
+        assert_eq!(session.requests().len(), 1);
+    }
 }
 
 #[tokio::test]

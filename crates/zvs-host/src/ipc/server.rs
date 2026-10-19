@@ -188,6 +188,8 @@ impl IpcServer {
                         ("channel", json!(channel)),
                         ("code", json!(error.code)),
                         ("error", json!(error.to_string())),
+                        // Details are built to be shareable: field names, kinds, statuses.
+                        ("details", json!(error.details)),
                     ],
                 );
                 failure(error)

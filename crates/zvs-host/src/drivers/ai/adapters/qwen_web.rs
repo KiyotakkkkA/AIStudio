@@ -1,46 +1,44 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::mem;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use serde::Deserialize;
-use serde_json::{Number, Value, json};
+use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
+use url::Url;
 use zvs_contract::{AdapterFamily, AppError, AppErrorCode, AuthMode, ModelCapability, ToolMode};
+use zvs_qwen_web::protocol::{self, chat_referer_path};
+use zvs_qwen_web::{
+    CompletionTurn, ModelsDiagnostics, QwenModel, RowProblem, TurnDecoder, TurnEvent,
+    VendorFailure, new_chat_body, parse_chat_created, parse_models,
+};
 
 use super::account_family::{
-    AccountAdapterCore, AccountAdapterOptions, VendorObservation, flatten_prompt,
-    malformed_payload, malformed_turn, truncated_stream,
+    AccountAdapterCore, AccountAdapterOptions, MALFORMED_MODELS_MESSAGE, flatten_prompt,
+    malformed_turn, response_diagnostics, truncated_stream,
 };
-use super::wire::object;
 use crate::drivers::ai::capabilities::{AdapterCapabilities, Honours};
-use crate::drivers::ai::errors::session_expired;
+use crate::drivers::ai::errors::{html_title, request_failed, session_expired};
 use crate::drivers::ai::ports::{
     DeltaStream, DiscoveredModel, FinishReason, GenerateRequest, GenerateResult, TextDelta,
     TextGenerationDriver, TokenUsage,
 };
 use crate::drivers::ai::sse::FrameStream;
-use crate::drivers::ai::transport::RequestSpec;
+use crate::drivers::ai::transport::{RequestSpec, TransportResponse};
+use crate::platform::logger::{LogLevel, SharedLogger};
 
-pub const QWEN_MODELS_PATH: &str = "/models/";
-pub const QWEN_CHATS_NEW_PATH: &str = "/chats/new";
-pub const QWEN_COMPLETIONS_PATH: &str = "/chat/completions";
+pub use zvs_qwen_web::protocol::{
+    API_VERSION as QWEN_API_VERSION, CHAT_MODE as QWEN_CHAT_MODE, CHAT_TYPE as QWEN_CHAT_TYPE,
+    CHATS_NEW_PATH as QWEN_CHATS_NEW_PATH, COMPLETIONS_PATH as QWEN_COMPLETIONS_PATH,
+    DEFAULT_TIMEOUT_SECONDS as QWEN_DEFAULT_TIMEOUT_SECONDS,
+    GENERATION_OBSERVATION as QWEN_GENERATION_OBSERVATION,
+    MODELS_OBSERVATION as QWEN_MODELS_OBSERVATION, MODELS_PATH as QWEN_MODELS_PATH,
+    WEB_VERSION as QWEN_WEB_VERSION,
+};
 
-pub const QWEN_CHAT_MODE: &str = "local";
-pub const QWEN_CHAT_TYPE: &str = "t2t";
-pub const QWEN_API_VERSION: &str = "2.1";
 pub const GENERATION_ABORTED_MESSAGE: &str = "Вендор прервал генерацию";
-
-pub const QWEN_MODELS_OBSERVATION: VendorObservation = VendorObservation {
-    source: "https://chat.qwen.ai/api/v2/models/",
-    observed_at: "2026-09-10",
-};
-
-pub const QWEN_GENERATION_OBSERVATION: VendorObservation = VendorObservation {
-    source: "https://chat.qwen.ai/api/v2/chats/new then POST /api/v2/chat/completions?chat_id=… (SSE, one vendor chat per generation)",
-    observed_at: "2026-09-10",
-};
+pub const MODELS_REFUSED_MESSAGE: &str = "Qwen отклонил запрос списка моделей";
 
 pub const QWEN_WEB_CAPABILITIES: AdapterCapabilities = AdapterCapabilities {
     family: AdapterFamily::QwenWeb,
@@ -55,320 +53,118 @@ pub const QWEN_WEB_CAPABILITIES: AdapterCapabilities = AdapterCapabilities {
 
 const FAMILY: AdapterFamily = AdapterFamily::QwenWeb;
 
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum Flag {
-    Bool(bool),
-    Number(f64),
-}
-
-#[derive(Deserialize)]
-struct Flags {
-    #[serde(rename = "vision")]
-    _vision: Option<Flag>,
-    #[serde(rename = "document")]
-    _document: Option<Flag>,
-    #[serde(rename = "video")]
-    _video: Option<Flag>,
-    #[serde(rename = "audio")]
-    _audio: Option<Flag>,
-    thinking: Option<Flag>,
-}
-
-#[derive(Deserialize)]
-struct ModelMeta {
-    max_context_length: Option<Number>,
-    max_generation_length: Option<Number>,
-    #[serde(rename = "modality")]
-    _modality: Option<Vec<String>>,
-    capabilities: Option<Flags>,
-    abilities: Option<Flags>,
-}
-
-#[derive(Deserialize)]
-struct ModelInfo {
-    name: Option<String>,
-    is_active: Option<bool>,
-    meta: Option<ModelMeta>,
-}
-
-#[derive(Deserialize)]
-struct ModelEntry {
-    id: String,
-    name: Option<String>,
-    owned_by: Option<String>,
-    info: Option<ModelInfo>,
-}
-
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum ModelData {
-    List(Vec<ModelEntry>),
-    Wrapped { data: Vec<ModelEntry> },
-}
-
-#[derive(Deserialize)]
-struct ModelsPayload {
-    success: Option<bool>,
-    data: Option<ModelData>,
-}
-
-#[derive(Deserialize)]
-struct ChatCreatedData {
-    id: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct ChatCreated {
-    success: Option<bool>,
-    id: Option<String>,
-    data: Option<ChatCreatedData>,
-}
-
-#[derive(Deserialize)]
-struct Summary {
-    content: Option<Vec<String>>,
-}
-
-#[derive(Deserialize)]
-struct Extra {
-    #[serde(rename = "summary_title")]
-    _title: Option<Summary>,
-    summary_thought: Option<Summary>,
-}
-
-#[derive(Deserialize)]
-struct Delta {
-    #[serde(rename = "role")]
-    _role: Option<String>,
-    content: Option<String>,
-    phase: Option<String>,
-    status: Option<String>,
-    extra: Option<Extra>,
-}
-
-#[derive(Deserialize)]
-struct Choice {
-    delta: Option<Delta>,
-}
-
-#[derive(Deserialize)]
-struct Usage {
-    input_tokens: Option<u64>,
-    output_tokens: Option<u64>,
-    total_tokens: Option<u64>,
-}
-
-#[derive(Deserialize, Clone)]
-#[serde(untagged)]
-enum VendorCode {
-    Number(Number),
-    Text(String),
-}
-
-#[derive(Deserialize)]
-struct ErrorDetail {
-    code: Option<VendorCode>,
-    #[serde(rename = "message")]
-    _message: Option<String>,
-    status: Option<i64>,
-}
-
-enum VendorError {
-    Text,
-    Detail(ErrorDetail),
-}
-
-impl<'de> Deserialize<'de> for VendorError {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        match Value::deserialize(deserializer)? {
-            Value::String(_) => Ok(Self::Text),
-            detail @ Value::Object(_) => ErrorDetail::deserialize(detail)
-                .map(Self::Detail)
-                .map_err(serde::de::Error::custom),
-            _ => Err(serde::de::Error::custom(
-                "a vendor error is a string or an object",
-            )),
-        }
-    }
-}
-
-#[derive(Deserialize)]
-struct StreamFrame {
-    choices: Option<Vec<Choice>>,
-    usage: Option<Usage>,
-    success: Option<bool>,
-    status: Option<i64>,
-    code: Option<VendorCode>,
-    error: Option<VendorError>,
-}
-
-fn positive(value: Option<&Number>) -> Result<Option<i64>, ()> {
-    let Some(number) = value else {
-        return Ok(None);
-    };
-    let whole = number
-        .as_i64()
-        .or_else(|| {
-            number
-                .as_f64()
-                .filter(|float| float.fract() == 0.0)
-                .map(|float| float as i64)
-        })
-        .ok_or(())?;
-    if whole > 0 { Ok(Some(whole)) } else { Err(()) }
-}
-
-fn enabled(flag: Option<&Flag>) -> bool {
-    match flag {
-        Some(Flag::Bool(value)) => *value,
-        Some(Flag::Number(value)) => *value > 0.0,
-        None => false,
-    }
-}
-
-fn text(value: Option<&str>) -> Option<String> {
-    value
-        .map(str::trim)
-        .filter(|trimmed| !trimmed.is_empty())
-        .map(str::to_owned)
-}
-
-fn to_discovered_model(external_id: String, entry: &ModelEntry) -> Result<DiscoveredModel, ()> {
-    let meta = entry.info.as_ref().and_then(|info| info.meta.as_ref());
-    let context_window = positive(meta.and_then(|meta| meta.max_context_length.as_ref()))?;
-    let max_output = positive(meta.and_then(|meta| meta.max_generation_length.as_ref()))?;
-    let thinking = meta
-        .and_then(|meta| meta.capabilities.as_ref())
-        .and_then(|flags| flags.thinking.as_ref())
-        .or_else(|| {
-            meta.and_then(|meta| meta.abilities.as_ref())
-                .and_then(|flags| flags.thinking.as_ref())
-        });
+fn to_discovered_model(model: QwenModel) -> DiscoveredModel {
     let mut capabilities = vec![ModelCapability::Streaming];
-    if enabled(thinking) {
+    if model.thinking {
         capabilities.push(ModelCapability::Reasoning);
     }
-    Ok(DiscoveredModel {
-        display_name: text(entry.name.as_deref())
-            .or_else(|| text(entry.info.as_ref().and_then(|info| info.name.as_deref())))
-            .unwrap_or_else(|| external_id.clone()),
-        family: text(entry.owned_by.as_deref()),
-        context_window,
-        max_output,
+    DiscoveredModel {
+        display_name: model.display_name,
+        family: model.owned_by,
+        context_window: model.context_window,
+        max_output: model.max_output,
         capabilities,
-        ..DiscoveredModel::named(external_id)
-    })
+        ..DiscoveredModel::named(model.id)
+    }
 }
 
+/// `None` also when every row was malformed, as discovery treats that list as unusable.
 pub fn map_qwen_models(payload: &Value) -> Option<Vec<DiscoveredModel>> {
-    let parsed = ModelsPayload::deserialize(payload).ok()?;
-    if parsed.success == Some(false) {
+    let list = parse_models(payload)?;
+    if list.models.is_empty() && list.skipped > 0 {
         return None;
     }
-    let entries = match parsed.data? {
-        ModelData::List(entries) | ModelData::Wrapped { data: entries } => entries,
-    };
-    let mut seen = HashSet::new();
-    let mut models = Vec::new();
-    let mut converted = Vec::with_capacity(entries.len());
-    for entry in &entries {
-        converted.push(to_discovered_model(entry.id.trim().to_owned(), entry).ok()?);
-    }
-    for (entry, model) in entries.iter().zip(converted) {
-        let external_id = entry.id.trim();
-        if external_id.is_empty() || seen.contains(external_id) {
-            continue;
-        }
-        if entry.info.as_ref().and_then(|info| info.is_active) == Some(false) {
-            continue;
-        }
-        seen.insert(external_id.to_owned());
-        models.push(model);
-    }
-    Some(models)
+    Some(list.models.into_iter().map(to_discovered_model).collect())
 }
 
-fn code_json(code: &VendorCode) -> Value {
-    match code {
-        VendorCode::Number(number) => Value::Number(number.clone()),
-        VendorCode::Text(text) => Value::String(text.clone()),
-    }
-}
-
-fn is_auth_code(code: Option<&VendorCode>) -> bool {
-    match code {
-        Some(VendorCode::Number(number)) => {
-            matches!(number.as_f64(), Some(value) if value == 401.0 || value == 403.0)
-        }
-        Some(VendorCode::Text(text)) => {
-            if text == "401" || text == "403" {
-                return true;
-            }
-            let lower = text.to_lowercase();
-            ["unauth", "forbidden", "token", "login", "expire", "session"]
-                .iter()
-                .any(|needle| lower.contains(needle))
-        }
-        None => false,
-    }
-}
-
-fn vendor_failure(frame: &StreamFrame) -> Option<AppError> {
-    let (nested_code, nested_status) = match &frame.error {
-        Some(VendorError::Detail(detail)) => (detail.code.as_ref(), detail.status),
-        _ => (None, None),
-    };
-    let code = nested_code.or(frame.code.as_ref());
-    let status = nested_status.or(frame.status);
+fn vendor_failure(failure: VendorFailure) -> AppError {
     let mut details = zvs_contract::ErrorDetails::new();
     details.insert("family".to_owned(), json!(FAMILY.as_str()));
     details.insert("endpoint".to_owned(), json!(QWEN_COMPLETIONS_PATH));
-    if let Some(code) = code {
-        details.insert("vendorCode".to_owned(), code_json(code));
+    if let Some(code) = failure.code {
+        details.insert("vendorCode".to_owned(), code);
     }
-    if let Some(status) = status {
+    if let Some(status) = failure.status {
         details.insert("status".to_owned(), json!(status));
     }
-    if matches!(status, Some(401 | 403)) || is_auth_code(code) {
-        return Some(session_expired(details));
+    if failure.auth {
+        return session_expired(details);
     }
-    if frame.success != Some(false)
-        && frame.error.is_none()
-        && status.is_none_or(|status| status < 400)
-    {
-        return None;
-    }
-    Some(AppError::new(AppErrorCode::Unknown, GENERATION_ABORTED_MESSAGE).with_details(details))
+    AppError::new(AppErrorCode::Unknown, GENERATION_ABORTED_MESSAGE).with_details(details)
 }
 
-fn summary_deltas(emitted: &mut Vec<String>, next: &[String]) -> Vec<String> {
-    let mut chunks = Vec::new();
-    for (index, value) in next.iter().enumerate() {
-        let seen = emitted.get(index).cloned().unwrap_or_default();
-        if *value == seen {
-            continue;
-        }
-        chunks.push(match value.strip_prefix(seen.as_str()) {
-            Some(rest) => rest.to_owned(),
-            None => value.clone(),
-        });
-        if emitted.len() <= index {
-            emitted.resize(index + 1, String::new());
-        }
-        emitted[index].clone_from(value);
-    }
-    chunks
+fn row_problems(problems: &[RowProblem]) -> Value {
+    problems
+        .iter()
+        .map(|problem| {
+            json!({
+                "row": problem.index,
+                "field": problem.field,
+                "expected": problem.expected,
+                "found": problem.found,
+            })
+        })
+        .collect()
 }
 
-fn to_usage(raw: Option<&Usage>) -> Option<TokenUsage> {
-    let raw = raw?;
+fn malformed_models_response(response: &TransportResponse, logger: &SharedLogger) -> AppError {
+    let shape = ModelsDiagnostics::inspect(&response.text);
+    let content_type = response
+        .headers
+        .get("content-type")
+        .cloned()
+        .unwrap_or_default();
+    // An explicit refusal with a code is the vendor's answer, not an unknown format.
+    let (code, message) = if shape.outer_success == "false" && shape.vendor_code.is_some() {
+        (AppErrorCode::ProviderUnreachable, MODELS_REFUSED_MESSAGE)
+    } else {
+        (AppErrorCode::Unknown, MALFORMED_MODELS_MESSAGE)
+    };
+    logger.log(
+        LogLevel::Warn,
+        "ai",
+        message,
+        &[
+            ("family", json!(FAMILY.as_str())),
+            ("endpoint", json!(QWEN_MODELS_PATH)),
+            ("status", json!(response.status)),
+            ("contentType", json!(content_type)),
+            ("payloadShape", json!(shape.payload_shape)),
+            ("rootFields", json!(shape.root_fields)),
+            ("outerSuccess", json!(shape.outer_success)),
+            ("dataShape", json!(shape.data_shape)),
+            ("dataFields", json!(shape.data_fields)),
+            ("modelCount", json!(shape.model_count)),
+            ("sampleModelFields", json!(shape.sample_model_fields)),
+            ("sampleInfoFields", json!(shape.sample_info_fields)),
+            ("sampleMetaFields", json!(shape.sample_meta_fields)),
+            ("rowProblems", row_problems(&shape.row_problems)),
+            ("htmlTitle", json!(html_title(&response.text))),
+            ("dataFieldKinds", json!(shape.data_field_kinds)),
+            ("vendorCode", json!(shape.vendor_code)),
+        ],
+    );
+    AppError::new(code, message)
+        .with_detail("family", FAMILY.as_str())
+        .with_detail("endpoint", QWEN_MODELS_PATH)
+        .with_detail("status", response.status)
+        .with_detail("contentType", content_type)
+        .with_detail("payloadShape", shape.payload_shape)
+        .with_detail("rootFields", json!(shape.root_fields))
+        .with_detail("outerSuccess", shape.outer_success)
+        .with_detail("dataShape", shape.data_shape)
+        .with_detail("modelCount", shape.model_count)
+        .with_detail("rowProblems", row_problems(&shape.row_problems))
+        .with_detail("vendorCode", json!(shape.vendor_code))
+}
+
+fn to_usage(raw: zvs_qwen_web::Usage) -> TokenUsage {
     let count = |value: Option<u64>| value.and_then(|value| i64::try_from(value).ok());
-    Some(TokenUsage {
+    TokenUsage {
         prompt_tokens: count(raw.input_tokens),
         completion_tokens: count(raw.output_tokens),
         total_tokens: count(raw.total_tokens),
-    })
+    }
 }
 
 #[derive(Debug, Default)]
@@ -386,20 +182,64 @@ fn with_summary(summary: &SharedSummary, update: impl FnOnce(&mut TurnSummary)) 
 struct Shared {
     core: AccountAdapterCore,
     models: Mutex<Option<Vec<DiscoveredModel>>>,
+    /// The client creates one chat at a time; so does the adapter, to stay client-like.
+    creating: tokio::sync::Mutex<()>,
 }
 
 impl Shared {
+    fn web_request(&self, spec: RequestSpec, referer_path: &str) -> Result<RequestSpec, AppError> {
+        let mut referer =
+            Url::parse(self.core.transport.base_url()).map_err(|_| request_failed())?;
+        referer.set_path(referer_path);
+        referer.set_query(None);
+        referer.set_fragment(None);
+        Ok(spec
+            .with_header("source", protocol::SOURCE)
+            .with_header("Version", QWEN_WEB_VERSION)
+            .with_header("referer", referer.to_string()))
+    }
+
     async fn list_models(
         &self,
         cancel: &CancellationToken,
     ) -> Result<Vec<DiscoveredModel>, AppError> {
         let response = self
             .core
-            .request(&RequestSpec::get(QWEN_MODELS_PATH), cancel)
+            .request(
+                &self.web_request(
+                    RequestSpec::get(QWEN_MODELS_PATH),
+                    protocol::MODELS_REFERER_PATH,
+                )?,
+                cancel,
+            )
             .await?;
-        let payload = self.core.decode(&response.text, QWEN_MODELS_PATH)?;
-        let models = map_qwen_models(&payload)
-            .ok_or_else(|| malformed_payload(FAMILY, QWEN_MODELS_PATH, &self.core.logger))?;
+        let payload = serde_json::from_str::<Value>(&response.text)
+            .map_err(|_| malformed_models_response(&response, &self.core.logger))?;
+        let list = parse_models(&payload)
+            .ok_or_else(|| malformed_models_response(&response, &self.core.logger))?;
+        if list.models.is_empty() && list.skipped > 0 {
+            return Err(malformed_models_response(&response, &self.core.logger));
+        }
+        if list.skipped > 0 {
+            self.core.logger.log(
+                LogLevel::Warn,
+                "ai",
+                "Qwen returned model entries with an unsupported schema",
+                &[
+                    ("family", json!(FAMILY.as_str())),
+                    ("endpoint", json!(QWEN_MODELS_PATH)),
+                    ("status", json!(response.status)),
+                    ("modelCount", json!(list.models.len())),
+                    ("skippedCount", json!(list.skipped)),
+                    ("rowProblems", row_problems(&list.problems)),
+                ],
+            );
+        }
+        let models = list
+            .models
+            .into_iter()
+            .map(to_discovered_model)
+            .collect::<Vec<_>>();
         *self.models.lock().unwrap_or_else(PoisonError::into_inner) = Some(models.clone());
         Ok(models)
     }
@@ -416,90 +256,58 @@ impl Shared {
         model: &str,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        let body = object([
-            ("chatId", json!("")),
-            ("chat_mode", json!(QWEN_CHAT_MODE)),
-            ("chat_type", json!(QWEN_CHAT_TYPE)),
-            ("models", json!([model])),
-            ("project_id", json!("")),
-            ("timestamp", json!(self.core.clock.now())),
-        ]);
+        let _one_at_a_time = tokio::select! {
+            biased;
+            () = cancel.cancelled() => return Err(crate::drivers::ai::errors::cancelled()),
+            guard = self.creating.lock() => guard,
+        };
         let response = self
             .core
-            .request(&RequestSpec::post(QWEN_CHATS_NEW_PATH, body), cancel)
+            .request(
+                &self.web_request(
+                    RequestSpec::post(
+                        QWEN_CHATS_NEW_PATH,
+                        new_chat_body(model, self.core.clock.now()),
+                    ),
+                    protocol::NEW_CHAT_REFERER_PATH,
+                )?,
+                cancel,
+            )
             .await?;
-        let payload = self.core.decode(&response.text, QWEN_CHATS_NEW_PATH)?;
-        let malformed = || malformed_turn(FAMILY, QWEN_CHATS_NEW_PATH, &self.core.logger);
-        let created = ChatCreated::deserialize(&payload).map_err(|_| malformed())?;
-        if created.success == Some(false) {
-            return Err(malformed());
-        }
-        let chat_id = created
-            .data
-            .and_then(|data| data.id)
-            .or(created.id)
-            .unwrap_or_default();
-        let chat_id = chat_id.trim();
-        if chat_id.is_empty() {
-            return Err(malformed());
-        }
-        Ok(chat_id.to_owned())
+        let payload = self.core.decode(&response, QWEN_CHATS_NEW_PATH)?;
+        parse_chat_created(&payload).ok_or_else(|| {
+            malformed_turn(
+                FAMILY,
+                QWEN_CHATS_NEW_PATH,
+                &self.core.logger,
+                response_diagnostics(&response),
+            )
+        })
     }
 
-    fn turn(&self, chat_id: &str, request: &GenerateRequest, thinking: bool) -> RequestSpec {
-        let timestamp = self.core.clock.now().div_euclid(1000);
-        let message = object([
-            ("id", Value::Null),
-            ("fid", json!((self.core.new_id)())),
-            ("parentId", Value::Null),
-            ("parent_id", Value::Null),
-            ("childrenIds", json!([])),
-            ("role", json!("user")),
-            ("content", json!(flatten_prompt(request))),
-            ("user_action", json!("chat")),
-            ("files", json!([])),
-            ("timestamp", json!(timestamp)),
-            ("model", json!("")),
-            ("models", json!([request.model])),
-            ("chat_type", json!(QWEN_CHAT_TYPE)),
-            ("sub_chat_type", json!(QWEN_CHAT_TYPE)),
-            (
-                "feature_config",
-                object([
-                    ("thinking_enabled", json!(thinking)),
-                    ("thinking_format", json!("summary")),
-                    (
-                        "thinking_mode",
-                        json!(if thinking { "Thinking" } else { "Fast" }),
-                    ),
-                    ("auto_thinking", json!(false)),
-                    ("auto_search", json!(false)),
-                    ("output_schema", json!("phase")),
-                    ("research_mode", json!("normal")),
-                ]),
-            ),
-            (
-                "extra",
-                object([("meta", object([("subChatType", json!(QWEN_CHAT_TYPE))]))]),
-            ),
-        ]);
-        let body = object([
-            ("chatId", json!(chat_id)),
-            ("chat_id", json!(chat_id)),
-            ("chat_mode", json!(QWEN_CHAT_MODE)),
-            ("chat_type", json!(QWEN_CHAT_TYPE)),
-            ("incremental_output", json!(true)),
-            ("messages", json!([message])),
-            ("model", json!(request.model)),
-            ("parentId", Value::Null),
-            ("parent_id", Value::Null),
-            ("stream", json!(true)),
-            ("timestamp", json!(timestamp)),
-            ("version", json!(QWEN_API_VERSION)),
-        ]);
-        RequestSpec::post(QWEN_COMPLETIONS_PATH, body)
-            .with_query("chat_id", chat_id)
-            .with_accept("text/event-stream")
+    fn turn(
+        &self,
+        chat_id: &str,
+        request: &GenerateRequest,
+        thinking: bool,
+    ) -> Result<RequestSpec, AppError> {
+        let prompt = flatten_prompt(request);
+        let fid = (self.core.new_id)();
+        let body = CompletionTurn {
+            chat_id,
+            model: &request.model,
+            prompt: &prompt,
+            thinking,
+            fid: &fid,
+            now_ms: self.core.clock.now(),
+        }
+        .body();
+        self.web_request(
+            RequestSpec::post(QWEN_COMPLETIONS_PATH, body)
+                .with_query("chat_id", chat_id)
+                .with_accept("text/event-stream"),
+            &chat_referer_path(chat_id),
+        )
     }
 
     async fn open(
@@ -519,7 +327,7 @@ impl Shared {
         let chat_id = self.create_chat(&request.model, cancel).await?;
         Ok(self
             .core
-            .frames(self.turn(&chat_id, request, thinking), cancel))
+            .frames(self.turn(&chat_id, request, thinking)?, cancel))
     }
 }
 
@@ -535,7 +343,7 @@ struct Run {
     cancel: CancellationToken,
     phase: Phase,
     queue: VecDeque<Result<TextDelta, AppError>>,
-    emitted: Vec<String>,
+    decoder: TurnDecoder,
     finished: bool,
     summary: Option<SharedSummary>,
 }
@@ -547,49 +355,24 @@ impl Run {
     }
 
     fn frame(&mut self, payload: &str) {
-        let Ok(value) = serde_json::from_str::<Value>(payload) else {
-            return;
-        };
-        let Ok(frame) = StreamFrame::deserialize(&value) else {
-            return;
-        };
-        if let Some(failure) = vendor_failure(&frame) {
-            let failure = self.shared.core.normalise(failure);
-            self.fail(failure);
-            return;
-        }
-        if let Some(summary) = &self.summary
-            && let Some(usage) = to_usage(frame.usage.as_ref())
-        {
-            with_summary(summary, |summary| summary.usage = Some(usage));
-        }
-        let Some(delta) = frame
-            .choices
-            .and_then(|choices| choices.into_iter().next())
-            .and_then(|choice| choice.delta)
-        else {
-            return;
-        };
-        if delta.phase.as_deref() == Some("thinking_summary") {
-            let thought = delta
-                .extra
-                .and_then(|extra| extra.summary_thought)
-                .and_then(|summary| summary.content)
-                .unwrap_or_default();
-            for chunk in summary_deltas(&mut self.emitted, &thought) {
-                self.queue.push_back(Ok(TextDelta::reasoning(chunk)));
+        for event in self.decoder.push(payload) {
+            match event {
+                TurnEvent::Failure(failure) => {
+                    let failure = self.shared.core.normalise(vendor_failure(failure));
+                    self.fail(failure);
+                    return;
+                }
+                TurnEvent::Usage(usage) => {
+                    if let Some(summary) = &self.summary {
+                        with_summary(summary, |summary| summary.usage = Some(to_usage(usage)));
+                    }
+                }
+                TurnEvent::Reasoning(chunk) => {
+                    self.queue.push_back(Ok(TextDelta::reasoning(chunk)))
+                }
+                TurnEvent::Text(chunk) => self.queue.push_back(Ok(TextDelta::text(chunk))),
+                TurnEvent::Finished => self.finished = true,
             }
-            return;
-        }
-        if delta.phase.as_deref() != Some("answer") {
-            return;
-        }
-        let content = delta.content.unwrap_or_default();
-        if !content.is_empty() {
-            self.queue.push_back(Ok(TextDelta::text(content)));
-        }
-        if delta.status.as_deref() == Some("finished") {
-            self.finished = true;
         }
     }
 
@@ -630,6 +413,7 @@ impl QwenWebAdapter {
             shared: Arc::new(Shared {
                 core: AccountAdapterCore::new(options, QWEN_WEB_CAPABILITIES),
                 models: Mutex::new(None),
+                creating: tokio::sync::Mutex::new(()),
             }),
         }
     }
@@ -646,7 +430,7 @@ impl QwenWebAdapter {
             cancel: cancel.clone(),
             phase: Phase::Open,
             queue: VecDeque::new(),
-            emitted: Vec::new(),
+            decoder: TurnDecoder::new(),
             finished: false,
             summary,
         };

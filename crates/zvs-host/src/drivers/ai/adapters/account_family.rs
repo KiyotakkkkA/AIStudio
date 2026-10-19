@@ -7,7 +7,7 @@ use zvs_contract::{AdapterFamily, AppError, AppErrorCode, TunableParameter};
 
 use super::wire::{normalise, open_frames};
 use crate::drivers::ai::capabilities::AdapterCapabilities;
-use crate::drivers::ai::errors::is_session_expired;
+use crate::drivers::ai::errors::{html_title, is_session_expired};
 use crate::drivers::ai::ports::{ChatRole, GenerateRequest};
 use crate::drivers::ai::sse::{FrameStream, sse_data};
 use crate::drivers::ai::transport::{RequestSpec, SharedTransport, TransportResponse};
@@ -73,14 +73,81 @@ fn described(code: AppErrorCode, message: &str, fields: Vec<(&'static str, Value
         })
 }
 
-pub fn malformed_payload(family: AdapterFamily, endpoint: &str, logger: &SharedLogger) -> AppError {
-    let fields = details(family, endpoint);
+const MAX_LOGGED_FIELDS: usize = 20;
+
+fn kind(value: &Value) -> &'static str {
+    match value {
+        Value::Object(_) => "object",
+        Value::Array(_) => "array",
+        Value::String(_) => "string",
+        Value::Number(_) => "number",
+        Value::Bool(_) => "boolean",
+        Value::Null => "null",
+    }
+}
+
+/// What a response that could not be used looked like: status, content type, size, JSON kind
+/// and top-level field names, and an HTML page's title. Never field values or the body.
+pub fn response_diagnostics(response: &TransportResponse) -> Vec<(&'static str, Value)> {
+    let parsed = serde_json::from_str::<Value>(&response.text).ok();
+    let trimmed = response.text.trim_start();
+    let html = trimmed.starts_with('<');
+    let mut fields = vec![
+        ("status", json!(response.status)),
+        (
+            "contentType",
+            json!(
+                response
+                    .headers
+                    .get("content-type")
+                    .cloned()
+                    .unwrap_or_default()
+            ),
+        ),
+        ("bytes", json!(response.text.len())),
+        (
+            "payloadShape",
+            json!(
+                parsed
+                    .as_ref()
+                    .map_or(if html { "html" } else { "invalid-json" }, kind)
+            ),
+        ),
+    ];
+    if let Some(object) = parsed.as_ref().and_then(Value::as_object) {
+        let names = object
+            .iter()
+            .take(MAX_LOGGED_FIELDS)
+            .map(|(name, value)| format!("{name}:{}", kind(value)))
+            .collect::<Vec<_>>();
+        fields.push(("rootFields", json!(names)));
+    }
+    if html && let Some(title) = html_title(trimmed) {
+        fields.push(("htmlTitle", json!(title)));
+    }
+    fields
+}
+
+pub fn malformed_payload(
+    family: AdapterFamily,
+    endpoint: &str,
+    logger: &SharedLogger,
+    extra: Vec<(&'static str, Value)>,
+) -> AppError {
+    let mut fields = details(family, endpoint);
+    fields.extend(extra);
     logger.log(LogLevel::Warn, "ai", MALFORMED_MODELS_MESSAGE, &fields);
     described(AppErrorCode::Unknown, MALFORMED_MODELS_MESSAGE, fields)
 }
 
-pub fn malformed_turn(family: AdapterFamily, endpoint: &str, logger: &SharedLogger) -> AppError {
-    let fields = details(family, endpoint);
+pub fn malformed_turn(
+    family: AdapterFamily,
+    endpoint: &str,
+    logger: &SharedLogger,
+    extra: Vec<(&'static str, Value)>,
+) -> AppError {
+    let mut fields = details(family, endpoint);
+    fields.extend(extra);
     logger.log(LogLevel::Warn, "ai", MALFORMED_TURN_MESSAGE, &fields);
     described(AppErrorCode::Unknown, MALFORMED_TURN_MESSAGE, fields)
 }
@@ -161,9 +228,16 @@ impl AccountAdapterCore {
             .boxed()
     }
 
-    pub fn decode(&self, text: &str, endpoint: &str) -> Result<Value, AppError> {
-        serde_json::from_str(text)
-            .map_err(|_| malformed_payload(self.capabilities.family, endpoint, &self.logger))
+    /// Decode a turn endpoint's JSON answer. A model list has its own diagnostics.
+    pub fn decode(&self, response: &TransportResponse, endpoint: &str) -> Result<Value, AppError> {
+        serde_json::from_str(&response.text).map_err(|_| {
+            malformed_turn(
+                self.capabilities.family,
+                endpoint,
+                &self.logger,
+                response_diagnostics(response),
+            )
+        })
     }
 
     pub fn drop_unsupported(&self, request: &GenerateRequest) -> Vec<TunableParameter> {
