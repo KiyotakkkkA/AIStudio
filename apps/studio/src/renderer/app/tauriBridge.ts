@@ -33,11 +33,9 @@ function createTauriBridge(): ZvsBridge {
   });
 }
 
-if ("__TAURI_INTERNALS__" in window && !("zvs" in window)) {
-  Object.defineProperty(window, "zvs", {
-    value: createTauriBridge(),
-    enumerable: true,
-    configurable: false,
-    writable: false,
-  });
-}
+Object.defineProperty(window, "zvs", {
+  value: createTauriBridge(),
+  enumerable: true,
+  configurable: false,
+  writable: false,
+});

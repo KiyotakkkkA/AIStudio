@@ -1,6 +1,6 @@
 # zvs-host
 
-The Rust host. Every service, repository, driver and the execution kernel will live here
+The Rust host. Every service, repository, driver and the execution kernel live here
 (PASSPORT §5, §8). The crate has **no Tauri dependency**, so all of it is unit-testable
 without a window. Shell capabilities reach it through port traits that `zvs-studio`
 implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that builds it.
@@ -70,8 +70,7 @@ crates' tests. `debug-panic` adds `InProcessCore::debug_panic`, `vector_debug_pa
 §10). `InProcessCore` implements all three. Synchronous work (chunking, hashing, every graph
 call, removing a vector store) runs on `spawn_blocking`; vector calls are LanceDB futures. Each
 call is wrapped in `catch_unwind`, so a panic answers `NATIVE_ERROR` («Rust operation
-panicked») and the next call works. Core errors keep their code (`core_error`), as the addon's
-JSON envelope did. `ChunkConfig` is validated before the core is reached
+panicked») and the next call works. Core errors keep their code (`core_error`). `ChunkConfig` is validated before the core is reached
 (`VALIDATION_FAILED`, «Некорректный размер или перекрытие фрагментов»), and graph ids, nodes,
 edges and queries are trimmed and checked against `MAX_HOPS` and `MAX_NODE_BUDGET`
 («Некорректный запрос к графу»). `upsert` takes the caller's `CancellationToken` and passes it
@@ -79,7 +78,7 @@ into `VectorIndex::upsert`; a token that is already cancelled answers `RUN_CANCE
 touching the store. The graph registry keyed by `graphId` lives in `InProcessCore`, so the
 composition root's single instance is the process-wide registry.
 
-`SidecarDriver` is `SidecarDriver.ts` over `tokio::process`: the child is spawned on demand
+`SidecarDriver` runs `zvs-jobd` over `tokio::process`: the child is spawned on demand
 with `CREATE_NO_WINDOW`, requests and answers are newline-delimited JSON (a line over 8 MiB
 kills the child), stderr is logged as `Sidecar diagnostics`, and a ping every 5 s (2 s timeout)
 kills a silent child. `run(job, params, JobRunOptions { cancel, on_progress })` sends
@@ -88,7 +87,8 @@ kills a silent child. `run(job, params, JobRunOptions { cancel, on_progress })` 
 spawn after `250 ms × 2^restarts` (capped at 30 s); a ping answer resets the count. `dispose`
 kills the child and waits for it, after which `run` answers `CONFLICT`.
 `StudioPaths::sidecar_path` is `zvs-jobd(.exe)` next to the main executable: `target/<profile>`
-in development, the `externalBin` copy when packaged. The driver's tests live in
+in development, where `scripts/tauri.mjs` builds it, and beside the installed executable when
+packaged. The driver's tests live in
 `crates/zvs-jobd/tests/driver.rs`, so they run against the real binary Cargo built for them.
 
 ## System
@@ -96,7 +96,7 @@ in development, the `externalBin` copy when packaged. The driver's tests live in
 `SystemService` answers `system.nativePing` (an in-process chunk count with the default
 config), `system.device` and `system.resources`. `DeviceProbe` measures once, caches, and
 measures again on `refresh`; a failing GPU or disk probe costs only its own field. The tier
-rule is the TypeScript one: ≥ 30 GiB and ≥ 12 cores is `high`, ≥ 14 GiB and ≥ 6 cores is
+rule: ≥ 30 GiB and ≥ 12 cores is `high`, ≥ 14 GiB and ≥ 6 cores is
 `medium`, and a discrete GPU lifts the tier one step. `select_gpu` drops software adapters,
 picks the adapter with the most dedicated memory, and calls it discrete when it is NVIDIA, has
 at least 2 GiB, or sits beside a weaker adapter. `ResourceMonitor` reads CPU, memory and the
@@ -105,7 +105,7 @@ tried once and then left alone on a machine without it; a missing reading is `nu
 
 ## Vector stores and graph
 
-`VectorStoreService` is `VectorStoreService.ts` over `VectorCore`. A store row is written as
+`VectorStoreService` works over `VectorCore`. A store row is written as
 `pending` before `create_index`; a failed creation removes the table and the row, and a
 failed cleanup marks the row `broken` («Store creation and cleanup failed; metadata retained
 for removal»). `list` reports drift without writing (a busy store keeps its stored status),
@@ -125,27 +125,24 @@ answer or the 20 s timeout fall back to vector order with a `warn`; a cancelled 
 the cancellation. Local rerankers attach through `attach_rerankers` once the runtime service
 exists (TASK_071). Durations come from the injectable `Stopwatch`.
 
-`VectorSourceService` is the non-indexing half of `IndexingService.ts`: sources (paths
+`VectorSourceService` is the non-indexing half of the vector store sources: sources (paths
 trimmed, the `\\?\` prefix stripped and resolved like `path.resolve`), documents, and
 `remove_document` (delete the vectors under the lease, drop the row, `maintain`, reconcile).
-`vectorStores.index` stays unregistered until TASK_072. `VectorEvalService` runs every case in
+`VectorEvalService` runs every case in
 each mode `eval_modes` allows and stores the run as `last_eval`; a failed case is reported, not
-fatal. `GraphService` is `GraphService.ts`: the catalogue comes from migration
+fatal. In `GraphService` the catalogue comes from migration
 `0001_graph_relation_seed`, the engine graph of a store is hydrated from the ledger on first
 use (`tokio::sync::OnceCell`, retried after a failure), a failed engine write rolls the row
 back, a failed engine removal keeps the row and sets `graph_stale`. Engine weights are `f32`;
-they come back with their shortest decimal spelling (`stored::widen`), as the addon's JSON did.
+they come back with their shortest decimal spelling (`stored::widen`).
 
-Search hit scores are the core's `f32` widened with `f64::from`, which is what the addon's
-`serde_json::Value` round trip produced. The parity test
-(`services::vector_eval::parity`) and `apps/studio/tests/vectorEvalParity.test.ts` run the
-same corpus (`test/fixtures/retrieval/eval-corpus.json`) through each host and assert the
-metrics pinned in it.
+Search hit scores are the core's `f32` widened with `f64::from`. The parity test
+(`services::vector_eval::parity`) runs the corpus in `test/fixtures/retrieval/eval-corpus.json`
+and asserts the metrics pinned in it.
 
 ## Kernel
 
-The kernel is `apps/studio/src/host/kernel/README.md` in Rust; that file stays the
-specification until TASK_076 moves it here. A node is written once as a typed `NodeDef`
+The kernel's behaviour is specified in `src/kernel/README.md`. A node is written once as a typed `NodeDef`
 (`Input: DeserializeOwned + JsonSchema + Validate`, `Output: Serialize + JsonSchema +
 Validate`, a `PermissionRequirement` and a mandatory `side_effect`) and registered type-erased
 over `serde_json::Value`. Registration records the input and output JSON Schema
@@ -158,7 +155,7 @@ order, which `for_tool` relies on.
 the run's `CancellationToken` and, after cancellation, waits `grace` (500 ms by default) before
 marking the step `abandoned`. The task is detached, not aborted, and a `live` flag drops its
 late events, approvals and output. Retries, backoff, the concurrency cap, bindings and the
-sibling abort follow `Scheduler.ts`. Run, step and event writes go through `RunStream::commit`:
+sibling abort follow `src/kernel/README.md`. Run, step and event writes go through `RunStream::commit`:
 the rows and the `run_event` rows of the drafts commit in one SQLite transaction, then the
 events are delivered and synchronous observers (`RunService::subscribe`) are called. Delivery
 and observers run after the database lock is released, so an observer may write to the
@@ -181,7 +178,7 @@ and SQLite close. `system.demoJob` starts one `job.run` over `job.sleep`; like e
 
 `IpcServer::handle::<I, O, _, _>(channel, handler)` registers one contract channel. A handler
 is `async fn(Arc<Services>, I) -> Result<O, AppError>`. `dispatch(channel, payload)` returns
-the wire envelope as a `serde_json::Value`, exactly as `@zvs/ipc`'s `createIpcServer` does:
+the wire envelope as a `serde_json::Value`, which `@zvs/ipc`'s client validates:
 
 | Failure                                | Envelope                                                       | Log                                                  |
 | -------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
@@ -199,10 +196,9 @@ contract channel is served, and `ipc::tests::every_contract_channel_is_served` i
 
 ## Logger
 
-`logs/studio.jsonl`, rotated to `studio.1.jsonl` … `studio.3.jsonl` at 5 MiB. A line has the
-TypeScript host's shape and key order: the caller's fields first, then `timestamp`, `level`,
-`scope`, `message`, and `raw` (always present at `warn` and `error`). Strings are redacted
-with the same key shapes as `logger.ts`. Fields are passed as a slice of `(&str, Value)` so
+`logs/studio.jsonl`, rotated to `studio.1.jsonl` … `studio.3.jsonl` at 5 MiB. A line's key
+order is the caller's fields first, then `timestamp`, `level`, `scope`, `message`, and `raw`
+(always present at `warn` and `error`). Strings under secret-like keys are redacted. Fields are passed as a slice of `(&str, Value)` so
 their order is kept.
 
 ## Events
@@ -226,14 +222,13 @@ Row structs never select `cipher` except `SecretCipherRow`, and its `Debug` prin
 (`CryptProtectData` / `CryptUnprotectData`, current user, ciphertext prefixed with version byte
 `0x01`) and `UnavailableBackend` elsewhere, which makes `CryptoService` refuse with
 `SECRET_DECRYPT_FAILED` rather than store anything. macOS Keychain and Linux Secret Service are
-follow-ups. Field validation against a type schema (`services::secret_fields`) reproduces
-`buildFieldsSchema`: strict keys, defaults, and `z.url()` through the WHATWG `url` crate.
+follow-ups. Field validation against a type schema (`services::secret_fields`) applies strict
+keys, defaults, and URL fields through the WHATWG `url` crate.
 
 ## AI drivers
 
-`drivers::ai` is the API-mode half of `host/drivers/ai` (PASSPORT §12), plus the
-`SessionGateway` port account mode is built on. `AccountTransport`, `qwen-web` and the
-identity probe land in TASK_067. Qwen is the only account family; why DeepSeek was removed is
+`drivers::ai` holds the AI drivers (PASSPORT §12): API mode, and account mode over the
+`SessionGateway` port with `AccountTransport`, `qwen-web` and the identity probe. Qwen is the only account family; why DeepSeek was removed is
 in `docs/adr/0001-account-provider-limitations.md`.
 
 | Module             | Contents                                                                                                          |
@@ -253,7 +248,7 @@ in `docs/adr/0001-account-provider-limitations.md`.
 Every driver call takes a `tokio_util::sync::CancellationToken`. A fired token ends a request
 or a stream with `RUN_CANCELLED` and drops the `reqwest` response, which aborts the vendor
 request. The provider timeout (default 60 s) is one deadline from the send, covering the body
-and every stream chunk, as `AbortSignal.timeout` did.
+and every stream chunk.
 
 `ApiTransport` holds the secret **id** and a `SecretResolver`, never the key. Each request
 resolves it, builds a sensitive `Authorization` header and drops the plaintext before the call
@@ -274,7 +269,7 @@ OpenAI-dialect vendor, and `ZVS_LIVE_OLLAMA=http://127.0.0.1:11434`
 
 ### Session gateway
 
-`transport::session::SessionGateway` is `SessionGateway.ts`: `partition()`, `user_agent()`,
+`transport::session::SessionGateway` has `partition()`, `user_agent()`,
 `account_token(url)` and `fetch(url, SessionRequest, &CancellationToken)`. The response is a
 `SessionResponse` with the status, lower-cased headers and the body as a `ByteStream`, which
 `bytes()` and `text()` collect. `AccountToken` and `SessionRequest` print no secret values.
@@ -286,7 +281,7 @@ open, and holds tokens per origin.
 
 ### Account transport
 
-`transport::account::AccountTransport` is `AccountTransport.ts` over a `SessionGateway`. Each
+`transport::account::AccountTransport` works over a `SessionGateway`. Each
 request sends `accept`, the gateway's `user-agent`, the base URL's `origin` and `referer`, the
 extra and spec headers, `authorization` from `AccountCredentials::current` when there is a
 token, and `content-type` for a JSON body. A `401`/`403` on an authorised request asks
@@ -302,7 +297,7 @@ request nobody reads.
 `identity::IdentityProbe` has one implementation per account family: `QwenIdentityProbe`
 (`GET https://chat.qwen.ai/api/v1/auths/`). It sends the captured bearer when the gateway has
 one, gives up after 20 s, maps a redirect or HTML to `PROVIDER_SESSION_EXPIRED`, and validates
-the payload field by field as the Zod schema did (a malformed profile is `VALIDATION_FAILED`).
+the payload field by field (a malformed profile is `VALIDATION_FAILED`).
 
 - `account_session` wraps the gateway so `account_token` falls back to the stored token for
   the identity origin, which keeps a session usable after a restart.
@@ -336,7 +331,7 @@ account must exist and be `linked` (else `PROVIDER_SESSION_EXPIRED`, with
 
 ## Providers
 
-`ProviderService` is `ProviderService.ts`. It reads and writes `provider` and `model` through
+`ProviderService` reads and writes `provider` and `model` through
 the repositories, always inside `database.transaction`, and reaches drivers only through the
 `DriverSource` port (`ephemeral_driver`, `invalidate`), which `ProviderRegistry` implements.
 The service never branches on the auth mode; a test scans its source to keep it that way.
@@ -366,7 +361,7 @@ enabled, idle provider every `providers.healthcheck.minutes` (default 15, at lea
 
 ## Accounts
 
-`AccountService` is `AccountService.ts`. `link(family)` joins a running link for the same
+In `AccountService`, `link(family)` joins a running link for the same
 family, cancels refreshes of that family, opens the vendor login through the `AccountBrowser`
 port, and polls the identity probe every 2 s (±10 % jitter) on its own event stream
 (`step` `waiting-for-sign-in`, `progress` against the 180 s deadline). A signed-out or
@@ -400,12 +395,13 @@ together, and the whole run is capped at `DEFAULT_SHUTDOWN_CAP` (5 s). Every sta
 `request_exit` from `RunEvent::ExitRequested`: the first call prevents the exit and starts the
 run, which ends with `AppHandle::exit`; calls during the run keep preventing it; afterwards the
 exit goes through and `RunEvent::Exit` logs `Shutdown`. Today it holds `health-check.stop`,
-`retention.stop`, `downloads` and `runtimes` (`Stop`), `runs` (`Drain`) and `providers`, `health-check`, `accounts`, `account-gateway` and `sidecar` (`Dispose`). Later ports register their own tasks
-in the stage `main.ts` used for them.
+`retention.stop`, `downloads` and `runtimes` (`Stop`), `runs` (`Drain`) and `providers`,
+`health-check`, `accounts`, `account-gateway` and `sidecar` (`Dispose`). New services register
+their own tasks in the stage that fits them.
 
 ## Downloads
 
-`DownloadService` is `DownloadService.ts`. A download is a `download` run with one
+In `DownloadService`, a download is a `download` run with one
 `download.fetch` node; the node calls `DownloadService::execute`, which runs `job.download` in the
 sidecar (resume from `<target>.part`, checksum before the rename). The queue holds at most
 `downloads.concurrency` (1–8, default 2) running rows and fills free slots by priority, then
@@ -432,7 +428,7 @@ is written as a plain file. Rust's `std` already adds the `\\?\` prefix to long 
 
 ## Runtimes
 
-`RuntimeService` is `RuntimeService.ts`. The installed builds live in the `runtimes.installed`
+In `RuntimeService`, the installed builds live in the `runtimes.installed`
 setting. `install` resolves today's llama.cpp release (`ReleaseResolver`, cached 6 h, the cache
 kept when GitHub is unreachable, 403 is `RATE_LIMITED`), offers each asset to the catalogue and
 queues it; `unpack_download` extracts an engine archive, deletes it and records the tag and the
@@ -451,14 +447,14 @@ re-run the test binary as a stub `llama-server` (`runtimes::llama_server::tests:
 
 ## Tools and MCP
 
-`ToolRegistry` is `ToolRegistry.ts`. A tool row's tier is the permission ceiling: registering
+In `ToolRegistry`, a tool row's tier is the permission ceiling: registering
 writes the `global` grant (`granted_by = registry`), `set_tier` rewrites it, and `RunService`
 (given `tools`) refuses a disabled or unavailable tool before composing scopes and counts a use
 after every admitted step. `register_kernel_tools` registers every tool-gated kernel node except
 `llm.generate`, with its `schemars` input schema. `ToolInvoker` runs `tools.invoke` as a one-node
 `job` run and approves its own `ask` admission when the call was confirmed.
 
-`McpService` is `McpService.ts` over the official SDK, `rmcp =3.5.0` (client side only, no
+`McpService` works over the official SDK, `rmcp =3.5.0` (client side only, no
 default features). `rmcp` speaks the protocol (handshake, requests, timeouts with
 `notifications/cancelled`, sessions); the transports are ours. `StdioTransport` spawns through
 `default_spawn` (Windows: `PATH`/`PATHEXT` resolution and `cmd.exe /d /s /c` with quoted,
@@ -467,7 +463,7 @@ logs unreadable lines, reports a message that is not JSON-RPC host-side only, an
 tree (`taskkill /T /F`) after a 2 s grace. `McpHttpClient` implements `rmcp`'s
 `StreamableHttpClient` over the shared `reqwest` client, sends static headers verbatim (secret
 values resolved at launch, never stored or logged) and names a 401/403 in the error. The client
-asks for `2025-06-18` and accepts the three versions the TS host accepted. Stdio servers get the
+asks for `2025-06-18` and accepts three protocol versions. Stdio servers get the
 `mcp-toolchain` env under app data, a server's own env wins. A start that fails is never
 restarted; a server that dies is restarted with backoff (1 s doubling to 60 s, five attempts).
 Discovered tools are registered as `mcp` tools and kernel nodes under `namespace.tool`;
@@ -477,7 +473,7 @@ endpoint (HTTP).
 
 ## Chat
 
-`ChatService` is `ChatService.ts`. It registers `chat.prepare`, `chat.generate` (gated on
+`ChatService` registers `chat.prepare`, `chat.generate` (gated on
 `llm.generate`, which a chat run admits itself) and `chat.persist` on the shared registry, so the
 composition root builds it before `recover()`. `send` checks the budget for the system prompt and
 the current turn first, then starts the turn graph with `RunService::start_with`: the user message

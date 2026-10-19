@@ -3,35 +3,25 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "out/host/main.js",
   "scripts": {
-    "postinstall": "install-electron && electron-rebuild -f -w better-sqlite3",
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "start": "electron-vite preview",
+    "dev": "node ../../scripts/tauri.mjs dev",
+    "build": "node ../../scripts/tauri.mjs build --no-bundle",
+    "package": "node ../../scripts/tauri.mjs build",
     "dev:web": "vite",
     "build:web": "vite build",
-    "dev:tauri": "node ../../scripts/tauri.mjs dev",
-    "build:tauri": "node ../../scripts/tauri.mjs build --no-bundle",
-    "test": "vitest run --root ../.. --project host --project renderer",
+    "test": "vitest run --root ../.. --project renderer",
     "typecheck": "tsc -b && tsc -p tsconfig.test.json",
-    "lint": "eslint . --max-warnings 0",
-    "db:generate": "drizzle-kit generate"
+    "lint": "eslint . --max-warnings 0"
   },
   "devDependencies": {
-    "@electron/rebuild": "4.2.0",
     "@tailwindcss/vite": "4.3.3",
     "@tauri-apps/api": "2.12.1",
     "@tauri-apps/cli": "2.12.1",
     "@testing-library/react": "16.3.3",
-    "@types/better-sqlite3": "9.6.0",
     "@types/node": "26.5.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "@zvs/tsconfig": "workspace:*",
-    "drizzle-kit": "0.31.10",
-    "electron": "44.2.0",
-    "electron-vite": "5.0.0",
     "tailwindcss": "4.3.3",
     "vite": "7.3.6"
   },
@@ -42,16 +32,12 @@
     "@mdi/js": "7.4.47",
     "@zvs/ipc": "workspace:*",
     "@zvs/shared": "workspace:*",
-    "better-sqlite3": "13.0.3",
-    "drizzle-orm": "0.45.2",
     "mobx": "7.0.3",
     "mobx-react-lite": "5.0.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-markdown": "10.1.0",
     "react-router-dom": "7.18.3",
-    "remark-gfm": "4.0.1",
-    "uuid": "14.0.2",
-    "zod": "4.5.4"
+    "remark-gfm": "4.0.1"
   }
 }

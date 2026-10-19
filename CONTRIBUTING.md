@@ -4,11 +4,8 @@ Short and directive on purpose. `/docs/PASSPORT.md` is the binding architecture 
 `/tasks/INDEX.md` is the backlog and the rules for running one task. This file covers how
 work gets verified and landed.
 
-> **Phase M (TASK_058 – TASK_076): the move to Tauri and a Rust host.** While it runs, the
-> TypeScript host in `apps/studio/src/host/` is frozen. Its Vitest suite is the specification
-> each Rust port must reproduce, so **port the tests together with the code** and do not
-> delete them before TASK_076. New host code is Rust and is tested with `cargo test`. The
-> sections below describe both halves, and TASK_076 removes the Electron-only parts.
+The studio is a Tauri app with a Rust host (PASSPORT D10). Host code is Rust and is tested
+with `cargo test`; Vitest covers the workspace packages and the renderer.
 
 ## Testing policy
 
@@ -33,22 +30,23 @@ copy.
 
 | Command                  | What it runs                                                           |
 | ------------------------ | ---------------------------------------------------------------------- |
-| `pnpm test`              | Every unit test: `packages/*`, host and renderer, in one Vitest run    |
+| `pnpm test`              | Every TS unit test: `packages/*` and the renderer, in one Vitest run   |
 | `pnpm test:watch`        | The same suite in watch mode                                           |
 | `pnpm test:coverage`     | The suite plus a coverage report in `coverage/`                        |
 | `pnpm test:e2e`          | The Playwright e2e suite against the built Tauri app over WebView2 CDP |
 | `cargo test --workspace` | Rust host, contract, core and sidecar tests                            |
 
-Vitest projects live in `vitest.config.ts`: `packages` and `host` run in a Node environment,
-`renderer` runs in jsdom. The `host` project disappears at TASK_076, when its tests exist in
-Rust. Workspace packages resolve to source, so `pnpm test` needs no
-build. `pnpm test:e2e` **does**: its global setup runs `pnpm build:tauri -- --features e2e`
-once (skip it with `ZVS_E2E_PREBUILT=1` when the build is fresh) and drives
+Vitest projects live in `vitest.config.ts`: `packages` runs in a Node environment, `renderer`
+runs in jsdom. Workspace packages resolve to source, so `pnpm test` needs no build.
+`pnpm test:e2e` **does**: its global setup runs `scripts/tauri.mjs build --no-bundle --features
+e2e` once (skip it with `ZVS_E2E_PREBUILT=1` when the build is fresh) and drives
 `target/release/zvs-studio.exe`, not the dev server, so that it exercises what actually ships.
 `e2e/launch.ts` starts the app with `ZVS_DATA_DIR` in a temp folder and a free
 `ZVS_E2E_CDP_PORT`, then attaches with `chromium.connectOverCDP`. Both variables exist only in
 builds with the `e2e` cargo feature. Site webviews have no debugging port, so their behaviour is
-asserted through fixture pages that report to the test's local server.
+asserted through fixture pages that report to the test's local server. An e2e build also
+compiles `zvs-core`'s `seed_vectors` example, which `seedVectors` in `e2e/launch.ts` runs to
+write fixture vectors straight into a store.
 
 Coverage is reported, never gated. A threshold chosen this early would reward writing tests
 for the wrong things; TASK_057 decides one when the codebase has a settled shape.
@@ -57,21 +55,19 @@ for the wrong things; TASK_057 decides one when the codebase has a settled shape
 
 Use these rather than rolling your own — `test/helpers/`:
 
-- `tempDb.ts` — `temporaryDatabase()` gives a migrated SQLite database in a throwaway
-  directory plus a `dispose()`. **Every** repository test uses it. No test may open the real
-  user-data database.
 - `paths.ts` — `temporaryDirectory()` and `assertTemporaryPath()`. Anything a test writes to
   or deletes must sit under the OS temp directory; the assertion fails loudly if it does not.
   On Windows, `dispose()` tolerates a file another process still holds (`EPERM`, `EBUSY`,
   `ENOTEMPTY`): the directory stays under the temp root and is removed again when the process
   exits. Any other failure still throws.
-- `fakeBridge.ts` — `createFakeBridge()` is an in-memory preload bridge. Renderer stores can
-  be tested against the real IPC contract without Electron: register handlers with `handle`,
+- `fakeBridge.ts` — `createFakeBridge()` is an in-memory `window.zvs` bridge. Renderer stores
+  can be tested against the real IPC contract without Tauri: register handlers with `handle`,
   push events with `emit`.
-- `fakeClock.ts` — `createFakeClock()` is a controllable clock. Services take a clock
+- `fakeClock.ts` — `createFakeClock()` is a controllable clock. Stores take a clock
   dependency (PASSPORT §15) precisely so time-dependent logic is testable; pass this one.
+- `fakeMcpServer.mjs` — a scriptable MCP server the Rust MCP tests launch with `node`.
 
-Rust helpers (from TASK_060 – TASK_061), in `crates/zvs-host`'s `testing` module:
+Rust helpers, in `crates/zvs-host`'s `testing` module:
 `temporary_database()` (a migrated SQLite in a temp directory, dropped with the guard; every
 repository test uses it), `temporary_directory()` with the same temp-path assertion, and
 `FakeClock`. Use `tokio::time::pause()` for timer logic instead of real sleeps.

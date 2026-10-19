@@ -4,8 +4,6 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
-export const STUDIO_ROOT = join(REPO_ROOT, "apps", "studio");
-export const MIGRATIONS_DIR = join(STUDIO_ROOT, "src", "host", "data", "migrations");
 
 const TEMP_ROOT = normalise(realpathSync(tmpdir()));
 

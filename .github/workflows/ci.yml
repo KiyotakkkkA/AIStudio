@@ -7,12 +7,11 @@ on:
 permissions:
   contents: read
 
-# TASK_008 decision: unit gates run on Linux because they are faster and cheaper, and the
-# e2e smoke runs on Windows because Windows is the only verified target (PASSPORT §18.3).
-# No `xvfb-run` is needed anywhere as a result; adding a Linux e2e job would need it.
+# Unit gates run on Linux because they are faster and cheaper. The Tauri shell, its build and
+# the e2e suite run on Windows because Windows is the only verified target (PASSPORT §18.3).
 jobs:
-  rust:
-    name: Rust format · clippy · test
+  linux:
+    name: Rust · typecheck · lint · test · format (Linux)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,53 +22,19 @@ jobs:
       - uses: arduino/setup-protoc@v3
         with:
           version: "36.1"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
       - run: cargo fmt --check
       - run: cargo clippy --locked --workspace --exclude zvs-studio --all-targets --all-features -- -D warnings
       - run: cargo test --locked --workspace --exclude zvs-studio --all-features
-
-  tauri:
-    name: Tauri shell · clippy · test · build (Windows)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 26
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter "studio^..." build
-      - run: pnpm --filter studio build:web
-      - run: cargo clippy --locked -p zvs-studio --all-targets -- -D warnings
-      - run: cargo test --locked -p zvs-studio
-      - run: pnpm build:tauri
-
-  gates:
-    name: typecheck · lint · build · test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - uses: arduino/setup-protoc@v3
-        with:
-          version: "36.1"
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 26
-          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
-      - run: pnpm build
       - run: node scripts/contract-channels.mjs --check
-      - run: pnpm build:rust:debug
-      - run: node --test test/native/addon.test.mjs
+      - run: pnpm exec knip --include files,dependencies,devDependencies,unlisted,binaries,unresolved
       - run: pnpm test:coverage
       - run: pnpm format:check
       - uses: actions/upload-artifact@v4
@@ -79,12 +44,14 @@ jobs:
           path: coverage
           retention-days: 7
 
-  e2e:
-    name: e2e on Tauri (Windows)
+  windows:
+    name: Tauri shell · clippy · test · build · e2e (Windows)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
       - uses: arduino/setup-protoc@v3
         with:
@@ -96,8 +63,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter "studio^..." build
-      - run: pnpm build:rust
-      - run: pnpm build:tauri -- --features e2e
+      - run: pnpm --filter studio build:web
+      - run: cargo clippy --locked -p zvs-studio --all-targets -- -D warnings
+      - run: cargo clippy --locked -p zvs-studio --all-targets --features e2e -- -D warnings
+      - run: cargo test --locked -p zvs-studio
+      - run: pnpm build
+      - run: pnpm --filter studio build -- --features e2e
       - run: pnpm test:e2e
         env:
           ZVS_E2E_PREBUILT: "1"

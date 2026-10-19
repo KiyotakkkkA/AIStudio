@@ -1,0 +1,17 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "cache": false,
+      "passThroughEnv": ["PROTOC"],
+      "dependsOn": ["^build", "lint"]
+    },
+    "dev": {
+      "passThroughEnv": ["PROTOC"]
+    },
+    "package": {
+      "passThroughEnv": ["PROTOC"]
+    }
+  }
+}

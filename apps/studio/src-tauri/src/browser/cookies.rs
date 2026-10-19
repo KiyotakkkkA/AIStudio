@@ -61,7 +61,7 @@ mod tests {
     }
 
     #[test]
-    fn the_id_matches_the_electron_shape() {
+    fn the_id_is_the_json_tuple_of_domain_path_name_and_secure() {
         assert_eq!(
             cookie(".example.com", false, 0.0).id(),
             r#"[".example.com","/","sid",true]"#

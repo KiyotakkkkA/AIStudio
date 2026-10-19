@@ -28,14 +28,6 @@ export default defineConfig({
       {
         ...shared,
         test: {
-          name: "host",
-          environment: "node",
-          include: ["apps/studio/tests/*.test.ts"],
-        },
-      },
-      {
-        ...shared,
-        test: {
           name: "renderer",
           environment: "jsdom",
           include: ["apps/studio/tests/renderer/**/*.test.{ts,tsx}"],
@@ -48,7 +40,7 @@ export default defineConfig({
       reporter: ["text-summary", "html", "lcov"],
       reportsDirectory: "coverage",
       include: ["packages/*/src/**/*.ts", "apps/studio/src/**/*.{ts,tsx}"],
-      exclude: ["**/*.d.ts", "apps/studio/src/renderer/main.tsx", "apps/studio/src/host/main.ts"],
+      exclude: ["**/*.d.ts", "apps/studio/src/renderer/main.tsx"],
     },
   },
 });

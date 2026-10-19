@@ -3,12 +3,11 @@
 **Status:** locked · **Date:** 2026-10-10 · **Doc version:** 2.0
 
 > **Revision 2.0 (2026-10-10): Tauri and a Rust host.** Electron is replaced by Tauri 2, and
-> the whole host (services, kernel, repositories, drivers) is rewritten in Rust. See D10. This
-> document describes the **target** architecture. The move is executed by Phase M in
-> `/tasks/INDEX.md` (TASK_058 – TASK_076). Until TASK_076 lands, the Electron shell and the
-> TypeScript host under `apps/studio/src/host/` still exist, frozen, as the behavioural
-> specification of the port. §5 maps every old path to its new home. Version 1.1 is in git
-> history.
+> the whole host (services, kernel, repositories, drivers) is rewritten in Rust. See D10. Phase
+> M in `/tasks/INDEX.md` (TASK_058 – TASK_076) carried out the move, and it is **complete**
+> (2026-10-19): the Electron shell, the TypeScript host, the napi addon, Drizzle and
+> `better-sqlite3` are gone. §5 maps every old path to its new home for tasks written before
+> the revision. Version 1.1 is in git history.
 
 This is the binding reference for stack and structure. Design mockups for all fifteen
 surfaces live in `/design` (canvas: `zvs-ai-studio-maket.html`). Anything in this document
@@ -55,7 +54,7 @@ are Rust.
 | D7 | Execution | **One kernel, three front-ends** | Chat, scenarios and agentic runs are all Run/Step/Event; one cancellation, retry, log and progress story feeding one Tasks page | The kernel must be general enough on day one |
 | D8 | Document viewer | **Right dock that expands to overlay; PDF/image/text native, office converted to PDF by the sidecar** | One rendering path and faithful office layout; read-while-chatting stays possible | A conversion step and a cache to manage |
 | D9 | Agent browser | **Child webviews attached to the studio window, in their own WebView2 profile, driven over WebView2's CDP; tiered approval** *(rev. 2.0; was `BrowserWindow` + `WebContentsView`)* | No second browser to ship, every action visible live, instant takeover; the user logs into sites once | We own the automation primitives, a logged-in profile raises the stakes on prompt injection, and CDP access is WebView2-only, so automation is Windows-only |
-| D10 | Shell and host | **Tauri 2 (WebView2 on Windows); the whole host in Rust; no Node runtime in the shipped app** *(decided 2026-10-10)* | One language for host and core, so no FFI layer, no Node ABI rebuilds and no JSON hop to reach `zvs-core`. A much smaller install and memory footprint than a bundled Chromium. Capability-scoped IPC instead of a preload convention | A rewrite of ~22k lines of host TypeScript (Phase M). Multi-webview needs Tauri's `unstable` feature. Only WebView2 is verified. Electron APIs are replaced one by one, as listed below |
+| D10 | Shell and host | **Tauri 2 (WebView2 on Windows); the whole host in Rust; no Node runtime in the shipped app** *(decided 2026-10-10; complete 2026-10-19, TASK_076)* | One language for host and core, so no FFI layer, no Node ABI rebuilds and no JSON hop to reach `zvs-core`. A much smaller install and memory footprint than a bundled Chromium. Capability-scoped IPC instead of a preload convention | A rewrite of ~22k lines of host TypeScript (Phase M). Multi-webview needs Tauri's `unstable` feature. Only WebView2 is verified. Electron APIs are replaced one by one, as listed below |
 | D11 | Account-mode providers | **Qwen only; no vendor whose web API demands a proof of work or other anti-automation challenge** *(decided 2026-10-19, ADR 0001)* | Account mode sends the requests the user's own signed-in page sends and nothing more; solving a vendor's anti-bot challenge would mean shipping code that defeats its abuse protection | DeepSeek is offered only through its official API (`openai-compatible`) or OpenRouter; existing `deepseek-web` rows are deleted by migration 0002 |
 
 **D10, what replaced what.** `BrowserWindow` became a Tauri window with a `studio` webview.
@@ -737,9 +736,9 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
 11. Document viewer: PDF/image/text path first, then sidecar conversion for office formats.
 12. Browser window, CDP driver, policy engine and the browser.* kernel nodes.
 
-Steps 1–9 were built on Electron with a TypeScript host. Revision 2.0 inserts the **migration
-order** before the remaining steps. Each step ports a slice and leaves the Tauri app answering
-more channels:
+Steps 1–9 were built on Electron with a TypeScript host. Revision 2.0 inserted the **migration
+order** before the remaining steps, and it finished on 2026-10-19. Each step ported a slice and
+left the Tauri app answering more channels:
 shell and bridge → contract mirror → host skeleton (paths, logger, events, IPC server) →
 data layer → secrets → AI drivers → providers → browser workspace → account gateway →
 accounts → in-process core, sidecar and device probes → vector stores and graph → kernel →

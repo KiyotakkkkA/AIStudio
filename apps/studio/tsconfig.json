@@ -2,8 +2,6 @@
   "files": [],
   "references": [
     { "path": "./tsconfig.browser.json" },
-    { "path": "./tsconfig.host.json" },
-    { "path": "./tsconfig.preload.json" },
     { "path": "./tsconfig.recovery.json" },
     { "path": "./tsconfig.renderer.json" },
     { "path": "./tsconfig.config.json" }

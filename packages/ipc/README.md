@@ -1,26 +1,15 @@
-# IPC runtimes
+# IPC client
 
-> **Revision 2.0 (PASSPORT D10).** The host end is now `zvs-host::ipc::IpcServer` in Rust,
-> reached through the Tauri command `ipc_call`. `createIpcServer` below serves only the
-> frozen Electron host and is deleted in TASK_076. The client is unchanged and stays.
+The renderer's end of the process boundary, derived from the one contract in `@zvs/shared`
+(PASSPORT §7). The host end is `zvs-host::ipc::IpcServer` in Rust, reached through the Tauri
+command `ipc_call`; the renderer's `tauriBridge` turns that command into the `IpcBridge` this
+package wraps.
 
-The two halves of the process boundary, both derived from the one contract in
-`@zvs/shared` (PASSPORT §7). Nothing here knows about a feature: add a channel to the
-contract, add a handler, done.
+`createIpcClient(contract, bridge, { validateResponses })` validates input before it reaches
+the bridge, validates the response envelope by default, resolves with the channel's output and
+rejects with `IpcError`. Switch on `IpcError.code`; never parse its `message`. Turning
+`validateResponses` off trusts the envelope as is; the studio does that only when built with
+`ZVS_VALIDATE_IPC=false`.
 
-`createIpcServer(contract, handlers, { ipcMain, logger, validateOutput })` registers one
-`ipcMain.handle` per channel and returns `{ channels, dispose }`. It parses input before the
-handler runs, parses handler output while `validateOutput` is on, and converts every failure
-into a `Result` envelope — a handler never throws across IPC. `AppError` keeps its code,
-`ZodError` becomes `VALIDATION_FAILED`, everything else becomes `UNKNOWN`; the stack is
-logged host-side and never sent.
-
-`handlers` is `IpcHandlers<Contract>`, a mapped type over every channel, so a missing or
-mistyped handler is a compile error (`tests/types.test.ts` pins this).
-
-`createIpcClient(contract, bridge, { validateResponses })` wraps the preload's `call`. It
-validates input, validates the response envelope by default, resolves with the channel's
-output and rejects with `IpcError`. Switch on `IpcError.code`; never parse its `message`.
-
-`ipcMain` is injected through a structural `IpcMainLike`, so the package stays importable
-from plain Node and Vitest without Electron.
+Nothing here knows about a feature: add a channel to the contract and a handler in
+`zvs-host`, done.

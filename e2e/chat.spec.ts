@@ -1,10 +1,8 @@
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { STUDIO_ROOT, temporaryDirectory, assertTemporaryPath } from "../test/helpers/paths.ts";
-import { RustCore } from "../apps/studio/src/host/drivers/rust/RustCore.ts";
-import { nativeTargetTriple } from "../apps/studio/src/host/platform/paths.ts";
-import { launchStudio, rpc } from "./launch.ts";
+import { temporaryDirectory } from "../test/helpers/paths.ts";
+import { launchStudio, rpc, seedVectors } from "./launch.ts";
 
 test("chat streams grounded answers, preserves scroll, cancels and fits a narrow thread", async ({
   browserName,
@@ -87,10 +85,7 @@ test("chat streams grounded answers, preserves scroll, cancels and fits a narrow
       embeddingModelId: "fixture-chat",
       dimension: 3,
     });
-    const core = RustCore.fromPaths({
-      nativeAddonPath: join(STUDIO_ROOT, "resources/native", nativeTargetTriple(), "zvs-core.node"),
-    });
-    await core.upsertVectors(assertTemporaryPath(join(directory.path, "vectors", store.id)), [
+    seedVectors(join(directory.path, "vectors", store.id), [
       {
         id: "rotation",
         vector: [1, 0, 0],

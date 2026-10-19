@@ -61,8 +61,7 @@ These mirror PASSPORT §6. Review enforces them; the golden fixtures catch what 
 - `ResultEnvelope<T>` omits `data` only when `T` is zero-sized (`()`, i.e. a `z.void()`
   output). A `null` from a nullable output is kept. JSON cannot carry `undefined`, and Zod 4 requires the
   `data` key even for `z.void()`, so the Tauri bridge (`restoreEnvelope` in
-  `renderer/app/tauriEnvelope.ts`) adds `data: undefined` to a success without it, as Electron's
-  structured clone did.
+  `renderer/app/tauriEnvelope.ts`) adds `data: undefined` to a success without it.
 - `HostEvent` is the envelope (`streamId`, `seq`, `ts`) with a flattened `HostEventDraft`,
   an internally tagged enum (`#[serde(tag = "type")]`) with the same variant names as Zod.
 

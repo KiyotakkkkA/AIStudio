@@ -3,10 +3,8 @@
 Shared Rust logic for the host and the job sidecar. Adapters own transport and
 runtime integration; this crate never opens SQLite.
 
-> **Revision 2.0 (PASSPORT D1, D10).** The Rust host (`crates/zvs-host`) links this crate
-> directly through its `drivers::core` ports (TASK_068). The napi addon mentioned below serves
-> only the frozen Electron host until TASK_076 deletes it. The JSON transport notes describe
-> that addon, not this crate's API.
+The Rust host (`crates/zvs-host`) links this crate directly through its `drivers::core`
+ports (PASSPORT D1, D10).
 
 ## Cancellation
 
@@ -79,7 +77,7 @@ and `PERMISSION_DENIED`. IO errors preserve their source.
 | ------------------------ | ------------------------------------------------------------------------------------------------ |
 | `chunk`, `hash`, `error` | TASK_017                                                                                         |
 | `index`                  | TASK_019 storage/search; TASK_028 indexing orchestration                                         |
-| `graph`                  | TASK_021_EXTRA_1 store and traversal; TASK_021_EXTRA_2 napi exposure                             |
+| `graph`                  | TASK_021_EXTRA_1 store and traversal                                                             |
 | `embed`                  | TASK_028 embedding pipeline                                                                      |
 | `ocr`                    | Reserved for sidecar document processing after TASK_027; no OCR implementation task assigned yet |
 
@@ -99,15 +97,18 @@ release checked for TASK_021_EXTRA_1.
 
 Lance requires the Protocol Buffers compiler (`protoc`, verified with 36.1).
 Install it from the official Protocol Buffers release and put it on PATH or set
-`PROTOC` to its executable. CI provisions it in every Rust-building job. The napi
-build script also recognises `target/tools/protoc/bin/protoc[.exe]` for a local
+`PROTOC` to its executable. CI provisions it in every Rust-building job.
+`scripts/tauri.mjs` also recognises `target/tools/protoc/bin/protoc[.exe]` for a local
 installation. For direct Cargo commands in PowerShell with that installation:
 `$env:PROTOC = (Resolve-Path target/tools/protoc/bin/protoc.exe).Path`.
 
 Use `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test`
-from the repository root. `pnpm build` runs `build:rust` before package builds,
-using `cargo build --workspace --release --locked`. Turbo delegates incremental
-Rust caching to Cargo so target artifacts remain specific to the current machine.
+from the repository root. Turbo delegates incremental Rust caching to Cargo so target
+artifacts remain specific to the current machine.
+
+The `seed_vectors` example writes rows straight into an existing store:
+`seed_vectors <store directory>` reads a JSON array of `VectorRow`s (camelCase) from stdin
+and prints the count. The e2e suite uses it for fixture data; an e2e build compiles it.
 
 ## Vector storage
 
@@ -115,8 +116,8 @@ Rust caching to Cargo so target artifacts remain specific to the current machine
 table in the host-supplied directory. Dimension is required; the confirmed UI
 default is 1024 and the default metric is cosine. Both are persisted in the Arrow
 schema and checked when reopening. A mismatch rejects with `VALIDATION_FAILED`.
-`open` does not create a missing store. TypeScript resolves per-store paths with
-`vectorStoresDir` and `vectorStorePath` in `platform/paths.ts`.
+`open` does not create a missing store. The host resolves per-store paths under
+`StudioPaths::vector_stores_dir`.
 
 Rows contain a unique nonempty ID, finite float32 vector, JSON payload, document
 ID, chunk index and source path. Schema v2 (`zvs.schema = 2` in the Arrow
@@ -178,15 +179,9 @@ dimension and metric, index type, schema version and physical file bytes within
 this table's `vectors.lance` directory, including retained versions. Store descriptions, embedding providers and document counts
 remain owned by the host's SQLite repositories.
 
-The addon accepts JSON through async `vectorCall` and catches panics across all
-future polls. A `search` request takes an optional `mode` (`vector` default,
-`hybrid`), the `query` text for the keyword side and `documentIds`, which the
-addon turns into a quoted `document_id IN (...)` predicate. `chunks` and
-`maintain` are separate operations. `RustCore` exposes typed
-create/open/upsert/search/chunks/maintain/delete/stats methods through
-`VectorCorePort`, and `chunkSegments` beside `chunk`. Upsert bridges `AbortSignal` through async
-operation-token allocation, cancellation and release; release also handles JSON
-serialization failures before the native call starts.
+The host reaches these operations through `zvs-host`'s `VectorCore` port, which
+`InProcessCore` implements; it scopes a search to documents with a quoted
+`document_id IN (...)` predicate built with `index::literal`.
 
 ## Relationship graph
 

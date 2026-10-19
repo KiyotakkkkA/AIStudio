@@ -8,12 +8,8 @@
   },
   "scripts": {
     "dev": "turbo run dev",
-    "dev:tauri": "pnpm --filter studio dev:tauri",
     "build": "turbo run build",
-    "build:tauri": "pnpm --filter studio build:tauri",
-    "build:rust": "node scripts/build-rust.mjs",
-    "build:rust:debug": "node scripts/build-rust.mjs --debug-panic",
-    "test:rust": "pnpm build:rust && pnpm build:rust:debug && node --test test/native/",
+    "package": "turbo run package",
     "contract:channels": "node scripts/contract-channels.mjs",
     "contract:channels:check": "node scripts/contract-channels.mjs --check",
     "typecheck": "turbo run typecheck",
@@ -31,7 +27,6 @@
     "test:e2e": "playwright test"
   },
   "devDependencies": {
-    "@napi-rs/cli": "3.9.1",
     "@playwright/test": "1.63.0",
     "@types/node": "26.5.0",
     "@vitest/coverage-v8": "5.0.0",

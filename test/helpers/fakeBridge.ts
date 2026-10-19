@@ -12,9 +12,9 @@ export type FakeHandler<C extends ContractShape, K extends ChannelName<C>> = (
 ) => OutputOf<C, K> | Promise<OutputOf<C, K>>;
 
 /**
- * An in-memory stand-in for the preload bridge (`window.zvs`). It speaks the same
+ * An in-memory stand-in for the Tauri bridge (`window.zvs`). It speaks the same
  * contract the real one does — `call` resolves a `Result` envelope, `subscribe` hands
- * back an unsubscribe function — so renderer code can be tested without Electron.
+ * back an unsubscribe function — so renderer code can be tested without Tauri.
  */
 export interface FakeBridge<C extends ContractShape> extends IpcBridge {
   subscribe(handler: (event: unknown) => void): () => void;

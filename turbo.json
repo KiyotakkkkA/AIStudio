@@ -8,12 +8,17 @@
   ],
   "tasks": {
     "dev": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },
     "build": {
-      "dependsOn": ["^build", "lint", "//#build:rust"],
-      "outputs": ["dist/**", "out/**"]
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "package": {
+      "dependsOn": ["^build", "lint"],
+      "cache": false
     },
     "typecheck": {
       "dependsOn": ["^build", "//#typecheck:root"],
@@ -23,17 +28,15 @@
       "dependsOn": ["//#lint:root", "^build"],
       "outputs": []
     },
-    "//#build:rust": {
-      "cache": false,
-      "passThroughEnv": ["PROTOC"]
-    },
     "//#lint:root": {
+      "dependsOn": ["@zvs/shared#build", "@zvs/ipc#build"],
       "cache": false
     },
     "//#format:root": {
       "cache": false
     },
     "//#typecheck:root": {
+      "dependsOn": ["@zvs/shared#build", "@zvs/ipc#build"],
       "cache": false
     }
   }

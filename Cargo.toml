@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["apps/studio/src-tauri", "crates/zvs-contract", "crates/zvs-host", "crates/zvs-core", "crates/zvs-jobd", "crates/zvs-napi", "crates/zvs-qwen-web"]
+members = ["apps/studio/src-tauri", "crates/zvs-contract", "crates/zvs-host", "crates/zvs-core", "crates/zvs-jobd", "crates/zvs-qwen-web"]
 
 [workspace.package]
 edition = "2024"
@@ -25,9 +25,6 @@ regex = "=1.13.1"
 schemars = { version = "=1.2.2", features = ["preserve_order"] }
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
 rmcp = { version = "=3.5.0", default-features = false, features = ["client", "transport-streamable-http-client"] }
-napi = { version = "=3.12.4", default-features = false, features = ["napi8", "tokio_rt"] }
-napi-derive = "=3.6.5"
-napi-build = "=2.4.2"
 reqwest = { version = "=0.12.28", default-features = false, features = ["rustls-tls-native-roots", "stream", "http2", "charset"] }
 sha2 = "=0.11.0"
 sse-stream = "=0.2.6"

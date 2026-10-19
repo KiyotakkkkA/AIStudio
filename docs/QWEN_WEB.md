@@ -1,10 +1,9 @@
 # Qwen web adapter
 
 The adapter implements text generation and streaming over the linked browser
-account session. Under Electron that session was the `persist:browser-work` partition. After
-the Tauri migration (PASSPORT D10, TASK_066–TASK_067), requests run as `fetch()` inside a
-hidden webview of the browser's work profile, so the vendor's cookies are never copied out. It is an unofficial web protocol integration, not the Qwen OAuth
-or Qwen Code API.
+account session. Requests run as `fetch()` inside a hidden webview of the browser's work
+profile (PASSPORT D10), so the vendor's cookies are never copied out. It is an unofficial web
+protocol integration, not the Qwen OAuth or Qwen Code API.
 
 ## Model capabilities and thinking
 

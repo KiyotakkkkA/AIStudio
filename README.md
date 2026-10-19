@@ -4,23 +4,18 @@ Local-first desktop automation studio. The binding architecture is in
 [docs/PASSPORT.md](docs/PASSPORT.md); the backlog and the rules for running a task are in
 `tasks/INDEX.md`.
 
-## Moving to Tauri
+## Architecture
 
-On 2026-10-10 we decided to move the studio from Electron to **Tauri 2 with the whole host
-rewritten in Rust** (PASSPORT D10). Phase M of the backlog (TASK_058 – TASK_076) does the
-move one domain at a time. Until TASK_076 lands, two apps live in this repository:
+The studio is a **Tauri 2** app with the whole host in **Rust** (PASSPORT D10). The renderer
+is React + MobX in a WebView2 window. It reaches the host through two Tauri commands:
+`ipc_call` for request/response over the contract in `packages/shared`, and
+`events_subscribe` for streams. Data lives in `%APPDATA%\com.zvs.aistudio`.
 
-|       | Electron (current, frozen)            | Tauri (target, growing)                         |
-| ----- | ------------------------------------- | ----------------------------------------------- |
-| Run   | `pnpm dev`                            | `pnpm dev:tauri`                                |
-| Shell | `apps/studio/src/host/main.ts`        | `apps/studio/src-tauri` (`zvs-studio`)          |
-| Host  | TypeScript in `apps/studio/src/host/` | Rust in `crates/zvs-host`                       |
-| Data  | `%APPDATA%\ZVS AI Studio`             | `%APPDATA%\<bundle identifier>`, starting empty |
-
-The TypeScript host is **frozen**. No feature work goes into it, because it is the behavioural
-specification the Rust port is checked against. Channels not yet ported answer
-`NOT_IMPLEMENTED` in the Tauri app. TASK_076 deletes Electron, the TS host, the napi addon,
-Drizzle and `better-sqlite3`, and makes `pnpm dev` the Tauri app.
+| Command        | What it does                                                                  |
+| -------------- | ----------------------------------------------------------------------------- |
+| `pnpm dev`     | Builds the workspace packages and the sidecar, then `tauri dev` with Vite HMR |
+| `pnpm build`   | The web build plus `tauri build --no-bundle`: `target/release/zvs-studio.exe` |
+| `pnpm package` | `tauri build`; bundling is switched on by the installer task (TASK_056)       |
 
 ## Requirements
 
@@ -44,13 +39,13 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-`pnpm test:e2e` runs the Playwright suite against the built app. After TASK_075 it attaches
-over WebView2's DevTools Protocol to a build with the `e2e` cargo feature.
+`pnpm test:e2e` runs the Playwright suite against the built app. It attaches over WebView2's
+DevTools Protocol to a build with the `e2e` cargo feature.
 
 ## Layout
 
 ```
-apps/studio/src           renderer (React + MobX), browser-ui chrome; the frozen TS host until TASK_076
+apps/studio/src           renderer (React + MobX), browser-ui chrome, recovery page
 apps/studio/src-tauri     zvs-studio: Tauri shell, composition root, webviews, OS ports
 crates/zvs-host           the Rust host: IPC server, services, kernel, repositories, drivers
 crates/zvs-contract       serde mirror of packages/shared, bound by golden fixtures

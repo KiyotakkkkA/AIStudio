@@ -1,7 +1,7 @@
 import { expect, expectTypeOf, it } from "vitest";
 import { AppErrorCode, err, ok } from "@zvs/shared";
-import { createIpcClient, createIpcServer, isIpcError, IpcError } from "../src/index.js";
-import { createFakeIpcMain, createRecordingLogger, testContract } from "./harness.js";
+import { createIpcClient, isIpcError, IpcError } from "../src/index.js";
+import { testContract } from "./harness.js";
 
 async function rejection(promise: Promise<unknown>): Promise<IpcError> {
   try {
@@ -62,23 +62,9 @@ it("fails loudly on a drifted response envelope, and trusts it when validation i
   expect(await trusting.client.call("system.ping", { sentAt: 10 })).toEqual(drifted.data);
 });
 
-it("round-trips through the server across a bridge, error codes included", async () => {
-  const ipcMain = createFakeIpcMain();
-  createIpcServer(
-    testContract,
-    {
-      "system.ping": (input) => ({ pong: true as const, hostTime: input.sentAt + 5 }),
-      "system.echo": (input) => ({ text: input.text.toUpperCase() }),
-    },
-    { ipcMain, logger: createRecordingLogger() },
-  );
-  const client = createIpcClient(testContract, { call: (c, p) => ipcMain.invoke(c, p) });
-  expect(await client.call("system.ping", { sentAt: 1 })).toEqual({ pong: true, hostTime: 6 });
-  expect(await client.call("system.echo", { text: "ok" })).toEqual({ text: "OK" });
-});
-
-it("propagates a missing host handler as a rejection rather than hanging", async () => {
-  const ipcMain = createFakeIpcMain();
-  const client = createIpcClient(testContract, { call: (c, p) => ipcMain.invoke(c, p) });
-  await expect(client.call("system.ping", { sentAt: 1 })).rejects.toThrow(/No handler registered/);
+it("propagates a bridge rejection rather than hanging", async () => {
+  const client = createIpcClient(testContract, {
+    call: () => Promise.reject(new Error("Unknown channel")),
+  });
+  await expect(client.call("system.ping", { sentAt: 1 })).rejects.toThrow(/Unknown channel/);
 });

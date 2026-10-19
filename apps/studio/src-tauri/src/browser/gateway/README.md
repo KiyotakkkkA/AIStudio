@@ -47,8 +47,8 @@ if a matching element appears; the host then shows the gateway window (`reveal`)
 can pass the check, waits up to `challenge_timeout` (5 min) instead of the head timeout, and
 hides it again (`conceal`). A watched request silent for `reveal_after` (10 s) is shown too.
 Closing the shown window only hides it.
-| `ack`   | Gives the request `credit` more chunks                                      |
-| `abort` | Aborts the request's `AbortController`                                      |
+| `ack` | Gives the request `credit` more chunks |
+| `abort` | Aborts the request's `AbortController` |
 
 The page reports through the binding: `head` (status and headers), `challenge`, `chunk` (base64, at most
 `chunk_size` bytes), `end`, or `error` (with `aborted`). A request may have `window` chunks

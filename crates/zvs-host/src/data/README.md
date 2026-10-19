@@ -1,8 +1,7 @@
 # Data layer
 
 The Rust host owns SQLite, alone (PASSPORT D2 as revised by D10). One writer, one schema
-owner, one migration runner. The frozen TypeScript layer in `apps/studio/src/host/data` is the
-specification this module reproduces until TASK_076 deletes it.
+owner, one migration runner.
 
 ## Layout
 
@@ -12,11 +11,11 @@ specification this module reproduces until TASK_076 deletes it.
 | `migrate.rs`                  | `MIGRATIONS`, the runner, backups, `MigrationFailed`, `prepare_database`                            |
 | `schema/`                     | One row struct per table (`SettingRow`), with `COLUMNS` and `from_row`                              |
 | `repositories/`               | The only code that writes SQL. `Repositories::new(&connection)` hands out every repository          |
-| `../../migrations/*.sql`      | Embedded with `include_str!`. `0000_baseline.sql` is Drizzle `0000`–`0021` squashed                 |
-| `../../migrations/snapshots/` | `sqlite_master` after the baseline, as the TypeScript host produced it                              |
+| `../../migrations/*.sql`      | Embedded with `include_str!`. `0000_baseline.sql` is the frozen starting schema                     |
+| `../../migrations/snapshots/` | `sqlite_master` after the baseline, pinned by a test                                                |
 
 The connection is opened with `journal_mode = WAL`, `foreign_keys = ON`,
-`busy_timeout = 5000` and `synchronous = NORMAL`, the same pragmas as `client.ts`.
+`busy_timeout = 5000` and `synchronous = NORMAL`.
 
 ## Rules for repositories
 
@@ -41,20 +40,19 @@ The connection is opened with `journal_mode = WAL`, `foreign_keys = ON`,
 Each writes more than one row, so a service calls them inside `database.transaction`. The
 auth-mode integrity rule is checked before the first write, so a refused row leaves nothing
 behind even outside a transaction. `provider.adapter` and `provider.auth_mode` stay `String` in
-`ProviderRow`, so an unknown value reaches the registry and fails there with the TS message.
+`ProviderRow`, so an unknown value reaches the registry and fails there.
 
-`0001_graph_relation_seed` inserts the four starter relations Drizzle `0015` seeded
-(`INSERT OR IGNORE`, same ids). The baseline snapshot holds only `sqlite_master`, so the rows
-had to come back as data. `VectorStoreRepository::update` writes only the columns a
-`VectorStorePatch` sets, `updated_at` included, as the Drizzle `update` did.
+`0001_graph_relation_seed` inserts the four starter relations (`INSERT OR IGNORE`, fixed ids).
+The baseline snapshot holds only `sqlite_master`, so the rows live in their own migration.
+`VectorStoreRepository::update` writes only the columns a `VectorStorePatch` sets,
+`updated_at` included.
 
 ## Errors
 
 Closures passed to `with_connection` and `transaction` return `Result<T, DataError>`, so both
 `AppError` and `rusqlite::Error` work with `?`. On the way out an `AppError` passes through
 unchanged. A SQLite or I/O error is logged at `error` (`data`, `Database operation failed`)
-and becomes `UNKNOWN` / `Внутренняя ошибка`, the same envelope a raw Drizzle error produced in
-the TypeScript host, with the detail kept host-side.
+and becomes `UNKNOWN` / `Внутренняя ошибка`, with the detail kept host-side.
 
 ## Concurrency
 
@@ -94,9 +92,8 @@ constructed, so the app never runs against a half-migrated schema.
    A table rebuild must keep foreign keys valid without switching them off.
 4. Add or update the repository and its tests. `cargo test -p zvs-host` must stay green.
 
-The baseline is frozen. `the_baseline_schema_equals_the_drizzle_schema_snapshot` (Rust) and
-`the Rust baseline snapshot equals the schema the Drizzle migrations produce` (Vitest) pin it
-to the Drizzle output from both sides while the TypeScript host still exists.
+The baseline is frozen. `the_baseline_schema_equals_the_frozen_snapshot` pins it to
+`migrations/snapshots/0000_baseline.json`.
 
 ## Tests
 

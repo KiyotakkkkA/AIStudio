@@ -22,11 +22,18 @@ const features = rest.flatMap((argument, index) => {
 });
 if (features.includes("e2e")) process.env.ZVS_E2E_BUILD = "1";
 
-execFileSync(
-  "cargo",
-  ["build", "--locked", "--package", "zvs-jobd", ...(release ? ["--release"] : [])],
-  { cwd: root, stdio: "inherit" },
-);
+const profile = release ? ["--release"] : [];
+execFileSync("cargo", ["build", "--locked", "--package", "zvs-jobd", ...profile], {
+  cwd: root,
+  stdio: "inherit",
+});
+if (features.includes("e2e")) {
+  execFileSync(
+    "cargo",
+    ["build", "--locked", "--package", "zvs-core", "--example", "seed_vectors", ...profile],
+    { cwd: root, stdio: "inherit" },
+  );
+}
 
 const tauri = spawnSync("pnpm", ["exec", "tauri", command, ...rest], {
   cwd: join(root, "apps/studio"),

@@ -13,6 +13,7 @@ declare global {
 }
 
 export const STUDIO_EXECUTABLE = join(REPO_ROOT, "target", "release", "zvs-studio.exe");
+const SEED_VECTORS = join(REPO_ROOT, "target", "release", "examples", "seed_vectors.exe");
 const STUDIO_HOST = "tauri.localhost";
 const CHROME_PATH = "/browser-ui/";
 const STARTUP_TIMEOUT = 60_000;
@@ -62,7 +63,7 @@ function isChromePage(page: Page): boolean {
 export function startStudio(dataDir: string, env: NodeJS.ProcessEnv = {}): ChildProcess {
   expect(
     existsSync(STUDIO_EXECUTABLE),
-    `${STUDIO_EXECUTABLE} is missing — run \`pnpm build:tauri -- --features e2e\``,
+    `${STUDIO_EXECUTABLE} is missing — run \`pnpm --filter studio build -- --features e2e\``,
   ).toBe(true);
   const environment: NodeJS.ProcessEnv = { ...process.env, ...env };
   environment.ZVS_DATA_DIR = assertTemporaryPath(dataDir);
@@ -180,6 +181,31 @@ export async function launchStudio(dataDir: string): Promise<Studio> {
     await stopStudio(child);
     throw error;
   }
+}
+
+export interface SeedRow {
+  readonly id: string;
+  readonly vector: number[];
+  readonly documentId: string;
+  readonly chunkIndex: number;
+  readonly path: string;
+  readonly text: string;
+  readonly section: string;
+  readonly page: number | null;
+  readonly payload: unknown;
+}
+
+export function seedVectors(storeDir: string, rows: SeedRow[]): number {
+  expect(
+    existsSync(SEED_VECTORS),
+    `${SEED_VECTORS} is missing — run \`pnpm --filter studio build -- --features e2e\``,
+  ).toBe(true);
+  const result = spawnSync(SEED_VECTORS, [assertTemporaryPath(storeDir)], {
+    input: JSON.stringify(rows),
+    encoding: "utf8",
+  });
+  if (result.status !== 0) throw new Error(`seed_vectors failed: ${result.stderr}`);
+  return Number(result.stdout.trim());
 }
 
 export async function rpc<T>(page: Page, channel: string, payload?: unknown): Promise<T> {

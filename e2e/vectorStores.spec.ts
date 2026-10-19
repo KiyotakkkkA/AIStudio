@@ -2,10 +2,8 @@ import { createServer } from "node:http";
 import { join } from "node:path";
 import { rm } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
-import { STUDIO_ROOT, temporaryDirectory, assertTemporaryPath } from "../test/helpers/paths.ts";
-import { RustCore } from "../apps/studio/src/host/drivers/rust/RustCore.ts";
-import { nativeTargetTriple } from "../apps/studio/src/host/platform/paths.ts";
-import { launchStudio } from "./launch.ts";
+import { temporaryDirectory, assertTemporaryPath } from "../test/helpers/paths.ts";
+import { launchStudio, seedVectors } from "./launch.ts";
 
 test("vector stores UI creates, searches native data, edits, detects loss and confirms deletion", async ({
   browserName,
@@ -80,10 +78,7 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
     )) as { ok: boolean; data: { id: string }[] };
     const id = response.data[0]!.id;
     const path = assertTemporaryPath(join(directory.path, "vectors", id));
-    const core = RustCore.fromPaths({
-      nativeAddonPath: join(STUDIO_ROOT, "resources/native", nativeTargetTriple(), "zvs-core.node"),
-    });
-    await core.upsertVectors(path, [
+    seedVectors(path, [
       {
         id: "a",
         vector: [1, 0, 0],

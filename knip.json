@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.mjs", "e2e/**/*.ts", "test/helpers/fakeMcpServer.mjs"],
+      "ignoreBinaries": ["tauri"]
+    },
+    "apps/studio": {
+      "entry": [
+        "src/browser-ui/main.tsx",
+        "src/recovery/main.ts",
+        "src-tauri/isolation/index.js",
+        "src-tauri/src/browser/gateway/page.js"
+      ],
+      "ignoreDependencies": ["@tauri-apps/cli"],
+      "ignore": ["src-tauri/src/browser/gateway/page.d.ts"]
+    },
+    "packages/eslint-config": {
+      "ignoreDependencies": ["eslint-import-resolver-typescript"]
+    }
+  }
+}

@@ -407,7 +407,7 @@ mod tests {
     }
 
     #[test]
-    fn the_baseline_schema_equals_the_drizzle_schema_snapshot() {
+    fn the_baseline_schema_equals_the_frozen_snapshot() {
         let (database, clock) = fresh();
         migrate(
             &database,
