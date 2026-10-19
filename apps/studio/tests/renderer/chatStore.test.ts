@@ -8,12 +8,14 @@ import {
   MessageDto,
   type Contract,
   VectorStoreId,
+  type AccountDto,
+  type ProviderId,
 } from "@zvs/shared";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import ChatStore from "../../src/renderer/features/chat/ChatStore.ts";
 import { shouldPinToBottom } from "../../src/renderer/features/chat/scroll.ts";
-import { provider } from "./providerFixtures.ts";
+import { ADAPTERS, MODEL, model, provider } from "./providerFixtures.ts";
 
 const id = "0199bb11-4444-7111-8111-000000000001";
 const handle = RunHandleDto.parse({
@@ -250,4 +252,137 @@ test.each([
   [100, 500, 1000, false],
 ])("scroll pinning at %s/%s/%s is %s", (top, height, total, expected) => {
   expect(shouldPinToBottom(Number(top), Number(height), Number(total))).toBe(expected);
+});
+
+test("a linked account whose family generates is offered in chat and becomes a provider on pick", async () => {
+  const { store, bridge } = setup();
+  const qwenId = "0199bb11-6666-7111-8111-000000000001" as AccountDto["id"];
+  const signedOutId = "0199bb11-6666-7111-8111-000000000002" as AccountDto["id"];
+  const account = (id: AccountDto["id"], adapter: AccountDto["adapter"]): AccountDto => ({
+    id,
+    adapter,
+    emailMasked: null,
+    displayName: null,
+    avatarUrl: null,
+    status: "linked",
+    detail: null,
+    expiresAt: null,
+    lastCheckedAt: null,
+    linkedProvidersCount: 0,
+  });
+  const created = provider({
+    id: "0199bb11-6666-7111-8111-000000000003" as ProviderId,
+    name: "Qwen",
+    accountId: qwenId,
+    models: [model({ id: MODEL, externalId: "qwen3.7-plus" })],
+  });
+  bridge
+    .handle("accounts.list", () => [
+      account(qwenId, "qwen-web"),
+      { ...account(signedOutId, "qwen-web"), status: "needs-relink" },
+    ])
+    .handle("providers.adapters", () => ADAPTERS)
+    .handle("providers.create", () => created)
+    .handle("providers.probe", () => ({
+      providerId: created.id,
+      outcome: { kind: "ok", latencyMs: 1, models: [], live: true },
+      status: "ok",
+      statusDetail: null,
+      checkedAt: 1,
+      provider: created,
+    }))
+    .handle("providers.update", () => created)
+    .handle("providers.get", () =>
+      bridge.calls.some((call) => call.channel === "providers.create") ? created : saved,
+    );
+  await store.mount();
+  expect(store.accountChoices.map((choice) => choice.label)).toEqual(["Qwen · аккаунт"]);
+  await store.connectAccount(qwenId);
+  expect(store.error).toBeNull();
+  const create = bridge.calls.find((call) => call.channel === "providers.create");
+  expect(create?.payload).toMatchObject({
+    adapter: "qwen-web",
+    authMode: "account",
+    accountId: qwenId,
+    capabilities: ["text"],
+    baseUrl: "https://chat.qwen.ai/api/v2",
+  });
+  const update = bridge.calls.find((call) => call.channel === "providers.update");
+  expect(update?.payload).toMatchObject({
+    id: created.id,
+    settings: { selectedModelIds: ["qwen3.7-plus"] },
+  });
+  expect(store.provider?.id).toBe(created.id);
+  expect(store.modelId).toBe("qwen3.7-plus");
+  expect(store.accountChoices).toEqual([]);
+  store.dispose();
+});
+
+test("an existing Qwen provider without models is reused, enabled and given its models", async () => {
+  const { store, bridge } = setup();
+  const qwenId = "0199bb11-6666-7111-8111-000000000001" as AccountDto["id"];
+  const existingId = "0199bb11-6666-7111-8111-000000000004" as ProviderId;
+  const bare = provider({
+    id: existingId,
+    name: "Qwen",
+    adapter: "qwen-web",
+    authMode: "account",
+    accountId: qwenId,
+    enabled: false,
+    capabilities: ["embedding"],
+    models: [],
+  });
+  const ready = {
+    ...bare,
+    enabled: true,
+    models: [model({ id: MODEL, externalId: "qwen3.7-plus" })],
+  };
+  let probed = false;
+  bridge
+    .handle("accounts.list", () => [
+      {
+        id: qwenId,
+        adapter: "qwen-web" as const,
+        emailMasked: null,
+        displayName: null,
+        avatarUrl: null,
+        status: "linked" as const,
+        detail: null,
+        expiresAt: null,
+        lastCheckedAt: null,
+        linkedProvidersCount: 1,
+      },
+    ])
+    .handle("providers.adapters", () => ADAPTERS)
+    .handle("providers.list", (input) =>
+      input && "enabled" in input ? [saved] : [saved, { ...bare, modelCount: 0 }],
+    )
+    .handle("providers.probe", () => {
+      probed = true;
+      return {
+        providerId: existingId,
+        outcome: { kind: "ok", latencyMs: 1, models: [], live: true },
+        status: "ok",
+        statusDetail: null,
+        checkedAt: 1,
+        provider: ready,
+      };
+    })
+    .handle("providers.update", () => ready)
+    .handle("providers.get", (input) =>
+      input.id === existingId ? (probed ? ready : bare) : saved,
+    );
+  await store.mount();
+  expect(store.accountChoices.map((choice) => choice.accountId)).toEqual([qwenId]);
+  await store.connectAccount(qwenId);
+  expect(store.error).toBeNull();
+  expect(bridge.calls.some((call) => call.channel === "providers.create")).toBe(false);
+  expect(bridge.calls.find((call) => call.channel === "providers.update")?.payload).toMatchObject({
+    id: existingId,
+    enabled: true,
+    capabilities: ["embedding", "text"],
+    settings: { selectedModelIds: ["qwen3.7-plus"] },
+  });
+  expect(store.provider?.id).toBe(existingId);
+  store.dispose();
 });

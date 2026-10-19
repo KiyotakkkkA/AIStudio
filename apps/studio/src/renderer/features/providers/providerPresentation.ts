@@ -35,7 +35,6 @@ export const KIND_LABELS: Record<ProviderKind, string> = {
 export const ADAPTER_LABELS: Record<AdapterFamily, string> = {
   "openai-compatible": "Совместимый с OpenAI (API)",
   "qwen-web": "Qwen (веб)",
-  "deepseek-web": "DeepSeek (веб)",
   local: "Локальные модели",
 };
 
@@ -68,7 +67,6 @@ const KIND_BASE_URLS: Record<ProviderKind, string> = {
 
 const ADAPTER_BASE_URLS: Partial<Record<AdapterFamily, string>> = {
   "qwen-web": "https://chat.qwen.ai/api/v2",
-  "deepseek-web": "https://chat.deepseek.com/api",
   local: LOCAL_BASE_URL,
 };
 

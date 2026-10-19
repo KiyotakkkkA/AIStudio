@@ -390,7 +390,7 @@ test("account draft credentials verify identity without changing the database", 
   await actual.dispose();
 });
 
-test("saved probes apply secret rotation and mark curated model lists", async () => {
+test("saved probes apply secret rotation", async () => {
   const secret = secrets.create({
     type: "openrouter",
     name: "Expiring",
@@ -400,8 +400,4 @@ test("saved probes apply secret rotation and mark curated model lists", async ()
   });
   const row = service.create(CreateProviderInput.parse({ ...input, secretId: secret.id }));
   expect((await service.probe({ id: row.id })).derived.status).toBe("degraded");
-  const result = await service.probe({
-    draft: { ...input, adapter: "deepseek-web", authMode: "account" },
-  });
-  expect(result.outcome).toMatchObject({ kind: "ok", live: false });
 });

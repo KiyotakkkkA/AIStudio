@@ -7,16 +7,9 @@ import { createFakeSession } from "../../../test/helpers/FakeSession.ts";
 import { createFakeTransport, type FakeTransport } from "../../../test/helpers/FakeTransport.ts";
 import { REPO_ROOT } from "../../../test/helpers/paths.ts";
 import {
-  ACCOUNT_GENERATION_PENDING,
   flattenPrompt,
   type AccountAdapterOptions,
 } from "../src/host/drivers/ai/adapters/accountFamily.ts";
-import {
-  DEEPSEEK_CURATED_MODELS,
-  DEEPSEEK_MODELS_OBSERVATION,
-  DeepSeekWebAdapter,
-  DEEPSEEK_WEB_CAPABILITIES,
-} from "../src/host/drivers/ai/adapters/deepseekWeb.ts";
 import {
   QWEN_CHATS_NEW_PATH,
   QWEN_COMPLETIONS_PATH,
@@ -214,29 +207,8 @@ test("a rejected account session surfaces as PROVIDER_SESSION_EXPIRED", async ()
   );
 });
 
-test("the deepseek family serves a curated list because the vendor exposes no endpoint", async () => {
-  const transport = createFakeTransport("https://chat.deepseek.com/api/v0");
-  const adapter = new DeepSeekWebAdapter({ transport });
-
-  const models = await adapter.listModels();
-
-  assert.equal(transport.calls.length, 0);
-  assert.deepEqual(models, [...DEEPSEEK_CURATED_MODELS]);
-  assert.deepEqual(
-    models.map((model) => model.externalId),
-    ["deepseek-chat", "deepseek-reasoner"],
-  );
-  assert.deepEqual(models[1]?.capabilities, ["streaming", "reasoning"]);
-  assert.equal(
-    models.every((model) => model.contextWindow === null && model.maxOutput === null),
-    true,
-  );
-  assert.equal(DEEPSEEK_WEB_CAPABILITIES.liveModelList, false);
-  assert.equal(DEEPSEEK_MODELS_OBSERVATION.observedAt, "2026-09-10");
-});
-
-test("both account families declare their honoured parameters honestly", () => {
-  for (const capabilities of [QWEN_WEB_CAPABILITIES, DEEPSEEK_WEB_CAPABILITIES]) {
+test("the account family declares their honoured parameters honestly", () => {
+  for (const capabilities of [QWEN_WEB_CAPABILITIES]) {
     assert.deepEqual(capabilities.authModes, ["account"]);
     assert.equal(capabilities.embedding, false);
     assert.equal(capabilities.image, false);
@@ -248,30 +220,11 @@ test("both account families declare their honoured parameters honestly", () => {
     });
   }
   assert.equal(QWEN_WEB_CAPABILITIES.streaming, true);
-  assert.equal(DEEPSEEK_WEB_CAPABILITIES.streaming, false);
-  for (const family of ["qwen-web", "deepseek-web"] as const) {
+  for (const family of ["qwen-web"] as const) {
     const driver = adapterEntry(family).build({ transport: createFakeTransport() });
     assert.equal(driver.embedding, null);
     assert.equal(driver.image, null);
   }
-});
-
-test("deepseek generation stays unimplemented until its wire format is recorded", async () => {
-  const options: AccountAdapterOptions = { transport: createFakeTransport() };
-  const adapter = new DeepSeekWebAdapter(options);
-  const rejected = (error: unknown): boolean =>
-    isAppError(error) &&
-    error.code === AppErrorCode.UNKNOWN &&
-    error.message === ACCOUNT_GENERATION_PENDING &&
-    error.details?.family === "deepseek-web" &&
-    error.details?.model === "deepseek-chat";
-
-  await assert.rejects(() => adapter.generate({ ...prompt, model: "deepseek-chat" }), rejected);
-  await assert.rejects(
-    () => drain(adapter.stream({ ...prompt, model: "deepseek-chat" })),
-    rejected,
-  );
-  assert.equal(DEEPSEEK_WEB_CAPABILITIES.streaming, false);
 });
 
 test("the qwen family opens a chat and streams reasoning and answer as distinct deltas", async () => {

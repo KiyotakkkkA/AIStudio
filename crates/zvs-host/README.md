@@ -55,6 +55,10 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 | `tools`                    | `ToolRegistry` (tiers, ceiling, defaults, usage, references), `ToolInvoker`, `register_kernel_tools`              |
 | `services::mcp`            | `McpService`: servers, supervision, discovery into the registry, health, autostart, `derive_namespace`            |
 | `drivers::mcp`             | The `rmcp` client, `StdioTransport`, `McpHttpClient`, Windows `.cmd` launch, the isolated toolchain env           |
+| `services::chat`           | `ChatService`, the `chat.prepare` / `chat.generate` / `chat.persist` nodes, the tool-calling loop                 |
+| `services::chat_history`   | `window_chat_history` (budget, passages, neighbours, related documents, citations), `join_chunks`, `fence_source` |
+| `services::chat_tools`     | `offered_tools`, `wire_tool_name`, result budget, capping and fencing, the loop caps                              |
+| `services::token_estimate` | `estimate_tokens`, the script-aware conservative estimate                                                         |
 
 `testing` is compiled for this crate's own tests and behind the `testing` feature for other
 crates' tests. `debug-panic` adds `InProcessCore::debug_panic`, `vector_debug_panic` and
@@ -189,9 +193,9 @@ the wire envelope as a `serde_json::Value`, exactly as `@zvs/ipc`'s `createIpcSe
 
 A panic is caught with `FutureExt::catch_unwind`, so it costs one call and leaves the server
 usable. Registering a name outside `zvs_contract::CHANNELS`, or the same name twice, panics at
-startup. `finish()` writes one log line listing the channels still answering
-`NOT_IMPLEMENTED`. `ipc::tests::every_contract_channel_is_served` is `#[ignore]`d until
-TASK_076, when it becomes strict.
+startup. `finish()` writes one log line: `Every contract channel is served` once every channel
+has a handler, otherwise the channels still answering `NOT_IMPLEMENTED`. Since TASK_074 every
+contract channel is served, and `ipc::tests::every_contract_channel_is_served` is strict.
 
 ## Logger
 
@@ -228,8 +232,9 @@ follow-ups. Field validation against a type schema (`services::secret_fields`) r
 ## AI drivers
 
 `drivers::ai` is the API-mode half of `host/drivers/ai` (PASSPORT §12), plus the
-`SessionGateway` port account mode is built on. `AccountTransport`, `qwen-web`,
-`deepseek-web` and the identity probes land in TASK_067.
+`SessionGateway` port account mode is built on. `AccountTransport`, `qwen-web` and the
+identity probe land in TASK_067. Qwen is the only account family; why DeepSeek was removed is
+in `docs/adr/0001-account-provider-limitations.md`.
 
 | Module             | Contents                                                                                                          |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------- |
@@ -239,7 +244,7 @@ follow-ups. Field validation against a type schema (`services::secret_fields`) r
 | `transport`        | `Transport`, `RequestSpec`, `TransportResponse`, `join_url`, `ApiTransport`, `AccountTransport`, `SessionGateway` |
 | `sse`              | Streaming UTF-8 decoding, `sse_data` (stops at `[DONE]`) and `ndjson_lines`                                       |
 | `errors`           | `http_failure`, `network_failure`, `cancelled`, `timed_out`, `session_expired`, raw text                          |
-| `adapters`         | `openai-compatible`, `ollama`, `local`, `qwen-web`, `deepseek-web`, the family table                              |
+| `adapters`         | `openai-compatible`, `ollama`, `local`, `qwen-web`, the family table                                              |
 | `identity`         | Identity probes per account family, `ProbeAccountCredentials`, `AccountCredentialStore`                           |
 | `injected_tools`   | The `zvs_call_tool` prompt protocol and `with_injected_tools`                                                     |
 | `stream_to_events` | Deltas re-emitted as `token` events, ended with the run outcome                                                   |
@@ -295,11 +300,9 @@ request nobody reads.
 ### Identity
 
 `identity::IdentityProbe` has one implementation per account family: `QwenIdentityProbe`
-(`GET https://chat.qwen.ai/api/v1/auths/`) and `DeepSeekIdentityProbe`
-(`GET https://chat.deepseek.com/api/v0/users/current`). Both send the captured bearer when the
-gateway has one, give up after 20 s, map a redirect or HTML to `PROVIDER_SESSION_EXPIRED`, and
-validate the payload field by field as the Zod schemas did (a malformed profile is
-`VALIDATION_FAILED`). A non-zero DeepSeek `code` or `biz_code` is a signed-out session.
+(`GET https://chat.qwen.ai/api/v1/auths/`). It sends the captured bearer when the gateway has
+one, gives up after 20 s, maps a redirect or HTML to `PROVIDER_SESSION_EXPIRED`, and validates
+the payload field by field as the Zod schema did (a malformed profile is `VALIDATION_FAILED`).
 
 - `account_session` wraps the gateway so `account_token` falls back to the stored token for
   the identity origin, which keeps a session usable after a restart.
@@ -320,8 +323,8 @@ streaming `/chat/completions?chat_id=…`. History is flattened into one role-la
 `answer` frames text deltas; a stream that ends without `status: finished` is
 `PROVIDER_UNREACHABLE` «Поток вендора оборвался». Vendor frames with `401`/`403` or an
 auth-like code are `PROVIDER_SESSION_EXPIRED`, other error frames `UNKNOWN` «Вендор прервал
-генерацию». `deepseek-web` serves a curated two-model list and refuses generation with
-`account-mode generation is not implemented yet (TASK_014_EXTRA_3)`.
+генерацию». Migration `0002_remove_deepseek_web` deletes any `deepseek-web` account, its
+token secret and its providers left from earlier builds.
 
 The registry builds account-mode transports through `DatabaseAccounts`: the provider's
 account must exist and be `linked` (else `PROVIDER_SESSION_EXPIRED`, with
@@ -471,6 +474,31 @@ Discovered tools are registered as `mcp` tools and kernel nodes under `namespace
 `dispose()` (shutdown stage `Dispose`) stops every server. Tests drive
 `test/helpers/fakeMcpServer.mjs` with `node` (stdio, including a `.cmd` shim) and an axum
 endpoint (HTTP).
+
+## Chat
+
+`ChatService` is `ChatService.ts`. It registers `chat.prepare`, `chat.generate` (gated on
+`llm.generate`, which a chat run admits itself) and `chat.persist` on the shared registry, so the
+composition root builds it before `recover()`. `send` checks the budget for the system prompt and
+the current turn first, then starts the turn graph with `RunService::start_with`: the user message
+and the run row commit in one transaction, and the token observer is attached before the scheduler
+task exists. The graph is one `vector.search` per attached store (query from `retrieval_query`),
+then prepare, generate and persist. Prepare merges the hits (`merge_retrieval`, per-store floor),
+fetches ±1 neighbours when the vector service has chunks, follows the graph for related documents
+when the conversation asks, windows the history (`window_chat_history`) and inserts the partial
+assistant message. Each token is saved as it arrives, so cancellation, a provider failure and
+shutdown keep the partial answer; recovery marks the turn `interrupted` and never repeats it. A
+conversation runs one turn at a time, and removal and truncation refuse a busy one. The title is
+derived from the first question after the first answer.
+
+The tool loop offers the conversation's picked tools that are enabled, available and not `off`,
+under wire-safe names. It runs at most 4 rounds and 8 calls, then asks for an answer with the
+budget note. Each call is a kernel step `generate.callN` through `StepContext::invoke_tool`, which
+admits it as a model call (`AdmissionOrigin::Model`, the ceiling and the run gate apply, a
+destructive tool needs at least `ask`) and reports approvals to the call record. Native adapters
+get fenced tool results; the injected adapter (Qwen) goes through `with_injected_tools`.
+`KernelServices` gains `graph` (`GraphNeighbors`) and `VectorSearch` gains `chunks` and
+`related_chunks` behind `has_chunks` / `has_related_chunks`.
 
 ## Browser
 

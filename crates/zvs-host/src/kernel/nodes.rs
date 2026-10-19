@@ -87,7 +87,7 @@ pub struct GenerateNodeInput {
 }
 
 impl GenerateNodeInput {
-    fn request(self) -> GenerateRequest {
+    pub fn request(self) -> GenerateRequest {
         GenerateRequest {
             system: self.system,
             temperature: self.temperature,

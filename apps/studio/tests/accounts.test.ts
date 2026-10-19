@@ -14,10 +14,6 @@ import type {
 } from "../src/host/data/repositories/index.ts";
 import type { LogLevel, Logger } from "../src/host/platform/logger.ts";
 import { AccountCredentialStore } from "../src/host/drivers/ai/identity/AccountCredentialStore.ts";
-import {
-  DEEPSEEK_IDENTITY_ENDPOINT,
-  mapDeepSeekIdentity,
-} from "../src/host/drivers/ai/identity/deepseek.ts";
 import { IDENTITY_PROBES, identityProbe } from "../src/host/drivers/ai/identity/registry.ts";
 import { QWEN_IDENTITY_ENDPOINT, mapQwenIdentity } from "../src/host/drivers/ai/identity/qwen.ts";
 import { AccountTransport } from "../src/host/drivers/ai/transport/AccountTransport.ts";
@@ -31,7 +27,7 @@ let repositories: Repositories;
 let secrets: SecretService;
 
 const accountDraft: AccountDraft = {
-  adapter: "deepseek-web",
+  adapter: "qwen-web",
   partition: "persist:browser-work",
   externalId: "user-1",
   linkedAt: 100,
@@ -40,10 +36,10 @@ const accountDraft: AccountDraft = {
 
 const providerDraft: ProviderDraft = {
   kind: "openai-compatible",
-  name: "DeepSeek",
-  adapter: "deepseek-web",
+  name: "Qwen",
+  adapter: "qwen-web",
   authMode: "account",
-  baseUrl: "https://chat.deepseek.com/api/v0",
+  baseUrl: "https://chat.qwen.ai/api/v2",
   capabilities: ["text"],
   createdAt: 100,
   updatedAt: 100,
@@ -57,21 +53,6 @@ const qwenPayload = {
   token: "qwen-token-1",
   token_type: "Bearer",
   expires_at: 4_102_444_800,
-};
-
-const deepSeekPayload = {
-  code: 0,
-  msg: "",
-  data: {
-    biz_code: 0,
-    biz_msg: "",
-    biz_data: {
-      id: 4242,
-      email: "k***@mail.ru",
-      token: "deepseek-token-1",
-      id_profile: { name: "Кирилл", picture: "https://cdn.deepseek.com/a.png" },
-    },
-  },
 };
 
 beforeEach(() => {
@@ -148,12 +129,9 @@ test("migration 0004 adds the account table and the provider link", () => {
   const linked = repositories.accounts.create(accountDraft);
   assert.throws(() => repositories.accounts.create({ ...accountDraft, id: undefined }), /UNIQUE/);
   assert.equal(linked.status, "linked");
-  assert.deepEqual(repositories.accounts.listByAdapter("deepseek-web"), [linked]);
-  assert.deepEqual(repositories.accounts.listByAdapter("qwen-web"), []);
-  assert.deepEqual(
-    repositories.accounts.findByAdapterAndExternalId("deepseek-web", "user-1"),
-    linked,
-  );
+  assert.deepEqual(repositories.accounts.listByAdapter("qwen-web"), [linked]);
+  assert.deepEqual(repositories.accounts.findByAdapterAndExternalId("qwen-web", "user-1"), linked);
+  assert.equal(repositories.accounts.findByAdapterAndExternalId("qwen-web", "user-2"), undefined);
 });
 
 test("the auth-mode guard keeps api and account providers apart", () => {
@@ -222,7 +200,7 @@ test("removing an account detaches providers instead of deleting them", () => {
   assert.deepEqual(repositories.accounts.remove(account.id).detachedProviderIds, []);
 });
 
-test("both vendor payloads collapse onto one AccountIdentity", () => {
+test("the vendor payload collapses onto one AccountIdentity", () => {
   const qwen = mapQwenIdentity(qwenPayload);
   assert.deepEqual(qwen.identity, {
     externalId: "qwen-9",
@@ -233,38 +211,14 @@ test("both vendor payloads collapse onto one AccountIdentity", () => {
   });
   assert.deepEqual(qwen.credential, { token: "qwen-token-1", tokenType: "Bearer" });
 
-  const deepseek = mapDeepSeekIdentity(deepSeekPayload);
-  assert.deepEqual(deepseek.identity, {
-    externalId: "4242",
-    emailMasked: "k***@mail.ru",
-    displayName: "Кирилл",
-    avatarUrl: "https://cdn.deepseek.com/a.png",
-  });
-  assert.deepEqual(deepseek.credential, { token: "deepseek-token-1", tokenType: "Bearer" });
-  assert.equal("expiresAt" in deepseek.identity, false);
-
   const sparse = mapQwenIdentity({ id: 7 });
   assert.deepEqual(sparse, { identity: { externalId: "7" }, credential: null });
   assert.throws(
     () => mapQwenIdentity({ email: "nobody" }),
     (error: unknown) => code(error) === AppErrorCode.VALIDATION_FAILED,
   );
-  assert.deepEqual(Object.keys(IDENTITY_PROBES).sort(), ["deepseek-web", "qwen-web"]);
+  assert.deepEqual(Object.keys(IDENTITY_PROBES).sort(), ["qwen-web"]);
   assert.equal(identityProbe("qwen-web").endpoint, QWEN_IDENTITY_ENDPOINT);
-  assert.equal(identityProbe("deepseek-web").endpoint, DEEPSEEK_IDENTITY_ENDPOINT);
-});
-
-test("a 200 with a non-zero DeepSeek code is a failure, not a signed-in user", () => {
-  for (const payload of [
-    { ...deepSeekPayload, code: 40_003 },
-    { ...deepSeekPayload, data: { ...deepSeekPayload.data, biz_code: 1 } },
-    { code: 0, data: { biz_code: 0, biz_data: null } },
-  ]) {
-    assert.throws(
-      () => mapDeepSeekIdentity(payload),
-      (error: unknown) => code(error) === AppErrorCode.PROVIDER_SESSION_EXPIRED,
-    );
-  }
 });
 
 test("a login redirect to HTML is a session expiry, not a parse error", async () => {
@@ -282,20 +236,18 @@ test("a login redirect to HTML is a session expiry, not a parse error", async ()
   );
 
   session.reset();
-  session.queue(DEEPSEEK_IDENTITY_ENDPOINT, { status: 401, body: { code: 40_100 } });
+  session.queue(QWEN_IDENTITY_ENDPOINT, { status: 401, body: { code: 40_100 } });
   assert.equal(
     code(
-      await rejection(() =>
-        identityProbe("deepseek-web").probe(session, AbortSignal.timeout(1000)),
-      ),
+      await rejection(() => identityProbe("qwen-web").probe(session, AbortSignal.timeout(1000))),
     ),
     AppErrorCode.PROVIDER_SESSION_EXPIRED,
   );
 
   session.reset();
-  session.queue(DEEPSEEK_IDENTITY_ENDPOINT, { error: new Error("getaddrinfo ENOTFOUND") });
+  session.queue(QWEN_IDENTITY_ENDPOINT, { error: new Error("getaddrinfo ENOTFOUND") });
   const unreachable = await rejection(() =>
-    identityProbe("deepseek-web").probe(session, AbortSignal.timeout(1000)),
+    identityProbe("qwen-web").probe(session, AbortSignal.timeout(1000)),
   );
   assert.equal(
     isAppError(unreachable) &&
@@ -524,9 +476,9 @@ test("an account-mode provider without a live account never reaches the network"
 
 test("an api-mode 401 stays PROVIDER_AUTH_FAILED while an account-mode 401 does not", async () => {
   const session = createFakeSession();
-  const url = "https://chat.deepseek.com/api/v0/chat";
+  const url = "https://chat.qwen.ai/api/v2/chat";
   session.queue(url, { status: 401, body: { code: 40_100 } });
-  const transport = new AccountTransport({ baseUrl: "https://chat.deepseek.com/api/v0", session });
+  const transport = new AccountTransport({ baseUrl: "https://chat.qwen.ai/api/v2", session });
   assert.equal(
     code(
       await rejection(() =>

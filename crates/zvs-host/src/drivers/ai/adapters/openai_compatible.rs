@@ -848,7 +848,7 @@ mod tests {
         let server = MockServer::start().await;
         server.reply(
             "/v1/models",
-            Reply::json(json!({ "data": [{ "id": "deepseek/deepseek-v4.1-flash" }] })),
+            Reply::json(json!({ "data": [{ "id": "qwen/qwen3-coder" }] })),
         );
         let models =
             TextGenerationDriver::list_models(&adapter(&server), &CancellationToken::new())
@@ -859,7 +859,7 @@ mod tests {
                 .iter()
                 .map(|model| model.external_id.as_str())
                 .collect::<Vec<_>>(),
-            ["deepseek/deepseek-v4.1-flash"]
+            ["qwen/qwen3-coder"]
         );
         assert_eq!(server.paths(), ["/v1/models"]);
     }

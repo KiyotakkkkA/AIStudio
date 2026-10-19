@@ -1,0 +1,28 @@
+[
+  {
+    "name": "ranked",
+    "value": {
+      "storeId": "0199aa11-5555-7111-8111-111111111111",
+      "documentId": "doc",
+      "sourcePath": "docs/a.md",
+      "chunkIndex": 3,
+      "score": 0.9,
+      "section": "",
+      "page": null,
+      "related": null
+    }
+  },
+  {
+    "name": "related with page",
+    "value": {
+      "storeId": "0199aa11-5555-7111-8111-111111111111",
+      "documentId": "doc",
+      "sourcePath": "docs/a.md",
+      "chunkIndex": 3,
+      "score": 0.9,
+      "section": "Intro",
+      "page": 2,
+      "related": "references"
+    }
+  }
+]

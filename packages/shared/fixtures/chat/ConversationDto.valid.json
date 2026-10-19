@@ -1,0 +1,36 @@
+[
+  {
+    "name": "defaults",
+    "value": {
+      "id": "0199aa11-2222-7111-8111-111111111111",
+      "title": "New conversation",
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "modelId": "fake-model",
+      "settings": {},
+      "systemPrompt": "",
+      "attachedStoreIds": [],
+      "useRelations": false,
+      "enabledTools": [],
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "tools and stores",
+    "value": {
+      "id": "0199aa11-2222-7111-8111-111111111111",
+      "title": "Plans",
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "modelId": "fake-model",
+      "settings": {
+        "maxOutputTokens": 128
+      },
+      "systemPrompt": "",
+      "attachedStoreIds": ["0199aa11-5555-7111-8111-111111111111"],
+      "useRelations": true,
+      "enabledTools": ["demo.lookup"],
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  }
+]

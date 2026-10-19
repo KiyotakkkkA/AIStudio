@@ -1,4 +1,3 @@
-pub mod deepseek;
 pub mod probe_credentials;
 pub mod qwen;
 pub mod session;
@@ -14,9 +13,6 @@ use tokio_util::sync::CancellationToken;
 use url::Url;
 use zvs_contract::{AccountFamily, AppError, AppErrorCode, AuthMode, ErrorDetails};
 
-pub use deepseek::{
-    DEEPSEEK_IDENTITY_ENDPOINT, DEEPSEEK_LOGIN_URL, DeepSeekIdentityProbe, map_deepseek_identity,
-};
 pub use probe_credentials::ProbeAccountCredentials;
 pub use qwen::{QWEN_IDENTITY_ENDPOINT, QWEN_LOGIN_URL, QwenIdentityProbe, map_qwen_identity};
 pub use session::{StoredTokenSession, account_session};
@@ -75,12 +71,10 @@ pub type SharedIdentityProbe = Arc<dyn IdentityProbe>;
 pub type ProbeFactory = Arc<dyn Fn(AccountFamily) -> SharedIdentityProbe + Send + Sync>;
 
 static QWEN: LazyLock<SharedIdentityProbe> = LazyLock::new(|| Arc::new(QwenIdentityProbe));
-static DEEPSEEK: LazyLock<SharedIdentityProbe> = LazyLock::new(|| Arc::new(DeepSeekIdentityProbe));
 
 pub fn identity_probe(family: AccountFamily) -> SharedIdentityProbe {
     match family {
         AccountFamily::QwenWeb => Arc::clone(&QWEN),
-        AccountFamily::DeepseekWeb => Arc::clone(&DEEPSEEK),
     }
 }
 
@@ -161,14 +155,6 @@ pub(crate) struct Payload<'a>(&'a Map<String, Value>);
 impl<'a> Payload<'a> {
     pub(crate) fn of(value: &'a Value) -> Option<Self> {
         value.as_object().map(Self)
-    }
-
-    pub(crate) fn nested(&self, key: &str) -> Result<Option<Self>, ()> {
-        match self.0.get(key) {
-            None | Some(Value::Null) => Ok(None),
-            Some(Value::Object(object)) => Ok(Some(Self(object))),
-            Some(_) => Err(()),
-        }
     }
 
     pub(crate) fn text(&self, key: &str) -> Result<Option<String>, ()> {

@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use url::Url;
 use zvs_host::drivers::ai::AccountToken;
 
-pub const ACCOUNT_ORIGINS: [&str; 2] = ["https://chat.qwen.ai", "https://chat.deepseek.com"];
+pub const ACCOUNT_ORIGINS: [&str; 1] = ["https://chat.qwen.ai"];
 const FIXTURE_HOST: &str = "127.0.0.1";
 const BEARER: &str = "bearer";
 
@@ -117,7 +117,6 @@ mod tests {
     use super::*;
 
     const QWEN: &str = "https://chat.qwen.ai/api/v1/auths/";
-    const DEEPSEEK: &str = "https://chat.deepseek.com/api/v0/users/current";
 
     fn seen(request_url: &str, authorization: &str, page_url: &str) -> Sighting {
         Sighting {
@@ -143,7 +142,6 @@ mod tests {
             ..seen(QWEN, "", QWEN)
         }));
         assert_eq!(tokens.token(QWEN), Some(AccountToken::bearer("original")));
-        assert_eq!(tokens.token(DEEPSEEK), None);
         assert_eq!(tokens.token("https://untrusted.example/"), None);
         assert_eq!(tokens.token("not a url"), None);
         assert!(!format!("{tokens:?}").contains("original"));
@@ -153,18 +151,14 @@ mod tests {
     fn a_third_party_frame_on_another_origin_cannot_set_the_token() {
         let tokens = BearerTokens::default();
         assert!(!tokens.observe(&seen(
-            DEEPSEEK,
+            QWEN,
             "Bearer framed",
             "https://ads.example/frame.html"
         )));
-        assert!(!tokens.observe(&seen(DEEPSEEK, "Bearer cross", "https://chat.qwen.ai/")));
-        assert_eq!(tokens.token(DEEPSEEK), None);
-        assert!(tokens.observe(&seen(
-            DEEPSEEK,
-            "Bearer own",
-            "https://chat.deepseek.com/a/chat"
-        )));
-        assert_eq!(tokens.token(DEEPSEEK), Some(AccountToken::bearer("own")));
+        assert!(!tokens.observe(&seen(QWEN, "Bearer cross", "https://chat.qwen.ai.example/")));
+        assert_eq!(tokens.token(QWEN), None);
+        assert!(tokens.observe(&seen(QWEN, "Bearer own", "https://chat.qwen.ai/c/chat")));
+        assert_eq!(tokens.token(QWEN), Some(AccountToken::bearer("own")));
     }
 
     #[test]
@@ -187,15 +181,11 @@ mod tests {
             account_origin(QWEN).as_deref(),
             Some("https://chat.qwen.ai")
         );
-        assert_eq!(
-            account_origin("https://chat.deepseek.com").as_deref(),
-            Some("https://chat.deepseek.com")
-        );
         for refused in [
             "http://chat.qwen.ai/",
             "https://chat.qwen.ai.evil.example/",
             "https://evil.chat.qwen.ai/",
-            "https://chat.deepseek.com:8443/",
+            "https://chat.qwen.ai:8443/",
             "file:///C:/",
             "http://127.0.0.1/",
             "http://user:pass@127.0.0.1:9/",
@@ -206,6 +196,6 @@ mod tests {
             account_origin("http://127.0.0.1:4100/robots.txt").as_deref(),
             Some("http://127.0.0.1:4100")
         );
-        assert_eq!(request_filters().len(), 3);
+        assert_eq!(request_filters().len(), 2);
     }
 }

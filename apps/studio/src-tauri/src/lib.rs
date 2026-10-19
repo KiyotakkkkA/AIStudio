@@ -55,12 +55,12 @@ use zvs_host::runtimes::{
 use zvs_host::services::rerank::local_rerankers;
 use zvs_host::services::system::DEMO_INTERVAL;
 use zvs_host::services::{
-    AccountService, AccountServiceOptions, CryptoService, GraphService, GraphServiceOptions,
-    HealthCheckOptions, HealthCheckService, McpService, McpServiceOptions, ProviderService,
-    ProviderServiceOptions, RetentionService, RetentionServiceOptions, RunService,
-    RunServiceOptions, SecretService, Services, SettingService, SystemService, VectorEvalService,
-    VectorEvalServiceOptions, VectorSourceService, VectorSourceServiceOptions, VectorStoreService,
-    VectorStoreServiceOptions,
+    AccountService, AccountServiceOptions, ChatService, ChatServiceOptions, CryptoService,
+    GraphService, GraphServiceOptions, HealthCheckOptions, HealthCheckService, McpService,
+    McpServiceOptions, ProviderService, ProviderServiceOptions, RetentionService,
+    RetentionServiceOptions, RunService, RunServiceOptions, SecretService, Services,
+    SettingService, SystemService, VectorEvalService, VectorEvalServiceOptions,
+    VectorSourceService, VectorSourceServiceOptions, VectorStoreService, VectorStoreServiceOptions,
 };
 use zvs_host::tools::{ToolInvoker, ToolRegistry, ToolRegistryOptions, register_kernel_tools};
 use zvs_host::{IpcServer, ipc};
@@ -577,12 +577,19 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             jobs: Some(Arc::new(sidecar.clone())),
             downloads: Some(Arc::new(downloads.clone())),
             indexing: Some(Arc::new(indexing.clone())),
+            graph: Some(Arc::new(graph.clone())),
         },
         clock: clock.clone(),
         logger: logger.clone(),
         runtime: Some(runtime.clone()),
         tools: Some(tools.clone()),
         ..RunServiceOptions::new(Arc::clone(&database), events.clone(), Arc::clone(&nodes))
+    })?;
+    let chat = ChatService::new(ChatServiceOptions {
+        tools: Some(tools.clone()),
+        logger: logger.clone(),
+        clock: clock.clone(),
+        ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), Arc::clone(&nodes))
     })?;
     let tool_invoker = ToolInvoker::new(tools.clone(), nodes, runs.clone(), clock.clone());
     downloads.attach(Arc::new(runs.clone()));
@@ -696,6 +703,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         tools,
         tool_invoker,
         mcp,
+        chat,
         picker: Some(Arc::new(DialogPicker::new(app.handle().clone()))),
     });
     let mut server = IpcServer::new(Arc::clone(&services), logger.clone());

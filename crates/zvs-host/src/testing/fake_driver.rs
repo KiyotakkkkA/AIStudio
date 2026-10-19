@@ -42,6 +42,7 @@ pub struct FakeScript {
     pub delay: Option<Duration>,
     pub manual: Option<bool>,
     pub vectors: Option<Vec<Vec<f32>>>,
+    pub fail_after: Option<usize>,
 }
 
 #[derive(Default)]
@@ -51,12 +52,18 @@ struct FakeState {
     requests: Vec<GenerateRequest>,
     embeddings: Vec<(Vec<String>, String)>,
     list_calls: usize,
+    emitted: usize,
+}
+
+#[derive(Default)]
+struct FakeCore {
+    state: Mutex<FakeState>,
+    holding: Notify,
 }
 
 #[derive(Default)]
 pub struct FakeDriver {
-    state: Mutex<FakeState>,
-    holding: Notify,
+    core: Arc<FakeCore>,
 }
 
 impl FakeDriver {
@@ -74,7 +81,7 @@ impl FakeDriver {
     }
 
     fn state(&self) -> MutexGuard<'_, FakeState> {
-        self.state.lock().unwrap_or_else(PoisonError::into_inner)
+        self.core.state()
     }
 
     pub fn script(&self, next: FakeScript) {
@@ -98,6 +105,17 @@ impl FakeDriver {
         if next.vectors.is_some() {
             script.vectors = next.vectors;
         }
+        if next.fail_after.is_some() {
+            script.fail_after = next.fail_after;
+        }
+    }
+
+    pub fn clear_manual(&self) {
+        self.state().script.manual = None;
+    }
+
+    pub fn emitted(&self) -> usize {
+        self.state().emitted
     }
 
     pub fn clear_failure(&self) {
@@ -129,7 +147,7 @@ impl FakeDriver {
 
     pub async fn when_holding(&self) {
         loop {
-            let notified = self.holding.notified();
+            let notified = self.core.holding.notified();
             if self.is_holding() {
                 return;
             }
@@ -148,6 +166,35 @@ impl FakeDriver {
             text: Some(self.clone()),
             embedding: Some(self.clone()),
             image: Some(self.clone()),
+        }
+    }
+
+    async fn hold(&self, cancel: &CancellationToken) -> Result<(), AppError> {
+        self.core.hold(cancel).await
+    }
+
+    fn failure(&self) -> Result<(), AppError> {
+        self.state().script.fail_with.clone().map_or(Ok(()), Err)
+    }
+
+    async fn list(&self, cancel: &CancellationToken) -> Result<Vec<DiscoveredModel>, AppError> {
+        self.state().list_calls += 1;
+        self.hold(cancel).await?;
+        self.failure()?;
+        Ok(self.state().script.models.clone().unwrap_or_default())
+    }
+}
+
+impl FakeCore {
+    fn state(&self) -> MutexGuard<'_, FakeState> {
+        self.state.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn failure_at(&self, index: usize) -> Result<(), AppError> {
+        let state = self.state();
+        match (&state.script.fail_with, state.script.fail_after) {
+            (Some(error), Some(at)) if at == index => Err(error.clone()),
+            _ => Ok(()),
         }
     }
 
@@ -177,17 +224,6 @@ impl FakeDriver {
         };
         self.state().gate = None;
         outcome
-    }
-
-    fn failure(&self) -> Result<(), AppError> {
-        self.state().script.fail_with.clone().map_or(Ok(()), Err)
-    }
-
-    async fn list(&self, cancel: &CancellationToken) -> Result<Vec<DiscoveredModel>, AppError> {
-        self.state().list_calls += 1;
-        self.hold(cancel).await?;
-        self.failure()?;
-        Ok(self.state().script.models.clone().unwrap_or_default())
     }
 }
 
@@ -222,14 +258,40 @@ impl TextGenerationDriver for FakeDriver {
         })
     }
 
-    fn stream(&self, request: &GenerateRequest, _cancel: &CancellationToken) -> DeltaStream {
+    fn stream(&self, request: &GenerateRequest, cancel: &CancellationToken) -> DeltaStream {
         let deltas = {
             let mut state = self.state();
             state.requests.push(request.clone());
             state.script.deltas.clone().unwrap_or_default()
         };
-        Box::pin(stream::iter(
-            deltas.into_iter().map(|delta| Ok(TextDelta::text(delta))),
+        let core = Arc::clone(&self.core);
+        let cancel = cancel.clone();
+        let total = deltas.len();
+        Box::pin(stream::unfold(
+            (deltas.into_iter().enumerate(), false),
+            move |(mut pending, done)| {
+                let core = Arc::clone(&core);
+                let cancel = cancel.clone();
+                async move {
+                    if done {
+                        return None;
+                    }
+                    let Some((index, delta)) = pending.next() else {
+                        return core
+                            .failure_at(total)
+                            .err()
+                            .map(|error| (Err(error), (pending, true)));
+                    };
+                    if let Err(error) = core.hold(&cancel).await {
+                        return Some((Err(error), (pending, true)));
+                    }
+                    if let Err(error) = core.failure_at(index) {
+                        return Some((Err(error), (pending, true)));
+                    }
+                    core.state().emitted += 1;
+                    Some((Ok(TextDelta::text(delta)), (pending, false)))
+                }
+            },
         ))
     }
 

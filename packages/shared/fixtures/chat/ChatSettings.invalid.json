@@ -1,0 +1,26 @@
+[
+  {
+    "name": "temperature above 2",
+    "value": {
+      "temperature": 2.5
+    }
+  },
+  {
+    "name": "zero topK",
+    "value": {
+      "topK": 0
+    }
+  },
+  {
+    "name": "null topP",
+    "value": {
+      "topP": null
+    }
+  },
+  {
+    "name": "fractional tokens",
+    "value": {
+      "maxOutputTokens": 1.5
+    }
+  }
+]

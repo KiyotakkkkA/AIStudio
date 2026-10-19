@@ -1,0 +1,49 @@
+[
+  {
+    "name": "missing id",
+    "value": {
+      "title": "New conversation",
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "modelId": "fake-model",
+      "settings": {},
+      "systemPrompt": "",
+      "attachedStoreIds": [],
+      "useRelations": false,
+      "enabledTools": [],
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "fractional time",
+    "value": {
+      "id": "0199aa11-2222-7111-8111-111111111111",
+      "title": "New conversation",
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "modelId": "fake-model",
+      "settings": {},
+      "systemPrompt": "",
+      "attachedStoreIds": [],
+      "useRelations": false,
+      "enabledTools": [],
+      "createdAt": 1.5,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "empty model",
+    "value": {
+      "id": "0199aa11-2222-7111-8111-111111111111",
+      "title": "New conversation",
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "modelId": "",
+      "settings": {},
+      "systemPrompt": "",
+      "attachedStoreIds": [],
+      "useRelations": false,
+      "enabledTools": [],
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  }
+]

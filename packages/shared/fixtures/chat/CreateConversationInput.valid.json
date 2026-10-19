@@ -1,0 +1,24 @@
+[
+  {
+    "name": "minimal",
+    "value": {
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "modelId": "fake-model"
+    }
+  },
+  {
+    "name": "full",
+    "value": {
+      "title": "Plans",
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "modelId": "fake-model",
+      "settings": {
+        "temperature": 0.2
+      },
+      "systemPrompt": "Be concise.",
+      "attachedStoreIds": ["0199aa11-5555-7111-8111-111111111111"],
+      "useRelations": true,
+      "enabledTools": ["demo.lookup"]
+    }
+  }
+]

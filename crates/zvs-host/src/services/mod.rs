@@ -1,5 +1,8 @@
 pub mod accounts;
 pub mod approvals;
+pub mod chat;
+pub mod chat_history;
+pub mod chat_tools;
 pub mod crypto;
 pub mod graph;
 pub mod health_check;
@@ -20,6 +23,7 @@ pub mod secrets;
 pub mod settings;
 pub mod stored;
 pub mod system;
+pub mod token_estimate;
 pub mod vector_eval;
 pub mod vector_health;
 pub mod vector_sources;
@@ -27,6 +31,7 @@ pub mod vector_stores;
 
 pub use accounts::{AccountBrowser, AccountService, AccountServiceOptions, SharedAccountBrowser};
 pub use approvals::ApprovalService;
+pub use chat::{ChatService, ChatServiceOptions};
 pub use crypto::{
     CryptoBackend, CryptoService, Plaintext, SharedCryptoBackend, UnavailableBackend,
 };
@@ -75,5 +80,6 @@ pub struct Services {
     pub tools: ToolRegistry,
     pub tool_invoker: ToolInvoker,
     pub mcp: McpService,
+    pub chat: ChatService,
     pub picker: Option<SharedPicker>,
 }

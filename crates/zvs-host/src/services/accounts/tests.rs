@@ -24,7 +24,6 @@ use crate::testing::{
 };
 
 const QWEN: AccountFamily = AccountFamily::QwenWeb;
-const DEEPSEEK: AccountFamily = AccountFamily::DeepseekWeb;
 
 struct Harness {
     database: TemporaryDatabase,
@@ -242,7 +241,7 @@ async fn polling_stores_a_masked_identity_and_encrypted_token_with_progress_and_
 async fn a_timeout_writes_nothing_and_makes_no_further_requests() {
     let harness = harness();
     harness.probes.always(ProbeStep::Fail(signed_out()));
-    let result = harness.service.link(DEEPSEEK).await.expect("settles");
+    let result = harness.service.link(QWEN).await.expect("settles");
     assert_eq!(
         result,
         AccountLinkResult::Timeout {
@@ -305,12 +304,7 @@ async fn an_unexpected_vendor_failure_ends_linking_as_unreachable() {
         "Browser is unavailable",
     ));
     assert_eq!(
-        harness
-            .service
-            .link(DEEPSEEK)
-            .await
-            .expect_err("fails")
-            .message,
+        harness.service.link(QWEN).await.expect_err("fails").message,
         "Browser is unavailable"
     );
 }
@@ -357,7 +351,7 @@ async fn automatic_refresh_checks_unknown_expiry_every_fifteen_minutes_and_stops
     harness
         .probes
         .once(ProbeStep::Identity(without_expiry("private-bearer-token")));
-    harness.link(DEEPSEEK).await;
+    harness.link(QWEN).await;
     harness.probes.always(ProbeStep::Fail(signed_out()));
     harness.service.start_auto_refresh().expect("starts");
     advance(14 * 60_000).await;
@@ -399,7 +393,7 @@ async fn persistent_vendor_failures_still_stop_at_the_sign_in_deadline() {
         .probes
         .always(ProbeStep::Fail(unreachable("Unavailable")));
     assert!(matches!(
-        harness.service.link(DEEPSEEK).await.expect("settles"),
+        harness.service.link(QWEN).await.expect("settles"),
         AccountLinkResult::Timeout { .. }
     ));
     assert!(harness.list().is_empty());
@@ -606,7 +600,6 @@ async fn cookie_clearing_marks_only_the_matching_vendor_and_derives_session_expi
  {
     let harness = harness();
     harness.link(QWEN).await;
-    harness.link(DEEPSEEK).await;
     let row = harness
         .list()
         .into_iter()
@@ -633,7 +626,6 @@ async fn cookie_clearing_marks_only_the_matching_vendor_and_derives_session_expi
             domain: ".qwen.ai".to_owned(),
         });
     assert_eq!(status_of(QWEN), AccountStatus::NeedsRelink);
-    assert_eq!(status_of(DEEPSEEK), AccountStatus::Linked);
     assert_eq!(
         harness
             .row(&row.id.to_string())
@@ -660,7 +652,7 @@ async fn cookie_clearing_marks_only_the_matching_vendor_and_derives_session_expi
         .await
         .expect("probes");
     assert_eq!(probed.outcome.kind(), "session-expired");
-    assert_eq!(harness.probes.calls(), 2);
+    assert_eq!(harness.probes.calls(), 1);
     providers.dispose().await;
 }
 

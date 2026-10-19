@@ -1,0 +1,80 @@
+[
+  {
+    "name": "missing messages",
+    "value": {
+      "id": "0199aa11-2222-7111-8111-111111111111",
+      "title": "New conversation",
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "modelId": "fake-model",
+      "settings": {},
+      "systemPrompt": "",
+      "attachedStoreIds": [],
+      "useRelations": false,
+      "enabledTools": [],
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "bad message",
+    "value": {
+      "id": "0199aa11-2222-7111-8111-111111111111",
+      "title": "New conversation",
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "modelId": "fake-model",
+      "settings": {},
+      "systemPrompt": "",
+      "attachedStoreIds": [],
+      "useRelations": false,
+      "enabledTools": [],
+      "createdAt": 1,
+      "updatedAt": 2,
+      "messages": [
+        {
+          "id": "0199aa11-3333-7111-8111-111111111111",
+          "conversationId": "0199aa11-2222-7111-8111-111111111111",
+          "role": "assistant",
+          "content": "Hello",
+          "reasoning": "",
+          "citations": [
+            {
+              "storeId": "0199aa11-5555-7111-8111-111111111111",
+              "documentId": "doc",
+              "sourcePath": "docs/a.md",
+              "chunkIndex": 3,
+              "score": 0.9,
+              "section": "",
+              "page": null,
+              "related": null
+            }
+          ],
+          "toolCalls": [
+            {
+              "id": "call_1",
+              "key": "demo.lookup",
+              "name": "demo__lookup",
+              "round": 0,
+              "arguments": {
+                "query": "x"
+              },
+              "status": "succeeded",
+              "result": "found x",
+              "truncated": false,
+              "error": null,
+              "approvalId": null,
+              "stepId": null,
+              "durationMs": 4
+            }
+          ],
+          "tokensIn": 12,
+          "tokensOut": 2,
+          "usageEstimated": true,
+          "durationMs": 40,
+          "runId": "0199aa11-4444-7111-8111-111111111111",
+          "partial": "no",
+          "createdAt": 3
+        }
+      ]
+    }
+  }
+]

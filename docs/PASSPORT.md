@@ -56,6 +56,7 @@ are Rust.
 | D8 | Document viewer | **Right dock that expands to overlay; PDF/image/text native, office converted to PDF by the sidecar** | One rendering path and faithful office layout; read-while-chatting stays possible | A conversion step and a cache to manage |
 | D9 | Agent browser | **Child webviews attached to the studio window, in their own WebView2 profile, driven over WebView2's CDP; tiered approval** *(rev. 2.0; was `BrowserWindow` + `WebContentsView`)* | No second browser to ship, every action visible live, instant takeover; the user logs into sites once | We own the automation primitives, a logged-in profile raises the stakes on prompt injection, and CDP access is WebView2-only, so automation is Windows-only |
 | D10 | Shell and host | **Tauri 2 (WebView2 on Windows); the whole host in Rust; no Node runtime in the shipped app** *(decided 2026-10-10)* | One language for host and core, so no FFI layer, no Node ABI rebuilds and no JSON hop to reach `zvs-core`. A much smaller install and memory footprint than a bundled Chromium. Capability-scoped IPC instead of a preload convention | A rewrite of ~22k lines of host TypeScript (Phase M). Multi-webview needs Tauri's `unstable` feature. Only WebView2 is verified. Electron APIs are replaced one by one, as listed below |
+| D11 | Account-mode providers | **Qwen only; no vendor whose web API demands a proof of work or other anti-automation challenge** *(decided 2026-10-19, ADR 0001)* | Account mode sends the requests the user's own signed-in page sends and nothing more; solving a vendor's anti-bot challenge would mean shipping code that defeats its abuse protection | DeepSeek is offered only through its official API (`openai-compatible`) or OpenRouter; existing `deepseek-web` rows are deleted by migration 0002 |
 
 **D10, what replaced what.** `BrowserWindow` became a Tauri window with a `studio` webview.
 The preloads became capabilities: the studio webview may call only `ipc_call` and
@@ -502,12 +503,12 @@ collapse them into one enum:
 
 | Axis | Values | What it decides |
 | --- | --- | --- |
-| **Adapter family** — `provider.adapter` | `openai-compatible`, `anthropic`, `qwen-web`, `deepseek-web` | The wire shape: request/response mapping, model-list endpoint, streaming format |
+| **Adapter family** — `provider.adapter` | `openai-compatible`, `anthropic`, `qwen-web` | The wire shape: request/response mapping, model-list endpoint, streaming format |
 | **Auth mode** — `provider.auth_mode` | `api`, `account` | How a request is credentialed and which HTTP stack carries it |
 
 One adapter family serves many vendors: Ollama, OpenRouter, Mistral, LM Studio and vLLM are
 all `openai-compatible` rows differing only by base URL and secret. A vendor whose wire
-format is its own — Qwen, DeepSeek — gets its own family. **Adding a vendor that speaks a
+format is its own — Qwen — gets its own family. **Adding a vendor that speaks a
 known dialect must be a row, not a file.**
 
 - **`api` mode** — base URL plus a `secret` reference. `SecretService.resolve()` at point of
@@ -524,7 +525,11 @@ known dialect must be a row, not a file.**
   (WebView2 `WebResourceRequested`, only when the tab's origin matches the request origin) and
   stored through `SecretService` like any other credential: encrypted at rest, never in a
   DTO, never in the renderer. **Cookies are never copied out of the profile**. Reading them
-  into a Rust HTTP client was considered and rejected.
+  into a Rust HTTP client was considered and rejected. Account mode is plain authenticated
+  requests only: a vendor that gates its web API behind a proof of work, a CAPTCHA or another
+  anti-automation challenge is offered through its official API instead. That is why Qwen is
+  the only account family (and only works while Qwen does not challenge its chat
+  endpoints) and DeepSeek is API-only (D11, `docs/adr/0001-account-provider-limitations.md`).
 
 ### Structure
 
@@ -540,7 +545,7 @@ known dialect must be a row, not a file.**
   requires an account?) so services and UI degrade honestly instead of guessing.
 - `drivers/ai/identity/` — per-family identity probes for `account` mode: a small mapper from
   the vendor's "current user" endpoint onto our `AccountIdentity`
-  (`chat.qwen.ai/api/v1/auths/`, `chat.deepseek.com/api/v0/users/current`).
+  (`chat.qwen.ai/api/v1/auths/`).
 - A **provider registry** maps a `provider` row to a configured driver: pick the adapter
   family, build the transport for the auth mode, cache the client per provider id, invalidate
   on provider, secret or account change. **Never cache a resolved plaintext credential.**

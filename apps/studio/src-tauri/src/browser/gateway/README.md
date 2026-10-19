@@ -7,7 +7,7 @@ the response headers (never `Set-Cookie`) and the body bytes, and nothing else.
 
 ## Pages
 
-- The allow-list is `https://chat.qwen.ai` and `https://chat.deepseek.com`
+- The allow-list is `https://chat.qwen.ai`
   (`bearer::ACCOUNT_ORIGINS`). Builds with `cfg(test)` or the `e2e` feature also allow
   `http://127.0.0.1:<port>` for the fixture server. Any other URL is refused before a page
   exists.

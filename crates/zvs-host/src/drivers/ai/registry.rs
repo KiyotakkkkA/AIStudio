@@ -901,7 +901,7 @@ mod tests {
                 Ok(Repositories::new(transaction)
                     .accounts
                     .create(&AccountDraft::new(
-                        AccountFamily::DeepseekWeb,
+                        AccountFamily::QwenWeb,
                         "persist:browser-work",
                         "user-1",
                         100,
@@ -910,10 +910,10 @@ mod tests {
             .expect("an account");
         let linked = fixture.create(&ProviderDraft {
             kind: ProviderKind::OpenaiCompatible,
-            name: "DeepSeek".to_owned(),
-            adapter: AdapterFamily::DeepseekWeb,
+            name: "Qwen".to_owned(),
+            adapter: AdapterFamily::QwenWeb,
             auth_mode: AuthMode::Account,
-            base_url: "https://chat.deepseek.com/api/v0".to_owned(),
+            base_url: "https://chat.qwen.ai/api/v2".to_owned(),
             account_id: Some(account.id.clone()),
             ..draft()
         });
@@ -995,7 +995,7 @@ mod tests {
                 Ok(Repositories::new(transaction)
                     .accounts
                     .create(&AccountDraft::new(
-                        AccountFamily::DeepseekWeb,
+                        AccountFamily::QwenWeb,
                         "persist:browser-work",
                         "user-2",
                         1100,

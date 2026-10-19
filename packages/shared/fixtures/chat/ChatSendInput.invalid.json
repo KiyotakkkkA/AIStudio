@@ -1,0 +1,23 @@
+[
+  {
+    "name": "blank text",
+    "value": {
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "text": "  "
+    }
+  },
+  {
+    "name": "missing conversation",
+    "value": {
+      "text": "x"
+    }
+  },
+  {
+    "name": "empty model",
+    "value": {
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "text": "x",
+      "modelId": ""
+    }
+  }
+]

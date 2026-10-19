@@ -298,7 +298,7 @@ mod tests {
             Some(AccountToken::bearer("original"))
         );
         assert_eq!(
-            gateway.account_token("https://chat.deepseek.com/api/v0/users/current"),
+            gateway.account_token("https://chat.qwen.ai.example/api/v1/auths/"),
             None
         );
         assert_eq!(gateway.account_token("not a url"), None);

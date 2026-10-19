@@ -15,6 +15,7 @@ pub const TIMED_OUT_MESSAGE: &str = "Провайдер не ответил во
 pub const UNREACHABLE_MESSAGE: &str = "Провайдер недоступен";
 pub const REQUEST_FAILED_MESSAGE: &str = "Не удалось выполнить запрос к провайдеру";
 pub const SESSION_EXPIRED_MESSAGE: &str = "Сессия аккаунта истекла — требуется повторная привязка";
+pub const BROWSER_VERIFICATION_MESSAGE: &str = "Вендор вернул страницу проверки браузера (антибот-защита) вместо ответа API — генерация через аккаунт недоступна, подключите вендора по официальному API";
 
 const MAX_CAUSE_DEPTH: usize = 8;
 
@@ -81,6 +82,20 @@ pub fn session_expired(details: ErrorDetails) -> AppError {
     .with_details(details)
 }
 
+pub fn browser_verification(details: ErrorDetails) -> AppError {
+    AppError::new(
+        AppErrorCode::ProviderUnreachable,
+        BROWSER_VERIFICATION_MESSAGE,
+    )
+    .with_details(details)
+}
+
+pub fn is_html(headers: &Headers) -> bool {
+    headers
+        .get("content-type")
+        .is_some_and(|value| value.to_lowercase().contains("text/html"))
+}
+
 pub fn is_session_expired(error: &AppError) -> bool {
     error.code == AppErrorCode::ProviderSessionExpired
 }
@@ -99,12 +114,7 @@ pub fn is_not_found_response(error: &AppError) -> bool {
 }
 
 pub fn is_signed_out_response(status: u16, headers: &Headers) -> bool {
-    if (300..400).contains(&status) {
-        return true;
-    }
-    headers
-        .get("content-type")
-        .is_some_and(|value| value.to_lowercase().contains("text/html"))
+    (300..400).contains(&status) || is_html(headers)
 }
 
 pub fn http_failure(failure: HttpFailure) -> AppError {

@@ -111,7 +111,6 @@ test("migration 0003 adds adapter and auth mode and backfills from kind", () => 
 
 test("every registered adapter family is implemented, and an unknown one is refused", () => {
   assert.deepEqual(Object.keys(ADAPTER_REGISTRY).sort(), [
-    "deepseek-web",
     "local",
     "openai-compatible",
     "qwen-web",
@@ -372,13 +371,13 @@ test("OpenRouter metadata failures preserve discovery without assuming free or p
 test("a base URL that speaks the OpenAI dialect is listed in one request", async () => {
   const transport = createFakeTransport("https://api.mistral.ai/v1");
   const adapter = new OpenAiCompatibleAdapter({ transport });
-  transport.reply("/models", { body: { data: [{ id: "deepseek/deepseek-v4.1-flash" }] } });
+  transport.reply("/models", { body: { data: [{ id: "qwen/qwen3-coder" }] } });
 
   const models = await adapter.listModels(new AbortController().signal);
 
   assert.deepEqual(
     models.map((entry) => entry.externalId),
-    ["deepseek/deepseek-v4.1-flash"],
+    ["qwen/qwen3-coder"],
   );
   assert.deepEqual(
     transport.calls.map((call) => call.path),

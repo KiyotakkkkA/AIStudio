@@ -38,23 +38,6 @@ fn qwen_payload() -> Value {
     })
 }
 
-fn deepseek_payload() -> Value {
-    json!({
-        "code": 0,
-        "msg": "",
-        "data": {
-            "biz_code": 0,
-            "biz_msg": "",
-            "biz_data": {
-                "id": 4242,
-                "email": "k***@mail.ru",
-                "token": "deepseek-token-1",
-                "id_profile": { "name": "Кирилл", "picture": "https://cdn.deepseek.com/a.png" },
-            },
-        },
-    })
-}
-
 struct Fixture {
     database: TemporaryDatabase,
     secrets: Arc<SecretService>,
@@ -183,7 +166,7 @@ fn raw_row(database: &Database, id: &str) -> String {
 }
 
 #[test]
-fn both_vendor_payloads_collapse_onto_one_account_identity() {
+fn the_vendor_payload_collapses_onto_one_account_identity() {
     let qwen = map_qwen_identity(&qwen_payload()).expect("maps");
     assert_eq!(
         qwen.identity,
@@ -196,22 +179,6 @@ fn both_vendor_payloads_collapse_onto_one_account_identity() {
         }
     );
     assert_eq!(qwen.credential, Some(AccountToken::bearer("qwen-token-1")));
-
-    let deepseek = map_deepseek_identity(&deepseek_payload()).expect("maps");
-    assert_eq!(
-        deepseek.identity,
-        AccountIdentity {
-            external_id: "4242".to_owned(),
-            email_masked: Some("k***@mail.ru".to_owned()),
-            display_name: Some("Кирилл".to_owned()),
-            avatar_url: Some("https://cdn.deepseek.com/a.png".to_owned()),
-            expires_at: None,
-        }
-    );
-    assert_eq!(
-        deepseek.credential,
-        Some(AccountToken::bearer("deepseek-token-1"))
-    );
 
     let sparse = map_qwen_identity(&json!({ "id": 7 })).expect("maps");
     assert_eq!(
@@ -250,10 +217,6 @@ fn both_vendor_payloads_collapse_onto_one_account_identity() {
         QWEN_IDENTITY_ENDPOINT
     );
     assert_eq!(
-        identity_probe(AccountFamily::DeepseekWeb).endpoint(),
-        DEEPSEEK_IDENTITY_ENDPOINT
-    );
-    assert_eq!(
         AccountFamily::ALL
             .iter()
             .map(|family| identity_probe(*family).family())
@@ -263,32 +226,6 @@ fn both_vendor_payloads_collapse_onto_one_account_identity() {
     assert_eq!(
         identity_probe(AccountFamily::QwenWeb).login_url(),
         QWEN_LOGIN_URL
-    );
-}
-
-#[test]
-fn a_200_with_a_non_zero_deepseek_code_is_a_failure_not_a_signed_in_user() {
-    let mut outer = deepseek_payload();
-    outer["code"] = json!(40_003);
-    let mut inner = deepseek_payload();
-    inner["data"]["biz_code"] = json!(1);
-    for payload in [
-        outer,
-        inner,
-        json!({ "code": 0, "data": { "biz_code": 0, "biz_data": null } }),
-    ] {
-        let error = map_deepseek_identity(&payload).expect_err("refuses");
-        assert_eq!(
-            error.code,
-            AppErrorCode::ProviderSessionExpired,
-            "{payload}"
-        );
-    }
-    let mut blank = deepseek_payload();
-    blank["data"]["biz_data"]["id"] = json!(" ");
-    assert_eq!(
-        map_deepseek_identity(&blank).expect_err("refuses").code,
-        AppErrorCode::ValidationFailed
     );
 }
 
@@ -311,11 +248,11 @@ async fn a_login_redirect_to_html_is_a_session_expiry_not_a_parse_error() {
 
     session.reset();
     session.queue(
-        DEEPSEEK_IDENTITY_ENDPOINT,
+        QWEN_IDENTITY_ENDPOINT,
         vec![FakeReply::json(401, &json!({ "code": 40_100 }))],
     );
     assert_eq!(
-        identity_probe(AccountFamily::DeepseekWeb)
+        identity_probe(AccountFamily::QwenWeb)
             .probe(session.as_ref(), &token())
             .await
             .expect_err("expired")
@@ -325,13 +262,13 @@ async fn a_login_redirect_to_html_is_a_session_expiry_not_a_parse_error() {
 
     session.reset();
     session.queue(
-        DEEPSEEK_IDENTITY_ENDPOINT,
+        QWEN_IDENTITY_ENDPOINT,
         vec![FakeReply::Failure(zvs_contract::AppError::new(
             AppErrorCode::ProviderUnreachable,
             UNREACHABLE_MESSAGE,
         ))],
     );
-    let unreachable = identity_probe(AccountFamily::DeepseekWeb)
+    let unreachable = identity_probe(AccountFamily::QwenWeb)
         .probe(session.as_ref(), &token())
         .await
         .expect_err("unreachable");
@@ -704,7 +641,7 @@ fn the_stored_token_only_answers_for_the_identity_origin() {
         session.account_token("https://chat.qwen.ai/api/v2/models/"),
         Some(AccountToken::bearer("qwen-token-stale"))
     );
-    assert_eq!(session.account_token("https://chat.deepseek.com/"), None);
+    assert_eq!(session.account_token("https://chat.qwen.ai.example/"), None);
     assert!(!format!("{session:?}").contains("qwen-token-stale"));
     fixture
         .session
@@ -728,10 +665,10 @@ fn the_stored_token_only_answers_for_the_identity_origin() {
 #[tokio::test]
 async fn an_account_mode_401_is_session_expired_while_an_api_mode_401_is_an_auth_failure() {
     let session = FakeSessionGateway::shared();
-    let url = "https://chat.deepseek.com/api/v0/chat";
+    let url = "https://chat.qwen.ai/api/v2/chat";
     session.queue(url, vec![FakeReply::json(401, &json!({ "code": 40_100 }))]);
     let transport = AccountTransport::new(AccountTransportOptions::new(
-        "https://chat.deepseek.com/api/v0",
+        "https://chat.qwen.ai/api/v2",
         session.clone(),
     ));
     assert_eq!(
@@ -806,8 +743,19 @@ async fn the_account_transport_guards_redirects_html_and_server_errors() {
         .stream(&RequestSpec::post("chat", json!({})), &token())
         .await
         .err()
-        .expect("signed out");
-    assert_eq!(error.code, AppErrorCode::ProviderSessionExpired);
+        .expect("a verification page");
+    assert_eq!(error.code, AppErrorCode::ProviderUnreachable);
+    assert_eq!(
+        error.message,
+        crate::drivers::ai::errors::BROWSER_VERIFICATION_MESSAGE
+    );
+    assert_eq!(
+        error
+            .details
+            .as_ref()
+            .and_then(|details| details.get("reason")),
+        Some(&json!("browser-verification"))
+    );
     assert_eq!(
         session
             .last_request()

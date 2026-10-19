@@ -244,7 +244,6 @@ mod tests {
             [
                 json!(["openai-compatible", true]),
                 json!(["qwen-web", true]),
-                json!(["deepseek-web", true]),
                 json!(["local", true]),
             ]
         );

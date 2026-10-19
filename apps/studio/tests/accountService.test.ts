@@ -70,7 +70,7 @@ beforeEach(() => {
     probes: (family) => ({
       family,
       endpoint: "https://example.com/identity",
-      loginUrl: family === "qwen-web" ? "https://chat.qwen.ai/" : "https://chat.deepseek.com/",
+      loginUrl: "https://chat.qwen.ai/",
       probe: (_session, signal) => {
         calls.push(signal);
         return probe(signal);
@@ -117,7 +117,7 @@ test("polling stores a masked identity and encrypted token with progress and don
 
 test("timeout writes nothing and makes no further requests", async () => {
   probe.mockRejectedValue(signedOut());
-  const pending = service.link({ adapter: "deepseek-web" });
+  const pending = service.link({ adapter: "qwen-web" });
   await vi.advanceTimersByTimeAsync(6000);
   expect(await pending).toMatchObject({ status: "timeout" });
   expect(service.list()).toEqual([]);
@@ -161,7 +161,7 @@ test("automatic refresh saves rotated credentials without opening a login tab", 
 
 test("automatic refresh checks unknown expiry every fifteen minutes and stops on sign-out", async () => {
   probe.mockResolvedValueOnce({ ...identity(), identity: { externalId: "user-1" } });
-  await service.link({ adapter: "deepseek-web" });
+  await service.link({ adapter: "qwen-web" });
   probe.mockRejectedValue(signedOut());
   service.startAutoRefresh();
   await vi.advanceTimersByTimeAsync(14 * 60_000);
@@ -188,7 +188,7 @@ test("automatic refresh backs off after transient failures and recovers", async 
 
 test("persistent vendor failures still stop at the sign-in deadline", async () => {
   probe.mockRejectedValue(new AppError(AppErrorCode.PROVIDER_UNREACHABLE, "Unavailable"));
-  const pending = service.link({ adapter: "deepseek-web" });
+  const pending = service.link({ adapter: "qwen-web" });
   await vi.advanceTimersByTimeAsync(6000);
   expect(await pending).toMatchObject({ status: "timeout" });
   expect(service.list()).toEqual([]);
@@ -320,23 +320,19 @@ test("unlink preserves browser session and providers while deleting the token", 
 
 test("cookie clearing marks only the matching vendor and derives session-expired without outbound calls", async () => {
   await service.link({ adapter: "qwen-web" });
-  await service.link({ adapter: "deepseek-web" });
   const row = service.list().find((account) => account.adapter === "qwen-web")!;
   const provider = attach(row.id);
   lifecycle.emit({ type: "cookies-cleared", domain: "evilqwen.ai" });
   expect(service.list().find((account) => account.id === row.id)?.status).toBe("linked");
   lifecycle.emit({ type: "cookies-cleared", domain: ".qwen.ai" });
   expect(service.list().find((account) => account.id === row.id)?.status).toBe("needs-relink");
-  expect(service.list().find((account) => account.adapter === "deepseek-web")?.status).toBe(
-    "linked",
-  );
   const providers = createProviderService(database.client);
   expect(providers.get(provider.id)).toMatchObject({
     status: "failed",
     statusDetail: "Сессия истекла — войдите заново",
   });
   expect((await providers.probe({ id: provider.id })).outcome).toEqual({ kind: "session-expired" });
-  expect(probe).toHaveBeenCalledTimes(2);
+  expect(probe).toHaveBeenCalledTimes(1);
   await providers.dispose();
 });
 

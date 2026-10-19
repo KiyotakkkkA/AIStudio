@@ -8,5 +8,11 @@
   {
     "name": "nothing",
     "value": {}
+  },
+  {
+    "name": "the removed deepseek family",
+    "value": {
+      "adapter": "deepseek-web"
+    }
   }
 ]

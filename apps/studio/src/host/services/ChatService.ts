@@ -191,7 +191,7 @@ export class ChatService {
           createdAt: this.clock(),
         });
         return {
-          providerId: conversation.providerId,
+          providerId: input.providerId,
           model: model.externalId,
           messages: prepared.messages.flatMap(({ role, content }) =>
             role === "tool" ? [] : [{ role, content }],

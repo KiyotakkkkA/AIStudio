@@ -15,8 +15,8 @@ use super::{
     TransportResponse, join_url, normalise_timeout,
 };
 use crate::drivers::ai::errors::{
-    HttpFailure, cancelled, http_failure, is_signed_out_response, request_failed, session_expired,
-    timed_out,
+    HttpFailure, browser_verification, cancelled, http_failure, is_html, is_signed_out_response,
+    request_failed, session_expired, timed_out,
 };
 use crate::drivers::ai::transport::AccountToken;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
@@ -290,6 +290,16 @@ impl AccountTransport {
             "partition".to_owned(),
             Value::from(self.session.partition()),
         );
+        if (200..300).contains(&status) && is_html(headers) {
+            details.insert("reason".to_owned(), json!("browser-verification"));
+            self.logger.log(
+                LogLevel::Warn,
+                "ai",
+                "The vendor answered an API call with a browser-verification page",
+                &[("status", json!(status)), ("origin", json!(self.origin))],
+            );
+            return Err(browser_verification(details));
+        }
         Err(session_expired(details))
     }
 

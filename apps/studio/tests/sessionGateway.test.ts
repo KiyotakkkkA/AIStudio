@@ -34,14 +34,11 @@ function observe(
   } as unknown as Electron.OnSendHeadersListenerDetails);
 }
 
-for (const family of ["qwen-web", "deepseek-web"] as const) {
+for (const family of ["qwen-web"] as const) {
   test(`${family} detects existing and newly authenticated browser sessions`, async () => {
     const gateway = createSessionGateway();
     const probe = identityProbe(family);
-    const payload =
-      family === "qwen-web"
-        ? { id: "user-1", name: "Person" }
-        : { code: 0, data: { biz_code: 0, biz_data: { id: "user-1" } } };
+    const payload = { id: "user-1", name: "Person" };
     electron.profile.fetch.mockImplementation(async (_url, request) =>
       request.headers.authorization === "Bearer browser-token"
         ? Response.json(payload)
@@ -79,7 +76,7 @@ test("tokens stay scoped to the vendor and browser partition, and host probes ca
   observe(endpoint, "Basic unsupported");
   observe("https://untrusted.example/api", "Bearer unrelated");
   expect(gateway.accountToken?.(endpoint)).toEqual({ token: "original", tokenType: "Bearer" });
-  expect(gateway.accountToken?.(identityProbe("deepseek-web").endpoint)).toBeNull();
+  expect(gateway.accountToken?.("https://chat.qwen.ai.example/api/v1/auths/")).toBeNull();
   expect(gateway.accountToken?.("https://untrusted.example/")).toBeNull();
 });
 
@@ -100,7 +97,7 @@ test("saved credentials survive a restart and newer browser credentials take pre
   );
   expect(resolve).toHaveBeenCalledWith("saved-secret");
   expect(restored.accountToken?.(endpoint)).toEqual({ token: "saved-token", tokenType: "Bearer" });
-  expect(restored.accountToken?.("https://chat.deepseek.com/api/v0/users/current")).toBeNull();
+  expect(restored.accountToken?.("https://chat.qwen.ai.example/api/v1/auths/")).toBeNull();
   expect(restored.accountToken?.("https://untrusted.example/")).toBeNull();
   observe(endpoint, "Bearer rotated-token");
   expect(restored.accountToken?.(endpoint)).toEqual({

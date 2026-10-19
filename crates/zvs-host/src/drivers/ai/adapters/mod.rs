@@ -1,5 +1,4 @@
 pub mod account_family;
-pub mod deepseek_web;
 pub mod local;
 pub mod ollama;
 pub mod openai_compatible;
@@ -11,7 +10,6 @@ use std::sync::Arc;
 use zvs_contract::{AdapterFamily, AppError, AppErrorCode};
 
 pub use account_family::{AccountAdapterCore, AccountAdapterOptions, flatten_prompt};
-pub use deepseek_web::{DEEPSEEK_WEB_CAPABILITIES, DeepSeekWebAdapter, deepseek_curated_models};
 pub use local::{
     FileSystemModelStore, LOCAL_CAPABILITIES, LocalEmbeddingAdapter, LocalEmbeddingEngine,
     LocalModelStore, SharedEmbeddingEngine, SharedModelStore,
@@ -119,13 +117,6 @@ impl AdapterFamilyEntry {
                 embedding: None,
                 image: None,
             }),
-            AdapterFamily::DeepseekWeb => Ok(AiDriver {
-                text: Some(Arc::new(DeepSeekWebAdapter::new(
-                    context.account_options()?,
-                ))),
-                embedding: None,
-                image: None,
-            }),
         }
     }
 }
@@ -142,10 +133,6 @@ pub const fn adapter_entry(family: AdapterFamily) -> AdapterFamilyEntry {
         },
         AdapterFamily::QwenWeb => AdapterFamilyEntry {
             capabilities: QWEN_WEB_CAPABILITIES,
-            implemented: true,
-        },
-        AdapterFamily::DeepseekWeb => AdapterFamilyEntry {
-            capabilities: DEEPSEEK_WEB_CAPABILITIES,
             implemented: true,
         },
     }
@@ -235,24 +222,22 @@ mod tests {
     }
 
     #[test]
-    fn both_account_families_build_a_text_only_driver_over_their_transport() {
-        for family in [AdapterFamily::QwenWeb, AdapterFamily::DeepseekWeb] {
-            let entry = adapter_entry(family);
-            let driver = entry
-                .build(&AdapterContext::with_transport(transport_for(
-                    "http://127.0.0.1:9",
-                )))
-                .expect("builds");
-            assert!(driver.text.is_some());
-            assert!(driver.embedding.is_none());
-            assert!(driver.image.is_none());
-            assert_eq!(
-                entry
-                    .build(&AdapterContext::default())
-                    .expect_err("refuses")
-                    .message,
-                "Адаптеру нужен транспорт"
-            );
-        }
+    fn the_account_family_builds_a_text_only_driver_over_its_transport() {
+        let entry = adapter_entry(AdapterFamily::QwenWeb);
+        let driver = entry
+            .build(&AdapterContext::with_transport(transport_for(
+                "http://127.0.0.1:9",
+            )))
+            .expect("builds");
+        assert!(driver.text.is_some());
+        assert!(driver.embedding.is_none());
+        assert!(driver.image.is_none());
+        assert_eq!(
+            entry
+                .build(&AdapterContext::default())
+                .expect_err("refuses")
+                .message,
+            "Адаптеру нужен транспорт"
+        );
     }
 }

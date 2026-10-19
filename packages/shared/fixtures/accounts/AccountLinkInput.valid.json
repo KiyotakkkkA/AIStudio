@@ -4,11 +4,5 @@
     "value": {
       "adapter": "qwen-web"
     }
-  },
-  {
-    "name": "deepseek",
-    "value": {
-      "adapter": "deepseek-web"
-    }
   }
 ]

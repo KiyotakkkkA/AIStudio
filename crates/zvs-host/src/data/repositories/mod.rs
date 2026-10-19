@@ -1,4 +1,5 @@
 pub mod account;
+pub mod chat;
 pub mod download;
 pub mod graph_edge;
 pub mod graph_relation;
@@ -20,6 +21,7 @@ use rusqlite::Connection;
 pub use account::{
     AccountDraft, AccountPatch, AccountRemoval, AccountRepository, NO_ACCOUNT_LINKED,
 };
+pub use chat::{ChatRepository, ConversationPatch, MessagePatch};
 pub use download::{DownloadPatch, DownloadRepository};
 pub use graph_edge::{GraphEdgeDraft, GraphEdgeLookup, GraphEdgeRepository};
 pub use graph_relation::GraphRelationRepository;
@@ -58,6 +60,7 @@ pub struct Repositories<'c> {
     pub downloads: DownloadRepository<'c>,
     pub tools: ToolRepository<'c>,
     pub mcp_servers: McpServerRepository<'c>,
+    pub chat: ChatRepository<'c>,
 }
 
 impl<'c> Repositories<'c> {
@@ -79,6 +82,7 @@ impl<'c> Repositories<'c> {
             downloads: DownloadRepository::new(connection),
             tools: ToolRepository::new(connection),
             mcp_servers: McpServerRepository::new(connection),
+            chat: ChatRepository::new(connection),
         }
     }
 }

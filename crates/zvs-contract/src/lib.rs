@@ -2,12 +2,14 @@ pub mod accounts;
 pub mod ai;
 pub mod browser;
 pub mod channels;
+pub mod chat;
 pub mod downloads;
 pub mod enums;
 pub mod envelope;
 pub mod errors;
 pub mod events;
 pub mod graph;
+pub mod graph_expansion;
 pub mod ids;
 pub mod mcp;
 pub mod primitives;
@@ -36,6 +38,13 @@ pub use browser::{
     BrowserState, BrowserTab,
 };
 pub use channels::{CHANNELS, is_channel};
+pub use chat::{
+    ChatCitationDto, ChatConversationsListOutput, ChatSendInput, ChatSettings, ChatToolCallDto,
+    ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationRef,
+    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, MessageDto, MessageRole,
+    RenameConversationInput, TruncateConversationInput, UpdateConversationRelationsInput,
+    UpdateConversationStoresInput, UpdateConversationToolsInput,
+};
 pub use downloads::{
     CatalogueFilter, CatalogueItemDto, CatalogueItemState, CatalogueSource, ChecksumAlgorithm,
     ChecksumDto, DiskCategory, DiskCategoryUsage, DiskUsageDto, DownloadDto, DownloadFetchInput,
@@ -57,6 +66,10 @@ pub use graph::{
     GraphRelationTypeDto, GraphRelationsListOutput, GraphRemoveEdgeOutput, GraphShortestPathInput,
     GraphShortestPathOutput, GraphSubgraphDto, GraphSubgraphInput, GraphSubgraphNodeDto,
     RemoveGraphEdgeInput, is_relation_name,
+};
+pub use graph_expansion::{
+    GRAPH_EXPANSION_DEFAULT_MAX, GraphExpansion, GraphExpansionDocument, GraphNeighborhood,
+    merge_graph_neighbors,
 };
 pub use ids::*;
 pub use mcp::{

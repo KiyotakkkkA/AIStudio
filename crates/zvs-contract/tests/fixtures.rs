@@ -563,6 +563,63 @@ const TABLE: &[(&str, Check)] = &[
         "runtimes/RuntimesRemoveOutput",
         round_trip::<zvs_contract::RuntimesRemoveOutput>,
     ),
+    (
+        "chat/ChatSettings",
+        round_trip::<zvs_contract::ChatSettings>,
+    ),
+    (
+        "chat/ChatCitationDto",
+        round_trip::<zvs_contract::ChatCitationDto>,
+    ),
+    (
+        "chat/ChatToolCallStatus",
+        round_trip::<zvs_contract::ChatToolCallStatus>,
+    ),
+    (
+        "chat/ChatToolCallDto",
+        round_trip::<zvs_contract::ChatToolCallDto>,
+    ),
+    (
+        "chat/CreateConversationInput",
+        round_trip::<zvs_contract::CreateConversationInput>,
+    ),
+    (
+        "chat/ConversationRef",
+        round_trip::<zvs_contract::ConversationRef>,
+    ),
+    (
+        "chat/ConversationDto",
+        round_trip::<zvs_contract::ConversationDto>,
+    ),
+    ("chat/MessageDto", round_trip::<zvs_contract::MessageDto>),
+    (
+        "chat/ConversationDetailDto",
+        round_trip::<zvs_contract::ConversationDetailDto>,
+    ),
+    (
+        "chat/ChatSendInput",
+        round_trip::<zvs_contract::ChatSendInput>,
+    ),
+    (
+        "chat/TruncateConversationInput",
+        round_trip::<zvs_contract::TruncateConversationInput>,
+    ),
+    (
+        "chat/RenameConversationInput",
+        round_trip::<zvs_contract::RenameConversationInput>,
+    ),
+    (
+        "chat/UpdateConversationStoresInput",
+        round_trip::<zvs_contract::UpdateConversationStoresInput>,
+    ),
+    (
+        "chat/UpdateConversationRelationsInput",
+        round_trip::<zvs_contract::UpdateConversationRelationsInput>,
+    ),
+    (
+        "chat/UpdateConversationToolsInput",
+        round_trip::<zvs_contract::UpdateConversationToolsInput>,
+    ),
 ];
 
 const SECRET_OUTPUTS: &[&str] = &[

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "succeeded",
+    "value": {
+      "id": "call_1",
+      "key": "demo.lookup",
+      "name": "demo__lookup",
+      "round": 0,
+      "arguments": {
+        "query": "x"
+      },
+      "status": "succeeded",
+      "result": "found x",
+      "truncated": false,
+      "error": null,
+      "approvalId": null,
+      "stepId": null,
+      "durationMs": 4
+    }
+  },
+  {
+    "name": "awaiting approval",
+    "value": {
+      "id": "call_1",
+      "key": "demo.lookup",
+      "name": "demo__lookup",
+      "round": 0,
+      "arguments": "{oops",
+      "status": "awaiting-approval",
+      "result": null,
+      "truncated": false,
+      "error": null,
+      "approvalId": "0199aa11-4444-7111-8111-111111111111",
+      "stepId": null,
+      "durationMs": 4
+    }
+  }
+]

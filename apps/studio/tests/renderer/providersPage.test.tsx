@@ -95,7 +95,7 @@ test("the page mounts one form and one list, with the token as a picker over sec
 test("web adapter hides the vendor field", async () => {
   renderPage(
     provider({
-      adapter: "deepseek-web",
+      adapter: "qwen-web",
       authMode: "account",
       secretId: null,
       accountId: null,

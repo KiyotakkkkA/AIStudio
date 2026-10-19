@@ -32,6 +32,7 @@ pub struct RunPatch {
     pub error: Option<Option<String>>,
     pub started_at: Option<Timestamp>,
     pub finished_at: Option<Timestamp>,
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -299,6 +300,10 @@ impl<'c> RunRepository<'c> {
         if let Some(finished_at) = patch.finished_at {
             assignments.push("finished_at = ?");
             values.push(SqlValue::Integer(finished_at));
+        }
+        if let Some(title) = &patch.title {
+            assignments.push("title = ?");
+            values.push(SqlValue::Text(title.clone()));
         }
         if assignments.is_empty() {
             return Ok(0);

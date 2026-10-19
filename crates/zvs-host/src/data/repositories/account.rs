@@ -325,7 +325,7 @@ mod tests {
 
     fn draft() -> AccountDraft {
         AccountDraft::new(
-            AccountFamily::DeepseekWeb,
+            AccountFamily::QwenWeb,
             "persist:browser-work",
             "user-1",
             100,
@@ -334,13 +334,13 @@ mod tests {
 
     fn provider(account_id: Option<&str>) -> ProviderDraft {
         ProviderDraft {
-            adapter: AdapterFamily::DeepseekWeb,
+            adapter: AdapterFamily::QwenWeb,
             auth_mode: AuthMode::Account,
             account_id: account_id.map(str::to_owned),
             ..ProviderDraft::new(
                 ProviderKind::OpenaiCompatible,
-                "DeepSeek",
-                "https://chat.deepseek.com/api/v0",
+                "Qwen",
+                "https://chat.qwen.ai/api/v2",
                 vec![ProviderCapability::Text],
                 100,
             )
@@ -416,19 +416,19 @@ mod tests {
             assert_eq!(
                 repositories
                     .accounts
-                    .list_by_adapter(AccountFamily::DeepseekWeb)?,
+                    .list_by_adapter(AccountFamily::QwenWeb)?,
                 std::slice::from_ref(&linked)
-            );
-            assert!(
-                repositories
-                    .accounts
-                    .list_by_adapter(AccountFamily::QwenWeb)?
-                    .is_empty()
             );
             assert_eq!(
                 repositories
                     .accounts
-                    .find_by_adapter_and_external_id(AccountFamily::DeepseekWeb, "user-1")?,
+                    .find_by_adapter_and_external_id(AccountFamily::QwenWeb, "user-2")?,
+                None
+            );
+            assert_eq!(
+                repositories
+                    .accounts
+                    .find_by_adapter_and_external_id(AccountFamily::QwenWeb, "user-1")?,
                 Some(linked)
             );
             Ok(())

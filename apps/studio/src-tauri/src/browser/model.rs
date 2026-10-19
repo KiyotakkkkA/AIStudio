@@ -313,14 +313,14 @@ mod tests {
     fn a_link_tab_is_reported_once_when_it_closes_and_forgotten_when_linking_finishes() {
         let mut links = LinkTabs::default();
         links.opened("browser-site-1", "https://chat.qwen.ai/");
-        links.opened("browser-site-2", "https://chat.deepseek.com/");
+        links.opened("browser-site-2", "https://chat.qwen.ai/c/second");
         assert_eq!(links.closed("browser-site-9"), None);
         assert_eq!(
             links.closed("browser-site-1").as_deref(),
             Some("https://chat.qwen.ai/")
         );
         assert_eq!(links.closed("browser-site-1"), None);
-        links.finished("https://chat.deepseek.com/");
+        links.finished("https://chat.qwen.ai/c/second");
         assert_eq!(links.closed("browser-site-2"), None);
         links.opened("browser-site-3", "https://chat.qwen.ai/");
         links.clear();

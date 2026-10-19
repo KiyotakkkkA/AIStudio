@@ -1,11 +1,9 @@
 import { AppError, AppErrorCode, type AccountFamily } from "@zvs/shared";
-import { deepSeekIdentityProbe } from "./deepseek.ts";
 import type { IdentityProbe } from "./IdentityProbe.ts";
 import { qwenIdentityProbe } from "./qwen.ts";
 
 export const IDENTITY_PROBES: Readonly<Record<AccountFamily, IdentityProbe>> = {
   "qwen-web": qwenIdentityProbe,
-  "deepseek-web": deepSeekIdentityProbe,
 };
 
 export function identityProbe(family: AccountFamily): IdentityProbe {

@@ -15,10 +15,10 @@
     }
   },
   {
-    "name": "a deepseek account that needs a re-link",
+    "name": "a qwen account that needs a re-link",
     "value": {
       "id": "0199aa11-1111-7111-8111-111111111111",
-      "adapter": "deepseek-web",
+      "adapter": "qwen-web",
       "emailMasked": null,
       "displayName": null,
       "avatarUrl": null,

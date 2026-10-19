@@ -80,7 +80,7 @@ test("the empty state explains account mode and offers only the vendors the host
     within(menu)
       .getAllByRole("menuitem")
       .map((item) => item.textContent),
-    ["DeepSeekОткроется сайт вендора", "QwenОткроется сайт вендора"],
+    ["QwenОткроется сайт вендора"],
   );
 
   // The vendor's own page takes the password; our UI never offers a field for one.

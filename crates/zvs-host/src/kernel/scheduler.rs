@@ -10,15 +10,15 @@ use serde_json::{Map, Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, AppErrorCode, ApprovalRequestDto, GraphBinding, GraphNode, HostEventDraft, RunId,
-    RunOutcomeDto, RunOutcomeStatus, RunStatus, StepEventDto, StepStatus, Timestamp, Validate,
-    log_line,
+    RunOutcomeDto, RunOutcomeStatus, RunStatus, StepEventDto, StepStatus, Timestamp, ToolTier,
+    Validate, log_line,
 };
 
 use super::registry::NodeRegistry;
 use super::stream::RunStream;
 use super::types::{
-    AdmissionOrigin, ApprovalDecision, KernelServices, PermissionRequirement, StepContext,
-    StepLink, cancelled,
+    AdmissionOrigin, ApprovalDecision, ApprovalObserver, KernelServices, PermissionRequirement,
+    StepContext, StepLink, ToolStepFuture, ToolStepRequest, ToolStepResult, cancelled,
 };
 use crate::data::repositories::RunPatch;
 use crate::data::schema::{RunRow, StepRow};
@@ -35,6 +35,8 @@ pub const ONLY_KERNEL_ENDS: &str = "Only the kernel can end a run";
 pub const NO_PERMISSION_SERVICE: &str = "Сервис разрешений недоступен";
 pub const NO_APPROVAL_SERVICE: &str = "Сервис согласования недоступен";
 pub const NODE_PANICKED: &str = "Узел завершился аварийно";
+pub const NO_TOOL_NODE: &str =
+    "Инструмент нельзя вызвать: источник не предоставил для него исполняемый узел";
 
 pub type ApprovalHook = Arc<
     dyn Fn(
@@ -551,6 +553,7 @@ impl Scheduler {
             Arc::new(NodeLink {
                 scheduler: Arc::clone(&self),
                 live: Arc::clone(&live),
+                node_id: node.id.clone(),
             }),
         );
         let registry = Arc::clone(&self.options.registry);
@@ -650,6 +653,110 @@ impl Scheduler {
         self.commit_step(&step, false)
     }
 
+    fn commit_tool_step(&self, step: &StepRow, inserting: bool) -> Result<(), AppError> {
+        self.stream.commit(
+            self.live_drafts(vec![HostEventDraft::Step {
+                step: step_event(step),
+            }]),
+            |repositories| {
+                if inserting {
+                    repositories.runs.add_step(step).map_err(data_error)?;
+                } else {
+                    repositories.runs.update_step(step).map_err(data_error)?;
+                }
+                Ok(())
+            },
+        )
+    }
+
+    async fn invoke_tool(
+        self: Arc<Self>,
+        context: StepContext,
+        parent: String,
+        request: ToolStepRequest,
+    ) -> Result<ToolStepResult, AppError> {
+        context.check_cancelled()?;
+        let definition = self
+            .options
+            .registry
+            .for_tool(&request.key)
+            .filter(|definition| definition.permission().tool_key().is_some())
+            .ok_or_else(|| {
+                AppError::new(AppErrorCode::NotFound, NO_TOOL_NODE)
+                    .with_detail("key", request.key.clone())
+            })?;
+        let mut step = StepRow {
+            id: new_id().hyphenated().to_string(),
+            run_id: self.run.id.clone(),
+            node_id: format!("{parent}.{}", request.label),
+            step_type: definition.node_type().to_owned(),
+            status: StepStatus::Running,
+            input: request.input.clone(),
+            output: Value::Null,
+            error: None,
+            started_at: self.now(),
+            finished_at: None,
+            attempt: 1,
+        };
+        self.commit_tool_step(&step, true)?;
+        let requirement = match definition.permission().clone() {
+            PermissionRequirement::Tool { tool, tier }
+                if request.minimum_tier == Some(ToolTier::Ask) && tier != Some(ToolTier::Off) =>
+            {
+                PermissionRequirement::Tool {
+                    tool,
+                    tier: Some(ToolTier::Ask),
+                }
+            }
+            other => other,
+        };
+        let admission = StepContext::new(
+            context.run_id,
+            context.cancel.clone(),
+            context.services.clone(),
+            Arc::new(ObservedLink {
+                inner: context.link(),
+                observer: request.on_approval.clone(),
+            }),
+        );
+        let outcome = async {
+            match self.options.admit.clone() {
+                Some(admit) => admit(requirement, admission, AdmissionOrigin::Model).await?,
+                None => {
+                    return Err(AppError::new(
+                        AppErrorCode::PermissionDenied,
+                        NO_PERMISSION_SERVICE,
+                    ));
+                }
+            }
+            context.check_cancelled()?;
+            let output = definition.execute(&context, request.input.clone()).await?;
+            context.check_cancelled()?;
+            Ok(output)
+        }
+        .await;
+        step.finished_at = Some(self.now());
+        match &outcome {
+            Ok(output) => {
+                step.status = StepStatus::Succeeded;
+                step.output = output.clone();
+            }
+            Err(_) if self.cancel.is_cancelled() => {
+                step.status = StepStatus::Cancelled;
+                step.error = Some(super::types::CANCELLED_MESSAGE.to_owned());
+            }
+            Err(error) => {
+                step.status = StepStatus::Failed;
+                step.error = Some(error.message.clone());
+            }
+        }
+        self.commit_tool_step(&step, false)?;
+        outcome.map(|output| ToolStepResult {
+            step_id: step.id,
+            output,
+        })
+    }
+
     fn approval_finished(&self, live: &AtomicBool) -> Result<(), AppError> {
         let remaining = {
             let mut state = self.state();
@@ -682,9 +789,41 @@ fn max_attempts(node: &GraphNode) -> i64 {
     i64::try_from(node.retry().max_attempts).unwrap_or(i64::MAX)
 }
 
+#[derive(Clone)]
 struct NodeLink {
     scheduler: Arc<Scheduler>,
     live: Arc<AtomicBool>,
+    node_id: String,
+}
+
+struct ObservedLink {
+    inner: Arc<dyn StepLink>,
+    observer: Option<ApprovalObserver>,
+}
+
+impl StepLink for ObservedLink {
+    fn emit(&self, event: HostEventDraft) -> Result<(), AppError> {
+        self.inner.emit(event)
+    }
+
+    fn request_approval(
+        &self,
+        request: ApprovalRequestDto,
+    ) -> BoxFuture<'static, Result<ApprovalDecision, AppError>> {
+        let inner = Arc::clone(&self.inner);
+        let observer = self.observer.clone();
+        async move {
+            if let Some(observer) = &observer {
+                observer(&request, None);
+            }
+            let decision = inner.request_approval(request.clone()).await?;
+            if let Some(observer) = &observer {
+                observer(&request, Some(decision));
+            }
+            Ok(decision)
+        }
+        .boxed()
+    }
 }
 
 impl StepLink for NodeLink {
@@ -728,5 +867,26 @@ impl StepLink for NodeLink {
             decision
         }
         .boxed()
+    }
+
+    fn invoke_tool(&self, request: ToolStepRequest) -> Option<ToolStepFuture> {
+        let link = self.clone();
+        Some(
+            async move {
+                if !link.live.load(Ordering::SeqCst) || link.scheduler.cancel.is_cancelled() {
+                    return Err(cancelled());
+                }
+                let context = StepContext::new(
+                    link.scheduler.run_id,
+                    link.scheduler.cancel.clone(),
+                    link.scheduler.options.services.clone(),
+                    Arc::new(link.clone()),
+                );
+                Arc::clone(&link.scheduler)
+                    .invoke_tool(context, link.node_id.clone(), request)
+                    .await
+            }
+            .boxed(),
+        )
     }
 }

@@ -39,7 +39,7 @@ test("the vendor list comes from the host's account families, not from the rende
 
   await store.load();
 
-  assert.deepEqual(store.families, ["deepseek-web", "qwen-web"]);
+  assert.deepEqual(store.families, ["qwen-web"]);
   assert.equal(store.isEmpty, true);
 });
 

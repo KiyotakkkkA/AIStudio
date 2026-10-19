@@ -15,8 +15,6 @@ use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 
-pub const ACCOUNT_GENERATION_PENDING: &str =
-    "account-mode generation is not implemented yet (TASK_014_EXTRA_3)";
 pub const MALFORMED_MODELS_MESSAGE: &str = "Вендор вернул неизвестный формат списка моделей";
 pub const MALFORMED_TURN_MESSAGE: &str = "Вендор вернул неизвестный формат ответа";
 pub const TRUNCATED_STREAM_MESSAGE: &str = "Поток вендора оборвался";
@@ -73,12 +71,6 @@ fn described(code: AppErrorCode, message: &str, fields: Vec<(&'static str, Value
         .fold(AppError::new(code, message), |error, (key, value)| {
             error.with_detail(key, value)
         })
-}
-
-pub fn generation_not_implemented(family: AdapterFamily, model: &str) -> AppError {
-    AppError::new(AppErrorCode::Unknown, ACCOUNT_GENERATION_PENDING)
-        .with_detail("family", family.as_str())
-        .with_detail("model", model)
 }
 
 pub fn malformed_payload(family: AdapterFamily, endpoint: &str, logger: &SharedLogger) -> AppError {

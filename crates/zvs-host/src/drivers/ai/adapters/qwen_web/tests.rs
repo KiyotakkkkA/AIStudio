@@ -7,13 +7,7 @@ use tokio_util::sync::CancellationToken;
 use zvs_contract::{AppErrorCode, DeltaKind, HostEventDraft, RunOutcomeStatus, TunableParameter};
 
 use super::*;
-use crate::drivers::ai::adapters::account_family::{
-    ACCOUNT_GENERATION_PENDING, AccountAdapterOptions,
-};
-use crate::drivers::ai::adapters::deepseek_web::{
-    DEEPSEEK_MODELS_OBSERVATION, DEEPSEEK_WEB_CAPABILITIES, DeepSeekWebAdapter,
-    deepseek_curated_models,
-};
+use crate::drivers::ai::adapters::account_family::AccountAdapterOptions;
 use crate::drivers::ai::injected_tools::{INJECTED_CALL_KEY, with_injected_tools};
 use crate::drivers::ai::mock::{
     MockServer, Recorded, Reply, fixture_frames, fixture_text, search_tool, transport_for,
@@ -216,75 +210,15 @@ async fn a_rejected_account_session_surfaces_as_session_expired() {
     );
 }
 
-#[tokio::test]
-async fn the_deepseek_family_serves_a_curated_list_because_the_vendor_exposes_no_endpoint() {
-    let server = MockServer::start().await;
-    let deepseek = DeepSeekWebAdapter::new(AccountAdapterOptions::new(transport_for(
-        &server.url("/api/v0"),
-    )));
-    let models = deepseek.list_models(&token()).await.expect("lists");
-    assert!(server.calls().is_empty());
-    assert_eq!(models, deepseek_curated_models());
-    assert_eq!(
-        models
-            .iter()
-            .map(|model| model.external_id.as_str())
-            .collect::<Vec<_>>(),
-        ["deepseek-chat", "deepseek-reasoner"]
-    );
-    assert_eq!(
-        models[1].capabilities,
-        [ModelCapability::Streaming, ModelCapability::Reasoning]
-    );
-    assert!(
-        models
-            .iter()
-            .all(|model| model.context_window.is_none() && model.max_output.is_none())
-    );
-    const { assert!(!DEEPSEEK_WEB_CAPABILITIES.live_model_list) };
-    assert_eq!(DEEPSEEK_MODELS_OBSERVATION.observed_at, "2026-09-10");
-}
-
 #[test]
-fn both_account_families_declare_their_honoured_parameters_honestly() {
-    for capabilities in [QWEN_WEB_CAPABILITIES, DEEPSEEK_WEB_CAPABILITIES] {
-        assert_eq!(capabilities.auth_modes, [AuthMode::Account]);
-        assert!(!capabilities.embedding);
-        assert!(!capabilities.image);
-        assert_eq!(capabilities.honours, Honours::NONE);
-        assert_eq!(capabilities.tools, ToolMode::Injected);
-    }
+fn the_account_family_declares_its_honoured_parameters_honestly() {
+    let capabilities = QWEN_WEB_CAPABILITIES;
+    assert_eq!(capabilities.auth_modes, [AuthMode::Account]);
+    assert!(!capabilities.embedding);
+    assert!(!capabilities.image);
+    assert_eq!(capabilities.honours, Honours::NONE);
+    assert_eq!(capabilities.tools, ToolMode::Injected);
     const { assert!(QWEN_WEB_CAPABILITIES.streaming) };
-    const { assert!(!DEEPSEEK_WEB_CAPABILITIES.streaming) };
-}
-
-#[tokio::test]
-async fn deepseek_generation_stays_unimplemented_until_its_wire_format_is_recorded() {
-    let deepseek = DeepSeekWebAdapter::new(AccountAdapterOptions::new(transport_for(
-        "http://127.0.0.1:9",
-    )));
-    let request = GenerateRequest {
-        model: "deepseek-chat".to_owned(),
-        ..prompt()
-    };
-    let check = |error: AppError| {
-        assert_eq!(error.code, AppErrorCode::Unknown);
-        assert_eq!(error.message, ACCOUNT_GENERATION_PENDING);
-        let details = error.details.expect("details");
-        assert_eq!(details["family"], json!("deepseek-web"));
-        assert_eq!(details["model"], json!("deepseek-chat"));
-    };
-    check(
-        deepseek
-            .generate(&request, &token())
-            .await
-            .expect_err("pending"),
-    );
-    check(
-        drain(deepseek.stream(&request, &token()))
-            .await
-            .expect_err("pending"),
-    );
 }
 
 #[tokio::test]

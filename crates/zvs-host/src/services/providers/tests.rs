@@ -568,7 +568,7 @@ async fn disposing_cancels_a_pending_probe_and_refuses_new_ones() {
 }
 
 #[tokio::test]
-async fn saved_probes_apply_secret_rotation_and_mark_curated_model_lists() {
+async fn saved_probes_apply_secret_rotation() {
     let fixture = Fixture::new();
     let secret_id = fixture.create_secret("Expiring", "sk-key", Some(NOW - DAY_MS));
     let row = fixture.create(&create_input(json!({ "secretId": secret_id })));
@@ -581,15 +581,6 @@ async fn saved_probes_apply_secret_rotation_and_mark_curated_model_lists() {
             .status,
         ProviderStatus::Degraded
     );
-    let curated = fixture
-        .probe_draft(create_input(
-            json!({ "adapter": "deepseek-web", "authMode": "account" }),
-        ))
-        .await;
-    assert!(matches!(
-        curated.outcome,
-        ProbeOutcome::Ok { live: false, .. }
-    ));
 }
 
 #[tokio::test]
@@ -704,11 +695,10 @@ fn adapter_descriptors_list_every_family_with_its_wiring_state() {
         [
             (AdapterFamily::OpenaiCompatible, true),
             (AdapterFamily::QwenWeb, true),
-            (AdapterFamily::DeepseekWeb, true),
             (AdapterFamily::Local, true),
         ]
     );
-    let local = &descriptors[3].capabilities;
+    let local = &descriptors[2].capabilities;
     assert!(local.embedding);
     assert!(!local.streaming);
 }

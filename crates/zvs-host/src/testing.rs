@@ -377,6 +377,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         clock: clock.clone(),
         tools: Some(tools.clone()),
         services: crate::kernel::KernelServices {
+            providers: Some(Arc::new(FakeTexts(drivers.clone()))),
             jobs: Some(jobs.clone()),
             downloads: Some(Arc::new(downloads.clone())),
             indexing: Some(Arc::new(indexing.clone())),
@@ -404,6 +405,16 @@ pub fn test_services(system: SystemService) -> TestServices {
             reqwest::Client::new(),
         )
     });
+    let chat = crate::services::ChatService::new(crate::services::ChatServiceOptions {
+        tools: Some(tools.clone()),
+        clock: clock.clone(),
+        ..crate::services::ChatServiceOptions::new(
+            database.shared(),
+            runs.clone(),
+            Arc::clone(&nodes),
+        )
+    })
+    .expect("a chat service");
     let picker = FakePicker::shared();
     TestServices {
         services: Arc::new(Services {
@@ -425,6 +436,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             tools,
             tool_invoker,
             mcp,
+            chat,
             picker: Some(picker.clone()),
         }),
         nodes,
@@ -445,6 +457,22 @@ pub fn test_services(system: SystemService) -> TestServices {
         core,
         picker,
         database,
+    }
+}
+
+pub struct FakeTexts(pub Arc<FakeDriverSource>);
+
+impl crate::kernel::TextDrivers for FakeTexts {
+    fn text(
+        &self,
+        _provider_id: &str,
+    ) -> Result<crate::drivers::ai::ports::SharedTextDriver, zvs_contract::AppError> {
+        self.0
+            .driver()
+            .map(|driver| driver as crate::drivers::ai::ports::SharedTextDriver)
+            .ok_or_else(|| {
+                zvs_contract::AppError::new(zvs_contract::AppErrorCode::Conflict, "No fake driver")
+            })
     }
 }
 

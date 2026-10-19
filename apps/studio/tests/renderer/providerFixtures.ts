@@ -30,17 +30,6 @@ export const ADAPTERS: AdapterDescriptorDto[] = [
     implemented: true,
   },
   {
-    family: "deepseek-web",
-    authModes: ["account"],
-    streaming: false,
-    liveModelList: false,
-    embedding: false,
-    image: false,
-    honours: { temperature: false, topK: false, topP: false, maxOutputTokens: false },
-    tools: "injected",
-    implemented: true,
-  },
-  {
     family: "qwen-web",
     authModes: ["account"],
     streaming: true,

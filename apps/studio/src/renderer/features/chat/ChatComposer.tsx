@@ -43,6 +43,20 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
           >
             Открыть провайдеров ИИ
           </Link>
+          {store.accountChoices.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {store.accountChoices.map((choice) => (
+                <Button
+                  key={choice.value}
+                  tone="primary"
+                  disabled={store.connecting}
+                  onClick={() => void store.connectAccount(choice.accountId)}
+                >
+                  {store.connecting ? "Подключение…" : `Подключить ${choice.label}`}
+                </Button>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : (
         <form
@@ -242,12 +256,23 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                   <SelectInput
                     label="Провайдер чата"
                     value={store.provider?.id ?? ""}
-                    options={store.providers.map((provider) => ({
-                      value: provider.id,
-                      label: provider.name,
-                    }))}
-                    disabled={!store.canConfigure}
+                    options={[
+                      ...store.providers.map((provider) => ({
+                        value: provider.id,
+                        label: provider.name,
+                      })),
+                      ...store.accountChoices.map((choice) => ({
+                        value: choice.value,
+                        label: choice.label,
+                      })),
+                    ]}
+                    disabled={!store.canConfigure || store.connecting}
                     onChange={(id) => {
+                      const choice = store.accountChoices.find((item) => item.value === id);
+                      if (choice) {
+                        void store.connectAccount(choice.accountId);
+                        return;
+                      }
                       const provider = store.providers.find((item) => item.id === id);
                       if (provider) store.composer.selectProvider(provider);
                     }}

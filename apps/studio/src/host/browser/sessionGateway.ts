@@ -7,7 +7,7 @@ import type {
 import { BROWSER_PARTITION } from "./policy.ts";
 import type { AccountToken } from "../drivers/ai/transport/AccountTransport.ts";
 
-const ACCOUNT_ORIGINS = ["https://chat.qwen.ai", "https://chat.deepseek.com"];
+const ACCOUNT_ORIGINS = ["https://chat.qwen.ai"];
 
 export function createSessionGateway(partition: string = BROWSER_PARTITION): SessionGateway {
   const profile = session.fromPartition(partition);

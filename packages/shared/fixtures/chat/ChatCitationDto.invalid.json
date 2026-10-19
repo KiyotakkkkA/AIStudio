@@ -1,0 +1,40 @@
+[
+  {
+    "name": "score above one",
+    "value": {
+      "storeId": "0199aa11-5555-7111-8111-111111111111",
+      "documentId": "doc",
+      "sourcePath": "docs/a.md",
+      "chunkIndex": 3,
+      "score": 1.5,
+      "section": "",
+      "page": null,
+      "related": null
+    }
+  },
+  {
+    "name": "zero page",
+    "value": {
+      "storeId": "0199aa11-5555-7111-8111-111111111111",
+      "documentId": "doc",
+      "sourcePath": "docs/a.md",
+      "chunkIndex": 3,
+      "score": 0.9,
+      "section": "",
+      "page": 0,
+      "related": null
+    }
+  },
+  {
+    "name": "missing store",
+    "value": {
+      "documentId": "doc",
+      "sourcePath": "docs/a.md",
+      "chunkIndex": 3,
+      "score": 0.9,
+      "section": "",
+      "page": null,
+      "related": null
+    }
+  }
+]

@@ -1,4 +1,5 @@
 pub mod accounts;
+pub mod chat;
 pub mod downloads;
 pub mod graph_relations;
 pub mod mcp;
@@ -27,6 +28,7 @@ pub fn register(server: &mut IpcServer) {
     runtimes::register(server);
     tools::register(server);
     mcp::register(server);
+    chat::register(server);
 }
 
 #[cfg(test)]
@@ -63,6 +65,17 @@ mod tests {
                 "accounts.list",
                 "accounts.refresh",
                 "accounts.unlink",
+                "chat.cancel",
+                "chat.conversations.create",
+                "chat.conversations.get",
+                "chat.conversations.list",
+                "chat.conversations.remove",
+                "chat.conversations.rename",
+                "chat.conversations.truncate",
+                "chat.conversations.updateRelations",
+                "chat.conversations.updateStores",
+                "chat.conversations.updateTools",
+                "chat.send",
                 "downloads.cancel",
                 "downloads.catalogue",
                 "downloads.disk",
@@ -160,7 +173,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "becomes strict at TASK_076, when every channel is ported"]
     fn every_contract_channel_is_served() {
         let (_host, server) = registered();
         let coverage = server.coverage();
@@ -170,5 +182,7 @@ mod tests {
             coverage.missing.len(),
             coverage.missing
         );
+        assert_eq!(server.channels(), zvs_contract::CHANNELS);
+        assert!(server.finish().is_complete());
     }
 }

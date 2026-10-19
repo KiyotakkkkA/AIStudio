@@ -3,7 +3,6 @@ import type { Logger } from "../../../platform/logger.ts";
 import type { AdapterCapabilities } from "../AdapterCapabilities.ts";
 import type { AiDriver } from "../ports.ts";
 import type { Transport } from "../transport/Transport.ts";
-import { DeepSeekWebAdapter, DEEPSEEK_WEB_CAPABILITIES } from "./deepseekWeb.ts";
 import {
   LocalEmbeddingAdapter,
   LOCAL_CAPABILITIES,
@@ -58,17 +57,6 @@ export const ADAPTER_REGISTRY: Readonly<Record<AdapterFamily, AdapterFamilyEntry
       return { text: new QwenWebAdapter(requireTransport(context)), embedding: null, image: null };
     },
   },
-  "deepseek-web": {
-    capabilities: DEEPSEEK_WEB_CAPABILITIES,
-    implemented: true,
-    build(context: AdapterContext): AiDriver {
-      return {
-        text: new DeepSeekWebAdapter(requireTransport(context)),
-        embedding: null,
-        image: null,
-      };
-    },
-  },
   local: {
     capabilities: LOCAL_CAPABILITIES,
     implemented: true,
@@ -98,7 +86,6 @@ export function adapterCapabilities(family: AdapterFamily): AdapterCapabilities 
   return adapterEntry(family).capabilities;
 }
 
-export { DeepSeekWebAdapter, DEEPSEEK_WEB_CAPABILITIES };
 export { OpenAiCompatibleAdapter, OPENAI_COMPATIBLE_CAPABILITIES };
 export { QwenWebAdapter, QWEN_WEB_CAPABILITIES };
 export { LocalEmbeddingAdapter, LOCAL_CAPABILITIES };

@@ -1,0 +1,59 @@
+[
+  {
+    "name": "empty id",
+    "value": {
+      "id": "",
+      "key": "demo.lookup",
+      "name": "demo__lookup",
+      "round": 0,
+      "arguments": {
+        "query": "x"
+      },
+      "status": "succeeded",
+      "result": "found x",
+      "truncated": false,
+      "error": null,
+      "approvalId": null,
+      "stepId": null,
+      "durationMs": 4
+    }
+  },
+  {
+    "name": "negative round",
+    "value": {
+      "id": "call_1",
+      "key": "demo.lookup",
+      "name": "demo__lookup",
+      "round": -1,
+      "arguments": {
+        "query": "x"
+      },
+      "status": "succeeded",
+      "result": "found x",
+      "truncated": false,
+      "error": null,
+      "approvalId": null,
+      "stepId": null,
+      "durationMs": 4
+    }
+  },
+  {
+    "name": "unknown status",
+    "value": {
+      "id": "call_1",
+      "key": "demo.lookup",
+      "name": "demo__lookup",
+      "round": 0,
+      "arguments": {
+        "query": "x"
+      },
+      "status": "done",
+      "result": "found x",
+      "truncated": false,
+      "error": null,
+      "approvalId": null,
+      "stepId": null,
+      "durationMs": 4
+    }
+  }
+]

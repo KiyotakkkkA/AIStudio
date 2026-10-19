@@ -8,7 +8,8 @@ import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import ChatStore from "../../src/renderer/features/chat/ChatStore.ts";
 import ChatComposer from "../../src/renderer/features/chat/ChatComposer";
 import ChatMarkdown from "../../src/renderer/features/chat/ChatMarkdown";
-import { provider } from "./providerFixtures.ts";
+import { ADAPTERS, provider } from "./providerFixtures.ts";
+import { account } from "./accountFixtures.ts";
 
 test("Markdown drops raw HTML and remote images and renders fenced code as escaped text", async () => {
   const content =
@@ -48,6 +49,26 @@ test("no provider routes to configuration and does not leave a dead composer", a
       .getAttribute("href"),
   ).toBe("/providers");
   expect(screen.queryByRole("textbox", { name: /Message|Сообщение/ })).toBeNull();
+  store.dispose();
+  events.dispose();
+});
+
+test("with no provider yet, a linked Qwen account can be connected straight from the chat", async () => {
+  const bridge = createFakeBridge<Contract>()
+    .handle("chat.conversations.list", () => [])
+    .handle("providers.list", () => [])
+    .handle("vectorStores.list", () => [])
+    .handle("accounts.list", () => [account()])
+    .handle("providers.adapters", () => ADAPTERS);
+  const events = createEventRouter();
+  const store = new ChatStore(createIpcClient(contract, bridge), events);
+  await store.mount();
+  render(
+    <MemoryRouter>
+      <ChatComposer store={store} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("button", { name: "Подключить Qwen · аккаунт" })).toBeTruthy();
   store.dispose();
   events.dispose();
 });

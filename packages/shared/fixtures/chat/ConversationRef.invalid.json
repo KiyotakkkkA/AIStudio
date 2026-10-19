@@ -1,0 +1,12 @@
+[
+  {
+    "name": "missing id",
+    "value": {}
+  },
+  {
+    "name": "not a uuid",
+    "value": {
+      "id": "c1"
+    }
+  }
+]

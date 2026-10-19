@@ -146,7 +146,7 @@ test("an account-only family disables the API-key segment and switches the mode"
 test("a family the host declares but has not wired up is refused", () => {
   // Every registered family is implemented today; the guard must still hold when one is not.
   const stub = ADAPTERS.map((entry) =>
-    entry.family === "deepseek-web" ? { ...entry, implemented: false } : entry,
+    entry.family === "qwen-web" ? { ...entry, implemented: false } : entry,
   );
   const vm = new ProviderFormVm({
     adapters: stub,
@@ -154,12 +154,12 @@ test("a family the host declares but has not wired up is refused", () => {
     capability: "text",
     provider: null,
   });
-  vm.setName("DeepSeek");
+  vm.setName("Qwen");
   vm.setSecretId(SECRET);
-  vm.setAdapter("deepseek-web");
+  vm.setAdapter("qwen-web");
 
   assert.equal(vm.validate(), false);
-  assert.equal(vm.errorOf("adapter"), "Семейство deepseek-web ещё не реализовано.");
+  assert.equal(vm.errorOf("adapter"), "Семейство qwen-web ещё не реализовано.");
 });
 
 test("tunables come from the descriptor, never from vendor guesswork", () => {

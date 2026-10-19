@@ -55,6 +55,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0001_graph_relation_seed",
         sql: include_str!("../../migrations/0001_graph_relation_seed.sql"),
     },
+    Migration {
+        id: 2,
+        name: "0002_remove_deepseek_web",
+        sql: include_str!("../../migrations/0002_remove_deepseek_web.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -355,6 +360,30 @@ mod tests {
 
     fn sql_migration(id: u32, name: &'static str, sql: &'static str) -> Migration<'static> {
         Migration { id, name, sql }
+    }
+
+    #[test]
+    fn the_deepseek_cleanup_removes_its_accounts_and_providers_and_keeps_qwen() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..2], &options(&backups, &clock)).expect("applies");
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    "INSERT INTO account (id, adapter, partition, external_id, status, linked_at, updated_at) VALUES                        ('a-gone', 'deepseek-web', 'persist:browser-work', 'u1', 'linked', 1, 1),                        ('a-kept', 'qwen-web', 'persist:browser-work', 'u2', 'linked', 1, 1);                      INSERT INTO provider (id, kind, name, base_url, capabilities, created_at, updated_at, adapter, auth_mode, account_id) VALUES                        ('p-gone', 'openai-compatible', 'DeepSeek', 'https://chat.deepseek.com/api', '[\"text\"]', 1, 1, 'deepseek-web', 'account', 'a-gone'),                        ('p-kept', 'openai-compatible', 'Qwen', 'https://chat.qwen.ai/api/v2', '[\"text\"]', 1, 1, 'qwen-web', 'account', 'a-kept');",
+                )?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        assert_eq!(
+            query(&database, "SELECT id FROM account ORDER BY id"),
+            ["a-kept"]
+        );
+        assert_eq!(
+            query(&database, "SELECT id FROM provider ORDER BY id"),
+            ["p-kept"]
+        );
     }
 
     #[test]

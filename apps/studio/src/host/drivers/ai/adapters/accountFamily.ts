@@ -17,9 +17,6 @@ import type {
 import type { RequestSpec, Transport, TransportResponse } from "../transport/Transport.ts";
 import { sseData } from "./sse.ts";
 
-export const ACCOUNT_GENERATION_PENDING =
-  "account-mode generation is not implemented yet (TASK_014_EXTRA_3)";
-
 export const ROLE_LABELS: Readonly<Record<ChatRole, string>> = {
   system: "System",
   user: "User",
@@ -38,12 +35,6 @@ export interface AccountAdapterOptions {
 export interface VendorObservation {
   readonly source: string;
   readonly observedAt: string;
-}
-
-export function generationNotImplemented(family: AdapterFamily, model: string): AppError {
-  return new AppError(AppErrorCode.UNKNOWN, ACCOUNT_GENERATION_PENDING, {
-    details: { family, model },
-  });
 }
 
 export function failingStream(error: AppError): AsyncIterable<TextDelta> {

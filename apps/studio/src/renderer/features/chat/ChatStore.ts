@@ -7,6 +7,9 @@ import {
   modelToolSupport,
   resolveToolMode,
   type ToolMode,
+  type AccountDto,
+  type AccountId,
+  type AdapterDescriptorDto,
   type ChatCitationDto,
   type Contract,
   type ConversationDetailDto,
@@ -20,6 +23,16 @@ import {
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import ConversationVm from "./ConversationVm";
+import { adapterLabel } from "../providers/accountPresentation";
+import { suggestedBaseUrl } from "../providers/providerPresentation";
+
+export const ACCOUNT_OPTION_PREFIX = "account:";
+
+export interface AccountChoice {
+  readonly value: string;
+  readonly label: string;
+  readonly accountId: AccountId;
+}
 
 export default class ChatStore {
   conversations: ConversationDto[] = [];
@@ -27,6 +40,9 @@ export default class ChatStore {
   providers: ProviderDto[] = [];
   stores: VectorStoreDto[] = [];
   tools: ToolDto[] = [];
+  accounts: AccountDto[] = [];
+  adapters: AdapterDescriptorDto[] = [];
+  connecting = false;
   composer = new ConversationVm();
   query = "";
   contextOpen = false;
@@ -114,6 +130,95 @@ export default class ChatStore {
       provider.adapterCapabilities.tools,
       modelToolSupport(model, provider.models),
     );
+  }
+  get accountChoices(): AccountChoice[] {
+    return this.accounts
+      .filter(
+        (account) =>
+          account.status === "linked" &&
+          this.adapters.some(
+            (adapter) =>
+              adapter.family === account.adapter &&
+              adapter.implemented &&
+              adapter.streaming &&
+              adapter.authModes.includes("account"),
+          ) &&
+          !this.providers.some(
+            (provider) =>
+              provider.accountId === account.id &&
+              provider.enabled &&
+              provider.models.some((model) => model.available),
+          ),
+      )
+      .map((account) => ({
+        value: `${ACCOUNT_OPTION_PREFIX}${account.id}`,
+        label: `${adapterLabel(account.adapter)} · аккаунт`,
+        accountId: account.id,
+      }));
+  }
+  async connectAccount(accountId: AccountId) {
+    const account = this.accounts.find((entry) => entry.id === accountId);
+    if (!account || this.connecting) return;
+    this.connecting = true;
+    this.error = null;
+    try {
+      const created =
+        (await this.accountProvider(account)) ??
+        (await this.ipc.call("providers.create", {
+          name: adapterLabel(account.adapter),
+          kind: "openai-compatible",
+          adapter: account.adapter,
+          authMode: "account",
+          baseUrl: suggestedBaseUrl("openai-compatible", account.adapter),
+          secretId: null,
+          accountId: account.id,
+          capabilities: ["text"],
+          settings: { selectedModelIds: [] },
+          enabled: true,
+        }));
+      await this.ipc.call("providers.probe", { id: created.id });
+      const discovered = await this.ipc.call("providers.get", {
+        id: created.id,
+        selectedOnly: false,
+      });
+      const selectedModelIds = discovered.models
+        .filter((model) => model.available)
+        .map((model) => model.externalId);
+      await this.ipc.call("providers.update", {
+        id: created.id,
+        enabled: true,
+        capabilities: discovered.capabilities.includes("text")
+          ? discovered.capabilities
+          : [...discovered.capabilities, "text"],
+        settings: { ...discovered.settings, selectedModelIds },
+      });
+      const provider = await this.ipc.call("providers.get", {
+        id: created.id,
+        selectedOnly: true,
+      });
+      runInAction(() => {
+        this.providers = [...this.providers.filter((item) => item.id !== provider.id), provider];
+        this.composer.selectProvider(provider);
+        this.connecting = false;
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.error = errorCopy(error);
+        this.connecting = false;
+      });
+    }
+  }
+  private async accountProvider(account: AccountDto) {
+    const summaries = await this.ipc.call("providers.list", {});
+    for (const summary of summaries) {
+      if (summary.adapter !== account.adapter || summary.authMode !== "account") continue;
+      const provider = await this.ipc.call("providers.get", {
+        id: summary.id,
+        selectedOnly: false,
+      });
+      if (provider.accountId === account.id) return provider;
+    }
+    return null;
   }
   get enabledTools() {
     return this.active?.enabledTools ?? this.composer.enabledTools;
@@ -267,13 +372,15 @@ export default class ChatStore {
     this.error = null;
     const revision = ++this.revision;
     try {
-      const [conversations, summaries, stores, tools] = await Promise.all([
+      const [conversations, summaries, stores, tools, accounts, adapters] = await Promise.all([
         this.ipc.call("chat.conversations.list", undefined),
         this.ipc.call("providers.list", { capability: "text", enabled: true }),
         this.ipc.call("vectorStores.list", undefined),
         this.ipc
           .call("tools.list", { includeUnavailable: true })
           .catch((): ToolDto[] => this.tools),
+        this.ipc.call("accounts.list", undefined).catch((): AccountDto[] => []),
+        this.ipc.call("providers.adapters", undefined).catch((): AdapterDescriptorDto[] => []),
       ]);
       const providers = await Promise.all(
         summaries.map((provider) =>
@@ -286,6 +393,8 @@ export default class ChatStore {
         this.providers = providers;
         this.stores = stores;
         this.tools = tools;
+        this.accounts = accounts;
+        this.adapters = adapters;
         if (!this.composer.providerId && providers[0]) this.composer.selectProvider(providers[0]);
         this.loading = false;
       });

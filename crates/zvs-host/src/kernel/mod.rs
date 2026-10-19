@@ -18,6 +18,7 @@ pub use registry::{NodeRegistry, RegisteredNode, input_schema, json_schema};
 pub use scheduler::{AdmitHook, ApprovalHook, Finish, Scheduler, SchedulerOptions};
 pub use stream::{Observers, RunObserver, RunStream, Subscription};
 pub use types::{
-    AdmissionOrigin, ApprovalDecision, FnNode, KernelServices, NodeDef, PermissionRequirement,
-    StepContext, StepLink, TextDrivers, VectorIndexer, VectorSearch,
+    AdmissionOrigin, ApprovalDecision, ApprovalObserver, FnNode, GraphNeighbors, KernelServices,
+    NodeDef, PermissionRequirement, StepContext, StepLink, TextDrivers, ToolStepFuture,
+    ToolStepRequest, ToolStepResult, VectorIndexer, VectorSearch,
 };

@@ -5,6 +5,14 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
   AccountDto,
+  ChatCitationDto,
+  ChatSettings,
+  ChatToolCallDto,
+  ChatToolCallStatus,
+  ConversationDetailDto,
+  ConversationDto,
+  CreateConversationInput,
+  MessageDto,
   AdapterCapabilitiesDto,
   AdapterDescriptorDto,
   AppErrorCode,
@@ -286,6 +294,21 @@ const schemas: Record<string, z.ZodType> = {
   "runtimes/InstallRuntimeInput": contract["runtimes.install"].input,
   "runtimes/RuntimesStopOutput": contract["runtimes.stop"].output,
   "runtimes/RuntimesRemoveOutput": contract["runtimes.remove"].output,
+  "chat/ChatSettings": ChatSettings,
+  "chat/ChatCitationDto": ChatCitationDto,
+  "chat/ChatToolCallStatus": ChatToolCallStatus,
+  "chat/ChatToolCallDto": ChatToolCallDto,
+  "chat/CreateConversationInput": CreateConversationInput,
+  "chat/ConversationRef": contract["chat.conversations.get"].input,
+  "chat/ConversationDto": ConversationDto,
+  "chat/MessageDto": MessageDto,
+  "chat/ConversationDetailDto": ConversationDetailDto,
+  "chat/ChatSendInput": contract["chat.send"].input,
+  "chat/TruncateConversationInput": contract["chat.conversations.truncate"].input,
+  "chat/RenameConversationInput": contract["chat.conversations.rename"].input,
+  "chat/UpdateConversationStoresInput": contract["chat.conversations.updateStores"].input,
+  "chat/UpdateConversationRelationsInput": contract["chat.conversations.updateRelations"].input,
+  "chat/UpdateConversationToolsInput": contract["chat.conversations.updateTools"].input,
 };
 
 const root = fileURLToPath(new URL("../fixtures/", import.meta.url));

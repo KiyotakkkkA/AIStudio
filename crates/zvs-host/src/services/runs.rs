@@ -19,7 +19,7 @@ use super::approvals::{ApprovalService, DEFAULT_APPROVAL_TIMEOUT};
 use super::permissions::{Admission, PermissionContext, PermissionService};
 use crate::data::repositories::{RunCursor, RunDraft, RunPageQuery, encode_run_cursor};
 use crate::data::schema::{RunRow, StepRow};
-use crate::data::{Database, Repositories};
+use crate::data::{DataError, Database, Repositories};
 use crate::kernel::scheduler::step_event;
 use crate::kernel::{
     AdmissionOrigin, AdmitHook, ApprovalDecision, ApprovalHook, Finish, KernelServices,
@@ -360,6 +360,16 @@ impl RunService {
     }
 
     pub fn start(&self, input: StartRunInput) -> Result<RunHandleDto, AppError> {
+        self.start_with(input, |_, _| Ok(()), None)
+            .map(|(handle, _)| handle)
+    }
+
+    pub fn start_with(
+        &self,
+        input: StartRunInput,
+        prepare: impl FnOnce(&Repositories<'_>, &RunId) -> Result<(), DataError>,
+        observer: Option<RunObserver>,
+    ) -> Result<(RunHandleDto, Option<Subscription>), AppError> {
         if self.inner.closed.load(Ordering::SeqCst) {
             return Err(AppError::new(AppErrorCode::Conflict, SERVICE_STOPPED));
         }
@@ -382,15 +392,22 @@ impl RunService {
             created_at: self.inner.clock.now(),
             started_at: None,
         };
-        let run = self.inner.database.with_connection(|connection| {
-            Ok(Repositories::new(connection).runs.create(&draft)?)
+        let run = self.inner.database.transaction(|transaction| {
+            let repositories = Repositories::new(transaction);
+            let run = repositories.runs.create(&draft)?;
+            prepare(&repositories, &id)?;
+            Ok(run)
         })?;
+        let subscription = observer.map(|observer| {
+            let token = self.inner.observers.add(&run.id, observer);
+            Subscription::new(Arc::clone(&self.inner.observers), run.id.clone(), token)
+        });
         let stream = self.open_stream(&run)?;
         stream.emit(HostEventDraft::Log {
             line: log_line(&[("runId", json!(run.id)), ("status", json!("queued"))]),
         })?;
         self.launch(run, stream)?;
-        Ok(RunHandleDto { id, stream_id })
+        Ok((RunHandleDto { id, stream_id }, subscription))
     }
 
     fn open_stream(&self, run: &RunRow) -> Result<Arc<RunStream>, AppError> {

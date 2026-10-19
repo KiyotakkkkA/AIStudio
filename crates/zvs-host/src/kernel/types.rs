@@ -7,10 +7,12 @@ use futures::future::BoxFuture;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, ApprovalRequestDto, HostEventDraft, RunId, ToolTier, Validate,
-    VectorIndexInput, VectorIndexReportDto, VectorSearchHitDto, VectorStoreDto,
+    AppError, AppErrorCode, ApprovalRequestDto, GraphNeighborDto, GraphNeighborsInput,
+    HostEventDraft, RunId, ToolTier, Validate, VectorChunkDto, VectorIndexInput,
+    VectorIndexReportDto, VectorSearchHitDto, VectorStoreDto,
 };
 
 pub use crate::data::schema::ApprovalDecision;
@@ -19,6 +21,7 @@ use crate::drivers::ai::ProviderRegistry;
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::sidecar::SharedSidecarJobs;
 use crate::indexing::{IndexContext, IndexingService};
+use crate::services::graph::GraphService;
 use crate::services::vector_stores::{VectorSearchOptions, VectorStoreService};
 
 pub const CANCELLED_MESSAGE: &str = "Выполнение отменено";
@@ -83,11 +86,39 @@ pub trait VectorSearch: Send + Sync {
     ) -> Result<Vec<VectorSearchHitDto>, AppError>;
 
     async fn list(&self) -> Result<Vec<VectorStoreDto>, AppError> {
-        Err(AppError::new(
-            AppErrorCode::Conflict,
-            "Vector service unavailable",
-        ))
+        Err(unavailable())
     }
+
+    fn has_chunks(&self) -> bool {
+        false
+    }
+
+    async fn chunks(
+        &self,
+        _store_id: &str,
+        _document_id: &str,
+        _indices: &[u64],
+    ) -> Result<Vec<VectorChunkDto>, AppError> {
+        Err(unavailable())
+    }
+
+    fn has_related_chunks(&self) -> bool {
+        false
+    }
+
+    async fn related_chunks(
+        &self,
+        _store_id: &str,
+        _query: &str,
+        _document_ids: &[String],
+        _cancel: &CancellationToken,
+    ) -> Result<Vec<VectorSearchHitDto>, AppError> {
+        Err(unavailable())
+    }
+}
+
+fn unavailable() -> AppError {
+    AppError::new(AppErrorCode::Conflict, "Vector service unavailable")
 }
 
 #[async_trait]
@@ -104,6 +135,51 @@ impl VectorSearch for VectorStoreService {
 
     async fn list(&self) -> Result<Vec<VectorStoreDto>, AppError> {
         Self::list(self).await
+    }
+
+    fn has_chunks(&self) -> bool {
+        true
+    }
+
+    async fn chunks(
+        &self,
+        store_id: &str,
+        document_id: &str,
+        indices: &[u64],
+    ) -> Result<Vec<VectorChunkDto>, AppError> {
+        Self::chunks(self, store_id, document_id, indices).await
+    }
+
+    fn has_related_chunks(&self) -> bool {
+        true
+    }
+
+    async fn related_chunks(
+        &self,
+        store_id: &str,
+        query: &str,
+        document_ids: &[String],
+        cancel: &CancellationToken,
+    ) -> Result<Vec<VectorSearchHitDto>, AppError> {
+        Self::related_chunks(self, store_id, query, document_ids, cancel).await
+    }
+}
+
+#[async_trait]
+pub trait GraphNeighbors: Send + Sync {
+    async fn neighbors(
+        &self,
+        input: &GraphNeighborsInput,
+    ) -> Result<Vec<GraphNeighborDto>, AppError>;
+}
+
+#[async_trait]
+impl GraphNeighbors for GraphService {
+    async fn neighbors(
+        &self,
+        input: &GraphNeighborsInput,
+    ) -> Result<Vec<GraphNeighborDto>, AppError> {
+        Self::neighbors(self, input).await
     }
 }
 
@@ -134,7 +210,28 @@ pub struct KernelServices {
     pub jobs: Option<SharedSidecarJobs>,
     pub downloads: Option<SharedDownloadExecutor>,
     pub indexing: Option<Arc<dyn VectorIndexer>>,
+    pub graph: Option<Arc<dyn GraphNeighbors>>,
 }
+
+pub type ApprovalObserver =
+    Arc<dyn Fn(&ApprovalRequestDto, Option<ApprovalDecision>) + Send + Sync>;
+
+#[derive(Clone)]
+pub struct ToolStepRequest {
+    pub key: String,
+    pub input: Value,
+    pub label: String,
+    pub minimum_tier: Option<ToolTier>,
+    pub on_approval: Option<ApprovalObserver>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolStepResult {
+    pub step_id: String,
+    pub output: Value,
+}
+
+pub type ToolStepFuture = BoxFuture<'static, Result<ToolStepResult, AppError>>;
 
 pub trait StepLink: Send + Sync {
     fn emit(&self, event: HostEventDraft) -> Result<(), AppError>;
@@ -143,6 +240,10 @@ pub trait StepLink: Send + Sync {
         &self,
         request: ApprovalRequestDto,
     ) -> BoxFuture<'static, Result<ApprovalDecision, AppError>>;
+
+    fn invoke_tool(&self, _request: ToolStepRequest) -> Option<ToolStepFuture> {
+        None
+    }
 }
 
 #[derive(Clone)]
@@ -189,6 +290,14 @@ impl StepContext {
         request: ApprovalRequestDto,
     ) -> Result<ApprovalDecision, AppError> {
         self.link.request_approval(request).await
+    }
+
+    pub fn invoke_tool(&self, request: ToolStepRequest) -> Option<ToolStepFuture> {
+        self.link.invoke_tool(request)
+    }
+
+    pub fn link(&self) -> Arc<dyn StepLink> {
+        Arc::clone(&self.link)
     }
 }
 

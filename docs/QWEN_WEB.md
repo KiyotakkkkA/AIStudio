@@ -46,10 +46,13 @@ generation and a fresh browser payload comparison remain unverified. The existin
 `local` chat mode, `2.1` version and phase output schema have been retained;
 third-party differences alone are insufficient evidence to change them.
 
-The shared account transport currently treats HTML as a signed-out response, so
-this live browser-verification response surfaces as `PROVIDER_SESSION_EXPIRED`.
-Distinguishing verification challenges from login pages is a remaining transport
-limitation; a successful identity probe alone does not establish generation access.
+Since TASK_074_EXTRA_1 the account transport tells the two apart: a redirect is still
+`PROVIDER_SESSION_EXPIRED`, but a 2xx HTML page answering an API call is
+`PROVIDER_UNREACHABLE` with `reason: "browser-verification"` and «Вендор вернул страницу
+проверки браузера (антибот-защита)…», and it no longer marks the account for re-linking. A
+successful identity probe alone does not establish generation access. We do not try to pass
+the verification (ADR 0001); when it blocks generation, Qwen is used through its official
+API instead.
 
 The reviewed [public Qwen implementation](https://github.com/xtekky/gpt4free/blob/main/g4f/Provider/Qwen.py)
 also uses dynamic browser state. Its OAuth/device flow is a separate integration;

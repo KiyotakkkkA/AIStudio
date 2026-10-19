@@ -6,7 +6,6 @@ export const EXPIRY_WARNING_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
 export const ACCOUNT_ADAPTER_LABELS: Record<AccountFamily, string> = {
   "qwen-web": "Qwen",
-  "deepseek-web": "DeepSeek",
 };
 
 export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, string> = {

@@ -1,4 +1,5 @@
 pub mod account;
+pub mod chat;
 pub mod columns;
 pub mod download;
 pub mod graph_edge;
@@ -18,6 +19,7 @@ pub mod vector_source;
 pub mod vector_store;
 
 pub use account::AccountRow;
+pub use chat::{ConversationRow, MessageRow};
 pub use columns::EnumColumn;
 pub use download::DownloadRow;
 pub use graph_edge::GraphEdgeRow;

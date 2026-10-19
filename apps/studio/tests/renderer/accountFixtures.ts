@@ -1,7 +1,6 @@
 import type { AccountDto, AccountId, StreamId } from "@zvs/shared";
 
 export const QWEN_ACCOUNT = "0199bb11-4444-7111-8111-000000000001" as AccountId;
-export const DEEPSEEK_ACCOUNT = "0199bb11-4444-7111-8111-000000000002" as AccountId;
 export const LINK_STREAM = "0199bb11-5555-7111-8111-000000000001" as StreamId;
 
 export function account(overrides: Partial<AccountDto> = {}): AccountDto {

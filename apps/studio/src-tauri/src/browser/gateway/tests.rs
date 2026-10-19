@@ -9,7 +9,7 @@ use super::*;
 use crate::browser::bearer::Sighting;
 
 const QWEN: &str = "https://chat.qwen.ai/api/v2/chat/completions";
-const DEEPSEEK: &str = "https://chat.deepseek.com/api/v0/users/current";
+const FIXTURE: &str = "http://127.0.0.1:4100/api/v1/auths/";
 
 #[derive(Clone)]
 enum Plan {
@@ -358,7 +358,7 @@ async fn the_request_is_passed_as_data_with_browser_owned_headers_removed() {
     assert!(!start.to_string().contains("stolen"));
     let foreign = SessionRequest::new("GET").with_header("referer", "https://evil.example/");
     gateway
-        .fetch(DEEPSEEK, foreign, &CancellationToken::new())
+        .fetch(FIXTURE, foreign, &CancellationToken::new())
         .await
         .expect("responds");
     let start = pages.page(1).commands("start").remove(0);
@@ -371,7 +371,7 @@ async fn one_gateway_page_serves_each_origin_and_other_origins_are_refused() {
     let pages = FakePages::shared(respond(200, vec![b"ok".to_vec()]));
     let gateway = gateway(&pages);
     let cancel = CancellationToken::new();
-    for url in [QWEN, "https://chat.qwen.ai/api/v1/auths/", DEEPSEEK] {
+    for url in [QWEN, "https://chat.qwen.ai/api/v1/auths/", FIXTURE] {
         gateway
             .fetch(url, SessionRequest::new("GET"), &cancel)
             .await
@@ -379,7 +379,7 @@ async fn one_gateway_page_serves_each_origin_and_other_origins_are_refused() {
     }
     assert_eq!(
         pages.origins(),
-        vec!["https://chat.qwen.ai", "https://chat.deepseek.com"]
+        vec!["https://chat.qwen.ai", "http://127.0.0.1:4100"]
     );
     for refused in [
         "https://evil.example/api",
@@ -745,7 +745,7 @@ fn identity_comes_from_the_profile_and_tokens_from_site_tabs() {
         gateway.account_token(QWEN),
         Some(AccountToken::bearer("live"))
     );
-    assert_eq!(gateway.account_token(DEEPSEEK), None);
+    assert_eq!(gateway.account_token(FIXTURE), None);
 }
 
 #[test]

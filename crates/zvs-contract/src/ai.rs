@@ -6,7 +6,6 @@ use crate::validate::no_refinements;
 wire_enum!(AdapterFamily {
     OpenaiCompatible => "openai-compatible",
     QwenWeb => "qwen-web",
-    DeepseekWeb => "deepseek-web",
     Local => "local",
 });
 
@@ -17,7 +16,6 @@ wire_enum!(AuthMode {
 
 wire_enum!(AccountFamily {
     QwenWeb => "qwen-web",
-    DeepseekWeb => "deepseek-web",
 });
 
 wire_enum!(TunableParameter {
@@ -83,7 +81,6 @@ impl AdapterFamily {
     pub const fn account_family(self) -> Option<AccountFamily> {
         match self {
             Self::QwenWeb => Some(AccountFamily::QwenWeb),
-            Self::DeepseekWeb => Some(AccountFamily::DeepseekWeb),
             Self::OpenaiCompatible | Self::Local => None,
         }
     }
@@ -123,7 +120,7 @@ mod tests {
                 .iter()
                 .map(|family| family.as_str())
                 .collect::<Vec<_>>(),
-            ["openai-compatible", "qwen-web", "deepseek-web", "local"]
+            ["openai-compatible", "qwen-web", "local"]
         );
         assert_eq!(
             serde_json::to_value(TunableParameter::MaxOutputTokens).expect("serialises"),
