@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+  ChatContextDto,
+  ChatContextInput,
   ChatEnabledTools,
   ChatSendInput,
   ConversationDetailDto,
@@ -156,6 +158,7 @@ export const contract = defineContract({
     input: TruncateConversationInput,
     output: ConversationDetailDto,
   },
+  "chat.context": { input: ChatContextInput, output: ChatContextDto },
   "chat.send": { input: ChatSendInput, output: RunHandleDto },
   "chat.cancel": { input: RunIdInput, output: z.void() },
   "runs.approve": {

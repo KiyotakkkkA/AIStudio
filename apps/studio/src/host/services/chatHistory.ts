@@ -270,3 +270,37 @@ function citation(
     related,
   };
 }
+
+export function measureContext(
+  systemPrompt: string,
+  toolBlock: string,
+  history: readonly ChatMessage[],
+  contextWindow: number,
+  maxOutputTokens: number,
+) {
+  const systemText = toolBlock ? `${systemPrompt}\n\n${toolBlock}` : systemPrompt;
+  const system = estimateTokens(systemPrompt) + 8;
+  const tools = Math.max(0, estimateTokens(systemText) + 8 - system);
+  const current: ChatMessage = { role: "user", content: "" };
+  try {
+    const prepared = windowChatHistory(
+      systemText,
+      history,
+      current,
+      contextWindow,
+      maxOutputTokens,
+    );
+    return {
+      system,
+      tools,
+      history: Math.max(
+        0,
+        prepared.tokensIn - estimateTokens(systemText) - 8 - messageCost(current),
+      ),
+      historyMessages: prepared.messages.length - 1,
+      trimmed: prepared.trimmed,
+    };
+  } catch {
+    return { system, tools, history: 0, historyMessages: 0, trimmed: history.length };
+  }
+}

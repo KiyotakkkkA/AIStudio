@@ -1,4 +1,4 @@
-import { makeAutoObservable, runInAction } from "mobx";
+import { makeAutoObservable, reaction, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
   ChatToolCallDto,
@@ -11,10 +11,13 @@ import {
   type AccountId,
   type AdapterDescriptorDto,
   type ChatCitationDto,
+  type ChatContextDto,
+  type ChatContextInput,
   type Contract,
   type ConversationDetailDto,
   type ConversationDto,
   type ConversationId,
+  type McpServerDto,
   type MessageId,
   type ProviderDto,
   type RunHandleDto,
@@ -42,6 +45,8 @@ export default class ChatStore {
   tools: ToolDto[] = [];
   accounts: AccountDto[] = [];
   adapters: AdapterDescriptorDto[] = [];
+  servers: McpServerDto[] = [];
+  context: ChatContextDto | null = null;
   connecting = false;
   composer = new ConversationVm();
   query = "";
@@ -66,6 +71,8 @@ export default class ChatStore {
   private revision = 0;
   private mounted = false;
   private retryText = "";
+  private contextRevision = 0;
+  private stopContext: (() => void) | undefined;
 
   constructor(
     private readonly ipc: IpcClient<Contract>,
@@ -82,6 +89,8 @@ export default class ChatStore {
       | "revision"
       | "mounted"
       | "retryText"
+      | "contextRevision"
+      | "stopContext"
     >(
       this,
       {
@@ -94,6 +103,8 @@ export default class ChatStore {
         revision: false,
         mounted: false,
         retryText: false,
+        contextRevision: false,
+        stopContext: false,
       },
       { autoBind: true },
     );
@@ -265,6 +276,54 @@ export default class ChatStore {
         .reduce((sum, message) => sum + message.tokensIn + message.tokensOut, 0) ?? 0
     );
   }
+  get lastTurn() {
+    return this.active?.messages
+      .slice()
+      .reverse()
+      .find((message) => message.role === "assistant" && !message.partial);
+  }
+  get contextUsed() {
+    return this.context?.total ?? 0;
+  }
+  get contextWindow() {
+    return this.context?.contextWindow ?? this.model?.contextWindow ?? 0;
+  }
+  private get contextInput(): ChatContextInput | null {
+    const providerId = this.composer.providerId;
+    const modelId = this.model?.externalId;
+    if (!providerId || !modelId || !this.available) return null;
+    if (this.active)
+      return {
+        conversationId: this.active.id,
+        providerId,
+        modelId,
+        enabledTools: [...this.active.enabledTools],
+      };
+    return {
+      providerId,
+      modelId,
+      systemPrompt: this.composer.systemPrompt,
+      enabledTools: [...this.composer.enabledTools],
+    };
+  }
+  async refreshContext() {
+    const input = this.contextInput;
+    const revision = ++this.contextRevision;
+    if (!input) {
+      this.context = null;
+      return;
+    }
+    try {
+      const context = await this.ipc.call("chat.context", input);
+      runInAction(() => {
+        if (revision === this.contextRevision) this.context = context;
+      });
+    } catch {
+      runInAction(() => {
+        if (revision === this.contextRevision) this.context = null;
+      });
+    }
+  }
   get visibleConversations() {
     return this.conversations
       .filter((conversation) =>
@@ -372,16 +431,18 @@ export default class ChatStore {
     this.error = null;
     const revision = ++this.revision;
     try {
-      const [conversations, summaries, stores, tools, accounts, adapters] = await Promise.all([
-        this.ipc.call("chat.conversations.list", undefined),
-        this.ipc.call("providers.list", { capability: "text", enabled: true }),
-        this.ipc.call("vectorStores.list", undefined),
-        this.ipc
-          .call("tools.list", { includeUnavailable: true })
-          .catch((): ToolDto[] => this.tools),
-        this.ipc.call("accounts.list", undefined).catch((): AccountDto[] => []),
-        this.ipc.call("providers.adapters", undefined).catch((): AdapterDescriptorDto[] => []),
-      ]);
+      const [conversations, summaries, stores, tools, accounts, adapters, servers] =
+        await Promise.all([
+          this.ipc.call("chat.conversations.list", undefined),
+          this.ipc.call("providers.list", { capability: "text", enabled: true }),
+          this.ipc.call("vectorStores.list", undefined),
+          this.ipc
+            .call("tools.list", { includeUnavailable: true })
+            .catch((): ToolDto[] => this.tools),
+          this.ipc.call("accounts.list", undefined).catch((): AccountDto[] => []),
+          this.ipc.call("providers.adapters", undefined).catch((): AdapterDescriptorDto[] => []),
+          this.ipc.call("mcp.list", undefined).catch((): McpServerDto[] => this.servers),
+        ]);
       const providers = await Promise.all(
         summaries.map((provider) =>
           this.ipc.call("providers.get", { id: provider.id, selectedOnly: true }),
@@ -395,9 +456,21 @@ export default class ChatStore {
         this.tools = tools;
         this.accounts = accounts;
         this.adapters = adapters;
+        this.servers = servers;
         if (!this.composer.providerId && providers[0]) this.composer.selectProvider(providers[0]);
         this.loading = false;
       });
+      this.stopContext?.();
+      this.stopContext = reaction(
+        () =>
+          JSON.stringify([
+            this.contextInput,
+            this.active?.messages.length ?? 0,
+            this.active?.updatedAt ?? 0,
+          ]),
+        () => void this.refreshContext(),
+        { fireImmediately: true },
+      );
       if (this.run) this.subscribe();
       else if (this.active) await this.select(this.active.id);
     } catch (error) {
@@ -756,6 +829,8 @@ export default class ChatStore {
     this.flush();
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.stopContext?.();
+    this.stopContext = undefined;
   }
 }
 

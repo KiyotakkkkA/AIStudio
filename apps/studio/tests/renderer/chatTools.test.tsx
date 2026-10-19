@@ -79,6 +79,17 @@ function setup() {
     .handle("vectorStores.list", () => [])
     .handle("tools.list", () => [tool("mcp.docs.search"), tool("mcp.docs.drop", { tier: "off" })])
     .handle("chat.send", () => handle)
+    .handle("chat.context", (input) => ({
+      contextWindow: 8192,
+      reservedOutput: 1024,
+      system: 12,
+      tools: (input.enabledTools ?? []).length * 40,
+      toolItems: (input.enabledTools ?? []).map((key) => ({ key, tokens: 32 })),
+      history: 0,
+      historyMessages: 0,
+      trimmed: 0,
+      total: 12 + (input.enabledTools ?? []).length * 40,
+    }))
     .handle("runs.approve", () => undefined);
   const events = createEventRouter({ logger: { log: vi.fn() } });
   const store = new ChatStore(createIpcClient(contract, bridge), events);
@@ -103,11 +114,30 @@ test("the conversation's tool picks travel with create and later with updateTool
   events.dispatch({ type: "end", ...handle, seq: 1, ts: Date.now(), outcome: { status: "ok" } });
   await vi.waitFor(() => expect(store.generating).toBe(false));
   await store.toggleTool("mcp.docs.search");
-  expect(bridge.calls.at(-1)).toMatchObject({
+  expect(
+    bridge.calls.filter((call) => call.channel === "chat.conversations.updateTools").at(-1),
+  ).toMatchObject({
     channel: "chat.conversations.updateTools",
     payload: { id: conversation.id, enabledTools: [] },
   });
   expect(store.enabledTools).toEqual([]);
+  store.dispose();
+  events.dispose();
+});
+
+test("the context breakdown follows the tools picked for the next turn", async () => {
+  const { store, bridge, events } = setup();
+  await store.mount();
+  await vi.waitFor(() => expect(store.context?.total).toBe(12));
+  await store.toggleTool("mcp.docs.search");
+  await vi.waitFor(() =>
+    expect(store.context?.toolItems).toEqual([{ key: "mcp.docs.search", tokens: 32 }]),
+  );
+  expect(
+    bridge.calls.filter((call) => call.channel === "chat.context").at(-1)?.payload,
+  ).toMatchObject({ modelId: saved.models[0]!.externalId, enabledTools: ["mcp.docs.search"] });
+  expect(store.contextUsed).toBe(52);
+  expect(store.contextWindow).toBe(8192);
   store.dispose();
   events.dispose();
 });

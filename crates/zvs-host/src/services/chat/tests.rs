@@ -9,11 +9,11 @@ use serde_json::{Value, json};
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, ChatSendInput, ConversationId, CreateConversationInput,
-    CreateVectorStoreInput, GraphDirection, GraphLinkDto, GraphNeighborDto, GraphNeighborsInput,
-    GraphNodeDto, GraphNodeKind, HostEvent, HostEventDraft, ProviderCapability, ProviderId,
-    ProviderKind, RunHandleDto, RunListFilter, RunStatus, ToolTier, VectorChunkDto,
-    VectorRerankConfig, VectorSearchHitDto, VectorStoreDto, VectorStoreId,
+    AppError, AppErrorCode, ChatContextInput, ChatSendInput, ConversationId,
+    CreateConversationInput, CreateVectorStoreInput, GraphDirection, GraphLinkDto,
+    GraphNeighborDto, GraphNeighborsInput, GraphNodeDto, GraphNodeKind, HostEvent, HostEventDraft,
+    ProviderCapability, ProviderId, ProviderKind, RunHandleDto, RunListFilter, RunStatus, ToolTier,
+    VectorChunkDto, VectorRerankConfig, VectorSearchHitDto, VectorStoreDto, VectorStoreId,
 };
 
 use super::*;
@@ -1246,4 +1246,57 @@ async fn cancel_refuses_a_run_that_is_not_a_chat_turn() {
             .message,
         NOT_A_CHAT_RUN
     );
+}
+
+#[tokio::test]
+async fn context_breaks_down_the_prompt_and_history_the_next_turn_will_carry() {
+    let harness = Harness::new();
+    let draft = harness
+        .chat
+        .context(&ChatContextInput {
+            conversation_id: None,
+            provider_id: harness.provider_id,
+            model_id: harness.model_id.clone(),
+            settings: None,
+            system_prompt: Some("Always be helpful.".to_owned()),
+            enabled_tools: None,
+        })
+        .expect("measures a draft");
+    assert_eq!(draft.context_window, 1024);
+    assert_eq!(draft.reserved_output, 128);
+    assert_eq!(draft.system, as_u64(tokens("Always be helpful.") + 8));
+    assert_eq!(
+        (draft.tools, draft.history, draft.history_messages),
+        (0, 0, 0)
+    );
+    assert_eq!(draft.total, draft.system);
+
+    let created = harness.create(CreateConversationInput {
+        system_prompt: Some("Always be helpful.".to_owned()),
+        ..harness.input()
+    });
+    within(harness.turn(created, "first question")).await;
+    let measured = harness
+        .chat
+        .context(&ChatContextInput {
+            conversation_id: Some(created),
+            provider_id: harness.provider_id,
+            model_id: harness.model_id.clone(),
+            settings: None,
+            system_prompt: None,
+            enabled_tools: None,
+        })
+        .expect("measures a conversation");
+    assert_eq!(measured.system, draft.system);
+    assert_eq!(measured.history_messages, 2);
+    assert_eq!(measured.trimmed, 0);
+    assert_eq!(
+        measured.history,
+        as_u64(tokens("first question") + tokens("Hello world") + 16)
+    );
+    assert_eq!(measured.total, measured.system + measured.history);
+}
+
+fn as_u64(value: i64) -> u64 {
+    u64::try_from(value).expect("a non-negative count")
 }

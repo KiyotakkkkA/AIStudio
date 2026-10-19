@@ -10,18 +10,18 @@ use serde_json::{Value, json};
 use zvs_contract::validate::{check, js_slice, nested};
 use zvs_contract::vector_stores::DEFAULT_CHAT_MIN_SCORE;
 use zvs_contract::{
-    AppError, AppErrorCode, ChatCitationDto, ChatSendInput, ChatSettings, ChatToolCallDto,
-    ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationId,
-    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DeltaKind, DocumentId,
-    GRAPH_EXPANSION_DEFAULT_MAX, GraphDirection, GraphExpansionDocument, GraphNeighborhood,
-    GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId, MessageRole,
-    ProviderCapability, ProviderId, RunGraph, RunHandleDto, RunId, RunKind, StartRunInput,
-    ToolListFilter, ToolMode, ToolTier, Validate, VectorSearchHitDto, VectorStoreId, log_line,
-    merge_graph_neighbors, model_tool_support, resolve_tool_mode,
+    AppError, AppErrorCode, ChatCitationDto, ChatContextDto, ChatContextInput, ChatContextToolDto,
+    ChatSendInput, ChatSettings, ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto,
+    ConversationDto, ConversationId, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
+    DeltaKind, DocumentId, GRAPH_EXPANSION_DEFAULT_MAX, GraphDirection, GraphExpansionDocument,
+    GraphNeighborhood, GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId,
+    MessageRole, ProviderCapability, ProviderId, RunGraph, RunHandleDto, RunId, RunKind,
+    StartRunInput, ToolListFilter, ToolMode, ToolTier, Validate, VectorSearchHitDto, VectorStoreId,
+    log_line, merge_graph_neighbors, model_tool_support, resolve_tool_mode,
 };
 
 use super::chat_history::{
-    RelatedSource, RetrievedSource, estimate_tokens, tokens, window_chat_history,
+    RelatedSource, RetrievedSource, estimate_tokens, measure_context, tokens, window_chat_history,
 };
 use super::chat_tools::{
     CHAT_TOOL_CALLS, CHAT_TOOL_ROUNDS, OfferedTool, TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS,
@@ -1723,6 +1723,80 @@ impl ChatService {
         )?;
         drop(subscription);
         Ok(handle)
+    }
+
+    pub fn context(&self, input: &ChatContextInput) -> Result<ChatContextDto, AppError> {
+        input.validate()?;
+        let conversation = input
+            .conversation_id
+            .as_ref()
+            .map(|id| self.get(id))
+            .transpose()?;
+        let details = conversation.as_ref().map(|detail| &detail.conversation);
+        let settings = input
+            .settings
+            .or_else(|| details.map(|details| details.settings))
+            .unwrap_or_default();
+        let model =
+            self.inner
+                .resolve_model(&input.provider_id.to_string(), &input.model_id, &settings)?;
+        let system_prompt = input
+            .system_prompt
+            .clone()
+            .or_else(|| details.map(|details| details.system_prompt.clone()))
+            .unwrap_or_default();
+        let enabled = input
+            .enabled_tools
+            .clone()
+            .or_else(|| details.map(|details| details.enabled_tools.clone()))
+            .unwrap_or_default();
+        let registered = match &self.inner.tools {
+            Some(tools) => tools.list(&ToolListFilter::default())?,
+            None => Vec::new(),
+        };
+        let offered = offered_tools(&enabled, &registered);
+        let tool_block = if offered.is_empty() {
+            String::new()
+        } else {
+            format!("{TOOL_RESULTS_INSTRUCTION}\n{}", tool_specs_json(&offered))
+        };
+        let history: Vec<ChatMessage> = conversation
+            .as_ref()
+            .map(|detail| {
+                detail
+                    .messages
+                    .iter()
+                    .map(|message| {
+                        ChatMessage::new(chat_role(message.role), message.content.clone())
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let usage = measure_context(
+            &system_prompt,
+            &tool_block,
+            &history,
+            model.context_window,
+            model.max_output_tokens,
+        );
+        let count = |value: i64| u64::try_from(value).unwrap_or(0);
+        Ok(ChatContextDto {
+            context_window: count(model.context_window),
+            reserved_output: count(model.max_output_tokens),
+            system: count(usage.system),
+            tools: count(usage.tools),
+            tool_items: offered
+                .iter()
+                .map(|tool| ChatContextToolDto {
+                    key: tool.key.clone(),
+                    tokens: count(tokens(&tool_specs_json(std::slice::from_ref(tool)))),
+                })
+                .collect(),
+            history: count(usage.history),
+            history_messages: usage.history_messages as u64,
+            trimmed: usage.trimmed as u64,
+            total: count(usage.system + usage.tools + usage.history),
+        })
     }
 
     pub async fn cancel(&self, id: &RunId) -> Result<(), AppError> {

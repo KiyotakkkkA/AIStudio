@@ -15,6 +15,7 @@ export function createChatHandlers(
   | "chat.conversations.updateRelations"
   | "chat.conversations.updateTools"
   | "chat.conversations.truncate"
+  | "chat.context"
   | "chat.send"
   | "chat.cancel"
 > {
@@ -31,6 +32,7 @@ export function createChatHandlers(
     "chat.conversations.updateTools": ({ id, enabledTools }) =>
       service.updateTools(id, enabledTools),
     "chat.conversations.truncate": ({ id, messageId }) => service.truncate(id, messageId),
+    "chat.context": (input) => service.context(input),
     "chat.send": ({ conversationId, text, providerId, modelId, settings }) =>
       service.sendMessage(conversationId, text, { providerId, modelId, settings }),
     "chat.cancel": ({ id }) => service.cancel(id),

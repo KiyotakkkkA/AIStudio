@@ -1,0 +1,30 @@
+[
+  {
+    "name": "zero window",
+    "value": {
+      "contextWindow": 0,
+      "reservedOutput": 0,
+      "system": 0,
+      "tools": 0,
+      "toolItems": [],
+      "history": 0,
+      "historyMessages": 0,
+      "trimmed": 0,
+      "total": 0
+    }
+  },
+  {
+    "name": "negative tokens",
+    "value": {
+      "contextWindow": 8192,
+      "reservedOutput": 1024,
+      "system": -1,
+      "tools": 0,
+      "toolItems": [],
+      "history": 0,
+      "historyMessages": 0,
+      "trimmed": 0,
+      "total": 0
+    }
+  }
+]

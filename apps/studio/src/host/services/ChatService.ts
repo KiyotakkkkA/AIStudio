@@ -2,6 +2,8 @@ import { z } from "zod";
 import {
   AppError,
   AppErrorCode,
+  ChatContextInput,
+  type ChatContextDto,
   ChatEnabledTools,
   ChatSendInput,
   type ChatToolCallDto,
@@ -36,6 +38,7 @@ import { createId } from "../platform/ids.ts";
 import type { RunService } from "./RunService.ts";
 import {
   estimateTokens,
+  measureContext,
   windowChatHistory,
   type RelatedSource,
   type RetrievedSource,
@@ -319,6 +322,41 @@ export class ChatService {
       chat.update(conversationId, { updatedAt: this.clock() });
     });
     return this.get(conversationId);
+  }
+  context(raw: ChatContextInput): ChatContextDto {
+    const input = ChatContextInput.parse(raw);
+    const conversation = input.conversationId ? this.get(input.conversationId) : undefined;
+    const systemPrompt = input.systemPrompt ?? conversation?.systemPrompt ?? "";
+    const enabledTools = input.enabledTools ?? conversation?.enabledTools ?? [];
+    const model = this.resolveModel({
+      ...CreateConversationInput.parse({ providerId: input.providerId, modelId: input.modelId }),
+      settings: input.settings ?? conversation?.settings ?? {},
+    });
+    const offered = offeredTools(enabledTools, this.options.tools?.list() ?? []);
+    const usage = measureContext(
+      systemPrompt,
+      offered.length > 0
+        ? `${TOOL_RESULTS_INSTRUCTION}
+${JSON.stringify(toolSpecs(offered))}`
+        : "",
+      (conversation?.messages ?? []).map(({ role, content }) => ({ role, content })),
+      model.contextWindow,
+      model.maxOutputTokens,
+    );
+    return {
+      contextWindow: model.contextWindow,
+      reservedOutput: model.maxOutputTokens,
+      system: usage.system,
+      tools: usage.tools,
+      toolItems: offered.map((tool) => ({
+        key: tool.key,
+        tokens: estimateTokens(JSON.stringify(toolSpecs([tool]))),
+      })),
+      history: usage.history,
+      historyMessages: usage.historyMessages,
+      trimmed: usage.trimmed,
+      total: usage.system + usage.tools + usage.history,
+    };
   }
   remove(id: string): void {
     this.get(id);

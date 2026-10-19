@@ -421,6 +421,60 @@ pub fn window_chat_history(
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ContextUsage {
+    pub system: i64,
+    pub tools: i64,
+    pub history: i64,
+    pub history_messages: usize,
+    pub trimmed: usize,
+}
+
+pub fn measure_context(
+    system_prompt: &str,
+    tool_block: &str,
+    history: &[ChatMessage],
+    context_window: i64,
+    max_output_tokens: i64,
+) -> ContextUsage {
+    let system_text = if tool_block.is_empty() {
+        system_prompt.to_owned()
+    } else {
+        format!("{system_prompt}\n\n{tool_block}")
+    };
+    let system = tokens(system_prompt) + MESSAGE_OVERHEAD;
+    let tools = (tokens(&system_text) + MESSAGE_OVERHEAD - system).max(0);
+    let current = ChatMessage::user(String::new());
+    match window_chat_history(
+        &system_text,
+        history,
+        &current,
+        context_window,
+        max_output_tokens,
+        &[],
+        &[],
+    ) {
+        Ok(prepared) => ContextUsage {
+            system,
+            tools,
+            history: (prepared.tokens_in
+                - tokens(&system_text)
+                - MESSAGE_OVERHEAD
+                - message_cost(&current))
+            .max(0),
+            history_messages: prepared.messages.len() - 1,
+            trimmed: prepared.trimmed,
+        },
+        Err(_) => ContextUsage {
+            system,
+            tools,
+            history: 0,
+            history_messages: 0,
+            trimmed: history.len(),
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -710,6 +764,41 @@ mod tests {
             .map(|text| tokens(text) + MESSAGE_OVERHEAD)
             .sum();
         assert_eq!(prepared.tokens_in, expected);
+    }
+
+    #[test]
+    fn context_usage_splits_the_prompt_tools_and_the_history_that_fits() {
+        let history = [
+            ChatMessage::user("old ".repeat(100)),
+            ChatMessage::assistant("answer ".repeat(10)),
+            ChatMessage::user("recent"),
+            ChatMessage::assistant("reply"),
+        ];
+        let usage = measure_context("s", "", &history, 90, 20);
+        assert_eq!(usage.system, tokens("s") + MESSAGE_OVERHEAD);
+        assert_eq!(usage.tools, 0);
+        assert_eq!(usage.history_messages, 2);
+        assert_eq!(usage.trimmed, 2);
+        assert_eq!(
+            usage.history,
+            tokens("recent") + tokens("reply") + 2 * MESSAGE_OVERHEAD
+        );
+
+        let block = "Tool instructions.\n[{\"name\":\"read\"}]";
+        let with_tools = measure_context("s", block, &[], 10_000, 100);
+        assert_eq!(
+            with_tools.system + with_tools.tools,
+            tokens(&format!("s\n\n{block}")) + MESSAGE_OVERHEAD
+        );
+        assert!(with_tools.tools > 0);
+    }
+
+    #[test]
+    fn context_usage_reports_the_whole_history_trimmed_when_the_prompt_overflows() {
+        let usage = measure_context(&"я".repeat(600), "", &[ChatMessage::user("hi")], 100, 20);
+        assert_eq!(usage.history, 0);
+        assert_eq!(usage.history_messages, 0);
+        assert_eq!(usage.trimmed, 1);
     }
 
     #[test]

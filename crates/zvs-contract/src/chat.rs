@@ -424,6 +424,99 @@ impl Validate for ChatSendInput {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatContextInput {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub conversation_id: Option<ConversationId>,
+    pub provider_id: ProviderId,
+    pub model_id: String,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub settings: Option<ChatSettings>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub system_prompt: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub enabled_tools: Option<Vec<String>>,
+}
+
+impl Validate for ChatContextInput {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("modelId", &self.model_id)?;
+        if let Some(settings) = &self.settings {
+            nested("settings", settings.validate())?;
+        }
+        if let Some(prompt) = &self.system_prompt {
+            check::max_len("systemPrompt", prompt, SYSTEM_PROMPT_MAX)?;
+        }
+        if let Some(keys) = &self.enabled_tools {
+            check_enabled_tools("enabledTools", keys)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatContextToolDto {
+    pub key: String,
+    pub tokens: u64,
+}
+
+impl Validate for ChatContextToolDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check_tool_key("key", &self.key)?;
+        check::safe_integer("tokens", self.tokens)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatContextDto {
+    pub context_window: u64,
+    pub reserved_output: u64,
+    pub system: u64,
+    pub tools: u64,
+    pub tool_items: Vec<ChatContextToolDto>,
+    pub history: u64,
+    pub history_messages: u64,
+    pub trimmed: u64,
+    pub total: u64,
+}
+
+impl Validate for ChatContextDto {
+    fn validate(&self) -> Result<(), AppError> {
+        positive("contextWindow", self.context_window)?;
+        for (field, value) in [
+            ("reservedOutput", self.reserved_output),
+            ("system", self.system),
+            ("tools", self.tools),
+            ("history", self.history),
+            ("historyMessages", self.history_messages),
+            ("trimmed", self.trimmed),
+            ("total", self.total),
+        ] {
+            check::safe_integer(field, value)?;
+        }
+        nested("toolItems", self.tool_items.validate())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TruncateConversationInput {

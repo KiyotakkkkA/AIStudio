@@ -803,3 +803,39 @@ async fn conversation_tool_selection_is_validated_and_persisted() {
         AppErrorCode::NotFound
     );
 }
+
+#[tokio::test]
+async fn context_counts_the_offered_tools_one_by_one() {
+    let setup = Loop::new();
+    let created = setup.conversation(&["demo.lookup"]);
+    let measured = setup
+        .harness
+        .chat
+        .context(&zvs_contract::ChatContextInput {
+            conversation_id: Some(created),
+            provider_id: setup.harness.provider_id,
+            model_id: setup.harness.model_id.clone(),
+            settings: None,
+            system_prompt: None,
+            enabled_tools: None,
+        })
+        .expect("measures");
+    assert_eq!(measured.tool_items.len(), 1);
+    assert_eq!(measured.tool_items[0].key, "demo.lookup");
+    assert!(measured.tool_items[0].tokens > 0);
+    assert!(measured.tools > measured.tool_items[0].tokens);
+
+    let none = setup
+        .harness
+        .chat
+        .context(&zvs_contract::ChatContextInput {
+            conversation_id: Some(created),
+            provider_id: setup.harness.provider_id,
+            model_id: setup.harness.model_id.clone(),
+            settings: None,
+            system_prompt: None,
+            enabled_tools: Some(Vec::new()),
+        })
+        .expect("measures without tools");
+    assert_eq!((none.tools, none.tool_items.len()), (0, 0));
+}

@@ -66,6 +66,7 @@ mod tests {
                 "accounts.refresh",
                 "accounts.unlink",
                 "chat.cancel",
+                "chat.context",
                 "chat.conversations.create",
                 "chat.conversations.get",
                 "chat.conversations.list",

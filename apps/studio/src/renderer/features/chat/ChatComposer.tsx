@@ -5,18 +5,18 @@ import {
   mdiClose,
   mdiCogOutline,
   mdiDatabaseOutline,
-  mdiInformationOutline,
   mdiPaperclip,
   mdiUpload,
   mdiWrenchOutline,
 } from "@mdi/js";
-import { Dropdown, InputCheckBox, Modal, ProgressBar } from "@kiyotakkkka/zvs-uikit-lib";
+import { Dropdown, InputCheckBox, Modal } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import SelectInput from "../../ui/atoms/SelectInput";
 import TextArea from "../../ui/atoms/TextArea";
 import Toggle from "../../ui/atoms/Toggle";
+import ChatContextMeter from "./ChatContextMeter";
 import ChatToolPicker from "./ChatToolPicker";
 import type ChatStore from "./ChatStore";
 
@@ -79,58 +79,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               <span className="block h-full w-2/5 animate-zvs-sweep bg-linear-to-r from-transparent via-accent-dark to-transparent" />
             </span>
           ) : null}
-          <div className="flex items-center gap-2 rounded-control bg-main-800 py-1 pr-2.5 pl-1">
-            <Dropdown menuWidth={320} menuPlacement="top-left">
-              <IconDropdownButton
-                label="Контекстное окно"
-                path={mdiInformationOutline}
-                className="size-6 justify-center gap-0 rounded-[6px] border-transparent bg-transparent p-0 text-main-500 hover:bg-main-700 hover:text-main-100"
-                iconSize={15}
-              />
-              <Dropdown.Menu
-                rounded="rounded-lg"
-                className="w-80 rounded-card border border-line bg-main-900 p-3.5 text-[12px] text-main-300 shadow-pop"
-              >
-                <div className="space-y-2.5">
-                  <p className="text-[13px] font-semibold text-main-50">Контекстное окно</p>
-                  <ProgressBar
-                    value={store.sessionTokens}
-                    max={store.model?.contextWindow || Math.max(1, store.sessionTokens)}
-                    label="Общий контекст"
-                    showValue={false}
-                    variant="info"
-                    className="w-full"
-                    classNames={{
-                      label: "text-[12px] text-main-400",
-                      track: "h-1.5 rounded-full bg-main-700",
-                      indicator: "rounded-full bg-accent-dark",
-                    }}
-                  />
-                  <div className="flex justify-end font-mono text-[11px] text-main-500">
-                    {store.sessionTokens.toLocaleString()} /{" "}
-                    {store.model?.contextWindow?.toLocaleString() ?? "—"}
-                  </div>
-                </div>
-              </Dropdown.Menu>
-            </Dropdown>
-            <ProgressBar
-              value={store.sessionTokens}
-              max={store.model?.contextWindow || Math.max(1, store.sessionTokens)}
-              label="Общий контекст"
-              showValue={false}
-              variant="info"
-              className="min-w-0 flex-1"
-              classNames={{
-                header: "hidden",
-                track: "h-1 rounded-full bg-main-700",
-                indicator: "rounded-full bg-accent-dark",
-              }}
-            />
-            <span className="shrink-0 font-mono text-[11px] text-main-500">
-              {store.sessionTokens.toLocaleString()} /{" "}
-              {store.model?.contextWindow?.toLocaleString() ?? "—"}
-            </span>
-          </div>
+          <ChatContextMeter store={store} />
           {(store.attachedStoreIds.length > 0 || store.enabledTools.length > 0) && (
             <div className="flex flex-wrap gap-1.5 px-1">
               {store.stores

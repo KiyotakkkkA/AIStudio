@@ -601,6 +601,14 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ChatSendInput>,
     ),
     (
+        "chat/ChatContextInput",
+        round_trip::<zvs_contract::ChatContextInput>,
+    ),
+    (
+        "chat/ChatContextDto",
+        round_trip::<zvs_contract::ChatContextDto>,
+    ),
+    (
         "chat/TruncateConversationInput",
         round_trip::<zvs_contract::TruncateConversationInput>,
     ),

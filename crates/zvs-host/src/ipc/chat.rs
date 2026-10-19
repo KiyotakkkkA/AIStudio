@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use zvs_contract::{
-    AppError, ChatSendInput, ConversationRef, CreateConversationInput, RenameConversationInput,
-    RunIdInput, TruncateConversationInput, UpdateConversationRelationsInput,
-    UpdateConversationStoresInput, UpdateConversationToolsInput,
+    AppError, ChatContextInput, ChatSendInput, ConversationRef, CreateConversationInput,
+    RenameConversationInput, RunIdInput, TruncateConversationInput,
+    UpdateConversationRelationsInput, UpdateConversationStoresInput, UpdateConversationToolsInput,
 };
 
 use super::IpcServer;
@@ -67,6 +67,12 @@ pub fn register(server: &mut IpcServer) {
             "chat.conversations.truncate",
             |services: Arc<Services>, input: TruncateConversationInput| async move {
                 services.chat.truncate(&input.id, &input.message_id)
+            },
+        )
+        .handle(
+            "chat.context",
+            |services: Arc<Services>, input: ChatContextInput| async move {
+                services.chat.context(&input)
             },
         )
         .handle(

@@ -1,0 +1,21 @@
+[
+  {
+    "name": "breakdown",
+    "value": {
+      "contextWindow": 8192,
+      "reservedOutput": 1024,
+      "system": 40,
+      "tools": 180,
+      "toolItems": [
+        {
+          "key": "mail.send",
+          "tokens": 120
+        }
+      ],
+      "history": 600,
+      "historyMessages": 4,
+      "trimmed": 0,
+      "total": 820
+    }
+  }
+]

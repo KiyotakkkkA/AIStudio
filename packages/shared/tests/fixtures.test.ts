@@ -304,6 +304,8 @@ const schemas: Record<string, z.ZodType> = {
   "chat/MessageDto": MessageDto,
   "chat/ConversationDetailDto": ConversationDetailDto,
   "chat/ChatSendInput": contract["chat.send"].input,
+  "chat/ChatContextInput": contract["chat.context"].input,
+  "chat/ChatContextDto": contract["chat.context"].output,
   "chat/TruncateConversationInput": contract["chat.conversations.truncate"].input,
   "chat/RenameConversationInput": contract["chat.conversations.rename"].input,
   "chat/UpdateConversationStoresInput": contract["chat.conversations.updateStores"].input,

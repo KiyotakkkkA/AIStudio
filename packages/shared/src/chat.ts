@@ -99,5 +99,31 @@ export const ChatSendInput = z.object({
   settings: ChatSettings.optional(),
 });
 export type ChatSendInput = z.infer<typeof ChatSendInput>;
+export const ChatContextInput = z.object({
+  conversationId: ConversationId.optional(),
+  providerId: ProviderId,
+  modelId: z.string().min(1),
+  settings: ChatSettings.optional(),
+  systemPrompt: z.string().max(100000).optional(),
+  enabledTools: ChatEnabledTools.optional(),
+});
+export type ChatContextInput = z.infer<typeof ChatContextInput>;
+export const ChatContextToolDto = z.object({
+  key: ToolKey,
+  tokens: z.number().int().nonnegative(),
+});
+export type ChatContextToolDto = z.infer<typeof ChatContextToolDto>;
+export const ChatContextDto = z.object({
+  contextWindow: z.number().int().positive(),
+  reservedOutput: z.number().int().nonnegative(),
+  system: z.number().int().nonnegative(),
+  tools: z.number().int().nonnegative(),
+  toolItems: z.array(ChatContextToolDto),
+  history: z.number().int().nonnegative(),
+  historyMessages: z.number().int().nonnegative(),
+  trimmed: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+});
+export type ChatContextDto = z.infer<typeof ChatContextDto>;
 export const TruncateConversationInput = ConversationRef.extend({ messageId: MessageId });
 export type TruncateConversationInput = z.infer<typeof TruncateConversationInput>;

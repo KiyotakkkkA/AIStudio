@@ -39,11 +39,12 @@ pub use browser::{
 };
 pub use channels::{CHANNELS, is_channel};
 pub use chat::{
-    ChatCitationDto, ChatConversationsListOutput, ChatSendInput, ChatSettings, ChatToolCallDto,
-    ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationRef,
-    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, MessageDto, MessageRole,
-    RenameConversationInput, TruncateConversationInput, UpdateConversationRelationsInput,
-    UpdateConversationStoresInput, UpdateConversationToolsInput,
+    ChatCitationDto, ChatContextDto, ChatContextInput, ChatContextToolDto,
+    ChatConversationsListOutput, ChatSendInput, ChatSettings, ChatToolCallDto, ChatToolCallStatus,
+    ConversationDetailDto, ConversationDto, ConversationRef, CreateConversationInput,
+    DEFAULT_CONVERSATION_TITLE, MessageDto, MessageRole, RenameConversationInput,
+    TruncateConversationInput, UpdateConversationRelationsInput, UpdateConversationStoresInput,
+    UpdateConversationToolsInput,
 };
 pub use downloads::{
     CatalogueFilter, CatalogueItemDto, CatalogueItemState, CatalogueSource, ChecksumAlgorithm,
