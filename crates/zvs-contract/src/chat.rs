@@ -6,6 +6,7 @@ use crate::ids::{ConversationId, MessageId, ProviderId, RunId, VectorStoreId};
 use crate::primitives::{Json, Timestamp};
 use crate::tools::check_tool_key;
 use crate::validate::{Validate, check, invalid, js_trim, nested};
+use crate::vector_stores::VectorSearchHitDto;
 
 pub const DEFAULT_CONVERSATION_TITLE: &str = "New conversation";
 pub const CONVERSATION_TITLE_MAX: usize = 200;
@@ -125,6 +126,25 @@ pub struct ChatCitationDto {
     pub related: Option<String>,
 }
 
+impl ChatCitationDto {
+    pub fn from_hit(
+        store_id: VectorStoreId,
+        hit: &VectorSearchHitDto,
+        related: Option<&str>,
+    ) -> Self {
+        Self {
+            store_id,
+            document_id: hit.document_id.clone(),
+            source_path: hit.path.clone(),
+            chunk_index: hit.chunk_index,
+            score: hit.score,
+            section: hit.section.clone(),
+            page: hit.page,
+            related: related.map(str::to_owned),
+        }
+    }
+}
+
 impl Validate for ChatCitationDto {
     fn validate(&self) -> Result<(), AppError> {
         check::safe_integer("chunkIndex", self.chunk_index)?;
@@ -155,6 +175,8 @@ pub struct ChatToolCallDto {
     pub step_id: Option<String>,
     #[serde(default)]
     pub duration_ms: u64,
+    #[serde(default)]
+    pub meta: Option<Json>,
 }
 
 impl Validate for ChatToolCallDto {

@@ -34,7 +34,8 @@
           "error": null,
           "approvalId": null,
           "stepId": null,
-          "durationMs": 4
+          "durationMs": 4,
+          "meta": null
         }
       ],
       "tokensIn": 12,

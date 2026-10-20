@@ -51,6 +51,7 @@ export const ChatToolCallDto = z.object({
   approvalId: z.string().nullable().default(null),
   stepId: z.string().nullable().default(null),
   durationMs: z.number().int().nonnegative().default(0),
+  meta: Json.nullable().default(null),
 });
 export type ChatToolCallDto = z.infer<typeof ChatToolCallDto>;
 export const ChatEnabledTools = z.array(ToolKey).max(64);

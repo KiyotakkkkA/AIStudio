@@ -179,23 +179,6 @@ struct Group {
     hits: HashMap<u64, (VectorSearchHitDto, usize)>,
 }
 
-fn citation(
-    store_id: VectorStoreId,
-    hit: &VectorSearchHitDto,
-    related: Option<&str>,
-) -> ChatCitationDto {
-    ChatCitationDto {
-        store_id,
-        document_id: hit.document_id.clone(),
-        source_path: hit.path.clone(),
-        chunk_index: hit.chunk_index,
-        score: hit.score,
-        section: hit.section.clone(),
-        page: hit.page,
-        related: related.map(str::to_owned),
-    }
-}
-
 fn group_key(store_id: VectorStoreId, document_id: &str) -> (VectorStoreId, String) {
     (store_id, document_id.to_owned())
 }
@@ -341,7 +324,7 @@ pub fn window_chat_history(
                 .collect::<Vec<_>>(),
         );
         passages.push(fence_source(citations.len() + 1, best, &joined, None));
-        citations.push(citation(group.store_id, best, None));
+        citations.push(ChatCitationDto::from_hit(group.store_id, best, None));
     }
 
     let mut related_passages: Vec<String> = Vec::new();
@@ -371,7 +354,11 @@ pub fn window_chat_history(
         used += cost;
         present.insert(key);
         related_passages.push(passage);
-        citations.push(citation(source.store_id, hit, Some(&source.relation)));
+        citations.push(ChatCitationDto::from_hit(
+            source.store_id,
+            hit,
+            Some(&source.relation),
+        ));
     }
 
     let mut recent: Vec<ChatMessage> = Vec::new();

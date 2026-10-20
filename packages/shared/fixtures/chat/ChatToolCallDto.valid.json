@@ -15,7 +15,8 @@
       "error": null,
       "approvalId": null,
       "stepId": null,
-      "durationMs": 4
+      "durationMs": 4,
+      "meta": null
     }
   },
   {
@@ -32,7 +33,42 @@
       "error": null,
       "approvalId": "0199aa11-4444-7111-8111-111111111111",
       "stepId": null,
-      "durationMs": 4
+      "durationMs": 4,
+      "meta": null
+    }
+  },
+  {
+    "name": "with render meta",
+    "value": {
+      "id": "call_2",
+      "key": "vector.search",
+      "name": "vector__search",
+      "round": 1,
+      "arguments": {
+        "storeId": "0199aa11-2222-7111-8111-111111111111",
+        "query": "x"
+      },
+      "status": "succeeded",
+      "result": "[]",
+      "truncated": true,
+      "error": null,
+      "approvalId": null,
+      "stepId": "0199aa11-5555-7111-8111-111111111111",
+      "durationMs": 12,
+      "meta": {
+        "citations": [
+          {
+            "storeId": "0199aa11-2222-7111-8111-111111111111",
+            "documentId": "doc-1",
+            "sourcePath": "C:/docs/a.pdf",
+            "chunkIndex": 0,
+            "score": 0.9,
+            "section": "",
+            "page": 2,
+            "related": null
+          }
+        ]
+      }
     }
   }
 ]

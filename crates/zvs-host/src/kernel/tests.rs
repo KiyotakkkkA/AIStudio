@@ -1732,3 +1732,38 @@ async fn a_killed_host_process_recovers_runs_according_to_the_selected_policy() 
         ));
     }
 }
+
+#[test]
+fn a_vector_search_tool_call_carries_its_hits_as_citations_for_display_only() {
+    let store = "0199aa11-2222-7111-8111-111111111111";
+    let hits: Vec<VectorSearchHitDto> = serde_json::from_value(json!([{
+        "id": "doc-1:0",
+        "documentId": "doc-1",
+        "path": "docs/a.pdf",
+        "chunkIndex": 0,
+        "score": 0.9,
+        "text": "passage",
+        "section": "Intro",
+        "page": 2,
+        "payload": {},
+    }]))
+    .expect("hits");
+    let node = super::nodes::VectorSearchNode;
+    let meta = node
+        .tool_meta(&json!({ "storeId": store, "query": "x" }), &hits)
+        .expect("a meta");
+    assert_eq!(
+        meta,
+        json!({ "citations": [{
+            "storeId": store,
+            "documentId": "doc-1",
+            "sourcePath": "docs/a.pdf",
+            "chunkIndex": 0,
+            "score": 0.9,
+            "section": "Intro",
+            "page": 2,
+            "related": null,
+        }] })
+    );
+    assert!(node.tool_meta(&json!({ "query": "x" }), &hits).is_none());
+}

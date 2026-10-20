@@ -229,6 +229,7 @@ pub struct ToolStepRequest {
 pub struct ToolStepResult {
     pub step_id: String,
     pub output: Value,
+    pub meta: Option<Value>,
 }
 
 pub type ToolStepFuture = BoxFuture<'static, Result<ToolStepResult, AppError>>;
@@ -321,6 +322,10 @@ pub trait NodeDef: Send + Sync + 'static {
         context: &StepContext,
         input: Self::Input,
     ) -> Result<Self::Output, AppError>;
+
+    fn tool_meta(&self, _input: &Value, _output: &Self::Output) -> Option<Value> {
+        None
+    }
 }
 
 pub struct FnNode<I, O, F> {

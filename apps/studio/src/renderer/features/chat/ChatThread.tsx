@@ -13,6 +13,7 @@ import MessageActions from "../../ui/molecules/MessageActions";
 import ChatComposer from "./ChatComposer";
 import ChatApprovals from "./ChatApprovals";
 import ChatToolCalls from "./ChatToolCalls";
+import { answerCitations } from "./citations";
 import { shouldPinToBottom } from "./scroll";
 import type ChatStore from "./ChatStore";
 
@@ -161,7 +162,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                 key={message.id}
                 content={message.content}
                 reasoning={message.reasoning}
-                citations={message.citations}
+                citations={answerCitations(message.citations, message.toolCalls)}
                 stores={store.stores}
                 partial={message.partial}
                 tools={<ChatToolCalls calls={message.toolCalls} />}
@@ -180,7 +181,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
             <ChatMessage
               content={store.liveText}
               reasoning={store.liveReasoning}
-              citations={store.liveCitations}
+              citations={answerCitations(store.liveCitations, store.liveToolCalls)}
               stores={store.stores}
               generating={store.generating}
               status={generationPhase(store)}

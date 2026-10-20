@@ -1123,8 +1123,11 @@ impl GenerateChatNode {
         };
         match invocation.await {
             Ok(result) => {
-                calls.lock().unwrap_or_else(PoisonError::into_inner)[index].step_id =
-                    Some(result.step_id);
+                {
+                    let mut guard = calls.lock().unwrap_or_else(PoisonError::into_inner);
+                    guard[index].step_id = Some(result.step_id);
+                    guard[index].meta = result.meta;
+                }
                 let text = tool_result_text(&result.output);
                 Ok(if text.is_error {
                     settle(
@@ -1266,6 +1269,7 @@ impl GenerateChatNode {
                             approval_id: None,
                             step_id: None,
                             duration_ms: 0,
+                            meta: None,
                         });
                         guard.len() - 1
                     };

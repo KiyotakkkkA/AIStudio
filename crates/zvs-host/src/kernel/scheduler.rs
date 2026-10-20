@@ -730,14 +730,16 @@ impl Scheduler {
                 }
             }
             context.check_cancelled()?;
-            let output = definition.execute(&context, request.input.clone()).await?;
+            let executed = definition
+                .execute_tool(&context, request.input.clone())
+                .await?;
             context.check_cancelled()?;
-            Ok(output)
+            Ok(executed)
         }
         .await;
         step.finished_at = Some(self.now());
         match &outcome {
-            Ok(output) => {
+            Ok((output, _)) => {
                 step.status = StepStatus::Succeeded;
                 step.output = output.clone();
             }
@@ -751,9 +753,10 @@ impl Scheduler {
             }
         }
         self.commit_tool_step(&step, false)?;
-        outcome.map(|output| ToolStepResult {
+        outcome.map(|(output, meta)| ToolStepResult {
             step_id: step.id,
             output,
+            meta,
         })
     }
 

@@ -12,6 +12,17 @@ use super::types::{NodeDef, PermissionRequirement, StepContext};
 #[async_trait]
 trait ErasedNode: Send + Sync {
     async fn execute(&self, context: &StepContext, input: Value) -> Result<Value, AppError>;
+
+    async fn execute_tool(
+        &self,
+        context: &StepContext,
+        input: Value,
+    ) -> Result<(Value, Option<Value>), AppError>;
+}
+
+fn output_value<T: serde::Serialize>(output: T) -> Result<Value, AppError> {
+    serde_json::to_value(output)
+        .map_err(|error| AppError::new(AppErrorCode::ValidationFailed, error.to_string()))
 }
 
 #[async_trait]
@@ -20,8 +31,19 @@ impl<N: NodeDef> ErasedNode for N {
         let input: N::Input = zvs_contract::parse(input)?;
         let output = self.run(context, input).await?;
         output.validate()?;
-        serde_json::to_value(output)
-            .map_err(|error| AppError::new(AppErrorCode::ValidationFailed, error.to_string()))
+        output_value(output)
+    }
+
+    async fn execute_tool(
+        &self,
+        context: &StepContext,
+        input: Value,
+    ) -> Result<(Value, Option<Value>), AppError> {
+        let typed: N::Input = zvs_contract::parse(input.clone())?;
+        let output = self.run(context, typed).await?;
+        output.validate()?;
+        let meta = self.tool_meta(&input, &output);
+        Ok((output_value(output)?, meta))
     }
 }
 
@@ -137,6 +159,14 @@ impl RegisteredNode {
 
     pub async fn execute(&self, context: &StepContext, input: Value) -> Result<Value, AppError> {
         self.node.execute(context, input).await
+    }
+
+    pub async fn execute_tool(
+        &self,
+        context: &StepContext,
+        input: Value,
+    ) -> Result<(Value, Option<Value>), AppError> {
+        self.node.execute_tool(context, input).await
     }
 }
 

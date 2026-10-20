@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use zvs_contract::validate::check;
 use zvs_contract::{
-    AppError, AppErrorCode, HostEventDraft, Validate, VectorIndexInput, VectorIndexReportDto,
-    VectorSearchHitDto, VectorSearchInput, log_line,
+    AppError, AppErrorCode, ChatCitationDto, HostEventDraft, Validate, VectorIndexInput,
+    VectorIndexReportDto, VectorSearchHitDto, VectorSearchInput, VectorStoreId, log_line,
 };
 
 use super::registry::NodeRegistry;
@@ -267,6 +267,16 @@ impl NodeDef for VectorSearchNode {
             .await?;
         context.check_cancelled()?;
         Ok(hits)
+    }
+
+    fn tool_meta(&self, input: &Value, output: &Vec<VectorSearchHitDto>) -> Option<Value> {
+        let store_id =
+            serde_json::from_value::<VectorStoreId>(input.get("storeId")?.clone()).ok()?;
+        let citations = output
+            .iter()
+            .map(|hit| ChatCitationDto::from_hit(store_id, hit, None))
+            .collect::<Vec<_>>();
+        Some(json!({ "citations": citations }))
     }
 }
 
