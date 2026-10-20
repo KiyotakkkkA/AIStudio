@@ -389,13 +389,11 @@ impl GatewayPage for WebviewPage {
         if !self.healthy() {
             return Err("the gateway page is closed".to_owned());
         }
+        let awaited = command["op"] == "renew";
+        let call = CallFunctionOn::new(*PAGE_SCRIPT, self.context, vec![command]);
         let result = self
             .cdp
-            .call_function_on(CallFunctionOn::new(
-                *PAGE_SCRIPT,
-                self.context,
-                vec![command],
-            ))
+            .call_function_on(if awaited { call.awaiting() } else { call })
             .await
             .map_err(failed)?;
         Ok(result.value.unwrap_or(Value::Null))

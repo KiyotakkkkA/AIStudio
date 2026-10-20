@@ -1,6 +1,8 @@
 use rusqlite::Row;
 use zvs_contract::{AccountFamily, AccountStatus, Timestamp};
 
+pub const SESSION_EXPIRED_DETAIL: &str = "Session expired — sign in again";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AccountRow {
     pub id: String,
@@ -45,11 +47,54 @@ impl AccountRow {
         self.status == AccountStatus::Linked.as_str()
     }
 
+    pub fn session_lapsed(&self) -> bool {
+        self.status == AccountStatus::NeedsRelink.as_str()
+            && self.status_detail.as_deref() == Some(SESSION_EXPIRED_DETAIL)
+    }
+
     pub fn family(&self) -> Option<AccountFamily> {
         AccountFamily::parse(&self.adapter)
     }
 
     pub fn account_status(&self) -> Option<AccountStatus> {
         AccountStatus::parse(&self.status)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(status: AccountStatus, detail: Option<&str>) -> AccountRow {
+        AccountRow {
+            id: "a".to_owned(),
+            adapter: "qwen-web".to_owned(),
+            partition: "persist:browser-work".to_owned(),
+            external_id: "user-1".to_owned(),
+            email_masked: None,
+            display_name: None,
+            avatar_url: None,
+            token_secret_id: None,
+            token_expires_at: None,
+            status: status.as_str().to_owned(),
+            status_detail: detail.map(str::to_owned),
+            last_checked_at: None,
+            linked_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    #[test]
+    fn only_a_session_the_app_found_expired_counts_as_lapsed() {
+        assert!(row(AccountStatus::NeedsRelink, Some(SESSION_EXPIRED_DETAIL)).session_lapsed());
+        assert!(!row(AccountStatus::NeedsRelink, None).session_lapsed());
+        assert!(
+            !row(
+                AccountStatus::NeedsRelink,
+                Some("Browser is signed in to a different account")
+            )
+            .session_lapsed()
+        );
+        assert!(!row(AccountStatus::Linked, Some(SESSION_EXPIRED_DETAIL)).session_lapsed());
     }
 }

@@ -1,14 +1,15 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use async_trait::async_trait;
 use futures::{StreamExt, stream};
 use tokio_util::sync::CancellationToken;
 use url::Url;
-use zvs_contract::AppError;
+use zvs_contract::{AppError, ErrorDetails};
 
 use crate::browser::BROWSER_PARTITION;
-use crate::drivers::ai::errors::{Headers, cancelled};
+use crate::drivers::ai::errors::{Headers, cancelled, session_expired};
 use crate::drivers::ai::transport::{
     AccountToken, ByteStream, SessionGateway, SessionRequest, SessionResponse,
 };
@@ -87,6 +88,9 @@ pub struct FakeSessionGateway {
     scopes: Mutex<Vec<CancellationToken>>,
     queued: Mutex<HashMap<String, Vec<FakeReply>>>,
     responder: Mutex<Responder>,
+    renewable: AtomicBool,
+    revoked: AtomicBool,
+    renewals: Mutex<Vec<String>>,
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -109,6 +113,9 @@ impl Default for FakeSessionGateway {
             scopes: Mutex::default(),
             queued: Mutex::default(),
             responder: Mutex::new(Box::new(|_| FakeReply::json(404, &serde_json::json!({})))),
+            renewable: AtomicBool::new(false),
+            revoked: AtomicBool::new(false),
+            renewals: Mutex::default(),
         }
     }
 }
@@ -173,6 +180,20 @@ impl FakeSessionGateway {
         }
     }
 
+    pub fn renewable(&self, renewable: bool) -> &Self {
+        self.renewable.store(renewable, Ordering::SeqCst);
+        self
+    }
+
+    pub fn revoked(&self, revoked: bool) -> &Self {
+        self.revoked.store(revoked, Ordering::SeqCst);
+        self
+    }
+
+    pub fn renewals(&self) -> Vec<String> {
+        lock(&self.renewals).clone()
+    }
+
     pub fn requests(&self) -> Vec<RecordedSessionRequest> {
         lock(&self.requests).clone()
     }
@@ -194,6 +215,17 @@ impl SessionGateway for FakeSessionGateway {
 
     fn account_token(&self, url: &str) -> Option<AccountToken> {
         origin(url).and_then(|origin| lock(&self.tokens).get(&origin).cloned())
+    }
+
+    async fn renew(&self, url: &str, cancel: &CancellationToken) -> Result<bool, AppError> {
+        if cancel.is_cancelled() {
+            return Err(cancelled());
+        }
+        lock(&self.renewals).push(url.to_owned());
+        if self.revoked.load(Ordering::SeqCst) {
+            return Err(session_expired(ErrorDetails::new()));
+        }
+        Ok(self.renewable.load(Ordering::SeqCst))
     }
 
     async fn fetch(

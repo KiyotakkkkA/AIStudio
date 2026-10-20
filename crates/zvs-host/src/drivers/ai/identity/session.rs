@@ -87,4 +87,8 @@ impl SessionGateway for StoredTokenSession {
     ) -> Result<SessionResponse, AppError> {
         self.inner.fetch(url, request, cancel).await
     }
+
+    async fn renew(&self, url: &str, cancel: &CancellationToken) -> Result<bool, AppError> {
+        self.inner.renew(url, cancel).await
+    }
 }

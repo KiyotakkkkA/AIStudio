@@ -18,7 +18,7 @@ pub mod vector_eval_case;
 pub mod vector_source;
 pub mod vector_store;
 
-pub use account::AccountRow;
+pub use account::{AccountRow, SESSION_EXPIRED_DETAIL};
 pub use chat::{ConversationRow, MessageRow};
 pub use columns::EnumColumn;
 pub use download::DownloadRow;

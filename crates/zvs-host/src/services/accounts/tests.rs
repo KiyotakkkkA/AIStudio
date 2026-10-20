@@ -16,7 +16,7 @@ use crate::drivers::ai::transport::{AccountToken, SharedSessionGateway};
 use crate::platform::clock::{CLOCK_ORIGIN, Clock};
 use crate::platform::events::EventBusOptions;
 use crate::services::providers::{ProbeInput, ProviderService, ProviderServiceOptions};
-use crate::testing::fake_accounts::FAKE_QWEN_LOGIN;
+use crate::testing::fake_accounts::{FAKE_IDENTITY_ENDPOINT, FAKE_QWEN_LOGIN};
 use crate::testing::{
     FakeCrypto, FakeDriver, FakeDriverSource, FakeIdentityProbes, FakeSessionGateway, MemorySink,
     ProbeStep, RecordingBrowser, RecordingNavigator, TemporaryDatabase, TokioClock, fake_identity,
@@ -35,6 +35,7 @@ struct Harness {
     lifecycle: BrowserLifecycle,
     sink: Arc<MemorySink>,
     clock: Arc<TokioClock>,
+    session: Arc<FakeSessionGateway>,
 }
 
 fn harness() -> Harness {
@@ -53,7 +54,8 @@ fn harness() -> Harness {
     let sink = MemorySink::shared();
     let events = EventBus::new(EventBusOptions::default());
     events.attach(sink.clone());
-    let session: SharedSessionGateway = FakeSessionGateway::shared();
+    let fake_session = FakeSessionGateway::shared();
+    let session: SharedSessionGateway = fake_session.clone();
     let sessions: SessionFactory = Arc::new(move |_partition: &str| session.clone());
     let service = AccountService::new(AccountServiceOptions {
         probes: probes.factory(),
@@ -81,6 +83,7 @@ fn harness() -> Harness {
         lifecycle,
         sink,
         clock,
+        session: fake_session,
     }
 }
 
@@ -362,10 +365,57 @@ async fn automatic_refresh_checks_unknown_expiry_every_fifteen_minutes_and_stops
         harness.first().detail.as_deref(),
         Some(SESSION_EXPIRED_DETAIL)
     );
-    advance(30 * 60_000).await;
-    assert_eq!(harness.probes.calls(), 2);
+    harness
+        .probes
+        .always(ProbeStep::Identity(without_expiry("rotated-token")));
+    advance(15 * 60_000).await;
+    assert_eq!(harness.probes.calls(), 3);
+    assert_eq!(harness.first().status, AccountStatus::Linked);
     assert_eq!(harness.browser.opened().len(), 1);
     harness.service.dispose().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_lapsed_session_is_rechecked_as_soon_as_the_service_starts_again() {
+    let harness = harness();
+    harness.link(QWEN).await;
+    let id = harness.first().id.to_string();
+    harness.probes.once(ProbeStep::Fail(signed_out()));
+    harness.service.refresh(&id).await.expect("refreshes");
+    assert_eq!(harness.first().status, AccountStatus::NeedsRelink);
+    harness.service.start_auto_refresh().expect("starts");
+    settle().await;
+    assert_eq!(harness.probes.calls(), 3);
+    assert_eq!(harness.first().status, AccountStatus::Linked);
+    harness.service.dispose().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_rejected_session_is_renewed_by_its_client_before_the_account_needs_a_relink() {
+    let harness = harness();
+    harness.link(QWEN).await;
+    let id = harness.first().id.to_string();
+    harness.session.renewable(true);
+    harness.probes.once(ProbeStep::Fail(signed_out()));
+    let renewed = harness.service.refresh(&id).await.expect("refreshes");
+    assert_eq!(renewed.status, AccountStatus::Linked);
+    assert_eq!(harness.probes.calls(), 3);
+    assert_eq!(
+        harness.session.renewals(),
+        vec![FAKE_IDENTITY_ENDPOINT.to_owned(); 3]
+    );
+
+    harness.probes.once(ProbeStep::Fail(signed_out()));
+    harness.probes.once(ProbeStep::Fail(signed_out()));
+    let lapsed = harness.service.refresh(&id).await.expect("refreshes");
+    assert_eq!(lapsed.status, AccountStatus::NeedsRelink);
+    assert_eq!(lapsed.detail.as_deref(), Some(SESSION_EXPIRED_DETAIL));
+    assert_eq!(harness.session.renewals().len(), 4);
+
+    harness.session.renewable(false);
+    harness.probes.once(ProbeStep::Fail(unreachable("Offline")));
+    harness.service.refresh(&id).await.expect_err("offline");
+    assert_eq!(harness.session.renewals().len(), 4);
 }
 
 #[tokio::test(start_paused = true)]
@@ -795,4 +845,31 @@ fn emails_are_masked_to_their_first_character_and_domain() {
     assert_eq!(mask_email(Some("no-at")).as_deref(), Some("***"));
     assert_eq!(mask_email(Some("")), None);
     assert_eq!(mask_email(None), None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn linking_waits_for_a_real_sign_in_while_the_browser_session_cannot_be_renewed() {
+    let harness = harness();
+    harness.session.revoked(true);
+    let pending = tokio::spawn({
+        let service = harness.service.clone();
+        async move { service.link(QWEN).await }
+    });
+    advance(2500).await;
+    assert!(harness.list().is_empty());
+    assert!(!harness.session.renewals().is_empty());
+    harness.session.revoked(false);
+    let result = pending.await.expect("joins").expect("links");
+    assert_eq!(linked_account(&result).status, AccountStatus::Linked);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_check_marks_an_account_whose_session_cannot_be_renewed_for_a_relink() {
+    let harness = harness();
+    harness.link(QWEN).await;
+    let id = harness.first().id.to_string();
+    harness.session.revoked(true);
+    let checked = harness.service.refresh(&id).await.expect("refreshes");
+    assert_eq!(checked.status, AccountStatus::NeedsRelink);
+    assert_eq!(checked.detail.as_deref(), Some(SESSION_EXPIRED_DETAIL));
 }

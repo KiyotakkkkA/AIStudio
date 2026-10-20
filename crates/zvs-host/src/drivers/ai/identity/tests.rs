@@ -551,6 +551,72 @@ async fn a_store_refuses_an_unlinked_account_and_a_different_browser_identity() 
 }
 
 #[tokio::test]
+async fn a_rejected_bearer_has_the_client_renew_its_session_before_the_request_is_retried() {
+    let fixture = Fixture::new();
+    let account = fixture.account(AccountFamily::QwenWeb, "qwen-9");
+    let stale = fixture.stale_secret();
+    fixture.update(
+        &account.id,
+        &AccountPatch {
+            token_secret_id: Some(Some(stale)),
+            ..AccountPatch::default()
+        },
+    );
+    let account = fixture.find(&account.id).expect("an account");
+    fixture.session.renewable(true);
+    fixture.session.queue(
+        QWEN_IDENTITY_ENDPOINT,
+        vec![FakeReply::json(200, &json!({ "id": "qwen-9" }))],
+    );
+    fixture.session.queue(
+        QWEN_CHAT,
+        vec![
+            FakeReply::json(401, &json!({ "detail": "expired" })),
+            FakeReply::json(200, &json!({ "ok": true })),
+        ],
+    );
+    let credentials = ProbeAccountCredentials::new(
+        account.clone(),
+        fixture.shared_session(),
+        fixture.secrets.clone(),
+    )
+    .expect("credentials");
+    let mut options =
+        AccountTransportOptions::new("https://chat.qwen.ai/api/v2", fixture.shared_session());
+    options.credentials = Some(Arc::new(credentials));
+    let response = AccountTransport::new(options)
+        .request(&RequestSpec::get("chat/completions"), &token())
+        .await
+        .expect("retries");
+    assert_eq!(response.status, 200);
+    assert_eq!(
+        fixture.session.renewals(),
+        vec![QWEN_IDENTITY_ENDPOINT.to_owned()]
+    );
+    assert_eq!(fixture.session.requests_to(QWEN_CHAT).len(), 2);
+
+    fixture.session.queue(
+        QWEN_IDENTITY_ENDPOINT,
+        vec![
+            FakeReply::json(401, &json!({ "detail": "expired" })),
+            FakeReply::json(200, &json!({ "id": "qwen-9" })),
+        ],
+    );
+    let renewed = ProbeAccountCredentials::new(
+        account.clone(),
+        fixture.shared_session(),
+        fixture.secrets.clone(),
+    )
+    .expect("credentials")
+    .current(&token())
+    .await
+    .expect("a token");
+    assert_eq!(renewed, Some(AccountToken::bearer("qwen-token-stale")));
+    assert_eq!(fixture.session.renewals().len(), 2);
+    assert_eq!(fixture.find(&account.id), Some(account));
+}
+
+#[tokio::test]
 async fn probe_credentials_read_the_stored_token_after_a_restart_without_writing_anything() {
     let fixture = Fixture::new();
     let account = fixture.account(AccountFamily::QwenWeb, "qwen-9");

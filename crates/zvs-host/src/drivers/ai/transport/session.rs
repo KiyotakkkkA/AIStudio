@@ -161,6 +161,10 @@ pub trait SessionGateway: Send + Sync {
         request: SessionRequest,
         cancel: &CancellationToken,
     ) -> Result<SessionResponse, AppError>;
+
+    async fn renew(&self, _url: &str, _cancel: &CancellationToken) -> Result<bool, AppError> {
+        Ok(false)
+    }
 }
 
 pub type SharedSessionGateway = Arc<dyn SessionGateway>;

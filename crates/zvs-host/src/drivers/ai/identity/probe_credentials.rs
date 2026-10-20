@@ -5,9 +5,9 @@ use tokio_util::sync::CancellationToken;
 use zvs_contract::{AppError, ErrorDetails};
 
 use super::session::{account_family, account_session};
-use super::{SharedIdentityProbe, identity_probe};
+use super::{SharedIdentityProbe, identity_probe, probe_renewing};
 use crate::data::schema::AccountRow;
-use crate::drivers::ai::errors::{cancelled, session_expired};
+use crate::drivers::ai::errors::{cancelled, is_session_expired, session_expired};
 use crate::drivers::ai::transport::{
     AccountCredentials, AccountToken, SharedSecretResolver, SharedSessionGateway,
 };
@@ -58,7 +58,7 @@ impl ProbeAccountCredentials {
         if cancel.is_cancelled() {
             return Err(cancelled());
         }
-        let result = self.probe.probe(&session, cancel).await?;
+        let result = probe_renewing(self.probe.as_ref(), &session, cancel).await?;
         if cancel.is_cancelled() {
             return Err(cancelled());
         }
@@ -87,6 +87,10 @@ impl AccountCredentials for ProbeAccountCredentials {
     }
 
     async fn refresh(&self, cancel: &CancellationToken) -> Result<Option<AccountToken>, AppError> {
+        match self.session.renew(self.probe.endpoint(), cancel).await {
+            Err(error) if cancel.is_cancelled() || is_session_expired(&error) => return Err(error),
+            Ok(_) | Err(_) => {}
+        }
         self.read(cancel).await
     }
 }

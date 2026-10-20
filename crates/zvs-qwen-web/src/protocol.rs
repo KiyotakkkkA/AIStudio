@@ -13,6 +13,8 @@ pub const APP_PAGE: &str = "https://chat.qwen.ai/";
 pub const MODELS_PATH: &str = "/models/";
 pub const CHATS_NEW_PATH: &str = "/chats/new";
 pub const COMPLETIONS_PATH: &str = "/chat/completions";
+pub const SESSION_REFRESH_URL: &str = "https://auth.qwen.ai/api/v2/auths/refresh";
+pub const REQUEST_ORIGIN: &str = "chat.qwen.ai";
 
 pub const MODELS_REFERER_PATH: &str = "/";
 pub const NEW_CHAT_REFERER_PATH: &str = "/c/new-chat";

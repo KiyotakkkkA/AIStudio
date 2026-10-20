@@ -16,7 +16,8 @@ use url::Url;
 use zvs_contract::{AppError, AppErrorCode};
 use zvs_host::browser::BROWSER_PARTITION;
 use zvs_host::drivers::ai::errors::{
-    Headers, UNREACHABLE_MESSAGE, browser_verification, cancelled, request_failed, timed_out,
+    Headers, UNREACHABLE_MESSAGE, browser_verification, cancelled, request_failed, session_expired,
+    timed_out,
 };
 use zvs_host::drivers::ai::{
     AccountToken, ByteStream, SessionGateway, SessionRequest, SessionResponse,
@@ -77,6 +78,7 @@ pub struct GatewayOptions {
     pub reveal_after: Duration,
     /// How long a shown verification may take before the request fails.
     pub challenge_timeout: Duration,
+    pub renew_reuse: Duration,
 }
 
 impl Default for GatewayOptions {
@@ -90,6 +92,7 @@ impl Default for GatewayOptions {
             ack_every: 4,
             reveal_after: Duration::from_secs(10),
             challenge_timeout: Duration::from_secs(300),
+            renew_reuse: Duration::from_secs(5),
         }
     }
 }
@@ -132,6 +135,7 @@ struct Live {
 }
 
 type Slot = Arc<tokio::sync::Mutex<Option<Live>>>;
+type Renewal = Arc<tokio::sync::Mutex<Option<(tokio::time::Instant, Result<bool, AppError>)>>>;
 
 pub struct AccountGateway {
     factory: Arc<dyn PageFactory>,
@@ -139,6 +143,7 @@ pub struct AccountGateway {
     options: GatewayOptions,
     logger: SharedLogger,
     slots: Mutex<HashMap<String, Slot>>,
+    renewals: Mutex<HashMap<String, Renewal>>,
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -180,8 +185,37 @@ fn page_plan(origin: &str, url: &str) -> PagePlan {
             transport: PageTransport::Fetch,
             challenge_pattern: None,
             page_bearer_key: None,
+            session_refresh: None,
         }
     }
+}
+
+fn session_revoked(answer: &Value) -> bool {
+    answer["success"] == false
+        && answer["code"].as_str().is_some_and(|code| {
+            zvs_qwen_web::SESSION_REFUSALS.contains(&code.to_ascii_lowercase().as_str())
+        })
+}
+
+fn session_command(plan: PagePlan) -> Value {
+    let (Some(key), Some(refresh)) = (plan.page_bearer_key, plan.session_refresh) else {
+        return Value::Null;
+    };
+    json!({
+        "url": refresh.url,
+        "key": key,
+        "expiry_key": refresh.expiry_key,
+        "state_key": refresh.state_key,
+        "channel": refresh.channel,
+        "leeway_ms": refresh.leeway_ms,
+        "headers": [
+            ["accept", "application/json, text/plain, */*"],
+            ["source", zvs_qwen_web::protocol::SOURCE],
+            ["version", zvs_qwen_web::protocol::WEB_VERSION],
+            ["x-request-id", new_id().to_string()],
+            ["x-request-origin", zvs_qwen_web::protocol::REQUEST_ORIGIN],
+        ],
+    })
 }
 
 fn page_headers(request: &SessionRequest) -> Vec<(String, String)> {
@@ -341,6 +375,7 @@ impl AccountGateway {
             options,
             logger,
             slots: Mutex::default(),
+            renewals: Mutex::default(),
         }
     }
 
@@ -466,6 +501,7 @@ impl AccountGateway {
                 "transport": plan.transport.as_str(),
                 "challenge": plan.challenge_pattern,
                 "bearer_key": plan.page_bearer_key,
+                "session": session_command(plan),
             });
             let started = tokio::select! {
                 biased;
@@ -588,6 +624,70 @@ impl SessionGateway for AccountGateway {
 
     fn account_token(&self, url: &str) -> Option<AccountToken> {
         self.tokens.token(url)
+    }
+
+    async fn renew(&self, url: &str, cancel: &CancellationToken) -> Result<bool, AppError> {
+        let origin = account_origin(url).ok_or_else(refused_origin)?;
+        let plan = page_plan(&origin, url);
+        let session = session_command(plan);
+        if session.is_null() {
+            return Ok(false);
+        }
+        let page = page_url(&origin).ok_or_else(refused_origin)?;
+        let renewal = Arc::clone(lock(&self.renewals).entry(origin.clone()).or_default());
+        let mut renewed = tokio::select! {
+            biased;
+            () = cancel.cancelled() => return Err(cancelled()),
+            guard = renewal.lock() => guard,
+        };
+        if let Some((at, outcome)) = renewed.as_ref()
+            && at.elapsed() < self.options.renew_reuse
+        {
+            return outcome.clone();
+        }
+        let live = tokio::select! {
+            biased;
+            () = cancel.cancelled() => return Err(cancelled()),
+            live = self.live(&origin, &page) => live?,
+        };
+        let command = json!({ "op": "renew", "session": session });
+        let answer = tokio::select! {
+            biased;
+            () = cancel.cancelled() => return Err(cancelled()),
+            answer = live.page.command(command) => answer,
+        };
+        let answer = answer.unwrap_or(Value::Null);
+        let renewed_now = answer["stored"] == true || answer["changed"] == true;
+        let outcome = if session_revoked(&answer) {
+            let mut details = zvs_contract::ErrorDetails::new();
+            details.insert("origin".to_owned(), json!(origin));
+            details.insert("reason".to_owned(), json!("refresh-revoked"));
+            details.insert("vendorCode".to_owned(), answer["code"].clone());
+            Err(session_expired(details))
+        } else {
+            Ok(renewed_now)
+        };
+        *renewed = Some((tokio::time::Instant::now(), outcome.clone()));
+        self.logger.log(
+            if renewed_now {
+                LogLevel::Info
+            } else {
+                LogLevel::Warn
+            },
+            "browser",
+            "The account client was asked to renew its session",
+            &[
+                ("origin", json!(origin)),
+                ("status", answer["status"].clone()),
+                ("success", answer["success"].clone()),
+                ("vendorCode", answer["code"].clone()),
+                ("details", answer["details"].clone()),
+                ("fields", answer["fields"].clone()),
+                ("stored", answer["stored"].clone()),
+                ("bearerChanged", answer["changed"].clone()),
+            ],
+        );
+        outcome
     }
 
     async fn fetch(

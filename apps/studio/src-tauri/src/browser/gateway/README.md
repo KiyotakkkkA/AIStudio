@@ -49,6 +49,13 @@ hides it again (`conceal`). A watched request silent for `reveal_after` (10 s) i
 Closing the shown window only hides it.
 | `ack` | Gives the request `credit` more chunks |
 | `abort` | Aborts the request's `AbortController` |
+| `renew` | Awaited. Refresh the vendor session as its client does (`session`); returns `status`, `success`, `code`, `details`, field names, `stored`, `changed` |
+
+`start` and `renew` carry `session` for origins whose plan has a page bearer key and a session
+refresh (Qwen): the refresh URL, its headers, the client's storage keys and channel, and
+`leeway_ms`. Before a request with a bearer the page refreshes when the stored expiry is
+within `leeway_ms`, persists the client's token state and announces it; renewals share one
+call. A `renew` result within `renew_reuse` (5 s) is reused. Other origins answer `false`.
 
 The page reports through the binding: `head` (status and headers), `challenge`, `chunk` (base64, at most
 `chunk_size` bytes), `end`, or `error` (with `aborted`). A request may have `window` chunks

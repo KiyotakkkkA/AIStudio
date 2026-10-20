@@ -154,7 +154,7 @@ impl DatabaseAccounts {
         let Some(account) = self.find(account_id)? else {
             return Err(account_not_linked(provider));
         };
-        if !account.is_linked() {
+        if !account.is_linked() && !account.session_lapsed() {
             let mut details = ErrorDetails::new();
             details.insert("providerId".to_owned(), json!(provider.id));
             details.insert("accountId".to_owned(), json!(account.id));

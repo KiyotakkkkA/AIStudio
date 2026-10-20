@@ -7,7 +7,7 @@ use tokio_util::sync::CancellationToken;
 use zvs_contract::{AccountStatus, AppError, AppErrorCode, ErrorDetails, SecretScope};
 
 use super::session::account_family;
-use super::{AccountIdentity, ProbeFactory, ProbeResult, identity_probes};
+use super::{AccountIdentity, ProbeFactory, ProbeResult, identity_probes, probe_renewing};
 use crate::data::repositories::AccountPatch;
 use crate::data::schema::AccountRow;
 use crate::data::{Database, Repositories};
@@ -156,7 +156,7 @@ impl AccountCredentialStore {
     ) -> Result<Option<AccountToken>, AppError> {
         let row = self.row()?;
         let probe = (self.probes)(account_family(&row.adapter)?);
-        let result = match probe.probe(self.session.as_ref(), cancel).await {
+        let result = match probe_renewing(probe.as_ref(), self.session.as_ref(), cancel).await {
             Ok(result) => result,
             Err(error) => {
                 if is_session_expired(&error) {

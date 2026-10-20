@@ -25,11 +25,12 @@ use crate::browser::{
 };
 use crate::data::repositories::{AccountDraft, AccountPatch};
 use crate::data::schema::AccountRow;
+pub use crate::data::schema::SESSION_EXPIRED_DETAIL;
 use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::errors::is_session_expired;
 use crate::drivers::ai::identity::{
     ACCOUNT_TOKEN_SECRET_TYPE, ProbeFactory, ProbeResult, SharedIdentityProbe, account_session,
-    identity_probes,
+    confirm_renewable, identity_probes, probe_renewing,
 };
 use crate::drivers::ai::registry::SessionFactory;
 use crate::drivers::ai::stream_to_events::ok_outcome;
@@ -54,7 +55,6 @@ pub const OPERATION_CANCELLED: &str = "Account operation cancelled";
 pub const NO_SIGN_IN: &str = "No sign-in detected";
 pub const IDENTITY_REPLACED: &str = "Previous identity replaced; only one browser session per vendor can be active. Its providers now use the new account.";
 pub const DIFFERENT_ACCOUNT: &str = "Browser is signed in to a different account";
-pub const SESSION_EXPIRED_DETAIL: &str = "Session expired — sign in again";
 pub const COOKIES_CLEARED_DETAIL: &str = "Browser cookies cleared — sign in again";
 pub const LINKING_FAILED: &str = "Account linking failed";
 
@@ -333,15 +333,23 @@ impl AccountService {
         };
         for account in accounts {
             let id = account.id.to_string();
-            if account.status != AccountStatus::Linked
+            let lapsed = account.status == AccountStatus::NeedsRelink
+                && account.detail.as_deref() == Some(SESSION_EXPIRED_DETAIL);
+            if (account.status != AccountStatus::Linked && !lapsed)
                 || lock(&self.inner.links).contains_key(&account.adapter)
                 || lock(&self.inner.refreshes).contains_key(&id)
             {
                 continue;
             }
             let attempted = lock(&self.inner.attempts).get(&id).copied().unwrap_or(0);
-            let checked = account.last_checked_at.unwrap_or(0).max(attempted);
-            let due = if account
+            let checked = if lapsed {
+                attempted
+            } else {
+                account.last_checked_at.unwrap_or(0).max(attempted)
+            };
+            let due = if lapsed {
+                AUTO_REFRESH_IDLE_MS
+            } else if account
                 .expires_at
                 .is_some_and(|expires_at| expires_at <= now + EXPIRY_WINDOW_MS)
             {
@@ -728,10 +736,17 @@ impl Inner {
                     done: elapsed.min(total),
                     total,
                 });
-                match deadline
+                let checked = match deadline
                     .guard(probe.probe(session.as_ref(), cancel))
                     .await?
                 {
+                    Ok(result) => deadline
+                        .guard(confirm_renewable(probe.as_ref(), session.as_ref(), cancel))
+                        .await?
+                        .map(|()| result),
+                    Err(error) => Err(error),
+                };
+                match checked {
                     Err(error) => {
                         if !is_session_expired(&error)
                             && error.code != AppErrorCode::ProviderUnreachable
@@ -818,8 +833,12 @@ impl Inner {
             if cancel.is_cancelled() {
                 return Err(Stop::Aborted);
             }
+            let probe = self.probe(family);
             let result = deadline
-                .guard(self.probe(family).probe(&session, cancel))
+                .guard(probe_renewing(probe.as_ref(), &session, cancel))
+                .await??;
+            deadline
+                .guard(confirm_renewable(probe.as_ref(), &session, cancel))
                 .await??;
             if cancel.is_cancelled() {
                 return Err(Stop::Aborted);

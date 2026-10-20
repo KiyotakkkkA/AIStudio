@@ -107,6 +107,49 @@ session alone; then fail with `PROVIDER_SESSION_EXPIRED`, `reason: "token-reject
 A JSON answer to a streamed call goes through the same steps. Envelopes with other codes
 are reported as «Qwen отклонил запрос списка моделей» with `vendorCode`.
 
+## Session renewal after a pause or restart, 2026-10-20
+
+Observed in the client (FE `0.3.20`, `main.js`) on 2026-10-20:
+
+- The bearer in `localStorage.token` is a short-lived access token: its JWT `exp` is about
+  15 minutes after `iat`. The client keeps `at_expire_time` (ms) and
+  `qwen_access_token_state` (`version: 1`, `stateId`, `token`, `expiresAt`, `updatedAt`,
+  `sourceId`) next to it.
+- It renews with `GET https://auth.qwen.ai/api/v2/auths/refresh` (`withCredentials`; the
+  `.qwen.ai` cookies `refresh_token` and `auth-session`), reads `data.access_token` and
+  `data.expires_at` (seconds), persists the state and announces `TOKEN_UPDATED` on the
+  `BroadcastChannel` `qwen-auth-token`. Other tabs adopt that state rather than renewing again.
+- Without `x-request-origin: chat.qwen.ai` the auth host answers `Bad_Request`, «Missing
+  origin»; a dead session answers `Unauthorized`, «Token is revoked, please login again.»
+
+The client only renews around its own requests. The gateway's requests bypass its token
+manager, so after 15 idle minutes, or after a restart, they went out with an expired bearer
+and were refused. The startup identity check then marked the account `needs-relink` for good.
+
+- The gateway page now renews the same way (`SESSION_REFRESH` in `zvs-qwen-web`): before a
+  request that carries a bearer it checks `at_expire_time` (or the JWT `exp`) and, with less
+  than a minute left, refreshes, persists the client's state and announces it. Concurrent
+  renewals share one call. The token never leaves the page.
+- `SessionGateway::renew` runs the same refresh on demand after a refusal; the log line «The
+  account client was asked to renew its session» records the status, `success`, `data.code`,
+  `data.details` and field names, never values.
+- `ProbeAccountCredentials::refresh` renews before probing. Identity probes that end in a
+  session expiry (credentials, the store and the account check in `AccountService`) renew once
+  and probe again before giving up.
+- An account the app itself marked `needs-relink` with «Session expired — sign in again»
+  (`AccountRow::session_lapsed`) still gets a transport, and the automatic check retries it
+  right after startup and then every 15 minutes. A different identity or cleared cookies
+  still need a re-link, as does a revoked refresh token.
+- A refresh the auth host refuses with `unauthorized`, `invalid token` or `forbidden` (the
+  client's own refusal set) is a session expiry (`reason: "refresh-revoked"`). Linking and the
+  account check confirm the session renews after the identity probe passes: `/api/v1/auths/`
+  still accepts the cookies of a session whose refresh token is revoked, so a re-link used to
+  succeed without a sign-in and then fail every turn.
+- Rejected approach: reopening the gateway page so the app renews on load. The app kept its
+  rejected bearer (`bearerChanged: false`) and each reload started a new verification.
+- Not covered: an `unauthorized` frame inside an already streaming SSE answer still ends that
+  turn as an expired session.
+
 ## Upstream compatibility sync on 2026-10-18
 
 Compared the adapter with the then-current [Rfym21/Qwen2API request implementation](https://github.com/Rfym21/Qwen2API/tree/1b38a501c833a147d3ee3fc6317d1bc2a87d6482)

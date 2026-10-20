@@ -1,6 +1,6 @@
 //! How the gateway page sends a request so that it leaves the browser the way the client's does.
 
-use crate::protocol::{API_BASE, CHATS_NEW_PATH};
+use crate::protocol::{API_BASE, CHATS_NEW_PATH, SESSION_REFRESH_URL};
 
 /// The page API a request goes through. The vendor's anti-abuse SDK instruments the page's
 /// XHR, and the client creates chats over XHR; streamed completions use `fetch`.
@@ -30,6 +30,25 @@ pub const CHALLENGE_PATTERN: &str = "baxia|punish|nocaptcha|_____tmd_____";
 pub const PAGE_BEARER_KEY: &str = "token";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SessionRefresh {
+    pub url: &'static str,
+    pub expiry_key: &'static str,
+    pub state_key: &'static str,
+    pub channel: &'static str,
+    pub leeway_ms: u64,
+}
+
+pub const SESSION_REFUSALS: [&str; 3] = ["unauthorized", "invalid token", "forbidden"];
+
+pub const SESSION_REFRESH: SessionRefresh = SessionRefresh {
+    url: SESSION_REFRESH_URL,
+    expiry_key: "at_expire_time",
+    state_key: "qwen_access_token_state",
+    channel: "qwen-auth-token",
+    leeway_ms: 60_000,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PagePlan {
     pub transport: PageTransport,
     /// Watch the page for a verification dialog while the request waits for its response.
@@ -37,6 +56,7 @@ pub struct PagePlan {
     /// Replace a request's bearer with the one the client keeps under this `localStorage`
     /// key. A request sent without `Authorization` stays on the cookie session.
     pub page_bearer_key: Option<&'static str>,
+    pub session_refresh: Option<SessionRefresh>,
 }
 
 /// The plan for `url`, an absolute URL on the Qwen origin.
@@ -52,6 +72,7 @@ pub fn page_plan(url: &str) -> PagePlan {
         },
         challenge_pattern: Some(CHALLENGE_PATTERN),
         page_bearer_key: Some(PAGE_BEARER_KEY),
+        session_refresh: Some(SESSION_REFRESH),
     }
 }
 
@@ -85,5 +106,10 @@ mod tests {
         assert_eq!(PageTransport::Xhr.as_str(), "xhr");
         assert!(page_plan(API_BASE).challenge_pattern.is_some());
         assert_eq!(page_plan(API_BASE).page_bearer_key, Some("token"));
+        let refresh = page_plan(API_BASE)
+            .session_refresh
+            .expect("a session refresh");
+        assert_eq!(refresh.url, "https://auth.qwen.ai/api/v2/auths/refresh");
+        assert_eq!(refresh.state_key, "qwen_access_token_state");
     }
 }

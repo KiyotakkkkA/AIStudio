@@ -56,6 +56,7 @@ struct FakePage {
     revealed: AtomicUsize,
     concealed: AtomicUsize,
     passed: Notify,
+    renewal: Arc<Mutex<Value>>,
 }
 
 impl FakePage {
@@ -175,6 +176,10 @@ impl GatewayPage for Arc<FakePage> {
                 }
                 Ok(json!(true))
             }
+            Some("renew") => {
+                assert_eq!(command["session"]["key"], "token");
+                Ok(lock(&self.renewal).clone())
+            }
             Some("abort") => {
                 if let Some(flow) = lock(&self.flows).get(&id) {
                     flow.aborted.store(true, Ordering::SeqCst);
@@ -211,6 +216,7 @@ struct FakePages {
     failures: AtomicUsize,
     hang: AtomicBool,
     disposed: AtomicBool,
+    renewal: Arc<Mutex<Value>>,
 }
 
 impl FakePages {
@@ -279,6 +285,7 @@ impl PageFactory for FakePages {
             revealed: AtomicUsize::new(0),
             concealed: AtomicUsize::new(0),
             passed: Notify::new(),
+            renewal: Arc::clone(&self.renewal),
         });
         lock(&self.pages).push((origin.to_owned(), Arc::clone(&fake)));
         Ok(Arc::new(fake))
@@ -303,6 +310,7 @@ fn options() -> GatewayOptions {
         ack_every: 2,
         reveal_after: Duration::from_secs(60),
         challenge_timeout: Duration::from_secs(120),
+        renew_reuse: Duration::from_secs(5),
     }
 }
 
@@ -375,6 +383,8 @@ async fn the_request_is_passed_as_data_with_browser_owned_headers_removed() {
     assert_eq!(start["method"], "POST");
     assert_eq!(start["body"], r#"{"stream":true}"#);
     assert_eq!(start["page"], "https://chat.qwen.ai/");
+    assert_eq!(start["session"]["key"], "token");
+    assert_eq!(start["session"]["leeway_ms"], 60_000);
     assert_eq!(start["referrer"], "https://chat.qwen.ai/");
     assert_eq!(
         start["headers"],
@@ -392,6 +402,7 @@ async fn the_request_is_passed_as_data_with_browser_owned_headers_removed() {
         .expect("responds");
     let start = pages.page(1).commands("start").remove(0);
     assert_eq!(start["referrer"], Value::Null);
+    assert_eq!(start["session"], Value::Null);
     assert_eq!(start["body"], Value::Null);
 }
 
@@ -885,4 +896,54 @@ async fn a_long_silence_on_a_watched_request_shows_the_page() {
         .expect_err("times out");
     assert_eq!(fixture.message, TIMED_OUT_MESSAGE);
     assert_eq!(pages.page(1).revealed.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn renewing_asks_the_client_page_to_refresh_its_session_and_reuses_a_recent_answer() {
+    let pages = FakePages::shared(respond(200, vec![b"ok".to_vec()]));
+    *lock(&pages.renewal) = json!({ "status": 200, "stored": true, "changed": true });
+    let gateway = gateway(&pages);
+    let cancel = CancellationToken::new();
+    assert!(gateway.renew(QWEN, &cancel).await.expect("renews"));
+    assert!(gateway.renew(QWEN, &cancel).await.expect("reuses"));
+    assert_eq!(pages.pages().len(), 1);
+    let renewals = pages.page(0).commands("renew");
+    assert_eq!(renewals.len(), 1);
+    assert_eq!(
+        renewals[0]["session"]["url"],
+        "https://auth.qwen.ai/api/v2/auths/refresh"
+    );
+    assert_eq!(
+        renewals[0]["session"]["state_key"],
+        "qwen_access_token_state"
+    );
+    assert!(!renewals[0].to_string().contains("authorization"));
+    assert!(
+        renewals[0]["session"]["headers"]
+            .as_array()
+            .expect("headers")
+            .contains(&json!(["x-request-origin", "chat.qwen.ai"]))
+    );
+    assert!(pages.page(0).healthy());
+
+    tokio::time::sleep(Duration::from_secs(6)).await;
+    *lock(&pages.renewal) = json!({ "status": 401, "stored": false, "changed": false });
+    assert!(!gateway.renew(QWEN, &cancel).await.expect("answers"));
+    assert_eq!(pages.page(0).commands("renew").len(), 2);
+    assert_eq!(pages.pages().len(), 1);
+}
+
+#[tokio::test]
+async fn origins_without_a_client_session_refresh_are_not_renewed() {
+    let pages = FakePages::shared(respond(200, vec![b"ok".to_vec()]));
+    let gateway = gateway(&pages);
+    let cancel = CancellationToken::new();
+    assert!(!gateway.renew(FIXTURE, &cancel).await.expect("answers"));
+    assert!(pages.pages().is_empty());
+    assert!(
+        gateway
+            .renew("https://evil.example/", &cancel)
+            .await
+            .is_err()
+    );
 }

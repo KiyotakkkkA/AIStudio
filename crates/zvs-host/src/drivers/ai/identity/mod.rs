@@ -21,7 +21,10 @@ pub use store::{
     ACCOUNT_TOKEN_SECRET_TYPE, AccountCredentialStore, TOKEN_SKEW_SECONDS, to_identity,
 };
 
-use super::errors::{HttpFailure, account_page_error, cancelled, http_failure, is_html, timed_out};
+use super::errors::{
+    HttpFailure, account_page_error, cancelled, http_failure, is_html, is_session_expired,
+    timed_out,
+};
 use super::transport::{AccountToken, SessionGateway, SessionRequest};
 
 pub const IDENTITY_TIMEOUT_SECONDS: f64 = 20.0;
@@ -79,6 +82,34 @@ pub fn identity_probe(family: AccountFamily) -> SharedIdentityProbe {
 
 pub fn identity_probes() -> ProbeFactory {
     Arc::new(identity_probe)
+}
+
+pub async fn confirm_renewable(
+    probe: &dyn IdentityProbe,
+    session: &dyn SessionGateway,
+    cancel: &CancellationToken,
+) -> Result<(), AppError> {
+    match session.renew(probe.endpoint(), cancel).await {
+        Err(error) if cancel.is_cancelled() || is_session_expired(&error) => Err(error),
+        Ok(_) | Err(_) => Ok(()),
+    }
+}
+
+pub async fn probe_renewing(
+    probe: &dyn IdentityProbe,
+    session: &dyn SessionGateway,
+    cancel: &CancellationToken,
+) -> Result<ProbeResult, AppError> {
+    let error = match probe.probe(session, cancel).await {
+        Err(error) if is_session_expired(&error) => error,
+        outcome => return outcome,
+    };
+    match session.renew(probe.endpoint(), cancel).await {
+        Ok(true) => probe.probe(session, cancel).await,
+        Ok(false) => Err(error),
+        Err(renewal) if cancel.is_cancelled() => Err(renewal),
+        Err(_) => Err(error),
+    }
 }
 
 pub fn origin_of(url: &str) -> Option<String> {

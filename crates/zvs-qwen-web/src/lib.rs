@@ -11,7 +11,10 @@ pub mod request;
 pub mod stream;
 
 pub use models::{ModelList, ModelsDiagnostics, QwenModel, RowProblem, parse_models};
-pub use page::{CHALLENGE_PATTERN, PAGE_BEARER_KEY, PagePlan, PageTransport, page_plan};
+pub use page::{
+    CHALLENGE_PATTERN, PAGE_BEARER_KEY, PagePlan, PageTransport, SESSION_REFRESH, SESSION_REFUSALS,
+    SessionRefresh, page_plan,
+};
 pub use protocol::Observation;
 pub use request::{CompletionTurn, new_chat_body, parse_chat_created};
 pub use stream::{TurnDecoder, TurnEvent, Usage, VendorFailure};
