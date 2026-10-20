@@ -1,8 +1,6 @@
 import { observer } from "mobx-react-lite";
-import { mdiInformationOutline } from "@mdi/js";
-import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
+import { Dropdown, Tooltip } from "@kiyotakkkka/zvs-uikit-lib";
 import type { ChatContextDto, ToolDto } from "@zvs/shared";
-import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import { sourceGroups, sourceKey } from "../tools/toolFilters";
 import type ChatStore from "./ChatStore";
 
@@ -80,6 +78,33 @@ function StackedBar({
   );
 }
 
+function ContextRing({
+  value,
+  pressured,
+}: {
+  readonly value: number;
+  readonly pressured: boolean;
+}) {
+  const radius = 6;
+  const length = 2 * Math.PI * radius;
+  const filled = value > 0 ? Math.max(length * 0.04, (length * value) / 100) : 0;
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 -rotate-90">
+      <circle cx="8" cy="8" r={radius} fill="none" strokeWidth="2.25" className="stroke-main-700" />
+      <circle
+        cx="8"
+        cy="8"
+        r={radius}
+        fill="none"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeDasharray={`${filled} ${length}`}
+        className={`transition-[stroke-dasharray] duration-300 ${pressured ? "stroke-warn" : "stroke-accent-dark"}`}
+      />
+    </svg>
+  );
+}
+
 function Row({
   label,
   hint,
@@ -126,7 +151,7 @@ function ToolUsage({
   return (
     <section className="space-y-1.5">
       <p className="text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-        Что занимает инструменты
+        Статистика по инструментам
       </p>
       {groups.map(({ group, items, tokens }) => (
         <div key={group.key} className="rounded-lg bg-main-850 px-2.5 py-2">
@@ -185,100 +210,101 @@ export default observer(function ChatContextMeter({ store }: { readonly store: C
   const summary = `${compactTokens(store.contextUsed)} / ${limit > 0 ? compactTokens(limit) : "—"}`;
 
   return (
-    <div className="flex items-center gap-2 rounded-control bg-main-800 py-1 pr-2.5 pl-1">
-      <Dropdown menuWidth={340} menuPlacement="top-left">
-        <IconDropdownButton
-          label="Контекстное окно"
-          path={mdiInformationOutline}
-          className="size-6 justify-center gap-0 rounded-[6px] border-transparent bg-transparent p-0 text-main-500 hover:bg-main-700 hover:text-main-100"
-          iconSize={15}
-        />
-        <Dropdown.Menu
+    <Dropdown menuWidth={340} menuPlacement="top-right">
+      <Tooltip label="Контекстное окно" placement="top-center" rounded="rounded-lg" className="">
+        <Dropdown.Trigger
+          aria-label={`Контекстное окно: ${summary}`}
           rounded="rounded-lg"
-          className="max-h-[70vh] w-85 overflow-y-auto rounded-card border border-line bg-main-900 p-3.5 text-[12px] text-main-300 shadow-pop"
+          icon={false}
+          className={`h-8 w-auto justify-center gap-0 border-transparent bg-transparent px-2 hover:bg-main-800 ${
+            pressured ? "text-warn" : "text-main-500 hover:text-main-200"
+          }`}
         >
-          <div className="space-y-3.5">
-            <div className="space-y-2">
-              <div className="flex items-baseline gap-2">
-                <p className="flex-1 text-[13px] font-semibold text-main-50">Контекстное окно</p>
-                <span className="font-mono text-[11px] text-main-500">{summary}</span>
-                <span
-                  className={`font-mono text-[12px] font-semibold ${pressured ? "text-warn" : "text-main-100"}`}
-                >
-                  {percent(store.contextUsed, limit)}
+          <span className="flex items-center gap-1.5">
+            <ContextRing value={share(store.contextUsed, limit)} pressured={pressured} />
+            <span className="font-mono text-[11px] tabular-nums">{summary}</span>
+          </span>
+        </Dropdown.Trigger>
+      </Tooltip>
+      <Dropdown.Menu
+        rounded="rounded-lg"
+        className="max-h-[70vh] w-85 overflow-y-auto rounded-card border border-line bg-main-900 p-3.5 text-[12px] text-main-300 shadow-pop"
+      >
+        <div className="space-y-3.5">
+          <div className="space-y-2">
+            <div className="flex items-baseline gap-2">
+              <p className="flex-1 text-[13px] font-semibold text-main-50">Контекстное окно</p>
+              <span className="font-mono text-[11px] text-main-500">{summary}</span>
+              <span
+                className={`font-mono text-[12px] font-semibold ${pressured ? "text-warn" : "text-main-100"}`}
+              >
+                {percent(store.contextUsed, limit)}
+              </span>
+            </div>
+            <StackedBar parts={parts} total={limit} className="h-2" />
+            {context === null ? (
+              <p className="text-[11.5px] text-main-500">
+                Разбивка появится, когда будет выбрана доступная модель.
+              </p>
+            ) : null}
+          </div>
+
+          {context !== null ? (
+            <section>
+              <div className="flex items-baseline justify-between">
+                <p className="font-semibold text-main-100">Разбивка</p>
+                <span className="max-w-40 truncate font-mono text-[11px] text-main-500">
+                  {store.model?.displayName || store.model?.externalId}
                 </span>
               </div>
-              <StackedBar parts={parts} total={limit} className="h-2" />
-              {context === null ? (
-                <p className="text-[11.5px] text-main-500">
-                  Разбивка появится, когда будет выбрана доступная модель.
+              <div className="mt-1 divide-y divide-line">
+                {parts.map((part) => (
+                  <Row
+                    key={part.key}
+                    dot={part.fill}
+                    label={part.label}
+                    hint={
+                      part.key === "tools" && context.toolItems.length > 0
+                        ? String(context.toolItems.length)
+                        : part.key === "history" && context.historyMessages > 0
+                          ? `${context.historyMessages} ${plural(context.historyMessages, MESSAGE_FORMS)}`
+                          : undefined
+                    }
+                    value={compactTokens(part.tokens)}
+                  />
+                ))}
+                <Row dot="bg-main-700" label="Свободно" value={compactTokens(free)} />
+              </div>
+              {context.trimmed > 0 ? (
+                <p className="mt-2 rounded-lg bg-warn-soft px-2.5 py-1.5 text-[11.5px] text-warn">
+                  {context.trimmed} {plural(context.trimmed, MESSAGE_FORMS)} не помещаются и не
+                  попадут в следующий запрос.
                 </p>
               ) : null}
-            </div>
+            </section>
+          ) : null}
 
-            {context !== null ? (
-              <section>
-                <div className="flex items-baseline justify-between">
-                  <p className="font-semibold text-main-100">Разбивка</p>
-                  <span className="max-w-40 truncate font-mono text-[11px] text-main-500">
-                    {store.model?.displayName || store.model?.externalId}
-                  </span>
-                </div>
-                <div className="mt-1 divide-y divide-line">
-                  {parts.map((part) => (
-                    <Row
-                      key={part.key}
-                      dot={part.fill}
-                      label={part.label}
-                      hint={
-                        part.key === "tools" && context.toolItems.length > 0
-                          ? String(context.toolItems.length)
-                          : part.key === "history" && context.historyMessages > 0
-                            ? `${context.historyMessages} ${plural(context.historyMessages, MESSAGE_FORMS)}`
-                            : undefined
-                      }
-                      value={compactTokens(part.tokens)}
-                    />
-                  ))}
-                  <Row dot="bg-main-700" label="Свободно" value={compactTokens(free)} />
-                </div>
-                {context.trimmed > 0 ? (
-                  <p className="mt-2 rounded-lg bg-warn-soft px-2.5 py-1.5 text-[11.5px] text-warn">
-                    {context.trimmed} {plural(context.trimmed, MESSAGE_FORMS)} не помещаются и не
-                    попадут в следующий запрос.
-                  </p>
-                ) : null}
-              </section>
-            ) : null}
+          {context !== null ? <ToolUsage store={store} context={context} /> : null}
 
-            {context !== null ? <ToolUsage store={store} context={context} /> : null}
+          {last !== undefined ? (
+            <section>
+              <p className="font-semibold text-main-100">Последний ответ</p>
+              <div className="mt-1 divide-y divide-line">
+                <Row label="Вход" value={compactTokens(last.tokensIn)} />
+                <Row label="Выход" value={compactTokens(last.tokensOut)} />
+                <Row label="Всего за диалог" value={compactTokens(store.sessionTokens)} />
+              </div>
+            </section>
+          ) : null}
 
-            {last !== undefined ? (
-              <section>
-                <p className="font-semibold text-main-100">Последний ответ</p>
-                <div className="mt-1 divide-y divide-line">
-                  <Row label="Вход" value={compactTokens(last.tokensIn)} />
-                  <Row label="Выход" value={compactTokens(last.tokensOut)} />
-                  <Row label="Всего за диалог" value={compactTokens(store.sessionTokens)} />
-                </div>
-              </section>
-            ) : null}
-
-            <p className="text-[11px] leading-snug text-main-500">
-              Оценка по числу символов.
-              {store.attachedStoreIds.length > 0
-                ? " Фрагменты из хранилищ добавляются при отправке и занимают свободное место."
-                : ""}
-            </p>
-          </div>
-        </Dropdown.Menu>
-      </Dropdown>
-      <StackedBar parts={parts} total={limit} className="h-1 min-w-0 flex-1" />
-      <span
-        className={`shrink-0 font-mono text-[11px] ${pressured ? "text-warn" : "text-main-500"}`}
-      >
-        {summary}
-      </span>
-    </div>
+          <p className="text-[11px] leading-snug text-main-500">
+            Оценка по числу символов.
+            {store.attachedStoreIds.length > 0
+              ? " Фрагменты из хранилищ добавляются при отправке и занимают свободное место."
+              : ""}
+          </p>
+        </div>
+      </Dropdown.Menu>
+    </Dropdown>
   );
 });

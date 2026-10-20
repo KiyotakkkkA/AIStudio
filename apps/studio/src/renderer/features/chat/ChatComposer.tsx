@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Link } from "react-router-dom";
 import {
+  mdiChevronDown,
   mdiClose,
-  mdiCogOutline,
   mdiDatabaseOutline,
   mdiPaperclip,
   mdiUpload,
@@ -19,6 +19,17 @@ import Toggle from "../../ui/atoms/Toggle";
 import ChatContextMeter from "./ChatContextMeter";
 import ChatToolPicker from "./ChatToolPicker";
 import type ChatStore from "./ChatStore";
+
+function insidePopup(target: HTMLElement, form: HTMLElement): boolean {
+  for (
+    let node = target.closest<HTMLElement>("[id]");
+    node !== null && node !== form;
+    node = node.parentElement?.closest<HTMLElement>("[id]") ?? null
+  ) {
+    if (form.querySelector(`[aria-controls="${CSS.escape(node.id)}"]`)) return true;
+  }
+  return false;
+}
 
 export default observer(function ChatComposer({ store }: { readonly store: ChatStore }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -66,10 +77,12 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             void store.send();
           }}
           onClick={(event) => {
-            if ((event.target as HTMLElement).closest("button, a")) return;
+            const target = event.target as HTMLElement;
+            if (target.closest("button, a, input, select, label")) return;
+            if (insidePopup(target, event.currentTarget)) return;
             event.currentTarget.querySelector<HTMLTextAreaElement>("textarea")?.focus();
           }}
-          className="relative space-y-2 rounded-[18px] bg-main-900 p-2.5 shadow-pop"
+          className="relative space-y-2 rounded-[18px] border border-line-strong bg-main-900 p-2.5 shadow-pop"
         >
           {store.generating ? (
             <span
@@ -79,7 +92,6 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               <span className="block h-full w-2/5 animate-zvs-sweep bg-linear-to-r from-transparent via-accent-dark to-transparent" />
             </span>
           ) : null}
-          <ChatContextMeter store={store} />
           {(store.attachedStoreIds.length > 0 || store.enabledTools.length > 0) && (
             <div className="flex flex-wrap gap-1.5 px-1">
               {store.stores
@@ -154,7 +166,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               }}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1">
             <Dropdown menuWidth={300} menuPlacement="top-left">
               <IconDropdownButton
                 label="Прикрепить файлы"
@@ -192,14 +204,27 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
-            <Dropdown menuWidth={300} menuPlacement="top-left">
-              <IconDropdownButton
-                label="Настройки провайдера и модели"
-                path={mdiCogOutline}
-                className="size-8 justify-center gap-0 border-transparent bg-transparent p-0 text-main-400 hover:bg-main-700 hover:text-main-100"
+            <ChatToolPicker store={store} />
+            <span className="flex-1" />
+            <ChatContextMeter store={store} />
+            <Dropdown menuWidth={300} menuPlacement="top-right">
+              <Dropdown.Trigger
+                title="Провайдер и модель"
                 rounded="rounded-lg"
-                iconSize={18}
-              />
+                icon={<Icon path={mdiChevronDown} size={15} className="shrink-0 text-main-500" />}
+                className="h-8 w-auto max-w-64 min-w-0 gap-1 border-transparent bg-transparent px-2 text-[12.5px] text-main-200 hover:bg-main-700 hover:text-main-50"
+              >
+                <span className="flex min-w-0 items-center gap-1.5">
+                  {store.provider ? (
+                    <span className="hidden shrink-0 text-main-500 sm:inline">
+                      {store.provider.name}
+                    </span>
+                  ) : null}
+                  <span className="truncate font-medium">
+                    {store.model?.displayName || store.model?.externalId || store.modelId}
+                  </span>
+                </span>
+              </Dropdown.Trigger>
               <Dropdown.Menu
                 role="menu"
                 aria-label="Провайдер и модель"
@@ -254,11 +279,6 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 </div>
               </Dropdown.Menu>
             </Dropdown>
-            <ChatToolPicker store={store} />
-            <span className="inline-flex h-7 max-w-56 min-w-0 items-center truncate rounded-full bg-main-800 px-2.5 font-mono text-[11.5px] text-main-400">
-              {store.model?.displayName || store.model?.externalId || store.modelId}
-            </span>
-            <span className="flex-1" />
             {store.generating ? (
               <Button
                 type="button"
