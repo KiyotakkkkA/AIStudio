@@ -17,7 +17,7 @@
     "lint": "turbo run lint",
     "lint:tailwind": "eslint --config eslint.tailwind.config.js apps/studio/src/renderer --max-warnings 0",
     "lint:tailwind:fix": "pnpm lint:tailwind --fix",
-    "lint:root": "eslint . --max-warnings 0 --ignore-pattern apps/** --ignore-pattern packages/**",
+    "lint:root": "eslint . --max-warnings 0 --ignore-pattern \"apps/**\" --ignore-pattern \"packages/**\"",
     "format": "turbo run format:root",
     "format:root": "prettier --write .",
     "format:check": "prettier --check .",
