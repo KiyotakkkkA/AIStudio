@@ -24,6 +24,7 @@ pub struct McpServerRow {
     pub protocol_version: Option<String>,
     pub server_name: Option<String>,
     pub server_version: Option<String>,
+    pub instructions: Option<String>,
     pub last_error: Option<String>,
     pub last_connected_at: Option<Timestamp>,
     pub created_at: Timestamp,
@@ -32,7 +33,8 @@ pub struct McpServerRow {
 
 impl McpServerRow {
     pub const COLUMNS: &str = "id, name, namespace, transport, command, args, env, url, headers, \
-        enabled, startup, status, protocol_version, server_name, server_version, last_error, \
+        enabled, startup, status, protocol_version, server_name, server_version, instructions, \
+        last_error, \
         last_connected_at, created_at, updated_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
@@ -52,6 +54,7 @@ impl McpServerRow {
             protocol_version: row.get("protocol_version")?,
             server_name: row.get("server_name")?,
             server_version: row.get("server_version")?,
+            instructions: row.get("instructions")?,
             last_error: row.get("last_error")?,
             last_connected_at: row.get("last_connected_at")?,
             created_at: row.get("created_at")?,

@@ -20,6 +20,7 @@ import {
   type McpServerDto,
   type MessageId,
   type ProviderDto,
+  type RetrievalMode,
   type RunHandleDto,
   type ToolDto,
   type VectorStoreDto,
@@ -132,6 +133,9 @@ export default class ChatStore {
   }
   get useRelations() {
     return this.active?.useRelations ?? this.composer.useRelations;
+  }
+  get retrievalMode(): RetrievalMode {
+    return this.active?.retrievalMode ?? this.composer.retrievalMode;
   }
   get toolMode(): ToolMode {
     const provider = this.provider;
@@ -402,6 +406,28 @@ export default class ChatStore {
     }
   }
 
+  async setRetrievalMode(retrievalMode: RetrievalMode) {
+    if (!this.canConfigure || retrievalMode === this.retrievalMode) return;
+    if (!this.active) {
+      this.composer.setRetrievalMode(retrievalMode);
+      return;
+    }
+    try {
+      const updated = await this.ipc.call("chat.conversations.updateRetrieval", {
+        id: this.active.id,
+        retrievalMode,
+      });
+      runInAction(() => {
+        this.active = { ...this.active!, ...updated };
+        this.conversations = this.conversations.map((conversation) =>
+          conversation.id === updated.id ? updated : conversation,
+        );
+      });
+    } catch (error) {
+      this.error = errorCopy(error);
+    }
+  }
+
   async toggleRelations() {
     if (!this.canConfigure) return;
     const useRelations = !this.useRelations;
@@ -588,6 +614,7 @@ export default class ChatStore {
           attachedStoreIds: [...this.composer.attachedStoreIds],
           useRelations: this.composer.useRelations,
           enabledTools: [...this.composer.enabledTools],
+          retrievalMode: this.composer.retrievalMode,
         });
         runInAction(() => {
           this.active = { ...conversation, messages: [] };

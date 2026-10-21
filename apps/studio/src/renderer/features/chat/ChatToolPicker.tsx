@@ -69,7 +69,7 @@ const ToolRow = observer(function ToolRow({
             {tool.key}
           </span>
           {tool.destructive && (
-            <span className="shrink-0 rounded-full bg-err-soft px-1.5 text-[10.5px] leading-4 text-err">
+            <span className="shrink-0 rounded-full bg-err-soft px-1.5 text-[10.5px]/4  text-err">
               разрушающий
             </span>
           )}
@@ -83,7 +83,7 @@ const ToolRow = observer(function ToolRow({
       </span>
       <span
         title={TIER_HINTS[tool.tier]}
-        className={`shrink-0 rounded-full px-1.5 font-mono text-[10.5px] leading-4.5 ${TIER_PILL[tool.tier]}`}
+        className={`shrink-0 rounded-full px-1.5 font-mono text-[10.5px]/4.5  ${TIER_PILL[tool.tier]}`}
       >
         {TIER_LABELS[tool.tier]}
       </span>
@@ -138,7 +138,7 @@ export default observer(function ChatToolPicker({ store }: { readonly store: Cha
             <p className="flex-1 text-[13px] font-semibold text-main-50">Инструменты</p>
             <span
               title={TOOL_MODE_HINTS[store.toolMode]}
-              className={`rounded-full px-2 text-[11px] leading-5 ${
+              className={`rounded-full px-2 text-[11px]/5  ${
                 unsupported ? "bg-warn-soft text-warn" : "bg-main-800 text-main-400"
               }`}
             >

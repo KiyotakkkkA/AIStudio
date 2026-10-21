@@ -11,7 +11,7 @@ use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, AppErrorCode, ApprovalRequestDto, GraphNeighborDto, GraphNeighborsInput,
-    HostEventDraft, RunId, ToolTier, Validate, VectorChunkDto, VectorIndexInput,
+    HostEventDraft, RunId, ToolTier, Validate, VectorChunkDto, VectorDocumentDto, VectorIndexInput,
     VectorIndexReportDto, VectorSearchHitDto, VectorStoreDto,
 };
 
@@ -102,6 +102,14 @@ pub trait VectorSearch: Send + Sync {
         Err(unavailable())
     }
 
+    async fn document(
+        &self,
+        _store_id: &str,
+        _document_id: &str,
+    ) -> Result<Option<VectorDocumentDto>, AppError> {
+        Err(unavailable())
+    }
+
     fn has_related_chunks(&self) -> bool {
         false
     }
@@ -148,6 +156,14 @@ impl VectorSearch for VectorStoreService {
         indices: &[u64],
     ) -> Result<Vec<VectorChunkDto>, AppError> {
         Self::chunks(self, store_id, document_id, indices).await
+    }
+
+    async fn document(
+        &self,
+        store_id: &str,
+        document_id: &str,
+    ) -> Result<Option<VectorDocumentDto>, AppError> {
+        Self::document(self, store_id, document_id)
     }
 
     fn has_related_chunks(&self) -> bool {

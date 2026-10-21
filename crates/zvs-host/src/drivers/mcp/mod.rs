@@ -1,12 +1,13 @@
 pub mod client;
 pub mod http;
+pub mod oauth;
 pub mod protocol;
 pub mod stdio;
 pub mod toolchain_env;
 pub mod transport;
 pub mod windows_command;
 
-pub use client::{McpClient, McpClientOptions, McpEndpoint, McpHandshake};
+pub use client::{FailureSlot, McpClient, McpClientOptions, McpEndpoint, McpHandshake};
 pub use protocol::{
     CLIENT_PROTOCOL_VERSION, McpDiscovery, McpPromptDescriptor, McpResourceDescriptor,
     McpToolDescriptor, SUPPORTED_PROTOCOL_VERSIONS, call_result, infer_destructive,

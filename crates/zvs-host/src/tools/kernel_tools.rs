@@ -3,6 +3,10 @@ use std::collections::BTreeMap;
 use zvs_contract::{AppError, ToolDto, ToolSource};
 
 use super::registry::{ToolDescriptor, ToolRegistry};
+use crate::kernel::knowledge_nodes::{
+    KNOWLEDGE_LIST, KNOWLEDGE_READ, KNOWLEDGE_SEARCH, LIST_DESCRIPTION, READ_DESCRIPTION,
+    SEARCH_DESCRIPTION,
+};
 use crate::kernel::{NodeRegistry, PermissionRequirement};
 
 const NOT_TOOLS: &[&str] = &["llm.generate"];
@@ -27,6 +31,30 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
         BuiltinToolMeta {
             display_name: "vector.list",
             description: "Список векторных хранилищ: UUID, название, описание и число документов. UUID передаётся в vector.search как storeId.",
+            destructive: false,
+        },
+    ),
+    (
+        KNOWLEDGE_SEARCH,
+        BuiltinToolMeta {
+            display_name: "knowledge.search",
+            description: SEARCH_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        KNOWLEDGE_READ,
+        BuiltinToolMeta {
+            display_name: "knowledge.read",
+            description: READ_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        KNOWLEDGE_LIST,
+        BuiltinToolMeta {
+            display_name: "knowledge.list",
+            description: LIST_DESCRIPTION,
             destructive: false,
         },
     ),

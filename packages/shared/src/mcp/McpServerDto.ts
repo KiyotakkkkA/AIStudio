@@ -12,6 +12,9 @@ export type McpStartup = z.infer<typeof McpStartup>;
 export const McpServerStatus = z.enum(["disabled", "stopped", "starting", "connected", "failed"]);
 export type McpServerStatus = z.infer<typeof McpServerStatus>;
 
+export const McpOAuthState = z.enum(["none", "required", "signed-in"]);
+export type McpOAuthState = z.infer<typeof McpOAuthState>;
+
 export const McpCapabilityKind = z.enum(["tool", "resource", "prompt"]);
 export type McpCapabilityKind = z.infer<typeof McpCapabilityKind>;
 
@@ -66,9 +69,11 @@ export const McpServerDto = z.object({
   enabled: z.boolean(),
   startup: McpStartup,
   status: McpServerStatus,
+  oauth: McpOAuthState,
   protocolVersion: z.string().max(64).nullable(),
   serverName: z.string().max(200).nullable(),
   serverVersion: z.string().max(64).nullable(),
+  instructions: z.string().max(8000).nullable().default(null),
   lastError: z.string().max(2000).nullable(),
   lastConnectedAt: Timestamp.nullable(),
   toolCount: z.number().int().nonnegative(),

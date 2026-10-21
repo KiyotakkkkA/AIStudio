@@ -1,0 +1,14 @@
+[
+  {
+    "name": "none",
+    "value": "none"
+  },
+  {
+    "name": "required",
+    "value": "required"
+  },
+  {
+    "name": "signed-in",
+    "value": "signed-in"
+  }
+]

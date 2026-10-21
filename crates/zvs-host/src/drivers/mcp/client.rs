@@ -6,7 +6,8 @@ use reqwest::header::{HeaderName, HeaderValue};
 use rmcp::model::{
     CallToolRequest, CallToolRequestParams, ClientCapabilities, ClientConfig, ClientRequest,
     Implementation, ListPromptsRequest, ListResourcesRequest, ListToolsRequest,
-    PaginatedRequestParams, ProtocolVersion, ServerResult,
+    PaginatedRequestParams, ProtocolVersion, ReadResourceRequest, ReadResourceRequestParams,
+    ResourceContents, ServerResult,
 };
 use rmcp::service::ClientInitializeError;
 use rmcp::service::{PeerRequestOptions, RunningService, ServiceError};
@@ -56,10 +57,11 @@ pub struct McpHandshake {
     pub server_name: String,
     pub server_version: String,
     pub capabilities: Map<String, Value>,
+    pub instructions: Option<String>,
     pub latency_ms: u64,
 }
 
-pub type FailureSlot = Arc<SyncMutex<Option<String>>>;
+pub type FailureSlot = Arc<SyncMutex<Option<AppError>>>;
 
 pub struct McpClient {
     service: Mutex<Option<RunningService<RoleClient, ClientConfig>>>,
@@ -109,7 +111,7 @@ fn timed_out(method: &str, timeout: Duration) -> AppError {
     .with_detail("timeoutMs", ms)
 }
 
-fn take_failure(failures: &FailureSlot) -> Option<String> {
+fn take_failure(failures: &FailureSlot) -> Option<AppError> {
     failures
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
@@ -238,6 +240,11 @@ impl McpClient {
                 .unwrap_or_default(),
             server_version: server.map(|server| server.version).unwrap_or_default(),
             capabilities,
+            instructions: info
+                .as_ref()
+                .and_then(|info| info.instructions.clone())
+                .map(|text| text.trim().to_owned())
+                .filter(|text| !text.is_empty()),
             latency_ms,
         };
         Ok((client, handshake))
@@ -248,8 +255,8 @@ impl McpClient {
         hooks: &TransportHooks,
         failures: &FailureSlot,
     ) -> AppError {
-        if let Some(message) = take_failure(failures) {
-            return AppError::new(AppErrorCode::McpUnavailable, message);
+        if let Some(failure) = take_failure(failures) {
+            return failure;
         }
         match error {
             ClientInitializeError::ExpectedInitResult(result) => {
@@ -288,8 +295,8 @@ impl McpClient {
     }
 
     fn service_error(&self, error: ServiceError, method: &str) -> AppError {
-        if let Some(message) = take_failure(&self.failures) {
-            return AppError::new(AppErrorCode::McpUnavailable, message);
+        if let Some(failure) = take_failure(&self.failures) {
+            return failure;
         }
         match error {
             ServiceError::Timeout { timeout } => timed_out(method, timeout),
@@ -429,6 +436,44 @@ impl McpClient {
             other => {
                 report_value(&self.hooks, &other);
                 Err(unexpected("tools/call"))
+            }
+        }
+    }
+
+    pub async fn read_resource(&self, uri: &str, timeout: Duration) -> Result<Value, AppError> {
+        let request = ClientRequest::ReadResourceRequest(ReadResourceRequest::new(
+            ReadResourceRequestParams::new(uri.to_owned()),
+        ));
+        match self.request(request, "resources/read", timeout).await? {
+            ServerResult::ReadResourceResult(result) => {
+                let content: Vec<Value> = result
+                    .contents
+                    .iter()
+                    .map(|entry| match entry {
+                        ResourceContents::TextResourceContents { text, .. } => {
+                            json!({ "type": "text", "text": text })
+                        }
+                        ResourceContents::BlobResourceContents { uri, mime_type, .. } => json!({
+                            "type": "text",
+                            "text": format!(
+                                "[binary resource {uri}{}]",
+                                mime_type
+                                    .as_deref()
+                                    .map(|mime| format!(", {mime}"))
+                                    .unwrap_or_default()
+                            ),
+                        }),
+                        other => json!({
+                            "type": "text",
+                            "text": serde_json::to_string(other).unwrap_or_default(),
+                        }),
+                    })
+                    .collect();
+                Ok(json!({ "content": content, "isError": false }))
+            }
+            other => {
+                report_value(&self.hooks, &other);
+                Err(unexpected("resources/read"))
             }
         }
     }

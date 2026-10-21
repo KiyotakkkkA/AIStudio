@@ -37,15 +37,15 @@ use crate::tools::{ToolDescriptor, ToolRegistry, ToolRegistryOptions};
 type Round = Box<dyn FnOnce(&GenerateRequest) -> Vec<TextDelta> + Send>;
 type Fallback = Arc<dyn Fn(usize) -> Vec<TextDelta> + Send + Sync>;
 
-struct Scripted {
+pub(super) struct Scripted {
     requests: Mutex<Vec<GenerateRequest>>,
     rounds: Mutex<VecDeque<Round>>,
     fallback: Mutex<Fallback>,
-    mode: Mutex<ToolMode>,
+    pub(super) mode: Mutex<ToolMode>,
 }
 
 impl Scripted {
-    fn new() -> Arc<Self> {
+    pub(super) fn new() -> Arc<Self> {
         Arc::new(Self {
             requests: Mutex::new(Vec::new()),
             rounds: Mutex::new(VecDeque::new()),
@@ -54,18 +54,24 @@ impl Scripted {
         })
     }
 
-    fn round(&self, round: impl FnOnce(&GenerateRequest) -> Vec<TextDelta> + Send + 'static) {
+    pub(super) fn round(
+        &self,
+        round: impl FnOnce(&GenerateRequest) -> Vec<TextDelta> + Send + 'static,
+    ) {
         self.rounds
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .push_back(Box::new(round));
     }
 
-    fn fallback(&self, fallback: impl Fn(usize) -> Vec<TextDelta> + Send + Sync + 'static) {
+    pub(super) fn fallback(
+        &self,
+        fallback: impl Fn(usize) -> Vec<TextDelta> + Send + Sync + 'static,
+    ) {
         *self.fallback.lock().unwrap_or_else(PoisonError::into_inner) = Arc::new(fallback);
     }
 
-    fn requests(&self) -> Vec<GenerateRequest> {
+    pub(super) fn requests(&self) -> Vec<GenerateRequest> {
         self.requests
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -127,15 +133,15 @@ impl TextGenerationDriver for Scripted {
     }
 }
 
-fn text(value: &str) -> TextDelta {
+pub(super) fn text(value: &str) -> TextDelta {
     TextDelta::text(value)
 }
 
-fn call(name: &str, arguments: &Value) -> TextDelta {
+pub(super) fn call(name: &str, arguments: &Value) -> TextDelta {
     call_with_id(name, arguments, &format!("call_{name}"))
 }
 
-fn call_with_id(name: &str, arguments: &Value, id: &str) -> TextDelta {
+pub(super) fn call_with_id(name: &str, arguments: &Value, id: &str) -> TextDelta {
     TextDelta::ToolCall(ToolCall::new(id, name, arguments.to_string()))
 }
 
@@ -838,4 +844,64 @@ async fn context_counts_the_offered_tools_one_by_one() {
         })
         .expect("measures without tools");
     assert_eq!((none.tools, none.tool_items.len()), (0, 0));
+}
+
+#[tokio::test]
+async fn an_offered_mcp_tool_brings_its_server_instructions_and_resource_reader() {
+    let test = Loop::new();
+    let server_id = "0199dd11-1111-7111-8111-000000000001";
+    test.harness
+        .database
+        .with_connection(|connection| {
+            Repositories::new(connection).mcp_servers.insert(
+                &crate::data::schema::McpServerRow {
+                    id: server_id.to_owned(),
+                    name: "Testix".to_owned(),
+                    namespace: "testix".to_owned(),
+                    transport: zvs_contract::McpTransport::Http,
+                    command: None,
+                    args: Vec::new(),
+                    env: zvs_contract::McpEnv::new(),
+                    url: Some("https://testix.example/mcp".to_owned()),
+                    headers: zvs_contract::McpHeaders::new(),
+                    enabled: true,
+                    startup: zvs_contract::McpStartup::Manual,
+                    status: zvs_contract::McpServerStatus::Connected,
+                    protocol_version: None,
+                    server_name: Some("Testix".to_owned()),
+                    server_version: None,
+                    instructions: Some(
+                        "Read testix://instructions/questions before importing.".to_owned(),
+                    ),
+                    last_error: None,
+                    last_connected_at: None,
+                    created_at: 1,
+                    updated_at: 1,
+                },
+            )?;
+            Ok(())
+        })
+        .expect("adds a server");
+    for key in ["testix.importQuestions", "testix.read_resource"] {
+        test.tools
+            .register(&ToolDescriptor {
+                source_ref: Some(server_id.to_owned()),
+                read_only: true,
+                ..ToolDescriptor::new(key, ToolSource::Mcp)
+            })
+            .expect("registers");
+    }
+    test.driver.fallback(|_| vec![text("Done.")]);
+    test.turn(test.conversation(&["testix.importQuestions"]), "Import")
+        .await;
+    let request = &test.driver.requests()[0];
+    let names: Vec<&str> = request
+        .tools
+        .iter()
+        .map(|tool| tool.name.as_str())
+        .collect();
+    assert_eq!(names, ["testix__importQuestions", "testix__read_resource"]);
+    let system = request.system.clone().unwrap_or_default();
+    assert!(system.contains("Read testix://instructions/questions before importing."));
+    assert!(system.contains("«Testix»"));
 }

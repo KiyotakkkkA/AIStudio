@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use zvs_contract::{
-    AppError, ChatContextInput, ChatSendInput, ConversationRef, CreateConversationInput,
-    RenameConversationInput, RunIdInput, TruncateConversationInput,
-    UpdateConversationRelationsInput, UpdateConversationStoresInput, UpdateConversationToolsInput,
+    AppError, ChatContextInput, ChatEvalInput, ChatSendInput, ConversationRef,
+    CreateConversationInput, RenameConversationInput, RunIdInput, TruncateConversationInput,
+    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    UpdateConversationStoresInput, UpdateConversationToolsInput,
 };
 
 use super::IpcServer;
@@ -53,6 +54,20 @@ pub fn register(server: &mut IpcServer) {
                 services
                     .chat
                     .update_relations(&input.id, input.use_relations)
+            },
+        )
+        .handle(
+            "chat.evaluate",
+            |services: Arc<Services>, input: ChatEvalInput| async move {
+                services.chat.evaluate(&input).await
+            },
+        )
+        .handle(
+            "chat.conversations.updateRetrieval",
+            |services: Arc<Services>, input: UpdateConversationRetrievalInput| async move {
+                services
+                    .chat
+                    .update_retrieval(&input.id, input.retrieval_mode)
             },
         )
         .handle(

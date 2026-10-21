@@ -20,6 +20,7 @@ pub struct McpNodeTarget {
     pub tool: String,
     pub read_only: bool,
     pub timeout: Option<Duration>,
+    pub read_resource: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,6 +28,7 @@ pub struct McpCallTarget {
     pub server_id: String,
     pub tool: String,
     pub timeout: Option<Duration>,
+    pub read_resource: bool,
 }
 
 pub type McpToolCaller = Arc<
@@ -91,6 +93,7 @@ impl NodeDef for McpToolNode {
                 server_id: self.target.server_id.clone(),
                 tool: self.target.tool.clone(),
                 timeout: self.target.timeout,
+                read_resource: self.target.read_resource,
             },
             input.0,
             context.cancel.clone(),

@@ -81,6 +81,7 @@ function handle(message) {
       protocolVersion: PROTOCOL,
       capabilities: { tools: {}, resources: {}, prompts: {} },
       serverInfo: { name: "fake-qdrant", version: "0.8.1" },
+      instructions: "Read qdrant://collections before searching.",
     });
     return;
   }
@@ -94,6 +95,12 @@ function handle(message) {
       resources: [
         { uri: "qdrant://collections", name: "collections", description: "Список коллекций." },
       ],
+    });
+    return;
+  }
+  if (method === "resources/read") {
+    reply(id, {
+      contents: [{ uri: params?.uri, mimeType: "text/markdown", text: "kb, docs" }],
     });
     return;
   }

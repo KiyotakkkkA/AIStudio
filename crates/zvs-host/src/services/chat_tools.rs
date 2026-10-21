@@ -6,10 +6,12 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use zvs_contract::validate::{check, js_slice, js_trim};
-use zvs_contract::{AppError, ToolDto, ToolTier, Validate};
+use zvs_contract::{AppError, ChatCitationDto, ToolDto, ToolTier, Validate};
 
+use super::chat_history::{attribute, defang_sources, source_label, to_fixed_2};
 use crate::drivers::ai::ToolSpec;
 use crate::drivers::ai::adapters::wire::stringify;
+use crate::kernel::knowledge_nodes::{KnowledgeReadOutput, KnowledgeSearchOutput};
 
 pub const CHAT_TOOL_ROUNDS: usize = 4;
 pub const CHAT_TOOL_CALLS: usize = 8;
@@ -44,8 +46,11 @@ impl Validate for OfferedTool {
 }
 
 pub fn wire_tool_name(key: &str, taken: &HashSet<String>) -> String {
-    let replaced: String = key
-        .replace('.', "__")
+    let dotted = key.strip_prefix("knowledge.").map_or_else(
+        || key.replace('.', "__"),
+        |rest| format!("knowledge_{rest}"),
+    );
+    let replaced: String = dotted
         .chars()
         .flat_map(|character| {
             let kept = character.is_ascii_alphanumeric() || character == '_' || character == '-';
@@ -221,6 +226,183 @@ pub fn parse_tool_arguments(raw: &str) -> Option<Map<String, Value>> {
     match serde_json::from_str::<Value>(source) {
         Ok(Value::Object(map)) => Some(map),
         _ => None,
+    }
+}
+
+pub const KNOWLEDGE_INSTRUCTION: &str = "Knowledge bases are attached to this conversation. Decide yourself whether a message needs them: greetings, small talk and questions about the conversation itself do not. When the answer may be in the documents, call knowledge_search with a focused query; search once per part of a comparison or multi-part question, and search again with different wording when the passages are thin. Use knowledge_read when a passage is too short. Every passage carries a number: cite each claim taken from it as [n] with that number. If the knowledge bases do not contain the answer after searching, say so plainly instead of guessing.";
+pub const HYBRID_INSTRUCTION: &str = "A few sources were already retrieved for the current message and appear above it; search further only when they are not enough.";
+
+pub fn knowledge_catalogue(stores: &[(String, String, u64)]) -> String {
+    let lines: Vec<String> = stores
+        .iter()
+        .map(|(name, description, documents)| {
+            let description = js_trim(description);
+            if description.is_empty() {
+                format!("- {name} ({documents} documents)")
+            } else {
+                format!(
+                    "- {name} ({documents} documents): {}",
+                    js_slice(description, 300)
+                )
+            }
+        })
+        .collect();
+    format!("Attached knowledge bases:\n{}", lines.join("\n"))
+}
+
+fn same_place(left: &ChatCitationDto, right: &ChatCitationDto) -> bool {
+    left.store_id == right.store_id
+        && left.document_id == right.document_id
+        && left.chunk_index == right.chunk_index
+}
+
+pub fn cite(book: &mut Vec<ChatCitationDto>, citation: ChatCitationDto) -> usize {
+    if let Some(index) = book
+        .iter()
+        .position(|known| known.related.is_none() && same_place(known, &citation))
+    {
+        return index + 1;
+    }
+    book.push(citation);
+    book.len()
+}
+
+pub fn cite_span(
+    book: &mut Vec<ChatCitationDto>,
+    citation: ChatCitationDto,
+    to_chunk: u64,
+) -> usize {
+    if let Some(index) = book.iter().position(|known| {
+        known.related.is_none()
+            && known.store_id == citation.store_id
+            && known.document_id == citation.document_id
+            && (citation.chunk_index..=to_chunk).contains(&known.chunk_index)
+    }) {
+        return index + 1;
+    }
+    book.push(citation);
+    book.len()
+}
+
+fn passage_block(id: usize, label: &str, attributes: &[(&str, String)], text: &str) -> String {
+    let mut parts = vec![
+        format!("id=\"{id}\""),
+        format!("path=\"{}\"", attribute(label)),
+    ];
+    parts.extend(
+        attributes
+            .iter()
+            .map(|(name, value)| format!("{name}=\"{}\"", attribute(value))),
+    );
+    format!(
+        "<source {}>\n{}\n</source>",
+        parts.join(" "),
+        defang_sources(text)
+    )
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnowledgeText {
+    pub text: String,
+    pub compact: String,
+}
+
+fn compact_line(kind: &str, subject: &str, cited: &[(usize, String, String)]) -> String {
+    let sources = if cited.is_empty() {
+        "none".to_owned()
+    } else {
+        cited
+            .iter()
+            .map(|(id, path, document)| format!("[{id}] {path} (documentId {document})"))
+            .collect::<Vec<_>>()
+            .join("; ")
+    };
+    format!(
+        "[Earlier {kind} {subject}: the passage text was removed to free context. Sources: {sources}. Call knowledge_read with a documentId to see the text again; keep citing these numbers.]"
+    )
+}
+
+pub fn search_result_text(
+    output: &KnowledgeSearchOutput,
+    book: &mut Vec<ChatCitationDto>,
+) -> KnowledgeText {
+    let query = js_slice(&output.query, 200);
+    if output.passages.is_empty() {
+        let text = format!(
+            "No passages above the relevance floor for \"{query}\" in {} ({} below the floor). Try different wording or a narrower query; if repeated searches find nothing, tell the user the knowledge base does not contain the answer.",
+            output.searched.join(", "),
+            output.below_floor
+        );
+        return KnowledgeText {
+            compact: compact_line("knowledge_search", &format!("for \"{query}\""), &[]),
+            text,
+        };
+    }
+    let mut blocks = Vec::new();
+    let mut cited = Vec::new();
+    for passage in &output.passages {
+        let id = cite(book, passage.citation());
+        let label = source_label(&passage.path, passage.page, &passage.section);
+        cited.push((id, label.clone(), passage.document_id.clone()));
+        let mut text = passage.text.clone();
+        if passage.truncated {
+            text.push('…');
+        }
+        blocks.push(passage_block(
+            id,
+            &label,
+            &[
+                ("store", passage.store.clone()),
+                ("documentId", passage.document_id.clone()),
+                ("chunk", passage.chunk_index.to_string()),
+                ("score", to_fixed_2(passage.score)),
+            ],
+            &text,
+        ));
+    }
+    KnowledgeText {
+        text: format!(
+            "{} passages for \"{query}\". Cite them as [n] by their id.\n\n{}",
+            output.passages.len(),
+            blocks.join("\n\n")
+        ),
+        compact: compact_line("knowledge_search", &format!("for \"{query}\""), &cited),
+    }
+}
+
+pub fn read_result_text(
+    output: &KnowledgeReadOutput,
+    book: &mut Vec<ChatCitationDto>,
+) -> KnowledgeText {
+    let id = cite_span(book, output.citation(), output.to_chunk);
+    let label = source_label(&output.path, output.page, &output.section);
+    let mut text = output.text.clone();
+    if output.truncated {
+        text.push_str("…\n[text truncated; read a narrower chunk range for the rest]");
+    }
+    let block = passage_block(
+        id,
+        &label,
+        &[
+            ("store", output.store.clone()),
+            ("documentId", output.document_id.clone()),
+            (
+                "chunks",
+                format!(
+                    "{}-{} of {}",
+                    output.from_chunk, output.to_chunk, output.chunk_count
+                ),
+            ),
+        ],
+        &text,
+    );
+    KnowledgeText {
+        text: format!("Document span, cite it as [{id}].\n\n{block}"),
+        compact: compact_line(
+            "knowledge_read",
+            &format!("of {}", output.path),
+            &[(id, label, output.document_id.clone())],
+        ),
     }
 }
 

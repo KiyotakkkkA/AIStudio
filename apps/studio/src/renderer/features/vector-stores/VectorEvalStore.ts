@@ -8,6 +8,7 @@ import {
   type VectorEvalRunDto,
   type VectorStoreId,
 } from "@zvs/shared";
+import ChatEvalStore from "./ChatEvalStore";
 
 export default class VectorEvalStore {
   storeId: VectorStoreId | null = null;
@@ -20,10 +21,16 @@ export default class VectorEvalStore {
   busy = false;
   running = false;
   error: string | null = null;
+  readonly chat: ChatEvalStore;
   private revision = 0;
 
   constructor(private readonly ipc: IpcClient<Contract>) {
-    makeAutoObservable<VectorEvalStore, "ipc">(this, { ipc: false }, { autoBind: true });
+    this.chat = new ChatEvalStore(ipc);
+    makeAutoObservable<VectorEvalStore, "ipc">(
+      this,
+      { ipc: false, chat: false },
+      { autoBind: true },
+    );
   }
 
   get canAdd(): boolean {
@@ -59,11 +66,13 @@ export default class VectorEvalStore {
     this.expected = [];
     this.running = false;
     this.error = null;
+    this.chat.reset(null);
   }
 
   async load(storeId: VectorStoreId) {
     const revision = ++this.revision;
     this.storeId = storeId;
+    this.chat.reset(storeId);
     this.loading = true;
     this.error = null;
     try {

@@ -1,5 +1,6 @@
 import type { ChatToolCallDto, Json } from "@zvs/shared";
-import { mdiWrenchOutline } from "@mdi/js";
+import { toolCallSummary } from "./toolCallSummary";
+import { mdiBookOpenPageVariantOutline, mdiDatabaseSearchOutline, mdiWrenchOutline } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
@@ -27,9 +28,10 @@ export function toolArgumentsText(value: Json): string {
   return JSON.stringify(value, null, 2);
 }
 
-export function toolArgumentsSummary(value: Json): string {
-  const text = typeof value === "string" ? value : JSON.stringify(value);
-  return text.length > 80 ? `${text.slice(0, 80)}…` : text;
+function toolIcon(key: string): string {
+  if (key === "knowledge.search") return mdiDatabaseSearchOutline;
+  if (key === "knowledge.read") return mdiBookOpenPageVariantOutline;
+  return mdiWrenchOutline;
 }
 
 export interface ToolCallApproval {
@@ -66,13 +68,13 @@ export default function ChatToolCalls({
                   aria-hidden="true"
                   className="flex size-6 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-accent-medium"
                 >
-                  <Icon path={mdiWrenchOutline} size={13} />
+                  <Icon path={toolIcon(call.key)} size={13} />
                 </span>
                 <span className="shrink-0 font-mono text-[12px] font-medium text-main-100">
                   {call.key}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-main-500">
-                  {toolArgumentsSummary(call.arguments)}
+                  {toolCallSummary(call)}
                 </span>
                 <span
                   className={`inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium ${STATUS_TONE_TEXT[status.tone]} ${

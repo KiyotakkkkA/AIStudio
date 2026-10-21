@@ -60,6 +60,21 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0002_remove_deepseek_web",
         sql: include_str!("../../migrations/0002_remove_deepseek_web.sql"),
     },
+    Migration {
+        id: 3,
+        name: "0003_mcp_oauth",
+        sql: include_str!("../../migrations/0003_mcp_oauth.sql"),
+    },
+    Migration {
+        id: 4,
+        name: "0004_conversation_retrieval_mode",
+        sql: include_str!("../../migrations/0004_conversation_retrieval_mode.sql"),
+    },
+    Migration {
+        id: 5,
+        name: "0005_mcp_server_instructions",
+        sql: include_str!("../../migrations/0005_mcp_server_instructions.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -411,7 +426,7 @@ mod tests {
         let (database, clock) = fresh();
         migrate(
             &database,
-            MIGRATIONS,
+            &MIGRATIONS[..1],
             &options(&database.backups_dir(), &clock),
         )
         .expect("applies");

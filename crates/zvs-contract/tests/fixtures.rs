@@ -143,6 +143,10 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::McpServerStatus>,
     ),
     (
+        "mcp/McpOAuthState",
+        round_trip::<zvs_contract::McpOAuthState>,
+    ),
+    (
         "mcp/McpCapabilityKind",
         round_trip::<zvs_contract::McpCapabilityKind>,
     ),

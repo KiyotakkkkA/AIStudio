@@ -10,6 +10,7 @@
       "attachedStoreIds": [],
       "useRelations": false,
       "enabledTools": [],
+      "retrievalMode": "hybrid",
       "createdAt": 1,
       "updatedAt": 2
     }
@@ -26,6 +27,7 @@
       "attachedStoreIds": [],
       "useRelations": false,
       "enabledTools": [],
+      "retrievalMode": "hybrid",
       "createdAt": 1.5,
       "updatedAt": 2
     }
@@ -42,6 +44,7 @@
       "attachedStoreIds": [],
       "useRelations": false,
       "enabledTools": [],
+      "retrievalMode": "hybrid",
       "createdAt": 1,
       "updatedAt": 2
     }

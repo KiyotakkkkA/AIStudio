@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
@@ -10,18 +10,22 @@ use serde_json::{Map, Value, json};
 use tokio::runtime::Handle;
 use tokio::task::AbortHandle;
 use tokio_util::sync::CancellationToken;
-use zvs_contract::mcp::check_namespace;
+use zvs_contract::mcp::{MCP_INSTRUCTIONS_MAX, check_namespace};
 use zvs_contract::validate::{invalid, js_slice};
 use zvs_contract::{
     AppError, AppErrorCode, CreateMcpServerInput, McpCallResultDto, McpCapabilityDto,
-    McpCapabilityKind, McpHealthDto, McpLogLevel, McpLogLineDto, McpServerDetailDto, McpServerDto,
-    McpServerId, McpServerStatus, McpTestResultDto, McpTransport, McpValue, Timestamp, ToolSource,
-    UpdateMcpServerInput, ids::is_wire_uuid,
+    McpCapabilityKind, McpHealthDto, McpLogLevel, McpLogLineDto, McpOAuthState, McpServerDetailDto,
+    McpServerDto, McpServerId, McpServerStatus, McpTestResultDto, McpTransport, McpValue,
+    Timestamp, ToolSource, UpdateMcpServerInput, ids::is_wire_uuid,
 };
 
 use crate::data::repositories::{CapabilityCounts, McpServerPatch};
 use crate::data::schema::{McpCapabilityRow, McpServerRow, SecretConsumerKind};
 use crate::data::{Database, Repositories};
+use crate::drivers::mcp::oauth::{
+    self, AUTH_REQUIRED, ClientRegistration, CodeExchange, Loopback, OAuthGrant, Pkce,
+    SIGN_IN_TIMEOUT, is_auth_required,
+};
 use crate::drivers::mcp::{
     LaunchSpec, McpClient, McpClientOptions, McpDiscovery, McpEndpoint, SpawnServer,
     TransportHooks, call_result, infer_destructive, infer_read_only, isolated_toolchain_env,
@@ -30,9 +34,11 @@ use crate::kernel::{
     McpCallTarget, McpNodeTarget, McpToolCaller, NodeRegistry, register_mcp_tool_node,
 };
 use crate::platform::clock::{SharedClock, SystemClock};
+use crate::platform::external::UrlOpener;
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 use crate::services::SecretService;
+use crate::services::crypto::Plaintext;
 use crate::tools::{ToolDescriptor, ToolRegistry};
 
 pub const DAY_MS: Timestamp = 24 * 60 * 60 * 1000;
@@ -43,6 +49,12 @@ pub const SERVICE_STOPPED: &str = "Сервис MCP остановлен";
 pub const SERVER_DISABLED: &str = "MCP-сервер выключен";
 pub const NOT_CONNECTED: &str = "MCP-сервер не подключён";
 pub const CANCELLED: &str = "Операция отменена";
+pub const OAUTH_HTTP_ONLY: &str = "Вход через браузер доступен только для http-серверов";
+pub const OAUTH_NO_REGISTRATION: &str =
+    "Сервер авторизации не поддерживает автоматическую регистрацию клиентов";
+pub const RESOURCE_READER: &str = "read_resource";
+pub const RESOURCE_NOT_FOUND: &str = "У MCP-сервера нет такого ресурса";
+pub const OAUTH_CORRUPT: &str = "Сохранённый вход повреждён — войдите заново";
 
 pub struct McpServiceOptions {
     pub database: Arc<Database>,
@@ -61,6 +73,9 @@ pub struct McpServiceOptions {
     pub client_version: String,
     pub toolchain_dir: Option<PathBuf>,
     pub runtime: Option<Handle>,
+    pub opener: Option<UrlOpener>,
+    pub client_name: String,
+    pub sign_in_timeout: Duration,
 }
 
 impl McpServiceOptions {
@@ -88,6 +103,9 @@ impl McpServiceOptions {
             client_version: "0.0.0".to_owned(),
             toolchain_dir: None,
             runtime: None,
+            opener: None,
+            client_name: "ZVS AI Studio".to_owned(),
+            sign_in_timeout: SIGN_IN_TIMEOUT,
         }
     }
 }
@@ -113,6 +131,7 @@ struct Supervisor {
     retry: Option<AbortHandle>,
     intentional: bool,
     generation: u64,
+    sign_in: Option<CancellationToken>,
 }
 
 struct Inner {
@@ -220,7 +239,27 @@ fn capability_dto(row: McpCapabilityRow) -> Result<McpCapabilityDto, AppError> {
     })
 }
 
-fn server_dto(row: &McpServerRow, counts: CapabilityCounts) -> Result<McpServerDto, AppError> {
+fn oauth_state(row: &McpServerRow, signed_in: bool) -> McpOAuthState {
+    if row.last_error.as_deref() == Some(AUTH_REQUIRED) {
+        McpOAuthState::Required
+    } else if signed_in {
+        McpOAuthState::SignedIn
+    } else {
+        McpOAuthState::None
+    }
+}
+
+fn has_authorization(headers: &BTreeMap<String, String>) -> bool {
+    headers
+        .keys()
+        .any(|name| name.eq_ignore_ascii_case("authorization"))
+}
+
+fn server_dto(
+    row: &McpServerRow,
+    counts: CapabilityCounts,
+    signed_in: bool,
+) -> Result<McpServerDto, AppError> {
     Ok(McpServerDto {
         id: McpServerId::parse(&row.id).ok_or_else(malformed)?,
         name: row.name.clone(),
@@ -234,9 +273,11 @@ fn server_dto(row: &McpServerRow, counts: CapabilityCounts) -> Result<McpServerD
         enabled: row.enabled,
         startup: row.startup,
         status: row.status,
+        oauth: oauth_state(row, signed_in),
         protocol_version: row.protocol_version.clone(),
         server_name: row.server_name.clone(),
         server_version: row.server_version.clone(),
+        instructions: row.instructions.clone(),
         last_error: row.last_error.clone(),
         last_connected_at: row.last_connected_at,
         tool_count: counts.tool,
@@ -344,29 +385,41 @@ impl McpService {
     }
 
     pub fn list(&self) -> Result<Vec<McpServerDto>, AppError> {
-        let (rows, counts) = self.database().with_connection(|connection| {
+        let (rows, counts, signed_in) = self.database().with_connection(|connection| {
             let servers = Repositories::new(connection).mcp_servers;
             let rows = servers.list()?;
             let ids: Vec<String> = rows.iter().map(|row| row.id.clone()).collect();
             let counts = servers.counts_for_servers(&ids)?;
-            Ok((rows, counts))
+            let signed_in: HashSet<String> = servers.oauth_server_ids()?.into_iter().collect();
+            Ok((rows, counts, signed_in))
         })?;
         rows.iter()
-            .map(|row| server_dto(row, counts.get(&row.id).copied().unwrap_or_default()))
+            .map(|row| {
+                server_dto(
+                    row,
+                    counts.get(&row.id).copied().unwrap_or_default(),
+                    signed_in.contains(&row.id),
+                )
+            })
             .collect()
     }
 
     pub fn get(&self, id: &str) -> Result<McpServerDetailDto, AppError> {
         let row = self.require(id)?;
         Ok(McpServerDetailDto {
-            server: server_dto(&row, self.counts(&row.id)?)?,
+            server: self.dto(&row)?,
             capabilities: self.capabilities(&row.id, None)?,
         })
     }
 
     pub fn server(&self, id: &str) -> Result<McpServerDto, AppError> {
         let row = self.require(id)?;
-        server_dto(&row, self.counts(&row.id)?)
+        self.dto(&row)
+    }
+
+    fn dto(&self, row: &McpServerRow) -> Result<McpServerDto, AppError> {
+        let signed_in = self.oauth_cipher(&row.id)?.is_some();
+        server_dto(row, self.counts(&row.id)?, signed_in)
     }
 
     pub fn capabilities(
@@ -464,6 +517,7 @@ impl McpService {
                     protocol_version: None,
                     server_name: None,
                     server_version: None,
+                    instructions: None,
                     last_error: None,
                     last_connected_at: None,
                     created_at: now,
@@ -479,7 +533,7 @@ impl McpService {
                 ("transport", json!(row.transport)),
             ],
         );
-        server_dto(&row, CapabilityCounts::default())
+        server_dto(&row, CapabilityCounts::default(), false)
     }
 
     pub async fn update(&self, input: &UpdateMcpServerInput) -> Result<McpServerDto, AppError> {
@@ -519,14 +573,18 @@ impl McpService {
             },
         )?;
         self.sync_secret_usage(&row.id, &existing.secret_ids(), &row.secret_ids())?;
+        if row.url != existing.url || row.transport != existing.transport {
+            self.forget_grant(&row.id)?;
+        }
         if !row.enabled {
             self.withdraw(&row)?;
         }
-        server_dto(&row, self.counts(&row.id)?)
+        self.dto(&row)
     }
 
     pub async fn remove(&self, id: &str) -> Result<(), AppError> {
         let row = self.require(id)?;
+        self.abort_sign_in(&row.id);
         self.stop(&row.id).await;
         self.withdraw(&row)?;
         self.sync_secret_usage(&row.id, &row.secret_ids(), &[])?;
@@ -688,6 +746,9 @@ impl McpService {
     pub async fn dispose(&self) {
         self.inner.closed.store(true, Ordering::SeqCst);
         let ids: Vec<String> = self.supervisors().keys().cloned().collect();
+        for id in &ids {
+            self.abort_sign_in(id);
+        }
         join_all(ids.iter().map(|id| self.stop(id))).await;
         self.supervisors().clear();
     }
@@ -715,8 +776,26 @@ impl McpService {
         let started_at = self.now();
         let timeout = target.timeout.unwrap_or(self.inner.options.call_timeout);
         let outcome = tokio::select! {
-            result = client.call_tool(&target.tool, arguments, timeout) => result,
+            result = self.invoke(&client, target, &arguments, timeout) => result,
             () = cancel.cancelled() => Err(AppError::new(AppErrorCode::RunCancelled, CANCELLED)),
+        };
+        let outcome = match outcome {
+            Err(error) if is_auth_required(&error) && self.can_refresh(&target.server_id) => {
+                self.fresh_grant(&target.server_id, true).await?;
+                self.restart(&target.server_id).await?;
+                let client = self
+                    .with_supervisor(&target.server_id, |supervisor| supervisor.client.clone())
+                    .filter(|client| client.connected())
+                    .ok_or_else(|| {
+                        AppError::new(AppErrorCode::McpUnavailable, NOT_CONNECTED)
+                            .with_detail("serverId", target.server_id.clone())
+                    })?;
+                tokio::select! {
+                    result = self.invoke(&client, target, &arguments, timeout) => result,
+                    () = cancel.cancelled() => Err(AppError::new(AppErrorCode::RunCancelled, CANCELLED)),
+                }
+            }
+            outcome => outcome,
         };
         let elapsed = self.now() - started_at;
         match outcome {
@@ -751,6 +830,37 @@ impl McpService {
         }
     }
 
+    async fn invoke(
+        &self,
+        client: &McpClient,
+        target: &McpCallTarget,
+        arguments: &Map<String, Value>,
+        timeout: Duration,
+    ) -> Result<Value, AppError> {
+        if !target.read_resource {
+            return client
+                .call_tool(&target.tool, arguments.clone(), timeout)
+                .await;
+        }
+        let uri = arguments
+            .get("uri")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|uri| !uri.is_empty())
+            .ok_or_else(|| invalid("uri", "required"))?;
+        let known: Vec<String> = self
+            .capabilities(&target.server_id, Some(McpCapabilityKind::Resource))?
+            .into_iter()
+            .filter_map(|capability| capability.uri)
+            .collect();
+        if !known.iter().any(|candidate| candidate == uri) {
+            return Err(AppError::new(AppErrorCode::NotFound, RESOURCE_NOT_FOUND)
+                .with_detail("uri", uri)
+                .with_detail("available", known));
+        }
+        client.read_resource(uri, timeout).await
+    }
+
     pub async fn call_by_tool_key(
         &self,
         key: &str,
@@ -773,6 +883,7 @@ impl McpService {
                 server_id: capability.server_id,
                 tool: capability.name,
                 timeout: None,
+                read_resource: false,
             },
             arguments,
             cancel,
@@ -839,9 +950,22 @@ impl McpService {
             .collect()
     }
 
-    fn endpoint(&self, row: &McpServerRow) -> Result<McpEndpoint, AppError> {
+    async fn endpoint(
+        &self,
+        row: &McpServerRow,
+        force_refresh: bool,
+    ) -> Result<McpEndpoint, AppError> {
         let env = self.resolve(&row.env)?;
-        let headers = self.resolve(&row.headers)?;
+        let mut headers = self.resolve(&row.headers)?;
+        if row.transport == McpTransport::Http
+            && !has_authorization(&headers)
+            && let Some(grant) = self.fresh_grant(&row.id, force_refresh).await?
+        {
+            headers.insert(
+                "Authorization".to_owned(),
+                format!("Bearer {}", grant.access_token),
+            );
+        }
         match row.transport {
             McpTransport::Stdio => {
                 let command = row
@@ -892,6 +1016,236 @@ impl McpService {
         }
     }
 
+    fn oauth_cipher(&self, id: &str) -> Result<Option<Vec<u8>>, AppError> {
+        self.database().with_connection(|connection| {
+            Ok(Repositories::new(connection).mcp_servers.oauth_cipher(id)?)
+        })
+    }
+
+    fn grant(&self, id: &str) -> Result<Option<OAuthGrant>, AppError> {
+        let Some(cipher) = self.oauth_cipher(id)? else {
+            return Ok(None);
+        };
+        let plaintext = self.inner.options.secrets.open(&cipher)?;
+        serde_json::from_str(plaintext.expose())
+            .map(Some)
+            .map_err(|_| AppError::new(AppErrorCode::SecretDecryptFailed, OAUTH_CORRUPT))
+    }
+
+    fn save_grant(&self, id: &str, grant: &OAuthGrant) -> Result<(), AppError> {
+        let json = serde_json::to_string(grant)
+            .map_err(|cause| AppError::new(AppErrorCode::Unknown, cause.to_string()))?;
+        let cipher = self.inner.options.secrets.seal(&Plaintext::new(json))?;
+        let now = self.now();
+        self.database().with_connection(|connection| {
+            Ok(Repositories::new(connection)
+                .mcp_servers
+                .save_oauth(id, &cipher, now)?)
+        })
+    }
+
+    fn forget_grant(&self, id: &str) -> Result<(), AppError> {
+        self.database().with_connection(|connection| {
+            Ok(Repositories::new(connection).mcp_servers.remove_oauth(id)?)
+        })
+    }
+
+    fn can_refresh(&self, id: &str) -> bool {
+        self.grant(id)
+            .ok()
+            .flatten()
+            .is_some_and(|grant| grant.refresh_token.is_some())
+    }
+
+    async fn fresh_grant(&self, id: &str, force: bool) -> Result<Option<OAuthGrant>, AppError> {
+        let grant = match self.grant(id) {
+            Ok(grant) => grant,
+            Err(_) => {
+                self.forget_grant(id)?;
+                return Err(oauth::auth_required(None));
+            }
+        };
+        let Some(grant) = grant else {
+            return Ok(None);
+        };
+        if !force && !grant.expires_soon(self.now()) {
+            return Ok(Some(grant));
+        }
+        if grant.refresh_token.is_none() {
+            return Err(oauth::auth_required(None));
+        }
+        match oauth::refresh(&self.inner.options.http, &grant, self.now()).await {
+            Ok(refreshed) => {
+                self.save_grant(id, &refreshed)?;
+                self.append(id, McpLogLevel::Info, "oauth token refreshed");
+                Ok(Some(refreshed))
+            }
+            Err(error) if is_auth_required(&error) => {
+                self.append(id, McpLogLevel::Warn, &error.message);
+                Err(oauth::auth_required(None))
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn abort_sign_in(&self, id: &str) {
+        if let Some(token) = self.with_supervisor(id, |supervisor| supervisor.sign_in.take()) {
+            token.cancel();
+        }
+    }
+
+    pub fn cancel_sign_in(&self, id: &str) -> Result<McpServerDto, AppError> {
+        let row = self.require(id)?;
+        self.abort_sign_in(&row.id);
+        self.dto(&row)
+    }
+
+    pub async fn sign_out(&self, id: &str) -> Result<McpServerDto, AppError> {
+        let row = self.require(id)?;
+        self.abort_sign_in(&row.id);
+        self.stop(&row.id).await;
+        self.forget_grant(&row.id)?;
+        self.withdraw(&row)?;
+        if row.last_error.as_deref() == Some(AUTH_REQUIRED) {
+            self.patch(
+                &row.id,
+                &McpServerPatch {
+                    last_error: Some(None),
+                    updated_at: Some(self.now()),
+                    ..McpServerPatch::default()
+                },
+            )?;
+        }
+        self.append(&row.id, McpLogLevel::Info, "oauth signed out");
+        self.server(&row.id)
+    }
+
+    pub async fn sign_in(&self, id: &str) -> Result<McpServerDto, AppError> {
+        let row = self.require(id)?;
+        if row.transport != McpTransport::Http {
+            return Err(AppError::new(
+                AppErrorCode::ValidationFailed,
+                OAUTH_HTTP_ONLY,
+            ));
+        }
+        if !row.enabled {
+            return Err(AppError::new(AppErrorCode::Conflict, SERVER_DISABLED)
+                .with_detail("serverId", row.id));
+        }
+        let url = row
+            .url
+            .clone()
+            .filter(|url| !url.is_empty())
+            .ok_or_else(|| {
+                AppError::new(
+                    AppErrorCode::ValidationFailed,
+                    "У http-сервера не задан адрес",
+                )
+            })?;
+        let cancel = CancellationToken::new();
+        let previous = self.with_supervisor(&row.id, |supervisor| {
+            supervisor.sign_in.replace(cancel.clone())
+        });
+        if let Some(previous) = previous {
+            previous.cancel();
+        }
+        let outcome = self.authorize(&row.id, &url, &cancel).await;
+        if !cancel.is_cancelled() {
+            self.with_supervisor(&row.id, |supervisor| supervisor.sign_in = None);
+        }
+        let grant = match outcome {
+            Ok(grant) => grant,
+            Err(error) => {
+                self.append(&row.id, McpLogLevel::Error, &error.message);
+                return Err(error);
+            }
+        };
+        self.save_grant(&row.id, &grant)?;
+        self.append(&row.id, McpLogLevel::Info, "oauth signed in");
+        self.log(
+            LogLevel::Info,
+            "Signed in to an MCP server",
+            &[("serverId", json!(row.id)), ("issuer", json!(grant.issuer))],
+        );
+        self.stop(&row.id).await;
+        let _ = self.start(&row.id).await;
+        self.server(&row.id)
+    }
+
+    async fn authorize(
+        &self,
+        id: &str,
+        url: &str,
+        cancel: &CancellationToken,
+    ) -> Result<OAuthGrant, AppError> {
+        let http = &self.inner.options.http;
+        let challenge = oauth::probe_challenge(http, url).await;
+        let discovery = oauth::discover(http, url, challenge.as_deref()).await?;
+        let previous = self.grant(id).ok().flatten().filter(|grant| {
+            grant.issuer == discovery.issuer && grant.resource == discovery.resource
+        });
+        let loopback =
+            Loopback::bind(previous.as_ref().and_then(OAuthGrant::redirect_port)).await?;
+        let client = match previous
+            .as_ref()
+            .filter(|grant| grant.redirect_uri == loopback.redirect_uri)
+        {
+            Some(grant) => ClientRegistration {
+                client_id: grant.client_id.clone(),
+                client_secret: grant.client_secret.clone(),
+            },
+            None => {
+                let endpoint = discovery
+                    .server
+                    .registration_endpoint
+                    .clone()
+                    .ok_or_else(|| {
+                        AppError::new(AppErrorCode::McpUnavailable, OAUTH_NO_REGISTRATION)
+                    })?;
+                oauth::register(
+                    http,
+                    &endpoint,
+                    &loopback.redirect_uri,
+                    &self.inner.options.client_name,
+                    discovery.scope.as_deref(),
+                )
+                .await?
+            }
+        };
+        let pkce = Pkce::generate();
+        let state = oauth::random_state();
+        let redirect_uri = loopback.redirect_uri.clone();
+        let address =
+            oauth::authorize_url(&discovery, &client.client_id, &redirect_uri, &state, &pkce)?;
+        let opener = self.inner.options.opener.clone().ok_or_else(|| {
+            AppError::new(
+                AppErrorCode::NotImplemented,
+                crate::platform::external::OPEN_FAILED,
+            )
+        })?;
+        opener(&address)?;
+        self.append(
+            id,
+            McpLogLevel::Info,
+            &format!("oauth sign-in opened in the browser · {}", discovery.issuer),
+        );
+        let code = loopback
+            .wait_for_code(&state, self.inner.options.sign_in_timeout, cancel)
+            .await?;
+        oauth::exchange_code(
+            http,
+            CodeExchange {
+                discovery: &discovery,
+                client: &client,
+                redirect_uri: &redirect_uri,
+                code: &code,
+                verifier: &pkce.verifier,
+                now: self.now(),
+            },
+        )
+        .await
+    }
+
     fn hooks(&self, id: &str, generation: u64) -> TransportHooks {
         let weak: Weak<Inner> = Arc::downgrade(&self.inner);
         let log_weak = weak.clone();
@@ -935,9 +1289,15 @@ impl McpService {
             clock: self.inner.options.clock.clone(),
         };
         let connected = async {
-            let endpoint = self.endpoint(&row)?;
-            let (client, handshake) =
-                McpClient::connect(endpoint, &options, self.hooks(id, generation)).await?;
+            let endpoint = self.endpoint(&row, false).await?;
+            let attempt = McpClient::connect(endpoint, &options, self.hooks(id, generation)).await;
+            let (client, handshake) = match attempt {
+                Err(error) if is_auth_required(&error) && self.can_refresh(id) => {
+                    let endpoint = self.endpoint(&row, true).await?;
+                    McpClient::connect(endpoint, &options, self.hooks(id, generation)).await?
+                }
+                attempt => attempt?,
+            };
             let client = Arc::new(client);
             self.with_supervisor(id, |supervisor| {
                 supervisor.client = Some(Arc::clone(&client));
@@ -958,7 +1318,11 @@ impl McpService {
                     supervisor.client = None;
                     supervisor.failures += 1;
                 });
-                let message = error.message.clone();
+                let message = if is_auth_required(&error) {
+                    AUTH_REQUIRED.to_owned()
+                } else {
+                    error.message.clone()
+                };
                 self.patch(
                     id,
                     &McpServerPatch {
@@ -1013,6 +1377,12 @@ impl McpService {
                 ),
                 server_version: Some(
                     Some(handshake.server_version.clone()).filter(|version| !version.is_empty()),
+                ),
+                instructions: Some(
+                    handshake
+                        .instructions
+                        .as_deref()
+                        .map(|text| js_slice(text, MCP_INSTRUCTIONS_MAX).to_owned()),
                 ),
                 last_error: Some(None),
                 last_connected_at: Some(Some(now)),
@@ -1100,6 +1470,7 @@ impl McpService {
                     tool: tool.name.clone(),
                     read_only,
                     timeout: None,
+                    read_resource: false,
                 },
                 self.caller(),
             )?;
@@ -1149,6 +1520,15 @@ impl McpService {
                 .id,
             );
         }
+        let reader = tool_key(&row.namespace, RESOURCE_READER);
+        if !live.contains(&reader) {
+            if discovery.resources.is_empty() {
+                self.inner.options.tools.deregister(&reader)?;
+                self.inner.options.nodes.unregister(&reader);
+            } else {
+                self.register_reader(row, &reader, discovery)?;
+            }
+        }
         let stale: Vec<String> = self
             .database()
             .with_connection(|connection| {
@@ -1169,6 +1549,71 @@ impl McpService {
                 .mcp_servers
                 .prune_capabilities(&row.id, &kept)?)
         })
+    }
+
+    fn register_reader(
+        &self,
+        row: &McpServerRow,
+        key: &str,
+        discovery: &McpDiscovery,
+    ) -> Result<(), AppError> {
+        let server = row.server_name.clone().unwrap_or_else(|| row.name.clone());
+        let listing: Vec<String> = discovery
+            .resources
+            .iter()
+            .map(|resource| {
+                let about = resource
+                    .description
+                    .as_deref()
+                    .or(resource.title.as_deref())
+                    .or(resource.name.as_deref())
+                    .map(str::trim)
+                    .filter(|about| !about.is_empty());
+                match about {
+                    Some(about) => format!("{} — {about}", resource.uri),
+                    None => resource.uri.clone(),
+                }
+            })
+            .collect();
+        let uris: Vec<&str> = discovery
+            .resources
+            .iter()
+            .map(|resource| resource.uri.as_str())
+            .collect();
+        self.inner.options.tools.register(&ToolDescriptor {
+            source_ref: Some(row.id.clone()),
+            display_name: Some(format!("{server}: чтение ресурсов")),
+            description: description(Some(&format!(
+                "Read a resource of the {server} MCP server, such as instructions the server asks you to read before using its tools. Resources: {}",
+                listing.join("; ")
+            ))),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "uri": {
+                        "type": "string",
+                        "enum": uris,
+                        "description": "The resource URI to read.",
+                    },
+                },
+                "required": ["uri"],
+            }),
+            read_only: true,
+            destructive: false,
+            ..ToolDescriptor::new(key.to_owned(), ToolSource::Mcp)
+        })?;
+        register_mcp_tool_node(
+            &self.inner.options.nodes,
+            McpNodeTarget {
+                key: key.to_owned(),
+                server_id: row.id.clone(),
+                tool: RESOURCE_READER.to_owned(),
+                read_only: true,
+                timeout: None,
+                read_resource: true,
+            },
+            self.caller(),
+        )
     }
 
     fn withdraw(&self, row: &McpServerRow) -> Result<(), AppError> {

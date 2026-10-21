@@ -3,13 +3,19 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { CodeView } from "@kiyotakkkka/zvs-uikit-lib/code-view";
+import type { ChatCitationDto } from "@zvs/shared";
+import { citationNumber, linkCitations } from "./citationMarkers";
 
 export default function ChatMarkdown({
   content,
   streaming = false,
+  citations = [],
+  onCite,
 }: {
   readonly content: string;
   readonly streaming?: boolean;
+  readonly citations?: readonly ChatCitationDto[];
+  readonly onCite?: (citation: ChatCitationDto) => void;
 }) {
   return (
     <div
@@ -31,7 +37,21 @@ export default function ChatMarkdown({
               </ScrollArea>
             );
           },
-          a({ children }) {
+          a({ children, href }) {
+            const number = citationNumber(href);
+            const citation = number === null ? undefined : citations[number - 1];
+            if (number !== null && citation !== undefined)
+              return (
+                <button
+                  type="button"
+                  title={citation.sourcePath}
+                  aria-label={`Источник ${String(number)}: ${citation.sourcePath}`}
+                  className="mx-0.5 inline-flex h-4.5 min-w-4.5 -translate-y-px items-center justify-center rounded-full bg-accent-soft px-1 align-middle font-mono text-[10.5px] font-semibold text-accent-medium no-underline tabular-nums hover:bg-accent-dark hover:text-on-accent"
+                  onClick={() => onCite?.(citation)}
+                >
+                  {number}
+                </button>
+              );
             return <span className="text-accent-medium">{children}</span>;
           },
           img({ alt }) {
@@ -39,7 +59,7 @@ export default function ChatMarkdown({
           },
         }}
       >
-        {content}
+        {linkCitations(content, citations.length)}
       </ReactMarkdown>
     </div>
   );

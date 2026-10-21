@@ -3,6 +3,7 @@ pub mod clock;
 pub mod device;
 pub mod disk;
 pub mod events;
+pub mod external;
 pub mod gpu;
 pub mod ids;
 pub mod logger;

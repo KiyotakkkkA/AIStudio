@@ -76,7 +76,11 @@ pub fn source_label(path: &str, page: Option<u64>, section: &str) -> String {
     parts.join(" · ")
 }
 
-fn attribute(value: &str) -> String {
+pub fn defang_sources(text: &str) -> String {
+    SOURCE_FENCE.replace_all(text, "<$1 $2").into_owned()
+}
+
+pub fn attribute(value: &str) -> String {
     let escaped = value
         .replace('&', "&amp;")
         .replace('"', "&quot;")

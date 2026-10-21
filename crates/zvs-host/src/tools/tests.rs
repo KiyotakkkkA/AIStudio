@@ -700,7 +700,15 @@ async fn kernel_nodes_register_themselves_as_builtin_capabilities_exactly_once()
     assert_eq!(first, second);
     assert_eq!(
         host.keys(&ToolListFilter::default()),
-        ["mail.send", "vector.index", "vector.list", "vector.search"]
+        [
+            "knowledge.list",
+            "knowledge.read",
+            "knowledge.search",
+            "mail.send",
+            "vector.index",
+            "vector.list",
+            "vector.search"
+        ]
     );
     let tools = host.tools.list(&ToolListFilter::default()).expect("lists");
     let index = tools

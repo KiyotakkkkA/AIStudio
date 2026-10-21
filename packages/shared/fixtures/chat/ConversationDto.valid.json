@@ -11,6 +11,7 @@
       "attachedStoreIds": [],
       "useRelations": false,
       "enabledTools": [],
+      "retrievalMode": "hybrid",
       "createdAt": 1,
       "updatedAt": 2
     }
@@ -29,6 +30,7 @@
       "attachedStoreIds": ["0199aa11-5555-7111-8111-111111111111"],
       "useRelations": true,
       "enabledTools": ["demo.lookup"],
+      "retrievalMode": "hybrid",
       "createdAt": 1,
       "updatedAt": 2
     }

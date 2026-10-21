@@ -6,6 +6,7 @@ import { failureCopy, handshakeLine } from "./connectionPresentation";
 export interface TestResultLineProps {
   readonly result: McpTestResultDto | null;
   readonly testing: boolean;
+  readonly signingIn?: boolean;
   readonly unsaved: boolean;
   readonly lastError: string | null;
 }
@@ -13,9 +14,19 @@ export interface TestResultLineProps {
 export default function TestResultLine({
   result,
   testing,
+  signingIn = false,
   unsaved,
   lastError,
 }: TestResultLineProps) {
+  if (signingIn) {
+    return (
+      <span className="flex items-center gap-1.75 text-[12px] text-main-400">
+        <Icon path={mdiInformationOutline} size={14} className="flex-none" />
+        Ожидаем вход в браузере…
+      </span>
+    );
+  }
+
   if (testing) {
     return (
       <span className="flex items-center gap-1.75 text-[12px] text-main-400">

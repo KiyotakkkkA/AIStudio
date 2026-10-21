@@ -619,6 +619,7 @@ pub fn register_core_nodes(registry: &NodeRegistry) -> Result<(), AppError> {
     registry.register(VectorSearchNode)?;
     registry.register(VectorListNode)?;
     registry.register(VectorIndexNode)?;
+    super::knowledge_nodes::register_knowledge_nodes(registry)?;
     registry.register(BranchNode)?;
     registry.register(MapNode)
 }

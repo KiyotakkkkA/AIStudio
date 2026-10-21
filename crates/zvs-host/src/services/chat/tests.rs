@@ -1,3 +1,4 @@
+mod knowledge;
 mod tool_loop;
 
 use std::future::Future;
@@ -49,6 +50,9 @@ pub(super) struct FakeSearch {
     answer: Mutex<SearchAnswer>,
     gate: watch::Sender<bool>,
     delegate: Option<VectorStoreService>,
+    pub listed: Mutex<Vec<VectorStoreDto>>,
+    pub documents: Mutex<Vec<zvs_contract::VectorDocumentDto>>,
+    pub stored_chunks: Mutex<Vec<VectorChunkDto>>,
 }
 
 impl FakeSearch {
@@ -58,6 +62,9 @@ impl FakeSearch {
             answer: Mutex::new(Arc::new(|_| Vec::new())),
             gate: watch::channel(true).0,
             delegate,
+            listed: Mutex::new(Vec::new()),
+            documents: Mutex::new(Vec::new()),
+            stored_chunks: Mutex::new(Vec::new()),
         })
     }
 
@@ -104,6 +111,30 @@ impl VectorSearch for FakeSearch {
         self.delegate.is_some()
     }
 
+    async fn list(&self) -> Result<Vec<VectorStoreDto>, AppError> {
+        Ok(self
+            .listed
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone())
+    }
+
+    async fn document(
+        &self,
+        store_id: &str,
+        document_id: &str,
+    ) -> Result<Option<zvs_contract::VectorDocumentDto>, AppError> {
+        Ok(self
+            .documents
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .iter()
+            .find(|document| {
+                document.store_id.to_string() == store_id && document.id.to_string() == document_id
+            })
+            .cloned())
+    }
+
     async fn chunks(
         &self,
         store_id: &str,
@@ -112,7 +143,16 @@ impl VectorSearch for FakeSearch {
     ) -> Result<Vec<VectorChunkDto>, AppError> {
         match &self.delegate {
             Some(delegate) => delegate.chunks(store_id, document_id, indices).await,
-            None => Ok(Vec::new()),
+            None => Ok(self
+                .stored_chunks
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .iter()
+                .filter(|chunk| {
+                    chunk.document_id == document_id && indices.contains(&chunk.chunk_index)
+                })
+                .cloned()
+                .collect()),
         }
     }
 

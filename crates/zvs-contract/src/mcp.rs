@@ -26,6 +26,12 @@ wire_enum!(McpServerStatus {
     Failed => "failed",
 });
 
+wire_enum!(McpOAuthState {
+    None => "none",
+    Required => "required",
+    SignedIn => "signed-in",
+});
+
 wire_enum!(McpCapabilityKind {
     Tool => "tool",
     Resource => "resource",
@@ -46,6 +52,7 @@ pub const MCP_ARG_MAX: usize = 2048;
 pub const MCP_URL_MAX: usize = 2048;
 pub const MCP_VALUE_MAX: usize = 4096;
 pub const MCP_ERROR_MAX: usize = 2000;
+pub const MCP_INSTRUCTIONS_MAX: usize = 8000;
 pub const MCP_LOG_LINE_MAX: usize = 1000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -189,12 +196,15 @@ pub struct McpServerDto {
     pub enabled: bool,
     pub startup: McpStartup,
     pub status: McpServerStatus,
+    pub oauth: McpOAuthState,
     #[serde(deserialize_with = "crate::wire::nullable")]
     pub protocol_version: Option<String>,
     #[serde(deserialize_with = "crate::wire::nullable")]
     pub server_name: Option<String>,
     #[serde(deserialize_with = "crate::wire::nullable")]
     pub server_version: Option<String>,
+    #[serde(default, deserialize_with = "crate::wire::nullable")]
+    pub instructions: Option<String>,
     #[serde(deserialize_with = "crate::wire::nullable")]
     pub last_error: Option<String>,
     #[serde(deserialize_with = "crate::wire::nullable")]
@@ -219,6 +229,11 @@ impl Validate for McpServerDto {
         check_optional_len("protocolVersion", self.protocol_version.as_ref(), 64)?;
         check_optional_len("serverName", self.server_name.as_ref(), 200)?;
         check_optional_len("serverVersion", self.server_version.as_ref(), 64)?;
+        check_optional_len(
+            "instructions",
+            self.instructions.as_ref(),
+            MCP_INSTRUCTIONS_MAX,
+        )?;
         check_optional_len("lastError", self.last_error.as_ref(), MCP_ERROR_MAX)?;
         if let Some(at) = self.last_connected_at {
             check::timestamp("lastConnectedAt", at)?;

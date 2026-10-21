@@ -55,6 +55,38 @@ export const ChatToolCallDto = z.object({
 });
 export type ChatToolCallDto = z.infer<typeof ChatToolCallDto>;
 export const ChatEnabledTools = z.array(ToolKey).max(64);
+export const RetrievalMode = z.enum(["auto", "agentic", "hybrid"]);
+export type RetrievalMode = z.infer<typeof RetrievalMode>;
+export const ChatEvalInput = z.object({
+  storeId: VectorStoreId,
+  providerId: ProviderId,
+  modelId: z.string().min(1),
+  modes: z.array(RetrievalMode).min(1).max(3).optional(),
+});
+export type ChatEvalInput = z.infer<typeof ChatEvalInput>;
+export const ChatEvalCaseDto = z.object({
+  caseId: z.string(),
+  question: z.string(),
+  cited: z.array(z.string()),
+  hit: z.boolean(),
+  searches: z.number().int().nonnegative(),
+  error: z.string().nullable(),
+});
+export type ChatEvalCaseDto = z.infer<typeof ChatEvalCaseDto>;
+export const ChatEvalModeDto = z.object({
+  mode: RetrievalMode,
+  hitRate: z.number().min(0).max(1),
+  averageSearches: z.number().nonnegative(),
+  cases: z.array(ChatEvalCaseDto),
+});
+export type ChatEvalModeDto = z.infer<typeof ChatEvalModeDto>;
+export const ChatEvalRunDto = z.object({
+  storeId: VectorStoreId,
+  modelId: z.string(),
+  ranAt: z.number().int(),
+  modes: z.array(ChatEvalModeDto),
+});
+export type ChatEvalRunDto = z.infer<typeof ChatEvalRunDto>;
 export const CreateConversationInput = z.object({
   title: z.string().trim().min(1).max(200).default("New conversation"),
   providerId: ProviderId,
@@ -64,6 +96,7 @@ export const CreateConversationInput = z.object({
   attachedStoreIds: z.array(VectorStoreId).max(64).default([]),
   useRelations: z.boolean().default(false),
   enabledTools: ChatEnabledTools.default([]),
+  retrievalMode: RetrievalMode.default("hybrid"),
 });
 export type CreateConversationInput = z.infer<typeof CreateConversationInput>;
 export const ConversationRef = z.object({ id: ConversationId });

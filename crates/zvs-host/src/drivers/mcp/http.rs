@@ -10,8 +10,9 @@ use rmcp::transport::streamable_http_client::{
     SseError, StreamableHttpClient, StreamableHttpError, StreamableHttpPostResponse,
 };
 use sse_stream::{Sse, SseStream};
-use zvs_contract::McpLogLevel;
+use zvs_contract::{AppError, AppErrorCode, McpLogLevel};
 
+use super::oauth::{auth_required, challenge_from};
 use super::transport::{MAX_MESSAGE_BYTES, TransportHooks, decode_text};
 
 const SESSION_HEADER: &str = "mcp-session-id";
@@ -39,14 +40,14 @@ type Failure = StreamableHttpError<HttpFailure>;
 pub struct McpHttpClient {
     client: reqwest::Client,
     hooks: TransportHooks,
-    failures: Arc<Mutex<Option<String>>>,
+    failures: Arc<Mutex<Option<AppError>>>,
 }
 
 impl McpHttpClient {
     pub const fn new(
         client: reqwest::Client,
         hooks: TransportHooks,
-        failures: Arc<Mutex<Option<String>>>,
+        failures: Arc<Mutex<Option<AppError>>>,
     ) -> Self {
         Self {
             client,
@@ -56,7 +57,12 @@ impl McpHttpClient {
     }
 
     fn fail(&self, message: String) -> Failure {
-        *self.failures.lock().unwrap_or_else(PoisonError::into_inner) = Some(message.clone());
+        self.fail_with(AppError::new(AppErrorCode::McpUnavailable, message))
+    }
+
+    fn fail_with(&self, error: AppError) -> Failure {
+        let message = error.message.clone();
+        *self.failures.lock().unwrap_or_else(PoisonError::into_inner) = Some(error);
         StreamableHttpError::Client(HttpFailure::new(message))
     }
 
@@ -157,6 +163,10 @@ impl StreamableHttpClient for McpHttpClient {
         let response = self.send(&uri, builder).await?;
         let session = session_of(&response);
         let status = response.status();
+        let challenge = challenge_from(response.headers());
+        if status == StatusCode::UNAUTHORIZED && challenge.is_some() {
+            return Err(self.fail_with(auth_required(challenge.as_deref())));
+        }
         if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
             return Err(self.fail(format!(
                 "MCP-сервер отклонил учётные данные ({})",

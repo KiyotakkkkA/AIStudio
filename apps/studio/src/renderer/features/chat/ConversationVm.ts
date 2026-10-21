@@ -1,5 +1,5 @@
 import { makeAutoObservable } from "mobx";
-import type { ProviderDto, ProviderId, VectorStoreId } from "@zvs/shared";
+import type { ProviderDto, ProviderId, RetrievalMode, VectorStoreId } from "@zvs/shared";
 
 export default class ConversationVm {
   text = "";
@@ -9,6 +9,7 @@ export default class ConversationVm {
   systemPrompt = "";
   attachedStoreIds: VectorStoreId[] = [];
   useRelations = false;
+  retrievalMode: RetrievalMode = "hybrid";
   enabledTools: string[] = [];
 
   constructor() {
@@ -29,6 +30,9 @@ export default class ConversationVm {
   }
   setUseRelations(value: boolean) {
     this.useRelations = value;
+  }
+  setRetrievalMode(value: RetrievalMode) {
+    this.retrievalMode = value;
   }
   setEnabledTools(value: readonly string[]) {
     this.enabledTools = [...new Set(value)];

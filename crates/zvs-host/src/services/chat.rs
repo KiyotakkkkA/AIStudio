@@ -11,32 +11,39 @@ use zvs_contract::validate::{check, js_slice, nested};
 use zvs_contract::vector_stores::DEFAULT_CHAT_MIN_SCORE;
 use zvs_contract::{
     AppError, AppErrorCode, ChatCitationDto, ChatContextDto, ChatContextInput, ChatContextToolDto,
-    ChatSendInput, ChatSettings, ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto,
-    ConversationDto, ConversationId, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
-    DeltaKind, DocumentId, GRAPH_EXPANSION_DEFAULT_MAX, GraphDirection, GraphExpansionDocument,
-    GraphNeighborhood, GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId,
-    MessageRole, ProviderCapability, ProviderId, RunGraph, RunHandleDto, RunId, RunKind,
-    StartRunInput, ToolListFilter, ToolMode, ToolTier, Validate, VectorSearchHitDto, VectorStoreId,
-    log_line, merge_graph_neighbors, model_tool_support, resolve_tool_mode,
+    ChatEvalCaseDto, ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto, ChatSendInput, ChatSettings,
+    ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationId,
+    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DeltaKind, DocumentId,
+    GRAPH_EXPANSION_DEFAULT_MAX, GraphDirection, GraphExpansionDocument, GraphNeighborhood,
+    GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId, MessageRole,
+    ProviderCapability, ProviderId, RetrievalMode, RunGraph, RunHandleDto, RunId, RunKind,
+    RunStatus, StartRunInput, ToolListFilter, ToolMode, ToolTier, Validate, VectorSearchHitDto,
+    VectorStoreId, log_line, merge_graph_neighbors, model_tool_support, resolve_tool_mode,
 };
 
 use super::chat_history::{
-    RelatedSource, RetrievedSource, estimate_tokens, measure_context, tokens, window_chat_history,
+    MESSAGE_OVERHEAD, RelatedSource, RetrievedSource, estimate_tokens, measure_context, tokens,
+    window_chat_history,
 };
 use super::chat_tools::{
-    CHAT_TOOL_CALLS, CHAT_TOOL_ROUNDS, OfferedTool, TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS,
-    TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result, offered_tools, parse_tool_arguments,
-    tool_result_budget, tool_result_text, tool_specs, tool_specs_json,
+    CHAT_TOOL_CALLS, CHAT_TOOL_ROUNDS, HYBRID_INSTRUCTION, KNOWLEDGE_INSTRUCTION, KnowledgeText,
+    OfferedTool, TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text,
+    fence_tool_result, knowledge_catalogue, offered_tools, parse_tool_arguments, read_result_text,
+    search_result_text, tool_result_budget, tool_result_text, tool_specs, tool_specs_json,
 };
 use super::retrieval_merge::{CHAT_FETCH_K, MergeOptions, StoreHits, merge_retrieval};
 use super::retrieval_query::retrieval_query;
 use super::runs::RunService;
+use super::vector_stores::VectorSearchOptions;
 use crate::data::repositories::{ConversationPatch, MessagePatch, RunPatch};
 use crate::data::schema::{ConversationRow, MessageRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::ai::with_injected_tools;
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta, ToolCall};
+use crate::kernel::knowledge_nodes::{
+    KNOWLEDGE_READ, KNOWLEDGE_SEARCH, KNOWLEDGE_TOOLS, KnowledgeReadOutput, KnowledgeSearchOutput,
+};
 use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateOutput, GenerateRole};
 use crate::kernel::{
     ApprovalDecision, NodeDef, NodeRegistry, PermissionRequirement, RunObserver, StepContext,
@@ -45,9 +52,14 @@ use crate::kernel::{
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
+use crate::services::mcp::{RESOURCE_READER, tool_key};
 use crate::tools::ToolRegistry;
+use zvs_contract::mcp::MCP_INSTRUCTIONS_MAX;
+use zvs_contract::{ToolDto, ToolSource};
 
 pub const CHAT_RELATED_MAX: usize = 3;
+pub const HYBRID_SOURCES_MAX: usize = 3;
+pub const KNOWLEDGE_COMPACTED: &str = "Older knowledge results compacted";
 
 static SPACES: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[\s\x{feff}]+").expect("a valid pattern"));
@@ -78,6 +90,8 @@ pub const CALL_DENIED: &str = "Вызов отклонён пользовате�
 pub const CALL_FORBIDDEN: &str = "Инструмент запрещён разрешением";
 pub const RETRIEVAL_ASSEMBLED: &str = "Retrieval context assembled";
 pub const HISTORY_TRIMMED: &str = "Chat history trimmed";
+pub const MCP_INSTRUCTIONS_HEADING: &str = "Instructions published by the MCP servers whose tools are offered. Follow them when you use those tools; when they point to a resource (for example testix://…), read it with that server's read_resource tool before calling the tool that needs it.";
+pub const NO_EVAL_CASES: &str = "Добавьте хотя бы один вопрос для проверки";
 
 pub struct ChatServiceOptions {
     pub database: Arc<Database>,
@@ -144,6 +158,7 @@ fn conversation_dto(row: ConversationRow) -> Result<ConversationDto, AppError> {
             .collect::<Result<_, _>>()?,
         use_relations: row.use_relations,
         enabled_tools: row.enabled_tools,
+        retrieval_mode: row.retrieval_mode,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -425,6 +440,54 @@ impl Inner {
         }
     }
 
+    fn mcp_guidance(
+        &self,
+        enabled: &mut Vec<String>,
+        registered: &[ToolDto],
+    ) -> Result<String, AppError> {
+        let offered: HashSet<String> = offered_tools(enabled, registered)
+            .into_iter()
+            .map(|tool| tool.key)
+            .collect();
+        let servers = unique(
+            &registered
+                .iter()
+                .filter(|tool| tool.source == ToolSource::Mcp && offered.contains(&tool.key))
+                .filter_map(|tool| tool.source_ref.clone())
+                .collect::<Vec<_>>(),
+        );
+        let mut blocks = Vec::new();
+        for server_id in servers {
+            let Some(row) =
+                self.read(|repositories| Ok(repositories.mcp_servers.find_by_id(&server_id)?))?
+            else {
+                continue;
+            };
+            let reader = tool_key(&row.namespace, RESOURCE_READER);
+            if registered.iter().any(|tool| tool.key == reader) && !enabled.contains(&reader) {
+                enabled.push(reader);
+            }
+            if let Some(text) = row
+                .instructions
+                .as_deref()
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+            {
+                let name = row.server_name.clone().unwrap_or(row.name);
+                blocks.push(format!(
+                    "From the MCP server «{name}» (tools {}__*):\n{}",
+                    row.namespace,
+                    js_slice(text, MCP_INSTRUCTIONS_MAX)
+                ));
+            }
+        }
+        Ok(if blocks.is_empty() {
+            String::new()
+        } else {
+            format!("{MCP_INSTRUCTIONS_HEADING}\n\n{}", blocks.join("\n\n"))
+        })
+    }
+
     fn save_tool_calls(
         &self,
         context: &StepContext,
@@ -490,6 +553,31 @@ const fn default_tool_result_chars() -> u64 {
     DEFAULT_TOOL_RESULT_CHARS
 }
 
+const fn unlimited_budget() -> i64 {
+    i64::MAX
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeContext {
+    #[serde(default)]
+    pub store_ids: Vec<VectorStoreId>,
+    #[serde(default)]
+    pub citations: Vec<ChatCitationDto>,
+    #[serde(default = "unlimited_budget")]
+    pub context_budget: i64,
+}
+
+impl Default for KnowledgeContext {
+    fn default() -> Self {
+        Self {
+            store_ids: Vec::new(),
+            citations: Vec::new(),
+            context_budget: unlimited_budget(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatGenerateRequest {
@@ -502,6 +590,8 @@ pub struct ChatGenerateRequest {
     pub model_tools: Option<bool>,
     #[serde(default = "default_tool_result_chars")]
     pub tool_result_chars: u64,
+    #[serde(default)]
+    pub knowledge: KnowledgeContext,
 }
 
 impl Validate for ChatGenerateRequest {
@@ -558,7 +648,50 @@ const fn generate_role(role: ChatRole) -> Option<GenerateRole> {
     }
 }
 
+struct AttachedStore {
+    id: VectorStoreId,
+    name: String,
+    description: String,
+    documents: u64,
+    floor: f64,
+}
+
 impl PrepareNode {
+    async fn search_up_front(
+        &self,
+        context: &StepContext,
+        query: &str,
+        store_hits: &mut [StoreHits],
+    ) -> Result<(), AppError> {
+        let Some(vectors) = context.services.vector_stores.as_ref() else {
+            return Ok(());
+        };
+        for entry in store_hits.iter_mut() {
+            context.check_cancelled()?;
+            let options = VectorSearchOptions {
+                k: Some(CHAT_FETCH_K),
+                ..VectorSearchOptions::default()
+            };
+            match vectors
+                .search(&entry.store_id, query, options, &context.cancel)
+                .await
+            {
+                Ok(hits) => entry.hits = hits,
+                Err(error) if context.is_cancelled() => return Err(error),
+                Err(error) => self.0.log(
+                    LogLevel::Warn,
+                    "Could not search a store up front",
+                    &[
+                        ("runId", json!(context.run_id.to_string())),
+                        ("storeId", json!(entry.store_id)),
+                        ("error", json!(error.to_string())),
+                    ],
+                ),
+            }
+        }
+        Ok(())
+    }
+
     async fn with_neighbours(
         &self,
         context: &StepContext,
@@ -793,37 +926,88 @@ impl NodeDef for PrepareNode {
             .collect();
         let model = inner.resolve_model(&input.provider_id, &input.model_id, &input.settings)?;
         let details = &conversation.conversation;
-        let floors: Vec<f64> = details
+        let attached: Vec<AttachedStore> = details
             .attached_store_ids
             .iter()
             .map(|store_id| {
                 let id = store_id.to_string();
-                inner
-                    .read(|repositories| Ok(repositories.vector_stores.find_by_id(&id)?))
-                    .ok()
-                    .flatten()
-                    .map_or(DEFAULT_CHAT_MIN_SCORE, |store| store.chat_min_score)
+                let (row, documents) = inner
+                    .read(|repositories| {
+                        Ok((
+                            repositories.vector_stores.find_by_id(&id)?,
+                            repositories.vector_documents.list_by_store(&id)?.len(),
+                        ))
+                    })
+                    .unwrap_or((None, 0));
+                AttachedStore {
+                    id: *store_id,
+                    name: row
+                        .as_ref()
+                        .map_or_else(|| id.clone(), |row| row.name.clone()),
+                    description: row
+                        .as_ref()
+                        .map(|row| row.description.clone())
+                        .unwrap_or_default(),
+                    documents: documents as u64,
+                    floor: row.map_or(DEFAULT_CHAT_MIN_SCORE, |row| row.chat_min_score),
+                }
             })
             .collect();
+        let mode = details.retrieval_mode;
+        let tools_usable = context
+            .services
+            .providers
+            .as_ref()
+            .and_then(|providers| providers.text(&input.provider_id).ok())
+            .is_some_and(|driver| {
+                resolve_tool_mode(driver.capabilities().tools, model.supports_tools)
+                    != ToolMode::None
+            });
+        let registered = match &inner.tools {
+            Some(tools) => tools.list(&ToolListFilter::default())?,
+            None => Vec::new(),
+        };
+        let wants_knowledge = !attached.is_empty() && mode != RetrievalMode::Auto && tools_usable;
+        let mut enabled = details.enabled_tools.clone();
+        if wants_knowledge {
+            for key in KNOWLEDGE_TOOLS {
+                if !enabled.iter().any(|known| known == key) {
+                    enabled.push(key.to_owned());
+                }
+            }
+        }
+        let guidance = inner.mcp_guidance(&mut enabled, &registered)?;
+        let offered = offered_tools(&enabled, &registered);
+        let knowledge_on =
+            wants_knowledge && offered.iter().any(|tool| tool.key == KNOWLEDGE_SEARCH);
+        let query = input.query.clone().unwrap_or_else(|| user.content.clone());
+        let mut store_hits: Vec<StoreHits> = attached
+            .iter()
+            .enumerate()
+            .map(|(index, store)| StoreHits {
+                store_id: store.id.to_string(),
+                hits: input
+                    .stores
+                    .get(&format!("store{index}"))
+                    .cloned()
+                    .unwrap_or_default(),
+                floor: store.floor,
+            })
+            .collect();
+        if mode == RetrievalMode::Agentic && !knowledge_on && input.stores.is_empty() {
+            self.search_up_front(context, &query, &mut store_hits)
+                .await?;
+        }
         let merged = merge_retrieval(
-            &details
-                .attached_store_ids
-                .iter()
-                .zip(floors)
-                .enumerate()
-                .map(
-                    |(index, (store_id, floor)): (usize, (&VectorStoreId, f64))| StoreHits {
-                        store_id: store_id.to_string(),
-                        hits: input
-                            .stores
-                            .get(&format!("store{index}"))
-                            .cloned()
-                            .unwrap_or_default(),
-                        floor,
-                    },
-                )
-                .collect::<Vec<_>>(),
-            MergeOptions::default(),
+            &store_hits,
+            if mode == RetrievalMode::Hybrid && knowledge_on {
+                MergeOptions {
+                    limit: HYBRID_SOURCES_MAX,
+                    ..MergeOptions::default()
+                }
+            } else {
+                MergeOptions::default()
+            },
         );
         let ranked: Vec<RetrievedSource> = merged
             .hits
@@ -833,24 +1017,44 @@ impl NodeDef for PrepareNode {
                     .map(|store_id| RetrievedSource::new(store_id, merged.hit.clone()))
             })
             .collect();
-        let query = input.query.clone().unwrap_or_else(|| user.content.clone());
         let sources = self.with_neighbours(context, ranked.clone()).await?;
         let related = if details.use_relations && !ranked.is_empty() {
             self.related_sources(context, &query, &ranked).await?
         } else {
             Vec::new()
         };
-        let registered = match &inner.tools {
-            Some(tools) => tools.list(&ToolListFilter::default())?,
-            None => Vec::new(),
+        let prompt = if knowledge_on {
+            let catalogue = knowledge_catalogue(
+                &attached
+                    .iter()
+                    .map(|store| {
+                        (
+                            store.name.clone(),
+                            store.description.clone(),
+                            store.documents,
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            );
+            let hybrid = if mode == RetrievalMode::Hybrid && !ranked.is_empty() {
+                format!(" {HYBRID_INSTRUCTION}")
+            } else {
+                String::new()
+            };
+            format!("{KNOWLEDGE_INSTRUCTION}{hybrid}\n{catalogue}")
+        } else {
+            String::new()
         };
-        let offered = offered_tools(&details.enabled_tools, &registered);
+        let prompt = [details.system_prompt.clone(), prompt, guidance]
+            .into_iter()
+            .filter(|part| !part.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join("\n\n");
         let system = if offered.is_empty() {
-            details.system_prompt.clone()
+            prompt.clone()
         } else {
             format!(
-                "{}\n\n{TOOL_RESULTS_INSTRUCTION}\n{}",
-                details.system_prompt,
+                "{prompt}\n\n{TOOL_RESULTS_INSTRUCTION}\n{}",
                 tool_specs_json(&offered)
             )
         };
@@ -869,6 +1073,8 @@ impl NodeDef for PrepareNode {
             let fields = [
                 ("message", json!(RETRIEVAL_ASSEMBLED)),
                 ("conversationId", json!(details.id.to_string())),
+                ("mode", json!(mode.as_str())),
+                ("knowledgeTools", json!(knowledge_on)),
                 ("query", json!(query)),
                 ("fetched", json!(stats.fetched)),
                 ("belowFloor", json!(stats.below_floor)),
@@ -935,7 +1141,7 @@ impl NodeDef for PrepareNode {
                         })
                     })
                     .collect(),
-                system: Some(details.system_prompt.clone()),
+                system: Some(prompt),
                 temperature: input.settings.temperature,
                 top_k: input.settings.top_k,
                 top_p: input.settings.top_p,
@@ -947,6 +1153,11 @@ impl NodeDef for PrepareNode {
             tool_result_chars: tool_result_budget(
                 model.context_window - model.max_output_tokens - prepared.tokens_in,
             ) as u64,
+            knowledge: KnowledgeContext {
+                store_ids: details.attached_store_ids.clone(),
+                citations: prepared.citations,
+                context_budget: model.context_window - model.max_output_tokens,
+            },
         })
     }
 }
@@ -962,6 +1173,62 @@ struct CallOptions<'a> {
     label: String,
     limit: usize,
     refuse: Option<&'static str>,
+    scope: &'a [VectorStoreId],
+    book: &'a Mutex<Vec<ChatCitationDto>>,
+}
+
+struct CallOutcome {
+    content: String,
+    compact: Option<String>,
+}
+
+fn knowledge_text(
+    key: &str,
+    output: &Value,
+    book: &mut Vec<ChatCitationDto>,
+) -> Option<KnowledgeText> {
+    match key {
+        KNOWLEDGE_SEARCH => serde_json::from_value::<KnowledgeSearchOutput>(output.clone())
+            .ok()
+            .map(|output| search_result_text(&output, book)),
+        KNOWLEDGE_READ => serde_json::from_value::<KnowledgeReadOutput>(output.clone())
+            .ok()
+            .map(|output| read_result_text(&output, book)),
+        _ => None,
+    }
+}
+
+struct Compactable {
+    index: usize,
+    round: usize,
+    compact: String,
+}
+
+fn messages_cost(messages: &[ChatMessage]) -> i64 {
+    messages
+        .iter()
+        .map(|message| tokens(&message.content) + MESSAGE_OVERHEAD)
+        .sum()
+}
+
+fn compact_knowledge(
+    messages: &mut [ChatMessage],
+    pending: &mut Vec<Compactable>,
+    round: usize,
+    budget: i64,
+) -> usize {
+    let mut compacted = 0;
+    while messages_cost(messages) > budget {
+        let Some(position) = pending.iter().position(|entry| entry.round < round) else {
+            break;
+        };
+        let entry = pending.remove(position);
+        if let Some(message) = messages.get_mut(entry.index) {
+            message.content = entry.compact;
+            compacted += 1;
+        }
+    }
+    compacted
 }
 
 impl GenerateChatNode {
@@ -1029,7 +1296,11 @@ impl GenerateChatNode {
         calls: &Arc<Mutex<Vec<ChatToolCallDto>>>,
         index: usize,
         options: CallOptions<'_>,
-    ) -> Result<String, AppError> {
+    ) -> Result<CallOutcome, AppError> {
+        let plain = |content: String| CallOutcome {
+            content,
+            compact: None,
+        };
         let inner = &self.0;
         let started = inner.now();
         let limit = options.limit;
@@ -1066,20 +1337,32 @@ impl GenerateChatNode {
             };
         inner.save_tool_calls(context, assistant_id, calls);
         if let Some(reason) = options.refuse {
-            return Ok(settle(ChatToolCallStatus::Refused, Some(reason), None));
+            return Ok(plain(settle(
+                ChatToolCallStatus::Refused,
+                Some(reason),
+                None,
+            )));
         }
         let Some(tool) = options.tool else {
-            return Ok(settle(ChatToolCallStatus::Refused, Some(NOT_OFFERED), None));
+            return Ok(plain(settle(
+                ChatToolCallStatus::Refused,
+                Some(NOT_OFFERED),
+                None,
+            )));
         };
-        let arguments = calls.lock().unwrap_or_else(PoisonError::into_inner)[index]
+        let mut arguments = calls.lock().unwrap_or_else(PoisonError::into_inner)[index]
             .arguments
             .clone();
-        if !arguments.is_object() {
-            return Ok(settle(
+        let Value::Object(fields) = &mut arguments else {
+            return Ok(plain(settle(
                 ChatToolCallStatus::Failed,
                 Some(NOT_AN_OBJECT),
                 None,
-            ));
+            )));
+        };
+        let knowledge = KNOWLEDGE_TOOLS.contains(&tool.key.as_str());
+        if knowledge {
+            fields.insert("scope".to_owned(), json!(options.scope));
         }
         let observer_inner = Arc::clone(inner);
         let observer_context = context.clone();
@@ -1115,11 +1398,11 @@ impl GenerateChatNode {
             })),
         };
         let Some(invocation) = context.invoke_tool(request) else {
-            return Ok(settle(
+            return Ok(plain(settle(
                 ChatToolCallStatus::Refused,
                 Some(NO_TOOL_CALLS),
                 None,
-            ));
+            )));
         };
         match invocation.await {
             Ok(result) => {
@@ -1128,8 +1411,41 @@ impl GenerateChatNode {
                     guard[index].step_id = Some(result.step_id);
                     guard[index].meta = result.meta;
                 }
+                if knowledge {
+                    let formatted = {
+                        let mut book = options.book.lock().unwrap_or_else(PoisonError::into_inner);
+                        knowledge_text(&tool.key, &result.output, &mut book)
+                            .map(|formatted| (formatted, book.clone()))
+                    };
+                    if let Some((formatted, citations)) = formatted {
+                        if let Err(error) = inner.update_message(
+                            assistant_id,
+                            &MessagePatch {
+                                citations: Some(citations),
+                                ..MessagePatch::default()
+                            },
+                        ) {
+                            inner.log(
+                                LogLevel::Warn,
+                                "Could not save knowledge citations",
+                                &[
+                                    ("runId", json!(context.run_id.to_string())),
+                                    ("error", json!(error.message)),
+                                ],
+                            );
+                        }
+                        return Ok(CallOutcome {
+                            content: settle(
+                                ChatToolCallStatus::Succeeded,
+                                None,
+                                Some(formatted.text),
+                            ),
+                            compact: Some(formatted.compact),
+                        });
+                    }
+                }
                 let text = tool_result_text(&result.output);
-                Ok(if text.is_error {
+                Ok(plain(if text.is_error {
                     settle(
                         ChatToolCallStatus::Failed,
                         Some(TOOL_REPORTED_ERROR),
@@ -1137,22 +1453,22 @@ impl GenerateChatNode {
                     )
                 } else {
                     settle(ChatToolCallStatus::Succeeded, None, Some(text.text))
-                })
+                }))
             }
             Err(error) if context.is_cancelled() => Err(error),
-            Err(error) if error.code == AppErrorCode::ApprovalDenied => {
-                Ok(settle(ChatToolCallStatus::Denied, Some(CALL_DENIED), None))
-            }
-            Err(error) if error.code == AppErrorCode::PermissionDenied => Ok(settle(
-                ChatToolCallStatus::Refused,
-                Some(CALL_FORBIDDEN),
+            Err(error) if error.code == AppErrorCode::ApprovalDenied => Ok(plain(settle(
+                ChatToolCallStatus::Denied,
+                Some(CALL_DENIED),
                 None,
+            ))),
+            Err(error) if error.code == AppErrorCode::PermissionDenied && !knowledge => Ok(plain(
+                settle(ChatToolCallStatus::Refused, Some(CALL_FORBIDDEN), None),
             )),
-            Err(error) => Ok(settle(
+            Err(error) => Ok(plain(settle(
                 ChatToolCallStatus::Failed,
                 Some(&error.message),
                 None,
-            )),
+            ))),
         }
     }
 
@@ -1170,7 +1486,10 @@ impl GenerateChatNode {
             tools,
             model_tools,
             tool_result_chars,
+            knowledge,
         } = request;
+        let book = Mutex::new(knowledge.citations.clone());
+        let mut compactable: Vec<Compactable> = Vec::new();
         let raw = providers.text(&base.provider_id)?;
         let mode = if tools.is_empty() {
             ToolMode::None
@@ -1230,6 +1549,23 @@ impl GenerateChatNode {
                 if last && !specs.is_empty() {
                     messages.push(ChatMessage::user(TOOL_BUDGET_NOTE));
                 }
+                let overhead = tokens(template.system.as_deref().unwrap_or_default())
+                    + tokens(&tool_specs_json(&offered));
+                let compacted = compact_knowledge(
+                    &mut messages,
+                    &mut compactable,
+                    round,
+                    knowledge.context_budget.saturating_sub(overhead),
+                );
+                if compacted > 0 {
+                    context.emit(HostEventDraft::Log {
+                        line: log_line(&[
+                            ("message", json!(KNOWLEDGE_COMPACTED)),
+                            ("compacted", json!(compacted)),
+                            ("round", json!(round)),
+                        ]),
+                    })?;
+                }
                 let output = Self::generate_round(
                     context,
                     &driver,
@@ -1277,7 +1613,7 @@ impl GenerateChatNode {
                     if refuse.is_none() {
                         executed += 1;
                     }
-                    let content = self
+                    let outcome = self
                         .call_tool(
                             context,
                             &assistant_id,
@@ -1288,18 +1624,27 @@ impl GenerateChatNode {
                                 label: format!("call{}", index + 1),
                                 limit,
                                 refuse,
+                                scope: &knowledge.store_ids,
+                                book: &book,
                             },
                         )
                         .await?;
                     let status = calls.lock().unwrap_or_else(PoisonError::into_inner)[index].status;
-                    messages.push(ChatMessage::tool(
-                        call.id.clone(),
+                    let shape = |content: String| {
                         if mode == ToolMode::Native {
                             fence_tool_result(&call.name, status.as_str(), &content)
                         } else {
                             content
-                        },
-                    ));
+                        }
+                    };
+                    if let Some(compact) = outcome.compact {
+                        compactable.push(Compactable {
+                            index: messages.len(),
+                            round,
+                            compact: shape(compact),
+                        });
+                    }
+                    messages.push(ChatMessage::tool(call.id.clone(), shape(outcome.content)));
                 }
                 if last {
                     break;
@@ -1459,6 +1804,7 @@ impl ChatService {
             attached_store_ids: unique(&stores).iter().map(ToString::to_string).collect(),
             use_relations: input.use_relations(),
             enabled_tools: unique(&tools),
+            retrieval_mode: input.retrieval_mode(),
             created_at: now,
             updated_at: now,
         };
@@ -1530,6 +1876,22 @@ impl ChatService {
             &id,
             &ConversationPatch {
                 enabled_tools: Some(keys),
+                ..ConversationPatch::touched(self.inner.now())
+            },
+        )
+    }
+
+    pub fn update_retrieval(
+        &self,
+        id: &ConversationId,
+        retrieval_mode: RetrievalMode,
+    ) -> Result<ConversationDto, AppError> {
+        let id = id.to_string();
+        self.inner.conversation(&id)?;
+        self.update(
+            &id,
+            &ConversationPatch {
+                retrieval_mode: Some(retrieval_mode),
                 ..ConversationPatch::touched(self.inner.now())
             },
         )
@@ -1621,8 +1983,13 @@ impl ChatService {
             .find(|message| message.role == MessageRole::User)
             .map(|message| message.content.as_str());
         let query = retrieval_query(&text, previous_user);
-        let retrieval: Vec<Value> = details
-            .attached_store_ids
+        let searches_up_front: &[VectorStoreId] =
+            if details.retrieval_mode == RetrievalMode::Agentic {
+                &[]
+            } else {
+                &details.attached_store_ids
+            };
+        let retrieval: Vec<Value> = searches_up_front
             .iter()
             .enumerate()
             .map(|(index, store_id)| {
@@ -1749,7 +2116,7 @@ impl ChatService {
             .clone()
             .or_else(|| details.map(|details| details.system_prompt.clone()))
             .unwrap_or_default();
-        let enabled = input
+        let mut enabled = input
             .enabled_tools
             .clone()
             .or_else(|| details.map(|details| details.enabled_tools.clone()))
@@ -1758,12 +2125,20 @@ impl ChatService {
             Some(tools) => tools.list(&ToolListFilter::default())?,
             None => Vec::new(),
         };
+        let guidance = self.inner.mcp_guidance(&mut enabled, &registered)?;
         let offered = offered_tools(&enabled, &registered);
-        let tool_block = if offered.is_empty() {
-            String::new()
-        } else {
-            format!("{TOOL_RESULTS_INSTRUCTION}\n{}", tool_specs_json(&offered))
-        };
+        let tool_block = [
+            guidance,
+            if offered.is_empty() {
+                String::new()
+            } else {
+                format!("{TOOL_RESULTS_INSTRUCTION}\n{}", tool_specs_json(&offered))
+            },
+        ]
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n");
         let history: Vec<ChatMessage> = conversation
             .as_ref()
             .map(|detail| {
@@ -1801,6 +2176,126 @@ impl ChatService {
             trimmed: usage.trimmed as u64,
             total: count(usage.system + usage.tools + usage.history),
         })
+    }
+
+    pub async fn evaluate(&self, input: &ChatEvalInput) -> Result<ChatEvalRunDto, AppError> {
+        input.validate()?;
+        self.inner.require_stores(&[input.store_id])?;
+        let store_id = input.store_id.to_string();
+        let cases = self
+            .inner
+            .read(|repositories| Ok(repositories.vector_eval_cases.list_by_store(&store_id)?))?;
+        if cases.is_empty() {
+            return Err(AppError::new(AppErrorCode::ValidationFailed, NO_EVAL_CASES));
+        }
+        let mut modes = Vec::new();
+        for mode in input.modes() {
+            let mut results = Vec::new();
+            for case in &cases {
+                results.push(self.evaluate_case(input, mode, case).await);
+            }
+            let total = results.len().max(1) as f64;
+            let hits = results.iter().filter(|case| case.hit).count() as f64;
+            let searches: u64 = results.iter().map(|case| case.searches).sum();
+            modes.push(ChatEvalModeDto {
+                mode,
+                hit_rate: hits / total,
+                average_searches: searches as f64 / total,
+                cases: results,
+            });
+        }
+        let run = ChatEvalRunDto {
+            store_id: input.store_id,
+            model_id: input.model_id.clone(),
+            ran_at: self.inner.now(),
+            modes,
+        };
+        self.inner.log(
+            LogLevel::Info,
+            "Ran an end-to-end chat evaluation",
+            &[
+                ("storeId", json!(store_id)),
+                ("cases", json!(cases.len())),
+                (
+                    "modes",
+                    json!(
+                        run.modes
+                            .iter()
+                            .map(|mode| json!({ "mode": mode.mode, "hitRate": mode.hit_rate }))
+                            .collect::<Vec<_>>()
+                    ),
+                ),
+            ],
+        );
+        Ok(run)
+    }
+
+    async fn evaluate_case(
+        &self,
+        input: &ChatEvalInput,
+        mode: RetrievalMode,
+        case: &crate::data::schema::VectorEvalCaseRow,
+    ) -> ChatEvalCaseDto {
+        let outcome = async {
+            let conversation = self.create(&CreateConversationInput {
+                title: Some(format!("Проверка · {}", js_slice(&case.question, 60))),
+                attached_store_ids: Some(vec![input.store_id]),
+                retrieval_mode: Some(mode),
+                ..CreateConversationInput::new(input.provider_id, input.model_id.clone())
+            })?;
+            let turn = async {
+                let handle = self.send(&ChatSendInput::new(conversation.id, &case.question))?;
+                self.runs.wait(&handle.id).await;
+                let status = self.runs.get(&handle.id)?.status;
+                let answer = self
+                    .get(&conversation.id)?
+                    .messages
+                    .into_iter()
+                    .rev()
+                    .find(|message| message.role == MessageRole::Assistant);
+                Ok::<_, AppError>((status, answer))
+            }
+            .await;
+            let _ = self.remove(&conversation.id);
+            turn
+        }
+        .await;
+        let failed = |error: String| ChatEvalCaseDto {
+            case_id: case.id.clone(),
+            question: case.question.clone(),
+            cited: Vec::new(),
+            hit: false,
+            searches: 0,
+            error: Some(error),
+        };
+        match outcome {
+            Err(error) => failed(error.message),
+            Ok((status, None)) => failed(format!("Ответ не получен: {}", status.as_str())),
+            Ok((status, Some(answer))) => {
+                let cited = unique(
+                    &answer
+                        .citations
+                        .iter()
+                        .map(|citation| citation.document_id.clone())
+                        .collect::<Vec<_>>(),
+                );
+                ChatEvalCaseDto {
+                    case_id: case.id.clone(),
+                    question: case.question.clone(),
+                    hit: cited
+                        .iter()
+                        .any(|document| case.expected_document_ids.contains(document)),
+                    searches: answer
+                        .tool_calls
+                        .iter()
+                        .filter(|call| call.key == KNOWLEDGE_SEARCH)
+                        .count() as u64,
+                    error: (status != RunStatus::Succeeded)
+                        .then(|| format!("Ход завершился со статусом {}", status.as_str())),
+                    cited,
+                }
+            }
+        }
     }
 
     pub async fn cancel(&self, id: &RunId) -> Result<(), AppError> {

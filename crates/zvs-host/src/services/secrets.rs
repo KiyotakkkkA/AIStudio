@@ -106,6 +106,14 @@ impl SecretService {
         }
     }
 
+    pub fn seal(&self, plaintext: &Plaintext) -> Result<Vec<u8>, AppError> {
+        self.crypto.encrypt(plaintext)
+    }
+
+    pub fn open(&self, cipher: &[u8]) -> Result<Plaintext, AppError> {
+        self.crypto.decrypt(cipher)
+    }
+
     pub fn is_encryption_available(&self) -> bool {
         self.crypto.is_available()
     }

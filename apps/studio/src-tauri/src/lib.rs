@@ -578,6 +578,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         client_version: app.package_info().version.to_string(),
         toolchain_dir: Some(paths.data_dir.join(TOOLCHAIN_DIR)),
         runtime: Some(runtime.clone()),
+        opener: Some(zvs_host::platform::external::system_url_opener()),
         ..McpServiceOptions::new(
             Arc::clone(&database),
             tools.clone(),

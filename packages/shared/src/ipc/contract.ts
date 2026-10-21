@@ -3,11 +3,14 @@ import {
   ChatContextDto,
   ChatContextInput,
   ChatEnabledTools,
+  ChatEvalInput,
+  ChatEvalRunDto,
   ChatSendInput,
   ConversationDetailDto,
   TruncateConversationInput,
   ConversationDto,
   ConversationRef,
+  RetrievalMode,
   CreateConversationInput,
 } from "../chat.js";
 import { RunDto, RunHandleDto, RunIdInput, StartRunInput } from "../runs/RunDto.js";
@@ -146,6 +149,11 @@ export const contract = defineContract({
     input: ConversationRef.extend({ attachedStoreIds: z.array(VectorStoreId).max(64) }),
     output: ConversationDto,
   },
+  "chat.evaluate": { input: ChatEvalInput, output: ChatEvalRunDto },
+  "chat.conversations.updateRetrieval": {
+    input: ConversationRef.extend({ retrievalMode: RetrievalMode }),
+    output: ConversationDto,
+  },
   "chat.conversations.updateRelations": {
     input: ConversationRef.extend({ useRelations: z.boolean() }),
     output: ConversationDto,
@@ -244,6 +252,9 @@ export const contract = defineContract({
   "mcp.stop": { input: McpServerRef, output: McpServerDto },
   "mcp.test": { input: McpServerRef, output: McpTestResultDto },
   "mcp.health": { input: McpServerRef, output: McpHealthDto },
+  "mcp.signIn": { input: McpServerRef, output: McpServerDto },
+  "mcp.cancelSignIn": { input: McpServerRef, output: McpServerDto },
+  "mcp.signOut": { input: McpServerRef, output: McpServerDto },
   "downloads.list": { input: DownloadListFilter, output: z.array(DownloadDto) },
   "downloads.start": { input: StartDownloadInput, output: DownloadDto },
   "downloads.pause": { input: DownloadRef, output: DownloadDto },

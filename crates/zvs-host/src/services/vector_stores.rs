@@ -11,9 +11,10 @@ use tokio_util::sync::CancellationToken;
 use zvs_contract::validate::{js_slice, js_trim};
 use zvs_contract::{
     AppError, AppErrorCode, CreateVectorStoreInput, ProviderId, UpdateVectorStoreInput,
-    VECTOR_SCHEMA_VERSION, VectorBackend, VectorChunkDto, VectorHealth, VectorHitProvenance,
-    VectorOcrConfig, VectorRerankConfig, VectorRerankOutcome, VectorSearchHitDto,
-    VectorSearchInput, VectorSearchMode, VectorSearchResultDto, VectorStoreDto, VectorStoreId,
+    VECTOR_SCHEMA_VERSION, VectorBackend, VectorChunkDto, VectorDocumentDto, VectorHealth,
+    VectorHitProvenance, VectorOcrConfig, VectorRerankConfig, VectorRerankOutcome,
+    VectorSearchHitDto, VectorSearchInput, VectorSearchMode, VectorSearchResultDto, VectorStoreDto,
+    VectorStoreId,
 };
 
 use super::providers::DriverSource;
@@ -760,6 +761,21 @@ impl VectorStoreService {
             .into_iter()
             .map(chunk_dto)
             .collect())
+    }
+
+    pub fn document(
+        &self,
+        store_id: &str,
+        document_id: &str,
+    ) -> Result<Option<VectorDocumentDto>, AppError> {
+        let row = self.inner.database.with_connection(|connection| {
+            Ok(Repositories::new(connection)
+                .vector_documents
+                .find_by_id(document_id)?)
+        })?;
+        row.filter(|row| row.store_id == store_id)
+            .map(|row| crate::services::vector_sources::document_dto(&row))
+            .transpose()
     }
 
     pub async fn related_chunks(

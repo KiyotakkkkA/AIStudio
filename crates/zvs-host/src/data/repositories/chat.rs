@@ -1,8 +1,8 @@
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
-use zvs_contract::{ChatCitationDto, ChatSettings, ChatToolCallDto, Timestamp};
+use zvs_contract::{ChatCitationDto, ChatSettings, ChatToolCallDto, RetrievalMode, Timestamp};
 
-use crate::data::schema::columns::json_text;
+use crate::data::schema::columns::{EnumColumn, json_text};
 use crate::data::schema::{ConversationRow, MessageRow};
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -14,6 +14,7 @@ pub struct ConversationPatch {
     pub attached_store_ids: Option<Vec<String>>,
     pub use_relations: Option<bool>,
     pub enabled_tools: Option<Vec<String>>,
+    pub retrieval_mode: Option<RetrievalMode>,
     pub updated_at: Option<Timestamp>,
 }
 
@@ -47,6 +48,9 @@ impl ConversationPatch {
         }
         if let Some(keys) = &self.enabled_tools {
             assignments.push(("enabled_tools", SqlValue::Text(json_text(keys)?)));
+        }
+        if let Some(mode) = self.retrieval_mode {
+            assignments.push(("retrieval_mode", SqlValue::Text(mode.as_str().to_owned())));
         }
         if let Some(updated_at) = self.updated_at {
             assignments.push(("updated_at", SqlValue::Integer(updated_at)));
@@ -141,8 +145,8 @@ impl<'c> ChatRepository<'c> {
     pub fn create(&self, row: &ConversationRow) -> rusqlite::Result<ConversationRow> {
         self.connection
             .prepare_cached(&format!(
-                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, enabled_tools, created_at, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) RETURNING {}",
+                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, enabled_tools, retrieval_mode, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) RETURNING {}",
                 ConversationRow::COLUMNS
             ))?
             .query_row(
@@ -156,6 +160,7 @@ impl<'c> ChatRepository<'c> {
                     json_text(&row.attached_store_ids)?,
                     row.use_relations,
                     json_text(&row.enabled_tools)?,
+                    EnumColumn(row.retrieval_mode),
                     row.created_at,
                     row.updated_at,
                 ],
@@ -304,6 +309,7 @@ mod tests {
             attached_store_ids: Vec::new(),
             use_relations: false,
             enabled_tools: Vec::new(),
+            retrieval_mode: RetrievalMode::Hybrid,
             created_at: 1,
             updated_at,
         }

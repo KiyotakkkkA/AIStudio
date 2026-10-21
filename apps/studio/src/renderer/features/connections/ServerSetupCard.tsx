@@ -1,4 +1,4 @@
-import { mdiFlashOutline, mdiPlay, mdiStop } from "@mdi/js";
+import { mdiClose, mdiFlashOutline, mdiLogin, mdiLogout, mdiPlay, mdiStop } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import type { McpStartup, McpTransport } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
@@ -38,6 +38,9 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
     server.lastError !== null &&
     (state === "failed" || state === "reauth" || state === "restarting");
   const running = state === "connected" || state === "starting" || state === "restarting";
+  const oauthable = !vm.isNew && server !== null && server.transport === "http";
+  const signedIn = oauthable && server.oauth === "signed-in";
+  const needsSignIn = oauthable && (server.oauth === "required" || state === "reauth");
 
   return (
     <section className="flex flex-none flex-col gap-3.25 rounded-card border border-line bg-main-900 p-4">
@@ -230,15 +233,66 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
             Подключить
           </Button>
         )}
+        {store.signingIn ? (
+          <Button
+            type="button"
+            tone="secondary"
+            onClick={() => {
+              void store.cancelSignIn();
+            }}
+          >
+            <Icon path={mdiClose} size={15} />
+            Отменить вход
+          </Button>
+        ) : needsSignIn ? (
+          <Button
+            type="button"
+            tone="primary"
+            disabled={store.switching || !vm.enabled}
+            onClick={() => {
+              void store.signIn();
+            }}
+          >
+            <Icon path={mdiLogin} size={15} />
+            Войти
+          </Button>
+        ) : signedIn ? (
+          <Button
+            type="button"
+            tone="ghost"
+            disabled={store.switching}
+            onClick={() => {
+              void store.signOut();
+            }}
+          >
+            <Icon path={mdiLogout} size={15} />
+            Выйти
+          </Button>
+        ) : null}
         <span className="min-w-0 flex-1">
           <TestResultLine
             result={store.testResult}
             testing={store.testing}
+            signingIn={store.signingIn}
             unsaved={vm.dirty}
             lastError={showsError ? server.lastError : null}
           />
         </span>
       </div>
+
+      {vm.isNew || server?.instructions == null ? null : (
+        <details className="group rounded-control bg-main-800 px-3 py-2.25">
+          <summary className="cursor-pointer list-none text-[12px] font-medium text-main-300 [&::-webkit-details-marker]:hidden">
+            Инструкции сервера
+            <span className="ml-1.5 font-normal text-main-500">
+              — передаются модели вместе с инструментами
+            </span>
+          </summary>
+          <p className="mt-2 text-xs/relaxed whitespace-pre-wrap text-main-400">
+            {server.instructions}
+          </p>
+        </details>
+      )}
 
       {vm.banner === null ? null : (
         <p role="alert" className="rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err">

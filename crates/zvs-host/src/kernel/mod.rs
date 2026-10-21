@@ -1,4 +1,5 @@
 pub mod download_nodes;
+pub mod knowledge_nodes;
 pub mod mcp_nodes;
 pub mod nodes;
 pub mod registry;
@@ -10,6 +11,7 @@ pub mod types;
 mod tests;
 
 pub use download_nodes::register_download_nodes;
+pub use knowledge_nodes::{KNOWLEDGE_TOOLS, register_knowledge_nodes};
 pub use mcp_nodes::{
     McpCallTarget, McpNodeInput, McpNodeTarget, McpToolCaller, register_mcp_tool_node,
 };

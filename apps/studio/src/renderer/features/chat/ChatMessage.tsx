@@ -76,7 +76,15 @@ export default function ChatMessage({
             </Accordion>
           )}
           {tools}
-          <ChatMarkdown content={content} streaming={generating} />
+          <ChatMarkdown
+            content={content}
+            streaming={generating}
+            citations={citations}
+            onCite={(citation) => {
+              setActiveStoreId(citation.storeId);
+              setSourcesOpen(true);
+            }}
+          />
           {generating && <GenerationStatus label={status} />}
           {citations.length > 0 && (
             <button
@@ -150,8 +158,11 @@ export default function ChatMessage({
                   className="rounded-card border border-line bg-main-900 p-3.5"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <h3 className="min-w-0 truncate text-[13px] font-semibold text-main-100">
-                      {citation.sourcePath}
+                    <h3 className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-main-100">
+                      <span className="shrink-0 rounded-full bg-main-800 px-1.75 py-0.5 font-mono text-[11px] text-main-400 tabular-nums">
+                        [{citations.indexOf(citation) + 1}]
+                      </span>
+                      <span className="truncate">{citation.sourcePath}</span>
                     </h3>
                     {citation.related === null ? (
                       <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent-medium tabular-nums">

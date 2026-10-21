@@ -15,6 +15,18 @@ pub const CHAT_TEXT_MAX: usize = 100_000;
 pub const ATTACHED_STORES_MAX: usize = 64;
 pub const ENABLED_TOOLS_MAX: usize = 64;
 
+wire_enum!(RetrievalMode {
+    Auto => "auto",
+    Agentic => "agentic",
+    Hybrid => "hybrid",
+});
+
+pub const DEFAULT_RETRIEVAL_MODE: RetrievalMode = RetrievalMode::Hybrid;
+
+const fn default_retrieval_mode() -> RetrievalMode {
+    DEFAULT_RETRIEVAL_MODE
+}
+
 wire_enum!(ChatToolCallStatus {
     Running => "running",
     AwaitingApproval => "awaiting-approval",
@@ -233,6 +245,12 @@ pub struct CreateConversationInput {
         deserialize_with = "crate::wire::present"
     )]
     pub enabled_tools: Option<Vec<String>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub retrieval_mode: Option<RetrievalMode>,
 }
 
 impl CreateConversationInput {
@@ -246,6 +264,7 @@ impl CreateConversationInput {
             attached_store_ids: None,
             use_relations: None,
             enabled_tools: None,
+            retrieval_mode: None,
         }
     }
 
@@ -270,6 +289,10 @@ impl CreateConversationInput {
 
     pub fn use_relations(&self) -> bool {
         self.use_relations.unwrap_or(false)
+    }
+
+    pub fn retrieval_mode(&self) -> RetrievalMode {
+        self.retrieval_mode.unwrap_or(DEFAULT_RETRIEVAL_MODE)
     }
 
     pub fn enabled_tools(&self) -> Vec<String> {
@@ -326,6 +349,8 @@ pub struct ConversationDto {
     pub use_relations: bool,
     #[serde(default)]
     pub enabled_tools: Vec<String>,
+    #[serde(default = "default_retrieval_mode")]
+    pub retrieval_mode: RetrievalMode,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
@@ -585,6 +610,13 @@ pub struct UpdateConversationRelationsInput {
     pub use_relations: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateConversationRetrievalInput {
+    pub id: ConversationId,
+    pub retrieval_mode: RetrievalMode,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateConversationToolsInput {
@@ -609,10 +641,101 @@ impl Validate for UpdateConversationToolsInput {
 
 pub type ChatConversationsListOutput = Vec<ConversationDto>;
 
+pub const CHAT_EVAL_MODES_MAX: usize = 3;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatEvalInput {
+    pub store_id: VectorStoreId,
+    pub provider_id: ProviderId,
+    pub model_id: String,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub modes: Option<Vec<RetrievalMode>>,
+}
+
+impl ChatEvalInput {
+    pub fn modes(&self) -> Vec<RetrievalMode> {
+        let mut modes = Vec::new();
+        for mode in self
+            .modes
+            .clone()
+            .unwrap_or_else(|| vec![RetrievalMode::Auto, RetrievalMode::Agentic])
+        {
+            if !modes.contains(&mode) {
+                modes.push(mode);
+            }
+        }
+        modes
+    }
+}
+
+impl Validate for ChatEvalInput {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("modelId", &self.model_id)?;
+        if let Some(modes) = &self.modes {
+            if modes.is_empty() {
+                return Err(invalid("modes", "minItems"));
+            }
+            if modes.len() > CHAT_EVAL_MODES_MAX {
+                return Err(invalid("modes", "maxItems"));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatEvalCaseDto {
+    pub case_id: String,
+    pub question: String,
+    pub cited: Vec<String>,
+    pub hit: bool,
+    pub searches: u64,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatEvalModeDto {
+    pub mode: RetrievalMode,
+    pub hit_rate: f64,
+    pub average_searches: f64,
+    pub cases: Vec<ChatEvalCaseDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatEvalRunDto {
+    pub store_id: VectorStoreId,
+    pub model_id: String,
+    pub ran_at: Timestamp,
+    pub modes: Vec<ChatEvalModeDto>,
+}
+
+impl Validate for ChatEvalRunDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check_int("ranAt", self.ran_at)?;
+        for mode in &self.modes {
+            check::number_range("hitRate", mode.hit_rate, 0.0, 1.0)?;
+            for case in &mode.cases {
+                check::safe_integer("searches", case.searches)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 crate::validate::no_refinements!(
     ConversationRef,
     TruncateConversationInput,
-    UpdateConversationRelationsInput
+    UpdateConversationRelationsInput,
+    UpdateConversationRetrievalInput
 );
 
 #[cfg(test)]

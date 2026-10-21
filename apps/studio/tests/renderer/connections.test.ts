@@ -19,6 +19,7 @@ import ConnectionStore from "../../src/renderer/features/connections/ConnectionS
 import { ServerFormVm } from "../../src/renderer/features/connections/ServerFormVm.ts";
 import { joinArgs, splitArgs } from "../../src/renderer/features/connections/args.ts";
 import {
+  failureCopy,
   handshakeLine,
   serverState,
 } from "../../src/renderer/features/connections/connectionPresentation.ts";
@@ -48,9 +49,11 @@ function server(overrides: Partial<McpServerDto> = {}): McpServerDto {
     enabled: true,
     startup: "launch",
     status: "connected",
+    oauth: "none",
     protocolVersion: "2025-06-18",
     serverName: "qdrant",
     serverVersion: "0.8.1",
+    instructions: null,
     lastError: null,
     lastConnectedAt: 1_000,
     toolCount: 2,
@@ -401,6 +404,18 @@ test("the enable switch persists immediately for a saved server", async () => {
   assert.equal(servers.get(SERVER)?.enabled, false);
   assert.equal(store.form?.enabled, false);
   assert.equal(store.form?.dirty, false);
+});
+
+test("a server that asks for an OAuth sign-in reads as re-auth with a browser hint", () => {
+  const message = "Сервер требует входа: нажмите «Войти», чтобы авторизоваться в браузере";
+  assert.equal(
+    serverState(
+      server({ transport: "http", status: "failed", oauth: "required", lastError: message }),
+      null,
+    ),
+    "reauth",
+  );
+  assert.match(failureCopy(message).hint ?? "", /браузер/);
 });
 
 test("states cover never connected, connected, re-auth, disabled and crashed-and-restarting", () => {

@@ -5,6 +5,7 @@ import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
 import { STATUS_TONE_TEXT } from "../../ui/atoms/statusTone";
 import JsonBlock from "./JsonBlock";
+import { knowledgeSearchStep } from "./knowledgeStep";
 import { formatDuration, formatTime, STEP_TONES } from "./runPresentation";
 
 export interface RunStepDetailProps {
@@ -16,6 +17,7 @@ export interface RunStepDetailProps {
 
 export default function RunStepDetail({ step, expanded, pruned, onToggle }: RunStepDetailProps) {
   const tone = STEP_TONES[step.status] ?? "idle";
+  const search = knowledgeSearchStep(step);
   const duration = formatDuration(Math.max(0, (step.finishedAt ?? step.startedAt) - step.startedAt));
   return (
     <li className="list-none rounded-card bg-main-900 shadow-card">
@@ -31,7 +33,15 @@ export default function RunStepDetail({ step, expanded, pruned, onToggle }: RunS
           className="flex-none text-main-500"
         />
         <StatusDot tone={tone} />
-        <span className="min-w-0 flex-1 truncate text-[12px] text-main-100">{step.nodeId}</span>
+        <span className="min-w-0 flex-1 truncate text-[12px] text-main-100">
+          {step.nodeId}
+          {search === null ? null : (
+            <span className="text-main-400">
+              {" "}
+              · «{search.query}» → {search.passages.length}
+            </span>
+          )}
+        </span>
         <Chip>
           <span className="font-mono">{step.type}</span>
         </Chip>
@@ -51,6 +61,41 @@ export default function RunStepDetail({ step, expanded, pruned, onToggle }: RunS
             </p>
           ) : (
             <>
+              {search === null ? null : (
+                <>
+                  <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
+                    Запрос модели · найдено {search.passages.length}
+                  </p>
+                  <p className="m-0 text-[12px] text-main-100">«{search.query}»</p>
+                  {search.passages.length === 0 ? (
+                    <p className="m-0 text-[12px] text-main-500">
+                      Ничего не прошло порог релевантности.
+                    </p>
+                  ) : (
+                    <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
+                      {search.passages.map((passage, index) => (
+                        <li
+                          key={`${passage.path}:${String(index)}`}
+                          className="rounded-control bg-main-850 px-2.5 py-2"
+                        >
+                          <div className="flex items-center gap-2 text-[12px]">
+                            <span className="min-w-0 flex-1 truncate font-medium text-main-100">
+                              {passage.path}
+                              {passage.section === "" ? "" : ` · ${passage.section}`}
+                            </span>
+                            <span className="flex-none font-mono text-[11px] text-main-500 tabular-nums">
+                              {(passage.score * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                          <p className="m-0 mt-1 line-clamp-2 text-[11.5px] text-main-400">
+                            {passage.text}
+                          </p>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </>
+              )}
               <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                 Вход
               </p>

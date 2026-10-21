@@ -40,11 +40,12 @@ pub use browser::{
 pub use channels::{CHANNELS, is_channel};
 pub use chat::{
     ChatCitationDto, ChatContextDto, ChatContextInput, ChatContextToolDto,
-    ChatConversationsListOutput, ChatSendInput, ChatSettings, ChatToolCallDto, ChatToolCallStatus,
-    ConversationDetailDto, ConversationDto, ConversationRef, CreateConversationInput,
-    DEFAULT_CONVERSATION_TITLE, MessageDto, MessageRole, RenameConversationInput,
-    TruncateConversationInput, UpdateConversationRelationsInput, UpdateConversationStoresInput,
-    UpdateConversationToolsInput,
+    ChatConversationsListOutput, ChatEvalCaseDto, ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto,
+    ChatSendInput, ChatSettings, ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto,
+    ConversationDto, ConversationRef, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
+    MessageDto, MessageRole, RenameConversationInput, RetrievalMode, TruncateConversationInput,
+    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    UpdateConversationStoresInput, UpdateConversationToolsInput,
 };
 pub use downloads::{
     CatalogueFilter, CatalogueItemDto, CatalogueItemState, CatalogueSource, ChecksumAlgorithm,
@@ -75,7 +76,7 @@ pub use graph_expansion::{
 pub use ids::*;
 pub use mcp::{
     CreateMcpServerInput, McpCallResultDto, McpCapabilityDto, McpCapabilityKind, McpContentDto,
-    McpEnv, McpHeaders, McpHealthDto, McpLogLevel, McpLogLineDto, McpRemoveOutput,
+    McpEnv, McpHeaders, McpHealthDto, McpLogLevel, McpLogLineDto, McpOAuthState, McpRemoveOutput,
     McpServerDetailDto, McpServerDto, McpServerRef, McpServerStatus, McpStartup, McpTestResultDto,
     McpTransport, McpValue, UpdateMcpServerInput,
 };

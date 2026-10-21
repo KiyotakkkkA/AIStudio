@@ -8,6 +8,7 @@ import Icon from "../../ui/atoms/Icon";
 import SelectInput from "../../ui/atoms/SelectInput";
 import TextInput from "../../ui/atoms/TextInput";
 import Field from "../../ui/molecules/Field";
+import ChatEvalPanel from "./ChatEvalPanel";
 import { EVAL_MODE_LABELS, evalCaseRows, evalMetricRows } from "./evalRows";
 
 function VectorEvalSection() {
@@ -227,6 +228,7 @@ function VectorEvalSection() {
               ))}
             </div>
           )}
+          <ChatEvalPanel chat={evaluation.chat} cases={evaluation.cases.length} locked={locked} />
         </ScrollArea>
       </Accordion.Content>
     </Accordion>

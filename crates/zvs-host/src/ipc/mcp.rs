@@ -68,6 +68,24 @@ pub fn register(server: &mut IpcServer) {
             |services: Arc<Services>, input: McpServerRef| async move {
                 services.mcp.health(&input.id.to_string())
             },
+        )
+        .handle(
+            "mcp.signIn",
+            |services: Arc<Services>, input: McpServerRef| async move {
+                services.mcp.sign_in(&input.id.to_string()).await
+            },
+        )
+        .handle(
+            "mcp.cancelSignIn",
+            |services: Arc<Services>, input: McpServerRef| async move {
+                services.mcp.cancel_sign_in(&input.id.to_string())
+            },
+        )
+        .handle(
+            "mcp.signOut",
+            |services: Arc<Services>, input: McpServerRef| async move {
+                services.mcp.sign_out(&input.id.to_string()).await
+            },
         );
 }
 

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{title}} · ZVS AI Studio</title>
+    <style>
+      :root {
+        --page: #ece6dd;
+        --card: #ffffff;
+        --ink: #1e1915;
+        --muted: #8a7e71;
+        --soft: #574e46;
+        --line: rgb(90 60 30 / 0.085);
+        --accent: #b04c18;
+        --accent-soft: #fbece1;
+        --tone: {{tone-light}};
+        --tone-soft: {{tone-soft-light}};
+        color-scheme: light dark;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --page: #0f0d0b;
+          --card: #181513;
+          --ink: #f7f1e8;
+          --muted: #8c8074;
+          --soft: #c3b7a9;
+          --line: rgb(255 235 210 / 0.065);
+          --accent: #f2914d;
+          --accent-soft: rgb(229 117 50 / 0.14);
+          --tone: {{tone-dark}};
+          --tone-soft: {{tone-soft-dark}};
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+        background:
+          radial-gradient(circle at 50% -10%, var(--accent-soft), transparent 55%), var(--page);
+        color: var(--ink);
+        font: 13px/1.55 "Onest", "Segoe UI", system-ui, sans-serif;
+      }
+      main {
+        width: 100%;
+        max-width: 400px;
+        padding: 32px 28px 26px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--card);
+        box-shadow:
+          0 1px 2px rgb(40 25 10 / 0.05),
+          0 18px 48px -18px rgb(40 25 10 / 0.22);
+        text-align: center;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 26px;
+      }
+      .brand span {
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .status {
+        width: 52px;
+        height: 52px;
+        margin: 0 auto 16px;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        background: var(--tone-soft);
+        color: var(--tone);
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 19px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      p {
+        margin: 0;
+        color: var(--soft);
+      }
+      .hint {
+        margin-top: 22px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+        font-size: 12px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="brand">
+        <svg viewBox="64 64 896 896" width="28" height="28" aria-hidden="true">
+          <defs>
+            <linearGradient id="bg" x1="0.1" y1="0" x2="0.9" y2="1">
+              <stop offset="0" stop-color="#f59a55" />
+              <stop offset="0.5" stop-color="#d4621f" />
+              <stop offset="1" stop-color="#8a360e" />
+            </linearGradient>
+            <radialGradient id="sheen" cx="0.25" cy="0.12" r="0.8">
+              <stop offset="0" stop-color="#ffe2c2" stop-opacity="0.6" />
+              <stop offset="0.55" stop-color="#ffe2c2" stop-opacity="0" />
+            </radialGradient>
+            <radialGradient id="ember" cx="0.5" cy="0.5" r="0.5">
+              <stop offset="0" stop-color="#fff6e8" />
+              <stop offset="0.3" stop-color="#ffd09a" stop-opacity="0.85" />
+              <stop offset="1" stop-color="#ff9a4a" stop-opacity="0" />
+            </radialGradient>
+          </defs>
+          <rect x="64" y="64" width="896" height="896" rx="216" fill="url(#bg)" />
+          <rect x="64" y="64" width="896" height="896" rx="216" fill="url(#sheen)" />
+          <path
+            d="M240 584C312 312 432 312 512 512S712 712 784 440"
+            fill="none"
+            stroke="#fffaf3"
+            stroke-width="88"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <circle cx="784" cy="440" r="150" fill="url(#ember)" />
+          <circle cx="784" cy="440" r="32" fill="#fffaf3" />
+        </svg>
+        <span>ZVS AI Studio</span>
+      </div>
+      <div class="status">
+        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+          <path fill="currentColor" d="{{icon}}" />
+        </svg>
+      </div>
+      <h1>{{title}}</h1>
+      <p>{{message}}</p>
+      <p class="hint">{{hint}}</p>
+    </main>
+    <script>
+      history.replaceState(null, "", location.pathname);
+    </script>
+  </body>
+</html>

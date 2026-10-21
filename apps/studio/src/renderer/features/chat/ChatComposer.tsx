@@ -15,7 +15,9 @@ import Icon from "../../ui/atoms/Icon";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import SelectInput from "../../ui/atoms/SelectInput";
 import TextArea from "../../ui/atoms/TextArea";
+import SegmentedControl from "../../ui/atoms/SegmentedControl";
 import Toggle from "../../ui/atoms/Toggle";
+import { RETRIEVAL_MODES, retrievalHint } from "./retrievalModes";
 import ChatContextMeter from "./ChatContextMeter";
 import ChatToolPicker from "./ChatToolPicker";
 import type ChatStore from "./ChatStore";
@@ -307,7 +309,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             Источники из хранилища
           </h2>
           <p className="mt-1 text-[12.5px] text-main-500">
-            Перед ответом будут найдены релевантные фрагменты документов.
+            {retrievalHint(store.retrievalMode, store.toolMode)}
           </p>
         </div>
         <div className="mt-4 space-y-2 px-5">
@@ -342,6 +344,17 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               Хранилища не подключены.
             </p>
           )}
+          <div className="rounded-card bg-main-800 p-3.5">
+            <span className="mb-2 block text-[12px] font-medium text-main-300">
+              Поиск по знаниям
+            </span>
+            <SegmentedControl
+              label="Поиск по знаниям"
+              value={store.retrievalMode}
+              options={RETRIEVAL_MODES}
+              onChange={(mode) => void store.setRetrievalMode(mode)}
+            />
+          </div>
           <div className="rounded-card bg-main-800 p-3.5">
             <Toggle
               id="chat-use-relations"

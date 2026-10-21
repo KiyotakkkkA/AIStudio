@@ -55,6 +55,7 @@ export default class ConnectionStore {
   removing = false;
   testing = false;
   switching = false;
+  signingIn = false;
   busyToolIds: ToolId[] = [];
   error: string | null = null;
 
@@ -394,6 +395,63 @@ export default class ConnectionStore {
     await this.refreshSelected(id);
   }
 
+  async signIn(): Promise<void> {
+    const id = this.selectedId;
+    if (id === null || this.signingIn) return;
+    if (this.form?.dirty === true) {
+      const saved = await this.submit();
+      if (!saved) return;
+    }
+    this.signingIn = true;
+    this.error = null;
+    this.testResult = null;
+    try {
+      const server = await this.ipc.call("mcp.signIn", { id });
+      runInAction(() => {
+        this.signingIn = false;
+        this.mergeServer(server);
+      });
+    } catch (error: unknown) {
+      runInAction(() => {
+        this.signingIn = false;
+        this.error = connectionErrorCopy(error);
+      });
+    }
+    await this.refreshSelected(id);
+  }
+
+  async cancelSignIn(): Promise<void> {
+    const id = this.selectedId;
+    if (id === null || !this.signingIn) return;
+    try {
+      await this.ipc.call("mcp.cancelSignIn", { id });
+    } catch (error: unknown) {
+      runInAction(() => {
+        this.error = connectionErrorCopy(error);
+      });
+    }
+  }
+
+  async signOut(): Promise<void> {
+    const id = this.selectedId;
+    if (id === null || this.switching) return;
+    this.switching = true;
+    this.error = null;
+    try {
+      const server = await this.ipc.call("mcp.signOut", { id });
+      runInAction(() => {
+        this.switching = false;
+        this.mergeServer(server);
+      });
+    } catch (error: unknown) {
+      runInAction(() => {
+        this.switching = false;
+        this.error = connectionErrorCopy(error);
+      });
+    }
+    await this.refreshSelected(id);
+  }
+
   async setToolEnabled(id: ToolId, enabled: boolean): Promise<void> {
     await this.writeTool(id, () => this.ipc.call("tools.setEnabled", { id, enabled }));
   }
@@ -541,9 +599,11 @@ export default class ConnectionStore {
       enabled: server.enabled,
       startup: server.startup,
       status: server.status,
+      oauth: server.oauth,
       protocolVersion: server.protocolVersion,
       serverName: server.serverName,
       serverVersion: server.serverVersion,
+      instructions: server.instructions,
       lastError: server.lastError,
       lastConnectedAt: server.lastConnectedAt,
       toolCount: server.toolCount,

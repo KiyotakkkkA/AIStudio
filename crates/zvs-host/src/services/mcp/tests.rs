@@ -12,9 +12,9 @@ use axum::routing::post;
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppErrorCode, CreateMcpServerInput, McpCapabilityKind, McpServerStatus, McpStartup,
-    McpTransport, McpValue, RunStatus, SecretScope, ToolListFilter, ToolSource, ToolTier,
-    UpdateMcpServerInput,
+    AppErrorCode, CreateMcpServerInput, McpCapabilityKind, McpOAuthState, McpServerStatus,
+    McpStartup, McpTransport, McpValue, RunStatus, SecretScope, ToolListFilter, ToolSource,
+    ToolTier, UpdateMcpServerInput,
 };
 
 use super::*;
@@ -161,6 +161,7 @@ impl Host {
                     server_id: id.to_owned(),
                     tool: tool.to_owned(),
                     timeout,
+                    read_resource: false,
                 },
                 arguments.as_object().cloned().unwrap_or_default(),
                 &CancellationToken::new(),
@@ -293,6 +294,7 @@ async fn discovery_registers_tools_with_their_schemas_and_a_safe_default_tier() 
             "qdrant.crash",
             "qdrant.deleteCollection",
             "qdrant.hang",
+            "qdrant.read_resource",
             "qdrant.search",
             "qdrant.upsert",
             "qdrant.whoami"
@@ -484,11 +486,11 @@ async fn a_server_that_dies_marks_its_tools_unavailable_fails_in_flight_and_rest
     let host = host();
     let id = host.stdio_server("qdrant");
     host.mcp.start(&id).await.expect("starts");
-    assert_eq!(host.available_mcp().len(), 6);
+    assert_eq!(host.available_mcp().len(), 7);
     let error = host.call(&id, "crash", json!({})).await.expect_err("fails");
     assert_eq!(error.code, AppErrorCode::McpUnavailable, "{error:?}");
     eventually("the restart", Duration::from_secs(10), || {
-        host.status(&id) == McpServerStatus::Connected && host.available_mcp().len() == 6
+        host.status(&id) == McpServerStatus::Connected && host.available_mcp().len() == 7
     })
     .await;
     assert!(host.mcp.health(&id).expect("health").restarts >= 1);
@@ -578,6 +580,7 @@ async fn disabling_a_server_takes_its_tools_out_of_reach() {
 struct HttpFixture {
     calls: Arc<Mutex<Vec<(Value, HeaderMap)>>>,
     reject: bool,
+    bearer: Option<&'static str>,
 }
 
 async fn http_handler(
@@ -587,6 +590,23 @@ async fn http_handler(
 ) -> Response {
     if fixture.reject {
         return (StatusCode::UNAUTHORIZED, "no").into_response();
+    }
+    if let Some(token) = fixture.bearer {
+        let presented = headers
+            .get("authorization")
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or_default();
+        if presented != format!("Bearer {token}") {
+            return (
+                StatusCode::UNAUTHORIZED,
+                [(
+                    "www-authenticate",
+                    "Bearer realm=\"mcp\", resource_metadata=\"http://127.0.0.1:1/.well-known/oauth-protected-resource\"",
+                )],
+                "{}",
+            )
+                .into_response();
+        }
     }
     let body: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
     fixture
@@ -704,6 +724,57 @@ async fn an_http_server_that_rejects_the_token_fails_with_a_clear_error() {
             .is_some_and(|error| error.contains("401")),
         "{error:?}"
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_oauth_server_asks_for_sign_in_and_then_accepts_the_stored_token() {
+    let host = host();
+    let fixture = HttpFixture {
+        bearer: Some("access-1"),
+        ..HttpFixture::default()
+    };
+    let url = serve(fixture.clone()).await;
+    let id = host.create(&http_server(&url, &[]));
+    let error = host.mcp.start(&id).await.expect_err("needs a sign-in");
+    assert!(is_auth_required(&error));
+    let server = host.mcp.server(&id).expect("a server");
+    assert_eq!(server.oauth, McpOAuthState::Required);
+    assert_eq!(server.last_error.as_deref(), Some(AUTH_REQUIRED));
+    host.mcp
+        .save_grant(
+            &id,
+            &OAuthGrant {
+                issuer: "https://id.example".to_owned(),
+                token_endpoint: "https://id.example/token".to_owned(),
+                client_id: "client-1".to_owned(),
+                client_secret: None,
+                redirect_uri: "http://127.0.0.1:53682/callback".to_owned(),
+                resource: url.clone(),
+                scope: None,
+                access_token: "access-1".to_owned(),
+                refresh_token: None,
+                expires_at: None,
+            },
+        )
+        .expect("saves");
+    host.mcp.start(&id).await.expect("starts");
+    let server = host.mcp.server(&id).expect("a server");
+    assert_eq!(server.status, McpServerStatus::Connected);
+    assert_eq!(server.oauth, McpOAuthState::SignedIn);
+    assert_eq!(host.available_mcp(), ["github.listIssues"]);
+    assert!(!format!("{:?}", host.logger.entries()).contains("access-1"));
+    let signed_out = host.mcp.sign_out(&id).await.expect("signs out");
+    assert_eq!(signed_out.oauth, McpOAuthState::None);
+    assert!(host.available_mcp().is_empty());
+    host.mcp.dispose().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn signing_in_to_a_stdio_server_is_refused() {
+    let host = host();
+    let id = host.stdio_server("qdrant");
+    let error = host.mcp.sign_in(&id).await.expect_err("refused");
+    assert_eq!(error.code, AppErrorCode::ValidationFailed);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -987,4 +1058,68 @@ async fn a_cmd_shim_with_spaces_in_its_path_launches_and_its_whole_tree_is_stopp
         || !alive(pid),
     )
     .await;
+}
+
+fn reader_target(id: &str) -> McpCallTarget {
+    McpCallTarget {
+        server_id: id.to_owned(),
+        tool: RESOURCE_READER.to_owned(),
+        timeout: None,
+        read_resource: true,
+    }
+}
+
+fn uri_arguments(uri: &str) -> Map<String, Value> {
+    json!({ "uri": uri })
+        .as_object()
+        .cloned()
+        .unwrap_or_default()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn server_instructions_are_kept_and_resources_are_read_through_the_reader_tool() {
+    let host = host();
+    let id = host.stdio_server("qdrant");
+    host.mcp.start(&id).await.expect("starts");
+    assert_eq!(
+        host.mcp
+            .server(&id)
+            .expect("a server")
+            .instructions
+            .as_deref(),
+        Some("Read qdrant://collections before searching.")
+    );
+    let reader = host
+        .tools
+        .list(&ToolListFilter::default())
+        .expect("lists")
+        .into_iter()
+        .find(|tool| tool.key == "qdrant.read_resource")
+        .expect("the reader tool");
+    assert!(reader.read_only);
+    assert_eq!(
+        reader.input_schema["properties"]["uri"]["enum"],
+        json!(["qdrant://collections"])
+    );
+    let read = host
+        .mcp
+        .call(
+            &reader_target(&id),
+            uri_arguments("qdrant://collections"),
+            &CancellationToken::new(),
+        )
+        .await
+        .expect("reads");
+    assert_eq!(read.text, "kb, docs");
+    let unknown = host
+        .mcp
+        .call(
+            &reader_target(&id),
+            uri_arguments("file:///etc/passwd"),
+            &CancellationToken::new(),
+        )
+        .await
+        .expect_err("refused");
+    assert_eq!(unknown.message, RESOURCE_NOT_FOUND);
+    host.mcp.dispose().await;
 }

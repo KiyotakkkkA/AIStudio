@@ -43,6 +43,7 @@ pub struct McpServerPatch {
     pub protocol_version: Option<Option<String>>,
     pub server_name: Option<Option<String>>,
     pub server_version: Option<Option<String>>,
+    pub instructions: Option<Option<String>>,
     pub last_error: Option<Option<String>>,
     pub last_connected_at: Option<Option<Timestamp>>,
     pub updated_at: Option<Timestamp>,
@@ -118,7 +119,7 @@ impl<'c> McpServerRepository<'c> {
         self.connection
             .prepare_cached(&format!(
                 "INSERT INTO mcp_server ({columns}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, \
-                 ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19) RETURNING {columns}",
+                 ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20) RETURNING {columns}",
                 columns = McpServerRow::COLUMNS
             ))?
             .query_row(
@@ -138,6 +139,7 @@ impl<'c> McpServerRepository<'c> {
                     row.protocol_version,
                     row.server_name,
                     row.server_version,
+                    row.instructions,
                     row.last_error,
                     row.last_connected_at,
                     row.created_at,
@@ -196,6 +198,7 @@ impl<'c> McpServerRepository<'c> {
             ("protocol_version = ?", &patch.protocol_version),
             ("server_name = ?", &patch.server_name),
             ("server_version = ?", &patch.server_version),
+            ("instructions = ?", &patch.instructions),
             ("last_error = ?", &patch.last_error),
         ] {
             if let Some(value) = value {
@@ -229,6 +232,41 @@ impl<'c> McpServerRepository<'c> {
         self.connection
             .prepare_cached("DELETE FROM mcp_server WHERE id = ?1")?
             .execute([id])?;
+        Ok(())
+    }
+
+    pub fn oauth_cipher(&self, server_id: &str) -> rusqlite::Result<Option<Vec<u8>>> {
+        self.connection
+            .prepare_cached("SELECT cipher FROM mcp_oauth WHERE server_id = ?1")?
+            .query_row([server_id], |row| row.get(0))
+            .optional()
+    }
+
+    pub fn oauth_server_ids(&self) -> rusqlite::Result<Vec<String>> {
+        self.connection
+            .prepare_cached("SELECT server_id FROM mcp_oauth")?
+            .query_map([], |row| row.get(0))?
+            .collect()
+    }
+
+    pub fn save_oauth(
+        &self,
+        server_id: &str,
+        cipher: &[u8],
+        updated_at: Timestamp,
+    ) -> rusqlite::Result<()> {
+        self.connection
+            .prepare_cached(
+                "INSERT INTO mcp_oauth (server_id, cipher, updated_at) VALUES (?1, ?2, ?3)                  ON CONFLICT(server_id) DO UPDATE SET cipher = excluded.cipher,                  updated_at = excluded.updated_at",
+            )?
+            .execute(params![server_id, cipher, updated_at])?;
+        Ok(())
+    }
+
+    pub fn remove_oauth(&self, server_id: &str) -> rusqlite::Result<()> {
+        self.connection
+            .prepare_cached("DELETE FROM mcp_oauth WHERE server_id = ?1")?
+            .execute([server_id])?;
         Ok(())
     }
 
@@ -368,6 +406,7 @@ mod tests {
             protocol_version: None,
             server_name: None,
             server_version: None,
+            instructions: None,
             last_error: None,
             last_connected_at: None,
             created_at: 1,

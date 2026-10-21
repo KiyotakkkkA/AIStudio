@@ -55,7 +55,8 @@ export const TIER_TEXT: Record<ToolTier, string> = {
   off: "text-main-400",
 };
 
-const AUTH_FAILURE = /\b(401|403)\b|учётные данные|unauthori[sz]ed|forbidden/i;
+const AUTH_FAILURE = /\b(401|403)\b|учётные данные|требует входа|unauthori[sz]ed|forbidden/i;
+const SIGN_IN_FAILURE = /требует входа/i;
 
 export function needsReauthorisation(lastError: string | null): boolean {
   return lastError !== null && AUTH_FAILURE.test(lastError);
@@ -66,7 +67,7 @@ export function serverState(server: McpServerDto, health: McpHealthDto | null): 
   if (server.status === "connected") return "connected";
   if (server.status === "starting") return health?.restarting === true ? "restarting" : "starting";
   if (server.status === "failed") {
-    if (needsReauthorisation(server.lastError)) return "reauth";
+    if (server.oauth === "required" || needsReauthorisation(server.lastError)) return "reauth";
     return health?.restarting === true ? "restarting" : "failed";
   }
   return server.lastConnectedAt === null ? "never" : "stopped";
@@ -125,10 +126,16 @@ export function handshakeLine(result: McpTestResultDto): string {
 
 export function failureCopy(error: string | null): { title: string; hint: string | null } {
   const message = error ?? "Сервер не ответил на рукопожатие.";
+  if (SIGN_IN_FAILURE.test(message)) {
+    return {
+      title: message,
+      hint: "Откроется браузер: войдите в аккаунт, и приложение подключит сервер само.",
+    };
+  }
   if (needsReauthorisation(message)) {
     return {
       title: message,
-      hint: "Проверьте токен в заголовках: обновите секрет на странице «Секреты» и повторите проверку.",
+      hint: "Проверьте токен в заголовках или войдите через браузер кнопкой «Войти».",
     };
   }
   if (/ENOENT|not found|не найден/i.test(message)) {
