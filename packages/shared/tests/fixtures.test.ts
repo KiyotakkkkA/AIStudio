@@ -3,6 +3,7 @@ import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import * as skills from "../src/skills/index.js";
 import {
   AccountDto,
   ChatCitationDto,
@@ -173,6 +174,30 @@ const schemas: Record<string, z.ZodType> = {
   "mcp/McpContentDto": McpContentDto,
   "mcp/McpCallResultDto": McpCallResultDto,
   "mcp/McpRemoveOutput": contract["mcp.remove"].output,
+  "skills/SkillSource": skills.SkillSource,
+  "skills/SkillStatus": skills.SkillStatus,
+  "skills/SkillMatchMethod": skills.SkillMatchMethod,
+  "skills/SkillFileEncoding": skills.SkillFileEncoding,
+  "skills/SkillIssueRule": skills.SkillIssueRule,
+  "skills/SkillModelDto": skills.SkillModelDto,
+  "skills/SkillIssueDto": skills.SkillIssueDto,
+  "skills/SkillFileDto": skills.SkillFileDto,
+  "skills/SkillDto": skills.SkillDto,
+  "skills/SkillDetailDto": skills.SkillDetailDto,
+  "skills/SkillRef": skills.SkillRef,
+  "skills/SkillFileInput": skills.SkillFileInput,
+  "skills/CreateSkillInput": skills.CreateSkillInput,
+  "skills/UpdateSkillInput": skills.UpdateSkillInput,
+  "skills/SkillTestInput": skills.SkillTestInput,
+  "skills/SkillMatchDto": skills.SkillMatchDto,
+  "skills/SkillTestResultDto": skills.SkillTestResultDto,
+  "skills/SkillRunInput": skills.SkillRunInput,
+  "skills/SkillImportInput": skills.SkillImportInput,
+  "skills/SkillImportResultDto": skills.SkillImportResultDto,
+  "skills/SkillExportInput": skills.SkillExportInput,
+  "skills/SkillExportResultDto": skills.SkillExportResultDto,
+  "skills/SkillRemoveOutput": skills.SkillRemoveOutput,
+  "skills/SkillTriggerSettingsDto": skills.SkillTriggerSettingsDto,
   "events/HostEvent": HostEvent,
   "system/DeviceTier": DeviceTier,
   "system/DeviceGpuDto": DeviceGpuDto,

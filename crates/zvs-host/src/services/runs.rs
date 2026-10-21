@@ -43,6 +43,8 @@ pub const CHAT_RETRY_REFUSED: &str =
 pub const RESUMING_MESSAGE: &str = "Возобновление с последней контрольной точки";
 pub const ABANDONED_ON_EXIT: &str = "Выполнение прервано завершением приложения";
 pub const APPROVAL_INTERRUPTED: &str = "Approval interrupted";
+pub const OUTSIDE_ALLOWED_TOOLS: &str =
+    "Инструмент не входит в набор, разрешённый для этого запуска";
 pub const NOT_RESUMABLE: &str =
     "Автовозобновление недоступно: узел имеет побочные эффекты или отсутствует";
 
@@ -106,10 +108,17 @@ impl Gate {
         origin: AdmissionOrigin,
     ) -> Result<(), AppError> {
         let run = read_run(&self.database, &context.run_id.to_string())?;
+        if origin == AdmissionOrigin::Model && !run.graph.allows_tool(&tool) {
+            return Err(
+                AppError::new(AppErrorCode::PermissionDenied, OUTSIDE_ALLOWED_TOOLS)
+                    .with_detail("key", tool),
+            );
+        }
         if origin == AdmissionOrigin::Graph {
             let shortcut = matches!(
                 (run.kind, tool.as_str()),
-                (RunKind::Chat, "llm.generate" | "vector.search")
+                (RunKind::Chat | RunKind::Skill, "llm.generate")
+                    | (RunKind::Chat, "vector.search")
                     | (RunKind::Indexing, "vector.index")
                     | (RunKind::Download, "download.fetch")
             );

@@ -9,12 +9,9 @@ export type ToolTier = z.infer<typeof ToolTier>;
 export const ToolSource = z.enum(["builtin", "mcp", "skill", "integration", "browser"]);
 export type ToolSource = z.infer<typeof ToolSource>;
 
-export const ToolKey = z
-  .string()
-  .trim()
-  .min(1)
-  .max(128)
-  .regex(/^[a-z][a-zA-Z0-9]*(\.[a-zA-Z0-9_-]+)+$/);
+export const TOOL_KEY_PATTERN = /^[a-z][a-zA-Z0-9]*(\.[a-zA-Z0-9_-]+)+$/;
+
+export const ToolKey = z.string().trim().min(1).max(128).regex(TOOL_KEY_PATTERN);
 export type ToolKey = z.infer<typeof ToolKey>;
 
 export const ToolReferenceKind = z.enum(["scenario", "skill"]);

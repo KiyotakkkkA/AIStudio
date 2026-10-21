@@ -1,0 +1,16 @@
+[
+  {
+    "name": "null encoding",
+    "value": {
+      "path": "assets/a.png",
+      "content": "",
+      "encoding": null
+    }
+  },
+  {
+    "name": "missing content",
+    "value": {
+      "path": "assets/a.png"
+    }
+  }
+]

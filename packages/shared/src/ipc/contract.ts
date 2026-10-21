@@ -55,6 +55,21 @@ import {
 } from "../providers/index.js";
 import { ProviderId } from "../primitives/branded.js";
 import { defineContract } from "./defineContract.js";
+import {
+  CreateSkillInput,
+  SkillDetailDto,
+  SkillDto,
+  SkillExportInput,
+  SkillExportResultDto,
+  SkillImportInput,
+  SkillImportResultDto,
+  SkillRef,
+  SkillRemoveOutput,
+  SkillRunInput,
+  SkillTestInput,
+  SkillTestResultDto,
+  UpdateSkillInput,
+} from "../skills/index.js";
 import { AccountDto, AccountLinkInput, AccountLinkResult, AccountRef } from "../accounts.js";
 import { AdapterDescriptorDto } from "../ai.js";
 import { DeviceProfileDto, ResourceSampleDto } from "../system.js";
@@ -255,6 +270,15 @@ export const contract = defineContract({
   "mcp.signIn": { input: McpServerRef, output: McpServerDto },
   "mcp.cancelSignIn": { input: McpServerRef, output: McpServerDto },
   "mcp.signOut": { input: McpServerRef, output: McpServerDto },
+  "skills.list": { input: z.void(), output: z.array(SkillDto) },
+  "skills.get": { input: SkillRef, output: SkillDetailDto },
+  "skills.create": { input: CreateSkillInput, output: SkillDetailDto },
+  "skills.update": { input: UpdateSkillInput, output: SkillDetailDto },
+  "skills.remove": { input: SkillRef, output: SkillRemoveOutput },
+  "skills.test": { input: SkillTestInput, output: SkillTestResultDto },
+  "skills.run": { input: SkillRunInput, output: RunHandleDto },
+  "skills.import": { input: SkillImportInput, output: SkillImportResultDto },
+  "skills.export": { input: SkillExportInput, output: SkillExportResultDto },
   "downloads.list": { input: DownloadListFilter, output: z.array(DownloadDto) },
   "downloads.start": { input: StartDownloadInput, output: DownloadDto },
   "downloads.pause": { input: DownloadRef, output: DownloadDto },

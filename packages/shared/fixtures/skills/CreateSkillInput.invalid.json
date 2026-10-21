@@ -1,0 +1,29 @@
+[
+  {
+    "name": "missing instructions",
+    "value": {
+      "key": "pdf",
+      "name": "PDF",
+      "description": "d"
+    }
+  },
+  {
+    "name": "null enabled",
+    "value": {
+      "key": "pdf",
+      "name": "PDF",
+      "description": "d",
+      "instructions": "i",
+      "enabled": null
+    }
+  },
+  {
+    "name": "key too long",
+    "value": {
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "name": "PDF",
+      "description": "d",
+      "instructions": "i"
+    }
+  }
+]

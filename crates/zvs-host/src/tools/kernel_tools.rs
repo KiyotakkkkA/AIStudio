@@ -8,6 +8,10 @@ use crate::kernel::knowledge_nodes::{
     SEARCH_DESCRIPTION,
 };
 use crate::kernel::{NodeRegistry, PermissionRequirement};
+use crate::skills::nodes::{
+    LOAD_DESCRIPTION as SKILL_LOAD_DESCRIPTION, READ_DESCRIPTION as SKILL_READ_DESCRIPTION,
+    SKILL_LOAD, SKILL_READ,
+};
 
 const NOT_TOOLS: &[&str] = &["llm.generate"];
 
@@ -55,6 +59,22 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
         BuiltinToolMeta {
             display_name: "knowledge.list",
             description: LIST_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        SKILL_LOAD,
+        BuiltinToolMeta {
+            display_name: "skill.load",
+            description: SKILL_LOAD_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        SKILL_READ,
+        BuiltinToolMeta {
+            display_name: "skill.read",
+            description: SKILL_READ_DESCRIPTION,
             destructive: false,
         },
     ),

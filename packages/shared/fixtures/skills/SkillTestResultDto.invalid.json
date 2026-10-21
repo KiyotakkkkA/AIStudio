@@ -1,0 +1,10 @@
+[
+  {
+    "name": "bad method",
+    "value": {
+      "method": "regex",
+      "threshold": 0.5,
+      "matches": []
+    }
+  }
+]

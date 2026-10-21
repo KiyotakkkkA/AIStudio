@@ -29,7 +29,8 @@
           }
         }
       ],
-      "permissionScopes": ["skill:a", "scenario:1", "site:https://example.com"]
+      "permissionScopes": ["skill:a", "scenario:1", "site:https://example.com"],
+      "allowedTools": ["vector.search", "skill.read"]
     }
   }
 ]

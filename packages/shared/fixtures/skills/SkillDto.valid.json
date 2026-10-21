@@ -1,0 +1,46 @@
+[
+  {
+    "name": "ready",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "release-notes",
+      "name": "Заметки о выпуске",
+      "description": "Составляет заметки о выпуске по списку изменений",
+      "allowedTools": ["vector.search", "skill.read"],
+      "modelOverride": null,
+      "enabled": true,
+      "source": "local",
+      "status": "ready",
+      "issues": [],
+      "fileCount": 1,
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000000000
+    }
+  },
+  {
+    "name": "invalid with issues",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "release-notes",
+      "name": "Заметки о выпуске",
+      "description": "Составляет заметки о выпуске по списку изменений",
+      "allowedTools": ["vector.search", "skill.read"],
+      "modelOverride": {
+        "providerId": "0199aa11-2222-7222-8222-222222222222",
+        "modelId": "gpt-4o-mini"
+      },
+      "enabled": true,
+      "source": "imported",
+      "status": "invalid",
+      "issues": [
+        {
+          "field": "allowedTools.0",
+          "rule": "toolOff"
+        }
+      ],
+      "fileCount": 1,
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000000000
+    }
+  }
+]

@@ -20,6 +20,7 @@ export * from "./vectorStores/index.js";
 export * from "./graph/index.js";
 export * from "./tools/index.js";
 export * from "./mcp/index.js";
+export * from "./skills/index.js";
 export * from "./downloads/index.js";
 export * from "./runtimes/index.js";
 export * from "./runs/RunDto.js";

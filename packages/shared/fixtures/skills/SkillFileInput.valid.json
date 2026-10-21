@@ -1,0 +1,17 @@
+[
+  {
+    "name": "text",
+    "value": {
+      "path": "references/a.md",
+      "content": "text"
+    }
+  },
+  {
+    "name": "binary",
+    "value": {
+      "path": "assets/a.png",
+      "content": "iVBORw0K",
+      "encoding": "base64"
+    }
+  }
+]

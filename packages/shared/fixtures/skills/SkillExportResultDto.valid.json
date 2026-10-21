@@ -1,0 +1,14 @@
+[
+  {
+    "name": "written",
+    "value": {
+      "path": "C:/export/pdf"
+    }
+  },
+  {
+    "name": "cancelled",
+    "value": {
+      "path": null
+    }
+  }
+]

@@ -1,4 +1,5 @@
 import {
+  mdiBookOpenOutline,
   mdiChatOutline,
   mdiCreationOutline,
   mdiGraphOutline,
@@ -20,6 +21,7 @@ export const KIND_LABELS: Record<RunKind, string> = {
   indexing: "индексация",
   download: "загрузка",
   browser: "браузер",
+  skill: "навык",
 };
 
 export const KIND_FILTER_LABELS: Record<RunKind, string> = {
@@ -30,6 +32,7 @@ export const KIND_FILTER_LABELS: Record<RunKind, string> = {
   indexing: "Индексация",
   download: "Загрузки",
   browser: "Браузер",
+  skill: "Навыки",
 };
 
 export const KIND_ICONS: Record<RunKind, string> = {
@@ -40,6 +43,7 @@ export const KIND_ICONS: Record<RunKind, string> = {
   indexing: mdiDatabaseArrowDownOutline,
   download: mdiTrayArrowDown,
   browser: mdiWeb,
+  skill: mdiBookOpenOutline,
 };
 
 export const STATUS_LABELS: Record<RunStatus, string> = {

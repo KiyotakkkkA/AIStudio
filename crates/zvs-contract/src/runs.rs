@@ -11,6 +11,7 @@ use crate::primitives::{Json, MAX_SAFE_INTEGER, Timestamp};
 use crate::validate::{Validate, check, invalid, js_trim, nested, no_refinements};
 
 pub const GRAPH_MAX_NODES: usize = 10_000;
+pub const GRAPH_ALLOWED_TOOLS_MAX: usize = 256;
 pub const DEFAULT_CONCURRENCY: u64 = 4;
 pub const DEFAULT_RUN_LIST_LIMIT: u64 = 50;
 
@@ -47,6 +48,7 @@ wire_enum!(RunKind {
     Indexing => "indexing",
     Download => "download",
     Browser => "browser",
+    Skill => "skill",
 });
 
 wire_enum!(StepStatus {
@@ -199,6 +201,12 @@ pub struct RunGraph {
         deserialize_with = "crate::wire::present"
     )]
     pub permission_scopes: Option<Vec<String>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub allowed_tools: Option<Vec<String>>,
 }
 
 impl RunGraph {
@@ -206,6 +214,7 @@ impl RunGraph {
         Self {
             nodes,
             permission_scopes: None,
+            allowed_tools: None,
         }
     }
 
@@ -213,11 +222,18 @@ impl RunGraph {
         self.permission_scopes.as_deref().unwrap_or_default()
     }
 
+    pub fn allows_tool(&self, key: &str) -> bool {
+        self.allowed_tools
+            .as_ref()
+            .is_none_or(|allowed| allowed.iter().any(|tool| tool == key))
+    }
+
     #[must_use]
     pub fn normalized(self) -> Self {
         Self {
             nodes: self.nodes.into_iter().map(GraphNode::normalized).collect(),
             permission_scopes: self.permission_scopes,
+            allowed_tools: self.allowed_tools,
         }
     }
 }
@@ -231,6 +247,17 @@ impl Validate for RunGraph {
         for (index, scope) in self.permission_scopes().iter().enumerate() {
             if !is_permission_scope(scope) {
                 return Err(invalid(&format!("permissionScopes.{index}"), "pattern"));
+            }
+        }
+        if let Some(allowed) = &self.allowed_tools {
+            if allowed.len() > GRAPH_ALLOWED_TOOLS_MAX {
+                return Err(invalid("allowedTools", "maxLength"));
+            }
+            for (index, key) in allowed.iter().enumerate() {
+                check::max_len(&format!("allowedTools.{index}"), key, 128)?;
+                if !crate::tools::is_tool_key(key) {
+                    return Err(invalid(&format!("allowedTools.{index}"), "pattern"));
+                }
             }
         }
         Ok(())

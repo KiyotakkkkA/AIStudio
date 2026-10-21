@@ -44,7 +44,7 @@
   {
     "name": "too many kinds",
     "value": {
-      "kinds": ["job", "job", "job", "job", "job", "job", "job", "job"]
+      "kinds": ["job", "job", "job", "job", "job", "job", "job", "job", "job"]
     }
   },
   {

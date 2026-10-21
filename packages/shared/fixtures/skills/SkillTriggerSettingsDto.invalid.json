@@ -1,0 +1,24 @@
+[
+  {
+    "name": "threshold above one",
+    "value": {
+      "threshold": 1.5,
+      "catalogueLimit": 20
+    }
+  },
+  {
+    "name": "zero limit",
+    "value": {
+      "threshold": 0.5,
+      "catalogueLimit": 0
+    }
+  },
+  {
+    "name": "null embedding",
+    "value": {
+      "threshold": 0.5,
+      "catalogueLimit": 20,
+      "embedding": null
+    }
+  }
+]

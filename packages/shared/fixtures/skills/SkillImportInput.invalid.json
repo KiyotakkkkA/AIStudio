@@ -1,0 +1,14 @@
+[
+  {
+    "name": "blank path",
+    "value": {
+      "path": " "
+    }
+  },
+  {
+    "name": "null path",
+    "value": {
+      "path": null
+    }
+  }
+]

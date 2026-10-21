@@ -952,6 +952,7 @@ impl DownloadService {
             RunGraph {
                 nodes: vec![node],
                 permission_scopes: None,
+                allowed_tools: None,
             },
         );
         input.subject_id = Some(row.id.clone());

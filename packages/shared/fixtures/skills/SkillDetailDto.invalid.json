@@ -1,0 +1,46 @@
+[
+  {
+    "name": "missing files",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "release-notes",
+      "name": "Заметки о выпуске",
+      "description": "Составляет заметки о выпуске по списку изменений",
+      "allowedTools": ["vector.search", "skill.read"],
+      "modelOverride": null,
+      "enabled": true,
+      "source": "local",
+      "status": "ready",
+      "issues": [],
+      "fileCount": 1,
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000000000,
+      "instructions": "# Заметки\n\nСгруппируйте изменения."
+    }
+  },
+  {
+    "name": "bad file path",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "release-notes",
+      "name": "Заметки о выпуске",
+      "description": "Составляет заметки о выпуске по списку изменений",
+      "allowedTools": ["vector.search", "skill.read"],
+      "modelOverride": null,
+      "enabled": true,
+      "source": "local",
+      "status": "ready",
+      "issues": [],
+      "fileCount": 1,
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000000000,
+      "instructions": "# Заметки\n\nСгруппируйте изменения.",
+      "files": [
+        {
+          "path": "x.md",
+          "size": 1
+        }
+      ]
+    }
+  }
+]

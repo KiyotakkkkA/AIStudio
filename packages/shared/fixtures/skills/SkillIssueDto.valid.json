@@ -1,0 +1,9 @@
+[
+  {
+    "name": "tool",
+    "value": {
+      "field": "allowedTools.1",
+      "rule": "unknownTool"
+    }
+  }
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "name": "required",
+    "value": "required"
+  },
+  {
+    "name": "pattern",
+    "value": "pattern"
+  },
+  {
+    "name": "tooLong",
+    "value": "tooLong"
+  },
+  {
+    "name": "duplicate",
+    "value": "duplicate"
+  },
+  {
+    "name": "unknownTool",
+    "value": "unknownTool"
+  },
+  {
+    "name": "toolOff",
+    "value": "toolOff"
+  },
+  {
+    "name": "toolDisabled",
+    "value": "toolDisabled"
+  },
+  {
+    "name": "toolUnavailable",
+    "value": "toolUnavailable"
+  },
+  {
+    "name": "path",
+    "value": "path"
+  },
+  {
+    "name": "fileTooLarge",
+    "value": "fileTooLarge"
+  },
+  {
+    "name": "skillTooLarge",
+    "value": "skillTooLarge"
+  },
+  {
+    "name": "tooManyFiles",
+    "value": "tooManyFiles"
+  },
+  {
+    "name": "encoding",
+    "value": "encoding"
+  },
+  {
+    "name": "manifest",
+    "value": "manifest"
+  },
+  {
+    "name": "missing",
+    "value": "missing"
+  }
+]

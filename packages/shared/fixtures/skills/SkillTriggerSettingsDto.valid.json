@@ -1,0 +1,20 @@
+[
+  {
+    "name": "defaults spelled out",
+    "value": {
+      "threshold": 0.5,
+      "catalogueLimit": 20
+    }
+  },
+  {
+    "name": "with embedding",
+    "value": {
+      "threshold": 0.7,
+      "catalogueLimit": 10,
+      "embedding": {
+        "providerId": "0199aa11-2222-7222-8222-222222222222",
+        "modelId": "gpt-4o-mini"
+      }
+    }
+  }
+]

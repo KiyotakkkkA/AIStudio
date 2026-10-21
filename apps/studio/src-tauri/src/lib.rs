@@ -57,11 +57,15 @@ use zvs_host::services::rerank::local_rerankers;
 use zvs_host::services::system::DEMO_INTERVAL;
 use zvs_host::services::{
     AccountService, AccountServiceOptions, ChatService, ChatServiceOptions, CryptoService,
-    GraphService, GraphServiceOptions, HealthCheckOptions, HealthCheckService, McpService,
-    McpServiceOptions, ProviderService, ProviderServiceOptions, RetentionService,
+    DriverSource, GraphService, GraphServiceOptions, HealthCheckOptions, HealthCheckService,
+    McpService, McpServiceOptions, ProviderService, ProviderServiceOptions, RetentionService,
     RetentionServiceOptions, RunService, RunServiceOptions, SecretService, Services,
     SettingService, SystemService, VectorEvalService, VectorEvalServiceOptions,
     VectorSourceService, VectorSourceServiceOptions, VectorStoreService, VectorStoreServiceOptions,
+};
+use zvs_host::skills::{
+    SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillService, SkillServiceOptions,
+    register_skill_nodes,
 };
 use zvs_host::tools::{ToolInvoker, ToolRegistry, ToolRegistryOptions, register_kernel_tools};
 use zvs_host::{IpcServer, ipc};
@@ -73,6 +77,7 @@ use crate::browser::{
 use crate::commands::Host;
 use crate::picker::DialogPicker;
 use crate::theme::TauriTheme;
+use zvs_host::platform::picker::SharedPicker;
 
 enum Boot {
     Studio {
@@ -571,6 +576,16 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         clock: clock.clone(),
         ..ToolRegistryOptions::new(Arc::clone(&database))
     });
+    let skill_library = SkillLibrary::new(SkillLibraryOptions {
+        logger: logger.clone(),
+        clock: clock.clone(),
+        ..SkillLibraryOptions::new(
+            Arc::clone(&database),
+            paths.data_dir.join(SKILLS_DIR),
+            tools.clone(),
+        )
+    });
+    register_skill_nodes(&nodes, &skill_library)?;
     register_kernel_tools(&nodes, &tools)?;
     let mcp = McpService::new(McpServiceOptions {
         logger: logger.clone(),
@@ -589,7 +604,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     });
     let runs = RunService::new(RunServiceOptions {
         services: KernelServices {
-            providers: Some(registry),
+            providers: Some(registry.clone()),
             vector_stores: Some(Arc::new(vector_stores.clone())),
             jobs: Some(Arc::new(sidecar.clone())),
             downloads: Some(Arc::new(downloads.clone())),
@@ -602,8 +617,17 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         tools: Some(tools.clone()),
         ..RunServiceOptions::new(Arc::clone(&database), events.clone(), Arc::clone(&nodes))
     })?;
+    let picker: SharedPicker = Arc::new(DialogPicker::new(app.handle().clone()));
+    let skills = SkillService::new(SkillServiceOptions {
+        drivers: Some(registry.clone() as Arc<dyn DriverSource>),
+        settings: Some(settings.clone()),
+        picker: Some(Arc::clone(&picker)),
+        logger: logger.clone(),
+        ..SkillServiceOptions::new(skill_library, runs.clone(), Arc::clone(&database))
+    });
     let chat = ChatService::new(ChatServiceOptions {
         tools: Some(tools.clone()),
+        skills: Some(Arc::new(skills.clone())),
         logger: logger.clone(),
         clock: clock.clone(),
         ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), Arc::clone(&nodes))
@@ -720,8 +744,9 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         tools,
         tool_invoker,
         mcp,
+        skills,
         chat,
-        picker: Some(Arc::new(DialogPicker::new(app.handle().clone()))),
+        picker: Some(picker),
     });
     let mut server = IpcServer::new(Arc::clone(&services), logger.clone());
     ipc::register(&mut server);

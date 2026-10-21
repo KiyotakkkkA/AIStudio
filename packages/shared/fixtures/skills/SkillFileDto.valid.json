@@ -1,0 +1,16 @@
+[
+  {
+    "name": "reference",
+    "value": {
+      "path": "references/style.md",
+      "size": 120
+    }
+  },
+  {
+    "name": "nested asset",
+    "value": {
+      "path": "assets/img/logo.png",
+      "size": 0
+    }
+  }
+]

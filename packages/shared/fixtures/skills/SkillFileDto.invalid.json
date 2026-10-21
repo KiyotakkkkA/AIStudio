@@ -1,0 +1,23 @@
+[
+  {
+    "name": "outside a resource folder",
+    "value": {
+      "path": "SKILL.md",
+      "size": 1
+    }
+  },
+  {
+    "name": "parent segment",
+    "value": {
+      "path": "references/../x",
+      "size": 1
+    }
+  },
+  {
+    "name": "negative size",
+    "value": {
+      "path": "assets/a",
+      "size": -1
+    }
+  }
+]

@@ -59,6 +59,7 @@ use crate::indexing::IndexingService;
 use crate::platform::picker::SharedPicker;
 use crate::platform::theme::SharedThemePort;
 use crate::runtimes::RuntimeService;
+use crate::skills::SkillService;
 use crate::tools::{ToolInvoker, ToolRegistry};
 
 pub struct Services {
@@ -80,6 +81,7 @@ pub struct Services {
     pub tools: ToolRegistry,
     pub tool_invoker: ToolInvoker,
     pub mcp: McpService,
+    pub skills: SkillService,
     pub chat: ChatService,
     pub picker: Option<SharedPicker>,
 }

@@ -241,6 +241,7 @@ pub(super) struct HarnessOptions {
     pub graph: Option<Arc<dyn GraphNeighbors>>,
     pub providers: Option<Arc<dyn TextDrivers>>,
     pub tools: Option<ToolRegistry>,
+    pub skills: Option<Arc<dyn SkillCatalogue>>,
     pub registry: Option<Arc<NodeRegistry>>,
     pub capabilities: Vec<ProviderCapability>,
     pub context_window: i64,
@@ -256,6 +257,7 @@ impl Default for HarnessOptions {
             graph: None,
             providers: None,
             tools: None,
+            skills: None,
             registry: None,
             capabilities: vec![ProviderCapability::Text, ProviderCapability::Embedding],
             context_window: 1024,
@@ -321,6 +323,7 @@ impl Harness {
         }
         let chat = ChatService::new(ChatServiceOptions {
             tools: options.tools,
+            skills: options.skills,
             logger: logger.clone(),
             ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), registry)
         })

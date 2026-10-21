@@ -9,6 +9,7 @@ pub mod runtimes;
 pub mod secrets;
 mod server;
 pub mod settings;
+pub mod skills;
 pub mod system;
 pub mod tools;
 pub mod vector_stores;
@@ -28,6 +29,7 @@ pub fn register(server: &mut IpcServer) {
     runtimes::register(server);
     tools::register(server);
     mcp::register(server);
+    skills::register(server);
     chat::register(server);
 }
 
@@ -139,6 +141,15 @@ mod tests {
                 "secrets.update",
                 "settings.get",
                 "settings.set",
+                "skills.create",
+                "skills.export",
+                "skills.get",
+                "skills.import",
+                "skills.list",
+                "skills.remove",
+                "skills.run",
+                "skills.test",
+                "skills.update",
                 "system.demoJob",
                 "system.demoStream",
                 "system.device",

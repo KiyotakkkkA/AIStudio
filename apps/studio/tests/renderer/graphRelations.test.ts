@@ -114,7 +114,16 @@ const NO_RUNS: RunCountsDto = {
     cancelled: 0,
     interrupted: 0,
   },
-  byKind: { chat: 0, scenario: 0, agentic: 0, job: 0, indexing: 0, download: 0, browser: 0 },
+  byKind: {
+    chat: 0,
+    scenario: 0,
+    agentic: 0,
+    job: 0,
+    indexing: 0,
+    download: 0,
+    browser: 0,
+    skill: 0,
+  },
 };
 
 function setup() {

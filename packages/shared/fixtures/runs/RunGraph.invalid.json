@@ -23,5 +23,19 @@
       "nodes": [],
       "permissionScopes": null
     }
+  },
+  {
+    "name": "bad allowed tool",
+    "value": {
+      "nodes": [],
+      "allowedTools": ["search"]
+    }
+  },
+  {
+    "name": "null allowed tools",
+    "value": {
+      "nodes": [],
+      "allowedTools": null
+    }
   }
 ]

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { RunId, StreamId } from "../primitives/branded.js";
 import { RunOutcomeDto } from "../events/HostEvent.js";
+import { TOOL_KEY_PATTERN } from "../tools/ToolDto.js";
 
 export const RunStatus = z.enum([
   "queued",
@@ -19,6 +20,7 @@ export const RunKind = z.enum([
   "indexing",
   "download",
   "browser",
+  "skill",
 ]);
 export const GraphNode = z.object({
   id: z.string().min(1).max(128),
@@ -45,6 +47,7 @@ export type GraphNode = z.infer<typeof GraphNode>;
 export const RunGraph = z.object({
   nodes: z.array(GraphNode).max(10_000),
   permissionScopes: z.array(z.string().regex(/^(skill|scenario|site):.+$/)).optional(),
+  allowedTools: z.array(z.string().max(128).regex(TOOL_KEY_PATTERN)).max(256).optional(),
 });
 export type RunGraph = z.infer<typeof RunGraph>;
 export const StartRunInput = z.object({

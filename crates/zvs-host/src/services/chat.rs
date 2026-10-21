@@ -53,6 +53,7 @@ use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 use crate::services::mcp::{RESOURCE_READER, tool_key};
+use crate::skills::{SKILL_LOAD, SKILL_TOOLS, SkillCatalogue, catalogue_text};
 use crate::tools::ToolRegistry;
 use zvs_contract::mcp::MCP_INSTRUCTIONS_MAX;
 use zvs_contract::{ToolDto, ToolSource};
@@ -98,6 +99,7 @@ pub struct ChatServiceOptions {
     pub runs: RunService,
     pub registry: Arc<NodeRegistry>,
     pub tools: Option<ToolRegistry>,
+    pub skills: Option<Arc<dyn SkillCatalogue>>,
     pub logger: SharedLogger,
     pub clock: SharedClock,
 }
@@ -109,6 +111,7 @@ impl ChatServiceOptions {
             runs,
             registry,
             tools: None,
+            skills: None,
             logger: silent_logger(),
             clock: Arc::new(SystemClock),
         }
@@ -126,6 +129,7 @@ struct Model {
 struct Inner {
     database: Arc<Database>,
     tools: Option<ToolRegistry>,
+    skills: Option<Arc<dyn SkillCatalogue>>,
     logger: SharedLogger,
     clock: SharedClock,
 }
@@ -629,7 +633,7 @@ impl Validate for ChatPersistInput {
 }
 
 struct PrepareNode(Arc<Inner>);
-struct GenerateChatNode(Arc<Inner>);
+pub(crate) struct GenerateChatNode(Arc<Inner>);
 struct PersistNode(Arc<Inner>);
 
 const fn chat_role(role: MessageRole) -> ChatRole {
@@ -976,8 +980,25 @@ impl NodeDef for PrepareNode {
                 }
             }
         }
+        let skill_entries = match (&inner.skills, tools_usable) {
+            (Some(skills), true) => skills.catalogue(&user.content, &context.cancel).await,
+            _ => Vec::new(),
+        };
+        if !skill_entries.is_empty() {
+            for key in SKILL_TOOLS {
+                if !enabled.iter().any(|known| known == key) {
+                    enabled.push(key.to_owned());
+                }
+            }
+        }
         let guidance = inner.mcp_guidance(&mut enabled, &registered)?;
         let offered = offered_tools(&enabled, &registered);
+        let skill_note =
+            if !skill_entries.is_empty() && offered.iter().any(|tool| tool.key == SKILL_LOAD) {
+                catalogue_text(&skill_entries, &offered)
+            } else {
+                String::new()
+            };
         let knowledge_on =
             wants_knowledge && offered.iter().any(|tool| tool.key == KNOWLEDGE_SEARCH);
         let query = input.query.clone().unwrap_or_else(|| user.content.clone());
@@ -1045,7 +1066,7 @@ impl NodeDef for PrepareNode {
         } else {
             String::new()
         };
-        let prompt = [details.system_prompt.clone(), prompt, guidance]
+        let prompt = [details.system_prompt.clone(), prompt, guidance, skill_note]
             .into_iter()
             .filter(|part| !part.trim().is_empty())
             .collect::<Vec<_>>()
@@ -1162,10 +1183,10 @@ impl NodeDef for PrepareNode {
     }
 }
 
-struct RoundOutput {
-    text: String,
-    reasoning: String,
-    tool_calls: Vec<ToolCall>,
+pub(crate) struct RoundOutput {
+    pub(crate) text: String,
+    pub(crate) reasoning: String,
+    pub(crate) tool_calls: Vec<ToolCall>,
 }
 
 struct CallOptions<'a> {
@@ -1232,7 +1253,7 @@ fn compact_knowledge(
 }
 
 impl GenerateChatNode {
-    async fn generate_round(
+    pub(crate) async fn generate_round(
         context: &StepContext,
         driver: &SharedTextDriver,
         request: &GenerateRequest,
@@ -1758,6 +1779,7 @@ impl ChatService {
         let inner = Arc::new(Inner {
             database: options.database,
             tools: options.tools,
+            skills: options.skills,
             logger: options.logger,
             clock: options.clock,
         });

@@ -905,3 +905,96 @@ async fn an_offered_mcp_tool_brings_its_server_instructions_and_resource_reader(
     assert!(system.contains("Read testix://instructions/questions before importing."));
     assert!(system.contains("«Testix»"));
 }
+
+struct OneSkill;
+
+#[async_trait]
+impl crate::skills::SkillCatalogue for OneSkill {
+    async fn catalogue(
+        &self,
+        query: &str,
+        _cancel: &CancellationToken,
+    ) -> Vec<crate::skills::SkillCatalogueEntry> {
+        assert_eq!(query, "Write the release notes");
+        vec![crate::skills::SkillCatalogueEntry {
+            key: "release-notes".to_owned(),
+            description: "Writes release notes from a change list".to_owned(),
+        }]
+    }
+}
+
+#[tokio::test]
+async fn a_turn_lists_the_skills_and_offers_skill_load_even_when_the_conversation_did_not_pick_it()
+{
+    let database = temporary_database();
+    let registry = Arc::new(NodeRegistry::new());
+    register_core_nodes(&registry).expect("registers the core nodes");
+    registry
+        .register(FnNode::new(
+            crate::skills::SKILL_LOAD,
+            PermissionRequirement::tool(crate::skills::SKILL_LOAD),
+            false,
+            |_context: StepContext, input: Value| async move {
+                Ok(TextOutput {
+                    text: format!(
+                        "instructions for {}",
+                        input["key"].as_str().unwrap_or_default()
+                    ),
+                })
+            },
+        ))
+        .expect("registers skill.load");
+    let tools = ToolRegistry::new(ToolRegistryOptions::new(database.shared()));
+    for key in crate::skills::SKILL_TOOLS {
+        tools
+            .register(&ToolDescriptor {
+                read_only: true,
+                ..ToolDescriptor::new(key, ToolSource::Builtin)
+            })
+            .expect("registers a skill tool");
+    }
+    let driver = Scripted::new();
+    driver.round(|_| vec![call("skill__load", &json!({ "key": "release-notes" }))]);
+    driver.fallback(|_| vec![text("Notes.")]);
+    let harness = Harness::with(HarnessOptions {
+        database: Some(database.shared()),
+        providers: Some(Arc::new(OneDriver(Arc::clone(&driver) as SharedTextDriver))),
+        tools: Some(tools),
+        skills: Some(Arc::new(OneSkill)),
+        registry: Some(registry),
+        capabilities: vec![ProviderCapability::Text],
+        context_window: 16384,
+        max_output: 512,
+        ..HarnessOptions::default()
+    });
+    let created = harness.create(harness.input());
+
+    let handle = within(harness.turn(created, "Write the release notes")).await;
+
+    assert_eq!(harness.status(&handle), RunStatus::Succeeded);
+    let requests = driver.requests();
+    let mut offered: Vec<&str> = requests[0]
+        .tools
+        .iter()
+        .map(|tool| tool.name.as_str())
+        .collect();
+    offered.sort_unstable();
+    assert_eq!(offered, ["skill__load", "skill__read"]);
+    let system = requests[0].system.clone().unwrap_or_default();
+    assert!(system.contains("call skill__load with its key"), "{system}");
+    assert!(system.contains(
+        "<skills>
+- release-notes: Writes release notes from a change list
+</skills>"
+    ));
+    let assistant = harness.last(created);
+    assert_eq!(assistant.tool_calls[0].key, crate::skills::SKILL_LOAD);
+    assert_eq!(
+        assistant.tool_calls[0].status,
+        ChatToolCallStatus::Succeeded
+    );
+    assert_eq!(
+        assistant.tool_calls[0].result.as_deref(),
+        Some("instructions for release-notes")
+    );
+}

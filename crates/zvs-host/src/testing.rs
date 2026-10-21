@@ -372,6 +372,15 @@ pub fn test_services(system: SystemService) -> TestServices {
         clock: clock.clone(),
         ..crate::tools::ToolRegistryOptions::new(database.shared())
     });
+    let skill_library = crate::skills::SkillLibrary::new(crate::skills::SkillLibraryOptions {
+        clock: clock.clone(),
+        ..crate::skills::SkillLibraryOptions::new(
+            database.shared(),
+            workspace.join(crate::skills::SKILLS_DIR),
+            tools.clone(),
+        )
+    });
+    crate::skills::register_skill_nodes(&nodes, &skill_library).expect("registers the skill nodes");
     crate::tools::register_kernel_tools(&nodes, &tools).expect("registers the kernel tools");
     let runs = RunService::new(RunServiceOptions {
         clock: clock.clone(),
@@ -405,8 +414,16 @@ pub fn test_services(system: SystemService) -> TestServices {
             reqwest::Client::new(),
         )
     });
+    let picker = FakePicker::shared();
+    let skills = crate::skills::SkillService::new(crate::skills::SkillServiceOptions {
+        drivers: Some(drivers.clone()),
+        settings: Some(settings.clone()),
+        picker: Some(picker.clone()),
+        ..crate::skills::SkillServiceOptions::new(skill_library, runs.clone(), database.shared())
+    });
     let chat = crate::services::ChatService::new(crate::services::ChatServiceOptions {
         tools: Some(tools.clone()),
+        skills: Some(Arc::new(skills.clone())),
         clock: clock.clone(),
         ..crate::services::ChatServiceOptions::new(
             database.shared(),
@@ -415,7 +432,6 @@ pub fn test_services(system: SystemService) -> TestServices {
         )
     })
     .expect("a chat service");
-    let picker = FakePicker::shared();
     TestServices {
         services: Arc::new(Services {
             system,
@@ -436,6 +452,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             tools,
             tool_invoker,
             mcp,
+            skills,
             chat,
             picker: Some(picker.clone()),
         }),

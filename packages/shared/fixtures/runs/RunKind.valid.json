@@ -26,5 +26,9 @@
   {
     "name": "browser",
     "value": "browser"
+  },
+  {
+    "name": "skill",
+    "value": "skill"
   }
 ]

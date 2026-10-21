@@ -1,0 +1,9 @@
+[
+  {
+    "name": "bad rule",
+    "value": {
+      "field": "key",
+      "rule": "other"
+    }
+  }
+]

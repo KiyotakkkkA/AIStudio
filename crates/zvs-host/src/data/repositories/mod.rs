@@ -10,6 +10,7 @@ pub mod provider;
 pub mod run;
 pub mod secret;
 pub mod setting;
+pub mod skill;
 pub mod tool;
 pub mod vector_document;
 pub mod vector_eval_case;
@@ -37,6 +38,7 @@ pub use secret::{
     SecretDraft, SecretFilter, SecretPatch, SecretRepository, SecretUsageDraft, secret_in_use,
 };
 pub use setting::SettingRepository;
+pub use skill::SkillRepository;
 pub use tool::{ToolPatch, ToolRepository};
 pub use vector_document::{VectorDocumentDraft, VectorDocumentRepository};
 pub use vector_eval_case::{VectorEvalCaseDraft, VectorEvalCaseRepository};
@@ -61,6 +63,7 @@ pub struct Repositories<'c> {
     pub tools: ToolRepository<'c>,
     pub mcp_servers: McpServerRepository<'c>,
     pub chat: ChatRepository<'c>,
+    pub skills: SkillRepository<'c>,
 }
 
 impl<'c> Repositories<'c> {
@@ -83,6 +86,7 @@ impl<'c> Repositories<'c> {
             tools: ToolRepository::new(connection),
             mcp_servers: McpServerRepository::new(connection),
             chat: ChatRepository::new(connection),
+            skills: SkillRepository::new(connection),
         }
     }
 }

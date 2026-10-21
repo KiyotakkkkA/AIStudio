@@ -46,6 +46,7 @@ pub fn start_index_run(
         RunGraph {
             nodes: vec![node],
             permission_scopes: None,
+            allowed_tools: None,
         },
     );
     start.subject_id = Some(store.id.clone());

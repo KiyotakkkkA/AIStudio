@@ -55,6 +55,7 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 | `tools`                    | `ToolRegistry` (tiers, ceiling, defaults, usage, references), `ToolInvoker`, `register_kernel_tools`              |
 | `services::mcp`            | `McpService`: servers, supervision, discovery into the registry, health, autostart, `derive_namespace`            |
 | `drivers::mcp`             | The `rmcp` client, `StdioTransport`, `McpHttpClient`, Windows `.cmd` launch, the isolated toolchain env           |
+| `skills`                   | `SkillLibrary` (`SKILL.md` folders, index, checks), `SkillService` (trigger match, runs), `skill.*` nodes         |
 | `services::chat`           | `ChatService`, the `chat.prepare` / `chat.generate` / `chat.persist` nodes, the tool-calling loop                 |
 | `services::chat_history`   | `window_chat_history` (budget, passages, neighbours, related documents, citations), `join_chunks`, `fence_source` |
 | `services::chat_tools`     | `offered_tools`, `wire_tool_name`, result budget, capping and fencing, the loop caps                              |
