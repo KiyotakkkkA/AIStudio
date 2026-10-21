@@ -73,7 +73,7 @@ export function serverState(server: McpServerDto, health: McpHealthDto | null): 
   return server.lastConnectedAt === null ? "never" : "stopped";
 }
 
-function plural(count: number, one: string, few: string, many: string): string {
+export function plural(count: number, one: string, few: string, many: string): string {
   const tail = count % 100;
   const last = count % 10;
   if (tail >= 11 && tail <= 14) return `${String(count)} ${many}`;

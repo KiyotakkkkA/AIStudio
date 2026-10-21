@@ -9,6 +9,7 @@ import {
 import { isIpcError } from "@zvs/ipc";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 import {
+  plural,
   serverState,
   STATE_LABELS,
   STATE_TONES,
@@ -41,11 +42,7 @@ export const DEFAULT_TIER_HINT =
   "По типу: только чтение — auto, с побочными эффектами — ask, разрушающие — off.";
 
 export function sourcesWord(count: number): string {
-  const tail = count % 100;
-  const last = count % 10;
-  if (tail >= 11 && tail <= 14) return `${String(count)} источников`;
-  if (last === 1) return `${String(count)} источника`;
-  return `${String(count)} источников`;
+  return plural(count, "источник", "источника", "источников");
 }
 
 export function headerLine(tools: number, sources: number): string {
@@ -121,12 +118,7 @@ function isRecord(value: Json): value is { [key: string]: Json } {
 }
 
 function itemsWord(count: number): string {
-  const tail = count % 100;
-  const last = count % 10;
-  if (tail >= 11 && tail <= 14) return `${String(count)} элементов`;
-  if (last === 1) return `${String(count)} элемент`;
-  if (last >= 2 && last <= 4) return `${String(count)} элемента`;
-  return `${String(count)} элементов`;
+  return plural(count, "элемент", "элемента", "элементов");
 }
 
 function outputSummary(output: Json): string {
