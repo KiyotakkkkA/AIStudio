@@ -14,7 +14,7 @@ export default observer(function ChatApprovals({ store }: { readonly store: Chat
           <p className="min-w-0 flex-1 text-[13px] text-main-100">
             Разрешить{" "}
             {request.subject === "llm.generate"
-              ? "модели создать ответ"
+              ? "генерацию ответа"
               : request.subject === "vector.search"
                 ? "поиск в подключённом хранилище"
                 : request.subject}{" "}

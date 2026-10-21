@@ -121,7 +121,7 @@ export default observer(function TasksWorkspace() {
                 <EmptyState
                   icon={mdiClockOutline}
                   title="Активных задач нет"
-                  description="Запустите ход чата или сценарий — он появится здесь сразу, без обновления страницы."
+                  description="Активные ходы чата и сценарии отображаются здесь."
                 />
               </div>
             ) : null}

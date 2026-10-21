@@ -126,7 +126,10 @@ pub trait VectorSearch: Send + Sync {
 }
 
 fn unavailable() -> AppError {
-    AppError::new(AppErrorCode::Conflict, "Vector service unavailable")
+    AppError::new(
+        AppErrorCode::Conflict,
+        "Сервис векторного поиска недоступен",
+    )
 }
 
 #[async_trait]

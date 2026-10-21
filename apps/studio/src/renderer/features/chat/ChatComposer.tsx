@@ -364,8 +364,8 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               onChange={() => void store.toggleRelations()}
             />
             <p className="mt-1.5 text-[12px] text-main-500">
-              Документы, связанные с найденными на вкладке «Связи», добавляются в контекст ниже
-              основных источников и помечаются как связанные.
+              Связанные документы добавляются в контекст после основных источников и помечаются как
+              связанные.
             </p>
           </div>
         </div>

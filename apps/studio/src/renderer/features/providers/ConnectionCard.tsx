@@ -260,8 +260,8 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
           <Icon path={mdiFlashOutline} size={15} />
           {providers.probing
             ? vm.isLocal
-              ? "Ищем…"
-              : "Проверяем…"
+              ? "Поиск…"
+              : "Проверка…"
             : vm.isLocal
               ? "Найти модели"
               : "Проверить связь"}

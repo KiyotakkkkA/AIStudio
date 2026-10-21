@@ -298,7 +298,7 @@ mod tests {
     fn conversation(id: &str, provider_id: &str, updated_at: Timestamp) -> ConversationRow {
         ConversationRow {
             id: id.to_owned(),
-            title: "New conversation".to_owned(),
+            title: "Новый диалог".to_owned(),
             provider_id: provider_id.to_owned(),
             model_id: "m".to_owned(),
             settings: ChatSettings {

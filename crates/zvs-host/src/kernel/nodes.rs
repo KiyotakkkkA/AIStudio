@@ -19,7 +19,7 @@ use crate::indexing::{IndexContext, IndexProgress};
 use crate::services::vector_stores::VectorSearchOptions;
 
 pub const PROVIDERS_UNAVAILABLE: &str = "Provider service unavailable";
-pub const VECTORS_UNAVAILABLE: &str = "Vector service unavailable";
+pub const VECTORS_UNAVAILABLE: &str = "Сервис векторного поиска недоступен";
 pub const JOBS_UNAVAILABLE: &str = "Сервис задач недоступен";
 pub const INDEXING_UNAVAILABLE: &str = "Сервис индексации недоступен";
 

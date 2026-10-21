@@ -606,7 +606,7 @@ export default class ChatStore {
     try {
       if (!this.active) {
         const conversation = await this.ipc.call("chat.conversations.create", {
-          title: "New conversation",
+          title: "Новый диалог",
           providerId: this.provider!.id,
           modelId: this.modelId,
           settings: { temperature: this.composer.temperature },
@@ -862,5 +862,5 @@ export default class ChatStore {
 }
 
 function errorCopy(error: unknown) {
-  return error instanceof Error ? error.message : "Unable to load chat. Please try again.";
+  return error instanceof Error ? error.message : "Не удалось загрузить чат. Попробуйте ещё раз.";
 }

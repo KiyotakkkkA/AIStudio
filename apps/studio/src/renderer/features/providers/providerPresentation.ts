@@ -116,7 +116,7 @@ export function statusTone(status: ProviderStatus): StatusTone {
 export const STATUS_LABELS: Record<ProviderStatus, string> = {
   unknown: "Не проверялся",
   ok: "Подключён",
-  degraded: "Работает с оговорками",
+  degraded: "Работает с ограничениями",
   failed: "Ошибка подключения",
   "needs-relink": "Нужна повторная привязка",
 };
@@ -172,7 +172,7 @@ export function probeLine(outcome: ProbeOutcomeDto): ProbeLine {
       return {
         tone: "warn",
         text: "Аккаунт не привязан",
-        detail: "Свяжите аккаунт вендора, чтобы запросы получили сессию.",
+        detail: "Привяжите аккаунт вендора для получения сессии.",
         relink: true,
       };
     case "session-expired":
@@ -191,7 +191,7 @@ export function probeLine(outcome: ProbeOutcomeDto): ProbeLine {
         detail:
           outcome.retryAfter === undefined
             ? "Провайдер ограничил частоту запросов."
-            : `Провайдер просит повторить через ${String(outcome.retryAfter)} с.`,
+            : `Повторите запрос через ${String(outcome.retryAfter)} с.`,
         relink: false,
       };
     default:

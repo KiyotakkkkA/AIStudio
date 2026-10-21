@@ -26,7 +26,9 @@ use crate::kernel::{
 };
 use crate::platform::events::EventBus;
 use crate::services::VectorStoreService;
-use crate::services::chat_history::{SOURCES_HEADING, SOURCES_INSTRUCTION, tokens};
+use crate::services::chat_history::{
+    BUDGET_EXCEEDED, SOURCES_HEADING, SOURCES_INSTRUCTION, tokens,
+};
 use crate::services::rerank::{Reranker, RerankerSource, SharedReranker};
 use crate::services::runs::RunServiceOptions;
 use crate::services::vector_stores::VectorSearchOptions;
@@ -597,14 +599,10 @@ async fn cancelling_mid_stream_persists_the_prefix_before_the_end_event_and_rele
         .chat
         .send(&ChatSendInput::new(created, "Concurrent"))
         .expect_err("busy");
-    assert!(concurrent.message.contains("active turn"));
-    assert!(
-        harness
-            .chat
-            .remove(&created)
-            .expect_err("busy")
-            .message
-            .contains("active turn")
+    assert_eq!(concurrent.message, ACTIVE_TURN);
+    assert_eq!(
+        harness.chat.remove(&created).expect_err("busy").message,
+        ACTIVE_TURN
     );
     within(harness.chat.cancel(&handle.id))
         .await
@@ -737,7 +735,7 @@ async fn oversized_mandatory_prompts_fail_before_persisting_or_launching_a_run()
         .chat
         .send(&ChatSendInput::new(created, "current"))
         .expect_err("over budget");
-    assert!(error.message.contains("context budget"));
+    assert_eq!(error.message, BUDGET_EXCEEDED);
     assert!(harness.messages(created).is_empty());
     assert!(
         harness

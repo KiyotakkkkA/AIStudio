@@ -32,7 +32,7 @@ export const NAV_GROUPS: readonly NavGroupModel[] = [
         icon: mdiCreationOutline,
         path: ROUTES.agenticBuild,
       },
-      { id: "providers", label: "Провадеры", icon: mdiLayersOutline, path: ROUTES.providers },
+      { id: "providers", label: "Провайдеры", icon: mdiLayersOutline, path: ROUTES.providers },
       { id: "scenarios", label: "Сценарии", icon: mdiGraphOutline, path: ROUTES.scenarios },
     ],
   },

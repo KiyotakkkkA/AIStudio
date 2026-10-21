@@ -247,7 +247,7 @@ test("an offline source explains why its tools are unavailable", () => {
     title: "Источник офлайн: filesystem — ошибка подключения",
     detail: "spawn npx ENOENT",
   });
-  expect(unavailability(REGISTRY[5]!, files)?.title).toBe("Сервер-источник сейчас не подключён");
+  expect(unavailability(REGISTRY[5]!, files)?.title).toBe("Сервер-источник не подключён");
   expect(unavailability(REGISTRY[4]!, null)?.title).toBe("MCP-сервер удалён");
   expect(unavailability(REGISTRY[0]!, null)).toBeNull();
 });

@@ -41,8 +41,8 @@ function SecretsPage() {
         <div className="flex flex-1 items-center justify-center rounded-card bg-main-800">
           <EmptyState
             icon={mdiHistory}
-            title="Журнал доступа ещё не описан"
-            description="История обращений к секретам появится вместе с ядром исполнения — задача в бэклоге не заведена."
+            title="Журнал доступа недоступен"
+            description="История обращений к секретам пока не ведётся."
           />
         </div>
       ) : null}

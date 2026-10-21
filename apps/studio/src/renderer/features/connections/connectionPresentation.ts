@@ -11,12 +11,12 @@ export type ServerState =
   "never" | "stopped" | "starting" | "connected" | "reauth" | "restarting" | "failed" | "disabled";
 
 export const STATE_LABELS: Record<ServerState, string> = {
-  never: "Ещё не подключался",
+  never: "Подключение не выполнялось",
   stopped: "Остановлен",
   starting: "Запускается",
   connected: "Подключён",
   reauth: "Нужна повторная авторизация",
-  restarting: "Упал · перезапускается",
+  restarting: "Сбой · перезапуск",
   failed: "Ошибка подключения",
   disabled: "Выключен",
 };
@@ -73,7 +73,7 @@ export function serverState(server: McpServerDto, health: McpHealthDto | null): 
   return server.lastConnectedAt === null ? "never" : "stopped";
 }
 
-function plural(count: number, one: string, few: string, many: string): string {
+export function plural(count: number, one: string, few: string, many: string): string {
   const tail = count % 100;
   const last = count % 10;
   if (tail >= 11 && tail <= 14) return `${String(count)} ${many}`;
@@ -129,7 +129,7 @@ export function failureCopy(error: string | null): { title: string; hint: string
   if (SIGN_IN_FAILURE.test(message)) {
     return {
       title: message,
-      hint: "Откроется браузер: войдите в аккаунт, и приложение подключит сервер само.",
+      hint: "Войдите в аккаунт в открывшемся браузере — подключение завершится автоматически.",
     };
   }
   if (needsReauthorisation(message)) {
@@ -147,14 +147,14 @@ export function failureCopy(error: string | null): { title: string; hint: string
   if (/timeout|тайм-?аут|не ответил/i.test(message)) {
     return {
       title: message,
-      hint: "Сервер не уложился во время ожидания. Проверьте аргументы и что процесс пишет протокол в stdout.",
+      hint: "Превышено время ожидания. Проверьте аргументы запуска и вывод протокола в stdout.",
     };
   }
   if (/секрет|secret/i.test(message)) {
     return { title: message, hint: "Один из секретов окружения недоступен — выберите другой." };
   }
   if (/выключен/i.test(message)) {
-    return { title: message, hint: "Включите сервер переключателем в карточке, затем проверьте." };
+    return { title: message, hint: "Включите сервер и повторите проверку." };
   }
   if (/ECONNREFUSED|недоступен|fetch failed/i.test(message)) {
     return { title: message, hint: "Адрес не отвечает. Убедитесь, что сервер запущен и доступен." };

@@ -689,7 +689,7 @@ mod tests {
                         .remove(&first)
                         .map_err(message)
                         .expect_err("refuses"),
-                    format!("CONFLICT: Секрет используется (1) и не может быть удалён")
+                    "CONFLICT: Секрет используется (1) и не может быть удалён"
                 );
                 assert!(
                     connection

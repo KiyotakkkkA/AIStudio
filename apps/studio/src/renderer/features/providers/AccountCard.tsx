@@ -110,7 +110,7 @@ function AccountCard({
             onClick={onRecheck}
           >
             <Icon path={mdiRefresh} size={15} />
-            {checking ? "Проверяем…" : "Проверить сессию"}
+            {checking ? "Проверка…" : "Проверить сессию"}
           </Button>
         )}
         <Button

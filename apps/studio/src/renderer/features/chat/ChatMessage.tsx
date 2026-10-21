@@ -15,7 +15,7 @@ export default function ChatMessage({
   stores,
   partial = false,
   generating = false,
-  status = "Думает",
+  status = "Обработка запроса",
   usage,
   tools,
   onEdit,
@@ -61,7 +61,7 @@ export default function ChatMessage({
                     <Icon path={mdiThoughtBubbleOutline} size={14} />
                   </span>
                   <span className={`truncate ${thinking ? "zvs-shimmer-text" : ""}`}>
-                    {thinking ? "Размышляет…" : "Размышления"}
+                    {thinking ? "Размышления…" : "Размышления"}
                   </span>
                   <span className="shrink-0 font-mono text-[11px] font-normal text-main-500 tabular-nums">
                     {reasoningWords(reasoning)} сл.

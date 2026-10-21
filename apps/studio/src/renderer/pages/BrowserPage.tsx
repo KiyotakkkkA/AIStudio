@@ -25,7 +25,7 @@ export default function BrowserPage() {
     };
   }, []);
   return (
-    <div ref={panel} className="relative min-h-0 flex-1" aria-label="Browser workspace">
+    <div ref={panel} className="relative min-h-0 flex-1" aria-label="Рабочая область браузера">
       {error && (
         <p role="alert" className="p-5 text-err">
           Не удалось открыть браузер. Перейдите на другую страницу и попробуйте снова.

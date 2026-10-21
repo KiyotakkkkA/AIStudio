@@ -9,6 +9,7 @@ import {
 import { isIpcError } from "@zvs/ipc";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 import {
+  plural,
   serverState,
   STATE_LABELS,
   STATE_TONES,
@@ -23,7 +24,7 @@ export {
   toolsWord,
 } from "../connections/connectionPresentation";
 
-export const TIER_FILTER_LABELS = { auto: "Auto", ask: "Ask first", off: "Off" } as const;
+export const TIER_FILTER_LABELS = { auto: "auto", ask: "ask", off: "off" } as const;
 
 export const TIER_TONES = { auto: "ok", ask: "warn", off: "idle" } as const satisfies Record<
   ToolDto["tier"],
@@ -41,11 +42,7 @@ export const DEFAULT_TIER_HINT =
   "По типу: только чтение — auto, с побочными эффектами — ask, разрушающие — off.";
 
 export function sourcesWord(count: number): string {
-  const tail = count % 100;
-  const last = count % 10;
-  if (tail >= 11 && tail <= 14) return `${String(count)} источников`;
-  if (last === 1) return `${String(count)} источника`;
-  return `${String(count)} источников`;
+  return plural(count, "источник", "источника", "источников");
 }
 
 export function headerLine(tools: number, sources: number): string {
@@ -89,7 +86,7 @@ export function unavailability(tool: ToolDto, server: McpServerDto | null): Unav
   if (tool.available) {
     if (tool.source === "mcp" && server !== null && server.status === "failed")
       return {
-        title: "Сервер-источник сейчас не подключён",
+        title: "Сервер-источник не подключён",
         detail: server.lastError,
       };
     return null;
@@ -98,7 +95,7 @@ export function unavailability(tool: ToolDto, server: McpServerDto | null): Unav
     if (server === null)
       return {
         title: "MCP-сервер удалён",
-        detail: "Инструмент остался в реестре с прежним разрешением, но вызвать его нельзя.",
+        detail: "Инструмент остался в реестре, но его вызов невозможен.",
       };
     const state = serverState(server, null);
     return {
@@ -107,7 +104,7 @@ export function unavailability(tool: ToolDto, server: McpServerDto | null): Unav
         server.lastError ??
         (state === "disabled"
           ? "Сервер выключен на странице «Коннекторы»."
-          : "Подключите сервер на странице «Коннекторы», чтобы инструмент снова стал доступен."),
+          : "Подключите сервер на странице «Коннекторы»."),
     };
   }
   return {
@@ -121,12 +118,7 @@ function isRecord(value: Json): value is { [key: string]: Json } {
 }
 
 function itemsWord(count: number): string {
-  const tail = count % 100;
-  const last = count % 10;
-  if (tail >= 11 && tail <= 14) return `${String(count)} элементов`;
-  if (last === 1) return `${String(count)} элемент`;
-  if (last >= 2 && last <= 4) return `${String(count)} элемента`;
-  return `${String(count)} элементов`;
+  return plural(count, "элемент", "элемента", "элементов");
 }
 
 function outputSummary(output: Json): string {
@@ -160,7 +152,7 @@ const COPY: Partial<Record<AppErrorCode, string>> = {
   [AppErrorCode.VALIDATION_FAILED]: "Входные данные не подходят под схему инструмента.",
   [AppErrorCode.NOT_FOUND]: "Инструмент не найден — возможно, он уже удалён из реестра.",
   [AppErrorCode.DB_ERROR]: "Сбой локальной базы данных.",
-  [AppErrorCode.NOT_IMPLEMENTED]: "Эта функция ещё не перенесена в новую оболочку приложения.",
+  [AppErrorCode.NOT_IMPLEMENTED]: "Функция пока недоступна.",
 };
 
 const HOST_WORDED = new Set<AppErrorCode>([

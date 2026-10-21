@@ -37,7 +37,7 @@ function SecretsWorkspace() {
             <EmptyState
               icon={mdiKeyOutline}
               title="Секрет не выбран"
-              description="Выберите секрет слева или создайте новый — форма собирается по схеме выбранного типа."
+              description="Выберите секрет в списке или создайте новый."
             />
           </div>
         ) : (

@@ -67,18 +67,18 @@ pub const DEFAULT_CONTEXT_WINDOW: i64 = 8192;
 pub const DEFAULT_MAX_OUTPUT: i64 = 1024;
 pub const TITLE_MAX: usize = 80;
 pub const DEFAULT_TOOL_RESULT_CHARS: u64 = 4000;
-pub const CONVERSATION_NOT_FOUND: &str = "Conversation not found";
-pub const MESSAGE_NOT_FOUND: &str = "Message not found";
-pub const STORE_NOT_FOUND: &str = "Vector store not found";
+pub const CONVERSATION_NOT_FOUND: &str = "Диалог не найден";
+pub const MESSAGE_NOT_FOUND: &str = "Сообщение не найдено";
+pub const STORE_NOT_FOUND: &str = "Векторное хранилище не найдено";
 pub const TOOL_NOT_FOUND: &str = "Инструмент не найден";
-pub const ACTIVE_TURN: &str = "Conversation already has an active turn";
-pub const INVALID_TURN: &str = "Invalid chat turn";
-pub const NOT_A_CHAT_RUN: &str = "Not a chat run";
-pub const FOREIGN_MESSAGE: &str = "Message does not belong to this run";
-pub const PROVIDER_UNAVAILABLE: &str = "Text provider unavailable";
-pub const MODEL_UNAVAILABLE: &str = "Text model unavailable";
-pub const OUTPUT_BUDGET: &str = "Output budget exceeds model limits";
-pub const PROVIDERS_UNAVAILABLE: &str = "Provider service unavailable";
+pub const ACTIVE_TURN: &str = "В диалоге уже выполняется ход";
+pub const INVALID_TURN: &str = "Некорректный ход чата";
+pub const NOT_A_CHAT_RUN: &str = "Запуск не относится к чату";
+pub const FOREIGN_MESSAGE: &str = "Сообщение не принадлежит этому запуску";
+pub const PROVIDER_UNAVAILABLE: &str = "Текстовый провайдер недоступен";
+pub const MODEL_UNAVAILABLE: &str = "Текстовая модель недоступна";
+pub const OUTPUT_BUDGET: &str = "Бюджет ответа превышает ограничения модели";
+pub const PROVIDERS_UNAVAILABLE: &str = "Сервис провайдеров недоступен";
 pub const TOOLS_NOT_OFFERED: &str =
     "The model does not support tool calling; tools were not offered";
 pub const BUDGET_EXHAUSTED: &str = "Бюджет вызовов инструментов на этот ход исчерпан";
@@ -139,7 +139,7 @@ pub struct ChatService {
 fn malformed(field: &str) -> AppError {
     AppError::new(
         AppErrorCode::Unknown,
-        format!("Сохранённый разговор повреждён: {field}"),
+        format!("Сохранённый диалог повреждён: {field}"),
     )
 }
 

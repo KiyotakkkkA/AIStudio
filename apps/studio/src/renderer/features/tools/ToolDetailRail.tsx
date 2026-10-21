@@ -19,9 +19,9 @@ import { sourceLabel } from "./toolPresentation";
 import TryItPanel from "./TryItPanel";
 
 const TIER_OPTIONS: readonly { value: ToolTier; label: string }[] = [
-  { value: "auto", label: "Auto" },
-  { value: "ask", label: "Ask" },
-  { value: "off", label: "Off" },
+  { value: "auto", label: "auto" },
+  { value: "ask", label: "ask" },
+  { value: "off", label: "off" },
 ];
 
 const SECTION = "text-[11px] font-semibold tracking-[0.08em] text-main-400 uppercase";

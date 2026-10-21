@@ -42,7 +42,7 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
             <EmptyState
               icon={mdiLayersOutline}
               title="Подключений нет"
-              description="Добавьте первое подключение: ключ берётся из секретов, модели — из проверки связи."
+              description="Добавьте подключение: ключ выбирается из секретов, список моделей приходит после проверки связи."
             />
           </div>
         ) : null}

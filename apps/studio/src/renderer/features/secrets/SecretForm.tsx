@@ -198,7 +198,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
               id="secret-note"
               value={vm.note}
               maxLength={2000}
-              placeholder="Для чего этот ключ и где его не стоит использовать."
+              placeholder="Назначение ключа и ограничения на его использование"
               onChange={(event) => {
                 vm.setNote(event.target.value);
               }}
@@ -211,7 +211,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
         <Icon path={mdiLockOutline} size={15} className="flex-none text-ok" />
         <span
           className="line-clamp-2 min-w-0 flex-1 text-[12px] text-main-400"
-          title="Значение шифруется хранилищем учётных данных операционной системы и не покидает эту машину, пока его не запросит провайдер."
+          title="Значение шифруется хранилищем учётных данных операционной системы и не покидает это устройство."
         >
           Значение шифруется хранилищем учётных данных операционной системы и не покидает эту
           машину, пока его не запросит провайдер.

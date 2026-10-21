@@ -177,7 +177,7 @@ function VectorEvalSection() {
             <p className="text-[12px] text-main-400">
               {evaluation.loading
                 ? "Загрузка вопросов…"
-                : "Вопросов пока нет. Добавьте несколько вопросов, ответ на которые вы знаете."}
+                : "Вопросов пока нет. Добавьте вопросы с известными ответами."}
             </p>
           ) : (
             <div className="flex flex-col gap-1.5">
