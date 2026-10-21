@@ -20,7 +20,7 @@ export const CHAT_EVAL_MODES: readonly RetrievalMode[] = ["auto", "agentic"];
 export const CHAT_EVAL_MODE_LABELS: Record<RetrievalMode, string> = {
   auto: "Перед ответом",
   hybrid: "Гибрид",
-  agentic: "Модель сама",
+  agentic: "Решает модель",
 };
 
 export default class ChatEvalStore {

@@ -40,7 +40,7 @@ function ToolTable({ store }: { readonly store: ToolStore }) {
           <EmptyState
             icon={mdiWrenchOutline}
             title="Инструментов пока нет"
-            description="Встроенные инструменты регистрируются при запуске, а инструменты MCP-серверов — при подключении на странице «Коннекторы»."
+            description="Встроенные инструменты регистрируются при запуске, инструменты MCP-серверов — после подключения сервера."
           />
         </div>
       ) : rows.length === 0 ? (

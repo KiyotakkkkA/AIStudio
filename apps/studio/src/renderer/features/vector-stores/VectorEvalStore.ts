@@ -102,7 +102,7 @@ export default class VectorEvalStore {
       expectedDocumentIds: this.expected,
     });
     if (!input.success) {
-      this.error = "Напишите вопрос и выберите от 1 до 20 ожидаемых документов.";
+      this.error = "Укажите вопрос и от 1 до 20 ожидаемых документов.";
       return false;
     }
     return this.mutate(async () => {

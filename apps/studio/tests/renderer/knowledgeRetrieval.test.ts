@@ -59,8 +59,8 @@ test("knowledge calls are summarised by their query and what was found", () => {
 
 test("a tool-less model falls back to searching before the answer", () => {
   expect(retrievalHint("agentic", "none")).toMatch(/перед ответом/);
-  expect(retrievalHint("agentic", "native")).toMatch(/сама решает/);
-  expect(retrievalHint("auto", "none")).toMatch(/Перед каждым ответом/);
+  expect(retrievalHint("agentic", "native")).toMatch(/определяет необходимость поиска/);
+  expect(retrievalHint("auto", "none")).toMatch(/перед каждым ответом/);
 });
 
 test("a model-issued search step exposes its query and passages", () => {

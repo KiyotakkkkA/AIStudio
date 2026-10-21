@@ -57,7 +57,7 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
             <EmptyState
               icon={mdiKeyPlus}
               title="Секретов пока нет"
-              description="Добавьте первый ключ — он будет зашифрован и останется на этой машине."
+              description="Добавьте ключ: значение шифруется и остаётся на этом устройстве."
             />
           </div>
         ) : null}

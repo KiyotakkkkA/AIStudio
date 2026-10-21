@@ -38,7 +38,7 @@ function VectorStoreDetail() {
           }
           description={
             store.loading || (store.selectedId && !store.error)
-              ? "Получаем настройки и статистику хранилища."
+              ? "Загрузка настроек и статистики хранилища…"
               : "Выберите хранилище слева или добавьте новое, чтобы настроить поиск по документам."
           }
         />
@@ -106,7 +106,7 @@ function VectorStoreDetail() {
               needConfirm
               modalSetup={{
                 title: `Очистить «${detail.name}»?`,
-                content: `Из хранилища будут удалены все векторы (${detail.vectors.toLocaleString("ru-RU")}) и документы (${detail.documents.toLocaleString("ru-RU")}). Само хранилище, его источники и настройки останутся — индексацию можно запустить заново. Это действие нельзя отменить.`,
+                content: `Из хранилища будут удалены все векторы (${detail.vectors.toLocaleString("ru-RU")}) и документы (${detail.documents.toLocaleString("ru-RU")}). Само хранилище, его источники и настройки сохранятся. Действие нельзя отменить.`,
                 tone: "danger",
                 confirmLabel: "Очистить",
               }}
@@ -122,7 +122,7 @@ function VectorStoreDetail() {
               needConfirm
               modalSetup={{
                 title: `Удалить «${detail.name}»?`,
-                content: `Будут удалены хранилище и его документы (${detail.documents}). Зависимые чаты и сценарии ещё не подключены к хранилищам. Это действие нельзя отменить.`,
+                content: `Будут удалены хранилище и его документы (${detail.documents}). Действие нельзя отменить.`,
                 tone: "danger",
                 confirmLabel: "Удалить",
               }}

@@ -30,16 +30,16 @@ pub const READ_MAX_CHUNKS: u64 = 12;
 pub const READ_MAX_CHARS: usize = 6000;
 pub const SECTION_SCAN_CHUNKS: u64 = 400;
 
-pub const NO_STORES: &str = "К разговору не подключены хранилища знаний";
-pub const STORE_OUT_OF_SCOPE: &str = "Это хранилище не подключено к разговору";
+pub const NO_STORES: &str = "К диалогу не подключены хранилища знаний";
+pub const STORE_OUT_OF_SCOPE: &str = "Это хранилище не подключено к диалогу";
 pub const DOCUMENT_OUT_OF_SCOPE: &str = "Документ не найден в подключённых хранилищах";
 pub const SECTION_NOT_FOUND: &str = "В документе нет раздела с таким названием";
 pub const EMPTY_QUERY: &str = "Пустой поисковый запрос";
-pub const VECTORS_MISSING: &str = "Vector service unavailable";
+pub const VECTORS_MISSING: &str = "Сервис векторного поиска недоступен";
 
-pub const SEARCH_DESCRIPTION: &str = "Search the knowledge bases attached to this conversation and get numbered passages with document path, section, page and relevance score. Use it whenever the answer may be in the user's documents; skip it for greetings and small talk. Write a focused query in your own words rather than copying the user's message. For a comparison or a multi-part question, search once per part. If the passages are thin or off-topic, search again with different wording before concluding. Cite every claim taken from a passage as [n] using the number shown on it. If repeated searches find nothing relevant, say plainly that the knowledge base does not contain the answer.";
-pub const READ_DESCRIPTION: &str = "Read a contiguous span of a document from an attached knowledge base when a search passage is too short to answer: the whole section a passage belongs to, or a range of chunk numbers. Use the documentId from a search result. Cite what you use as [n].";
-pub const LIST_DESCRIPTION: &str = "List the knowledge bases attached to this conversation with their names, descriptions and document counts, so you know what can be searched and which store name to pass to knowledge_search.";
+pub const SEARCH_DESCRIPTION: &str = "Поиск по базам знаний, подключённым к диалогу. Возвращает нумерованные фрагменты с путём документа, разделом, страницей и оценкой релевантности. Вызывайте, когда ответ может содержаться в документах пользователя; для приветствий и светской беседы — не вызывайте. Формулируйте краткий запрос своими словами, не копируйте сообщение пользователя. Для сравнения или вопроса из нескольких частей выполняйте отдельный поиск по каждой части. Если фрагменты неполные или не по теме, повторите поиск с другой формулировкой. Каждое утверждение, взятое из фрагмента, снабжайте ссылкой [n] с его номером. Если повторный поиск не дал релевантных результатов, сообщите, что ответа в базе знаний нет.";
+pub const READ_DESCRIPTION: &str = "Чтение непрерывной части документа из подключённой базы знаний, когда найденного фрагмента недостаточно для ответа: весь раздел, которому принадлежит фрагмент, либо диапазон номеров фрагментов. Используйте documentId из результата поиска. Использованное содержимое снабжайте ссылкой [n].";
+pub const LIST_DESCRIPTION: &str = "Список баз знаний, подключённых к диалогу, с названиями, описаниями и числом документов: показывает, по каким данным доступен поиск и какое название хранилища передавать в knowledge_search.";
 
 fn missing_vectors() -> AppError {
     AppError::new(AppErrorCode::Conflict, VECTORS_MISSING)

@@ -37,26 +37,29 @@ use crate::platform::paths::vector_store_path;
 pub const DEFAULT_RERANK_TIMEOUT: Duration = Duration::from_secs(20);
 pub const DEFAULT_EMBEDDING_TIMEOUT_SECONDS: f64 = 30.0;
 
-pub const ONLY_LANCEDB: &str = "Only LanceDB is supported";
-pub const STORE_NOT_FOUND: &str = "Vector store not found";
-pub const STORE_BUSY: &str = "Vector store is busy";
-pub const NAME_TAKEN: &str = "Vector store name already exists";
-pub const PROVIDER_NOT_FOUND: &str = "Embedding provider not found";
-pub const PROVIDER_UNUSABLE: &str = "Embedding provider must be enabled and support embeddings";
-pub const NO_EMBEDDINGS: &str = "Provider does not support embeddings";
-pub const DIMENSION_MISMATCH: &str = "Embedding dimension does not match the store";
-pub const STORE_CHANGED: &str = "Vector store changed during the search";
-pub const OVERLAP_TOO_LARGE: &str = "Chunk overlap must be smaller than chunk size";
-pub const SETTINGS_FROZEN: &str = "Chunk and prefix settings can only change before indexing";
-pub const INDEX_FROZEN: &str = "Cannot change chunk settings for this index";
-pub const CREATED_MISMATCH: &str = "Created index configuration does not match the store";
+pub const ONLY_LANCEDB: &str = "Поддерживается только LanceDB";
+pub const STORE_NOT_FOUND: &str = "Векторное хранилище не найдено";
+pub const STORE_BUSY: &str = "Векторное хранилище занято другой операцией";
+pub const NAME_TAKEN: &str = "Хранилище с таким названием уже существует";
+pub const PROVIDER_NOT_FOUND: &str = "Провайдер эмбеддингов не найден";
+pub const PROVIDER_UNUSABLE: &str =
+    "Провайдер эмбеддингов должен быть включён и поддерживать эмбеддинги";
+pub const NO_EMBEDDINGS: &str = "Провайдер не поддерживает эмбеддинги";
+pub const DIMENSION_MISMATCH: &str = "Размерность эмбеддинга не совпадает с размерностью хранилища";
+pub const STORE_CHANGED: &str = "Хранилище изменилось во время поиска";
+pub const OVERLAP_TOO_LARGE: &str = "Перекрытие фрагмента должно быть меньше его размера";
+pub const SETTINGS_FROZEN: &str =
+    "Параметры фрагментов и префиксов изменяются только до индексации";
+pub const INDEX_FROZEN: &str = "Для этого индекса нельзя изменить параметры фрагментов";
+pub const CREATED_MISMATCH: &str =
+    "Конфигурация созданного индекса не совпадает с настройками хранилища";
 pub const CREATION_CLEANUP_FAILED: &str =
-    "Store creation and cleanup failed; metadata retained for removal";
-pub const REMOVAL_FAILED: &str = "Could not remove vector store; metadata retained";
+    "Не удалось создать хранилище и очистить данные; метаданные сохранены для удаления";
+pub const REMOVAL_FAILED: &str = "Не удалось удалить векторное хранилище; метаданные сохранены";
 pub const CLEAR_FAILED: &str = "Не удалось очистить хранилище";
 pub const RERANK_MODEL_REQUIRED: &str = "Выберите модель переранжирования";
 pub const OCR_MODEL_REQUIRED: &str = "Выберите модель OCR";
-pub const RERANK_MALFORMED: &str = "Reranker returned a malformed answer";
+pub const RERANK_MALFORMED: &str = "Модель переранжирования вернула некорректный ответ";
 pub const RERANK_UNAVAILABLE: &str = "Reranker unavailable, using vector order";
 pub const RERANK_FAILED: &str = "Reranking failed, using vector order";
 
@@ -293,7 +296,7 @@ fn require_backend(row: &VectorStoreRow) -> Result<(), AppError> {
 
 fn integer(value: u64) -> Result<i64, AppError> {
     i64::try_from(value)
-        .map_err(|_| AppError::new(AppErrorCode::ValidationFailed, "Value is too large"))
+        .map_err(|_| AppError::new(AppErrorCode::ValidationFailed, "Значение слишком велико"))
 }
 
 fn native_error(message: &str, cause: &AppError) -> AppError {

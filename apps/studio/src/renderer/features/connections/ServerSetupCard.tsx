@@ -206,7 +206,7 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
           }}
         >
           <Icon path={mdiFlashOutline} size={15} />
-          {store.testing ? "Проверяем…" : "Проверить связь"}
+          {store.testing ? "Проверка…" : "Проверить связь"}
         </Button>
         {vm.isNew ? null : running ? (
           <Button

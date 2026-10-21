@@ -146,7 +146,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
         )}
         {!store.loading && store.visibleConversations.length === 0 && (
           <p className="px-2.5 py-3 text-[12px] text-main-500">
-            {store.query ? "Подходящих диалогов нет." : "Здесь появятся ваши диалоги."}
+            {store.query ? "Подходящих диалогов нет." : "Диалогов пока нет."}
           </p>
         )}
       </ScrollArea>

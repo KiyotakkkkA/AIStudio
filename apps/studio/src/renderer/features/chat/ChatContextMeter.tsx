@@ -243,9 +243,7 @@ export default observer(function ChatContextMeter({ store }: { readonly store: C
             </div>
             <StackedBar parts={parts} total={limit} className="h-2" />
             {context === null ? (
-              <p className="text-[11.5px] text-main-500">
-                Разбивка появится, когда будет выбрана доступная модель.
-              </p>
+              <p className="text-[11.5px] text-main-500">Разбивка доступна после выбора модели.</p>
             ) : null}
           </div>
 
@@ -300,7 +298,7 @@ export default observer(function ChatContextMeter({ store }: { readonly store: C
           <p className="text-[11px] leading-snug text-main-500">
             Оценка по числу символов.
             {store.attachedStoreIds.length > 0
-              ? " Фрагменты из хранилищ добавляются при отправке и занимают свободное место."
+              ? " Фрагменты из хранилищ добавляются при отправке."
               : ""}
           </p>
         </div>

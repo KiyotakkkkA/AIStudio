@@ -88,7 +88,7 @@ export const ChatEvalRunDto = z.object({
 });
 export type ChatEvalRunDto = z.infer<typeof ChatEvalRunDto>;
 export const CreateConversationInput = z.object({
-  title: z.string().trim().min(1).max(200).default("New conversation"),
+  title: z.string().trim().min(1).max(200).default("Новый диалог"),
   providerId: ProviderId,
   modelId: z.string().min(1),
   settings: ChatSettings.default({}),

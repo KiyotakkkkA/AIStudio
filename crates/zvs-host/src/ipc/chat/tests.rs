@@ -90,7 +90,7 @@ async fn a_turn_through_the_channels_answers_titles_the_conversation_and_matches
             )
             .await,
     );
-    assert_eq!(created.title, "New conversation");
+    assert_eq!(created.title, "Новый диалог");
     let handle: RunHandleDto = data(
         &channels
             .server

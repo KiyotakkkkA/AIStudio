@@ -54,7 +54,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
     <section aria-label="Лента чата" className="flex min-h-0 min-w-0 flex-1 flex-col">
       <header className="flex h-14 shrink-0 items-center gap-2.5 px-6">
         <h2 className="min-w-0 flex-1 truncate text-[14px] font-medium text-main-100">
-          {store.active?.title ?? "Новый чат"}
+          {store.active?.title ?? "Новый диалог"}
         </h2>
         {store.attachedStoreIds.length > 0 ? (
           <span title={`Подключено хранилищ: ${String(store.attachedStoreIds.length)}`}>
@@ -101,10 +101,10 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                 className="mb-4 drop-shadow-[0_8px_20px_rgb(180_80_20/0.3)]"
               />
               <h2 className="mb-1.5 text-[20px] font-semibold tracking-[-0.02em] text-main-50">
-                Что хотите исследовать?
+                Начните диалог
               </h2>
               <p className="max-w-100 text-[13px] leading-relaxed text-main-400">
-                Выберите модель и подключите хранилища, чтобы отвечать на основе ваших документов.
+                Выберите модель и подключите векторные хранилища для поиска по документам.
               </p>
             </div>
           )}
@@ -251,12 +251,12 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
 });
 
 function generationPhase(store: ChatStore): string {
-  if (store.standaloneApprovals.length > 0) return "Ждёт вашего решения";
+  if (store.standaloneApprovals.length > 0) return "Ожидает подтверждения";
   if (store.liveToolCalls.some((call) => call.status === "awaiting-approval"))
-    return "Ждёт вашего решения";
+    return "Ожидает подтверждения";
   const running = store.liveToolCalls.find((call) => call.status === "running");
-  if (running) return `Вызывает ${running.key}`;
-  if (store.liveText) return "Пишет ответ";
-  if (store.liveReasoning) return "Размышляет";
-  return "Думает";
+  if (running) return `Вызов ${running.key}`;
+  if (store.liveText) return "Генерация ответа";
+  if (store.liveReasoning) return "Размышления";
+  return "Обработка запроса";
 }

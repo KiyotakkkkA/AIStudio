@@ -8,7 +8,7 @@ use crate::tools::check_tool_key;
 use crate::validate::{Validate, check, invalid, js_trim, nested};
 use crate::vector_stores::VectorSearchHitDto;
 
-pub const DEFAULT_CONVERSATION_TITLE: &str = "New conversation";
+pub const DEFAULT_CONVERSATION_TITLE: &str = "Новый диалог";
 pub const CONVERSATION_TITLE_MAX: usize = 200;
 pub const SYSTEM_PROMPT_MAX: usize = 100_000;
 pub const CHAT_TEXT_MAX: usize = 100_000;
