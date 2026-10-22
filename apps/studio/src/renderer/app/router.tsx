@@ -17,6 +17,7 @@ const ToolsPage = lazy(() => import("../pages/ToolsPage"));
 const TasksPage = lazy(() => import("../pages/TasksPage"));
 const DownloadsPage = lazy(() => import("../pages/DownloadsPage"));
 const RunsPage = lazy(() => import("../pages/RunsPage"));
+const PermissionsPage = lazy(() => import("../pages/PermissionsPage"));
 const SettingsPage = lazy(() => import("../pages/SettingsPage"));
 const BrowserPage = lazy(() => import("../pages/BrowserPage"));
 
@@ -48,6 +49,7 @@ export const routes: RouteObject[] = [
       page(ROUTES.tasks, TasksPage),
       page(ROUTES.downloads, DownloadsPage),
       page(ROUTES.runs, RunsPage),
+      page(ROUTES.permissions, PermissionsPage),
       page(ROUTES.settings, SettingsPage),
       page(ROUTES.browser, BrowserPage),
       { path: "*", element: <Navigate to={DEFAULT_ROUTE} replace /> },

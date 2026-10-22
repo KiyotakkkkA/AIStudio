@@ -62,6 +62,7 @@ use crate::runtimes::RuntimeService;
 use crate::skills::SkillService;
 use crate::toolchain::ToolchainService;
 use crate::tools::{ToolInvoker, ToolRegistry};
+use crate::workspace::FolderAccessService;
 
 pub struct Services {
     pub system: SystemService,
@@ -85,5 +86,6 @@ pub struct Services {
     pub mcp: McpService,
     pub skills: SkillService,
     pub chat: ChatService,
+    pub folders: FolderAccessService,
     pub picker: Option<SharedPicker>,
 }

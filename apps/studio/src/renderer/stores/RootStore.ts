@@ -15,6 +15,7 @@ import ConnectionStore from "../features/connections/ConnectionStore";
 import ToolStore from "../features/tools/ToolStore";
 import ToolchainStore from "../features/toolchain/ToolchainStore";
 import SkillStore from "../features/skills/SkillStore";
+import PermissionsStore from "../features/permissions/PermissionsStore";
 
 export interface RootStoreEnvironment {
   readonly ipc: IpcClient<Contract>;
@@ -35,6 +36,7 @@ export class RootStore {
   readonly tools: ToolStore;
   readonly toolchain: ToolchainStore;
   readonly skills: SkillStore;
+  readonly permissions: PermissionsStore;
 
   constructor(private readonly environment: RootStoreEnvironment) {
     this.ui = new UiStore(environment.ipc);
@@ -50,6 +52,7 @@ export class RootStore {
     this.tools = new ToolStore(environment.ipc);
     this.toolchain = new ToolchainStore(environment.ipc, environment.events);
     this.skills = new SkillStore(environment.ipc);
+    this.permissions = new PermissionsStore(environment.ipc);
     makeAutoObservable<RootStore, "environment">(
       this,
       {
@@ -67,6 +70,7 @@ export class RootStore {
         tools: false,
         toolchain: false,
         skills: false,
+        permissions: false,
       },
       { autoBind: true },
     );
@@ -95,6 +99,7 @@ export class RootStore {
     this.tools.dispose();
     this.toolchain.dispose();
     this.skills.dispose();
+    this.permissions.dispose();
     this.environment.events.dispose();
   }
 }

@@ -71,6 +71,7 @@ use zvs_host::toolchain::{
     ToolchainResolver, ToolchainResolverOptions, ToolchainService, ToolchainServiceOptions,
 };
 use zvs_host::tools::{ToolInvoker, ToolRegistry, ToolRegistryOptions, register_kernel_tools};
+use zvs_host::workspace::{FolderAccessService, ForbiddenFolders};
 use zvs_host::{IpcServer, ipc};
 
 use crate::browser::gateway::GatewayOptions;
@@ -661,9 +662,22 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger: logger.clone(),
         ..SkillServiceOptions::new(skill_library, runs.clone(), Arc::clone(&database))
     });
+    let folders = FolderAccessService::new(
+        Arc::clone(&database),
+        runs.approvals(),
+        ForbiddenFolders::from_environment(&[
+            paths.data_dir.clone(),
+            paths.cache_dir.clone(),
+            paths.logs_dir.clone(),
+            paths.downloads_dir.clone(),
+            profile_dir(&paths.data_dir),
+        ]),
+        clock.clone(),
+    );
     let chat = ChatService::new(ChatServiceOptions {
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),
+        folders: Some(folders.clone()),
         logger: logger.clone(),
         clock: clock.clone(),
         ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), Arc::clone(&nodes))
@@ -783,6 +797,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         mcp,
         skills,
         chat,
+        folders,
         picker: Some(picker),
     });
     let mut server = IpcServer::new(Arc::clone(&services), logger.clone());

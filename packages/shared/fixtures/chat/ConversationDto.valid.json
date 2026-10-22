@@ -12,6 +12,8 @@
       "useRelations": false,
       "enabledTools": [],
       "retrievalMode": "hybrid",
+      "workingFolder": null,
+      "workingFolderAccess": null,
       "createdAt": 1,
       "updatedAt": 2
     }
@@ -31,6 +33,27 @@
       "useRelations": true,
       "enabledTools": ["demo.lookup"],
       "retrievalMode": "hybrid",
+      "workingFolder": null,
+      "workingFolderAccess": null,
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "working folder",
+    "value": {
+      "id": "0199aa11-2222-7111-8111-111111111111",
+      "title": "New conversation",
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "modelId": "fake-model",
+      "settings": {},
+      "systemPrompt": "",
+      "attachedStoreIds": [],
+      "useRelations": false,
+      "enabledTools": [],
+      "retrievalMode": "hybrid",
+      "workingFolder": "D:\\work\\site",
+      "workingFolderAccess": "missing",
       "createdAt": 1,
       "updatedAt": 2
     }

@@ -1,5 +1,6 @@
 mod knowledge;
 mod tool_loop;
+mod workspace;
 
 use std::future::Future;
 use std::sync::{Arc, Mutex, PoisonError};

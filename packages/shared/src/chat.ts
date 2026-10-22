@@ -7,6 +7,7 @@ import {
   VectorStoreId,
 } from "./primitives/branded.js";
 import { Json } from "./primitives/json.js";
+import { FolderGrantScope, FolderPath, WorkingFolderAccess } from "./folders.js";
 import { ToolKey } from "./tools/ToolDto.js";
 
 export const ChatSettings = z.object({
@@ -100,10 +101,19 @@ export const CreateConversationInput = z.object({
 });
 export type CreateConversationInput = z.infer<typeof CreateConversationInput>;
 export const ConversationRef = z.object({ id: ConversationId });
-export const ConversationDto = CreateConversationInput.extend({
+const ConversationFields = CreateConversationInput.extend({
   id: ConversationId,
+  workingFolder: FolderPath.nullable().default(null),
+  workingFolderAccess: WorkingFolderAccess.nullable().default(null),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
+});
+const folderAccessMatches = (conversation: {
+  workingFolder: string | null;
+  workingFolderAccess: WorkingFolderAccess | null;
+}) => (conversation.workingFolder === null) === (conversation.workingFolderAccess === null);
+export const ConversationDto = ConversationFields.refine(folderAccessMatches, {
+  path: ["workingFolderAccess"],
 });
 export type ConversationDto = z.infer<typeof ConversationDto>;
 export const MessageDto = z.object({
@@ -123,7 +133,9 @@ export const MessageDto = z.object({
   createdAt: z.number().int(),
 });
 export type MessageDto = z.infer<typeof MessageDto>;
-export const ConversationDetailDto = ConversationDto.extend({ messages: z.array(MessageDto) });
+export const ConversationDetailDto = ConversationFields.extend({
+  messages: z.array(MessageDto),
+}).refine(folderAccessMatches, { path: ["workingFolderAccess"] });
 export type ConversationDetailDto = z.infer<typeof ConversationDetailDto>;
 export const ChatSendInput = z.object({
   conversationId: ConversationId,
@@ -161,3 +173,17 @@ export const ChatContextDto = z.object({
 export type ChatContextDto = z.infer<typeof ChatContextDto>;
 export const TruncateConversationInput = ConversationRef.extend({ messageId: MessageId });
 export type TruncateConversationInput = z.infer<typeof TruncateConversationInput>;
+
+export const BindFolderInput = z.object({
+  id: ConversationId,
+  path: FolderPath,
+  grant: FolderGrantScope.optional(),
+});
+export type BindFolderInput = z.infer<typeof BindFolderInput>;
+export const BindFolderResultDto = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("bound"), conversation: ConversationDto }),
+  z.object({ status: z.literal("needsGrant"), path: FolderPath }),
+]);
+export type BindFolderResultDto = z.infer<typeof BindFolderResultDto>;
+export const PickFolderResultDto = z.object({ path: FolderPath.nullable() });
+export type PickFolderResultDto = z.infer<typeof PickFolderResultDto>;

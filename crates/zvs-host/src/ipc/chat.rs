@@ -1,13 +1,15 @@
 use std::sync::Arc;
 
 use zvs_contract::{
-    AppError, ChatContextInput, ChatEvalInput, ChatSendInput, ConversationRef,
-    CreateConversationInput, RenameConversationInput, RunIdInput, TruncateConversationInput,
-    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
-    UpdateConversationStoresInput, UpdateConversationToolsInput,
+    AppError, AppErrorCode, BindFolderInput, ChatContextInput, ChatEvalInput, ChatSendInput,
+    ConversationRef, CreateConversationInput, PickFolderResultDto, RenameConversationInput,
+    RunIdInput, TruncateConversationInput, UpdateConversationRelationsInput,
+    UpdateConversationRetrievalInput, UpdateConversationStoresInput, UpdateConversationToolsInput,
+    VectorSourceKind,
 };
 
 use super::IpcServer;
+use super::vector_stores::PICKER_UNAVAILABLE;
 use crate::services::Services;
 
 pub fn register(server: &mut IpcServer) {
@@ -76,6 +78,34 @@ pub fn register(server: &mut IpcServer) {
                 services
                     .chat
                     .update_tools(&input.id, &input.enabled_tools())
+            },
+        )
+        .handle(
+            "chat.pickFolder",
+            |services: Arc<Services>, _input: ()| async move {
+                let picker = services
+                    .picker
+                    .clone()
+                    .ok_or_else(|| AppError::new(AppErrorCode::Conflict, PICKER_UNAVAILABLE))?;
+                Ok::<_, AppError>(PickFolderResultDto {
+                    path: picker
+                        .pick(VectorSourceKind::Folder)
+                        .await?
+                        .into_iter()
+                        .next(),
+                })
+            },
+        )
+        .handle(
+            "chat.bindFolder",
+            |services: Arc<Services>, input: BindFolderInput| async move {
+                services.chat.bind_folder(&input)
+            },
+        )
+        .handle(
+            "chat.unbindFolder",
+            |services: Arc<Services>, input: ConversationRef| async move {
+                services.chat.unbind_folder(&input.id)
             },
         )
         .handle(

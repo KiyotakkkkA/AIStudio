@@ -458,9 +458,20 @@ pub fn test_services(system: SystemService) -> TestServices {
         picker: Some(picker.clone()),
         ..crate::skills::SkillServiceOptions::new(skill_library, runs.clone(), database.shared())
     });
+    let folders = crate::workspace::FolderAccessService::new(
+        database.shared(),
+        runs.approvals(),
+        crate::workspace::ForbiddenFolders::new(
+            &[workspace.path().to_path_buf()],
+            &[],
+            Arc::new(Vec::new),
+        ),
+        clock.clone(),
+    );
     let chat = crate::services::ChatService::new(crate::services::ChatServiceOptions {
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),
+        folders: Some(folders.clone()),
         clock: clock.clone(),
         ..crate::services::ChatServiceOptions::new(
             database.shared(),
@@ -492,6 +503,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             mcp,
             skills,
             chat,
+            folders,
             picker: Some(picker.clone()),
         }),
         nodes,

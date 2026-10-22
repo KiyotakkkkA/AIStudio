@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import * as skills from "../src/skills/index.js";
 import * as toolchain from "../src/toolchain/index.js";
+import * as folders from "../src/folders.js";
 import {
   AccountDto,
   ChatCitationDto,
@@ -175,6 +176,17 @@ const schemas: Record<string, z.ZodType> = {
   "mcp/McpContentDto": McpContentDto,
   "mcp/McpCallResultDto": McpCallResultDto,
   "mcp/McpRemoveOutput": contract["mcp.remove"].output,
+  "folders/FolderGrantScope": folders.FolderGrantScope,
+  "folders/WorkingFolderAccess": folders.WorkingFolderAccess,
+  "folders/FolderAccessAnswer": folders.FolderAccessAnswer,
+  "folders/FolderGrantDto": folders.FolderGrantDto,
+  "folders/FolderGrantRef": folders.FolderGrantRef,
+  "folders/FolderRequestEntryDto": folders.FolderRequestEntryDto,
+  "folders/FolderApprovalDto": folders.FolderApprovalDto,
+  "folders/AnswerFolderRequestInput": contract["folders.answer"].input,
+  "folders/BindFolderInput": contract["chat.bindFolder"].input,
+  "folders/BindFolderResultDto": contract["chat.bindFolder"].output,
+  "folders/PickFolderResultDto": contract["chat.pickFolder"].output,
   "skills/SkillSource": skills.SkillSource,
   "skills/SkillStatus": skills.SkillStatus,
   "skills/SkillMatchMethod": skills.SkillMatchMethod,

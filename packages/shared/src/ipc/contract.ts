@@ -12,7 +12,11 @@ import {
   ConversationRef,
   RetrievalMode,
   CreateConversationInput,
+  BindFolderInput,
+  BindFolderResultDto,
+  PickFolderResultDto,
 } from "../chat.js";
+import { AnswerFolderRequestInput, FolderGrantDto, FolderGrantRef } from "../folders.js";
 import { RunDto, RunHandleDto, RunIdInput, StartRunInput } from "../runs/RunDto.js";
 import { RunListFilter, RunPageDto } from "../runs/RunListFilter.js";
 import { RunDetailDto } from "../runs/RunDetailDto.js";
@@ -193,6 +197,12 @@ export const contract = defineContract({
   "chat.context": { input: ChatContextInput, output: ChatContextDto },
   "chat.send": { input: ChatSendInput, output: RunHandleDto },
   "chat.cancel": { input: RunIdInput, output: z.void() },
+  "chat.pickFolder": { input: z.void(), output: PickFolderResultDto },
+  "chat.bindFolder": { input: BindFolderInput, output: BindFolderResultDto },
+  "chat.unbindFolder": { input: ConversationRef, output: ConversationDto },
+  "folders.list": { input: z.void(), output: z.array(FolderGrantDto) },
+  "folders.revoke": { input: FolderGrantRef, output: z.void() },
+  "folders.answer": { input: AnswerFolderRequestInput, output: z.void() },
   "runs.approve": {
     input: RunIdInput.extend({ approvalId: z.string().uuid(), always: z.boolean().default(false) }),
     output: z.void(),

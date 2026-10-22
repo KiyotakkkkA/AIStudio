@@ -1,0 +1,16 @@
+[
+  {
+    "name": "creates",
+    "value": {
+      "path": "D:\\work",
+      "creates": ["out", "out\\logs"]
+    }
+  },
+  {
+    "name": "plain",
+    "value": {
+      "path": "D:\\docs",
+      "creates": []
+    }
+  }
+]

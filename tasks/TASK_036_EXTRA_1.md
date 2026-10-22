@@ -2,7 +2,7 @@
 task: TASK_036_EXTRA_1
 title: Working folder and folder access — chat binding, access requests, the «Разрешения» page
 phase: 6 — Tools, MCP and Skills
-status: todo
+status: done
 depends_on: [TASK_036]
 unblocks: [TASK_036_EXTRA_2, TASK_036_EXTRA_3]
 estimate: 5 h
@@ -175,16 +175,66 @@ Manual check: bind a folder, revoke it on «Разрешения», confirm the 
 
 ## Definition of done
 
-- [ ] Working folder can be bound, changed and removed between turns, and appears in the prompt
-- [ ] Access requests with four answers, one modal per tool call, binding modal with three
-- [ ] Forbidden folders refused with no modal, junction escapes caught
-- [ ] «Разрешения» lists and revokes grants
-- [ ] DTO changes in Rust, Zod and fixtures; PASSPORT §1 and §14 updated
-- [ ] Gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Working folder can be bound, changed and removed between turns, and appears in the prompt
+- [x] Access requests with four answers, one modal per tool call, binding modal with three
+- [x] Forbidden folders refused with no modal, junction escapes caught
+- [x] «Разрешения» lists and revokes grants
+- [x] DTO changes in Rust, Zod and fixtures; PASSPORT §1 and §14 updated
+- [x] Gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- `zvs-host/src/workspace/`: `paths.rs` (`canonical`, component-wise case-insensitive
+  `covers`, `grant_target` with the nearest-parent rule and the `creates` tail,
+  `ForbiddenFolders` with trees, exact folders and removable mounts from `sysinfo`) and
+  `service.rs` (`FolderAccessService`: grant, revoke, list, touch, `working_folder` checks,
+  `ensure_access`, `answer`). Tests in `workspace/tests.rs` drive a fake `test.folders` node
+  through real runs and cover every case the task lists.
+- Migration `0007_folder_access.sql`: `folder_grant` (a CHECK ties `scope` to
+  `conversation_id`, which cascades on chat delete) and `conversation.working_folder` /
+  `conversation.turn_folder`. `FolderGrantRow`, `FolderGrantRepository`.
+- Contract: `zvs_contract::folders` (`FolderGrantScope`, `WorkingFolderAccess`,
+  `FolderAccessAnswer`, `FolderGrantDto`, `FolderGrantRef`, `FolderRequestEntryDto`,
+  `FolderApprovalDto`, `AnswerFolderRequestInput`, `BindFolderInput`, `BindFolderResultDto`,
+  `PickFolderResultDto`), `FolderGrantId`, `ConversationDto.workingFolder` /
+  `workingFolderAccess`; Zod in `packages/shared/src/folders.ts` and `chat.ts`; fixtures in
+  `fixtures/folders/` and the updated conversation fixtures.
+- Channels `chat.pickFolder`, `chat.bindFolder`, `chat.unbindFolder`, `folders.list`,
+  `folders.revoke`, `folders.answer`. `Services.folders`; the shell builds the forbidden set
+  from the environment plus data, cache, logs, downloads and the browser profile.
+- Prompt: `working_folder_section` in `services/chat.rs` (English), recorded per turn in
+  `turn_folder`; `chat.context` measures the same section.
+- Renderer: `ChatWorkingFolder` above the composer (name, full path on hover, change, remove,
+  «Нет доступа» with «Предоставить доступ», locked during a turn) with the three-option binding
+  modal; `FolderAccessModal` for `kind: "folder"` requests; `ConfirmModal` takes `actions`.
+  «Разрешения» page (`/permissions`, rail «Система», `mdiShieldCheckOutline`) with
+  «Постоянные» / «В диалогах» in an `EntityListPanel`, a detail pane and «Отозвать» confirmed
+  through `ConfirmModal`; the toolbar holds a single «Папки» tab for later tool and site
+  grants. `PermissionsStore` and ChatStore folder logic are tested.
+
 **Deviated from plan:**
+- `ensure_access(context, call, action, targets)`: the conversation and tool travel in a
+  `FolderCall` from `FolderAccessService::call(conversation, tool)`, which also holds the
+  once-grants, so a once-grant lives exactly as long as that handle. Targets say file or
+  folder (`FolderTarget::file` / `::folder`), since a missing path cannot tell.
+- The binding modal is not an approval: there is no run while binding. `chat.bindFolder`
+  answers `needsGrant` and the renderer calls it again with `grant`.
+- Folder requests are answered through `folders.answer`; an approval decided through
+  `runs.approve` is treated as denied by `ensure_access`.
+- The working-folder section is added when the turn offers tools, a folder is bound, or the
+  folder changed since the previous turn. A tool-less turn with no folder gets nothing, since
+  no folder can be reached without a tool.
+- Choosing a folder in a new chat creates the conversation first.
+- Fixed the IPC channel list test, which was missing `skills.duplicate`, `skills.readFile`
+  and `skills.setEnabled` from TASK_036.
+
 **Next session should know:**
+- TASK_036_EXTRA_2 / _3: build a `FolderCall` per tool call and call `ensure_access` before
+  touching the filesystem; use the returned `GrantTarget.path` (canonical, junctions
+  resolved) rather than the model's path. The conversation id reaches a node the way
+  knowledge nodes get their scope (a hidden input field set by the chat loop).
+- Removable media are read from `sysinfo` on each check, so a drive plugged in later is
+  caught.
+- Not run here: `pnpm build`, `pnpm test:e2e` and the manual check (need the built app).

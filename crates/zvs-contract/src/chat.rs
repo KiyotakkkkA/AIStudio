@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::enums::wire_enum;
 use crate::errors::AppError;
+use crate::folders::{WorkingFolderAccess, check_folder_path};
 use crate::ids::{ConversationId, MessageId, ProviderId, RunId, VectorStoreId};
 use crate::primitives::{Json, Timestamp};
 use crate::tools::check_tool_key;
@@ -351,6 +352,10 @@ pub struct ConversationDto {
     pub enabled_tools: Vec<String>,
     #[serde(default = "default_retrieval_mode")]
     pub retrieval_mode: RetrievalMode,
+    #[serde(default)]
+    pub working_folder: Option<String>,
+    #[serde(default)]
+    pub working_folder_access: Option<WorkingFolderAccess>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
@@ -363,6 +368,12 @@ impl Validate for ConversationDto {
         check::max_len("systemPrompt", &self.system_prompt, SYSTEM_PROMPT_MAX)?;
         check_attached_stores("attachedStoreIds", &self.attached_store_ids)?;
         check_enabled_tools("enabledTools", &self.enabled_tools)?;
+        if let Some(folder) = &self.working_folder {
+            check_folder_path("workingFolder", folder)?;
+        }
+        if self.working_folder.is_some() != self.working_folder_access.is_some() {
+            return Err(invalid("workingFolderAccess", "workingFolder"));
+        }
         check_int("createdAt", self.created_at)?;
         check_int("updatedAt", self.updated_at)
     }

@@ -2,6 +2,7 @@ import { makeAutoObservable, reaction, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
   ChatToolCallDto,
+  FolderApprovalDto,
   MessageDto,
   VectorSearchHitDto,
   modelToolSupport,
@@ -17,6 +18,8 @@ import {
   type ConversationDetailDto,
   type ConversationDto,
   type ConversationId,
+  type FolderAccessAnswer,
+  type FolderGrantScope,
   type McpServerDto,
   type MessageId,
   type ProviderDto,
@@ -29,6 +32,7 @@ import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import ConversationVm from "./ConversationVm";
 import { adapterLabel } from "../providers/accountPresentation";
 import { suggestedBaseUrl } from "../providers/providerPresentation";
+import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
 
@@ -63,6 +67,11 @@ export default class ChatStore {
   liveToolCalls: ChatToolCallDto[] = [];
   searchedStoreIds: VectorStoreDto["id"][] = [];
   approvals: { id: string; subject: string; busy: boolean }[] = [];
+  folderRequests: FolderApprovalDto[] = [];
+  answeringFolder = false;
+  folderBusy = false;
+  folderError: string | null = null;
+  folderPrompt: { path: string } | null = null;
   pendingTurn = false;
   outcome: "ok" | "cancelled" | "failed" | null = null;
   private buffer = "";
@@ -133,6 +142,18 @@ export default class ChatStore {
   }
   get useRelations() {
     return this.active?.useRelations ?? this.composer.useRelations;
+  }
+  get workingFolder() {
+    return this.active?.workingFolder ?? null;
+  }
+  get workingFolderAccess() {
+    return this.active?.workingFolderAccess ?? null;
+  }
+  get canChangeFolder() {
+    return !this.generating && !this.folderBusy && !this.loading;
+  }
+  get folderRequest() {
+    return this.folderRequests[0] ?? null;
   }
   get retrievalMode(): RetrievalMode {
     return this.active?.retrievalMode ?? this.composer.retrievalMode;
@@ -514,6 +535,8 @@ export default class ChatStore {
     const revision = ++this.revision;
     this.loading = true;
     this.error = null;
+    this.folderError = null;
+    this.folderPrompt = null;
     try {
       const active = await this.ipc.call("chat.conversations.get", { id });
       runInAction(() => {
@@ -551,6 +574,8 @@ export default class ChatStore {
     this.active = null;
     this.loading = false;
     this.error = null;
+    this.folderError = null;
+    this.folderPrompt = null;
     this.outcome = null;
     this.liveText = "";
     this.liveReasoning = "";
@@ -604,24 +629,7 @@ export default class ChatStore {
     this.searchedStoreIds = [];
     this.pendingTurn = true;
     try {
-      if (!this.active) {
-        const conversation = await this.ipc.call("chat.conversations.create", {
-          title: "Новый диалог",
-          providerId: this.provider!.id,
-          modelId: this.modelId,
-          settings: { temperature: this.composer.temperature },
-          systemPrompt: this.composer.systemPrompt,
-          attachedStoreIds: [...this.composer.attachedStoreIds],
-          useRelations: this.composer.useRelations,
-          enabledTools: [...this.composer.enabledTools],
-          retrievalMode: this.composer.retrievalMode,
-        });
-        runInAction(() => {
-          this.active = { ...conversation, messages: [] };
-          this.conversations.unshift(conversation);
-        });
-      }
-      const id = this.active!.id;
+      const id = await this.ensureConversation();
       const run = await this.ipc.call("chat.send", {
         conversationId: id,
         text,
@@ -642,6 +650,157 @@ export default class ChatStore {
         this.outcome = "failed";
         this.sending = false;
         this.pendingTurn = false;
+      });
+    }
+  }
+
+  private async ensureConversation(): Promise<ConversationId> {
+    if (this.active) return this.active.id;
+    const conversation = await this.ipc.call("chat.conversations.create", {
+      title: "Новый диалог",
+      providerId: this.provider!.id,
+      modelId: this.modelId,
+      settings: { temperature: this.composer.temperature },
+      systemPrompt: this.composer.systemPrompt,
+      attachedStoreIds: [...this.composer.attachedStoreIds],
+      useRelations: this.composer.useRelations,
+      enabledTools: [...this.composer.enabledTools],
+      retrievalMode: this.composer.retrievalMode,
+    });
+    runInAction(() => {
+      this.active = { ...conversation, messages: [] };
+      this.conversations.unshift(conversation);
+    });
+    return conversation.id;
+  }
+
+  private applyConversation(conversation: ConversationDto) {
+    this.conversations = this.conversations.map((item) =>
+      item.id === conversation.id ? conversation : item,
+    );
+    if (this.active?.id === conversation.id) this.active = { ...this.active, ...conversation };
+  }
+
+  get canPickFolder() {
+    return this.canChangeFolder && (this.active !== null || this.provider !== undefined);
+  }
+
+  async pickFolder() {
+    if (!this.canPickFolder) return;
+    this.folderBusy = true;
+    this.folderError = null;
+    try {
+      const picked = await this.ipc.call("chat.pickFolder", undefined);
+      if (picked.path === null) return;
+      await this.bindFolder(picked.path);
+    } catch (error) {
+      runInAction(() => {
+        this.folderError = folderErrorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.folderBusy = false;
+      });
+    }
+  }
+
+  async restoreFolderAccess() {
+    const path = this.workingFolder;
+    if (path === null || !this.canChangeFolder) return;
+    this.folderBusy = true;
+    this.folderError = null;
+    try {
+      await this.bindFolder(path);
+    } catch (error) {
+      runInAction(() => {
+        this.folderError = folderErrorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.folderBusy = false;
+      });
+    }
+  }
+
+  private async bindFolder(path: string, grant?: FolderGrantScope) {
+    const id = await this.ensureConversation();
+    const result = await this.ipc.call("chat.bindFolder", {
+      id,
+      path,
+      ...(grant === undefined ? {} : { grant }),
+    });
+    runInAction(() => {
+      if (result.status === "needsGrant") {
+        this.folderPrompt = { path: result.path };
+        return;
+      }
+      this.folderPrompt = null;
+      this.applyConversation(result.conversation);
+    });
+  }
+
+  async confirmFolder(grant: FolderGrantScope) {
+    const prompt = this.folderPrompt;
+    if (prompt === null || this.folderBusy) return;
+    this.folderBusy = true;
+    this.folderError = null;
+    try {
+      await this.bindFolder(prompt.path, grant);
+    } catch (error) {
+      runInAction(() => {
+        this.folderPrompt = null;
+        this.folderError = folderErrorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.folderBusy = false;
+      });
+    }
+  }
+
+  cancelFolderPrompt() {
+    this.folderPrompt = null;
+  }
+
+  async unbindFolder() {
+    const active = this.active;
+    if (!active || active.workingFolder === null || !this.canChangeFolder) return;
+    this.folderBusy = true;
+    this.folderError = null;
+    try {
+      const conversation = await this.ipc.call("chat.unbindFolder", { id: active.id });
+      runInAction(() => {
+        this.applyConversation(conversation);
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.folderError = folderErrorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.folderBusy = false;
+      });
+    }
+  }
+
+  async answerFolder(answer: FolderAccessAnswer) {
+    const request = this.folderRequest;
+    if (request === null || this.answeringFolder) return;
+    this.answeringFolder = true;
+    try {
+      await this.ipc.call("folders.answer", {
+        id: request.runId,
+        approvalId: request.id,
+        answer,
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.error = answerErrorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.folderRequests = this.folderRequests.filter((item) => item.id !== request.id);
+        this.answeringFolder = false;
       });
     }
   }
@@ -731,7 +890,12 @@ export default class ChatStore {
   private receive(event: RoutedEvent) {
     if (!this.run || event.streamId !== this.run.streamId || event.seq <= this.lastSeq) return;
     this.lastSeq = event.seq;
-    if (
+    const folderRequest =
+      event.type === "approval" ? FolderApprovalDto.safeParse(event.request) : null;
+    if (folderRequest?.success === true && folderRequest.data.runId === this.run.id) {
+      if (!this.folderRequests.some((request) => request.id === folderRequest.data.id))
+        this.folderRequests.push(folderRequest.data);
+    } else if (
       event.type === "approval" &&
       event.request.runId === this.run.id &&
       typeof event.request.id === "string" &&
@@ -792,6 +956,7 @@ export default class ChatStore {
       this.unsubscribe = undefined;
       this.run = null;
       this.approvals = [];
+      this.folderRequests = [];
       this.stopping = false;
       void this.refreshCompleted();
     }

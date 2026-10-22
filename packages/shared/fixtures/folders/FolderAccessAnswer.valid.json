@@ -1,0 +1,18 @@
+[
+  {
+    "name": "once",
+    "value": "once"
+  },
+  {
+    "name": "conversation",
+    "value": "conversation"
+  },
+  {
+    "name": "always",
+    "value": "always"
+  },
+  {
+    "name": "deny",
+    "value": "deny"
+  }
+]

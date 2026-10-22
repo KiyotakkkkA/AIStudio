@@ -13,6 +13,7 @@ pub mod services;
 pub mod skills;
 pub mod toolchain;
 pub mod tools;
+pub mod workspace;
 
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;

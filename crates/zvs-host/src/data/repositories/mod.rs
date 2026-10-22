@@ -1,6 +1,7 @@
 pub mod account;
 pub mod chat;
 pub mod download;
+pub mod folder_grant;
 pub mod graph_edge;
 pub mod graph_relation;
 pub mod mcp_server;
@@ -24,6 +25,7 @@ pub use account::{
 };
 pub use chat::{ChatRepository, ConversationPatch, MessagePatch};
 pub use download::{DownloadPatch, DownloadRepository};
+pub use folder_grant::FolderGrantRepository;
 pub use graph_edge::{GraphEdgeDraft, GraphEdgeLookup, GraphEdgeRepository};
 pub use graph_relation::GraphRelationRepository;
 pub use mcp_server::{CapabilityCounts, McpServerPatch, McpServerRepository};
@@ -64,6 +66,7 @@ pub struct Repositories<'c> {
     pub mcp_servers: McpServerRepository<'c>,
     pub chat: ChatRepository<'c>,
     pub skills: SkillRepository<'c>,
+    pub folder_grants: FolderGrantRepository<'c>,
 }
 
 impl<'c> Repositories<'c> {
@@ -87,6 +90,7 @@ impl<'c> Repositories<'c> {
             mcp_servers: McpServerRepository::new(connection),
             chat: ChatRepository::new(connection),
             skills: SkillRepository::new(connection),
+            folder_grants: FolderGrantRepository::new(connection),
         }
     }
 }

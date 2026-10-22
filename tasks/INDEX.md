@@ -141,7 +141,7 @@ against; 016 can be started earlier if you are prepared to render the Account op
 - [x] **TASK_035_EXTRA_1** — Toolchain: uv and Node as host runtimes for MCP and skill scripts, the «Окружение» tab
 - [x] **TASK_035_EXTRA_2** — Skill scripts: running `scripts/` through the toolchain under its own permission
 - [x] **TASK_036** — Skills page
-- [ ] **TASK_036_EXTRA_1** — Working folder and folder access: chat binding, access requests, the «Разрешения» page
+- [x] **TASK_036_EXTRA_1** — Working folder and folder access: chat binding, access requests, the «Разрешения» page
 - [ ] **TASK_036_EXTRA_2** — File tools: `fs.list`, `fs.read`, `fs.search` and the `fs.apply` batch
 - [ ] **TASK_036_EXTRA_3** — Code and commands: a shared process runner, `code.run` and `shell.run`
 

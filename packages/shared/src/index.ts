@@ -14,6 +14,7 @@ export * from "./browser.js";
 export * from "./ai.js";
 export * from "./system.js";
 export * from "./chat.js";
+export * from "./folders.js";
 export * from "./providers/index.js";
 export * from "./accounts.js";
 export * from "./vectorStores/index.js";

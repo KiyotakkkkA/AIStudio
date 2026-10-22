@@ -633,6 +633,50 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::UpdateConversationToolsInput>,
     ),
     (
+        "folders/FolderGrantScope",
+        round_trip::<zvs_contract::folders::FolderGrantScope>,
+    ),
+    (
+        "folders/WorkingFolderAccess",
+        round_trip::<zvs_contract::folders::WorkingFolderAccess>,
+    ),
+    (
+        "folders/FolderAccessAnswer",
+        round_trip::<zvs_contract::folders::FolderAccessAnswer>,
+    ),
+    (
+        "folders/FolderGrantDto",
+        round_trip::<zvs_contract::folders::FolderGrantDto>,
+    ),
+    (
+        "folders/FolderGrantRef",
+        round_trip::<zvs_contract::folders::FolderGrantRef>,
+    ),
+    (
+        "folders/FolderRequestEntryDto",
+        round_trip::<zvs_contract::folders::FolderRequestEntryDto>,
+    ),
+    (
+        "folders/FolderApprovalDto",
+        round_trip::<zvs_contract::folders::FolderApprovalDto>,
+    ),
+    (
+        "folders/AnswerFolderRequestInput",
+        round_trip::<zvs_contract::folders::AnswerFolderRequestInput>,
+    ),
+    (
+        "folders/BindFolderInput",
+        round_trip::<zvs_contract::folders::BindFolderInput>,
+    ),
+    (
+        "folders/BindFolderResultDto",
+        round_trip::<zvs_contract::folders::BindFolderResultDto>,
+    ),
+    (
+        "folders/PickFolderResultDto",
+        round_trip::<zvs_contract::folders::PickFolderResultDto>,
+    ),
+    (
         "skills/SkillSource",
         round_trip::<zvs_contract::skills::SkillSource>,
     ),

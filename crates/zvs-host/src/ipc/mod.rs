@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod chat;
 pub mod downloads;
+pub mod folders;
 pub mod graph_relations;
 pub mod mcp;
 pub mod providers;
@@ -33,6 +34,7 @@ pub fn register(server: &mut IpcServer) {
     skills::register(server);
     toolchain::register(server);
     chat::register(server);
+    folders::register(server);
 }
 
 #[cfg(test)]
@@ -69,6 +71,7 @@ mod tests {
                 "accounts.list",
                 "accounts.refresh",
                 "accounts.unlink",
+                "chat.bindFolder",
                 "chat.cancel",
                 "chat.context",
                 "chat.conversations.create",
@@ -82,7 +85,9 @@ mod tests {
                 "chat.conversations.updateStores",
                 "chat.conversations.updateTools",
                 "chat.evaluate",
+                "chat.pickFolder",
                 "chat.send",
+                "chat.unbindFolder",
                 "downloads.cancel",
                 "downloads.catalogue",
                 "downloads.disk",
@@ -92,6 +97,9 @@ mod tests {
                 "downloads.remove",
                 "downloads.resume",
                 "downloads.start",
+                "folders.answer",
+                "folders.list",
+                "folders.revoke",
                 "graphRelations.addEdge",
                 "graphRelations.kHopSubgraph",
                 "graphRelations.list",
@@ -144,12 +152,15 @@ mod tests {
                 "settings.get",
                 "settings.set",
                 "skills.create",
+                "skills.duplicate",
                 "skills.export",
                 "skills.get",
                 "skills.import",
                 "skills.list",
+                "skills.readFile",
                 "skills.remove",
                 "skills.run",
+                "skills.setEnabled",
                 "skills.test",
                 "skills.update",
                 "system.demoJob",

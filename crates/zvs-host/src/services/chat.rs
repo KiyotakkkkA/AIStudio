@@ -36,7 +36,7 @@ use super::retrieval_query::retrieval_query;
 use super::runs::RunService;
 use super::vector_stores::VectorSearchOptions;
 use crate::data::repositories::{ConversationPatch, MessagePatch, RunPatch};
-use crate::data::schema::{ConversationRow, MessageRow};
+use crate::data::schema::{ConversationRow, FolderGrantRow, MessageRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::ai::with_injected_tools;
@@ -55,7 +55,9 @@ use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 use crate::services::mcp::{RESOURCE_READER, tool_key};
 use crate::skills::{SKILL_LOAD, SKILL_TOOLS, SkillCatalogue, catalogue_text};
 use crate::tools::ToolRegistry;
+use crate::workspace::{FolderAccessService, ForbiddenFolders, folder_access};
 use zvs_contract::mcp::MCP_INSTRUCTIONS_MAX;
+use zvs_contract::{BindFolderInput, BindFolderResultDto};
 use zvs_contract::{ToolDto, ToolSource};
 
 pub const CHAT_RELATED_MAX: usize = 3;
@@ -93,6 +95,10 @@ pub const RETRIEVAL_ASSEMBLED: &str = "Retrieval context assembled";
 pub const HISTORY_TRIMMED: &str = "Chat history trimmed";
 pub const MCP_INSTRUCTIONS_HEADING: &str = "Instructions published by the MCP servers whose tools are offered. Follow them when you use those tools; when they point to a resource (for example testix://…), read it with that server's read_resource tool before calling the tool that needs it.";
 pub const NO_EVAL_CASES: &str = "Добавьте хотя бы один вопрос для проверки";
+pub const WORKING_FOLDER_HEADING: &str = "Working folder";
+pub const NO_WORKING_FOLDER_NOTE: &str = "This conversation has no working folder. Every folder needs the user's approval before you can read or change files in it.";
+pub const WORKING_FOLDER_RULES: &str = "Relative paths resolve against the working folder. Any other folder needs the user's approval before you can read or change files in it.";
+pub const WORKING_FOLDER_CHANGED: &str = "The working folder changed since the previous turn";
 
 pub struct ChatServiceOptions {
     pub database: Arc<Database>,
@@ -100,6 +106,7 @@ pub struct ChatServiceOptions {
     pub registry: Arc<NodeRegistry>,
     pub tools: Option<ToolRegistry>,
     pub skills: Option<Arc<dyn SkillCatalogue>>,
+    pub folders: Option<FolderAccessService>,
     pub logger: SharedLogger,
     pub clock: SharedClock,
 }
@@ -112,6 +119,7 @@ impl ChatServiceOptions {
             registry,
             tools: None,
             skills: None,
+            folders: None,
             logger: silent_logger(),
             clock: Arc::new(SystemClock),
         }
@@ -130,6 +138,7 @@ struct Inner {
     database: Arc<Database>,
     tools: Option<ToolRegistry>,
     skills: Option<Arc<dyn SkillCatalogue>>,
+    folders: FolderAccessService,
     logger: SharedLogger,
     clock: SharedClock,
 }
@@ -147,7 +156,11 @@ fn malformed(field: &str) -> AppError {
     )
 }
 
-fn conversation_dto(row: ConversationRow) -> Result<ConversationDto, AppError> {
+fn conversation_dto(
+    row: ConversationRow,
+    grants: &[FolderGrantRow],
+) -> Result<ConversationDto, AppError> {
+    let working_folder_access = folder_access(row.working_folder.as_deref(), grants, &row.id);
     Ok(ConversationDto {
         id: ConversationId::parse(&row.id).ok_or_else(|| malformed("id"))?,
         title: row.title,
@@ -163,9 +176,28 @@ fn conversation_dto(row: ConversationRow) -> Result<ConversationDto, AppError> {
         use_relations: row.use_relations,
         enabled_tools: row.enabled_tools,
         retrieval_mode: row.retrieval_mode,
+        working_folder: row.working_folder,
+        working_folder_access,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
+}
+
+pub fn working_folder_section(folder: Option<&str>, previous: Option<Option<&str>>) -> String {
+    let mut section = match folder {
+        Some(folder) => format!("{WORKING_FOLDER_HEADING}: {folder}\n{WORKING_FOLDER_RULES}"),
+        None => NO_WORKING_FOLDER_NOTE.to_owned(),
+    };
+    if let Some(previous) = previous
+        && previous != folder
+    {
+        section.push('\n');
+        section.push_str(&match previous {
+            Some(previous) => format!("{WORKING_FOLDER_CHANGED}; it was {previous}."),
+            None => format!("{WORKING_FOLDER_CHANGED}; there was none."),
+        });
+    }
+    section
 }
 
 fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
@@ -220,14 +252,23 @@ impl Inner {
             .ok_or_else(|| AppError::new(AppErrorCode::NotFound, CONVERSATION_NOT_FOUND))
     }
 
+    fn dto(&self, row: ConversationRow) -> Result<ConversationDto, AppError> {
+        let grants = self.read(|repositories| Ok(repositories.folder_grants.list()?))?;
+        conversation_dto(row, &grants)
+    }
+
     fn get(&self, id: &str) -> Result<ConversationDetailDto, AppError> {
-        let (row, messages) = self.read(|repositories| {
-            Ok((repositories.chat.get(id)?, repositories.chat.messages(id)?))
+        let (row, messages, grants) = self.read(|repositories| {
+            Ok((
+                repositories.chat.get(id)?,
+                repositories.chat.messages(id)?,
+                repositories.folder_grants.list()?,
+            ))
         })?;
         let row =
             row.ok_or_else(|| AppError::new(AppErrorCode::NotFound, CONVERSATION_NOT_FOUND))?;
         Ok(ConversationDetailDto {
-            conversation: conversation_dto(row)?,
+            conversation: conversation_dto(row, &grants)?,
             messages: messages
                 .into_iter()
                 .map(message_dto)
@@ -1066,11 +1107,36 @@ impl NodeDef for PrepareNode {
         } else {
             String::new()
         };
-        let prompt = [details.system_prompt.clone(), prompt, guidance, skill_note]
-            .into_iter()
-            .filter(|part| !part.trim().is_empty())
-            .collect::<Vec<_>>()
-            .join("\n\n");
+        let row = inner.conversation(&input.conversation_id)?;
+        let previous = (position > 0).then_some(row.turn_folder.as_deref());
+        let changed = previous.is_some_and(|previous| previous != row.working_folder.as_deref());
+        let workspace = if offered.is_empty() && row.working_folder.is_none() && !changed {
+            String::new()
+        } else {
+            working_folder_section(row.working_folder.as_deref(), previous)
+        };
+        if row.turn_folder != row.working_folder {
+            inner.read(|repositories| {
+                Ok(repositories.chat.update(
+                    &input.conversation_id,
+                    &ConversationPatch {
+                        turn_folder: Some(row.working_folder.clone()),
+                        ..ConversationPatch::default()
+                    },
+                )?)
+            })?;
+        }
+        let prompt = [
+            details.system_prompt.clone(),
+            prompt,
+            guidance,
+            skill_note,
+            workspace,
+        ]
+        .into_iter()
+        .filter(|part| !part.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n");
         let system = if offered.is_empty() {
             prompt.clone()
         } else {
@@ -1776,10 +1842,19 @@ impl NodeDef for PersistNode {
 
 impl ChatService {
     pub fn new(options: ChatServiceOptions) -> Result<Self, AppError> {
+        let folders = options.folders.unwrap_or_else(|| {
+            FolderAccessService::new(
+                Arc::clone(&options.database),
+                options.runs.approvals(),
+                ForbiddenFolders::from_environment(&[]),
+                options.clock.clone(),
+            )
+        });
         let inner = Arc::new(Inner {
             database: options.database,
             tools: options.tools,
             skills: options.skills,
+            folders,
             logger: options.logger,
             clock: options.clock,
         });
@@ -1795,11 +1870,19 @@ impl ChatService {
     }
 
     pub fn list(&self) -> Result<Vec<ConversationDto>, AppError> {
-        self.inner
-            .read(|repositories| Ok(repositories.chat.list()?))?
-            .into_iter()
-            .map(conversation_dto)
+        let (rows, grants) = self.inner.read(|repositories| {
+            Ok((
+                repositories.chat.list()?,
+                repositories.folder_grants.list()?,
+            ))
+        })?;
+        rows.into_iter()
+            .map(|row| conversation_dto(row, &grants))
             .collect()
+    }
+
+    pub fn folders(&self) -> FolderAccessService {
+        self.inner.folders.clone()
     }
 
     pub fn get(&self, id: &ConversationId) -> Result<ConversationDetailDto, AppError> {
@@ -1827,10 +1910,12 @@ impl ChatService {
             use_relations: input.use_relations(),
             enabled_tools: unique(&tools),
             retrieval_mode: input.retrieval_mode(),
+            working_folder: None,
+            turn_folder: None,
             created_at: now,
             updated_at: now,
         };
-        conversation_dto(
+        self.inner.dto(
             self.inner
                 .read(|repositories| Ok(repositories.chat.create(&row)?))?,
         )
@@ -1840,7 +1925,51 @@ impl ChatService {
         self.inner
             .read(|repositories| Ok(repositories.chat.update(id, patch)?))?
             .ok_or_else(|| AppError::new(AppErrorCode::NotFound, CONVERSATION_NOT_FOUND))
-            .and_then(conversation_dto)
+            .and_then(|row| self.inner.dto(row))
+    }
+
+    pub fn bind_folder(&self, input: &BindFolderInput) -> Result<BindFolderResultDto, AppError> {
+        input.validate()?;
+        let id = input.id.to_string();
+        self.inner.conversation(&id)?;
+        self.inner.require_idle(&id)?;
+        let folders = &self.inner.folders;
+        let folder = folders.working_folder(std::path::Path::new(&input.path))?;
+        if !folders.covered(&id, &folder)? {
+            match input.grant {
+                Some(scope) => {
+                    folders.grant(&folder, scope, Some(&id))?;
+                }
+                None => {
+                    return Ok(BindFolderResultDto::NeedsGrant {
+                        path: folder.to_string_lossy().into_owned(),
+                    });
+                }
+            }
+        }
+        let conversation = self.update(
+            &id,
+            &ConversationPatch {
+                working_folder: Some(Some(folder.to_string_lossy().into_owned())),
+                ..ConversationPatch::touched(self.inner.now())
+            },
+        )?;
+        Ok(BindFolderResultDto::Bound {
+            conversation: Box::new(conversation),
+        })
+    }
+
+    pub fn unbind_folder(&self, id: &ConversationId) -> Result<ConversationDto, AppError> {
+        let id = id.to_string();
+        self.inner.conversation(&id)?;
+        self.inner.require_idle(&id)?;
+        self.update(
+            &id,
+            &ConversationPatch {
+                working_folder: Some(None),
+                ..ConversationPatch::touched(self.inner.now())
+            },
+        )
     }
 
     pub fn rename(&self, id: &ConversationId, title: &str) -> Result<ConversationDto, AppError> {
@@ -2149,8 +2278,15 @@ impl ChatService {
         };
         let guidance = self.inner.mcp_guidance(&mut enabled, &registered)?;
         let offered = offered_tools(&enabled, &registered);
+        let folder = details.and_then(|details| details.working_folder.as_deref());
+        let workspace = if offered.is_empty() && folder.is_none() {
+            String::new()
+        } else {
+            working_folder_section(folder, None)
+        };
         let tool_block = [
             guidance,
+            workspace,
             if offered.is_empty() {
                 String::new()
             } else {

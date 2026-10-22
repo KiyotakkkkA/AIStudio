@@ -13,6 +13,7 @@ export const ROUTES = {
   tasks: "/tasks",
   downloads: "/downloads",
   runs: "/runs",
+  permissions: "/permissions",
   settings: "/settings",
 } as const;
 

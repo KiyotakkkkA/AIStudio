@@ -72,3 +72,6 @@ export type StreamId = z.infer<typeof StreamId>;
 
 export const AccountId = brandedId("AccountId");
 export type AccountId = z.infer<typeof AccountId>;
+
+export const FolderGrantId = brandedId("FolderGrantId");
+export type FolderGrantId = z.infer<typeof FolderGrantId>;

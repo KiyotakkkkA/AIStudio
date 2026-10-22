@@ -1,0 +1,34 @@
+[
+  {
+    "name": "always",
+    "value": {
+      "id": "0199aa11-6666-7111-8111-111111111111",
+      "path": "D:\\work",
+      "scope": "always",
+      "conversation": null,
+      "boundConversations": [
+        {
+          "id": "0199aa11-2222-7111-8111-111111111111",
+          "title": "Plans"
+        }
+      ],
+      "grantedAt": 1,
+      "lastUsedAt": 2
+    }
+  },
+  {
+    "name": "dialog",
+    "value": {
+      "id": "0199aa11-6666-7111-8111-111111111111",
+      "path": "D:\\work\\site",
+      "scope": "conversation",
+      "conversation": {
+        "id": "0199aa11-2222-7111-8111-111111111111",
+        "title": "Plans"
+      },
+      "boundConversations": [],
+      "grantedAt": 1,
+      "lastUsedAt": null
+    }
+  }
+]

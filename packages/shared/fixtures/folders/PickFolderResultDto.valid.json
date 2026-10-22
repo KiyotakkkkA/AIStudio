@@ -1,0 +1,14 @@
+[
+  {
+    "name": "picked",
+    "value": {
+      "path": "D:\\work"
+    }
+  },
+  {
+    "name": "cancelled",
+    "value": {
+      "path": null
+    }
+  }
+]

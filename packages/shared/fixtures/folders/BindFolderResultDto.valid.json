@@ -1,0 +1,31 @@
+[
+  {
+    "name": "bound",
+    "value": {
+      "status": "bound",
+      "conversation": {
+        "id": "0199aa11-2222-7111-8111-111111111111",
+        "title": "Plans",
+        "providerId": "0199aa11-1111-7111-8111-111111111111",
+        "modelId": "fake-model",
+        "settings": {},
+        "systemPrompt": "",
+        "attachedStoreIds": [],
+        "useRelations": false,
+        "enabledTools": [],
+        "retrievalMode": "hybrid",
+        "workingFolder": "D:\\work",
+        "workingFolderAccess": "granted",
+        "createdAt": 1,
+        "updatedAt": 2
+      }
+    }
+  },
+  {
+    "name": "needs grant",
+    "value": {
+      "status": "needsGrant",
+      "path": "D:\\work"
+    }
+  }
+]

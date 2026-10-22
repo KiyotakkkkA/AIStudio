@@ -8,6 +8,7 @@ pub mod enums;
 pub mod envelope;
 pub mod errors;
 pub mod events;
+pub mod folders;
 pub mod graph;
 pub mod graph_expansion;
 pub mod ids;
@@ -62,6 +63,12 @@ pub use errors::{AppError, AppErrorCode, ErrorDetails};
 pub use events::{
     ApprovalRequestDto, DeltaKind, EVENT_CHANNEL, EventSeq, HostEvent, HostEventDraft, LogLineDto,
     RunOutcomeDto, RunOutcomeStatus, StepEventDto,
+};
+pub use folders::{
+    AnswerFolderRequestInput, BindFolderInput, BindFolderResultDto, FOLDER_APPROVAL_KIND,
+    FolderAccessAnswer, FolderApprovalDto, FolderGrantChatDto, FolderGrantDto, FolderGrantRef,
+    FolderGrantScope, FolderRequestEntryDto, FoldersListOutput, PickFolderResultDto,
+    WorkingFolderAccess,
 };
 pub use graph::{
     AddGraphEdgeInput, GRAPH_MAX_HOPS, GraphDirection, GraphEdgeDto, GraphEdgeKey,

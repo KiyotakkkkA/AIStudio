@@ -19,7 +19,7 @@ revision of this file.
 
 ## 1. What the product is
 
-A local-first desktop studio for building and running AI automations. Thirteen routed
+A local-first desktop studio for building and running AI automations. Fifteen routed
 pages behind one navigation rail, plus two surfaces that are not routes:
 
 | Group | Pages |
@@ -27,7 +27,7 @@ pages behind one navigation rail, plus two surfaces that are not routes:
 | Workspace | Secrets & Identity · AI Providers · Vector Stores |
 | Build | Chat · Agentic Build · Scenarios |
 | Extend | Skills · Connections (MCP) · Integrations · Tools |
-| System | Tasks · Downloads · Runs & Logs · Settings |
+| System | Tasks · Downloads · Runs & Logs · Permissions · Settings |
 
 Two non-route surfaces:
 
@@ -630,6 +630,29 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   admission; the UI only reflects it.
 - Sidecar runs with the app's privileges but no elevated rights; workspace roots are an
   explicit allow-list checked host-side, not in Rust.
+- **Folder access** (`zvs-host/src/workspace/`, TASK_036_EXTRA_1). A chat may bind one
+  *working folder*; it starts with none, and binding or unbinding is refused while a turn runs.
+  Relative paths resolve against it, and its path goes into the system prompt each turn, with
+  a note when it changed since the previous turn. Every other folder is reached through a
+  grant: `always` (stored, any chat), `conversation` (stored, deleted with the chat) or a
+  once-grant held in memory for one tool call. A grant covers the folder and all its
+  subfolders; coverage compares canonical paths (junctions and symlinks resolved, `\\?\`
+  stripped) case-insensitively on component boundaries. The grant unit is the nearest parent:
+  a file asks for its folder, a listing for the folder itself, a missing path for its deepest
+  existing ancestor plus the folders that will be created. `ensure_access` raises **one**
+  `kind: "folder"` approval per call for all uncovered folders, answered «Разрешить
+  однократно», «Разрешить для этого диалога», «Разрешить всегда» or «Запретить»; a timeout
+  or a closed modal denies and the call fails with `PermissionDenied`. Binding an uncovered
+  folder asks with the two stored scopes only. Revoking a grant on the «Разрешения» page keeps
+  bindings; the chat then reports `workingFolderAccess: "missing"`.
+- **Forbidden folders** are refused outright, with no request, both as targets and as
+  working folders: drive roots, `%WINDIR%`, `Program Files`, `Program Files (x86)`,
+  `%ProgramData%`, the bare user profile root (its subfolders are allowed), every app folder
+  (data, cache, logs, downloads, the browser work profile), network (UNC) paths and removable
+  media, and any grant that would contain one of them.
+- **Folder access and tool tiers are separate axes.** A grant says *where* a tool may act;
+  the tier on the Tools page says *whether* and with what confirmation it may act. Neither
+  widens the other.
 - No telemetry, no outbound calls the user did not configure.
 - **Page and document content is untrusted input.** Anything the agent reads from a web page,
   a PDF or an email is data, never instruction. Text from those sources is fenced before it

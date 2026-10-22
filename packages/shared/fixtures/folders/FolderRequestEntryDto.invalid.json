@@ -1,0 +1,9 @@
+[
+  {
+    "name": "empty path",
+    "value": {
+      "path": "",
+      "creates": []
+    }
+  }
+]

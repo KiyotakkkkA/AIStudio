@@ -15,6 +15,8 @@ pub struct ConversationPatch {
     pub use_relations: Option<bool>,
     pub enabled_tools: Option<Vec<String>>,
     pub retrieval_mode: Option<RetrievalMode>,
+    pub working_folder: Option<Option<String>>,
+    pub turn_folder: Option<Option<String>>,
     pub updated_at: Option<Timestamp>,
 }
 
@@ -51,6 +53,18 @@ impl ConversationPatch {
         }
         if let Some(mode) = self.retrieval_mode {
             assignments.push(("retrieval_mode", SqlValue::Text(mode.as_str().to_owned())));
+        }
+        if let Some(folder) = &self.working_folder {
+            assignments.push((
+                "working_folder",
+                folder.clone().map_or(SqlValue::Null, SqlValue::Text),
+            ));
+        }
+        if let Some(folder) = &self.turn_folder {
+            assignments.push((
+                "turn_folder",
+                folder.clone().map_or(SqlValue::Null, SqlValue::Text),
+            ));
         }
         if let Some(updated_at) = self.updated_at {
             assignments.push(("updated_at", SqlValue::Integer(updated_at)));
@@ -145,8 +159,8 @@ impl<'c> ChatRepository<'c> {
     pub fn create(&self, row: &ConversationRow) -> rusqlite::Result<ConversationRow> {
         self.connection
             .prepare_cached(&format!(
-                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, enabled_tools, retrieval_mode, created_at, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) RETURNING {}",
+                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, enabled_tools, retrieval_mode, working_folder, turn_folder, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14) RETURNING {}",
                 ConversationRow::COLUMNS
             ))?
             .query_row(
@@ -161,6 +175,8 @@ impl<'c> ChatRepository<'c> {
                     row.use_relations,
                     json_text(&row.enabled_tools)?,
                     EnumColumn(row.retrieval_mode),
+                    row.working_folder,
+                    row.turn_folder,
                     row.created_at,
                     row.updated_at,
                 ],
@@ -310,6 +326,8 @@ mod tests {
             use_relations: false,
             enabled_tools: Vec::new(),
             retrieval_mode: RetrievalMode::Hybrid,
+            working_folder: None,
+            turn_folder: None,
             created_at: 1,
             updated_at,
         }

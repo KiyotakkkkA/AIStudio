@@ -12,6 +12,8 @@
       "useRelations": false,
       "enabledTools": [],
       "retrievalMode": "hybrid",
+      "workingFolder": null,
+      "workingFolderAccess": null,
       "createdAt": 1,
       "updatedAt": 2,
       "messages": [
@@ -76,6 +78,8 @@
       "useRelations": false,
       "enabledTools": [],
       "retrievalMode": "hybrid",
+      "workingFolder": null,
+      "workingFolderAccess": null,
       "createdAt": 1,
       "updatedAt": 2,
       "messages": []

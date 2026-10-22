@@ -12,6 +12,8 @@ import ChatMessage from "./ChatMessage";
 import MessageActions from "../../ui/molecules/MessageActions";
 import ChatComposer from "./ChatComposer";
 import ChatApprovals from "./ChatApprovals";
+import ChatWorkingFolder from "./ChatWorkingFolder";
+import FolderAccessModal from "./FolderAccessModal";
 import ChatToolCalls from "./ChatToolCalls";
 import { answerCitations } from "./citations";
 import { shouldPinToBottom } from "./scroll";
@@ -245,13 +247,18 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           <ChatApprovals store={store} />
         </div>
       </div>
+      <div className="mx-auto w-full max-w-4xl shrink-0 px-6">
+        <ChatWorkingFolder store={store} />
+      </div>
+      <FolderAccessModal store={store} />
       <ChatComposer store={store} />
     </section>
   );
 });
 
 function generationPhase(store: ChatStore): string {
-  if (store.standaloneApprovals.length > 0) return "Ожидает подтверждения";
+  if (store.standaloneApprovals.length > 0 || store.folderRequest !== null)
+    return "Ожидает подтверждения";
   if (store.liveToolCalls.some((call) => call.status === "awaiting-approval"))
     return "Ожидает подтверждения";
   const running = store.liveToolCalls.find((call) => call.status === "running");

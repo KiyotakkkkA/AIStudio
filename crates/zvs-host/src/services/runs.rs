@@ -339,6 +339,10 @@ impl RunService {
         Arc::clone(&self.inner.permissions)
     }
 
+    pub fn approvals(&self) -> Arc<ApprovalService> {
+        Arc::clone(&self.inner.approvals)
+    }
+
     pub fn registry(&self) -> Arc<NodeRegistry> {
         Arc::clone(&self.inner.registry)
     }

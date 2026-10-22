@@ -1,0 +1,22 @@
+[
+  {
+    "name": "one folder",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111111",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "folder",
+      "subject": "folder.access",
+      "scope": "global",
+      "expiresAt": 60000,
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "tool": "files.write",
+      "action": "Запись файла D:\\work\\out\u0007.txt",
+      "folders": [
+        {
+          "path": "D:\\work",
+          "creates": ["out", "out\\logs"]
+        }
+      ]
+    }
+  }
+]
