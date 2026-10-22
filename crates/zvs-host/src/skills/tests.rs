@@ -310,7 +310,12 @@ fn host_with(drivers: Option<Arc<dyn DriverSource>>) -> Host {
         workspace.join(SKILLS_DIR),
         tools.clone(),
     ));
-    register_skill_nodes(&nodes, &library).expect("registers the skill nodes");
+    register_skill_nodes(
+        &nodes,
+        &library,
+        SkillScriptOptions::new(None, workspace.join("skill-scripts")),
+    )
+    .expect("registers the skill nodes");
     register_kernel_tools(&nodes, &tools).expect("registers the kernel tools");
     let driver = Arc::new(Scripted::default());
     let runs = RunService::new(RunServiceOptions {

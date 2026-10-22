@@ -979,7 +979,7 @@ async fn a_turn_lists_the_skills_and_offers_skill_load_even_when_the_conversatio
         .map(|tool| tool.name.as_str())
         .collect();
     offered.sort_unstable();
-    assert_eq!(offered, ["skill__load", "skill__read"]);
+    assert_eq!(offered, ["skill__load", "skill__read", "skill__script"]);
     let system = requests[0].system.clone().unwrap_or_default();
     assert!(system.contains("call skill__load with its key"), "{system}");
     assert!(system.contains(

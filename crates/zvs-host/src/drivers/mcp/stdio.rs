@@ -89,7 +89,7 @@ pub fn cannot_start(spec: &LaunchSpec, error: &std::io::Error) -> AppError {
     .with_detail("command", spec.command.clone())
 }
 
-async fn kill_tree(child: &mut Child) {
+pub async fn kill_tree(child: &mut Child) {
     #[cfg(windows)]
     if let Some(pid) = child.id() {
         let mut taskkill = Command::new("taskkill");

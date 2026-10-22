@@ -64,8 +64,8 @@ use zvs_host::services::{
     VectorSourceService, VectorSourceServiceOptions, VectorStoreService, VectorStoreServiceOptions,
 };
 use zvs_host::skills::{
-    SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillService, SkillServiceOptions,
-    register_skill_nodes,
+    SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillScriptOptions, SkillService,
+    SkillServiceOptions, register_skill_nodes,
 };
 use zvs_host::toolchain::{
     ToolchainResolver, ToolchainResolverOptions, ToolchainService, ToolchainServiceOptions,
@@ -606,7 +606,14 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             tools.clone(),
         )
     });
-    register_skill_nodes(&nodes, &skill_library)?;
+    register_skill_nodes(
+        &nodes,
+        &skill_library,
+        SkillScriptOptions::new(
+            Some(Arc::new(toolchain.clone())),
+            paths.cache_dir.join("skill-scripts"),
+        ),
+    )?;
     register_kernel_tools(&nodes, &tools)?;
     let mcp = McpService::new(McpServiceOptions {
         logger: logger.clone(),

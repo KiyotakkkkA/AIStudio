@@ -410,7 +410,15 @@ pub fn test_services(system: SystemService) -> TestServices {
             tools.clone(),
         )
     });
-    crate::skills::register_skill_nodes(&nodes, &skill_library).expect("registers the skill nodes");
+    crate::skills::register_skill_nodes(
+        &nodes,
+        &skill_library,
+        crate::skills::SkillScriptOptions::new(
+            Some(Arc::new(toolchain.clone())),
+            workspace.join("skill-scripts"),
+        ),
+    )
+    .expect("registers the skill nodes");
     crate::tools::register_kernel_tools(&nodes, &tools).expect("registers the kernel tools");
     let runs = RunService::new(RunServiceOptions {
         clock: clock.clone(),

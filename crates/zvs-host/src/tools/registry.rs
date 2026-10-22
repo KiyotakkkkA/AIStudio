@@ -30,6 +30,7 @@ pub struct ToolDescriptor {
     pub input_schema: Value,
     pub read_only: bool,
     pub destructive: bool,
+    pub tier: Option<ToolTier>,
 }
 
 impl ToolDescriptor {
@@ -43,6 +44,7 @@ impl ToolDescriptor {
             input_schema: Value::Null,
             read_only: false,
             destructive: false,
+            tier: None,
         }
     }
 
@@ -77,6 +79,7 @@ impl ToolDescriptor {
             input_schema: self.input_schema.clone(),
             read_only: self.read_only,
             destructive: self.destructive,
+            tier: self.tier,
         })
     }
 }
@@ -279,8 +282,9 @@ impl ToolRegistry {
         let row = self.inner.database.transaction(|transaction| {
             let repositories = Repositories::new(transaction);
             let Some(existing) = repositories.tools.find_by_key(&descriptor.key)? else {
-                let tier =
-                    default_tool_tier(descriptor.read_only, descriptor.destructive, preference);
+                let tier = descriptor.tier.unwrap_or_else(|| {
+                    default_tool_tier(descriptor.read_only, descriptor.destructive, preference)
+                });
                 let created = repositories.tools.insert(&ToolRow {
                     id: id_text(),
                     key: descriptor.key.clone(),
@@ -306,11 +310,13 @@ impl ToolRegistry {
                 return Ok(created);
             };
             let tier = if descriptor.destructive && !existing.destructive {
-                default_tool_tier(
-                    descriptor.read_only,
-                    descriptor.destructive,
-                    ToolDefaultTier::Inferred,
-                )
+                descriptor.tier.unwrap_or_else(|| {
+                    default_tool_tier(
+                        descriptor.read_only,
+                        descriptor.destructive,
+                        ToolDefaultTier::Inferred,
+                    )
+                })
             } else {
                 existing.tier
             };

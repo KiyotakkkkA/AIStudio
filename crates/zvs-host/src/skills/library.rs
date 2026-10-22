@@ -30,6 +30,7 @@ pub const SKILL_INVALID: &str = "Навык не прошёл проверку";
 pub const SKILL_NOT_READY: &str = "Навык содержит ошибки и не может быть использован";
 pub const SKILL_DISABLED: &str = "Навык выключен";
 pub const SKILL_FILE_NOT_FOUND: &str = "Файл навыка не найден";
+pub const SKILL_SCRIPT_OUTSIDE: &str = "Запускать можно только файлы из папки scripts/";
 pub const SKILL_FILE_TOO_LARGE: &str = "Файл навыка превышает допустимый размер";
 pub const SKILL_STORAGE_FAILED: &str = "Не удалось сохранить файлы навыка";
 pub const SKILL_IMPORT_NO_MANIFEST: &str = "В выбранной папке нет файла SKILL.md";
@@ -37,6 +38,7 @@ pub const SKILL_EXPORT_TAKEN: &str =
     "В папке назначения уже есть папка с идентификатором этого навыка";
 
 const STAGING_PREFIX: &str = ".staging-";
+const SCRIPTS_PREFIX: &str = "scripts/";
 const TRASH_PREFIX: &str = ".trash-";
 const TOOL_FIELD: &str = "allowedTools";
 const TOOL_RULES: [SkillIssueRule; 4] = [
@@ -85,6 +87,13 @@ pub struct LoadedSkill {
     pub skill: SkillDto,
     pub instructions: String,
     pub files: Vec<SkillFileDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillScriptFile {
+    pub path: String,
+    pub dir: PathBuf,
+    pub file: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1047,9 +1056,24 @@ impl SkillLibrary {
         self.load(&row.key)
     }
 
-    pub fn read(&self, key: &str, path: &str) -> Result<SkillFileContent, AppError> {
-        let row = self.usable_row(key)?;
+    pub fn script(&self, key: &str, path: &str) -> Result<SkillScriptFile, AppError> {
         let path = js_trim(path);
+        if !path.starts_with(SCRIPTS_PREFIX) {
+            return Err(AppError::new(
+                AppErrorCode::PermissionDenied,
+                SKILL_SCRIPT_OUTSIDE,
+            ));
+        }
+        let (dir, file) = self.locate(key, path)?;
+        Ok(SkillScriptFile {
+            path: path.to_owned(),
+            dir,
+            file,
+        })
+    }
+
+    fn locate(&self, key: &str, path: &str) -> Result<(PathBuf, PathBuf), AppError> {
+        let row = self.usable_row(key)?;
         if !is_skill_path(path) {
             return Err(AppError::new(AppErrorCode::NotFound, SKILL_FILE_NOT_FOUND));
         }
@@ -1057,13 +1081,15 @@ impl SkillLibrary {
         let file = path
             .split('/')
             .fold(dir.clone(), |file, segment| file.join(segment));
-        let inside = match (file.canonicalize(), dir.canonicalize()) {
-            (Ok(file), Ok(dir)) => file.starts_with(dir) && file.is_file(),
-            _ => false,
-        };
-        if !inside {
-            return Err(AppError::new(AppErrorCode::NotFound, SKILL_FILE_NOT_FOUND));
+        match (file.canonicalize(), dir.canonicalize()) {
+            (Ok(file), Ok(dir)) if file.starts_with(&dir) && file.is_file() => Ok((dir, file)),
+            _ => Err(AppError::new(AppErrorCode::NotFound, SKILL_FILE_NOT_FOUND)),
         }
+    }
+
+    pub fn read(&self, key: &str, path: &str) -> Result<SkillFileContent, AppError> {
+        let path = js_trim(path);
+        let (_, file) = self.locate(key, path)?;
         let size = fs::metadata(&file).map_err(|error| storage(&error))?.len();
         if size > SKILL_FILE_MAX_BYTES {
             return Err(AppError::new(

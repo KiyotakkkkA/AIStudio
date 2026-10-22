@@ -333,6 +333,22 @@ async fn a_tool_that_becomes_destructive_is_pushed_back_to_off() {
 }
 
 #[tokio::test]
+async fn a_declared_tier_replaces_the_default_only_until_the_user_changes_it() {
+    let host = host();
+    let declared = ToolDescriptor {
+        destructive: true,
+        tier: Some(ToolTier::Ask),
+        ..descriptor()
+    };
+    let registered = host.register(&declared);
+    assert_eq!(registered.tier, ToolTier::Ask);
+    host.tools
+        .set_tier(&registered.id.to_string(), ToolTier::Off, "user")
+        .expect("sets");
+    assert_eq!(host.register(&declared).tier, ToolTier::Off);
+}
+
+#[tokio::test]
 async fn the_registered_ceiling_is_the_one_admission_composes_against() {
     let host = host();
     let registered = host.register(&read_only());

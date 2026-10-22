@@ -13,6 +13,6 @@ pub use protocol::{
     McpToolDescriptor, SUPPORTED_PROTOCOL_VERSIONS, call_result, infer_destructive,
     infer_read_only,
 };
-pub use stdio::{LaunchSpec, SpawnServer, default_spawn};
+pub use stdio::{LaunchSpec, SpawnServer, default_spawn, kill_tree};
 pub use toolchain_env::{TOOLCHAIN_DIR, isolated_toolchain_env};
 pub use transport::TransportHooks;

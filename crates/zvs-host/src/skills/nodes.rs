@@ -10,6 +10,7 @@ use zvs_contract::{
 };
 
 use super::library::SkillLibrary;
+use super::script::{SKILL_SCRIPT, SkillScriptNode, SkillScriptOptions};
 use crate::drivers::ai::{ChatMessage, GenerateRequest, with_injected_tools};
 use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateRole};
 use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext, ToolStepRequest};
@@ -22,7 +23,7 @@ use crate::services::chat_tools::{
 pub const SKILL_LOAD: &str = "skill.load";
 pub const SKILL_READ: &str = "skill.read";
 pub const SKILL_GENERATE: &str = "skill.generate";
-pub const SKILL_TOOLS: [&str; 2] = [SKILL_LOAD, SKILL_READ];
+pub const SKILL_TOOLS: [&str; 3] = [SKILL_LOAD, SKILL_READ, SKILL_SCRIPT];
 
 pub const LOAD_DESCRIPTION: &str = "Загрузка навыка по идентификатору из списка навыков в системном сообщении. Возвращает инструкции навыка и перечень его файлов; при выполнении запроса следуйте этим инструкциям. Вызывайте только для навыка, который соответствует запросу.";
 pub const READ_DESCRIPTION: &str = "Чтение файла навыка из папок references/, scripts/ или assets/ по идентификатору навыка и пути из результата skill.load. Текстовый файл возвращается целиком, для двоичного сообщается только размер.";
@@ -454,8 +455,13 @@ impl NodeDef for SkillGenerateNode {
     }
 }
 
-pub fn register_skill_nodes(nodes: &NodeRegistry, library: &SkillLibrary) -> Result<(), AppError> {
+pub fn register_skill_nodes(
+    nodes: &NodeRegistry,
+    library: &SkillLibrary,
+    scripts: SkillScriptOptions,
+) -> Result<(), AppError> {
     nodes.register(SkillLoadNode(library.clone()))?;
     nodes.register(SkillReadNode(library.clone()))?;
+    nodes.register(SkillScriptNode::new(library.clone(), scripts))?;
     nodes.register(SkillGenerateNode)
 }

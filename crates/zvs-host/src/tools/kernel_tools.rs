@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use zvs_contract::{AppError, ToolDto, ToolSource};
+use zvs_contract::{AppError, ToolDto, ToolSource, ToolTier};
 
 use super::registry::{ToolDescriptor, ToolRegistry};
 use crate::kernel::knowledge_nodes::{
@@ -12,6 +12,7 @@ use crate::skills::nodes::{
     LOAD_DESCRIPTION as SKILL_LOAD_DESCRIPTION, READ_DESCRIPTION as SKILL_READ_DESCRIPTION,
     SKILL_LOAD, SKILL_READ,
 };
+use crate::skills::script::{SCRIPT_DESCRIPTION as SKILL_SCRIPT_DESCRIPTION, SKILL_SCRIPT};
 
 const NOT_TOOLS: &[&str] = &["llm.generate"];
 
@@ -79,6 +80,14 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
         },
     ),
     (
+        SKILL_SCRIPT,
+        BuiltinToolMeta {
+            display_name: "skill.script",
+            description: SKILL_SCRIPT_DESCRIPTION,
+            destructive: true,
+        },
+    ),
+    (
         "vector.index",
         BuiltinToolMeta {
             display_name: "vector.index",
@@ -135,6 +144,9 @@ pub fn register_kernel_tools(
             input_schema: node.input_schema().clone(),
             read_only: node.side_effect_free() && previous,
             destructive: meta.is_some_and(|meta| meta.destructive),
+            tier: meta
+                .is_some_and(|meta| meta.destructive)
+                .then_some(ToolTier::Ask),
             ..ToolDescriptor::new(key.clone(), ToolSource::Builtin)
         })?;
         if !order.contains(key) {
