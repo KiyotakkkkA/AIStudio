@@ -56,7 +56,8 @@ export default function DownloadFailureRow({
       <IconButton
         path={mdiClose}
         aria-label={`Убрать запись о ${download.displayName}`}
-        title="Убрать запись"
+        label="Убрать запись"
+        tooltip="left-center"
         disabled={busy}
         onClick={onDismiss}
       />

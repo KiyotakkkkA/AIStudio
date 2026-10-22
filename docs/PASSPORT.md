@@ -689,6 +689,17 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   and there is no sandbox. `skill.script`, `code.run` and `shell.run` share one runner
   (`toolchain/process.rs`): scratch folders, a timeout, kill-tree on cancel, capped streams and
   fenced output.
+- **Working folder explorer** (`zvs-host/src/workspace/explorer.rs`, TASK_036_EXTRA_4). The
+  «Файлы» side panel in the chat is the user browsing their own folder, not a tool call:
+  `workspace.list` / `workspace.read` raise **no** access request, but they require the chat's
+  working folder to be covered by a grant (otherwise `PermissionDenied`), and every path is
+  canonicalised and refused when it leaves the working folder (`..`, an absolute path, a
+  junction or symlink pointing out). Listings are one level, folders first, `.git` hidden and
+  `.gitignore` matches flagged rather than dropped; reads are capped at 1 MiB, cut on a line.
+  `workspace.watch` starts one recursive `notify` watcher per chat, shared by subscribers,
+  debounced to 300 ms (at most 2 s) and coalesced; changes travel as `step` events
+  `{ domain: "workspace", conversationId, changes }` on the watch's stream, and binding,
+  unbinding or a vanished folder report the root (`""`) as modified or removed.
 - **Folder access and tool tiers are separate axes.** A grant says *where* a tool may act;
   the tier on the Tools page says *whether* and with what confirmation it may act. Neither
   widens the other.

@@ -99,13 +99,17 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "chat.bindFolder",
             |services: Arc<Services>, input: BindFolderInput| async move {
-                services.chat.bind_folder(&input)
+                let result = services.chat.bind_folder(&input)?;
+                services.explorer.rebind(&input.id);
+                Ok::<_, AppError>(result)
             },
         )
         .handle(
             "chat.unbindFolder",
             |services: Arc<Services>, input: ConversationRef| async move {
-                services.chat.unbind_folder(&input.id)
+                let conversation = services.chat.unbind_folder(&input.id)?;
+                services.explorer.rebind(&input.id);
+                Ok::<_, AppError>(conversation)
             },
         )
         .handle(

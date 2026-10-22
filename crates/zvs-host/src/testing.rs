@@ -430,7 +430,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             indexing: Some(Arc::new(indexing.clone())),
             ..crate::kernel::KernelServices::default()
         },
-        ..RunServiceOptions::new(database.shared(), run_bus, Arc::clone(&nodes))
+        ..RunServiceOptions::new(database.shared(), run_bus.clone(), Arc::clone(&nodes))
     })
     .expect("a run service");
     downloads.attach(Arc::new(runs.clone()));
@@ -520,6 +520,11 @@ pub fn test_services(system: SystemService) -> TestServices {
             mcp,
             skills,
             chat,
+            explorer: crate::workspace::ExplorerService::with_debounce(
+                folders.clone(),
+                run_bus.clone(),
+                std::time::Duration::from_millis(50),
+            ),
             folders,
             picker: Some(picker.clone()),
         }),

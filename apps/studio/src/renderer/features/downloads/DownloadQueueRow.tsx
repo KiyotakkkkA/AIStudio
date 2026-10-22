@@ -63,21 +63,24 @@ export default function DownloadQueueRow({
       <IconButton
         path={mdiArrowUp}
         aria-label={`Поднять ${download.displayName} в очереди`}
-        title="Выше в очереди"
+        label="Выше в очереди"
+        tooltip="left-center"
         disabled={busy || download.priority >= 9}
         onClick={onRaise}
       />
       <IconButton
         path={mdiArrowDown}
         aria-label={`Опустить ${download.displayName} в очереди`}
-        title="Ниже в очереди"
+        label="Ниже в очереди"
+        tooltip="left-center"
         disabled={busy || download.priority <= 0}
         onClick={onLower}
       />
       <IconButton
         path={mdiClose}
         aria-label={`Убрать ${download.displayName} из очереди`}
-        title="Убрать из очереди"
+        label="Убрать из очереди"
+        tooltip="left-center"
         disabled={busy}
         onClick={onCancel}
       />

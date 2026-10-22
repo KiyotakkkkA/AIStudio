@@ -15,6 +15,7 @@ export * from "./ai.js";
 export * from "./system.js";
 export * from "./chat.js";
 export * from "./files.js";
+export * from "./explorer.js";
 export * from "./process.js";
 export * from "./folders.js";
 export * from "./providers/index.js";

@@ -51,8 +51,8 @@ export default observer(function ConversationList({ store }: { readonly store: C
           Чат
         </h1>
         <IconButton
-          aria-label="Новый чат"
-          title="Новый чат"
+          label="Новый чат"
+          tooltip="bottom-center"
           path={mdiSquareEditOutline}
           iconSize={17}
           disabled={store.generating}
@@ -97,6 +97,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
                         rounded="rounded-lg"
                         aria-label={`Действия для ${conversation.title}`}
                         label="Действия"
+                        tooltip="right-center"
                         path={mdiDotsVertical}
                         className="invisible size-6 justify-center gap-0 border-transparent bg-transparent p-0 text-main-400 group-focus-within:visible group-hover:visible hover:border-transparent hover:bg-main-700 hover:text-main-100"
                         iconSize={18}

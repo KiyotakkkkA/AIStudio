@@ -73,7 +73,7 @@ use zvs_host::toolchain::{
     ToolchainResolver, ToolchainResolverOptions, ToolchainService, ToolchainServiceOptions,
 };
 use zvs_host::tools::{ToolInvoker, ToolRegistry, ToolRegistryOptions, register_kernel_tools};
-use zvs_host::workspace::{FolderAccessService, ForbiddenFolders};
+use zvs_host::workspace::{ExplorerService, FolderAccessService, ForbiddenFolders};
 use zvs_host::{IpcServer, ipc};
 
 use crate::browser::gateway::GatewayOptions;
@@ -699,6 +699,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         clock: clock.clone(),
         ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), Arc::clone(&nodes))
     })?;
+    let explorer = ExplorerService::new(folders.clone(), events.clone());
     let tool_invoker = ToolInvoker::new(tools.clone(), nodes, runs.clone(), clock.clone());
     downloads.attach(Arc::new(runs.clone()));
     let retention = RetentionService::new(RetentionServiceOptions {
@@ -737,6 +738,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         let downloads = downloads.clone();
         shutdown.register(ShutdownStage::Stop, "downloads", move || async move {
             downloads.dispose();
+        });
+    }
+    {
+        let explorer = explorer.clone();
+        shutdown.register(ShutdownStage::Stop, "explorer", move || async move {
+            explorer.dispose();
         });
     }
     {
@@ -814,6 +821,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         mcp,
         skills,
         chat,
+        explorer: explorer.clone(),
         folders,
         picker: Some(picker),
     });

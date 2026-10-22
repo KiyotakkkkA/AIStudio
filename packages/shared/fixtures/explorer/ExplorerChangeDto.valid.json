@@ -1,0 +1,16 @@
+[
+  {
+    "name": "created",
+    "value": {
+      "path": "docs/PLAN.md",
+      "kind": "created"
+    }
+  },
+  {
+    "name": "root removed",
+    "value": {
+      "path": "",
+      "kind": "removed"
+    }
+  }
+]

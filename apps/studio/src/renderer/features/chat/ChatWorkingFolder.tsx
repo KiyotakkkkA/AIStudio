@@ -65,14 +65,16 @@ export default observer(function ChatWorkingFolder({ store }: { readonly store: 
             ) : null}
             <IconButton
               aria-label={CHANGE_FOLDER}
-              title={hint ?? CHANGE_FOLDER}
+              label={hint ?? CHANGE_FOLDER}
+              tooltip="top-center"
               path={mdiFolderSwapOutline}
               disabled={locked}
               onClick={() => void store.pickFolder()}
             />
             <IconButton
               aria-label={REMOVE_FOLDER}
-              title={hint ?? REMOVE_FOLDER}
+              label={hint ?? REMOVE_FOLDER}
+              tooltip="top-center"
               path={mdiClose}
               disabled={locked}
               onClick={() => void store.unbindFolder()}

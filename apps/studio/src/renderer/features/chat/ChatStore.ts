@@ -37,8 +37,11 @@ import ConversationVm from "./ConversationVm";
 import { adapterLabel } from "../providers/accountPresentation";
 import { suggestedBaseUrl } from "../providers/providerPresentation";
 import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
+import ExplorerStore from "./explorer/ExplorerStore";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
+
+export type SidePanel = "context" | "files";
 
 export interface AccountChoice {
   readonly value: string;
@@ -59,7 +62,8 @@ export default class ChatStore {
   connecting = false;
   composer = new ConversationVm();
   query = "";
-  contextOpen = false;
+  sidePanel: SidePanel = "context";
+  panelOpen = false;
   loading = false;
   sending = false;
   stopping = false;
@@ -83,6 +87,7 @@ export default class ChatStore {
   folderError: string | null = null;
   folderPrompt: { path: string } | null = null;
   pendingTurn = false;
+  readonly explorer: ExplorerStore;
   outcome: "ok" | "cancelled" | "failed" | null = null;
   private buffer = "";
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -98,6 +103,7 @@ export default class ChatStore {
     private readonly ipc: IpcClient<Contract>,
     private readonly events: EventRouter,
   ) {
+    this.explorer = new ExplorerStore(ipc, events);
     makeAutoObservable<
       ChatStore,
       | "ipc"
@@ -116,6 +122,7 @@ export default class ChatStore {
       {
         ipc: false,
         events: false,
+        explorer: false,
         buffer: false,
         timer: false,
         unsubscribe: false,
@@ -370,8 +377,19 @@ export default class ChatStore {
   setQuery(value: string) {
     this.query = value;
   }
-  toggleContext() {
-    this.contextOpen = !this.contextOpen;
+  get activePanel(): SidePanel {
+    return this.sidePanel === "files" && this.workingFolder !== null ? "files" : "context";
+  }
+  showPanel(panel: SidePanel) {
+    if (this.activePanel === panel) {
+      this.panelOpen = !this.panelOpen;
+      return;
+    }
+    this.sidePanel = panel;
+    this.panelOpen = true;
+  }
+  closePanel() {
+    this.panelOpen = false;
   }
 
   async toggleStore(id: VectorStoreDto["id"]) {
@@ -1042,6 +1060,7 @@ export default class ChatStore {
     this.unsubscribe = undefined;
     this.stopContext?.();
     this.stopContext = undefined;
+    this.explorer.dispose();
   }
 }
 

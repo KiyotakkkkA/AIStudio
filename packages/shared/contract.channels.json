@@ -136,5 +136,9 @@
   "vectorStores.sources.list",
   "vectorStores.sources.pick",
   "vectorStores.sources.remove",
-  "vectorStores.update"
+  "vectorStores.update",
+  "workspace.list",
+  "workspace.read",
+  "workspace.unwatch",
+  "workspace.watch"
 ]

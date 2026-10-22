@@ -1,9 +1,11 @@
+pub mod explorer;
 pub mod paths;
 pub mod service;
 
 #[cfg(test)]
 mod tests;
 
+pub use explorer::{EXPLORER_DEBOUNCE, ExplorerService};
 pub use paths::{
     ForbiddenFolders, GrantTarget, RemovableMounts, TargetKind, canonical, covers, grant_target,
 };

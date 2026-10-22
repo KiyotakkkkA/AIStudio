@@ -172,6 +172,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             <Dropdown menuWidth={300} menuPlacement="top-left">
               <IconDropdownButton
                 label="Прикрепить файлы"
+                tooltip="top-center"
                 path={mdiPaperclip}
                 className="size-8 justify-center gap-0 border-transparent bg-transparent p-0 text-main-400 hover:bg-main-700 hover:text-main-100"
                 rounded="rounded-lg"

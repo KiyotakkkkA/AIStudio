@@ -1,0 +1,27 @@
+[
+  {
+    "name": "listing",
+    "value": {
+      "path": "",
+      "entries": [
+        {
+          "name": "node_modules",
+          "path": "node_modules",
+          "kind": "folder",
+          "size": 0,
+          "modifiedAt": null,
+          "ignored": true
+        },
+        {
+          "name": "PLAN.md",
+          "path": "docs/PLAN.md",
+          "kind": "file",
+          "size": 2048,
+          "modifiedAt": 1700000000000,
+          "ignored": false
+        }
+      ],
+      "truncated": false
+    }
+  }
+]

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
-import { mdiDatabaseOutline, mdiTuneVariant } from "@mdi/js";
+import { mdiDatabaseOutline, mdiFolderOutline, mdiTuneVariant } from "@mdi/js";
 import Chip from "../../ui/atoms/Chip";
 import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
 import Icon from "../../ui/atoms/Icon";
@@ -18,6 +18,31 @@ import ChatToolCalls from "./ChatToolCalls";
 import { answerCitations } from "./citations";
 import { shouldPinToBottom } from "./scroll";
 import type ChatStore from "./ChatStore";
+import { CONTEXT_PANEL, FILES_PANEL, PANEL_GROUP_LABEL } from "./explorer/explorerCopy";
+
+function PanelButton({
+  label,
+  path,
+  active,
+  onClick,
+}: {
+  readonly label: string;
+  readonly path: string;
+  readonly active: boolean;
+  readonly onClick: () => void;
+}) {
+  return (
+    <IconButton
+      label={label}
+      tooltip="bottom-center"
+      aria-pressed={active}
+      path={path}
+      iconSize={16}
+      onClick={onClick}
+      className={active ? "bg-main-700 text-main-50" : ""}
+    />
+  );
+}
 
 export default observer(function ChatThread({ store }: { readonly store: ChatStore }) {
   const viewport = useRef<HTMLDivElement>(null);
@@ -66,15 +91,26 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
             </Chip>
           </span>
         ) : null}
-        <span className="min-[1101px]:hidden">
-          <IconButton
-            aria-label="Контекст запуска"
-            title="Контекст запуска"
+        <div
+          role="group"
+          aria-label={PANEL_GROUP_LABEL}
+          className="flex flex-none items-center gap-0.5 rounded-control bg-main-800 p-0.5"
+        >
+          <PanelButton
+            label={CONTEXT_PANEL}
             path={mdiTuneVariant}
-            iconSize={17}
-            onClick={store.toggleContext}
+            active={store.activePanel === "context"}
+            onClick={() => store.showPanel("context")}
           />
-        </span>
+          {store.workingFolder === null ? null : (
+            <PanelButton
+              label={FILES_PANEL}
+              path={mdiFolderOutline}
+              active={store.activePanel === "files"}
+              onClick={() => store.showPanel("files")}
+            />
+          )}
+        </div>
       </header>
       <ScrollArea
         ref={viewport}

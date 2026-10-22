@@ -102,7 +102,8 @@ function ValueTable({ vm, table, secrets, namePlaceholder, empty }: ValueTablePr
                   </Chip>
                   <IconButton
                     path={mdiClose}
-                    aria-label="Удалить строку"
+                    label="Удалить строку"
+                    tooltip="left-center"
                     onClick={() => {
                       vm.removeRow(table, row.id);
                     }}

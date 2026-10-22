@@ -1,0 +1,12 @@
+[
+  {
+    "name": "truncated binary",
+    "value": {
+      "path": "logo.png",
+      "size": 4096,
+      "modifiedAt": null,
+      "text": null,
+      "truncated": true
+    }
+  }
+]

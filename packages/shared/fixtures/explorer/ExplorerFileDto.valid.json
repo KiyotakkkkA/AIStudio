@@ -1,0 +1,22 @@
+[
+  {
+    "name": "text",
+    "value": {
+      "path": "docs/PLAN.md",
+      "size": 12,
+      "modifiedAt": 1700000000000,
+      "text": "# Plan\n",
+      "truncated": false
+    }
+  },
+  {
+    "name": "binary",
+    "value": {
+      "path": "logo.png",
+      "size": 4096,
+      "modifiedAt": null,
+      "text": null,
+      "truncated": false
+    }
+  }
+]

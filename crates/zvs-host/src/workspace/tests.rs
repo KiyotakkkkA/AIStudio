@@ -20,6 +20,8 @@ use crate::platform::ids::new_id;
 use crate::services::SystemService;
 use crate::testing::{TemporaryDirectory, TestServices, temporary_directory, test_services};
 
+mod explorer;
+
 const NODE: &str = "test.folders";
 
 fn junction(link: &Path, target: &Path) {

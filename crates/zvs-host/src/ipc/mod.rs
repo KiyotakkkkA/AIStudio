@@ -15,6 +15,7 @@ pub mod system;
 pub mod toolchain;
 pub mod tools;
 pub mod vector_stores;
+pub mod workspace;
 
 pub use server::{Coverage, INTERNAL_MESSAGE, IpcServer};
 
@@ -35,6 +36,7 @@ pub fn register(server: &mut IpcServer) {
     toolchain::register(server);
     chat::register(server);
     folders::register(server);
+    workspace::register(server);
 }
 
 #[cfg(test)]
@@ -203,7 +205,11 @@ mod tests {
                 "vectorStores.sources.list",
                 "vectorStores.sources.pick",
                 "vectorStores.sources.remove",
-                "vectorStores.update"
+                "vectorStores.update",
+                "workspace.list",
+                "workspace.read",
+                "workspace.unwatch",
+                "workspace.watch"
             ]
         );
     }

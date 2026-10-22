@@ -17,6 +17,13 @@ import {
   PickFolderResultDto,
 } from "../chat.js";
 import { AnswerFolderRequestInput, FolderGrantDto, FolderGrantRef } from "../folders.js";
+import {
+  ExplorerFileDto,
+  ExplorerListInput,
+  ExplorerListingDto,
+  ExplorerReadInput,
+  ExplorerWatchDto,
+} from "../explorer.js";
 import { RunDto, RunHandleDto, RunIdInput, StartRunInput } from "../runs/RunDto.js";
 import { RunListFilter, RunPageDto } from "../runs/RunListFilter.js";
 import { RunDetailDto } from "../runs/RunDetailDto.js";
@@ -203,6 +210,10 @@ export const contract = defineContract({
   "folders.list": { input: z.void(), output: z.array(FolderGrantDto) },
   "folders.revoke": { input: FolderGrantRef, output: z.void() },
   "folders.answer": { input: AnswerFolderRequestInput, output: z.void() },
+  "workspace.list": { input: ExplorerListInput, output: ExplorerListingDto },
+  "workspace.read": { input: ExplorerReadInput, output: ExplorerFileDto },
+  "workspace.watch": { input: ConversationRef, output: ExplorerWatchDto },
+  "workspace.unwatch": { input: ConversationRef, output: z.void() },
   "runs.approve": {
     input: RunIdInput.extend({ approvalId: z.string().uuid(), always: z.boolean().default(false) }),
     output: z.void(),

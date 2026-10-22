@@ -665,6 +665,46 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::process::ProcessApprovalDto>,
     ),
     (
+        "explorer/ExplorerEntryKind",
+        round_trip::<zvs_contract::explorer::ExplorerEntryKind>,
+    ),
+    (
+        "explorer/ExplorerChangeKind",
+        round_trip::<zvs_contract::explorer::ExplorerChangeKind>,
+    ),
+    (
+        "explorer/ExplorerEntryDto",
+        round_trip::<zvs_contract::explorer::ExplorerEntryDto>,
+    ),
+    (
+        "explorer/ExplorerListInput",
+        round_trip::<zvs_contract::explorer::ExplorerListInput>,
+    ),
+    (
+        "explorer/ExplorerListingDto",
+        round_trip::<zvs_contract::explorer::ExplorerListingDto>,
+    ),
+    (
+        "explorer/ExplorerReadInput",
+        round_trip::<zvs_contract::explorer::ExplorerReadInput>,
+    ),
+    (
+        "explorer/ExplorerFileDto",
+        round_trip::<zvs_contract::explorer::ExplorerFileDto>,
+    ),
+    (
+        "explorer/ExplorerChangeDto",
+        round_trip::<zvs_contract::explorer::ExplorerChangeDto>,
+    ),
+    (
+        "explorer/ExplorerChangesDto",
+        round_trip::<zvs_contract::explorer::ExplorerChangesDto>,
+    ),
+    (
+        "explorer/ExplorerWatchDto",
+        round_trip::<zvs_contract::explorer::ExplorerWatchDto>,
+    ),
+    (
         "folders/FolderGrantScope",
         round_trip::<zvs_contract::folders::FolderGrantScope>,
     ),

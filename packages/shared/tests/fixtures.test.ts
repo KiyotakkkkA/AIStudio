@@ -8,6 +8,7 @@ import * as toolchain from "../src/toolchain/index.js";
 import * as files from "../src/files.js";
 import * as processes from "../src/process.js";
 import * as folders from "../src/folders.js";
+import * as explorer from "../src/explorer.js";
 import {
   AccountDto,
   ChatCitationDto,
@@ -186,6 +187,16 @@ const schemas: Record<string, z.ZodType> = {
   "process/ProcessPlanDto": processes.ProcessPlanDto,
   "process/ProcessResultDto": processes.ProcessResultDto,
   "process/ProcessApprovalDto": processes.ProcessApprovalDto,
+  "explorer/ExplorerEntryKind": explorer.ExplorerEntryKind,
+  "explorer/ExplorerChangeKind": explorer.ExplorerChangeKind,
+  "explorer/ExplorerEntryDto": explorer.ExplorerEntryDto,
+  "explorer/ExplorerListInput": explorer.ExplorerListInput,
+  "explorer/ExplorerListingDto": explorer.ExplorerListingDto,
+  "explorer/ExplorerReadInput": explorer.ExplorerReadInput,
+  "explorer/ExplorerFileDto": explorer.ExplorerFileDto,
+  "explorer/ExplorerChangeDto": explorer.ExplorerChangeDto,
+  "explorer/ExplorerChangesDto": explorer.ExplorerChangesDto,
+  "explorer/ExplorerWatchDto": explorer.ExplorerWatchDto,
   "folders/FolderGrantScope": folders.FolderGrantScope,
   "folders/WorkingFolderAccess": folders.WorkingFolderAccess,
   "folders/FolderAccessAnswer": folders.FolderAccessAnswer,

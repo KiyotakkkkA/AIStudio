@@ -127,7 +127,8 @@ export default function TaskRow({
         <IconButton
           path={mdiStopCircleOutline}
           aria-label={`Остановить ${run.title}`}
-          title="Остановить"
+          label="Остановить"
+          tooltip="left-center"
           disabled={busy}
           onClick={onStop}
         />

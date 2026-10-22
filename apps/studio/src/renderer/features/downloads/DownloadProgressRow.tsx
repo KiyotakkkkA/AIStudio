@@ -97,14 +97,16 @@ export default function DownloadProgressRow({
       <IconButton
         path={running ? mdiPause : mdiPlay}
         aria-label={`${running ? "Приостановить" : "Продолжить"} загрузку ${download.displayName}`}
-        title={running ? "Приостановить" : "Продолжить"}
+        label={running ? "Приостановить" : "Продолжить"}
+        tooltip="left-center"
         disabled={busy}
         onClick={running ? onPause : onResume}
       />
       <IconButton
         path={mdiClose}
         aria-label={`Отменить загрузку ${download.displayName}`}
-        title="Отменить"
+        label="Отменить"
+        tooltip="left-center"
         disabled={busy}
         onClick={onCancel}
       />

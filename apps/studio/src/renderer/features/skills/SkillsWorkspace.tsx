@@ -125,6 +125,7 @@ function SkillsWorkspace() {
                   <Dropdown menuWidth={220} menuPlacement="bottom-right">
                     <IconDropdownButton
                       label="Действия с навыком"
+                      tooltip="bottom-left"
                       path={mdiDotsHorizontal}
                       className="size-8 justify-center gap-0 border-transparent bg-transparent p-0 text-main-400 hover:bg-main-700 hover:text-main-100"
                       rounded="rounded-lg"

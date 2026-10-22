@@ -16,6 +16,7 @@ export default function MessageActions({
   readonly onDelete?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const tooltip = isUser ? "bottom-left" : "top-right";
 
   useEffect(() => {
     if (!copied) {
@@ -39,7 +40,8 @@ export default function MessageActions({
     <div className="flex items-center gap-0.5 text-main-400">
       <IconButton
         aria-label={copied ? "Сообщение скопировано" : "Копировать сообщение"}
-        title={copied ? "Скопировано" : "Копировать"}
+        label={copied ? "Скопировано" : "Копировать"}
+        tooltip={tooltip}
         path={copied ? mdiCheck : mdiContentCopy}
         onClick={() => void handleCopy()}
       />
@@ -47,7 +49,8 @@ export default function MessageActions({
         <>
           <IconButton
             aria-label="Повторить сообщение"
-            title="Повторить"
+            label="Повторить"
+            tooltip={tooltip}
             path={mdiRefresh}
             iconSize={16}
             onClick={onRefresh}
@@ -57,7 +60,8 @@ export default function MessageActions({
       {onEdit && (
         <IconButton
           aria-label="Редактировать сообщение"
-          title="Редактировать"
+          label="Редактировать"
+          tooltip={tooltip}
           path={mdiPencilOutline}
           onClick={onEdit}
         />
@@ -65,7 +69,8 @@ export default function MessageActions({
       {onDelete && (
         <IconButton
           aria-label="Удалить сообщение"
-          title="Удалить"
+          label="Удалить"
+          tooltip={tooltip}
           path={mdiDeleteOutline}
           className="hover:text-err"
           onClick={onDelete}

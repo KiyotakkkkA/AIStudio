@@ -8,6 +8,7 @@ pub mod enums;
 pub mod envelope;
 pub mod errors;
 pub mod events;
+pub mod explorer;
 pub mod files;
 pub mod folders;
 pub mod graph;
@@ -65,6 +66,11 @@ pub use errors::{AppError, AppErrorCode, ErrorDetails};
 pub use events::{
     ApprovalRequestDto, DeltaKind, EVENT_CHANNEL, EventSeq, HostEvent, HostEventDraft, LogLineDto,
     RunOutcomeDto, RunOutcomeStatus, StepEventDto,
+};
+pub use explorer::{
+    EXPLORER_CHANGES_MAX, EXPLORER_LIST_MAX, EXPLORER_STEP_DOMAIN, EXPLORER_TEXT_MAX,
+    ExplorerChangeDto, ExplorerChangeKind, ExplorerChangesDto, ExplorerEntryDto, ExplorerEntryKind,
+    ExplorerFileDto, ExplorerListInput, ExplorerListingDto, ExplorerReadInput, ExplorerWatchDto,
 };
 pub use files::{
     FILE_CHANGES_MAX, FILE_DIFF_MAX, FILES_APPROVAL_KIND, FileChangeKind, FileChangesDto,
