@@ -18,7 +18,7 @@ export default observer(function TaskFilterRail({ store }: { readonly store: Tas
   return (
     <aside
       aria-label="Фильтры задач"
-      className="flex w-56 flex-none flex-col gap-0.5 bg-main-800 p-3"
+      className="flex w-56 flex-none flex-col gap-0.5 bg-main-800 py-3.5 pr-2.5 pl-3"
     >
       <p className="px-2 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
         Статус

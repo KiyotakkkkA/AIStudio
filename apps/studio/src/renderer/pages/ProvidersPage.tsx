@@ -23,6 +23,7 @@ function ProvidersPage() {
 
   return (
     <PageShell
+      bleed={!onAccounts}
       icon={mdiLayersOutline}
       title="AI-провайдеры"
       subtitle={

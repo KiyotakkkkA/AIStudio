@@ -35,7 +35,7 @@ export default observer(function TaskDetailRail({ store }: { readonly store: Tas
           />
         </div>
       ) : (
-        <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 p-3.5">
+        <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 px-3.5 py-4">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
               <h2 className="m-0 min-w-0 flex-1 truncate text-[13.5px] font-semibold text-main-50">

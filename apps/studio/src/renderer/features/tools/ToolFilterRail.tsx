@@ -15,7 +15,7 @@ function ToolFilterRail({ store }: { readonly store: ToolStore }) {
   return (
     <aside
       aria-label="Фильтры инструментов"
-      className="flex min-h-0 w-57.5 flex-none flex-col bg-main-800 p-2.5 pt-3.5"
+      className="flex min-h-0 w-56 flex-none flex-col bg-main-800 py-3.5 pr-2.5 pl-3"
     >
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-0.5">
         <p className="px-2 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">

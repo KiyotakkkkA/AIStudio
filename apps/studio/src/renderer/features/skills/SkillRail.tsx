@@ -216,7 +216,7 @@ function SkillRail({ store, vm }: { readonly store: SkillStore; readonly vm: Ski
   return (
     <aside
       aria-label="Проверка и запуск навыка"
-      className="flex w-75 flex-none flex-col border-l border-line bg-main-900"
+      className="flex w-75 flex-none flex-col bg-main-800"
     >
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 px-3.5 py-4">
         <span className={HEADING}>Проверка срабатывания</span>

@@ -48,7 +48,7 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
 
   return (
     <aside aria-label="Детали загрузки" className="flex w-78.5 flex-none flex-col bg-main-800">
-      <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 p-3.5">
+      <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 px-3.5 py-4">
         {item?.kind === "runtime" && isToolchainRef(item.ref) && store.runtimeError !== null ? (
           <span role="alert" className="text-[11px] text-err">
             {store.runtimeError}

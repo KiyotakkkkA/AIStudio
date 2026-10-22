@@ -8,6 +8,7 @@ export interface PageShellProps {
   readonly subtitle?: string;
   readonly actions?: ReactNode;
   readonly toolbar?: ReactNode;
+  readonly bleed?: boolean;
   readonly children: ReactNode;
 }
 
@@ -17,6 +18,7 @@ export default function PageShell({
   subtitle,
   actions,
   toolbar,
+  bleed = false,
   children,
 }: PageShellProps) {
   return (
@@ -27,7 +29,11 @@ export default function PageShell({
           {toolbar}
         </div>
       ) : null}
-      <ScrollArea className="flex min-h-0 flex-1 flex-col gap-5 px-6 py-5">{children}</ScrollArea>
+      {bleed ? (
+        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+      ) : (
+        <ScrollArea className="flex min-h-0 flex-1 flex-col gap-5 px-6 py-5">{children}</ScrollArea>
+      )}
     </div>
   );
 }
