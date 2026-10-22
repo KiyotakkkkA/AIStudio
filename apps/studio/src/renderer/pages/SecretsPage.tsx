@@ -21,6 +21,7 @@ function SecretsPage() {
 
   return (
     <PageShell
+      bleed={tab === "secrets"}
       icon={mdiKeyOutline}
       title="Секреты"
       subtitle={`${String(secrets.total)} секретов`}

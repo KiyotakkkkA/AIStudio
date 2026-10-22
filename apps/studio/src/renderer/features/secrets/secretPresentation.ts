@@ -1,4 +1,3 @@
-import { mdiKeyOutline } from "@mdi/js";
 import type { SecretScope, SecretSummaryDto } from "@zvs/shared";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 
@@ -13,19 +12,6 @@ export const SCOPE_OPTIONS: readonly { value: SecretScope; label: string }[] = [
   { value: "shared", label: "Доступен сценариям" },
   { value: "public", label: "Публичные метаданные" },
 ];
-
-const TYPE_ICONS: Record<string, string> = {
-  ollama: mdiKeyOutline,
-};
-
-export function typeIcon(type: string): string | undefined {
-  return TYPE_ICONS[type];
-}
-
-export function typeInitials(type: string): string {
-  const letters = type.replace(/[^a-z]/gi, "");
-  return letters.slice(0, 2).toUpperCase();
-}
 
 export function maskedHint(hint: string | null): string {
   return hint === null || hint.length === 0 ? "••••••••••••" : hint;

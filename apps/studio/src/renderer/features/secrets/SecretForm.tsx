@@ -32,7 +32,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
 
   return (
     <form
-      className="flex min-h-0 min-w-0 flex-1 flex-col rounded-card border border-line bg-main-900"
+      className="flex min-h-0 min-w-0 flex-1 flex-col"
       onSubmit={(event) => {
         event.preventDefault();
         onSave();

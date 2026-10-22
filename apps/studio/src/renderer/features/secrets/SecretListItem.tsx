@@ -1,17 +1,8 @@
 import type { SecretSummaryDto, SecretTypeSchema } from "@zvs/shared";
 import Chip from "../../ui/atoms/Chip";
-import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
 import ListRow from "../../ui/molecules/ListRow";
-import {
-  maskedHint,
-  metaLabel,
-  SCOPE_LABELS,
-  statusTone,
-  typeIcon,
-  typeInitials,
-  usageLabel,
-} from "./secretPresentation";
+import { maskedHint, metaLabel, SCOPE_LABELS, statusTone, usageLabel } from "./secretPresentation";
 
 export interface SecretListItemProps {
   readonly secret: SecretSummaryDto;
@@ -28,33 +19,18 @@ export default function SecretListItem({
   now,
   onSelect,
 }: SecretListItemProps) {
-  const icon = typeIcon(secret.type);
   return (
-    <ListRow
-      selected={selected}
-      onClick={onSelect}
-      leading={
-        <span
-          className={`flex size-8 flex-none items-center justify-center rounded-control bg-main-700 text-[11px] font-semibold ${
-            selected ? "text-accent-medium" : "text-main-300"
-          }`}
-        >
-          {icon === undefined ? typeInitials(secret.type) : <Icon path={icon} size={16} />}
+    <ListRow selected={selected} onClick={onSelect}>
+      <span className="flex min-w-0 items-center gap-2">
+        <StatusDot tone={statusTone(secret)} title={schema?.label ?? secret.type} />
+        <span className="flex-1 truncate text-[12.5px] font-medium text-main-50">
+          {secret.name}
         </span>
-      }
-      trailing={<StatusDot tone={statusTone(secret)} title={schema?.label ?? secret.type} />}
-    >
-      <span className="flex items-center gap-1.75">
-        <span className="truncate font-semibold text-main-50">{secret.name}</span>
-        <Chip tone={selected ? "raised" : "neutral"}>{secret.type}</Chip>
+        <Chip>{secret.type}</Chip>
       </span>
-      <span className="truncate font-mono text-[11px] text-main-500">
-        {maskedHint(secret.hint)}
-      </span>
-      <span className="flex gap-3 text-[11px] text-main-400">
-        <span>{SCOPE_LABELS[secret.scope]}</span>
-        <span>{usageLabel(secret.usageCount)}</span>
-        <span className="truncate">{metaLabel(secret, now)}</span>
+      <span className="truncate text-[11px] text-main-400" title={metaLabel(secret, now)}>
+        <span className="font-mono text-main-500">{maskedHint(secret.hint)}</span> ·{" "}
+        {SCOPE_LABELS[secret.scope]} · {usageLabel(secret.usageCount)}
       </span>
     </ListRow>
   );
