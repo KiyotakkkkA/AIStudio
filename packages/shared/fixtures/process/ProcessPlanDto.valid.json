@@ -1,0 +1,22 @@
+[
+  {
+    "name": "a command",
+    "value": {
+      "program": "C:\\Program Files\\nodejs\\npm.cmd",
+      "argv": ["npm", "test"],
+      "cwd": "D:\\work\\app",
+      "packages": []
+    }
+  },
+  {
+    "name": "a script with packages",
+    "value": {
+      "program": "Node.js",
+      "language": "javascript",
+      "argv": ["--verbose"],
+      "cwd": "D:\\scratch\\run",
+      "source": "import _ from 'lodash';\nconsole.log(_.chunk([1, 2, 3], 2));\n",
+      "packages": ["lodash@4.17.21"]
+    }
+  }
+]

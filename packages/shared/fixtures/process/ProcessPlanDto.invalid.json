@@ -1,0 +1,32 @@
+[
+  {
+    "name": "source without a language",
+    "value": {
+      "program": "uv",
+      "argv": [],
+      "cwd": "D:\\scratch\\run",
+      "source": "print(1)",
+      "packages": []
+    }
+  },
+  {
+    "name": "packages for python",
+    "value": {
+      "program": "uv",
+      "language": "python",
+      "argv": [],
+      "cwd": "D:\\scratch\\run",
+      "source": "print(1)",
+      "packages": ["requests"]
+    }
+  },
+  {
+    "name": "an empty program",
+    "value": {
+      "program": "",
+      "argv": [],
+      "cwd": "D:\\work",
+      "packages": []
+    }
+  }
+]

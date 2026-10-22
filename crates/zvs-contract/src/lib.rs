@@ -15,6 +15,7 @@ pub mod graph_expansion;
 pub mod ids;
 pub mod mcp;
 pub mod primitives;
+pub mod process;
 pub mod providers;
 pub mod runs;
 pub mod runtimes;
@@ -95,6 +96,10 @@ pub use mcp::{
     McpTransport, McpValue, UpdateMcpServerInput,
 };
 pub use primitives::{Json, MAX_SAFE_INTEGER, Page, PageRequest, Sort, SortDirection, Timestamp};
+pub use process::{
+    CodeLanguage, PROCESS_APPROVAL_KIND, PROCESS_ARG_MAX, PROCESS_ARGV_MAX, PROCESS_PACKAGE_MAX,
+    PROCESS_PACKAGES_MAX, PROCESS_SOURCE_MAX, ProcessApprovalDto, ProcessPlanDto, ProcessResultDto,
+};
 pub use providers::{
     CreateProviderInput, DiscoveredModelDto, ModelCapability, ModelDto, ProbeOutcomeDto,
     ProbeRequest, ProbeResultDto, ProviderCapability, ProviderConnectionInput, ProviderDto,

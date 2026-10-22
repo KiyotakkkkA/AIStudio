@@ -6,6 +6,7 @@ import { z } from "zod";
 import * as skills from "../src/skills/index.js";
 import * as toolchain from "../src/toolchain/index.js";
 import * as files from "../src/files.js";
+import * as processes from "../src/process.js";
 import * as folders from "../src/folders.js";
 import {
   AccountDto,
@@ -181,6 +182,10 @@ const schemas: Record<string, z.ZodType> = {
   "files/FileDiffDto": files.FileDiffDto,
   "files/FileChangesDto": files.FileChangesDto,
   "files/FilesApprovalDto": files.FilesApprovalDto,
+  "process/CodeLanguage": processes.CodeLanguage,
+  "process/ProcessPlanDto": processes.ProcessPlanDto,
+  "process/ProcessResultDto": processes.ProcessResultDto,
+  "process/ProcessApprovalDto": processes.ProcessApprovalDto,
   "folders/FolderGrantScope": folders.FolderGrantScope,
   "folders/WorkingFolderAccess": folders.WorkingFolderAccess,
   "folders/FolderAccessAnswer": folders.FolderAccessAnswer,

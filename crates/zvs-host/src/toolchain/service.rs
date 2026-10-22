@@ -18,6 +18,7 @@ use super::definitions::{
 };
 use super::launch::{LaunchSpec, prepend_path};
 use super::probe::{Probed, ProcessProbe, SharedProbe, primary_for, probe};
+use super::process::path_dirs;
 use super::releases::{ToolchainBuild, ToolchainResolver};
 use crate::data::schema::DownloadRow;
 use crate::downloads::{CatalogueItem, CatalogueProvider, DownloadInstaller, InstalledItem};
@@ -52,6 +53,10 @@ pub trait CommandLauncher: Send + Sync {
         command: &str,
         args: &[String],
     ) -> Option<Result<LaunchSpec, AppError>>;
+
+    fn program_dirs(&self) -> Vec<PathBuf> {
+        path_dirs(std::env::var_os("PATH").as_ref())
+    }
 }
 
 #[derive(Clone)]
@@ -853,6 +858,27 @@ impl CommandLauncher for ToolchainService {
         args: &[String],
     ) -> Option<Result<LaunchSpec, AppError>> {
         ToolchainCommand::parse(command).map(|command| self.launch(command, args))
+    }
+
+    fn program_dirs(&self) -> Vec<PathBuf> {
+        let mut dirs: Vec<PathBuf> = TOOLCHAIN_DEFINITIONS
+            .iter()
+            .filter_map(|definition| self.connection(definition.runtime))
+            .map(|record| PathBuf::from(record.executable_path))
+            .filter(|primary| primary.is_file())
+            .filter_map(|primary| primary.parent().map(Path::to_path_buf))
+            .collect();
+        let current = self
+            .options()
+            .path_env
+            .clone()
+            .or_else(|| std::env::var_os("PATH"));
+        for dir in path_dirs(current.as_ref()) {
+            if !dirs.contains(&dir) {
+                dirs.push(dir);
+            }
+        }
+        dirs
     }
 }
 

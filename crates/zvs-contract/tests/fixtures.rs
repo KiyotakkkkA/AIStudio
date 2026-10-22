@@ -649,6 +649,22 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::files::FilesApprovalDto>,
     ),
     (
+        "process/CodeLanguage",
+        round_trip::<zvs_contract::process::CodeLanguage>,
+    ),
+    (
+        "process/ProcessPlanDto",
+        round_trip::<zvs_contract::process::ProcessPlanDto>,
+    ),
+    (
+        "process/ProcessResultDto",
+        round_trip::<zvs_contract::process::ProcessResultDto>,
+    ),
+    (
+        "process/ProcessApprovalDto",
+        round_trip::<zvs_contract::process::ProcessApprovalDto>,
+    ),
+    (
         "folders/FolderGrantScope",
         round_trip::<zvs_contract::folders::FolderGrantScope>,
     ),

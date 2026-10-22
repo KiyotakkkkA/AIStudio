@@ -474,6 +474,16 @@ pub fn test_services(system: SystemService) -> TestServices {
         crate::files::FileToolOptions::new(workspace.join("runs")),
     )
     .expect("registers the file nodes");
+    crate::commands::register_command_nodes(
+        &nodes,
+        &folders,
+        runs.approvals(),
+        crate::commands::CommandToolOptions::new(
+            Some(Arc::new(toolchain.clone())),
+            workspace.join("code-runs"),
+        ),
+    )
+    .expect("registers the command nodes");
     crate::tools::register_kernel_tools(&nodes, &tools).expect("registers the file tools");
     let chat = crate::services::ChatService::new(crate::services::ChatServiceOptions {
         tools: Some(tools.clone()),

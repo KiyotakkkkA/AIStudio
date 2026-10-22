@@ -234,6 +234,16 @@ impl FolderAccessService {
             .find(|grant| covers(Path::new(&grant.path), folder)))
     }
 
+    pub fn working_folder_of(&self, conversation_id: &str) -> Result<Option<PathBuf>, AppError> {
+        if conversation_id.is_empty() {
+            return Ok(None);
+        }
+        let conversation = self
+            .read(|repositories| Ok(repositories.chat.get(conversation_id)?))?
+            .ok_or_else(|| AppError::new(AppErrorCode::NotFound, CONVERSATION_MISSING))?;
+        Ok(conversation.working_folder.map(PathBuf::from))
+    }
+
     pub fn covered(&self, conversation_id: &str, folder: &Path) -> Result<bool, AppError> {
         self.covering(conversation_id, folder)
             .map(|grant| grant.is_some())

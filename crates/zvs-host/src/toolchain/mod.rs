@@ -1,6 +1,7 @@
 pub mod definitions;
 pub mod launch;
 pub mod probe;
+pub mod process;
 pub mod releases;
 pub mod service;
 
@@ -9,6 +10,7 @@ pub use definitions::{
 };
 pub use launch::{LaunchSpec, prepend_path};
 pub use probe::{Probed, ProcessProbe, SharedProbe, VersionProbe, probe};
+pub use process::{ProcessLimits, ProcessRun, prepare_scratch, run_process};
 pub use releases::{ToolchainBuild, ToolchainResolver, ToolchainResolverOptions};
 pub use service::{
     CONNECTED_KEY, CommandLauncher, ConnectedRuntime, ToolchainService, ToolchainServiceOptions,

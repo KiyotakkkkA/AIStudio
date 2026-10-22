@@ -675,6 +675,20 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `manifest.json`, writes each file through a temp file renamed over the target, and restores
   everything already written if any write fails. NTFS has no cross-file transaction: this is
   all-or-nothing by rollback, not atomic. Line endings and a BOM are kept.
+- **Process tools** (`zvs-host/src/commands/`, TASK_036_EXTRA_3) are offered alongside the
+  file tools: `code.run` (Python through `uv run` with PEP 723 dependencies in uv's app cache,
+  JavaScript through `node` as an ES module with `packages[]` installed into the run's scratch
+  folder by `npm install --ignore-scripts --no-audit --no-fund`, PowerShell through
+  `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File`) and `shell.run`
+  (an argument vector, never a shell string; `argv[0]` resolved through the connected toolchain
+  folders first, then `PATH`; cwd is the working folder or a `cwd` that goes through
+  `ensure_access`, and with neither the call is refused). Both are destructive with a minimum
+  tier of `ask` through `permission_for`, so `auto` still asks and `off` denies; each raises one
+  `kind: "process"` approval showing the program, the cwd, the full source or argv and the
+  package list. Folder grants do **not** limit them: the process runs with the user's rights
+  and there is no sandbox. `skill.script`, `code.run` and `shell.run` share one runner
+  (`toolchain/process.rs`): scratch folders, a timeout, kill-tree on cancel, capped streams and
+  fenced output.
 - **Folder access and tool tiers are separate axes.** A grant says *where* a tool may act;
   the tier on the Tools page says *whether* and with what confirmation it may act. Neither
   widens the other.

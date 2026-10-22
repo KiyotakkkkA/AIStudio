@@ -1,0 +1,34 @@
+[
+  {
+    "name": "exited",
+    "value": {
+      "process": {
+        "program": "C:\\Users\\dev\\.cargo\\bin\\cargo.exe",
+        "argv": ["cargo", "check"],
+        "cwd": "D:\\work\\app",
+        "packages": []
+      },
+      "exitCode": 0,
+      "durationMs": 4210,
+      "timedOut": false,
+      "truncated": false
+    }
+  },
+  {
+    "name": "timed out",
+    "value": {
+      "process": {
+        "program": "Python",
+        "language": "python",
+        "argv": [],
+        "cwd": "D:\\scratch\\run",
+        "source": "while True:\n    pass\n",
+        "packages": []
+      },
+      "exitCode": null,
+      "durationMs": 120000,
+      "timedOut": true,
+      "truncated": false
+    }
+  }
+]

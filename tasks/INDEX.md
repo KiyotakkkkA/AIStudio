@@ -143,7 +143,7 @@ against; 016 can be started earlier if you are prepared to render the Account op
 - [x] **TASK_036** — Skills page
 - [x] **TASK_036_EXTRA_1** — Working folder and folder access: chat binding, access requests, the «Разрешения» page
 - [x] **TASK_036_EXTRA_2** — File tools: `fs.list`, `fs.read`, `fs.search` and the `fs.apply` batch
-- [ ] **TASK_036_EXTRA_3** — Code and commands: a shared process runner, `code.run` and `shell.run`
+- [x] **TASK_036_EXTRA_3** — Code and commands: a shared process runner, `code.run` and `shell.run`
 
 ## Phase M — Migration to Tauri (done)
 

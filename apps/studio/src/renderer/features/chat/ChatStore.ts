@@ -4,7 +4,9 @@ import {
   ChatToolCallDto,
   FilesApprovalDto,
   FolderApprovalDto,
+  ProcessApprovalDto,
   type FileDiffDto,
+  type ProcessPlanDto,
   MessageDto,
   VectorSearchHitDto,
   modelToolSupport,
@@ -68,7 +70,13 @@ export default class ChatStore {
   liveCitations: ChatCitationDto[] = [];
   liveToolCalls: ChatToolCallDto[] = [];
   searchedStoreIds: VectorStoreDto["id"][] = [];
-  approvals: { id: string; subject: string; busy: boolean; changes: FileDiffDto[] }[] = [];
+  approvals: {
+    id: string;
+    subject: string;
+    busy: boolean;
+    changes: FileDiffDto[];
+    process?: ProcessPlanDto;
+  }[] = [];
   folderRequests: FolderApprovalDto[] = [];
   answeringFolder = false;
   folderBusy = false;
@@ -905,11 +913,13 @@ export default class ChatStore {
     ) {
       if (!this.approvals.some((request) => request.id === event.request.id)) {
         const files = FilesApprovalDto.safeParse(event.request);
+        const process = ProcessApprovalDto.safeParse(event.request);
         this.approvals.push({
           id: event.request.id,
           subject: event.request.subject,
           busy: false,
           changes: files.success ? files.data.changes : [],
+          ...(process.success ? { process: process.data.process } : {}),
         });
       }
     }

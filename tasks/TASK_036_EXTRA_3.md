@@ -2,7 +2,7 @@
 task: TASK_036_EXTRA_3
 title: Code and commands — a shared process runner, code.run and shell.run
 phase: 6 — Tools, MCP and Skills
-status: todo
+status: done
 depends_on: [TASK_036_EXTRA_2]
 unblocks: [TASK_040]
 estimate: 4 h
@@ -114,16 +114,60 @@ Tests that must exist:
 
 ## Definition of done
 
-- [ ] One process runner shared by `skill.script`, `code.run`, `shell.run`
-- [ ] `code.run` for Python (PEP 723), JavaScript (scratch `npm install`), PowerShell
-- [ ] `shell.run` with argv, working folder cwd, folder access for other cwds
-- [ ] Both always ask; the approval shows the full source or command
-- [ ] DECISION answered or defaulted and noted
-- [ ] Gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] One process runner shared by `skill.script`, `code.run`, `shell.run`
+- [x] `code.run` for Python (PEP 723), JavaScript (scratch `npm install`), PowerShell
+- [x] `shell.run` with argv, working folder cwd, folder access for other cwds
+- [x] Both always ask; the approval shows the full source or command
+- [x] DECISION answered or defaulted and noted
+- [x] Gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- `toolchain/process.rs`: the shared runner — `run_process` (spawn, stdin, capped drains,
+  timeout, cancel with kill-tree), `process_text` and `fenced`, `prepare_scratch`,
+  `find_program` (PATHEXT on Windows, toolchain folders first) and `path_dirs`/`joined_path`.
+  `skill.script` runs on it; its tests are unchanged and pass.
+- `ToolchainCommand::Npm` (`npm.cmd` on Windows) and `CommandLauncher::program_dirs()` —
+  connected toolchain folders, then `PATH`.
+- `zvs-host/src/commands/`: `code.run` and `shell.run`, `register_command_nodes`, Russian
+  descriptions registered in `kernel_tools.rs` as destructive. Both use `permission_for` with a
+  minimum tier of `ask` and `defers_approval`, so each raises one `kind: "process"` approval with
+  the plan (program, language, argv, cwd, source, packages); nothing is written to disk before it
+  is approved. Results carry a `ProcessResultDto` as the tool call meta.
+- `code.run` writes `main.py` / `main.mjs` / `main.ps1` into `<cache>/code-runs/<runId>/<call>/`.
+  JavaScript with `packages` gets a private `package.json` and an `npm install --ignore-scripts
+  --no-audit --no-fund` first; a failed install returns its output and the program does not run.
+  The PowerShell file is written with a BOM and a UTF-8 console prelude so Cyrillic survives.
+  Package specs are limited to registry names and versions (no `git+`, `file:`, URLs or flags).
+- `shell.run` resolves `argv[0]`, defaults cwd to the working folder, sends an explicit `cwd`
+  through `ensure_access`, and refuses with `NO_FOLDER` when there is neither.
+- `FolderAccessService::working_folder_of`.
+- Contract: `zvs_contract::process` (`CodeLanguage`, `ProcessPlanDto`, `ProcessResultDto`,
+  `ProcessApprovalDto`), Zod in `packages/shared/src/process.ts`, fixtures in
+  `fixtures/process/`.
+- Chat: both tools are offered with the file tools, get the hidden `conversationId`, and a
+  «Process tools» prompt section (English) names them with the argv and approval rules.
+- Renderer: `processCopy.ts`, `ProcessPlanView`; an awaiting call shows the plan with
+  «Запустить» / «Отклонить», a finished call shows the exit code, the duration and the plan above
+  the fenced result. «Разрешения» says folder access does not limit «code.run» and «shell.run».
+- PASSPORT §14 documents the process tools.
+- Tests: `commands/tests.rs` covers every case under Verify; `tests/renderer/processCalls.test.ts`.
+
 **Deviated from plan:**
+- DECISION answered by the user: (a) — every `shell.run` asks; no per-folder allow-list.
+- The tool call card's duration in the header now goes through `toLocaleString("ru-RU")`
+  (`1,5 с`); `chatTools.test.tsx` asserts against `durationLabel` instead of `"1.5 с"`.
+- `ProcessApprovalDto.conversationId` is optional so `code.run` also asks from a graph or the
+  «Попробовать» panel without a chat; `shell.run` without a chat can only refuse (no folder).
+- A foreign `cwd` that is not yet granted gives a folder request first and the process approval
+  after it — two modals, not one as for `fs.apply`.
+- `ToolchainCommand::parse("npm")` now maps to the toolchain, so an MCP server configured with
+  `npm` also launches from the connected Node.
+
 **Next session should know:**
+- Scratch folders keep the last 16 runs under `<cache>/code-runs`; snapshots are not involved.
+- Not run here: `pnpm build`, `pnpm test:e2e`, `zvs-studio` clippy. `pnpm typecheck` fails on
+  `tests/renderer/fileChanges.test.ts:59` (`from: undefined` under exact optional types) on the
+  clean tree too; this task did not touch it.

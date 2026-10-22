@@ -1,5 +1,13 @@
 import type { ChatToolCallDto, Json } from "@zvs/shared";
 import { FILE_TOOL_APPLY, changesSummary, fileChanges } from "./fileChangesCopy";
+import {
+  LANGUAGE_LABEL,
+  PROCESS_TOOL_CODE,
+  PROCESS_TOOL_SHELL,
+  commandLine,
+  processResult,
+  processSummary,
+} from "./processCopy";
 
 export function toolArgumentsSummary(value: Json): string {
   const text = typeof value === "string" ? value : JSON.stringify(value);
@@ -39,6 +47,16 @@ export function toolCallSummary(call: ChatToolCallDto): string {
   if (call.key === FILE_TOOL_APPLY) {
     const changes = fileChanges(call.meta);
     if (changes.length > 0) return changesSummary(changes);
+  }
+  if (call.key === PROCESS_TOOL_CODE || call.key === PROCESS_TOOL_SHELL) {
+    const result = processResult(call.meta);
+    if (result) return processSummary(result.process);
+    const argv = field(call.arguments, "argv");
+    if (Array.isArray(argv) && argv.every((part) => typeof part === "string"))
+      return toolArgumentsSummary(commandLine(argv));
+    const language = field(call.arguments, "language");
+    if (language === "python" || language === "javascript" || language === "powershell")
+      return LANGUAGE_LABEL[language];
   }
   return toolArgumentsSummary(call.arguments);
 }

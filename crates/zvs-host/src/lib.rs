@@ -1,6 +1,7 @@
 #![deny(clippy::await_holding_lock)]
 
 pub mod browser;
+pub mod commands;
 pub mod data;
 pub mod downloads;
 pub mod drivers;

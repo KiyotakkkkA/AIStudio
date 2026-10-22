@@ -1,7 +1,9 @@
-import type { ChatToolCallDto, FileDiffDto, Json } from "@zvs/shared";
+import type { ChatToolCallDto, FileDiffDto, Json, ProcessPlanDto } from "@zvs/shared";
 import { toolCallSummary } from "./toolCallSummary";
 import {
   mdiBookOpenPageVariantOutline,
+  mdiCodeBraces,
+  mdiConsoleLine,
   mdiDatabaseSearchOutline,
   mdiFileDocumentEditOutline,
   mdiFileDocumentOutline,
@@ -16,6 +18,17 @@ import {
   type StatusTone,
 } from "../../ui/atoms/statusTone";
 import FileChangeList from "./FileChangeList";
+import ProcessPlanView from "./ProcessPlanView";
+import {
+  PROCESS_TOOL_CODE,
+  PROCESS_TOOL_SHELL,
+  REJECT_PROCESS,
+  RUN_PROCESS,
+  durationLabel,
+  exitLabel,
+  processLead,
+  processResult,
+} from "./processCopy";
 import {
   APPROVE_CHANGES,
   CHANGES_LEAD,
@@ -47,6 +60,8 @@ function toolIcon(key: string): string {
   if (key === "knowledge.search") return mdiDatabaseSearchOutline;
   if (key === "knowledge.read") return mdiBookOpenPageVariantOutline;
   if (key === FILE_TOOL_APPLY) return mdiFileDocumentEditOutline;
+  if (key === PROCESS_TOOL_CODE) return mdiCodeBraces;
+  if (key === PROCESS_TOOL_SHELL) return mdiConsoleLine;
   if (key.startsWith("fs.")) return mdiFileDocumentOutline;
   return mdiWrenchOutline;
 }
@@ -55,6 +70,7 @@ export interface ToolCallApproval {
   readonly id: string;
   readonly busy: boolean;
   readonly changes?: readonly FileDiffDto[];
+  readonly process?: ProcessPlanDto;
 }
 
 export default function ChatToolCalls({
@@ -75,6 +91,8 @@ export default function ChatToolCalls({
           call.status === "awaiting-approval" ? approvalFor?.(call.approvalId) : undefined;
         const proposed = approval?.changes ?? [];
         const applied = call.key === FILE_TOOL_APPLY ? fileChanges(call.meta) : [];
+        const proposedProcess = approval?.process;
+        const finished = proposedProcess === undefined ? processResult(call.meta) : null;
         return (
           <li
             key={call.id}
@@ -111,9 +129,7 @@ export default function ChatToolCalls({
                 </span>
                 {call.durationMs > 0 && (
                   <span className="shrink-0 font-mono text-[11px] text-main-500 tabular-nums">
-                    {call.durationMs < 1000
-                      ? `${String(call.durationMs)} мс`
-                      : `${(call.durationMs / 1000).toFixed(1)} с`}
+                    {durationLabel(call.durationMs)}
                   </span>
                 )}
               </summary>
@@ -128,6 +144,14 @@ export default function ChatToolCalls({
                     </pre>
                   </ScrollArea>
                 </div>
+                {finished && (
+                  <div className="space-y-2">
+                    <p className="m-0 font-mono text-[11.5px] text-main-300 tabular-nums">
+                      {exitLabel(finished)} · {durationLabel(finished.durationMs)}
+                    </p>
+                    <ProcessPlanView plan={finished.process} />
+                  </div>
+                )}
                 {applied.length > 0 && (
                   <div>
                     <p className="mb-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
@@ -170,7 +194,30 @@ export default function ChatToolCalls({
                     </div>
                   </div>
                 )}
-                {approval && proposed.length === 0 && (
+                {approval && proposedProcess && (
+                  <div role="status" className="space-y-2 rounded-control bg-warn-soft px-3 py-2.5">
+                    <p className="m-0 text-[12.5px] text-main-100">
+                      {processLead(proposedProcess)}
+                    </p>
+                    <ProcessPlanView plan={proposedProcess} expanded />
+                    <div className="flex gap-2">
+                      <Button
+                        disabled={approval.busy}
+                        tone="primary"
+                        onClick={() => onDecide?.(approval.id, true)}
+                      >
+                        {RUN_PROCESS}
+                      </Button>
+                      <Button
+                        disabled={approval.busy}
+                        onClick={() => onDecide?.(approval.id, false)}
+                      >
+                        {REJECT_PROCESS}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {approval && proposed.length === 0 && !proposedProcess && (
                   <div
                     role="status"
                     className="flex flex-wrap items-center gap-3 rounded-control bg-warn-soft px-3 py-2.5"

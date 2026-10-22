@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use zvs_contract::{AppError, ToolDto, ToolSource, ToolTier};
 
 use super::registry::{ToolDescriptor, ToolRegistry};
+use crate::commands::nodes::{CODE_DESCRIPTION, CODE_RUN, SHELL_DESCRIPTION, SHELL_RUN};
 use crate::files::nodes::{
     APPLY_DESCRIPTION as FS_APPLY_DESCRIPTION, FS_APPLY, FS_LIST, FS_READ, FS_SEARCH,
     LIST_DESCRIPTION as FS_LIST_DESCRIPTION, READ_DESCRIPTION as FS_READ_DESCRIPTION,
@@ -123,6 +124,22 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
             display_name: "fs.apply",
             description: FS_APPLY_DESCRIPTION,
             destructive: false,
+        },
+    ),
+    (
+        CODE_RUN,
+        BuiltinToolMeta {
+            display_name: "code.run",
+            description: CODE_DESCRIPTION,
+            destructive: true,
+        },
+    ),
+    (
+        SHELL_RUN,
+        BuiltinToolMeta {
+            display_name: "shell.run",
+            description: SHELL_DESCRIPTION,
+            destructive: true,
         },
     ),
     (

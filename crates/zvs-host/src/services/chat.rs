@@ -36,6 +36,7 @@ use super::retrieval_merge::{CHAT_FETCH_K, MergeOptions, StoreHits, merge_retrie
 use super::retrieval_query::retrieval_query;
 use super::runs::RunService;
 use super::vector_stores::VectorSearchOptions;
+use crate::commands::PROCESS_TOOLS;
 use crate::data::repositories::{ConversationPatch, MessagePatch, RunPatch};
 use crate::data::schema::{ConversationRow, FolderGrantRow, MessageRow};
 use crate::data::{DataError, Database, Repositories};
@@ -102,6 +103,8 @@ pub const NO_WORKING_FOLDER_NOTE: &str = "This conversation has no working folde
 pub const WORKING_FOLDER_RULES: &str = "Relative paths resolve against the working folder. Any other folder needs the user's approval before you can read or change files in it.";
 pub const WORKING_FOLDER_CHANGED: &str = "The working folder changed since the previous turn";
 pub const FILE_TOOLS_HEADING: &str = "File tools";
+pub const PROCESS_TOOLS_HEADING: &str = "Process tools";
+pub const PROCESS_TOOLS_RULES: &str = "Use the code tool for a quick computation or conversion, and the shell tool to run the project's own build and test commands, then read their output to check a change. The user approves every run after seeing the full source or command. Pass a command as an argument vector, not a shell string: there are no pipes, redirections or glob expansion. Servers, background processes and interactive input are not supported, and each run has a time limit.";
 pub const FILE_TOOLS_RULES: &str = "Read a file with the read tool in this turn before you change it; a change to a file that was not read, or that changed since it was read, is refused. Put every change of one task into a single apply call, so the user reviews and applies it as one diff. Paths may be absolute; relative paths resolve against the working folder.";
 
 pub struct ChatServiceOptions {
@@ -215,6 +218,22 @@ pub fn file_tools_section(offered: &[OfferedTool]) -> String {
     }
     format!(
         "{FILE_TOOLS_HEADING}: {}\n{FILE_TOOLS_RULES}",
+        names.join(", ")
+    )
+}
+
+pub fn process_tools_section(offered: &[OfferedTool]) -> String {
+    let names: Vec<&str> = PROCESS_TOOLS
+        .iter()
+        .filter_map(|key| offered.iter().find(|tool| tool.key == *key))
+        .map(|tool| tool.name.as_str())
+        .collect();
+    if names.is_empty() {
+        return String::new();
+    }
+    format!(
+        "{PROCESS_TOOLS_HEADING}: {}
+{PROCESS_TOOLS_RULES}",
         names.join(", ")
     )
 }
@@ -1054,9 +1073,9 @@ impl NodeDef for PrepareNode {
             }
         }
         if tools_usable {
-            for key in FILE_TOOLS {
+            for key in FILE_TOOLS.iter().chain(&PROCESS_TOOLS) {
                 if !enabled.iter().any(|known| known == key) {
-                    enabled.push(key.to_owned());
+                    enabled.push((*key).to_owned());
                 }
             }
         }
@@ -1155,6 +1174,7 @@ impl NodeDef for PrepareNode {
             })?;
         }
         let files = file_tools_section(&offered);
+        let processes = process_tools_section(&offered);
         let prompt = [
             details.system_prompt.clone(),
             prompt,
@@ -1162,6 +1182,7 @@ impl NodeDef for PrepareNode {
             skill_note,
             workspace,
             files,
+            processes,
         ]
         .into_iter()
         .filter(|part| !part.trim().is_empty())
@@ -1490,7 +1511,7 @@ impl GenerateChatNode {
         if knowledge {
             fields.insert("scope".to_owned(), json!(options.scope));
         }
-        if FILE_TOOLS.contains(&tool.key.as_str()) {
+        if FILE_TOOLS.contains(&tool.key.as_str()) || PROCESS_TOOLS.contains(&tool.key.as_str()) {
             fields.insert("conversationId".to_owned(), json!(options.conversation));
         }
         let observer_inner = Arc::clone(inner);
@@ -2351,9 +2372,9 @@ impl ChatService {
             None => Vec::new(),
         };
         if model.supports_tools != Some(false) {
-            for key in FILE_TOOLS {
+            for key in FILE_TOOLS.iter().chain(&PROCESS_TOOLS) {
                 if !enabled.iter().any(|known| known == key) {
-                    enabled.push(key.to_owned());
+                    enabled.push((*key).to_owned());
                 }
             }
         }
@@ -2369,6 +2390,7 @@ impl ChatService {
             guidance,
             workspace,
             file_tools_section(&offered),
+            process_tools_section(&offered),
             if offered.is_empty() {
                 String::new()
             } else {

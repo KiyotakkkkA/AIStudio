@@ -1,0 +1,17 @@
+[
+  {
+    "name": "a negative duration",
+    "value": {
+      "process": {
+        "program": "cargo",
+        "argv": ["cargo", "check"],
+        "cwd": "D:\\work\\app",
+        "packages": []
+      },
+      "exitCode": 0,
+      "durationMs": -1,
+      "timedOut": false,
+      "truncated": false
+    }
+  }
+]

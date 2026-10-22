@@ -13,6 +13,7 @@ use std::sync::Arc;
 use serde_json::json;
 use tauri::{App, AppHandle, Manager, RunEvent, WindowEvent};
 use zvs_host::browser::{BrowserLifecycle, profile_dir};
+use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::data::Repositories;
 use zvs_host::data::repositories::{ProviderFilter, SecretFilter};
 use zvs_host::data::{MigrationFailed, PrepareOptions, prepare_database};
@@ -679,6 +680,15 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         &nodes,
         &folders,
         FileToolOptions::new(paths.runs_dir.clone()),
+    )?;
+    register_command_nodes(
+        &nodes,
+        &folders,
+        runs.approvals(),
+        CommandToolOptions::new(
+            Some(Arc::new(toolchain.clone())),
+            paths.cache_dir.join("code-runs"),
+        ),
     )?;
     register_kernel_tools(&nodes, &tools)?;
     let chat = ChatService::new(ChatServiceOptions {

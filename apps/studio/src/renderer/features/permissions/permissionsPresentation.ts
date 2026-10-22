@@ -18,6 +18,8 @@ export const NOTHING_FOUND = "Ничего не найдено по текуще
 export const LOAD_ERROR = "Не удалось загрузить разрешения. Попробуйте ещё раз.";
 export const REVOKE_ERROR = "Не удалось отозвать разрешение. Попробуйте ещё раз.";
 export const ALREADY_REVOKED = "Разрешение уже отозвано.";
+export const PROCESS_TOOLS_NOTE =
+  "Разрешения на папки не ограничивают «code.run» и «shell.run»: процессы работают с правами пользователя, каждый запуск подтверждается отдельно.";
 
 export function grantCountLabel(count: number): string {
   return plural(count, "папка", "папки", "папок");

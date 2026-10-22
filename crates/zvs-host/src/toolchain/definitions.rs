@@ -112,6 +112,7 @@ pub fn companion_name(runtime: ToolchainRuntime, platform: Platform) -> &'static
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolchainCommand {
     Node,
+    Npm,
     Npx,
     Uv,
     Uvx,
@@ -130,6 +131,7 @@ impl ToolchainCommand {
             .unwrap_or(&lower);
         match bare {
             "node" => Some(Self::Node),
+            "npm" => Some(Self::Npm),
             "npx" => Some(Self::Npx),
             "uv" => Some(Self::Uv),
             "uvx" => Some(Self::Uvx),
@@ -139,7 +141,7 @@ impl ToolchainCommand {
 
     pub const fn runtime(self) -> ToolchainRuntime {
         match self {
-            Self::Node | Self::Npx => ToolchainRuntime::Node,
+            Self::Node | Self::Npm | Self::Npx => ToolchainRuntime::Node,
             Self::Uv | Self::Uvx => ToolchainRuntime::Uv,
         }
     }
@@ -147,6 +149,7 @@ impl ToolchainCommand {
     pub const fn name(self) -> &'static str {
         match self {
             Self::Node => "node",
+            Self::Npm => "npm",
             Self::Npx => "npx",
             Self::Uv => "uv",
             Self::Uvx => "uvx",
@@ -157,6 +160,8 @@ impl ToolchainCommand {
         match self {
             Self::Node | Self::Uv => primary_name(self.runtime(), platform),
             Self::Npx | Self::Uvx => companion_name(self.runtime(), platform),
+            Self::Npm if is_windows(platform) => "npm.cmd",
+            Self::Npm => "npm",
         }
     }
 }
@@ -236,6 +241,16 @@ mod tests {
         assert_eq!(ToolchainCommand::parse("./uvx"), None);
         assert_eq!(ToolchainCommand::Npx.file_name(WINDOWS), "npx.cmd");
         assert_eq!(ToolchainCommand::Uvx.file_name(LINUX), "uvx");
+        assert_eq!(
+            ToolchainCommand::parse("npm.cmd"),
+            Some(ToolchainCommand::Npm)
+        );
+        assert_eq!(ToolchainCommand::Npm.file_name(WINDOWS), "npm.cmd");
+        assert_eq!(ToolchainCommand::Npm.file_name(LINUX), "npm");
+        assert_eq!(
+            ToolchainCommand::Npm.runtime(),
+            zvs_contract::ToolchainRuntime::Node
+        );
     }
 
     #[test]

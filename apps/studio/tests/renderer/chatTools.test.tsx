@@ -14,6 +14,7 @@ import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import ChatStore from "../../src/renderer/features/chat/ChatStore.ts";
 import ChatToolCalls from "../../src/renderer/features/chat/ChatToolCalls";
 import { toolBlockReason } from "../../src/renderer/features/chat/ChatToolPicker";
+import { durationLabel } from "../../src/renderer/features/chat/processCopy.ts";
 import { provider } from "./providerFixtures.ts";
 
 const saved = provider();
@@ -216,7 +217,7 @@ test("a card shows the call, its result and an inline approval prompt", () => {
   expect(screen.getByText("готово")).toBeTruthy();
   expect(screen.getByText("Use the CLI.")).toBeTruthy();
   expect(screen.getByText("Результат · сокращён")).toBeTruthy();
-  expect(screen.getByText("1.5 с")).toBeTruthy();
+  expect(screen.getByText(durationLabel(1500))).toBeTruthy();
 });
 
 test("a tool that cannot be offered explains why", () => {
