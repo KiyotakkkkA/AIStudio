@@ -48,7 +48,7 @@ fn registered() -> Channels {
             repositories.models.replace_for_provider(
                 &provider.id,
                 &[ModelDraft {
-                    context_window: Some(1024),
+                    context_window: Some(8192),
                     max_output: Some(128),
                     ..ModelDraft::new("fake-model", "Fake", 1)
                 }],

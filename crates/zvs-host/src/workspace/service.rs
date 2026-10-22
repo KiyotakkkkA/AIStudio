@@ -4,9 +4,9 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use serde_json::{Value, json};
 use zvs_contract::{
-    AppError, AppErrorCode, ConversationId, FOLDER_APPROVAL_KIND, FolderAccessAnswer,
-    FolderGrantChatDto, FolderGrantDto, FolderGrantId, FolderGrantScope, FolderRequestEntryDto,
-    RunId, WorkingFolderAccess,
+    AppError, AppErrorCode, ConversationId, FILES_APPROVAL_KIND, FOLDER_APPROVAL_KIND, FileDiffDto,
+    FolderAccessAnswer, FolderGrantChatDto, FolderGrantDto, FolderGrantId, FolderGrantScope,
+    FolderRequestEntryDto, RunId, WorkingFolderAccess,
 };
 
 use super::paths::{
@@ -15,7 +15,7 @@ use super::paths::{
 };
 use crate::data::schema::{ConversationRow, FolderGrantRow};
 use crate::data::{DataError, Database, Repositories};
-use crate::kernel::{ApprovalDecision, StepContext};
+use crate::kernel::{ApprovalDecision, DeferredApproval, StepContext};
 use crate::platform::clock::SharedClock;
 use crate::platform::ids::new_id;
 use crate::services::approvals::{ApprovalService, NO_LONGER_PENDING};
@@ -31,6 +31,7 @@ pub const GRANT_NOT_FOUND: &str = "Разрешение не найдено";
 pub const NO_WORKING_FOLDER: &str =
     "Относительный путь нельзя разрешить: у диалога нет рабочей папки";
 pub const CONVERSATION_MISSING: &str = "Диалог не найден";
+pub const CHANGES_DENIED: &str = "Изменения файлов отклонены";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FolderTarget {
@@ -52,6 +53,18 @@ impl FolderTarget {
             kind: TargetKind::Folder,
         }
     }
+}
+
+pub struct AccessPlan {
+    pub resolved: Vec<GrantTarget>,
+    pub folders: Vec<PathBuf>,
+    used: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Review {
+    pub approval: Option<DeferredApproval>,
+    pub changes: Vec<FileDiffDto>,
 }
 
 pub struct FolderCall {
@@ -375,14 +388,11 @@ impl FolderAccessService {
             .collect()
     }
 
-    pub async fn ensure_access(
+    pub fn resolve(
         &self,
-        context: &StepContext,
         call: &FolderCall,
-        action: &str,
         targets: &[FolderTarget],
-    ) -> Result<Vec<GrantTarget>, AppError> {
-        context.check_cancelled()?;
+    ) -> Result<AccessPlan, AppError> {
         let resolved = self.targets(&call.conversation_id, targets)?;
         let grants = self.read(|repositories| {
             Ok(repositories
@@ -407,14 +417,65 @@ impl FolderAccessService {
             }
             uncovered.push(target.folder.clone());
         }
+        Ok(AccessPlan {
+            resolved,
+            folders: minimal(uncovered),
+            used,
+        })
+    }
+
+    pub async fn ensure_access(
+        &self,
+        context: &StepContext,
+        call: &FolderCall,
+        action: &str,
+        targets: &[FolderTarget],
+    ) -> Result<Vec<GrantTarget>, AppError> {
+        context.check_cancelled()?;
+        let plan = self.resolve(call, targets)?;
+        self.confirm(context, call, action, plan, None).await
+    }
+
+    pub async fn confirm(
+        &self,
+        context: &StepContext,
+        call: &FolderCall,
+        action: &str,
+        plan: AccessPlan,
+        review: Option<Review>,
+    ) -> Result<Vec<GrantTarget>, AppError> {
+        context.check_cancelled()?;
+        let AccessPlan {
+            resolved,
+            folders,
+            used,
+        } = plan;
         if !used.is_empty() {
             let now = self.inner.clock.now();
             self.read(|repositories| Ok(repositories.folder_grants.touch(&used, now)?))?;
         }
-        if uncovered.is_empty() {
-            return Ok(resolved);
+        let approval = review.as_ref().and_then(|review| review.approval.clone());
+        if folders.is_empty() {
+            let (Some(approval), Some(review)) = (approval, review) else {
+                return Ok(resolved);
+            };
+            let mut request = self.inner.approvals.create(
+                &context.run_id.to_string(),
+                &approval.subject,
+                &approval.scope,
+            )?;
+            request.insert("kind".to_owned(), json!(FILES_APPROVAL_KIND));
+            request.insert("conversationId".to_owned(), json!(call.conversation_id));
+            request.insert("tool".to_owned(), json!(call.tool));
+            request.insert("action".to_owned(), json!(action));
+            request.insert("changes".to_owned(), json!(review.changes));
+            return match context.request_approval(request).await? {
+                ApprovalDecision::Approved => Ok(resolved),
+                ApprovalDecision::Denied => {
+                    Err(AppError::new(AppErrorCode::ApprovalDenied, CHANGES_DENIED))
+                }
+            };
         }
-        let folders = minimal(uncovered);
         let entries: Vec<FolderRequestEntryDto> = folders
             .iter()
             .map(|folder| {
@@ -437,15 +498,21 @@ impl FolderAccessService {
             })
             .collect();
         let run_id = context.run_id.to_string();
-        let mut request = self
-            .inner
-            .approvals
-            .create(&run_id, FOLDER_SUBJECT, GLOBAL_SCOPE)?;
+        let (subject, scope) = approval.map_or_else(
+            || (FOLDER_SUBJECT.to_owned(), GLOBAL_SCOPE.to_owned()),
+            |approval| (approval.subject, approval.scope),
+        );
+        let mut request = self.inner.approvals.create(&run_id, &subject, &scope)?;
         request.insert("kind".to_owned(), json!(FOLDER_APPROVAL_KIND));
         request.insert("conversationId".to_owned(), json!(call.conversation_id));
         request.insert("tool".to_owned(), json!(call.tool));
         request.insert("action".to_owned(), json!(action));
         request.insert("folders".to_owned(), json!(entries));
+        if let Some(review) = &review
+            && !review.changes.is_empty()
+        {
+            request.insert("changes".to_owned(), json!(review.changes));
+        }
         let id = request
             .get("id")
             .and_then(Value::as_str)

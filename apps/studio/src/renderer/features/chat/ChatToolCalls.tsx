@@ -1,6 +1,12 @@
-import type { ChatToolCallDto, Json } from "@zvs/shared";
+import type { ChatToolCallDto, FileDiffDto, Json } from "@zvs/shared";
 import { toolCallSummary } from "./toolCallSummary";
-import { mdiBookOpenPageVariantOutline, mdiDatabaseSearchOutline, mdiWrenchOutline } from "@mdi/js";
+import {
+  mdiBookOpenPageVariantOutline,
+  mdiDatabaseSearchOutline,
+  mdiFileDocumentEditOutline,
+  mdiFileDocumentOutline,
+  mdiWrenchOutline,
+} from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
@@ -9,6 +15,15 @@ import {
   STATUS_TONE_TEXT,
   type StatusTone,
 } from "../../ui/atoms/statusTone";
+import FileChangeList from "./FileChangeList";
+import {
+  APPROVE_CHANGES,
+  CHANGES_LEAD,
+  CHANGES_TITLE,
+  FILE_TOOL_APPLY,
+  REJECT_CHANGES,
+  fileChanges,
+} from "./fileChangesCopy";
 
 export const TOOL_CALL_STATUS: Record<
   ChatToolCallDto["status"],
@@ -31,12 +46,15 @@ export function toolArgumentsText(value: Json): string {
 function toolIcon(key: string): string {
   if (key === "knowledge.search") return mdiDatabaseSearchOutline;
   if (key === "knowledge.read") return mdiBookOpenPageVariantOutline;
+  if (key === FILE_TOOL_APPLY) return mdiFileDocumentEditOutline;
+  if (key.startsWith("fs.")) return mdiFileDocumentOutline;
   return mdiWrenchOutline;
 }
 
 export interface ToolCallApproval {
   readonly id: string;
   readonly busy: boolean;
+  readonly changes?: readonly FileDiffDto[];
 }
 
 export default function ChatToolCalls({
@@ -55,6 +73,8 @@ export default function ChatToolCalls({
         const status = TOOL_CALL_STATUS[call.status];
         const approval =
           call.status === "awaiting-approval" ? approvalFor?.(call.approvalId) : undefined;
+        const proposed = approval?.changes ?? [];
+        const applied = call.key === FILE_TOOL_APPLY ? fileChanges(call.meta) : [];
         return (
           <li
             key={call.id}
@@ -108,6 +128,14 @@ export default function ChatToolCalls({
                     </pre>
                   </ScrollArea>
                 </div>
+                {applied.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
+                      {CHANGES_TITLE}
+                    </p>
+                    <FileChangeList changes={applied} />
+                  </div>
+                )}
                 {call.result !== null && (
                   <div>
                     <p className="mb-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
@@ -121,7 +149,28 @@ export default function ChatToolCalls({
                   </div>
                 )}
                 {call.error !== null && <p className="text-[12px] text-err">{call.error}</p>}
-                {approval && (
+                {approval && proposed.length > 0 && (
+                  <div role="status" className="space-y-2 rounded-control bg-warn-soft px-3 py-2.5">
+                    <p className="m-0 text-[12.5px] text-main-100">{CHANGES_LEAD}</p>
+                    <FileChangeList changes={proposed} expanded />
+                    <div className="flex gap-2">
+                      <Button
+                        disabled={approval.busy}
+                        tone="primary"
+                        onClick={() => onDecide?.(approval.id, true)}
+                      >
+                        {APPROVE_CHANGES}
+                      </Button>
+                      <Button
+                        disabled={approval.busy}
+                        onClick={() => onDecide?.(approval.id, false)}
+                      >
+                        {REJECT_CHANGES}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {approval && proposed.length === 0 && (
                   <div
                     role="status"
                     className="flex flex-wrap items-center gap-3 rounded-control bg-warn-soft px-3 py-2.5"

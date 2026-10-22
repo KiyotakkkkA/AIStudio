@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FileDiffDto } from "./files.js";
 import { ConversationId, FolderGrantId, RunId } from "./primitives/branded.js";
 
 export const FOLDER_APPROVAL_KIND = "folder";
@@ -52,6 +53,7 @@ export const FolderApprovalDto = z.object({
   tool: z.string().min(1),
   action: z.string().max(2000),
   folders: z.array(FolderRequestEntryDto).min(1).max(64),
+  changes: z.array(FileDiffDto).max(32).optional(),
 });
 export type FolderApprovalDto = z.infer<typeof FolderApprovalDto>;
 

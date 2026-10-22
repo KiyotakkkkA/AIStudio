@@ -1,4 +1,5 @@
 import type { ChatToolCallDto, Json } from "@zvs/shared";
+import { FILE_TOOL_APPLY, changesSummary, fileChanges } from "./fileChangesCopy";
 
 export function toolArgumentsSummary(value: Json): string {
   const text = typeof value === "string" ? value : JSON.stringify(value);
@@ -34,6 +35,10 @@ export function toolCallSummary(call: ChatToolCallDto): string {
         ? `фрагменты ${String(from + 1)}–${String(to + 1)}`
         : `с фрагмента ${String(from + 1)}`;
     return "начало документа";
+  }
+  if (call.key === FILE_TOOL_APPLY) {
+    const changes = fileChanges(call.meta);
+    if (changes.length > 0) return changesSummary(changes);
   }
   return toolArgumentsSummary(call.arguments);
 }

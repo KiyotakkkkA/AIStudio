@@ -633,6 +633,22 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::UpdateConversationToolsInput>,
     ),
     (
+        "files/FileChangeKind",
+        round_trip::<zvs_contract::files::FileChangeKind>,
+    ),
+    (
+        "files/FileDiffDto",
+        round_trip::<zvs_contract::files::FileDiffDto>,
+    ),
+    (
+        "files/FileChangesDto",
+        round_trip::<zvs_contract::files::FileChangesDto>,
+    ),
+    (
+        "files/FilesApprovalDto",
+        round_trip::<zvs_contract::files::FilesApprovalDto>,
+    ),
+    (
         "folders/FolderGrantScope",
         round_trip::<zvs_contract::folders::FolderGrantScope>,
     ),

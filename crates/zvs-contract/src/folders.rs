@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::chat::ConversationDto;
 use crate::enums::wire_enum;
 use crate::errors::AppError;
+use crate::files::{FileDiffDto, check_optional_changes};
 use crate::ids::{ConversationId, FolderGrantId, RunId, is_wire_uuid};
 use crate::primitives::Timestamp;
 use crate::validate::{Validate, check, invalid, nested, no_refinements};
@@ -111,6 +112,12 @@ pub struct FolderApprovalDto {
     pub tool: String,
     pub action: String,
     pub folders: Vec<FolderRequestEntryDto>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub changes: Option<Vec<FileDiffDto>>,
 }
 
 impl Validate for FolderApprovalDto {
@@ -131,7 +138,8 @@ impl Validate for FolderApprovalDto {
         if self.folders.len() > FOLDER_REQUEST_MAX {
             return Err(invalid("folders", "maxItems"));
         }
-        nested("folders", self.folders.validate())
+        nested("folders", self.folders.validate())?;
+        check_optional_changes(self.changes.as_deref())
     }
 }
 

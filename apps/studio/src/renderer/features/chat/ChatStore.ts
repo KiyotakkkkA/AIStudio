@@ -2,7 +2,9 @@ import { makeAutoObservable, reaction, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
   ChatToolCallDto,
+  FilesApprovalDto,
   FolderApprovalDto,
+  type FileDiffDto,
   MessageDto,
   VectorSearchHitDto,
   modelToolSupport,
@@ -66,7 +68,7 @@ export default class ChatStore {
   liveCitations: ChatCitationDto[] = [];
   liveToolCalls: ChatToolCallDto[] = [];
   searchedStoreIds: VectorStoreDto["id"][] = [];
-  approvals: { id: string; subject: string; busy: boolean }[] = [];
+  approvals: { id: string; subject: string; busy: boolean; changes: FileDiffDto[] }[] = [];
   folderRequests: FolderApprovalDto[] = [];
   answeringFolder = false;
   folderBusy = false;
@@ -901,8 +903,15 @@ export default class ChatStore {
       typeof event.request.id === "string" &&
       typeof event.request.subject === "string"
     ) {
-      if (!this.approvals.some((request) => request.id === event.request.id))
-        this.approvals.push({ id: event.request.id, subject: event.request.subject, busy: false });
+      if (!this.approvals.some((request) => request.id === event.request.id)) {
+        const files = FilesApprovalDto.safeParse(event.request);
+        this.approvals.push({
+          id: event.request.id,
+          subject: event.request.subject,
+          busy: false,
+          changes: files.success ? files.data.changes : [],
+        });
+      }
     }
     if (event.type === "token") {
       if (event.kind === "reasoning") this.liveReasoning += event.delta;

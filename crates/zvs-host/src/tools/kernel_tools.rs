@@ -3,6 +3,11 @@ use std::collections::BTreeMap;
 use zvs_contract::{AppError, ToolDto, ToolSource, ToolTier};
 
 use super::registry::{ToolDescriptor, ToolRegistry};
+use crate::files::nodes::{
+    APPLY_DESCRIPTION as FS_APPLY_DESCRIPTION, FS_APPLY, FS_LIST, FS_READ, FS_SEARCH,
+    LIST_DESCRIPTION as FS_LIST_DESCRIPTION, READ_DESCRIPTION as FS_READ_DESCRIPTION,
+    SEARCH_DESCRIPTION as FS_SEARCH_DESCRIPTION,
+};
 use crate::kernel::knowledge_nodes::{
     KNOWLEDGE_LIST, KNOWLEDGE_READ, KNOWLEDGE_SEARCH, LIST_DESCRIPTION, READ_DESCRIPTION,
     SEARCH_DESCRIPTION,
@@ -15,6 +20,7 @@ use crate::skills::nodes::{
 use crate::skills::script::{SCRIPT_DESCRIPTION as SKILL_SCRIPT_DESCRIPTION, SKILL_SCRIPT};
 
 const NOT_TOOLS: &[&str] = &["llm.generate"];
+const ASK_BY_DEFAULT: &[&str] = &[FS_APPLY];
 
 struct BuiltinToolMeta {
     display_name: &'static str,
@@ -88,6 +94,38 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
         },
     ),
     (
+        FS_LIST,
+        BuiltinToolMeta {
+            display_name: "fs.list",
+            description: FS_LIST_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        FS_READ,
+        BuiltinToolMeta {
+            display_name: "fs.read",
+            description: FS_READ_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        FS_SEARCH,
+        BuiltinToolMeta {
+            display_name: "fs.search",
+            description: FS_SEARCH_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        FS_APPLY,
+        BuiltinToolMeta {
+            display_name: "fs.apply",
+            description: FS_APPLY_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
         "vector.index",
         BuiltinToolMeta {
             display_name: "vector.index",
@@ -144,9 +182,9 @@ pub fn register_kernel_tools(
             input_schema: node.input_schema().clone(),
             read_only: node.side_effect_free() && previous,
             destructive: meta.is_some_and(|meta| meta.destructive),
-            tier: meta
-                .is_some_and(|meta| meta.destructive)
-                .then_some(ToolTier::Ask),
+            tier: (meta.is_some_and(|meta| meta.destructive)
+                || ASK_BY_DEFAULT.contains(&key.as_str()))
+            .then_some(ToolTier::Ask),
             ..ToolDescriptor::new(key.clone(), ToolSource::Builtin)
         })?;
         if !order.contains(key) {

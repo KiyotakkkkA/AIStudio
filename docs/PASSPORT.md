@@ -449,6 +449,8 @@ pub trait NodeDef: Send + Sync {
     type Output: Serialize + JsonSchema;
     const TYPE: &'static str;                // "llm.generate", "vector.search", "mail.send"
     fn permission(&self) -> PermissionRequirement;  // resolved against the tool ceiling — §14
+    fn permission_for(&self, input: &Value) -> PermissionRequirement;  // defaults to permission()
+    fn defers_approval(&self) -> bool;       // the node raises its own approval, see below
     fn side_effect(&self) -> SideEffect;     // decides whether recovery may resume it
     async fn run(&self, ctx: &StepContext, input: Self::Input) -> Result<Self::Output, AppError>;
 }
@@ -473,6 +475,17 @@ Core concepts:
 - **Checkpoint** — after each step, so a run survives an app restart and can resume.
 - **Approval gate** — a node whose permission exceeds its grant suspends the run and emits
   an `approval` event. The Agentic Build and Tasks pages both render this state.
+- **Per-input permission** — admission (graph steps and model tool calls alike) asks
+  `permission_for(input)`, so one call of a tool can need a stricter minimum tier than
+  another; `fs.apply` asks at least `ask` when its batch deletes a file. The ceiling still
+  applies on top, and `off` still denies.
+- **Deferred approval** — a node with `defers_approval()` does not suspend at admission. When
+  the tier says `ask`, admission hands it a ticket on the `StepContext` instead, and the node
+  raises one approval itself once it can show what it is about to do (`fs.apply`: the combined
+  diff, merged with any folder request into a single modal).
+- **Concurrent tool calls** — in the chat loop, consecutive side-effect-free calls of one
+  round run concurrently; a call with side effects is a barrier and keeps its place. Results
+  go back to the model in the original call order.
 
 Mapping:
 
@@ -650,6 +663,18 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `%ProgramData%`, the bare user profile root (its subfolders are allowed), every app folder
   (data, cache, logs, downloads, the browser work profile), network (UNC) paths and removable
   media, and any grant that would contain one of them.
+- **File tools** (`zvs-host/src/files/`, TASK_036_EXTRA_2) are offered in every chat whose
+  model can call tools: `fs.list`, `fs.read`, `fs.search` (`auto`, side-effect free, output
+  fenced) and `fs.apply` (`ask` by default). Each resolves its paths through `FolderAccessService`
+  and acts on the canonical path, never the model's spelling. `.gitignore` is honoured by
+  listings and search; links are not followed. `fs.apply` takes 1–32 changes (`write`, `edit`,
+  `move`, `delete`, ≤ 1 MiB of text), plans them in memory over the disk, refuses the whole
+  batch on any forbidden or escaping path, on a binary or non-UTF-8 target, or on a file this
+  run did not read with `fs.read` or that changed since (a run-scoped read ledger of content
+  hashes). It snapshots the originals to `runs/<runId>/snapshots/<batch>/` with a
+  `manifest.json`, writes each file through a temp file renamed over the target, and restores
+  everything already written if any write fails. NTFS has no cross-file transaction: this is
+  all-or-nothing by rollback, not atomic. Line endings and a BOM are kept.
 - **Folder access and tool tiers are separate axes.** A grant says *where* a tool may act;
   the tier on the Tools page says *whether* and with what confirmation it may act. Neither
   widens the other.

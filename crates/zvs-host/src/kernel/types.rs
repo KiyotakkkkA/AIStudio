@@ -1,6 +1,6 @@
 use std::future::Future;
 use std::marker::PhantomData;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use async_trait::async_trait;
 use futures::future::BoxFuture;
@@ -266,12 +266,19 @@ pub trait StepLink: Send + Sync {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeferredApproval {
+    pub subject: String,
+    pub scope: String,
+}
+
 #[derive(Clone)]
 pub struct StepContext {
     pub run_id: RunId,
     pub cancel: CancellationToken,
     pub services: KernelServices,
     link: Arc<dyn StepLink>,
+    deferred: Option<Arc<Mutex<Option<DeferredApproval>>>>,
 }
 
 impl StepContext {
@@ -286,7 +293,36 @@ impl StepContext {
             cancel,
             services,
             link,
+            deferred: None,
         }
+    }
+
+    pub fn with_link(&self, link: Arc<dyn StepLink>) -> Self {
+        Self {
+            link,
+            ..self.clone()
+        }
+    }
+
+    pub fn deferring(self) -> Self {
+        Self {
+            deferred: Some(Arc::new(Mutex::new(None))),
+            ..self
+        }
+    }
+
+    pub fn defer_approval(&self, approval: DeferredApproval) -> bool {
+        let Some(slot) = &self.deferred else {
+            return false;
+        };
+        *slot.lock().unwrap_or_else(PoisonError::into_inner) = Some(approval);
+        true
+    }
+
+    pub fn take_deferred_approval(&self) -> Option<DeferredApproval> {
+        self.deferred
+            .as_ref()
+            .and_then(|slot| slot.lock().unwrap_or_else(PoisonError::into_inner).take())
     }
 
     pub fn is_cancelled(&self) -> bool {
@@ -333,6 +369,14 @@ pub trait NodeDef: Send + Sync + 'static {
     fn node_type(&self) -> &str;
 
     fn permission(&self) -> PermissionRequirement;
+
+    fn permission_for(&self, _input: &Value) -> PermissionRequirement {
+        self.permission()
+    }
+
+    fn defers_approval(&self) -> bool {
+        false
+    }
 
     fn side_effect(&self) -> bool;
 

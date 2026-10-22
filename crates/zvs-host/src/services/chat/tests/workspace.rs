@@ -87,3 +87,20 @@ async fn each_turn_carries_the_working_folder_and_notes_when_it_changed() {
     assert!(prompt.contains(NO_WORKING_FOLDER_NOTE));
     assert!(prompt.contains(&format!("{WORKING_FOLDER_CHANGED}; it was {moved}.")));
 }
+
+#[test]
+fn the_file_tools_section_names_the_offered_file_tools_and_the_rules() {
+    let tool = |key: &str, name: &str| OfferedTool {
+        key: key.to_owned(),
+        name: name.to_owned(),
+        description: String::new(),
+        parameters: serde_json::json!({}),
+        destructive: false,
+        read_only: true,
+    };
+    assert!(file_tools_section(&[tool("demo.x", "demo__x")]).is_empty());
+    assert_eq!(
+        file_tools_section(&[tool("fs.apply", "fs__apply"), tool("fs.read", "fs__read")]),
+        format!("{FILE_TOOLS_HEADING}: fs__read, fs__apply\n{FILE_TOOLS_RULES}")
+    );
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "one edit",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111111",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "files",
+      "subject": "fs.apply",
+      "scope": "global",
+      "expiresAt": 60000,
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "tool": "fs.apply",
+      "action": "Изменение файлов: 1",
+      "changes": [
+        {
+          "path": "D:\\work\\notes.md",
+          "kind": "modify",
+          "added": 1,
+          "removed": 1,
+          "diff": "@@ -1,1 +1,1 @@\n-old\n+new\n",
+          "truncated": false
+        }
+      ]
+    }
+  }
+]

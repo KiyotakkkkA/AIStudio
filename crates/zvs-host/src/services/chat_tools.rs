@@ -35,6 +35,8 @@ pub struct OfferedTool {
     pub description: String,
     pub parameters: Value,
     pub destructive: bool,
+    #[serde(default)]
+    pub read_only: bool,
 }
 
 impl Validate for OfferedTool {
@@ -118,6 +120,7 @@ pub fn offered_tools(enabled: &[String], registered: &[ToolDto]) -> Vec<OfferedT
                 description: js_slice(description, TOOL_DESCRIPTION_MAX).to_owned(),
                 parameters: tool_parameters(&tool.input_schema),
                 destructive: tool.destructive,
+                read_only: tool.read_only,
             }
         })
         .collect()

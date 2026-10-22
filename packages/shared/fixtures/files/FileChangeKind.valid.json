@@ -1,0 +1,6 @@
+[
+  { "name": "create", "value": "create" },
+  { "name": "modify", "value": "modify" },
+  { "name": "move", "value": "move" },
+  { "name": "delete", "value": "delete" }
+]

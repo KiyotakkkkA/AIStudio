@@ -562,14 +562,15 @@ impl Scheduler {
         let mut work = tokio::spawn(async move {
             context.check_cancelled()?;
             let definition = registry.get(&node_type)?;
+            let context = if definition.defers_approval() {
+                context.deferring()
+            } else {
+                context
+            };
+            let requirement = definition.permission_for(&input);
             if let Some(admit) = admit {
-                admit(
-                    definition.permission().clone(),
-                    context.clone(),
-                    AdmissionOrigin::Graph,
-                )
-                .await?;
-            } else if definition.permission().tool_key().is_some() {
+                admit(requirement, context.clone(), AdmissionOrigin::Graph).await?;
+            } else if requirement.tool_key().is_some() {
                 return Err(AppError::new(
                     AppErrorCode::PermissionDenied,
                     NO_PERMISSION_SERVICE,
@@ -699,7 +700,7 @@ impl Scheduler {
             attempt: 1,
         };
         self.commit_tool_step(&step, true)?;
-        let requirement = match definition.permission().clone() {
+        let requirement = match definition.permission_for(&request.input) {
             PermissionRequirement::Tool { tool, tier }
                 if request.minimum_tier == Some(ToolTier::Ask) && tier != Some(ToolTier::Off) =>
             {
@@ -710,18 +711,18 @@ impl Scheduler {
             }
             other => other,
         };
-        let admission = StepContext::new(
-            context.run_id,
-            context.cancel.clone(),
-            context.services.clone(),
-            Arc::new(ObservedLink {
-                inner: context.link(),
-                observer: request.on_approval.clone(),
-            }),
-        );
+        let context = context.with_link(Arc::new(ObservedLink {
+            inner: context.link(),
+            observer: request.on_approval.clone(),
+        }));
+        let context = if definition.defers_approval() {
+            context.deferring()
+        } else {
+            context
+        };
         let outcome = async {
             match self.options.admit.clone() {
-                Some(admit) => admit(requirement, admission, AdmissionOrigin::Model).await?,
+                Some(admit) => admit(requirement, context.clone(), AdmissionOrigin::Model).await?,
                 None => {
                     return Err(AppError::new(
                         AppErrorCode::PermissionDenied,
@@ -826,6 +827,10 @@ impl StepLink for ObservedLink {
             Ok(decision)
         }
         .boxed()
+    }
+
+    fn invoke_tool(&self, request: ToolStepRequest) -> Option<ToolStepFuture> {
+        self.inner.invoke_tool(request)
     }
 }
 

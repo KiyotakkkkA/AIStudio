@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import * as skills from "../src/skills/index.js";
 import * as toolchain from "../src/toolchain/index.js";
+import * as files from "../src/files.js";
 import * as folders from "../src/folders.js";
 import {
   AccountDto,
@@ -176,6 +177,10 @@ const schemas: Record<string, z.ZodType> = {
   "mcp/McpContentDto": McpContentDto,
   "mcp/McpCallResultDto": McpCallResultDto,
   "mcp/McpRemoveOutput": contract["mcp.remove"].output,
+  "files/FileChangeKind": files.FileChangeKind,
+  "files/FileDiffDto": files.FileDiffDto,
+  "files/FileChangesDto": files.FileChangesDto,
+  "files/FilesApprovalDto": files.FilesApprovalDto,
   "folders/FolderGrantScope": folders.FolderGrantScope,
   "folders/WorkingFolderAccess": folders.WorkingFolderAccess,
   "folders/FolderAccessAnswer": folders.FolderAccessAnswer,

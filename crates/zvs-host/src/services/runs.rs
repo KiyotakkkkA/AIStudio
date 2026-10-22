@@ -22,9 +22,9 @@ use crate::data::schema::{RunRow, StepRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::kernel::scheduler::step_event;
 use crate::kernel::{
-    AdmissionOrigin, AdmitHook, ApprovalDecision, ApprovalHook, Finish, KernelServices,
-    NodeRegistry, Observers, PermissionRequirement, RunObserver, RunStream, Scheduler,
-    SchedulerOptions, StepContext, Subscription,
+    AdmissionOrigin, AdmitHook, ApprovalDecision, ApprovalHook, DeferredApproval, Finish,
+    KernelServices, NodeRegistry, Observers, PermissionRequirement, RunObserver, RunStream,
+    Scheduler, SchedulerOptions, StepContext, Subscription,
 };
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::events::{EventBus, StreamOptions};
@@ -158,6 +158,12 @@ impl Gate {
             )),
             Admission::Ask => {
                 let scope = permission.scopes.first().map_or("global", String::as_str);
+                if context.defer_approval(DeferredApproval {
+                    subject: tool.clone(),
+                    scope: scope.to_owned(),
+                }) {
+                    return Ok(());
+                }
                 let request = self.approvals.create(&run.id, &tool, scope)?;
                 let decision = context.request_approval(request).await?;
                 if decision != ApprovalDecision::Approved {

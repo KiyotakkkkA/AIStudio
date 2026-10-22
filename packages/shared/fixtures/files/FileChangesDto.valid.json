@@ -1,0 +1,31 @@
+[
+  {
+    "name": "two files",
+    "value": {
+      "changes": [
+        {
+          "path": "D:\\work\\notes.md",
+          "kind": "create",
+          "added": 1,
+          "removed": 0,
+          "diff": "@@ -0,0 +1,1 @@\n+hello\n",
+          "truncated": false
+        },
+        {
+          "path": "D:\\work\\old.md",
+          "kind": "delete",
+          "added": 0,
+          "removed": 1,
+          "diff": "@@ -1,1 +0,0 @@\n-bye\n",
+          "truncated": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "nothing changed",
+    "value": {
+      "changes": []
+    }
+  }
+]

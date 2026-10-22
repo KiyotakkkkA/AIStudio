@@ -468,6 +468,13 @@ pub fn test_services(system: SystemService) -> TestServices {
         ),
         clock.clone(),
     );
+    crate::files::register_file_nodes(
+        &nodes,
+        &folders,
+        crate::files::FileToolOptions::new(workspace.join("runs")),
+    )
+    .expect("registers the file nodes");
+    crate::tools::register_kernel_tools(&nodes, &tools).expect("registers the file tools");
     let chat = crate::services::ChatService::new(crate::services::ChatServiceOptions {
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),

@@ -8,6 +8,7 @@ pub mod enums;
 pub mod envelope;
 pub mod errors;
 pub mod events;
+pub mod files;
 pub mod folders;
 pub mod graph;
 pub mod graph_expansion;
@@ -63,6 +64,10 @@ pub use errors::{AppError, AppErrorCode, ErrorDetails};
 pub use events::{
     ApprovalRequestDto, DeltaKind, EVENT_CHANNEL, EventSeq, HostEvent, HostEventDraft, LogLineDto,
     RunOutcomeDto, RunOutcomeStatus, StepEventDto,
+};
+pub use files::{
+    FILE_CHANGES_MAX, FILE_DIFF_MAX, FILES_APPROVAL_KIND, FileChangeKind, FileChangesDto,
+    FileDiffDto, FilesApprovalDto,
 };
 pub use folders::{
     AnswerFolderRequestInput, BindFolderInput, BindFolderResultDto, FOLDER_APPROVAL_KIND,

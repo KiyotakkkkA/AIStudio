@@ -1,0 +1,25 @@
+[
+  {
+    "name": "an edit",
+    "value": {
+      "path": "D:\\work\\notes.md",
+      "kind": "modify",
+      "added": 1,
+      "removed": 1,
+      "diff": "@@ -1,1 +1,1 @@\n-old\n+new\n",
+      "truncated": false
+    }
+  },
+  {
+    "name": "a move",
+    "value": {
+      "path": "D:\\work\\b.txt",
+      "from": "D:\\work\\a.txt",
+      "kind": "move",
+      "added": 0,
+      "removed": 0,
+      "diff": "",
+      "truncated": false
+    }
+  }
+]

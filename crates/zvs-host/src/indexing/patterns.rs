@@ -62,6 +62,21 @@ pub fn matches_pattern(relative_path: &str, pattern: &str) -> bool {
     expression.is_some_and(|expression| expression.is_match(&normalize_relative(relative_path)))
 }
 
+static ANCHORED: LazyLock<Mutex<HashMap<String, Option<Regex>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+pub fn matches_anchored(relative_path: &str, pattern: &str) -> bool {
+    let key = pattern.replace('\\', "/");
+    let expression = {
+        let mut cache = ANCHORED.lock().unwrap_or_else(PoisonError::into_inner);
+        cache
+            .entry(key.clone())
+            .or_insert_with(|| to_regex(&key))
+            .clone()
+    };
+    expression.is_some_and(|expression| expression.is_match(&normalize_relative(relative_path)))
+}
+
 pub fn excludes(relative_path: &str, exclude: &[String]) -> bool {
     exclude.iter().any(|pattern| {
         matches_pattern(relative_path, pattern)

@@ -3,6 +3,7 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use async_trait::async_trait;
 use futures::StreamExt;
+use futures::future::join_all;
 use regex::Regex;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -41,6 +42,7 @@ use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::ai::with_injected_tools;
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta, ToolCall};
+use crate::files::FILE_TOOLS;
 use crate::kernel::knowledge_nodes::{
     KNOWLEDGE_READ, KNOWLEDGE_SEARCH, KNOWLEDGE_TOOLS, KnowledgeReadOutput, KnowledgeSearchOutput,
 };
@@ -99,6 +101,8 @@ pub const WORKING_FOLDER_HEADING: &str = "Working folder";
 pub const NO_WORKING_FOLDER_NOTE: &str = "This conversation has no working folder. Every folder needs the user's approval before you can read or change files in it.";
 pub const WORKING_FOLDER_RULES: &str = "Relative paths resolve against the working folder. Any other folder needs the user's approval before you can read or change files in it.";
 pub const WORKING_FOLDER_CHANGED: &str = "The working folder changed since the previous turn";
+pub const FILE_TOOLS_HEADING: &str = "File tools";
+pub const FILE_TOOLS_RULES: &str = "Read a file with the read tool in this turn before you change it; a change to a file that was not read, or that changed since it was read, is refused. Put every change of one task into a single apply call, so the user reviews and applies it as one diff. Paths may be absolute; relative paths resolve against the working folder.";
 
 pub struct ChatServiceOptions {
     pub database: Arc<Database>,
@@ -198,6 +202,21 @@ pub fn working_folder_section(folder: Option<&str>, previous: Option<Option<&str
         });
     }
     section
+}
+
+pub fn file_tools_section(offered: &[OfferedTool]) -> String {
+    let names: Vec<&str> = FILE_TOOLS
+        .iter()
+        .filter_map(|key| offered.iter().find(|tool| tool.key == *key))
+        .map(|tool| tool.name.as_str())
+        .collect();
+    if names.is_empty() {
+        return String::new();
+    }
+    format!(
+        "{FILE_TOOLS_HEADING}: {}\n{FILE_TOOLS_RULES}",
+        names.join(", ")
+    )
 }
 
 fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
@@ -637,6 +656,8 @@ pub struct ChatGenerateRequest {
     pub tool_result_chars: u64,
     #[serde(default)]
     pub knowledge: KnowledgeContext,
+    #[serde(default)]
+    pub conversation_id: String,
 }
 
 impl Validate for ChatGenerateRequest {
@@ -1032,6 +1053,13 @@ impl NodeDef for PrepareNode {
                 }
             }
         }
+        if tools_usable {
+            for key in FILE_TOOLS {
+                if !enabled.iter().any(|known| known == key) {
+                    enabled.push(key.to_owned());
+                }
+            }
+        }
         let guidance = inner.mcp_guidance(&mut enabled, &registered)?;
         let offered = offered_tools(&enabled, &registered);
         let skill_note =
@@ -1126,12 +1154,14 @@ impl NodeDef for PrepareNode {
                 )?)
             })?;
         }
+        let files = file_tools_section(&offered);
         let prompt = [
             details.system_prompt.clone(),
             prompt,
             guidance,
             skill_note,
             workspace,
+            files,
         ]
         .into_iter()
         .filter(|part| !part.trim().is_empty())
@@ -1245,6 +1275,7 @@ impl NodeDef for PrepareNode {
                 citations: prepared.citations,
                 context_budget: model.context_window - model.max_output_tokens,
             },
+            conversation_id: input.conversation_id.clone(),
         })
     }
 }
@@ -1262,6 +1293,14 @@ struct CallOptions<'a> {
     refuse: Option<&'static str>,
     scope: &'a [VectorStoreId],
     book: &'a Mutex<Vec<ChatCitationDto>>,
+    conversation: &'a str,
+}
+
+struct PendingCall<'a> {
+    call: ToolCall,
+    tool: Option<&'a OfferedTool>,
+    index: usize,
+    refuse: Option<&'static str>,
 }
 
 struct CallOutcome {
@@ -1451,6 +1490,9 @@ impl GenerateChatNode {
         if knowledge {
             fields.insert("scope".to_owned(), json!(options.scope));
         }
+        if FILE_TOOLS.contains(&tool.key.as_str()) {
+            fields.insert("conversationId".to_owned(), json!(options.conversation));
+        }
         let observer_inner = Arc::clone(inner);
         let observer_context = context.clone();
         let observer_calls = Arc::clone(calls);
@@ -1574,6 +1616,7 @@ impl GenerateChatNode {
             model_tools,
             tool_result_chars,
             knowledge,
+            conversation_id,
         } = request;
         let book = Mutex::new(knowledge.citations.clone());
         let mut compactable: Vec<Compactable> = Vec::new();
@@ -1672,6 +1715,7 @@ impl GenerateChatNode {
                     ChatMessage::assistant(output.text.clone())
                         .with_tool_calls(output.tool_calls.clone()),
                 );
+                let mut pending = Vec::with_capacity(output.tool_calls.len());
                 for call in output.tool_calls {
                     let tool = by_name.get(call.name.as_str()).copied();
                     let index = {
@@ -1700,38 +1744,68 @@ impl GenerateChatNode {
                     if refuse.is_none() {
                         executed += 1;
                     }
-                    let outcome = self
-                        .call_tool(
+                    pending.push(PendingCall {
+                        call,
+                        tool,
+                        index,
+                        refuse,
+                    });
+                }
+                let concurrent = |entry: &PendingCall<'_>| {
+                    entry.refuse.is_none() && entry.tool.is_some_and(|tool| tool.read_only)
+                };
+                let mut position = 0;
+                while position < pending.len() {
+                    let mut end = position + 1;
+                    if concurrent(&pending[position]) {
+                        while end < pending.len() && concurrent(&pending[end]) {
+                            end += 1;
+                        }
+                    }
+                    let group = &pending[position..end];
+                    let outcomes = join_all(group.iter().map(|entry| {
+                        self.call_tool(
                             context,
                             &assistant_id,
                             &calls,
-                            index,
+                            entry.index,
                             CallOptions {
-                                tool,
-                                label: format!("call{}", index + 1),
+                                tool: entry.tool,
+                                label: format!("call{}", entry.index + 1),
                                 limit,
-                                refuse,
+                                refuse: entry.refuse,
                                 scope: &knowledge.store_ids,
                                 book: &book,
+                                conversation: &conversation_id,
                             },
                         )
-                        .await?;
-                    let status = calls.lock().unwrap_or_else(PoisonError::into_inner)[index].status;
-                    let shape = |content: String| {
-                        if mode == ToolMode::Native {
-                            fence_tool_result(&call.name, status.as_str(), &content)
-                        } else {
-                            content
+                    }))
+                    .await;
+                    for (entry, outcome) in group.iter().zip(outcomes) {
+                        let outcome = outcome?;
+                        let status = calls.lock().unwrap_or_else(PoisonError::into_inner)
+                            [entry.index]
+                            .status;
+                        let shape = |content: String| {
+                            if mode == ToolMode::Native {
+                                fence_tool_result(&entry.call.name, status.as_str(), &content)
+                            } else {
+                                content
+                            }
+                        };
+                        if let Some(compact) = outcome.compact {
+                            compactable.push(Compactable {
+                                index: messages.len(),
+                                round,
+                                compact: shape(compact),
+                            });
                         }
-                    };
-                    if let Some(compact) = outcome.compact {
-                        compactable.push(Compactable {
-                            index: messages.len(),
-                            round,
-                            compact: shape(compact),
-                        });
+                        messages.push(ChatMessage::tool(
+                            entry.call.id.clone(),
+                            shape(outcome.content),
+                        ));
                     }
-                    messages.push(ChatMessage::tool(call.id.clone(), shape(outcome.content)));
+                    position = end;
                 }
                 if last {
                     break;
@@ -2276,6 +2350,13 @@ impl ChatService {
             Some(tools) => tools.list(&ToolListFilter::default())?,
             None => Vec::new(),
         };
+        if model.supports_tools != Some(false) {
+            for key in FILE_TOOLS {
+                if !enabled.iter().any(|known| known == key) {
+                    enabled.push(key.to_owned());
+                }
+            }
+        }
         let guidance = self.inner.mcp_guidance(&mut enabled, &registered)?;
         let offered = offered_tools(&enabled, &registered);
         let folder = details.and_then(|details| details.working_folder.as_deref());
@@ -2287,6 +2368,7 @@ impl ChatService {
         let tool_block = [
             guidance,
             workspace,
+            file_tools_section(&offered),
             if offered.is_empty() {
                 String::new()
             } else {

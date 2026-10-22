@@ -28,6 +28,7 @@ use zvs_host::drivers::ai::{
 use zvs_host::drivers::core::InProcessCore;
 use zvs_host::drivers::mcp::TOOLCHAIN_DIR;
 use zvs_host::drivers::sidecar::{SidecarDriver, SidecarOptions};
+use zvs_host::files::{FileToolOptions, register_file_nodes};
 use zvs_host::indexing::{
     DocumentExtractorOptions, ImageExtractor, IndexingService, IndexingServiceOptions,
     PdfExtractor, image_extensions,
@@ -674,6 +675,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         ]),
         clock.clone(),
     );
+    register_file_nodes(
+        &nodes,
+        &folders,
+        FileToolOptions::new(paths.runs_dir.clone()),
+    )?;
+    register_kernel_tools(&nodes, &tools)?;
     let chat = ChatService::new(ChatServiceOptions {
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),

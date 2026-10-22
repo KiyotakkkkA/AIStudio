@@ -11,6 +11,8 @@ use super::types::{NodeDef, PermissionRequirement, StepContext};
 
 #[async_trait]
 trait ErasedNode: Send + Sync {
+    fn permission_for(&self, input: &Value) -> PermissionRequirement;
+
     async fn execute(&self, context: &StepContext, input: Value) -> Result<Value, AppError>;
 
     async fn execute_tool(
@@ -27,6 +29,10 @@ fn output_value<T: serde::Serialize>(output: T) -> Result<Value, AppError> {
 
 #[async_trait]
 impl<N: NodeDef> ErasedNode for N {
+    fn permission_for(&self, input: &Value) -> PermissionRequirement {
+        NodeDef::permission_for(self, input)
+    }
+
     async fn execute(&self, context: &StepContext, input: Value) -> Result<Value, AppError> {
         let input: N::Input = zvs_contract::parse(input)?;
         let output = self.run(context, input).await?;
@@ -115,6 +121,7 @@ fn absent_not_null(schema: &mut Value) {
 pub struct RegisteredNode {
     node_type: String,
     permission: PermissionRequirement,
+    defers_approval: bool,
     side_effect: bool,
     input_schema: Value,
     output_schema: Value,
@@ -126,6 +133,7 @@ impl RegisteredNode {
         Self {
             node_type: node.node_type().to_owned(),
             permission: node.permission(),
+            defers_approval: node.defers_approval(),
             side_effect: node.side_effect(),
             input_schema: input_schema::<N::Input>(),
             output_schema: json_schema::<N::Output>(),
@@ -139,6 +147,14 @@ impl RegisteredNode {
 
     pub const fn permission(&self) -> &PermissionRequirement {
         &self.permission
+    }
+
+    pub fn permission_for(&self, input: &Value) -> PermissionRequirement {
+        self.node.permission_for(input)
+    }
+
+    pub const fn defers_approval(&self) -> bool {
+        self.defers_approval
     }
 
     pub const fn side_effect(&self) -> bool {

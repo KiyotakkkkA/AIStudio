@@ -1,0 +1,36 @@
+[
+  {
+    "name": "a move without a source",
+    "value": {
+      "path": "D:\\work\\b.txt",
+      "kind": "move",
+      "added": 0,
+      "removed": 0,
+      "diff": "",
+      "truncated": false
+    }
+  },
+  {
+    "name": "a source on a creation",
+    "value": {
+      "path": "D:\\work\\b.txt",
+      "from": "D:\\work\\a.txt",
+      "kind": "create",
+      "added": 1,
+      "removed": 0,
+      "diff": "+x\n",
+      "truncated": false
+    }
+  },
+  {
+    "name": "an empty path",
+    "value": {
+      "path": "",
+      "kind": "delete",
+      "added": 0,
+      "removed": 1,
+      "diff": "-x\n",
+      "truncated": false
+    }
+  }
+]

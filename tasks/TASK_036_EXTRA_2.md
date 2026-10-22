@@ -2,7 +2,7 @@
 task: TASK_036_EXTRA_2
 title: File tools — fs.list, fs.read, fs.search and the fs.apply batch
 phase: 6 — Tools, MCP and Skills
-status: todo
+status: done
 depends_on: [TASK_036_EXTRA_1]
 unblocks: [TASK_036_EXTRA_3, TASK_040]
 estimate: 5 h
@@ -135,15 +135,69 @@ Tests that must exist:
 
 ## Definition of done
 
-- [ ] `fs.list`, `fs.read`, `fs.search` registered, `auto`, untrusted output fenced
-- [ ] `fs.apply` plans, checks staleness, asks once, commits with rollback, returns diffs
-- [ ] `permission_for` in the kernel; deletes always ask
-- [ ] Side-effect-free calls of a round run concurrently
-- [ ] Gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] `fs.list`, `fs.read`, `fs.search` registered, `auto`, untrusted output fenced
+- [x] `fs.apply` plans, checks staleness, asks once, commits with rollback, returns diffs
+- [x] `permission_for` in the kernel; deletes always ask
+- [x] Side-effect-free calls of a round run concurrently
+- [x] Gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- `zvs-host/src/files/`: `text.rs` (UTF-8/BOM/CRLF decode and encode, binary detection,
+  SHA-256 content hash), `ledger.rs` (`ReadLedger`, run-scoped path → hash, last 64 runs),
+  `walk.rs` (breadth-first walk with `.gitignore` rules up to the git root, `.git` skipped,
+  links listed but never followed), `plan.rs` (the overlay planner behind a `Disk` trait),
+  `diff.rs` (line diff with `+/-` counts and unified hunks, capped at `FILE_DIFF_MAX`),
+  `commit.rs` (snapshot with `manifest.json`, temp file + rename per file, rollback of written
+  files and created folders, injectable `Fault`), `nodes.rs` (the four nodes,
+  `register_file_nodes`, Russian descriptions).
+- Kernel: `NodeDef::permission_for(input)` and `defers_approval()`; `RegisteredNode` exposes
+  both; the scheduler uses `permission_for` for graph steps and model tool calls. A
+  `DeferredApproval` slot on `StepContext`: the run gate, on `ask`, hands the node a ticket
+  instead of suspending. Model tool calls now execute under the observed link, so approvals a
+  node raises itself also mark the chat card «ждёт подтверждения».
+- `FolderAccessService::resolve` + `confirm(…, Review)` split out of `ensure_access`; with a
+  ticket and no uncovered folder it raises a `kind: "files"` approval carrying the diff, with
+  uncovered folders one `kind: "folder"` approval that also carries `changes`.
+- Contract: `zvs_contract::files` (`FileChangeKind`, `FileDiffDto`, `FileChangesDto`,
+  `FilesApprovalDto`), optional `FolderApprovalDto.changes`; Zod in `packages/shared/src/files.ts`;
+  fixtures in `fixtures/files/` and a combined folder approval fixture.
+- Chat: file tools are added to the offered set whenever the model can call tools; the
+  conversation id reaches them as a hidden `conversationId`; a «File tools» prompt section
+  (English) names them and the read-before-change and one-batch rules; `OfferedTool.readOnly`
+  drives concurrent execution of consecutive read-only calls.
+- `StudioPaths.runs_dir` (`<data>/runs`) for snapshots.
+- Renderer: `FileChangeList` (per-file diffs, collapsed past three files), the `fs.apply` card
+  shows applied diffs and a summary line, an `ask` batch shows the combined diff with
+  «Применить изменения» / «Отклонить», and `FolderAccessModal` shows the diff under the folders.
+- Tests: `files/tests.rs` covers every case listed under Verify; the chat-loop overlap and
+  order test is in `services/chat/tests/tool_loop.rs`; renderer logic in
+  `tests/renderer/fileChanges.test.ts`.
+
 **Deviated from plan:**
+- `fs.apply` is registered with `destructive: false` and an explicit default tier `ask`. The
+  chat loop forces `ask` on every destructive tool, which would make the «routine edits at
+  `auto`» setting impossible; deletes keep their mandatory `ask` through `permission_for`.
+- `walk.rs` has no `.gitignore` support, so `files/walk.rs` implements the rules on top of the
+  indexing glob patterns (`matches_anchored` added to `indexing/patterns.rs`). Nested
+  `.gitignore` files, `!` negations, anchored and folder-only patterns are honoured.
+- Binary and non-UTF-8 files are refused for every operation, `move` and `delete` included.
+- The diff is planned before folder access is answered, so it can be shown in the same modal.
+  Planning reads files in a not-yet-granted folder on the host only; their content reaches the
+  model only if the user approves, but a planning error (for example a missing `old`) can
+  reveal that a file exists.
+- Snapshots live in `<data>/runs/<runId>/snapshots/<batch>/`; nothing prunes them yet.
+- `ipc/chat/tests.rs` used a 1024-token model; the file tool specs no longer fit, so its fixture
+  now has 8192.
+
 **Next session should know:**
+- TASK_040/041: `FsApplyOutput.changes` (also the tool call `meta`, a `FileChangesDto`) and the
+  snapshot `manifest.json` (`path`, `snapshot` file name or null, `deleted`) are the inputs for
+  the changed-files rail and session revert.
+- File tools need a conversation: the «Попробовать» panel and scenario graphs without a
+  `conversationId` fail with «Диалог не найден».
+- Not run here: `pnpm build`, `pnpm test:e2e`, `zvs-studio` test clippy (its browser gateway
+  tests use the unstable `atomic_try_update` on this toolchain, unrelated to this change).
+  `zvs-jobd`'s `cancelling_stops_a_job…` failed once and passed on rerun.

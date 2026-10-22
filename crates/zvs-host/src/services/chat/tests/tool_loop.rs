@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use async_trait::async_trait;
@@ -173,6 +173,8 @@ struct Calls {
     drops: Mutex<usize>,
     hang: AtomicBool,
     started: AtomicBool,
+    inflight: AtomicUsize,
+    peak: AtomicUsize,
 }
 
 impl Calls {
@@ -242,6 +244,34 @@ fn register_demo_nodes(registry: &NodeRegistry, calls: &Arc<Calls>) {
             },
         ))
         .expect("registers drop");
+    let slow = Arc::clone(calls);
+    registry
+        .register(FnNode::new(
+            "demo.slow",
+            PermissionRequirement::tool("demo.slow"),
+            false,
+            move |_context: StepContext, input: LookupInput| {
+                let calls = Arc::clone(&slow);
+                async move {
+                    let now = calls.inflight.fetch_add(1, Ordering::SeqCst) + 1;
+                    calls.peak.fetch_max(now, Ordering::SeqCst);
+                    for _ in 0..2_000 {
+                        if calls.peak.load(Ordering::SeqCst) >= 2 {
+                            break;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+                    }
+                    if input.query == "first" {
+                        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+                    }
+                    calls.inflight.fetch_sub(1, Ordering::SeqCst);
+                    Ok(TextOutput {
+                        text: format!("slow {}", input.query),
+                    })
+                }
+            },
+        ))
+        .expect("registers slow");
 }
 
 impl Loop {
@@ -266,6 +296,15 @@ impl Loop {
                 ..ToolDescriptor::new("demo.drop", ToolSource::Builtin)
             })
             .expect("registers drop");
+        tools
+            .register(&ToolDescriptor {
+                description: "Look a fact up slowly".to_owned(),
+                input_schema: json!({ "type": "object", "properties": { "query": { "type": "string" } } }),
+                read_only: true,
+                tier: Some(ToolTier::Auto),
+                ..ToolDescriptor::new("demo.slow", ToolSource::Builtin)
+            })
+            .expect("registers slow");
         let driver = Scripted::new();
         let harness = Harness::with(HarnessOptions {
             database: Some(database.shared()),
@@ -996,5 +1035,44 @@ async fn a_turn_lists_the_skills_and_offers_skill_load_even_when_the_conversatio
     assert_eq!(
         assistant.tool_calls[0].result.as_deref(),
         Some("instructions for release-notes")
+    );
+}
+
+#[tokio::test]
+async fn read_only_calls_of_one_round_overlap_and_return_in_call_order() {
+    let test = Loop::new();
+    test.driver.round(|_| {
+        vec![
+            call_with_id("demo__slow", &json!({ "query": "first" }), "call_a"),
+            call_with_id("demo__slow", &json!({ "query": "second" }), "call_b"),
+        ]
+    });
+    test.driver.fallback(|_| vec![text("Both found.")]);
+    let created = test.conversation(&["demo.slow"]);
+
+    let handle = test.turn(created, "Question").await;
+
+    assert_eq!(test.harness.status(&handle), RunStatus::Succeeded);
+    assert_eq!(test.calls.peak.load(Ordering::SeqCst), 2);
+    let requests = test.driver.requests();
+    let replies: Vec<&str> = requests[1]
+        .messages
+        .iter()
+        .filter(|message| message.role == ChatRole::Tool)
+        .filter_map(|message| message.tool_call_id.as_deref())
+        .collect();
+    assert_eq!(replies, ["call_a", "call_b"]);
+    let calls = test.harness.last(created).tool_calls;
+    assert_eq!(
+        calls
+            .iter()
+            .map(|call| call.id.as_str())
+            .collect::<Vec<_>>(),
+        ["call_a", "call_b"]
+    );
+    assert!(
+        calls
+            .iter()
+            .all(|call| call.status == ChatToolCallStatus::Succeeded)
     );
 }

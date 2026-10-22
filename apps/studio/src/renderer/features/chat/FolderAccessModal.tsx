@@ -1,6 +1,8 @@
 import { observer } from "mobx-react-lite";
 import ConfirmModal from "../../ui/molecules/ConfirmModal";
 import type ChatStore from "./ChatStore";
+import FileChangeList from "./FileChangeList";
+import { CHANGES_TITLE } from "./fileChangesCopy";
 import {
   ALLOW_ALWAYS,
   ALLOW_CONVERSATION,
@@ -45,6 +47,14 @@ export default observer(function FolderAccessModal({ store }: { readonly store: 
               ))}
             </ul>
             <p>{SUBFOLDERS_NOTE}</p>
+            {request.changes === undefined || request.changes.length === 0 ? null : (
+              <div>
+                <p className="mb-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
+                  {CHANGES_TITLE}
+                </p>
+                <FileChangeList changes={request.changes} expanded />
+              </div>
+            )}
           </div>
         )
       }

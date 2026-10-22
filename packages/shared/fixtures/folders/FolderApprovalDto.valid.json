@@ -18,5 +18,35 @@
         }
       ]
     }
+  },
+  {
+    "name": "with the changes it is for",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111111",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "folder",
+      "subject": "fs.apply",
+      "scope": "global",
+      "expiresAt": 60000,
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "tool": "fs.apply",
+      "action": "Изменение файлов: 1",
+      "folders": [
+        {
+          "path": "D:\\work",
+          "creates": []
+        }
+      ],
+      "changes": [
+        {
+          "path": "D:\\work\\notes.md",
+          "kind": "create",
+          "added": 1,
+          "removed": 0,
+          "diff": "@@ -0,0 +1,1 @@\n+hello\n",
+          "truncated": false
+        }
+      ]
+    }
   }
 ]
