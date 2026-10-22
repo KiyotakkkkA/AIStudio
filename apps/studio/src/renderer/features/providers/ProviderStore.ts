@@ -38,6 +38,7 @@ export class ProviderStore {
   accounts: AccountDto[] = [];
   pending: PendingIntent | null = null;
   modelQuery = "";
+  listQuery = "";
   freeModelsOnly = false;
   noTrainingOnly = false;
   loading = false;
@@ -242,6 +243,19 @@ export class ProviderStore {
 
   resetForm(): void {
     this.form = this.detail === null ? null : this.newForm(this.detail);
+  }
+
+  get visibleSummaries(): ProviderSummaryDto[] {
+    const query = this.listQuery.trim().toLowerCase();
+    if (query.length === 0) return this.summaries;
+    return this.summaries.filter(
+      (summary) =>
+        summary.name.toLowerCase().includes(query) || summary.kind.toLowerCase().includes(query),
+    );
+  }
+
+  setListQuery(query: string): void {
+    this.listQuery = query;
   }
 
   setModelQuery(query: string): void {

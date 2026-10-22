@@ -4,6 +4,7 @@ import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
+import TextInput from "../../ui/atoms/TextInput";
 import { STATUS_TONE_TEXT } from "../../ui/atoms/statusTone";
 import EmptyState from "../../ui/molecules/EmptyState";
 import ListRow from "../../ui/molecules/ListRow";
@@ -17,6 +18,15 @@ function ServerList({ store }: { readonly store: ConnectionStore }) {
       <div className="flex-none px-0.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
         MCP-серверы
       </div>
+      <TextInput
+        preset="search"
+        aria-label="Поиск серверов"
+        value={store.query}
+        placeholder="Поиск серверов…"
+        onChange={(event) => {
+          store.setQuery(event.target.value);
+        }}
+      />
 
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-2 pr-0.5">
         {store.loading && store.servers.length === 0 ? (
@@ -36,7 +46,7 @@ function ServerList({ store }: { readonly store: ConnectionStore }) {
           </div>
         ) : null}
 
-        {store.servers.map((server) => {
+        {store.visibleServers.map((server) => {
           const state = store.stateOf(server);
           const tone = STATE_TONES[state];
           return (

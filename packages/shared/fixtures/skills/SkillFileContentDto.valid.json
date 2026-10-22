@@ -1,0 +1,7 @@
+[
+  {
+    "name": "text",
+    "value": { "path": "references/style.md", "size": 14, "text": "Пишите кратко." }
+  },
+  { "name": "binary", "value": { "path": "assets/logo.png", "size": 2048, "text": null } }
+]

@@ -1,3 +1,4 @@
+pub mod bundled;
 pub mod library;
 pub mod manifest;
 pub mod matching;
@@ -8,6 +9,7 @@ pub mod service;
 #[cfg(test)]
 mod tests;
 
+pub use bundled::{BUNDLED_SKILLS, BundledFile, BundledSkill};
 pub use library::{SKILLS_DIR, SkillLibrary, SkillLibraryOptions};
 pub use nodes::{SKILL_GENERATE, SKILL_LOAD, SKILL_READ, SKILL_TOOLS, register_skill_nodes};
 pub use script::{SKILL_SCRIPT, SkillScriptOptions};

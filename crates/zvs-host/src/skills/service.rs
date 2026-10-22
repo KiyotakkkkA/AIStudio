@@ -10,10 +10,10 @@ use zvs_contract::validate::js_trim;
 use zvs_contract::{
     AppError, AppErrorCode, CreateSkillInput, GraphNode, ProviderCapability, RetryPolicy, RunGraph,
     RunHandleDto, RunKind, SKILL_TRIGGER_KEY, SkillDetailDto, SkillDto, SkillExportInput,
-    SkillExportResultDto, SkillId, SkillImportInput, SkillImportResultDto, SkillMatchDto,
-    SkillMatchMethod, SkillModelDto, SkillRunInput, SkillTestInput, SkillTestResultDto,
-    SkillTriggerSettingsDto, StartRunInput, ToolListFilter, UpdateSkillInput, Validate,
-    VectorSourceKind, model_tool_support,
+    SkillExportResultDto, SkillFileContentDto, SkillId, SkillImportInput, SkillImportResultDto,
+    SkillMatchDto, SkillMatchMethod, SkillModelDto, SkillRunInput, SkillTestInput,
+    SkillTestResultDto, SkillTriggerSettingsDto, StartRunInput, ToolListFilter, UpdateSkillInput,
+    Validate, VectorSourceKind, model_tool_support,
 };
 
 use super::library::{LoadedSkill, SkillLibrary};
@@ -219,7 +219,7 @@ impl SkillService {
     }
 
     pub fn list(&self) -> Result<Vec<SkillDto>, AppError> {
-        self.inner.library.list()
+        self.inner.library.reconcile()
     }
 
     pub fn get(&self, id: &SkillId) -> Result<SkillDetailDto, AppError> {
@@ -236,6 +236,23 @@ impl SkillService {
 
     pub fn remove(&self, id: &SkillId) -> Result<(), AppError> {
         self.inner.library.remove(id)
+    }
+
+    pub fn set_enabled(&self, id: &SkillId, enabled: bool) -> Result<SkillDto, AppError> {
+        self.inner.library.set_enabled(id, enabled)
+    }
+
+    pub fn duplicate(&self, id: &SkillId) -> Result<SkillDetailDto, AppError> {
+        self.inner.library.duplicate(id)
+    }
+
+    pub fn read_file(&self, id: &SkillId, path: &str) -> Result<SkillFileContentDto, AppError> {
+        let content = self.inner.library.read_file(id, path)?;
+        Ok(SkillFileContentDto {
+            path: content.path,
+            size: content.size,
+            text: content.text,
+        })
     }
 
     async fn pick_folder(&self) -> Result<Option<PathBuf>, AppError> {

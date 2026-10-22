@@ -1,3 +1,5 @@
+import type { StatusTone } from "../../ui/atoms/statusTone";
+import { plural } from "../connections/connectionPresentation";
 import type { VectorHealth } from "@zvs/shared";
 
 export const healthLabels: Record<VectorHealth, string> = {
@@ -6,12 +8,16 @@ export const healthLabels: Record<VectorHealth, string> = {
   pending: "Ожидает индексации",
   broken: "Недоступно",
 };
-export const healthColors: Record<VectorHealth, string> = {
-  healthy: "bg-ok",
-  stale: "bg-warn",
-  pending: "bg-warn",
-  broken: "bg-err",
+export const healthTones: Record<VectorHealth, StatusTone> = {
+  healthy: "ok",
+  stale: "warn",
+  pending: "warn",
+  broken: "err",
 };
+
+export function vectorsLine(vectors: number, dimension: number): string {
+  return `${plural(vectors, "вектор", "вектора", "векторов")} · ${String(dimension)} изм.`;
+}
 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${String(bytes)} B`;

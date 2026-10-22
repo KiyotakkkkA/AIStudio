@@ -522,6 +522,7 @@ impl RunService {
         let query = RunPageQuery {
             statuses: filter.statuses.clone().unwrap_or_default(),
             kinds: filter.kinds.clone().unwrap_or_default(),
+            subject_id: filter.subject_id.clone(),
             query: filter.query().map(str::to_owned),
             from: filter.from,
             to: filter.to,

@@ -9,7 +9,8 @@ import Chip from "../../ui/atoms/Chip";
 import TextInput from "../../ui/atoms/TextInput";
 import VectorStoreDetail from "./VectorStoreDetail";
 import VectorStoreForm from "./VectorStoreForm";
-import { healthColors, healthLabels } from "./vectorPresentation";
+import { healthLabels, healthTones, vectorsLine } from "./vectorPresentation";
+import StatusDot from "../../ui/atoms/StatusDot";
 import ListRow from "../../ui/molecules/ListRow";
 import Icon from "../../ui/atoms/Icon";
 import EmptyState from "../../ui/molecules/EmptyState";
@@ -27,15 +28,6 @@ function VectorStoresWorkspace() {
       subtitle={`${store.stores.length} хранилищ`}
       actions={
         <div className="flex flex-none items-center gap-3">
-          <div className="w-60">
-            <TextInput
-              preset="search"
-              aria-label="Поиск хранилищ"
-              placeholder="Поиск хранилищ…"
-              value={store.filter}
-              onChange={(e) => store.set("filter", e.target.value)}
-            />
-          </div>
           <Button
             disabled={store.busy || store.searching || !!store.form || !store.stores.length}
             onClick={() => {
@@ -69,10 +61,17 @@ function VectorStoresWorkspace() {
         </div>
       ) : null}
       <div className="flex min-h-0 flex-1 gap-4.5">
-        <aside className="flex min-h-0 w-62.5 flex-none flex-col gap-2">
+        <aside className="flex min-h-0 w-65.5 flex-none flex-col gap-2 border-r border-line pr-2.5">
           <div className="flex-none px-0.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             Хранилища
           </div>
+          <TextInput
+            preset="search"
+            aria-label="Поиск хранилищ"
+            placeholder="Поиск хранилищ…"
+            value={store.filter}
+            onChange={(e) => store.set("filter", e.target.value)}
+          />
           <ScrollArea className="flex min-h-0 flex-1 flex-col gap-2 pr-0.5">
             {store.loading && !store.loaded ? (
               <>
@@ -89,19 +88,15 @@ function VectorStoresWorkspace() {
                   void store.select(item.id);
                 }}
               >
-                <span className="flex w-full items-center gap-2">
-                  <span
-                    title={healthLabels[item.status]}
-                    className={`size-1.75  flex-none rounded-full ${healthColors[item.status]}`}
-                  />
-                  <span className="min-w-0 flex-1 wrap-break-word text-[13px] font-semibold">
+                <span className="flex min-w-0 items-center gap-2">
+                  <StatusDot tone={healthTones[item.status]} title={healthLabels[item.status]} />
+                  <span className="flex-1 truncate text-[12.5px] font-medium text-main-50">
                     {item.name}
                   </span>
                   <Chip>{item.backend}</Chip>
                 </span>
-                <span className="text-[12px] text-main-400">{item.description}</span>
-                <span className="font-mono text-[11px] text-main-500">
-                  {item.vectors.toLocaleString()} vectors · {item.dimension} dim
+                <span className="truncate text-[11px] text-main-400" title={item.description}>
+                  {vectorsLine(item.vectors, item.dimension)}
                 </span>
               </ListRow>
             ))}

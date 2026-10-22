@@ -49,6 +49,7 @@ export default class ConnectionStore {
   testResult: McpTestResultDto | null = null;
   pending: PendingIntent | null = null;
   registryOpen = false;
+  query = "";
   loading = false;
   loaded = false;
   saving = false;
@@ -73,6 +74,22 @@ export default class ConnectionStore {
       { ipc: false, timer: false, polling: false, pollMs: false },
       { autoBind: true },
     );
+  }
+
+  get visibleServers(): McpServerDto[] {
+    const query = this.query.trim().toLowerCase();
+    if (query.length === 0) return this.servers;
+    return this.servers.filter(
+      (server) =>
+        server.name.toLowerCase().includes(query) ||
+        server.namespace.toLowerCase().includes(query) ||
+        (server.command ?? "").toLowerCase().includes(query) ||
+        (server.url ?? "").toLowerCase().includes(query),
+    );
+  }
+
+  setQuery(query: string): void {
+    this.query = query;
   }
 
   get selectedServer(): McpServerDto | null {

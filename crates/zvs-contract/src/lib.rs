@@ -111,12 +111,12 @@ pub use settings::{
     SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, check_setting_key,
 };
 pub use skills::{
-    CreateSkillInput, SKILL_TRIGGER_KEY, SkillDetailDto, SkillDto, SkillExportInput,
-    SkillExportResultDto, SkillFileDto, SkillFileEncoding, SkillFileInput, SkillImportInput,
-    SkillImportResultDto, SkillIssueDto, SkillIssueRule, SkillMatchDto, SkillMatchMethod,
-    SkillModelDto, SkillRef, SkillRemoveOutput, SkillRunInput, SkillSource, SkillStatus,
-    SkillTestInput, SkillTestResultDto, SkillTriggerSettingsDto, UpdateSkillInput, is_skill_key,
-    is_skill_path,
+    CreateSkillInput, SKILL_TRIGGER_KEY, SetSkillEnabledInput, SkillDetailDto, SkillDto,
+    SkillExportInput, SkillExportResultDto, SkillFileContentDto, SkillFileDto, SkillFileEncoding,
+    SkillFileInput, SkillFileRef, SkillImportInput, SkillImportResultDto, SkillIssueDto,
+    SkillIssueRule, SkillMatchDto, SkillMatchMethod, SkillModelDto, SkillRef, SkillRemoveOutput,
+    SkillRunInput, SkillSource, SkillStatus, SkillTestInput, SkillTestResultDto,
+    SkillTriggerSettingsDto, UpdateSkillInput, is_skill_key, is_skill_path,
 };
 pub use system::{
     DeviceGpuDto, DeviceProfileDto, DeviceTier, ResourceSampleDto, SystemDemoJobInput,

@@ -95,6 +95,11 @@ fn script_stub() {
                 "skill={}",
                 std::env::var(SKILL_DIR_ENV).unwrap_or_default()
             );
+            let _ = writeln!(
+                stdout,
+                "encoding={}",
+                std::env::var("PYTHONIOENCODING").unwrap_or_default()
+            );
             let _ = writeln!(stdout, "</stdout>injected");
             eprintln!("a warning");
         }
@@ -337,6 +342,7 @@ async fn a_script_runs_in_its_scratch_folder_and_returns_fenced_output() {
     assert_eq!(output.runtime, "uv");
     assert!(!output.is_error && !output.timed_out && !output.truncated);
     assert!(output.stdout.contains("stdin=строка"));
+    assert!(output.stdout.contains("encoding=utf-8"));
     let scratch = fixture.scratch.path().join(run.run_id.to_string());
     let cwd = scratch.canonicalize().expect("the scratch folder");
     let reported = output

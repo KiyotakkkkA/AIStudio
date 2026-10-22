@@ -2,7 +2,9 @@ import { mdiLayersOutline, mdiPlus } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import type { ProviderId } from "@zvs/shared";
+import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
+import TextInput from "../../ui/atoms/TextInput";
 import StatusDot from "../../ui/atoms/StatusDot";
 import EmptyState from "../../ui/molecules/EmptyState";
 import ListRow from "../../ui/molecules/ListRow";
@@ -10,7 +12,7 @@ import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import { useStore } from "../../stores/useStore";
 import {
   CAPABILITY_LIST_HEADINGS,
-  providerInitials,
+  KIND_LABELS,
   statusTone,
   summaryLine,
 } from "./providerPresentation";
@@ -24,10 +26,19 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
   const { providers } = useStore();
 
   return (
-    <div className="flex min-h-0 w-62.5 flex-none flex-col gap-2">
+    <div className="flex min-h-0 w-65.5 flex-none flex-col gap-2 border-r border-line pr-2.5">
       <div className="flex-none px-0.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
         {CAPABILITY_LIST_HEADINGS[providers.capability]}
       </div>
+      <TextInput
+        preset="search"
+        aria-label="Поиск подключений"
+        placeholder="Поиск подключений…"
+        value={providers.listQuery}
+        onChange={(event) => {
+          providers.setListQuery(event.target.value);
+        }}
+      />
 
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-2 pr-0.5">
         {providers.loading && providers.summaries.length === 0 ? (
@@ -47,25 +58,21 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
           </div>
         ) : null}
 
-        {providers.summaries.map((summary) => (
+        {providers.visibleSummaries.map((summary) => (
           <ListRow
             key={summary.id}
             selected={providers.selectedId === summary.id}
             onClick={() => {
               onSelect(summary.id);
             }}
-            leading={
-              <span className="flex size-9 flex-none items-center justify-center rounded-control bg-main-700 text-[11px] font-semibold text-accent-medium">
-                {providerInitials(summary.name, summary.kind)}
-              </span>
-            }
-            trailing={
-              <span className="flex flex-none items-center pt-1.5">
-                <StatusDot tone={statusTone(summary.status)} title={summaryLine(summary)} />
-              </span>
-            }
           >
-            <span className="truncate font-semibold text-main-50">{summary.name}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <StatusDot tone={statusTone(summary.status)} title={summaryLine(summary)} />
+              <span className="flex-1 truncate text-[12.5px] font-medium text-main-50">
+                {summary.name}
+              </span>
+              <Chip>{KIND_LABELS[summary.kind]}</Chip>
+            </span>
             <span
               className={`truncate text-[11px] ${
                 summary.status === "failed"

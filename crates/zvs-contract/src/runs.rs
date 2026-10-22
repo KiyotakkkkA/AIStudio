@@ -551,6 +551,12 @@ pub struct RunListFilter {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "crate::wire::present"
     )]
+    pub subject_id: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
     pub query: Option<String>,
     #[serde(
         default,
@@ -613,6 +619,10 @@ impl Validate for RunListFilter {
             .is_some_and(|kinds| kinds.len() > RunKind::ALL.len())
         {
             return Err(invalid("kinds", "maxLength"));
+        }
+        if let Some(subject_id) = &self.subject_id {
+            check::non_empty("subjectId", subject_id)?;
+            check::max_len("subjectId", subject_id, 128)?;
         }
         if let Some(query) = self.query() {
             check::max_len("query", query, 200)?;

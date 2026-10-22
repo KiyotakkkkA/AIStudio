@@ -48,6 +48,12 @@
     }
   },
   {
+    "name": "empty subject",
+    "value": {
+      "subjectId": ""
+    }
+  },
+  {
     "name": "null live",
     "value": {
       "live": null

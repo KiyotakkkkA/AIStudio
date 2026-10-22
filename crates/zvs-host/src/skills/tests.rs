@@ -1271,3 +1271,182 @@ async fn the_chat_catalogue_lists_usable_skills_with_the_wire_tool_names() {
         "<skills>\n- release-notes: Составляет заметки о выпуске по списку изменений\n</skills>"
     ));
 }
+
+#[test]
+fn the_bundled_skills_install_once_as_ready_skills_with_their_scripts() {
+    let host = host();
+    let library = host.service.library();
+    let installed = library.install_bundled(BUNDLED_SKILLS).expect("installs");
+    assert_eq!(installed, ["pdf", "docx", "xlsx"]);
+    let skills = host.service.list().expect("lists");
+    for bundled in BUNDLED_SKILLS {
+        let skill = skills
+            .iter()
+            .find(|skill| skill.key == bundled.key)
+            .expect("a bundled skill is listed");
+        assert_eq!(skill.source, SkillSource::Bundled);
+        assert_eq!(skill.status, SkillStatus::Ready, "{}", skill.key);
+        assert!(skill.enabled);
+        assert!(!skill.description.is_empty());
+        assert_eq!(skill.file_count, bundled.files.len() as u64);
+        let loaded = library.load(bundled.key).expect("loads");
+        assert!(service::has_scripts(&loaded), "{}", skill.key);
+        assert!(!loaded.instructions.starts_with("---"));
+        for file in bundled.files {
+            assert!(
+                host.workspace
+                    .join(SKILLS_DIR)
+                    .join(bundled.key)
+                    .join(file.path)
+                    .is_file(),
+                "{}",
+                file.path
+            );
+        }
+    }
+    assert!(
+        library
+            .install_bundled(BUNDLED_SKILLS)
+            .expect("installs again")
+            .is_empty()
+    );
+    let pdf = skills
+        .iter()
+        .find(|skill| skill.key == "pdf")
+        .expect("the pdf skill");
+    host.service.remove(&pdf.id).expect("removes");
+    assert!(
+        library
+            .install_bundled(BUNDLED_SKILLS)
+            .expect("installs after a removal")
+            .is_empty()
+    );
+    assert!(
+        host.service
+            .list()
+            .expect("lists")
+            .iter()
+            .all(|skill| skill.key != "pdf")
+    );
+}
+
+#[test]
+fn a_bundled_key_already_taken_by_the_user_is_left_alone() {
+    let host = host();
+    let mine = CreateSkillInput {
+        key: "pdf".to_owned(),
+        ..weather()
+    };
+    host.service.create(&mine).expect("creates");
+    let installed = host
+        .service
+        .library()
+        .install_bundled(BUNDLED_SKILLS)
+        .expect("installs");
+    assert_eq!(installed, ["docx", "xlsx"]);
+    let pdf = host
+        .service
+        .library()
+        .find_by_key("pdf")
+        .expect("finds")
+        .expect("the user's skill");
+    assert_eq!(pdf.source, SkillSource::Local);
+    assert_eq!(pdf.name, "Погода");
+}
+
+#[test]
+fn a_duplicate_copies_the_folder_under_a_free_key() {
+    let host = host();
+    let original = host
+        .service
+        .create(&notes(&["demo.lookup"]))
+        .expect("creates");
+    let first = host
+        .service
+        .duplicate(&original.skill.id)
+        .expect("duplicates");
+    assert_eq!(first.skill.key, "release-notes-copy");
+    assert_eq!(first.skill.name, "Заметки о выпуске (копия)");
+    assert_eq!(first.skill.source, SkillSource::Local);
+    assert_eq!(first.skill.allowed_tools, ["demo.lookup"]);
+    assert_eq!(first.instructions, original.instructions);
+    assert_eq!(first.files, original.files);
+    assert_ne!(first.skill.id, original.skill.id);
+    let second = host
+        .service
+        .duplicate(&original.skill.id)
+        .expect("duplicates again");
+    assert_eq!(second.skill.key, "release-notes-copy-2");
+    let long = CreateSkillInput {
+        key: "a".repeat(64),
+        ..weather()
+    };
+    let saved = host.service.create(&long).expect("creates a long key");
+    let copy = host.service.duplicate(&saved.skill.id).expect("duplicates");
+    assert_eq!(copy.skill.key.len(), 64);
+    assert!(copy.skill.key.ends_with("-copy"));
+}
+
+#[test]
+fn enabling_does_not_rewrite_the_folder_and_works_on_an_invalid_skill() {
+    let host = host();
+    let saved = host
+        .service
+        .create(&notes(&["demo.lookup"]))
+        .expect("creates");
+    host.tools
+        .set_tier(&host.lookup.id.to_string(), ToolTier::Off, "user")
+        .expect("turns the tool off");
+    let manifest = host
+        .workspace
+        .join(SKILLS_DIR)
+        .join("release-notes")
+        .join(SKILL_FILE);
+    let before = fs::metadata(&manifest)
+        .and_then(|metadata| metadata.modified())
+        .expect("a manifest");
+    let disabled = host
+        .service
+        .set_enabled(&saved.skill.id, false)
+        .expect("disables");
+    assert!(!disabled.enabled);
+    assert_eq!(disabled.status, SkillStatus::Invalid);
+    assert_eq!(
+        fs::metadata(&manifest)
+            .and_then(|metadata| metadata.modified())
+            .expect("a manifest"),
+        before
+    );
+    let enabled = host
+        .service
+        .set_enabled(&saved.skill.id, true)
+        .expect("enables");
+    assert!(enabled.enabled);
+}
+
+#[test]
+fn a_file_is_readable_by_id_even_when_the_skill_is_off_and_never_outside_its_folder() {
+    let host = host();
+    let saved = host.service.create(&notes(&[])).expect("creates");
+    host.service
+        .set_enabled(&saved.skill.id, false)
+        .expect("disables");
+    let text = host
+        .service
+        .read_file(&saved.skill.id, "references/style.md")
+        .expect("reads");
+    assert_eq!(text.text.as_deref(), Some("Пишите кратко."));
+    let binary = host
+        .service
+        .read_file(&saved.skill.id, "assets/logo.bin")
+        .expect("reads a binary file");
+    assert_eq!(binary.text, None);
+    assert_eq!(binary.size, 3);
+    for path in ["SKILL.md", "references/../SKILL.md", "references/none.md"] {
+        let error = host
+            .service
+            .read_file(&saved.skill.id, path)
+            .expect_err("refused");
+        assert_eq!(error.code, AppErrorCode::NotFound, "{path}");
+    }
+}

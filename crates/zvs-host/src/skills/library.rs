@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -13,9 +13,12 @@ use zvs_contract::{
     SkillFileEncoding, SkillFileInput, SkillId, SkillIssueDto, SkillIssueRule, SkillModelDto,
     SkillSource, SkillStatus, ToolDto, ToolListFilter, ToolReferenceKind, ToolTier,
     UpdateSkillInput, is_skill_key, is_skill_path,
-    skills::{SKILL_FILE_MAX_BYTES, SKILL_FILES_MAX, SKILL_TOTAL_MAX_BYTES},
+    skills::{
+        SKILL_FILE_MAX_BYTES, SKILL_FILES_MAX, SKILL_KEY_MAX, SKILL_NAME_MAX, SKILL_TOTAL_MAX_BYTES,
+    },
 };
 
+use super::bundled::BundledSkill;
 use super::manifest::{Manifest, SKILL_FILE, parse_manifest, render_manifest};
 use crate::data::schema::SkillRow;
 use crate::data::{Database, Repositories};
@@ -37,6 +40,9 @@ pub const SKILL_IMPORT_NO_MANIFEST: &str = "В выбранной папке н�
 pub const SKILL_EXPORT_TAKEN: &str =
     "В папке назначения уже есть папка с идентификатором этого навыка";
 
+const BUNDLED_MARKER: &str = ".bundled.json";
+const COPY_SUFFIX: &str = "-copy";
+const COPY_NAME_SUFFIX: &str = " (копия)";
 const STAGING_PREFIX: &str = ".staging-";
 const SCRIPTS_PREFIX: &str = "scripts/";
 const TRASH_PREFIX: &str = ".trash-";
@@ -310,6 +316,30 @@ fn status_of(issues: &[SkillIssueDto]) -> SkillStatus {
     } else {
         SkillStatus::Invalid
     }
+}
+
+fn copy_key(key: &str, taken: impl Fn(&str) -> bool) -> String {
+    (1..)
+        .map(|attempt| {
+            let suffix = if attempt == 1 {
+                COPY_SUFFIX.to_owned()
+            } else {
+                format!("{COPY_SUFFIX}-{attempt}")
+            };
+            let base: String = key
+                .chars()
+                .take(SKILL_KEY_MAX.saturating_sub(suffix.len()))
+                .collect();
+            format!("{}{suffix}", base.trim_end_matches('-'))
+        })
+        .find(|candidate| !taken(candidate))
+        .unwrap_or_else(|| key.to_owned())
+}
+
+fn copy_name(name: &str) -> String {
+    let limit = SKILL_NAME_MAX - COPY_NAME_SUFFIX.chars().count();
+    let base: String = js_trim(name).chars().take(limit).collect();
+    format!("{}{COPY_NAME_SUFFIX}", base.trim_end())
 }
 
 fn display_name(manifest: &Manifest, key: &str) -> String {
@@ -891,13 +921,108 @@ impl SkillLibrary {
     }
 
     pub fn set_enabled(&self, id: &SkillId, enabled: bool) -> Result<SkillDto, AppError> {
+        let registered = self.registered()?;
+        let _guard = self
+            .inner
+            .writing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         let row = self.find(&id.to_string())?;
-        let saved = self.save(&SkillRow {
-            enabled,
-            updated_at: self.now(),
-            ..row
-        })?;
-        skill_dto(&saved)
+        let saved = if row.enabled == enabled {
+            row
+        } else {
+            self.save(&SkillRow {
+                enabled,
+                updated_at: self.now(),
+                ..row
+            })?
+        };
+        skill_dto(&self.refresh_with(saved, &registered)?)
+    }
+
+    pub fn duplicate(&self, id: &SkillId) -> Result<SkillDetailDto, AppError> {
+        let _guard = self
+            .inner
+            .writing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let row = self.find(&id.to_string())?;
+        let mut draft = Self::draft_of(&row)?;
+        let taken: HashSet<String> = self.rows()?.into_iter().map(|row| row.key).collect();
+        draft.key = copy_key(&row.key, |candidate| {
+            taken.contains(candidate) || self.inner.root.join(candidate).exists()
+        });
+        draft.name = copy_name(&row.name);
+        draft.source = SkillSource::Local;
+        self.commit(None, draft, true)
+    }
+
+    pub fn install_bundled(&self, bundled: &[BundledSkill]) -> Result<Vec<String>, AppError> {
+        let _guard = self
+            .inner
+            .writing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        fs::create_dir_all(&self.inner.root).map_err(|error| storage(&error))?;
+        let marker = self.inner.root.join(BUNDLED_MARKER);
+        let mut seeded: BTreeSet<String> = fs::read_to_string(&marker)
+            .ok()
+            .and_then(|text| serde_json::from_str(&text).ok())
+            .unwrap_or_default();
+        let mut installed = Vec::new();
+        for skill in bundled {
+            if seeded.contains(skill.key) {
+                continue;
+            }
+            let taken =
+                self.find_key(skill.key)?.is_some() || self.inner.root.join(skill.key).exists();
+            if !taken {
+                let manifest = parse_manifest(skill.manifest)
+                    .map_err(|_| rejected(&[issue("instructions", SkillIssueRule::Manifest)]))?;
+                let files = skill
+                    .files
+                    .iter()
+                    .map(|file| {
+                        (
+                            file.path.to_owned(),
+                            Staged {
+                                field: "files".to_owned(),
+                                size: file.content.len() as u64,
+                                source: Source::Bytes(file.content.as_bytes().to_vec()),
+                            },
+                        )
+                    })
+                    .collect();
+                let draft = Draft {
+                    name: display_name(&manifest, skill.key),
+                    key: skill.key.to_owned(),
+                    description: manifest.description.clone(),
+                    instructions: manifest.instructions.trim().to_owned(),
+                    allowed_tools: unique(manifest.allowed_tools.clone()),
+                    model_override: manifest.model.clone(),
+                    enabled: true,
+                    source: SkillSource::Bundled,
+                    extra: manifest.extra.clone(),
+                    metadata: manifest.metadata.clone(),
+                    files,
+                    issues: Vec::new(),
+                };
+                self.commit(None, draft, true)?;
+                installed.push(skill.key.to_owned());
+            }
+            seeded.insert(skill.key.to_owned());
+        }
+        let text = serde_json::to_string(&seeded).unwrap_or_else(|_| "[]".to_owned());
+        fs::write(&marker, text).map_err(|error| storage(&error))?;
+        if !installed.is_empty() {
+            self.inner.logger.log(
+                LogLevel::Info,
+                "skills",
+                "Installed bundled skills",
+                &[("skills", json!(installed))],
+            );
+        }
+        Ok(installed)
     }
 
     pub fn remove(&self, id: &SkillId) -> Result<(), AppError> {
@@ -1087,17 +1212,39 @@ impl SkillLibrary {
         }
     }
 
+    pub fn read_file(&self, id: &SkillId, path: &str) -> Result<SkillFileContent, AppError> {
+        let row = self.find(&id.to_string())?;
+        let path = js_trim(path);
+        if !is_skill_path(path) {
+            return Err(AppError::new(AppErrorCode::NotFound, SKILL_FILE_NOT_FOUND));
+        }
+        let dir = PathBuf::from(&row.path);
+        let file = path
+            .split('/')
+            .fold(dir.clone(), |file, segment| file.join(segment));
+        match (file.canonicalize(), dir.canonicalize()) {
+            (Ok(file), Ok(dir)) if file.starts_with(&dir) && file.is_file() => {
+                Self::content_of(path, &file)
+            }
+            _ => Err(AppError::new(AppErrorCode::NotFound, SKILL_FILE_NOT_FOUND)),
+        }
+    }
+
     pub fn read(&self, key: &str, path: &str) -> Result<SkillFileContent, AppError> {
         let path = js_trim(path);
         let (_, file) = self.locate(key, path)?;
-        let size = fs::metadata(&file).map_err(|error| storage(&error))?.len();
+        Self::content_of(path, &file)
+    }
+
+    fn content_of(path: &str, file: &Path) -> Result<SkillFileContent, AppError> {
+        let size = fs::metadata(file).map_err(|error| storage(&error))?.len();
         if size > SKILL_FILE_MAX_BYTES {
             return Err(AppError::new(
                 AppErrorCode::LimitExceeded,
                 SKILL_FILE_TOO_LARGE,
             ));
         }
-        let bytes = fs::read(&file).map_err(|error| storage(&error))?;
+        let bytes = fs::read(file).map_err(|error| storage(&error))?;
         let text = String::from_utf8(bytes)
             .ok()
             .filter(|text| !text.contains('\u{0}'));

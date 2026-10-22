@@ -39,6 +39,7 @@ pub struct RunPatch {
 pub struct RunPageQuery {
     pub statuses: Vec<RunStatus>,
     pub kinds: Vec<RunKind>,
+    pub subject_id: Option<String>,
     pub query: Option<String>,
     pub from: Option<Timestamp>,
     pub to: Option<Timestamp>,
@@ -191,6 +192,10 @@ impl<'c> RunRepository<'c> {
                     .iter()
                     .map(|kind| SqlValue::Text(kind.as_str().to_owned())),
             );
+        }
+        if let Some(subject_id) = &query.subject_id {
+            conditions.push("subject_id = ?".to_owned());
+            values.push(SqlValue::Text(subject_id.clone()));
         }
         if query.live {
             conditions.push(format!(
@@ -653,6 +658,7 @@ mod tests {
                 runs.create(&draft("r2", RunStatus::Failed, 20))?;
                 runs.create(&RunDraft {
                     kind: RunKind::Chat,
+                    subject_id: Some("subject".to_owned()),
                     ..draft("r3", RunStatus::Running, 30)
                 })?;
                 let ids =
@@ -672,6 +678,13 @@ mod tests {
                 assert_eq!(
                     ids(runs.page(&RunPageQuery {
                         kinds: vec![RunKind::Chat],
+                        ..query.clone()
+                    })?),
+                    ["r3"]
+                );
+                assert_eq!(
+                    ids(runs.page(&RunPageQuery {
+                        subject_id: Some("subject".to_owned()),
                         ..query.clone()
                     })?),
                     ["r3"]

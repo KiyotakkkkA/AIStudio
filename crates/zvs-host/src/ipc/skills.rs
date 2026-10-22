@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, CreateSkillInput, SkillExportInput, SkillImportInput, SkillRef, SkillRemoveOutput,
-    SkillRunInput, SkillTestInput, UpdateSkillInput,
+    AppError, CreateSkillInput, SetSkillEnabledInput, SkillExportInput, SkillFileRef,
+    SkillImportInput, SkillRef, SkillRemoveOutput, SkillRunInput, SkillTestInput, UpdateSkillInput,
 };
 
 use super::IpcServer;
@@ -39,6 +39,24 @@ pub fn register(server: &mut IpcServer) {
                     id: input.id,
                     removed: true,
                 })
+            },
+        )
+        .handle(
+            "skills.setEnabled",
+            |services: Arc<Services>, input: SetSkillEnabledInput| async move {
+                services.skills.set_enabled(&input.id, input.enabled)
+            },
+        )
+        .handle(
+            "skills.duplicate",
+            |services: Arc<Services>, input: SkillRef| async move {
+                services.skills.duplicate(&input.id)
+            },
+        )
+        .handle(
+            "skills.readFile",
+            |services: Arc<Services>, input: SkillFileRef| async move {
+                services.skills.read_file(&input.id, &input.path)
             },
         )
         .handle(

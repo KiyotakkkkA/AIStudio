@@ -8,6 +8,7 @@
     "value": {
       "statuses": ["failed", "running"],
       "kinds": ["job"],
+      "subjectId": "0b7c2f1e-4d3a-4c55-9e1b-2a6f8d9c0e11",
       "query": "index",
       "from": 0,
       "to": 10,

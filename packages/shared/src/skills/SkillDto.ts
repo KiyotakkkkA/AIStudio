@@ -20,7 +20,7 @@ export const DEFAULT_SKILL_CATALOGUE_LIMIT = 20;
 export const SKILL_CATALOGUE_MAX = 200;
 export const SKILL_TRIGGER_KEY = "skills.trigger";
 
-export const SkillSource = z.enum(["local", "imported"]);
+export const SkillSource = z.enum(["local", "imported", "bundled"]);
 export type SkillSource = z.infer<typeof SkillSource>;
 
 export const SkillStatus = z.enum(["ready", "invalid"]);
@@ -120,6 +120,22 @@ export type SkillDetailDto = z.infer<typeof SkillDetailDto>;
 
 export const SkillRef = z.object({ id: SkillId });
 export type SkillRef = z.infer<typeof SkillRef>;
+
+export const SkillFileRef = z.object({
+  id: SkillId,
+  path: z.string().min(1).max(SKILL_PATH_MAX),
+});
+export type SkillFileRef = z.infer<typeof SkillFileRef>;
+
+export const SkillFileContentDto = z.object({
+  path: z.string().max(SKILL_PATH_MAX),
+  size: z.number().int().nonnegative(),
+  text: z.string().nullable(),
+});
+export type SkillFileContentDto = z.infer<typeof SkillFileContentDto>;
+
+export const SetSkillEnabledInput = z.object({ id: SkillId, enabled: z.boolean() });
+export type SetSkillEnabledInput = z.infer<typeof SetSkillEnabledInput>;
 
 export const SkillFileInput = z.object({
   path: z.string().max(SKILL_PATH_MAX),

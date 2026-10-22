@@ -64,8 +64,8 @@ use zvs_host::services::{
     VectorSourceService, VectorSourceServiceOptions, VectorStoreService, VectorStoreServiceOptions,
 };
 use zvs_host::skills::{
-    SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillScriptOptions, SkillService,
-    SkillServiceOptions, register_skill_nodes,
+    BUNDLED_SKILLS, SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillScriptOptions,
+    SkillService, SkillServiceOptions, register_skill_nodes,
 };
 use zvs_host::toolchain::{
     ToolchainResolver, ToolchainResolverOptions, ToolchainService, ToolchainServiceOptions,
@@ -615,6 +615,14 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         ),
     )?;
     register_kernel_tools(&nodes, &tools)?;
+    if let Err(error) = skill_library.install_bundled(BUNDLED_SKILLS) {
+        logger.log(
+            LogLevel::Warn,
+            "skills",
+            "Could not install the bundled skills",
+            &[("error", json!(error.message))],
+        );
+    }
     let mcp = McpService::new(McpServiceOptions {
         logger: logger.clone(),
         clock: clock.clone(),

@@ -7,6 +7,7 @@ import { RunSummaryDto } from "./RunSummaryDto.js";
 export const RunListFilter = z.object({
   statuses: z.array(RunStatus).max(RunStatus.options.length).optional(),
   kinds: z.array(RunKind).max(RunKind.options.length).optional(),
+  subjectId: z.string().min(1).max(128).optional(),
   query: z.string().trim().max(200).optional(),
   from: Timestamp.optional(),
   to: Timestamp.optional(),

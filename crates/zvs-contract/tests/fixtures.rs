@@ -677,6 +677,18 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::skills::SkillRef>,
     ),
     (
+        "skills/SkillFileRef",
+        round_trip::<zvs_contract::skills::SkillFileRef>,
+    ),
+    (
+        "skills/SkillFileContentDto",
+        round_trip::<zvs_contract::skills::SkillFileContentDto>,
+    ),
+    (
+        "skills/SetSkillEnabledInput",
+        round_trip::<zvs_contract::skills::SetSkillEnabledInput>,
+    ),
+    (
         "skills/SkillFileInput",
         round_trip::<zvs_contract::skills::SkillFileInput>,
     ),

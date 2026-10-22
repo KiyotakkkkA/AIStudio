@@ -459,3 +459,24 @@ test("states cover never connected, connected, re-auth, disabled and crashed-and
     "handshake ok · 128 ms · protocol 2025-06-18 · server v0.8.1",
   );
 });
+
+test("the server search matches name, namespace and command, ignoring case", () => {
+  const { store } = fakeHost();
+  store.servers = [
+    server(),
+    server({ id: OTHER, name: "github", namespace: "github", command: "npx", url: null }),
+  ];
+  assert.equal(store.visibleServers.length, 2);
+  store.setQuery("  QDRANT ");
+  assert.deepEqual(
+    store.visibleServers.map((entry) => entry.id),
+    [SERVER],
+  );
+  store.setQuery("npx");
+  assert.deepEqual(
+    store.visibleServers.map((entry) => entry.id),
+    [OTHER],
+  );
+  store.setQuery("nothing");
+  assert.deepEqual(store.visibleServers, []);
+});

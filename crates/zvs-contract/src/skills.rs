@@ -9,6 +9,7 @@ use crate::validate::{Validate, check, invalid, js_trim, nested, no_refinements}
 wire_enum!(SkillSource {
     Local => "local",
     Imported => "imported",
+    Bundled => "bundled",
 });
 
 wire_enum!(SkillStatus {
@@ -195,6 +196,43 @@ impl Validate for SkillDetailDto {
 #[serde(rename_all = "camelCase")]
 pub struct SkillRef {
     pub id: SkillId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillFileRef {
+    pub id: SkillId,
+    pub path: String,
+}
+
+impl Validate for SkillFileRef {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("path", &self.path)?;
+        check::max_len("path", &self.path, SKILL_PATH_MAX)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillFileContentDto {
+    pub path: String,
+    pub size: u64,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub text: Option<String>,
+}
+
+impl Validate for SkillFileContentDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::max_len("path", &self.path, SKILL_PATH_MAX)?;
+        check::safe_integer("size", self.size)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetSkillEnabledInput {
+    pub id: SkillId,
+    pub enabled: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -617,7 +655,7 @@ impl Validate for SkillTriggerSettingsDto {
     }
 }
 
-no_refinements!(SkillRef);
+no_refinements!(SkillRef, SetSkillEnabledInput);
 
 #[cfg(test)]
 mod tests {

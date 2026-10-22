@@ -29,6 +29,7 @@ pub const SCRIPT_SCRATCH_FAILED: &str = "Не удалось подготови�
 
 pub const SKILL_DIR_ENV: &str = "ZVS_SKILL_DIR";
 pub const SCRATCH_DIR_ENV: &str = "ZVS_SCRATCH_DIR";
+pub const PYTHON_UTF8_ENV: &[(&str, &str)] = &[("PYTHONUTF8", "1"), ("PYTHONIOENCODING", "utf-8")];
 pub const SCRIPT_TIMEOUT: Duration = Duration::from_secs(120);
 pub const SCRIPT_OUTPUT_BYTES: usize = 64 * 1024;
 pub const SCRATCH_KEEP: usize = 16;
@@ -306,6 +307,13 @@ impl NodeDef for SkillScriptNode {
             SCRATCH_DIR_ENV.to_owned(),
             scratch.to_string_lossy().into_owned(),
         );
+        if runtime == ScriptRuntime::Python {
+            for (name, value) in PYTHON_UTF8_ENV {
+                spec.env
+                    .entry((*name).to_owned())
+                    .or_insert_with(|| (*value).to_owned());
+            }
+        }
         spec.cwd = Some(scratch);
         context.check_cancelled()?;
         let mut child = default_spawn(&spec).map_err(|error| {

@@ -89,16 +89,6 @@ export function secretsForKind(
   return secrets.filter((secret) => allowed.includes(secret.type));
 }
 
-export function providerInitials(name: string, kind: ProviderKind): string {
-  const words = name
-    .split(/[\s\-_.]+/u)
-    .map((word) => word.replace(/[^\p{L}\p{N}]/gu, ""))
-    .filter((word) => word.length > 0);
-  if (words.length >= 2) return `${first(words[0])}${first(words[1])}`.toUpperCase();
-  const single = words[0] ?? kind;
-  return single.slice(0, 2).toUpperCase();
-}
-
 export function statusTone(status: ProviderStatus): StatusTone {
   switch (status) {
     case "ok":
@@ -219,8 +209,4 @@ export function sizeLabel(bytes: number): string {
   if (gb >= 1) return `${String(Math.round(gb))} ГБ`;
   const mb = bytes / 1024 ** 2;
   return `${String(Math.round(mb))} МБ`;
-}
-
-function first(word: string | undefined): string {
-  return word === undefined ? "" : word.slice(0, 1);
 }
