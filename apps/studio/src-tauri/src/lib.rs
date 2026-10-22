@@ -67,6 +67,9 @@ use zvs_host::skills::{
     SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillService, SkillServiceOptions,
     register_skill_nodes,
 };
+use zvs_host::toolchain::{
+    ToolchainResolver, ToolchainResolverOptions, ToolchainService, ToolchainServiceOptions,
+};
 use zvs_host::tools::{ToolInvoker, ToolRegistry, ToolRegistryOptions, register_kernel_tools};
 use zvs_host::{IpcServer, ipc};
 
@@ -537,7 +540,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         downloads_dir: paths.downloads_dir.clone(),
         device: Some(device.clone()),
         resolver: ReleaseResolver::new(ReleaseResolverOptions::new(
-            http,
+            http.clone(),
             clock.clone(),
             logger.clone(),
         )),
@@ -551,6 +554,24 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     });
     downloads.attach_installer(Arc::new(runtimes.clone()));
     catalogue.add_provider(runtimes.catalogue_provider());
+    let picker: SharedPicker = Arc::new(DialogPicker::new(app.handle().clone()));
+    let toolchain = ToolchainService::new(ToolchainServiceOptions {
+        picker: Some(Arc::clone(&picker)),
+        ..ToolchainServiceOptions::new(
+            paths.data_dir.join(TOOLCHAIN_DIR),
+            settings.clone(),
+            Arc::new(downloads.clone()),
+            Arc::new(catalogue.clone()),
+            ToolchainResolver::new(ToolchainResolverOptions::new(
+                http.clone(),
+                clock.clone(),
+                logger.clone(),
+            )),
+            logger.clone(),
+        )
+    });
+    downloads.attach_installer(Arc::new(toolchain.clone()));
+    catalogue.add_provider(toolchain.catalogue_provider());
     registry.attach_local_engine(Arc::new(runtimes.clone()));
     vector_stores.attach_rerankers(local_rerankers(Arc::new(runtimes.clone())));
     let documents = DocumentExtractorOptions {
@@ -592,6 +613,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         clock: clock.clone(),
         client_version: app.package_info().version.to_string(),
         toolchain_dir: Some(paths.data_dir.join(TOOLCHAIN_DIR)),
+        toolchain: Some(Arc::new(toolchain.clone())),
         runtime: Some(runtime.clone()),
         opener: Some(zvs_host::platform::external::system_url_opener()),
         ..McpServiceOptions::new(
@@ -617,7 +639,6 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         tools: Some(tools.clone()),
         ..RunServiceOptions::new(Arc::clone(&database), events.clone(), Arc::clone(&nodes))
     })?;
-    let picker: SharedPicker = Arc::new(DialogPicker::new(app.handle().clone()));
     let skills = SkillService::new(SkillServiceOptions {
         drivers: Some(registry.clone() as Arc<dyn DriverSource>),
         settings: Some(settings.clone()),
@@ -741,6 +762,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         runs,
         downloads,
         runtimes,
+        toolchain,
         tools,
         tool_invoker,
         mcp,

@@ -15,6 +15,7 @@ import {
   shortChecksum,
   STATUS_LABELS,
 } from "./downloadPresentation";
+import { isToolchainRef } from "../toolchain/toolchainPresentation";
 
 export default observer(function DownloadDetailRail({ store }: { readonly store: DownloadStore }) {
   const item = store.selectedItem;
@@ -48,7 +49,12 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
   return (
     <aside aria-label="Детали загрузки" className="flex w-78.5 flex-none flex-col bg-main-800">
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 p-3.5">
-        {item?.kind === "runtime" && store.runtimes !== null ? (
+        {item?.kind === "runtime" && isToolchainRef(item.ref) && store.runtimeError !== null ? (
+          <span role="alert" className="text-[11px] text-err">
+            {store.runtimeError}
+          </span>
+        ) : null}
+        {item?.kind === "runtime" && !isToolchainRef(item.ref) && store.runtimes !== null ? (
           <div className="flex flex-col gap-1 rounded-card bg-main-900 shadow-card px-3 py-2.5">
             <span className="text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
               Эта машина

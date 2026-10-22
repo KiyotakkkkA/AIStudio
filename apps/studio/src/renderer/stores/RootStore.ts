@@ -13,6 +13,7 @@ import TaskStore from "../features/tasks/TaskStore";
 import RunHistoryStore from "../features/tasks/RunHistoryStore";
 import ConnectionStore from "../features/connections/ConnectionStore";
 import ToolStore from "../features/tools/ToolStore";
+import ToolchainStore from "../features/toolchain/ToolchainStore";
 
 export interface RootStoreEnvironment {
   readonly ipc: IpcClient<Contract>;
@@ -31,6 +32,7 @@ export class RootStore {
   readonly runs: RunHistoryStore;
   readonly connections: ConnectionStore;
   readonly tools: ToolStore;
+  readonly toolchain: ToolchainStore;
 
   constructor(private readonly environment: RootStoreEnvironment) {
     this.ui = new UiStore(environment.ipc);
@@ -44,6 +46,7 @@ export class RootStore {
     this.runs = new RunHistoryStore(environment.ipc);
     this.connections = new ConnectionStore(environment.ipc);
     this.tools = new ToolStore(environment.ipc);
+    this.toolchain = new ToolchainStore(environment.ipc, environment.events);
     makeAutoObservable<RootStore, "environment">(
       this,
       {
@@ -59,6 +62,7 @@ export class RootStore {
         runs: false,
         connections: false,
         tools: false,
+        toolchain: false,
       },
       { autoBind: true },
     );
@@ -85,6 +89,7 @@ export class RootStore {
     this.runs.dispose();
     this.connections.dispose();
     this.tools.dispose();
+    this.toolchain.dispose();
     this.environment.events.dispose();
   }
 }

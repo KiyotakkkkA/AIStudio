@@ -11,6 +11,7 @@ import {
   STATE_LABELS,
   STATE_TONES,
 } from "./downloadPresentation";
+import { isToolchainRef, removalCopy } from "../toolchain/toolchainPresentation";
 
 export interface CatalogueRowProps {
   readonly item: CatalogueItemDto;
@@ -99,8 +100,9 @@ export default function CatalogueRow({
           needConfirm
           modalSetup={{
             title: `Удалить «${item.displayName}»?`,
-            content:
-              item.kind === "runtime"
+            content: isToolchainRef(item.ref)
+              ? removalCopy(item.displayName)
+              : item.kind === "runtime"
                 ? "Распакованная сборка движка будет удалена с диска. Хранилища, настроенные на этот движок, не смогут вычислять локальные эмбеддинги до установки другого движка."
                 : "Файл будет удалён с диска. Повторная загрузка доступна в каталоге.",
             confirmLabel: "Удалить",

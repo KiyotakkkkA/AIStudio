@@ -20,6 +20,7 @@ pub mod secrets;
 pub mod settings;
 pub mod skills;
 pub mod system;
+pub mod toolchain;
 pub mod tools;
 pub mod validate;
 pub mod vector_stores;
@@ -121,6 +122,10 @@ pub use system::{
     DeviceGpuDto, DeviceProfileDto, DeviceTier, ResourceSampleDto, SystemDemoJobInput,
     SystemDemoStreamInput, SystemDemoStreamOutput, SystemDeviceInput, SystemNativePingInput,
     SystemNativePingOutput, SystemPingInput, SystemPingOutput,
+};
+pub use toolchain::{
+    ToolchainDto, ToolchainListInput, ToolchainRef, ToolchainRuntime, ToolchainSelectInput,
+    ToolchainSource, ToolchainStatus,
 };
 pub use tools::{
     SetToolEnabledInput, SetToolTierInput, ToolDefaultTier, ToolDefaultsDto, ToolDetailDto,

@@ -1,0 +1,59 @@
+[
+  {
+    "name": "a managed copy with an update",
+    "value": {
+      "runtime": "node",
+      "displayName": "Node.js",
+      "status": "ready",
+      "source": "managed",
+      "version": "22.11.0",
+      "executablePath": "C:/Users/user/AppData/Roaming/zvs-ai-studio/mcp-toolchain/node/22.11.0/node-v22.11.0-win-x64/node.exe",
+      "minimumVersion": "18.0.0",
+      "latestVersion": "22.21.0",
+      "updateAvailable": true,
+      "managedVersions": ["22.11.0"],
+      "refs": []
+    }
+  },
+  {
+    "name": "nothing connected",
+    "value": {
+      "runtime": "uv",
+      "displayName": "uv",
+      "status": "missing",
+      "minimumVersion": "0.4.0",
+      "updateAvailable": false,
+      "managedVersions": [],
+      "refs": []
+    }
+  },
+  {
+    "name": "a download in flight",
+    "value": {
+      "runtime": "uv",
+      "displayName": "uv",
+      "status": "installing",
+      "minimumVersion": "0.4.0",
+      "latestVersion": "0.9.5",
+      "updateAvailable": false,
+      "managedVersions": [],
+      "refs": ["toolchain:uv:0.9.5:uv-x86_64-pc-windows-msvc.zip"]
+    }
+  },
+  {
+    "name": "a manual copy that disappeared",
+    "value": {
+      "runtime": "node",
+      "displayName": "Node.js",
+      "status": "broken",
+      "source": "manual",
+      "version": "20.18.0",
+      "executablePath": "D:/tools/node/node.exe",
+      "minimumVersion": "18.0.0",
+      "updateAvailable": false,
+      "managedVersions": [],
+      "problem": "Исполняемый файл не найден: D:/tools/node/node.exe",
+      "refs": []
+    }
+  }
+]

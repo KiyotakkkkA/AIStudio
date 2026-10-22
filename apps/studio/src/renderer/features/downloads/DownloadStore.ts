@@ -12,9 +12,11 @@ import {
   type Json,
   type RuntimeOverviewDto,
   type StreamId,
+  type ToolchainRuntime,
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import { estimateEta, smoothRate, type RateState } from "../progressRate";
+import { toolchainErrorCopy, toolchainRuntimeOf } from "../toolchain/toolchainPresentation";
 
 const CONCURRENCY_KEY = "downloads.concurrency";
 const OPTIONS_KEY = "downloads.options";
@@ -250,17 +252,31 @@ export default class DownloadStore {
    * resolve-then-download that the host owns.
    */
   install(item: CatalogueItemDto) {
+    const toolchain = toolchainOf(item);
+    if (toolchain !== undefined) {
+      return this.toolchainAction(
+        toolchain,
+        item.state === "update" ? "toolchain.update" : "toolchain.install",
+      );
+    }
     const runtimeId = runtimeIdOf(item);
     return runtimeId === undefined ? this.start(item.ref) : this.installRuntime(runtimeId);
   }
 
   /** True when this row has something on disk that pressing Remove would actually delete. */
   isRemovable(item: CatalogueItemDto): boolean {
+    if (toolchainOf(item) !== undefined)
+      return item.state === "installed" || item.state === "update";
     if (runtimeIdOf(item) !== undefined) return item.state === "installed";
     return this.installedId(item.ref) !== undefined;
   }
 
   async uninstall(item: CatalogueItemDto) {
+    const toolchain = toolchainOf(item);
+    if (toolchain !== undefined) {
+      await this.toolchainAction(toolchain, "toolchain.remove");
+      return;
+    }
     const runtimeId = runtimeIdOf(item);
     if (runtimeId === undefined) {
       const id = this.installedId(item.ref);
@@ -295,6 +311,29 @@ export default class DownloadStore {
     } catch (error) {
       runInAction(() => {
         this.runtimeError = copy(error, "Не удалось установить движок.");
+      });
+      return false;
+    } finally {
+      runInAction(() => {
+        this.runtimeBusyId = null;
+      });
+    }
+  }
+
+  async toolchainAction(
+    runtime: ToolchainRuntime,
+    channel: "toolchain.install" | "toolchain.update" | "toolchain.remove",
+  ) {
+    if (this.runtimeBusyId !== null) return false;
+    this.runtimeBusyId = `toolchain:${runtime}`;
+    this.runtimeError = null;
+    try {
+      await this.ipc.call(channel, { runtime });
+      await this.load();
+      return true;
+    } catch (error) {
+      runInAction(() => {
+        this.runtimeError = toolchainErrorCopy(error);
       });
       return false;
     } finally {
@@ -484,6 +523,10 @@ function readStoredOptions(value: unknown): Record<string, PostDownloadOptions> 
 
 function copy(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+function toolchainOf(item: CatalogueItemDto): ToolchainRuntime | undefined {
+  return item.kind === "runtime" ? toolchainRuntimeOf(item.ref) : undefined;
 }
 
 /** A runtime row is a catalogue row whose ref names an engine build rather than a file. */

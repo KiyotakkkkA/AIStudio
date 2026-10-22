@@ -11,6 +11,7 @@ pub mod platform;
 pub mod runtimes;
 pub mod services;
 pub mod skills;
+pub mod toolchain;
 pub mod tools;
 
 #[cfg(any(test, feature = "testing"))]

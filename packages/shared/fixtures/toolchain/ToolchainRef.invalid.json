@@ -1,0 +1,12 @@
+[
+  {
+    "name": "no runtime",
+    "value": {}
+  },
+  {
+    "name": "an unknown runtime",
+    "value": {
+      "runtime": "deno"
+    }
+  }
+]

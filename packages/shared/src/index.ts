@@ -23,6 +23,7 @@ export * from "./mcp/index.js";
 export * from "./skills/index.js";
 export * from "./downloads/index.js";
 export * from "./runtimes/index.js";
+export * from "./toolchain/index.js";
 export * from "./runs/RunDto.js";
 export * from "./runs/RunSummaryDto.js";
 export * from "./runs/RunListFilter.js";

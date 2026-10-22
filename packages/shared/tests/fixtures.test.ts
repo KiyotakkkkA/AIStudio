@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import * as skills from "../src/skills/index.js";
+import * as toolchain from "../src/toolchain/index.js";
 import {
   AccountDto,
   ChatCitationDto,
@@ -321,6 +322,13 @@ const schemas: Record<string, z.ZodType> = {
   "runtimes/InstallRuntimeInput": contract["runtimes.install"].input,
   "runtimes/RuntimesStopOutput": contract["runtimes.stop"].output,
   "runtimes/RuntimesRemoveOutput": contract["runtimes.remove"].output,
+  "toolchain/ToolchainRuntime": toolchain.ToolchainRuntime,
+  "toolchain/ToolchainSource": toolchain.ToolchainSource,
+  "toolchain/ToolchainStatus": toolchain.ToolchainStatus,
+  "toolchain/ToolchainDto": toolchain.ToolchainDto,
+  "toolchain/ToolchainListInput": contract["toolchain.list"].input,
+  "toolchain/ToolchainRef": contract["toolchain.install"].input,
+  "toolchain/ToolchainSelectInput": contract["toolchain.select"].input,
   "chat/ChatSettings": ChatSettings,
   "chat/ChatCitationDto": ChatCitationDto,
   "chat/ChatToolCallStatus": ChatToolCallStatus,

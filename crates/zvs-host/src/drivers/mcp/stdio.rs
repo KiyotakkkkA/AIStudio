@@ -1,6 +1,4 @@
-use std::collections::BTreeMap;
 use std::future::Future;
-use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -16,19 +14,12 @@ use zvs_contract::validate::js_slice;
 use zvs_contract::{AppError, AppErrorCode, McpLogLevel};
 
 use super::transport::{MAX_MESSAGE_BYTES, STOPPED, TransportHooks, decode_text};
+pub use crate::toolchain::LaunchSpec;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const CLOSE_GRACE: Duration = Duration::from_secs(2);
 pub const NOT_RUNNING: &str = "MCP-сервер не запущен";
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LaunchSpec {
-    pub command: String,
-    pub args: Vec<String>,
-    pub env: BTreeMap<String, String>,
-    pub cwd: Option<PathBuf>,
-}
 
 pub type SpawnServer = Arc<dyn Fn(&LaunchSpec) -> std::io::Result<Child> + Send + Sync>;
 

@@ -195,6 +195,7 @@ pub struct TestServices {
     pub account_events: Arc<MemorySink>,
     pub core: Arc<InProcessCore>,
     pub picker: Arc<FakePicker>,
+    pub toolchain_probe: Arc<FakeProbe>,
     pub nodes: Arc<NodeRegistry>,
     pub run_events: Arc<MemorySink>,
     pub jobs: Arc<FakeJobs>,
@@ -356,13 +357,42 @@ pub fn test_services(system: SystemService) -> TestServices {
             url: "http://127.0.0.1:9/releases".to_owned(),
             ..ReleaseResolverOptions::new(local_http.clone(), clock.clone(), silent_logger())
         }),
-        http: local_http,
+        http: local_http.clone(),
         logger: silent_logger(),
         create_server: None,
         context_size: None,
     });
     downloads.attach_installer(Arc::new(runtimes.clone()));
     catalogue.add_provider(runtimes.catalogue_provider());
+    let picker = FakePicker::shared();
+    let toolchain_probe = FakeProbe::shared();
+    let toolchain =
+        crate::toolchain::ToolchainService::new(crate::toolchain::ToolchainServiceOptions {
+            probe: toolchain_probe.clone(),
+            picker: Some(picker.clone()),
+            path_env: Some(std::ffi::OsString::new()),
+            ..crate::toolchain::ToolchainServiceOptions::new(
+                workspace.join("mcp-toolchain"),
+                settings.clone(),
+                Arc::new(downloads.clone()),
+                Arc::new(catalogue.clone()),
+                crate::toolchain::ToolchainResolver::new(
+                    crate::toolchain::ToolchainResolverOptions {
+                        node_index_url: "http://127.0.0.1:9/index.json".to_owned(),
+                        node_dist_url: "http://127.0.0.1:9/dist".to_owned(),
+                        uv_releases_url: "http://127.0.0.1:9/releases".to_owned(),
+                        ..crate::toolchain::ToolchainResolverOptions::new(
+                            local_http.clone(),
+                            clock.clone(),
+                            silent_logger(),
+                        )
+                    },
+                ),
+                silent_logger(),
+            )
+        });
+    downloads.attach_installer(Arc::new(toolchain.clone()));
+    catalogue.add_provider(toolchain.catalogue_provider());
     crate::kernel::register_download_nodes(&nodes).expect("registers the download nodes");
     nodes
         .register(crate::kernel::nodes::VectorIndexNode)
@@ -414,7 +444,6 @@ pub fn test_services(system: SystemService) -> TestServices {
             reqwest::Client::new(),
         )
     });
-    let picker = FakePicker::shared();
     let skills = crate::skills::SkillService::new(crate::skills::SkillServiceOptions {
         drivers: Some(drivers.clone()),
         settings: Some(settings.clone()),
@@ -449,6 +478,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             runs,
             downloads,
             runtimes,
+            toolchain,
             tools,
             tool_invoker,
             mcp,
@@ -473,6 +503,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         account_events,
         core,
         picker,
+        toolchain_probe,
         database,
     }
 }
@@ -577,6 +608,37 @@ impl crate::platform::picker::PickerPort for FakePicker {
         let mut state = self.0.lock().unwrap_or_else(PoisonError::into_inner);
         state.1.push(kind);
         Ok(state.0.clone())
+    }
+}
+
+#[derive(Default)]
+pub struct FakeProbe(Mutex<Vec<PathBuf>>);
+
+impl FakeProbe {
+    pub fn shared() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn probed(&self) -> Vec<PathBuf> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::toolchain::VersionProbe for FakeProbe {
+    async fn run(&self, executable: &Path) -> Result<String, String> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(executable.to_path_buf());
+        let text = std::fs::read_to_string(executable).map_err(|error| error.to_string())?;
+        match text.strip_prefix("fail:") {
+            Some(reason) => Err(reason.trim().to_owned()),
+            None => Ok(text.trim().to_owned()),
+        }
     }
 }
 

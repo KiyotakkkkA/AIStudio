@@ -60,6 +60,7 @@ use crate::platform::picker::SharedPicker;
 use crate::platform::theme::SharedThemePort;
 use crate::runtimes::RuntimeService;
 use crate::skills::SkillService;
+use crate::toolchain::ToolchainService;
 use crate::tools::{ToolInvoker, ToolRegistry};
 
 pub struct Services {
@@ -78,6 +79,7 @@ pub struct Services {
     pub runs: RunService,
     pub downloads: DownloadService,
     pub runtimes: RuntimeService,
+    pub toolchain: ToolchainService,
     pub tools: ToolRegistry,
     pub tool_invoker: ToolInvoker,
     pub mcp: McpService,

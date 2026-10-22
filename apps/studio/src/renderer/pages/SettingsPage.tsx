@@ -1,22 +1,34 @@
 import { mdiTuneVariant } from "@mdi/js";
+import { useState } from "react";
 import HostCheck from "../features/diagnostics/HostCheck";
-import PagePlaceholder from "../ui/molecules/PagePlaceholder";
+import EnvironmentTab from "../features/toolchain/EnvironmentTab";
+import SegmentedControl from "../ui/atoms/SegmentedControl";
 import PageShell from "../ui/templates/PageShell";
 
+const TABS = [{ value: "environment", label: "Окружение" }] as const;
+
+type TabValue = (typeof TABS)[number]["value"];
+
 export default function SettingsPage() {
+  const [tab, setTab] = useState<TabValue>("environment");
+
   return (
     <PageShell
       icon={mdiTuneVariant}
       title="Настройки"
-      subtitle="Конфигурация приложения, пути и обслуживание"
+      subtitle="Конфигурация приложения"
+      toolbar={
+        <SegmentedControl
+          label="Раздел настроек"
+          value={tab}
+          options={TABS}
+          onChange={setTab}
+          ghost={true}
+        />
+      }
     >
+      {tab === "environment" ? <EnvironmentTab /> : null}
       <HostCheck />
-      <PagePlaceholder
-        icon={mdiTuneVariant}
-        title="Настройки ещё не подключены"
-        description="Разделы конфигурации, пути хранения и обслуживание базы появятся здесь."
-        task="TASK_052"
-      />
     </PageShell>
   );
 }

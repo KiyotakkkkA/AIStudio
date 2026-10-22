@@ -1,0 +1,8 @@
+[
+  {
+    "name": "a string flag",
+    "value": {
+      "checkUpdates": "yes"
+    }
+  }
+]

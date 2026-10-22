@@ -960,6 +960,94 @@ async fn stdio_servers_get_the_isolated_toolchain_env_and_a_servers_own_env_wins
     assert_eq!(seen[0]["UV_CACHE_DIR"], "D:/mine");
 }
 
+struct FakeLauncher;
+
+impl CommandLauncher for FakeLauncher {
+    fn launch_command(
+        &self,
+        command: &str,
+        args: &[String],
+    ) -> Option<Result<LaunchSpec, AppError>> {
+        match command {
+            "npx" => Some(Ok(LaunchSpec {
+                command: "C:/toolchain/node/22.11.0/npx.cmd".to_owned(),
+                args: args.to_vec(),
+                env: BTreeMap::from([
+                    ("PATH".to_owned(), "C:/toolchain/node/22.11.0".to_owned()),
+                    (
+                        "UV_CACHE_DIR".to_owned(),
+                        "C:/toolchain/uv/cache".to_owned(),
+                    ),
+                ]),
+                cwd: None,
+            })),
+            "uvx" => Some(Err(AppError::new(
+                AppErrorCode::NotFound,
+                crate::toolchain::service::SETTINGS_HINT,
+            )
+            .with_detail("runtime", "uv"))),
+            _ => None,
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn runtime_commands_launch_through_the_toolchain_and_a_missing_one_never_spawns() {
+    let mut host = host();
+    let seen: Arc<Mutex<Vec<LaunchSpec>>> = Arc::default();
+    let recorder = Arc::clone(&seen);
+    host.mcp = McpService::new(McpServiceOptions {
+        toolchain_dir: Some(PathBuf::from("C:").join("data").join("mcp-toolchain")),
+        toolchain: Some(Arc::new(FakeLauncher)),
+        spawn: Some(Arc::new(move |spec: &LaunchSpec| {
+            recorder.lock().expect("seen").push(spec.clone());
+            Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "spawn ENOENT",
+            ))
+        })),
+        ..options(&host)
+    });
+    let npx = host.create(&CreateMcpServerInput {
+        command: Some(Some("npx".to_owned())),
+        args: Some(vec!["-y".to_owned(), "server-memory".to_owned()]),
+        env: Some(BTreeMap::from([(
+            "UV_CACHE_DIR".to_owned(),
+            McpValue::literal("D:/mine"),
+        )])),
+        ..CreateMcpServerInput::new("npx", McpTransport::Stdio)
+    });
+    host.mcp.test(&npx).await.expect("tests");
+    let spawned = seen.lock().expect("seen").clone();
+    assert_eq!(spawned.len(), 1);
+    assert_eq!(spawned[0].command, "C:/toolchain/node/22.11.0/npx.cmd");
+    assert_eq!(spawned[0].args, ["-y", "server-memory"]);
+    assert_eq!(spawned[0].env["PATH"], "C:/toolchain/node/22.11.0");
+    assert_eq!(spawned[0].env["UV_CACHE_DIR"], "D:/mine");
+
+    let uvx = host.create(&CreateMcpServerInput {
+        command: Some(Some("uvx".to_owned())),
+        ..CreateMcpServerInput::new("uvx", McpTransport::Stdio)
+    });
+    let result = host.mcp.test(&uvx).await.expect("tests");
+    assert!(!result.ok);
+    assert_eq!(
+        result.error.as_deref(),
+        Some(crate::toolchain::service::SETTINGS_HINT)
+    );
+    assert_eq!(seen.lock().expect("seen").len(), 1);
+
+    let other = host.create(&CreateMcpServerInput {
+        command: Some(Some("python".to_owned())),
+        ..CreateMcpServerInput::new("python", McpTransport::Stdio)
+    });
+    host.mcp.test(&other).await.expect("tests");
+    let spawned = seen.lock().expect("seen").clone();
+    assert_eq!(spawned[1].command, "python");
+    assert!(spawned[1].env["npm_config_cache"].contains("mcp-toolchain"));
+    assert!(!spawned[1].env.contains_key("PATH"));
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn servers_configured_for_launch_come_up_and_one_bad_server_never_blocks_the_rest() {
     let host = host();

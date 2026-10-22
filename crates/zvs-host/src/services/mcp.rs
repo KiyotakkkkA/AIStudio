@@ -39,6 +39,7 @@ use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 use crate::services::SecretService;
 use crate::services::crypto::Plaintext;
+use crate::toolchain::CommandLauncher;
 use crate::tools::{ToolDescriptor, ToolRegistry};
 
 pub const DAY_MS: Timestamp = 24 * 60 * 60 * 1000;
@@ -72,6 +73,7 @@ pub struct McpServiceOptions {
     pub max_restarts: u64,
     pub client_version: String,
     pub toolchain_dir: Option<PathBuf>,
+    pub toolchain: Option<Arc<dyn CommandLauncher>>,
     pub runtime: Option<Handle>,
     pub opener: Option<UrlOpener>,
     pub client_name: String,
@@ -102,6 +104,7 @@ impl McpServiceOptions {
             max_restarts: 5,
             client_version: "0.0.0".to_owned(),
             toolchain_dir: None,
+            toolchain: None,
             runtime: None,
             opener: None,
             client_name: "ZVS AI Studio".to_owned(),
@@ -978,21 +981,36 @@ impl McpService {
                             "У stdio-сервера не задана команда",
                         )
                     })?;
-                let mut merged = self
+                let launched = self
                     .inner
                     .options
-                    .toolchain_dir
-                    .as_deref()
-                    .map(isolated_toolchain_env)
-                    .unwrap_or_default();
-                merged.extend(env);
-                Ok(McpEndpoint::Stdio {
-                    spec: LaunchSpec {
+                    .toolchain
+                    .as_ref()
+                    .and_then(|toolchain| toolchain.launch_command(&command, &row.args));
+                let mut spec = match launched {
+                    Some(Ok(spec)) => spec,
+                    Some(Err(error)) => {
+                        return Err(AppError {
+                            code: AppErrorCode::McpUnavailable,
+                            ..error
+                        });
+                    }
+                    None => LaunchSpec {
                         command,
                         args: row.args.clone(),
-                        env: merged,
+                        env: self
+                            .inner
+                            .options
+                            .toolchain_dir
+                            .as_deref()
+                            .map(isolated_toolchain_env)
+                            .unwrap_or_default(),
                         cwd: None,
                     },
+                };
+                spec.env.extend(env);
+                Ok(McpEndpoint::Stdio {
+                    spec,
                     spawn: self.inner.options.spawn.clone(),
                 })
             }

@@ -1,0 +1,88 @@
+[
+  {
+    "name": "an update without the version it offers",
+    "value": {
+      "runtime": "node",
+      "displayName": "Node.js",
+      "status": "ready",
+      "source": "managed",
+      "version": "22.11.0",
+      "executablePath": "C:/Users/user/AppData/Roaming/zvs-ai-studio/mcp-toolchain/node/22.11.0/node-v22.11.0-win-x64/node.exe",
+      "minimumVersion": "18.0.0",
+      "updateAvailable": true,
+      "managedVersions": ["22.11.0"],
+      "refs": []
+    }
+  },
+  {
+    "name": "an empty version",
+    "value": {
+      "runtime": "node",
+      "displayName": "Node.js",
+      "status": "ready",
+      "source": "managed",
+      "version": "",
+      "executablePath": "C:/Users/user/AppData/Roaming/zvs-ai-studio/mcp-toolchain/node/22.11.0/node-v22.11.0-win-x64/node.exe",
+      "minimumVersion": "18.0.0",
+      "latestVersion": "22.21.0",
+      "updateAvailable": true,
+      "managedVersions": ["22.11.0"],
+      "refs": []
+    }
+  },
+  {
+    "name": "a null source",
+    "value": {
+      "runtime": "uv",
+      "displayName": "uv",
+      "status": "missing",
+      "minimumVersion": "0.4.0",
+      "updateAvailable": false,
+      "managedVersions": [],
+      "refs": [],
+      "source": null
+    }
+  },
+  {
+    "name": "an unknown runtime",
+    "value": {
+      "runtime": "python",
+      "displayName": "uv",
+      "status": "missing",
+      "minimumVersion": "0.4.0",
+      "updateAvailable": false,
+      "managedVersions": [],
+      "refs": []
+    }
+  },
+  {
+    "name": "too many refs",
+    "value": {
+      "runtime": "uv",
+      "displayName": "uv",
+      "status": "installing",
+      "minimumVersion": "0.4.0",
+      "latestVersion": "0.9.5",
+      "updateAvailable": false,
+      "managedVersions": [],
+      "refs": [
+        "toolchain:uv:0.9.5:a.zip",
+        "toolchain:uv:0.9.5:a.zip",
+        "toolchain:uv:0.9.5:a.zip",
+        "toolchain:uv:0.9.5:a.zip",
+        "toolchain:uv:0.9.5:a.zip"
+      ]
+    }
+  },
+  {
+    "name": "no minimum version",
+    "value": {
+      "runtime": "uv",
+      "displayName": "uv",
+      "status": "missing",
+      "updateAvailable": false,
+      "managedVersions": [],
+      "refs": []
+    }
+  }
+]

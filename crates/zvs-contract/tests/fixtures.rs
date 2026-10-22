@@ -728,6 +728,34 @@ const TABLE: &[(&str, Check)] = &[
         "skills/SkillTriggerSettingsDto",
         round_trip::<zvs_contract::skills::SkillTriggerSettingsDto>,
     ),
+    (
+        "toolchain/ToolchainRuntime",
+        round_trip::<zvs_contract::ToolchainRuntime>,
+    ),
+    (
+        "toolchain/ToolchainSource",
+        round_trip::<zvs_contract::ToolchainSource>,
+    ),
+    (
+        "toolchain/ToolchainStatus",
+        round_trip::<zvs_contract::ToolchainStatus>,
+    ),
+    (
+        "toolchain/ToolchainDto",
+        round_trip::<zvs_contract::ToolchainDto>,
+    ),
+    (
+        "toolchain/ToolchainListInput",
+        round_trip::<zvs_contract::ToolchainListInput>,
+    ),
+    (
+        "toolchain/ToolchainRef",
+        round_trip::<zvs_contract::ToolchainRef>,
+    ),
+    (
+        "toolchain/ToolchainSelectInput",
+        round_trip::<zvs_contract::ToolchainSelectInput>,
+    ),
 ];
 
 const SECRET_OUTPUTS: &[&str] = &[

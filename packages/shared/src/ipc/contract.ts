@@ -75,6 +75,12 @@ import { AdapterDescriptorDto } from "../ai.js";
 import { DeviceProfileDto, ResourceSampleDto } from "../system.js";
 import { InstallRuntimeInput, RuntimeOverviewDto, RuntimeRef } from "../runtimes/index.js";
 import {
+  ToolchainDto,
+  ToolchainListInput,
+  ToolchainRef,
+  ToolchainSelectInput,
+} from "../toolchain/index.js";
+import {
   AddGraphEdgeInput,
   GraphEdgeDto,
   GraphEdgeRef,
@@ -333,6 +339,12 @@ export const contract = defineContract({
   "runtimes.install": { input: InstallRuntimeInput, output: z.array(DownloadDto) },
   "runtimes.stop": { input: RuntimeRef, output: z.object({ stopped: z.boolean() }) },
   "runtimes.remove": { input: RuntimeRef, output: RuntimeRef.extend({ removed: z.literal(true) }) },
+  "toolchain.list": { input: ToolchainListInput, output: z.array(ToolchainDto) },
+  "toolchain.install": { input: ToolchainRef, output: ToolchainDto },
+  "toolchain.scan": { input: ToolchainRef, output: ToolchainDto },
+  "toolchain.select": { input: ToolchainSelectInput, output: ToolchainDto },
+  "toolchain.update": { input: ToolchainRef, output: ToolchainDto },
+  "toolchain.remove": { input: ToolchainRef, output: ToolchainDto },
   "system.nativePing": {
     input: z.object({ text: z.string().max(1_000_000) }),
     output: z.object({ count: z.number().int().nonnegative() }),

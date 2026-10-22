@@ -1,0 +1,14 @@
+[
+  {
+    "name": "uv",
+    "value": {
+      "runtime": "uv"
+    }
+  },
+  {
+    "name": "node",
+    "value": {
+      "runtime": "node"
+    }
+  }
+]

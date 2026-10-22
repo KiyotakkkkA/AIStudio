@@ -11,6 +11,7 @@ mod server;
 pub mod settings;
 pub mod skills;
 pub mod system;
+pub mod toolchain;
 pub mod tools;
 pub mod vector_stores;
 
@@ -30,6 +31,7 @@ pub fn register(server: &mut IpcServer) {
     tools::register(server);
     mcp::register(server);
     skills::register(server);
+    toolchain::register(server);
     chat::register(server);
 }
 
@@ -156,6 +158,12 @@ mod tests {
                 "system.nativePing",
                 "system.ping",
                 "system.resources",
+                "toolchain.install",
+                "toolchain.list",
+                "toolchain.remove",
+                "toolchain.scan",
+                "toolchain.select",
+                "toolchain.update",
                 "tools.defaults",
                 "tools.get",
                 "tools.invoke",

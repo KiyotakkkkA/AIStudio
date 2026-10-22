@@ -1,0 +1,22 @@
+[
+  {
+    "name": "an empty path",
+    "value": {
+      "runtime": "uv",
+      "path": ""
+    }
+  },
+  {
+    "name": "a null path",
+    "value": {
+      "runtime": "uv",
+      "path": null
+    }
+  },
+  {
+    "name": "an unknown runtime",
+    "value": {
+      "runtime": "bun"
+    }
+  }
+]

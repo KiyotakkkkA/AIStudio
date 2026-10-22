@@ -1,0 +1,14 @@
+[
+  {
+    "name": "a quiet list",
+    "value": {
+      "checkUpdates": false
+    }
+  },
+  {
+    "name": "an update check",
+    "value": {
+      "checkUpdates": true
+    }
+  }
+]

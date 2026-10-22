@@ -172,7 +172,7 @@ struct Inner {
     live: Mutex<HashMap<String, Live>>,
     intents: Mutex<HashMap<String, Intent>>,
     runner: RwLock<Option<Arc<dyn DownloadRunner>>>,
-    installer: RwLock<Option<SharedDownloadInstaller>>,
+    installers: RwLock<Vec<SharedDownloadInstaller>>,
     closed: AtomicBool,
     pumping: Mutex<()>,
     pump_requested: AtomicBool,
@@ -302,7 +302,7 @@ impl DownloadService {
                 live: Mutex::new(HashMap::new()),
                 intents: Mutex::new(HashMap::new()),
                 runner: RwLock::new(None),
-                installer: RwLock::new(None),
+                installers: RwLock::new(Vec::new()),
                 closed: AtomicBool::new(false),
                 pumping: Mutex::new(()),
                 pump_requested: AtomicBool::new(false),
@@ -319,11 +319,11 @@ impl DownloadService {
     }
 
     pub fn attach_installer(&self, installer: SharedDownloadInstaller) {
-        *self
-            .inner
-            .installer
+        self.inner
+            .installers
             .write()
-            .unwrap_or_else(PoisonError::into_inner) = Some(installer);
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(installer);
     }
 
     pub fn attach(&self, runner: Arc<dyn DownloadRunner>) {
@@ -343,9 +343,9 @@ impl DownloadService {
             .clone()
     }
 
-    fn installer(&self) -> Option<SharedDownloadInstaller> {
+    fn installers(&self) -> Vec<SharedDownloadInstaller> {
         self.inner
-            .installer
+            .installers
             .read()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
@@ -814,7 +814,7 @@ impl DownloadService {
             )
             .await?;
         let (bytes, resumed_from, path, reported_checksum) = read_report(&result)?;
-        if let Some(installer) = self.installer() {
+        for installer in self.installers() {
             installer.install(row).await?;
         }
         let at = self.now();

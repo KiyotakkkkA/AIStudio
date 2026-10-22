@@ -87,12 +87,18 @@ pub trait RuntimeCatalogue: Send + Sync {
     fn offer(&self, item: CatalogueItem) -> CatalogueItem;
 
     async fn find(&self, item_ref: &str) -> Result<CatalogueItem, AppError>;
+
+    fn invalidate(&self) {}
 }
 
 #[async_trait]
 impl RuntimeCatalogue for CatalogueService {
     fn offer(&self, item: CatalogueItem) -> CatalogueItem {
         Self::offer(self, item)
+    }
+
+    fn invalidate(&self) {
+        Self::invalidate(self);
     }
 
     async fn find(&self, item_ref: &str) -> Result<CatalogueItem, AppError> {
