@@ -261,7 +261,7 @@ test("the toggle decides whether a search is widened, and graph rows carry a rel
   expect(row.relation).toBe("user_linked");
   expect(row.path).toBe("setup.md");
   expect(row.via).toBe("glossary.md");
-  expect(row.position).toBe("4 чанков");
+  expect(row.position).toBe("4 фрагмента");
   expect(row).not.toHaveProperty("score");
 
   // The cap is honoured from the field, and a new search starts without the previous expansion.

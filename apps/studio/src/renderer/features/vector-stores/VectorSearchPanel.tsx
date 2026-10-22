@@ -142,9 +142,9 @@ function VectorSearchPanel() {
         </div>
       ) : null}
       <p className="text-[12px] text-main-500">
-        Результаты только для чтения. Чанки ниже порога показаны приглушёнными; найденные только по
-        ключевым словам порогом не отсекаются. По умолчанию порог равен порогу релевантности чата (
-        {store.detail?.chatMinScore ?? "—"}): приглушённые строки чат не увидит.
+        Результаты только для чтения. Фрагменты ниже порога показаны приглушёнными; найденные только
+        по ключевым словам порогом не отсекаются. По умолчанию порог равен порогу релевантности чата
+        ({store.detail?.chatMinScore ?? "—"}): приглушённые строки чат не увидит.
       </p>
       {store.result && graph.expandEnabled && store.graphRows.length === 0 ? (
         <p role="status" className="text-[12px] text-main-400">
@@ -187,7 +187,7 @@ function VectorSearchPanel() {
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <span className="break-all font-mono text-[12px] text-main-300">{row.path}</span>
-                <Chip>чанк {row.position}</Chip>
+                <Chip>фрагмент {row.position}</Chip>
                 {row.place === null ? null : <Chip>{row.place}</Chip>}
                 {row.provenance === null ? null : (
                   <Chip tone="accent" title={row.provenanceTitle ?? undefined}>

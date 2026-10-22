@@ -1,4 +1,17 @@
-import { mdiDatabaseOutline } from "@mdi/js";
+import {
+  mdiClockOutline,
+  mdiDatabaseCogOutline,
+  mdiDatabaseOutline,
+  mdiFileDocumentMultipleOutline,
+  mdiFolderOutline,
+  mdiHeartPulse,
+  mdiRuler,
+  mdiSetCenter,
+  mdiSortVariant,
+  mdiTextBoxOutline,
+  mdiTextRecognition,
+  mdiTextShort,
+} from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea, Switcher } from "@kiyotakkkka/zvs-uikit-lib";
 import { VECTOR_SCHEMA_VERSION } from "@zvs/shared";
@@ -12,7 +25,10 @@ import VectorSearchPanel from "./VectorSearchPanel";
 import VectorDocumentsPanel from "./VectorDocumentsPanel";
 import VectorRelationsPanel from "./VectorRelationsPanel";
 import { formatBytes } from "../downloads/downloadPresentation";
-import { healthLabels } from "./vectorPresentation";
+import { healthLabels, healthTones } from "./vectorPresentation";
+import InfoTable from "../../ui/molecules/InfoTable";
+import StatusDot from "../../ui/atoms/StatusDot";
+import { plural } from "../connections/connectionPresentation";
 import EmptyState from "../../ui/molecules/EmptyState";
 
 const VECTOR_STORE_TABS = [
@@ -203,24 +219,59 @@ function VectorStoreDetail() {
           <ScrollArea role="tabpanel" className="space-y-3 p-4 text-[12px] text-main-300">
             {store.tab === "Settings" ? (
               <>
-                <p>
-                  Чанк: {detail.chunkSize} · перекрытие: {detail.chunkOverlap}
-                </p>
-                <p>
-                  Движок: {detail.backend} · метрика: {detail.metric}
-                </p>
-                <p>
-                  Переранжирование:{" "}
-                  {detail.rerank.enabled
-                    ? `${describeRef(detail.rerank.modelRef)} · ${detail.rerank.candidates} кандидатов`
-                    : "выключено"}
-                </p>
-                <p>
-                  OCR:{" "}
-                  {detail.ocr.enabled
-                    ? `${describeRef(detail.ocr.modelRef)} · язык: ${detail.ocr.language} · порог: ${detail.ocr.minCharsPerPage}`
-                    : "выключен"}
-                </p>
+                <InfoTable
+                  label="Параметры хранилища"
+                  rows={[
+                    {
+                      key: "chunk",
+                      icon: mdiTextBoxOutline,
+                      label: "Размер фрагмента",
+                      value: plural(detail.chunkSize, "символ", "символа", "символов"),
+                    },
+                    {
+                      key: "overlap",
+                      icon: mdiSetCenter,
+                      label: "Перекрытие фрагментов",
+                      value: plural(detail.chunkOverlap, "символ", "символа", "символов"),
+                    },
+                    {
+                      key: "backend",
+                      icon: mdiDatabaseCogOutline,
+                      label: "Движок",
+                      value: detail.backend,
+                      mono: true,
+                    },
+                    {
+                      key: "metric",
+                      icon: mdiRuler,
+                      label: "Метрика",
+                      value: detail.metric,
+                      mono: true,
+                    },
+                    {
+                      key: "rerank",
+                      icon: mdiSortVariant,
+                      label: "Переранжирование",
+                      value: detail.rerank.enabled
+                        ? describeRef(detail.rerank.modelRef)
+                        : "выключено",
+                      hint: detail.rerank.enabled
+                        ? plural(detail.rerank.candidates, "кандидат", "кандидата", "кандидатов")
+                        : undefined,
+                      muted: !detail.rerank.enabled,
+                    },
+                    {
+                      key: "ocr",
+                      icon: mdiTextRecognition,
+                      label: "Распознавание текста",
+                      value: detail.ocr.enabled ? describeRef(detail.ocr.modelRef) : "выключено",
+                      hint: detail.ocr.enabled
+                        ? `язык ${detail.ocr.language} · от ${plural(detail.ocr.minCharsPerPage, "символа", "символов", "символов")} на странице`
+                        : undefined,
+                      muted: !detail.ocr.enabled,
+                    },
+                  ]}
+                />
                 <form
                   className="flex max-w-md items-end gap-2.5 pt-1"
                   onSubmit={(e) => {
@@ -254,19 +305,58 @@ function VectorStoreDetail() {
               </>
             ) : (
               <>
-                <p>{detail.description || "Описание не задано."}</p>
-                <p>
-                  Хранилище: {detail.backend} · {healthLabels[detail.status]}
-                </p>
-                <p>
-                  Последняя индексация:{" "}
-                  {detail.lastIndexedAt === null
-                    ? "ещё не выполнялась"
-                    : new Date(detail.lastIndexedAt).toLocaleString()}
-                </p>
-                <p>
-                  Источников: {store.sources.length} · документов: {store.documents.length}
-                </p>
+                <InfoTable
+                  label="Обзор хранилища"
+                  rows={[
+                    {
+                      key: "description",
+                      icon: mdiTextShort,
+                      label: "Описание",
+                      value: detail.description || "не задано",
+                      muted: !detail.description,
+                    },
+                    {
+                      key: "status",
+                      icon: mdiHeartPulse,
+                      label: "Состояние",
+                      value: (
+                        <span className="flex items-center gap-2">
+                          <StatusDot tone={healthTones[detail.status]} />
+                          {healthLabels[detail.status]}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: "backend",
+                      icon: mdiDatabaseCogOutline,
+                      label: "Движок",
+                      value: detail.backend,
+                      mono: true,
+                    },
+                    {
+                      key: "indexed",
+                      icon: mdiClockOutline,
+                      label: "Последняя индексация",
+                      value:
+                        detail.lastIndexedAt === null
+                          ? "ещё не выполнялась"
+                          : new Date(detail.lastIndexedAt).toLocaleString("ru-RU"),
+                      muted: detail.lastIndexedAt === null,
+                    },
+                    {
+                      key: "sources",
+                      icon: mdiFolderOutline,
+                      label: "Источники",
+                      value: store.sources.length.toLocaleString("ru-RU"),
+                    },
+                    {
+                      key: "documents",
+                      icon: mdiFileDocumentMultipleOutline,
+                      label: "Документы",
+                      value: store.documents.length.toLocaleString("ru-RU"),
+                    },
+                  ]}
+                />
               </>
             )}
           </ScrollArea>

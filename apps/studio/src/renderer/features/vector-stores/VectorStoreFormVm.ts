@@ -203,7 +203,7 @@ export default class VectorStoreFormVm {
     if (!result.success)
       for (const issue of result.error.issues) errors[String(issue.path[0])] = issue.message;
     if (!this.dimension.trim()) errors.dimension = "Укажите размерность явно.";
-    if (!this.chunkSize.trim()) errors.chunkSize = "Укажите размер чанка.";
+    if (!this.chunkSize.trim()) errors.chunkSize = "Укажите размер фрагмента.";
     if (!this.chunkOverlap.trim()) errors.chunkOverlap = "Укажите перекрытие, включая 0.";
     if (
       this.isNew &&

@@ -98,7 +98,7 @@ function VectorEvalSection() {
           </form>
           <div className="flex flex-wrap items-end gap-2.5 border-t border-line pt-3.25">
             <div className="w-30">
-              <Field label="Глубина, чанков" htmlFor="vs-eval-k">
+              <Field label="Глубина, фрагментов" htmlFor="vs-eval-k">
                 <TextInput
                   id="vs-eval-k"
                   value={evaluation.k}

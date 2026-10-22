@@ -24,7 +24,7 @@ function VectorStoreForm() {
   if (!vm) return null;
   const fields = [
     ["dimension", "Размерность"],
-    ["chunkSize", "Размер чанка"],
+    ["chunkSize", "Размер фрагмента"],
     ["chunkOverlap", "Перекрытие"],
   ] as const;
   return (
@@ -151,7 +151,7 @@ function VectorStoreForm() {
                       </>
                     ) : key === "chunkSize" ? (
                       <>
-                        <p className="mb-2 font-medium text-main-50">Размер чанка</p>
+                        <p className="mb-2 font-medium text-main-50">Размер фрагмента</p>
                         <p>
                           Сколько частей текста помещается в один фрагмент для поиска. Большие
                           значения сохраняют больше контекста, маленькие точнее находят отдельные
@@ -218,7 +218,7 @@ function VectorStoreForm() {
           )}
           <p className="text-[11px] leading-relaxed text-main-500">
             LanceDB · FLAT. Провайдер, модель, размерность и метрика фиксируются при создании.
-            Размер чанка и перекрытие можно менять до индексации.
+            Размер фрагмента и перекрытие можно менять до индексации.
           </p>
           {vm.isNew && !vm.providers.some((p) => p.enabled) ? (
             <p

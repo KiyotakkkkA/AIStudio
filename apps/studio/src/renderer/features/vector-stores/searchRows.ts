@@ -55,7 +55,7 @@ export function searchRows(hits: readonly VectorSearchHitDto[], floor: number) {
       path: hit.path || hit.documentId,
       place: placeOf(hit),
       position: `${hit.chunkIndex + 1}${typeof total === "number" && Number.isInteger(total) && total > hit.chunkIndex ? `/${total}` : ""}`,
-      text: textOf(hit) ?? "Текст чанка отсутствует в payload.",
+      text: textOf(hit) ?? "Текст фрагмента отсутствует.",
     };
   });
 }

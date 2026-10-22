@@ -1,3 +1,4 @@
+import { plural } from "../connections/connectionPresentation";
 import type { GraphExpansion, VectorDocumentDto } from "@zvs/shared";
 
 export {
@@ -19,7 +20,7 @@ export function graphRows(
     position:
       expansion.chunkCount === null
         ? "документ"
-        : `${expansion.chunkCount.toLocaleString("ru-RU")} чанков`,
+        : plural(expansion.chunkCount, "фрагмент", "фрагмента", "фрагментов"),
     via: byId.get(expansion.viaDocumentId)?.sourcePath ?? expansion.viaDocumentId,
     text: `Фрагмент не ранжировался: документ добавлен по связи «${expansion.relation}» с результатом поиска.`,
   }));

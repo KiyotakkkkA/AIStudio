@@ -1,5 +1,6 @@
 import { mdiFileDocumentOutline, mdiFolderOutline, mdiTrashCan } from "@mdi/js";
 import { observer } from "mobx-react-lite";
+import { plural } from "../connections/connectionPresentation";
 import { useRef, useState } from "react";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
@@ -247,7 +248,7 @@ function VectorDocumentsPanel() {
                         {document.sourcePath}
                       </div>
                       <div className="mt-0.5 text-[11px] text-main-500">
-                        {document.chunkCount.toLocaleString("ru-RU")} чанков ·{" "}
+                        {plural(document.chunkCount, "фрагмент", "фрагмента", "фрагментов")} ·{" "}
                         {formatBytes(document.bytes)} · {formatIndexedAt(document.indexedAt)}
                       </div>
                     </div>
