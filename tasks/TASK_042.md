@@ -2,7 +2,7 @@
 task: TASK_042
 title: Document service — open, hash cache, PDF path
 phase: 8 — Documents and the agent browser
-status: todo
+status: done
 depends_on: [TASK_026, TASK_076]
 unblocks: [TASK_043]
 estimate: 3 h
@@ -79,17 +79,61 @@ Manual check: Open a PDF and a markdown file through the channel and confirm des
 
 ## Definition of done
 
-- [ ] Documents open by path, citation and store-document id
-- [ ] Cache keyed by content hash with safe LRU eviction
-- [ ] Kind detection resists mislabelled extensions
-- [ ] Extracted text marked untrusted at the DTO level
-- [ ] Unsupported formats fail cleanly
-- [ ] Tests and gates pass
+- [x] Documents open by path, citation and store-document id
+- [x] Cache keyed by content hash with safe LRU eviction
+- [x] Kind detection resists mislabelled extensions
+- [x] Extracted text marked untrusted at the DTO level
+- [x] Unsupported formats fail cleanly
+- [x] Tests and gates pass
 - [ ] `pnpm typecheck && pnpm lint && pnpm build` pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- Contract `zvs_contract::documents` (`DocumentKind`, `DocumentTextEncoding`, `DocumentRef`,
+  `DocumentDto`, `DocumentHandle`, `DocumentPageInput`, `DocumentPageDto`); Zod in
+  `packages/shared/src/documents.ts`; fixtures in `fixtures/documents/`. Channels
+  `documents.open`, `documents.page`, `documents.close`, `documents.list`, `documents.reveal`.
+- Migration `0008_document.sql`, `DocumentRow` and `DocumentRepository` (`record_opened`
+  upserts on the unique `content_hash`, so the id survives a second path).
+- `zvs-host/src/documents/`: `kind.rs` (extension claim checked against the content
+  signature, shiki language ids, a PDF page estimate that does not parse), `text.rs`
+  (encoding detection and line pagination), `cache.rs` (`<hash>.<ext>` files, temp file then
+  rename, the pure `eviction_plan`), `service.rs` (`DocumentService` with open-handle counts,
+  the `DocumentConverter` hook and rebuilding a deleted cache). On `Services.documents`; the
+  composition root shares one `ForbiddenFolders` between folder access and documents.
+- `platform::external::reveal_in_file_manager` behind a `PathRevealer` port
+  (`explorer /select,` on Windows).
+- Tests: `documents/{kind,text,cache}.rs`, `documents/tests.rs` (cache hits across two paths,
+  a moved source, byte ranges, mislabelled and unsupported files, the converter hook, eviction
+  with open handles, pagination, encodings, rebuilding the cache, store-document and citation
+  opens, forbidden and relative paths, reveal), the repository, and the channels in
+  `ipc/documents.rs`.
+
 **Deviated from plan:**
+- The hash is the `zvs-core` blake3 `content_hash` (as the task says) rather than SHA-256 as
+  PASSPORT §20 used to say; §20 is updated.
+- The table column is `cached_file` (a file name in the cache folder), not `cachedPdfPath`:
+  every kind is cached, not only PDFs, and a relative name survives a moved cache folder.
+- Native kinds are copied into the cache as well, so a moved file keeps serving and the cache
+  is the only thing `documents.page` reads.
+- `documents.page` serves *parts* (`index` < `partCount`), not PDF pages: 4 MiB byte ranges
+  for PDF and images, 256 KiB line-aligned text parts for text kinds. `pageCount` is what the
+  viewer shows (an estimate for PDFs, since the host never parses them per §10).
+- Eviction deletes the row as well as the file, so `documents.list` shows what is cached.
+- Path opens are refused in forbidden folders (app data, system folders and the rest of §14);
+  citations resolve through the stored `vector_document` path and ignore the path they carry.
+- Added `encoding_rs = "=0.8.42"` (latest stable) for UTF-16 and Windows-1251.
+- Rust 1.99's clippy flags `unnecessary_sort_by`; the two existing sorts in
+  `toolchain/process.rs` and `toolchain/releases.rs` now use `sort_by_key` with `Reverse` so the
+  gate passes.
+
 **Next session should know:**
+- TASK_043 plugs the converter in through `DocumentServiceOptions::converter`; the hook writes
+  to a temp file in the cache folder and the service renames it to `<hash>.pdf`. Conversion as
+  a kernel job (`documents.convert`, a run handle) is still TASK_043's.
+- The cache ceiling is `DOCUMENT_CACHE_CEILING` (2 GiB) in the options; TASK_052 turns it
+  into a setting.
+- `pnpm --filter studio typecheck` already fails on `main` at
+  `tests/renderer/fileChanges.test.ts:59` (a `JSONType` mismatch), which this task did not touch.

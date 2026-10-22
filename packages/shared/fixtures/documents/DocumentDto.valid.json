@@ -1,0 +1,35 @@
+[
+  {
+    "name": "pdf",
+    "value": {
+      "id": "0199aa11-3333-7333-8333-333333333333",
+      "contentHash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+      "name": "report.pdf",
+      "sourcePath": "C:/Users/a/report.pdf",
+      "kind": "pdf",
+      "mimeType": "application/pdf",
+      "sizeBytes": 120400,
+      "pageCount": 12,
+      "partCount": 1,
+      "initialPage": 4,
+      "open": true,
+      "openedAt": 1700000000000
+    }
+  },
+  {
+    "name": "code without a known page count",
+    "value": {
+      "id": "0199aa11-3333-7333-8333-333333333333",
+      "contentHash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+      "name": "main.rs",
+      "sourcePath": "C:/Users/a/main.rs",
+      "kind": "code",
+      "mimeType": "text/plain",
+      "language": "rust",
+      "sizeBytes": 0,
+      "partCount": 1,
+      "open": false,
+      "openedAt": 0
+    }
+  }
+]

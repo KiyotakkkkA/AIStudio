@@ -1,0 +1,8 @@
+[
+  { "name": "pdf", "value": "pdf" },
+  { "name": "image", "value": "image" },
+  { "name": "markdown", "value": "markdown" },
+  { "name": "code", "value": "code" },
+  { "name": "csv", "value": "csv" },
+  { "name": "text", "value": "text" }
+]

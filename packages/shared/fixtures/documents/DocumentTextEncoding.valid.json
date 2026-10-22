@@ -1,0 +1,6 @@
+[
+  { "name": "utf-8", "value": "utf-8" },
+  { "name": "utf-16le", "value": "utf-16le" },
+  { "name": "utf-16be", "value": "utf-16be" },
+  { "name": "windows-1251", "value": "windows-1251" }
+]

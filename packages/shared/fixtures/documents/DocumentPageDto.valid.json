@@ -1,0 +1,25 @@
+[
+  {
+    "name": "bytes",
+    "value": {
+      "content": "bytes",
+      "index": 0,
+      "partCount": 1,
+      "offset": 0,
+      "totalBytes": 4,
+      "data": "JVBERg=="
+    }
+  },
+  {
+    "name": "text",
+    "value": {
+      "content": "text",
+      "index": 1,
+      "partCount": 2,
+      "firstLine": 120,
+      "encoding": "windows-1251",
+      "text": "Привет\n",
+      "untrusted": true
+    }
+  }
+]

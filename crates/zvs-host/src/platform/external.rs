@@ -1,11 +1,14 @@
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 
 use zvs_contract::{AppError, AppErrorCode};
 
 pub type UrlOpener = Arc<dyn Fn(&str) -> Result<(), AppError> + Send + Sync>;
+pub type PathRevealer = Arc<dyn Fn(&Path) -> Result<(), AppError> + Send + Sync>;
 
 pub const OPEN_FAILED: &str = "Не удалось открыть браузер";
+pub const REVEAL_FAILED: &str = "Не удалось показать файл в папке";
 
 fn command(url: &str) -> Command {
     if cfg!(windows) {
@@ -42,4 +45,37 @@ pub fn open_in_system_browser(url: &str) -> Result<(), AppError> {
 
 pub fn system_url_opener() -> UrlOpener {
     Arc::new(open_in_system_browser)
+}
+
+fn reveal_command(path: &Path) -> Command {
+    if cfg!(windows) {
+        let mut command = Command::new("explorer");
+        command.arg("/select,").arg(path);
+        command
+    } else if cfg!(target_os = "macos") {
+        let mut command = Command::new("open");
+        command.arg("-R").arg(path);
+        command
+    } else {
+        let mut command = Command::new("xdg-open");
+        command.arg(path.parent().unwrap_or(path));
+        command
+    }
+}
+
+pub fn reveal_in_file_manager(path: &Path) -> Result<(), AppError> {
+    reveal_command(path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| ())
+        .map_err(|cause| {
+            AppError::new(AppErrorCode::Unknown, REVEAL_FAILED)
+                .with_detail("raw", cause.to_string())
+        })
+}
+
+pub fn system_path_revealer() -> PathRevealer {
+    Arc::new(reveal_in_file_manager)
 }

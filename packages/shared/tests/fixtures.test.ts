@@ -9,6 +9,7 @@ import * as files from "../src/files.js";
 import * as processes from "../src/process.js";
 import * as folders from "../src/folders.js";
 import * as explorer from "../src/explorer.js";
+import * as documents from "../src/documents.js";
 import {
   AccountDto,
   ChatCitationDto,
@@ -197,6 +198,13 @@ const schemas: Record<string, z.ZodType> = {
   "explorer/ExplorerChangeDto": explorer.ExplorerChangeDto,
   "explorer/ExplorerChangesDto": explorer.ExplorerChangesDto,
   "explorer/ExplorerWatchDto": explorer.ExplorerWatchDto,
+  "documents/DocumentKind": documents.DocumentKind,
+  "documents/DocumentTextEncoding": documents.DocumentTextEncoding,
+  "documents/DocumentRef": documents.DocumentRef,
+  "documents/DocumentDto": documents.DocumentDto,
+  "documents/DocumentHandle": documents.DocumentHandle,
+  "documents/DocumentPageInput": documents.DocumentPageInput,
+  "documents/DocumentPageDto": documents.DocumentPageDto,
   "folders/FolderGrantScope": folders.FolderGrantScope,
   "folders/WorkingFolderAccess": folders.WorkingFolderAccess,
   "folders/FolderAccessAnswer": folders.FolderAccessAnswer,

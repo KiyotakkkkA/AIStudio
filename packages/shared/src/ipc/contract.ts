@@ -24,6 +24,13 @@ import {
   ExplorerReadInput,
   ExplorerWatchDto,
 } from "../explorer.js";
+import {
+  DocumentDto,
+  DocumentHandle,
+  DocumentPageDto,
+  DocumentPageInput,
+  DocumentRef,
+} from "../documents.js";
 import { RunDto, RunHandleDto, RunIdInput, StartRunInput } from "../runs/RunDto.js";
 import { RunListFilter, RunPageDto } from "../runs/RunListFilter.js";
 import { RunDetailDto } from "../runs/RunDetailDto.js";
@@ -214,6 +221,11 @@ export const contract = defineContract({
   "workspace.read": { input: ExplorerReadInput, output: ExplorerFileDto },
   "workspace.watch": { input: ConversationRef, output: ExplorerWatchDto },
   "workspace.unwatch": { input: ConversationRef, output: z.void() },
+  "documents.open": { input: DocumentRef, output: DocumentDto },
+  "documents.page": { input: DocumentPageInput, output: DocumentPageDto },
+  "documents.close": { input: DocumentHandle, output: z.void() },
+  "documents.list": { input: z.void(), output: z.array(DocumentDto) },
+  "documents.reveal": { input: DocumentHandle, output: z.void() },
   "runs.approve": {
     input: RunIdInput.extend({ approvalId: z.string().uuid(), always: z.boolean().default(false) }),
     output: z.void(),

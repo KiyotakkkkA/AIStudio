@@ -1,0 +1,26 @@
+[
+  {
+    "name": "path",
+    "value": { "source": "path", "path": "C:/Users/a/report.pdf" }
+  },
+  {
+    "name": "citation",
+    "value": {
+      "source": "citation",
+      "citation": {
+        "storeId": "0199aa11-1111-7111-8111-111111111111",
+        "documentId": "0199aa11-2222-7222-8222-222222222222",
+        "sourcePath": "C:/Users/a/report.pdf",
+        "chunkIndex": 3,
+        "score": 0.5,
+        "section": "Введение",
+        "page": 4,
+        "related": null
+      }
+    }
+  },
+  {
+    "name": "store document",
+    "value": { "source": "storeDocument", "documentId": "0199aa11-2222-7222-8222-222222222222" }
+  }
+]

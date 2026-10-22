@@ -54,6 +54,7 @@ pub use vector_stores::{VectorSearchOptions, VectorStoreService, VectorStoreServ
 
 use std::sync::Arc;
 
+use crate::documents::DocumentService;
 use crate::downloads::DownloadService;
 use crate::indexing::IndexingService;
 use crate::platform::picker::SharedPicker;
@@ -88,5 +89,6 @@ pub struct Services {
     pub chat: ChatService,
     pub folders: FolderAccessService,
     pub explorer: ExplorerService,
+    pub documents: DocumentService,
     pub picker: Option<SharedPicker>,
 }

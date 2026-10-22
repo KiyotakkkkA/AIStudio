@@ -3,6 +3,7 @@
 pub mod browser;
 pub mod commands;
 pub mod data;
+pub mod documents;
 pub mod downloads;
 pub mod drivers;
 pub mod files;

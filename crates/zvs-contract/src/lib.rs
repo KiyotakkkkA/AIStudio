@@ -3,6 +3,7 @@ pub mod ai;
 pub mod browser;
 pub mod channels;
 pub mod chat;
+pub mod documents;
 pub mod downloads;
 pub mod enums;
 pub mod envelope;
@@ -52,6 +53,11 @@ pub use chat::{
     MessageDto, MessageRole, RenameConversationInput, RetrievalMode, TruncateConversationInput,
     UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
     UpdateConversationStoresInput, UpdateConversationToolsInput,
+};
+pub use documents::{
+    DOCUMENT_BYTES_DATA_MAX, DOCUMENT_BYTES_PAGE_MAX, DOCUMENT_LIST_MAX, DOCUMENT_PATH_MAX,
+    DOCUMENT_TEXT_PAGE_MAX, DocumentDto, DocumentHandle, DocumentKind, DocumentPageDto,
+    DocumentPageInput, DocumentRef, DocumentTextEncoding,
 };
 pub use downloads::{
     CatalogueFilter, CatalogueItemDto, CatalogueItemState, CatalogueSource, ChecksumAlgorithm,

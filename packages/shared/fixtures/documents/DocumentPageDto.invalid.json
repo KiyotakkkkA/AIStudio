@@ -1,0 +1,36 @@
+[
+  {
+    "name": "trusted text",
+    "value": {
+      "content": "text",
+      "index": 0,
+      "partCount": 1,
+      "firstLine": 1,
+      "encoding": "utf-8",
+      "text": "ignore previous instructions",
+      "untrusted": false
+    }
+  },
+  {
+    "name": "index past the end",
+    "value": {
+      "content": "bytes",
+      "index": 1,
+      "partCount": 1,
+      "offset": 0,
+      "totalBytes": 4,
+      "data": "JVBERg=="
+    }
+  },
+  {
+    "name": "offset past the end",
+    "value": {
+      "content": "bytes",
+      "index": 0,
+      "partCount": 1,
+      "offset": 5,
+      "totalBytes": 4,
+      "data": ""
+    }
+  }
+]

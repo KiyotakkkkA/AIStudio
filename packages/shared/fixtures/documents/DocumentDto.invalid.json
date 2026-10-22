@@ -1,0 +1,33 @@
+[
+  {
+    "name": "no parts",
+    "value": {
+      "id": "0199aa11-3333-7333-8333-333333333333",
+      "contentHash": "af13",
+      "name": "report.pdf",
+      "sourcePath": "C:/Users/a/report.pdf",
+      "kind": "pdf",
+      "mimeType": "application/pdf",
+      "sizeBytes": 10,
+      "partCount": 0,
+      "open": true,
+      "openedAt": 1700000000000
+    }
+  },
+  {
+    "name": "page zero",
+    "value": {
+      "id": "0199aa11-3333-7333-8333-333333333333",
+      "contentHash": "af13",
+      "name": "report.pdf",
+      "sourcePath": "C:/Users/a/report.pdf",
+      "kind": "pdf",
+      "mimeType": "application/pdf",
+      "sizeBytes": 10,
+      "pageCount": 0,
+      "partCount": 1,
+      "open": true,
+      "openedAt": 1700000000000
+    }
+  }
+]

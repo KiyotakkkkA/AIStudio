@@ -190,7 +190,7 @@ Electron app untouched. TASK_066's CDP client is reused by TASK_046.
 
 ## Phase 8 — Documents and the agent browser
 
-- [ ] **TASK_042** — Document service: open, hash cache, PDF path
+- [x] **TASK_042** — Document service: open, hash cache, PDF path
 - [ ] **TASK_043** — Office → PDF conversion in the sidecar
 - [ ] **TASK_044** — Document viewer dock and selection → chat
 - [x] **TASK_045** — Attached browser workspace, WebContentsView, session partition

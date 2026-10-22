@@ -525,6 +525,17 @@ pub fn test_services(system: SystemService) -> TestServices {
                 run_bus.clone(),
                 std::time::Duration::from_millis(50),
             ),
+            documents: crate::documents::DocumentService::new(
+                crate::documents::DocumentServiceOptions {
+                    clock: clock.clone(),
+                    reveal: Arc::new(|_: &Path| Ok(())),
+                    ..crate::documents::DocumentServiceOptions::new(
+                        database.shared(),
+                        core.clone(),
+                        workspace.join("cache").join("documents"),
+                    )
+                },
+            ),
             folders,
             picker: Some(picker.clone()),
         }),

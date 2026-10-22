@@ -126,7 +126,7 @@ pub fn newest_lts(index: &Value, file_key: &str) -> Option<String> {
             Some((Version::parse(tag)?, tag.to_owned()))
         })
         .collect();
-    candidates.sort_by(|left, right| right.0.cmp(&left.0));
+    candidates.sort_by_key(|candidate| std::cmp::Reverse(candidate.0));
     candidates.into_iter().next().map(|(_, tag)| tag)
 }
 

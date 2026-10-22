@@ -17,6 +17,7 @@ use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::data::Repositories;
 use zvs_host::data::repositories::{ProviderFilter, SecretFilter};
 use zvs_host::data::{MigrationFailed, PrepareOptions, prepare_database};
+use zvs_host::documents::{DocumentService, DocumentServiceOptions};
 use zvs_host::downloads::{
     CatalogueService, CatalogueServiceOptions, CuratedProvider, DiskService, DiskServiceOptions,
     DownloadService, DownloadServiceOptions, OllamaProvider,
@@ -664,18 +665,29 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger: logger.clone(),
         ..SkillServiceOptions::new(skill_library, runs.clone(), Arc::clone(&database))
     });
+    let forbidden = ForbiddenFolders::from_environment(&[
+        paths.data_dir.clone(),
+        paths.cache_dir.clone(),
+        paths.logs_dir.clone(),
+        paths.downloads_dir.clone(),
+        profile_dir(&paths.data_dir),
+    ]);
     let folders = FolderAccessService::new(
         Arc::clone(&database),
         runs.approvals(),
-        ForbiddenFolders::from_environment(&[
-            paths.data_dir.clone(),
-            paths.cache_dir.clone(),
-            paths.logs_dir.clone(),
-            paths.downloads_dir.clone(),
-            profile_dir(&paths.data_dir),
-        ]),
+        forbidden.clone(),
         clock.clone(),
     );
+    let documents = DocumentService::new(DocumentServiceOptions {
+        forbidden: Some(forbidden),
+        clock: clock.clone(),
+        logger: logger.clone(),
+        ..DocumentServiceOptions::new(
+            Arc::clone(&database),
+            core.clone(),
+            paths.cache_dir.join("documents"),
+        )
+    });
     register_file_nodes(
         &nodes,
         &folders,
@@ -822,6 +834,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         skills,
         chat,
         explorer: explorer.clone(),
+        documents,
         folders,
         picker: Some(picker),
     });

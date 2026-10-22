@@ -1,5 +1,6 @@
 pub mod account;
 pub mod chat;
+pub mod document;
 pub mod download;
 pub mod folder_grant;
 pub mod graph_edge;
@@ -24,6 +25,7 @@ pub use account::{
     AccountDraft, AccountPatch, AccountRemoval, AccountRepository, NO_ACCOUNT_LINKED,
 };
 pub use chat::{ChatRepository, ConversationPatch, MessagePatch};
+pub use document::DocumentRepository;
 pub use download::{DownloadPatch, DownloadRepository};
 pub use folder_grant::FolderGrantRepository;
 pub use graph_edge::{GraphEdgeDraft, GraphEdgeLookup, GraphEdgeRepository};
@@ -67,6 +69,7 @@ pub struct Repositories<'c> {
     pub chat: ChatRepository<'c>,
     pub skills: SkillRepository<'c>,
     pub folder_grants: FolderGrantRepository<'c>,
+    pub documents: DocumentRepository<'c>,
 }
 
 impl<'c> Repositories<'c> {
@@ -91,6 +94,7 @@ impl<'c> Repositories<'c> {
             chat: ChatRepository::new(connection),
             skills: SkillRepository::new(connection),
             folder_grants: FolderGrantRepository::new(connection),
+            documents: DocumentRepository::new(connection),
         }
     }
 }

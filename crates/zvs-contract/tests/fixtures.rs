@@ -705,6 +705,34 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::explorer::ExplorerWatchDto>,
     ),
     (
+        "documents/DocumentKind",
+        round_trip::<zvs_contract::documents::DocumentKind>,
+    ),
+    (
+        "documents/DocumentTextEncoding",
+        round_trip::<zvs_contract::documents::DocumentTextEncoding>,
+    ),
+    (
+        "documents/DocumentRef",
+        round_trip::<zvs_contract::documents::DocumentRef>,
+    ),
+    (
+        "documents/DocumentDto",
+        round_trip::<zvs_contract::documents::DocumentDto>,
+    ),
+    (
+        "documents/DocumentHandle",
+        round_trip::<zvs_contract::documents::DocumentHandle>,
+    ),
+    (
+        "documents/DocumentPageInput",
+        round_trip::<zvs_contract::documents::DocumentPageInput>,
+    ),
+    (
+        "documents/DocumentPageDto",
+        round_trip::<zvs_contract::documents::DocumentPageDto>,
+    ),
+    (
         "folders/FolderGrantScope",
         round_trip::<zvs_contract::folders::FolderGrantScope>,
     ),

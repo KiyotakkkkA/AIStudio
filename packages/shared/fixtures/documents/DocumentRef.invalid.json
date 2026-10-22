@@ -1,0 +1,8 @@
+[
+  { "name": "empty path", "value": { "source": "path", "path": "" } },
+  { "name": "unknown source", "value": { "source": "url", "url": "https://example.com" } },
+  {
+    "name": "store document without an id",
+    "value": { "source": "storeDocument", "documentId": "d1" }
+  }
+]

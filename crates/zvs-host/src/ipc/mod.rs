@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod chat;
+pub mod documents;
 pub mod downloads;
 pub mod folders;
 pub mod graph_relations;
@@ -37,6 +38,7 @@ pub fn register(server: &mut IpcServer) {
     chat::register(server);
     folders::register(server);
     workspace::register(server);
+    documents::register(server);
 }
 
 #[cfg(test)]
@@ -90,6 +92,11 @@ mod tests {
                 "chat.pickFolder",
                 "chat.send",
                 "chat.unbindFolder",
+                "documents.close",
+                "documents.list",
+                "documents.open",
+                "documents.page",
+                "documents.reveal",
                 "downloads.cancel",
                 "downloads.catalogue",
                 "downloads.disk",

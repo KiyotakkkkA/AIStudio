@@ -855,10 +855,43 @@ viewer at the right page, and a selection there feeds the next turn.
 
 **Extracted document text is untrusted input** (§14) and is fenced before it reaches a model.
 
+### Document service (`zvs-host/src/documents/`, TASK_042)
+
+- **Registry.** The `document` table holds one row per content hash (`id`, `content_hash`
+  unique, `source_path` of the last open, `kind`, `mime_type`, `page_count`, `part_count`,
+  `size_bytes`, `cached_file`, `opened_at`), so one file at two paths is one document. The hash
+  is the `zvs-core` blake3 hash reached through `TextCore::hash`, the same one indexing records.
+- **Open.** `documents.open` takes a `DocumentRef`: `path` (absolute, canonicalised, refused
+  under a forbidden folder, §14), `citation` or `storeDocument`. A citation and a store document
+  resolve through the `vector_document` row; the path a citation carries is never trusted. A
+  citation's `page` comes back as `initialPage`.
+- **Kind detection** checks the extension against the content signature (`%PDF-`, PNG, JPEG,
+  GIF, WEBP, BMP, the OOXML package parts, text without control bytes). A mismatch fails with
+  `UNSUPPORTED_FORMAT` (`reason: "mislabelled"`) and never renders. An unknown extension is
+  read by its content. Native kinds: `pdf`, `image`, `markdown`, `code` (with a shiki
+  `language`), `csv`, `text`. DOCX, XLSX and PPTX go through the `DocumentConverter` hook to
+  `<hash>.pdf`; with no converter registered they fail with `UNSUPPORTED_FORMAT`.
+- **Cache.** `<cache>/documents/<hash>.<ext>` holds a copy of the file, so a moved or deleted
+  source keeps serving and reopening costs one hash. Only hash-named files belong to the cache,
+  so the indexing scratch folders beside them are ignored. Eviction is LRU by `opened_at`
+  against a ceiling (2 GiB until Settings owns it, TASK_052), files without a row go first,
+  and a document with an open handle is never evicted (handles are counted per open). A
+  missing cache file is rebuilt from the source if its hash still matches.
+- **Pages.** `partCount` is the number of `documents.page` parts. PDFs and images are served
+  as base64 byte ranges of 4 MiB (`content: "bytes"`) for `pdf.js`. Text kinds are decoded
+  (UTF-8, UTF-16 with a BOM, else Windows-1251), CRLF normalised, and split on lines into
+  parts of at most 256 KiB, each with `firstLine` and `encoding`. `pageCount` for a PDF
+  estimates page objects without parsing (the host never parses PDFs, §10); `pdf.js` is
+  authoritative. Text over 32 MiB and files over 512 MiB are refused with `LIMIT_EXCEEDED`.
+- **Untrusted text.** Every text part carries `untrusted: true` (a literal in both schemas),
+  so the viewer and any model call fence it (§14).
+
 ### IPC
 
-`documents.open`, `documents.page`, `documents.convert` (returns a run handle; progress
-arrives on the event channel), `documents.close`.
+`documents.open`, `documents.page`, `documents.close`, `documents.list` (the registry,
+newest first, each with `open`), `documents.reveal` (shows the source file in the OS file
+manager), and `documents.convert` (TASK_043; returns a run handle, and progress arrives on
+the event channel).
 
 ---
 

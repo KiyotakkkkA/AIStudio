@@ -131,7 +131,7 @@ pub fn prepare_scratch(root: &Path, run: &str) -> Result<PathBuf, AppError> {
             Some((modified, path))
         })
         .collect();
-    others.sort_by(|left, right| right.0.cmp(&left.0));
+    others.sort_by_key(|other| std::cmp::Reverse(other.0));
     for (_, stale) in others.into_iter().skip(SCRATCH_KEEP.saturating_sub(1)) {
         let _ = fs::remove_dir_all(stale);
     }

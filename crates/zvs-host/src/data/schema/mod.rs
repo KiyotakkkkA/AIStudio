@@ -1,6 +1,7 @@
 pub mod account;
 pub mod chat;
 pub mod columns;
+pub mod document;
 pub mod download;
 pub mod folder_grant;
 pub mod graph_edge;
@@ -23,6 +24,7 @@ pub mod vector_store;
 pub use account::{AccountRow, SESSION_EXPIRED_DETAIL};
 pub use chat::{ConversationRow, MessageRow};
 pub use columns::EnumColumn;
+pub use document::DocumentRow;
 pub use download::DownloadRow;
 pub use folder_grant::FolderGrantRow;
 pub use graph_edge::GraphEdgeRow;
