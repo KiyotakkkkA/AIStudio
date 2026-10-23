@@ -2,7 +2,7 @@
 task: TASK_038
 title: Scenario canvas editor
 phase: 7 — Scenarios and Agentic Build
-status: todo
+status: done
 depends_on: [TASK_037, TASK_076]
 unblocks: [TASK_039]
 estimate: 4 h
@@ -91,17 +91,71 @@ Manual check: Rebuild the exact graph from `/design/Scenario.dc.html` — trigge
 
 ## Definition of done
 
-- [ ] Pan, zoom, drag, connect, attach, select, delete, undo/redo all work
-- [ ] Nodes and edges match the mockup, including dashed attachment edges
-- [ ] Palette respects the tool ceiling
-- [ ] Graph state is our own model; serialisation round-trips
-- [ ] Autosave survives a crash
-- [ ] Tests and gates pass
-- [ ] `pnpm typecheck && pnpm lint && pnpm build` pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Pan, zoom, drag, connect, attach, select, delete, undo/redo all work
+- [x] Nodes and edges match the mockup, including dashed attachment edges
+- [x] Palette respects the tool ceiling
+- [x] Graph state is our own model; serialisation round-trips
+- [x] Autosave survives a crash
+- [x] Tests and gates pass
+- [x] `pnpm typecheck && pnpm lint && pnpm build` pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- Decision: React Flow 12 (`@xyflow/react` 12.12.0, `base.css` only) as the renderer over our own
+  model (option c). `features/scenarios/graphModel.ts` holds the graph reducers (add, move,
+  remove, connect, reroute, attach, duplicate, update, replace) with typed refusals;
+  `history.ts` is a bounded (100) undo/redo stack; `layout.ts` holds node sizes, slot port
+  offsets, the drop-on-slot hit test and the tidy action. `ScenarioEditor` (MobX) owns the
+  working graph, selection, drag state, autosave and validation; React Flow is fed derived
+  nodes/edges (`flowModel.ts`) and only reports changes back.
+- Canvas: dot grid as React Flow's SVG pattern (22 px), pan with Space-drag and middle-drag,
+  wheel zoom to cursor, box select, fit-to-view, zoom readout, undo/redo and tidy in the
+  bottom-left toolbar, «Добавить шаг» centred, «+» top-right.
+- Nodes per the mockup: 11 px radius, `main-800` fill, `main-600` border, icon tile, label and
+  sub-label, 9 px ports, trigger accent edge, accent border plus soft ring when selected,
+  dashed and dimmed when disabled. Agent nodes expose named slot ports along the bottom with
+  `Чат-модель *` / `Память` / `Инструменты` labels and filled-slot chips. Main edges are
+  `main-600` beziers; attachment edges are dashed `main-500`.
+- Attachment: dragging a sub-node onto a slot port attaches it (the slot lights accent or
+  `err` during the drag); an incompatible drop keeps the move and shows the reason in a banner.
+  Drawing from a slot port to a node's top port attaches too. Rules: the child must fill the
+  slot, a single slot must be free, a step with main edges is refused, no attachment cycles;
+  re-attaching moves a node.
+- Palette: searchable, grouped (triggers, agents and sub-nodes, core actions, then tools by
+  source/MCP server). A node whose tool is `off`, unavailable or unregistered is listed
+  disabled with the reason. Adding with a node selected connects the new step after it, or
+  attaches it to the first compatible free slot.
+- Keyboard: Delete/Backspace, Ctrl+D, Ctrl+A, Escape, Ctrl+Z, Ctrl+Shift+Z/Ctrl+Y.
+- Inspector: name, required parameters, the full params as JSON, «Отключён», connected
+  sub-nodes per slot (select, detach), the node's issues; with nothing selected, the scenario's
+  issue list. Invalid nodes carry a marker whose tooltip lists the validator's issues.
+- Host: `scenario_draft` table (migration 0014) and channels `scenarios.draft|saveDraft|
+  discardDraft`; a save with a graph clears the draft in the same transaction.
+  `scenarios.catalogue` exposes the node types (role, trigger kind, fills, slots, required
+  params, tool key). DTOs mirrored in Zod with golden fixtures.
+- Autosave writes the draft 800 ms after the last mutation; reopening restores a draft that
+  differs from the current version and offers «Отбросить черновик». «Сохранить» creates a
+  version through `scenarios.update`. The scenario list page creates, opens and removes
+  scenarios; the header renames, toggles «Активен» and shows the version chip.
+
 **Deviated from plan:**
+- No «Test scenario» button and no run-log strip: both belong to TASK_039. Edges are drawn in
+  their resting colour only; the `ok`-green traversed state and the item-count labels need
+  run data, which TASK_039 adds to the edge data in `flowModel.ts`.
+- The palette's tool ceiling is computed in the renderer from `tools.list` joined on the
+  catalogue's `toolKey`, not by the host.
+- Main edges can be re-routed by dragging an end; attachment edges are deleted and redrawn.
+
 **Next session should know:**
+- Graph comparison is key-order independent (`sameGraph`): the host returns node fields and
+  params in serde order, which differs from the renderer's insertion order.
+- React Flow runs controlled: positions during a drag live in `ScenarioEditor.dragPositions`
+  and are committed once on drag end; measured sizes are kept in component state.
+- `pnpm typecheck` still fails only in `apps/studio/tests/renderer/fileChanges.test.ts`, the
+  same pre-existing failure noted in TASK_037.
+- Gates run: cargo fmt, clippy `-D warnings`, `cargo test --workspace --exclude zvs-jobd` (a
+  running dev build locked `zvs-jobd.exe`), `pnpm lint`, `pnpm test`, `pnpm format:check`,
+  `pnpm contract:channels:check`, `pnpm build`. The manual walk through the mockup graph in the
+  running app was not done in this session.

@@ -737,3 +737,144 @@ async fn the_channels_create_validate_activate_and_list_versions_in_the_contract
         "{removed}"
     );
 }
+
+#[test]
+fn a_draft_survives_until_a_version_is_saved_and_then_goes_away() {
+    let host = host();
+    let created = create(&host, builtin_graph());
+    let id = created.scenario.id;
+    assert_eq!(host.service.draft(&id).expect("reads"), None);
+    host.clock.advance(500);
+    let mut working = builtin_graph();
+    working.nodes[0].position = ScenarioPositionDto { x: 40.5, y: 80.5 };
+    let saved = host
+        .service
+        .save_draft(&zvs_contract::SaveScenarioDraftInput {
+            id,
+            graph: working.clone(),
+        })
+        .expect("saves the draft");
+    assert_eq!(saved.graph, working);
+    let restored = host.service.draft(&id).expect("reads").expect("a draft");
+    assert_eq!(restored.graph, working);
+    assert_eq!(restored.saved_at, saved.saved_at);
+    assert_eq!(host.service.versions(&id).expect("lists").len(), 1);
+
+    let updated = host
+        .service
+        .update(&UpdateScenarioInput {
+            id,
+            name: None,
+            tags: None,
+            graph: Some(working.clone()),
+            note: None,
+        })
+        .expect("saves a version");
+    assert_eq!(updated.scenario.version, 2);
+    assert_eq!(host.service.draft(&id).expect("reads"), None);
+
+    host.service
+        .save_draft(&zvs_contract::SaveScenarioDraftInput {
+            id,
+            graph: ScenarioGraphDto::default(),
+        })
+        .expect("saves the draft");
+    host.service.discard_draft(&id).expect("discards");
+    assert_eq!(host.service.draft(&id).expect("reads"), None);
+
+    host.service.remove(&id).expect("removes");
+    assert_eq!(
+        host.service.draft(&id).expect_err("gone").code,
+        AppErrorCode::NotFound
+    );
+    assert_eq!(
+        host.service
+            .save_draft(&zvs_contract::SaveScenarioDraftInput {
+                id,
+                graph: ScenarioGraphDto::default(),
+            })
+            .expect_err("gone")
+            .code,
+        AppErrorCode::NotFound
+    );
+}
+
+#[test]
+fn the_catalogue_describes_roles_slots_and_what_each_node_fills() {
+    let types = host().service.node_types();
+    let find = |node_type: &str| {
+        types
+            .iter()
+            .find(|entry| entry.node_type == node_type)
+            .unwrap_or_else(|| panic!("{node_type} is catalogued"))
+    };
+    let trigger = find(TRIGGER_SCHEDULE);
+    assert_eq!(trigger.role, zvs_contract::ScenarioNodeRole::Trigger);
+    assert_eq!(trigger.trigger, Some(ScenarioTriggerKind::Schedule));
+    assert_eq!(trigger.required_params, ["cron"]);
+    let agent = find(AGENT_TOOLS);
+    assert_eq!(agent.role, zvs_contract::ScenarioNodeRole::Action);
+    assert_eq!(
+        agent
+            .slots
+            .iter()
+            .map(|spec| (spec.slot, spec.required, spec.multiple))
+            .collect::<Vec<_>>(),
+        [
+            (ScenarioSlot::Model, true, false),
+            (ScenarioSlot::Memory, false, false),
+            (ScenarioSlot::Tool, false, true),
+        ]
+    );
+    let model = find(MODEL_CHAT);
+    assert_eq!(model.role, zvs_contract::ScenarioNodeRole::SubNode);
+    assert_eq!(model.fills, [ScenarioSlot::Model]);
+    assert_eq!(find(EMBEDDING_MODEL).fills, [ScenarioSlot::Embedding]);
+    assert_eq!(find(MEMORY_WINDOW).tool_key, None);
+}
+
+#[tokio::test]
+async fn the_catalogue_and_draft_channels_answer_in_the_contract_shape() {
+    let services = test_services(SystemService::new(
+        Arc::new(FakeClock::default()),
+        EventBus::default(),
+        Duration::ZERO,
+    ));
+    let mut server =
+        IpcServer::new(services.shared(), silent_logger()).with_output_validation(true);
+    crate::ipc::scenarios::register(&mut server);
+    let catalogue = server.dispatch("scenarios.catalogue", json!(null)).await;
+    assert_eq!(catalogue["ok"], json!(true), "{catalogue}");
+    let entries = catalogue["data"].as_array().expect("a list");
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry["toolKey"].is_string() && entry["fills"] == json!(["tool"])),
+        "{catalogue}"
+    );
+    let created = server
+        .dispatch("scenarios.create", json!({ "name": "Триаж" }))
+        .await;
+    let id = created["data"]["id"].clone();
+    let empty = server
+        .dispatch("scenarios.draft", json!({ "id": id }))
+        .await;
+    assert_eq!(empty["data"], json!(null), "{empty}");
+    let graph = json!({
+        "nodes": [{ "id": "trigger", "type": TRIGGER_CHAT, "position": { "x": 0.5, "y": 0.5 }, "params": {} }],
+        "edges": [],
+        "attachments": []
+    });
+    let saved = server
+        .dispatch("scenarios.saveDraft", json!({ "id": id, "graph": graph }))
+        .await;
+    assert_eq!(saved["ok"], json!(true), "{saved}");
+    let draft = server
+        .dispatch("scenarios.draft", json!({ "id": id }))
+        .await;
+    assert_eq!(draft["data"]["graph"], graph, "{draft}");
+    let discarded = server
+        .dispatch("scenarios.discardDraft", json!({ "id": id }))
+        .await;
+    assert_eq!(discarded["data"], json!({ "id": id }), "{discarded}");
+}

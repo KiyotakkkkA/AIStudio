@@ -1,0 +1,37 @@
+[
+  {
+    "name": "missing tool key",
+    "value": {
+      "type": "model.chat",
+      "role": "subNode",
+      "trigger": null,
+      "fills": ["model"],
+      "slots": [],
+      "requiredParams": []
+    }
+  },
+  {
+    "name": "empty type",
+    "value": {
+      "type": "",
+      "role": "action",
+      "trigger": null,
+      "fills": [],
+      "slots": [],
+      "requiredParams": [],
+      "toolKey": null
+    }
+  },
+  {
+    "name": "unknown role",
+    "value": {
+      "type": "agent.tools",
+      "role": "agent",
+      "trigger": null,
+      "fills": [],
+      "slots": [],
+      "requiredParams": [],
+      "toolKey": null
+    }
+  }
+]

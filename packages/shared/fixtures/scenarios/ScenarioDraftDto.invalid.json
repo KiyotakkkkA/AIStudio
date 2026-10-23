@@ -1,0 +1,77 @@
+[
+  {
+    "name": "missing saved time",
+    "value": {
+      "scenarioId": "0199aa11-1111-7111-8111-111111111111",
+      "graph": {
+        "nodes": [
+          {
+            "id": "trigger",
+            "type": "trigger.chat",
+            "position": {
+              "x": 24.5,
+              "y": 268.5
+            },
+            "params": {}
+          },
+          {
+            "id": "agent",
+            "type": "agent.tools",
+            "position": {
+              "x": 250.5,
+              "y": 258.5
+            },
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": "trigger",
+            "to": "agent",
+            "fromPort": "main",
+            "toPort": "main"
+          }
+        ],
+        "attachments": []
+      }
+    }
+  },
+  {
+    "name": "bad id",
+    "value": {
+      "scenarioId": "s1",
+      "graph": {
+        "nodes": [
+          {
+            "id": "trigger",
+            "type": "trigger.chat",
+            "position": {
+              "x": 24.5,
+              "y": 268.5
+            },
+            "params": {}
+          },
+          {
+            "id": "agent",
+            "type": "agent.tools",
+            "position": {
+              "x": 250.5,
+              "y": 258.5
+            },
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": "trigger",
+            "to": "agent",
+            "fromPort": "main",
+            "toPort": "main"
+          }
+        ],
+        "attachments": []
+      },
+      "savedAt": 1
+    }
+  }
+]

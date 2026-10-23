@@ -21,6 +21,12 @@ wire_enum!(ScenarioTriggerKind {
     Webhook => "webhook",
 });
 
+wire_enum!(ScenarioNodeRole {
+    Trigger => "trigger",
+    Action => "action",
+    SubNode => "subNode",
+});
+
 wire_enum!(ScenarioIssueRule {
     DuplicateNode => "duplicateNode",
     UnknownNodeType => "unknownNodeType",
@@ -538,7 +544,78 @@ impl Validate for ScenarioRemoveOutput {
     }
 }
 
-crate::validate::no_refinements!(ScenarioRef, SetScenarioActiveInput);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioSlotSpecDto {
+    pub slot: ScenarioSlot,
+    pub required: bool,
+    pub multiple: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioNodeTypeDto {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub role: ScenarioNodeRole,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub trigger: Option<ScenarioTriggerKind>,
+    pub fills: Vec<ScenarioSlot>,
+    pub slots: Vec<ScenarioSlotSpecDto>,
+    pub required_params: Vec<String>,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub tool_key: Option<String>,
+}
+
+impl Validate for ScenarioNodeTypeDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("type", &self.node_type)?;
+        check::max_len("type", &self.node_type, SCENARIO_NODE_TYPE_MAX)?;
+        self.required_params
+            .iter()
+            .enumerate()
+            .try_for_each(|(index, param)| {
+                let field = format!("requiredParams.{index}");
+                check::non_empty(&field, param)?;
+                check::max_len(&field, param, SCENARIO_PARAM_KEY_MAX)
+            })?;
+        if let Some(key) = &self.tool_key {
+            check::non_empty("toolKey", key)?;
+            check::max_len("toolKey", key, SCENARIO_NODE_TYPE_MAX)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioDraftDto {
+    pub scenario_id: ScenarioId,
+    pub graph: ScenarioGraphDto,
+    pub saved_at: Timestamp,
+}
+
+impl Validate for ScenarioDraftDto {
+    fn validate(&self) -> Result<(), AppError> {
+        nested("graph", self.graph.validate())?;
+        check::timestamp("savedAt", self.saved_at)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveScenarioDraftInput {
+    pub id: ScenarioId,
+    pub graph: ScenarioGraphDto,
+}
+
+impl Validate for SaveScenarioDraftInput {
+    fn validate(&self) -> Result<(), AppError> {
+        nested("graph", self.graph.validate())
+    }
+}
+
+crate::validate::no_refinements!(ScenarioRef, SetScenarioActiveInput, ScenarioSlotSpecDto);
 
 pub fn normalise_tags(tags: &[String]) -> Vec<String> {
     let mut seen: Vec<String> = Vec::new();

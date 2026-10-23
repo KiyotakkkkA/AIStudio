@@ -39,6 +39,9 @@ export type ScenarioSlot = z.infer<typeof ScenarioSlot>;
 export const ScenarioTriggerKind = z.enum(["chat", "mail", "schedule", "webhook"]);
 export type ScenarioTriggerKind = z.infer<typeof ScenarioTriggerKind>;
 
+export const ScenarioNodeRole = z.enum(["trigger", "action", "subNode"]);
+export type ScenarioNodeRole = z.infer<typeof ScenarioNodeRole>;
+
 export const ScenarioIssueRule = z.enum([
   "duplicateNode",
   "unknownNodeType",
@@ -186,3 +189,31 @@ export type SetScenarioActiveInput = z.infer<typeof SetScenarioActiveInput>;
 
 export const ScenarioRemoveOutput = z.object({ id: ScenarioId, removed: z.literal(true) });
 export type ScenarioRemoveOutput = z.infer<typeof ScenarioRemoveOutput>;
+
+export const ScenarioSlotSpecDto = z.object({
+  slot: ScenarioSlot,
+  required: z.boolean(),
+  multiple: z.boolean(),
+});
+export type ScenarioSlotSpecDto = z.infer<typeof ScenarioSlotSpecDto>;
+
+export const ScenarioNodeTypeDto = z.object({
+  type: z.string().min(1).max(SCENARIO_NODE_TYPE_MAX),
+  role: ScenarioNodeRole,
+  trigger: ScenarioTriggerKind.nullable(),
+  fills: z.array(ScenarioSlot),
+  slots: z.array(ScenarioSlotSpecDto),
+  requiredParams: z.array(z.string().min(1).max(SCENARIO_PARAM_KEY_MAX)),
+  toolKey: z.string().min(1).max(SCENARIO_NODE_TYPE_MAX).nullable(),
+});
+export type ScenarioNodeTypeDto = z.infer<typeof ScenarioNodeTypeDto>;
+
+export const ScenarioDraftDto = z.object({
+  scenarioId: ScenarioId,
+  graph: ScenarioGraphDto,
+  savedAt: Timestamp,
+});
+export type ScenarioDraftDto = z.infer<typeof ScenarioDraftDto>;
+
+export const SaveScenarioDraftInput = z.object({ id: ScenarioId, graph: ScenarioGraphDto });
+export type SaveScenarioDraftInput = z.infer<typeof SaveScenarioDraftInput>;

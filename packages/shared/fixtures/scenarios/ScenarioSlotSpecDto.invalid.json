@@ -1,0 +1,17 @@
+[
+  {
+    "name": "unknown slot",
+    "value": {
+      "slot": "brain",
+      "required": true,
+      "multiple": false
+    }
+  },
+  {
+    "name": "missing multiple",
+    "value": {
+      "slot": "memory",
+      "required": false
+    }
+  }
+]

@@ -1,0 +1,318 @@
+import { mdiClose, mdiContentCopy, mdiDeleteOutline, mdiLinkVariantOff } from "@mdi/js";
+import { observer } from "mobx-react-lite";
+import { useState } from "react";
+import type { Json, ScenarioNodeDto, ScenarioParams } from "@zvs/shared";
+import Button from "../../ui/atoms/buttons/Button";
+import Icon from "../../ui/atoms/Icon";
+import StatusDot from "../../ui/atoms/StatusDot";
+import TextArea from "../../ui/atoms/TextArea";
+import TextInput from "../../ui/atoms/TextInput";
+import Toggle from "../../ui/atoms/Toggle";
+import Field from "../../ui/molecules/Field";
+import { attachmentLinkId, childrenIn } from "./graphModel";
+import { iconFor } from "./flowModel";
+import type ScenarioEditor from "./ScenarioEditor";
+import { issueText, ROLE_LABELS, slotLabel, stepsWord } from "./scenarioCopy";
+
+const PARAMS_INVALID = "Параметры должны быть JSON-объектом";
+const SECTION = "m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase";
+
+function paramText(value: Json | undefined): string {
+  if (value === undefined || value === null) return "";
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+function parseParams(text: string): ScenarioParams | null {
+  try {
+    const value: unknown = JSON.parse(text.trim().length === 0 ? "{}" : text);
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+    return value as ScenarioParams;
+  } catch {
+    return null;
+  }
+}
+
+const NodeForm = observer(function NodeForm({
+  editor,
+  node,
+}: {
+  readonly editor: ScenarioEditor;
+  readonly node: ScenarioNodeDto;
+}) {
+  const spec = editor.catalogue.get(node.type);
+  const [name, setName] = useState(node.name ?? "");
+  const [paramsText, setParamsText] = useState(JSON.stringify(node.params, null, 2));
+  const [paramsError, setParamsError] = useState<string | null>(null);
+  const issues = editor.issuesByNode.get(node.id) ?? [];
+  const required = spec?.requiredParams ?? [];
+
+  const setParam = (key: string, value: string) => {
+    const params: ScenarioParams = { ...node.params };
+    if (value.length === 0) delete params[key];
+    else params[key] = value;
+    editor.updateNode(node.id, { params });
+    setParamsText(JSON.stringify(params, null, 2));
+  };
+
+  return (
+    <>
+      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-3.5">
+        <Field label="Название" htmlFor="scenario-node-name">
+          <TextInput
+            id="scenario-node-name"
+            value={name}
+            placeholder={editor.labelOf(node.type)}
+            onChange={(event) => {
+              setName(event.target.value);
+            }}
+            onBlur={() => {
+              editor.updateNode(node.id, { name });
+            }}
+          />
+        </Field>
+
+        {required.map((key) => (
+          <Field key={key} label={key} htmlFor={`scenario-param-${key}`} required>
+            <TextInput
+              id={`scenario-param-${key}`}
+              mono
+              defaultValue={paramText(node.params[key])}
+              invalid={issues.some((issue) => issue.param === key)}
+              onBlur={(event) => {
+                if (event.target.value !== paramText(node.params[key])) {
+                  setParam(key, event.target.value);
+                }
+              }}
+            />
+          </Field>
+        ))}
+
+        <Field
+          label="Параметры (JSON)"
+          htmlFor="scenario-node-params"
+          error={paramsError ?? undefined}
+        >
+          <TextArea
+            id="scenario-node-params"
+            value={paramsText}
+            invalid={paramsError !== null}
+            spellCheck={false}
+            onChange={(event) => {
+              setParamsText(event.target.value);
+            }}
+            onBlur={() => {
+              const params = parseParams(paramsText);
+              if (params === null) {
+                setParamsError(PARAMS_INVALID);
+                return;
+              }
+              setParamsError(null);
+              if (JSON.stringify(params) !== JSON.stringify(node.params)) {
+                editor.updateNode(node.id, { params });
+              }
+            }}
+          />
+        </Field>
+
+        <Toggle
+          label="Отключён"
+          checked={node.disabled === true}
+          onChange={(disabled) => {
+            editor.updateNode(node.id, { disabled });
+          }}
+        />
+
+        {editor.ceilingOf(node.id) === null ? null : (
+          <p className="m-0 rounded-control bg-warn-soft px-3 py-2 text-[12px] text-warn">
+            {editor.ceilingOf(node.id)}
+          </p>
+        )}
+
+        {spec !== undefined && spec.slots.length > 0 ? (
+          <>
+            <div className="h-px flex-none bg-line" />
+            <h3 className={SECTION}>Подключённые подузлы</h3>
+            {spec.slots.map((entry) => {
+              const children = childrenIn(editor.graph, node.id, entry.slot);
+              return (
+                <div
+                  key={entry.slot}
+                  className={`rounded-card border border-line bg-main-850 px-2.75 py-2.5 ${
+                    children.length === 0 ? "opacity-70" : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-2.25">
+                    <StatusDot
+                      tone={children.length > 0 ? "ok" : entry.required ? "err" : "idle"}
+                    />
+                    <span className="flex-1 text-[12px] font-medium text-main-100">
+                      {slotLabel(entry.slot, entry.required)}
+                    </span>
+                  </div>
+                  {children.length === 0 ? (
+                    <span className="mt-1 block pl-4.25 font-mono text-[10.5px] text-main-500">
+                      Не подключено
+                    </span>
+                  ) : (
+                    children.map((attachment) => (
+                      <div
+                        key={attachment.childNodeId}
+                        className="mt-1 flex items-center gap-1.5 pl-4.25"
+                      >
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 truncate text-left font-mono text-[10.5px] text-main-400 hover:text-main-100"
+                          onClick={() => {
+                            editor.select(attachment.childNodeId);
+                          }}
+                        >
+                          {editor.nameOf(attachment.childNodeId)}
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Отключить от слота"
+                          title="Отключить от слота"
+                          className="flex-none text-main-500 hover:text-main-100"
+                          onClick={() => {
+                            editor.dispatch({
+                              type: "remove",
+                              nodeIds: [],
+                              linkIds: [attachmentLinkId(attachment)],
+                            });
+                          }}
+                        >
+                          <Icon path={mdiLinkVariantOff} size={14} />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              );
+            })}
+          </>
+        ) : null}
+
+        {issues.length === 0 ? null : (
+          <>
+            <div className="h-px flex-none bg-line" />
+            <h3 className={SECTION}>Ошибки</h3>
+            <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+              {issues.map((issue) => (
+                <li
+                  key={`${issue.rule}-${issue.slot ?? ""}-${issue.param ?? ""}`}
+                  className="text-[12px] leading-snug text-err"
+                >
+                  {issueText(issue, editor.nameOf)}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+      <div className="flex flex-none gap-2 border-t border-line px-3.5 py-3">
+        <Button type="button" tone="secondary" onClick={editor.duplicateSelection}>
+          <Icon path={mdiContentCopy} size={15} />
+          Дублировать
+        </Button>
+        <span className="flex-1" />
+        <Button type="button" tone="ghost" onClick={editor.deleteSelection}>
+          <Icon path={mdiDeleteOutline} size={15} />
+          Удалить
+        </Button>
+      </div>
+    </>
+  );
+});
+
+const Overview = observer(function Overview({ editor }: { readonly editor: ScenarioEditor }) {
+  const count = editor.selection.nodes.length;
+  if (count > 1) {
+    return (
+      <div className="flex flex-1 flex-col">
+        <div className="flex-1 p-3.5 text-[12.5px] text-main-400">Выбрано: {stepsWord(count)}</div>
+        <div className="flex flex-none gap-2 border-t border-line px-3.5 py-3">
+          <Button type="button" tone="secondary" onClick={editor.duplicateSelection}>
+            <Icon path={mdiContentCopy} size={15} />
+            Дублировать
+          </Button>
+          <span className="flex-1" />
+          <Button type="button" tone="ghost" onClick={editor.deleteSelection}>
+            <Icon path={mdiDeleteOutline} size={15} />
+            Удалить
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3.5">
+      <h3 className={SECTION}>Проверка сценария</h3>
+      {editor.issues.length === 0 ? (
+        <p className="m-0 flex items-center gap-2 text-[12.5px] text-main-300">
+          <StatusDot tone="ok" />
+          Ошибок нет
+        </p>
+      ) : (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+          {editor.issues.map((issue, index) => (
+            <li key={`${issue.rule}-${issue.nodeId ?? ""}-${String(index)}`}>
+              <button
+                type="button"
+                disabled={issue.nodeId === undefined}
+                className="w-full rounded-control px-2 py-1.5 text-left text-[12px] leading-snug text-err enabled:hover:bg-err-soft"
+                onClick={() => {
+                  if (issue.nodeId !== undefined) editor.select(issue.nodeId);
+                }}
+              >
+                {issueText(issue, editor.nameOf)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+});
+
+function NodeInspector({ editor }: { readonly editor: ScenarioEditor }) {
+  const node = editor.selectedNode;
+  const spec = node === null ? undefined : editor.catalogue.get(node.type);
+  return (
+    <aside className="flex w-85 flex-none flex-col border-l border-line bg-main-900">
+      <div className="flex h-13 flex-none items-center gap-2.5 border-b border-line px-3.5">
+        {node === null ? (
+          <span className="flex-1 text-[13px] font-semibold text-main-50">Сценарий</span>
+        ) : (
+          <>
+            <span className="flex size-7 flex-none items-center justify-center rounded-lg bg-main-700 text-accent-medium">
+              <Icon path={iconFor(node.type, spec?.toolKey ?? null)} size={16} />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-[13px] font-semibold text-main-50">
+                {editor.nameOf(node.id)}
+              </span>
+              <span className="truncate text-[10.5px] text-main-500">
+                {spec === undefined ? node.type : `${ROLE_LABELS[spec.role]} · ${node.type}`}
+              </span>
+            </span>
+            <button
+              type="button"
+              aria-label="Снять выделение"
+              className="flex-none text-main-500 hover:text-main-100"
+              onClick={editor.clearSelection}
+            >
+              <Icon path={mdiClose} size={16} />
+            </button>
+          </>
+        )}
+      </div>
+      {node === null ? (
+        <Overview editor={editor} />
+      ) : (
+        <NodeForm key={`${node.id}:${String(editor.revision)}`} editor={editor} node={node} />
+      )}
+    </aside>
+  );
+}
+
+export default observer(NodeInspector);

@@ -185,7 +185,7 @@ Electron app untouched. TASK_066's CDP client is reused by TASK_046.
 ## Phase 7 — Scenarios and Agentic Build
 
 - [x] **TASK_037** — Scenario model, versioning and validation
-- [ ] **TASK_038** — Scenario canvas editor
+- [x] **TASK_038** — Scenario canvas editor
 - [ ] **TASK_039** — Scenario execution, node inspector, run log
 - [ ] **TASK_040** — Agentic session engine: planning loop and self-extending runs
 - [ ] **TASK_041** — Agentic Build page
@@ -306,7 +306,7 @@ you can settle the load-bearing ones early rather than being interrupted mid-tas
 | TASK_036_EXTRA_4 (resolved) | Fallback (a): a file opens in a split beside the thread with a draggable divider, covering the chat below 1250 px. | yes |
 | TASK_036_EXTRA_5 (resolved) | Native toasts for every enabled event whatever window is in front, as in Electron. Built on `Windows.UI.Notifications` directly (own AUMID, `zvs-studio://` launch URL, tag and group), not a wrapper crate. A click opens its conversation, or «Загрузки». Action Center and cold-start clicks follow in TASK_036_EXTRA_6 through protocol activation. | yes |
 | TASK_037 (resolved) | Own format matched to the kernel (option a); no n8n import. A best-effort importer is a candidate later task. | **no** |
-| TASK_038 | Scenario canvas: React Flow, or hand-rolled? | **no** |
+| TASK_038 (resolved) | React Flow now, revisit if it fights the design (option c). The graph lives in our own model (`graphModel.ts` reducers, `ScenarioEditor`); React Flow only renders it, so a hand-rolled canvas stays open. | **no** |
 | TASK_040 | Default agentic session budget, and pause-or-stop on exhaustion | yes |
 | TASK_043 (superseded by ADR 0003) | LibreOffice integration removed in TASK_044 after the managed copy crashed on almost every conversion. Office documents render in the renderer (docx-preview, an OOXML sheet reader, slide text). «Компоненты» holds Node.js and uv. | moderate |
 | TASK_049 | Does mail send automatically once approved, or per message? | yes |

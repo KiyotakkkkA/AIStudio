@@ -16,6 +16,7 @@ import ConnectionStore from "../features/connections/ConnectionStore";
 import ToolStore from "../features/tools/ToolStore";
 import ToolchainStore from "../features/toolchain/ToolchainStore";
 import SkillStore from "../features/skills/SkillStore";
+import ScenarioStore from "../features/scenarios/ScenarioStore";
 import PermissionsStore from "../features/permissions/PermissionsStore";
 import AboutStore from "../features/preferences/AboutStore";
 import AppSettingsStore from "../features/preferences/AppSettingsStore";
@@ -40,6 +41,7 @@ export class RootStore {
   readonly tools: ToolStore;
   readonly toolchain: ToolchainStore;
   readonly skills: SkillStore;
+  readonly scenarios: ScenarioStore;
   readonly permissions: PermissionsStore;
   readonly about: AboutStore;
   readonly appSettings: AppSettingsStore;
@@ -61,6 +63,7 @@ export class RootStore {
     this.tools = new ToolStore(environment.ipc);
     this.toolchain = new ToolchainStore(environment.ipc, environment.events);
     this.skills = new SkillStore(environment.ipc);
+    this.scenarios = new ScenarioStore(environment.ipc);
     this.permissions = new PermissionsStore(environment.ipc);
     this.about = new AboutStore(environment.ipc);
     this.appSettings = new AppSettingsStore(environment.ipc);
@@ -82,6 +85,7 @@ export class RootStore {
         tools: false,
         toolchain: false,
         skills: false,
+        scenarios: false,
         permissions: false,
         about: false,
         appSettings: false,
@@ -114,6 +118,7 @@ export class RootStore {
     this.tools.dispose();
     this.toolchain.dispose();
     this.skills.dispose();
+    this.scenarios.dispose();
     this.permissions.dispose();
     this.environment.events.dispose();
   }

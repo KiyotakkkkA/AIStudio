@@ -143,6 +143,38 @@ impl<'c> ScenarioRepository<'c> {
             })
             .optional()
     }
+
+    pub fn draft(&self, scenario_id: &str) -> rusqlite::Result<Option<(ScenarioGraphDto, i64)>> {
+        self.connection
+            .prepare_cached("SELECT graph, saved_at FROM scenario_draft WHERE scenario_id = ?1")?
+            .query_row([scenario_id], |row| {
+                Ok((
+                    crate::data::schema::columns::json_column(row, "graph")?,
+                    row.get("saved_at")?,
+                ))
+            })
+            .optional()
+    }
+
+    pub fn save_draft(
+        &self,
+        scenario_id: &str,
+        graph: &ScenarioGraphDto,
+        saved_at: i64,
+    ) -> rusqlite::Result<()> {
+        self.connection
+            .prepare_cached(
+                "INSERT INTO scenario_draft (scenario_id, graph, saved_at) VALUES (?1, ?2, ?3)                  ON CONFLICT (scenario_id) DO UPDATE SET graph = excluded.graph,                  saved_at = excluded.saved_at",
+            )?
+            .execute(params![scenario_id, json_text(graph)?, saved_at])?;
+        Ok(())
+    }
+
+    pub fn discard_draft(&self, scenario_id: &str) -> rusqlite::Result<usize> {
+        self.connection
+            .prepare_cached("DELETE FROM scenario_draft WHERE scenario_id = ?1")?
+            .execute([scenario_id])
+    }
 }
 
 #[cfg(test)]
@@ -229,12 +261,17 @@ mod tests {
                         .collect::<Vec<_>>(),
                     [2, 1]
                 );
-                assert_eq!(scenarios.version_graph("v2")?, Some(graph));
+                assert_eq!(scenarios.version_graph("v2")?, Some(graph.clone()));
                 assert_eq!(
                     scenarios.find_version("v1")?.map(|row| row.version),
                     Some(1)
                 );
+                assert_eq!(scenarios.draft("s")?, None);
+                scenarios.save_draft("s", &ScenarioGraphDto::default(), 10)?;
+                scenarios.save_draft("s", &graph, 20)?;
+                assert_eq!(scenarios.draft("s")?, Some((graph.clone(), 20)));
                 assert_eq!(scenarios.remove("s")?, 1);
+                assert_eq!(scenarios.draft("s")?, None);
                 assert!(scenarios.versions("s")?.is_empty());
                 assert_eq!(scenarios.version_graph("v2")?, None);
                 Ok(())

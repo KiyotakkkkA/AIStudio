@@ -1,5 +1,7 @@
 use serde_json::Value;
-use zvs_contract::{ScenarioSlot, ScenarioTriggerKind};
+use zvs_contract::{
+    ScenarioNodeRole, ScenarioNodeTypeDto, ScenarioSlot, ScenarioSlotSpecDto, ScenarioTriggerKind,
+};
 
 use crate::kernel::NodeRegistry;
 
@@ -99,6 +101,36 @@ impl NodeSpec {
     pub fn slot(&self, slot: ScenarioSlot) -> Option<&SlotSpec> {
         self.slots.iter().find(|spec| spec.slot == slot)
     }
+
+    pub const fn role(&self) -> ScenarioNodeRole {
+        if self.trigger.is_some() {
+            ScenarioNodeRole::Trigger
+        } else if self.trunk {
+            ScenarioNodeRole::Action
+        } else {
+            ScenarioNodeRole::SubNode
+        }
+    }
+
+    pub fn dto(&self) -> ScenarioNodeTypeDto {
+        ScenarioNodeTypeDto {
+            node_type: self.node_type.clone(),
+            role: self.role(),
+            trigger: self.trigger,
+            fills: self.fills.clone(),
+            slots: self
+                .slots
+                .iter()
+                .map(|spec| ScenarioSlotSpecDto {
+                    slot: spec.slot,
+                    required: spec.required,
+                    multiple: spec.multiple,
+                })
+                .collect(),
+            required_params: self.required_params.clone(),
+            tool_key: self.tool_key.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -164,6 +196,10 @@ impl ScenarioCatalogue {
 
     pub fn spec(&self, node_type: &str) -> Option<&NodeSpec> {
         self.specs.iter().find(|spec| spec.node_type == node_type)
+    }
+
+    pub fn specs(&self) -> &[NodeSpec] {
+        &self.specs
     }
 }
 

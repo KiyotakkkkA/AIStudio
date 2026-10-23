@@ -1,0 +1,18 @@
+[
+  {
+    "name": "required model",
+    "value": {
+      "slot": "model",
+      "required": true,
+      "multiple": false
+    }
+  },
+  {
+    "name": "many tools",
+    "value": {
+      "slot": "tool",
+      "required": false,
+      "multiple": true
+    }
+  }
+]

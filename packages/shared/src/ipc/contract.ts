@@ -107,8 +107,11 @@ import {
 } from "../skills/index.js";
 import {
   CreateScenarioInput,
+  SaveScenarioDraftInput,
   ScenarioDetailDto,
+  ScenarioDraftDto,
   ScenarioDto,
+  ScenarioNodeTypeDto,
   ScenarioRef,
   ScenarioRemoveOutput,
   ScenarioValidateInput,
@@ -375,6 +378,10 @@ export const contract = defineContract({
   "scenarios.validate": { input: ScenarioValidateInput, output: ScenarioValidationDto },
   "scenarios.activate": { input: SetScenarioActiveInput, output: ScenarioDto },
   "scenarios.versions": { input: ScenarioRef, output: z.array(ScenarioVersionDto) },
+  "scenarios.catalogue": { input: z.void(), output: z.array(ScenarioNodeTypeDto) },
+  "scenarios.draft": { input: ScenarioRef, output: ScenarioDraftDto.nullable() },
+  "scenarios.saveDraft": { input: SaveScenarioDraftInput, output: ScenarioDraftDto },
+  "scenarios.discardDraft": { input: ScenarioRef, output: ScenarioRef },
   "downloads.list": { input: DownloadListFilter, output: z.array(DownloadDto) },
   "downloads.start": { input: StartDownloadInput, output: DownloadDto },
   "downloads.pause": { input: DownloadRef, output: DownloadDto },

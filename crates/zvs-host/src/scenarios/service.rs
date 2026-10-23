@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use serde_json::json;
 use zvs_contract::{
-    AppError, AppErrorCode, CreateScenarioInput, ScenarioDetailDto, ScenarioDto, ScenarioGraphDto,
-    ScenarioId, ScenarioIssueDto, ScenarioTriggerKind, ScenarioValidationDto, ScenarioVersionDto,
+    AppError, AppErrorCode, CreateScenarioInput, SaveScenarioDraftInput, ScenarioDetailDto,
+    ScenarioDraftDto, ScenarioDto, ScenarioGraphDto, ScenarioId, ScenarioIssueDto,
+    ScenarioNodeTypeDto, ScenarioTriggerKind, ScenarioValidationDto, ScenarioVersionDto,
     ScenarioVersionId, ToolReferenceKind, UpdateScenarioInput, normalise_tags, validate::js_trim,
 };
 
-use super::catalogue::ScenarioCatalogue;
+use super::catalogue::{NodeSpec, ScenarioCatalogue};
 use super::diff::diff_graphs;
 use super::validation::{trigger_binding, validate_graph};
 use crate::data::schema::{ScenarioRow, ScenarioVersionRow};
@@ -110,6 +111,10 @@ impl ScenarioService {
 
     pub fn catalogue(&self) -> ScenarioCatalogue {
         ScenarioCatalogue::from_registry(&self.inner.nodes)
+    }
+
+    pub fn node_types(&self) -> Vec<ScenarioNodeTypeDto> {
+        self.catalogue().specs().iter().map(NodeSpec::dto).collect()
     }
 
     pub fn validate(&self, graph: &ScenarioGraphDto) -> ScenarioValidationDto {
@@ -237,6 +242,9 @@ impl ScenarioService {
             if let Some(tags) = &input.tags {
                 loaded.row.tags = normalise_tags(tags);
             }
+            if input.graph.is_some() {
+                repositories.scenarios.discard_draft(&loaded.row.id)?;
+            }
             if let Some(graph) = input.graph.as_ref().filter(|graph| **graph != loaded.graph) {
                 let issues = validate_graph(graph, &catalogue);
                 if loaded.row.active && !issues.is_empty() {
@@ -311,6 +319,46 @@ impl ScenarioService {
             Ok(scenarios.versions(&id.to_string())?)
         })?;
         rows.iter().map(version_dto).collect()
+    }
+
+    pub fn draft(&self, id: &ScenarioId) -> Result<Option<ScenarioDraftDto>, AppError> {
+        let found = self.inner.database.with_connection(|connection| {
+            let scenarios = Repositories::new(connection).scenarios;
+            if scenarios.find_by_id(&id.to_string())?.is_none() {
+                return Err(not_found(SCENARIO_NOT_FOUND).into());
+            }
+            Ok(scenarios.draft(&id.to_string())?)
+        })?;
+        Ok(found.map(|(graph, saved_at)| ScenarioDraftDto {
+            scenario_id: *id,
+            graph,
+            saved_at,
+        }))
+    }
+
+    pub fn save_draft(&self, input: &SaveScenarioDraftInput) -> Result<ScenarioDraftDto, AppError> {
+        let saved_at = self.inner.clock.now();
+        self.inner.database.with_connection(|connection| {
+            let scenarios = Repositories::new(connection).scenarios;
+            if scenarios.find_by_id(&input.id.to_string())?.is_none() {
+                return Err(not_found(SCENARIO_NOT_FOUND).into());
+            }
+            Ok(scenarios.save_draft(&input.id.to_string(), &input.graph, saved_at)?)
+        })?;
+        Ok(ScenarioDraftDto {
+            scenario_id: input.id,
+            graph: input.graph.clone(),
+            saved_at,
+        })
+    }
+
+    pub fn discard_draft(&self, id: &ScenarioId) -> Result<(), AppError> {
+        self.inner.database.with_connection(|connection| {
+            Ok(Repositories::new(connection)
+                .scenarios
+                .discard_draft(&id.to_string())?)
+        })?;
+        Ok(())
     }
 
     pub fn version(

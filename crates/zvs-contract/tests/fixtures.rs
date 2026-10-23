@@ -1073,6 +1073,26 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::scenarios::ScenarioRemoveOutput>,
     ),
     (
+        "scenarios/ScenarioNodeRole",
+        round_trip::<zvs_contract::scenarios::ScenarioNodeRole>,
+    ),
+    (
+        "scenarios/ScenarioSlotSpecDto",
+        round_trip::<zvs_contract::scenarios::ScenarioSlotSpecDto>,
+    ),
+    (
+        "scenarios/ScenarioNodeTypeDto",
+        round_trip::<zvs_contract::scenarios::ScenarioNodeTypeDto>,
+    ),
+    (
+        "scenarios/ScenarioDraftDto",
+        round_trip::<zvs_contract::scenarios::ScenarioDraftDto>,
+    ),
+    (
+        "scenarios/SaveScenarioDraftInput",
+        round_trip::<zvs_contract::scenarios::SaveScenarioDraftInput>,
+    ),
+    (
         "toolchain/ToolchainRuntime",
         round_trip::<zvs_contract::ToolchainRuntime>,
     ),

@@ -144,10 +144,11 @@ pub use runtimes::{
     RuntimePlanDto, RuntimeRef, RuntimeState, RuntimesRemoveOutput, RuntimesStopOutput,
 };
 pub use scenarios::{
-    CreateScenarioInput, SCENARIO_MAIN_PORT, ScenarioAttachmentDto, ScenarioDetailDto,
-    ScenarioDiffDto, ScenarioDto, ScenarioEdgeDto, ScenarioGraphDto, ScenarioIssueDto,
-    ScenarioIssueRule, ScenarioNodeDto, ScenarioParams, ScenarioPositionDto, ScenarioRef,
-    ScenarioRemoveOutput, ScenarioSlot, ScenarioTriggerDto, ScenarioTriggerKind,
+    CreateScenarioInput, SCENARIO_MAIN_PORT, SaveScenarioDraftInput, ScenarioAttachmentDto,
+    ScenarioDetailDto, ScenarioDiffDto, ScenarioDraftDto, ScenarioDto, ScenarioEdgeDto,
+    ScenarioGraphDto, ScenarioIssueDto, ScenarioIssueRule, ScenarioNodeDto, ScenarioNodeRole,
+    ScenarioNodeTypeDto, ScenarioParams, ScenarioPositionDto, ScenarioRef, ScenarioRemoveOutput,
+    ScenarioSlot, ScenarioSlotSpecDto, ScenarioTriggerDto, ScenarioTriggerKind,
     ScenarioValidateInput, ScenarioValidationDto, ScenarioVersionDto, SetScenarioActiveInput,
     UpdateScenarioInput, normalise_tags,
 };

@@ -1,0 +1,54 @@
+[
+  {
+    "name": "agent with slots",
+    "value": {
+      "type": "agent.tools",
+      "role": "action",
+      "trigger": null,
+      "fills": [],
+      "slots": [
+        {
+          "slot": "model",
+          "required": true,
+          "multiple": false
+        },
+        {
+          "slot": "memory",
+          "required": false,
+          "multiple": false
+        },
+        {
+          "slot": "tool",
+          "required": false,
+          "multiple": true
+        }
+      ],
+      "requiredParams": [],
+      "toolKey": null
+    }
+  },
+  {
+    "name": "trigger",
+    "value": {
+      "type": "trigger.schedule",
+      "role": "trigger",
+      "trigger": "schedule",
+      "fills": [],
+      "slots": [],
+      "requiredParams": ["cron"],
+      "toolKey": null
+    }
+  },
+  {
+    "name": "tool node",
+    "value": {
+      "type": "vector.search",
+      "role": "action",
+      "trigger": null,
+      "fills": ["tool"],
+      "slots": [],
+      "requiredParams": ["query"],
+      "toolKey": "vector.search"
+    }
+  }
+]
