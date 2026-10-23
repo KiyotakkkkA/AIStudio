@@ -34,6 +34,12 @@ pub fn register(server: &mut IpcServer) {
             |services: Arc<Services>, input: DocumentHandle| async move {
                 services.documents.reveal(&input.id)
             },
+        )
+        .handle(
+            "documents.save",
+            |services: Arc<Services>, input: DocumentHandle| async move {
+                services.documents.save(&input.id).await
+            },
         );
 }
 
@@ -109,7 +115,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_office_file_without_a_converter_opens_for_approximate_rendering() {
+    async fn an_office_file_opens_with_its_format_for_the_viewer() {
         let (_host, server) = server();
         let folder = tempfile::tempdir().expect("a temporary folder");
         let path = folder.path().join("letter.docx");
@@ -121,7 +127,7 @@ mod tests {
         )
         .await;
         assert_eq!(opened["kind"], json!("office"));
-        assert_eq!(opened["rendering"], json!("approximate"));
+        assert_eq!(opened.get("rendering"), None);
         assert_eq!(opened["officeFormat"], json!("docx"));
     }
 

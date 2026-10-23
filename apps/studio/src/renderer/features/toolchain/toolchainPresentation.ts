@@ -1,4 +1,4 @@
-import { mdiFileDocumentMultipleOutline, mdiLanguagePython, mdiNodejs } from "@mdi/js";
+import { mdiLanguagePython, mdiNodejs } from "@mdi/js";
 import {
   AppErrorCode,
   ToolchainRuntime,
@@ -11,18 +11,16 @@ import type { StatusTone } from "../../ui/atoms/statusTone";
 
 export type ToolchainAction = "install" | "update" | "scan" | "select" | "remove";
 
-export const TOOLCHAIN_ORDER: readonly ToolchainRuntime[] = ["node", "uv", "libreoffice"];
+export const TOOLCHAIN_ORDER: readonly ToolchainRuntime[] = ["node", "uv"];
 
 export const RUNTIME_ICONS: Record<ToolchainRuntime, string> = {
   uv: mdiLanguagePython,
   node: mdiNodejs,
-  libreoffice: mdiFileDocumentMultipleOutline,
 };
 
 export const RUNTIME_HINTS: Record<ToolchainRuntime, string> = {
   uv: "Нужен MCP-серверам, которые запускаются через uvx и uv.",
   node: "Нужен MCP-серверам, которые запускаются через npx и node.",
-  libreoffice: "Преобразует документы DOCX, XLSX и PPTX в PDF для точного просмотра.",
 };
 
 export const STATUS_LABELS: Record<ToolchainStatus, string> = {
@@ -43,7 +41,6 @@ export const SOURCE_LABELS: Record<ToolchainSource, string> = {
   managed: "Загружено приложением",
   path: "Найдено в PATH",
   manual: "Указано вручную",
-  system: "Установлено в системе",
 };
 
 export const ACTION_LABELS: Record<ToolchainAction, string> = {
@@ -54,7 +51,6 @@ export const ACTION_LABELS: Record<ToolchainAction, string> = {
   remove: "Удалить",
 };
 
-export const SCAN_SYSTEM_LABEL = "Найти в системе";
 export const DISCONNECT_LABEL = "Отключить";
 export const INSTALLING_HINT = "Ход загрузки отображается в разделе «Загрузки».";
 export const UNKNOWN_TOOLCHAIN_ERROR = "Не удалось выполнить операцию. Попробуйте ещё раз.";
@@ -95,15 +91,8 @@ export function removalLabel(dto: Pick<ToolchainDto, "source">): string {
     : DISCONNECT_LABEL;
 }
 
-export function actionLabel(action: ToolchainAction, runtime: ToolchainRuntime): string {
-  return action === "scan" && runtime === "libreoffice" ? SCAN_SYSTEM_LABEL : ACTION_LABELS[action];
-}
-
-export function removalCopy(displayName: string, runtime?: ToolchainRuntime): string {
-  const removed = `${displayName} будет отключён, а копии, загруженные приложением, удалены с диска.`;
-  return runtime === "libreoffice"
-    ? `${removed} Документы DOCX, XLSX и PPTX, ещё не преобразованные в PDF, будут отображаться приближённо.`
-    : `${removed} MCP-серверы, которые используют ${displayName}, не запустятся до подключения другой копии.`;
+export function removalCopy(displayName: string): string {
+  return `${displayName} будет отключён, а копии, загруженные приложением, удалены с диска. MCP-серверы, которые используют ${displayName}, не запустятся до подключения другой копии.`;
 }
 
 export function versionLine(dto: ToolchainDto): string {

@@ -41,7 +41,7 @@ pub use ai::{
     AuthMode, HonoursDto, LOCAL_BASE_URL, ProvidersAdaptersOutput, ToolMode, TunableParameter,
     model_tool_support, resolve_tool_mode,
 };
-pub use artifacts::{ArtifactDto, ArtifactRef, ArtifactSaveResult};
+pub use artifacts::{ArtifactApplicationDto, ArtifactDto, ArtifactRef, ArtifactSaveResult};
 pub use browser::{
     BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie, BrowserSecurity,
     BrowserState, BrowserTab,
@@ -52,14 +52,14 @@ pub use chat::{
     ChatConversationsListOutput, ChatEvalCaseDto, ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto,
     ChatSendInput, ChatSettings, ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto,
     ConversationDto, ConversationRef, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
-    MessageDto, MessageRole, RenameConversationInput, RetrievalMode, TruncateConversationInput,
-    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    DocumentSelectionDto, MessageDto, MessageRole, RenameConversationInput, RetrievalMode,
+    TruncateConversationInput, UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
     UpdateConversationStoresInput, UpdateConversationToolsInput,
 };
 pub use documents::{
     DOCUMENT_BYTES_DATA_MAX, DOCUMENT_BYTES_PAGE_MAX, DOCUMENT_LIST_MAX, DOCUMENT_PATH_MAX,
     DOCUMENT_TEXT_PAGE_MAX, DocumentDto, DocumentHandle, DocumentKind, DocumentOfficeFormat,
-    DocumentPageDto, DocumentPageInput, DocumentRef, DocumentRendering, DocumentTextEncoding,
+    DocumentPageDto, DocumentPageInput, DocumentRef, DocumentSaveResult, DocumentTextEncoding,
 };
 pub use downloads::{
     CatalogueFilter, CatalogueItemDto, CatalogueItemState, CatalogueSource, ChecksumAlgorithm,

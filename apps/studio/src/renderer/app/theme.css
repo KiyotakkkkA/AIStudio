@@ -376,3 +376,92 @@ select:focus-visible,
     transition-timing-function: ease-out;
   }
 }
+
+.textLayer {
+  color-scheme: only light;
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  text-align: initial;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+
+  :is(span, br) {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+    user-select: text;
+  }
+
+  > :not(.markedContent),
+  .markedContent span:not(.markedContent) {
+    z-index: 1;
+    --font-height: 0;
+    font-size: calc(var(--text-scale-factor) * var(--font-height));
+    --scale-x: 1;
+    --rotate: 0deg;
+    transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+  }
+
+  .markedContent {
+    display: contents;
+  }
+
+  span[role="img"] {
+    user-select: none;
+    cursor: default;
+  }
+
+  ::selection {
+    background: rgb(229 117 50 / 0.3);
+    color: transparent;
+  }
+
+  br::selection {
+    background: transparent;
+  }
+
+  .endOfContent {
+    display: block;
+    position: absolute;
+    inset: 100% 0 0;
+    z-index: 0;
+    cursor: default;
+    user-select: none;
+  }
+}
+
+::highlight(zvs-viewer-match) {
+  background-color: rgb(214 160 40 / 0.38);
+}
+
+::highlight(zvs-viewer-current) {
+  background-color: rgb(229 117 50 / 0.55);
+}
+
+::highlight(zvs-viewer-passage) {
+  background-color: rgb(229 117 50 / 0.22);
+}
+
+.zvs-docx .docx-wrapper {
+  background: transparent;
+  padding: 20px 0 32px;
+}
+
+.zvs-docx .docx-wrapper > section.docx {
+  margin-bottom: 16px;
+  border-radius: 3px;
+  box-shadow: var(--zvs-shadow-pop);
+}

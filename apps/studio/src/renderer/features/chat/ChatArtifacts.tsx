@@ -1,6 +1,9 @@
 import { observer } from "mobx-react-lite";
 import type { ArtifactDto } from "@zvs/shared";
+import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
 import {
+  mdiEyeOutline,
+  mdiOpenInNew,
   mdiFileDocumentOutline,
   mdiFileExcelOutline,
   mdiFileImageOutline,
@@ -11,15 +14,22 @@ import {
   mdiTrayArrowDown,
 } from "@mdi/js";
 import IconButton from "../../ui/atoms/buttons/IconButton";
+import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
+import { useStore } from "../../stores/useStore";
+import { viewerCanShow } from "../../viewer/viewerModel";
 import Icon from "../../ui/atoms/Icon";
 import { STATUS_TONE_TEXT, type StatusTone } from "../../ui/atoms/statusTone";
 import type ArtifactActions from "./ArtifactActions";
 import {
   ARTIFACTS_LABEL,
   DOWNLOAD_ARTIFACT,
+  OPEN_ARTIFACT,
+  OPEN_IN_VIEWER,
   REVEAL_ARTIFACT,
+  VIEWER_UNAVAILABLE,
   artifactKind,
   artifactSubtitle,
+  openInApplication,
 } from "./artifacts";
 
 const TILE_BACKGROUNDS: Record<StatusTone, string> = {
@@ -58,6 +68,72 @@ function formatIcon(format: string): string {
       return mdiFileDocumentOutline;
   }
 }
+
+const OpenMenu = observer(function OpenMenu({
+  artifact,
+  actions,
+  disabled,
+}: {
+  readonly artifact: ArtifactDto;
+  readonly actions: ArtifactActions;
+  readonly disabled: boolean;
+}) {
+  const { viewer } = useStore();
+  const viewable = viewerCanShow(artifact.format);
+  return (
+    <Dropdown
+      menuWidth={260}
+      menuPlacement="bottom-right"
+      disabled={disabled}
+      onOpenChange={(open) => {
+        if (open) void actions.loadApplication(artifact.id, artifact.format);
+      }}
+    >
+      <IconDropdownButton
+        label={OPEN_ARTIFACT}
+        tooltip="top-center"
+        path={mdiOpenInNew}
+        iconSize={16}
+        rounded="rounded-lg"
+        disabled={disabled}
+        className="size-8 justify-center gap-0 border-transparent bg-main-800 p-0 text-main-400 hover:bg-main-700 hover:text-main-50"
+      />
+      <Dropdown.Menu
+        role="menu"
+        aria-label={OPEN_ARTIFACT}
+        rounded="rounded-lg"
+        className="rounded-card border-line bg-main-900 p-1 shadow-pop"
+      >
+        <Dropdown.Item
+          role="menuitem"
+          rounded="rounded-lg"
+          className="text-[13px] text-main-100"
+          onClick={() => void actions.open(artifact.id)}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <Icon path={mdiOpenInNew} size={17} className="flex-none text-main-400" />
+            <span className="truncate">
+              {openInApplication(actions.applicationOf(artifact.format))}
+            </span>
+          </span>
+        </Dropdown.Item>
+        <Dropdown.Item
+          role="menuitem"
+          rounded="rounded-lg"
+          disabled={!viewable}
+          title={viewable ? undefined : VIEWER_UNAVAILABLE}
+          className="text-[13px] text-main-100 disabled:opacity-45"
+          onClick={() => void viewer.openArtifact(artifact)}
+        >
+          <span className="flex items-center gap-2">
+            <Icon path={mdiEyeOutline} size={17} className="flex-none text-main-400" />
+            {OPEN_IN_VIEWER}
+          </span>
+        </Dropdown.Item>
+      </Dropdown.Menu>
+    </Dropdown>
+  );
+});
 
 function ChatArtifacts({
   artifacts,
@@ -98,6 +174,7 @@ function ChatArtifacts({
                 </span>
               </span>
               <span className="flex flex-none items-center gap-1">
+                <OpenMenu artifact={artifact} actions={actions} disabled={busy !== undefined} />
                 <IconButton
                   path={mdiTrayArrowDown}
                   label={DOWNLOAD_ARTIFACT}

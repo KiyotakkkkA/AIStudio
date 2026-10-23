@@ -13,11 +13,10 @@ use zvs_contract::{
 };
 
 use super::definitions::{
-    TOOLCHAIN_DEFINITIONS, ToolchainCategory, ToolchainCommand, Version, definition,
-    libreoffice_build, libreoffice_system_dirs, node_file_key, primary_name, uv_asset_name,
+    TOOLCHAIN_DEFINITIONS, ToolchainCommand, Version, definition, node_file_key, primary_name,
+    uv_asset_name,
 };
 use super::launch::{LaunchSpec, prepend_path};
-use super::msi::{MsiexecExtractor, SharedMsiExtractor};
 use super::probe::{Probed, ProcessProbe, SharedProbe, primary_for, probe};
 use super::process::path_dirs;
 use super::releases::{ToolchainBuild, ToolchainResolver};
@@ -36,7 +35,6 @@ pub const NOT_MANAGED: &str = "Обновить можно только копи
 pub const NO_PICKER: &str = "Выбор файла недоступен";
 pub const NO_CHECKSUM: &str = "Загрузка не содержит контрольной суммы и не будет подключена";
 pub const SETTINGS_HINT: &str = "Подключите его в разделе «Расширения → Компоненты».";
-pub const ALREADY_DOWNLOADING_COMPONENT: &str = "Этот компонент уже загружается";
 const STAGING_PREFIX: &str = ".staging-";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,8 +69,6 @@ pub struct ToolchainServiceOptions {
     pub probe: SharedProbe,
     pub picker: Option<SharedPicker>,
     pub path_env: Option<OsString>,
-    pub system_dirs: Option<Vec<PathBuf>>,
-    pub msi: SharedMsiExtractor,
     pub logger: SharedLogger,
 }
 
@@ -94,8 +90,6 @@ impl ToolchainServiceOptions {
             probe: Arc::new(ProcessProbe::default()),
             picker: None,
             path_env: None,
-            system_dirs: None,
-            msi: Arc::new(MsiexecExtractor::default()),
             logger,
         }
     }
@@ -196,23 +190,6 @@ fn platform_supported(runtime: ToolchainRuntime, platform: Platform) -> bool {
     match runtime {
         ToolchainRuntime::Uv => uv_asset_name(platform).is_some(),
         ToolchainRuntime::Node => node_file_key(platform).is_some(),
-        ToolchainRuntime::LibreOffice => libreoffice_build(platform).is_some(),
-    }
-}
-
-fn source_tag(source: ToolchainSource) -> &'static str {
-    match source {
-        ToolchainSource::Managed => "загружено приложением",
-        ToolchainSource::Path => "из PATH",
-        ToolchainSource::Manual => "указано вручную",
-        ToolchainSource::System => "установлено в системе",
-    }
-}
-
-fn catalogue_source(category: ToolchainCategory) -> CatalogueSource {
-    match category {
-        ToolchainCategory::Runtime => CatalogueSource::Github,
-        ToolchainCategory::Component => CatalogueSource::Curated,
     }
 }
 
@@ -474,13 +451,10 @@ impl ToolchainService {
 
     fn require_idle(&self, runtime: ToolchainRuntime) -> Result<(), AppError> {
         if self.active_refs(runtime)?.is_empty() {
-            return Ok(());
+            Ok(())
+        } else {
+            Err(conflict(ALREADY_DOWNLOADING).with_detail("runtime", runtime.as_str()))
         }
-        let message = match definition(runtime).category {
-            ToolchainCategory::Runtime => ALREADY_DOWNLOADING,
-            ToolchainCategory::Component => ALREADY_DOWNLOADING_COMPONENT,
-        };
-        Err(conflict(message).with_detail("runtime", runtime.as_str()))
     }
 
     pub async fn install(&self, runtime: ToolchainRuntime) -> Result<ToolchainDto, AppError> {
@@ -528,11 +502,11 @@ impl ToolchainService {
             url: build.url.clone(),
             file_name: build.asset_name.clone(),
             checksum: Some(build.checksum.clone()),
-            tags: vec![definition.category.tag().to_owned(), version.clone()],
+            tags: vec!["окружение".to_owned(), version.clone()],
             ..CatalogueItem::new(
                 toolchain_archive_ref(build),
                 DownloadItemKind::Runtime,
-                catalogue_source(definition.category),
+                CatalogueSource::Github,
                 format!("{}/{}", build.runtime, build.asset_name),
             )
         };
@@ -555,17 +529,7 @@ impl ToolchainService {
         Ok(())
     }
 
-    fn system_dirs(&self, runtime: ToolchainRuntime) -> Vec<PathBuf> {
-        if runtime != ToolchainRuntime::LibreOffice {
-            return Vec::new();
-        }
-        self.options()
-            .system_dirs
-            .clone()
-            .unwrap_or_else(|| libreoffice_system_dirs(self.platform()))
-    }
-
-    fn path_candidates(&self, runtime: ToolchainRuntime) -> Vec<(PathBuf, ToolchainSource)> {
+    fn path_candidates(&self, runtime: ToolchainRuntime) -> Vec<PathBuf> {
         let path = self
             .options()
             .path_env
@@ -574,82 +538,45 @@ impl ToolchainService {
             .unwrap_or_default();
         let name = primary_name(runtime, self.platform());
         let mut seen = HashSet::new();
-        let system = self
-            .system_dirs(runtime)
-            .into_iter()
-            .map(|directory| (directory, ToolchainSource::System));
         std::env::split_paths(&path)
             .filter(|directory| !directory.as_os_str().is_empty())
-            .map(|directory| (directory, ToolchainSource::Path))
-            .chain(system)
-            .map(|(directory, source)| (directory.join(name), source))
-            .filter(|(candidate, _)| candidate.is_file())
-            .filter(|(candidate, _)| {
+            .map(|directory| directory.join(name))
+            .filter(|candidate| candidate.is_file())
+            .filter(|candidate| {
                 let key = candidate.to_string_lossy().to_lowercase();
                 seen.insert(key)
             })
             .collect()
     }
 
-    fn not_found_message(runtime: ToolchainRuntime) -> String {
-        let name = definition(runtime).display_name;
-        match definition(runtime).category {
-            ToolchainCategory::Runtime => format!("{name} не найден в PATH"),
-            ToolchainCategory::Component => format!("{name} не найден в системе"),
-        }
-    }
-
-    async fn detect(&self, runtime: ToolchainRuntime) -> Result<Probed, Vec<String>> {
-        let mut refusals = Vec::new();
-        for (candidate, source) in self.path_candidates(runtime) {
-            match self.check(runtime, &candidate).await {
-                Ok(probed) => match self.connect(runtime, source, &probed) {
-                    Ok(()) => return Ok(probed),
-                    Err(error) => refusals.push(error.message),
-                },
-                Err(reason) => refusals.push(reason),
-            }
-        }
-        Err(refusals)
-    }
-
-    pub async fn office_executable(&self) -> Option<PathBuf> {
-        let runtime = ToolchainRuntime::LibreOffice;
-        if let Some(record) = self.connection(runtime) {
-            return Some(PathBuf::from(record.executable_path)).filter(|path| path.is_file());
-        }
-        if !self.active_refs(runtime).ok()?.is_empty() {
-            return None;
-        }
-        let _operation = self.inner.operation.lock().await;
-        if let Some(record) = self.connection(runtime) {
-            return Some(PathBuf::from(record.executable_path)).filter(|path| path.is_file());
-        }
-        self.detect(runtime)
-            .await
-            .ok()
-            .map(|probed| probed.executable)
-    }
-
     pub async fn scan(&self, runtime: ToolchainRuntime) -> Result<ToolchainDto, AppError> {
         let _operation = self.inner.operation.lock().await;
         let definition = definition(runtime);
-        if self.path_candidates(runtime).is_empty() {
-            return Err(
-                AppError::new(AppErrorCode::NotFound, Self::not_found_message(runtime))
-                    .with_detail("runtime", runtime.as_str()),
-            );
+        let candidates = self.path_candidates(runtime);
+        if candidates.is_empty() {
+            return Err(AppError::new(
+                AppErrorCode::NotFound,
+                format!("{} не найден в PATH", definition.display_name),
+            )
+            .with_detail("runtime", runtime.as_str()));
         }
-        match self.detect(runtime).await {
-            Ok(_) => self.get(runtime),
-            Err(refusals) => Err(conflict(format!(
-                "Найденная копия {} не подходит: {}",
-                definition.display_name,
-                refusals.first().map(String::as_str).unwrap_or_default()
-            ))
-            .with_detail("runtime", runtime.as_str())
-            .with_detail("reasons", json!(refusals))),
+        let mut refusals = Vec::new();
+        for candidate in candidates {
+            match self.check(runtime, &candidate).await {
+                Ok(probed) => {
+                    self.connect(runtime, ToolchainSource::Path, &probed)?;
+                    return self.get(runtime);
+                }
+                Err(reason) => refusals.push(reason),
+            }
         }
+        Err(conflict(format!(
+            "Найденная в PATH копия {} не подходит: {}",
+            definition.display_name,
+            refusals.first().map(String::as_str).unwrap_or_default()
+        ))
+        .with_detail("runtime", runtime.as_str())
+        .with_detail("reasons", json!(refusals)))
     }
 
     pub async fn select(&self, input: &ToolchainSelectInput) -> Result<ToolchainDto, AppError> {
@@ -790,12 +717,12 @@ impl ToolchainService {
     ) -> Result<Probed, AppError> {
         let runtime = parsed.runtime;
         let definition = definition(runtime);
-        let package = Path::new(&row.target_path);
-        if parsed.asset_name.to_ascii_lowercase().ends_with(".msi") {
-            self.options().msi.extract(package, staging).await?;
-        } else {
-            extract_archive(package, staging, ExtractOptions::default()).await?;
-        }
+        extract_archive(
+            Path::new(&row.target_path),
+            staging,
+            ExtractOptions::default(),
+        )
+        .await?;
         let name = primary_name(runtime, self.platform());
         let root = staging.to_path_buf();
         let executable = tokio::task::spawn_blocking(move || find_file(&root, name, 0))
@@ -892,26 +819,30 @@ impl ToolchainService {
                 ToolchainStatus::Ready => CatalogueItemState::Installed,
                 ToolchainStatus::Missing | ToolchainStatus::Broken => CatalogueItemState::Available,
             };
-            let mut tags = vec![definition.category.tag().to_owned()];
+            let mut tags = vec!["окружение".to_owned()];
             if let Some(source) = dto.source {
-                tags.push(source_tag(source).to_owned());
+                tags.push(
+                    match source {
+                        ToolchainSource::Managed => "загружено приложением",
+                        ToolchainSource::Path => "из PATH",
+                        ToolchainSource::Manual => "указано вручную",
+                    }
+                    .to_owned(),
+                );
             }
             rows.push(CatalogueItem {
                 display_name: definition.display_name.to_owned(),
                 description: definition.description.to_owned(),
                 size_bytes: definition.approximate_bytes,
                 url: definition.page.to_owned(),
-                file_name: match definition.category {
-                    ToolchainCategory::Runtime => format!("{}.zip", definition.runtime),
-                    ToolchainCategory::Component => format!("{}.msi", definition.runtime),
-                },
+                file_name: format!("{}.zip", definition.runtime),
                 tags,
                 state: Some(state),
                 version: dto.latest_version.clone().or_else(|| dto.version.clone()),
                 ..CatalogueItem::new(
                     toolchain_catalogue_ref(definition.runtime),
                     DownloadItemKind::Runtime,
-                    catalogue_source(definition.category),
+                    CatalogueSource::Github,
                     definition.runtime.as_str(),
                 )
             });
@@ -932,7 +863,6 @@ impl CommandLauncher for ToolchainService {
     fn program_dirs(&self) -> Vec<PathBuf> {
         let mut dirs: Vec<PathBuf> = TOOLCHAIN_DEFINITIONS
             .iter()
-            .filter(|definition| definition.category == ToolchainCategory::Runtime)
             .filter_map(|definition| self.connection(definition.runtime))
             .map(|record| PathBuf::from(record.executable_path))
             .filter(|primary| primary.is_file())

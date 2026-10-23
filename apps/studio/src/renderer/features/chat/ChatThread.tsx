@@ -18,6 +18,7 @@ import ChatToolCalls from "./ChatToolCalls";
 import { answerCitations } from "./citations";
 import { answerArtifacts } from "./artifacts";
 import ChatArtifacts from "./ChatArtifacts";
+import SelectionChips from "./SelectionChips";
 import { shouldPinToBottom } from "./scroll";
 import type ChatStore from "./ChatStore";
 import { CONTEXT_PANEL, FILES_PANEL, PANEL_GROUP_LABEL } from "./explorer/explorerCopy";
@@ -179,9 +180,16 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
-                      {message.content}
-                    </div>
+                    <>
+                      <div className="rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
+                        {message.content}
+                      </div>
+                      {message.selections.length > 0 ? (
+                        <div className="mt-1.5">
+                          <SelectionChips selections={message.selections} align="end" />
+                        </div>
+                      ) : null}
+                    </>
                   )}
                   <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                     <MessageActions

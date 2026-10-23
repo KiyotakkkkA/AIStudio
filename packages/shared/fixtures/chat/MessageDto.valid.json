@@ -65,5 +65,35 @@
       "partial": false,
       "createdAt": 3
     }
+  },
+  {
+    "name": "user with a selection",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111112",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "role": "user",
+      "content": "Что это значит?",
+      "reasoning": "",
+      "citations": [],
+      "toolCalls": [],
+      "selections": [
+        {
+          "documentId": "0199aa11-2222-7222-8222-222222222222",
+          "name": "Отчёт.docx",
+          "page": 2,
+          "start": 120,
+          "end": 354,
+          "text": "Выручка составила 11,12 млрд руб.",
+          "untrusted": true
+        }
+      ],
+      "tokensIn": 12,
+      "tokensOut": 2,
+      "usageEstimated": true,
+      "durationMs": 40,
+      "runId": "0199aa11-4444-7111-8111-111111111111",
+      "partial": false,
+      "createdAt": 3
+    }
   }
 ]

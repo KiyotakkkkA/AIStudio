@@ -8,7 +8,6 @@
       "sourcePath": "C:/Users/a/report.pdf",
       "kind": "pdf",
       "mimeType": "application/pdf",
-      "rendering": "native",
       "sizeBytes": 120400,
       "pageCount": 12,
       "partCount": 1,
@@ -26,7 +25,6 @@
       "sourcePath": "C:/Users/a/main.rs",
       "kind": "code",
       "mimeType": "text/plain",
-      "rendering": "native",
       "language": "rust",
       "sizeBytes": 0,
       "partCount": 1,
@@ -35,25 +33,7 @@
     }
   },
   {
-    "name": "an office document converted to pdf",
-    "value": {
-      "id": "0199aa11-3333-7333-8333-333333333333",
-      "contentHash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
-      "name": "plan.docx",
-      "sourcePath": "C:/Users/a/plan.docx",
-      "kind": "pdf",
-      "mimeType": "application/pdf",
-      "rendering": "converted",
-      "officeFormat": "docx",
-      "sizeBytes": 20480,
-      "pageCount": 3,
-      "partCount": 1,
-      "open": true,
-      "openedAt": 1700000000000
-    }
-  },
-  {
-    "name": "an office document rendered approximately",
+    "name": "an office document",
     "value": {
       "id": "0199aa11-3333-7333-8333-333333333333",
       "contentHash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
@@ -61,7 +41,6 @@
       "sourcePath": "C:/Users/a/budget.xlsx",
       "kind": "office",
       "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "rendering": "approximate",
       "officeFormat": "xlsx",
       "sizeBytes": 9000,
       "partCount": 1,

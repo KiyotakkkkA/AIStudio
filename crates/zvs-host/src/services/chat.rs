@@ -24,7 +24,7 @@ use zvs_contract::{
 
 use super::chat_history::{
     MESSAGE_OVERHEAD, RelatedSource, RetrievedSource, estimate_tokens, measure_context, tokens,
-    window_chat_history,
+    window_chat_history, with_selections,
 };
 use super::chat_tools::{
     CHAT_TOOL_CALLS, CHAT_TOOL_ROUNDS, HYBRID_INSTRUCTION, KNOWLEDGE_INSTRUCTION, KnowledgeText,
@@ -249,6 +249,7 @@ fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
         reasoning: row.reasoning,
         citations: row.citations,
         tool_calls: row.tool_calls,
+        selections: row.selections,
         tokens_in: count(row.tokens_in),
         tokens_out: count(row.tokens_out),
         usage_estimated: row.usage_estimated,
@@ -724,6 +725,13 @@ const fn chat_role(role: MessageRole) -> ChatRole {
     }
 }
 
+fn model_message(message: &MessageDto) -> ChatMessage {
+    ChatMessage::new(
+        chat_role(message.role),
+        with_selections(&message.content, &message.selections),
+    )
+}
+
 const fn generate_role(role: ChatRole) -> Option<GenerateRole> {
     match role {
         ChatRole::System => Some(GenerateRole::System),
@@ -1007,7 +1015,7 @@ impl NodeDef for PrepareNode {
         let user = &conversation.messages[position];
         let history: Vec<ChatMessage> = conversation.messages[..position]
             .iter()
-            .map(|message| ChatMessage::new(chat_role(message.role), message.content.clone()))
+            .map(model_message)
             .collect();
         let model = inner.resolve_model(&input.provider_id, &input.model_id, &input.settings)?;
         let details = &conversation.conversation;
@@ -1199,7 +1207,7 @@ impl NodeDef for PrepareNode {
         let prepared = window_chat_history(
             &system,
             &history,
-            &ChatMessage::user(user.content.clone()),
+            &ChatMessage::user(with_selections(&user.content, &user.selections)),
             model.context_window,
             model.max_output_tokens,
             &sources,
@@ -1256,6 +1264,7 @@ impl NodeDef for PrepareNode {
             reasoning: String::new(),
             citations: prepared.citations.clone(),
             tool_calls: Vec::new(),
+            selections: Vec::new(),
             tokens_in: prepared.tokens_in,
             tokens_out: 0,
             usage_estimated: true,
@@ -2214,7 +2223,7 @@ impl ChatService {
         window_chat_history(
             &details.system_prompt,
             &[],
-            &ChatMessage::user(text.clone()),
+            &ChatMessage::user(with_selections(&text, &input.selections)),
             model.context_window,
             model.max_output_tokens,
             &[],
@@ -2300,7 +2309,8 @@ impl ChatService {
             reasoning: String::new(),
             citations: Vec::<ChatCitationDto>::new(),
             tool_calls: Vec::new(),
-            tokens_in: tokens(&text),
+            selections: input.selections.clone(),
+            tokens_in: tokens(&with_selections(&text, &input.selections)),
             tokens_out: 0,
             usage_estimated: true,
             duration_ms: 0,
@@ -2403,15 +2413,7 @@ impl ChatService {
         .join("\n\n");
         let history: Vec<ChatMessage> = conversation
             .as_ref()
-            .map(|detail| {
-                detail
-                    .messages
-                    .iter()
-                    .map(|message| {
-                        ChatMessage::new(chat_role(message.role), message.content.clone())
-                    })
-                    .collect()
-            })
+            .map(|detail| detail.messages.iter().map(model_message).collect())
             .unwrap_or_default();
         let usage = measure_context(
             &system_prompt,

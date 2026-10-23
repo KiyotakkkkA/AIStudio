@@ -6,6 +6,7 @@ import { AccountStore } from "../features/providers/AccountStore";
 import { ProviderStore } from "../features/providers/ProviderStore";
 import { SecretStore } from "../features/secrets/SecretStore";
 import { UiStore } from "./UiStore";
+import ViewerStore from "./ViewerStore";
 import VectorStoreStore from "../features/vector-stores/VectorStoreStore";
 import ChatStore from "../features/chat/ChatStore";
 import DownloadStore from "../features/downloads/DownloadStore";
@@ -25,6 +26,7 @@ export interface RootStoreEnvironment {
 
 export class RootStore {
   readonly ui: UiStore;
+  readonly viewer: ViewerStore;
   readonly secrets: SecretStore;
   readonly providers: ProviderStore;
   readonly accounts: AccountStore;
@@ -47,6 +49,9 @@ export class RootStore {
     this.accounts = new AccountStore(environment);
     this.vectorStores = new VectorStoreStore(environment.ipc, environment.events);
     this.chat = new ChatStore(environment.ipc, environment.events);
+    this.viewer = new ViewerStore(environment.ipc, {
+      attachSelection: (selection) => this.chat.attachSelection(selection),
+    });
     this.tasks = new TaskStore(environment.ipc, environment.events);
     this.downloads = new DownloadStore(environment.ipc, environment.events);
     this.runs = new RunHistoryStore(environment.ipc);
@@ -61,6 +66,7 @@ export class RootStore {
       {
         environment: false,
         ui: false,
+        viewer: false,
         secrets: false,
         providers: false,
         accounts: false,
@@ -89,10 +95,11 @@ export class RootStore {
   }
 
   async boot(): Promise<void> {
-    await this.ui.restore();
+    await Promise.all([this.ui.restore(), this.viewer.restore()]);
   }
 
   dispose(): void {
+    this.viewer.dispose();
     this.accounts.dispose();
     this.vectorStores.dispose();
     this.chat.dispose();

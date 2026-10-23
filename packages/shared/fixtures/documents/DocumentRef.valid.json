@@ -1,7 +1,10 @@
 [
   {
     "name": "path",
-    "value": { "source": "path", "path": "C:/Users/a/report.pdf" }
+    "value": {
+      "source": "path",
+      "path": "C:/Users/a/report.pdf"
+    }
   },
   {
     "name": "citation",
@@ -21,6 +24,16 @@
   },
   {
     "name": "store document",
-    "value": { "source": "storeDocument", "documentId": "0199aa11-2222-7222-8222-222222222222" }
+    "value": {
+      "source": "storeDocument",
+      "documentId": "0199aa11-2222-7222-8222-222222222222"
+    }
+  },
+  {
+    "name": "artifact",
+    "value": {
+      "source": "artifact",
+      "artifactId": "0199aa11-4444-7444-8444-444444444444/Отчёт.docx"
+    }
   }
 ]

@@ -16,6 +16,8 @@ import IconButton from "../../../ui/atoms/buttons/IconButton";
 import EmptyState from "../../../ui/molecules/EmptyState";
 import SidePanelFrame from "../SidePanelFrame";
 import type ChatStore from "../ChatStore";
+import { useStore } from "../../../stores/useStore";
+import { openEntry, viewedPath } from "./openEntry";
 import { RESTORE_FOLDER_ACCESS, folderName } from "../workingFolderCopy";
 import type { ExplorerRow } from "./ExplorerStore";
 import {
@@ -55,11 +57,13 @@ const ExplorerRowView = observer(function ExplorerRowView({
   readonly row: ExplorerRow;
 }) {
   const explorer = store.explorer;
+  const { viewer } = useStore();
   const { entry, depth, expanded, loading } = row;
   const folder = entry.kind === "folder";
   const mark = explorer.markOf(entry);
   const focused = explorer.focused === entry.path;
-  const open = explorer.openPath === entry.path;
+  const open =
+    explorer.openPath === entry.path || viewedPath(viewer, store.workingFolder) === entry.path;
   const markStyle = mark === null ? null : MARK_STYLES[mark];
   return (
     <div
@@ -69,7 +73,7 @@ const ExplorerRowView = observer(function ExplorerRowView({
       aria-expanded={folder ? expanded : undefined}
       aria-selected={open}
       title={entry.ignored ? `${entry.name} · ${IGNORED_HINT}` : entry.name}
-      onClick={() => void explorer.activate(entry)}
+      onClick={() => void openEntry(explorer, viewer, store.workingFolder, entry)}
       className={`flex h-7 cursor-pointer items-center gap-1.5 rounded-control pr-2 text-[12.5px] select-none ${open ? "bg-main-700 text-main-50" : "text-main-200 hover:bg-main-750"} ${focused ? "outline-1 -outline-offset-1 outline-accent-line" : ""} ${entry.ignored ? "opacity-55" : ""}`}
       style={{ paddingLeft: `${String(6 + depth * 14)}px` }}
     >
@@ -102,6 +106,7 @@ const ExplorerRowView = observer(function ExplorerRowView({
 
 export default observer(function ChatExplorer({ store }: { readonly store: ChatStore }) {
   const explorer = store.explorer;
+  const { viewer } = useStore();
   const conversationId = store.active?.id ?? null;
   const folder = store.workingFolder;
   const access = store.workingFolderAccess;
@@ -122,7 +127,7 @@ export default observer(function ChatExplorer({ store }: { readonly store: ChatS
     else if (event.key === "ArrowLeft") explorer.collapseFocused();
     else {
       const row = explorer.rows.find((candidate) => candidate.entry.path === explorer.focused);
-      if (row !== undefined) void explorer.activate(row.entry);
+      if (row !== undefined) void openEntry(explorer, viewer, folder, row.entry);
     }
   };
 

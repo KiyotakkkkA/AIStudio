@@ -20,6 +20,7 @@ import Toggle from "../../ui/atoms/Toggle";
 import { RETRIEVAL_MODES, retrievalHint } from "./retrievalModes";
 import ChatContextMeter from "./ChatContextMeter";
 import ChatToolPicker from "./ChatToolPicker";
+import SelectionChips from "./SelectionChips";
 import type ChatStore from "./ChatStore";
 
 function insidePopup(target: HTMLElement, form: HTMLElement): boolean {
@@ -93,6 +94,14 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             >
               <span className="block h-full w-2/5 animate-zvs-sweep bg-linear-to-r from-transparent via-accent-dark to-transparent" />
             </span>
+          ) : null}
+          {store.composer.selections.length > 0 ? (
+            <div className="px-1">
+              <SelectionChips
+                selections={store.composer.selections}
+                onRemove={store.composer.removeSelection}
+              />
+            </div>
           ) : null}
           {(store.attachedStoreIds.length > 0 || store.enabledTools.length > 0) && (
             <div className="flex flex-wrap gap-1.5 px-1">

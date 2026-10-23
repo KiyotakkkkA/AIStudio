@@ -9,6 +9,17 @@ pub type PathRevealer = Arc<dyn Fn(&Path) -> Result<(), AppError> + Send + Sync>
 
 pub const OPEN_FAILED: &str = "Не удалось открыть браузер";
 pub const REVEAL_FAILED: &str = "Не удалось показать файл в папке";
+pub const LAUNCH_FAILED: &str = "Не удалось открыть файл в приложении";
+
+pub trait FileLauncher: Send + Sync {
+    fn application(&self, _extension: &str) -> Option<String> {
+        None
+    }
+
+    fn open(&self, path: &Path) -> Result<(), AppError>;
+}
+
+pub type SharedFileLauncher = Arc<dyn FileLauncher>;
 
 fn command(url: &str) -> Command {
     if cfg!(windows) {
@@ -78,4 +89,45 @@ pub fn reveal_in_file_manager(path: &Path) -> Result<(), AppError> {
 
 pub fn system_path_revealer() -> PathRevealer {
     Arc::new(reveal_in_file_manager)
+}
+
+fn launch_command(path: &Path) -> Command {
+    if cfg!(windows) {
+        let mut command = Command::new("explorer");
+        command.arg(path);
+        command
+    } else if cfg!(target_os = "macos") {
+        let mut command = Command::new("open");
+        command.arg(path);
+        command
+    } else {
+        let mut command = Command::new("xdg-open");
+        command.arg(path);
+        command
+    }
+}
+
+pub fn open_with_default_application(path: &Path) -> Result<(), AppError> {
+    launch_command(path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| ())
+        .map_err(|cause| {
+            AppError::new(AppErrorCode::Unknown, LAUNCH_FAILED)
+                .with_detail("raw", cause.to_string())
+        })
+}
+
+pub struct SystemFileLauncher;
+
+impl FileLauncher for SystemFileLauncher {
+    fn open(&self, path: &Path) -> Result<(), AppError> {
+        open_with_default_application(path)
+    }
+}
+
+pub fn system_file_launcher() -> SharedFileLauncher {
+    Arc::new(SystemFileLauncher)
 }

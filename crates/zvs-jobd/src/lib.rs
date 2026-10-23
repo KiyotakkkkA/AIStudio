@@ -1,6 +1,5 @@
 #![doc = include_str!("../README.md")]
 
-pub mod convert;
 pub mod document;
 pub mod download;
 pub mod jobs;

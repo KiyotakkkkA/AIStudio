@@ -8,7 +8,6 @@
       "sourcePath": "C:/Users/a/report.pdf",
       "kind": "pdf",
       "mimeType": "application/pdf",
-      "rendering": "native",
       "sizeBytes": 10,
       "partCount": 0,
       "open": true,
@@ -24,7 +23,6 @@
       "sourcePath": "C:/Users/a/report.pdf",
       "kind": "pdf",
       "mimeType": "application/pdf",
-      "rendering": "native",
       "sizeBytes": 10,
       "pageCount": 0,
       "partCount": 1,
@@ -33,7 +31,7 @@
     }
   },
   {
-    "name": "converted without an office format",
+    "name": "an office format on a pdf",
     "value": {
       "id": "0199aa11-3333-7333-8333-333333333333",
       "contentHash": "af13",
@@ -41,15 +39,15 @@
       "sourcePath": "C:/Users/a/report.pdf",
       "kind": "pdf",
       "mimeType": "application/pdf",
-      "rendering": "converted",
       "sizeBytes": 10,
       "partCount": 1,
       "open": true,
-      "openedAt": 1700000000000
+      "openedAt": 1700000000000,
+      "officeFormat": "docx"
     }
   },
   {
-    "name": "an office kind rendered natively",
+    "name": "an office kind without its format",
     "value": {
       "id": "0199aa11-3333-7333-8333-333333333333",
       "contentHash": "af13",
@@ -57,7 +55,6 @@
       "sourcePath": "C:/Users/a/report.pdf",
       "kind": "office",
       "mimeType": "application/pdf",
-      "rendering": "native",
       "sizeBytes": 10,
       "partCount": 1,
       "open": true,

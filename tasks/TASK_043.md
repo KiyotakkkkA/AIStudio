@@ -97,6 +97,9 @@ Manual check: Convert the reference document from `/references` (a real .docx) a
 
 ## Handoff
 
+> **Superseded (2026-10-23, TASK_044):** the LibreOffice integration below was removed — see
+> `docs/adr/0003-office-documents-render-in-the-renderer.md`.
+
 **Built:**
 - Decision: neither bundled nor JS-only. LibreOffice is a third `ToolchainRuntime`
   (`libreoffice`, category «компонент») beside uv and Node: detected in `PATH` and in

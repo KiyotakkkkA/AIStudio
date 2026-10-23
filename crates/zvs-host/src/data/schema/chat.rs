@@ -1,6 +1,7 @@
 use rusqlite::Row;
 use zvs_contract::{
-    ChatCitationDto, ChatSettings, ChatToolCallDto, MessageRole, RetrievalMode, Timestamp,
+    ChatCitationDto, ChatSettings, ChatToolCallDto, DocumentSelectionDto, MessageRole,
+    RetrievalMode, Timestamp,
 };
 
 use super::columns::{EnumColumn, json_column};
@@ -57,6 +58,7 @@ pub struct MessageRow {
     pub reasoning: String,
     pub citations: Vec<ChatCitationDto>,
     pub tool_calls: Vec<ChatToolCallDto>,
+    pub selections: Vec<DocumentSelectionDto>,
     pub tokens_in: i64,
     pub tokens_out: i64,
     pub usage_estimated: bool,
@@ -68,7 +70,8 @@ pub struct MessageRow {
 
 impl MessageRow {
     pub const COLUMNS: &str = "id, conversation_id, role, content, reasoning, citations, \
-        tool_calls, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, created_at";
+        tool_calls, selections, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, \
+        created_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -79,6 +82,7 @@ impl MessageRow {
             reasoning: row.get("reasoning")?,
             citations: json_column(row, "citations")?,
             tool_calls: json_column(row, "tool_calls")?,
+            selections: json_column(row, "selections")?,
             tokens_in: row.get("tokens_in")?,
             tokens_out: row.get("tokens_out")?,
             usage_estimated: row.get("usage_estimated")?,

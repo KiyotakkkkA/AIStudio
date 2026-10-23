@@ -36,21 +36,9 @@ impl Version {
     }
 
     pub fn find(output: &str) -> Option<Self> {
-        output.split_whitespace().find_map(|token| {
-            let token = token.trim_matches(|c: char| c == '(' || c == ')');
-            Self::parse(token).or_else(|| Self::parse_build(token))
-        })
-    }
-
-    fn parse_build(token: &str) -> Option<Self> {
-        let mut parts = token.split('.');
-        let core: Vec<&str> = parts.by_ref().take(3).collect();
-        let build = parts.next()?;
-        let numeric =
-            |part: &str| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit());
-        (core.len() == 3 && numeric(build) && parts.next().is_none())
-            .then(|| Self::parse(&core.join(".")))
-            .flatten()
+        output
+            .split_whitespace()
+            .find_map(|token| Self::parse(token.trim_matches(|c: char| c == '(' || c == ')')))
     }
 }
 
@@ -61,24 +49,8 @@ impl fmt::Display for Version {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ToolchainCategory {
-    Runtime,
-    Component,
-}
-
-impl ToolchainCategory {
-    pub const fn tag(self) -> &'static str {
-        match self {
-            Self::Runtime => "окружение",
-            Self::Component => "компонент",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ToolchainDefinition {
     pub runtime: ToolchainRuntime,
-    pub category: ToolchainCategory,
     pub display_name: &'static str,
     pub description: &'static str,
     pub minimum: Version,
@@ -87,10 +59,9 @@ pub struct ToolchainDefinition {
     pub banner: &'static str,
 }
 
-pub const TOOLCHAIN_DEFINITIONS: [ToolchainDefinition; 3] = [
+pub const TOOLCHAIN_DEFINITIONS: [ToolchainDefinition; 2] = [
     ToolchainDefinition {
         runtime: ToolchainRuntime::Uv,
-        category: ToolchainCategory::Runtime,
         display_name: "uv",
         description: "Менеджер пакетов Python. Нужен MCP-серверам, которые запускаются через uvx.",
         minimum: Version::new(0, 4, 0),
@@ -100,7 +71,6 @@ pub const TOOLCHAIN_DEFINITIONS: [ToolchainDefinition; 3] = [
     },
     ToolchainDefinition {
         runtime: ToolchainRuntime::Node,
-        category: ToolchainCategory::Runtime,
         display_name: "Node.js",
         description: "Среда выполнения JavaScript. Нужна MCP-серверам, которые запускаются через npx.",
         minimum: Version::new(18, 0, 0),
@@ -108,23 +78,12 @@ pub const TOOLCHAIN_DEFINITIONS: [ToolchainDefinition; 3] = [
         page: "https://nodejs.org/en/download",
         banner: "v",
     },
-    ToolchainDefinition {
-        runtime: ToolchainRuntime::LibreOffice,
-        category: ToolchainCategory::Component,
-        display_name: "LibreOffice",
-        description: "Офисный пакет. Преобразует документы DOCX, XLSX и PPTX в PDF для точного просмотра.",
-        minimum: Version::new(7, 0, 0),
-        approximate_bytes: 375 * 1024 * 1024,
-        page: "https://www.libreoffice.org/download/download-libreoffice/",
-        banner: "LibreOffice",
-    },
 ];
 
 pub fn definition(runtime: ToolchainRuntime) -> &'static ToolchainDefinition {
     match runtime {
         ToolchainRuntime::Uv => &TOOLCHAIN_DEFINITIONS[0],
         ToolchainRuntime::Node => &TOOLCHAIN_DEFINITIONS[1],
-        ToolchainRuntime::LibreOffice => &TOOLCHAIN_DEFINITIONS[2],
     }
 }
 
@@ -138,8 +97,6 @@ pub fn primary_name(runtime: ToolchainRuntime, platform: Platform) -> &'static s
         (ToolchainRuntime::Uv, false) => "uv",
         (ToolchainRuntime::Node, true) => "node.exe",
         (ToolchainRuntime::Node, false) => "node",
-        (ToolchainRuntime::LibreOffice, true) => "soffice.com",
-        (ToolchainRuntime::LibreOffice, false) => "soffice",
     }
 }
 
@@ -149,8 +106,6 @@ pub fn companion_name(runtime: ToolchainRuntime, platform: Platform) -> &'static
         (ToolchainRuntime::Uv, false) => "uvx",
         (ToolchainRuntime::Node, true) => "npx.cmd",
         (ToolchainRuntime::Node, false) => "npx",
-        (ToolchainRuntime::LibreOffice, true) => "soffice.exe",
-        (ToolchainRuntime::LibreOffice, false) => "soffice",
     }
 }
 
@@ -233,39 +188,6 @@ pub fn node_asset_name(version: &str, platform: Platform) -> Option<String> {
     })
 }
 
-pub fn libreoffice_build(platform: Platform) -> Option<(&'static str, &'static str)> {
-    match (platform.os, platform.arch) {
-        ("win32", "x64") => Some(("x86_64", "x86-64")),
-        ("win32", "arm64") => Some(("aarch64", "aarch64")),
-        _ => None,
-    }
-}
-
-pub fn libreoffice_asset_name(version: &str, platform: Platform) -> Option<String> {
-    let (_, arch) = libreoffice_build(platform)?;
-    Some(format!("LibreOffice_{version}_Win_{arch}.msi"))
-}
-
-pub fn libreoffice_system_dirs(platform: Platform) -> Vec<std::path::PathBuf> {
-    use std::path::PathBuf;
-    match platform.os {
-        "win32" => ["ProgramFiles", "ProgramW6432", "ProgramFiles(x86)"]
-            .iter()
-            .filter_map(std::env::var_os)
-            .map(|root| PathBuf::from(root).join("LibreOffice").join("program"))
-            .collect(),
-        "darwin" => vec![PathBuf::from(
-            "/Applications/LibreOffice.app/Contents/MacOS",
-        )],
-        _ => vec![
-            PathBuf::from("/usr/bin"),
-            PathBuf::from("/usr/lib/libreoffice/program"),
-            PathBuf::from("/opt/libreoffice/program"),
-            PathBuf::from("/snap/bin"),
-        ],
-    }
-}
-
 pub fn uv_asset_name(platform: Platform) -> Option<&'static str> {
     Some(match (platform.os, platform.arch) {
         ("win32", "x64") => "uv-x86_64-pc-windows-msvc.zip",
@@ -299,11 +221,6 @@ mod tests {
         assert_eq!(Version::find("v22.11.0\n"), Some(Version::new(22, 11, 0)));
         assert!(Version::new(18, 0, 0) > Version::new(16, 20, 2));
         assert!(Version::new(0, 10, 0) > Version::new(0, 9, 30));
-        assert_eq!(
-            Version::find("LibreOffice 26.8.1.2 3f5a0a8e2c7d1b0e"),
-            Some(Version::new(26, 8, 1))
-        );
-        assert_eq!(Version::find("build 1.2.3.4.5"), None);
     }
 
     #[test]
@@ -356,14 +273,5 @@ mod tests {
             Some("uv-x86_64-pc-windows-msvc.zip")
         );
         assert_eq!(uv_asset_name(Platform::new("freebsd", "x64")), None);
-        assert_eq!(
-            libreoffice_asset_name("26.8.1", WINDOWS).as_deref(),
-            Some("LibreOffice_26.8.1_Win_x86-64.msi")
-        );
-        assert_eq!(libreoffice_asset_name("26.8.1", LINUX), None);
-        assert_eq!(
-            primary_name(ToolchainRuntime::LibreOffice, WINDOWS),
-            "soffice.com"
-        );
     }
 }

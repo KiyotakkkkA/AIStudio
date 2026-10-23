@@ -530,12 +530,13 @@ pub fn test_services(system: SystemService) -> TestServices {
                 run_bus.clone(),
                 std::time::Duration::from_millis(50),
             ),
-            artifacts: crate::artifacts::ArtifactStore::new(workspace.join("artifacts"))
-                .with_revealer(Arc::new(|_: &Path| Ok(()))),
+            artifacts: test_artifacts(workspace.join("artifacts")),
             documents: crate::documents::DocumentService::new(
                 crate::documents::DocumentServiceOptions {
                     clock: clock.clone(),
                     reveal: Arc::new(|_: &Path| Ok(())),
+                    artifacts: Some(test_artifacts(workspace.join("artifacts"))),
+                    picker: Some(picker.clone()),
                     ..crate::documents::DocumentServiceOptions::new(
                         database.shared(),
                         core.clone(),
@@ -657,6 +658,34 @@ impl FakePicker {
             .1
             .clone()
     }
+}
+
+pub struct FakeLauncher {
+    pub opened: Mutex<Vec<PathBuf>>,
+    pub application: Option<String>,
+}
+
+impl crate::platform::external::FileLauncher for FakeLauncher {
+    fn application(&self, _extension: &str) -> Option<String> {
+        self.application.clone()
+    }
+
+    fn open(&self, path: &Path) -> Result<(), zvs_contract::AppError> {
+        self.opened
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(path.to_path_buf());
+        Ok(())
+    }
+}
+
+fn test_artifacts(root: PathBuf) -> crate::artifacts::ArtifactStore {
+    crate::artifacts::ArtifactStore::new(root)
+        .with_revealer(Arc::new(|_: &Path| Ok(())))
+        .with_launcher(Arc::new(FakeLauncher {
+            opened: Mutex::new(Vec::new()),
+            application: None,
+        }))
 }
 
 #[async_trait::async_trait]

@@ -2,7 +2,7 @@
 task: TASK_044
 title: Document viewer dock and selection → chat
 phase: 8 — Documents and the agent browser
-status: todo
+status: done
 depends_on: [TASK_043, TASK_076]
 unblocks: []
 estimate: 4 h
@@ -95,5 +95,45 @@ Manual check: Ask a question in chat that produces a citation into the reference
 ## Handoff
 
 **Built:**
+- `stores/ViewerStore` (cross-cutting, on `RootStore.viewer`): open by path, artifact or
+  citation (the cited chunk text comes from `vectorStores.chunks` and becomes the highlighted
+  passage), page/zoom/fit/expanded/selection/search state, `documents.save` and
+  `documents.reveal`; dock width, zoom and fit persist in `viewer.dock.width`, `viewer.zoom`,
+  `viewer.fit`. `UiStore.viewerDockWidth` is gone.
+- `renderer/viewer/`: `ViewerDock` (in the chat workspace slot, resizable, cover mode below
+  1250 px, fixed overlay when expanded, keyboard), `ViewerHeader`, `PdfView` (pdf.js
+  `=6.4.299`, worker as a module, per-page canvas at the device pixel ratio, text layer,
+  virtualised), `TextView` (markdown through `ChatMarkdown`, code through the kit `CodeView`,
+  plain text), `GridView` (CSV and sheets, virtualised rows, Excel-like fixed column widths),
+  `ImageView`, `OfficeView` (DOCX via `docx-preview` `=0.4.1`, XLSX via `ooxml.ts` over `jszip`
+  `=3.10.2`, PPTX slide text). Search and highlights use the CSS Custom Highlight API; every
+  scroller is the kit `ScrollArea`.
+- Selection → chat: `DocumentSelectionDto` (contract, Zod, fixtures), `ChatSendInput.selections`
+  and `MessageDto.selections` (migration `0010_message_selections`), chips in the composer and
+  under the user message, fenced `<document_excerpt>` blocks for the model
+  (`chat_history::with_selections`) in the turn and in later history.
+- Openers: explorer (PDF, images, office, CSV go to the viewer; markdown and text keep the
+  explorer view), citation markers and the «Источники» list, the sources panel («Открыть
+  документ»), and artifact cards: «Открыть» menu with «Открыть в <приложение>»
+  (`artifacts.open`, `artifacts.application`, `ShellLauncher` over `AssocQueryStringW` in the
+  shell) and «Открыть в просмотрщике» (`DocumentRef` `{ source: "artifact" }`).
+- `documents.save`; CSP gains `worker-src 'self'` and `img-src blob:`.
+- Tests: viewer store, selection mapping, virtualisation, citation open, persistence, CSV and
+  OOXML readers, grid widths, chat selections, artifact actions (renderer); fencing, selection
+  turns, artifact opens and saves, IPC channels, the shell launcher, the migration (Rust).
+
 **Deviated from plan:**
+- ADR 0003: LibreOffice integration (TASK_043) removed at the user's request after the managed
+  copy crashed on nearly every conversion. Office documents render in the renderer;
+  `DocumentRendering` left the contract; migration `0011_document_office_native` drops rows
+  that had been converted to PDF. No «converting» state exists any more.
+- XLSX is read by our own OOXML reader rather than SheetJS (npm release frozen at 0.18.5).
+- The dock lives in the chat workspace, where every opener is today, not in the app shell.
+
 **Next session should know:**
+- Not run here: `pnpm build`, `pnpm test:e2e`, the manual check in «Verify».
+  `cargo test --workspace` was blocked by the running dev build locking `zvs-jobd.exe`; every
+  crate passed on its own. `pnpm typecheck` still fails only at
+  `tests/renderer/fileChanges.test.ts:59`, as on `main`.
+- A previously downloaded LibreOffice stays in `<app data>/mcp-toolchain/libreoffice/` and can
+  be deleted by hand.

@@ -55,13 +55,12 @@ export default function TaskRow({
   const stoppable = live || run.status === "queued";
   return (
     <div
+      onClick={onSelect}
       className={`flex items-center gap-3 border-b border-line px-5 py-3 ${
         selected ? "bg-main-750 shadow-[inset_2px_0_0_var(--color-accent-dark)]" : "hover:bg-main-800"
       }`}
     >
       <button
-        type="button"
-        onClick={onSelect}
         aria-current={selected ? "true" : undefined}
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >

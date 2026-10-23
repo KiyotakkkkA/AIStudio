@@ -18,9 +18,7 @@ use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::data::Repositories;
 use zvs_host::data::repositories::{ProviderFilter, SecretFilter};
 use zvs_host::data::{MigrationFailed, PrepareOptions, prepare_database};
-use zvs_host::documents::{
-    DocumentService, DocumentServiceOptions, KernelDocumentConverter, register_document_nodes,
-};
+use zvs_host::documents::{DocumentService, DocumentServiceOptions};
 use zvs_host::downloads::{
     CatalogueService, CatalogueServiceOptions, CuratedProvider, DiskService, DiskServiceOptions,
     DownloadService, DownloadServiceOptions, OllamaProvider,
@@ -623,8 +621,9 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             tools.clone(),
         )
     });
-    let artifacts =
-        ArtifactStore::new(paths.data_dir.join("artifacts")).with_picker(Arc::clone(&picker));
+    let artifacts = ArtifactStore::new(paths.data_dir.join("artifacts"))
+        .with_picker(Arc::clone(&picker))
+        .with_launcher(platform::file_launcher());
     register_skill_nodes(
         &nodes,
         &skill_library,
@@ -696,17 +695,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         forbidden.clone(),
         clock.clone(),
     );
-    register_document_nodes(
-        &nodes,
-        Arc::new(sidecar.clone()),
-        paths.cache_dir.join("documents"),
-    )?;
     let documents = DocumentService::new(DocumentServiceOptions {
         forbidden: Some(forbidden),
-        converter: Some(Arc::new(KernelDocumentConverter::new(
-            runs.clone(),
-            Arc::new(toolchain.clone()),
-        ))),
+        artifacts: Some(artifacts.clone()),
+        picker: Some(Arc::clone(&picker)),
         clock: clock.clone(),
         logger: logger.clone(),
         ..DocumentServiceOptions::new(

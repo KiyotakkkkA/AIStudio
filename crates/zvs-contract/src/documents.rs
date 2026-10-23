@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::artifacts::{ARTIFACT_PATH_MAX, check_artifact_id};
 use crate::chat::ChatCitationDto;
 use crate::enums::wire_enum;
 use crate::errors::AppError;
@@ -36,12 +37,6 @@ wire_enum!(DocumentOfficeFormat {
     Pptx => "pptx",
 });
 
-wire_enum!(DocumentRendering {
-    Native => "native",
-    Converted => "converted",
-    Approximate => "approximate",
-});
-
 impl DocumentKind {
     pub const fn is_text(self) -> bool {
         matches!(self, Self::Markdown | Self::Code | Self::Csv | Self::Text)
@@ -68,6 +63,10 @@ pub enum DocumentRef {
     StoreDocument {
         document_id: DocumentId,
     },
+    #[serde(rename_all = "camelCase")]
+    Artifact {
+        artifact_id: String,
+    },
 }
 
 impl Validate for DocumentRef {
@@ -82,6 +81,7 @@ impl Validate for DocumentRef {
                 nested("citation", citation.validate())
             }
             Self::StoreDocument { .. } => Ok(()),
+            Self::Artifact { artifact_id } => check_artifact_id("artifactId", artifact_id),
         }
     }
 }
@@ -95,7 +95,6 @@ pub struct DocumentDto {
     pub source_path: String,
     pub kind: DocumentKind,
     pub mime_type: String,
-    pub rendering: DocumentRendering,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub office_format: Option<DocumentOfficeFormat>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -120,14 +119,8 @@ impl Validate for DocumentDto {
         check::max_len("sourcePath", &self.source_path, DOCUMENT_PATH_MAX)?;
         check::non_empty("mimeType", &self.mime_type)?;
         check::max_len("mimeType", &self.mime_type, DOCUMENT_MIME_MAX)?;
-        let office = self.office_format.is_some();
-        let consistent = match self.rendering {
-            DocumentRendering::Native => !office && self.kind != DocumentKind::Office,
-            DocumentRendering::Converted => office && self.kind == DocumentKind::Pdf,
-            DocumentRendering::Approximate => office && self.kind == DocumentKind::Office,
-        };
-        if !consistent {
-            return Err(invalid("rendering", "kind"));
+        if self.office_format.is_some() != (self.kind == DocumentKind::Office) {
+            return Err(invalid("officeFormat", "kind"));
         }
         if let Some(language) = &self.language {
             check::non_empty("language", language)?;
@@ -228,6 +221,23 @@ impl Validate for DocumentPageDto {
                 check::literal_true("untrusted", *untrusted)
             }
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentSaveResult {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
+impl Validate for DocumentSaveResult {
+    fn validate(&self) -> Result<(), AppError> {
+        if let Some(path) = &self.path {
+            check::non_empty("path", path)?;
+            check::max_len("path", path, ARTIFACT_PATH_MAX)?;
+        }
+        Ok(())
     }
 }
 

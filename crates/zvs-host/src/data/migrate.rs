@@ -95,6 +95,16 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0009_document_office",
         sql: include_str!("../../migrations/0009_document_office.sql"),
     },
+    Migration {
+        id: 10,
+        name: "0010_message_selections",
+        sql: include_str!("../../migrations/0010_message_selections.sql"),
+    },
+    Migration {
+        id: 11,
+        name: "0011_document_office_native",
+        sql: include_str!("../../migrations/0011_document_office_native.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -418,6 +428,26 @@ mod tests {
         assert_eq!(
             query(&database, "SELECT id FROM provider ORDER BY id"),
             ["p-kept"]
+        );
+    }
+
+    #[test]
+    fn documents_once_converted_to_pdf_leave_the_registry_and_the_rest_stay() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..11], &options(&backups, &clock)).expect("applies");
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    "INSERT INTO document (id, content_hash, source_path, kind, mime_type, office_format, page_count, part_count, size_bytes, cached_file, opened_at) VALUES                        ('converted', 'h1', 'C:/a.docx', 'pdf', 'application/pdf', 'docx', 2, 1, 10, 'h1.pdf', 1),                        ('office', 'h2', 'C:/b.xlsx', 'office', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx', NULL, 1, 10, 'h2.xlsx', 1),                        ('pdf', 'h3', 'C:/c.pdf', 'pdf', 'application/pdf', NULL, 2, 1, 10, 'h3.pdf', 1);",
+                )?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        assert_eq!(
+            query(&database, "SELECT id FROM document ORDER BY id"),
+            ["office", "pdf"]
         );
     }
 

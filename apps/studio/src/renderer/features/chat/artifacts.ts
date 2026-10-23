@@ -8,6 +8,14 @@ const ToolArtifacts = ArtifactDto.array();
 export const ARTIFACTS_LABEL = "Созданные файлы";
 export const DOWNLOAD_ARTIFACT = "Скачать";
 export const REVEAL_ARTIFACT = "Перейти";
+export const OPEN_ARTIFACT = "Открыть";
+export const OPEN_IN_VIEWER = "Открыть в просмотрщике";
+export const OPEN_IN_DEFAULT_APP = "Открыть в приложении по умолчанию";
+export const VIEWER_UNAVAILABLE = "Формат не поддерживается просмотрщиком";
+
+export function openInApplication(name: string | null): string {
+  return name === null ? OPEN_IN_DEFAULT_APP : `Открыть в ${name}`;
+}
 export const ARTIFACT_SAVED = "Файл сохранён";
 export const UNKNOWN_ARTIFACT_ERROR = "Не удалось выполнить действие с файлом. Попробуйте ещё раз.";
 

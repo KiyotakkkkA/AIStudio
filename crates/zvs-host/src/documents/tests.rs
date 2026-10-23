@@ -1,13 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 
-use async_trait::async_trait;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use zvs_contract::{
     AppError, AppErrorCode, ChatCitationDto, DocumentDto, DocumentId, DocumentKind,
-    DocumentOfficeFormat, DocumentPageDto, DocumentRef, DocumentRendering, DocumentTextEncoding,
-    VectorStoreId,
+    DocumentOfficeFormat, DocumentPageDto, DocumentRef, DocumentTextEncoding, VectorStoreId,
 };
 
 use super::*;
@@ -91,10 +89,6 @@ impl Fixture {
 
     fn cache(&self) -> DocumentCache {
         DocumentCache::new(self.folder.path().join("cache").join("documents"))
-    }
-
-    fn cache_dir(&self) -> PathBuf {
-        self.folder.path().join("cache").join("documents")
     }
 
     fn cached(&self) -> Vec<CacheEntry> {
@@ -252,12 +246,11 @@ async fn a_mislabelled_file_fails_without_touching_the_cache() {
 }
 
 #[tokio::test]
-async fn an_office_file_without_a_converter_opens_for_approximate_rendering() {
+async fn an_office_file_opens_as_its_original_bytes() {
     let fixture = fixture();
     let docx = fixture.write("letter.docx", DOCX_BYTES);
     let opened = fixture.open(&docx).await.expect("opens");
     assert_eq!(opened.kind, DocumentKind::Office);
-    assert_eq!(opened.rendering, DocumentRendering::Approximate);
     assert_eq!(opened.office_format, Some(DocumentOfficeFormat::Docx));
     assert_eq!(opened.page_count, None);
     assert_eq!(
@@ -284,140 +277,16 @@ async fn an_unsupported_format_fails_cleanly() {
     assert!(fixture.service.list().expect("lists").is_empty());
 }
 
-struct FakeConverter;
-
-#[async_trait]
-impl DocumentConverter for FakeConverter {
-    async fn convert_to_pdf(
-        &self,
-        _source: &Path,
-        format: OfficeFormat,
-        target: &Path,
-    ) -> Result<(), AppError> {
-        assert_eq!(format, OfficeFormat::Docx);
-        std::fs::write(target, PDF_BYTES).expect("writes the converted file");
-        Ok(())
-    }
-}
-
-#[derive(Default)]
-struct CountingConverter {
-    ready: std::sync::atomic::AtomicBool,
-    calls: std::sync::atomic::AtomicUsize,
-    fail: Option<AppErrorCode>,
-}
-
-impl CountingConverter {
-    fn ready(fail: Option<AppErrorCode>) -> Arc<Self> {
-        Arc::new(Self {
-            ready: std::sync::atomic::AtomicBool::new(true),
-            calls: std::sync::atomic::AtomicUsize::new(0),
-            fail,
-        })
-    }
-
-    fn calls(&self) -> usize {
-        self.calls.load(std::sync::atomic::Ordering::SeqCst)
-    }
-}
-
-#[async_trait]
-impl DocumentConverter for CountingConverter {
-    async fn ready(&self) -> bool {
-        self.ready.load(std::sync::atomic::Ordering::SeqCst)
-    }
-
-    async fn convert_to_pdf(
-        &self,
-        _source: &Path,
-        _format: OfficeFormat,
-        target: &Path,
-    ) -> Result<(), AppError> {
-        self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        std::fs::write(target, b"%PDF-partial").expect("writes a partial file");
-        match self.fail {
-            Some(code) => Err(AppError::new(code, "failed")),
-            None => {
-                std::fs::write(target, PDF_BYTES).expect("writes the converted file");
-                Ok(())
-            }
-        }
-    }
-}
-
 #[tokio::test]
-async fn conversion_is_cached_by_source_hash_across_paths() {
-    let converter = CountingConverter::ready(None);
-    let shared = converter.clone();
-    let fixture = fixture_with(move |options| options.converter = Some(shared));
+async fn an_office_file_is_cached_once_by_content_across_paths() {
+    let fixture = fixture();
     let first = fixture.write("a/letter.docx", DOCX_BYTES);
     let second = fixture.write("b/copy.docx", DOCX_BYTES);
-    let opened = fixture.open(&first).await.expect("converts");
+    let opened = fixture.open(&first).await.expect("opens");
     let again = fixture.open(&second).await.expect("reuses");
-    assert_eq!(converter.calls(), 1);
     assert_eq!(opened.id, again.id);
-    assert_eq!(again.rendering, DocumentRendering::Converted);
     assert_eq!(again.office_format, Some(DocumentOfficeFormat::Docx));
-}
-
-#[tokio::test]
-async fn a_converter_that_becomes_ready_replaces_the_approximate_copy() {
-    let converter = Arc::new(CountingConverter::default());
-    let shared = converter.clone();
-    let fixture = fixture_with(move |options| options.converter = Some(shared));
-    let docx = fixture.write("letter.docx", DOCX_BYTES);
-    let approximate = fixture.open(&docx).await.expect("opens");
-    assert_eq!(approximate.rendering, DocumentRendering::Approximate);
-    assert_eq!(converter.calls(), 0);
-    converter
-        .ready
-        .store(true, std::sync::atomic::Ordering::SeqCst);
-    let converted = fixture.open(&docx).await.expect("converts");
-    assert_eq!(converted.id, approximate.id);
-    assert_eq!(converted.kind, DocumentKind::Pdf);
-    assert_eq!(
-        fixture
-            .cached()
-            .into_iter()
-            .map(|entry| entry.name)
-            .collect::<Vec<_>>(),
-        [format!("{}.pdf", converted.content_hash)]
-    );
-}
-
-#[tokio::test]
-async fn a_failed_or_cancelled_conversion_leaves_no_partial_file_in_the_cache() {
-    for code in [AppErrorCode::UnsupportedFormat, AppErrorCode::RunCancelled] {
-        let converter = CountingConverter::ready(Some(code));
-        let fixture = fixture_with(move |options| options.converter = Some(converter));
-        let docx = fixture.write("letter.docx", DOCX_BYTES);
-        let error = fixture.open(&docx).await.expect_err("fails");
-        assert_eq!(error.code, code);
-        assert!(fixture.cached().is_empty());
-        assert!(fixture.service.list().expect("lists").is_empty());
-        let leftovers = std::fs::read_dir(fixture.cache_dir())
-            .map(|entries| entries.count())
-            .unwrap_or(0);
-        assert_eq!(leftovers, 0);
-    }
-}
-
-#[tokio::test]
-async fn an_office_file_takes_the_pdf_path_through_the_converter() {
-    let fixture = fixture_with(|options| options.converter = Some(Arc::new(FakeConverter)));
-    let docx = fixture.write("letter.docx", DOCX_BYTES);
-    let opened = fixture.open(&docx).await.expect("converts");
-    assert_eq!(opened.kind, DocumentKind::Pdf);
-    assert_eq!(opened.size_bytes, DOCX_BYTES.len() as u64);
-    assert_eq!(opened.page_count, Some(2));
-    assert_eq!(
-        fixture
-            .cached()
-            .into_iter()
-            .map(|entry| entry.name)
-            .collect::<Vec<_>>(),
-        [format!("{}.pdf", opened.content_hash)]
-    );
+    assert_eq!(fixture.cached().len(), 1);
 }
 
 #[tokio::test]
@@ -675,4 +544,105 @@ async fn reveal_shows_the_source_file() {
         .reveal(&DocumentId::parse(STORE_DOCUMENT).expect("uuid"))
         .expect_err("unknown");
     assert_eq!(unknown.message, DOCUMENT_NOT_FOUND);
+}
+
+#[tokio::test]
+async fn an_artifact_opens_through_the_store_even_inside_a_forbidden_folder() {
+    let data = tempfile::tempdir().expect("app data");
+    let root = data.path().join("artifacts");
+    let artifact = root.join("run-1").join("Отчёт.pdf");
+    std::fs::create_dir_all(artifact.parent().expect("a parent")).expect("a folder");
+    std::fs::write(&artifact, PDF_BYTES).expect("writes");
+    let fixture = fixture_with(|options| {
+        options.forbidden = Some(ForbiddenFolders::new(
+            &[data.path().to_path_buf()],
+            &[],
+            Arc::new(Vec::new),
+        ));
+        options.artifacts = Some(crate::artifacts::ArtifactStore::new(root.clone()));
+    });
+
+    let opened = fixture
+        .service
+        .open(DocumentRef::Artifact {
+            artifact_id: "run-1/Отчёт.pdf".to_owned(),
+        })
+        .await
+        .expect("opens");
+    assert_eq!(opened.kind, DocumentKind::Pdf);
+    assert_eq!(opened.name, "Отчёт.pdf");
+
+    let escape = fixture
+        .service
+        .open(DocumentRef::Artifact {
+            artifact_id: "run-1/../../secret.pdf".to_owned(),
+        })
+        .await
+        .expect_err("outside the store");
+    assert!(matches!(
+        escape.code,
+        AppErrorCode::NotFound | AppErrorCode::ValidationFailed
+    ));
+    let refused = fixture.open(&artifact).await.expect_err("a path open");
+    assert_eq!(refused.code, AppErrorCode::PermissionDenied);
+}
+
+#[tokio::test]
+async fn an_artifact_without_a_store_is_not_found() {
+    let fixture = fixture();
+    let error = fixture
+        .service
+        .open(DocumentRef::Artifact {
+            artifact_id: "run-1/a.pdf".to_owned(),
+        })
+        .await
+        .expect_err("no store");
+    assert_eq!(error.code, AppErrorCode::NotFound);
+}
+
+#[tokio::test]
+async fn save_copies_the_viewed_document_to_the_picked_path() {
+    let picker = crate::testing::FakePicker::shared();
+    let fixture = fixture_with(|options| options.picker = Some(picker.clone()));
+    let path = fixture.write("notes.md", b"# Plan");
+    let opened = fixture.open(&path).await.expect("opens");
+    let target = fixture.folder.path().join("saved.md");
+    picker.answer(&[target.to_string_lossy().as_ref()]);
+
+    std::fs::remove_file(&path).expect("removes the source");
+    let saved = fixture.service.save(&opened.id).await.expect("saves");
+    assert_eq!(
+        saved.path.as_deref(),
+        Some(target.to_string_lossy().as_ref())
+    );
+    assert_eq!(std::fs::read(&target).expect("reads"), b"# Plan");
+
+    picker.answer(&[]);
+    let cancelled = fixture.service.save(&opened.id).await.expect("cancelled");
+    assert_eq!(cancelled.path, None);
+}
+
+#[tokio::test]
+async fn an_office_document_saves_its_original_bytes() {
+    let picker = crate::testing::FakePicker::shared();
+    let fixture = fixture_with(|options| options.picker = Some(picker.clone()));
+    let docx = fixture.write("letter.docx", DOCX_BYTES);
+    let opened = fixture.open(&docx).await.expect("opens");
+    let target = fixture.folder.path().join("letter-copy.docx");
+    picker.answer(&[target.to_string_lossy().as_ref()]);
+    fixture.service.save(&opened.id).await.expect("saves");
+    assert_eq!(std::fs::read(&target).expect("reads"), DOCX_BYTES);
+}
+
+#[tokio::test]
+async fn save_without_a_dialog_is_not_implemented() {
+    let fixture = fixture();
+    let path = fixture.write("report.pdf", PDF_BYTES);
+    let opened = fixture.open(&path).await.expect("opens");
+    let error = fixture
+        .service
+        .save(&opened.id)
+        .await
+        .expect_err("no dialog");
+    assert_eq!(error.code, AppErrorCode::NotImplemented);
 }

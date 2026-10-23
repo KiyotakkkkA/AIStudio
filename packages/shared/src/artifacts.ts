@@ -34,3 +34,8 @@ export const ArtifactSaveResult = z.object({
   path: z.string().min(1).max(ARTIFACT_PATH_MAX).optional(),
 });
 export type ArtifactSaveResult = z.infer<typeof ArtifactSaveResult>;
+
+export const ArtifactApplicationDto = z.object({
+  name: z.string().min(1).max(256).optional(),
+});
+export type ArtifactApplicationDto = z.infer<typeof ArtifactApplicationDto>;

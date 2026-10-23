@@ -11,10 +11,12 @@ export default function ChatSources({
   sources,
   fragments,
   onOpen,
+  onView,
 }: {
   readonly sources: readonly CitationSource[];
   readonly fragments: number;
   readonly onOpen: (storeId?: ChatCitationDto["storeId"]) => void;
+  readonly onView: (citation: ChatCitationDto) => void;
 }) {
   if (sources.length === 0) return null;
   const shown = sources.slice(0, SOURCES_SHOWN);
@@ -29,7 +31,7 @@ export default function ChatSources({
               type="button"
               title={source.path}
               className="cursor-pointer text-left text-accent-medium underline decoration-accent-line underline-offset-3 hover:decoration-accent-medium"
-              onClick={() => onOpen(source.storeId)}
+              onClick={() => onView(source.citation)}
             >
               {source.name}
               <span className="inline-block pl-1 text-main-500">— {sourceDetail(source)}</span>

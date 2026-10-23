@@ -717,16 +717,24 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::artifacts::ArtifactSaveResult>,
     ),
     (
+        "artifacts/ArtifactApplicationDto",
+        round_trip::<zvs_contract::artifacts::ArtifactApplicationDto>,
+    ),
+    (
+        "chat/DocumentSelectionDto",
+        round_trip::<zvs_contract::chat::DocumentSelectionDto>,
+    ),
+    (
+        "documents/DocumentSaveResult",
+        round_trip::<zvs_contract::documents::DocumentSaveResult>,
+    ),
+    (
         "documents/DocumentKind",
         round_trip::<zvs_contract::documents::DocumentKind>,
     ),
     (
         "documents/DocumentOfficeFormat",
         round_trip::<zvs_contract::documents::DocumentOfficeFormat>,
-    ),
-    (
-        "documents/DocumentRendering",
-        round_trip::<zvs_contract::documents::DocumentRendering>,
     ),
     (
         "documents/DocumentTextEncoding",

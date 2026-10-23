@@ -7,10 +7,15 @@ pub const ARTIFACT_ID_MAX: usize = 512;
 pub const ARTIFACT_NAME_MAX: usize = 255;
 pub const ARTIFACT_FORMAT_MAX: usize = 16;
 pub const ARTIFACT_PATH_MAX: usize = 32_767;
+pub const ARTIFACT_APPLICATION_MAX: usize = 256;
 
 fn check_id(id: &str) -> Result<(), AppError> {
-    check::non_empty("id", id)?;
-    check::max_len("id", id, ARTIFACT_ID_MAX)?;
+    check_artifact_id("id", id)
+}
+
+pub fn check_artifact_id(field: &str, id: &str) -> Result<(), AppError> {
+    check::non_empty(field, id)?;
+    check::max_len(field, id, ARTIFACT_ID_MAX)?;
     let mut parts = id.split('/');
     let valid = matches!(
         (parts.next(), parts.next(), parts.next()),
@@ -22,7 +27,7 @@ fn check_id(id: &str) -> Result<(), AppError> {
     if valid {
         Ok(())
     } else {
-        Err(invalid("id", "format"))
+        Err(invalid(field, "format"))
     }
 }
 
@@ -71,6 +76,23 @@ impl Validate for ArtifactSaveResult {
         if let Some(path) = &self.path {
             check::non_empty("path", path)?;
             check::max_len("path", path, ARTIFACT_PATH_MAX)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactApplicationDto {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+impl Validate for ArtifactApplicationDto {
+    fn validate(&self) -> Result<(), AppError> {
+        if let Some(name) = &self.name {
+            check::non_empty("name", name)?;
+            check::max_len("name", name, ARTIFACT_APPLICATION_MAX)?;
         }
         Ok(())
     }

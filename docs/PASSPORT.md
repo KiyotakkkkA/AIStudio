@@ -52,7 +52,7 @@ are Rust.
 | D5 | Repo layout | **pnpm workspace + Vite + Tauri + cargo workspace** *(rev. 2.0; was electron-vite)* | Enforced package and crate boundaries, fast HMR, one command to build both toolchains | Monorepo orchestration to configure once |
 | D6 | Renderer structure | **Atomic for UI, feature modules for domains** | Atomic Design has no answer for where a store or use-case goes; feature modules fill that gap without discarding it | Two organizing axes to teach |
 | D7 | Execution | **One kernel, three front-ends** | Chat, scenarios and agentic runs are all Run/Step/Event; one cancellation, retry, log and progress story feeding one Tasks page | The kernel must be general enough on day one |
-| D8 | Document viewer | **Right dock that expands to overlay; PDF/image/text native, office converted to PDF by the sidecar** | One rendering path and faithful office layout; read-while-chatting stays possible | A conversion step and a cache to manage |
+| D8 | Document viewer | **Right dock that expands to overlay; every kind renders in the renderer, office included (ADR 0003)** | No converter to install or keep alive; read-while-chatting stays possible | Office layout is approximate |
 | D9 | Agent browser | **Child webviews attached to the studio window, in their own WebView2 profile, driven over WebView2's CDP; tiered approval** *(rev. 2.0; was `BrowserWindow` + `WebContentsView`)* | No second browser to ship, every action visible live, instant takeover; the user logs into sites once | We own the automation primitives, a logged-in profile raises the stakes on prompt injection, and CDP access is WebView2-only, so automation is Windows-only |
 | D10 | Shell and host | **Tauri 2 (WebView2 on Windows); the whole host in Rust; no Node runtime in the shipped app** *(decided 2026-10-10; complete 2026-10-19, TASK_076)* | One language for host and core, so no FFI layer, no Node ABI rebuilds and no JSON hop to reach `zvs-core`. A much smaller install and memory footprint than a bundled Chromium. Capability-scoped IPC instead of a preload convention | A rewrite of ~22k lines of host TypeScript (Phase M). Multi-webview needs Tauri's `unstable` feature. Only WebView2 is verified. Electron APIs are replaced one by one, as listed below |
 | D11 | Account-mode providers | **Qwen only; no vendor whose web API demands a proof of work or other anti-automation challenge** *(decided 2026-10-19, ADR 0001)* | Account mode sends the requests the user's own signed-in page sends and nothing more; solving a vendor's anti-bot challenge would mean shipping code that defeats its abuse protection | DeepSeek is offered only through its official API (`openai-compatible`) or OpenRouter; existing `deepseek-web` rows are deleted by migration 0002 |
@@ -787,13 +787,10 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
    start, without a `t()` shim. Developer communication and code identifiers remain English.
 7. `@kiyotakkkka/zvs-uikit-lib` is ESM-only and Tailwind-based; the app's Tailwind config
    must include its `dist` in `content` for class scanning.
-8. **Confirmed (TASK_043, 2026-10-23):** LibreOffice is **not** bundled. Office→PDF conversion
-   uses a LibreOffice the user already has (Program Files or `PATH`, detected on first use) or
-   a managed copy installed from «Расширения → Компоненты» or «Загрузки»: the official MSI
-   (~360 MB, SHA-256 from the TDF mirror) unpacked with `msiexec /a` into
-   `<app data>/mcp-toolchain/libreoffice/<version>` — no admin rights, no system install.
-   Without LibreOffice an office document opens with `rendering: "approximate"` and the viewer
-   renders it in JavaScript with a visible note.
+8. **Revised (ADR 0003, 2026-10-23):** there is no office converter. LibreOffice integration
+   (TASK_043) was removed after the managed copy crashed on almost every conversion; DOCX,
+   XLSX and PPTX render in the renderer (docx-preview, an OOXML sheet reader over jszip,
+   slide text) and are marked «приближённое отображение».
 9. The browser ships one profile ("work", the WebView2 data directory `<app data>/browser/work`).
    Multiple named profiles come later, as further data directories under `browser/`.
 10. **Confirmed (2026-10-10):** no import of Electron-era data. The Tauri build starts from an
@@ -843,17 +840,25 @@ in a run, a document row in a vector store, or a drop onto the window.
 | PDF | `pdf.js` in the renderer, rendered to canvas per page, virtualised |
 | Images | Native `<img>` with pan/zoom |
 | Markdown / code / CSV | Rendered in-app; code via the kit's `./code-view` (shiki) |
-| DOCX · XLSX · PPTX | **Converted to PDF by the sidecar on open** when LibreOffice is connected, then the PDF path; otherwise `kind: "office"` bytes for approximate JS rendering (docx-preview, SheetJS; PPTX falls back to extracted text) |
+| DOCX · XLSX · PPTX | `kind: "office"` bytes rendered in the renderer (ADR 0003): DOCX with `docx-preview`, XLSX with the OOXML reader in `viewer/ooxml.ts` into the virtualised grid, PPTX as slide text |
 
-Conversion is an ordinary kernel job: a `job` run titled «Преобразование «name» в PDF» with
-one `document.convert` node, which runs the sidecar job `job.document.convert` (`zvs-core`
-`OfficeConverter`, backend `SofficeConverter`: headless `soffice --convert-to pdf` with a
-fresh profile per job, kill-tree on cancel and on a 10-minute timeout). It shows on the Tasks
-page, reports progress, and is cancellable; a cancelled, failed or timed-out conversion leaves
-no file in the cache. The node only writes into the document cache. The result is cached at
-`<app data>/cache/documents/<hash>.pdf`, keyed by the **source** content hash — so reopening is
-instant, one file at two paths converts once, and the cache is safe to delete at any time.
-Eviction is LRU against a size ceiling set in Settings.
+Nothing is converted. Every kind is cached as a copy of the source at
+`<app data>/cache/documents/<hash>.<ext>`, keyed by its content hash — so reopening is instant,
+one file at two paths is one document, and the cache is safe to delete at any time. Eviction is
+LRU against a size ceiling set in Settings.
+
+### Dock
+
+`renderer/viewer/ViewerDock` sits in the chat workspace in the slot beside the thread (where the
+explorer's file view sits), keeps the thread at least 420 px wide, covers the chat below
+1250 px with «Назад к диалогу», and expands to a fixed overlay over the window. Header: page
+navigation (input, `PageUp`/`PageDown`, `Alt+←/→`), zoom presets and «По ширине», search
+(`Ctrl+F`, CSS Custom Highlight API, no DOM mutation), download (`documents.save`, the OS save
+dialog), reveal, expand, close. PDFs render one canvas per visible page at the device pixel
+ratio with pdf.js's text layer, and only the pages in view plus one either side exist. The
+explorer opens PDF, image, office and CSV files here; markdown and text keep its own view. A
+chat artifact opens here through `{ source: "artifact" }` or in the OS default application
+through `artifacts.open` («Открыть в Word», the name from `artifacts.application`).
 
 ### State
 
@@ -884,12 +889,8 @@ viewer at the right page, and a selection there feeds the next turn.
   GIF, WEBP, BMP, the OOXML package parts, text without control bytes). A mismatch fails with
   `UNSUPPORTED_FORMAT` (`reason: "mislabelled"`) and never renders. An unknown extension is
   read by its content. Native kinds: `pdf`, `image`, `markdown`, `code` (with a shiki
-  `language`), `csv`, `text`. DOCX, XLSX and PPTX carry `officeFormat` and a `rendering`:
-  `converted` (`kind: "pdf"`, through the `DocumentConverter` hook to `<hash>.pdf`) when a
-  converter is ready or the PDF is already cached, otherwise `approximate` (`kind: "office"`,
-  the original bytes cached as `<hash>.<ext>`). A converter that becomes ready later replaces
-  the approximate copy on the next open. A document the converter cannot read fails with
-  `UNSUPPORTED_FORMAT` and «Не удалось преобразовать документ DOCX в PDF».
+  `language`), `csv`, `text`. DOCX, XLSX and PPTX are `kind: "office"` with `officeFormat`, served as their
+  original bytes; `officeFormat` is present exactly when the kind is `office`.
 - **Cache.** `<cache>/documents/<hash>.<ext>` holds a copy of the file, so a moved or deleted
   source keeps serving and reopening costs one hash. Only hash-named files belong to the cache,
   so the indexing scratch folders beside them are ignored. Eviction is LRU by `opened_at`
@@ -909,9 +910,19 @@ viewer at the right page, and a selection there feeds the next turn.
 
 `documents.open`, `documents.page`, `documents.close`, `documents.list` (the registry,
 newest first, each with `open`), `documents.reveal` (shows the source file in the OS file
-manager). There is no separate `documents.convert`: `documents.open` starts the conversion
-run itself and resolves when it ends; the viewer follows progress through the run on the
-event channel.
+manager), `documents.save` (copies the cached file through the save dialog). `documents.open`
+also takes `{ source: "artifact", artifactId }`, resolved through the artifact store, which is
+how a file a skill produced in app data opens despite the forbidden-folder rule.
+`artifacts.open` and `artifacts.application` hand an artifact to the OS default application
+and name it (`AssocQueryStringW` on Windows).
+
+### Selections in a turn
+
+`ChatSendInput.selections` (at most 8 `DocumentSelectionDto`, 8 000 characters each) is stored
+on the user message (`message.selections`, migration `0010`). Every time the message reaches a
+model — the turn itself and the history of later turns — `chat_history::with_selections`
+appends each selection as a `<document_excerpt name="…" page="…">` block under an instruction
+that the excerpts are untrusted; an excerpt cannot close its own fence.
 
 ---
 

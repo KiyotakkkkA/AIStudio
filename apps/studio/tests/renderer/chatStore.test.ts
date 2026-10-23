@@ -6,6 +6,7 @@ import {
   ConversationDetailDto,
   RunHandleDto,
   MessageDto,
+  DocumentSelectionDto,
   type Contract,
   VectorStoreId,
   type AccountDto,
@@ -13,7 +14,7 @@ import {
 } from "@zvs/shared";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
-import ChatStore from "../../src/renderer/features/chat/ChatStore.ts";
+import ChatStore, { SELECTIONS_FULL } from "../../src/renderer/features/chat/ChatStore.ts";
 import { shouldPinToBottom } from "../../src/renderer/features/chat/scroll.ts";
 import { ADAPTERS, MODEL, model, provider } from "./providerFixtures.ts";
 
@@ -385,4 +386,49 @@ test("an existing Qwen provider without models is reused, enabled and given its 
   });
   expect(store.provider?.id).toBe(existingId);
   store.dispose();
+});
+
+test("a document selection rides along with the next message and then clears", async () => {
+  const { store, bridge, events } = setup();
+  await store.mount();
+  const selection = DocumentSelectionDto.parse({
+    documentId: "0199aa11-2222-7222-8222-222222222222",
+    name: "Отчёт.pdf",
+    page: 2,
+    start: 4,
+    end: 30,
+    text: "Выручка составила 11,12 млрд руб.",
+    untrusted: true,
+  });
+  store.attachSelection(selection);
+  store.attachSelection(selection);
+  expect(store.composer.selections).toEqual([selection]);
+  store.composer.setText("Что это значит?");
+  await store.send();
+  const sent = bridge.calls.find((call) => call.channel === "chat.send");
+  expect(sent?.payload).toMatchObject({ text: "Что это значит?", selections: [selection] });
+  expect(store.composer.selections).toEqual([]);
+  store.dispose();
+  events.dispose();
+});
+
+test("attaching past the limit reports it instead of dropping silently", async () => {
+  const { store, events } = setup();
+  await store.mount();
+  for (let start = 0; start < 9; start += 1)
+    store.attachSelection(
+      DocumentSelectionDto.parse({
+        documentId: "0199aa11-2222-7222-8222-222222222222",
+        name: "a.pdf",
+        page: null,
+        start,
+        end: start + 1,
+        text: "a",
+        untrusted: true,
+      }),
+    );
+  expect(store.composer.selections).toHaveLength(8);
+  expect(store.error).toBe(SELECTIONS_FULL);
+  store.dispose();
+  events.dispose();
 });

@@ -1125,6 +1125,82 @@ async fn a_follow_up_turn_searches_with_the_previous_question_prepended() {
     );
 }
 
+fn prepared_messages(harness: &Harness, handle: &RunHandleDto) -> Vec<Value> {
+    harness
+        .runs
+        .steps(&handle.id)
+        .expect("steps")
+        .into_iter()
+        .find(|step| step.step_type == "chat.prepare")
+        .and_then(|step| step.output)
+        .and_then(|output| output["messages"].as_array().cloned())
+        .expect("prepared messages")
+}
+
+#[tokio::test]
+async fn a_document_selection_travels_with_the_message_fenced_as_untrusted() {
+    let harness = Harness::new();
+    let created = harness.conversation();
+    let selection = zvs_contract::DocumentSelectionDto {
+        document_id: zvs_contract::DocumentId::parse("0199aa11-2222-7222-8222-222222222222")
+            .expect("an id"),
+        name: "Отчёт.docx".to_owned(),
+        page: Some(2),
+        start: 10,
+        end: 40,
+        text: "Выручка составила 11,12 млрд руб.".to_owned(),
+        untrusted: true,
+    };
+    let handle = harness
+        .chat
+        .send(&ChatSendInput {
+            selections: vec![selection.clone()],
+            ..ChatSendInput::new(created, "Что это значит?")
+        })
+        .expect("sends");
+    within(harness.runs.wait(&handle.id)).await;
+    let user = &harness.messages(created)[0];
+    assert_eq!(user.content, "Что это значит?");
+    assert_eq!(user.selections, std::slice::from_ref(&selection));
+    let fenced = crate::services::chat_history::with_selections("Что это значит?", &[selection]);
+    let sent = prepared_messages(&harness, &handle);
+    assert_eq!(sent.last().expect("the turn")["content"], json!(fenced));
+
+    let next = harness.turn(created, "А дальше?").await;
+    let history = prepared_messages(&harness, &next);
+    assert!(
+        history
+            .iter()
+            .any(|message| message["content"] == json!(fenced)),
+        "{history:?}"
+    );
+}
+
+#[tokio::test]
+async fn too_many_selections_are_refused_before_a_run_starts() {
+    let harness = Harness::new();
+    let created = harness.conversation();
+    let selection = zvs_contract::DocumentSelectionDto {
+        document_id: zvs_contract::DocumentId::parse("0199aa11-2222-7222-8222-222222222222")
+            .expect("an id"),
+        name: "a.pdf".to_owned(),
+        page: None,
+        start: 0,
+        end: 1,
+        text: "a".to_owned(),
+        untrusted: true,
+    };
+    let error = harness
+        .chat
+        .send(&ChatSendInput {
+            selections: vec![selection; 9],
+            ..ChatSendInput::new(created, "q")
+        })
+        .expect_err("too many");
+    assert_eq!(error.code, AppErrorCode::ValidationFailed);
+    assert!(harness.messages(created).is_empty());
+}
+
 #[tokio::test]
 async fn a_turn_runs_on_the_provider_selected_for_it_and_the_conversation_remembers_it() {
     let harness = Harness::new();

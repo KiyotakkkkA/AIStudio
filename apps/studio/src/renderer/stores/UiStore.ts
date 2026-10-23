@@ -35,14 +35,9 @@ function isFontSize(value: unknown): value is FontSize {
   return typeof value === "number" && (FONT_SIZES as readonly number[]).includes(value);
 }
 
-export const VIEWER_DOCK_MIN_WIDTH = 320;
-export const VIEWER_DOCK_MAX_WIDTH = 720;
-export const VIEWER_DOCK_DEFAULT_WIDTH = 420;
-
 export class UiStore {
   railCollapsed = false;
   activeRoute: RoutePath = DEFAULT_ROUTE;
-  viewerDockWidth = VIEWER_DOCK_DEFAULT_WIDTH;
   theme: ThemeMode = "system";
   railThemePicker = true;
   fontFamily: FontFamily = "onest";
@@ -124,14 +119,6 @@ export class UiStore {
     if (!isRoutePath(route) || this.activeRoute === route) return;
     this.activeRoute = route;
     void this.write(LAST_ROUTE_KEY, route);
-  }
-
-  setViewerDockWidth(width: number): void {
-    const clamped = Math.min(
-      VIEWER_DOCK_MAX_WIDTH,
-      Math.max(VIEWER_DOCK_MIN_WIDTH, Math.round(width)),
-    );
-    this.viewerDockWidth = clamped;
   }
 
   private async read(key: string): Promise<unknown> {

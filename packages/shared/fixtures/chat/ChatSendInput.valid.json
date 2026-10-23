@@ -17,5 +17,23 @@
         "topP": 0.5
       }
     }
+  },
+  {
+    "name": "with a selection",
+    "value": {
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "text": "Что это значит?",
+      "selections": [
+        {
+          "documentId": "0199aa11-2222-7222-8222-222222222222",
+          "name": "Отчёт.docx",
+          "page": 2,
+          "start": 120,
+          "end": 354,
+          "text": "Выручка составила 11,12 млрд руб.",
+          "untrusted": true
+        }
+      ]
+    }
   }
 ]

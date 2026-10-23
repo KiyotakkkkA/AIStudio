@@ -13,11 +13,8 @@ import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import DownloadStore from "../../src/renderer/features/downloads/DownloadStore.ts";
 import ToolchainStore from "../../src/renderer/features/toolchain/ToolchainStore.ts";
 import {
-  actionLabel,
   availableActions,
   DISCONNECT_LABEL,
-  removalCopy,
-  SCAN_SYSTEM_LABEL,
   ACTION_LABELS,
   removalLabel,
   toolchainErrorCopy,
@@ -191,25 +188,4 @@ test("a toolchain row on the downloads page installs, updates and removes throug
   bridge.fail("toolchain.install", AppErrorCode.CONFLICT, "Эта среда уже загружается");
   await store.install(item("available"));
   expect(store.runtimeError).toBe("Эта среда уже загружается");
-});
-
-test("LibreOffice is listed after the runtimes and worded as a component", async () => {
-  const office = dto("libreoffice", {
-    displayName: "LibreOffice",
-    minimumVersion: "7.0.0",
-    status: "ready",
-    source: "system",
-    version: "26.8.1",
-    executablePath: "C:/Program Files/LibreOffice/program/soffice.com",
-  });
-  const { store } = setup([office, dto("uv"), dto("node")]);
-  await store.mount();
-  expect(store.ordered.map((row) => row.runtime)).toEqual(["node", "uv", "libreoffice"]);
-  store.dispose();
-  expect(actionLabel("scan", "libreoffice")).toBe(SCAN_SYSTEM_LABEL);
-  expect(actionLabel("scan", "node")).toBe(ACTION_LABELS.scan);
-  expect(removalLabel(office)).toBe(DISCONNECT_LABEL);
-  expect(removalCopy("LibreOffice", "libreoffice")).not.toContain("MCP");
-  expect(removalCopy("Node.js", "node")).toContain("MCP");
-  expect(toolchainRuntimeOf("toolchain:libreoffice")).toBe("libreoffice");
 });

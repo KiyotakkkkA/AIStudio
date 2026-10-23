@@ -3,9 +3,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use zvs_contract::{AppError, AppErrorCode, ArtifactDto, ArtifactSaveResult};
+use zvs_contract::{
+    AppError, AppErrorCode, ArtifactApplicationDto, ArtifactDto, ArtifactSaveResult,
+};
 
-use crate::platform::external::{PathRevealer, system_path_revealer};
+use crate::platform::external::{
+    PathRevealer, SharedFileLauncher, system_file_launcher, system_path_revealer,
+};
 use crate::platform::long_path::extended;
 use crate::platform::picker::{SAVE_DIALOG_UNAVAILABLE, SharedPicker};
 
@@ -138,6 +142,7 @@ pub struct ArtifactStore {
     root: PathBuf,
     picker: Option<SharedPicker>,
     reveal: PathRevealer,
+    launcher: SharedFileLauncher,
 }
 
 impl ArtifactStore {
@@ -146,6 +151,7 @@ impl ArtifactStore {
             root,
             picker: None,
             reveal: system_path_revealer(),
+            launcher: system_file_launcher(),
         }
     }
 
@@ -158,6 +164,12 @@ impl ArtifactStore {
     #[must_use]
     pub fn with_revealer(mut self, reveal: PathRevealer) -> Self {
         self.reveal = reveal;
+        self
+    }
+
+    #[must_use]
+    pub fn with_launcher(mut self, launcher: SharedFileLauncher) -> Self {
+        self.launcher = launcher;
         self
     }
 
@@ -217,6 +229,27 @@ impl ArtifactStore {
         (self.reveal)(&path)
     }
 
+    pub fn open(&self, id: &str) -> Result<(), AppError> {
+        let path = self.resolve(id)?;
+        self.launcher.open(&path)
+    }
+
+    pub fn application(&self, id: &str) -> Result<ArtifactApplicationDto, AppError> {
+        let path = self.resolve(id)?;
+        let name = path
+            .extension()
+            .map(|extension| extension.to_string_lossy().to_ascii_lowercase())
+            .and_then(|extension| self.launcher.application(&extension))
+            .map(|name| name.trim().to_owned())
+            .filter(|name| !name.is_empty())
+            .map(|name| {
+                name.chars()
+                    .take(zvs_contract::artifacts::ARTIFACT_APPLICATION_MAX)
+                    .collect()
+            });
+        Ok(ArtifactApplicationDto { name })
+    }
+
     pub async fn save(&self, id: &str) -> Result<ArtifactSaveResult, AppError> {
         let source = self.resolve(id)?;
         let picker = self
@@ -259,7 +292,7 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
-    use crate::testing::FakePicker;
+    use crate::testing::{FakeLauncher, FakePicker};
 
     fn write(path: &Path, text: &str) {
         std::fs::create_dir_all(path.parent().expect("a parent")).expect("creates");
@@ -377,6 +410,48 @@ mod tests {
                 "{id}"
             );
         }
+    }
+
+    #[test]
+    fn open_hands_the_file_to_the_default_application_and_names_it() {
+        let root = tempfile::tempdir().expect("the store");
+        let launcher = Arc::new(FakeLauncher {
+            opened: Mutex::new(Vec::new()),
+            application: Some(" Word ".to_owned()),
+        });
+        let store = ArtifactStore::new(root.path().to_path_buf()).with_launcher(launcher.clone());
+        let path = root.path().join("run-1").join("Отчёт.docx");
+        write(&path, "x");
+
+        store.open("run-1/Отчёт.docx").expect("opens");
+        assert_eq!(*launcher.opened.lock().expect("records"), [path]);
+        assert_eq!(
+            store.application("run-1/Отчёт.docx").expect("names"),
+            ArtifactApplicationDto {
+                name: Some("Word".to_owned())
+            }
+        );
+        let error = store.open("../secret.pdf").expect_err("outside");
+        assert!(matches!(
+            error.code,
+            AppErrorCode::NotFound | AppErrorCode::ValidationFailed
+        ));
+        assert_eq!(launcher.opened.lock().expect("records").len(), 1);
+    }
+
+    #[test]
+    fn a_format_without_a_registered_application_has_no_name() {
+        let root = tempfile::tempdir().expect("the store");
+        let store =
+            ArtifactStore::new(root.path().to_path_buf()).with_launcher(Arc::new(FakeLauncher {
+                opened: Mutex::new(Vec::new()),
+                application: Some("  ".to_owned()),
+            }));
+        write(&root.path().join("run-1").join("data.csv"), "a,b");
+        assert_eq!(
+            store.application("run-1/data.csv").expect("answers"),
+            ArtifactApplicationDto { name: None }
+        );
     }
 
     #[tokio::test]

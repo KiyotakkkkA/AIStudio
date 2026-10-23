@@ -22,6 +22,7 @@ import {
   type ConversationDetailDto,
   type ConversationDto,
   type ConversationId,
+  type DocumentSelectionDto,
   type FolderAccessAnswer,
   type FolderGrantScope,
   type McpServerDto,
@@ -41,6 +42,7 @@ import ArtifactActions from "./ArtifactActions";
 import ExplorerStore from "./explorer/ExplorerStore";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
+export const SELECTIONS_FULL = "К сообщению можно приложить не больше 8 фрагментов документов.";
 
 export type SidePanel = "context" | "files";
 
@@ -395,6 +397,10 @@ export default class ChatStore {
   closePanel() {
     this.panelOpen = false;
   }
+  attachSelection(selection: DocumentSelectionDto) {
+    if (this.composer.addSelection(selection)) this.error = null;
+    else this.error = SELECTIONS_FULL;
+  }
 
   async toggleStore(id: VectorStoreDto["id"]) {
     if (!this.canConfigure) return;
@@ -668,11 +674,13 @@ export default class ChatStore {
         providerId: this.composer.providerId ?? undefined,
         modelId: this.composer.modelId,
         settings: { temperature: this.composer.temperature },
+        selections: [...this.composer.selections],
       });
       runInAction(() => {
         this.run = run;
         this.lastSeq = -1;
         this.composer.setText("");
+        this.composer.clearSelections();
         this.sending = false;
         if (this.mounted) this.subscribe();
       });
@@ -868,17 +876,27 @@ export default class ChatStore {
   }
 
   async refreshMessage(messageId: MessageId, content: string) {
+    const selections = this.messageSelections(messageId);
     if (!(await this.truncateMessage(messageId))) return;
     this.composer.setText(content);
+    this.composer.setSelections(selections);
     await this.send();
   }
 
   async editMessage(messageId: MessageId, content: string): Promise<boolean> {
     const text = content.trim();
+    const selections = this.messageSelections(messageId);
     if (!text || !(await this.truncateMessage(messageId))) return false;
     this.composer.setText(text);
+    this.composer.setSelections(selections);
     await this.send();
     return true;
+  }
+
+  private messageSelections(messageId: MessageId): DocumentSelectionDto[] {
+    return [
+      ...(this.active?.messages.find((message) => message.id === messageId)?.selections ?? []),
+    ];
   }
 
   retry() {

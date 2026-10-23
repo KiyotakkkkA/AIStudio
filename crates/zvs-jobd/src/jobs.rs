@@ -9,7 +9,6 @@ use tokio::sync::mpsc::UnboundedSender;
 use zvs_core::{CancellationToken, Error, Result};
 
 use crate::{
-    convert::{CONVERT_JOB, convert},
     document::{DOCUMENT_JOB, extract},
     download::{DOWNLOAD_JOB, download},
     protocol::Response,
@@ -88,7 +87,6 @@ pub async fn dispatch(job: &str, params: Value, context: &JobContext) -> Result<
         SLEEP_JOB => sleep(params, context).await,
         DOWNLOAD_JOB => download(params, context).await,
         DOCUMENT_JOB => extract(params, context).await,
-        CONVERT_JOB => convert(params, context).await,
         #[cfg(debug_assertions)]
         DEBUG_CRASH_JOB => {
             context.progress(0, 2, Some(job.to_owned()));

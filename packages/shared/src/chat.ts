@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   ConversationId,
+  DocumentId,
   MessageId,
   ProviderId,
   RunId,
@@ -116,6 +117,27 @@ export const ConversationDto = ConversationFields.refine(folderAccessMatches, {
   path: ["workingFolderAccess"],
 });
 export type ConversationDto = z.infer<typeof ConversationDto>;
+export const CHAT_SELECTIONS_MAX = 8;
+export const SELECTION_TEXT_MAX = 8000;
+
+export const DocumentSelectionDto = z
+  .object({
+    documentId: DocumentId,
+    name: z.string().min(1).max(1024),
+    page: z.number().int().positive().nullable().default(null),
+    start: z.number().int().nonnegative(),
+    end: z.number().int().nonnegative(),
+    text: z
+      .string()
+      .max(SELECTION_TEXT_MAX)
+      .refine((text) => text.trim().length > 0),
+    untrusted: z.literal(true),
+  })
+  .refine((selection) => selection.end > selection.start, { path: ["end"] });
+export type DocumentSelectionDto = z.infer<typeof DocumentSelectionDto>;
+
+const Selections = z.array(DocumentSelectionDto).max(CHAT_SELECTIONS_MAX);
+
 export const MessageDto = z.object({
   id: MessageId,
   conversationId: ConversationId,
@@ -124,6 +146,7 @@ export const MessageDto = z.object({
   reasoning: z.string().default(""),
   citations: z.array(ChatCitationDto),
   toolCalls: z.array(ChatToolCallDto).default([]),
+  selections: Selections.default([]),
   tokensIn: z.number().int().nonnegative(),
   tokensOut: z.number().int().nonnegative(),
   usageEstimated: z.boolean(),
@@ -143,6 +166,7 @@ export const ChatSendInput = z.object({
   providerId: ProviderId.optional(),
   modelId: z.string().min(1).optional(),
   settings: ChatSettings.optional(),
+  selections: Selections.default([]),
 });
 export type ChatSendInput = z.infer<typeof ChatSendInput>;
 export const ChatContextInput = z.object({

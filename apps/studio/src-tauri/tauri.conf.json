@@ -26,8 +26,8 @@
       }
     ],
     "security": {
-      "csp": "script-src 'self'; style-src 'self' 'sha256-YEercZJImS+vUX2bz7vkQ0aA4rtBIPLuCEWz+yraQ/g='; img-src 'self'; font-src 'self'; media-src 'none'; worker-src 'none'; manifest-src 'none'; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-      "devCsp": "default-src 'none'; script-src 'self'; style-src 'self' 'sha256-YEercZJImS+vUX2bz7vkQ0aA4rtBIPLuCEWz+yraQ/g='; img-src 'self'; font-src 'self'; connect-src ipc: http://ipc.localhost ws://localhost:5183; frame-src isolation: http://*.localhost; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "csp": "script-src 'self'; style-src 'self' 'sha256-YEercZJImS+vUX2bz7vkQ0aA4rtBIPLuCEWz+yraQ/g='; img-src 'self' blob:; font-src 'self'; media-src 'none'; worker-src 'self'; manifest-src 'none'; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "devCsp": "default-src 'none'; script-src 'self'; style-src 'self' 'sha256-YEercZJImS+vUX2bz7vkQ0aA4rtBIPLuCEWz+yraQ/g='; img-src 'self' blob:; font-src 'self'; worker-src 'self'; connect-src ipc: http://ipc.localhost ws://localhost:5183; frame-src isolation: http://*.localhost; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
       "pattern": {
         "use": "isolation",
         "options": { "dir": "isolation" }

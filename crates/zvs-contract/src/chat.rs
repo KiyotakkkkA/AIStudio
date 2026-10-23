@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::enums::wire_enum;
 use crate::errors::AppError;
 use crate::folders::{WorkingFolderAccess, check_folder_path};
-use crate::ids::{ConversationId, MessageId, ProviderId, RunId, VectorStoreId};
+use crate::ids::{ConversationId, DocumentId, MessageId, ProviderId, RunId, VectorStoreId};
 use crate::primitives::{Json, Timestamp};
 use crate::tools::check_tool_key;
 use crate::validate::{Validate, check, invalid, js_trim, nested};
@@ -15,6 +15,9 @@ pub const SYSTEM_PROMPT_MAX: usize = 100_000;
 pub const CHAT_TEXT_MAX: usize = 100_000;
 pub const ATTACHED_STORES_MAX: usize = 64;
 pub const ENABLED_TOOLS_MAX: usize = 64;
+pub const CHAT_SELECTIONS_MAX: usize = 8;
+pub const SELECTION_TEXT_MAX: usize = 8_000;
+pub const SELECTION_NAME_MAX: usize = 1024;
 
 wire_enum!(RetrievalMode {
     Auto => "auto",
@@ -380,6 +383,48 @@ impl Validate for ConversationDto {
 }
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentSelectionDto {
+    pub document_id: DocumentId,
+    pub name: String,
+    #[serde(default)]
+    pub page: Option<u64>,
+    pub start: u64,
+    pub end: u64,
+    pub text: String,
+    pub untrusted: bool,
+}
+
+impl Validate for DocumentSelectionDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("name", &self.name)?;
+        check::max_len("name", &self.name, SELECTION_NAME_MAX)?;
+        self.page.map_or(Ok(()), |page| positive("page", page))?;
+        check::safe_integer("start", self.start)?;
+        check::safe_integer("end", self.end)?;
+        if self.end <= self.start {
+            return Err(invalid("end", "min"));
+        }
+        check::non_empty("text", js_trim(&self.text))?;
+        check::max_len("text", &self.text, SELECTION_TEXT_MAX)?;
+        check::literal_true("untrusted", self.untrusted)
+    }
+}
+
+fn check_selections(selections: &[DocumentSelectionDto]) -> Result<(), AppError> {
+    if selections.len() > CHAT_SELECTIONS_MAX {
+        return Err(invalid("selections", "max"));
+    }
+    selections
+        .iter()
+        .enumerate()
+        .try_for_each(|(index, selection)| {
+            nested(&format!("selections.{index}"), selection.validate())
+        })
+}
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageDto {
@@ -392,6 +437,8 @@ pub struct MessageDto {
     pub citations: Vec<ChatCitationDto>,
     #[serde(default)]
     pub tool_calls: Vec<ChatToolCallDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub selections: Vec<DocumentSelectionDto>,
     pub tokens_in: u64,
     pub tokens_out: u64,
     pub usage_estimated: bool,
@@ -406,6 +453,7 @@ impl Validate for MessageDto {
     fn validate(&self) -> Result<(), AppError> {
         nested("citations", self.citations.validate())?;
         nested("toolCalls", self.tool_calls.validate())?;
+        check_selections(&self.selections)?;
         check::safe_integer("tokensIn", self.tokens_in)?;
         check::safe_integer("tokensOut", self.tokens_out)?;
         check::safe_integer("durationMs", self.duration_ms)?;
@@ -451,6 +499,8 @@ pub struct ChatSendInput {
         deserialize_with = "crate::wire::present"
     )]
     pub settings: Option<ChatSettings>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub selections: Vec<DocumentSelectionDto>,
 }
 
 impl ChatSendInput {
@@ -461,6 +511,7 @@ impl ChatSendInput {
             provider_id: None,
             model_id: None,
             settings: None,
+            selections: Vec::new(),
         }
     }
 
@@ -478,7 +529,7 @@ impl Validate for ChatSendInput {
         if let Some(settings) = &self.settings {
             nested("settings", settings.validate())?;
         }
-        Ok(())
+        check_selections(&self.selections)
     }
 }
 

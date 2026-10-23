@@ -107,18 +107,6 @@ test("the theme mode restores, rejects unknown values and writes through once", 
   assert.equal(fallback.theme, "system");
 });
 
-test("the viewer dock width is clamped to the documented bounds", () => {
-  const { bridge } = settingsBridge();
-  const ui = new UiStore(client(bridge));
-
-  ui.setViewerDockWidth(10);
-  assert.equal(ui.viewerDockWidth, 320);
-  ui.setViewerDockWidth(9_000);
-  assert.equal(ui.viewerDockWidth, 720);
-  ui.setViewerDockWidth(421.4);
-  assert.equal(ui.viewerDockWidth, 421);
-});
-
 test("events pushed through the bridge reach the router that subscribed to the stream", () => {
   const bridge = createFakeBridge<Contract>();
   const router = createEventRouter({ logger: { log: () => {} } });

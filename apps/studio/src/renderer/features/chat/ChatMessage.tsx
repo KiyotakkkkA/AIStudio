@@ -1,10 +1,12 @@
 import { useState, type ReactNode } from "react";
 import type { ChatCitationDto, VectorStoreDto, VectorStoreId } from "@zvs/shared";
 import { Accordion, ScrollArea, SlidedPanel, Tabs } from "@kiyotakkkka/zvs-uikit-lib";
-import { mdiThoughtBubbleOutline } from "@mdi/js";
+import { mdiFileEyeOutline, mdiThoughtBubbleOutline } from "@mdi/js";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import ChatMarkdown from "./ChatMarkdown";
 import ChatSources from "./ChatSources";
-import { citationSources } from "./citations";
+import { OPEN_CITATION, citationLocation, citationSources } from "./citations";
+import { useStore } from "../../stores/useStore";
 import MessageActions from "../../ui/molecules/MessageActions";
 import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
 import Icon from "../../ui/atoms/Icon";
@@ -39,7 +41,14 @@ export default function ChatMessage({
   readonly onRefresh?: () => void;
   readonly onDelete?: () => void;
 }) {
+  const { viewer } = useStore();
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const storeName = (storeId: VectorStoreId) =>
+    stores.find((store) => store.id === storeId)?.name ?? "Хранилище";
+  const view = (citation: ChatCitationDto) => {
+    setSourcesOpen(false);
+    void viewer.openCitation(citation, citationLocation(citation, storeName(citation.storeId)));
+  };
   const citationStoreIds = [...new Set(citations.map((citation) => citation.storeId))];
   const [activeStoreId, setActiveStoreId] = useState<VectorStoreId | "">(citationStoreIds[0] ?? "");
   const selectedStoreId =
@@ -48,10 +57,7 @@ export default function ChatMessage({
       : (citationStoreIds[0] ?? "");
   const selectedCitations = citations.filter((citation) => citation.storeId === selectedStoreId);
   const thinking = generating && content === "";
-  const sources = citationSources(
-    citations,
-    (storeId) => stores.find((store) => store.id === storeId)?.name ?? "Хранилище",
-  );
+  const sources = citationSources(citations, storeName);
 
   return (
     <article aria-label="Ответ ассистента" className="group flex min-w-0 gap-3">
@@ -88,10 +94,7 @@ export default function ChatMessage({
             content={content}
             streaming={generating}
             citations={citations}
-            onCite={(citation) => {
-              setActiveStoreId(citation.storeId);
-              setSourcesOpen(true);
-            }}
+            onCite={view}
           />
           {generating && <GenerationStatus label={status} />}
           <ChatSources
@@ -101,6 +104,7 @@ export default function ChatMessage({
               if (storeId !== undefined) setActiveStoreId(storeId);
               setSourcesOpen(true);
             }}
+            onView={view}
           />
           {artifacts}
           {partial && !generating && (
@@ -168,18 +172,27 @@ export default function ChatMessage({
                       </span>
                       <span className="truncate">{citation.sourcePath}</span>
                     </h3>
-                    {citation.related === null ? (
-                      <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent-medium tabular-nums">
-                        {(citation.score * 100).toFixed(0)}%
-                      </span>
-                    ) : (
-                      <span
-                        title="Документ добавлен по связи с найденным источником, он не ранжировался"
-                        className="shrink-0 rounded-full border border-dashed border-line-strong px-2 py-0.5 text-[11px] text-main-400"
-                      >
-                        связь «{citation.related}»
-                      </span>
-                    )}
+                    <span className="flex shrink-0 items-center gap-1">
+                      <IconButton
+                        label={OPEN_CITATION}
+                        tooltip="bottom-left"
+                        path={mdiFileEyeOutline}
+                        iconSize={16}
+                        onClick={() => view(citation)}
+                      />
+                      {citation.related === null ? (
+                        <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent-medium tabular-nums">
+                          {(citation.score * 100).toFixed(0)}%
+                        </span>
+                      ) : (
+                        <span
+                          title="Документ добавлен по связи с найденным источником, он не ранжировался"
+                          className="shrink-0 rounded-full border border-dashed border-line-strong px-2 py-0.5 text-[11px] text-main-400"
+                        >
+                          связь «{citation.related}»
+                        </span>
+                      )}
+                    </span>
                   </div>
                   <p className="mt-1.5 text-[12px] text-main-500">{citationPlace(citation)}</p>
                 </article>

@@ -8,8 +8,6 @@ pub enum Error {
     Backend(String),
     #[error("Limit exceeded: {0}")]
     LimitExceeded(String),
-    #[error("Unsupported input: {0}")]
-    Unsupported(String),
     #[error("Operation cancelled")]
     Cancelled,
 }
@@ -25,7 +23,6 @@ impl Error {
             Self::InvalidInput(_) => "VALIDATION_FAILED",
             Self::LimitExceeded(_) => "LIMIT_EXCEEDED",
             Self::Backend(_) => "NATIVE_ERROR",
-            Self::Unsupported(_) => "UNSUPPORTED_FORMAT",
             Self::Cancelled => "RUN_CANCELLED",
         }
     }

@@ -42,6 +42,7 @@ export interface CitationSource {
   readonly store: string;
   readonly pages: readonly number[];
   readonly fragments: number;
+  readonly citation: ChatCitationDto;
 }
 
 export function sourceName(path: string): string {
@@ -61,6 +62,11 @@ export function citationSources(
     const key = `${citation.storeId}:${citation.documentId}`;
     const entry = grouped.get(key) ?? { citation, pages: new Set<number>(), count: 0 };
     if (citation.page !== null) entry.pages.add(citation.page);
+    if (
+      citation.page !== null &&
+      (entry.citation.page === null || citation.page < entry.citation.page)
+    )
+      entry.citation = citation;
     entry.count += 1;
     grouped.set(key, entry);
   }
@@ -72,6 +78,7 @@ export function citationSources(
     store: storeName(entry.citation.storeId),
     pages: [...entry.pages].sort((left, right) => left - right),
     fragments: entry.count,
+    citation: entry.citation,
   }));
 }
 
@@ -86,4 +93,14 @@ export function fragmentsLabel(fragments: number, hidden: number): string {
   const all = `${ALL_FRAGMENTS} (${fragments.toLocaleString("ru-RU")})`;
   if (hidden <= 0) return all;
   return `${all} · ещё ${plural(hidden, "источник", "источника", "источников")}`;
+}
+
+export const OPEN_CITATION = "Открыть документ";
+
+export function citationLocation(citation: ChatCitationDto, store: string): string {
+  return [
+    store,
+    ...(citation.page === null ? [] : [`стр. ${citation.page.toLocaleString("ru-RU")}`]),
+    ...(citation.section === "" ? [] : [citation.section]),
+  ].join(" · ");
 }

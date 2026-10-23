@@ -6,6 +6,7 @@ mod site_stub;
 
 use std::sync::Arc;
 
+use zvs_host::platform::external::SharedFileLauncher;
 use zvs_host::platform::gpu::SharedGpuProbe;
 use zvs_host::services::SharedCryptoBackend;
 
@@ -33,4 +34,14 @@ pub fn gpu_probe() -> SharedGpuProbe {
 #[cfg(not(windows))]
 pub fn gpu_probe() -> SharedGpuProbe {
     Arc::new(zvs_host::platform::gpu::NoGpu)
+}
+
+#[cfg(windows)]
+pub fn file_launcher() -> SharedFileLauncher {
+    Arc::new(windows::assoc::ShellLauncher)
+}
+
+#[cfg(not(windows))]
+pub fn file_launcher() -> SharedFileLauncher {
+    zvs_host::platform::external::system_file_launcher()
 }

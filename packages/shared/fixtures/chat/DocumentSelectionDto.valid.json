@@ -1,0 +1,26 @@
+[
+  {
+    "name": "pdf page",
+    "value": {
+      "documentId": "0199aa11-2222-7222-8222-222222222222",
+      "name": "Отчёт.docx",
+      "page": 2,
+      "start": 120,
+      "end": 354,
+      "text": "Выручка составила 11,12 млрд руб.",
+      "untrusted": true
+    }
+  },
+  {
+    "name": "text document",
+    "value": {
+      "documentId": "0199aa11-2222-7222-8222-222222222222",
+      "name": "notes.md",
+      "page": null,
+      "start": 120,
+      "end": 354,
+      "text": "Выручка составила 11,12 млрд руб.",
+      "untrusted": true
+    }
+  }
+]

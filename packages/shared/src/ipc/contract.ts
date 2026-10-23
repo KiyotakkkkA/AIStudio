@@ -24,13 +24,14 @@ import {
   ExplorerReadInput,
   ExplorerWatchDto,
 } from "../explorer.js";
-import { ArtifactRef, ArtifactSaveResult } from "../artifacts.js";
+import { ArtifactApplicationDto, ArtifactRef, ArtifactSaveResult } from "../artifacts.js";
 import {
   DocumentDto,
   DocumentHandle,
   DocumentPageDto,
   DocumentPageInput,
   DocumentRef,
+  DocumentSaveResult,
 } from "../documents.js";
 import { RunDto, RunHandleDto, RunIdInput, StartRunInput } from "../runs/RunDto.js";
 import { RunListFilter, RunPageDto } from "../runs/RunListFilter.js";
@@ -227,8 +228,11 @@ export const contract = defineContract({
   "documents.close": { input: DocumentHandle, output: z.void() },
   "documents.list": { input: z.void(), output: z.array(DocumentDto) },
   "documents.reveal": { input: DocumentHandle, output: z.void() },
+  "documents.save": { input: DocumentHandle, output: DocumentSaveResult },
   "artifacts.save": { input: ArtifactRef, output: ArtifactSaveResult },
   "artifacts.reveal": { input: ArtifactRef, output: z.void() },
+  "artifacts.open": { input: ArtifactRef, output: z.void() },
+  "artifacts.application": { input: ArtifactRef, output: ArtifactApplicationDto },
   "runs.approve": {
     input: RunIdInput.extend({ approvalId: z.string().uuid(), always: z.boolean().default(false) }),
     output: z.void(),

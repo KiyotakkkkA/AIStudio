@@ -1,5 +1,12 @@
 import { makeAutoObservable } from "mobx";
-import type { ProviderDto, ProviderId, RetrievalMode, VectorStoreId } from "@zvs/shared";
+import {
+  CHAT_SELECTIONS_MAX,
+  type DocumentSelectionDto,
+  type ProviderDto,
+  type ProviderId,
+  type RetrievalMode,
+  type VectorStoreId,
+} from "@zvs/shared";
 
 export default class ConversationVm {
   text = "";
@@ -11,6 +18,7 @@ export default class ConversationVm {
   useRelations = false;
   retrievalMode: RetrievalMode = "hybrid";
   enabledTools: string[] = [];
+  selections: DocumentSelectionDto[] = [];
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true });
@@ -18,6 +26,28 @@ export default class ConversationVm {
 
   setText(value: string) {
     this.text = value;
+  }
+  addSelection(selection: DocumentSelectionDto): boolean {
+    const duplicate = this.selections.some(
+      (item) =>
+        item.documentId === selection.documentId &&
+        item.page === selection.page &&
+        item.start === selection.start &&
+        item.end === selection.end,
+    );
+    if (duplicate) return true;
+    if (this.selections.length >= CHAT_SELECTIONS_MAX) return false;
+    this.selections = [...this.selections, selection];
+    return true;
+  }
+  removeSelection(index: number) {
+    this.selections = this.selections.filter((_, position) => position !== index);
+  }
+  clearSelections() {
+    this.selections = [];
+  }
+  setSelections(selections: readonly DocumentSelectionDto[]) {
+    this.selections = selections.slice(0, CHAT_SELECTIONS_MAX);
   }
   setModel(value: string) {
     this.modelId = value;
