@@ -36,7 +36,10 @@ import {
   type RunStep,
   type RunView,
 } from "../../src/renderer/features/scenarios/runModel.ts";
-import ScenarioRunState from "../../src/renderer/features/scenarios/ScenarioRunState.ts";
+import ScenarioRunState, {
+  STRIP_HEIGHT_DEFAULT,
+  STRIP_HEIGHT_MIN,
+} from "../../src/renderer/features/scenarios/ScenarioRunState.ts";
 import { itemsLabel } from "../../src/renderer/features/scenarios/runCopy.ts";
 
 const SCENARIO = "0199aa11-1111-7111-8111-111111111111" as ScenarioId;
@@ -378,5 +381,20 @@ describe("scenario run state", () => {
     expect(await state.start(GRAPH)).toBe(false);
     expect(state.error).toBe("Сценарий содержит ошибки");
     expect(state.view).toBeNull();
+  });
+});
+
+describe("run log strip height", () => {
+  test("the height is clamped between the minimum and the room left for the canvas", () => {
+    const { state } = rig();
+    expect(state.stripHeight).toBe(STRIP_HEIGHT_DEFAULT);
+    state.toggleStrip();
+    state.setStripHeight(40);
+    expect(state.stripHeight).toBe(STRIP_HEIGHT_MIN);
+    expect(state.stripOpen).toBe(true);
+    state.setStripHeight(900, 420);
+    expect(state.stripHeight).toBe(420);
+    state.setStripHeight(300.4, 420);
+    expect(state.stripHeight).toBe(300);
   });
 });

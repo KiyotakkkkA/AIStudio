@@ -16,6 +16,7 @@ export default class ScenarioStore {
   removingId: ScenarioId | null = null;
   error: string | null = null;
   palettePinned = false;
+  logHeight: number | undefined = undefined;
 
   constructor(
     private readonly ipc: IpcClient<Contract>,
@@ -80,6 +81,7 @@ export default class ScenarioStore {
       ...this.editorOptions,
       ...(this.events === null ? {} : { events: this.events }),
       palettePinned: this.palettePinned,
+      ...(this.logHeight === undefined ? {} : { logHeight: this.logHeight }),
     });
     this.editor = editor;
     await editor.load();
@@ -89,6 +91,7 @@ export default class ScenarioStore {
     const editor = this.editor;
     if (editor === null) return;
     this.palettePinned = editor.palettePinned;
+    this.logHeight = editor.execution.stripHeight;
     editor.dispose();
     this.editor = null;
     void this.load();

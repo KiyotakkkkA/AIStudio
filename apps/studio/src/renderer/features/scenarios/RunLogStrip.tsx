@@ -1,6 +1,7 @@
 import { mdiChevronDown, mdiChevronUp, mdiPinOutline, mdiReplay } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { observer } from "mobx-react-lite";
+import type { PointerEvent } from "react";
 import type { Json } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
@@ -9,6 +10,7 @@ import StatusDot from "../../ui/atoms/StatusDot";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 import JsonView from "./JsonView";
 import type ScenarioEditor from "./ScenarioEditor";
+import { STRIP_HEIGHT_COLLAPSED } from "./ScenarioRunState";
 import {
   attemptLabel,
   clockLabel,
@@ -179,16 +181,52 @@ const StepActions = observer(function StepActions({ editor }: { readonly editor:
   );
 });
 
+const CANVAS_MIN = 220;
+const RESIZE_LABEL = "Изменить высоту журнала";
+
 function RunLogStrip({ editor }: { readonly editor: ScenarioEditor }) {
   const run = editor.execution;
   const view = run.view;
   const step = run.selected;
   const now = Date.now();
+
+  const startResize = (event: PointerEvent<HTMLDivElement>) => {
+    const handle = event.currentTarget;
+    const strip = handle.parentElement;
+    const area = strip?.parentElement;
+    if (strip === null || area === null || area === undefined) return;
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    const bottom = strip.getBoundingClientRect().bottom;
+    const limit = area.getBoundingClientRect().height - CANVAS_MIN;
+    const move = (next: globalThis.PointerEvent) => {
+      run.setStripHeight(bottom - next.clientY, limit);
+    };
+    const stop = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", stop);
+      handle.removeEventListener("pointercancel", stop);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", stop);
+    handle.addEventListener("pointercancel", stop);
+  };
+
   return (
     <section
       aria-label={LAST_RUN}
-      className={`flex flex-none border-t border-line bg-main-900 ${run.stripOpen ? "h-46.5" : "h-9.5"}`}
+      style={{ height: `${String(run.stripOpen ? run.stripHeight : STRIP_HEIGHT_COLLAPSED)}px` }}
+      className="relative flex flex-none border-t border-line bg-main-900"
     >
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label={RESIZE_LABEL}
+        aria-valuenow={run.stripHeight}
+        onPointerDown={startResize}
+        onDoubleClick={run.toggleStrip}
+        className="absolute inset-x-0 -top-1 z-10 h-2 cursor-row-resize hover:bg-accent-line"
+      />
       <div className="flex w-82.5 flex-none flex-col border-r border-line">
         <div className="flex h-9.5 flex-none items-center gap-2.25 border-b border-line px-3.5">
           <h3 className={`${SECTION} flex-1`}>{LAST_RUN}</h3>

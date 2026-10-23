@@ -60,6 +60,7 @@ export interface ScenarioEditorOptions {
   readonly autosaveMs?: number;
   readonly validateMs?: number;
   readonly palettePinned?: boolean;
+  readonly logHeight?: number;
   readonly events?: EventRouter;
 }
 
@@ -128,6 +129,7 @@ export default class ScenarioEditor {
     this.validateMs = options.validateMs ?? 250;
     this.entities = new EntityOptions(ipc);
     this.execution = new ScenarioRunState(ipc, id, options.events ?? null, this.clock);
+    if (options.logHeight !== undefined) this.execution.setStripHeight(options.logHeight);
     this.palettePinned = options.palettePinned ?? false;
     this.paletteOpen = this.palettePinned;
     makeAutoObservable<

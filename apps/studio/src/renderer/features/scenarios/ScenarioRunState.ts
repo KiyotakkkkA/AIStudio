@@ -35,11 +35,16 @@ import { RUN_CANCEL_FAILED, RUN_LOAD_FAILED, runErrorCopy } from "./runCopy";
 
 const OUTCOME_PHASES = { ok: "succeeded", failed: "failed", cancelled: "cancelled" } as const;
 
+export const STRIP_HEIGHT_DEFAULT = 186;
+export const STRIP_HEIGHT_MIN = 120;
+export const STRIP_HEIGHT_COLLAPSED = 38;
+
 export default class ScenarioRunState {
   view: RunView | null = null;
   selectedStepId: string | null = null;
   tab: RunTab = "input";
   stripOpen = true;
+  stripHeight = STRIP_HEIGHT_DEFAULT;
   starting = false;
   cancelling = false;
   error: string | null = null;
@@ -99,6 +104,12 @@ export default class ScenarioRunState {
 
   toggleStrip(): void {
     this.stripOpen = !this.stripOpen;
+  }
+
+  setStripHeight(height: number, limit: number = Number.POSITIVE_INFINITY): void {
+    const ceiling = Math.max(STRIP_HEIGHT_MIN, limit);
+    this.stripHeight = Math.round(Math.min(ceiling, Math.max(STRIP_HEIGHT_MIN, height)));
+    this.stripOpen = true;
   }
 
   dismissError(): void {
