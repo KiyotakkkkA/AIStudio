@@ -194,7 +194,7 @@ const NotificationsSection = observer(function NotificationsSection() {
     <div className="flex flex-col">
       <ToggleSettingRow row={NOTIFICATIONS_ROW} />
       {appSettings.values[NOTIFICATIONS_ROW.key] ? (
-        <div className="ml-1 flex flex-col border-l border-line pl-5">
+        <div className="ml-1 flex flex-col pl-5">
           {NOTIFICATION_KIND_ROWS.map((row) => (
             <ToggleSettingRow key={row.key} row={row} />
           ))}
