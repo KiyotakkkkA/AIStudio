@@ -10,6 +10,7 @@ pub mod notifications;
 pub mod providers;
 pub mod runs;
 pub mod runtimes;
+pub mod scenarios;
 pub mod secrets;
 mod server;
 pub mod settings;
@@ -38,6 +39,7 @@ pub fn register(server: &mut IpcServer) {
     mcp::register(server);
     notifications::register(server);
     skills::register(server);
+    scenarios::register(server);
     toolchain::register(server);
     chat::register(server);
     folders::register(server);
@@ -167,6 +169,14 @@ mod tests {
                 "runtimes.list",
                 "runtimes.remove",
                 "runtimes.stop",
+                "scenarios.activate",
+                "scenarios.create",
+                "scenarios.get",
+                "scenarios.list",
+                "scenarios.remove",
+                "scenarios.update",
+                "scenarios.validate",
+                "scenarios.versions",
                 "secrets.create",
                 "secrets.get",
                 "secrets.list",

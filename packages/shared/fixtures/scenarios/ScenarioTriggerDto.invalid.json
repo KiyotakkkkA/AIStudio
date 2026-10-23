@@ -1,0 +1,17 @@
+[
+  {
+    "name": "unknown kind",
+    "value": {
+      "kind": "manual",
+      "nodeId": "trigger",
+      "params": {}
+    }
+  },
+  {
+    "name": "missing params",
+    "value": {
+      "kind": "chat",
+      "nodeId": "t"
+    }
+  }
+]

@@ -43,6 +43,9 @@ export type MessageId = z.infer<typeof MessageId>;
 export const ScenarioId = brandedId("ScenarioId");
 export type ScenarioId = z.infer<typeof ScenarioId>;
 
+export const ScenarioVersionId = brandedId("ScenarioVersionId");
+export type ScenarioVersionId = z.infer<typeof ScenarioVersionId>;
+
 export const RunId = brandedId("RunId");
 export type RunId = z.infer<typeof RunId>;
 

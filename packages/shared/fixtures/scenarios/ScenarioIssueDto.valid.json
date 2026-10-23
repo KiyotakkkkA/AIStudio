@@ -1,0 +1,24 @@
+[
+  {
+    "name": "graph level",
+    "value": {
+      "rule": "noTrigger"
+    }
+  },
+  {
+    "name": "slot",
+    "value": {
+      "rule": "missingAttachment",
+      "nodeId": "agent",
+      "slot": "model"
+    }
+  },
+  {
+    "name": "param",
+    "value": {
+      "rule": "missingParameter",
+      "nodeId": "model",
+      "param": "modelId"
+    }
+  }
+]

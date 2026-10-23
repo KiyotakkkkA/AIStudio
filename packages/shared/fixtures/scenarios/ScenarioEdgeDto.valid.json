@@ -1,0 +1,20 @@
+[
+  {
+    "name": "main",
+    "value": {
+      "from": "trigger",
+      "to": "agent",
+      "fromPort": "main",
+      "toPort": "main"
+    }
+  },
+  {
+    "name": "branch port",
+    "value": {
+      "from": "branch",
+      "to": "mail",
+      "fromPort": "true",
+      "toPort": "main"
+    }
+  }
+]

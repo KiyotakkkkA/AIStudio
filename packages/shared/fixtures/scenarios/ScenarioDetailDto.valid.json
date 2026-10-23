@@ -1,0 +1,118 @@
+[
+  {
+    "name": "with issues",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "name": "Support triage bot",
+      "tags": [],
+      "active": false,
+      "currentVersionId": "0199aa11-2222-7222-8222-222222222222",
+      "version": 1,
+      "trigger": null,
+      "issueCount": 1,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000500000,
+      "graph": {
+        "nodes": [
+          {
+            "id": "trigger",
+            "type": "trigger.chat",
+            "name": "Chat message received",
+            "position": {
+              "x": 40.5,
+              "y": 120.25
+            },
+            "params": {}
+          },
+          {
+            "id": "agent",
+            "type": "agent.tools",
+            "name": "AI Agent",
+            "position": {
+              "x": 320.5,
+              "y": 120.25
+            },
+            "params": {
+              "systemMessage": "Отвечать по базе знаний",
+              "maxIterations": 8
+            }
+          },
+          {
+            "id": "model",
+            "type": "model.chat",
+            "position": {
+              "x": 280.5,
+              "y": 300.75
+            },
+            "params": {
+              "providerId": "0199aa11-1111-7111-8111-111111111111",
+              "modelId": "gpt-oss:120b"
+            }
+          },
+          {
+            "id": "memory",
+            "type": "memory.window",
+            "position": {
+              "x": 400.5,
+              "y": 300.75
+            },
+            "params": {},
+            "disabled": true
+          }
+        ],
+        "edges": [
+          {
+            "from": "trigger",
+            "to": "agent",
+            "fromPort": "main",
+            "toPort": "main"
+          }
+        ],
+        "attachments": [
+          {
+            "parentNodeId": "agent",
+            "childNodeId": "model",
+            "slot": "model"
+          },
+          {
+            "parentNodeId": "agent",
+            "childNodeId": "memory",
+            "slot": "memory"
+          }
+        ]
+      },
+      "issues": [
+        {
+          "rule": "missingAttachment",
+          "nodeId": "agent",
+          "slot": "model"
+        }
+      ]
+    }
+  },
+  {
+    "name": "clean",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "name": "Support triage bot",
+      "tags": ["support"],
+      "active": true,
+      "currentVersionId": "0199aa11-2222-7222-8222-222222222222",
+      "version": 14,
+      "trigger": {
+        "kind": "chat",
+        "nodeId": "trigger",
+        "params": {}
+      },
+      "issueCount": 0,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000500000,
+      "graph": {
+        "nodes": [],
+        "edges": [],
+        "attachments": []
+      },
+      "issues": []
+    }
+  }
+]

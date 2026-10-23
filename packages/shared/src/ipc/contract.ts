@@ -105,6 +105,18 @@ import {
   SkillTestResultDto,
   UpdateSkillInput,
 } from "../skills/index.js";
+import {
+  CreateScenarioInput,
+  ScenarioDetailDto,
+  ScenarioDto,
+  ScenarioRef,
+  ScenarioRemoveOutput,
+  ScenarioValidateInput,
+  ScenarioValidationDto,
+  ScenarioVersionDto,
+  SetScenarioActiveInput,
+  UpdateScenarioInput,
+} from "../scenarios.js";
 import { AccountDto, AccountLinkInput, AccountLinkResult, AccountRef } from "../accounts.js";
 import { AdapterDescriptorDto } from "../ai.js";
 import { DeviceProfileDto, ResourceSampleDto } from "../system.js";
@@ -355,6 +367,14 @@ export const contract = defineContract({
   "skills.run": { input: SkillRunInput, output: RunHandleDto },
   "skills.import": { input: SkillImportInput, output: SkillImportResultDto },
   "skills.export": { input: SkillExportInput, output: SkillExportResultDto },
+  "scenarios.list": { input: z.void(), output: z.array(ScenarioDto) },
+  "scenarios.get": { input: ScenarioRef, output: ScenarioDetailDto },
+  "scenarios.create": { input: CreateScenarioInput, output: ScenarioDetailDto },
+  "scenarios.update": { input: UpdateScenarioInput, output: ScenarioDetailDto },
+  "scenarios.remove": { input: ScenarioRef, output: ScenarioRemoveOutput },
+  "scenarios.validate": { input: ScenarioValidateInput, output: ScenarioValidationDto },
+  "scenarios.activate": { input: SetScenarioActiveInput, output: ScenarioDto },
+  "scenarios.versions": { input: ScenarioRef, output: z.array(ScenarioVersionDto) },
   "downloads.list": { input: DownloadListFilter, output: z.array(DownloadDto) },
   "downloads.start": { input: StartDownloadInput, output: DownloadDto },
   "downloads.pause": { input: DownloadRef, output: DownloadDto },

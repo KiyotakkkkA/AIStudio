@@ -471,6 +471,12 @@ pub fn test_services(system: SystemService) -> TestServices {
         picker: Some(picker.clone()),
         ..crate::skills::SkillServiceOptions::new(skill_library, runs.clone(), database.shared())
     });
+    let scenarios =
+        crate::scenarios::ScenarioService::new(crate::scenarios::ScenarioServiceOptions {
+            tools: Some(tools.clone()),
+            clock: clock.clone(),
+            ..crate::scenarios::ScenarioServiceOptions::new(database.shared(), Arc::clone(&nodes))
+        });
     let folders = crate::workspace::FolderAccessService::new(
         database.shared(),
         runs.approvals(),
@@ -544,6 +550,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             tool_invoker,
             mcp,
             skills,
+            scenarios,
             chat,
             explorer: crate::workspace::ExplorerService::with_debounce(
                 folders.clone(),

@@ -184,7 +184,7 @@ Electron app untouched. TASK_066's CDP client is reused by TASK_046.
 
 ## Phase 7 — Scenarios and Agentic Build
 
-- [ ] **TASK_037** — Scenario model, versioning and validation
+- [x] **TASK_037** — Scenario model, versioning and validation
 - [ ] **TASK_038** — Scenario canvas editor
 - [ ] **TASK_039** — Scenario execution, node inspector, run log
 - [ ] **TASK_040** — Agentic session engine: planning loop and self-extending runs
@@ -305,7 +305,7 @@ you can settle the load-bearing ones early rather than being interrupted mid-tas
 | TASK_035 (resolved) | Neither option as written: each skill is its own folder inside the app's data directory (`SKILL.md` plus `references/`, `scripts/`, `assets/`), and the database holds only the index and the state the app owns. No watcher: a stat fingerprint is compared on read, and a changed folder is re-parsed and re-checked. Import and export copy a folder. | **no** — migrates user content |
 | TASK_036_EXTRA_4 (resolved) | Fallback (a): a file opens in a split beside the thread with a draggable divider, covering the chat below 1250 px. | yes |
 | TASK_036_EXTRA_5 (resolved) | Native toasts for every enabled event whatever window is in front, as in Electron. Built on `Windows.UI.Notifications` directly (own AUMID, `zvs-studio://` launch URL, tag and group), not a wrapper crate. A click opens its conversation, or «Загрузки». Action Center and cold-start clicks follow in TASK_036_EXTRA_6 through protocol activation. | yes |
-| TASK_037 | Own scenario format, or n8n-compatible? | **no** |
+| TASK_037 (resolved) | Own format matched to the kernel (option a); no n8n import. A best-effort importer is a candidate later task. | **no** |
 | TASK_038 | Scenario canvas: React Flow, or hand-rolled? | **no** |
 | TASK_040 | Default agentic session budget, and pause-or-stop on exhaustion | yes |
 | TASK_043 (superseded by ADR 0003) | LibreOffice integration removed in TASK_044 after the managed copy crashed on almost every conversion. Office documents render in the renderer (docx-preview, an OOXML sheet reader, slide text). «Компоненты» holds Node.js and uv. | moderate |

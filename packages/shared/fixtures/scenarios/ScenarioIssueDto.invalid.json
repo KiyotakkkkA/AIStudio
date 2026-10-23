@@ -1,0 +1,23 @@
+[
+  {
+    "name": "unknown rule",
+    "value": {
+      "rule": "broken"
+    }
+  },
+  {
+    "name": "null node",
+    "value": {
+      "rule": "cycle",
+      "nodeId": null
+    }
+  },
+  {
+    "name": "empty param",
+    "value": {
+      "rule": "missingParameter",
+      "nodeId": "a",
+      "param": ""
+    }
+  }
+]

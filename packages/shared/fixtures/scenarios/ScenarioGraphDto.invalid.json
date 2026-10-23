@@ -1,0 +1,31 @@
+[
+  {
+    "name": "missing attachments",
+    "value": {
+      "nodes": [],
+      "edges": []
+    }
+  },
+  {
+    "name": "bad node",
+    "value": {
+      "nodes": [
+        {
+          "id": "",
+          "type": "agent.tools",
+          "name": "AI Agent",
+          "position": {
+            "x": 320.5,
+            "y": 120.25
+          },
+          "params": {
+            "systemMessage": "Отвечать по базе знаний",
+            "maxIterations": 8
+          }
+        }
+      ],
+      "edges": [],
+      "attachments": []
+    }
+  }
+]

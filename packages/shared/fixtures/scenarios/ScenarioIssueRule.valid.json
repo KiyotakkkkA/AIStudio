@@ -1,0 +1,62 @@
+[
+  {
+    "name": "duplicateNode",
+    "value": "duplicateNode"
+  },
+  {
+    "name": "unknownNodeType",
+    "value": "unknownNodeType"
+  },
+  {
+    "name": "unknownNode",
+    "value": "unknownNode"
+  },
+  {
+    "name": "duplicateEdge",
+    "value": "duplicateEdge"
+  },
+  {
+    "name": "invalidEdge",
+    "value": "invalidEdge"
+  },
+  {
+    "name": "cycle",
+    "value": "cycle"
+  },
+  {
+    "name": "unsupportedSlot",
+    "value": "unsupportedSlot"
+  },
+  {
+    "name": "slotMismatch",
+    "value": "slotMismatch"
+  },
+  {
+    "name": "multipleParents",
+    "value": "multipleParents"
+  },
+  {
+    "name": "missingAttachment",
+    "value": "missingAttachment"
+  },
+  {
+    "name": "tooManyAttachments",
+    "value": "tooManyAttachments"
+  },
+  {
+    "name": "missingParameter",
+    "value": "missingParameter"
+  },
+  {
+    "name": "noTrigger",
+    "value": "noTrigger"
+  },
+  {
+    "name": "multipleTriggers",
+    "value": "multipleTriggers"
+  },
+  {
+    "name": "unreachable",
+    "value": "unreachable"
+  }
+]

@@ -2,7 +2,7 @@
 task: TASK_037
 title: Scenario model, versioning and validation
 phase: 7 — Scenarios and Agentic Build
-status: todo
+status: done
 depends_on: [TASK_023, TASK_076]
 unblocks: [TASK_038]
 estimate: 3 h
@@ -86,16 +86,69 @@ Manual check: Create a scenario through channels with a deliberately invalid gra
 
 ## Definition of done
 
-- [ ] Graph schema represents main edges and sub-node attachments distinctly
-- [ ] Validation covers every rule, returning node-addressable issues
-- [ ] Version-on-save with history and diff summaries
-- [ ] Invalid scenarios cannot be activated
-- [ ] Tests and gates pass
-- [ ] `pnpm typecheck && pnpm lint && pnpm build` pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Graph schema represents main edges and sub-node attachments distinctly
+- [x] Validation covers every rule, returning node-addressable issues
+- [x] Version-on-save with history and diff summaries
+- [x] Invalid scenarios cannot be activated
+- [x] Tests and gates pass
+- [ ] `pnpm typecheck && pnpm lint && pnpm build` pass (typecheck: pre-existing failure, see handoff)
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
+**Decision:** option (a), own format, no n8n import (asked and answered). An n8n importer
+(option b) stays a candidate later task.
+
 **Built:**
+- Contract `zvs_contract::scenarios` / `packages/shared/src/scenarios.ts`: `ScenarioGraphDto`
+  (`nodes[]` with id, type, optional name, position, params, optional disabled; `edges[]` with
+  from, to, fromPort, toPort; `attachments[]` with parentNodeId, childNodeId and a
+  `ScenarioSlot` of `model | memory | tool | embedding`), `ScenarioIssueDto` (rule plus optional
+  nodeId, slot, param), `ScenarioTriggerDto`, `ScenarioDiffDto`, `ScenarioDto`,
+  `ScenarioDetailDto`, `ScenarioVersionDto`, the inputs and `ScenarioRemoveOutput`. New branded
+  `ScenarioVersionId`. Fixtures in `fixtures/scenarios/`, both fixture tables updated.
+- Channels `scenarios.list|get|create|update|remove|validate|activate|versions`.
+  `activate` takes `{ id, active }` and also deactivates.
+- Migration `0013_scenario`: `scenario` (tags JSON, active, current_version_id, the trigger
+  binding as JSON plus an indexed `trigger_kind`) and `scenario_version` (graph JSON, note,
+  diff summary; unique per scenario and number; cascades on scenario delete).
+  `ScenarioRepository` on `Repositories`.
+- `zvs-host/src/scenarios/`: `catalogue.rs` (`ScenarioCatalogue` = built-in structural types plus
+  every registry node; registry nodes are trunk actions, a node with a tool key can also fill the
+  `tool` slot, required params come from the input schema), `validation.rs` (pure
+  `validate_graph` and `trigger_binding`), `diff.rs`, `service.rs` (`ScenarioService` on
+  `Services`).
+- Built-in types: `trigger.chat`, `trigger.mail`, `trigger.schedule` (needs `cron`),
+  `trigger.webhook` (needs `path`), `agent.tools` (slots: model required, memory optional,
+  tool many), `model.chat` and `embedding.model` (need `providerId`, `modelId`),
+  `memory.window`.
+- Validation rules: duplicateNode, unknownNodeType, unknownNode, duplicateEdge, invalidEdge
+  (a sub-node on a main edge, an edge into a trigger, a tool child also on the trunk), cycle
+  (main graph via SCC, and attachment loops), unsupportedSlot, slotMismatch, multipleParents,
+  missingAttachment, tooManyAttachments, missingParameter, noTrigger, multipleTriggers,
+  unreachable.
+
 **Deviated from plan:**
+- Two triggers in one scenario are disallowed (`multipleTriggers`), since one binding is stored.
+- Saving an unchanged graph does not add a version; a layout-only change does, with an empty
+  summary. A note without a graph change is dropped.
+- An active scenario refuses a save whose graph has issues (`ACTIVE_SCENARIO_INVALID`, issues in
+  `details.issues`) instead of silently deactivating.
+- Disabled nodes skip their parameter and slot checks and do not fill a parent's slot. A node
+  attached as a tool skips its required parameters: the model supplies them per call.
+- Saving records the scenario's tool keys as tool references (`ToolReferenceKind::Scenario`),
+  so the «Инструменты» page lists the scenario; removal clears them.
+
 **Next session should know:**
+- TASK_039 pins a run with `ScenarioService::version(version_id)` (row plus graph); versions
+  are immutable. TASK_048 finds what to fire with `active_for_trigger(kind)`.
+- Issues are computed on read against the live registry, so a scenario can become invalid when
+  an MCP tool disappears; `issueCount` on the list reflects that.
+- Built-in structural types have no executors yet; TASK_039 registers them.
+- Positions are f64; a whole number comes back as `120.0`, so fixtures use fractional values.
+- `pnpm typecheck` fails in `apps/studio/tests/renderer/fileChanges.test.ts` (a `from:
+  undefined` passed as JSON). It fails the same way on `main` before this task and was left
+  alone.
+- Gates run: cargo fmt, clippy `-D warnings`, `cargo test --workspace --exclude zvs-jobd` (a
+  running dev build locked `zvs-jobd.exe`), `pnpm lint`, `pnpm test`, `pnpm format:check`,
+  `pnpm contract:channels:check`, `pnpm build`.

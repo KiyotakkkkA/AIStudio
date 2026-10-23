@@ -1,0 +1,19 @@
+[
+  {
+    "name": "empty port",
+    "value": {
+      "from": "trigger",
+      "to": "agent",
+      "fromPort": "",
+      "toPort": "main"
+    }
+  },
+  {
+    "name": "missing to",
+    "value": {
+      "from": "a",
+      "fromPort": "main",
+      "toPort": "main"
+    }
+  }
+]

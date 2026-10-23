@@ -1,0 +1,20 @@
+[
+  {
+    "name": "chat",
+    "value": {
+      "kind": "chat",
+      "nodeId": "trigger",
+      "params": {}
+    }
+  },
+  {
+    "name": "schedule",
+    "value": {
+      "kind": "schedule",
+      "nodeId": "cron",
+      "params": {
+        "cron": "0 9 * * 1-5"
+      }
+    }
+  }
+]

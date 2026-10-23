@@ -1,0 +1,39 @@
+[
+  {
+    "name": "missing note",
+    "value": {
+      "id": "0199aa11-2222-7222-8222-222222222222",
+      "scenarioId": "0199aa11-1111-7111-8111-111111111111",
+      "version": 14,
+      "summary": {
+        "nodesAdded": ["model"],
+        "nodesRemoved": [],
+        "nodesChanged": ["agent"],
+        "edgesAdded": 1,
+        "edgesRemoved": 0,
+        "attachmentsAdded": 1,
+        "attachmentsRemoved": 0
+      },
+      "createdAt": 1760000500000
+    }
+  },
+  {
+    "name": "long note",
+    "value": {
+      "id": "0199aa11-2222-7222-8222-222222222222",
+      "scenarioId": "0199aa11-1111-7111-8111-111111111111",
+      "version": 14,
+      "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "summary": {
+        "nodesAdded": ["model"],
+        "nodesRemoved": [],
+        "nodesChanged": ["agent"],
+        "edgesAdded": 1,
+        "edgesRemoved": 0,
+        "attachmentsAdded": 1,
+        "attachmentsRemoved": 0
+      },
+      "createdAt": 1760000500000
+    }
+  }
+]

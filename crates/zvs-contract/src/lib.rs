@@ -24,6 +24,7 @@ pub mod providers;
 pub mod questions;
 pub mod runs;
 pub mod runtimes;
+pub mod scenarios;
 pub mod secrets;
 pub mod settings;
 pub mod skills;
@@ -141,6 +142,14 @@ pub use runs::{
 pub use runtimes::{
     Accelerator, InstallRuntimeInput, ModelFormat, RuntimeDto, RuntimeEngine, RuntimeOverviewDto,
     RuntimePlanDto, RuntimeRef, RuntimeState, RuntimesRemoveOutput, RuntimesStopOutput,
+};
+pub use scenarios::{
+    CreateScenarioInput, SCENARIO_MAIN_PORT, ScenarioAttachmentDto, ScenarioDetailDto,
+    ScenarioDiffDto, ScenarioDto, ScenarioEdgeDto, ScenarioGraphDto, ScenarioIssueDto,
+    ScenarioIssueRule, ScenarioNodeDto, ScenarioParams, ScenarioPositionDto, ScenarioRef,
+    ScenarioRemoveOutput, ScenarioSlot, ScenarioTriggerDto, ScenarioTriggerKind,
+    ScenarioValidateInput, ScenarioValidationDto, ScenarioVersionDto, SetScenarioActiveInput,
+    UpdateScenarioInput, normalise_tags,
 };
 pub use secrets::{
     CreateSecretInput, FieldDefault, FieldDescriptor, FieldKind, FieldOption, RotationStatus,

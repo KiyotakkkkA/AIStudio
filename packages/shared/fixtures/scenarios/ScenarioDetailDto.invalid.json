@@ -1,0 +1,51 @@
+[
+  {
+    "name": "missing graph",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "name": "Support triage bot",
+      "tags": ["support"],
+      "active": true,
+      "currentVersionId": "0199aa11-2222-7222-8222-222222222222",
+      "version": 14,
+      "trigger": {
+        "kind": "chat",
+        "nodeId": "trigger",
+        "params": {}
+      },
+      "issueCount": 0,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000500000,
+      "issues": []
+    }
+  },
+  {
+    "name": "bad issue",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "name": "Support triage bot",
+      "tags": ["support"],
+      "active": true,
+      "currentVersionId": "0199aa11-2222-7222-8222-222222222222",
+      "version": 14,
+      "trigger": {
+        "kind": "chat",
+        "nodeId": "trigger",
+        "params": {}
+      },
+      "issueCount": 0,
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000500000,
+      "graph": {
+        "nodes": [],
+        "edges": [],
+        "attachments": []
+      },
+      "issues": [
+        {
+          "rule": "broken"
+        }
+      ]
+    }
+  }
+]

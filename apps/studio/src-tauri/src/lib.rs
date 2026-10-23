@@ -66,6 +66,7 @@ use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_windo
 use zvs_host::runtimes::{
     ReleaseResolver, ReleaseResolverOptions, RuntimeService, RuntimeServiceOptions,
 };
+use zvs_host::scenarios::{ScenarioService, ScenarioServiceOptions};
 use zvs_host::services::rerank::local_rerankers;
 use zvs_host::services::system::DEMO_INTERVAL;
 use zvs_host::services::{
@@ -782,6 +783,11 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger: logger.clone(),
         ..SkillServiceOptions::new(skill_library, runs.clone(), Arc::clone(&database))
     });
+    let scenarios = ScenarioService::new(ScenarioServiceOptions {
+        tools: Some(tools.clone()),
+        clock: clock.clone(),
+        ..ScenarioServiceOptions::new(Arc::clone(&database), Arc::clone(&nodes))
+    });
     let forbidden = ForbiddenFolders::from_environment(&[
         paths.data_dir.clone(),
         paths.cache_dir.clone(),
@@ -989,6 +995,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         tool_invoker,
         mcp,
         skills,
+        scenarios,
         chat,
         explorer: explorer.clone(),
         terminals,

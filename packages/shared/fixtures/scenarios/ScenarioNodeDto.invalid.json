@@ -1,0 +1,77 @@
+[
+  {
+    "name": "empty id",
+    "value": {
+      "id": "",
+      "type": "agent.tools",
+      "name": "AI Agent",
+      "position": {
+        "x": 320.5,
+        "y": 120.25
+      },
+      "params": {
+        "systemMessage": "Отвечать по базе знаний",
+        "maxIterations": 8
+      }
+    }
+  },
+  {
+    "name": "missing params",
+    "value": {
+      "id": "agent",
+      "type": "agent.tools",
+      "name": "AI Agent",
+      "position": {
+        "x": 320.5,
+        "y": 120.25
+      }
+    }
+  },
+  {
+    "name": "long type",
+    "value": {
+      "id": "agent",
+      "type": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "name": "AI Agent",
+      "position": {
+        "x": 320.5,
+        "y": 120.25
+      },
+      "params": {
+        "systemMessage": "Отвечать по базе знаний",
+        "maxIterations": 8
+      }
+    }
+  },
+  {
+    "name": "null name",
+    "value": {
+      "id": "agent",
+      "type": "agent.tools",
+      "name": null,
+      "position": {
+        "x": 320.5,
+        "y": 120.25
+      },
+      "params": {
+        "systemMessage": "Отвечать по базе знаний",
+        "maxIterations": 8
+      }
+    }
+  },
+  {
+    "name": "empty param key",
+    "value": {
+      "id": "agent",
+      "type": "agent.tools",
+      "name": "AI Agent",
+      "position": {
+        "x": 320.5,
+        "y": 120.25
+      },
+      "params": {
+        "": 1
+      }
+    }
+  }
+]

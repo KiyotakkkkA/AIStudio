@@ -1,0 +1,22 @@
+[
+  {
+    "name": "valid",
+    "value": {
+      "valid": true,
+      "issues": []
+    }
+  },
+  {
+    "name": "invalid",
+    "value": {
+      "valid": false,
+      "issues": [
+        {
+          "rule": "missingAttachment",
+          "nodeId": "agent",
+          "slot": "model"
+        }
+      ]
+    }
+  }
+]

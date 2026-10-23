@@ -1,0 +1,22 @@
+[
+  {
+    "name": "negative",
+    "value": {
+      "nodesAdded": ["model"],
+      "nodesRemoved": [],
+      "nodesChanged": ["agent"],
+      "edgesAdded": -1,
+      "edgesRemoved": 0,
+      "attachmentsAdded": 1,
+      "attachmentsRemoved": 0
+    }
+  },
+  {
+    "name": "missing counts",
+    "value": {
+      "nodesAdded": [],
+      "nodesRemoved": [],
+      "nodesChanged": []
+    }
+  }
+]

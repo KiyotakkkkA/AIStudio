@@ -1,0 +1,45 @@
+[
+  {
+    "name": "named",
+    "value": {
+      "id": "agent",
+      "type": "agent.tools",
+      "name": "AI Agent",
+      "position": {
+        "x": 320.5,
+        "y": 120.25
+      },
+      "params": {
+        "systemMessage": "Отвечать по базе знаний",
+        "maxIterations": 8
+      }
+    }
+  },
+  {
+    "name": "disabled",
+    "value": {
+      "id": "memory",
+      "type": "memory.window",
+      "position": {
+        "x": 400.5,
+        "y": 300.75
+      },
+      "params": {},
+      "disabled": true
+    }
+  },
+  {
+    "name": "bare",
+    "value": {
+      "id": "n1",
+      "type": "trigger.webhook",
+      "position": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "params": {
+        "path": "orders"
+      }
+    }
+  }
+]

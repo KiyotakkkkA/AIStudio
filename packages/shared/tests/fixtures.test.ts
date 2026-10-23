@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import * as skills from "../src/skills/index.js";
+import * as scenarios from "../src/scenarios.js";
 import * as toolchain from "../src/toolchain/index.js";
 import * as files from "../src/files.js";
 import * as processes from "../src/process.js";
@@ -247,6 +248,27 @@ const schemas: Record<string, z.ZodType> = {
   "folders/BindFolderInput": contract["chat.bindFolder"].input,
   "folders/BindFolderResultDto": contract["chat.bindFolder"].output,
   "folders/PickFolderResultDto": contract["chat.pickFolder"].output,
+  "scenarios/ScenarioSlot": scenarios.ScenarioSlot,
+  "scenarios/ScenarioTriggerKind": scenarios.ScenarioTriggerKind,
+  "scenarios/ScenarioIssueRule": scenarios.ScenarioIssueRule,
+  "scenarios/ScenarioPositionDto": scenarios.ScenarioPositionDto,
+  "scenarios/ScenarioNodeDto": scenarios.ScenarioNodeDto,
+  "scenarios/ScenarioEdgeDto": scenarios.ScenarioEdgeDto,
+  "scenarios/ScenarioAttachmentDto": scenarios.ScenarioAttachmentDto,
+  "scenarios/ScenarioGraphDto": scenarios.ScenarioGraphDto,
+  "scenarios/ScenarioIssueDto": scenarios.ScenarioIssueDto,
+  "scenarios/ScenarioTriggerDto": scenarios.ScenarioTriggerDto,
+  "scenarios/ScenarioDiffDto": scenarios.ScenarioDiffDto,
+  "scenarios/ScenarioDto": scenarios.ScenarioDto,
+  "scenarios/ScenarioDetailDto": scenarios.ScenarioDetailDto,
+  "scenarios/ScenarioVersionDto": scenarios.ScenarioVersionDto,
+  "scenarios/ScenarioRef": scenarios.ScenarioRef,
+  "scenarios/CreateScenarioInput": scenarios.CreateScenarioInput,
+  "scenarios/UpdateScenarioInput": scenarios.UpdateScenarioInput,
+  "scenarios/ScenarioValidateInput": scenarios.ScenarioValidateInput,
+  "scenarios/ScenarioValidationDto": scenarios.ScenarioValidationDto,
+  "scenarios/SetScenarioActiveInput": scenarios.SetScenarioActiveInput,
+  "scenarios/ScenarioRemoveOutput": scenarios.ScenarioRemoveOutput,
   "skills/SkillSource": skills.SkillSource,
   "skills/SkillStatus": skills.SkillStatus,
   "skills/SkillMatchMethod": skills.SkillMatchMethod,

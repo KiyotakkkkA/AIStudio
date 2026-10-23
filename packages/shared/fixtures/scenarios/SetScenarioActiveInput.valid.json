@@ -1,0 +1,16 @@
+[
+  {
+    "name": "activate",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "active": true
+    }
+  },
+  {
+    "name": "deactivate",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "active": false
+    }
+  }
+]

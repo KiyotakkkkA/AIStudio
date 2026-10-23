@@ -68,6 +68,7 @@ branded_ids!(
     ConversationId,
     MessageId,
     ScenarioId,
+    ScenarioVersionId,
     RunId,
     StepId,
     SkillId,

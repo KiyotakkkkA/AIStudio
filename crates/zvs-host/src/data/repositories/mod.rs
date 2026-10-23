@@ -10,6 +10,7 @@ pub mod model;
 pub mod permission;
 pub mod provider;
 pub mod run;
+pub mod scenario;
 pub mod secret;
 pub mod setting;
 pub mod skill;
@@ -38,6 +39,7 @@ pub use run::{
     RunCounts, RunCursor, RunDraft, RunPageQuery, RunPatch, RunRepository, RunningNode,
     decode_run_cursor, encode_run_cursor,
 };
+pub use scenario::ScenarioRepository;
 pub use secret::{
     SecretDraft, SecretFilter, SecretPatch, SecretRepository, SecretUsageDraft, secret_in_use,
 };
@@ -70,6 +72,7 @@ pub struct Repositories<'c> {
     pub skills: SkillRepository<'c>,
     pub folder_grants: FolderGrantRepository<'c>,
     pub documents: DocumentRepository<'c>,
+    pub scenarios: ScenarioRepository<'c>,
 }
 
 impl<'c> Repositories<'c> {
@@ -95,6 +98,7 @@ impl<'c> Repositories<'c> {
             skills: SkillRepository::new(connection),
             folder_grants: FolderGrantRepository::new(connection),
             documents: DocumentRepository::new(connection),
+            scenarios: ScenarioRepository::new(connection),
         }
     }
 }

@@ -11,6 +11,7 @@ pub mod model;
 pub mod permission;
 pub mod provider;
 pub mod run;
+pub mod scenario;
 pub mod secret;
 pub mod secret_usage;
 pub mod setting;
@@ -36,6 +37,7 @@ pub use permission::{
 };
 pub use provider::{ProviderRow, ProviderSettings};
 pub use run::{RunRow, StepRow};
+pub use scenario::{ScenarioRow, ScenarioVersionRow};
 pub use secret::{ScopeColumn, SecretCipherRow, SecretRow};
 pub use secret_usage::{SecretConsumerKind, SecretUsageRow};
 pub use setting::SettingRow;
