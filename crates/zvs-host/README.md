@@ -313,8 +313,14 @@ the payload field by field (a malformed profile is `VALIDATION_FAILED`).
 
 `qwen-web` lists models from `/models/` (one entry that fails validation fails the whole
 list, inactive and duplicate ids are skipped, `reasoning` comes from `capabilities.thinking`,
-else `abilities.thinking`), and generates by creating a vendor chat (`/chats/new`) and
-streaming `/chat/completions?chat_id=…`. History is flattened into one role-labelled prompt.
+else `abilities.thinking`), and generates by streaming `/chat/completions?chat_id=…` into a
+vendor chat. Chats are leased per model: a turn takes an idle chat, or creates one with
+`/chats/new` when none is idle (so concurrent turns get separate chats), and returns it after a
+finished answer; a chat is retired after 200 turns. A reused chat that fails before any delta
+with an error that is not a cancellation, a session expiry or `PROVIDER_UNREACHABLE` is
+dropped and the turn retried once on a new chat; a session expiry forgets every idle chat.
+History is flattened into one role-labelled prompt and each turn is a root message
+(`parent_id: null`).
 `thinking_summary` frames become reasoning deltas (only the new suffix of each summary line),
 `answer` frames text deltas; a stream that ends without `status: finished` is
 `PROVIDER_UNREACHABLE` «Поток вендора оборвался». Vendor frames with `401`/`403` or an

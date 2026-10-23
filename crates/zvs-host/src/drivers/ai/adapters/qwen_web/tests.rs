@@ -979,3 +979,115 @@ async fn live_qwen_identity_models_and_thinking_and_fast_generation() {
         );
     }
 }
+
+fn count(server: &MockServer, path: &str) -> usize {
+    server
+        .paths()
+        .iter()
+        .filter(|recorded| recorded.as_str() == path)
+        .count()
+}
+
+#[tokio::test]
+async fn one_verified_chat_serves_every_turn_of_a_model_until_it_is_refused() {
+    let server = qwen_server(fixture_frames("qwenStream.sse")).await;
+    let qwen = adapter(&server);
+    for _ in 0..3 {
+        qwen.generate(&prompt(), &token()).await.expect("generates");
+    }
+    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 1);
+    assert_eq!(count(&server, &route(QWEN_COMPLETIONS_PATH)), 3);
+    assert_eq!(qwen.idle_chats(), 1);
+    let chats: Vec<String> = server
+        .calls()
+        .iter()
+        .filter(|call| call.path == route(QWEN_COMPLETIONS_PATH))
+        .map(|call| {
+            call.json()["chat_id"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned()
+        })
+        .collect();
+    assert!(chats.iter().all(|chat| chat == &chats[0]), "{chats:?}");
+    qwen.generate(
+        &GenerateRequest {
+            model: "qwen3.5-plus".to_owned(),
+            ..prompt()
+        },
+        &token(),
+    )
+    .await
+    .expect("generates");
+    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 2);
+    assert_eq!(qwen.idle_chats(), 2);
+}
+
+#[tokio::test]
+async fn a_reused_chat_the_vendor_refuses_is_replaced_by_a_new_one_within_the_same_turn() {
+    let server = qwen_server(fixture_frames("qwenStream.sse")).await;
+    let qwen = adapter(&server);
+    qwen.generate(&prompt(), &token()).await.expect("generates");
+    server.reply(
+        &route(QWEN_COMPLETIONS_PATH),
+        Reply::json(json!({ "detail": "chat not found" })).with_status(404),
+    );
+    let error = qwen
+        .generate(&prompt(), &token())
+        .await
+        .expect_err("the fresh chat fails too");
+    assert_ne!(error.code, AppErrorCode::ProviderSessionExpired);
+    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 2);
+    assert_eq!(count(&server, &route(QWEN_COMPLETIONS_PATH)), 3);
+    assert_eq!(qwen.idle_chats(), 0);
+    server.reply(
+        &route(QWEN_COMPLETIONS_PATH),
+        Reply::chunks(fixture_frames("qwenStream.sse")),
+    );
+    qwen.generate(&prompt(), &token()).await.expect("generates");
+    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 3);
+    assert_eq!(qwen.idle_chats(), 1);
+}
+
+#[tokio::test]
+async fn an_expired_session_forgets_every_reused_chat() {
+    let server = qwen_server(fixture_frames("qwenStream.sse")).await;
+    let qwen = adapter(&server);
+    qwen.generate(&prompt(), &token()).await.expect("generates");
+    assert_eq!(qwen.idle_chats(), 1);
+    server.reply(
+        &route(QWEN_COMPLETIONS_PATH),
+        Reply::chunks(fixture_frames("qwenStreamStatus401.sse")),
+    );
+    let error = qwen
+        .generate(&prompt(), &token())
+        .await
+        .expect_err("expires");
+    assert_eq!(error.code, AppErrorCode::ProviderSessionExpired);
+    assert_eq!(qwen.idle_chats(), 0);
+    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 1);
+}
+
+#[tokio::test]
+async fn concurrent_turns_rotate_through_separate_chats_and_keep_them_for_later() {
+    let server = qwen_server(fixture_frames("qwenStream.sse")).await;
+    server.reply(
+        &route(QWEN_COMPLETIONS_PATH),
+        Reply::chunks(fixture_frames("qwenStream.sse")).with_gap(Duration::from_millis(20)),
+    );
+    let qwen = adapter(&server);
+    let request = prompt();
+    let cancel = token();
+    let (first, second) = tokio::join!(
+        qwen.generate(&request, &cancel),
+        qwen.generate(&request, &cancel)
+    );
+    first.expect("first");
+    second.expect("second");
+    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 2);
+    assert_eq!(qwen.idle_chats(), 2);
+    for _ in 0..2 {
+        qwen.generate(&request, &token()).await.expect("generates");
+    }
+    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 2);
+}

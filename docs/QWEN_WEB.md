@@ -199,3 +199,25 @@ chats. It prints endpoint status and counts, never credentials or response bodie
 It uses direct fetch without the browser profile's cookies, so browser verification
 can block it even with a valid token. After TASK_067 this test is an `#[ignore]`d Rust test
 (`cargo test -p zvs-host -- --ignored live_qwen`) with the same behaviour. Without the environment variable it is skipped.
+
+## Chat reuse, 2026-10-24
+
+Every turn used to create a vendor chat, and `chats/new` is the request the vendor's
+anti-abuse SDK guards with Baxia, so long tool loops and scenario runs met the verification
+far more often than a person using the client would. The adapter now keeps the chats it
+created and reuses them for the session's lifetime:
+
+- Chats are leased per model. A turn takes an idle chat or creates one; concurrent turns
+  therefore rotate through separate chats, and each chat carries one turn at a time.
+- A chat goes back to the pool only after a finished answer, and is retired after 200 turns.
+  A cancelled or failed turn drops its chat.
+- A reused chat refused before any delta (anything but a cancellation, a session expiry or
+  `PROVIDER_UNREACHABLE`) is dropped and the turn is retried once on a new chat, so the
+  behaviour degrades to the old one-chat-per-turn path.
+- A session expiry forgets every idle chat. Relinking builds a new adapter with an empty pool.
+  The pool lives in memory, so a restart creates one chat per model on first use.
+- Each turn is a root message (`parent_id: null`) carrying the whole flattened prompt, so no
+  vendor-side history is relied on.
+
+Not yet verified live: whether Qwen accepts many root messages in one chat over a long session.
+The retry above keeps turns working if it does not.

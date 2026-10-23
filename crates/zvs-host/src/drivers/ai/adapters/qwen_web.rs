@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::mem;
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -19,7 +19,9 @@ use super::account_family::{
     malformed_turn, response_diagnostics, truncated_stream,
 };
 use crate::drivers::ai::capabilities::{AdapterCapabilities, Honours};
-use crate::drivers::ai::errors::{html_title, request_failed, session_expired};
+use crate::drivers::ai::errors::{
+    html_title, is_cancellation, is_session_expired, request_failed, session_expired,
+};
 use crate::drivers::ai::ports::{
     DeltaStream, DiscoveredModel, FinishReason, GenerateRequest, GenerateResult, TextDelta,
     TextGenerationDriver, TokenUsage,
@@ -39,6 +41,7 @@ pub use zvs_qwen_web::protocol::{
 
 pub const GENERATION_ABORTED_MESSAGE: &str = "Вендор прервал генерацию";
 pub const MODELS_REFUSED_MESSAGE: &str = "Qwen отклонил запрос списка моделей";
+pub const CHAT_TURNS_MAX: u32 = 200;
 
 pub const QWEN_WEB_CAPABILITIES: AdapterCapabilities = AdapterCapabilities {
     family: AdapterFamily::QwenWeb,
@@ -179,11 +182,31 @@ fn with_summary(summary: &SharedSummary, update: impl FnOnce(&mut TurnSummary)) 
     update(&mut summary.lock().unwrap_or_else(PoisonError::into_inner));
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ChatLease {
+    chat_id: String,
+    model: String,
+    turns: u32,
+}
+
+struct Opened {
+    frames: FrameStream,
+    lease: ChatLease,
+    reused: bool,
+}
+
+fn retryable_on_new_chat(error: &AppError) -> bool {
+    !is_cancellation(error)
+        && !is_session_expired(error)
+        && error.code != AppErrorCode::ProviderUnreachable
+}
+
 struct Shared {
     core: AccountAdapterCore,
     models: Mutex<Option<Vec<DiscoveredModel>>>,
     /// The client creates one chat at a time; so does the adapter, to stay client-like.
     creating: tokio::sync::Mutex<()>,
+    idle: Mutex<HashMap<String, Vec<ChatLease>>>,
 }
 
 impl Shared {
@@ -242,6 +265,56 @@ impl Shared {
             .collect::<Vec<_>>();
         *self.models.lock().unwrap_or_else(PoisonError::into_inner) = Some(models.clone());
         Ok(models)
+    }
+
+    fn checkout(&self, model: &str) -> Option<ChatLease> {
+        self.idle
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get_mut(model)
+            .and_then(Vec::pop)
+    }
+
+    fn release(&self, mut lease: ChatLease) {
+        lease.turns += 1;
+        if lease.turns >= CHAT_TURNS_MAX {
+            return;
+        }
+        self.idle
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .entry(lease.model.clone())
+            .or_default()
+            .push(lease);
+    }
+
+    fn forget_chats(&self) {
+        self.idle
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
+    }
+
+    fn idle_chats(&self) -> usize {
+        self.idle
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .values()
+            .map(Vec::len)
+            .sum()
+    }
+
+    fn retire(&self, lease: &ChatLease, error: &AppError) {
+        self.core.logger.log(
+            LogLevel::Info,
+            "ai",
+            "Qwen refused a reused chat; opening a new one",
+            &[
+                ("family", json!(FAMILY.as_str())),
+                ("turns", json!(lease.turns)),
+                ("code", json!(error.code)),
+            ],
+        );
     }
 
     fn cached_models(&self) -> Option<Vec<DiscoveredModel>> {
@@ -314,7 +387,8 @@ impl Shared {
         &self,
         request: &GenerateRequest,
         cancel: &CancellationToken,
-    ) -> Result<FrameStream, AppError> {
+        fresh: bool,
+    ) -> Result<Opened, AppError> {
         self.core.drop_unsupported(request);
         let models = match self.cached_models() {
             Some(models) => models,
@@ -324,10 +398,30 @@ impl Shared {
             .iter()
             .find(|model| model.external_id == request.model)
             .is_some_and(|model| model.capabilities.contains(&ModelCapability::Reasoning));
-        let chat_id = self.create_chat(&request.model, cancel).await?;
-        Ok(self
+        let idle = if fresh {
+            None
+        } else {
+            self.checkout(&request.model)
+        };
+        let (lease, reused) = match idle {
+            Some(lease) => (lease, true),
+            None => (
+                ChatLease {
+                    chat_id: self.create_chat(&request.model, cancel).await?,
+                    model: request.model.clone(),
+                    turns: 0,
+                },
+                false,
+            ),
+        };
+        let frames = self
             .core
-            .frames(self.turn(&chat_id, request, thinking)?, cancel))
+            .frames(self.turn(&lease.chat_id, request, thinking)?, cancel);
+        Ok(Opened {
+            frames,
+            lease,
+            reused,
+        })
     }
 }
 
@@ -346,12 +440,34 @@ struct Run {
     decoder: TurnDecoder,
     finished: bool,
     summary: Option<SharedSummary>,
+    lease: Option<ChatLease>,
+    reused: bool,
+    produced: bool,
+    fresh: bool,
 }
 
 impl Run {
     fn fail(&mut self, error: AppError) {
+        if is_session_expired(&error) {
+            self.shared.forget_chats();
+        }
+        self.lease = None;
         self.queue.push_back(Err(error));
         self.phase = Phase::Done;
+    }
+
+    fn settle(&mut self, error: AppError) {
+        if self.reused && !self.produced && !self.fresh && retryable_on_new_chat(&error) {
+            if let Some(lease) = self.lease.take() {
+                self.shared.retire(&lease, &error);
+            }
+            self.decoder = TurnDecoder::new();
+            self.finished = false;
+            self.fresh = true;
+            self.phase = Phase::Open;
+            return;
+        }
+        self.fail(error);
     }
 
     fn frame(&mut self, payload: &str) {
@@ -359,7 +475,7 @@ impl Run {
             match event {
                 TurnEvent::Failure(failure) => {
                     let failure = self.shared.core.normalise(vendor_failure(failure));
-                    self.fail(failure);
+                    self.settle(failure);
                     return;
                 }
                 TurnEvent::Usage(usage) => {
@@ -368,9 +484,13 @@ impl Run {
                     }
                 }
                 TurnEvent::Reasoning(chunk) => {
-                    self.queue.push_back(Ok(TextDelta::reasoning(chunk)))
+                    self.produced = true;
+                    self.queue.push_back(Ok(TextDelta::reasoning(chunk)));
                 }
-                TurnEvent::Text(chunk) => self.queue.push_back(Ok(TextDelta::text(chunk))),
+                TurnEvent::Text(chunk) => {
+                    self.produced = true;
+                    self.queue.push_back(Ok(TextDelta::text(chunk)));
+                }
                 TurnEvent::Finished => self.finished = true,
             }
         }
@@ -379,21 +499,34 @@ impl Run {
     async fn advance(&mut self) {
         match mem::replace(&mut self.phase, Phase::Done) {
             Phase::Done => {}
-            Phase::Open => match self.shared.open(&self.request, &self.cancel).await {
-                Ok(frames) => self.phase = Phase::Frames(frames),
+            Phase::Open => match self
+                .shared
+                .open(&self.request, &self.cancel, self.fresh)
+                .await
+            {
+                Ok(opened) => {
+                    self.lease = Some(opened.lease);
+                    self.reused = opened.reused;
+                    self.phase = Phase::Frames(opened.frames);
+                }
                 Err(error) => self.fail(error),
             },
             Phase::Frames(mut frames) => match frames.next().await {
                 None => {
                     if !self.finished {
                         self.fail(truncated_stream(FAMILY, QWEN_COMPLETIONS_PATH));
-                    } else if let Some(summary) = &self.summary {
+                        return;
+                    }
+                    if let Some(lease) = self.lease.take() {
+                        self.shared.release(lease);
+                    }
+                    if let Some(summary) = &self.summary {
                         with_summary(summary, |summary| {
                             summary.finish_reason = Some(FinishReason::Stop);
                         });
                     }
                 }
-                Some(Err(error)) => self.fail(error),
+                Some(Err(error)) => self.settle(error),
                 Some(Ok(payload)) => {
                     self.phase = Phase::Frames(frames);
                     self.frame(&payload);
@@ -414,8 +547,13 @@ impl QwenWebAdapter {
                 core: AccountAdapterCore::new(options, QWEN_WEB_CAPABILITIES),
                 models: Mutex::new(None),
                 creating: tokio::sync::Mutex::new(()),
+                idle: Mutex::new(HashMap::new()),
             }),
         }
+    }
+
+    pub fn idle_chats(&self) -> usize {
+        self.shared.idle_chats()
     }
 
     fn run(
@@ -433,6 +571,10 @@ impl QwenWebAdapter {
             decoder: TurnDecoder::new(),
             finished: false,
             summary,
+            lease: None,
+            reused: false,
+            produced: false,
+            fresh: false,
         };
         futures::stream::unfold(run, |mut run| async move {
             loop {
