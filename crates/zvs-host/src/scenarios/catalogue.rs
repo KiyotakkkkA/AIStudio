@@ -13,6 +13,14 @@ pub const AGENT_TOOLS: &str = "agent.tools";
 pub const MODEL_CHAT: &str = "model.chat";
 pub const MEMORY_WINDOW: &str = "memory.window";
 pub const EMBEDDING_MODEL: &str = "embedding.model";
+pub const TOOL_SET: &str = "tool.set";
+pub const TOOL_SET_PARAM: &str = "tools";
+pub const OUTPUT_CHAT_REPLY: &str = "output.chatReply";
+pub const OUTPUT_CHAT_MESSAGE: &str = "output.chatMessage";
+pub const OUTPUT_NEW_CHAT: &str = "output.newChat";
+pub const OUTPUT_NOTIFY: &str = "output.notify";
+pub const OUTPUT_FILE: &str = "output.file";
+pub const INTERNAL_PREFIXES: &[&str] = &["chat."];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SlotSpec {
@@ -161,16 +169,27 @@ impl ScenarioCatalogue {
                     .with_required(&["providerId", "modelId"]),
             )
             .with(NodeSpec::sub_node(MEMORY_WINDOW, ScenarioSlot::Memory))
+            .with(NodeSpec::sub_node(TOOL_SET, ScenarioSlot::Tool).with_required(&[TOOL_SET_PARAM]))
             .with(
                 NodeSpec::sub_node(EMBEDDING_MODEL, ScenarioSlot::Embedding)
                     .with_required(&["providerId", "modelId"]),
             )
+            .with(NodeSpec::action(OUTPUT_CHAT_REPLY))
+            .with(NodeSpec::action(OUTPUT_CHAT_MESSAGE).with_required(&["conversationId"]))
+            .with(NodeSpec::action(OUTPUT_NEW_CHAT))
+            .with(NodeSpec::action(OUTPUT_NOTIFY).with_required(&["title"]))
+            .with(NodeSpec::action(OUTPUT_FILE).with_required(&["path"]))
     }
 
     pub fn from_registry(registry: &NodeRegistry) -> Self {
         registry
             .list()
             .iter()
+            .filter(|node| {
+                !INTERNAL_PREFIXES
+                    .iter()
+                    .any(|prefix| node.node_type().starts_with(prefix))
+            })
             .fold(Self::builtin(), |catalogue, node| {
                 let tool_key = node.permission().tool_key().map(str::to_owned);
                 catalogue.with(NodeSpec {

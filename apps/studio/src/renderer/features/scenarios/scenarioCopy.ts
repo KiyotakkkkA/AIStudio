@@ -5,7 +5,6 @@ import {
   type ScenarioIssueRule,
   type ScenarioNodeRole,
   type ScenarioSlot,
-  type ToolSource,
 } from "@zvs/shared";
 import { plural } from "../connections/connectionPresentation";
 import type { AttachRefusal, ConnectRefusal, Refusal } from "./graphModel";
@@ -19,6 +18,12 @@ export const NODE_TYPE_LABELS: Readonly<Record<string, string>> = {
   "model.chat": "Чат-модель",
   "memory.window": "Память диалога",
   "embedding.model": "Модель эмбеддингов",
+  "tool.set": "Набор инструментов",
+  "output.chatReply": "Ответ в чат",
+  "output.chatMessage": "Сообщение в диалог",
+  "output.newChat": "Новый диалог",
+  "output.notify": "Уведомление",
+  "output.file": "Сохранение в файл",
   "llm.generate": "Генерация текста",
   "flow.branch": "Ветвление",
   "flow.map": "Обработка списка",
@@ -42,20 +47,14 @@ export const SLOT_LABELS: Record<ScenarioSlot, string> = {
 export const PALETTE_GROUP_LABELS = {
   triggers: "Триггеры",
   agents: "Агенты и подузлы",
+  outputs: "Результат",
   core: "Действия ядра",
 } as const;
-
-export const TOOL_GROUP_LABELS: Record<ToolSource, string> = {
-  builtin: "Встроенные инструменты",
-  mcp: "MCP-серверы",
-  skill: "Навыки",
-  integration: "Интеграции",
-  browser: "Браузер",
-};
 
 export const TOOL_OFF = "Инструмент выключен: разрешение «off»";
 export const TOOL_UNAVAILABLE = "Инструмент недоступен";
 export const TOOL_UNREGISTERED = "Инструмент не зарегистрирован";
+export const TOOL_SET_EMPTY = "Инструменты не выбраны";
 
 export const SCENARIO_LOAD_FAILED = "Не удалось загрузить сценарий.";
 export const SCENARIO_ACTION_FAILED = "Не удалось выполнить операцию со сценарием.";

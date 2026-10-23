@@ -1,27 +1,35 @@
 import {
+  mdiBellOutline,
   mdiBrain,
   mdiClockOutline,
   mdiCogOutline,
   mdiDatabaseOutline,
   mdiDownloadOutline,
   mdiEmailOutline,
+  mdiFileDocumentOutline,
   mdiFormatListBulleted,
+  mdiMessageArrowRightOutline,
   mdiMessageOutline,
+  mdiMessagePlusOutline,
+  mdiReply,
   mdiRobotOutline,
   mdiSourceBranch,
   mdiTextBoxOutline,
   mdiTimerSandEmpty,
+  mdiToolboxOutline,
   mdiVectorPoint,
   mdiWebhook,
   mdiWrenchOutline,
 } from "@mdi/js";
 import type { Edge, Node } from "@xyflow/react";
-import type { ScenarioNodeRole, ScenarioSlot } from "@zvs/shared";
+import type { ScenarioNodeDto, ScenarioNodeRole, ScenarioSlot } from "@zvs/shared";
 import { attachmentLinkId, childrenIn, edgeLinkId } from "./graphModel";
 import { nodeSize, slotOffset } from "./layout";
 import type ScenarioEditor from "./ScenarioEditor";
 import { slotHandle } from "./ScenarioEditor";
-import { ROLE_LABELS, slotLabel, toolCountLabel } from "./scenarioCopy";
+import { ROLE_LABELS, slotLabel, TOOL_SET_EMPTY, toolCountLabel } from "./scenarioCopy";
+import { isOutputType } from "./nodeForms";
+import { TOOL_SET_TYPE, toolSetKeys } from "./toolSet";
 
 export const IN_HANDLE = "in";
 export const OUT_HANDLE = "out";
@@ -71,6 +79,12 @@ const TYPE_ICONS: Readonly<Record<string, string>> = {
   "model.chat": mdiBrain,
   "memory.window": mdiDatabaseOutline,
   "embedding.model": mdiVectorPoint,
+  "tool.set": mdiToolboxOutline,
+  "output.chatReply": mdiReply,
+  "output.chatMessage": mdiMessageArrowRightOutline,
+  "output.newChat": mdiMessagePlusOutline,
+  "output.notify": mdiBellOutline,
+  "output.file": mdiFileDocumentOutline,
   "llm.generate": mdiTextBoxOutline,
   "flow.branch": mdiSourceBranch,
   "flow.map": mdiFormatListBulleted,
@@ -90,6 +104,14 @@ export function iconFor(type: string, toolKey: string | null): string {
 
 function chipFor(slot: ScenarioSlot, count: number): string {
   return slot === "tool" ? toolCountLabel(count) : SLOT_CHIPS[slot];
+}
+
+function subLabelOf(node: ScenarioNodeDto, base: string, modelId: unknown): string {
+  if (node.type === TOOL_SET_TYPE) {
+    const count = toolSetKeys(node.params).length;
+    return count === 0 ? TOOL_SET_EMPTY : toolCountLabel(count);
+  }
+  return typeof modelId === "string" && modelId.length > 0 ? `${base} · ${modelId}` : base;
 }
 
 export function flowNodes(editor: ScenarioEditor): ScenarioFlowNode[] {
@@ -117,7 +139,10 @@ export function flowNodes(editor: ScenarioEditor): ScenarioFlowNode[] {
           : null,
     }));
     const chips = (spec?.slots ?? []).flatMap((entry) => {
-      const count = childrenIn(graph, node.id, entry.slot).length;
+      const count = childrenIn(graph, node.id, entry.slot).reduce((sum, attachment) => {
+        const child = graph.nodes.find((candidate) => candidate.id === attachment.childNodeId);
+        return sum + (child?.type === TOOL_SET_TYPE ? toolSetKeys(child.params).length : 1);
+      }, 0);
       return count === 0 ? [] : [chipFor(entry.slot, count)];
     });
     return {
@@ -129,13 +154,14 @@ export function flowNodes(editor: ScenarioEditor): ScenarioFlowNode[] {
       height: size.height,
       data: {
         label: editor.nameOf(node.id),
-        subLabel: typeof modelId === "string" && modelId.length > 0 ? `${base} · ${modelId}` : base,
+        subLabel: subLabelOf(node, base, modelId),
         role,
         icon: iconFor(node.type, spec?.toolKey ?? null),
         width: size.width,
         height: size.height,
         hasIn: role === "action" || role === null,
-        hasOut: role === "action" || role === "trigger" || role === null,
+        hasOut:
+          (role === "action" || role === "trigger" || role === null) && !isOutputType(node.type),
         hasUp: (spec?.fills.length ?? 0) > 0,
         slots,
         chips,

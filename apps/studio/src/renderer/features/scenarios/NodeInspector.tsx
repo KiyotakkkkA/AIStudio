@@ -1,18 +1,39 @@
-import { mdiClose, mdiContentCopy, mdiDeleteOutline, mdiLinkVariantOff } from "@mdi/js";
+import {
+  mdiChevronDown,
+  mdiChevronRight,
+  mdiClose,
+  mdiContentCopy,
+  mdiDeleteOutline,
+  mdiLinkVariantOff,
+} from "@mdi/js";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { observer } from "mobx-react-lite";
 import { useState } from "react";
 import type { Json, ScenarioNodeDto, ScenarioParams } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
+import SelectInput from "../../ui/atoms/SelectInput";
 import StatusDot from "../../ui/atoms/StatusDot";
 import TextArea from "../../ui/atoms/TextArea";
 import TextInput from "../../ui/atoms/TextInput";
 import Toggle from "../../ui/atoms/Toggle";
 import Field from "../../ui/molecules/Field";
+import {
+  ENTITY_PLACEHOLDERS,
+  entityKindOf,
+  MODEL_NEEDS_PROVIDER,
+  withCurrent,
+  withParam,
+  type EntityKind,
+} from "./entityParams";
 import { attachmentLinkId, childrenIn } from "./graphModel";
 import { iconFor } from "./flowModel";
+import { descriptionOf, formFields, withField } from "./nodeForms";
 import type ScenarioEditor from "./ScenarioEditor";
 import { issueText, ROLE_LABELS, slotLabel, stepsWord } from "./scenarioCopy";
+import { TOOL_SET_PARAM, TOOL_SET_TYPE } from "./toolSet";
+import ToolSetPicker from "./ToolSetPicker";
 
 const PARAMS_INVALID = "Параметры должны быть JSON-объектом";
 const SECTION = "m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase";
@@ -32,6 +53,157 @@ function parseParams(text: string): ScenarioParams | null {
   }
 }
 
+function CommitInput({
+  id,
+  value,
+  placeholder,
+  mono = false,
+  multiline = false,
+  invalid = false,
+  onCommit,
+}: {
+  readonly id: string;
+  readonly value: string;
+  readonly placeholder?: string;
+  readonly mono?: boolean;
+  readonly multiline?: boolean;
+  readonly invalid?: boolean;
+  readonly onCommit: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const events = {
+    onFocus: () => {
+      setDraft(value);
+    },
+    onBlur: () => {
+      if (draft !== null && draft !== value) onCommit(draft);
+      setDraft(null);
+    },
+  };
+  if (multiline) {
+    return (
+      <TextArea
+        id={id}
+        invalid={invalid}
+        value={draft ?? value}
+        placeholder={placeholder}
+        onChange={(event) => {
+          setDraft(event.target.value);
+        }}
+        {...events}
+      />
+    );
+  }
+  return (
+    <TextInput
+      id={id}
+      mono={mono}
+      invalid={invalid}
+      value={draft ?? value}
+      placeholder={placeholder}
+      onChange={(event) => {
+        setDraft(event.target.value);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+      {...events}
+    />
+  );
+}
+
+const EntityField = observer(function EntityField({
+  editor,
+  node,
+  param,
+  kind,
+  label,
+  required,
+  invalid,
+}: {
+  readonly editor: ScenarioEditor;
+  readonly node: ScenarioNodeDto;
+  readonly param: string;
+  readonly kind: EntityKind;
+  readonly label: string;
+  readonly required: boolean;
+  readonly invalid: boolean;
+}) {
+  const options = editor.entities.options(kind, node.params);
+  const current = paramText(node.params[param]);
+  return (
+    <Field label={label} required={required}>
+      <SelectInput
+        label={label}
+        value={current}
+        invalid={invalid}
+        disabled={options === null}
+        placeholder={options === null ? MODEL_NEEDS_PROVIDER : ENTITY_PLACEHOLDERS[kind]}
+        options={withCurrent(options ?? [], current)}
+        onChange={(value) => {
+          editor.updateNode(node.id, { params: withParam(node.params, param, value) });
+        }}
+      />
+    </Field>
+  );
+});
+
+const ParamsJson = observer(function ParamsJson({
+  editor,
+  node,
+}: {
+  readonly editor: ScenarioEditor;
+  readonly node: ScenarioNodeDto;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const text = JSON.stringify(node.params, null, 2);
+  return (
+    <Field label="Параметры (JSON)" htmlFor="scenario-node-params" error={error ?? undefined}>
+      <TextArea
+        id="scenario-node-params"
+        value={draft ?? text}
+        invalid={error !== null}
+        spellCheck={false}
+        onFocus={() => {
+          setDraft(text);
+        }}
+        onChange={(event) => {
+          setDraft(event.target.value);
+        }}
+        onBlur={() => {
+          const params = parseParams(draft ?? text);
+          if (params === null) {
+            setError(PARAMS_INVALID);
+            return;
+          }
+          setError(null);
+          setDraft(null);
+          if (JSON.stringify(params) !== JSON.stringify(node.params)) {
+            editor.updateNode(node.id, { params });
+          }
+        }}
+      />
+    </Field>
+  );
+});
+
+function SelectionActions({ editor }: { readonly editor: ScenarioEditor }) {
+  return (
+    <div className="flex flex-none gap-2 border-t border-line px-3.5 py-3">
+      <Button type="button" tone="secondary" onClick={editor.duplicateSelection}>
+        <Icon path={mdiContentCopy} size={15} />
+        Дублировать
+      </Button>
+      <span className="flex-1" />
+      <Button type="button" tone="danger" onClick={editor.deleteSelection}>
+        <Icon path={mdiDeleteOutline} size={15} />
+        Удалить
+      </Button>
+    </div>
+  );
+}
+
 const NodeForm = observer(function NodeForm({
   editor,
   node,
@@ -40,186 +212,185 @@ const NodeForm = observer(function NodeForm({
   readonly node: ScenarioNodeDto;
 }) {
   const spec = editor.catalogue.get(node.type);
-  const [name, setName] = useState(node.name ?? "");
-  const [paramsText, setParamsText] = useState(JSON.stringify(node.params, null, 2));
-  const [paramsError, setParamsError] = useState<string | null>(null);
   const issues = editor.issuesByNode.get(node.id) ?? [];
-  const required = spec?.requiredParams ?? [];
-
-  const setParam = (key: string, value: string) => {
-    const params: ScenarioParams = { ...node.params };
-    if (value.length === 0) delete params[key];
-    else params[key] = value;
-    editor.updateNode(node.id, { params });
-    setParamsText(JSON.stringify(params, null, 2));
-  };
+  const fields = formFields(spec, node.type);
+  const description = descriptionOf(node.type);
+  const [showJson, setShowJson] = useState(false);
+  const toolSet = node.type === TOOL_SET_TYPE;
+  const ceiling = editor.ceilingOf(node.id);
+  const missing = (key: string) => issues.some((issue) => issue.param === key);
 
   return (
     <>
-      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-3.5">
-        <Field label="Название" htmlFor="scenario-node-name">
-          <TextInput
-            id="scenario-node-name"
-            value={name}
-            placeholder={editor.labelOf(node.type)}
-            onChange={(event) => {
-              setName(event.target.value);
-            }}
-            onBlur={() => {
-              editor.updateNode(node.id, { name });
-            }}
-          />
-        </Field>
-
-        {required.map((key) => (
-          <Field key={key} label={key} htmlFor={`scenario-param-${key}`} required>
-            <TextInput
-              id={`scenario-param-${key}`}
-              mono
-              defaultValue={paramText(node.params[key])}
-              invalid={issues.some((issue) => issue.param === key)}
-              onBlur={(event) => {
-                if (event.target.value !== paramText(node.params[key])) {
-                  setParam(key, event.target.value);
-                }
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="flex flex-col gap-3.5 p-3.5">
+          {description === null ? null : (
+            <p className="m-0 text-[12px] leading-relaxed text-main-400">{description}</p>
+          )}
+          <Field label="Название" htmlFor="scenario-node-name">
+            <CommitInput
+              id="scenario-node-name"
+              value={node.name ?? ""}
+              placeholder={editor.labelOf(node.type)}
+              onCommit={(name) => {
+                editor.updateNode(node.id, { name });
               }}
             />
           </Field>
-        ))}
 
-        <Field
-          label="Параметры (JSON)"
-          htmlFor="scenario-node-params"
-          error={paramsError ?? undefined}
-        >
-          <TextArea
-            id="scenario-node-params"
-            value={paramsText}
-            invalid={paramsError !== null}
-            spellCheck={false}
-            onChange={(event) => {
-              setParamsText(event.target.value);
+          {fields.map((field) => {
+            if (toolSet && field.key === TOOL_SET_PARAM) return null;
+            const kind = entityKindOf(field.key);
+            if (kind !== null) {
+              return (
+                <EntityField
+                  key={field.key}
+                  editor={editor}
+                  node={node}
+                  param={field.key}
+                  kind={kind}
+                  label={field.label}
+                  required={field.required}
+                  invalid={missing(field.key)}
+                />
+              );
+            }
+            return (
+              <Field
+                key={field.key}
+                label={field.label}
+                htmlFor={`scenario-param-${field.key}`}
+                required={field.required}
+                help={field.hint}
+              >
+                <CommitInput
+                  id={`scenario-param-${field.key}`}
+                  mono={field.kind !== "multiline"}
+                  multiline={field.kind === "multiline"}
+                  value={paramText(node.params[field.key])}
+                  placeholder={field.placeholder}
+                  invalid={missing(field.key)}
+                  onCommit={(value) => {
+                    editor.updateNode(node.id, { params: withField(node.params, field, value) });
+                  }}
+                />
+              </Field>
+            );
+          })}
+
+          {toolSet ? (
+            <ToolSetPicker editor={editor} node={node} invalid={missing(TOOL_SET_PARAM)} />
+          ) : null}
+
+          <button
+            type="button"
+            aria-expanded={showJson}
+            className="flex items-center gap-1.5 self-start text-[12px] text-main-400 hover:text-main-100"
+            onClick={() => {
+              setShowJson(!showJson);
             }}
-            onBlur={() => {
-              const params = parseParams(paramsText);
-              if (params === null) {
-                setParamsError(PARAMS_INVALID);
-                return;
-              }
-              setParamsError(null);
-              if (JSON.stringify(params) !== JSON.stringify(node.params)) {
-                editor.updateNode(node.id, { params });
-              }
+          >
+            <Icon path={showJson ? mdiChevronDown : mdiChevronRight} size={16} />
+            Все параметры в JSON
+          </button>
+          {showJson ? <ParamsJson editor={editor} node={node} /> : null}
+
+          <Toggle
+            label="Отключён"
+            checked={node.disabled === true}
+            onChange={(disabled) => {
+              editor.updateNode(node.id, { disabled });
             }}
           />
-        </Field>
 
-        <Toggle
-          label="Отключён"
-          checked={node.disabled === true}
-          onChange={(disabled) => {
-            editor.updateNode(node.id, { disabled });
-          }}
-        />
+          {ceiling === null ? null : (
+            <p className="m-0 rounded-control bg-warn-soft px-3 py-2 text-[12px] text-warn">
+              {ceiling}
+            </p>
+          )}
 
-        {editor.ceilingOf(node.id) === null ? null : (
-          <p className="m-0 rounded-control bg-warn-soft px-3 py-2 text-[12px] text-warn">
-            {editor.ceilingOf(node.id)}
-          </p>
-        )}
-
-        {spec !== undefined && spec.slots.length > 0 ? (
-          <>
-            <div className="h-px flex-none bg-line" />
-            <h3 className={SECTION}>Подключённые подузлы</h3>
-            {spec.slots.map((entry) => {
-              const children = childrenIn(editor.graph, node.id, entry.slot);
-              return (
-                <div
-                  key={entry.slot}
-                  className={`rounded-card border border-line bg-main-850 px-2.75 py-2.5 ${
-                    children.length === 0 ? "opacity-70" : ""
-                  }`}
-                >
-                  <div className="flex items-center gap-2.25">
-                    <StatusDot
-                      tone={children.length > 0 ? "ok" : entry.required ? "err" : "idle"}
-                    />
-                    <span className="flex-1 text-[12px] font-medium text-main-100">
-                      {slotLabel(entry.slot, entry.required)}
-                    </span>
+          {spec !== undefined && spec.slots.length > 0 ? (
+            <>
+              <div className="h-px flex-none bg-line" />
+              <h3 className={SECTION}>Подключённые подузлы</h3>
+              {spec.slots.map((entry) => {
+                const children = childrenIn(editor.graph, node.id, entry.slot);
+                return (
+                  <div
+                    key={entry.slot}
+                    className={`rounded-card border border-line bg-main-850 px-2.75 py-2.5 ${
+                      children.length === 0 ? "opacity-70" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.25">
+                      <StatusDot
+                        tone={children.length > 0 ? "ok" : entry.required ? "err" : "idle"}
+                      />
+                      <span className="flex-1 text-[12px] font-medium text-main-100">
+                        {slotLabel(entry.slot, entry.required)}
+                      </span>
+                    </div>
+                    {children.length === 0 ? (
+                      <span className="mt-1 block pl-4.25 font-mono text-[10.5px] text-main-500">
+                        Не подключено
+                      </span>
+                    ) : (
+                      children.map((attachment) => (
+                        <div
+                          key={attachment.childNodeId}
+                          className="mt-1 flex items-center gap-1.5 pl-4.25"
+                        >
+                          <button
+                            type="button"
+                            className="min-w-0 flex-1 truncate text-left font-mono text-[10.5px] text-main-400 hover:text-main-100"
+                            onClick={() => {
+                              editor.select(attachment.childNodeId);
+                            }}
+                          >
+                            {editor.nameOf(attachment.childNodeId)}
+                          </button>
+                          <IconButton
+                            path={mdiLinkVariantOff}
+                            label="Отключить от слота"
+                            tooltip="left-center"
+                            iconSize={14}
+                            className="size-6"
+                            onClick={() => {
+                              editor.dispatch({
+                                type: "remove",
+                                nodeIds: [],
+                                linkIds: [attachmentLinkId(attachment)],
+                              });
+                            }}
+                          />
+                        </div>
+                      ))
+                    )}
                   </div>
-                  {children.length === 0 ? (
-                    <span className="mt-1 block pl-4.25 font-mono text-[10.5px] text-main-500">
-                      Не подключено
-                    </span>
-                  ) : (
-                    children.map((attachment) => (
-                      <div
-                        key={attachment.childNodeId}
-                        className="mt-1 flex items-center gap-1.5 pl-4.25"
-                      >
-                        <button
-                          type="button"
-                          className="min-w-0 flex-1 truncate text-left font-mono text-[10.5px] text-main-400 hover:text-main-100"
-                          onClick={() => {
-                            editor.select(attachment.childNodeId);
-                          }}
-                        >
-                          {editor.nameOf(attachment.childNodeId)}
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Отключить от слота"
-                          title="Отключить от слота"
-                          className="flex-none text-main-500 hover:text-main-100"
-                          onClick={() => {
-                            editor.dispatch({
-                              type: "remove",
-                              nodeIds: [],
-                              linkIds: [attachmentLinkId(attachment)],
-                            });
-                          }}
-                        >
-                          <Icon path={mdiLinkVariantOff} size={14} />
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              );
-            })}
-          </>
-        ) : null}
+                );
+              })}
+            </>
+          ) : null}
 
-        {issues.length === 0 ? null : (
-          <>
-            <div className="h-px flex-none bg-line" />
-            <h3 className={SECTION}>Ошибки</h3>
-            <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-              {issues.map((issue) => (
-                <li
-                  key={`${issue.rule}-${issue.slot ?? ""}-${issue.param ?? ""}`}
-                  className="text-[12px] leading-snug text-err"
-                >
-                  {issueText(issue, editor.nameOf)}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
-      <div className="flex flex-none gap-2 border-t border-line px-3.5 py-3">
-        <Button type="button" tone="secondary" onClick={editor.duplicateSelection}>
-          <Icon path={mdiContentCopy} size={15} />
-          Дублировать
-        </Button>
-        <span className="flex-1" />
-        <Button type="button" tone="ghost" onClick={editor.deleteSelection}>
-          <Icon path={mdiDeleteOutline} size={15} />
-          Удалить
-        </Button>
-      </div>
+          {issues.length === 0 ? null : (
+            <>
+              <div className="h-px flex-none bg-line" />
+              <h3 className={SECTION}>Ошибки</h3>
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                {issues.map((issue) => (
+                  <li
+                    key={`${issue.rule}-${issue.slot ?? ""}-${issue.param ?? ""}`}
+                    className="text-[12px] leading-snug text-err"
+                  >
+                    {issueText(issue, editor.nameOf)}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      </ScrollArea>
+      <SelectionActions editor={editor} />
     </>
   );
 });
@@ -230,47 +401,39 @@ const Overview = observer(function Overview({ editor }: { readonly editor: Scena
     return (
       <div className="flex flex-1 flex-col">
         <div className="flex-1 p-3.5 text-[12.5px] text-main-400">Выбрано: {stepsWord(count)}</div>
-        <div className="flex flex-none gap-2 border-t border-line px-3.5 py-3">
-          <Button type="button" tone="secondary" onClick={editor.duplicateSelection}>
-            <Icon path={mdiContentCopy} size={15} />
-            Дублировать
-          </Button>
-          <span className="flex-1" />
-          <Button type="button" tone="ghost" onClick={editor.deleteSelection}>
-            <Icon path={mdiDeleteOutline} size={15} />
-            Удалить
-          </Button>
-        </div>
+        <SelectionActions editor={editor} />
       </div>
     );
   }
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3.5">
-      <h3 className={SECTION}>Проверка сценария</h3>
-      {editor.issues.length === 0 ? (
-        <p className="m-0 flex items-center gap-2 text-[12.5px] text-main-300">
-          <StatusDot tone="ok" />
-          Ошибок нет
-        </p>
-      ) : (
-        <ul className="m-0 flex list-none flex-col gap-1 p-0">
-          {editor.issues.map((issue, index) => (
-            <li key={`${issue.rule}-${issue.nodeId ?? ""}-${String(index)}`}>
-              <button
-                type="button"
-                disabled={issue.nodeId === undefined}
-                className="w-full rounded-control px-2 py-1.5 text-left text-[12px] leading-snug text-err enabled:hover:bg-err-soft"
-                onClick={() => {
-                  if (issue.nodeId !== undefined) editor.select(issue.nodeId);
-                }}
-              >
-                {issueText(issue, editor.nameOf)}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <ScrollArea className="min-h-0 flex-1">
+      <div className="flex flex-col gap-3 p-3.5">
+        <h3 className={SECTION}>Проверка сценария</h3>
+        {editor.issues.length === 0 ? (
+          <p className="m-0 flex items-center gap-2 text-[12.5px] text-main-300">
+            <StatusDot tone="ok" />
+            Ошибок нет
+          </p>
+        ) : (
+          <ul className="m-0 flex list-none flex-col gap-1 p-0">
+            {editor.issues.map((issue, index) => (
+              <li key={`${issue.rule}-${issue.nodeId ?? ""}-${String(index)}`}>
+                <button
+                  type="button"
+                  disabled={issue.nodeId === undefined}
+                  className="w-full rounded-control px-2 py-1.5 text-left text-[12px] leading-snug text-err enabled:hover:bg-err-soft"
+                  onClick={() => {
+                    if (issue.nodeId !== undefined) editor.select(issue.nodeId);
+                  }}
+                >
+                  {issueText(issue, editor.nameOf)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </ScrollArea>
   );
 });
 
@@ -295,21 +458,20 @@ function NodeInspector({ editor }: { readonly editor: ScenarioEditor }) {
                 {spec === undefined ? node.type : `${ROLE_LABELS[spec.role]} · ${node.type}`}
               </span>
             </span>
-            <button
-              type="button"
-              aria-label="Снять выделение"
-              className="flex-none text-main-500 hover:text-main-100"
+            <IconButton
+              path={mdiClose}
+              label="Снять выделение"
+              tooltip="bottom-right"
+              iconSize={16}
               onClick={editor.clearSelection}
-            >
-              <Icon path={mdiClose} size={16} />
-            </button>
+            />
           </>
         )}
       </div>
       {node === null ? (
         <Overview editor={editor} />
       ) : (
-        <NodeForm key={`${node.id}:${String(editor.revision)}`} editor={editor} node={node} />
+        <NodeForm key={node.id} editor={editor} node={node} />
       )}
     </aside>
   );

@@ -3,6 +3,7 @@ import { observer } from "mobx-react-lite";
 import { useEffect, useState, type ReactNode } from "react";
 import type { ScenarioDto } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
 import Toggle from "../../ui/atoms/Toggle";
@@ -62,15 +63,14 @@ const EditorHeader = observer(function EditorHeader({
 
   return (
     <header className="flex h-14 flex-none items-center gap-3 border-b border-line bg-main-900 px-4.5">
-      <button
-        type="button"
-        aria-label="К списку сценариев"
-        title="К списку сценариев"
-        className="flex size-8 flex-none items-center justify-center rounded-control text-main-400 hover:bg-main-700 hover:text-main-100"
+      <IconButton
+        path={mdiArrowLeft}
+        label="К списку сценариев"
+        tooltip="bottom-left"
+        iconSize={18}
+        className="size-8"
         onClick={store.close}
-      >
-        <Icon path={mdiArrowLeft} size={18} />
-      </button>
+      />
       <input
         aria-label="Название сценария"
         value={name}

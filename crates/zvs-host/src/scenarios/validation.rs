@@ -344,6 +344,7 @@ fn is_missing(value: Option<&Value>) -> bool {
     match value {
         None | Some(Value::Null) => true,
         Some(Value::String(text)) => js_trim(text).is_empty(),
+        Some(Value::Array(items)) => items.is_empty(),
         Some(_) => false,
     }
 }
@@ -358,7 +359,8 @@ fn check_params(nodes: &Graph<'_>, attachments: &[&ScenarioAttachmentDto], issue
         let Some(spec) = nodes.spec(&node.id) else {
             continue;
         };
-        if node.is_disabled() || tools.contains(node.id.as_str()) {
+        let filled_by_model = tools.contains(node.id.as_str()) && spec.tool_key.is_some();
+        if node.is_disabled() || filled_by_model {
             continue;
         }
         for param in &spec.required_params {

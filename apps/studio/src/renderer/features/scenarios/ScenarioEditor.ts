@@ -10,6 +10,7 @@ import type {
   ScenarioIssueDto,
   ScenarioNodeDto,
   ScenarioNodeTypeDto,
+  ScenarioParams,
   ScenarioPositionDto,
   ScenarioSlot,
   ToolDto,
@@ -30,7 +31,9 @@ import {
 } from "./graphModel";
 import { canRedo, canUndo, commit, redo, startHistory, undo, type GraphHistory } from "./history";
 import { nodeSize, slotOffset, slotUnder, tidy, type SlotTarget } from "./layout";
+import EntityOptions from "./entityParams";
 import { ceilingReason, paletteGroups, typeLabel, type PaletteGroup } from "./palette";
+import { TOOL_SET_PARAM, TOOL_SET_TYPE, toolSetProblem } from "./toolSet";
 import {
   DRAFT_SAVE_FAILED,
   SCENARIO_LOAD_FAILED,
@@ -51,6 +54,7 @@ export interface ScenarioEditorOptions {
   readonly timers?: Timers;
   readonly autosaveMs?: number;
   readonly validateMs?: number;
+  readonly palettePinned?: boolean;
 }
 
 export interface Selection {
@@ -93,7 +97,8 @@ export default class ScenarioEditor {
   switching = false;
   paletteOpen = false;
   paletteQuery = "";
-  revision = 0;
+  palettePinned: boolean;
+  readonly entities: EntityOptions;
 
   private draftTimer: unknown = undefined;
   private validateTimer: unknown = undefined;
@@ -113,6 +118,9 @@ export default class ScenarioEditor {
     this.timers = options.timers ?? DEFAULT_TIMERS;
     this.autosaveMs = options.autosaveMs ?? 800;
     this.validateMs = options.validateMs ?? 250;
+    this.entities = new EntityOptions(ipc);
+    this.palettePinned = options.palettePinned ?? false;
+    this.paletteOpen = this.palettePinned;
     makeAutoObservable<
       ScenarioEditor,
       | "ipc"
@@ -129,6 +137,7 @@ export default class ScenarioEditor {
       {
         ipc: false,
         id: false,
+        entities: false,
         draftTimer: false,
         validateTimer: false,
         validation: false,
@@ -163,7 +172,7 @@ export default class ScenarioEditor {
   }
 
   get palette(): PaletteGroup[] {
-    return paletteGroups(this.types, this.tools, this.servers, this.paletteQuery);
+    return paletteGroups(this.types, this.tools, this.paletteQuery);
   }
 
   get selectedNode(): ScenarioNodeDto | null {
@@ -201,8 +210,11 @@ export default class ScenarioEditor {
   }
 
   ceilingOf(id: string): string | null {
+    const node = findNode(this.graph, id);
     const spec = this.specOf(id);
-    return spec === undefined ? null : ceilingReason(spec, this.tools);
+    if (node === undefined || spec === undefined) return null;
+    if (node.type === TOOL_SET_TYPE) return toolSetProblem(node.params, this.tools);
+    return ceilingReason(spec, this.tools);
   }
 
   positionOf(node: ScenarioNodeDto): ScenarioPositionDto {
@@ -299,7 +311,6 @@ export default class ScenarioEditor {
   }
 
   private changed(): void {
-    this.revision += 1;
     const live = new Set(this.graph.nodes.map((node) => node.id));
     this.selection = {
       nodes: this.selection.nodes.filter((id) => live.has(id)),
@@ -347,7 +358,7 @@ export default class ScenarioEditor {
 
   clearSelection(): void {
     this.selection = NO_SELECTION;
-    this.paletteOpen = false;
+    this.closePalette();
   }
 
   deleteSelection(): void {
@@ -358,6 +369,20 @@ export default class ScenarioEditor {
       linkIds: this.selection.links,
     });
     this.selection = NO_SELECTION;
+  }
+
+  private focus(id: string): void {
+    if (!this.selection.nodes.includes(id)) this.selection = { nodes: [id], links: [] };
+  }
+
+  duplicateNode(id: string): void {
+    this.focus(id);
+    this.duplicateSelection();
+  }
+
+  deleteNode(id: string): void {
+    this.focus(id);
+    this.deleteSelection();
   }
 
   duplicateSelection(): void {
@@ -445,8 +470,19 @@ export default class ScenarioEditor {
     this.paletteQuery = "";
   }
 
-  closePalette(): void {
+  closePalette(force = false): void {
+    if (this.palettePinned && !force) return;
     this.paletteOpen = false;
+  }
+
+  togglePalette(): void {
+    if (this.paletteOpen) this.closePalette(true);
+    else this.openPalette();
+  }
+
+  togglePalettePin(): void {
+    this.palettePinned = !this.palettePinned;
+    if (this.palettePinned) this.paletteOpen = true;
   }
 
   setPaletteQuery(query: string): void {
@@ -466,7 +502,8 @@ export default class ScenarioEditor {
     const actions: GraphAction[] = [];
     let position = fallback;
     const anchorSpec = anchor === null ? undefined : this.catalogue.get(anchor.type);
-    const node: ScenarioNodeDto = { id, type, position, params: {} };
+    const params: ScenarioParams = type === TOOL_SET_TYPE ? { [TOOL_SET_PARAM]: [] } : {};
+    const node: ScenarioNodeDto = { id, type, position, params };
     const probe: ScenarioGraphDto = { ...this.graph, nodes: [...this.graph.nodes, node] };
     const slot =
       anchor === null || anchorSpec === undefined
@@ -504,7 +541,7 @@ export default class ScenarioEditor {
     const created = this.run(actions);
     if (created === null) return false;
     this.selection = { nodes: [id], links: [] };
-    this.paletteOpen = false;
+    this.closePalette();
     return true;
   }
 
@@ -629,7 +666,6 @@ export default class ScenarioEditor {
       await this.ipc.call("scenarios.discardDraft", { id: this.id });
       runInAction(() => {
         this.history = commit(this.history, this.saved);
-        this.revision += 1;
         this.draftState = "clean";
         this.draftSavedAt = null;
         this.notice = null;

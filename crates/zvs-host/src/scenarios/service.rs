@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use serde_json::json;
+use serde_json::{Value, json};
 use zvs_contract::{
     AppError, AppErrorCode, CreateScenarioInput, SaveScenarioDraftInput, ScenarioDetailDto,
     ScenarioDraftDto, ScenarioDto, ScenarioGraphDto, ScenarioId, ScenarioIssueDto,
@@ -8,7 +8,7 @@ use zvs_contract::{
     ScenarioVersionId, ToolReferenceKind, UpdateScenarioInput, normalise_tags, validate::js_trim,
 };
 
-use super::catalogue::{NodeSpec, ScenarioCatalogue};
+use super::catalogue::{NodeSpec, ScenarioCatalogue, TOOL_SET, TOOL_SET_PARAM};
 use super::diff::diff_graphs;
 use super::validation::{trigger_binding, validate_graph};
 use crate::data::schema::{ScenarioRow, ScenarioVersionRow};
@@ -414,12 +414,19 @@ impl ScenarioService {
         };
         let mut keys: Vec<&str> = Vec::new();
         for node in &loaded.graph.nodes {
-            if let Some(key) = catalogue
+            let own = catalogue
                 .spec(&node.node_type)
-                .and_then(|spec| spec.tool_key.as_deref())
-                && !keys.contains(&key)
-            {
-                keys.push(key);
+                .and_then(|spec| spec.tool_key.as_deref());
+            let chosen = (node.node_type == TOOL_SET)
+                .then(|| node.params.get(TOOL_SET_PARAM).and_then(Value::as_array))
+                .flatten()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str);
+            for key in own.into_iter().chain(chosen) {
+                if !keys.contains(&key) {
+                    keys.push(key);
+                }
             }
         }
         tools.record_references(&self.subject(&loaded.row.id, &loaded.row.name), &keys)

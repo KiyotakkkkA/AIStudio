@@ -9,7 +9,7 @@ use zvs_contract::{
 };
 
 use super::catalogue::{
-    AGENT_TOOLS, EMBEDDING_MODEL, MEMORY_WINDOW, MODEL_CHAT, TRIGGER_CHAT, TRIGGER_MAIL,
+    AGENT_TOOLS, EMBEDDING_MODEL, MEMORY_WINDOW, MODEL_CHAT, TOOL_SET, TRIGGER_CHAT, TRIGGER_MAIL,
     TRIGGER_SCHEDULE,
 };
 use super::*;
@@ -664,10 +664,10 @@ async fn the_channels_create_validate_activate_and_list_versions_in_the_contract
         Duration::ZERO,
     ));
     let tool = services
-        .nodes
-        .list()
+        .scenarios
+        .node_types()
         .into_iter()
-        .find_map(|node| node.permission().tool_key().map(str::to_owned))
+        .find_map(|entry| entry.tool_key.filter(|key| key == &entry.node_type))
         .expect("a registered tool node");
     let mut server =
         IpcServer::new(services.shared(), silent_logger()).with_output_validation(true);
@@ -877,4 +877,103 @@ async fn the_catalogue_and_draft_channels_answer_in_the_contract_shape() {
         .dispatch("scenarios.discardDraft", json!({ "id": id }))
         .await;
     assert_eq!(discarded["data"], json!({ "id": id }), "{discarded}");
+}
+
+#[test]
+fn a_tool_set_fills_the_tool_slot_and_needs_at_least_one_tool() {
+    let mut graph = valid_graph();
+    graph.nodes.push(node("set", TOOL_SET));
+    graph
+        .attachments
+        .push(attach("agent", "set", ScenarioSlot::Tool));
+    assert_eq!(issues(&graph), [ScenarioIssueDto::param("set", "tools")]);
+    graph.nodes.last_mut().expect("the set").params = json!({ "tools": [] })
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(issues(&graph), [ScenarioIssueDto::param("set", "tools")]);
+    graph.nodes.last_mut().expect("the set").params = json!({ "tools": [SEARCH] })
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(issues(&graph), []);
+}
+
+#[tokio::test]
+async fn a_tool_set_records_its_chosen_tools_as_references() {
+    let services = test_services(SystemService::new(
+        Arc::new(FakeClock::default()),
+        EventBus::default(),
+        Duration::ZERO,
+    ));
+    let tool = services
+        .scenarios
+        .node_types()
+        .into_iter()
+        .find_map(|entry| entry.tool_key.filter(|key| key == &entry.node_type))
+        .expect("a registered tool node");
+    let mut graph = builtin_graph();
+    graph.nodes.push(with_params(
+        node("set", TOOL_SET),
+        json!({ "tools": [tool] }),
+    ));
+    graph
+        .attachments
+        .push(attach("agent", "set", ScenarioSlot::Tool));
+    let created = services
+        .scenarios
+        .create(&CreateScenarioInput {
+            name: "Набор".to_owned(),
+            tags: None,
+            graph: Some(graph),
+            note: None,
+        })
+        .expect("creates");
+    assert_eq!(created.issues, []);
+    let referenced = services
+        .tools
+        .list(&ToolListFilter::default())
+        .expect("lists tools")
+        .into_iter()
+        .find(|row| row.key == tool)
+        .expect("the tool is catalogued");
+    let references = services
+        .tools
+        .references(&referenced.id.to_string())
+        .expect("references");
+    assert!(
+        references.iter().any(|reference| reference.name == "Набор"),
+        "{references:?}"
+    );
+}
+
+#[test]
+fn internal_chat_turn_nodes_stay_out_of_scenarios_and_outputs_are_offered() {
+    let services = test_services(SystemService::new(
+        Arc::new(FakeClock::default()),
+        EventBus::default(),
+        Duration::ZERO,
+    ));
+    let types = services.scenarios.node_types();
+    assert!(
+        types
+            .iter()
+            .all(|entry| !entry.node_type.starts_with("chat.")),
+        "{types:?}"
+    );
+    let notify = types
+        .iter()
+        .find(|entry| entry.node_type == super::catalogue::OUTPUT_NOTIFY)
+        .expect("the notification output");
+    assert_eq!(notify.role, zvs_contract::ScenarioNodeRole::Action);
+    assert_eq!(notify.required_params, ["title"]);
+    let mut graph = builtin_graph();
+    graph
+        .nodes
+        .push(node("send", super::catalogue::OUTPUT_CHAT_MESSAGE));
+    graph.edges.push(edge("agent", "send"));
+    assert_eq!(
+        validate_graph(&graph, &ScenarioCatalogue::builtin()),
+        [ScenarioIssueDto::param("send", "conversationId")]
+    );
 }

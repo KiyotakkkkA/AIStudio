@@ -40,7 +40,23 @@ import {
   slotUnder,
   tidy,
 } from "../../src/renderer/features/scenarios/layout.ts";
-import { paletteGroups } from "../../src/renderer/features/scenarios/palette.ts";
+import { paletteGroups, toolReason } from "../../src/renderer/features/scenarios/palette.ts";
+import {
+  toggleToolKey,
+  toolSetKeys,
+  toolSetProblem,
+} from "../../src/renderer/features/scenarios/toolSet.ts";
+import {
+  descriptionOf,
+  formFields,
+  isOutputType,
+  withField,
+} from "../../src/renderer/features/scenarios/nodeForms.ts";
+import EntityOptions, {
+  entityKindOf,
+  withCurrent,
+  withParam,
+} from "../../src/renderer/features/scenarios/entityParams.ts";
 import {
   CONNECT_REFUSALS,
   TOOL_OFF,
@@ -81,6 +97,9 @@ const TYPES: ScenarioNodeTypeDto[] = [
   type({ type: "model.chat", role: "subNode", fills: ["model"], requiredParams: ["modelId"] }),
   type({ type: "memory.window", role: "subNode", fills: ["memory"] }),
   type({ type: "embedding.model", role: "subNode", fills: ["embedding"] }),
+  type({ type: "tool.set", role: "subNode", fills: ["tool"], requiredParams: ["tools"] }),
+  type({ type: "output.notify", requiredParams: ["title"] }),
+  type({ type: "output.chatMessage", requiredParams: ["conversationId"] }),
   type({
     type: "vector.search",
     fills: ["tool"],
@@ -449,35 +468,113 @@ describe("tidy", () => {
 });
 
 describe("palette", () => {
-  test("node types group by source and a tool switched off is shown disabled with the reason", () => {
-    const groups = paletteGroups(TYPES, TOOLS, [], "");
-    expect(groups.map((group) => group.key).slice(0, 2)).toEqual(["triggers", "agents"]);
-    const entries = groups.flatMap((group) => group.entries);
-    const reason = (type: string) => entries.find((entry) => entry.type === type)?.disabledReason;
-    expect(reason("fs.delete")).toBe(TOOL_OFF);
-    expect(reason("web.fetch")).toBe(TOOL_UNAVAILABLE);
-    expect(reason("ghost.tool")).toBe(TOOL_UNREGISTERED);
-    expect(reason("vector.search")).toBeNull();
-    expect(reason("agent.tools")).toBeNull();
-    expect(entries.find((entry) => entry.type === "vector.search")?.label).toBe(
-      "Поиск по хранилищу",
-    );
-    const integration = groups.find((group) => group.key === "tool:integration:slack");
-    expect(integration?.entries.map((entry) => entry.type)).toEqual(["slack.post"]);
-  });
-
-  test("a disabled tool loses the off reason once it is switched back on", () => {
-    const enabled = TOOLS.map((entry) =>
-      entry.key === "fs.delete" ? { ...entry, tier: "ask" as const } : entry,
-    );
-    const entries = paletteGroups(TYPES, enabled, [], "").flatMap((group) => group.entries);
-    expect(entries.find((entry) => entry.type === "fs.delete")?.disabledReason).toBeNull();
+  test("steps group into triggers, agents and core actions, and single tools are left out", () => {
+    const groups = paletteGroups(TYPES, TOOLS, "");
+    expect(groups.map((group) => group.key)).toEqual(["triggers", "agents", "outputs"]);
+    expect(
+      groups.find((group) => group.key === "outputs")?.entries.map((entry) => entry.type),
+    ).toEqual(["output.chatMessage", "output.notify"]);
+    const types = groups.flatMap((group) => group.entries.map((entry) => entry.type));
+    expect(types).toContain("tool.set");
+    expect(types).not.toContain("vector.search");
+    expect(types).not.toContain("fs.delete");
   });
 
   test("the search matches the label and the type", () => {
-    const found = paletteGroups(TYPES, TOOLS, [], "хранилищ").flatMap((group) => group.entries);
-    expect(found.map((entry) => entry.type)).toEqual(["vector.search"]);
-    expect(paletteGroups(TYPES, TOOLS, [], "model.chat")[0]?.entries[0]?.type).toBe("model.chat");
+    const found = paletteGroups(TYPES, TOOLS, "набор").flatMap((group) => group.entries);
+    expect(found.map((entry) => entry.type)).toEqual(["tool.set"]);
+    expect(paletteGroups(TYPES, TOOLS, "model.chat")[0]?.entries[0]?.type).toBe("model.chat");
+  });
+
+  test("a tool's ceiling names why it cannot be used", () => {
+    expect(toolReason("fs.delete", TOOLS)).toBe(TOOL_OFF);
+    expect(toolReason("web.fetch", TOOLS)).toBe(TOOL_UNAVAILABLE);
+    expect(toolReason("ghost.tool", TOOLS)).toBe(TOOL_UNREGISTERED);
+    expect(toolReason("vector.search", TOOLS)).toBeNull();
+  });
+});
+
+describe("node forms", () => {
+  test("built-in nodes describe themselves and label their parameters, required ones marked", () => {
+    expect(descriptionOf("output.notify")).not.toBeNull();
+    const spec = CATALOGUE.get("output.chatMessage");
+    const fields = formFields(spec, "output.chatMessage");
+    expect(fields.map((field) => [field.key, field.required, field.entity])).toEqual([
+      ["conversationId", true, true],
+      ["template", false, false],
+    ]);
+    const undeclared = formFields(type({ type: "x.y", requiredParams: ["query"] }), "x.y");
+    expect(undeclared).toEqual([{ key: "query", label: "query", required: true, entity: false }]);
+  });
+
+  test("number fields store numbers and an emptied field is removed", () => {
+    const size = { key: "size", label: "Размер", kind: "number" as const };
+    expect(withField({}, size, " 12 ")).toEqual({ size: 12 });
+    expect(withField({ size: 12 }, size, "")).toEqual({});
+    expect(withField({}, { key: "title", label: "Заголовок" }, "Отчёт")).toEqual({
+      title: "Отчёт",
+    });
+  });
+
+  test("output steps end the chain", () => {
+    expect(isOutputType("output.file")).toBe(true);
+    expect(isOutputType("agent.tools")).toBe(false);
+  });
+});
+
+describe("tool set", () => {
+  test("toggling adds and removes a tool key and the first blocked tool is reported", () => {
+    let params = toggleToolKey({ tools: [] }, "vector.search");
+    params = toggleToolKey(params, "fs.delete");
+    expect(toolSetKeys(params)).toEqual(["vector.search", "fs.delete"]);
+    expect(toolSetProblem(params, TOOLS)).toBe(`«fs.delete»: ${TOOL_OFF}`);
+    params = toggleToolKey(params, "fs.delete");
+    expect(toolSetKeys(params)).toEqual(["vector.search"]);
+    expect(toolSetProblem(params, TOOLS)).toBeNull();
+    expect(toolSetKeys({ tools: "vector.search" })).toEqual([]);
+  });
+});
+
+describe("entity parameters", () => {
+  test("id parameters map to the entity they refer to", () => {
+    expect(entityKindOf("providerId")).toBe("provider");
+    expect(entityKindOf("modelId")).toBe("model");
+    expect(entityKindOf("storeId")).toBe("vectorStore");
+    expect(entityKindOf("conversationId")).toBe("conversation");
+    expect(entityKindOf("cron")).toBeNull();
+  });
+
+  test("changing the provider clears the model chosen for the old one", () => {
+    const params = { providerId: "p1", modelId: "gpt-oss:120b" };
+    expect(withParam(params, "providerId", "p2")).toEqual({ providerId: "p2" });
+    expect(withParam(params, "providerId", "p1")).toEqual(params);
+    expect(withParam(params, "modelId", "")).toEqual({ providerId: "p1" });
+  });
+
+  test("a value no longer in the list stays visible as missing", () => {
+    const options = [{ value: "a", label: "A" }];
+    expect(withCurrent(options, "a")).toBe(options);
+    expect(withCurrent(options, "")).toBe(options);
+    expect(withCurrent(options, "gone")[0]?.value).toBe("gone");
+  });
+
+  test("models load per chosen provider and providers once", async () => {
+    const bridge = createFakeBridge<Contract>();
+    let providerCalls = 0;
+    bridge
+      .handle("providers.list", () => {
+        providerCalls += 1;
+        return [];
+      })
+      .handle("providers.get", () => {
+        throw new Error("unused");
+      });
+    const entities = new EntityOptions(createIpcClient(contract, bridge));
+    expect(entities.options("model", {})).toBeNull();
+    expect(entities.options("provider", {})).toEqual([]);
+    await entities.ensure("provider");
+    await settle();
+    expect(providerCalls).toBe(1);
   });
 });
 
@@ -503,6 +600,7 @@ describe("keyboard", () => {
     expect(press("z", { ctrl: true })).toBe("undo");
     expect(press("Z", { ctrl: true, shift: true })).toBe("redo");
     expect(press("y", { ctrl: true })).toBe("redo");
+    expect(press("s", { ctrl: true })).toBe("save");
     expect(press("d")).toBeNull();
     expect(press("z", { ctrl: true, alt: true })).toBeNull();
   });
@@ -725,6 +823,46 @@ describe("scenario editor", () => {
     ]);
     expect(editor.addStep("fs.delete", { x: 0, y: 0 })).toBe(false);
     expect(editor.refusal).toBe(TOOL_OFF);
+    editor.select("tools-1");
+    expect(editor.addStep("tool.set", { x: 0, y: 0 })).toBe(true);
+    expect(editor.graph.nodes.find((entry) => entry.id === "set-1")?.params).toEqual({ tools: [] });
+    expect(editor.graph.attachments).toContainEqual({
+      parentNodeId: "tools-1",
+      childNodeId: "set-1",
+      slot: "tool",
+    });
+    editor.updateNode("set-1", { params: { tools: ["fs.delete"] } });
+    expect(editor.ceilingOf("set-1")).toBe(`«fs.delete»: ${TOOL_OFF}`);
+  });
+
+  test("the context actions act on the clicked node, or on the selection it belongs to", async () => {
+    const { editor } = setup();
+    await editor.load();
+    editor.setSelection({ nodes: ["trigger"], links: [] });
+    editor.duplicateNode("slack");
+    expect(editor.selection.nodes).toEqual(["post-1"]);
+    editor.setSelection({ nodes: ["model", "memory"], links: [] });
+    editor.deleteNode("memory");
+    const ids = editor.graph.nodes.map((entry) => entry.id);
+    expect(ids).not.toContain("model");
+    expect(ids).not.toContain("memory");
+    expect(ids).toContain("trigger");
+  });
+
+  test("a pinned step list stays open after adding a step and on deselect", async () => {
+    const { editor } = setup({ saved: graphOf([node("trigger", "trigger.chat", 40, 40)]) });
+    await editor.load();
+    editor.openPalette();
+    editor.addStep("agent.tools", { x: 0, y: 0 });
+    expect(editor.paletteOpen).toBe(false);
+    editor.togglePalettePin();
+    expect(editor.paletteOpen).toBe(true);
+    editor.addStep("output.notify", { x: 0, y: 0 });
+    editor.clearSelection();
+    editor.closePalette();
+    expect(editor.paletteOpen).toBe(true);
+    editor.togglePalette();
+    expect(editor.paletteOpen).toBe(false);
   });
 
   test("selection commands delete, duplicate and select everything", async () => {

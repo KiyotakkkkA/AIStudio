@@ -1,4 +1,5 @@
-export type CanvasCommand = "delete" | "duplicate" | "selectAll" | "deselect" | "undo" | "redo";
+export type CanvasCommand =
+  "delete" | "duplicate" | "selectAll" | "deselect" | "undo" | "redo" | "save";
 
 export interface KeyPress {
   readonly key: string;
@@ -15,6 +16,7 @@ export function canvasCommand(press: KeyPress): CanvasCommand | null {
   if (!mod && (key === "delete" || key === "backspace")) return "delete";
   if (!mod && key === "escape") return "deselect";
   if (!mod) return null;
+  if (key === "s" && !press.shiftKey) return "save";
   if (key === "z") return press.shiftKey ? "redo" : "undo";
   if (key === "y" && !press.shiftKey) return "redo";
   if (key === "d" && !press.shiftKey) return "duplicate";

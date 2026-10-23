@@ -14,6 +14,7 @@ export default class ScenarioStore {
   creating = false;
   removingId: ScenarioId | null = null;
   error: string | null = null;
+  palettePinned = false;
 
   constructor(
     private readonly ipc: IpcClient<Contract>,
@@ -73,7 +74,10 @@ export default class ScenarioStore {
 
   async open(id: ScenarioId): Promise<void> {
     this.close();
-    const editor = new ScenarioEditor(this.ipc, id, this.editorOptions);
+    const editor = new ScenarioEditor(this.ipc, id, {
+      ...this.editorOptions,
+      palettePinned: this.palettePinned,
+    });
     this.editor = editor;
     await editor.load();
   }
@@ -81,6 +85,7 @@ export default class ScenarioStore {
   close(): void {
     const editor = this.editor;
     if (editor === null) return;
+    this.palettePinned = editor.palettePinned;
     editor.dispose();
     this.editor = null;
     void this.load();
