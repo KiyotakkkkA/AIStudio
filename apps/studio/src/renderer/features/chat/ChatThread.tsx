@@ -23,6 +23,7 @@ import type ChatStore from "./ChatStore";
 import { CONTEXT_PANEL, FILES_PANEL, PANEL_GROUP_LABEL } from "./explorer/explorerCopy";
 import TerminalDock from "../terminal/TerminalDock";
 import { TERMINAL_PANEL } from "../terminal/terminalCopy";
+import MemoryDropdown from "../memory/MemoryDropdown";
 
 function PanelButton({
   label,
@@ -45,7 +46,7 @@ function PanelButton({
       path={path}
       iconSize={16}
       onClick={onClick}
-      className={active ? activeClassName : ""}
+      {...(active ? { toneClassName: activeClassName } : {})}
     />
   );
 }
@@ -118,7 +119,11 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
             />
           )}
         </div>
-        <div className="flex flex-none items-center rounded-control bg-main-800 p-0.5">
+        <div
+          role="group"
+          aria-label={PANEL_GROUP_LABEL}
+          className="flex flex-none items-center gap-0.5 rounded-control bg-main-800 p-0.5"
+        >
           <PanelButton
             label={TERMINAL_PANEL}
             path={mdiConsole}
@@ -126,6 +131,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
             activeClassName="bg-accent-soft text-accent-medium hover:bg-accent-soft hover:text-accent-light"
             onClick={() => void store.terminal.toggle()}
           />
+          <MemoryDropdown conversationId={store.active?.id ?? null} />
         </div>
       </header>
       <ScrollArea

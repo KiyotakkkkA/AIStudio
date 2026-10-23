@@ -87,7 +87,7 @@ const SettingRow = observer(function SettingRow({
   return (
     <div
       data-setting={id}
-      className={`-mx-3 flex flex-wrap items-center gap-x-6 gap-y-2.5 rounded-control border-b border-line px-3 py-4 transition-colors duration-500 last:border-b-0 ${
+      className={`-mx-3 flex flex-wrap items-center gap-x-6 gap-y-2.5 rounded-control border-b [clip-path:inset(0_round_12px)] border-line px-3 py-4 transition-colors duration-500 last:border-b-0 ${
         ui.preferenceTarget === id ? "bg-accent-soft" : ""
       }`}
     >

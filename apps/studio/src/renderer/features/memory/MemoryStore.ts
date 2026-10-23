@@ -49,6 +49,10 @@ export default class MemoryStore {
     return [...groups.values()];
   }
 
+  conversationFacts(id: ConversationId): MemoryDto[] {
+    return this.memories.filter((memory) => memory.conversation?.id === id);
+  }
+
   dismissError() {
     this.error = null;
   }

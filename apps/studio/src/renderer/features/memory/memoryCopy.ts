@@ -4,6 +4,13 @@ import { plural } from "../connections/connectionPresentation";
 
 export const MEMORY_TOOL = "chat.memory";
 
+export const MEMORY_PANEL = "Память";
+export const PANEL_ACCOUNT = "Общая память";
+export const PANEL_DIALOG = "Этот диалог";
+export const PANEL_EMPTY = "Записей нет.";
+export const PANEL_MANAGE = "Управление памятью";
+export const PANEL_OFF = "Память выключена: факты не передаются модели.";
+
 export const ENABLED_ROW = {
   key: "memory.enabled",
   label: "Память",

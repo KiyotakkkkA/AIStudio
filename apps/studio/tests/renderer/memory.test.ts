@@ -97,6 +97,13 @@ describe("MemoryStore", () => {
     ]);
   });
 
+  test("lists the facts of one dialog for the memory panel", async () => {
+    const { store } = setup([memory(1), dialog(2, PLANS, "Планы"), dialog(3, NOTES, "Заметки")]);
+    await store.load();
+    expect(store.conversationFacts(PLANS).map((item) => item.id)).toEqual([id(2)]);
+    expect(store.conversationFacts(NOTES).map((item) => item.id)).toEqual([id(3)]);
+  });
+
   test("adds to the account or to a dialog, edits and removes, then reloads", async () => {
     const { bridge, store } = setup([memory(1)]);
     await store.load();
