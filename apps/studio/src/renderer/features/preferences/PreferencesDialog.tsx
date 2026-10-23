@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import {
   mdiBellOutline,
@@ -53,6 +53,11 @@ import {
   type InfoRow,
   type ToggleRowCopy,
 } from "./preferencesPresentation";
+import PreferencesSearch from "./PreferencesSearch";
+import { aboutSettingId, SETTING_ENTRIES, SETTING_IDS } from "./settingsIndex";
+
+const REVEAL_MS = 1600;
+const REVEAL_ATTEMPTS = 10;
 
 const SECTION_ICONS: Record<PreferenceSection, string> = {
   general: mdiCogOutline,
@@ -61,19 +66,27 @@ const SECTION_ICONS: Record<PreferenceSection, string> = {
   about: mdiInformationOutline,
 };
 
-function SettingRow({
+const SettingRow = observer(function SettingRow({
+  id,
   label,
   hint,
   error,
   children,
 }: {
+  readonly id: string;
   readonly label: string;
   readonly hint: string;
   readonly error?: string | undefined;
   readonly children: ReactNode;
 }) {
+  const { ui } = useStore();
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5 border-b border-line py-4 last:border-b-0">
+    <div
+      data-setting={id}
+      className={`-mx-3 flex flex-wrap items-center gap-x-6 gap-y-2.5 rounded-control border-b border-line px-3 py-4 transition-colors duration-500 last:border-b-0 ${
+        ui.preferenceTarget === id ? "bg-accent-soft" : ""
+      }`}
+    >
       <div className="flex min-w-56 flex-1 flex-col gap-0.5">
         <span className="text-[13px] font-medium text-main-100">{label}</span>
         <span className="text-[12px] text-main-500">{hint}</span>
@@ -86,26 +99,44 @@ function SettingRow({
       <div className="flex flex-none items-center">{children}</div>
     </div>
   );
-}
+});
 
-function InfoTableRows({ rows }: { readonly rows: readonly InfoRow[] }) {
+const InfoTableRows = observer(function InfoTableRows({
+  rows,
+}: {
+  readonly rows: readonly InfoRow[];
+}) {
+  const { ui } = useStore();
   return (
     <dl className="m-0 grid grid-cols-[minmax(10rem,auto)_1fr] gap-x-6 gap-y-2.5 text-[13px]">
-      {rows.map((row) => (
-        <div key={row.label} className="contents">
-          <dt className="text-main-500">{row.label}</dt>
-          <dd className="m-0 min-w-0 wrap-break-word text-main-100">{row.value}</dd>
-        </div>
-      ))}
+      {rows.map((row) => {
+        const id = aboutSettingId(row.label);
+        const tone = ui.preferenceTarget === id ? "bg-accent-soft" : "";
+        return (
+          <div key={row.label} className="contents">
+            <dt
+              data-setting={id}
+              className={`rounded-control transition-colors duration-500 ${tone} text-main-500`}
+            >
+              {row.label}
+            </dt>
+            <dd
+              className={`m-0 min-w-0 rounded-control wrap-break-word transition-colors duration-500 ${tone} text-main-100`}
+            >
+              {row.value}
+            </dd>
+          </div>
+        );
+      })}
     </dl>
   );
-}
+});
 
 const AppearanceSection = observer(function AppearanceSection() {
   const { ui } = useStore();
   return (
     <div className="flex flex-col">
-      <SettingRow label={THEME_LABEL} hint={THEME_HINT}>
+      <SettingRow id={SETTING_IDS.theme} label={THEME_LABEL} hint={THEME_HINT}>
         <SegmentedControl
           label={THEME_LABEL}
           value={ui.theme}
@@ -113,14 +144,14 @@ const AppearanceSection = observer(function AppearanceSection() {
           onChange={ui.setTheme}
         />
       </SettingRow>
-      <SettingRow label={RAIL_PICKER_LABEL} hint={RAIL_PICKER_HINT}>
+      <SettingRow id={SETTING_IDS.railPicker} label={RAIL_PICKER_LABEL} hint={RAIL_PICKER_HINT}>
         <Toggle
           label={ui.railThemePicker ? "Показан" : "Скрыт"}
           checked={ui.railThemePicker}
           onChange={ui.setRailThemePicker}
         />
       </SettingRow>
-      <SettingRow label={FONT_FAMILY_LABEL} hint={FONT_FAMILY_HINT}>
+      <SettingRow id={SETTING_IDS.fontFamily} label={FONT_FAMILY_LABEL} hint={FONT_FAMILY_HINT}>
         <div className="w-52">
           <SelectInput
             label={FONT_FAMILY_LABEL}
@@ -135,6 +166,7 @@ const AppearanceSection = observer(function AppearanceSection() {
         </div>
       </SettingRow>
       <SettingRow
+        id={SETTING_IDS.fontSize}
         label={FONT_SIZE_LABEL}
         hint={`${FONT_SIZE_HINT} Сейчас: ${fontSizeLabel(ui.fontSize)}.`}
       >
@@ -160,7 +192,7 @@ const ToggleSettingRow = observer(function ToggleSettingRow({
   const { appSettings } = useStore();
   const checked = appSettings.values[row.key];
   return (
-    <SettingRow label={row.label} hint={row.hint} error={appSettings.errors[row.key]}>
+    <SettingRow id={row.key} label={row.label} hint={row.hint} error={appSettings.errors[row.key]}>
       <Toggle
         label={checked ? TOGGLE_ON : TOGGLE_OFF}
         checked={checked}
@@ -246,9 +278,41 @@ const AboutSection = observer(function AboutSection() {
   );
 });
 
+function useRevealTarget(container: RefObject<HTMLElement | null>) {
+  const { ui } = useStore();
+  const target = ui.preferenceTarget;
+  const section = ui.preferences;
+  useEffect(() => {
+    if (target === null) return;
+    const entry = SETTING_ENTRIES.find((item) => item.id === target);
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const find = (id: string) =>
+      container.current?.querySelector<HTMLElement>(`[data-setting="${id}"]`) ?? null;
+    const reveal = () => {
+      const element = find(target);
+      if (element === null && entry?.fallback !== undefined && find(entry.fallback) !== null) {
+        ui.revealPreference(entry.section, entry.fallback);
+        return;
+      }
+      if (element === null) {
+        attempts += 1;
+        timer = setTimeout(attempts < REVEAL_ATTEMPTS ? reveal : ui.clearPreferenceTarget, 100);
+        return;
+      }
+      element.scrollIntoView({ block: "center", behavior: "smooth" });
+      timer = setTimeout(ui.clearPreferenceTarget, REVEAL_MS);
+    };
+    timer = setTimeout(reveal, 0);
+    return () => clearTimeout(timer);
+  }, [container, target, section, ui]);
+}
+
 function PreferencesDialog() {
   const { ui } = useStore();
   const section = ui.preferences;
+  const content = useRef<HTMLDivElement | null>(null);
+  useRevealTarget(content);
   return (
     <Modal
       open={section !== null}
@@ -260,6 +324,7 @@ function PreferencesDialog() {
         aria-label={PREFERENCES_TITLE}
         className="flex w-56 flex-none flex-col gap-0.5 border-r border-line bg-main-950 px-3 py-4"
       >
+        <PreferencesSearch />
         <span className="px-2.5 pb-1.5 text-[12px] text-main-500">{PREFERENCES_GROUP}</span>
         {PREFERENCE_SECTIONS.map((item) => (
           <button
@@ -278,7 +343,7 @@ function PreferencesDialog() {
           </button>
         ))}
       </nav>
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div ref={content} className="flex min-w-0 flex-1 flex-col">
         <div className="flex flex-none items-start gap-3 px-7 pt-6 pb-2">
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <h2 className="m-0 text-[16px] font-semibold tracking-[-0.01em] text-main-50">

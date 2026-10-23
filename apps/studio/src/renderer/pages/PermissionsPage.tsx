@@ -1,13 +1,17 @@
 import { mdiShieldCheckOutline, mdiShieldOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import FolderGrantDetail from "../features/permissions/FolderGrantDetail";
 import FolderGrantList from "../features/permissions/FolderGrantList";
+import ToolDefaultsTable from "../features/permissions/ToolDefaultsTable";
 import {
   FOLDERS_TAB,
   NOTHING_SELECTED_DESCRIPTION,
   NOTHING_SELECTED_TITLE,
   PAGE_TITLE,
+  TOOLS_TAB,
+  TOOLS_TAB_PARAM,
   grantCountLabel,
 } from "../features/permissions/permissionsPresentation";
 import { useStore } from "../stores/useStore";
@@ -15,13 +19,20 @@ import SegmentedControl from "../ui/atoms/SegmentedControl";
 import EmptyState from "../ui/molecules/EmptyState";
 import PageShell from "../ui/templates/PageShell";
 
-const TABS = [{ value: "folders", label: FOLDERS_TAB }] as const;
+const TABS = [
+  { value: "folders", label: FOLDERS_TAB },
+  { value: TOOLS_TAB_PARAM, label: TOOLS_TAB },
+] as const;
 
 type TabValue = (typeof TABS)[number]["value"];
 
 function PermissionsPage() {
   const { permissions } = useStore();
-  const [tab, setTab] = useState<TabValue>("folders");
+  const [params, setParams] = useSearchParams();
+  const tab: TabValue = params.get("tab") === TOOLS_TAB_PARAM ? TOOLS_TAB_PARAM : "folders";
+  const setTab = (value: TabValue) => {
+    setParams(value === "folders" ? {} : { tab: value }, { replace: true });
+  };
 
   useEffect(() => {
     void permissions.load();
@@ -56,25 +67,29 @@ function PermissionsPage() {
           </button>
         </div>
       )}
-      <div className="flex min-h-0 flex-1">
-        <FolderGrantList />
-        {selected === null ? (
-          <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
-            <EmptyState
-              icon={mdiShieldOutline}
-              title={NOTHING_SELECTED_TITLE}
-              description={NOTHING_SELECTED_DESCRIPTION}
+      {tab === TOOLS_TAB_PARAM ? (
+        <ToolDefaultsTable />
+      ) : (
+        <div className="flex min-h-0 flex-1">
+          <FolderGrantList />
+          {selected === null ? (
+            <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
+              <EmptyState
+                icon={mdiShieldOutline}
+                title={NOTHING_SELECTED_TITLE}
+                description={NOTHING_SELECTED_DESCRIPTION}
+              />
+            </div>
+          ) : (
+            <FolderGrantDetail
+              grant={selected}
+              now={permissions.now}
+              revoking={permissions.revoking}
+              onRevoke={() => void permissions.revoke(selected.id)}
             />
-          </div>
-        ) : (
-          <FolderGrantDetail
-            grant={selected}
-            now={permissions.now}
-            revoking={permissions.revoking}
-            onRevoke={() => void permissions.revoke(selected.id)}
-          />
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </PageShell>
   );
 }

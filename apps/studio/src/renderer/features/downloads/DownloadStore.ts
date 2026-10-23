@@ -17,6 +17,7 @@ import {
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import { estimateEta, smoothRate, type RateState } from "../progressRate";
 import { toolchainErrorCopy, toolchainRuntimeOf } from "../toolchain/toolchainPresentation";
+import { CATALOGUE_SECTIONS, sectionOf, type CatalogueSection } from "./downloadPresentation";
 
 const CONCURRENCY_KEY = "downloads.concurrency";
 const OPTIONS_KEY = "downloads.options";
@@ -112,6 +113,17 @@ export default class DownloadStore {
     );
   }
 
+  get sections(): { readonly section: CatalogueSection; readonly items: CatalogueItemDto[] }[] {
+    return CATALOGUE_SECTIONS.map((section) => ({
+      section,
+      items: this.visible.filter((item) => sectionOf(item) === section),
+    })).filter((group) => group.items.length > 0);
+  }
+
+  get busy(): boolean {
+    return this.busyId !== null || this.runtimeBusyId !== null;
+  }
+
   get kindCounts(): Record<DownloadItemKind, number> {
     const counts: Record<DownloadItemKind, number> = {
       model: 0,
@@ -142,7 +154,7 @@ export default class DownloadStore {
 
   get selectedDownload(): DownloadDto | null {
     if (this.selectedRef === null) return null;
-    const rows = this.downloads.filter((row) => row.itemRef === this.selectedRef);
+    const rows = this.downloads.filter((row) => catalogueRefOf(row.itemRef) === this.selectedRef);
     return rows.find((row) => !TERMINAL_DOWNLOAD_STATUSES.includes(row.status)) ?? rows[0] ?? null;
   }
 
@@ -157,6 +169,14 @@ export default class DownloadStore {
 
   installedId(ref: string): DownloadId | undefined {
     return this.downloads.find((row) => row.itemRef === ref && row.status === "succeeded")?.id;
+  }
+
+  isSelected(row: DownloadDto): boolean {
+    return this.selectedRef !== null && catalogueRefOf(row.itemRef) === this.selectedRef;
+  }
+
+  selectDownload(row: DownloadDto) {
+    this.selectedRef = catalogueRefOf(row.itemRef);
   }
 
   optionsFor(ref: string): PostDownloadOptions {
@@ -524,6 +544,11 @@ function readStoredOptions(value: unknown): Record<string, PostDownloadOptions> 
 
 function copy(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+export function catalogueRefOf(itemRef: string): string {
+  const archive = /^(toolchain|runtime):([a-z0-9-]+):/.exec(itemRef);
+  return archive === null ? itemRef : `${archive[1]!}:${archive[2]!}`;
 }
 
 function toolchainOf(item: CatalogueItemDto): ToolchainRuntime | undefined {

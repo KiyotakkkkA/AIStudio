@@ -41,6 +41,7 @@ import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
 import ArtifactActions from "./ArtifactActions";
 import ExplorerStore from "./explorer/ExplorerStore";
 import TerminalStore from "../terminal/TerminalStore";
+import { isAutomaticTool, RECOMMENDED_TOOLS, toolBlockReason } from "./toolSets";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
 export const SELECTIONS_FULL = "К сообщению можно приложить не больше 8 фрагментов документов.";
@@ -440,12 +441,35 @@ export default class ChatStore {
     }
   }
 
-  async toggleTool(key: ToolDto["key"]) {
-    if (!this.canConfigure) return;
+  get recommendedTools() {
+    return RECOMMENDED_TOOLS.filter((key) =>
+      this.tools.some((tool) => tool.key === key && toolBlockReason(tool) === null),
+    );
+  }
+
+  get usesRecommendedTools() {
     const current = this.enabledTools;
-    const enabledTools = current.includes(key)
-      ? current.filter((value) => value !== key)
-      : [...current, key];
+    return (
+      current.length === this.recommendedTools.length &&
+      this.recommendedTools.every((key) => current.includes(key))
+    );
+  }
+
+  toggleTool(key: ToolDto["key"]) {
+    if (isAutomaticTool(key)) return Promise.resolve();
+    const current = this.enabledTools;
+    return this.setTools(
+      current.includes(key) ? current.filter((value) => value !== key) : [...current, key],
+    );
+  }
+
+  useRecommendedTools() {
+    return this.setTools(this.recommendedTools);
+  }
+
+  private async setTools(keys: readonly string[]) {
+    if (!this.canConfigure) return;
+    const enabledTools = keys.filter((key) => !isAutomaticTool(key));
     if (!this.active) {
       this.composer.setEnabledTools(enabledTools);
       return;

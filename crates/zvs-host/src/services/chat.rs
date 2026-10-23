@@ -1080,13 +1080,6 @@ impl NodeDef for PrepareNode {
                 }
             }
         }
-        if tools_usable {
-            for key in FILE_TOOLS.iter().chain(&PROCESS_TOOLS) {
-                if !enabled.iter().any(|known| known == key) {
-                    enabled.push((*key).to_owned());
-                }
-            }
-        }
         let guidance = inner.mcp_guidance(&mut enabled, &registered)?;
         let offered = offered_tools(&enabled, &registered);
         let skill_note =
@@ -2381,13 +2374,6 @@ impl ChatService {
             Some(tools) => tools.list(&ToolListFilter::default())?,
             None => Vec::new(),
         };
-        if model.supports_tools != Some(false) {
-            for key in FILE_TOOLS.iter().chain(&PROCESS_TOOLS) {
-                if !enabled.iter().any(|known| known == key) {
-                    enabled.push((*key).to_owned());
-                }
-            }
-        }
         let guidance = self.inner.mcp_guidance(&mut enabled, &registered)?;
         let offered = offered_tools(&enabled, &registered);
         let folder = details.and_then(|details| details.working_folder.as_deref());

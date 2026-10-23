@@ -13,7 +13,7 @@ import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import ChatStore from "../../src/renderer/features/chat/ChatStore.ts";
 import ChatToolCalls from "../../src/renderer/features/chat/ChatToolCalls";
-import { toolBlockReason } from "../../src/renderer/features/chat/ChatToolPicker";
+import { toolBlockReason } from "../../src/renderer/features/chat/toolSets.ts";
 import { durationLabel } from "../../src/renderer/features/chat/processCopy.ts";
 import { provider } from "./providerFixtures.ts";
 
@@ -225,4 +225,38 @@ test("a tool that cannot be offered explains why", () => {
   expect(toolBlockReason(tool("mcp.a.b", { tier: "off" }))).toMatch(/Запрещён/);
   expect(toolBlockReason(tool("mcp.a.b", { enabled: false }))).toMatch(/Выключен/);
   expect(toolBlockReason(tool("mcp.a.b", { available: false }))).toMatch(/недоступен/);
+});
+
+test("the recommended set replaces the picks with the offerable file tools only", async () => {
+  const { store, bridge, events } = setup();
+  bridge.handle("tools.list", () => [
+    tool("mcp.docs.search"),
+    tool("fs.list", { source: "builtin" }),
+    tool("fs.read", { source: "builtin" }),
+    tool("fs.search", { source: "builtin" }),
+    tool("fs.apply", { source: "builtin", tier: "off" }),
+    tool("shell.run", { source: "builtin" }),
+  ]);
+  await store.mount();
+  await store.toggleTool("mcp.docs.search");
+  expect(store.usesRecommendedTools).toBe(false);
+
+  await store.useRecommendedTools();
+  expect(store.enabledTools).toEqual(["fs.list", "fs.read", "fs.search"]);
+  expect(store.usesRecommendedTools).toBe(true);
+  store.dispose();
+  events.dispose();
+});
+
+test("skill tools stay attached and cannot be picked or dropped", async () => {
+  const { store, bridge, events } = setup();
+  bridge.handle("tools.list", () => [tool("skill.load", { source: "builtin" })]);
+  await store.mount();
+  await store.toggleTool("skill.load");
+  expect(store.enabledTools).toEqual([]);
+  expect(bridge.calls.some((call) => call.channel === "chat.conversations.updateTools")).toBe(
+    false,
+  );
+  store.dispose();
+  events.dispose();
 });

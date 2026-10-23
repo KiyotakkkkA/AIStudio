@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { observer } from "mobx-react-lite";
 import { mdiPause, mdiRefresh, mdiTrayArrowDown } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import type { CatalogueItemDto } from "@zvs/shared";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
@@ -15,7 +16,28 @@ import DownloadFailureRow from "./DownloadFailureRow";
 import DownloadFilterRail from "./DownloadFilterRail";
 import DownloadProgressRow from "./DownloadProgressRow";
 import DownloadQueueRow from "./DownloadQueueRow";
-import { formatBytes, formatRate } from "./downloadPresentation";
+import { formatBytes, formatRate, SECTION_LABELS } from "./downloadPresentation";
+
+const CatalogueEntry = observer(function CatalogueEntry({
+  item,
+  busy,
+}: {
+  readonly item: CatalogueItemDto;
+  readonly busy: boolean;
+}) {
+  const { downloads: store } = useStore();
+  return (
+    <CatalogueRow
+      item={item}
+      selected={store.selectedRef === item.ref}
+      busy={busy}
+      removable={store.isRemovable(item)}
+      onSelect={() => store.select(item.ref)}
+      onDownload={() => void store.install(item)}
+      onRemove={() => void store.uninstall(item)}
+    />
+  );
+});
 
 export default observer(function DownloadsWorkspace() {
   const { downloads: store } = useStore();
@@ -24,7 +46,7 @@ export default observer(function DownloadsWorkspace() {
     return store.dispose;
   }, [store]);
 
-  const busy = store.busyId !== null;
+  const busy = store.busy;
   const disk = store.disk;
 
   return (
@@ -111,9 +133,9 @@ export default observer(function DownloadsWorkspace() {
                   download={download}
                   rate={store.rateOf(download)}
                   etaMs={store.etaOf(download)}
-                  selected={store.selectedRef === download.itemRef}
+                  selected={store.isSelected(download)}
                   busy={busy}
-                  onSelect={() => store.select(download.itemRef)}
+                  onSelect={() => store.selectDownload(download)}
                   onPause={() => void store.pause(download.id)}
                   onResume={() => void store.resume(download.id)}
                   onCancel={() => void store.cancel(download.id)}
@@ -126,9 +148,9 @@ export default observer(function DownloadsWorkspace() {
                 key={download.id}
                 download={download}
                 position={index + 1}
-                selected={store.selectedRef === download.itemRef}
+                selected={store.isSelected(download)}
                 busy={busy}
-                onSelect={() => store.select(download.itemRef)}
+                onSelect={() => store.selectDownload(download)}
                 onRaise={() => void store.nudge(download.id, 1)}
                 onLower={() => void store.nudge(download.id, -1)}
                 onCancel={() => void store.cancel(download.id)}
@@ -147,9 +169,9 @@ export default observer(function DownloadsWorkspace() {
                   <DownloadFailureRow
                     key={download.id}
                     download={download}
-                    selected={store.selectedRef === download.itemRef}
+                    selected={store.isSelected(download)}
                     busy={busy}
-                    onSelect={() => store.select(download.itemRef)}
+                    onSelect={() => store.selectDownload(download)}
                     onRetry={() => void store.resume(download.id)}
                     onDismiss={() => void store.remove(download.id)}
                   />
@@ -199,19 +221,22 @@ export default observer(function DownloadsWorkspace() {
                   description="Под выбранные фильтры не подходит ни один артефакт. Сбросьте фильтры или обновите каталог."
                 />
               </div>
-            ) : (
-              store.visible.map((item) => (
-                <CatalogueRow
-                  key={item.ref}
-                  item={item}
-                  selected={store.selectedRef === item.ref}
-                  busy={busy}
-                  removable={store.isRemovable(item)}
-                  onSelect={() => store.select(item.ref)}
-                  onDownload={() => void store.install(item)}
-                  onRemove={() => void store.uninstall(item)}
-                />
+            ) : store.kind === "all" ? (
+              store.sections.map(({ section, items }) => (
+                <section key={section} aria-label={SECTION_LABELS[section]}>
+                  <div className="flex items-center gap-2.5 border-b border-line px-5 pt-3.5 pb-2">
+                    <span className="flex-1 text-[11.5px] font-semibold text-main-300">
+                      {SECTION_LABELS[section]}
+                    </span>
+                    <Chip>{items.length}</Chip>
+                  </div>
+                  {items.map((item) => (
+                    <CatalogueEntry key={item.ref} item={item} busy={busy} />
+                  ))}
+                </section>
               ))
+            ) : (
+              store.visible.map((item) => <CatalogueEntry key={item.ref} item={item} busy={busy} />)
             )}
           </ScrollArea>
         </div>

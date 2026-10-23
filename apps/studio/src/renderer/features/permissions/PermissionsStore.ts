@@ -1,6 +1,14 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
-import type { Contract, FolderGrantDto, FolderGrantId } from "@zvs/shared";
+import type {
+  Contract,
+  FolderGrantDto,
+  FolderGrantId,
+  ToolDefaultsDto,
+  ToolDefaultTier,
+  ToolSource,
+} from "@zvs/shared";
+import { toolErrorCopy } from "../tools/toolPresentation";
 import { LOAD_ERROR, revokeErrorCopy } from "./permissionsPresentation";
 
 export interface PermissionsStoreOptions {
@@ -15,6 +23,8 @@ export default class PermissionsStore {
   query = "";
   selectedId: FolderGrantId | null = null;
   revoking = false;
+  defaults: ToolDefaultsDto | null = null;
+  savingSource: ToolSource | null = null;
   now: number;
   private readonly clock: () => number;
   private revision = 0;
@@ -114,6 +124,42 @@ export default class PermissionsStore {
       });
     }
     await this.load();
+  }
+
+  async loadDefaults() {
+    try {
+      const defaults = await this.ipc.call("tools.defaults", undefined);
+      runInAction(() => {
+        this.defaults = defaults;
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.error = toolErrorCopy(error);
+      });
+    }
+  }
+
+  async setDefault(source: ToolSource, tier: ToolDefaultTier) {
+    const previous = this.defaults;
+    if (previous === null || this.savingSource !== null || previous[source] === tier) return;
+    this.defaults = { ...previous, [source]: tier };
+    this.savingSource = source;
+    this.error = null;
+    try {
+      const saved = await this.ipc.call("tools.setDefaults", this.defaults);
+      runInAction(() => {
+        this.defaults = saved;
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.defaults = previous;
+        this.error = toolErrorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.savingSource = null;
+      });
+    }
   }
 
   dispose() {

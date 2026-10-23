@@ -126,3 +126,41 @@ test("the revoke confirmation names the folder and what happens to bound chats",
   expect(revokeConsequence(bound)).toContain("Привязанные диалоги сохранят");
   expect(revokeConsequence(grant(3))).toBe(`Доступ к папке ${grant(3).path} будет закрыт.`);
 });
+
+describe("tool defaults", () => {
+  const defaults = {
+    builtin: "inferred",
+    mcp: "ask",
+    skill: "inferred",
+    integration: "inferred",
+    browser: "off",
+  } as const;
+
+  test("a changed source is saved at once with the whole set", async () => {
+    const { bridge, store } = setup([]);
+    bridge
+      .handle("tools.defaults", () => defaults)
+      .handle("tools.setDefaults", (input) => ({ ...defaults, ...input }));
+    await store.loadDefaults();
+    await store.setDefault("mcp", "auto");
+    expect(bridge.calls.find((call) => call.channel === "tools.setDefaults")?.payload).toEqual({
+      ...defaults,
+      mcp: "auto",
+    });
+    expect(store.defaults?.mcp).toBe("auto");
+    expect(store.savingSource).toBeNull();
+  });
+
+  test("a refused save puts the previous tier back and reports it", async () => {
+    const { bridge, store } = setup([]);
+    bridge
+      .handle("tools.defaults", () => defaults)
+      .handle("tools.setDefaults", () => {
+        throw new Error("refused");
+      });
+    await store.loadDefaults();
+    await store.setDefault("browser", "auto");
+    expect(store.defaults?.browser).toBe("off");
+    expect(store.error).not.toBeNull();
+  });
+});

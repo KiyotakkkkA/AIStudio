@@ -5,6 +5,13 @@ import { formatLastUsed } from "../tools/toolPresentation";
 
 export const PAGE_TITLE = "Разрешения";
 export const FOLDERS_TAB = "Папки";
+export const TOOLS_TAB = "Инструменты";
+export const TOOLS_TAB_PARAM = "tools";
+export const DEFAULTS_TITLE = "Разрешения по умолчанию";
+export const DEFAULTS_DESCRIPTION =
+  "Уровень, который получает инструмент при первой регистрации. Уже известные инструменты сохраняют своё разрешение: изменение здесь не включит то, что было выключено. Разрушающие инструменты всегда начинают с «off».";
+export const DEFAULTS_SOURCE_COLUMN = "Источник";
+export const DEFAULTS_TIER_COLUMN = "Разрешение для новых инструментов";
 export const ALWAYS_SECTION = "Постоянные";
 export const DIALOG_SECTION = "В диалогах";
 export const REVOKE = "Отозвать";

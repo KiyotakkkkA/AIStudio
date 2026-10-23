@@ -5,7 +5,6 @@ import {
   toolNeedsConfirmation,
   type Contract,
   type McpServerDto,
-  type ToolDefaultsDto,
   type ToolDetailDto,
   type ToolId,
   type ToolInvokeResultDto,
@@ -44,10 +43,6 @@ export default class ToolStore {
   confirming = false;
   result: ToolInvokeResultDto | null = null;
   runError: string | null = null;
-  defaults: ToolDefaultsDto | null = null;
-  defaultsDraft: ToolDefaultsDto | null = null;
-  defaultsOpen = false;
-  savingDefaults = false;
   busyIds: ToolId[] = [];
   loading = false;
   loaded = false;
@@ -334,56 +329,6 @@ export default class ToolStore {
     } finally {
       runInAction(() => {
         this.running = false;
-      });
-    }
-  }
-
-  async openDefaults(): Promise<void> {
-    this.defaultsOpen = true;
-    try {
-      const defaults = await this.ipc.call("tools.defaults", undefined);
-      runInAction(() => {
-        this.defaults = defaults;
-        this.defaultsDraft = { ...defaults };
-      });
-    } catch (error: unknown) {
-      runInAction(() => {
-        this.error = toolErrorCopy(error);
-        this.defaultsOpen = false;
-      });
-    }
-  }
-
-  closeDefaults(): void {
-    this.defaultsOpen = false;
-    this.defaultsDraft = null;
-  }
-
-  setDefault(source: keyof ToolDefaultsDto, tier: ToolDefaultsDto[keyof ToolDefaultsDto]): void {
-    if (this.defaultsDraft === null) return;
-    this.defaultsDraft = { ...this.defaultsDraft, [source]: tier };
-  }
-
-  async saveDefaults(): Promise<void> {
-    const draft = this.defaultsDraft;
-    if (draft === null || this.savingDefaults) return;
-    this.savingDefaults = true;
-    try {
-      const saved = await this.ipc.call("tools.setDefaults", draft);
-      const tools = await this.ipc.call("tools.list", { includeUnavailable: true });
-      runInAction(() => {
-        this.defaults = saved;
-        this.tools = [...tools];
-        this.defaultsOpen = false;
-        this.defaultsDraft = null;
-      });
-    } catch (error: unknown) {
-      runInAction(() => {
-        this.error = toolErrorCopy(error);
-      });
-    } finally {
-      runInAction(() => {
-        this.savingDefaults = false;
       });
     }
   }

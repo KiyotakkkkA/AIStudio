@@ -105,6 +105,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0011_document_office_native",
         sql: include_str!("../../migrations/0011_document_office_native.sql"),
     },
+    Migration {
+        id: 12,
+        name: "0012_conversation_workspace_tools",
+        sql: include_str!("../../migrations/0012_conversation_workspace_tools.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -448,6 +453,32 @@ mod tests {
         assert_eq!(
             query(&database, "SELECT id FROM document ORDER BY id"),
             ["office", "pdf"]
+        );
+    }
+
+    #[test]
+    fn existing_conversations_keep_the_workspace_tools_they_were_offered() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..12], &options(&backups, &clock)).expect("applies");
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    r#"INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, enabled_tools, created_at, updated_at) VALUES ('c1', 't', 'p', 'm', '{}', '', '[]', '["mail.send","fs.read"]', 1, 1), ('c2', 't', 'p', 'm', '{}', '', '[]', '[]', 1, 1);"#,
+                )?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        assert_eq!(
+            query(
+                &database,
+                "SELECT enabled_tools FROM conversation ORDER BY id"
+            ),
+            [
+                r#"["mail.send","fs.read","fs.list","fs.search","fs.apply","code.run","shell.run"]"#,
+                r#"["fs.list","fs.read","fs.search","fs.apply","code.run","shell.run"]"#,
+            ]
         );
     }
 

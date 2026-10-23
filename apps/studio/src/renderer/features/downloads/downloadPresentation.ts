@@ -6,12 +6,14 @@ import {
   mdiVectorTriangle,
 } from "@mdi/js";
 import type {
+  CatalogueItemDto,
   CatalogueItemState,
   DiskCategory,
   DownloadItemKind,
   DownloadStatus,
 } from "@zvs/shared";
 import type { StatusTone } from "../../ui/atoms/statusTone";
+import { isToolchainRef, removalCopy } from "../toolchain/toolchainPresentation";
 
 export const KIND_LABELS: Record<DownloadItemKind, string> = {
   model: "модель",
@@ -36,6 +38,40 @@ export const KIND_ICONS: Record<DownloadItemKind, string> = {
   mcp: mdiPowerPlugOutline,
   skill: mdiBookOpenPageVariantOutline,
 };
+
+export type CatalogueSection = "model" | "embedding" | "engine" | "toolchain" | "mcp" | "skill";
+
+export const CATALOGUE_SECTIONS: readonly CatalogueSection[] = [
+  "model",
+  "embedding",
+  "engine",
+  "toolchain",
+  "mcp",
+  "skill",
+];
+
+export const SECTION_LABELS: Record<CatalogueSection, string> = {
+  model: "Модели",
+  embedding: "Модели эмбеддингов",
+  engine: "Локальные движки",
+  toolchain: "Среды выполнения",
+  mcp: "MCP-серверы",
+  skill: "Наборы навыков",
+};
+
+export function sectionOf(item: Pick<CatalogueItemDto, "kind" | "ref">): CatalogueSection {
+  if (item.kind !== "runtime") return item.kind;
+  return isToolchainRef(item.ref) ? "toolchain" : "engine";
+}
+
+export function removalPrompt(
+  item: Pick<CatalogueItemDto, "kind" | "ref" | "displayName">,
+): string {
+  if (isToolchainRef(item.ref)) return removalCopy(item.displayName);
+  if (item.kind === "runtime")
+    return "Распакованная сборка движка будет удалена с диска. Хранилища, настроенные на этот движок, не смогут вычислять локальные эмбеддинги до установки другого движка.";
+  return "Файл будет удалён с диска. Повторная загрузка доступна в каталоге.";
+}
 
 export const STATE_LABELS: Record<CatalogueItemState, string> = {
   installed: "установлено",

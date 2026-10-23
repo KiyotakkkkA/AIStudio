@@ -1,26 +1,21 @@
 import { useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Link } from "react-router-dom";
-import { mdiArrowRight, mdiMagnify, mdiWrenchOutline } from "@mdi/js";
+import { mdiArrowRight, mdiAutoFix, mdiMagnify, mdiWrenchOutline } from "@mdi/js";
 import { Dropdown, InputCheckBox, ScrollArea, Tooltip } from "@kiyotakkkka/zvs-uikit-lib";
 import type { ToolDto, ToolTier } from "@zvs/shared";
 import { ROUTES } from "../../app/routes";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
 import { TIER_HINTS, TIER_LABELS } from "../connections/connectionPresentation";
 import { matchesQuery, sourceGroups, sourceKey } from "../tools/toolFilters";
 import type ChatStore from "./ChatStore";
+import { isAutomaticTool, toolBlockReason } from "./toolSets";
 
-export const TOOL_MODE_HINTS = {
-  native: "Модель вызывает инструменты через API провайдера.",
-  injected: "Инструменты описываются в системном промпте, модель отвечает JSON-вызовом.",
-  none: "Эта модель не поддерживает вызов инструментов: они не будут предложены.",
-} as const;
-
-const TOOL_MODE_LABELS = {
-  native: "нативно",
-  injected: "через промпт",
-  none: "не поддерживается",
-} as const;
+export const TOOLS_UNSUPPORTED =
+  "Эта модель не поддерживает вызов инструментов: они не будут предложены.";
+export const USE_RECOMMENDED = "Установить рекомендуемое";
+export const AUTOMATIC_TOOL_HINT = "Подключается автоматически, когда к запросу подходит навык";
 
 const TIER_PILL: Record<ToolTier, string> = {
   auto: "bg-ok-soft text-ok",
@@ -30,13 +25,6 @@ const TIER_PILL: Record<ToolTier, string> = {
 
 const SEARCH_THRESHOLD = 6;
 
-export function toolBlockReason(tool: ToolDto): string | null {
-  if (!tool.available) return "Источник недоступен";
-  if (!tool.enabled) return "Выключен в подключениях";
-  if (tool.tier === "off") return "Запрещён на странице инструментов";
-  return null;
-}
-
 const ToolRow = observer(function ToolRow({
   store,
   tool,
@@ -44,19 +32,21 @@ const ToolRow = observer(function ToolRow({
   readonly store: ChatStore;
   readonly tool: ToolDto;
 }) {
-  const selected = store.enabledTools.includes(tool.key);
+  const automatic = isAutomaticTool(tool.key);
+  const selected = automatic || store.enabledTools.includes(tool.key);
   const blocked = toolBlockReason(tool);
-  const description = blocked ?? (tool.description || "Описание не задано");
+  const description =
+    blocked ?? (automatic ? AUTOMATIC_TOOL_HINT : tool.description || "Описание не задано");
   return (
     <label
       className={`flex items-center gap-2.5 rounded-control px-2 py-1.5 transition-colors ${
         selected ? "bg-accent-soft" : ""
-      } ${blocked && !selected ? "opacity-55" : "cursor-pointer hover:bg-main-850"}`}
+      } ${blocked && !selected ? "opacity-55" : automatic ? "" : "cursor-pointer hover:bg-main-850"}`}
     >
       <InputCheckBox
         aria-label={`Предлагать модели: ${tool.key}`}
         checked={selected}
-        disabled={!store.canConfigure || (blocked !== null && !selected)}
+        disabled={automatic || !store.canConfigure || (blocked !== null && !selected)}
         onChange={() => void store.toggleTool(tool.key)}
       />
       <span className="min-w-0 flex-1">
@@ -136,19 +126,22 @@ export default observer(function ChatToolPicker({ store }: { readonly store: Cha
         <div className="space-y-2.5 px-3 pt-3 pb-2">
           <div className="flex items-center gap-2">
             <p className="flex-1 text-[13px] font-semibold text-main-50">Инструменты</p>
-            <span
-              title={TOOL_MODE_HINTS[store.toolMode]}
-              className={`rounded-full px-2 text-[11px]/5  ${
-                unsupported ? "bg-warn-soft text-warn" : "bg-main-800 text-main-400"
-              }`}
-            >
-              {TOOL_MODE_LABELS[store.toolMode]}
-            </span>
             <span className="font-mono text-[11px] text-main-500 tabular-nums">
               {count} / {tools.length}
             </span>
+            <IconButton
+              path={mdiAutoFix}
+              label={USE_RECOMMENDED}
+              iconSize={16}
+              disabled={
+                !store.canConfigure ||
+                store.recommendedTools.length === 0 ||
+                store.usesRecommendedTools
+              }
+              onClick={() => void store.useRecommendedTools()}
+            />
           </div>
-          {unsupported && <p className="text-[11.5px] text-warn">{TOOL_MODE_HINTS.none}</p>}
+          {unsupported && <p className="text-[11.5px] text-warn">{TOOLS_UNSUPPORTED}</p>}
           {tools.length > SEARCH_THRESHOLD && (
             <label className="flex h-8 items-center gap-2 rounded-control bg-main-800 px-2.5 text-main-500 focus-within:text-main-300">
               <Icon path={mdiMagnify} size={16} />
@@ -168,8 +161,12 @@ export default observer(function ChatToolPicker({ store }: { readonly store: Cha
               <p className="flex items-center gap-2 px-2 pt-1.5 pb-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                 <span className="min-w-0 flex-1 truncate">{group.label}</span>
                 <span className="font-mono tracking-normal tabular-nums">
-                  {items.filter((tool) => store.enabledTools.includes(tool.key)).length}/
-                  {items.length}
+                  {
+                    items.filter(
+                      (tool) => isAutomaticTool(tool.key) || store.enabledTools.includes(tool.key),
+                    ).length
+                  }
+                  /{items.length}
                 </span>
               </p>
               <div className="space-y-0.5">

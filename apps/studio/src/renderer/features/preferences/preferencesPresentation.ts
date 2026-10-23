@@ -17,6 +17,9 @@ export const APP_VERSION_LABEL = `${APP_CHANNEL} v${APP_VERSION}`;
 export const APP_EDITION = "Локальная установка";
 
 export const PREFERENCES_TITLE = "Параметры";
+export const SEARCH_LABEL = "Поиск параметров";
+export const SEARCH_PLACEHOLDER = "Поиск";
+export const SEARCH_EMPTY = "Ничего не найдено";
 export const PREFERENCES_GROUP = "Приложение";
 export const CLOSE_PREFERENCES = "Закрыть параметры";
 
@@ -139,11 +142,25 @@ export interface InfoRow {
   readonly value: string;
 }
 
+export const APP_ROW_LABELS = {
+  name: "Приложение",
+  version: "Версия",
+  edition: "Сборка",
+} as const;
+
+export const DEVICE_ROW_LABELS = {
+  os: "Операционная система",
+  cpu: "Процессор",
+  memory: "Оперативная память",
+  gpu: "Видеокарта",
+  disk: "Свободно на диске",
+} as const;
+
 export function appRows(): InfoRow[] {
   return [
-    { label: "Приложение", value: APP_NAME },
-    { label: "Версия", value: APP_VERSION_LABEL },
-    { label: "Сборка", value: APP_EDITION },
+    { label: APP_ROW_LABELS.name, value: APP_NAME },
+    { label: APP_ROW_LABELS.version, value: APP_VERSION_LABEL },
+    { label: APP_ROW_LABELS.edition, value: APP_EDITION },
   ];
 }
 
@@ -157,20 +174,20 @@ export function deviceRows(device: DeviceProfileDto): InfoRow[] {
         ].join(" · ");
   return [
     {
-      label: "Операционная система",
+      label: DEVICE_ROW_LABELS.os,
       value: `${PLATFORMS[device.platform] ?? device.platform} · ${device.arch}`,
     },
     {
-      label: "Процессор",
+      label: DEVICE_ROW_LABELS.cpu,
       value: `${device.cpuModel} · ядер: ${device.cpuCores.toLocaleString("ru-RU")}`,
     },
     {
-      label: "Оперативная память",
+      label: DEVICE_ROW_LABELS.memory,
       value: `${formatBytes(device.totalMemoryBytes)} · свободно ${formatBytes(device.freeMemoryBytes)}`,
     },
-    { label: "Видеокарта", value: gpu },
+    { label: DEVICE_ROW_LABELS.gpu, value: gpu },
     {
-      label: "Свободно на диске",
+      label: DEVICE_ROW_LABELS.disk,
       value: device.freeDiskBytes === 0 ? "Не измерено" : formatBytes(device.freeDiskBytes),
     },
   ];

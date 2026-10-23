@@ -43,6 +43,7 @@ export class UiStore {
   fontFamily: FontFamily = "onest";
   fontSize: FontSize = DEFAULT_FONT_SIZE;
   preferences: PreferenceSection | null = null;
+  preferenceTarget: string | null = null;
   restored = false;
 
   constructor(private readonly ipc: IpcClient<Contract>) {
@@ -111,8 +112,18 @@ export class UiStore {
     this.preferences = section;
   }
 
+  revealPreference(section: PreferenceSection, target: string): void {
+    this.preferences = section;
+    this.preferenceTarget = target;
+  }
+
+  clearPreferenceTarget(): void {
+    this.preferenceTarget = null;
+  }
+
   closePreferences(): void {
     this.preferences = null;
+    this.preferenceTarget = null;
   }
 
   setActiveRoute(route: string): void {

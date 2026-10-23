@@ -1,12 +1,14 @@
 import { mdiShieldLockOutline, mdiWrenchOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { ROUTES } from "../../app/routes";
 import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import TextInput from "../../ui/atoms/TextInput";
 import PageHeader from "../../ui/organisms/PageHeader";
 import { useStore } from "../../stores/useStore";
-import PermissionDefaultsDialog from "./PermissionDefaultsDialog";
+import { TOOLS_TAB_PARAM } from "../permissions/permissionsPresentation";
 import ToolDetailRail from "./ToolDetailRail";
 import ToolFilterRail from "./ToolFilterRail";
 import { headerLine } from "./toolPresentation";
@@ -14,6 +16,7 @@ import ToolTable from "./ToolTable";
 
 function ToolsWorkspace() {
   const { tools: store } = useStore();
+  const navigate = useNavigate();
 
   useEffect(() => {
     store.mount();
@@ -43,7 +46,7 @@ function ToolsWorkspace() {
               type="button"
               tone="secondary"
               onClick={() => {
-                void store.openDefaults();
+                void navigate(`${ROUTES.permissions}?tab=${TOOLS_TAB_PARAM}`);
               }}
             >
               <Icon path={mdiShieldLockOutline} size={15} />
@@ -70,8 +73,6 @@ function ToolsWorkspace() {
         <ToolTable store={store} />
         <ToolDetailRail store={store} />
       </div>
-
-      <PermissionDefaultsDialog store={store} />
     </div>
   );
 }

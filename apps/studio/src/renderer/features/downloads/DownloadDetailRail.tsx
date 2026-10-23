@@ -12,7 +12,9 @@ import {
   formatRate,
   KIND_LABELS,
   percentOf,
+  removalPrompt,
   shortChecksum,
+  STATE_LABELS,
   STATUS_LABELS,
 } from "./downloadPresentation";
 import { isToolchainRef } from "../toolchain/toolchainPresentation";
@@ -37,14 +39,24 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
 
   const ref = item?.ref ?? download?.itemRef ?? "";
   const title = item?.displayName ?? download?.displayName ?? "";
+  const installed = item?.state === "installed" || item?.state === "update";
+  const settled =
+    download === null || download.status === "succeeded" || download.status === "cancelled";
   const size = download?.sizeBytes ?? item?.sizeBytes ?? 0;
-  const done = download?.bytesDone ?? 0;
+  const done = download?.bytesDone ?? (installed ? size : 0);
+  const stateLabel =
+    item !== null && settled
+      ? STATE_LABELS[item.state]
+      : download === null
+        ? "не скачивалось"
+        : STATUS_LABELS[download.status];
   const percent = percentOf(done, size);
   const checksum = item?.checksum ?? download?.checksum;
   const options = store.optionsFor(ref);
   const running = download?.status === "running";
   const pausable = running || download?.status === "queued";
-  const busy = store.busyId !== null;
+  const busy = store.busy;
+  const removable = item !== null && installed && store.isRemovable(item);
 
   return (
     <aside aria-label="Детали загрузки" className="flex w-78.5 flex-none flex-col bg-main-800">
@@ -123,9 +135,7 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
           </div>
           <div className="flex justify-between gap-2">
             <dt className="text-main-400">Состояние</dt>
-            <dd className="m-0 font-mono">
-              {download === null ? "не скачивалось" : STATUS_LABELS[download.status]}
-            </dd>
+            <dd className="m-0 font-mono">{stateLabel}</dd>
           </div>
           <div className="flex justify-between gap-2">
             <dt className="text-main-400">Докачка</dt>
@@ -167,18 +177,34 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
 
         <div className="flex-1" />
         <div className="flex gap-2">
-          {download === null || !pausable ? (
+          {download !== null && pausable ? null : item?.state === "installed" ? null : (
             <Button
               tone="primary"
               disabled={busy || item === null || !item.downloadable}
               title={item?.blockedReason}
               onClick={() => {
-                if (item !== null) void store.start(item.ref);
+                if (item !== null) void store.install(item);
               }}
             >
               {item?.state === "update" ? "Обновить" : "Скачать"}
             </Button>
-          ) : (
+          )}
+          {item === null || !removable || (download !== null && pausable) ? null : (
+            <Button
+              tone="danger"
+              disabled={busy}
+              needConfirm
+              modalSetup={{
+                title: `Удалить «${item.displayName}»?`,
+                content: removalPrompt(item),
+                confirmLabel: "Удалить",
+              }}
+              onClick={() => void store.uninstall(item)}
+            >
+              Удалить
+            </Button>
+          )}
+          {download === null || !pausable ? null : (
             <Button
               tone="secondary"
               disabled={busy}

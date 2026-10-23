@@ -11,7 +11,9 @@ import {
 } from "@zvs/shared";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
-import DownloadStore from "../../src/renderer/features/downloads/DownloadStore.ts";
+import DownloadStore, {
+  catalogueRefOf,
+} from "../../src/renderer/features/downloads/DownloadStore.ts";
 import {
   estimateEta,
   smoothRate,
@@ -296,6 +298,66 @@ test("the detail rail reads one item however the row was reached", async () => {
   expect(store.selectedItem?.name).toBe("qwen2.5-vl:7b");
   expect(store.selectedDownload?.id).toBe(DOWNLOAD);
   expect(store.optionsFor(store.selectedRef ?? "")).toEqual({ verifyChecksum: true });
+
+  store.dispose();
+});
+
+test("an engine or toolchain archive download belongs to the catalogue row it installed", async () => {
+  const installed = download({
+    itemKind: "runtime",
+    itemRef: "toolchain:node:22.11.0:node-v22.11.0-win-x64.zip",
+    status: "succeeded",
+    bytesDone: 100 * MIB,
+  });
+  const { store } = setup({
+    rows: [installed],
+    catalogue: [
+      catalogueItem({
+        ref: "toolchain:node",
+        kind: "runtime",
+        name: "node",
+        displayName: "Node.js",
+        state: "installed",
+        downloadable: false,
+      }),
+    ],
+  });
+  await store.mount();
+
+  expect(catalogueRefOf("runtime:llama-cpp-cpu:b1:a.zip")).toBe("runtime:llama-cpp-cpu");
+  expect(catalogueRefOf("curated:model:qwen")).toBe("curated:model:qwen");
+
+  store.selectDownload(installed);
+  expect(store.selectedRef).toBe("toolchain:node");
+  expect(store.selectedItem?.state).toBe("installed");
+  expect(store.selectedDownload?.status).toBe("succeeded");
+  expect(store.isSelected(installed)).toBe(true);
+
+  store.dispose();
+});
+
+test("the catalogue splits into sections and engines apart from toolchains", async () => {
+  const { store } = setup({
+    catalogue: [
+      catalogueItem(),
+      catalogueItem({ ref: "toolchain:uv", kind: "runtime", name: "uv", displayName: "uv" }),
+      catalogueItem({
+        ref: "runtime:llama-cpp-cpu",
+        kind: "runtime",
+        name: "llama-cpp-cpu",
+        displayName: "llama.cpp CPU",
+      }),
+    ],
+  });
+  await store.mount();
+
+  expect(
+    store.sections.map(({ section, items }) => [section, items.map((item) => item.name)]),
+  ).toEqual([
+    ["embedding", ["bge-m3"]],
+    ["engine", ["llama-cpp-cpu"]],
+    ["toolchain", ["uv"]],
+  ]);
 
   store.dispose();
 });
