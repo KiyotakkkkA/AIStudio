@@ -118,8 +118,10 @@ impl Gate {
         if origin == AdmissionOrigin::Graph {
             let shortcut = matches!(
                 (run.kind, tool.as_str()),
-                (RunKind::Chat | RunKind::Skill, "llm.generate")
-                    | (RunKind::Chat, "vector.search")
+                (
+                    RunKind::Chat | RunKind::Skill | RunKind::Scenario,
+                    "llm.generate"
+                ) | (RunKind::Chat, "vector.search")
                     | (RunKind::Indexing, "vector.index")
                     | (RunKind::Download, "download.fetch")
             );

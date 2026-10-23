@@ -35,6 +35,7 @@ import {
   type ScenarioFlowEdge,
   type ScenarioFlowNode,
 } from "./flowModel";
+import ApprovalBar from "./ApprovalBar";
 import { CanvasActionsContext } from "./canvasActions";
 import { nodeSize } from "./layout";
 import NodePalette from "./NodePalette";
@@ -295,7 +296,9 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
           </div>
         ) : null}
 
-        {editor.refusal === null ? null : (
+        <ApprovalBar editor={editor} />
+
+        {editor.refusal === null || editor.execution.approval !== null ? null : (
           <div
             role="alert"
             className="absolute top-4 left-1/2 z-20 flex max-w-[min(560px,calc(100%-120px))] -translate-x-1/2 items-center gap-2.5 rounded-control border border-err-border bg-err-soft px-3 py-2.25 text-[12px] text-err shadow-card"

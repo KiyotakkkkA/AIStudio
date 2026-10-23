@@ -1,12 +1,13 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
-import type {
-  Contract,
-  Json,
-  RunHandleDto,
-  RunId,
-  ScenarioGraphDto,
-  ScenarioId,
+import {
+  RunApprovalDto,
+  type Contract,
+  type Json,
+  type RunHandleDto,
+  type RunId,
+  type ScenarioGraphDto,
+  type ScenarioId,
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import {
@@ -31,7 +32,13 @@ import {
   type RunView,
   type StepRow,
 } from "./runModel";
-import { RUN_CANCEL_FAILED, RUN_LOAD_FAILED, runErrorCopy } from "./runCopy";
+import {
+  APPROVAL_DECIDE_FAILED,
+  permissionCopy,
+  RUN_CANCEL_FAILED,
+  RUN_LOAD_FAILED,
+  runErrorCopy,
+} from "./runCopy";
 
 const OUTCOME_PHASES = { ok: "succeeded", failed: "failed", cancelled: "cancelled" } as const;
 
@@ -47,6 +54,8 @@ export default class ScenarioRunState {
   stripHeight = STRIP_HEIGHT_DEFAULT;
   starting = false;
   cancelling = false;
+  approval: RunApprovalDto | null = null;
+  deciding = false;
   error: string | null = null;
   loaded = false;
 
@@ -79,7 +88,47 @@ export default class ScenarioRunState {
   }
 
   get nodes(): ReadonlyMap<string, NodeRunState> {
-    return nodeStates(this.view);
+    const states = nodeStates(this.view);
+    const copy = permissionCopy(this.view?.code ?? null);
+    if (copy === null) return states;
+    return new Map(
+      [...states].map(([id, state]) => [
+        id,
+        state.status === "failed" ? { ...state, error: copy } : state,
+      ]),
+    );
+  }
+
+  stepError(step: RunStep): string | null {
+    if (step.status !== "failed") return step.error;
+    return permissionCopy(this.view?.code ?? null) ?? step.error;
+  }
+
+  async decide(approve: boolean, always = false): Promise<void> {
+    const view = this.view;
+    const approval = this.approval;
+    if (view === null || approval === null || this.deciding) return;
+    this.deciding = true;
+    try {
+      const id = view.runId as RunId;
+      if (approve) {
+        await this.ipc.call("runs.approve", { id, approvalId: approval.id, always });
+      } else {
+        await this.ipc.call("runs.deny", { id, approvalId: approval.id });
+      }
+      runInAction(() => {
+        if (this.approval?.id === approval.id) this.approval = null;
+      });
+    } catch (error: unknown) {
+      runInAction(() => {
+        this.error = runErrorCopy(error, APPROVAL_DECIDE_FAILED);
+        if (this.approval?.id === approval.id) this.approval = null;
+      });
+    } finally {
+      runInAction(() => {
+        this.deciding = false;
+      });
+    }
   }
 
   edges(graph: ScenarioGraphDto): ReadonlyMap<string, EdgeRunState> {
@@ -144,7 +193,13 @@ export default class ScenarioRunState {
         view = { ...view, retryOf: run.retryOfId ?? null };
         const phase = phaseOf(run.status);
         if (phase !== "running") {
-          view = { ...view, phase, finishedAt: run.finishedAt ?? null, error: run.error ?? null };
+          view = {
+            ...view,
+            phase,
+            finishedAt: run.finishedAt ?? null,
+            error: run.error ?? null,
+            code: run.outcome?.code ?? null,
+          };
         }
         this.view = view;
         this.loaded = true;
@@ -224,6 +279,7 @@ export default class ScenarioRunState {
         for (const step of seed) view = withStep(view, step);
         this.view = view;
         this.selectedStepId = null;
+        this.approval = null;
         this.starting = false;
         this.listen(handle.streamId);
       });
@@ -248,7 +304,15 @@ export default class ScenarioRunState {
     if (view === null || event.streamId !== view.streamId) return;
     if (event.type === "step") {
       const step = stepFromEvent(event.step);
-      if (step !== null) this.view = withStep(view, step);
+      if (step !== null) {
+        this.view = withStep(view, step);
+        if (step.status !== "running") this.approval = null;
+      }
+      return;
+    }
+    if (event.type === "approval") {
+      const approval = RunApprovalDto.safeParse(event.request);
+      if (approval.success) this.approval = approval.data;
       return;
     }
     if (event.type === "log") {
@@ -262,7 +326,9 @@ export default class ScenarioRunState {
         OUTCOME_PHASES[event.outcome.status],
         this.clock(),
         event.outcome.message ?? null,
+        event.outcome.code ?? null,
       );
+      this.approval = null;
       this.stop();
       this.focusFailure();
     }

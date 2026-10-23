@@ -35,6 +35,7 @@ export interface RunView {
   readonly startedAt: number;
   readonly finishedAt: number | null;
   readonly error: string | null;
+  readonly code: string | null;
   readonly retryOf: string | null;
 }
 
@@ -136,6 +137,7 @@ export function startView(runId: string, streamId: string, startedAt: number): R
     startedAt,
     finishedAt: null,
     error: null,
+    code: null,
     retryOf: null,
   };
 }
@@ -158,11 +160,12 @@ export function finishView(
   phase: Exclude<RunPhase, "running">,
   finishedAt: number,
   error: string | null,
+  code: string | null = null,
 ): RunView {
   const steps = view.steps.map((step) =>
     step.status === "running" ? { ...step, status: "cancelled" as const } : step,
   );
-  return { ...view, phase, finishedAt, error, steps };
+  return { ...view, phase, finishedAt, error, code, steps };
 }
 
 export function isNested(nodeId: string): boolean {

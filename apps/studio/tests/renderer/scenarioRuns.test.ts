@@ -40,7 +40,7 @@ import ScenarioRunState, {
   STRIP_HEIGHT_DEFAULT,
   STRIP_HEIGHT_MIN,
 } from "../../src/renderer/features/scenarios/ScenarioRunState.ts";
-import { itemsLabel } from "../../src/renderer/features/scenarios/runCopy.ts";
+import { APPROVAL_DENIED_COPY, itemsLabel } from "../../src/renderer/features/scenarios/runCopy.ts";
 
 const SCENARIO = "0199aa11-1111-7111-8111-111111111111" as ScenarioId;
 const RUN = "0199aa11-3333-7333-8333-333333333333" as RunId;
@@ -396,5 +396,57 @@ describe("run log strip height", () => {
     expect(state.stripHeight).toBe(420);
     state.setStripHeight(300.4, 420);
     expect(state.stripHeight).toBe(300);
+  });
+});
+
+describe("approvals during a scenario run", () => {
+  const request = {
+    id: "0199aa11-7777-7777-8777-777777777771",
+    subject: "knowledge.search",
+    scope: "scenario:s",
+    expiresAt: 99,
+  };
+
+  test("a pending approval is shown and answered through the runs channels", async () => {
+    const { state, emit, bridge } = rig();
+    const decisions: unknown[] = [];
+    bridge.handle("runs.approve", (input) => {
+      decisions.push({ approve: input });
+    });
+    bridge.handle("runs.deny", (input) => {
+      decisions.push({ deny: input });
+    });
+    await state.start(GRAPH);
+    emit(STREAM, { type: "approval", request });
+    expect(state.approval).toEqual(request);
+    await state.decide(true, true);
+    expect(decisions).toEqual([
+      { approve: { id: RUN, approvalId: "0199aa11-7777-7777-8777-777777777771", always: true } },
+    ]);
+    expect(state.approval).toBeNull();
+    emit(STREAM, {
+      type: "approval",
+      request: { ...request, id: "0199aa11-7777-7777-8777-777777777772" },
+    });
+    await state.decide(false);
+    expect(decisions[1]).toEqual({
+      deny: { id: RUN, approvalId: "0199aa11-7777-7777-8777-777777777772" },
+    });
+  });
+
+  test("a run that ends on a denied approval explains it in Russian on the failed step", async () => {
+    const { state, emit } = rig();
+    await state.start(GRAPH);
+    emit(STREAM, { type: "approval", request });
+    emit(STREAM, stepEvent("s1", "search", "failed", { error: "Approval denied" }));
+    emit(STREAM, {
+      type: "end",
+      outcome: { status: "failed", code: AppErrorCode.APPROVAL_DENIED, message: "Approval denied" },
+    });
+    expect(state.approval).toBeNull();
+    expect(state.nodes.get("search")?.error).toBe(APPROVAL_DENIED_COPY);
+    expect(state.selected === null ? null : state.stepError(state.selected)).toBe(
+      APPROVAL_DENIED_COPY,
+    );
   });
 });

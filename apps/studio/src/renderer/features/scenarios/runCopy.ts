@@ -50,6 +50,17 @@ export const OVERLAP_HINT =
 
 export const TOOL_CALL_LABEL = "Вызов инструмента";
 
+export const APPROVAL_DENIED_COPY = "Разрешение на действие не получено: запрос отклонён или истёк";
+export const PERMISSION_DENIED_COPY = "Инструмент запрещён настройками разрешений";
+export const APPROVAL_PROMPT = "Шаг ждёт разрешения на инструмент";
+export const APPROVAL_DECIDE_FAILED = "Не удалось передать решение по разрешению.";
+
+export function permissionCopy(code: string | null): string | null {
+  if (code === AppErrorCode.APPROVAL_DENIED) return APPROVAL_DENIED_COPY;
+  if (code === AppErrorCode.PERMISSION_DENIED) return PERMISSION_DENIED_COPY;
+  return null;
+}
+
 const HOST_WORDED = new Set<AppErrorCode>([
   AppErrorCode.VALIDATION_FAILED,
   AppErrorCode.CONFLICT,

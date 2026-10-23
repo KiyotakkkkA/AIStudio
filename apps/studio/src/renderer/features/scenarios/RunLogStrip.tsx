@@ -118,10 +118,11 @@ const StepDetail = observer(function StepDetail({ editor }: { readonly editor: S
   }
   if (run.tab === "logs") {
     const logs = stepLogs(run.view, step.nodeId);
+    const failure = run.stepError(step);
     return (
       <div className="flex flex-col gap-1.5 px-3.5 py-2.5 font-mono text-[11.5px] leading-relaxed">
-        {step.error === null ? null : <p className="m-0 text-err">{step.error}</p>}
-        {logs.length === 0 && step.error === null ? (
+        {failure === null ? null : <p className="m-0 font-sans text-err">{failure}</p>}
+        {logs.length === 0 && failure === null ? (
           <p className="m-0 font-sans text-main-500">{NO_STEP_LOGS}</p>
         ) : (
           logs.map((log, index) => (

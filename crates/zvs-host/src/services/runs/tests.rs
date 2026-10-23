@@ -565,7 +565,7 @@ async fn a_restart_fails_an_interrupted_approval_without_repeating_the_protected
 }
 
 #[tokio::test]
-async fn chat_runs_admit_their_own_generation_and_retrieval_without_asking() {
+async fn chat_and_scenario_runs_admit_their_own_generation_without_asking() {
     let database = temporary_database();
     let host = host(&database);
     let calls = Arc::new(AtomicUsize::new(0));
@@ -599,6 +599,20 @@ async fn chat_runs_admit_their_own_generation_and_retrieval_without_asking() {
     host.service.wait(&handle.id).await;
     assert_eq!(host.status(&handle.id), RunStatus::Succeeded);
     assert_eq!(calls.load(Ordering::SeqCst), 2);
+    let generation = host
+        .service
+        .start(
+            zvs_contract::parse(json!({
+                "kind": "scenario",
+                "subjectId": "s1",
+                "graph": { "nodes": [{ "id": "agent", "type": "llm.generate" }] }
+            }))
+            .expect("a start input"),
+        )
+        .expect("starts");
+    host.service.wait(&generation.id).await;
+    assert_eq!(host.status(&generation.id), RunStatus::Succeeded);
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
     let job = host
         .service
         .start(
