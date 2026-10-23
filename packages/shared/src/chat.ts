@@ -32,6 +32,7 @@ export type ChatCitationDto = z.infer<typeof ChatCitationDto>;
 export const CHAT_TOOL_CALL_STATUSES = [
   "running",
   "awaiting-approval",
+  "awaiting-answer",
   "succeeded",
   "failed",
   "refused",

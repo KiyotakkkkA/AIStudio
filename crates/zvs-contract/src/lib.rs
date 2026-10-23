@@ -21,6 +21,7 @@ pub mod notifications;
 pub mod primitives;
 pub mod process;
 pub mod providers;
+pub mod questions;
 pub mod runs;
 pub mod runtimes;
 pub mod secrets;
@@ -125,6 +126,10 @@ pub use providers::{
     ProviderKind, ProviderListFilter, ProviderRef, ProviderSettingsDto, ProviderStatus,
     ProviderSummaryDto, ProvidersGetInput, ProvidersListOutput, ProvidersRemoveOutput,
     SetDefaultModelInput, UpdateProviderInput,
+};
+pub use questions::{
+    ChatAnswerInput, ChatSkipInput, QUESTIONS_MAX, QuestionAnswerDto, QuestionDto, QuestionKind,
+    QuestionOptionDto, QuestionRecordDto, QuestionRequestDto,
 };
 pub use runs::{
     DEFAULT_CONCURRENCY, DEFAULT_RUN_LIST_LIMIT, GRAPH_ALLOWED_TOOLS_MAX, GRAPH_MAX_NODES,

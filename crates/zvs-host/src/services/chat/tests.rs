@@ -514,7 +514,8 @@ async fn a_storeless_turn_returns_before_tokens_skips_retrieval_and_persists_usa
     assert!(answer.tokens_out > 0);
     let request = &harness.driver.requests()[0];
     assert_eq!(request.model, "fake-model");
-    assert_eq!(request.system.as_deref(), Some("Be concise."));
+    assert_eq!(request.system, Some(asking("Be concise.")));
+    assert_eq!(request.tools, [ask_spec()]);
     assert_eq!(request.messages, [ChatMessage::user("First question")]);
     let sequence: Vec<u64> = harness
         .events()
@@ -705,7 +706,7 @@ async fn windowing_keeps_the_system_prompt_and_current_turn_logs_trimming_and_bo
     }
     within(harness.turn(created, "current turn")).await;
     let request = harness.driver.requests().pop().expect("a request");
-    assert_eq!(request.system.as_deref(), Some("Always be helpful."));
+    assert_eq!(request.system, Some(asking("Always be helpful.")));
     assert_eq!(
         request.messages.last(),
         Some(&ChatMessage::user("current turn"))
@@ -1429,11 +1430,16 @@ async fn context_breaks_down_the_prompt_and_history_the_next_turn_will_carry() {
     assert_eq!(draft.context_window, 1024);
     assert_eq!(draft.reserved_output, 128);
     assert_eq!(draft.system, as_u64(tokens("Always be helpful.") + 8));
+    assert_eq!((draft.history, draft.history_messages), (0, 0));
     assert_eq!(
-        (draft.tools, draft.history, draft.history_messages),
-        (0, 0, 0)
+        draft
+            .tool_items
+            .iter()
+            .map(|item| item.key.as_str())
+            .collect::<Vec<_>>(),
+        [ASK_TOOL]
     );
-    assert_eq!(draft.total, draft.system);
+    assert_eq!(draft.total, draft.system + draft.tools);
 
     let created = harness.create(CreateConversationInput {
         system_prompt: Some("Always be helpful.".to_owned()),
@@ -1458,7 +1464,25 @@ async fn context_breaks_down_the_prompt_and_history_the_next_turn_will_carry() {
         measured.history,
         as_u64(tokens("first question") + tokens("Hello world") + 16)
     );
-    assert_eq!(measured.total, measured.system + measured.history);
+    assert_eq!(
+        measured.total,
+        measured.system + measured.tools + measured.history
+    );
+}
+
+pub(super) fn ask_spec() -> crate::drivers::ai::ToolSpec {
+    tool_specs(&[ask_tool(&[])]).remove(0)
+}
+
+pub(super) fn asking(system: &str) -> String {
+    format!(
+        "{system}
+
+{}
+
+{TOOL_RESULTS_INSTRUCTION}",
+        ask_section(&[ask_tool(&[])])
+    )
 }
 
 fn as_u64(value: i64) -> u64 {

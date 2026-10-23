@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use zvs_contract::{
-    AppError, AppErrorCode, BindFolderInput, ChatContextInput, ChatEvalInput, ChatSendInput,
-    ConversationRef, CreateConversationInput, PickFolderResultDto, RenameConversationInput,
-    RunIdInput, TruncateConversationInput, UpdateConversationRelationsInput,
-    UpdateConversationRetrievalInput, UpdateConversationStoresInput, UpdateConversationToolsInput,
-    VectorSourceKind,
+    AppError, AppErrorCode, BindFolderInput, ChatAnswerInput, ChatContextInput, ChatEvalInput,
+    ChatSendInput, ChatSkipInput, ConversationRef, CreateConversationInput, PickFolderResultDto,
+    RenameConversationInput, RunIdInput, TruncateConversationInput,
+    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    UpdateConversationStoresInput, UpdateConversationToolsInput, VectorSourceKind,
 };
 
 use super::IpcServer;
@@ -135,6 +135,25 @@ pub fn register(server: &mut IpcServer) {
             |services: Arc<Services>, input: RunIdInput| async move {
                 services.chat.cancel(&input.id).await?;
                 Ok::<(), AppError>(())
+            },
+        )
+        .handle(
+            "chat.answer",
+            |services: Arc<Services>, input: ChatAnswerInput| async move {
+                services.runs.questions().answer(
+                    &input.id.to_string(),
+                    &input.request_id,
+                    &input.answers,
+                )
+            },
+        )
+        .handle(
+            "chat.skip",
+            |services: Arc<Services>, input: ChatSkipInput| async move {
+                services
+                    .runs
+                    .questions()
+                    .skip(&input.id.to_string(), &input.request_id)
             },
         );
 }

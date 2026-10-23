@@ -3,6 +3,7 @@ import { DeltaKind } from "../ai.js";
 import { AppErrorCode } from "../errors/AppErrorCode.js";
 import { StreamId } from "../primitives/branded.js";
 import { Timestamp } from "../primitives/time.js";
+import { QuestionRequestDto } from "../questions.js";
 
 export const EVENT_CHANNEL = "zvs:events";
 
@@ -45,6 +46,7 @@ export const HostEvent = z.discriminatedUnion("type", [
   z.object({ ...envelope, type: z.literal("step"), step: StepEventDto }),
   z.object({ ...envelope, type: z.literal("log"), line: LogLineDto }),
   z.object({ ...envelope, type: z.literal("approval"), request: ApprovalRequestDto }),
+  z.object({ ...envelope, type: z.literal("question"), request: QuestionRequestDto }),
   z.object({ ...envelope, type: z.literal("end"), outcome: RunOutcomeDto }),
 ]);
 export type HostEvent = z.infer<typeof HostEvent>;

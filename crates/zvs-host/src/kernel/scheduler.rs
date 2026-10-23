@@ -9,16 +9,17 @@ use futures::{FutureExt, StreamExt};
 use serde_json::{Map, Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, ApprovalRequestDto, GraphBinding, GraphNode, HostEventDraft, RunId,
-    RunOutcomeDto, RunOutcomeStatus, RunStatus, StepEventDto, StepStatus, Timestamp, ToolTier,
-    Validate, log_line,
+    AppError, AppErrorCode, ApprovalRequestDto, GraphBinding, GraphNode, HostEventDraft,
+    QuestionRequestDto, RunId, RunOutcomeDto, RunOutcomeStatus, RunStatus, StepEventDto,
+    StepStatus, Timestamp, ToolTier, Validate, log_line,
 };
 
 use super::registry::NodeRegistry;
 use super::stream::RunStream;
 use super::types::{
-    AdmissionOrigin, ApprovalDecision, ApprovalObserver, KernelServices, PermissionRequirement,
-    StepContext, StepLink, ToolStepFuture, ToolStepRequest, ToolStepResult, cancelled,
+    AdmissionOrigin, ApprovalDecision, ApprovalObserver, KernelServices, NO_QUESTION_SERVICE,
+    PermissionRequirement, QuestionOutcome, StepContext, StepLink, ToolStepFuture, ToolStepRequest,
+    ToolStepResult, cancelled,
 };
 use crate::data::repositories::RunPatch;
 use crate::data::schema::{RunRow, StepRow};
@@ -47,6 +48,15 @@ pub type ApprovalHook = Arc<
         + Sync,
 >;
 
+pub type QuestionHook = Arc<
+    dyn Fn(
+            QuestionRequestDto,
+            CancellationToken,
+        ) -> BoxFuture<'static, Result<QuestionOutcome, AppError>>
+        + Send
+        + Sync,
+>;
+
 pub type AdmitHook = Arc<
     dyn Fn(
             PermissionRequirement,
@@ -65,6 +75,7 @@ pub struct SchedulerOptions {
     pub grace: Duration,
     pub logger: SharedLogger,
     pub approval: Option<ApprovalHook>,
+    pub questions: Option<QuestionHook>,
     pub admit: Option<AdmitHook>,
 }
 
@@ -88,7 +99,7 @@ impl Finish {
 }
 
 struct State {
-    pending_approvals: usize,
+    pending_gates: usize,
     completed: HashMap<String, StepRow>,
     attempts: HashMap<String, i64>,
     latest: HashMap<String, StepRow>,
@@ -163,7 +174,7 @@ impl Scheduler {
             terminal: AtomicBool::new(false),
             finishing: AtomicBool::new(false),
             state: Mutex::new(State {
-                pending_approvals: 0,
+                pending_gates: 0,
                 completed: HashMap::new(),
                 attempts: HashMap::new(),
                 latest: HashMap::new(),
@@ -398,7 +409,7 @@ impl Scheduler {
             let mut next: Option<Timestamp> = None;
             for node in &nodes {
                 let mut state = self.state();
-                if state.pending_approvals > 0 || running.len() >= concurrency {
+                if state.pending_gates > 0 || running.len() >= concurrency {
                     break;
                 }
                 if state.completed.contains_key(&node.id)
@@ -761,11 +772,11 @@ impl Scheduler {
         })
     }
 
-    fn approval_finished(&self, live: &AtomicBool) -> Result<(), AppError> {
+    fn gate_finished(&self, live: &AtomicBool) -> Result<(), AppError> {
         let remaining = {
             let mut state = self.state();
-            state.pending_approvals = state.pending_approvals.saturating_sub(1);
-            state.pending_approvals
+            state.pending_gates = state.pending_gates.saturating_sub(1);
+            state.pending_gates
         };
         if live.load(Ordering::SeqCst) && !self.cancel.is_cancelled() && remaining == 0 {
             self.set_status(RunStatus::Running)?;
@@ -832,6 +843,13 @@ impl StepLink for ObservedLink {
     fn invoke_tool(&self, request: ToolStepRequest) -> Option<ToolStepFuture> {
         self.inner.invoke_tool(request)
     }
+
+    fn ask_user(
+        &self,
+        request: QuestionRequestDto,
+    ) -> BoxFuture<'static, Result<QuestionOutcome, AppError>> {
+        self.inner.ask_user(request)
+    }
 }
 
 impl StepLink for NodeLink {
@@ -862,7 +880,7 @@ impl StepLink for NodeLink {
                     NO_APPROVAL_SERVICE,
                 ));
             };
-            scheduler.state().pending_approvals += 1;
+            scheduler.state().pending_gates += 1;
             let decision = async {
                 scheduler.set_status(RunStatus::Blocked)?;
                 scheduler.emit(HostEventDraft::Approval {
@@ -871,8 +889,37 @@ impl StepLink for NodeLink {
                 approval(request, scheduler.cancel.clone()).await
             }
             .await;
-            scheduler.approval_finished(&live)?;
+            scheduler.gate_finished(&live)?;
             decision
+        }
+        .boxed()
+    }
+
+    fn ask_user(
+        &self,
+        request: QuestionRequestDto,
+    ) -> BoxFuture<'static, Result<QuestionOutcome, AppError>> {
+        let scheduler = Arc::clone(&self.scheduler);
+        let live = Arc::clone(&self.live);
+        async move {
+            if !live.load(Ordering::SeqCst) || scheduler.cancel.is_cancelled() {
+                return Err(cancelled());
+            }
+            let Some(questions) = scheduler.options.questions.clone() else {
+                return Err(AppError::new(AppErrorCode::Conflict, NO_QUESTION_SERVICE));
+            };
+            request.validate()?;
+            scheduler.state().pending_gates += 1;
+            let outcome = async {
+                scheduler.set_status(RunStatus::Blocked)?;
+                scheduler.emit(HostEventDraft::Question {
+                    request: request.clone(),
+                })?;
+                questions(request, scheduler.cancel.clone()).await
+            }
+            .await;
+            scheduler.gate_finished(&live)?;
+            outcome
         }
         .boxed()
     }

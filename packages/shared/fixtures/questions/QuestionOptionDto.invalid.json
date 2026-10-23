@@ -1,0 +1,17 @@
+[
+  {
+    "name": "blank label",
+    "value": {
+      "id": "o1",
+      "label": "   ",
+      "recommended": false
+    }
+  },
+  {
+    "name": "missing recommended",
+    "value": {
+      "id": "o1",
+      "label": "DOCX"
+    }
+  }
+]

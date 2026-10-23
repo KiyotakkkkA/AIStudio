@@ -1,0 +1,107 @@
+[
+  {
+    "name": "no questions",
+    "value": {
+      "id": "0199aa11-2222-7222-8222-222222222222",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "questions": []
+    }
+  },
+  {
+    "name": "seven questions",
+    "value": {
+      "id": "0199aa11-2222-7222-8222-222222222222",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "questions": [
+        {
+          "id": "q1",
+          "title": "Название отчёта",
+          "kind": "text",
+          "options": [],
+          "allowOther": false
+        },
+        {
+          "id": "q2",
+          "title": "Название отчёта",
+          "kind": "text",
+          "options": [],
+          "allowOther": false
+        },
+        {
+          "id": "q3",
+          "title": "Название отчёта",
+          "kind": "text",
+          "options": [],
+          "allowOther": false
+        },
+        {
+          "id": "q4",
+          "title": "Название отчёта",
+          "kind": "text",
+          "options": [],
+          "allowOther": false
+        },
+        {
+          "id": "q5",
+          "title": "Название отчёта",
+          "kind": "text",
+          "options": [],
+          "allowOther": false
+        },
+        {
+          "id": "q6",
+          "title": "Название отчёта",
+          "kind": "text",
+          "options": [],
+          "allowOther": false
+        },
+        {
+          "id": "q7",
+          "title": "Название отчёта",
+          "kind": "text",
+          "options": [],
+          "allowOther": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate question ids",
+    "value": {
+      "id": "0199aa11-2222-7222-8222-222222222222",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "questions": [
+        {
+          "id": "q3",
+          "title": "Название отчёта",
+          "kind": "text",
+          "options": [],
+          "allowOther": false
+        },
+        {
+          "id": "q3",
+          "title": "Название отчёта",
+          "kind": "text",
+          "options": [],
+          "allowOther": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "a request id that is not a uuid",
+    "value": {
+      "id": "r1",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "questions": [
+        {
+          "id": "q3",
+          "title": "Название отчёта",
+          "kind": "text",
+          "options": [],
+          "allowOther": false
+        }
+      ]
+    }
+  }
+]

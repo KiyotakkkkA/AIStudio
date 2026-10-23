@@ -1,0 +1,19 @@
+[
+  {
+    "name": "recommended with a description",
+    "value": {
+      "id": "o1",
+      "label": "DOCX",
+      "description": "Редактируемый документ",
+      "recommended": true
+    }
+  },
+  {
+    "name": "plain",
+    "value": {
+      "id": "o2",
+      "label": "PDF",
+      "recommended": false
+    }
+  }
+]

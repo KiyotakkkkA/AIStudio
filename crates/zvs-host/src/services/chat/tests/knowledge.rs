@@ -155,7 +155,12 @@ async fn in_agentic_mode_a_greeting_searches_nothing_but_the_knowledge_tools_are
         .collect();
     assert_eq!(
         names,
-        ["knowledge_list", "knowledge_read", "knowledge_search"]
+        [
+            "knowledge_list",
+            "knowledge_read",
+            "knowledge_search",
+            "ask_user"
+        ]
     );
     let search = requests[0]
         .tools
@@ -328,7 +333,7 @@ async fn auto_mode_searches_up_front_and_offers_no_knowledge_tools() {
     let conversation = test.conversation(RetrievalMode::Auto);
     within(test.harness.turn(conversation, "Tell me about leave")).await;
     assert_eq!(test.queries().len(), 1);
-    assert!(test.driver.requests()[0].tools.is_empty());
+    assert_eq!(test.driver.requests()[0].tools, [super::ask_spec()]);
     assert_eq!(test.harness.last(conversation).citations.len(), 1);
 }
 

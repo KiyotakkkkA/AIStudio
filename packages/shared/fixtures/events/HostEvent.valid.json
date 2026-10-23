@@ -74,6 +74,39 @@
     }
   },
   {
+    "name": "question",
+    "value": {
+      "streamId": "0199aa11-1111-7111-8111-111111111111",
+      "seq": 4,
+      "ts": 1700000000000,
+      "type": "question",
+      "request": {
+        "id": "0199aa11-2222-7222-8222-222222222222",
+        "runId": "0199aa11-1111-7111-8111-111111111111",
+        "questions": [
+          {
+            "id": "q1",
+            "title": "Формат отчёта",
+            "kind": "single",
+            "options": [
+              {
+                "id": "o1",
+                "label": "DOCX",
+                "recommended": true
+              },
+              {
+                "id": "o2",
+                "label": "PDF",
+                "recommended": false
+              }
+            ],
+            "allowOther": false
+          }
+        ]
+      }
+    }
+  },
+  {
     "name": "end ok",
     "value": {
       "streamId": "0199aa11-1111-7111-8111-111111111111",

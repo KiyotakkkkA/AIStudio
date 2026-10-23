@@ -665,6 +665,38 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::process::ProcessApprovalDto>,
     ),
     (
+        "questions/QuestionKind",
+        round_trip::<zvs_contract::questions::QuestionKind>,
+    ),
+    (
+        "questions/QuestionOptionDto",
+        round_trip::<zvs_contract::questions::QuestionOptionDto>,
+    ),
+    (
+        "questions/QuestionDto",
+        round_trip::<zvs_contract::questions::QuestionDto>,
+    ),
+    (
+        "questions/QuestionRequestDto",
+        round_trip::<zvs_contract::questions::QuestionRequestDto>,
+    ),
+    (
+        "questions/QuestionAnswerDto",
+        round_trip::<zvs_contract::questions::QuestionAnswerDto>,
+    ),
+    (
+        "questions/QuestionRecordDto",
+        round_trip::<zvs_contract::questions::QuestionRecordDto>,
+    ),
+    (
+        "questions/ChatAnswerInput",
+        round_trip::<zvs_contract::questions::ChatAnswerInput>,
+    ),
+    (
+        "questions/ChatSkipInput",
+        round_trip::<zvs_contract::questions::ChatSkipInput>,
+    ),
+    (
         "notifications/NotificationTargetDto",
         round_trip::<zvs_contract::notifications::NotificationTargetDto>,
     ),
@@ -1171,7 +1203,9 @@ fn every_host_event_variant_and_outcome_has_a_fixture() {
         .iter()
         .filter_map(|value| value["type"].as_str())
         .collect();
-    for variant in ["token", "progress", "step", "log", "approval", "end"] {
+    for variant in [
+        "token", "progress", "step", "log", "approval", "question", "end",
+    ] {
         assert!(
             types.contains(variant),
             "no fixture for the {variant} event"

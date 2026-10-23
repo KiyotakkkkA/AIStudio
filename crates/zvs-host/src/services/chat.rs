@@ -17,11 +17,15 @@ use zvs_contract::{
     CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DeltaKind, DocumentId,
     GRAPH_EXPANSION_DEFAULT_MAX, GraphDirection, GraphExpansionDocument, GraphNeighborhood,
     GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId, MessageRole,
-    ProviderCapability, ProviderId, RetrievalMode, RunGraph, RunHandleDto, RunId, RunKind,
-    RunStatus, StartRunInput, ToolListFilter, ToolMode, ToolTier, Validate, VectorSearchHitDto,
-    VectorStoreId, log_line, merge_graph_neighbors, model_tool_support, resolve_tool_mode,
+    ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph, RunHandleDto,
+    RunId, RunKind, RunStatus, StartRunInput, ToolListFilter, ToolMode, ToolTier, Validate,
+    VectorSearchHitDto, VectorStoreId, log_line, merge_graph_neighbors, model_tool_support,
+    resolve_tool_mode,
 };
 
+use super::chat_ask::{
+    ASK_MALFORMED, ASK_ONCE, ASK_TOOL, answers_text, ask_request, ask_section, ask_tool,
+};
 use super::chat_history::{
     MESSAGE_OVERHEAD, RelatedSource, RetrievedSource, estimate_tokens, measure_context, tokens,
     window_chat_history, with_selections,
@@ -49,8 +53,8 @@ use crate::kernel::knowledge_nodes::{
 };
 use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateOutput, GenerateRole};
 use crate::kernel::{
-    ApprovalDecision, NodeDef, NodeRegistry, PermissionRequirement, RunObserver, StepContext,
-    ToolStepRequest,
+    ApprovalDecision, NodeDef, NodeRegistry, PermissionRequirement, QuestionOutcome, RunObserver,
+    StepContext, ToolStepRequest,
 };
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
@@ -1081,7 +1085,7 @@ impl NodeDef for PrepareNode {
             }
         }
         let guidance = inner.mcp_guidance(&mut enabled, &registered)?;
-        let offered = offered_tools(&enabled, &registered);
+        let mut offered = offered_tools(&enabled, &registered);
         let skill_note =
             if !skill_entries.is_empty() && offered.iter().any(|tool| tool.key == SKILL_LOAD) {
                 catalogue_text(&skill_entries, &offered)
@@ -1174,8 +1178,12 @@ impl NodeDef for PrepareNode {
                 )?)
             })?;
         }
+        if tools_usable {
+            offered.push(ask_tool(&offered));
+        }
         let files = file_tools_section(&offered);
         let processes = process_tools_section(&offered);
+        let asking = ask_section(&offered);
         let prompt = [
             details.system_prompt.clone(),
             prompt,
@@ -1184,6 +1192,7 @@ impl NodeDef for PrepareNode {
             workspace,
             files,
             processes,
+            asking,
         ]
         .into_iter()
         .filter(|part| !part.trim().is_empty())
@@ -1499,6 +1508,59 @@ impl GenerateChatNode {
                 None,
             )));
         };
+        if tool.key == ASK_TOOL {
+            let arguments = calls.lock().unwrap_or_else(PoisonError::into_inner)[index]
+                .arguments
+                .clone();
+            let request = match ask_request(
+                &arguments,
+                context.run_id,
+                ConversationId::parse(options.conversation),
+            ) {
+                Ok(request) => request,
+                Err(problem) => {
+                    return Ok(plain(settle(
+                        ChatToolCallStatus::Failed,
+                        Some(ASK_MALFORMED),
+                        Some(problem),
+                    )));
+                }
+            };
+            let record = |outcome: Option<&QuestionOutcome>| {
+                serde_json::to_value(QuestionRecordDto {
+                    request: request.clone(),
+                    answers: match outcome {
+                        Some(QuestionOutcome::Answered(answers)) => answers.clone(),
+                        _ => Vec::new(),
+                    },
+                    skipped: outcome == Some(&QuestionOutcome::Skipped),
+                })
+                .ok()
+            };
+            {
+                let mut guard = calls.lock().unwrap_or_else(PoisonError::into_inner);
+                guard[index].status = ChatToolCallStatus::AwaitingAnswer;
+                guard[index].meta = record(None);
+            }
+            inner.save_tool_calls(context, assistant_id, calls);
+            return match context.ask_user(request.clone()).await {
+                Ok(outcome) => {
+                    calls.lock().unwrap_or_else(PoisonError::into_inner)[index].meta =
+                        record(Some(&outcome));
+                    Ok(plain(settle(
+                        ChatToolCallStatus::Succeeded,
+                        None,
+                        Some(answers_text(&request, &outcome)),
+                    )))
+                }
+                Err(error) if context.is_cancelled() => Err(error),
+                Err(error) => Ok(plain(settle(
+                    ChatToolCallStatus::Failed,
+                    Some(&error.message),
+                    None,
+                ))),
+            };
+        }
         let mut arguments = calls.lock().unwrap_or_else(PoisonError::into_inner)[index]
             .arguments
             .clone();
@@ -1739,6 +1801,7 @@ impl GenerateChatNode {
                         .with_tool_calls(output.tool_calls.clone()),
                 );
                 let mut pending = Vec::with_capacity(output.tool_calls.len());
+                let mut asked = false;
                 for call in output.tool_calls {
                     let tool = by_name.get(call.name.as_str()).copied();
                     let index = {
@@ -1763,8 +1826,16 @@ impl GenerateChatNode {
                         });
                         guard.len() - 1
                     };
-                    let refuse = (last || executed >= CHAT_TOOL_CALLS).then_some(BUDGET_EXHAUSTED);
-                    if refuse.is_none() {
+                    let asking = tool.is_some_and(|tool| tool.key == ASK_TOOL);
+                    let refuse = if last || executed >= CHAT_TOOL_CALLS {
+                        Some(BUDGET_EXHAUSTED)
+                    } else if asking && asked {
+                        Some(ASK_ONCE)
+                    } else {
+                        None
+                    };
+                    asked |= asking;
+                    if refuse.is_none() && !asking {
                         executed += 1;
                     }
                     pending.push(PendingCall {
@@ -1844,7 +1915,9 @@ impl GenerateChatNode {
                 for call in guard.iter_mut() {
                     if matches!(
                         call.status,
-                        ChatToolCallStatus::Running | ChatToolCallStatus::AwaitingApproval
+                        ChatToolCallStatus::Running
+                            | ChatToolCallStatus::AwaitingApproval
+                            | ChatToolCallStatus::AwaitingAnswer
                     ) {
                         call.status = ChatToolCallStatus::Cancelled;
                         call.error = Some(if context.is_cancelled() {
@@ -2375,18 +2448,22 @@ impl ChatService {
             None => Vec::new(),
         };
         let guidance = self.inner.mcp_guidance(&mut enabled, &registered)?;
-        let offered = offered_tools(&enabled, &registered);
+        let mut offered = offered_tools(&enabled, &registered);
         let folder = details.and_then(|details| details.working_folder.as_deref());
         let workspace = if offered.is_empty() && folder.is_none() {
             String::new()
         } else {
             working_folder_section(folder, None)
         };
+        if model.supports_tools != Some(false) {
+            offered.push(ask_tool(&offered));
+        }
         let tool_block = [
             guidance,
             workspace,
             file_tools_section(&offered),
             process_tools_section(&offered),
+            ask_section(&offered),
             if offered.is_empty() {
                 String::new()
             } else {

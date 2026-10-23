@@ -34,6 +34,7 @@ const fn default_retrieval_mode() -> RetrievalMode {
 wire_enum!(ChatToolCallStatus {
     Running => "running",
     AwaitingApproval => "awaiting-approval",
+    AwaitingAnswer => "awaiting-answer",
     Succeeded => "succeeded",
     Failed => "failed",
     Refused => "refused",
@@ -816,6 +817,7 @@ mod tests {
             json!([
                 "running",
                 "awaiting-approval",
+                "awaiting-answer",
                 "succeeded",
                 "failed",
                 "refused",

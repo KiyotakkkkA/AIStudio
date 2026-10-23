@@ -28,6 +28,7 @@ use crate::kernel::types::CANCELLED_MESSAGE;
 use crate::kernel::{
     FnNode, NodeRegistry, PermissionRequirement, StepContext, register_core_nodes,
 };
+use crate::services::chat_ask::{ASK_MALFORMED, ASK_ONCE, ASK_SKIPPED, ASK_TOOL};
 use crate::services::chat_tools::{
     CHAT_TOOL_CALLS, CHAT_TOOL_ROUNDS, TOOL_BUDGET_NOTE, TOOL_RESULTS_INSTRUCTION,
 };
@@ -374,11 +375,14 @@ async fn a_native_call_is_admitted_run_as_its_own_step_and_fed_back_fenced_befor
     let requests = test.driver.requests();
     assert_eq!(
         requests[0].tools,
-        [ToolSpec {
-            name: "demo__lookup".to_owned(),
-            description: "Look a fact up".to_owned(),
-            parameters: json!({ "type": "object", "properties": { "query": { "type": "string" } } }),
-        }]
+        [
+            ToolSpec {
+                name: "demo__lookup".to_owned(),
+                description: "Look a fact up".to_owned(),
+                parameters: json!({ "type": "object", "properties": { "query": { "type": "string" } } }),
+            },
+            super::ask_spec()
+        ]
     );
     assert!(
         requests[0]
@@ -447,18 +451,11 @@ async fn only_tools_picked_for_the_conversation_and_not_off_are_offered() {
     let test = Loop::new();
     test.turn(test.conversation(&[]), "Question").await;
     let requests = test.driver.requests();
-    assert!(requests[0].tools.is_empty());
-    assert!(
-        !requests[0]
-            .system
-            .clone()
-            .unwrap_or_default()
-            .contains(TOOL_RESULTS_INSTRUCTION)
-    );
+    assert_eq!(requests[0].tools, [super::ask_spec()]);
     test.set_tier(&test.lookup, ToolTier::Off);
     test.turn(test.conversation(&["demo.lookup"]), "Question")
         .await;
-    assert!(test.driver.requests()[1].tools.is_empty());
+    assert_eq!(test.driver.requests()[1].tools, [super::ask_spec()]);
 }
 
 #[tokio::test]
@@ -493,7 +490,7 @@ async fn an_off_tool_is_refused_at_admission_even_when_it_was_offered_at_the_sta
     assert_eq!(assistant.content, "Done.");
 
     test.turn(created, "Question").await;
-    assert!(test.driver.requests()[2].tools.is_empty());
+    assert_eq!(test.driver.requests()[2].tools, [super::ask_spec()]);
 }
 
 async fn awaiting_approval(test: &Loop, created: ConversationId) -> String {
@@ -865,8 +862,9 @@ async fn context_counts_the_offered_tools_one_by_one() {
             enabled_tools: None,
         })
         .expect("measures");
-    assert_eq!(measured.tool_items.len(), 1);
+    assert_eq!(measured.tool_items.len(), 2);
     assert_eq!(measured.tool_items[0].key, "demo.lookup");
+    assert_eq!(measured.tool_items[1].key, ASK_TOOL);
     assert!(measured.tool_items[0].tokens > 0);
     assert!(measured.tools > measured.tool_items[0].tokens);
 
@@ -882,7 +880,13 @@ async fn context_counts_the_offered_tools_one_by_one() {
             enabled_tools: Some(Vec::new()),
         })
         .expect("measures without tools");
-    assert_eq!((none.tools, none.tool_items.len()), (0, 0));
+    assert_eq!(
+        none.tool_items
+            .iter()
+            .map(|item| item.key.as_str())
+            .collect::<Vec<_>>(),
+        [ASK_TOOL]
+    );
 }
 
 #[tokio::test]
@@ -939,7 +943,14 @@ async fn an_offered_mcp_tool_brings_its_server_instructions_and_resource_reader(
         .iter()
         .map(|tool| tool.name.as_str())
         .collect();
-    assert_eq!(names, ["testix__importQuestions", "testix__read_resource"]);
+    assert_eq!(
+        names,
+        [
+            "testix__importQuestions",
+            "testix__read_resource",
+            "ask_user"
+        ]
+    );
     let system = request.system.clone().unwrap_or_default();
     assert!(system.contains("Read testix://instructions/questions before importing."));
     assert!(system.contains("«Testix»"));
@@ -1018,7 +1029,10 @@ async fn a_turn_lists_the_skills_and_offers_skill_load_even_when_the_conversatio
         .map(|tool| tool.name.as_str())
         .collect();
     offered.sort_unstable();
-    assert_eq!(offered, ["skill__load", "skill__read", "skill__script"]);
+    assert_eq!(
+        offered,
+        ["ask_user", "skill__load", "skill__read", "skill__script"]
+    );
     let system = requests[0].system.clone().unwrap_or_default();
     assert!(system.contains("call skill__load with its key"), "{system}");
     assert!(system.contains(
@@ -1075,4 +1089,184 @@ async fn read_only_calls_of_one_round_overlap_and_return_in_call_order() {
             .iter()
             .all(|call| call.status == ChatToolCallStatus::Succeeded)
     );
+}
+
+fn format_question() -> Value {
+    json!({ "questions": [{
+        "title": "Формат?",
+        "kind": "single",
+        "options": [{ "label": "DOCX", "recommended": true }, { "label": "PDF" }]
+    }] })
+}
+
+async fn awaiting_answer(test: &Loop, created: ConversationId) -> zvs_contract::QuestionRecordDto {
+    let mut record = None;
+    eventually(|| {
+        record = test
+            .harness
+            .last(created)
+            .tool_calls
+            .first()
+            .filter(|call| call.status == ChatToolCallStatus::AwaitingAnswer)
+            .and_then(|call| call.meta.clone())
+            .and_then(|meta| serde_json::from_value(meta).ok());
+        record.is_some()
+    })
+    .await;
+    record.expect("a question record")
+}
+
+#[tokio::test]
+async fn asking_the_user_blocks_the_turn_and_the_answers_return_as_the_call_result() {
+    let test = Loop::new();
+    test.driver
+        .round(|_| vec![call("ask_user", &format_question())]);
+    test.driver.fallback(|_| vec![text("PDF it is.")]);
+    let created = test.conversation(&[]);
+    let handle = test.harness.send(created, "Make a report");
+
+    let record = within(awaiting_answer(&test, created)).await;
+    assert_eq!(test.harness.status(&handle), RunStatus::Blocked);
+    assert!(record.answers.is_empty() && !record.skipped);
+    assert_eq!(record.request.questions[0].options[0].label, "DOCX");
+    let emitted = test
+        .harness
+        .events()
+        .into_iter()
+        .find_map(|event| match event.body {
+            HostEventDraft::Question { request } => Some(request),
+            _ => None,
+        });
+    assert_eq!(emitted.as_ref(), Some(&record.request));
+    let questions = test.harness.runs.questions();
+    assert_eq!(questions.pending(&handle.id.to_string()).len(), 1);
+    questions
+        .answer(
+            &handle.id.to_string(),
+            &record.request.id,
+            &[zvs_contract::QuestionAnswerDto {
+                question_id: "q1".to_owned(),
+                selected: vec!["o2".to_owned()],
+                text: None,
+            }],
+        )
+        .expect("answers");
+    within(test.harness.runs.wait(&handle.id)).await;
+
+    assert_eq!(test.harness.status(&handle), RunStatus::Succeeded);
+    let assistant = test.harness.last(created);
+    assert_eq!(assistant.content, "PDF it is.");
+    let call = &assistant.tool_calls[0];
+    assert_eq!(call.key, ASK_TOOL);
+    assert_eq!(call.status, ChatToolCallStatus::Succeeded);
+    let answered: zvs_contract::QuestionRecordDto =
+        serde_json::from_value(call.meta.clone().expect("meta")).expect("a record");
+    assert_eq!(answered.answers[0].selected, ["o2"]);
+    assert!(test.tool_steps(&handle).is_empty());
+    assert!(
+        test.driver.requests()[1]
+            .messages
+            .last()
+            .is_some_and(|message| message
+                .content
+                .contains("The user answered:\n1. Формат?\n   PDF"))
+    );
+}
+
+#[tokio::test]
+async fn a_skipped_question_lets_the_turn_continue_on_assumptions() {
+    let test = Loop::new();
+    test.driver
+        .round(|_| vec![call("ask_user", &format_question())]);
+    let created = test.conversation(&[]);
+    let handle = test.harness.send(created, "Make a report");
+    let record = within(awaiting_answer(&test, created)).await;
+    test.harness
+        .runs
+        .questions()
+        .skip(&handle.id.to_string(), &record.request.id)
+        .expect("skips");
+    within(test.harness.runs.wait(&handle.id)).await;
+
+    assert_eq!(test.harness.status(&handle), RunStatus::Succeeded);
+    let call = &test.harness.last(created).tool_calls[0];
+    let skipped: zvs_contract::QuestionRecordDto =
+        serde_json::from_value(call.meta.clone().expect("meta")).expect("a record");
+    assert!(skipped.skipped);
+    assert!(
+        test.driver.requests()[1]
+            .messages
+            .last()
+            .is_some_and(|message| message.content.contains(ASK_SKIPPED))
+    );
+}
+
+#[tokio::test]
+async fn a_malformed_question_goes_back_to_the_model_and_a_second_ask_in_the_round_is_refused() {
+    let test = Loop::new();
+    test.driver.round(|_| {
+        vec![
+            call_with_id("ask_user", &json!({ "questions": [] }), "first"),
+            call_with_id("ask_user", &format_question(), "second"),
+            call("demo__lookup", &json!({ "query": "x" })),
+        ]
+    });
+    let created = test.conversation(&["demo.lookup"]);
+
+    let handle = test.turn(created, "Question").await;
+
+    assert_eq!(test.harness.status(&handle), RunStatus::Succeeded);
+    let calls = test.harness.last(created).tool_calls;
+    assert_eq!(calls[0].status, ChatToolCallStatus::Failed);
+    assert_eq!(calls[0].error.as_deref(), Some(ASK_MALFORMED));
+    assert_eq!(calls[1].status, ChatToolCallStatus::Refused);
+    assert_eq!(calls[1].error.as_deref(), Some(ASK_ONCE));
+    assert_eq!(calls[2].status, ChatToolCallStatus::Succeeded);
+    assert_eq!(test.calls.lookups(), ["x"]);
+    let request = &test.driver.requests()[1];
+    assert!(request.messages.iter().any(|message| {
+        message
+            .content
+            .contains("Invalid questions: questions breaks the minItems rule")
+    }));
+}
+
+#[tokio::test]
+async fn cancelling_while_a_question_waits_marks_the_call_cancelled() {
+    let test = Loop::new();
+    test.driver
+        .round(|_| vec![call("ask_user", &format_question())]);
+    let created = test.conversation(&[]);
+    let handle = test.harness.send(created, "Make a report");
+    within(awaiting_answer(&test, created)).await;
+
+    within(test.harness.chat.cancel(&handle.id))
+        .await
+        .expect("cancels");
+    within(test.harness.runs.wait(&handle.id)).await;
+
+    assert_eq!(test.harness.status(&handle), RunStatus::Cancelled);
+    let call = &test.harness.last(created).tool_calls[0];
+    assert_eq!(call.status, ChatToolCallStatus::Cancelled);
+    assert!(
+        test.harness
+            .runs
+            .questions()
+            .pending(&handle.id.to_string())
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn a_model_without_tool_calling_is_not_offered_the_question_bridge() {
+    let test = Loop::new();
+    *test
+        .driver
+        .mode
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner) = ToolMode::None;
+    test.turn(test.conversation(&[]), "Question").await;
+    assert!(test.driver.requests()[0].tools.is_empty());
+    let system = test.driver.requests()[0].system.clone().unwrap_or_default();
+    assert!(!system.contains(crate::services::chat_ask::ASK_HEADING));
 }

@@ -301,6 +301,7 @@ pub const fn type_of(draft: &HostEventDraft) -> &'static str {
         HostEventDraft::Step { .. } => "step",
         HostEventDraft::Log { .. } => "log",
         HostEventDraft::Approval { .. } => "approval",
+        HostEventDraft::Question { .. } => "question",
         HostEventDraft::End { .. } => "end",
     }
 }

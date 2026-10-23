@@ -105,7 +105,9 @@ impl NotificationService {
     pub fn observe(&self, run_id: &str, event: &HostEventDraft) {
         if !matches!(
             event,
-            HostEventDraft::Approval { .. } | HostEventDraft::End { .. }
+            HostEventDraft::Approval { .. }
+                | HostEventDraft::Question { .. }
+                | HostEventDraft::End { .. }
         ) {
             return;
         }
@@ -129,6 +131,22 @@ impl NotificationService {
                     &subject.id,
                     copy::APPROVAL_TITLE,
                     copy::approval_body(tool.as_deref(), &subject.label),
+                    NotificationTargetDto::Conversation { conversation_id },
+                );
+            }
+            (RunKind::Chat, HostEventDraft::Question { request }) => {
+                let Some(conversation_id) = ConversationId::parse(&subject.id) else {
+                    return;
+                };
+                let question = request
+                    .questions
+                    .first()
+                    .map_or("", |question| question.title.as_str());
+                self.raise(
+                    NotificationKind::Approval,
+                    &subject.id,
+                    copy::QUESTION_TITLE,
+                    copy::question_body(question, &subject.label),
                     NotificationTargetDto::Conversation { conversation_id },
                 );
             }

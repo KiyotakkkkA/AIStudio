@@ -195,6 +195,7 @@ Electron app untouched. TASK_066's CDP client is reused by TASK_046.
 - [x] **TASK_042** — Document service: open, hash cache, PDF path
 - [x] **TASK_043** — Office → PDF conversion in the sidecar
 - [x] **TASK_044** — Document viewer dock and selection → chat
+- [x] **TASK_044_EXTRA_1** — Questions to the user: the `chat.ask` bridge, a question gate in the kernel, the answer card
 - [x] **TASK_045** — Attached browser workspace, WebContentsView, session partition
 - [ ] **TASK_046** — CDP driver, `browser.*` nodes, policy engine
 - [ ] **TASK_047** — Browser agent panel, approvals, rate limiter

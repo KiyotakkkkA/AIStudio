@@ -28,6 +28,8 @@ import {
   type McpServerDto,
   type MessageId,
   type ProviderDto,
+  type QuestionAnswerDto,
+  type QuestionRequestDto,
   type RetrievalMode,
   type RunHandleDto,
   type ToolDto,
@@ -88,6 +90,7 @@ export default class ChatStore {
     process?: ProcessPlanDto;
   }[] = [];
   folderRequests: FolderApprovalDto[] = [];
+  questions: { request: QuestionRequestDto; busy: boolean }[] = [];
   answeringFolder = false;
   folderBusy = false;
   folderError: string | null = null;
@@ -318,6 +321,9 @@ export default class ChatStore {
   }
   approvalFor(id: string | null) {
     return id === null ? undefined : this.approvals.find((request) => request.id === id);
+  }
+  questionFor(id: string) {
+    return this.questions.find((question) => question.request.id === id);
   }
   get available() {
     return this.provider?.enabled === true && this.model?.available === true;
@@ -998,6 +1004,36 @@ export default class ChatStore {
     }
   }
 
+  async answerQuestion(requestId: string, answers: QuestionAnswerDto[]) {
+    await this.resolveQuestion(requestId, (id) =>
+      this.ipc.call("chat.answer", { id, requestId, answers }),
+    );
+  }
+
+  async skipQuestion(requestId: string) {
+    await this.resolveQuestion(requestId, (id) => this.ipc.call("chat.skip", { id, requestId }));
+  }
+
+  private async resolveQuestion(
+    requestId: string,
+    send: (runId: RunHandleDto["id"]) => Promise<void>,
+  ) {
+    const pending = this.questionFor(requestId);
+    if (!pending || pending.busy || !this.run) return;
+    pending.busy = true;
+    try {
+      await send(this.run.id);
+      runInAction(() => {
+        this.questions = this.questions.filter((item) => item.request.id !== requestId);
+      });
+    } catch (error) {
+      runInAction(() => {
+        pending.busy = false;
+        this.error = errorCopy(error);
+      });
+    }
+  }
+
   private subscribe() {
     this.unsubscribe?.();
     const run = this.run;
@@ -1033,6 +1069,12 @@ export default class ChatStore {
         });
       }
     }
+    if (
+      event.type === "question" &&
+      event.request.runId === this.run.id &&
+      !this.questions.some((question) => question.request.id === event.request.id)
+    )
+      this.questions.push({ request: event.request, busy: false });
     if (event.type === "token") {
       if (event.kind === "reasoning") this.liveReasoning += event.delta;
       else {
@@ -1085,6 +1127,7 @@ export default class ChatStore {
       this.unsubscribe = undefined;
       this.run = null;
       this.approvals = [];
+      this.questions = [];
       this.folderRequests = [];
       this.stopping = false;
       void this.refreshCompleted();

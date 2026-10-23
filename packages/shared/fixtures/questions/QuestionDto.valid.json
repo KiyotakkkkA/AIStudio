@@ -1,0 +1,60 @@
+[
+  {
+    "name": "single choice",
+    "value": {
+      "id": "q1",
+      "title": "Формат отчёта",
+      "kind": "single",
+      "options": [
+        {
+          "id": "o1",
+          "label": "DOCX",
+          "description": "Редактируемый документ",
+          "recommended": true
+        },
+        {
+          "id": "o2",
+          "label": "PDF",
+          "recommended": false
+        }
+      ],
+      "allowOther": true
+    }
+  },
+  {
+    "name": "multiple choice",
+    "value": {
+      "id": "q2",
+      "title": "Какие разделы включить",
+      "kind": "multiple",
+      "options": [
+        {
+          "id": "o1",
+          "label": "Введение",
+          "recommended": false
+        },
+        {
+          "id": "o2",
+          "label": "Выводы",
+          "recommended": false
+        },
+        {
+          "id": "o3",
+          "label": "Приложения",
+          "recommended": false
+        }
+      ],
+      "allowOther": false
+    }
+  },
+  {
+    "name": "text",
+    "value": {
+      "id": "q3",
+      "title": "Название отчёта",
+      "kind": "text",
+      "options": [],
+      "allowOther": false
+    }
+  }
+]

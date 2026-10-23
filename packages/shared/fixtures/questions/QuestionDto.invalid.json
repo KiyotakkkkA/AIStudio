@@ -1,0 +1,88 @@
+[
+  {
+    "name": "a choice with one option",
+    "value": {
+      "id": "q1",
+      "title": "Формат отчёта",
+      "kind": "single",
+      "options": [
+        {
+          "id": "o1",
+          "label": "DOCX",
+          "description": "Редактируемый документ",
+          "recommended": true
+        }
+      ],
+      "allowOther": true
+    }
+  },
+  {
+    "name": "text with options",
+    "value": {
+      "id": "q3",
+      "title": "Название отчёта",
+      "kind": "text",
+      "options": [
+        {
+          "id": "o1",
+          "label": "DOCX",
+          "description": "Редактируемый документ",
+          "recommended": true
+        },
+        {
+          "id": "o2",
+          "label": "PDF",
+          "recommended": false
+        }
+      ],
+      "allowOther": false
+    }
+  },
+  {
+    "name": "two recommendations",
+    "value": {
+      "id": "q2",
+      "title": "Какие разделы включить",
+      "kind": "multiple",
+      "options": [
+        {
+          "id": "o1",
+          "label": "Введение",
+          "recommended": true
+        },
+        {
+          "id": "o2",
+          "label": "Выводы",
+          "recommended": true
+        },
+        {
+          "id": "o3",
+          "label": "Приложения",
+          "recommended": true
+        }
+      ],
+      "allowOther": false
+    }
+  },
+  {
+    "name": "duplicate option ids",
+    "value": {
+      "id": "q2",
+      "title": "Какие разделы включить",
+      "kind": "multiple",
+      "options": [
+        {
+          "id": "o1",
+          "label": "Введение",
+          "recommended": false
+        },
+        {
+          "id": "o1",
+          "label": "Введение",
+          "recommended": false
+        }
+      ],
+      "allowOther": false
+    }
+  }
+]

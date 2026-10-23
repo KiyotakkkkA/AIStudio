@@ -1,8 +1,16 @@
-import type { ChatToolCallDto, FileDiffDto, Json, ProcessPlanDto } from "@zvs/shared";
+import type {
+  ChatToolCallDto,
+  FileDiffDto,
+  Json,
+  ProcessPlanDto,
+  QuestionAnswerDto,
+  QuestionRequestDto,
+} from "@zvs/shared";
 import { toolCallSummary } from "./toolCallSummary";
 import {
   mdiBookOpenPageVariantOutline,
   mdiCodeBraces,
+  mdiCommentQuestionOutline,
   mdiConsoleLine,
   mdiDatabaseSearchOutline,
   mdiFileDocumentEditOutline,
@@ -17,6 +25,7 @@ import {
   STATUS_TONE_TEXT,
   type StatusTone,
 } from "../../ui/atoms/statusTone";
+import ChatQuestionCard, { QuestionAnswers } from "./ChatQuestionCard";
 import FileChangeList from "./FileChangeList";
 import ProcessPlanView from "./ProcessPlanView";
 import {
@@ -37,6 +46,7 @@ import {
   REJECT_CHANGES,
   fileChanges,
 } from "./fileChangesCopy";
+import { ASK_TOOL, QUESTIONS_SKIPPED, QUESTIONS_UNANSWERED, questionRecord } from "./questionCopy";
 
 export const TOOL_CALL_STATUS: Record<
   ChatToolCallDto["status"],
@@ -44,6 +54,7 @@ export const TOOL_CALL_STATUS: Record<
 > = {
   running: { label: "выполняется", tone: "accent" },
   "awaiting-approval": { label: "ждёт подтверждения", tone: "warn" },
+  "awaiting-answer": { label: "ждёт ответа", tone: "warn" },
   succeeded: { label: "готово", tone: "ok" },
   failed: { label: "ошибка", tone: "err" },
   refused: { label: "запрещён", tone: "idle" },
@@ -59,6 +70,7 @@ export function toolArgumentsText(value: Json): string {
 function toolIcon(key: string): string {
   if (key === "knowledge.search") return mdiDatabaseSearchOutline;
   if (key === "knowledge.read") return mdiBookOpenPageVariantOutline;
+  if (key === ASK_TOOL) return mdiCommentQuestionOutline;
   if (key === FILE_TOOL_APPLY) return mdiFileDocumentEditOutline;
   if (key === PROCESS_TOOL_CODE) return mdiCodeBraces;
   if (key === PROCESS_TOOL_SHELL) return mdiConsoleLine;
@@ -73,16 +85,28 @@ export interface ToolCallApproval {
   readonly process?: ProcessPlanDto;
 }
 
+export interface ToolCallQuestion {
+  readonly request: QuestionRequestDto;
+  readonly busy: boolean;
+}
+
 export default function ChatToolCalls({
   calls,
   approvalFor,
   onDecide,
+  questionFor,
+  onAnswer,
+  onSkip,
 }: {
   readonly calls: readonly ChatToolCallDto[];
   readonly approvalFor?: (id: string | null) => ToolCallApproval | undefined;
   readonly onDecide?: (id: string, approve: boolean) => void;
+  readonly questionFor?: (id: string) => ToolCallQuestion | undefined;
+  readonly onAnswer?: (id: string, answers: QuestionAnswerDto[]) => void;
+  readonly onSkip?: (id: string) => void;
 }) {
   if (calls.length === 0) return null;
+  const live = questionFor !== undefined;
   return (
     <ul aria-label="Вызовы инструментов" className="space-y-1.5">
       {calls.map((call) => {
@@ -93,14 +117,19 @@ export default function ChatToolCalls({
         const applied = call.key === FILE_TOOL_APPLY ? fileChanges(call.meta) : [];
         const proposedProcess = approval?.process;
         const finished = proposedProcess === undefined ? processResult(call.meta) : null;
+        const record = call.key === ASK_TOOL ? questionRecord(call.meta) : null;
+        const asking =
+          record !== null && call.status === "awaiting-answer"
+            ? questionFor?.(record.request.id)
+            : undefined;
         return (
           <li
             key={call.id}
             className={`overflow-hidden rounded-card bg-main-800 ${
-              approval ? "shadow-[inset_0_0_0_1px_var(--color-warn-line)]" : ""
+              approval || asking ? "shadow-[inset_0_0_0_1px_var(--color-warn-line)]" : ""
             }`}
           >
-            <details open={approval !== undefined} className="group/call">
+            <details open={approval !== undefined || asking !== undefined} className="group/call">
               <summary className="flex min-h-9 cursor-pointer list-none items-center gap-2.5 px-3 py-1.5 text-[12px] [&::-webkit-details-marker]:hidden">
                 <span
                   aria-hidden="true"
@@ -134,16 +163,38 @@ export default function ChatToolCalls({
                 )}
               </summary>
               <div className="space-y-2.5 px-3 pt-1 pb-3 text-[12px]">
-                <div>
-                  <p className="mb-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-                    Аргументы
-                  </p>
-                  <ScrollArea className="max-h-48 rounded-control bg-main-900 px-2.5 py-2">
-                    <pre className="m-0 font-mono text-[11.5px] wrap-break-word whitespace-pre-wrap text-main-300">
-                      {toolArgumentsText(call.arguments)}
-                    </pre>
-                  </ScrollArea>
-                </div>
+                {asking && (
+                  <ChatQuestionCard
+                    request={asking.request}
+                    busy={asking.busy}
+                    onAnswer={(answers) => onAnswer?.(asking.request.id, answers)}
+                    onSkip={() => onSkip?.(asking.request.id)}
+                  />
+                )}
+                {record && !asking && !(live && call.status === "awaiting-answer") && (
+                  <QuestionAnswers
+                    record={record}
+                    note={
+                      record.skipped
+                        ? QUESTIONS_SKIPPED
+                        : call.status === "awaiting-answer" || call.status === "cancelled"
+                          ? QUESTIONS_UNANSWERED
+                          : null
+                    }
+                  />
+                )}
+                {record === null && (
+                  <div>
+                    <p className="mb-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
+                      Аргументы
+                    </p>
+                    <ScrollArea className="max-h-48 rounded-control bg-main-900 px-2.5 py-2">
+                      <pre className="m-0 font-mono text-[11.5px] wrap-break-word whitespace-pre-wrap text-main-300">
+                        {toolArgumentsText(call.arguments)}
+                      </pre>
+                    </ScrollArea>
+                  </div>
+                )}
                 {finished && (
                   <div className="space-y-2">
                     <p className="m-0 font-mono text-[11.5px] text-main-300 tabular-nums">
@@ -160,7 +211,7 @@ export default function ChatToolCalls({
                     <FileChangeList changes={applied} />
                   </div>
                 )}
-                {call.result !== null && (
+                {call.result !== null && record === null && (
                   <div>
                     <p className="mb-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                       Результат{call.truncated ? " · сокращён" : ""}

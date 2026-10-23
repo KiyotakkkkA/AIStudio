@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod approvals;
 pub mod chat;
+pub mod chat_ask;
 pub mod chat_history;
 pub mod chat_tools;
 pub mod crypto;
@@ -11,6 +12,7 @@ pub mod permissions;
 pub mod probe_outcome;
 pub mod provider_status;
 pub mod providers;
+pub mod questions;
 pub mod rerank;
 pub mod retention;
 pub mod retrieval_merge;

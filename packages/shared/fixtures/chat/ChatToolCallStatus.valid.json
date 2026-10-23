@@ -8,6 +8,10 @@
     "value": "awaiting-approval"
   },
   {
+    "name": "awaiting answer",
+    "value": "awaiting-answer"
+  },
+  {
     "name": "cancelled",
     "value": "cancelled"
   }

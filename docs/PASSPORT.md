@@ -319,6 +319,7 @@ export const HostEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('step'),     streamId: StreamId, seq: z.number(), step: StepEventDto }),
   z.object({ type: z.literal('log'),      streamId: StreamId, seq: z.number(), line: LogLineDto }),
   z.object({ type: z.literal('approval'), streamId: StreamId, seq: z.number(), request: ApprovalRequestDto }),
+  z.object({ type: z.literal('question'), streamId: StreamId, seq: z.number(), request: QuestionRequestDto }),
   z.object({ type: z.literal('end'),      streamId: StreamId, seq: z.number(), outcome: RunOutcomeDto }),
 ]);
 ```
@@ -483,6 +484,11 @@ Core concepts:
   the tier says `ask`, admission hands it a ticket on the `StepContext` instead, and the node
   raises one approval itself once it can show what it is about to do (`fs.apply`: the combined
   diff, merged with any folder request into a single modal).
+- **Question gate** — `StepContext::ask_user` suspends the run on a question to the user,
+  counted like an approval: the run is `blocked`, a `question` event carries the request, and
+  nothing new is scheduled until `chat.answer` or `chat.skip` resolves it. It has no timeout;
+  cancellation ends it. In chat the model reaches it through `chat.ask`, a bridge that is offered
+  to every tool-capable turn but is not a registry tool: no admission, no step row, no budget.
 - **Concurrent tool calls** — in the chat loop, consecutive side-effect-free calls of one
   round run concurrently; a call with side effects is a barrier and keeps its place. Results
   go back to the model in the original call order.

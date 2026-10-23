@@ -270,3 +270,44 @@ async fn removing_a_dialog_closes_its_terminals() {
     assert_eq!(channels.host.terminals.open(), 0);
     assert!(channels.host.pty.last().killed());
 }
+
+#[tokio::test]
+async fn answers_and_skips_for_a_question_that_is_not_pending_conflict() {
+    let channels = registered();
+    let run = RunId::new(crate::platform::ids::new_id());
+    let request = crate::platform::ids::new_id().hyphenated().to_string();
+    assert_eq!(
+        failed(
+            &channels
+                .server
+                .dispatch(
+                    "chat.answer",
+                    json!({
+                        "id": run,
+                        "requestId": request,
+                        "answers": [{ "questionId": "q1", "selected": ["o1"] }]
+                    })
+                )
+                .await
+        ),
+        &json!("CONFLICT")
+    );
+    assert_eq!(
+        failed(
+            &channels
+                .server
+                .dispatch("chat.skip", json!({ "id": run, "requestId": request }))
+                .await
+        ),
+        &json!("CONFLICT")
+    );
+    assert_eq!(
+        failed(
+            &channels
+                .server
+                .dispatch("chat.skip", json!({ "id": run, "requestId": "r1" }))
+                .await
+        ),
+        &json!("VALIDATION_FAILED")
+    );
+}

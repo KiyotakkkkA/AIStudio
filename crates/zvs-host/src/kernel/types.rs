@@ -11,8 +11,9 @@ use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, AppErrorCode, ApprovalRequestDto, GraphNeighborDto, GraphNeighborsInput,
-    HostEventDraft, RunId, ToolTier, Validate, VectorChunkDto, VectorDocumentDto, VectorIndexInput,
-    VectorIndexReportDto, VectorSearchHitDto, VectorStoreDto,
+    HostEventDraft, QuestionAnswerDto, QuestionRequestDto, RunId, ToolTier, Validate,
+    VectorChunkDto, VectorDocumentDto, VectorIndexInput, VectorIndexReportDto, VectorSearchHitDto,
+    VectorStoreDto,
 };
 
 pub use crate::data::schema::ApprovalDecision;
@@ -25,6 +26,13 @@ use crate::services::graph::GraphService;
 use crate::services::vector_stores::{VectorSearchOptions, VectorStoreService};
 
 pub const CANCELLED_MESSAGE: &str = "Выполнение отменено";
+pub const NO_QUESTION_SERVICE: &str = "Вопросы пользователю недоступны в этом запуске";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QuestionOutcome {
+    Answered(Vec<QuestionAnswerDto>),
+    Skipped,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PermissionRequirement {
@@ -264,6 +272,13 @@ pub trait StepLink: Send + Sync {
     fn invoke_tool(&self, _request: ToolStepRequest) -> Option<ToolStepFuture> {
         None
     }
+
+    fn ask_user(
+        &self,
+        _request: QuestionRequestDto,
+    ) -> BoxFuture<'static, Result<QuestionOutcome, AppError>> {
+        Box::pin(async { Err(AppError::new(AppErrorCode::Conflict, NO_QUESTION_SERVICE)) })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -350,6 +365,10 @@ impl StepContext {
 
     pub fn invoke_tool(&self, request: ToolStepRequest) -> Option<ToolStepFuture> {
         self.link.invoke_tool(request)
+    }
+
+    pub async fn ask_user(&self, request: QuestionRequestDto) -> Result<QuestionOutcome, AppError> {
+        self.link.ask_user(request).await
     }
 
     pub fn link(&self) -> Arc<dyn StepLink> {

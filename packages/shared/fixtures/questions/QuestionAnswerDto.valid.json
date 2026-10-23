@@ -1,0 +1,17 @@
+[
+  {
+    "name": "selected options",
+    "value": {
+      "questionId": "q2",
+      "selected": ["o1", "o3"]
+    }
+  },
+  {
+    "name": "free text",
+    "value": {
+      "questionId": "q3",
+      "selected": [],
+      "text": "Итоги квартала"
+    }
+  }
+]

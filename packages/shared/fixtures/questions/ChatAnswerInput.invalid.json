@@ -1,0 +1,32 @@
+[
+  {
+    "name": "no answers",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "requestId": "0199aa11-2222-7222-8222-222222222222",
+      "answers": []
+    }
+  },
+  {
+    "name": "a request id that is not a uuid",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "requestId": "r1",
+      "answers": [
+        {
+          "questionId": "q1",
+          "selected": ["o1"]
+        },
+        {
+          "questionId": "q2",
+          "selected": ["o1", "o3"]
+        },
+        {
+          "questionId": "q3",
+          "selected": [],
+          "text": "Итоги квартала"
+        }
+      ]
+    }
+  }
+]

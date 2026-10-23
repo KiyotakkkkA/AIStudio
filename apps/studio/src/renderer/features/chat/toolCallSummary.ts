@@ -8,6 +8,7 @@ import {
   processResult,
   processSummary,
 } from "./processCopy";
+import { ASK_TOOL, questionRecord, recordSummary } from "./questionCopy";
 
 export function toolArgumentsSummary(value: Json): string {
   const text = typeof value === "string" ? value : JSON.stringify(value);
@@ -43,6 +44,10 @@ export function toolCallSummary(call: ChatToolCallDto): string {
         ? `фрагменты ${String(from + 1)}–${String(to + 1)}`
         : `с фрагмента ${String(from + 1)}`;
     return "начало документа";
+  }
+  if (call.key === ASK_TOOL) {
+    const record = questionRecord(call.meta);
+    if (record) return recordSummary(record, call.status === "awaiting-answer");
   }
   if (call.key === FILE_TOOL_APPLY) {
     const changes = fileChanges(call.meta);

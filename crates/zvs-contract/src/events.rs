@@ -4,7 +4,8 @@ use serde_json::{Map, Value};
 use crate::errors::{AppError, AppErrorCode};
 use crate::ids::StreamId;
 use crate::primitives::Timestamp;
-use crate::validate::{Validate, check, no_refinements};
+use crate::questions::QuestionRequestDto;
+use crate::validate::{Validate, check, nested, no_refinements};
 
 pub const EVENT_CHANNEL: &str = "zvs:events";
 
@@ -78,6 +79,9 @@ pub enum HostEventDraft {
     Approval {
         request: ApprovalRequestDto,
     },
+    Question {
+        request: QuestionRequestDto,
+    },
     End {
         outcome: RunOutcomeDto,
     },
@@ -116,6 +120,7 @@ impl Validate for HostEventDraft {
                 check::safe_integer("done", *done)?;
                 check::safe_integer("total", *total)
             }
+            Self::Question { request } => nested("request", request.validate()),
             _ => Ok(()),
         }
     }

@@ -145,6 +145,31 @@ fn each_event_raises_its_own_toast_with_its_target() {
 }
 
 #[test]
+fn a_question_raises_an_approval_kind_toast_with_its_first_title() {
+    let fixture = fixture();
+    let request = serde_json::from_value(json!({
+        "id": "0199aa11-2222-7222-8222-222222222222",
+        "runId": "0199aa11-1111-7111-8111-111111111111",
+        "questions": [
+            { "id": "q1", "title": "Формат отчёта", "kind": "text", "options": [], "allowOther": false }
+        ]
+    }))
+    .expect("a request");
+    fixture
+        .service
+        .handle(&chat(), &HostEventDraft::Question { request });
+    let notified = fixture.shell.notified();
+    assert_eq!(notified.len(), 1);
+    assert_eq!(notified[0].kind, NotificationKind::Approval);
+    assert_eq!(notified[0].target, conversation());
+    assert_eq!(fixture.titles(), [copy::QUESTION_TITLE]);
+    assert_eq!(
+        notified[0].body,
+        copy::question_body("Формат отчёта", "Отчёт за квартал")
+    );
+}
+
+#[test]
 fn failures_have_their_own_titles_and_cancellations_stay_silent() {
     let fixture = fixture();
     fixture

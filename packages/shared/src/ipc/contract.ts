@@ -17,6 +17,7 @@ import {
   PickFolderResultDto,
 } from "../chat.js";
 import { AnswerFolderRequestInput, FolderGrantDto, FolderGrantRef } from "../folders.js";
+import { ChatAnswerInput, ChatSkipInput } from "../questions.js";
 import {
   ExplorerFileDto,
   ExplorerListInput,
@@ -224,6 +225,8 @@ export const contract = defineContract({
   "chat.context": { input: ChatContextInput, output: ChatContextDto },
   "chat.send": { input: ChatSendInput, output: RunHandleDto },
   "chat.cancel": { input: RunIdInput, output: z.void() },
+  "chat.answer": { input: ChatAnswerInput, output: z.void() },
+  "chat.skip": { input: ChatSkipInput, output: z.void() },
   "chat.pickFolder": { input: z.void(), output: PickFolderResultDto },
   "chat.bindFolder": { input: BindFolderInput, output: BindFolderResultDto },
   "chat.unbindFolder": { input: ConversationRef, output: ConversationDto },

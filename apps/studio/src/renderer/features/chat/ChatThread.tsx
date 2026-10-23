@@ -261,6 +261,9 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                   calls={store.liveToolCalls}
                   approvalFor={store.approvalFor}
                   onDecide={(id, approve) => void store.decideApproval(id, approve)}
+                  questionFor={store.questionFor}
+                  onAnswer={(id, answers) => void store.answerQuestion(id, answers)}
+                  onSkip={(id) => void store.skipQuestion(id)}
                 />
               }
             />
@@ -330,6 +333,7 @@ function generationPhase(store: ChatStore): string {
     return "Ожидает подтверждения";
   if (store.liveToolCalls.some((call) => call.status === "awaiting-approval"))
     return "Ожидает подтверждения";
+  if (store.questions.length > 0) return "Ожидает ответа";
   const running = store.liveToolCalls.find((call) => call.status === "running");
   if (running) return `Вызов ${running.key}`;
   if (store.liveText) return "Генерация ответа";

@@ -1,0 +1,77 @@
+[
+  {
+    "name": "three questions",
+    "value": {
+      "id": "0199aa11-2222-7222-8222-222222222222",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "conversationId": "0199aa11-3333-7333-8333-333333333333",
+      "questions": [
+        {
+          "id": "q1",
+          "title": "Формат отчёта",
+          "kind": "single",
+          "options": [
+            {
+              "id": "o1",
+              "label": "DOCX",
+              "description": "Редактируемый документ",
+              "recommended": true
+            },
+            {
+              "id": "o2",
+              "label": "PDF",
+              "recommended": false
+            }
+          ],
+          "allowOther": true
+        },
+        {
+          "id": "q2",
+          "title": "Какие разделы включить",
+          "kind": "multiple",
+          "options": [
+            {
+              "id": "o1",
+              "label": "Введение",
+              "recommended": false
+            },
+            {
+              "id": "o2",
+              "label": "Выводы",
+              "recommended": false
+            },
+            {
+              "id": "o3",
+              "label": "Приложения",
+              "recommended": false
+            }
+          ],
+          "allowOther": false
+        },
+        {
+          "id": "q3",
+          "title": "Название отчёта",
+          "kind": "text",
+          "options": [],
+          "allowOther": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "without a conversation",
+    "value": {
+      "id": "0199aa11-2222-7222-8222-222222222222",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "questions": [
+        {
+          "id": "q3",
+          "title": "Название отчёта",
+          "kind": "text",
+          "options": [],
+          "allowOther": false
+        }
+      ]
+    }
+  }
+]

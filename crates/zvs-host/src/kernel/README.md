@@ -70,6 +70,18 @@ For unscoped runs that explicitly changes the global ceiling. Scoped grants neve
 global ceiling, so a global `ask` continues to require approval. `PermissionService::grant`
 and `revoke` are host APIs. Grant uses persist in `permission_use`.
 
+## Questions
+
+`StepContext::ask_user(request)` is the second gate. The scheduler counts an open question like
+a pending approval (the run is `blocked` and schedules nothing new), emits a `question` event
+with the `QuestionRequestDto`, and resumes `running` once the hook resolves. `QuestionService`
+(owned by `RunService`) keeps the waiters in memory, keyed by request id, with no timeout.
+`chat.answer({ id, requestId, answers })` validates the answers against the request (known
+question and option ids, one option for `single`, text only where `allowOther`, nothing empty)
+and `chat.skip` resolves without answers; a request that is not pending for that run is a
+conflict. Cancellation ends the wait with `RUN_CANCELLED`, and a restart ends the turn like any
+other interrupted chat run.
+
 ## Core nodes
 
 Core node inputs and outputs are available through `NodeRegistry::resolve`:
@@ -116,6 +128,15 @@ settings, systemPrompt, attachedStoreIds and an optional title. Get returns the 
 with ordered messages. Send accepts `{ conversationId, text }` and returns `{ id, streamId }`;
 cancel accepts `{ id }` with the run ID. Only one turn may run in a conversation at a time.
 Removal rejects active conversations and cascades messages while retaining run history.
+`chat.answer` and `chat.skip` resolve a question the model asked through `chat.ask`.
+
+Every turn whose model can call tools is offered `chat.ask` (wire name `ask_user`) with a short
+prompt section, whatever tools the conversation picked. The loop intercepts it before tool
+invocation: the host assigns question and option ids, validates the request and returns a
+malformed call to the model as the call result. A second `chat.ask` in a round is refused, and
+the call does not count against the call budget. The call record is `awaiting-answer` with a
+`QuestionRecordDto` as meta, then `succeeded` with the answers or `skipped`; the model receives
+a plain-text summary of the answers.
 Missing model/provider references fail future sends while existing history stays readable.
 
 The renderer subscribes to the returned stream immediately, appends text token deltas to the

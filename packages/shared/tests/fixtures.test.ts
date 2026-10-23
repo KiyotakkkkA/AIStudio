@@ -7,6 +7,7 @@ import * as skills from "../src/skills/index.js";
 import * as toolchain from "../src/toolchain/index.js";
 import * as files from "../src/files.js";
 import * as processes from "../src/process.js";
+import * as questions from "../src/questions.js";
 import * as folders from "../src/folders.js";
 import * as explorer from "../src/explorer.js";
 import * as terminal from "../src/terminal.js";
@@ -192,6 +193,14 @@ const schemas: Record<string, z.ZodType> = {
   "process/ProcessPlanDto": processes.ProcessPlanDto,
   "process/ProcessResultDto": processes.ProcessResultDto,
   "process/ProcessApprovalDto": processes.ProcessApprovalDto,
+  "questions/QuestionKind": questions.QuestionKind,
+  "questions/QuestionOptionDto": questions.QuestionOptionDto,
+  "questions/QuestionDto": questions.QuestionDto,
+  "questions/QuestionRequestDto": questions.QuestionRequestDto,
+  "questions/QuestionAnswerDto": questions.QuestionAnswerDto,
+  "questions/QuestionRecordDto": questions.QuestionRecordDto,
+  "questions/ChatAnswerInput": questions.ChatAnswerInput,
+  "questions/ChatSkipInput": questions.ChatSkipInput,
   "notifications/NotificationTargetDto": notifications.NotificationTargetDto,
   "explorer/ExplorerEntryKind": explorer.ExplorerEntryKind,
   "explorer/ExplorerChangeKind": explorer.ExplorerChangeKind,

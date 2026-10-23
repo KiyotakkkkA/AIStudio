@@ -17,14 +17,15 @@ use zvs_contract::{
 
 use super::approvals::{ApprovalService, DEFAULT_APPROVAL_TIMEOUT};
 use super::permissions::{Admission, PermissionContext, PermissionService};
+use super::questions::QuestionService;
 use crate::data::repositories::{RunCursor, RunDraft, RunPageQuery, encode_run_cursor};
 use crate::data::schema::{RunRow, StepRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::kernel::scheduler::step_event;
 use crate::kernel::{
     AdmissionOrigin, AdmitHook, ApprovalDecision, ApprovalHook, DeferredApproval, Finish,
-    KernelServices, NodeRegistry, Observers, PermissionRequirement, RunObserver, RunStream,
-    RunWatcher, Scheduler, SchedulerOptions, StepContext, Subscription,
+    KernelServices, NodeRegistry, Observers, PermissionRequirement, QuestionHook, RunObserver,
+    RunStream, RunWatcher, Scheduler, SchedulerOptions, StepContext, Subscription,
 };
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::events::{EventBus, StreamOptions};
@@ -251,6 +252,7 @@ struct Inner {
     options: Arc<SchedulerOptions>,
     permissions: Arc<PermissionService>,
     approvals: Arc<ApprovalService>,
+    questions: Arc<QuestionService>,
     observers: Arc<Observers>,
     active: Mutex<HashMap<String, ActiveRun>>,
     closed: AtomicBool,
@@ -287,6 +289,14 @@ impl RunService {
                 async move { approvals.wait(&request, &cancel).await }.boxed()
             })
         });
+        let asked = Arc::new(QuestionService::new());
+        let questions: QuestionHook = {
+            let asked = Arc::clone(&asked);
+            Arc::new(move |request, cancel| {
+                let asked = Arc::clone(&asked);
+                async move { asked.wait(request, &cancel).await }.boxed()
+            })
+        };
         let admit = options.admit.unwrap_or_else(|| {
             let gate = Arc::new(Gate {
                 database: Arc::clone(&options.database),
@@ -320,6 +330,7 @@ impl RunService {
             grace: options.grace,
             logger: options.logger.clone(),
             approval: Some(approval),
+            questions: Some(questions),
             admit: Some(admit),
         });
         Ok(Self {
@@ -334,6 +345,7 @@ impl RunService {
                 options: scheduler,
                 permissions,
                 approvals,
+                questions: asked,
                 observers: Arc::new(Observers::default()),
                 active: Mutex::new(HashMap::new()),
                 closed: AtomicBool::new(false),
@@ -347,6 +359,10 @@ impl RunService {
 
     pub fn approvals(&self) -> Arc<ApprovalService> {
         Arc::clone(&self.inner.approvals)
+    }
+
+    pub fn questions(&self) -> Arc<QuestionService> {
+        Arc::clone(&self.inner.questions)
     }
 
     pub fn registry(&self) -> Arc<NodeRegistry> {
