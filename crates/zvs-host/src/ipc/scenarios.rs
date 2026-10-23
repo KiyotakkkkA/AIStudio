@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use zvs_contract::{
     AppError, CreateScenarioInput, SaveScenarioDraftInput, ScenarioRef, ScenarioRemoveOutput,
-    ScenarioValidateInput, ScenarioValidationDto, SetScenarioActiveInput, UpdateScenarioInput,
+    ScenarioRetryStepInput, ScenarioRunInput, ScenarioRunNodeInput, ScenarioValidateInput,
+    ScenarioValidationDto, SetScenarioActiveInput, UpdateScenarioInput,
 };
 
 use super::IpcServer;
@@ -83,6 +84,24 @@ pub fn register(server: &mut IpcServer) {
             |services: Arc<Services>, input: ScenarioRef| async move {
                 services.scenarios.discard_draft(&input.id)?;
                 Ok::<ScenarioRef, AppError>(input)
+            },
+        )
+        .handle(
+            "scenarios.run",
+            |services: Arc<Services>, input: ScenarioRunInput| async move {
+                services.scenario_runs.test(&input)
+            },
+        )
+        .handle(
+            "scenarios.runNode",
+            |services: Arc<Services>, input: ScenarioRunNodeInput| async move {
+                services.scenario_runs.run_node(&input)
+            },
+        )
+        .handle(
+            "scenarios.retryStep",
+            |services: Arc<Services>, input: ScenarioRetryStepInput| async move {
+                services.scenario_runs.retry_step(&input)
             },
         );
 }

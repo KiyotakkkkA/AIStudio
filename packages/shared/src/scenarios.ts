@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { ScenarioId, ScenarioVersionId } from "./primitives/branded.js";
+import { RunId, ScenarioId, ScenarioVersionId } from "./primitives/branded.js";
+import { GRAPH_TIMEOUT_MAX_MS } from "./runs/RunDto.js";
 import { Timestamp } from "./primitives/time.js";
 
 export const SCENARIO_NAME_MAX = 120;
@@ -16,6 +17,9 @@ export const SCENARIO_EDGES_MAX = 1000;
 export const SCENARIO_ATTACHMENTS_MAX = 1000;
 export const SCENARIO_ISSUES_MAX = 1000;
 export const SCENARIO_MAIN_PORT = "main";
+export const SCENARIO_NOTES_MAX = 2000;
+export const SCENARIO_ATTEMPTS_MAX = 10;
+export const SCENARIO_BACKOFF_MAX_MS = 60_000;
 
 const trimmedName = (max: number) =>
   z
@@ -38,6 +42,12 @@ export type ScenarioSlot = z.infer<typeof ScenarioSlot>;
 
 export const ScenarioTriggerKind = z.enum(["chat", "mail", "schedule", "webhook"]);
 export type ScenarioTriggerKind = z.infer<typeof ScenarioTriggerKind>;
+
+export const ScenarioOnError = z.enum(["stop", "continue"]);
+export type ScenarioOnError = z.infer<typeof ScenarioOnError>;
+
+export const ScenarioOverlap = z.enum(["skip", "queue"]);
+export type ScenarioOverlap = z.infer<typeof ScenarioOverlap>;
 
 export const ScenarioNodeRole = z.enum(["trigger", "action", "subNode"]);
 export type ScenarioNodeRole = z.infer<typeof ScenarioNodeRole>;
@@ -64,6 +74,14 @@ export type ScenarioIssueRule = z.infer<typeof ScenarioIssueRule>;
 export const ScenarioPositionDto = z.object({ x: z.number(), y: z.number() });
 export type ScenarioPositionDto = z.infer<typeof ScenarioPositionDto>;
 
+export const ScenarioNodeSettingsDto = z.object({
+  maxAttempts: z.number().int().min(1).max(SCENARIO_ATTEMPTS_MAX).optional(),
+  backoffMs: z.number().int().min(0).max(SCENARIO_BACKOFF_MAX_MS).optional(),
+  timeoutMs: z.number().int().min(1).max(GRAPH_TIMEOUT_MAX_MS).optional(),
+  onError: ScenarioOnError.optional(),
+});
+export type ScenarioNodeSettingsDto = z.infer<typeof ScenarioNodeSettingsDto>;
+
 export const ScenarioNodeDto = z.object({
   id: NodeId,
   type: z.string().min(1).max(SCENARIO_NODE_TYPE_MAX),
@@ -71,6 +89,9 @@ export const ScenarioNodeDto = z.object({
   position: ScenarioPositionDto,
   params: ScenarioParams,
   disabled: z.boolean().optional(),
+  settings: ScenarioNodeSettingsDto.optional(),
+  notes: z.string().max(SCENARIO_NOTES_MAX).optional(),
+  pinnedInput: z.json().optional(),
 });
 export type ScenarioNodeDto = z.infer<typeof ScenarioNodeDto>;
 
@@ -131,6 +152,7 @@ export const ScenarioDto = z.object({
   name: trimmedName(SCENARIO_NAME_MAX),
   tags: Tags,
   active: z.boolean(),
+  overlap: ScenarioOverlap,
   currentVersionId: ScenarioVersionId,
   version: Version,
   trigger: ScenarioTriggerDto.nullable(),
@@ -173,6 +195,7 @@ export const UpdateScenarioInput = z.object({
   tags: Tags.optional(),
   graph: ScenarioGraphDto.optional(),
   note: Note.optional(),
+  overlap: ScenarioOverlap.optional(),
 });
 export type UpdateScenarioInput = z.infer<typeof UpdateScenarioInput>;
 
@@ -205,6 +228,8 @@ export const ScenarioNodeTypeDto = z.object({
   slots: z.array(ScenarioSlotSpecDto),
   requiredParams: z.array(z.string().min(1).max(SCENARIO_PARAM_KEY_MAX)),
   toolKey: z.string().min(1).max(SCENARIO_NODE_TYPE_MAX).nullable(),
+  paramsSchema: z.json(),
+  idempotent: z.boolean(),
 });
 export type ScenarioNodeTypeDto = z.infer<typeof ScenarioNodeTypeDto>;
 
@@ -217,3 +242,21 @@ export type ScenarioDraftDto = z.infer<typeof ScenarioDraftDto>;
 
 export const SaveScenarioDraftInput = z.object({ id: ScenarioId, graph: ScenarioGraphDto });
 export type SaveScenarioDraftInput = z.infer<typeof SaveScenarioDraftInput>;
+
+export const ScenarioRunInput = z.object({
+  id: ScenarioId,
+  graph: ScenarioGraphDto.optional(),
+  input: z.json().optional(),
+});
+export type ScenarioRunInput = z.infer<typeof ScenarioRunInput>;
+
+export const ScenarioRunNodeInput = z.object({
+  id: ScenarioId,
+  graph: ScenarioGraphDto,
+  nodeId: NodeId,
+  input: z.json().optional(),
+});
+export type ScenarioRunNodeInput = z.infer<typeof ScenarioRunNodeInput>;
+
+export const ScenarioRetryStepInput = z.object({ runId: RunId, nodeId: NodeId });
+export type ScenarioRetryStepInput = z.infer<typeof ScenarioRetryStepInput>;

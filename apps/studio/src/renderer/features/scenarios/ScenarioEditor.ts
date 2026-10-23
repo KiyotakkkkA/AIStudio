@@ -2,6 +2,7 @@ import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import type {
   Contract,
+  Json,
   McpServerDto,
   ScenarioDetailDto,
   ScenarioDto,
@@ -9,7 +10,9 @@ import type {
   ScenarioId,
   ScenarioIssueDto,
   ScenarioNodeDto,
+  ScenarioNodeSettingsDto,
   ScenarioNodeTypeDto,
+  ScenarioOverlap,
   ScenarioParams,
   ScenarioPositionDto,
   ScenarioSlot,
@@ -30,6 +33,8 @@ import {
   type Refusal,
 } from "./graphModel";
 import { canRedo, canUndo, commit, redo, startHistory, undo, type GraphHistory } from "./history";
+import type { EventRouter } from "../../app/EventRouter";
+import ScenarioRunState from "./ScenarioRunState";
 import { nodeSize, slotOffset, slotUnder, tidy, type SlotTarget } from "./layout";
 import EntityOptions from "./entityParams";
 import { ceilingReason, paletteGroups, typeLabel, type PaletteGroup } from "./palette";
@@ -55,6 +60,7 @@ export interface ScenarioEditorOptions {
   readonly autosaveMs?: number;
   readonly validateMs?: number;
   readonly palettePinned?: boolean;
+  readonly events?: EventRouter;
 }
 
 export interface Selection {
@@ -98,7 +104,9 @@ export default class ScenarioEditor {
   paletteOpen = false;
   paletteQuery = "";
   palettePinned: boolean;
+  overlapSaving = false;
   readonly entities: EntityOptions;
+  readonly execution: ScenarioRunState;
 
   private draftTimer: unknown = undefined;
   private validateTimer: unknown = undefined;
@@ -119,6 +127,7 @@ export default class ScenarioEditor {
     this.autosaveMs = options.autosaveMs ?? 800;
     this.validateMs = options.validateMs ?? 250;
     this.entities = new EntityOptions(ipc);
+    this.execution = new ScenarioRunState(ipc, id, options.events ?? null, this.clock);
     this.palettePinned = options.palettePinned ?? false;
     this.paletteOpen = this.palettePinned;
     makeAutoObservable<
@@ -138,6 +147,7 @@ export default class ScenarioEditor {
         ipc: false,
         id: false,
         entities: false,
+        execution: false,
         draftTimer: false,
         validateTimer: false,
         validation: false,
@@ -248,6 +258,7 @@ export default class ScenarioEditor {
         this.loaded = true;
         this.loading = false;
       });
+      void this.execution.loadLast();
     } catch (error: unknown) {
       runInAction(() => {
         this.error = scenarioErrorCopy(error, SCENARIO_LOAD_FAILED);
@@ -459,6 +470,82 @@ export default class ScenarioEditor {
 
   updateNode(nodeId: string, patch: NodePatch): void {
     this.dispatch({ type: "updateNode", nodeId, patch });
+  }
+
+  setSettings(nodeId: string, settings: ScenarioNodeSettingsDto): void {
+    this.updateNode(nodeId, { settings });
+  }
+
+  setNotes(nodeId: string, notes: string): void {
+    this.updateNode(nodeId, { notes });
+  }
+
+  pinInput(nodeId: string, input: Json | null): void {
+    this.updateNode(nodeId, { pinnedInput: input });
+  }
+
+  toggleDisabled(nodeId: string): void {
+    const node = findNode(this.graph, nodeId);
+    if (node !== undefined) this.updateNode(nodeId, { disabled: node.disabled !== true });
+  }
+
+  inputFor(nodeId: string): Json | undefined {
+    const node = findNode(this.graph, nodeId);
+    if (node?.pinnedInput !== undefined) return node.pinnedInput;
+    return this.observedInput(nodeId);
+  }
+
+  async testRun(): Promise<void> {
+    await this.execution.start(this.graph);
+  }
+
+  async runNode(nodeId: string): Promise<void> {
+    await this.execution.runNode(this.graph, nodeId, this.inputFor(nodeId));
+  }
+
+  async retryStep(nodeId: string): Promise<void> {
+    await this.execution.retryStep(nodeId);
+  }
+
+  private observedInput(nodeId: string): Json | undefined {
+    const upstream = this.execution.upstreamOf(this.graph, nodeId);
+    if (upstream !== undefined) return upstream;
+    const input = this.execution.latest(nodeId)?.input;
+    if (input === undefined) return undefined;
+    const event =
+      input !== null && typeof input === "object" && !Array.isArray(input)
+        ? input.event
+        : undefined;
+    return event ?? input;
+  }
+
+  pinFromRun(nodeId: string): void {
+    const observed = this.observedInput(nodeId);
+    if (observed !== undefined) this.pinInput(nodeId, observed);
+  }
+
+  async setOverlap(overlap: ScenarioOverlap): Promise<void> {
+    if (this.scenario === null || this.overlapSaving || this.scenario.overlap === overlap) return;
+    this.overlapSaving = true;
+    this.error = null;
+    try {
+      const detail = await this.ipc.call("scenarios.update", { id: this.id, overlap });
+      runInAction(() => {
+        if (this.scenario !== null) {
+          this.scenario = {
+            ...this.scenario,
+            overlap: detail.overlap,
+            updatedAt: detail.updatedAt,
+          };
+        }
+        this.overlapSaving = false;
+      });
+    } catch (error: unknown) {
+      runInAction(() => {
+        this.error = scenarioErrorCopy(error);
+        this.overlapSaving = false;
+      });
+    }
   }
 
   tidy(): void {
@@ -680,6 +767,7 @@ export default class ScenarioEditor {
   }
 
   dispose(): void {
+    this.execution.dispose();
     if (this.validateTimer !== undefined) this.timers.clear(this.validateTimer);
     this.validateTimer = undefined;
     if (this.draftState === "pending") void this.flushDraft();

@@ -727,6 +727,13 @@ impl RunService {
             .collect()
     }
 
+    pub fn step_rows(&self, id: &str) -> Result<Vec<StepRow>, AppError> {
+        read_run(&self.inner.database, id)?;
+        self.inner
+            .database
+            .with_connection(|connection| Ok(Repositories::new(connection).runs.steps(id)?))
+    }
+
     pub fn recover(&self) -> Result<(), AppError> {
         if self.inner.closed.load(Ordering::SeqCst) {
             return Ok(());

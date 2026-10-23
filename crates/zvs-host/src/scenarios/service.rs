@@ -4,8 +4,9 @@ use serde_json::{Value, json};
 use zvs_contract::{
     AppError, AppErrorCode, CreateScenarioInput, SaveScenarioDraftInput, ScenarioDetailDto,
     ScenarioDraftDto, ScenarioDto, ScenarioGraphDto, ScenarioId, ScenarioIssueDto,
-    ScenarioNodeTypeDto, ScenarioTriggerKind, ScenarioValidationDto, ScenarioVersionDto,
-    ScenarioVersionId, ToolReferenceKind, UpdateScenarioInput, normalise_tags, validate::js_trim,
+    ScenarioNodeTypeDto, ScenarioOverlap, ScenarioTriggerKind, ScenarioValidationDto,
+    ScenarioVersionDto, ScenarioVersionId, ToolReferenceKind, UpdateScenarioInput, normalise_tags,
+    validate::js_trim,
 };
 
 use super::catalogue::{NodeSpec, ScenarioCatalogue, TOOL_SET, TOOL_SET_PARAM};
@@ -135,6 +136,7 @@ impl ScenarioService {
             name: loaded.row.name.clone(),
             tags: loaded.row.tags.clone(),
             active: loaded.row.active,
+            overlap: loaded.row.overlap,
             current_version_id: stored_id(ScenarioVersionId::parse, &loaded.version.id)?,
             version: unsigned(loaded.version.version)?,
             trigger: loaded.row.trigger.clone(),
@@ -201,6 +203,7 @@ impl ScenarioService {
                 name: js_trim(&input.name).to_owned(),
                 tags: normalise_tags(input.tags.as_deref().unwrap_or_default()),
                 active: false,
+                overlap: ScenarioOverlap::Skip,
                 current_version_id: None,
                 trigger: trigger_binding(&graph, &catalogue),
                 created_at: now,
@@ -241,6 +244,9 @@ impl ScenarioService {
             }
             if let Some(tags) = &input.tags {
                 loaded.row.tags = normalise_tags(tags);
+            }
+            if let Some(overlap) = input.overlap {
+                loaded.row.overlap = overlap;
             }
             if input.graph.is_some() {
                 repositories.scenarios.discard_draft(&loaded.row.id)?;

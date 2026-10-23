@@ -1,7 +1,7 @@
 import type { Json, ScenarioNodeTypeDto, ScenarioParams } from "@zvs/shared";
 import { entityKindOf } from "./entityParams";
 
-export type FieldKind = "text" | "multiline" | "number";
+export type FieldKind = "text" | "multiline" | "number" | "boolean" | "json" | "select";
 
 export interface ParamField {
   readonly key: string;
@@ -9,6 +9,7 @@ export interface ParamField {
   readonly kind?: FieldKind;
   readonly hint?: string;
   readonly placeholder?: string;
+  readonly options?: readonly string[];
 }
 
 export interface NodeForm {
@@ -139,6 +140,57 @@ export function descriptionOf(type: string): string | null {
   return NODE_FORMS[type]?.description ?? null;
 }
 
+function record(value: unknown): Readonly<Record<string, unknown>> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function schemaType(schema: Readonly<Record<string, unknown>>): string | null {
+  const declared = schema.type;
+  if (typeof declared === "string") return declared;
+  if (Array.isArray(declared)) {
+    const concrete = declared.find((entry) => entry !== "null");
+    return typeof concrete === "string" ? concrete : null;
+  }
+  return null;
+}
+
+function schemaKind(schema: Readonly<Record<string, unknown>>): FieldKind {
+  const options = schema.enum;
+  if (Array.isArray(options) && options.every((option) => typeof option === "string")) {
+    return "select";
+  }
+  const kind = schemaType(schema);
+  if (kind === "integer" || kind === "number") return "number";
+  if (kind === "boolean") return "boolean";
+  if (kind === "string") return "text";
+  return "json";
+}
+
+export function schemaFields(schema: Json | undefined): ParamField[] {
+  const root = record(schema);
+  const properties = record(root?.properties);
+  if (properties === null) return [];
+  return Object.entries(properties).flatMap(([key, value]) => {
+    const property = record(value);
+    if (property === null) return [];
+    const kind = schemaKind(property);
+    const title = typeof property.title === "string" ? property.title : key;
+    const description = typeof property.description === "string" ? property.description : undefined;
+    const options = kind === "select" ? (property.enum as string[]) : undefined;
+    return [
+      {
+        key,
+        label: title,
+        kind,
+        ...(description === undefined ? {} : { hint: description }),
+        ...(options === undefined ? {} : { options }),
+      },
+    ];
+  });
+}
+
 export function formFields(spec: ScenarioNodeTypeDto | undefined, type: string): FormField[] {
   const required = new Set(spec?.requiredParams ?? []);
   const declared = NODE_FORMS[type]?.fields ?? [];
@@ -147,8 +199,18 @@ export function formFields(spec: ScenarioNodeTypeDto | undefined, type: string):
     required: required.has(field.key),
     entity: entityKindOf(field.key) !== null,
   }));
+  const known = new Set(declared.map((field) => field.key));
+  for (const field of schemaFields(spec?.paramsSchema)) {
+    if (known.has(field.key)) continue;
+    known.add(field.key);
+    fields.push({
+      ...field,
+      required: required.has(field.key),
+      entity: entityKindOf(field.key) !== null,
+    });
+  }
   for (const key of required) {
-    if (declared.some((field) => field.key === key)) continue;
+    if (known.has(key)) continue;
     fields.push({ key, label: key, required: true, entity: entityKindOf(key) !== null });
   }
   return fields;
@@ -157,6 +219,13 @@ export function formFields(spec: ScenarioNodeTypeDto | undefined, type: string):
 export function fieldValue(field: ParamField, text: string): Json | undefined {
   const trimmed = text.trim();
   if (trimmed.length === 0) return undefined;
+  if (field.kind === "json") {
+    try {
+      return JSON.parse(trimmed) as Json;
+    } catch {
+      return text;
+    }
+  }
   if (field.kind !== "number") return text;
   const number = Number(trimmed.replace(",", "."));
   return Number.isFinite(number) ? number : text;

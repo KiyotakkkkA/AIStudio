@@ -44,6 +44,9 @@ fn node(id: &str, node_type: &str) -> ScenarioNodeDto {
         position: ScenarioPositionDto { x: 0.5, y: 0.5 },
         params: Map::new(),
         disabled: None,
+        settings: None,
+        notes: None,
+        pinned_input: None,
     }
 }
 
@@ -496,6 +499,7 @@ fn saving_a_changed_graph_adds_a_version_and_keeps_the_old_one() {
             tags: None,
             graph: Some(next.clone()),
             note: Some("Без памяти".to_owned()),
+            overlap: None,
         })
         .expect("updates");
     assert_eq!(updated.scenario.version, 2);
@@ -522,6 +526,7 @@ fn saving_a_changed_graph_adds_a_version_and_keeps_the_old_one() {
             tags: None,
             graph: Some(next),
             note: None,
+            overlap: None,
         })
         .expect("renames");
     assert_eq!(renamed.scenario.name, "Новый триаж");
@@ -605,6 +610,7 @@ fn an_active_scenario_is_found_by_its_trigger_and_refuses_an_invalid_save() {
             tags: None,
             graph: Some(ScenarioGraphDto::default()),
             note: None,
+            overlap: None,
         })
         .expect_err("refused");
     assert_eq!(error.message, ACTIVE_SCENARIO_INVALID);
@@ -768,6 +774,7 @@ fn a_draft_survives_until_a_version_is_saved_and_then_goes_away() {
             tags: None,
             graph: Some(working.clone()),
             note: None,
+            overlap: None,
         })
         .expect("saves a version");
     assert_eq!(updated.scenario.version, 2);

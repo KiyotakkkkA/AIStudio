@@ -24,7 +24,20 @@
         }
       ],
       "requiredParams": [],
-      "toolKey": null
+      "toolKey": null,
+      "paramsSchema": {
+        "type": "object",
+        "properties": {
+          "systemMessage": {
+            "type": "string"
+          },
+          "maxIterations": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "idempotent": false
     }
   },
   {
@@ -36,7 +49,17 @@
       "fills": [],
       "slots": [],
       "requiredParams": ["cron"],
-      "toolKey": null
+      "toolKey": null,
+      "paramsSchema": {
+        "type": "object",
+        "properties": {
+          "cron": {
+            "type": "string"
+          }
+        },
+        "required": ["cron"]
+      },
+      "idempotent": true
     }
   },
   {
@@ -48,7 +71,17 @@
       "fills": ["tool"],
       "slots": [],
       "requiredParams": ["query"],
-      "toolKey": "vector.search"
+      "toolKey": "vector.search",
+      "paramsSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": ["query"]
+      },
+      "idempotent": true
     }
   }
 ]

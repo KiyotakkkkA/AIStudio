@@ -36,6 +36,7 @@ pub const ONLY_KERNEL_ENDS: &str = "Only the kernel can end a run";
 pub const NO_PERMISSION_SERVICE: &str = "Сервис разрешений недоступен";
 pub const NO_APPROVAL_SERVICE: &str = "Сервис согласования недоступен";
 pub const NODE_PANICKED: &str = "Узел завершился аварийно";
+pub const STEP_TIMED_OUT: &str = "Превышено время выполнения шага";
 pub const NO_TOOL_NODE: &str =
     "Инструмент нельзя вызвать: источник не предоставил для него исполняемый узел";
 
@@ -371,6 +372,13 @@ impl Scheduler {
                 StepStatus::Succeeded => {
                     state.completed.insert(step.node_id.clone(), step);
                 }
+                StepStatus::Failed
+                    if node.continues_on_error() && step.attempt >= max_attempts(node) =>
+                {
+                    let mut passed = step.clone();
+                    passed.output = failure_output(step.error.as_deref());
+                    state.completed.insert(step.node_id.clone(), passed);
+                }
                 StepStatus::Failed => {
                     let due = step.finished_at.unwrap_or(0) + backoff(node) * step.attempt;
                     state.ready_at.insert(step.node_id.clone(), due);
@@ -507,10 +515,11 @@ impl Scheduler {
         for (key, binding) in node.bindings() {
             let value = match binding {
                 GraphBinding::Run {} => self.run.input.clone(),
-                GraphBinding::Node { node_id } => state
-                    .completed
-                    .get(node_id)
-                    .map_or(Value::Null, |step| step.output.clone()),
+                GraphBinding::Node { node_id, path } => {
+                    state.completed.get(node_id).map_or(Value::Null, |step| {
+                        project(&step.output, path.as_deref().unwrap_or_default())
+                    })
+                }
             };
             input.insert(key.clone(), value);
         }
@@ -570,6 +579,7 @@ impl Scheduler {
         let registry = Arc::clone(&self.options.registry);
         let admit = self.options.admit.clone();
         let node_type = node.node_type.clone();
+        let timeout = node.timeout_ms.map(Duration::from_millis);
         let mut work = tokio::spawn(async move {
             context.check_cancelled()?;
             let definition = registry.get(&node_type)?;
@@ -588,7 +598,14 @@ impl Scheduler {
                 ));
             }
             context.check_cancelled()?;
-            definition.execute(&context, input).await
+            match timeout {
+                Some(limit) => tokio::time::timeout(limit, definition.execute(&context, input))
+                    .await
+                    .unwrap_or_else(|_| {
+                        Err(AppError::new(AppErrorCode::RunFailed, STEP_TIMED_OUT))
+                    }),
+                None => definition.execute(&context, input).await,
+            }
         });
         let joined = |result: Result<Result<Value, AppError>, tokio::task::JoinError>| {
             result.unwrap_or_else(|_| Err(AppError::new(AppErrorCode::Unknown, NODE_PANICKED)))
@@ -648,7 +665,14 @@ impl Scheduler {
                 if permission_failure {
                     state.failure_code = error.code;
                 }
-                if permission_failure || attempt >= max_attempts(&node) {
+                if !permission_failure
+                    && attempt >= max_attempts(&node)
+                    && node.continues_on_error()
+                {
+                    let mut passed = step.clone();
+                    passed.output = failure_output(Some(&error.message));
+                    state.completed.insert(node.id.clone(), passed);
+                } else if permission_failure || attempt >= max_attempts(&node) {
                     state.failure = Some(error.message);
                     drop(state);
                     self.cancel.cancel();
@@ -796,6 +820,25 @@ fn settle(
     result
 }
 
+fn failure_output(message: Option<&str>) -> Value {
+    json!({ "error": message.unwrap_or(EXHAUSTED_MESSAGE) })
+}
+
+pub fn project(value: &Value, path: &str) -> Value {
+    path.split('.')
+        .filter(|segment| !segment.is_empty())
+        .try_fold(value, |current, segment| match current {
+            Value::Object(map) => map.get(segment),
+            Value::Array(items) => segment
+                .parse::<usize>()
+                .ok()
+                .and_then(|index| items.get(index)),
+            _ => None,
+        })
+        .cloned()
+        .unwrap_or(Value::Null)
+}
+
 fn backoff(node: &GraphNode) -> i64 {
     i64::try_from(node.retry().backoff_ms).unwrap_or(i64::MAX)
 }
@@ -860,6 +903,14 @@ impl StepLink for NodeLink {
         if matches!(event, HostEventDraft::End { .. }) {
             return Err(AppError::new(AppErrorCode::Unknown, ONLY_KERNEL_ENDS));
         }
+        let event = match event {
+            HostEventDraft::Log { mut line } => {
+                line.entry("nodeId")
+                    .or_insert_with(|| Value::String(self.node_id.clone()));
+                HostEventDraft::Log { line }
+            }
+            other => other,
+        };
         event.validate()?;
         self.scheduler.emit(event)
     }

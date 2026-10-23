@@ -52,6 +52,7 @@ function AppFrame() {
     void appSettings.takePendingTarget().then((target) => {
       if (target?.kind === "conversation") follow(ROUTES.chat, target.conversationId);
       if (target?.kind === "downloads") follow(ROUTES.downloads);
+      if (target?.kind === "scenarios") follow(ROUTES.scenarios);
     });
   }, [ui.restored, ui.activeRoute, navigation, appSettings, follow]);
 

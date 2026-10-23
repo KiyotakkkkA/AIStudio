@@ -12,6 +12,7 @@ import PageHeader from "../../ui/organisms/PageHeader";
 import { useStore } from "../../stores/useStore";
 import { formatLastUsed } from "../tools/toolPresentation";
 import NodeInspector from "./NodeInspector";
+import RunLogStrip from "./RunLogStrip";
 import ScenarioCanvas from "./ScenarioCanvas";
 import type ScenarioEditor from "./ScenarioEditor";
 import type ScenarioStore from "./ScenarioStore";
@@ -147,6 +148,18 @@ const EditorView = observer(function EditorView({
           {editor.error}
         </Banner>
       )}
+      {editor.execution.error === null ? null : (
+        <Banner
+          tone="err"
+          action={
+            <button type="button" className="text-main-400" onClick={editor.execution.dismissError}>
+              Скрыть
+            </button>
+          }
+        >
+          {editor.execution.error}
+        </Banner>
+      )}
       {editor.notice === null ? null : (
         <Banner
           tone="ok"
@@ -173,9 +186,12 @@ const EditorView = observer(function EditorView({
           Загрузка сценария…
         </div>
       ) : editor.scenario === null ? null : (
-        <div className="mt-3 flex min-h-0 flex-1 border-t border-line">
-          <ScenarioCanvas editor={editor} />
-          <NodeInspector editor={editor} />
+        <div className="mt-3 flex min-h-0 flex-1 flex-col border-t border-line">
+          <div className="flex min-h-0 flex-1">
+            <ScenarioCanvas editor={editor} />
+            <NodeInspector editor={editor} />
+          </div>
+          <RunLogStrip editor={editor} />
         </div>
       )}
     </div>
@@ -249,10 +265,7 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
                 tone={scenario.active ? "ok" : scenario.issueCount > 0 ? "err" : "idle"}
                 title={scenario.active ? "Активен" : "Не активен"}
               />
-              <button
-                type="button"
-                className="flex min-w-0 flex-1 flex-col text-left"
-              >
+              <button type="button" className="flex min-w-0 flex-1 flex-col text-left">
                 <span className="truncate text-[13.5px] font-semibold text-main-50">
                   {scenario.name}
                 </span>

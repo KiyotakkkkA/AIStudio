@@ -1,9 +1,17 @@
-import { mdiAlertCircle, mdiCancel, mdiContentCopy, mdiDeleteOutline } from "@mdi/js";
+import {
+  mdiAlertCircle,
+  mdiCancel,
+  mdiCheckCircle,
+  mdiContentCopy,
+  mdiDeleteOutline,
+  mdiPlayCircle,
+} from "@mdi/js";
 import { ContextMenu } from "@kiyotakkkka/zvs-uikit-lib";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { memo } from "react";
 import Icon from "../../ui/atoms/Icon";
 import { useCanvasActions } from "./canvasActions";
+import { STEP_STATUS_LABELS } from "./runCopy";
 import {
   IN_HANDLE,
   OUT_HANDLE,
@@ -22,6 +30,30 @@ function slotPortClass(port: SlotPort): string {
   return port.filled ? `${PORT} !bg-ok` : PORT;
 }
 
+function Badge({
+  path,
+  tone,
+  title,
+  pulse = false,
+}: {
+  readonly path: string;
+  readonly tone: string;
+  readonly title: string;
+  readonly pulse?: boolean;
+}) {
+  return (
+    <span
+      className={`absolute -top-2 -right-2 flex size-4.5 items-center justify-center rounded-full bg-main-800 ${tone} ${
+        pulse ? "animate-pulse" : ""
+      }`}
+      title={title}
+      aria-label={title}
+    >
+      <Icon path={path} size={16} />
+    </span>
+  );
+}
+
 function ScenarioNodeView({ id, data, selected }: NodeProps<ScenarioFlowNode>) {
   const actions = useCanvasActions();
   const trigger = data.role === "trigger";
@@ -29,9 +61,11 @@ function ScenarioNodeView({ id, data, selected }: NodeProps<ScenarioFlowNode>) {
   const frame = [
     "relative flex items-center rounded-[11px] border bg-main-800 text-left",
     sub ? "gap-2 px-2.5" : "gap-2.5 px-3",
-    selected
-      ? "border-accent-dark shadow-[0_0_0_3px_var(--color-accent-soft),var(--shadow-pop)]"
-      : "border-main-600 shadow-card",
+    data.run === "failed"
+      ? "border-err shadow-[0_0_0_3px_var(--color-err-soft),var(--shadow-card)]"
+      : selected || data.run === "running"
+        ? "border-accent-dark shadow-[0_0_0_3px_var(--color-accent-soft),var(--shadow-pop)]"
+        : "border-main-600 shadow-card",
     trigger ? "border-l-[3px] border-l-accent-dark" : "",
     data.disabled ? "border-dashed opacity-60" : "",
   ].join(" ");
@@ -81,21 +115,24 @@ function ScenarioNodeView({ id, data, selected }: NodeProps<ScenarioFlowNode>) {
           </span>
 
           {problem ? (
-            <span
-              className="absolute -top-2 -right-2 flex size-4.5 items-center justify-center rounded-full bg-main-800 text-err"
-              title={data.issues.join("\n")}
-              aria-label={data.issues.join(". ")}
-            >
-              <Icon path={mdiAlertCircle} size={16} />
-            </span>
+            <Badge path={mdiAlertCircle} tone="text-err" title={data.issues.join("\n")} />
+          ) : data.run === "failed" ? (
+            <Badge
+              path={mdiAlertCircle}
+              tone="text-err"
+              title={data.runError ?? STEP_STATUS_LABELS.failed}
+            />
           ) : data.ceiling !== null ? (
-            <span
-              className="absolute -top-2 -right-2 flex size-4.5 items-center justify-center rounded-full bg-main-800 text-warn"
-              title={data.ceiling}
-              aria-label={data.ceiling}
-            >
-              <Icon path={mdiCancel} size={16} />
-            </span>
+            <Badge path={mdiCancel} tone="text-warn" title={data.ceiling} />
+          ) : data.run === "running" ? (
+            <Badge
+              path={mdiPlayCircle}
+              tone="text-accent-medium"
+              title={STEP_STATUS_LABELS.running}
+              pulse
+            />
+          ) : data.run === "succeeded" ? (
+            <Badge path={mdiCheckCircle} tone="text-ok" title={STEP_STATUS_LABELS.succeeded} />
           ) : null}
 
           {data.hasIn ? (

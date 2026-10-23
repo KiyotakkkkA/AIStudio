@@ -1073,6 +1073,30 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::scenarios::ScenarioRemoveOutput>,
     ),
     (
+        "scenarios/ScenarioOverlap",
+        round_trip::<zvs_contract::scenarios::ScenarioOverlap>,
+    ),
+    (
+        "scenarios/ScenarioOnError",
+        round_trip::<zvs_contract::scenarios::ScenarioOnError>,
+    ),
+    (
+        "scenarios/ScenarioNodeSettingsDto",
+        round_trip::<zvs_contract::scenarios::ScenarioNodeSettingsDto>,
+    ),
+    (
+        "scenarios/ScenarioRunInput",
+        round_trip::<zvs_contract::scenarios::ScenarioRunInput>,
+    ),
+    (
+        "scenarios/ScenarioRunNodeInput",
+        round_trip::<zvs_contract::scenarios::ScenarioRunNodeInput>,
+    ),
+    (
+        "scenarios/ScenarioRetryStepInput",
+        round_trip::<zvs_contract::scenarios::ScenarioRetryStepInput>,
+    ),
+    (
         "scenarios/ScenarioNodeRole",
         round_trip::<zvs_contract::scenarios::ScenarioNodeRole>,
     ),

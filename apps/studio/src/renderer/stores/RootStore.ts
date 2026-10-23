@@ -63,7 +63,7 @@ export class RootStore {
     this.tools = new ToolStore(environment.ipc);
     this.toolchain = new ToolchainStore(environment.ipc, environment.events);
     this.skills = new SkillStore(environment.ipc);
-    this.scenarios = new ScenarioStore(environment.ipc);
+    this.scenarios = new ScenarioStore(environment.ipc, {}, environment.events);
     this.permissions = new PermissionsStore(environment.ipc);
     this.about = new AboutStore(environment.ipc);
     this.appSettings = new AppSettingsStore(environment.ipc);

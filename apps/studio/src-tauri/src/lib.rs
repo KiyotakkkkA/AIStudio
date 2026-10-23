@@ -66,7 +66,10 @@ use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_windo
 use zvs_host::runtimes::{
     ReleaseResolver, ReleaseResolverOptions, RuntimeService, RuntimeServiceOptions,
 };
-use zvs_host::scenarios::{ScenarioService, ScenarioServiceOptions};
+use zvs_host::scenarios::{
+    EffectsSlot, HostScenarioEffects, SCENARIO_FILES_DIR, ScenarioNodeOptions, ScenarioRunner,
+    ScenarioRunnerOptions, ScenarioService, ScenarioServiceOptions, register_scenario_nodes,
+};
 use zvs_host::services::rerank::local_rerankers;
 use zvs_host::services::system::DEMO_INTERVAL;
 use zvs_host::services::{
@@ -713,6 +716,14 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         clock: clock.clone(),
         ..ToolRegistryOptions::new(Arc::clone(&database))
     });
+    let scenario_effects = EffectsSlot::default();
+    register_scenario_nodes(
+        &nodes,
+        &ScenarioNodeOptions {
+            effects: scenario_effects.clone(),
+            tools: Some(tools.clone()),
+        },
+    )?;
     let skill_library = SkillLibrary::new(SkillLibraryOptions {
         logger: logger.clone(),
         clock: clock.clone(),
@@ -965,6 +976,16 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         )
     });
     runs.watch(notifications.watcher());
+    let scenario_runs = ScenarioRunner::new(ScenarioRunnerOptions {
+        logger: logger.clone(),
+        ..ScenarioRunnerOptions::new(scenarios.clone(), runs.clone())
+    });
+    chat.on_message(scenario_runs.chat_listener());
+    scenario_effects.attach(Arc::new(HostScenarioEffects {
+        chat: chat.clone(),
+        notifications: Some(notifications.clone()),
+        files_dir: paths.data_dir.join(SCENARIO_FILES_DIR),
+    }));
     notifications.start()?;
     let launched = cold_launch_target(&logger);
     if let Some(target) = launched {
@@ -996,6 +1017,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         mcp,
         skills,
         scenarios,
+        scenario_runs,
         chat,
         explorer: explorer.clone(),
         terminals,

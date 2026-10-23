@@ -3,8 +3,9 @@ use serde_json::{Map, Value};
 
 use crate::enums::wire_enum;
 use crate::errors::AppError;
-use crate::ids::{ScenarioId, ScenarioVersionId};
-use crate::primitives::{MAX_SAFE_INTEGER, Timestamp};
+use crate::ids::{RunId, ScenarioId, ScenarioVersionId};
+use crate::primitives::{Json, MAX_SAFE_INTEGER, Timestamp};
+use crate::runs::GRAPH_TIMEOUT_MAX_MS;
 use crate::validate::{Validate, check, invalid, js_trim, nested};
 
 wire_enum!(ScenarioSlot {
@@ -19,6 +20,16 @@ wire_enum!(ScenarioTriggerKind {
     Mail => "mail",
     Schedule => "schedule",
     Webhook => "webhook",
+});
+
+wire_enum!(ScenarioOnError {
+    Stop => "stop",
+    Continue => "continue",
+});
+
+wire_enum!(ScenarioOverlap {
+    Skip => "skip",
+    Queue => "queue",
 });
 
 wire_enum!(ScenarioNodeRole {
@@ -59,6 +70,9 @@ pub const SCENARIO_EDGES_MAX: usize = 1000;
 pub const SCENARIO_ATTACHMENTS_MAX: usize = 1000;
 pub const SCENARIO_ISSUES_MAX: usize = 1000;
 pub const SCENARIO_MAIN_PORT: &str = "main";
+pub const SCENARIO_NOTES_MAX: usize = 2000;
+pub const SCENARIO_ATTEMPTS_MAX: u64 = 10;
+pub const SCENARIO_BACKOFF_MAX_MS: u64 = 60_000;
 
 pub type ScenarioParams = Map<String, Value>;
 
@@ -111,6 +125,56 @@ impl Validate for ScenarioPositionDto {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioNodeSettingsDto {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub max_attempts: Option<u64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub backoff_ms: Option<u64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub timeout_ms: Option<u64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub on_error: Option<ScenarioOnError>,
+}
+
+impl ScenarioNodeSettingsDto {
+    pub fn on_error(&self) -> ScenarioOnError {
+        self.on_error.unwrap_or(ScenarioOnError::Stop)
+    }
+}
+
+impl Validate for ScenarioNodeSettingsDto {
+    fn validate(&self) -> Result<(), AppError> {
+        if let Some(attempts) = self.max_attempts {
+            check::int_range("maxAttempts", attempts, 1, SCENARIO_ATTEMPTS_MAX)?;
+        }
+        if let Some(backoff) = self.backoff_ms {
+            check::int_range("backoffMs", backoff, 0, SCENARIO_BACKOFF_MAX_MS)?;
+        }
+        if let Some(timeout) = self.timeout_ms {
+            check::int_range("timeoutMs", timeout, 1, GRAPH_TIMEOUT_MAX_MS)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScenarioNodeDto {
@@ -131,11 +195,33 @@ pub struct ScenarioNodeDto {
         deserialize_with = "crate::wire::present"
     )]
     pub disabled: Option<bool>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub settings: Option<ScenarioNodeSettingsDto>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub notes: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub pinned_input: Option<Json>,
 }
 
 impl ScenarioNodeDto {
     pub fn is_disabled(&self) -> bool {
         self.disabled.unwrap_or(false)
+    }
+
+    pub fn settings(&self) -> ScenarioNodeSettingsDto {
+        self.settings.unwrap_or_default()
     }
 }
 
@@ -148,6 +234,10 @@ impl Validate for ScenarioNodeDto {
             check::max_len("name", name, SCENARIO_NODE_NAME_MAX)?;
         }
         nested("position", self.position.validate())?;
+        nested("settings", self.settings.validate())?;
+        if let Some(notes) = &self.notes {
+            check::max_len("notes", notes, SCENARIO_NOTES_MAX)?;
+        }
         check_params("params", &self.params)
     }
 }
@@ -343,6 +433,7 @@ pub struct ScenarioDto {
     pub name: String,
     pub tags: Vec<String>,
     pub active: bool,
+    pub overlap: ScenarioOverlap,
     pub current_version_id: ScenarioVersionId,
     pub version: u64,
     #[serde(deserialize_with = "crate::wire::nullable")]
@@ -476,6 +567,12 @@ pub struct UpdateScenarioInput {
         deserialize_with = "crate::wire::present"
     )]
     pub note: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub overlap: Option<ScenarioOverlap>,
 }
 
 impl Validate for UpdateScenarioInput {
@@ -565,6 +662,8 @@ pub struct ScenarioNodeTypeDto {
     pub required_params: Vec<String>,
     #[serde(deserialize_with = "crate::wire::nullable")]
     pub tool_key: Option<String>,
+    pub params_schema: Json,
+    pub idempotent: bool,
 }
 
 impl Validate for ScenarioNodeTypeDto {
@@ -612,6 +711,64 @@ pub struct SaveScenarioDraftInput {
 impl Validate for SaveScenarioDraftInput {
     fn validate(&self) -> Result<(), AppError> {
         nested("graph", self.graph.validate())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioRunInput {
+    pub id: ScenarioId,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub graph: Option<ScenarioGraphDto>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub input: Option<Json>,
+}
+
+impl Validate for ScenarioRunInput {
+    fn validate(&self) -> Result<(), AppError> {
+        nested("graph", self.graph.validate())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioRunNodeInput {
+    pub id: ScenarioId,
+    pub graph: ScenarioGraphDto,
+    pub node_id: String,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub input: Option<Json>,
+}
+
+impl Validate for ScenarioRunNodeInput {
+    fn validate(&self) -> Result<(), AppError> {
+        nested("graph", self.graph.validate())?;
+        check_node_id("nodeId", &self.node_id)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioRetryStepInput {
+    pub run_id: RunId,
+    pub node_id: String,
+}
+
+impl Validate for ScenarioRetryStepInput {
+    fn validate(&self) -> Result<(), AppError> {
+        check_node_id("nodeId", &self.node_id)
     }
 }
 

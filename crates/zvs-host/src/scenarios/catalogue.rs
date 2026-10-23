@@ -1,4 +1,4 @@
-use serde_json::Value;
+use serde_json::{Map, Value, json};
 use zvs_contract::{
     ScenarioNodeRole, ScenarioNodeTypeDto, ScenarioSlot, ScenarioSlotSpecDto, ScenarioTriggerKind,
 };
@@ -20,6 +20,7 @@ pub const OUTPUT_CHAT_MESSAGE: &str = "output.chatMessage";
 pub const OUTPUT_NEW_CHAT: &str = "output.newChat";
 pub const OUTPUT_NOTIFY: &str = "output.notify";
 pub const OUTPUT_FILE: &str = "output.file";
+pub const TEMPLATE_PARAM: &str = "template";
 pub const INTERNAL_PREFIXES: &[&str] = &["chat."];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,7 +56,7 @@ impl SlotSpec {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NodeSpec {
     pub node_type: String,
     pub trunk: bool,
@@ -64,6 +65,9 @@ pub struct NodeSpec {
     pub slots: Vec<SlotSpec>,
     pub required_params: Vec<String>,
     pub tool_key: Option<String>,
+    pub params_schema: Value,
+    pub idempotent: bool,
+    pub builtin: bool,
 }
 
 impl NodeSpec {
@@ -76,12 +80,16 @@ impl NodeSpec {
             slots: Vec::new(),
             required_params: Vec::new(),
             tool_key: None,
+            params_schema: object_schema(&[], &[]),
+            idempotent: false,
+            builtin: false,
         }
     }
 
     pub fn trigger(node_type: &str, kind: ScenarioTriggerKind) -> Self {
         Self {
             trigger: Some(kind),
+            idempotent: true,
             ..Self::action(node_type)
         }
     }
@@ -90,6 +98,7 @@ impl NodeSpec {
         Self {
             trunk: false,
             fills: vec![slot],
+            idempotent: true,
             ..Self::action(node_type)
         }
     }
@@ -103,6 +112,19 @@ impl NodeSpec {
     #[must_use]
     pub fn with_required(mut self, params: &[&str]) -> Self {
         self.required_params = params.iter().map(|param| (*param).to_owned()).collect();
+        self
+    }
+
+    #[must_use]
+    pub fn with_schema(mut self, schema: Value) -> Self {
+        self.required_params = required_params(&schema);
+        self.params_schema = schema;
+        self
+    }
+
+    #[must_use]
+    pub const fn built_in(mut self) -> Self {
+        self.builtin = true;
         self
     }
 
@@ -137,6 +159,8 @@ impl NodeSpec {
                 .collect(),
             required_params: self.required_params.clone(),
             tool_key: self.tool_key.clone(),
+            params_schema: self.params_schema.clone(),
+            idempotent: self.idempotent,
         }
     }
 }
@@ -146,39 +170,84 @@ pub struct ScenarioCatalogue {
     specs: Vec<NodeSpec>,
 }
 
+fn text() -> Value {
+    json!({ "type": "string" })
+}
+
+fn bounded_integer(maximum: u64) -> Value {
+    json!({ "type": "integer", "minimum": 1, "maximum": maximum })
+}
+
+fn model_schema() -> Value {
+    object_schema(
+        &[
+            ("providerId", text()),
+            ("modelId", text()),
+            (
+                "temperature",
+                json!({ "type": "number", "minimum": 0, "maximum": 2 }),
+            ),
+        ],
+        &["providerId", "modelId"],
+    )
+}
+
+fn output_schema(fields: &[(&str, Value)], required: &[&str]) -> Value {
+    let mut all = fields.to_vec();
+    all.push((TEMPLATE_PARAM, text()));
+    object_schema(&all, required)
+}
+
 impl ScenarioCatalogue {
     pub fn builtin() -> Self {
-        Self::default()
-            .with(NodeSpec::trigger(TRIGGER_CHAT, ScenarioTriggerKind::Chat))
-            .with(NodeSpec::trigger(TRIGGER_MAIL, ScenarioTriggerKind::Mail))
-            .with(
-                NodeSpec::trigger(TRIGGER_SCHEDULE, ScenarioTriggerKind::Schedule)
-                    .with_required(&["cron"]),
-            )
-            .with(
-                NodeSpec::trigger(TRIGGER_WEBHOOK, ScenarioTriggerKind::Webhook)
-                    .with_required(&["path"]),
-            )
-            .with(NodeSpec::action(AGENT_TOOLS).with_slots(&[
-                SlotSpec::required(ScenarioSlot::Model),
-                SlotSpec::optional(ScenarioSlot::Memory),
-                SlotSpec::many(ScenarioSlot::Tool),
-            ]))
-            .with(
-                NodeSpec::sub_node(MODEL_CHAT, ScenarioSlot::Model)
-                    .with_required(&["providerId", "modelId"]),
-            )
-            .with(NodeSpec::sub_node(MEMORY_WINDOW, ScenarioSlot::Memory))
-            .with(NodeSpec::sub_node(TOOL_SET, ScenarioSlot::Tool).with_required(&[TOOL_SET_PARAM]))
-            .with(
-                NodeSpec::sub_node(EMBEDDING_MODEL, ScenarioSlot::Embedding)
-                    .with_required(&["providerId", "modelId"]),
-            )
-            .with(NodeSpec::action(OUTPUT_CHAT_REPLY))
-            .with(NodeSpec::action(OUTPUT_CHAT_MESSAGE).with_required(&["conversationId"]))
-            .with(NodeSpec::action(OUTPUT_NEW_CHAT))
-            .with(NodeSpec::action(OUTPUT_NOTIFY).with_required(&["title"]))
-            .with(NodeSpec::action(OUTPUT_FILE).with_required(&["path"]))
+        let specs = [
+            NodeSpec::trigger(TRIGGER_CHAT, ScenarioTriggerKind::Chat)
+                .with_schema(object_schema(&[("conversationId", text())], &[])),
+            NodeSpec::trigger(TRIGGER_MAIL, ScenarioTriggerKind::Mail)
+                .with_schema(object_schema(&[("from", text()), ("subject", text())], &[])),
+            NodeSpec::trigger(TRIGGER_SCHEDULE, ScenarioTriggerKind::Schedule)
+                .with_schema(object_schema(&[("cron", text())], &["cron"])),
+            NodeSpec::trigger(TRIGGER_WEBHOOK, ScenarioTriggerKind::Webhook)
+                .with_schema(object_schema(&[("path", text())], &["path"])),
+            NodeSpec::action(AGENT_TOOLS)
+                .with_slots(&[
+                    SlotSpec::required(ScenarioSlot::Model),
+                    SlotSpec::optional(ScenarioSlot::Memory),
+                    SlotSpec::many(ScenarioSlot::Tool),
+                ])
+                .with_schema(object_schema(
+                    &[
+                        ("systemMessage", text()),
+                        ("maxIterations", bounded_integer(20)),
+                    ],
+                    &[],
+                )),
+            NodeSpec::sub_node(MODEL_CHAT, ScenarioSlot::Model).with_schema(model_schema()),
+            NodeSpec::sub_node(MEMORY_WINDOW, ScenarioSlot::Memory)
+                .with_schema(object_schema(&[("size", bounded_integer(100))], &[])),
+            NodeSpec::sub_node(TOOL_SET, ScenarioSlot::Tool).with_schema(object_schema(
+                &[(
+                    TOOL_SET_PARAM,
+                    json!({ "type": "array", "items": { "type": "string" } }),
+                )],
+                &[TOOL_SET_PARAM],
+            )),
+            NodeSpec::sub_node(EMBEDDING_MODEL, ScenarioSlot::Embedding)
+                .with_schema(model_schema()),
+            NodeSpec::action(OUTPUT_CHAT_REPLY).with_schema(output_schema(&[], &[])),
+            NodeSpec::action(OUTPUT_CHAT_MESSAGE).with_schema(output_schema(
+                &[("conversationId", text())],
+                &["conversationId"],
+            )),
+            NodeSpec::action(OUTPUT_NEW_CHAT).with_schema(output_schema(&[("title", text())], &[])),
+            NodeSpec::action(OUTPUT_NOTIFY)
+                .with_schema(output_schema(&[("title", text())], &["title"])),
+            NodeSpec::action(OUTPUT_FILE)
+                .with_schema(output_schema(&[("path", text())], &["path"])),
+        ];
+        specs.into_iter().fold(Self::default(), |catalogue, spec| {
+            catalogue.with(spec.built_in())
+        })
     }
 
     pub fn from_registry(registry: &NodeRegistry) -> Self {
@@ -198,9 +267,9 @@ impl ScenarioCatalogue {
                     } else {
                         Vec::new()
                     },
-                    required_params: required_params(node.input_schema()),
                     tool_key,
-                    ..NodeSpec::action(node.node_type())
+                    idempotent: node.side_effect_free(),
+                    ..NodeSpec::action(node.node_type()).with_schema(node.input_schema().clone())
                 })
             })
     }
@@ -220,6 +289,14 @@ impl ScenarioCatalogue {
     pub fn specs(&self) -> &[NodeSpec] {
         &self.specs
     }
+}
+
+pub fn object_schema(properties: &[(&str, Value)], required: &[&str]) -> Value {
+    let properties: Map<String, Value> = properties
+        .iter()
+        .map(|(name, schema)| ((*name).to_owned(), schema.clone()))
+        .collect();
+    json!({ "type": "object", "properties": properties, "required": required })
 }
 
 fn required_params(schema: &Value) -> Vec<String> {

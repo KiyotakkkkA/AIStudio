@@ -1,0 +1,32 @@
+[
+  {
+    "name": "saved version",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111"
+    }
+  },
+  {
+    "name": "working graph with an event",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "graph": {
+        "nodes": [
+          {
+            "id": "trigger",
+            "type": "trigger.chat",
+            "position": {
+              "x": 40.5,
+              "y": 120.25
+            },
+            "params": {}
+          }
+        ],
+        "edges": [],
+        "attachments": []
+      },
+      "input": {
+        "text": "Как сменить токен?"
+      }
+    }
+  }
+]

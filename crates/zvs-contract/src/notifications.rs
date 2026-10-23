@@ -16,6 +16,7 @@ pub const NAVIGATION_STEP_DOMAIN: &str = "navigation";
 pub enum NotificationTargetDto {
     Conversation { conversation_id: ConversationId },
     Downloads,
+    Scenarios,
 }
 
 no_refinements!(NotificationTargetDto);
@@ -25,6 +26,7 @@ impl NotificationTargetDto {
         match self {
             Self::Conversation { .. } => "/chat",
             Self::Downloads => "/downloads",
+            Self::Scenarios => "/scenarios",
         }
     }
 
@@ -34,6 +36,7 @@ impl NotificationTargetDto {
                 format!("{NOTIFICATION_SCHEME}://conversation/{conversation_id}")
             }
             Self::Downloads => format!("{NOTIFICATION_SCHEME}://downloads"),
+            Self::Scenarios => format!("{NOTIFICATION_SCHEME}://scenarios"),
         }
     }
 
@@ -45,6 +48,7 @@ impl NotificationTargetDto {
         let rest = rest.strip_suffix('/').unwrap_or(rest);
         match rest.split('/').collect::<Vec<_>>().as_slice() {
             ["downloads"] => Some(Self::Downloads),
+            ["scenarios"] => Some(Self::Scenarios),
             ["conversation", id] if id.len() == 36 => ConversationId::parse(id)
                 .map(|conversation_id| Self::Conversation { conversation_id }),
             _ => None,
@@ -69,7 +73,11 @@ mod tests {
 
     #[test]
     fn every_target_survives_a_url_round_trip() {
-        for target in [conversation(), NotificationTargetDto::Downloads] {
+        for target in [
+            conversation(),
+            NotificationTargetDto::Downloads,
+            NotificationTargetDto::Scenarios,
+        ] {
             assert_eq!(
                 NotificationTargetDto::from_url(&target.to_url()),
                 Some(target)

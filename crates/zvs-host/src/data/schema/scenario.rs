@@ -1,7 +1,7 @@
 use rusqlite::Row;
-use zvs_contract::{ScenarioDiffDto, ScenarioTriggerDto, Timestamp};
+use zvs_contract::{ScenarioDiffDto, ScenarioOverlap, ScenarioTriggerDto, Timestamp};
 
-use super::columns::{json_column, optional_json_column};
+use super::columns::{EnumColumn, json_column, optional_json_column};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScenarioRow {
@@ -9,6 +9,7 @@ pub struct ScenarioRow {
     pub name: String,
     pub tags: Vec<String>,
     pub active: bool,
+    pub overlap: ScenarioOverlap,
     pub current_version_id: Option<String>,
     pub trigger: Option<ScenarioTriggerDto>,
     pub created_at: Timestamp,
@@ -17,7 +18,7 @@ pub struct ScenarioRow {
 
 impl ScenarioRow {
     pub const COLUMNS: &str =
-        "id, name, tags, active, current_version_id, trigger, created_at, updated_at";
+        "id, name, tags, active, overlap, current_version_id, trigger, created_at, updated_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -25,6 +26,7 @@ impl ScenarioRow {
             name: row.get("name")?,
             tags: json_column(row, "tags")?,
             active: row.get("active")?,
+            overlap: row.get::<_, EnumColumn<ScenarioOverlap>>("overlap")?.0,
             current_version_id: row.get("current_version_id")?,
             trigger: optional_json_column(row, "trigger")?,
             created_at: row.get("created_at")?,

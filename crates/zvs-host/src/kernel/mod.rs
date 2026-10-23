@@ -17,7 +17,9 @@ pub use mcp_nodes::{
 };
 pub use nodes::{register_core_nodes, register_job_nodes};
 pub use registry::{NodeRegistry, RegisteredNode, input_schema, json_schema};
-pub use scheduler::{AdmitHook, ApprovalHook, Finish, QuestionHook, Scheduler, SchedulerOptions};
+pub use scheduler::{
+    AdmitHook, ApprovalHook, Finish, QuestionHook, Scheduler, SchedulerOptions, project,
+};
 pub use stream::{Observers, RunObserver, RunStream, RunWatcher, Subscription};
 pub use types::{
     AdmissionOrigin, ApprovalDecision, ApprovalObserver, DeferredApproval, FnNode, GraphNeighbors,

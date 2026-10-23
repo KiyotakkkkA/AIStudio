@@ -52,9 +52,10 @@ impl<'c> ScenarioRepository<'c> {
         self.connection
             .prepare_cached(&format!(
                 "INSERT INTO scenario ({columns}, trigger_kind) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) \
                  ON CONFLICT (id) DO UPDATE SET name = excluded.name, tags = excluded.tags, \
-                 active = excluded.active, current_version_id = excluded.current_version_id, \
+                 active = excluded.active, overlap = excluded.overlap, \
+                 current_version_id = excluded.current_version_id, \
                  trigger = excluded.trigger, trigger_kind = excluded.trigger_kind, \
                  updated_at = excluded.updated_at \
                  RETURNING {columns}",
@@ -66,6 +67,7 @@ impl<'c> ScenarioRepository<'c> {
                     row.name,
                     json_text(&row.tags)?,
                     row.active,
+                    EnumColumn(row.overlap),
                     row.current_version_id,
                     trigger,
                     row.created_at,
@@ -195,6 +197,7 @@ mod tests {
             name: "Триаж".to_owned(),
             tags: vec!["support".to_owned()],
             active: false,
+            overlap: zvs_contract::ScenarioOverlap::Skip,
             current_version_id: None,
             trigger: trigger.map(|kind| ScenarioTriggerDto {
                 kind,
@@ -225,6 +228,9 @@ mod tests {
             position: ScenarioPositionDto { x: 0.5, y: 1.5 },
             params: Map::new(),
             disabled: None,
+            settings: None,
+            notes: None,
+            pinned_input: None,
         }
     }
 

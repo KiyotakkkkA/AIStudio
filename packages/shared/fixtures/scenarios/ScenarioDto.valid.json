@@ -6,6 +6,7 @@
       "name": "Support triage bot",
       "tags": ["support"],
       "active": true,
+      "overlap": "queue",
       "currentVersionId": "0199aa11-2222-7222-8222-222222222222",
       "version": 14,
       "trigger": {
@@ -25,6 +26,7 @@
       "name": "Support triage bot",
       "tags": [],
       "active": false,
+      "overlap": "skip",
       "currentVersionId": "0199aa11-2222-7222-8222-222222222222",
       "version": 1,
       "trigger": null,

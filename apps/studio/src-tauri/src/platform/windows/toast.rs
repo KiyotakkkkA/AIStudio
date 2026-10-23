@@ -215,6 +215,7 @@ impl Worker {
                     &self.app_id,
                 )?;
             }
+            NotificationTargetDto::Scenarios => {}
         }
         Ok(())
     }

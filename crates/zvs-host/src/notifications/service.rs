@@ -185,6 +185,16 @@ impl NotificationService {
         }
     }
 
+    pub fn announce(&self, tag: &str, title: &str, body: &str) {
+        self.raise(
+            NotificationKind::Turn,
+            tag,
+            title,
+            copy::clip(body),
+            NotificationTargetDto::Scenarios,
+        );
+    }
+
     pub fn enabled(&self, kind: NotificationKind) -> bool {
         self.setting(NOTIFICATIONS_SETTING_KEY, true) && self.setting(kind.setting_key(), true)
     }

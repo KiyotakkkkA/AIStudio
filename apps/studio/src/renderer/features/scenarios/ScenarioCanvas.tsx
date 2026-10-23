@@ -4,8 +4,10 @@ import {
   mdiFormatAlignLeft,
   mdiMagnifyMinusOutline,
   mdiMagnifyPlusOutline,
+  mdiPlay,
   mdiPlus,
   mdiRedo,
+  mdiStop,
   mdiUndo,
 } from "@mdi/js";
 import {
@@ -45,6 +47,7 @@ const NODE_TYPES = { scenario: ScenarioNodeView };
 const EDGE_TYPES = { scenario: ScenarioEdgeView };
 const PAN_BUTTONS = [1];
 const FIT_OPTIONS = { padding: 0.25, maxZoom: 1, duration: 180 };
+const TEST_BLOCKED = "Запуск недоступен, пока в сценарии есть ошибки";
 
 const FLOW_STYLE = {
   "--xy-selection-background-color": "var(--color-accent-soft)",
@@ -326,7 +329,29 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
         <Toolbar editor={editor} />
 
         {editor.graph.nodes.length === 0 ? null : (
-          <div className="absolute bottom-4.5 left-1/2 z-10 -translate-x-1/2">
+          <div className="absolute bottom-4.5 left-1/2 z-10 flex -translate-x-1/2 gap-2">
+            {editor.execution.running ? (
+              <Button
+                type="button"
+                tone="primary"
+                disabled={editor.execution.cancelling || editor.execution.view === null}
+                onClick={() => void editor.execution.cancel()}
+              >
+                <Icon path={mdiStop} size={15} />
+                Остановить
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                tone="primary"
+                disabled={editor.issues.length > 0}
+                title={editor.issues.length > 0 ? TEST_BLOCKED : undefined}
+                onClick={() => void editor.testRun()}
+              >
+                <Icon path={mdiPlay} size={15} />
+                Тестовый запуск
+              </Button>
+            )}
             <Button type="button" tone="secondary" onClick={editor.openPalette}>
               <Icon path={mdiPlus} size={15} />
               Добавить шаг

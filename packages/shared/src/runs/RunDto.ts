@@ -22,6 +22,7 @@ export const RunKind = z.enum([
   "browser",
   "skill",
 ]);
+export const GRAPH_TIMEOUT_MAX_MS = 3_600_000;
 export const GraphNode = z.object({
   id: z.string().min(1).max(128),
   type: z.string().min(1).max(128),
@@ -32,7 +33,7 @@ export const GraphNode = z.object({
       z.string(),
       z.union([
         z.object({ source: z.literal("run") }),
-        z.object({ source: z.literal("node"), nodeId: z.string() }),
+        z.object({ source: z.literal("node"), nodeId: z.string(), path: z.string().optional() }),
       ]),
     )
     .default({}),
@@ -42,6 +43,8 @@ export const GraphNode = z.object({
       backoffMs: z.number().int().min(0).max(60_000),
     })
     .default({ maxAttempts: 1, backoffMs: 0 }),
+  timeoutMs: z.number().int().min(1).max(GRAPH_TIMEOUT_MAX_MS).optional(),
+  continueOnError: z.boolean().optional(),
 });
 export type GraphNode = z.infer<typeof GraphNode>;
 export const RunGraph = z.object({

@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import type { Contract, ScenarioDto, ScenarioId } from "@zvs/shared";
+import type { EventRouter } from "../../app/EventRouter";
 import ScenarioEditor, { type ScenarioEditorOptions } from "./ScenarioEditor";
 import { scenarioErrorCopy } from "./scenarioCopy";
 
@@ -19,10 +20,11 @@ export default class ScenarioStore {
   constructor(
     private readonly ipc: IpcClient<Contract>,
     private readonly editorOptions: ScenarioEditorOptions = {},
+    private readonly events: EventRouter | null = null,
   ) {
-    makeAutoObservable<ScenarioStore, "ipc" | "editorOptions">(
+    makeAutoObservable<ScenarioStore, "ipc" | "editorOptions" | "events">(
       this,
-      { ipc: false, editorOptions: false },
+      { ipc: false, editorOptions: false, events: false },
       { autoBind: true },
     );
   }
@@ -76,6 +78,7 @@ export default class ScenarioStore {
     this.close();
     const editor = new ScenarioEditor(this.ipc, id, {
       ...this.editorOptions,
+      ...(this.events === null ? {} : { events: this.events }),
       palettePinned: this.palettePinned,
     });
     this.editor = editor;

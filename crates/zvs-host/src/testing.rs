@@ -410,6 +410,15 @@ pub fn test_services(system: SystemService) -> TestServices {
         clock: clock.clone(),
         ..crate::tools::ToolRegistryOptions::new(database.shared())
     });
+    let scenario_effects = crate::scenarios::EffectsSlot::default();
+    crate::scenarios::register_scenario_nodes(
+        &nodes,
+        &crate::scenarios::ScenarioNodeOptions {
+            effects: scenario_effects.clone(),
+            tools: Some(tools.clone()),
+        },
+    )
+    .expect("registers the scenario nodes");
     let skill_library = crate::skills::SkillLibrary::new(crate::skills::SkillLibraryOptions {
         clock: clock.clone(),
         ..crate::skills::SkillLibraryOptions::new(
@@ -526,6 +535,15 @@ pub fn test_services(system: SystemService) -> TestServices {
         ),
     );
     runs.watch(notifications.watcher());
+    let scenario_runs = crate::scenarios::ScenarioRunner::new(
+        crate::scenarios::ScenarioRunnerOptions::new(scenarios.clone(), runs.clone()),
+    );
+    chat.on_message(scenario_runs.chat_listener());
+    scenario_effects.attach(Arc::new(crate::scenarios::HostScenarioEffects {
+        chat: chat.clone(),
+        notifications: Some(notifications.clone()),
+        files_dir: workspace.join("scenario-files"),
+    }));
     TestServices {
         services: Arc::new(Services {
             system,
@@ -551,6 +569,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             mcp,
             skills,
             scenarios,
+            scenario_runs,
             chat,
             explorer: crate::workspace::ExplorerService::with_debounce(
                 folders.clone(),

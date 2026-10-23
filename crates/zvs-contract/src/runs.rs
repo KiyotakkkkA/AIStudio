@@ -67,8 +67,34 @@ wire_enum!(StepStatus {
 )]
 pub enum GraphBinding {
     Run {},
-    Node { node_id: String },
+    Node {
+        node_id: String,
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "crate::wire::present"
+        )]
+        path: Option<String>,
+    },
 }
+
+impl GraphBinding {
+    pub fn node(node_id: impl Into<String>) -> Self {
+        Self::Node {
+            node_id: node_id.into(),
+            path: None,
+        }
+    }
+
+    pub fn node_path(node_id: impl Into<String>, path: impl Into<String>) -> Self {
+        Self::Node {
+            node_id: node_id.into(),
+            path: Some(path.into()),
+        }
+    }
+}
+
+pub const GRAPH_TIMEOUT_MAX_MS: u64 = 3_600_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -123,6 +149,18 @@ pub struct GraphNode {
         deserialize_with = "crate::wire::present"
     )]
     pub retry: Option<RetryPolicy>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub timeout_ms: Option<u64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub continue_on_error: Option<bool>,
 }
 
 impl GraphNode {
@@ -134,7 +172,13 @@ impl GraphNode {
             input: None,
             bindings: None,
             retry: None,
+            timeout_ms: None,
+            continue_on_error: None,
         }
+    }
+
+    pub fn continues_on_error(&self) -> bool {
+        self.continue_on_error.unwrap_or(false)
     }
 
     pub fn dependencies(&self) -> &[String] {
@@ -176,6 +220,9 @@ impl Validate for GraphNode {
         check::max_len("id", &self.id, 128)?;
         check::non_empty("type", &self.node_type)?;
         check::max_len("type", &self.node_type, 128)?;
+        if let Some(timeout) = self.timeout_ms {
+            check::int_range("timeoutMs", timeout, 1, GRAPH_TIMEOUT_MAX_MS)?;
+        }
         nested("retry", self.retry.validate())
     }
 }
@@ -893,12 +940,7 @@ mod tests {
         assert_eq!(
             bindings,
             [
-                (
-                    &"left".to_owned(),
-                    &GraphBinding::Node {
-                        node_id: "b".to_owned()
-                    }
-                ),
+                (&"left".to_owned(), &GraphBinding::node("b")),
                 (&"original".to_owned(), &GraphBinding::Run {}),
             ]
         );

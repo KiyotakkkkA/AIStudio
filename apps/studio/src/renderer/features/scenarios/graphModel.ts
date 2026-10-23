@@ -1,10 +1,12 @@
 import {
   SCENARIO_MAIN_PORT,
   SCENARIO_NODE_ID_MAX,
+  type Json,
   type ScenarioAttachmentDto,
   type ScenarioEdgeDto,
   type ScenarioGraphDto,
   type ScenarioNodeDto,
+  type ScenarioNodeSettingsDto,
   type ScenarioNodeTypeDto,
   type ScenarioParams,
   type ScenarioPositionDto,
@@ -36,6 +38,13 @@ export interface NodePatch {
   readonly name?: string;
   readonly params?: ScenarioParams;
   readonly disabled?: boolean;
+  readonly settings?: ScenarioNodeSettingsDto | null;
+  readonly notes?: string;
+  readonly pinnedInput?: Json | null;
+}
+
+function isEmptySettings(settings: ScenarioNodeSettingsDto): boolean {
+  return Object.values(settings).every((value) => value === undefined);
 }
 
 export type GraphAction =
@@ -340,6 +349,18 @@ function updateNode(graph: ScenarioGraphDto, nodeId: string, patch: NodePatch): 
       if (patch.disabled !== undefined) {
         if (patch.disabled) next.disabled = true;
         else delete next.disabled;
+      }
+      if (patch.settings !== undefined) {
+        if (patch.settings === null || isEmptySettings(patch.settings)) delete next.settings;
+        else next.settings = patch.settings;
+      }
+      if (patch.notes !== undefined) {
+        if (patch.notes.trim().length === 0) delete next.notes;
+        else next.notes = patch.notes;
+      }
+      if (patch.pinnedInput !== undefined) {
+        if (patch.pinnedInput === null) delete next.pinnedInput;
+        else next.pinnedInput = patch.pinnedInput;
       }
       return next;
     }),

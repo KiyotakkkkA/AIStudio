@@ -186,7 +186,7 @@ Electron app untouched. TASK_066's CDP client is reused by TASK_046.
 
 - [x] **TASK_037** — Scenario model, versioning and validation
 - [x] **TASK_038** — Scenario canvas editor
-- [ ] **TASK_039** — Scenario execution, node inspector, run log
+- [x] **TASK_039** — Scenario execution, node inspector, run log
 - [ ] **TASK_040** — Agentic session engine: planning loop and self-extending runs
 - [ ] **TASK_041** — Agentic Build page
 

@@ -290,7 +290,7 @@ impl NodeRegistry {
                 return Err(invalid("Неизвестная зависимость"));
             }
             for (_, binding) in node.bindings() {
-                if let GraphBinding::Node { node_id } = binding
+                if let GraphBinding::Node { node_id, .. } = binding
                     && !dependencies.contains(node_id)
                 {
                     return Err(invalid("Источник данных должен быть зависимостью узла"));

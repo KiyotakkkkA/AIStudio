@@ -19,7 +19,11 @@
       "fills": [],
       "slots": [],
       "requiredParams": [],
-      "toolKey": null
+      "toolKey": null,
+      "paramsSchema": {
+        "type": "object"
+      },
+      "idempotent": true
     }
   },
   {
@@ -31,7 +35,24 @@
       "fills": [],
       "slots": [],
       "requiredParams": [],
-      "toolKey": null
+      "toolKey": null,
+      "paramsSchema": {
+        "type": "object"
+      },
+      "idempotent": true
+    }
+  },
+  {
+    "name": "missing idempotent",
+    "value": {
+      "type": "llm.generate",
+      "role": "action",
+      "trigger": null,
+      "fills": [],
+      "slots": [],
+      "requiredParams": [],
+      "toolKey": null,
+      "paramsSchema": {}
     }
   }
 ]

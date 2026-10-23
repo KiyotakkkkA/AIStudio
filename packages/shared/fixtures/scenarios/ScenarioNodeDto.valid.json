@@ -41,5 +41,27 @@
         "path": "orders"
       }
     }
+  },
+  {
+    "name": "settings, notes and pinned input",
+    "value": {
+      "id": "agent",
+      "type": "agent.tools",
+      "position": {
+        "x": 320.5,
+        "y": 120.25
+      },
+      "params": {},
+      "settings": {
+        "maxAttempts": 3,
+        "backoffMs": 500,
+        "timeoutMs": 30000,
+        "onError": "continue"
+      },
+      "notes": "Проверить ответы на тестовом наборе",
+      "pinnedInput": {
+        "text": "Как сменить токен?"
+      }
+    }
   }
 ]

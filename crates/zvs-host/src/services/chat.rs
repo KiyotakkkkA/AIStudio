@@ -41,7 +41,7 @@ use super::retrieval_query::retrieval_query;
 use super::runs::RunService;
 use super::vector_stores::VectorSearchOptions;
 use crate::commands::PROCESS_TOOLS;
-use crate::data::repositories::{ConversationPatch, MessagePatch, RunPatch};
+use crate::data::repositories::{ConversationPatch, MessagePatch, ProviderFilter, RunPatch};
 use crate::data::schema::{ConversationRow, FolderGrantRow, MessageRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::ports::SharedTextDriver;
@@ -101,6 +101,13 @@ pub const CALL_FORBIDDEN: &str = "Инструмент запрещён разр
 pub const RETRIEVAL_ASSEMBLED: &str = "Retrieval context assembled";
 pub const HISTORY_TRIMMED: &str = "Chat history trimmed";
 pub const MCP_INSTRUCTIONS_HEADING: &str = "Instructions published by the MCP servers whose tools are offered. Follow them when you use those tools; when they point to a resource (for example testix://…), read it with that server's read_resource tool before calling the tool that needs it.";
+pub const NO_DEFAULT_MODEL: &str =
+    "Не выбрана модель по умолчанию ни у одного включённого провайдера";
+pub const CHAT_TRIGGER_HISTORY: usize = 50;
+pub const CHAT_TITLE_MAX: usize = 120;
+
+pub type ChatMessageListener = Arc<dyn Fn(&Value) + Send + Sync>;
+
 pub const NO_EVAL_CASES: &str = "Добавьте хотя бы один вопрос для проверки";
 pub const WORKING_FOLDER_HEADING: &str = "Working folder";
 pub const NO_WORKING_FOLDER_NOTE: &str = "This conversation has no working folder. Every folder needs the user's approval before you can read or change files in it.";
@@ -152,6 +159,7 @@ struct Inner {
     folders: FolderAccessService,
     logger: SharedLogger,
     clock: SharedClock,
+    listeners: Mutex<Vec<ChatMessageListener>>,
 }
 
 #[derive(Clone)]
@@ -2027,6 +2035,7 @@ impl ChatService {
             folders,
             logger: options.logger,
             clock: options.clock,
+            listeners: Mutex::new(Vec::new()),
         });
         options.registry.register(PrepareNode(Arc::clone(&inner)))?;
         options
@@ -2262,6 +2271,97 @@ impl ChatService {
         self.get(conversation_id)
     }
 
+    pub fn on_message(&self, listener: ChatMessageListener) {
+        self.inner
+            .listeners
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(listener);
+    }
+
+    pub fn post_message(&self, conversation_id: &str, text: &str) -> Result<MessageDto, AppError> {
+        self.inner.conversation(conversation_id)?;
+        let now = self.inner.now();
+        let row = MessageRow {
+            id: new_id().hyphenated().to_string(),
+            conversation_id: conversation_id.to_owned(),
+            role: MessageRole::Assistant,
+            content: text.to_owned(),
+            reasoning: String::new(),
+            citations: Vec::new(),
+            tool_calls: Vec::new(),
+            selections: Vec::new(),
+            tokens_in: 0,
+            tokens_out: tokens(text),
+            usage_estimated: true,
+            duration_ms: 0,
+            run_id: None,
+            partial: false,
+            created_at: now,
+        };
+        let saved = self.inner.read(|repositories| {
+            let saved = repositories.chat.add_message(&row)?;
+            repositories
+                .chat
+                .update(conversation_id, &ConversationPatch::touched(now))?;
+            Ok(saved)
+        })?;
+        message_dto(saved)
+    }
+
+    pub fn start_conversation(&self, title: &str, text: &str) -> Result<ConversationDto, AppError> {
+        let default = self.inner.read(|repositories| {
+            Ok(repositories
+                .providers
+                .list(&ProviderFilter {
+                    capability: None,
+                    enabled: Some(true),
+                })?
+                .into_iter()
+                .find_map(|provider| Some((provider.id, provider.default_model_id?))))
+        })?;
+        let (provider_id, model_id) =
+            default.ok_or_else(|| AppError::new(AppErrorCode::Conflict, NO_DEFAULT_MODEL))?;
+        let provider_id = ProviderId::parse(&provider_id)
+            .ok_or_else(|| AppError::new(AppErrorCode::Conflict, NO_DEFAULT_MODEL))?;
+        let title = js_slice(title.trim(), CHAT_TITLE_MAX).to_owned();
+        let conversation = self.create(&CreateConversationInput {
+            title: (!title.is_empty()).then_some(title),
+            ..CreateConversationInput::new(provider_id, model_id)
+        })?;
+        self.post_message(&conversation.id.to_string(), text)?;
+        Ok(conversation)
+    }
+
+    fn announce(&self, conversation_id: &str, message_id: &str, text: &str, prior: &[MessageDto]) {
+        let listeners = self
+            .inner
+            .listeners
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        if listeners.is_empty() {
+            return;
+        }
+        let spoken: Vec<&MessageDto> = prior
+            .iter()
+            .filter(|message| matches!(message.role, MessageRole::User | MessageRole::Assistant))
+            .collect();
+        let history: Vec<Value> = spoken[spoken.len().saturating_sub(CHAT_TRIGGER_HISTORY)..]
+            .iter()
+            .map(|message| json!({ "role": message.role, "content": message.content }))
+            .collect();
+        let event = json!({
+            "conversationId": conversation_id,
+            "messageId": message_id,
+            "text": text,
+            "history": history,
+        });
+        for listener in listeners {
+            listener(&event);
+        }
+    }
+
     pub fn remove(&self, id: &ConversationId) -> Result<(), AppError> {
         let id = id.to_string();
         self.inner.conversation(&id)?;
@@ -2384,6 +2484,7 @@ impl ChatService {
             partial: false,
             created_at: now,
         };
+        let announced = (user.id.clone(), user.content.clone());
         let inner = Arc::clone(&self.inner);
         let observer: RunObserver = Arc::new(move |event: &HostEvent| {
             if let Err(error) = inner.record(&assistant_id, event) {
@@ -2415,6 +2516,12 @@ impl ChatService {
             Some(observer),
         )?;
         drop(subscription);
+        self.announce(
+            &conversation_id,
+            &announced.0,
+            &announced.1,
+            &conversation.messages,
+        );
         Ok(handle)
     }
 

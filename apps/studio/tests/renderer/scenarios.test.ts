@@ -80,6 +80,8 @@ function type(overrides: Partial<ScenarioNodeTypeDto> & { type: string }): Scena
     slots: [],
     requiredParams: [],
     toolKey: null,
+    paramsSchema: { type: "object", properties: {} },
+    idempotent: false,
     ...overrides,
   };
 }
@@ -643,6 +645,7 @@ function detail(graph: Graph, version = 1): ScenarioDetailDto {
     name: "Триаж",
     tags: ["support"],
     active: false,
+    overlap: "skip",
     currentVersionId: VERSION,
     version,
     trigger: null,

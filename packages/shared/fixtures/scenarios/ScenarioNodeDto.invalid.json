@@ -73,5 +73,35 @@
         "": 1
       }
     }
+  },
+  {
+    "name": "too many attempts",
+    "value": {
+      "id": "a",
+      "type": "agent.tools",
+      "position": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "params": {},
+      "settings": {
+        "maxAttempts": 11
+      }
+    }
+  },
+  {
+    "name": "unknown on-error",
+    "value": {
+      "id": "a",
+      "type": "agent.tools",
+      "position": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "params": {},
+      "settings": {
+        "onError": "retry"
+      }
+    }
   }
 ]

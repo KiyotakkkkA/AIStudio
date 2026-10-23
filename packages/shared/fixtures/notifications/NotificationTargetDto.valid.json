@@ -11,5 +11,11 @@
     "value": {
       "kind": "downloads"
     }
+  },
+  {
+    "name": "scenarios",
+    "value": {
+      "kind": "scenarios"
+    }
   }
 ]

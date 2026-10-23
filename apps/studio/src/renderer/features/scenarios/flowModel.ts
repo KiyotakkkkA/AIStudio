@@ -29,6 +29,7 @@ import type ScenarioEditor from "./ScenarioEditor";
 import { slotHandle } from "./ScenarioEditor";
 import { ROLE_LABELS, slotLabel, TOOL_SET_EMPTY, toolCountLabel } from "./scenarioCopy";
 import { isOutputType } from "./nodeForms";
+import type { NodeRunStatus } from "./runModel";
 import { TOOL_SET_TYPE, toolSetKeys } from "./toolSet";
 
 export const IN_HANDLE = "in";
@@ -61,10 +62,14 @@ export interface ScenarioNodeData extends Record<string, unknown> {
   readonly issues: readonly string[];
   readonly ceiling: string | null;
   readonly disabled: boolean;
+  readonly run: NodeRunStatus | null;
+  readonly runError: string | null;
 }
 
 export interface ScenarioEdgeData extends Record<string, unknown> {
   readonly kind: "main" | "attachment";
+  readonly traversed: boolean;
+  readonly items: number | null;
 }
 
 export type ScenarioFlowNode = Node<ScenarioNodeData, "scenario">;
@@ -118,7 +123,9 @@ export function flowNodes(editor: ScenarioEditor): ScenarioFlowNode[] {
   const graph = editor.graph;
   const selected = new Set(editor.selection.nodes);
   const drop = editor.dropTarget;
+  const runs = editor.execution.nodes;
   return graph.nodes.map((node) => {
+    const run = runs.get(node.id);
     const spec = editor.catalogue.get(node.type);
     const size = nodeSize(spec);
     const role = spec?.role ?? null;
@@ -168,6 +175,8 @@ export function flowNodes(editor: ScenarioEditor): ScenarioFlowNode[] {
         issues: editor.issueLines(node.id),
         ceiling: editor.ceilingOf(node.id),
         disabled: node.disabled === true,
+        run: run?.status ?? null,
+        runError: run?.error ?? null,
       },
     };
   });
@@ -176,8 +185,10 @@ export function flowNodes(editor: ScenarioEditor): ScenarioFlowNode[] {
 export function flowEdges(editor: ScenarioEditor): ScenarioFlowEdge[] {
   const graph = editor.graph;
   const selected = new Set(editor.selection.links);
+  const runs = editor.execution.edges(graph);
   const main: ScenarioFlowEdge[] = graph.edges.map((edge) => {
     const id = edgeLinkId(edge);
+    const run = runs.get(id);
     return {
       id,
       type: "scenario",
@@ -187,7 +198,7 @@ export function flowEdges(editor: ScenarioEditor): ScenarioFlowEdge[] {
       targetHandle: IN_HANDLE,
       selected: selected.has(id),
       reconnectable: true,
-      data: { kind: "main" },
+      data: { kind: "main", traversed: run?.traversed ?? false, items: run?.items ?? null },
     };
   });
   const attachments: ScenarioFlowEdge[] = graph.attachments.map((attachment) => {
@@ -201,7 +212,11 @@ export function flowEdges(editor: ScenarioEditor): ScenarioFlowEdge[] {
       targetHandle: UP_HANDLE,
       selected: selected.has(id),
       reconnectable: false,
-      data: { kind: "attachment" },
+      data: {
+        kind: "attachment",
+        traversed: editor.execution.nodes.get(attachment.parentNodeId)?.status === "succeeded",
+        items: null,
+      },
     };
   });
   return [...main, ...attachments];

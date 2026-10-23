@@ -35,5 +35,23 @@
       "type": "work",
       "input": null
     }
+  },
+  {
+    "name": "scenario step",
+    "value": {
+      "id": "agent",
+      "type": "agent.tools",
+      "dependencies": ["trigger"],
+      "input": {},
+      "bindings": {
+        "query": {
+          "source": "node",
+          "nodeId": "trigger",
+          "path": "text"
+        }
+      },
+      "timeoutMs": 30000,
+      "continueOnError": true
+    }
   }
 ]

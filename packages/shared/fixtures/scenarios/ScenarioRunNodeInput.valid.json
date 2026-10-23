@@ -1,0 +1,49 @@
+[
+  {
+    "name": "pinned input",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "graph": {
+        "nodes": [
+          {
+            "id": "trigger",
+            "type": "trigger.chat",
+            "position": {
+              "x": 40.5,
+              "y": 120.25
+            },
+            "params": {}
+          }
+        ],
+        "edges": [],
+        "attachments": []
+      },
+      "nodeId": "trigger",
+      "input": {
+        "text": "привет"
+      }
+    }
+  },
+  {
+    "name": "no input",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "graph": {
+        "nodes": [
+          {
+            "id": "trigger",
+            "type": "trigger.chat",
+            "position": {
+              "x": 40.5,
+              "y": 120.25
+            },
+            "params": {}
+          }
+        ],
+        "edges": [],
+        "attachments": []
+      },
+      "nodeId": "trigger"
+    }
+  }
+]

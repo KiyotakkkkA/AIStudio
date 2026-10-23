@@ -1,0 +1,10 @@
+[
+  {
+    "name": "stop",
+    "value": "stop"
+  },
+  {
+    "name": "continue",
+    "value": "continue"
+  }
+]

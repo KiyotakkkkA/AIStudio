@@ -64,7 +64,7 @@ use crate::platform::picker::SharedPicker;
 use crate::platform::shell::SharedShellPort;
 use crate::platform::theme::SharedThemePort;
 use crate::runtimes::RuntimeService;
-use crate::scenarios::ScenarioService;
+use crate::scenarios::{ScenarioRunner, ScenarioService};
 use crate::skills::SkillService;
 use crate::terminal::TerminalService;
 use crate::toolchain::ToolchainService;
@@ -95,6 +95,7 @@ pub struct Services {
     pub mcp: McpService,
     pub skills: SkillService,
     pub scenarios: ScenarioService,
+    pub scenario_runs: ScenarioRunner,
     pub chat: ChatService,
     pub folders: FolderAccessService,
     pub explorer: ExplorerService,

@@ -72,5 +72,13 @@
       "type": "w",
       "dependencies": null
     }
+  },
+  {
+    "name": "zero timeout",
+    "value": {
+      "id": "a",
+      "type": "w",
+      "timeoutMs": 0
+    }
   }
 ]

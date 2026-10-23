@@ -1,0 +1,14 @@
+[
+  {
+    "name": "zero timeout",
+    "value": {
+      "timeoutMs": 0
+    }
+  },
+  {
+    "name": "long backoff",
+    "value": {
+      "backoffMs": 60001
+    }
+  }
+]
