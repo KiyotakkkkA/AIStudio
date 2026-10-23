@@ -42,7 +42,7 @@ pub const DOCUMENT_TOO_LARGE: &str = "Файл слишком большой д�
 pub const DOCUMENT_UNREADABLE: &str = "Не удалось прочитать файл";
 pub const DOCUMENT_CACHE_FAILED: &str = "Не удалось подготовить документ к просмотру";
 pub const STORE_DOCUMENT_NOT_FOUND: &str = "Документ хранилища не найден";
-pub const CONVERSION_UNAVAILABLE: &str = "Преобразование документов в PDF недоступно: подключите LibreOffice в разделе «Настройки → Компоненты»";
+pub const CONVERSION_UNAVAILABLE: &str = "Преобразование документов в PDF недоступно: подключите LibreOffice в разделе «Расширения → Компоненты»";
 
 fn conversion_unavailable(format: OfficeFormat) -> AppError {
     AppError::new(AppErrorCode::UnsupportedFormat, CONVERSION_UNAVAILABLE)

@@ -20,9 +20,9 @@ const THEME_OPTIONS: readonly { value: RailTheme; label: string; icon: string }[
 export interface NavRailProps {
   readonly groups: readonly NavGroupModel[];
   readonly identity: RailIdentity;
-  readonly version: string;
   readonly collapsed: boolean;
   readonly theme: RailTheme;
+  readonly themePicker: boolean;
   readonly isActive: (item: NavItemModel) => boolean;
   readonly onSelect: (item: NavItemModel) => void;
   readonly onToggleCollapse: () => void;
@@ -36,9 +36,9 @@ const RAIL_ICON_BUTTON =
 export default function NavRail({
   groups,
   identity,
-  version,
   collapsed,
   theme,
+  themePicker,
   isActive,
   onSelect,
   onToggleCollapse,
@@ -59,12 +59,9 @@ export default function NavRail({
         <AppLogo size={32} className="drop-shadow-[0_2px_6px_rgb(180_80_20/0.25)]" />
         {collapsed ? null : (
           <>
-            <div className="flex min-w-0 flex-1 flex-col leading-tight">
-              <span className="truncate text-[14px] font-semibold tracking-[-0.01em] text-main-50">
-                ZVS AI Studio
-              </span>
-              <span className="font-mono text-[10.5px] text-main-500">{version}</span>
-            </div>
+            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-[-0.01em] text-main-50">
+              ZVS AI Studio
+            </span>
             <button
               type="button"
               aria-label="Свернуть панель навигации"
@@ -110,7 +107,7 @@ export default function NavRail({
       </ScrollArea>
 
       <div className={`flex flex-none flex-col gap-2 ${collapsed ? "items-center p-2.5" : "p-3"}`}>
-        {collapsed ? null : (
+        {collapsed || !themePicker ? null : (
           <div
             role="radiogroup"
             aria-label="Тема оформления"
@@ -155,8 +152,8 @@ export default function NavRail({
               </div>
               <button
                 type="button"
-                aria-label="Открыть настройки"
-                title="Открыть настройки"
+                aria-label="Открыть параметры"
+                title="Открыть параметры"
                 onClick={onOpenIdentity}
                 className={RAIL_ICON_BUTTON}
               >

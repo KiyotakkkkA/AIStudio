@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Runtime, Theme};
+use tauri::{AppHandle, Manager, Runtime, Theme};
 use zvs_host::platform::theme::{ThemePort, ThemeSource};
 
 pub struct TauriTheme<R: Runtime>(AppHandle<R>);
@@ -20,6 +20,12 @@ pub const fn tauri_theme(source: ThemeSource) -> Option<Theme> {
 impl<R: Runtime> ThemePort for TauriTheme<R> {
     fn apply(&self, source: ThemeSource) {
         self.0.set_theme(tauri_theme(source));
+    }
+
+    fn zoom(&self, factor: f64) {
+        if let Some(studio) = self.0.get_webview(crate::window::STUDIO) {
+            let _ = studio.set_zoom(factor);
+        }
     }
 }
 

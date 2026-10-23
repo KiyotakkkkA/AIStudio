@@ -54,7 +54,10 @@ use zvs_host::platform::recorder::{FileEventRecorder, recording_enabled_from_env
 use zvs_host::platform::shutdown::{
     DEFAULT_SHUTDOWN_CAP, ExitDecision, ShutdownCoordinator, ShutdownStage,
 };
-use zvs_host::platform::theme::{SharedThemePort, THEME_SETTING_KEY, apply_theme_source};
+use zvs_host::platform::theme::{
+    FONT_SIZE_SETTING_KEY, SharedThemePort, THEME_SETTING_KEY, apply_interface_zoom,
+    apply_theme_source,
+};
 use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_window_state};
 use zvs_host::runtimes::{
     ReleaseResolver, ReleaseResolverOptions, RuntimeService, RuntimeServiceOptions,
@@ -145,6 +148,7 @@ pub fn run() {
                     browser,
                 } => {
                     let services = Arc::clone(&host.services);
+                    let zoom_services = Arc::clone(&services);
                     let gateway = browser.gateway;
                     #[cfg(feature = "e2e")]
                     probe_gateway(Arc::clone(&gateway), logger.clone());
@@ -171,6 +175,12 @@ pub fn run() {
                             );
                         }
                     })?;
+                    if let Ok(stored) = zoom_services.settings.get(FONT_SIZE_SETTING_KEY) {
+                        apply_interface_zoom(
+                            stored.map(|setting| setting.value).as_ref(),
+                            zoom_services.theme.as_ref(),
+                        );
+                    }
                     if let Some(studio) = app.get_window(window::STUDIO) {
                         studio.on_window_event(move |event| {
                             if let WindowEvent::Destroyed = event {

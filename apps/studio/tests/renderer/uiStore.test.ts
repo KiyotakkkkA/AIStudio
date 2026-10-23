@@ -41,7 +41,14 @@ test("the store restores rail and route from the host through the real bridge co
   assert.equal(ui.railWidth, 64);
   assert.deepEqual(
     bridge.calls.map((call) => call.channel),
-    ["settings.get", "settings.get", "settings.get"],
+    [
+      "settings.get",
+      "settings.get",
+      "settings.get",
+      "settings.get",
+      "settings.get",
+      "settings.get",
+    ],
   );
 });
 

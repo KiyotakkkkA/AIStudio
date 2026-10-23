@@ -789,7 +789,7 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
    must include its `dist` in `content` for class scanning.
 8. **Confirmed (TASK_043, 2026-10-23):** LibreOffice is **not** bundled. Office→PDF conversion
    uses a LibreOffice the user already has (Program Files or `PATH`, detected on first use) or
-   a managed copy installed from «Настройки → Компоненты» or «Загрузки»: the official MSI
+   a managed copy installed from «Расширения → Компоненты» or «Загрузки»: the official MSI
    (~360 MB, SHA-256 from the TDF mirror) unpacked with `msiexec /a` into
    `<app data>/mcp-toolchain/libreoffice/<version>` — no admin rights, no system install.
    Without LibreOffice an office document opens with `rendering: "approximate"` and the viewer

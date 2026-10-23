@@ -1,4 +1,4 @@
-import { mdiTuneVariant } from "@mdi/js";
+import { mdiPuzzleOutline } from "@mdi/js";
 import { useState } from "react";
 import HostCheck from "../features/diagnostics/HostCheck";
 import ComponentsTab from "../features/toolchain/ComponentsTab";
@@ -14,12 +14,12 @@ export default function SettingsPage() {
 
   return (
     <PageShell
-      icon={mdiTuneVariant}
-      title="Настройки"
-      subtitle="Конфигурация приложения"
+      icon={mdiPuzzleOutline}
+      title="Расширения"
+      subtitle="Компоненты и среды выполнения"
       toolbar={
         <SegmentedControl
-          label="Раздел настроек"
+          label="Раздел расширений"
           value={tab}
           options={TABS}
           onChange={setTab}

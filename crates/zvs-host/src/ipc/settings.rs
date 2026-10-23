@@ -3,7 +3,9 @@ use std::sync::Arc;
 use zvs_contract::{SettingsGetInput, SettingsGetOutput, SettingsSetInput};
 
 use super::IpcServer;
-use crate::platform::theme::{THEME_SETTING_KEY, apply_theme_source};
+use crate::platform::theme::{
+    FONT_SIZE_SETTING_KEY, THEME_SETTING_KEY, apply_interface_zoom, apply_theme_source,
+};
 use crate::services::Services;
 use crate::services::health_check::is_health_check_key;
 
@@ -32,6 +34,9 @@ pub fn register(server: &mut IpcServer) {
                 }
                 if input.key == THEME_SETTING_KEY {
                     apply_theme_source(Some(&input.value), services.theme.as_ref());
+                }
+                if input.key == FONT_SIZE_SETTING_KEY {
+                    apply_interface_zoom(Some(&input.value), services.theme.as_ref());
                 }
                 Ok(result)
             },

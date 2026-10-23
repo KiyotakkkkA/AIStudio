@@ -252,8 +252,8 @@ test("isolated browser, navigation, cookie management and restart persistence", 
     .getByRole("button", { name: "Развернуть панель навигации" })
     .click();
   await expect.poll(() => reported<Size>("/", "size")?.width).toBe(panel.width);
-  await studio.locator("aside").getByText("Настройки", { exact: true }).click();
-  await expect(studio.locator("h1")).toHaveText("Настройки");
+  await studio.locator("aside").getByText("Расширения", { exact: true }).click();
+  await expect(studio.locator("h1")).toHaveText("Расширения");
   await expect.poll(() => reported<Size>("/", "size")?.visible).toBe("hidden");
   await expect.poll(() => app.surfaces()).toEqual({ windows: 1, webviews: 1 });
   await openBrowser();
@@ -339,7 +339,7 @@ test("isolated browser, navigation, cookie management and restart persistence", 
   });
   expect(rejected).toBe(true);
 
-  await studio.locator("aside").getByText("Настройки", { exact: true }).click();
+  await studio.locator("aside").getByText("Расширения", { exact: true }).click();
   await app.close();
   await launch();
   await openBrowser();

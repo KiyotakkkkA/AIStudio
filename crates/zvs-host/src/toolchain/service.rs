@@ -35,7 +35,7 @@ pub const ALREADY_DOWNLOADING: &str = "Эта среда уже загружае
 pub const NOT_MANAGED: &str = "Обновить можно только копию, загруженную приложением";
 pub const NO_PICKER: &str = "Выбор файла недоступен";
 pub const NO_CHECKSUM: &str = "Загрузка не содержит контрольной суммы и не будет подключена";
-pub const SETTINGS_HINT: &str = "Подключите его в разделе «Настройки → Компоненты».";
+pub const SETTINGS_HINT: &str = "Подключите его в разделе «Расширения → Компоненты».";
 pub const ALREADY_DOWNLOADING_COMPONENT: &str = "Этот компонент уже загружается";
 const STAGING_PREFIX: &str = ".staging-";
 

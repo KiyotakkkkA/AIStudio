@@ -3,6 +3,9 @@ use std::sync::Arc;
 use serde_json::Value;
 
 pub const THEME_SETTING_KEY: &str = "ui.theme";
+pub const FONT_SIZE_SETTING_KEY: &str = "ui.font.size";
+pub const BASE_FONT_SIZE: u64 = 13;
+pub const FONT_SIZE_RANGE: std::ops::RangeInclusive<u64> = 12..=16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ThemeSource {
@@ -24,6 +27,19 @@ impl ThemeSource {
 
 pub trait ThemePort: Send + Sync {
     fn apply(&self, source: ThemeSource);
+
+    fn zoom(&self, _factor: f64) {}
+}
+
+pub fn interface_zoom(value: Option<&Value>) -> f64 {
+    value
+        .and_then(Value::as_u64)
+        .filter(|size| FONT_SIZE_RANGE.contains(size))
+        .map_or(1.0, |size| size as f64 / BASE_FONT_SIZE as f64)
+}
+
+pub fn apply_interface_zoom(value: Option<&Value>, port: &dyn ThemePort) {
+    port.zoom(interface_zoom(value));
 }
 
 pub type SharedThemePort = Arc<dyn ThemePort>;
@@ -54,5 +70,15 @@ mod tests {
             theme.applied(),
             [ThemeSource::Dark, ThemeSource::Light, ThemeSource::System]
         );
+    }
+
+    #[test]
+    fn the_font_size_becomes_a_webview_zoom_relative_to_the_base_size() {
+        assert!((interface_zoom(Some(&json!(13))) - 1.0).abs() < f64::EPSILON);
+        assert!((interface_zoom(Some(&json!(16))) - 16.0 / 13.0).abs() < f64::EPSILON);
+        for value in [json!(40), json!("15"), json!(12.5), Value::Null] {
+            assert!((interface_zoom(Some(&value)) - 1.0).abs() < f64::EPSILON);
+        }
+        assert!((interface_zoom(None) - 1.0).abs() < f64::EPSILON);
     }
 }

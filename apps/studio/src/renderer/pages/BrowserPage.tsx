@@ -1,6 +1,11 @@
+import { observer } from "mobx-react-lite";
 import { useLayoutEffect, useRef, useState } from "react";
+import { interfaceZoom } from "../features/preferences/preferencesPresentation";
+import { useStore } from "../stores/useStore";
 
-export default function BrowserPage() {
+function BrowserPage() {
+  const { ui } = useStore();
+  const zoom = interfaceZoom(ui.fontSize);
   const panel = useRef<HTMLDivElement>(null);
   const [error, setError] = useState(false);
   useLayoutEffect(() => {
@@ -8,8 +13,14 @@ export default function BrowserPage() {
     if (!element) return;
     let disposed = false;
     const update = () => {
-      const { x, y, width, height } = element.getBoundingClientRect();
-      void window.zvs.call("browser.mount", { x, y, width, height }).catch(() => {
+      const rect = element.getBoundingClientRect();
+      const region = {
+        x: rect.x * zoom,
+        y: rect.y * zoom,
+        width: rect.width * zoom,
+        height: rect.height * zoom,
+      };
+      void window.zvs.call("browser.mount", region).catch(() => {
         if (!disposed) setError(true);
       });
     };
@@ -23,7 +34,7 @@ export default function BrowserPage() {
       window.removeEventListener("resize", update);
       void window.zvs.call("browser.hide", undefined).catch(() => undefined);
     };
-  }, []);
+  }, [zoom]);
   return (
     <div ref={panel} className="relative min-h-0 flex-1" aria-label="Рабочая область браузера">
       {error && (
@@ -34,3 +45,5 @@ export default function BrowserPage() {
     </div>
   );
 }
+
+export default observer(BrowserPage);

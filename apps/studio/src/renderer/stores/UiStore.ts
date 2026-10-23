@@ -6,12 +6,33 @@ import { DEFAULT_ROUTE, isRoutePath, type RoutePath } from "../app/routes";
 const RAIL_COLLAPSED_KEY = "ui.rail.collapsed";
 const LAST_ROUTE_KEY = "ui.route.last";
 const THEME_KEY = "ui.theme";
+const RAIL_THEME_PICKER_KEY = "ui.rail.themepicker";
+const FONT_FAMILY_KEY = "ui.font.family";
+const FONT_SIZE_KEY = "ui.font.size";
 
 export const THEME_MODES = ["system", "light", "dark"] as const;
 export type ThemeMode = (typeof THEME_MODES)[number];
 
 function isThemeMode(value: unknown): value is ThemeMode {
   return typeof value === "string" && (THEME_MODES as readonly string[]).includes(value);
+}
+
+export const FONT_FAMILIES = ["onest", "system", "mono"] as const;
+export type FontFamily = (typeof FONT_FAMILIES)[number];
+
+export const FONT_SIZES = [12, 13, 14, 15, 16] as const;
+export type FontSize = (typeof FONT_SIZES)[number];
+export const DEFAULT_FONT_SIZE: FontSize = 13;
+
+export const PREFERENCE_SECTIONS = ["appearance", "about"] as const;
+export type PreferenceSection = (typeof PREFERENCE_SECTIONS)[number];
+
+function isFontFamily(value: unknown): value is FontFamily {
+  return typeof value === "string" && (FONT_FAMILIES as readonly string[]).includes(value);
+}
+
+function isFontSize(value: unknown): value is FontSize {
+  return typeof value === "number" && (FONT_SIZES as readonly number[]).includes(value);
 }
 
 export const VIEWER_DOCK_MIN_WIDTH = 320;
@@ -23,6 +44,10 @@ export class UiStore {
   activeRoute: RoutePath = DEFAULT_ROUTE;
   viewerDockWidth = VIEWER_DOCK_DEFAULT_WIDTH;
   theme: ThemeMode = "system";
+  railThemePicker = true;
+  fontFamily: FontFamily = "onest";
+  fontSize: FontSize = DEFAULT_FONT_SIZE;
+  preferences: PreferenceSection | null = null;
   restored = false;
 
   constructor(private readonly ipc: IpcClient<Contract>) {
@@ -34,13 +59,19 @@ export class UiStore {
   }
 
   async restore(): Promise<void> {
-    const [collapsed, route, theme] = await Promise.all([
+    const [collapsed, route, theme, picker, family, size] = await Promise.all([
       this.read(RAIL_COLLAPSED_KEY),
       this.read(LAST_ROUTE_KEY),
       this.read(THEME_KEY),
+      this.read(RAIL_THEME_PICKER_KEY),
+      this.read(FONT_FAMILY_KEY),
+      this.read(FONT_SIZE_KEY),
     ]);
     runInAction(() => {
       if (isThemeMode(theme)) this.theme = theme;
+      if (typeof picker === "boolean") this.railThemePicker = picker;
+      if (isFontFamily(family)) this.fontFamily = family;
+      if (isFontSize(size)) this.fontSize = size;
       if (typeof collapsed === "boolean") this.railCollapsed = collapsed;
       if (isRoutePath(route)) this.activeRoute = route;
       this.restored = true;
@@ -61,6 +92,32 @@ export class UiStore {
     if (this.theme === theme) return;
     this.theme = theme;
     void this.write(THEME_KEY, theme);
+  }
+
+  setRailThemePicker(visible: boolean): void {
+    if (this.railThemePicker === visible) return;
+    this.railThemePicker = visible;
+    void this.write(RAIL_THEME_PICKER_KEY, visible);
+  }
+
+  setFontFamily(family: FontFamily): void {
+    if (this.fontFamily === family) return;
+    this.fontFamily = family;
+    void this.write(FONT_FAMILY_KEY, family);
+  }
+
+  setFontSize(size: FontSize): void {
+    if (this.fontSize === size) return;
+    this.fontSize = size;
+    void this.write(FONT_SIZE_KEY, size);
+  }
+
+  openPreferences(section: PreferenceSection = "appearance"): void {
+    this.preferences = section;
+  }
+
+  closePreferences(): void {
+    this.preferences = null;
   }
 
   setActiveRoute(route: string): void {
@@ -86,7 +143,7 @@ export class UiStore {
     }
   }
 
-  private async write(key: string, value: boolean | string): Promise<void> {
+  private async write(key: string, value: boolean | string | number): Promise<void> {
     try {
       await this.ipc.call("settings.set", { key, value });
     } catch {

@@ -7,10 +7,9 @@ import NavRail from "../ui/organisms/NavRail";
 import { NAV_GROUPS, RAIL_IDENTITY } from "./navigation";
 import type { NavItemModel } from "../ui/organisms/NavRailTypes";
 import AppShell from "../ui/templates/AppShell";
-import { ROUTES } from "./routes";
 import { HostEvent } from "@zvs/shared";
-
-const APP_VERSION = "v0.1.0 · local";
+import PreferencesDialog from "../features/preferences/PreferencesDialog";
+import { fontStack } from "../features/preferences/preferencesPresentation";
 
 function AppFrame() {
   const { ui } = useStore();
@@ -42,6 +41,13 @@ function AppFrame() {
   }, [ui.theme]);
 
   useEffect(() => {
+    const stack = fontStack(ui.fontFamily);
+    const root = document.documentElement;
+    if (stack === null) root.style.removeProperty("--font-sans");
+    else root.style.setProperty("--font-sans", stack);
+  }, [ui.fontFamily]);
+
+  useEffect(() => {
     if (!restoredOnce.current) return;
     ui.setActiveRoute(navigation.pathname);
   }, [ui, navigation.pathname]);
@@ -58,9 +64,9 @@ function AppFrame() {
     [navigation],
   );
 
-  const openSettings = useCallback(() => {
-    navigation.go(ROUTES.settings);
-  }, [navigation]);
+  const openPreferences = useCallback(() => {
+    ui.openPreferences();
+  }, [ui]);
 
   return (
     <AppShell
@@ -68,18 +74,19 @@ function AppFrame() {
         <NavRail
           groups={NAV_GROUPS}
           identity={RAIL_IDENTITY}
-          version={APP_VERSION}
           collapsed={ui.railCollapsed}
           theme={ui.theme}
+          themePicker={ui.railThemePicker}
           isActive={isActive}
           onSelect={select}
           onToggleCollapse={ui.toggleRail}
-          onOpenIdentity={openSettings}
+          onOpenIdentity={openPreferences}
           onThemeChange={ui.setTheme}
         />
       }
     >
       <Outlet />
+      <PreferencesDialog />
     </AppShell>
   );
 }
