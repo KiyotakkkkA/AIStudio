@@ -14,6 +14,10 @@ export default observer(function ChatWorkspace() {
     void chat.mount();
     return chat.dispose;
   }, [chat]);
+  const activeId = chat.active?.id ?? null;
+  useEffect(() => {
+    void chat.terminal.show(activeId);
+  }, [chat, activeId]);
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
       <ConversationList store={chat} />

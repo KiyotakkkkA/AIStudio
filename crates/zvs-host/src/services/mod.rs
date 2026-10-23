@@ -63,6 +63,7 @@ use crate::platform::shell::SharedShellPort;
 use crate::platform::theme::SharedThemePort;
 use crate::runtimes::RuntimeService;
 use crate::skills::SkillService;
+use crate::terminal::TerminalService;
 use crate::toolchain::ToolchainService;
 use crate::tools::{ToolInvoker, ToolRegistry};
 use crate::workspace::{ExplorerService, FolderAccessService};
@@ -93,6 +94,7 @@ pub struct Services {
     pub chat: ChatService,
     pub folders: FolderAccessService,
     pub explorer: ExplorerService,
+    pub terminals: TerminalService,
     pub documents: DocumentService,
     pub artifacts: crate::artifacts::ArtifactStore,
     pub picker: Option<SharedPicker>,

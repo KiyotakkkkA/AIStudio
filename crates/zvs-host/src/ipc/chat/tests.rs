@@ -239,3 +239,34 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
         &json!("NOT_FOUND")
     );
 }
+
+#[tokio::test]
+async fn removing_a_dialog_closes_its_terminals() {
+    let channels = registered();
+    let created: ConversationDto = data(
+        &channels
+            .server
+            .dispatch(
+                "chat.conversations.create",
+                json!({ "providerId": channels.provider_id, "modelId": "fake-model" }),
+            )
+            .await,
+    );
+    channels
+        .host
+        .terminals
+        .create(&zvs_contract::TerminalCreateInput {
+            conversation_id: created.id,
+            shell: None,
+            cols: 80,
+            rows: 24,
+        })
+        .expect("opens a terminal");
+    let removed = channels
+        .server
+        .dispatch("chat.conversations.remove", json!({ "id": created.id }))
+        .await;
+    assert_eq!(removed, json!({ "ok": true }));
+    assert_eq!(channels.host.terminals.open(), 0);
+    assert!(channels.host.pty.last().killed());
+}

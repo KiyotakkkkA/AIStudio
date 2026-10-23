@@ -15,6 +15,7 @@ mod server;
 pub mod settings;
 pub mod skills;
 pub mod system;
+pub mod terminal;
 pub mod toolchain;
 pub mod tools;
 pub mod vector_stores;
@@ -41,6 +42,7 @@ pub fn register(server: &mut IpcServer) {
     chat::register(server);
     folders::register(server);
     workspace::register(server);
+    terminal::register(server);
     documents::register(server);
     artifacts::register(server);
 }
@@ -189,6 +191,16 @@ mod tests {
                 "system.nativePing",
                 "system.ping",
                 "system.resources",
+                "terminal.attach",
+                "terminal.clear",
+                "terminal.close",
+                "terminal.create",
+                "terminal.list",
+                "terminal.rename",
+                "terminal.resize",
+                "terminal.restart",
+                "terminal.shells",
+                "terminal.write",
                 "toolchain.install",
                 "toolchain.list",
                 "toolchain.remove",

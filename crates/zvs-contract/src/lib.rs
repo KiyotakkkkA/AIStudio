@@ -27,6 +27,7 @@ pub mod secrets;
 pub mod settings;
 pub mod skills;
 pub mod system;
+pub mod terminal;
 pub mod toolchain;
 pub mod tools;
 pub mod validate;
@@ -157,6 +158,12 @@ pub use system::{
     DeviceGpuDto, DeviceProfileDto, DeviceTier, ResourceSampleDto, SystemDemoJobInput,
     SystemDemoStreamInput, SystemDemoStreamOutput, SystemDeviceInput, SystemNativePingInput,
     SystemNativePingOutput, SystemPingInput, SystemPingOutput,
+};
+pub use terminal::{
+    TERMINAL_COLS_MAX, TERMINAL_INPUT_MAX, TERMINAL_ROWS_MAX, TERMINAL_SCROLLBACK_MAX,
+    TERMINAL_SESSIONS_MAX, TERMINAL_STEP_DOMAIN, TERMINAL_TITLE_MAX, TerminalAttachDto,
+    TerminalCreateInput, TerminalRef, TerminalRenameInput, TerminalResizeInput, TerminalSessionDto,
+    TerminalShell, TerminalStatus, TerminalStatusDto, TerminalWriteInput,
 };
 pub use toolchain::{
     ToolchainDto, ToolchainListInput, ToolchainRef, ToolchainRuntime, ToolchainSelectInput,

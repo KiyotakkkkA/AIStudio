@@ -80,6 +80,7 @@ branded_ids!(
     AccountId,
     VectorEvalCaseId,
     FolderGrantId,
+    TerminalId,
 );
 
 pub fn is_wire_uuid(value: &str) -> bool {

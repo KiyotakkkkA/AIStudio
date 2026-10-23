@@ -40,6 +40,7 @@ import { suggestedBaseUrl } from "../providers/providerPresentation";
 import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
 import ArtifactActions from "./ArtifactActions";
 import ExplorerStore from "./explorer/ExplorerStore";
+import TerminalStore from "../terminal/TerminalStore";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
 export const SELECTIONS_FULL = "К сообщению можно приложить не больше 8 фрагментов документов.";
@@ -91,6 +92,7 @@ export default class ChatStore {
   folderPrompt: { path: string } | null = null;
   pendingTurn = false;
   readonly explorer: ExplorerStore;
+  readonly terminal: TerminalStore;
   readonly artifacts: ArtifactActions;
   outcome: "ok" | "cancelled" | "failed" | null = null;
   revealed = 0;
@@ -111,6 +113,7 @@ export default class ChatStore {
     private readonly events: EventRouter,
   ) {
     this.explorer = new ExplorerStore(ipc, events);
+    this.terminal = new TerminalStore(ipc, events);
     this.artifacts = new ArtifactActions(ipc);
     makeAutoObservable<
       ChatStore,
@@ -133,6 +136,7 @@ export default class ChatStore {
         ipc: false,
         events: false,
         explorer: false,
+        terminal: false,
         artifacts: false,
         buffer: false,
         timer: false,
@@ -1119,6 +1123,7 @@ export default class ChatStore {
     this.stopContext?.();
     this.stopContext = undefined;
     this.explorer.dispose();
+    this.terminal.dispose();
   }
 }
 

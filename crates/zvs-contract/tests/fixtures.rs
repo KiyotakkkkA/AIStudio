@@ -709,6 +709,46 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::explorer::ExplorerWatchDto>,
     ),
     (
+        "terminal/TerminalShell",
+        round_trip::<zvs_contract::terminal::TerminalShell>,
+    ),
+    (
+        "terminal/TerminalStatus",
+        round_trip::<zvs_contract::terminal::TerminalStatus>,
+    ),
+    (
+        "terminal/TerminalSessionDto",
+        round_trip::<zvs_contract::terminal::TerminalSessionDto>,
+    ),
+    (
+        "terminal/TerminalCreateInput",
+        round_trip::<zvs_contract::terminal::TerminalCreateInput>,
+    ),
+    (
+        "terminal/TerminalRef",
+        round_trip::<zvs_contract::terminal::TerminalRef>,
+    ),
+    (
+        "terminal/TerminalWriteInput",
+        round_trip::<zvs_contract::terminal::TerminalWriteInput>,
+    ),
+    (
+        "terminal/TerminalResizeInput",
+        round_trip::<zvs_contract::terminal::TerminalResizeInput>,
+    ),
+    (
+        "terminal/TerminalRenameInput",
+        round_trip::<zvs_contract::terminal::TerminalRenameInput>,
+    ),
+    (
+        "terminal/TerminalAttachDto",
+        round_trip::<zvs_contract::terminal::TerminalAttachDto>,
+    ),
+    (
+        "terminal/TerminalStatusDto",
+        round_trip::<zvs_contract::terminal::TerminalStatusDto>,
+    ),
+    (
         "artifacts/ArtifactDto",
         round_trip::<zvs_contract::artifacts::ArtifactDto>,
     ),

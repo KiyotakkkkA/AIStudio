@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
-import { mdiDatabaseOutline, mdiFolderOutline, mdiTuneVariant } from "@mdi/js";
+import { mdiConsole, mdiDatabaseOutline, mdiFolderOutline, mdiTuneVariant } from "@mdi/js";
 import Chip from "../../ui/atoms/Chip";
 import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
 import Icon from "../../ui/atoms/Icon";
@@ -22,16 +22,20 @@ import SelectionChips from "./SelectionChips";
 import { shouldPinToBottom } from "./scroll";
 import type ChatStore from "./ChatStore";
 import { CONTEXT_PANEL, FILES_PANEL, PANEL_GROUP_LABEL } from "./explorer/explorerCopy";
+import TerminalDock from "../terminal/TerminalDock";
+import { TERMINAL_PANEL } from "../terminal/terminalCopy";
 
 function PanelButton({
   label,
   path,
   active,
+  activeClassName = "bg-main-700 text-main-50",
   onClick,
 }: {
   readonly label: string;
   readonly path: string;
   readonly active: boolean;
+  readonly activeClassName?: string;
   readonly onClick: () => void;
 }) {
   return (
@@ -42,7 +46,7 @@ function PanelButton({
       path={path}
       iconSize={16}
       onClick={onClick}
-      className={active ? "bg-main-700 text-main-50" : ""}
+      className={active ? activeClassName : ""}
     />
   );
 }
@@ -113,6 +117,15 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
               onClick={() => store.showPanel("files")}
             />
           )}
+        </div>
+        <div className="flex flex-none items-center rounded-control bg-main-800 p-0.5">
+          <PanelButton
+            label={TERMINAL_PANEL}
+            path={mdiConsole}
+            active={store.terminal.open}
+            activeClassName="bg-accent-soft text-accent-medium hover:bg-accent-soft hover:text-accent-light"
+            onClick={() => void store.terminal.toggle()}
+          />
         </div>
       </header>
       <ScrollArea
@@ -310,6 +323,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
       </div>
       <FolderAccessModal store={store} />
       <ChatComposer store={store} />
+      <TerminalDock store={store.terminal} available={store.active !== null} />
     </section>
   );
 });

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "powershell",
+    "value": "powershell"
+  },
+  {
+    "name": "pwsh",
+    "value": "pwsh"
+  },
+  {
+    "name": "cmd",
+    "value": "cmd"
+  },
+  {
+    "name": "gitBash",
+    "value": "gitBash"
+  },
+  {
+    "name": "wsl",
+    "value": "wsl"
+  }
+]

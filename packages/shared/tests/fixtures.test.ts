@@ -9,6 +9,7 @@ import * as files from "../src/files.js";
 import * as processes from "../src/process.js";
 import * as folders from "../src/folders.js";
 import * as explorer from "../src/explorer.js";
+import * as terminal from "../src/terminal.js";
 import * as notifications from "../src/notifications.js";
 import * as documents from "../src/documents.js";
 import * as artifacts from "../src/artifacts.js";
@@ -202,6 +203,16 @@ const schemas: Record<string, z.ZodType> = {
   "explorer/ExplorerChangeDto": explorer.ExplorerChangeDto,
   "explorer/ExplorerChangesDto": explorer.ExplorerChangesDto,
   "explorer/ExplorerWatchDto": explorer.ExplorerWatchDto,
+  "terminal/TerminalShell": terminal.TerminalShell,
+  "terminal/TerminalStatus": terminal.TerminalStatus,
+  "terminal/TerminalSessionDto": terminal.TerminalSessionDto,
+  "terminal/TerminalCreateInput": terminal.TerminalCreateInput,
+  "terminal/TerminalRef": terminal.TerminalRef,
+  "terminal/TerminalWriteInput": terminal.TerminalWriteInput,
+  "terminal/TerminalResizeInput": terminal.TerminalResizeInput,
+  "terminal/TerminalRenameInput": terminal.TerminalRenameInput,
+  "terminal/TerminalAttachDto": terminal.TerminalAttachDto,
+  "terminal/TerminalStatusDto": terminal.TerminalStatusDto,
   "artifacts/ArtifactDto": artifacts.ArtifactDto,
   "artifacts/ArtifactRef": artifacts.ArtifactRef,
   "artifacts/ArtifactSaveResult": artifacts.ArtifactSaveResult,

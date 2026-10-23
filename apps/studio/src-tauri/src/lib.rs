@@ -80,6 +80,7 @@ use zvs_host::skills::{
     BUNDLED_SKILLS, SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillScriptOptions,
     SkillService, SkillServiceOptions, register_skill_nodes,
 };
+use zvs_host::terminal::{NativePty, SystemShells, TerminalService, TerminalServiceOptions};
 use zvs_host::toolchain::{
     ToolchainResolver, ToolchainResolverOptions, ToolchainService, ToolchainServiceOptions,
 };
@@ -830,6 +831,18 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), Arc::clone(&nodes))
     })?;
     let explorer = ExplorerService::new(folders.clone(), events.clone());
+    let terminals = TerminalService::new(TerminalServiceOptions {
+        folders: folders.clone(),
+        events: events.clone(),
+        clock: clock.clone(),
+        spawner: Arc::new(NativePty),
+        shells: Arc::new(SystemShells::from_env()),
+        launcher: Some(Arc::new(toolchain.clone())),
+        home: std::env::var_os("USERPROFILE")
+            .or_else(|| std::env::var_os("HOME"))
+            .map(std::path::PathBuf::from)
+            .unwrap_or_default(),
+    });
     let tool_invoker = ToolInvoker::new(tools.clone(), nodes, runs.clone(), clock.clone());
     downloads.attach(Arc::new(runs.clone()));
     let retention = RetentionService::new(RetentionServiceOptions {
@@ -874,6 +887,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         let explorer = explorer.clone();
         shutdown.register(ShutdownStage::Stop, "explorer", move || async move {
             explorer.dispose();
+        });
+    }
+    {
+        let terminals = terminals.clone();
+        shutdown.register(ShutdownStage::Stop, "terminals", move || async move {
+            terminals.dispose();
         });
     }
     {
@@ -972,6 +991,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         skills,
         chat,
         explorer: explorer.clone(),
+        terminals,
         documents,
         artifacts,
         folders,

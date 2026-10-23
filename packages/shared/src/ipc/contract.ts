@@ -24,6 +24,16 @@ import {
   ExplorerReadInput,
   ExplorerWatchDto,
 } from "../explorer.js";
+import {
+  TerminalAttachDto,
+  TerminalCreateInput,
+  TerminalRef,
+  TerminalRenameInput,
+  TerminalResizeInput,
+  TerminalSessionDto,
+  TerminalShell,
+  TerminalWriteInput,
+} from "../terminal.js";
 import { NotificationTargetDto } from "../notifications.js";
 import { ArtifactApplicationDto, ArtifactRef, ArtifactSaveResult } from "../artifacts.js";
 import {
@@ -224,6 +234,16 @@ export const contract = defineContract({
   "workspace.read": { input: ExplorerReadInput, output: ExplorerFileDto },
   "workspace.watch": { input: ConversationRef, output: ExplorerWatchDto },
   "workspace.unwatch": { input: ConversationRef, output: z.void() },
+  "terminal.shells": { input: z.void(), output: z.array(TerminalShell) },
+  "terminal.list": { input: ConversationRef, output: z.array(TerminalSessionDto) },
+  "terminal.create": { input: TerminalCreateInput, output: TerminalSessionDto },
+  "terminal.attach": { input: TerminalRef, output: TerminalAttachDto },
+  "terminal.write": { input: TerminalWriteInput, output: z.void() },
+  "terminal.resize": { input: TerminalResizeInput, output: z.void() },
+  "terminal.rename": { input: TerminalRenameInput, output: TerminalSessionDto },
+  "terminal.restart": { input: TerminalRef, output: TerminalSessionDto },
+  "terminal.clear": { input: TerminalRef, output: z.void() },
+  "terminal.close": { input: TerminalRef, output: z.void() },
   "documents.open": { input: DocumentRef, output: DocumentDto },
   "documents.page": { input: DocumentPageInput, output: DocumentPageDto },
   "documents.close": { input: DocumentHandle, output: z.void() },

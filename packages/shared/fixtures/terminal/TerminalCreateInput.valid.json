@@ -1,0 +1,20 @@
+[
+  {
+    "name": "host shell",
+    "value": {
+      "conversationId": "0199aa11-1111-7111-8111-111111111111",
+      "shell": null,
+      "cols": 80,
+      "rows": 24
+    }
+  },
+  {
+    "name": "chosen shell",
+    "value": {
+      "conversationId": "0199aa11-1111-7111-8111-111111111111",
+      "shell": "cmd",
+      "cols": 80,
+      "rows": 24
+    }
+  }
+]

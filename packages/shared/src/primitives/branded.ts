@@ -75,3 +75,6 @@ export type AccountId = z.infer<typeof AccountId>;
 
 export const FolderGrantId = brandedId("FolderGrantId");
 export type FolderGrantId = z.infer<typeof FolderGrantId>;
+
+export const TerminalId = brandedId("TerminalId");
+export type TerminalId = z.infer<typeof TerminalId>;

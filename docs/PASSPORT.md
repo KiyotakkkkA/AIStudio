@@ -706,6 +706,17 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   debounced to 300 ms (at most 2 s) and coalesced; changes travel as `step` events
   `{ domain: "workspace", conversationId, changes }` on the watch's stream, and binding,
   unbinding or a vanished folder report the root (`""`) as modified or removed.
+- **Terminal** (`zvs-host/src/terminal/`). The bottom dock in the chat is the user's own
+  shell, not a tool call: like the explorer it raises **no** access request, and the model has
+  no channel to it. Sessions are ConPTY pseudo-consoles (`portable-pty`) owned by
+  `TerminalService`, keyed by dialog (at most 8), started in the dialog's working folder or the
+  user's home, with the connected toolchain directories on `PATH`. Each session has one stream:
+  output as `token` deltas, status changes as `step` events
+  `{ domain: "terminal", id, status, exitCode }`, and `end` when it closes. The host keeps a
+  256 KiB scrollback so `terminal.attach` can restore the screen, and returns `nextSeq` so
+  the renderer drops events it already has. The host answers ConPTY's startup cursor query
+  itself, because a session can start before any view is attached. Closing a session,
+  deleting its dialog or quitting kills the shell's whole process tree.
 - **Folder access and tool tiers are separate axes.** A grant says *where* a tool may act;
   the tier on the Tools page says *whether* and with what confirmation it may act. Neither
   widens the other.

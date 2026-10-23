@@ -33,7 +33,9 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "chat.conversations.remove",
             |services: Arc<Services>, input: ConversationRef| async move {
-                services.chat.remove(&input.id)
+                services.chat.remove(&input.id)?;
+                services.terminals.close_conversation(&input.id);
+                Ok::<(), zvs_contract::AppError>(())
             },
         )
         .handle(

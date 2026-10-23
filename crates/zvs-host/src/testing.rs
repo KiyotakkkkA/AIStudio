@@ -2,6 +2,7 @@ pub mod fake_accounts;
 pub mod fake_downloads;
 pub mod fake_driver;
 pub mod fake_session;
+pub mod fake_terminal;
 
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -19,6 +20,7 @@ pub use self::fake_accounts::{
 pub use self::fake_downloads::{DownloadAttempt, FakeDownloadJobs, FixedDiskProbe, sha256_hex};
 pub use self::fake_driver::{FAKE_CAPABILITIES, FakeDriver, FakeDriverSource, FakeScript};
 pub use self::fake_session::{FakeReply, FakeSessionGateway, RecordedSessionRequest};
+pub use self::fake_terminal::{FakeProcess, FakePty, FakeShells};
 use crate::browser::BrowserLifecycle;
 use crate::downloads::{
     CatalogueService, CatalogueServiceOptions, DiskService, DiskServiceOptions, DownloadService,
@@ -200,6 +202,7 @@ pub struct TestServices {
     pub toolchain_probe: Arc<FakeProbe>,
     pub nodes: Arc<NodeRegistry>,
     pub run_events: Arc<MemorySink>,
+    pub pty: Arc<FakePty>,
     pub jobs: Arc<FakeJobs>,
     pub download_jobs: Arc<FakeDownloadJobs>,
     pub disk_probe: Arc<FixedDiskProbe>,
@@ -319,6 +322,8 @@ pub fn test_services(system: SystemService) -> TestServices {
     let nodes = Arc::new(NodeRegistry::new());
     let jobs = FakeJobs::shared();
     let workspace = temporary_directory("studio-host-");
+    let pty = FakePty::shared();
+    std::fs::create_dir_all(workspace.join("home")).expect("creates a home folder");
     let downloads_dir = workspace.join("downloads");
     let download_jobs = FakeDownloadJobs::shared();
     let disk_probe = FixedDiskProbe::shared(1000 * GIB, 100 * GIB);
@@ -545,6 +550,20 @@ pub fn test_services(system: SystemService) -> TestServices {
                 run_bus.clone(),
                 std::time::Duration::from_millis(50),
             ),
+            terminals: crate::terminal::TerminalService::new(
+                crate::terminal::TerminalServiceOptions {
+                    folders: folders.clone(),
+                    events: run_bus.clone(),
+                    clock: clock.clone(),
+                    spawner: pty.clone(),
+                    shells: FakeShells::shared(&[
+                        zvs_contract::TerminalShell::PowerShell,
+                        zvs_contract::TerminalShell::Cmd,
+                    ]),
+                    launcher: None,
+                    home: workspace.join("home"),
+                },
+            ),
             artifacts: test_artifacts(workspace.join("artifacts")),
             documents: crate::documents::DocumentService::new(
                 crate::documents::DocumentServiceOptions {
@@ -564,6 +583,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         }),
         nodes,
         run_events,
+        pty,
         jobs,
         download_jobs,
         disk_probe,
