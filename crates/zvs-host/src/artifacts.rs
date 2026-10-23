@@ -66,13 +66,7 @@ pub fn produced(
     mentioned: &[PathBuf],
     since: SystemTime,
 ) -> Vec<PathBuf> {
-    let after = snapshot(directory);
-    let mut found: Vec<PathBuf> = after
-        .iter()
-        .filter(|(path, state)| before.get(*path) != Some(*state))
-        .map(|(path, _)| path.clone())
-        .collect();
-    found.sort();
+    let mut found: Vec<PathBuf> = Vec::new();
     for path in mentioned {
         let fresh = std::fs::metadata(path)
             .ok()
@@ -83,6 +77,13 @@ pub fn produced(
             found.push(path.clone());
         }
     }
+    let mut changed: Vec<PathBuf> = snapshot(directory)
+        .into_iter()
+        .filter(|(path, state)| before.get(path) != Some(state) && !found.contains(path))
+        .map(|(path, _)| path)
+        .collect();
+    changed.sort();
+    found.extend(changed);
     found
         .into_iter()
         .filter(|path| is_artifact(path))
@@ -291,7 +292,34 @@ mod tests {
             .iter()
             .map(|path| path.file_name().unwrap().to_string_lossy().into_owned())
             .collect();
-        assert_eq!(names, ["draft.xlsx", "Отчёт.pdf", "final.pptx"]);
+        assert_eq!(names, ["final.pptx", "draft.xlsx", "Отчёт.pdf"]);
+    }
+
+    #[test]
+    fn documents_named_in_the_arguments_survive_the_cap() {
+        let scratch = tempfile::tempdir().expect("a folder");
+        let before = snapshot(scratch.path());
+        let since = SystemTime::now() - Duration::from_secs(1);
+        for index in 0..ARTIFACTS_PER_CALL + 4 {
+            write(
+                &scratch
+                    .path()
+                    .join("noise")
+                    .join(format!("{index:02}.html")),
+                "x",
+            );
+        }
+        let outside = tempfile::tempdir().expect("another folder");
+        let requested = outside.path().join("demo.pdf");
+        write(&requested, "pdf");
+        let found = produced(
+            scratch.path(),
+            &before,
+            std::slice::from_ref(&requested),
+            since,
+        );
+        assert_eq!(found.len(), ARTIFACTS_PER_CALL);
+        assert_eq!(found[0], requested);
     }
 
     #[test]

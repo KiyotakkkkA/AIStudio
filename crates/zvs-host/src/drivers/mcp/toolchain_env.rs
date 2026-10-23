@@ -20,6 +20,7 @@ pub fn isolated_toolchain_env(root: &Path) -> BTreeMap<String, String> {
         ("UV_TOOL_DIR".to_owned(), path(&["uv", "tools"])),
         ("UV_TOOL_BIN_DIR".to_owned(), path(&["uv", "bin"])),
         ("UV_PYTHON_INSTALL_DIR".to_owned(), path(&["uv", "python"])),
+        ("UV_PYTHON_PREFERENCE".to_owned(), "only-managed".to_owned()),
         ("PIP_CACHE_DIR".to_owned(), path(&["pip-cache"])),
     ])
 }
@@ -41,5 +42,6 @@ mod tests {
         ] {
             assert!(isolated[name].starts_with(&root), "{name}");
         }
+        assert_eq!(isolated["UV_PYTHON_PREFERENCE"], "only-managed");
     }
 }

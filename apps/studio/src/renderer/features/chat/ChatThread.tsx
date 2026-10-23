@@ -278,7 +278,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
         </div>
       </ScrollArea>
       {jump && (
-        <div className="pointer-events-none -mt-12 flex justify-center pb-2">
+        <div className="pointer-events-none relative z-10 -mt-12 flex justify-center pb-2">
           <span className="pointer-events-auto rounded-control shadow-pop">
             <Button
               onClick={() => {
