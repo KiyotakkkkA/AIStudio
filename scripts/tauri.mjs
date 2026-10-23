@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 import process from "node:process";
 
@@ -23,6 +23,9 @@ const features = rest.flatMap((argument, index) => {
 if (features.includes("e2e")) process.env.ZVS_E2E_BUILD = "1";
 
 const profile = release ? ["--release"] : [];
+if (release && process.platform === "win32") {
+  process.env.CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS = "-C target-feature=+crt-static";
+}
 execFileSync("cargo", ["build", "--locked", "--package", "zvs-jobd", ...profile], {
   cwd: root,
   stdio: "inherit",
@@ -35,7 +38,21 @@ if (features.includes("e2e")) {
   );
 }
 
-const tauri = spawnSync("pnpm", ["exec", "tauri", command, ...rest], {
+const bundling = release && !rest.includes("--no-bundle");
+const sidecar = join(
+  root,
+  "target/release",
+  process.platform === "win32" ? "zvs-jobd.exe" : "zvs-jobd",
+);
+const overlay = join(root, "target/tauri.bundle.json");
+if (bundling) {
+  writeFileSync(
+    overlay,
+    JSON.stringify({ bundle: { resources: { [sidecar]: basename(sidecar) } } }),
+  );
+}
+const bundle = bundling ? ["--config", overlay] : [];
+const tauri = spawnSync("pnpm", ["exec", "tauri", command, ...rest, ...bundle], {
   cwd: join(root, "apps/studio"),
   stdio: "inherit",
   shell: process.platform === "win32",

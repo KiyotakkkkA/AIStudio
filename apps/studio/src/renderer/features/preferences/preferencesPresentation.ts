@@ -11,7 +11,9 @@ import { formatBytes } from "../downloads/downloadPresentation";
 import type { AppSettingKey } from "./AppSettingsStore";
 
 export const APP_NAME = "ZVS AI Studio";
-export const APP_VERSION = "0.1.0";
+const APP_VERSION = "1.0.0";
+const APP_CHANNEL = "BETA";
+export const APP_VERSION_LABEL = `${APP_CHANNEL} v${APP_VERSION}`;
 export const APP_EDITION = "Локальная установка";
 
 export const PREFERENCES_TITLE = "Параметры";
@@ -140,7 +142,7 @@ export interface InfoRow {
 export function appRows(): InfoRow[] {
   return [
     { label: "Приложение", value: APP_NAME },
-    { label: "Версия", value: APP_VERSION },
+    { label: "Версия", value: APP_VERSION_LABEL },
     { label: "Сборка", value: APP_EDITION },
   ];
 }

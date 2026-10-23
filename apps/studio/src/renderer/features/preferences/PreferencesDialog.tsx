@@ -24,7 +24,7 @@ import {
 import {
   APP_EDITION,
   APP_NAME,
-  APP_VERSION,
+  APP_VERSION_LABEL,
   CLOSE_PREFERENCES,
   DEVICE_LOADING,
   FONT_FAMILY_HINT,
@@ -218,7 +218,7 @@ const AboutSection = observer(function AboutSection() {
             {APP_NAME}
           </span>
           <span className="font-mono text-[12px] text-main-500">
-            v{APP_VERSION} · {APP_EDITION.toLowerCase()}
+            {APP_VERSION_LABEL} · {APP_EDITION.toLowerCase()}
           </span>
         </div>
       </div>

@@ -765,8 +765,10 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
 ## 16. Build and packaging
 
 - `pnpm build` runs the Vite web build and `tauri build --no-bundle`. `pnpm package` builds
-  the sidecar in release, copies it to its triple-suffixed `externalBin` name, builds the web
-  assets, and runs `tauri build` to produce the NSIS installer.
+  the sidecar in release, builds the web assets, and runs `tauri build` to produce the
+  per-user NSIS installer; the sidecar ships as a bundle resource that lands next to the
+  executable. Release builds on Windows link the C runtime statically (`crt-static`, set by
+  `scripts/tauri.mjs`), so the installer needs no Visual C++ Redistributable.
 - One executable holds the shell, the host, `zvs-core` and SQLite. The only other artefact is
   the `zvs-jobd` sidecar, placed next to the executable. No native module is rebuilt and no
   Node runtime ships.
