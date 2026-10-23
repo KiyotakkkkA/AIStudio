@@ -173,6 +173,18 @@ export default class ViewerStore {
     );
   }
 
+  openSelection(selection: DocumentSelectionDto, location: string | null = null): Promise<void> {
+    return this.open(
+      { source: "document", documentId: selection.documentId },
+      {
+        name: selection.name,
+        location,
+        page: selection.page,
+        passage: Promise.resolve(selection.text),
+      },
+    );
+  }
+
   async open(ref: DocumentRef, options: OpenOptions = {}): Promise<void> {
     this.release();
     const generation = ++this.generation;

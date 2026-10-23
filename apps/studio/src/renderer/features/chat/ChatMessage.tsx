@@ -1,11 +1,25 @@
 import { useState, type ReactNode } from "react";
-import type { ChatCitationDto, VectorStoreDto, VectorStoreId } from "@zvs/shared";
+import type {
+  ChatCitationDto,
+  DocumentSelectionDto,
+  VectorStoreDto,
+  VectorStoreId,
+} from "@zvs/shared";
 import { Accordion, ScrollArea, SlidedPanel, Tabs } from "@kiyotakkkka/zvs-uikit-lib";
 import { mdiFileEyeOutline, mdiThoughtBubbleOutline } from "@mdi/js";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import ChatMarkdown from "./ChatMarkdown";
 import ChatSources from "./ChatSources";
-import { OPEN_CITATION, citationLocation, citationSources } from "./citations";
+import {
+  OPEN_CITATION,
+  OPEN_SELECTION,
+  SELECTIONS_TAB,
+  citationLocation,
+  citationSources,
+  selectionLocation,
+  selectionSources,
+} from "./citations";
+import { excerptPreview } from "./selectionCopy";
 import { useStore } from "../../stores/useStore";
 import MessageActions from "../../ui/molecules/MessageActions";
 import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
@@ -16,6 +30,7 @@ export default function ChatMessage({
   content,
   reasoning = "",
   citations,
+  selections = [],
   stores,
   partial = false,
   generating = false,
@@ -30,6 +45,7 @@ export default function ChatMessage({
   readonly content: string;
   readonly reasoning?: string;
   readonly citations: readonly ChatCitationDto[];
+  readonly selections?: readonly DocumentSelectionDto[];
   readonly stores: readonly VectorStoreDto[];
   readonly partial?: boolean;
   readonly generating?: boolean;
@@ -49,13 +65,15 @@ export default function ChatMessage({
     setSourcesOpen(false);
     void viewer.openCitation(citation, citationLocation(citation, storeName(citation.storeId)));
   };
+  const viewSelection = (selection: DocumentSelectionDto) => {
+    setSourcesOpen(false);
+    void viewer.openSelection(selection, selectionLocation(selection));
+  };
   const citationStoreIds = [...new Set(citations.map((citation) => citation.storeId))];
-  const [activeStoreId, setActiveStoreId] = useState<VectorStoreId | "">(citationStoreIds[0] ?? "");
-  const selectedStoreId =
-    activeStoreId !== "" && citationStoreIds.includes(activeStoreId)
-      ? activeStoreId
-      : (citationStoreIds[0] ?? "");
-  const selectedCitations = citations.filter((citation) => citation.storeId === selectedStoreId);
+  const tabs: string[] = [...(selections.length > 0 ? [SELECTIONS_KEY] : []), ...citationStoreIds];
+  const [activeTab, setActiveTab] = useState<string>(tabs[0] ?? "");
+  const selectedTab = tabs.find((tab) => tab === activeTab) ?? tabs[0] ?? "";
+  const selectedCitations = citations.filter((citation) => citation.storeId === selectedTab);
   const thinking = generating && content === "";
   const sources = citationSources(citations, storeName);
 
@@ -99,12 +117,11 @@ export default function ChatMessage({
           {generating && <GenerationStatus label={status} />}
           <ChatSources
             sources={sources}
-            fragments={citations.length}
-            onOpen={(storeId) => {
-              if (storeId !== undefined) setActiveStoreId(storeId);
-              setSourcesOpen(true);
-            }}
+            selections={selectionSources(selections)}
+            fragments={citations.length + selections.length}
+            onOpen={() => setSourcesOpen(true)}
             onView={view}
+            onViewSelection={viewSelection}
           />
           {artifacts}
           {partial && !generating && (
@@ -142,16 +159,16 @@ export default function ChatMessage({
         </SlidedPanel.Header>
         <SlidedPanel.Content className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-5">
           <Tabs
-            value={selectedStoreId}
-            onChange={(value) => {
-              const storeId = citationStoreIds.find((id) => id === value);
-              if (storeId) setActiveStoreId(storeId);
-            }}
-            options={citationStoreIds.map((id) => ({
+            value={selectedTab}
+            onChange={setActiveTab}
+            options={tabs.map((id) => ({
               value: id,
-              label: stores.find((store) => store.id === id)?.name ?? "Хранилище",
+              label:
+                id === SELECTIONS_KEY
+                  ? SELECTIONS_TAB
+                  : (stores.find((store) => store.id === id)?.name ?? "Хранилище"),
             }))}
-            label="Хранилища источников"
+            label="Группы источников"
             classNames={{
               list: "flex-wrap",
               tab: "text-[12px]",
@@ -160,6 +177,33 @@ export default function ChatMessage({
           />
           <ScrollArea className="min-h-0 flex-1" showScrollbar>
             <div className="space-y-2 pr-1">
+              {selectedTab === SELECTIONS_KEY
+                ? selections.map((selection) => (
+                    <article
+                      key={`${selection.documentId}:${String(selection.page)}:${String(selection.start)}`}
+                      className="rounded-card border border-line bg-main-900 p-3.5"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="min-w-0 truncate text-[13px] font-semibold text-main-100">
+                          {selection.name}
+                        </h3>
+                        <IconButton
+                          label={OPEN_SELECTION}
+                          tooltip="bottom-left"
+                          path={mdiFileEyeOutline}
+                          iconSize={16}
+                          onClick={() => viewSelection(selection)}
+                        />
+                      </div>
+                      <p className="mt-1.5 text-[12px] text-main-500">
+                        {selectionLocation(selection)}
+                      </p>
+                      <p className="mt-2 line-clamp-4 border-l-2 border-accent-line pl-2.5 text-[12.5px]/relaxed text-main-300">
+                        {excerptPreview(selection.text, SELECTION_EXCERPT)}
+                      </p>
+                    </article>
+                  ))
+                : null}
               {selectedCitations.map((citation) => (
                 <article
                   key={`${citation.documentId}:${citation.chunkIndex}`}
@@ -204,6 +248,9 @@ export default function ChatMessage({
     </article>
   );
 }
+
+const SELECTIONS_KEY = "selections";
+const SELECTION_EXCERPT = 600;
 
 function reasoningWords(reasoning: string): number {
   return reasoning.split(/\s+/u).filter(Boolean).length;

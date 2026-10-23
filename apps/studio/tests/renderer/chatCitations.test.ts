@@ -1,10 +1,13 @@
 import { expect, test } from "vitest";
-import { ChatCitationDto, ChatToolCallDto } from "@zvs/shared";
+import { ChatCitationDto, ChatToolCallDto, DocumentSelectionDto } from "@zvs/shared";
 import {
   ALL_FRAGMENTS,
   answerCitations,
   citationSources,
   fragmentsLabel,
+  questionSelections,
+  selectionDetail,
+  selectionSources,
   sourceDetail,
   sourceName,
 } from "../../src/renderer/features/chat/citations.ts";
@@ -71,4 +74,45 @@ test("the fragments link counts what the list leaves out", () => {
     `${ALL_FRAGMENTS} (${(1200).toLocaleString("ru-RU")}) · ещё 3 источника`,
   );
   expect(fragmentsLabel(9, 5)).toBe(`${ALL_FRAGMENTS} (9) · ещё 5 источников`);
+});
+
+const DOC_A = "0199aa11-7777-7111-8111-00000000000a";
+const DOC_B = "0199aa11-7777-7111-8111-00000000000b";
+
+const picked = (documentId: string, page: number | null, start: number) =>
+  DocumentSelectionDto.parse({
+    documentId,
+    name: documentId === DOC_A ? "Отчёт.pdf" : "Заметки.md",
+    page,
+    start,
+    end: start + 5,
+    text: "текст фрагмента",
+    untrusted: true,
+  });
+
+test("selections group by document with their pages in order", () => {
+  const sources = selectionSources([
+    picked(DOC_A, 7, 0),
+    picked(DOC_B, null, 0),
+    picked(DOC_A, 2, 9),
+  ]);
+  expect(sources.map((source) => [source.name, source.pages, source.fragments])).toEqual([
+    ["Отчёт.pdf", [2, 7], 2],
+    ["Заметки.md", [], 1],
+  ]);
+  expect(sources[0]?.selection.page).toBe(2);
+  expect(selectionDetail(sources[0]!)).toBe("выделено в документе · стр. 2, 7");
+  expect(selectionDetail(sources[1]!)).toBe("выделено в документе");
+});
+
+test("an answer takes the fragments attached to the question before it", () => {
+  const first = [picked(DOC_A, 1, 0)];
+  const byAnswer = questionSelections([
+    { id: "q1", role: "user", selections: first },
+    { id: "a1", role: "assistant", selections: [] },
+    { id: "q2", role: "user", selections: [] },
+    { id: "a2", role: "assistant", selections: [] },
+  ]);
+  expect(byAnswer.get("a1")).toBe(first);
+  expect(byAnswer.get("a2")).toEqual([]);
 });

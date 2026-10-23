@@ -9,9 +9,9 @@ export function selectionTitle(selection: DocumentSelectionDto): string {
     : `${selection.name} · стр. ${selection.page.toLocaleString("ru-RU")}`;
 }
 
-export function excerptPreview(text: string): string {
+export function excerptPreview(text: string, limit = EXCERPT_PREVIEW): string {
   const flat = text.replace(/\s+/gu, " ").trim();
-  return flat.length <= EXCERPT_PREVIEW ? flat : `${flat.slice(0, EXCERPT_PREVIEW).trimEnd()}…`;
+  return flat.length <= limit ? flat : `${flat.slice(0, limit).trimEnd()}…`;
 }
 
 export function removeSelectionLabel(selection: DocumentSelectionDto): string {

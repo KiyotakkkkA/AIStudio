@@ -15,10 +15,9 @@ import ChatApprovals from "./ChatApprovals";
 import ChatWorkingFolder from "./ChatWorkingFolder";
 import FolderAccessModal from "./FolderAccessModal";
 import ChatToolCalls from "./ChatToolCalls";
-import { answerCitations } from "./citations";
+import { answerCitations, questionSelections } from "./citations";
 import { answerArtifacts } from "./artifacts";
 import ChatArtifacts from "./ChatArtifacts";
-import SelectionChips from "./SelectionChips";
 import { shouldPinToBottom } from "./scroll";
 import type ChatStore from "./ChatStore";
 import { CONTEXT_PANEL, FILES_PANEL, PANEL_GROUP_LABEL } from "./explorer/explorerCopy";
@@ -56,6 +55,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
   const content = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
   const [jump, setJump] = useState(false);
+  const answerSelections = questionSelections(store.active?.messages ?? []);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const scrollLatest = () => {
@@ -197,11 +197,6 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                       <div className="rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
                         {message.content}
                       </div>
-                      {message.selections.length > 0 ? (
-                        <div className="mt-1.5">
-                          <SelectionChips selections={message.selections} align="end" />
-                        </div>
-                      ) : null}
                     </>
                   )}
                   <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
@@ -224,6 +219,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                 content={message.content}
                 reasoning={message.reasoning}
                 citations={answerCitations(message.citations, message.toolCalls)}
+                selections={answerSelections.get(message.id)}
                 stores={store.stores}
                 partial={message.partial}
                 tools={<ChatToolCalls calls={message.toolCalls} />}
@@ -249,6 +245,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
               content={store.liveText}
               reasoning={store.liveReasoning}
               citations={answerCitations(store.liveCitations, store.liveToolCalls)}
+              selections={store.liveSelections}
               stores={store.stores}
               generating={store.generating}
               status={generationPhase(store)}

@@ -26,5 +26,12 @@
       "source": "artifact",
       "artifactId": "../secret.pdf"
     }
+  },
+  {
+    "name": "viewed document without an id",
+    "value": {
+      "source": "document",
+      "documentId": "d1"
+    }
   }
 ]

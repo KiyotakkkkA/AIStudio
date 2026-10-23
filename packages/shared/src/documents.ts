@@ -27,6 +27,7 @@ export const DocumentRef = z.discriminatedUnion("source", [
     citation: ChatCitationDto.extend({ documentId: z.string().min(1) }),
   }),
   z.object({ source: z.literal("storeDocument"), documentId: DocumentId }),
+  z.object({ source: z.literal("document"), documentId: DocumentId }),
   z.object({ source: z.literal("artifact"), artifactId: ArtifactId }),
 ]);
 export type DocumentRef = z.infer<typeof DocumentRef>;

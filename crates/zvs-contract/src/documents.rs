@@ -64,6 +64,10 @@ pub enum DocumentRef {
         document_id: DocumentId,
     },
     #[serde(rename_all = "camelCase")]
+    Document {
+        document_id: DocumentId,
+    },
+    #[serde(rename_all = "camelCase")]
     Artifact {
         artifact_id: String,
     },
@@ -80,7 +84,7 @@ impl Validate for DocumentRef {
                 check::non_empty("citation.documentId", &citation.document_id)?;
                 nested("citation", citation.validate())
             }
-            Self::StoreDocument { .. } => Ok(()),
+            Self::StoreDocument { .. } | Self::Document { .. } => Ok(()),
             Self::Artifact { artifact_id } => check_artifact_id("artifactId", artifact_id),
         }
     }

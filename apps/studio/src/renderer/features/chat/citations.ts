@@ -1,4 +1,4 @@
-import { ChatCitationDto, type ChatToolCallDto } from "@zvs/shared";
+import { ChatCitationDto, type ChatToolCallDto, type DocumentSelectionDto } from "@zvs/shared";
 import { plural } from "../connections/connectionPresentation";
 
 const ToolCitations = ChatCitationDto.array();
@@ -103,4 +103,74 @@ export function citationLocation(citation: ChatCitationDto, store: string): stri
     ...(citation.page === null ? [] : [`стр. ${citation.page.toLocaleString("ru-RU")}`]),
     ...(citation.section === "" ? [] : [citation.section]),
   ].join(" · ");
+}
+
+export const SELECTIONS_TAB = "Выделенные фрагменты";
+export const SELECTION_ORIGIN = "выделено в документе";
+export const OPEN_SELECTION = "Открыть фрагмент в документе";
+
+export interface SelectionSource {
+  readonly key: string;
+  readonly name: string;
+  readonly pages: readonly number[];
+  readonly fragments: number;
+  readonly selection: DocumentSelectionDto;
+}
+
+export function selectionSources(selections: readonly DocumentSelectionDto[]): SelectionSource[] {
+  const grouped = new Map<
+    string,
+    { selection: DocumentSelectionDto; pages: Set<number>; count: number }
+  >();
+  for (const selection of selections) {
+    const entry = grouped.get(selection.documentId) ?? {
+      selection,
+      pages: new Set<number>(),
+      count: 0,
+    };
+    if (selection.page !== null) entry.pages.add(selection.page);
+    if (
+      selection.page !== null &&
+      (entry.selection.page === null || selection.page < entry.selection.page)
+    )
+      entry.selection = selection;
+    entry.count += 1;
+    grouped.set(selection.documentId, entry);
+  }
+  return [...grouped.entries()].map(([key, entry]) => ({
+    key: `selection:${key}`,
+    name: entry.selection.name,
+    pages: [...entry.pages].sort((left, right) => left - right),
+    fragments: entry.count,
+    selection: entry.selection,
+  }));
+}
+
+export function selectionDetail(source: SelectionSource): string {
+  return [
+    SELECTION_ORIGIN,
+    ...(source.pages.length === 0 ? [] : [`стр. ${source.pages.join(", ")}`]),
+  ].join(" · ");
+}
+
+export function selectionLocation(selection: DocumentSelectionDto): string {
+  return selection.page === null
+    ? SELECTION_ORIGIN
+    : `${SELECTION_ORIGIN} · стр. ${selection.page.toLocaleString("ru-RU")}`;
+}
+
+export function questionSelections(
+  messages: readonly {
+    readonly id: string;
+    readonly role: string;
+    readonly selections: readonly DocumentSelectionDto[];
+  }[],
+): Map<string, readonly DocumentSelectionDto[]> {
+  const byAnswer = new Map<string, readonly DocumentSelectionDto[]>();
+  let question: readonly DocumentSelectionDto[] = [];
+  for (const message of messages) {
+    if (message.role === "user") question = message.selections;
+    else byAnswer.set(message.id, question);
+  }
+  return byAnswer;
 }

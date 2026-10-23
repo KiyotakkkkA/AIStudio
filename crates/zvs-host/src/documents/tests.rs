@@ -492,6 +492,34 @@ async fn opens_by_store_document_and_by_citation_from_the_indexed_path() {
 }
 
 #[tokio::test]
+async fn a_viewed_document_reopens_by_its_id_from_its_source() {
+    let fixture = fixture();
+    let path = fixture.write("notes.md", b"# Plan\n");
+    let opened = fixture.open(&path).await.expect("opens");
+    fixture.service.close(&opened.id).expect("closes");
+
+    let again = fixture
+        .service
+        .open(DocumentRef::Document {
+            document_id: opened.id,
+        })
+        .await
+        .expect("reopens by id");
+    assert_eq!(again.id, opened.id);
+    assert_eq!(again.source_path, opened.source_path);
+    assert!(again.open);
+
+    let error = fixture
+        .service
+        .open(DocumentRef::Document {
+            document_id: DocumentId::parse("0199aa11-9999-7999-8999-999999999999").expect("uuid"),
+        })
+        .await
+        .expect_err("never viewed");
+    assert_eq!(error.code, AppErrorCode::NotFound);
+}
+
+#[tokio::test]
 async fn path_opens_must_be_absolute_existing_and_allowed() {
     let blocked = tempfile::tempdir().expect("a temporary folder");
     let fixture = fixture_with(|options| {

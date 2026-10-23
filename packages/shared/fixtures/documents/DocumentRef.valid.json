@@ -35,5 +35,12 @@
       "source": "artifact",
       "artifactId": "0199aa11-4444-7444-8444-444444444444/Отчёт.docx"
     }
+  },
+  {
+    "name": "viewed document",
+    "value": {
+      "source": "document",
+      "documentId": "0199aa11-5555-7555-8555-555555555555"
+    }
   }
 ]

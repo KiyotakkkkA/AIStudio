@@ -259,6 +259,10 @@ impl DocumentService {
                 let (_, source) = self.store_document(&document_id.to_string())?;
                 Ok((self.indexed_path(&source)?, None))
             }
+            DocumentRef::Document { document_id } => {
+                let row = self.row(document_id)?;
+                Ok((self.indexed_path(&row.source_path)?, None))
+            }
             DocumentRef::Artifact { artifact_id } => {
                 let artifacts = self
                     .options()

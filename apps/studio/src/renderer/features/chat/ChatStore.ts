@@ -76,6 +76,7 @@ export default class ChatStore {
   liveText = "";
   liveReasoning = "";
   liveCitations: ChatCitationDto[] = [];
+  liveSelections: DocumentSelectionDto[] = [];
   liveToolCalls: ChatToolCallDto[] = [];
   searchedStoreIds: VectorStoreDto["id"][] = [];
   approvals: {
@@ -628,6 +629,7 @@ export default class ChatStore {
         this.liveText = "";
         this.liveReasoning = "";
         this.liveCitations = [];
+        this.liveSelections = [];
         this.liveToolCalls = [];
         this.outcome = null;
         this.retryText = "";
@@ -657,6 +659,7 @@ export default class ChatStore {
     this.liveText = "";
     this.liveReasoning = "";
     this.liveCitations = [];
+    this.liveSelections = [];
     this.liveToolCalls = [];
     this.retryText = "";
     this.pendingTurn = false;
@@ -702,6 +705,7 @@ export default class ChatStore {
     this.retryText = text;
     this.liveText = "";
     this.liveCitations = [];
+    this.liveSelections = [];
     this.liveToolCalls = [];
     this.searchedStoreIds = [];
     this.pendingTurn = true;
@@ -715,9 +719,11 @@ export default class ChatStore {
         settings: { temperature: this.composer.temperature },
         selections: [...this.composer.selections],
       });
+      const sentSelections = [...this.composer.selections];
       runInAction(() => {
         this.run = run;
         this.lastSeq = -1;
+        this.liveSelections = sentSelections;
         this.composer.setText("");
         this.composer.clearSelections();
         this.sending = false;
@@ -899,6 +905,7 @@ export default class ChatStore {
         this.liveText = "";
         this.liveReasoning = "";
         this.liveCitations = [];
+        this.liveSelections = [];
         this.liveToolCalls = [];
         this.pendingTurn = false;
         this.retryText = "";
@@ -1085,6 +1092,7 @@ export default class ChatStore {
         this.liveText = "";
         this.liveReasoning = "";
         this.liveCitations = [];
+        this.liveSelections = [];
         this.liveToolCalls = [];
         this.pendingTurn = false;
       });
