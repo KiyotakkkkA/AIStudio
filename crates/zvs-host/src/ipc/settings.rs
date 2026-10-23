@@ -27,6 +27,7 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "settings.set",
             |services: Arc<Services>, input: SettingsSetInput| async move {
+                services.notifications.apply(&input.key, &input.value)?;
                 let result = services.settings.set(&input.key, &input.value)?;
                 if is_health_check_key(&input.key) {
                     services.health.stop();
@@ -133,6 +134,51 @@ mod tests {
             assert_eq!(host.health.running(), running, "{key}");
         }
         assert_eq!(host.health.interval_minutes(), 5);
+    }
+
+    #[tokio::test]
+    async fn the_tray_and_autostart_settings_reach_the_shell_before_they_are_stored() {
+        let (host, server) = server();
+        for (key, value) in [
+            ("app.tray", json!(true)),
+            ("app.autostart", json!(true)),
+            ("app.tray", json!(false)),
+            ("ui.rail.collapsed", json!(true)),
+        ] {
+            let response = server
+                .dispatch("settings.set", json!({ "key": key, "value": value }))
+                .await;
+            assert_eq!(response["ok"], json!(true), "{key}");
+        }
+        assert_eq!(host.shell.tray(), [true, false]);
+        assert_eq!(host.shell.registered(), Some(true));
+    }
+
+    #[tokio::test]
+    async fn a_refused_autostart_change_fails_and_keeps_the_stored_value() {
+        let (host, server) = server();
+        host.settings
+            .set("app.autostart", &json!(false))
+            .expect("stores");
+        host.shell.fail_autostart(true);
+        let response = server
+            .dispatch(
+                "settings.set",
+                json!({ "key": "app.autostart", "value": true }),
+            )
+            .await;
+        assert_eq!(response["error"]["code"], json!("NATIVE_ERROR"));
+        assert_eq!(
+            response["error"]["message"],
+            json!(crate::notifications::copy::AUTOSTART_FAILED)
+        );
+        assert_eq!(
+            host.settings
+                .get("app.autostart")
+                .expect("reads")
+                .map(|setting| setting.value),
+            Some(json!(false))
+        );
     }
 
     #[tokio::test]

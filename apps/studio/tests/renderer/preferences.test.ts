@@ -5,8 +5,16 @@ import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createFakeClock } from "../../../../test/helpers/fakeClock.ts";
 import { UiStore } from "../../src/renderer/stores/UiStore.ts";
 import AboutStore from "../../src/renderer/features/preferences/AboutStore.ts";
+import AppSettingsStore from "../../src/renderer/features/preferences/AppSettingsStore.ts";
+import { PREFERENCE_SECTIONS } from "../../src/renderer/stores/UiStore.ts";
 import {
+  AUTOSTART_FAILED,
   DEVICE_UNAVAILABLE,
+  GENERAL_ROWS,
+  NOTIFICATION_KIND_ROWS,
+  NOTIFICATIONS_ROW,
+  SECTION_LABELS,
+  SETTING_SAVE_FAILED,
   deviceRows,
   fontSizeLabel,
   fontStack,
@@ -111,4 +119,71 @@ test("the about section describes the computer and loads it once", async () => {
   );
   await failing.load();
   expect(failing.error).toBe(DEVICE_UNAVAILABLE);
+});
+
+function appSettings(seed: Record<string, Json> = {}) {
+  const stored = new Map<string, Json>(Object.entries(seed));
+  const clock = createFakeClock();
+  const bridge = createFakeBridge<Contract>()
+    .handle("settings.get", ({ key }) => ({ key, value: stored.get(key) }))
+    .handle("settings.set", ({ key, value }) => {
+      stored.set(key, value);
+      return { key, value, updatedAt: clock.advance(1_000) };
+    });
+  return { bridge, stored, store: new AppSettingsStore(createIpcClient(contract, bridge)) };
+}
+
+test("the application group lists general, appearance, notifications and about in order", () => {
+  expect(PREFERENCE_SECTIONS.map((section) => SECTION_LABELS[section])).toEqual([
+    "Общие",
+    "Внешний вид",
+    "Уведомления",
+    "О системе",
+  ]);
+  expect(GENERAL_ROWS.map((row) => row.key)).toEqual(["app.autostart", "app.tray"]);
+  expect(NOTIFICATIONS_ROW.key).toBe("notifications.enabled");
+  expect(NOTIFICATION_KIND_ROWS.map((row) => row.key)).toEqual([
+    "notifications.approval",
+    "notifications.turn",
+    "notifications.download",
+  ]);
+});
+
+test("application settings load with their defaults and persist each toggle", async () => {
+  const { stored, store } = appSettings({ "app.tray": true, "notifications.turn": "yes" });
+  await store.load();
+  expect(store.values).toEqual({
+    "app.autostart": false,
+    "app.tray": true,
+    "notifications.enabled": true,
+    "notifications.approval": true,
+    "notifications.turn": true,
+    "notifications.download": true,
+  });
+  await store.set("notifications.enabled", false);
+  await store.set("app.autostart", true);
+  expect(stored.get("notifications.enabled")).toBe(false);
+  expect(stored.get("app.autostart")).toBe(true);
+});
+
+test("notification kinds keep their values while notifications are off", async () => {
+  const { stored, store } = appSettings({ "notifications.download": false });
+  await store.load();
+  await store.set("notifications.enabled", false);
+  await store.set("notifications.enabled", true);
+  expect(store.values["notifications.download"]).toBe(false);
+  expect(stored.get("notifications.download")).toBe(false);
+});
+
+test("a refused change rolls the toggle back and says why", async () => {
+  const { bridge, store } = appSettings();
+  await store.load();
+  bridge.fail("settings.set", AppErrorCode.NATIVE_ERROR, "host text");
+  await store.set("app.autostart", true);
+  expect(store.values["app.autostart"]).toBe(false);
+  expect(store.errors["app.autostart"]).toBe(AUTOSTART_FAILED);
+  await store.set("app.tray", true);
+  expect(store.values["app.tray"]).toBe(false);
+  expect(store.errors["app.tray"]).toBe(SETTING_SAVE_FAILED);
+  expect(store.pending).toEqual({});
 });

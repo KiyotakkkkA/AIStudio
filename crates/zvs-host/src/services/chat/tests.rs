@@ -796,6 +796,52 @@ async fn chat_generation_needs_no_tool_approval_and_completes() {
     assert!(!harness.messages(created)[1].partial);
 }
 
+#[tokio::test]
+async fn a_finished_turn_raises_one_toast_for_its_conversation() {
+    let harness = Harness::new();
+    harness
+        .runs
+        .permissions()
+        .grant("llm.generate", "global", ToolTier::Off, "test")
+        .expect("grants");
+    let shell = crate::testing::RecordingShell::shared();
+    let notifications = crate::notifications::NotificationService::new(
+        crate::notifications::NotificationServiceOptions::new(
+            Arc::clone(&harness.database),
+            crate::services::SettingService::new(
+                Arc::clone(&harness.database),
+                Arc::new(crate::testing::FakeClock::default()),
+            ),
+            shell.clone(),
+            EventBus::default(),
+            Arc::new(crate::testing::FakeClock::default()),
+        ),
+    );
+    harness.runs.watch(notifications.watcher());
+    let created = harness.conversation();
+    let handle = within(harness.turn(created, "Question")).await;
+    assert_eq!(harness.status(&handle), RunStatus::Succeeded);
+    let title = harness
+        .chat
+        .get(&created)
+        .expect("reads")
+        .conversation
+        .title;
+    let notified = shell.notified();
+    assert_eq!(notified.len(), 1);
+    assert_eq!(
+        notified[0].title,
+        crate::notifications::copy::TURN_DONE_TITLE
+    );
+    assert_eq!(notified[0].body, title);
+    assert_eq!(
+        notified[0].target,
+        zvs_contract::NotificationTargetDto::Conversation {
+            conversation_id: created
+        }
+    );
+}
+
 struct TextReranker;
 
 #[async_trait]

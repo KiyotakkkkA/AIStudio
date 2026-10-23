@@ -9,6 +9,7 @@ import * as files from "../src/files.js";
 import * as processes from "../src/process.js";
 import * as folders from "../src/folders.js";
 import * as explorer from "../src/explorer.js";
+import * as notifications from "../src/notifications.js";
 import * as documents from "../src/documents.js";
 import * as artifacts from "../src/artifacts.js";
 import {
@@ -190,6 +191,7 @@ const schemas: Record<string, z.ZodType> = {
   "process/ProcessPlanDto": processes.ProcessPlanDto,
   "process/ProcessResultDto": processes.ProcessResultDto,
   "process/ProcessApprovalDto": processes.ProcessApprovalDto,
+  "notifications/NotificationTargetDto": notifications.NotificationTargetDto,
   "explorer/ExplorerEntryKind": explorer.ExplorerEntryKind,
   "explorer/ExplorerChangeKind": explorer.ExplorerChangeKind,
   "explorer/ExplorerEntryDto": explorer.ExplorerEntryDto,

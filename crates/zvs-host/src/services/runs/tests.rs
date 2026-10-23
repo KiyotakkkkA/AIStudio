@@ -329,6 +329,39 @@ async fn an_approval_is_persisted_before_its_event_blocks_execution_then_resumes
 }
 
 #[tokio::test]
+async fn a_watcher_sees_the_approval_and_the_end_of_every_run() {
+    let database = temporary_database();
+    let host = host(&database);
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    {
+        let seen = Arc::clone(&seen);
+        host.service
+            .watch(Arc::new(move |run_id: &str, event: &HostEvent| {
+                if matches!(
+                    event.body,
+                    HostEventDraft::Approval { .. } | HostEventDraft::End { .. }
+                ) {
+                    let approval = matches!(event.body, HostEventDraft::Approval { .. });
+                    seen.lock()
+                        .expect("seen")
+                        .push((run_id.to_owned(), approval));
+                }
+            }));
+    }
+    let handle = host.start_tool(&[]);
+    let id = host.approval().await;
+    host.service
+        .approve(&handle.id, &id, false)
+        .expect("approves");
+    host.service.wait(&handle.id).await;
+    let run = handle.id.to_string();
+    assert_eq!(
+        *seen.lock().expect("seen"),
+        [(run.clone(), true), (run, false)]
+    );
+}
+
+#[tokio::test]
 async fn a_denial_fails_with_approval_denied_without_retries() {
     let database = temporary_database();
     let host = host(&database);

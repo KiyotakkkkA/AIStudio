@@ -183,6 +183,7 @@ export default class DownloadStore {
     if (this.mounted) return;
     this.mounted = true;
     this.unobserve = this.events.observe(this.receive);
+    void this.ipc.call("notifications.clear", { kind: "downloads" }).catch(() => undefined);
     await this.load();
   }
 

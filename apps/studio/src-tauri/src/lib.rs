@@ -3,12 +3,14 @@ mod commands;
 mod e2e;
 mod picker;
 mod platform;
+mod shell;
 mod theme;
+mod toast;
 mod window;
 
 use std::error::Error;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use serde_json::json;
 use tauri::{App, AppHandle, Manager, RunEvent, WindowEvent};
@@ -39,6 +41,7 @@ use zvs_host::indexing::{
 use zvs_host::kernel::{
     KernelServices, NodeRegistry, register_core_nodes, register_download_nodes, register_job_nodes,
 };
+use zvs_host::notifications::{NotificationService, NotificationServiceOptions};
 use zvs_host::platform::clock::{SharedClock, SystemClock};
 use zvs_host::platform::device::{DeviceProbe, DeviceProbeOptions};
 use zvs_host::platform::disk::free_bytes;
@@ -49,6 +52,7 @@ use zvs_host::platform::metrics::nvidia_monitor;
 use zvs_host::platform::navigation::SharedNavigator;
 use zvs_host::platform::paths::{PathEnvironment, StudioPaths};
 use zvs_host::platform::recorder::{FileEventRecorder, recording_enabled_from_env};
+use zvs_host::platform::shell::SharedShellPort;
 use zvs_host::platform::shutdown::{
     DEFAULT_SHUTDOWN_CAP, ExitDecision, ShutdownCoordinator, ShutdownStage,
 };
@@ -87,6 +91,7 @@ use crate::browser::{
 };
 use crate::commands::Host;
 use crate::picker::DialogPicker;
+use crate::shell::{ShellState, TauriShell};
 use crate::theme::TauriTheme;
 use zvs_host::platform::picker::SharedPicker;
 
@@ -94,6 +99,8 @@ enum Boot {
     Studio {
         host: Host,
         window: WindowState,
+        hidden: bool,
+        shell: Arc<ShellState>,
         logger: SharedLogger,
         lifecycle: Lifecycle,
         browser: Browser,
@@ -130,6 +137,12 @@ pub fn run() {
     };
     builder
         .plugin(tauri_plugin_dialog::init())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .arg(shell::AUTOSTART_ARG)
+                .app_name(APP_NAME)
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             commands::ipc_call,
             commands::events_subscribe,
@@ -141,6 +154,8 @@ pub fn run() {
                 Boot::Studio {
                     host,
                     window,
+                    hidden,
+                    shell,
                     logger,
                     lifecycle,
                     browser,
@@ -155,7 +170,7 @@ pub fn run() {
                     app.manage(browser.events);
                     app.manage(host);
                     app.manage(lifecycle);
-                    window::create_studio(app.handle(), window, move |state| {
+                    window::create_studio(app.handle(), window, hidden, shell, move |state| {
                         let stored = serde_json::to_value(state)
                             .map_err(|error| error.to_string())
                             .and_then(|value| {
@@ -276,6 +291,18 @@ fn on_run_event(app: &AppHandle, event: RunEvent) {
     }
 }
 
+const APP_NAME: &str = "ZVS AI Studio";
+const TOAST_ICON: &[u8] = include_bytes!("../icons/128x128.png");
+
+fn write_toast_icon(data_dir: &Path) -> Option<std::path::PathBuf> {
+    let icon = data_dir.join("shell").join("notification.png");
+    if std::fs::read(&icon).ok().as_deref() != Some(TOAST_ICON) {
+        std::fs::create_dir_all(icon.parent()?).ok()?;
+        std::fs::write(&icon, TOAST_ICON).ok()?;
+    }
+    Some(icon)
+}
+
 fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let data_dir = match e2e::data_dir() {
         Some(dir) => dir,
@@ -320,6 +347,21 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let database = Arc::new(database);
 
     let theme: SharedThemePort = Arc::new(TauriTheme::new(app.handle().clone()));
+    let shell_state = ShellState::shared();
+    let activation: toast::ActivationSlot = Arc::new(OnceLock::new());
+    let toast_icon = write_toast_icon(&paths.data_dir);
+    let toaster = platform::toaster(
+        &app.config().identifier,
+        APP_NAME,
+        toast_icon.as_deref(),
+        Arc::clone(&activation),
+        logger.clone(),
+    );
+    let shell: SharedShellPort = Arc::new(TauriShell::new(
+        app.handle().clone(),
+        Arc::clone(&shell_state),
+        toaster,
+    ));
     let settings = SettingService::new(Arc::clone(&database), clock.clone());
     apply_theme_source(
         settings
@@ -830,6 +872,20 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         });
     }
 
+    let notifications = NotificationService::new(NotificationServiceOptions {
+        logger: logger.clone(),
+        ..NotificationServiceOptions::new(
+            Arc::clone(&database),
+            settings.clone(),
+            Arc::clone(&shell),
+            events.clone(),
+            clock.clone(),
+        )
+    });
+    runs.watch(notifications.watcher());
+    notifications.start()?;
+    let hidden = shell::launched_by_autostart() && shell_state.tray();
+
     let services = Arc::new(Services {
         system,
         accounts,
@@ -838,6 +894,8 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         providers,
         health,
         theme,
+        shell,
+        notifications,
         vector_stores,
         vector_sources,
         vector_eval,
@@ -858,6 +916,14 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         folders,
         picker: Some(picker),
     });
+    {
+        let services = Arc::clone(&services);
+        let app = app.handle().clone();
+        let _ = activation.set(Arc::new(move |target| {
+            window::focus_studio(&app);
+            services.notifications.activated(target);
+        }));
+    }
     let mut server = IpcServer::new(Arc::clone(&services), logger.clone());
     ipc::register(&mut server);
     server.finish();
@@ -881,6 +947,8 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             services,
         },
         window,
+        hidden,
+        shell: shell_state,
         logger: logger.clone(),
         lifecycle: Lifecycle {
             shutdown,

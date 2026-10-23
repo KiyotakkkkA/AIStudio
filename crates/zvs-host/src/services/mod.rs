@@ -57,7 +57,9 @@ use std::sync::Arc;
 use crate::documents::DocumentService;
 use crate::downloads::DownloadService;
 use crate::indexing::IndexingService;
+use crate::notifications::NotificationService;
 use crate::platform::picker::SharedPicker;
+use crate::platform::shell::SharedShellPort;
 use crate::platform::theme::SharedThemePort;
 use crate::runtimes::RuntimeService;
 use crate::skills::SkillService;
@@ -73,6 +75,8 @@ pub struct Services {
     pub providers: ProviderService,
     pub health: HealthCheckService,
     pub theme: SharedThemePort,
+    pub shell: SharedShellPort,
+    pub notifications: NotificationService,
     pub vector_stores: VectorStoreService,
     pub vector_sources: VectorSourceService,
     pub vector_eval: VectorEvalService,

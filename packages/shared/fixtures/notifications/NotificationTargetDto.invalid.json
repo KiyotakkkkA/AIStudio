@@ -1,0 +1,21 @@
+[
+  {
+    "name": "unknown kind",
+    "value": {
+      "kind": "settings"
+    }
+  },
+  {
+    "name": "conversation without an id",
+    "value": {
+      "kind": "conversation"
+    }
+  },
+  {
+    "name": "conversation id not a uuid",
+    "value": {
+      "kind": "conversation",
+      "conversationId": "nope"
+    }
+  }
+]

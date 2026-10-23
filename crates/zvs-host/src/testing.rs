@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use serde_json::{Map, Value};
 use tempfile::TempDir;
-use zvs_contract::HostEvent;
+use zvs_contract::{HostEvent, NotificationTargetDto};
 
 pub use self::fake_accounts::{
     FakeIdentityProbes, ProbeStep, RecordingBrowser, RecordingNavigator, TokioClock, fake_identity,
@@ -39,6 +39,7 @@ pub use crate::platform::clock::{CLOCK_ORIGIN, FakeClock};
 use crate::platform::events::EventBus;
 use crate::platform::events::EventSink;
 use crate::platform::logger::{Field, LogLevel, Logger, SharedLogger, silent_logger};
+use crate::platform::shell::{NotificationDraft, ShellPort};
 use crate::platform::theme::{ThemePort, ThemeSource};
 use crate::services::crypto::BackendFailure;
 use crate::services::{
@@ -185,6 +186,7 @@ pub fn unmigrated_database() -> TemporaryDatabase {
 pub struct TestServices {
     services: Arc<Services>,
     pub theme: Arc<RecordingTheme>,
+    pub shell: Arc<RecordingShell>,
     pub clock: Arc<FakeClock>,
     pub crypto: Arc<FakeCrypto>,
     pub drivers: Arc<FakeDriverSource>,
@@ -227,6 +229,7 @@ pub fn test_services(system: SystemService) -> TestServices {
     let database = temporary_database();
     let clock = Arc::new(FakeClock::default());
     let theme = RecordingTheme::shared();
+    let shell = RecordingShell::shared();
     let crypto = FakeCrypto::shared();
     let drivers = FakeDriverSource::shared(FakeDriver::with_models(Vec::new()));
     let settings = SettingService::new(database.shared(), clock.clone());
@@ -502,6 +505,16 @@ pub fn test_services(system: SystemService) -> TestServices {
         )
     })
     .expect("a chat service");
+    let notifications = crate::notifications::NotificationService::new(
+        crate::notifications::NotificationServiceOptions::new(
+            database.shared(),
+            settings.clone(),
+            shell.clone(),
+            run_bus.clone(),
+            clock.clone(),
+        ),
+    );
+    runs.watch(notifications.watcher());
     TestServices {
         services: Arc::new(Services {
             system,
@@ -511,6 +524,8 @@ pub fn test_services(system: SystemService) -> TestServices {
             providers,
             health,
             theme: theme.clone(),
+            shell: shell.clone(),
+            notifications,
             vector_stores,
             vector_sources,
             vector_eval,
@@ -554,6 +569,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         disk_probe,
         workspace,
         theme,
+        shell,
         clock,
         crypto,
         drivers,
@@ -905,6 +921,95 @@ impl ThemePort for RecordingTheme {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .push(source);
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct RecordingShell {
+    notified: Mutex<Vec<NotificationDraft>>,
+    cleared: Mutex<Vec<NotificationTargetDto>>,
+    tray: Mutex<Vec<bool>>,
+    autostart: Mutex<Option<bool>>,
+    failing: AtomicBool,
+}
+
+impl RecordingShell {
+    pub fn shared() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn notified(&self) -> Vec<NotificationDraft> {
+        self.notified
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    pub fn cleared(&self) -> Vec<NotificationTargetDto> {
+        self.cleared
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    pub fn tray(&self) -> Vec<bool> {
+        self.tray
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    pub fn registered(&self) -> Option<bool> {
+        *self
+            .autostart
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
+    pub fn register(&self, enabled: Option<bool>) {
+        *self
+            .autostart
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = enabled;
+    }
+
+    pub fn fail_autostart(&self, failing: bool) {
+        self.failing.store(failing, Ordering::SeqCst);
+    }
+}
+
+impl ShellPort for RecordingShell {
+    fn set_autostart(&self, enabled: bool) -> Result<(), String> {
+        if self.failing.load(Ordering::SeqCst) {
+            return Err("registry write refused".to_owned());
+        }
+        self.register(Some(enabled));
+        Ok(())
+    }
+
+    fn autostart_enabled(&self) -> Option<bool> {
+        self.registered()
+    }
+
+    fn set_tray(&self, enabled: bool) {
+        self.tray
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(enabled);
+    }
+
+    fn notify(&self, draft: NotificationDraft) {
+        self.notified
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(draft);
+    }
+
+    fn clear(&self, target: NotificationTargetDto) {
+        self.cleared
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(target);
     }
 }
 

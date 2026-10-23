@@ -145,6 +145,8 @@ against; 016 can be started earlier if you are prepared to render the Account op
 - [x] **TASK_036_EXTRA_2** — File tools: `fs.list`, `fs.read`, `fs.search` and the `fs.apply` batch
 - [x] **TASK_036_EXTRA_3** — Code and commands: a shared process runner, `code.run` and `shell.run`
 - [x] **TASK_036_EXTRA_4** — Working folder explorer: the chat side panel toggle, a live file tree and the file view
+- [x] **TASK_036_EXTRA_5** — Preferences «Общие» and «Уведомления»: start with the system, the tray, OS notifications
+- [ ] **TASK_036_EXTRA_6** — Notification activation through `zvs-studio://`: Action Center clicks and cold start
 
 ## Phase M — Migration to Tauri (done)
 
@@ -301,6 +303,7 @@ you can settle the load-bearing ones early rather than being interrupted mid-tas
 | TASK_034_EXTRA_2 (resolved) | Fallback (c): `hybrid` is the default for new conversations — a cheap pre-search offers its top 3 sources and the model may search further. A model that cannot call tools gets the pre-search exactly as in `auto`, so it never answers worse than before. `auto` and `agentic` are per-conversation choices in the composer. | yes |
 | TASK_035 (resolved) | Neither option as written: each skill is its own folder inside the app's data directory (`SKILL.md` plus `references/`, `scripts/`, `assets/`), and the database holds only the index and the state the app owns. No watcher: a stat fingerprint is compared on read, and a changed folder is re-parsed and re-checked. Import and export copy a folder. | **no** — migrates user content |
 | TASK_036_EXTRA_4 (resolved) | Fallback (a): a file opens in a split beside the thread with a draggable divider, covering the chat below 1250 px. | yes |
+| TASK_036_EXTRA_5 (resolved) | Native toasts for every enabled event whatever window is in front, as in Electron. Built on `Windows.UI.Notifications` directly (own AUMID, `zvs-studio://` launch URL, tag and group), not a wrapper crate. A click opens its conversation, or «Загрузки». Action Center and cold-start clicks follow in TASK_036_EXTRA_6 through protocol activation. | yes |
 | TASK_037 | Own scenario format, or n8n-compatible? | **no** |
 | TASK_038 | Scenario canvas: React Flow, or hand-rolled? | **no** |
 | TASK_040 | Default agentic session budget, and pause-or-stop on exhaustion | yes |

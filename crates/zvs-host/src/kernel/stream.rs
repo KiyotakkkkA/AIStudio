@@ -8,10 +8,12 @@ use crate::data::{DataError, Database, Repositories};
 use crate::platform::events::StreamHandle;
 
 pub type RunObserver = Arc<dyn Fn(&HostEvent) + Send + Sync>;
+pub type RunWatcher = Arc<dyn Fn(&str, &HostEvent) + Send + Sync>;
 
 #[derive(Default)]
 pub struct Observers {
     observers: Mutex<HashMap<String, Vec<(u64, RunObserver)>>>,
+    watchers: Mutex<Vec<RunWatcher>>,
     next: AtomicU64,
 }
 
@@ -25,6 +27,13 @@ impl Observers {
             .or_default()
             .push((token, observer));
         token
+    }
+
+    pub fn watch(&self, watcher: RunWatcher) {
+        self.watchers
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(watcher);
     }
 
     pub fn remove(&self, run_id: &str, token: u64) {
@@ -42,6 +51,10 @@ impl Observers {
 
     pub fn clear(&self) {
         self.observers
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
+        self.watchers
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clear();
@@ -77,6 +90,14 @@ impl Observers {
         };
         for observer in current {
             observer(event);
+        }
+        let watchers = self
+            .watchers
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        for watcher in watchers {
+            watcher(run_id, event);
         }
     }
 }

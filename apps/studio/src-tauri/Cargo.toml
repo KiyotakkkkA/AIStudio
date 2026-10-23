@@ -28,7 +28,8 @@ base64 = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tauri = { version = "=2.12.1", features = ["isolation", "unstable"] }
+tauri = { version = "=2.12.1", features = ["isolation", "tray-icon", "unstable"] }
+tauri-plugin-autostart = "=2.7.0"
 tauri-plugin-dialog = "=2.8.3"
 tauri-plugin-single-instance = "=2.5.2"
 zvs-contract = { path = "../../../crates/zvs-contract" }
@@ -47,11 +48,15 @@ zvs-host = { path = "../../../crates/zvs-host", features = ["testing"] }
 [target.'cfg(windows)'.dependencies]
 webview2-com = "=0.39.1"
 windows = { version = "=0.62.2", features = [
+    "Data_Xml_Dom",
+    "Foundation",
+    "UI_Notifications",
     "Win32_Foundation",
     "Win32_Graphics_Dxgi",
     "Win32_Graphics_Gdi",
     "Win32_Security",
     "Win32_Security_Cryptography",
+    "Win32_System_Registry",
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }

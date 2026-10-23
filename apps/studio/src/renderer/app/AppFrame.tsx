@@ -7,12 +7,13 @@ import NavRail from "../ui/organisms/NavRail";
 import { NAV_GROUPS, RAIL_IDENTITY } from "./navigation";
 import type { NavItemModel } from "../ui/organisms/NavRailTypes";
 import AppShell from "../ui/templates/AppShell";
-import { HostEvent } from "@zvs/shared";
+import { ConversationId, HostEvent, NAVIGATION_STEP_DOMAIN } from "@zvs/shared";
+import { ROUTES } from "./routes";
 import PreferencesDialog from "../features/preferences/PreferencesDialog";
 import { fontStack } from "../features/preferences/preferencesPresentation";
 
 function AppFrame() {
-  const { ui } = useStore();
+  const { ui, chat } = useStore();
   const navigation = useAppNavigation();
   const restoredOnce = useRef(false);
 
@@ -21,11 +22,21 @@ function AppFrame() {
       window.zvs.subscribe((payload) => {
         const parsed = HostEvent.safeParse(payload);
         if (!parsed.success || parsed.data.type !== "step") return;
-        const { domain, path } = parsed.data.step;
-        if (domain === "navigation" && (path === "/browser" || path === "/providers"))
+        const { domain, path, conversationId } = parsed.data.step;
+        if (domain !== NAVIGATION_STEP_DOMAIN) return;
+        if (path === ROUTES.browser || path === ROUTES.providers) navigation.go(path);
+        if (path === ROUTES.downloads) {
+          ui.closePreferences();
           navigation.go(path);
+        }
+        if (path === ROUTES.chat) {
+          ui.closePreferences();
+          navigation.go(path);
+          const conversation = ConversationId.safeParse(conversationId);
+          if (conversation.success) void chat.open(conversation.data);
+        }
       }),
-    [navigation],
+    [navigation, ui, chat],
   );
 
   useEffect(() => {

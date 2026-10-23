@@ -11,6 +11,7 @@ pub mod files;
 pub mod indexing;
 pub mod ipc;
 pub mod kernel;
+pub mod notifications;
 pub mod platform;
 pub mod runtimes;
 pub mod services;

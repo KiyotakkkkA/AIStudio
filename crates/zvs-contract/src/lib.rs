@@ -17,6 +17,7 @@ pub mod graph;
 pub mod graph_expansion;
 pub mod ids;
 pub mod mcp;
+pub mod notifications;
 pub mod primitives;
 pub mod process;
 pub mod providers;
@@ -108,6 +109,9 @@ pub use mcp::{
     McpEnv, McpHeaders, McpHealthDto, McpLogLevel, McpLogLineDto, McpOAuthState, McpRemoveOutput,
     McpServerDetailDto, McpServerDto, McpServerRef, McpServerStatus, McpStartup, McpTestResultDto,
     McpTransport, McpValue, UpdateMcpServerInput,
+};
+pub use notifications::{
+    NAVIGATION_STEP_DOMAIN, NOTIFICATION_SCHEME, NOTIFICATION_URL_MAX, NotificationTargetDto,
 };
 pub use primitives::{Json, MAX_SAFE_INTEGER, Page, PageRequest, Sort, SortDirection, Timestamp};
 pub use process::{

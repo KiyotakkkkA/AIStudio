@@ -62,7 +62,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
     pinned.current = true;
     setJump(false);
     scrollLatest();
-  }, [store.active?.id]);
+  }, [store.active?.id, store.revealed]);
   useLayoutEffect(() => {
     if (pinned.current) scrollLatest();
   }, [

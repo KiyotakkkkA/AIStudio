@@ -13,6 +13,7 @@ pub mod navigation;
 pub mod paths;
 pub mod picker;
 pub mod recorder;
+pub mod shell;
 pub mod shutdown;
 pub mod theme;
 pub mod window_state;

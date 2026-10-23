@@ -24,7 +24,7 @@ use crate::kernel::scheduler::step_event;
 use crate::kernel::{
     AdmissionOrigin, AdmitHook, ApprovalDecision, ApprovalHook, DeferredApproval, Finish,
     KernelServices, NodeRegistry, Observers, PermissionRequirement, RunObserver, RunStream,
-    Scheduler, SchedulerOptions, StepContext, Subscription,
+    RunWatcher, Scheduler, SchedulerOptions, StepContext, Subscription,
 };
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::events::{EventBus, StreamOptions};
@@ -444,6 +444,10 @@ impl RunService {
             Arc::clone(&self.inner.database),
             Arc::clone(&self.inner.observers),
         )))
+    }
+
+    pub fn watch(&self, watcher: RunWatcher) {
+        self.inner.observers.watch(watcher);
     }
 
     pub fn subscribe(&self, id: &str, observer: RunObserver) -> Result<Subscription, AppError> {

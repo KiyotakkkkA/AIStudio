@@ -1,6 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
+use crate::shell::ShellState;
 use tauri::webview::{NewWindowResponse, PageLoadEvent};
 use tauri::window::Color;
 use tauri::{
@@ -57,6 +58,8 @@ fn normal_bounds<R: Runtime>(window: &WebviewWindow<R>) -> Option<NormalBounds> 
 pub fn create_studio<R: Runtime>(
     app: &AppHandle<R>,
     state: WindowState,
+    hidden: bool,
+    shell: Arc<ShellState>,
     persist: impl Fn(WindowState) + Send + Sync + 'static,
 ) -> tauri::Result<()> {
     let config = app
@@ -68,7 +71,7 @@ pub fn create_studio<R: Runtime>(
         .cloned()
         .ok_or(tauri::Error::WindowNotFound)?;
     let origin = app_origin(app, config.use_https_scheme);
-    let shown = Arc::new(AtomicBool::new(false));
+    let shown = Arc::new(AtomicBool::new(hidden));
 
     let mut builder = WebviewWindowBuilder::from_config(app, &config)?
         .inner_size(state.bounds.width as f64, state.bounds.height as f64)
@@ -114,12 +117,16 @@ pub fn create_studio<R: Runtime>(
                 });
             });
         }
-        WindowEvent::CloseRequested { .. } => {
+        WindowEvent::CloseRequested { api, .. } => {
             let normal = *normal.lock().unwrap_or_else(PoisonError::into_inner);
             persist(capture_window_state(&Tracked {
                 window: &tracked,
                 normal,
             }));
+            if shell.keeps_running() {
+                api.prevent_close();
+                let _ = tracked.hide();
+            }
         }
         _ => {}
     });

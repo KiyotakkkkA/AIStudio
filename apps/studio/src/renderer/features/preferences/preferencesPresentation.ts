@@ -8,6 +8,7 @@ import {
   type ThemeMode,
 } from "../../stores/UiStore";
 import { formatBytes } from "../downloads/downloadPresentation";
+import type { AppSettingKey } from "./AppSettingsStore";
 
 export const APP_NAME = "ZVS AI Studio";
 export const APP_VERSION = "0.1.0";
@@ -18,14 +19,67 @@ export const PREFERENCES_GROUP = "Приложение";
 export const CLOSE_PREFERENCES = "Закрыть параметры";
 
 export const SECTION_LABELS: Record<PreferenceSection, string> = {
+  general: "Общие",
   appearance: "Внешний вид",
+  notifications: "Уведомления",
   about: "О системе",
 };
 
 export const SECTION_HINTS: Record<PreferenceSection, string> = {
+  general: "Запуск и работа в фоне.",
   appearance: "Тема, шрифт и размер текста интерфейса.",
+  notifications: "Системные уведомления о событиях приложения.",
   about: "Версия приложения и характеристики компьютера.",
 };
+
+export const TOGGLE_ON = "Включено";
+export const TOGGLE_OFF = "Выключено";
+
+export interface ToggleRowCopy {
+  readonly key: AppSettingKey;
+  readonly label: string;
+  readonly hint: string;
+}
+
+export const GENERAL_ROWS: readonly ToggleRowCopy[] = [
+  {
+    key: "app.autostart",
+    label: "Запускать вместе с системой",
+    hint: "Открывать приложение при входе в Windows.",
+  },
+  {
+    key: "app.tray",
+    label: "Значок в области уведомлений",
+    hint: "При закрытии окна приложение продолжает работать в области уведомлений.",
+  },
+];
+
+export const NOTIFICATIONS_ROW: ToggleRowCopy = {
+  key: "notifications.enabled",
+  label: "Уведомления",
+  hint: "Системные уведомления о событиях приложения.",
+};
+
+export const NOTIFICATION_KIND_ROWS: readonly ToggleRowCopy[] = [
+  {
+    key: "notifications.approval",
+    label: "Требуется подтверждение",
+    hint: "Инструмент ожидает разрешения на выполнение.",
+  },
+  {
+    key: "notifications.turn",
+    label: "Ответ готов",
+    hint: "Модель завершила ответ в диалоге.",
+  },
+  {
+    key: "notifications.download",
+    label: "Загрузка завершена",
+    hint: "Модель или компонент загружены.",
+  },
+];
+
+export const AUTOSTART_FAILED = "Не удалось изменить автозапуск.";
+export const SETTING_SAVE_FAILED = "Не удалось сохранить настройку.";
 
 export const THEME_LABEL = "Тема";
 export const THEME_HINT = "Светлая, тёмная или как в настройках системы.";

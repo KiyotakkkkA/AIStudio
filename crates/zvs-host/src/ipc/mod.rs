@@ -6,6 +6,7 @@ pub mod downloads;
 pub mod folders;
 pub mod graph_relations;
 pub mod mcp;
+pub mod notifications;
 pub mod providers;
 pub mod runs;
 pub mod runtimes;
@@ -34,6 +35,7 @@ pub fn register(server: &mut IpcServer) {
     runtimes::register(server);
     tools::register(server);
     mcp::register(server);
+    notifications::register(server);
     skills::register(server);
     toolchain::register(server);
     chat::register(server);
@@ -136,6 +138,7 @@ mod tests {
                 "mcp.stop",
                 "mcp.test",
                 "mcp.update",
+                "notifications.clear",
                 "providers.adapters",
                 "providers.create",
                 "providers.get",

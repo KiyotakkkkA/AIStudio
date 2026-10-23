@@ -730,6 +730,21 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   else.
 - **IDs** — UUID v7 (time-sortable) generated on the host.
 - **Clock** — a `Clock` trait injected into services so time-dependent logic is testable.
+- **Notifications** — native OS notifications are raised by the host, never by the renderer,
+  so they still fire while the window is hidden in the tray. One `NotificationService` holds
+  the policy (the `notifications.*` settings and the 5 s coalescing). It watches every run
+  through `RunService::watch` and reacts to a chat run's approval or end, and to a download
+  run's end. A notification carries a title and a display name only: no message text, no file
+  contents, no paths. The shell shows it through the `ShellPort`. On Windows, that is
+  `Windows.UI.Notifications` directly, with the AUMID registered per user, a `zvs-studio://`
+  URL in `launch`, and the subject id and kind as tag and group. A click shows the window and
+  emits a `navigation` step that opens the conversation or «Загрузки». The URL is parsed by
+  `NotificationTargetDto::from_url` alone, and it only navigates.
+- **Tray and autostart** — with `app.tray` on, closing the studio window hides it. Runs,
+  streams and downloads keep going, and only «Выход» in the tray menu goes through the shutdown
+  coordinator. `app.autostart` is mirrored from the OS registration, which is the source of
+  truth and is re-read at startup. A launch by autostart with the tray on starts with the window
+  hidden.
 
 ---
 

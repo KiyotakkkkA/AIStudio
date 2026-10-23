@@ -18,6 +18,7 @@ import ToolchainStore from "../features/toolchain/ToolchainStore";
 import SkillStore from "../features/skills/SkillStore";
 import PermissionsStore from "../features/permissions/PermissionsStore";
 import AboutStore from "../features/preferences/AboutStore";
+import AppSettingsStore from "../features/preferences/AppSettingsStore";
 
 export interface RootStoreEnvironment {
   readonly ipc: IpcClient<Contract>;
@@ -41,6 +42,7 @@ export class RootStore {
   readonly skills: SkillStore;
   readonly permissions: PermissionsStore;
   readonly about: AboutStore;
+  readonly appSettings: AppSettingsStore;
 
   constructor(private readonly environment: RootStoreEnvironment) {
     this.ui = new UiStore(environment.ipc);
@@ -61,6 +63,7 @@ export class RootStore {
     this.skills = new SkillStore(environment.ipc);
     this.permissions = new PermissionsStore(environment.ipc);
     this.about = new AboutStore(environment.ipc);
+    this.appSettings = new AppSettingsStore(environment.ipc);
     makeAutoObservable<RootStore, "environment">(
       this,
       {
@@ -81,6 +84,7 @@ export class RootStore {
         skills: false,
         permissions: false,
         about: false,
+        appSettings: false,
       },
       { autoBind: true },
     );

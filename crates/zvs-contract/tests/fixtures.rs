@@ -665,6 +665,10 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::process::ProcessApprovalDto>,
     ),
     (
+        "notifications/NotificationTargetDto",
+        round_trip::<zvs_contract::notifications::NotificationTargetDto>,
+    ),
+    (
         "explorer/ExplorerEntryKind",
         round_trip::<zvs_contract::explorer::ExplorerEntryKind>,
     ),

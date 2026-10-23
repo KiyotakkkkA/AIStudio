@@ -24,7 +24,7 @@ export const FONT_SIZES = [12, 13, 14, 15, 16] as const;
 export type FontSize = (typeof FONT_SIZES)[number];
 export const DEFAULT_FONT_SIZE: FontSize = 13;
 
-export const PREFERENCE_SECTIONS = ["appearance", "about"] as const;
+export const PREFERENCE_SECTIONS = ["general", "appearance", "notifications", "about"] as const;
 export type PreferenceSection = (typeof PREFERENCE_SECTIONS)[number];
 
 function isFontFamily(value: unknown): value is FontFamily {

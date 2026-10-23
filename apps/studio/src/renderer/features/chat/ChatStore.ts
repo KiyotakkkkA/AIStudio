@@ -93,12 +93,15 @@ export default class ChatStore {
   readonly explorer: ExplorerStore;
   readonly artifacts: ArtifactActions;
   outcome: "ok" | "cancelled" | "failed" | null = null;
+  revealed = 0;
   private buffer = "";
   private timer: ReturnType<typeof setTimeout> | undefined;
   private unsubscribe: (() => void) | undefined;
   private lastSeq = -1;
   private revision = 0;
   private mounted = false;
+  private pendingOpen: ConversationId | null = null;
+  private ready = false;
   private retryText = "";
   private contextRevision = 0;
   private stopContext: (() => void) | undefined;
@@ -119,6 +122,8 @@ export default class ChatStore {
       | "lastSeq"
       | "revision"
       | "mounted"
+      | "pendingOpen"
+      | "ready"
       | "retryText"
       | "contextRevision"
       | "stopContext"
@@ -135,6 +140,8 @@ export default class ChatStore {
         lastSeq: false,
         revision: false,
         mounted: false,
+        pendingOpen: false,
+        ready: false,
         retryText: false,
         contextRevision: false,
         stopContext: false,
@@ -556,7 +563,11 @@ export default class ChatStore {
         () => void this.refreshContext(),
         { fireImmediately: true },
       );
+      this.ready = true;
+      const pending = this.pendingOpen;
+      this.pendingOpen = null;
       if (this.run) this.subscribe();
+      else if (pending !== null) await this.select(pending);
       else if (this.active) await this.select(this.active.id);
     } catch (error) {
       runInAction(() => {
@@ -568,6 +579,17 @@ export default class ChatStore {
     }
   }
 
+  async open(id: ConversationId) {
+    if (!this.ready) {
+      this.pendingOpen = id;
+      return;
+    }
+    await this.select(id);
+    runInAction(() => {
+      this.revealed += 1;
+    });
+  }
+
   async select(id: ConversationId) {
     if (this.generating) return;
     const revision = ++this.revision;
@@ -577,6 +599,9 @@ export default class ChatStore {
     this.folderPrompt = null;
     try {
       const active = await this.ipc.call("chat.conversations.get", { id });
+      void this.ipc
+        .call("notifications.clear", { kind: "conversation", conversationId: id })
+        .catch(() => undefined);
       runInAction(() => {
         if (revision !== this.revision) return;
         this.active = active;
@@ -1075,6 +1100,7 @@ export default class ChatStore {
 
   dispose() {
     this.mounted = false;
+    this.ready = false;
     ++this.revision;
     this.loading = false;
     this.flush();

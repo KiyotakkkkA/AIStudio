@@ -63,6 +63,7 @@
   "mcp.stop",
   "mcp.test",
   "mcp.update",
+  "notifications.clear",
   "providers.adapters",
   "providers.create",
   "providers.get",

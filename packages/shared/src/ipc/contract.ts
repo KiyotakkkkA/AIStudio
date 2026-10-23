@@ -24,6 +24,7 @@ import {
   ExplorerReadInput,
   ExplorerWatchDto,
 } from "../explorer.js";
+import { NotificationTargetDto } from "../notifications.js";
 import { ArtifactApplicationDto, ArtifactRef, ArtifactSaveResult } from "../artifacts.js";
 import {
   DocumentDto,
@@ -403,6 +404,7 @@ export const contract = defineContract({
       updatedAt: Timestamp.optional(),
     }),
   },
+  "notifications.clear": { input: NotificationTargetDto, output: z.void() },
   "settings.set": {
     input: z.object({ key: SettingKey, value: Json }),
     output: z.object({ key: SettingKey, value: Json, updatedAt: Timestamp }),

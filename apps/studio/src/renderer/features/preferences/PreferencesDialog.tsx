@@ -1,7 +1,13 @@
 import { observer } from "mobx-react-lite";
 import { useEffect, type ReactNode } from "react";
 import { Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
-import { mdiClose, mdiInformationOutline, mdiPaletteOutline } from "@mdi/js";
+import {
+  mdiBellOutline,
+  mdiClose,
+  mdiCogOutline,
+  mdiInformationOutline,
+  mdiPaletteOutline,
+} from "@mdi/js";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
 import SegmentedControl from "../../ui/atoms/SegmentedControl";
@@ -27,6 +33,9 @@ import {
   FONT_SIZE_HINT,
   FONT_SIZE_LABEL,
   FONT_SIZE_OPTIONS,
+  GENERAL_ROWS,
+  NOTIFICATION_KIND_ROWS,
+  NOTIFICATIONS_ROW,
   PREFERENCES_GROUP,
   PREFERENCES_TITLE,
   RAIL_PICKER_HINT,
@@ -36,24 +45,31 @@ import {
   THEME_HINT,
   THEME_LABEL,
   THEME_OPTIONS,
+  TOGGLE_OFF,
+  TOGGLE_ON,
   appRows,
   deviceRows,
   fontSizeLabel,
   type InfoRow,
+  type ToggleRowCopy,
 } from "./preferencesPresentation";
 
 const SECTION_ICONS: Record<PreferenceSection, string> = {
+  general: mdiCogOutline,
   appearance: mdiPaletteOutline,
+  notifications: mdiBellOutline,
   about: mdiInformationOutline,
 };
 
 function SettingRow({
   label,
   hint,
+  error,
   children,
 }: {
   readonly label: string;
   readonly hint: string;
+  readonly error?: string | undefined;
   readonly children: ReactNode;
 }) {
   return (
@@ -61,6 +77,11 @@ function SettingRow({
       <div className="flex min-w-56 flex-1 flex-col gap-0.5">
         <span className="text-[13px] font-medium text-main-100">{label}</span>
         <span className="text-[12px] text-main-500">{hint}</span>
+        {error === undefined ? null : (
+          <span role="alert" className="text-[12px] text-err">
+            {error}
+          </span>
+        )}
       </div>
       <div className="flex flex-none items-center">{children}</div>
     </div>
@@ -127,6 +148,58 @@ const AppearanceSection = observer(function AppearanceSection() {
           }}
         />
       </SettingRow>
+    </div>
+  );
+});
+
+const ToggleSettingRow = observer(function ToggleSettingRow({
+  row,
+}: {
+  readonly row: ToggleRowCopy;
+}) {
+  const { appSettings } = useStore();
+  const checked = appSettings.values[row.key];
+  return (
+    <SettingRow label={row.label} hint={row.hint} error={appSettings.errors[row.key]}>
+      <Toggle
+        label={checked ? TOGGLE_ON : TOGGLE_OFF}
+        checked={checked}
+        disabled={appSettings.pending[row.key] !== undefined}
+        onChange={(value) => void appSettings.set(row.key, value)}
+      />
+    </SettingRow>
+  );
+});
+
+const GeneralSection = observer(function GeneralSection() {
+  const { appSettings } = useStore();
+  useEffect(() => {
+    void appSettings.load();
+  }, [appSettings]);
+  return (
+    <div className="flex flex-col">
+      {GENERAL_ROWS.map((row) => (
+        <ToggleSettingRow key={row.key} row={row} />
+      ))}
+    </div>
+  );
+});
+
+const NotificationsSection = observer(function NotificationsSection() {
+  const { appSettings } = useStore();
+  useEffect(() => {
+    void appSettings.load();
+  }, [appSettings]);
+  return (
+    <div className="flex flex-col">
+      <ToggleSettingRow row={NOTIFICATIONS_ROW} />
+      {appSettings.values[NOTIFICATIONS_ROW.key] ? (
+        <div className="ml-1 flex flex-col border-l border-line pl-5">
+          {NOTIFICATION_KIND_ROWS.map((row) => (
+            <ToggleSettingRow key={row.key} row={row} />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 });
@@ -223,7 +296,9 @@ function PreferencesDialog() {
           />
         </div>
         <ScrollArea className="min-h-0 flex-1 px-7 pb-6">
+          {section === "general" ? <GeneralSection /> : null}
           {section === "appearance" ? <AppearanceSection /> : null}
+          {section === "notifications" ? <NotificationsSection /> : null}
           {section === "about" ? <AboutSection /> : null}
         </ScrollArea>
       </div>
