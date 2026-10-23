@@ -241,6 +241,7 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
         <ul className="m-0 flex min-h-0 flex-1 list-none flex-col gap-2 overflow-y-auto px-6 pt-1 pb-6">
           {store.scenarios.map((scenario) => (
             <li
+              onClick={() => void store.open(scenario.id)}
               key={scenario.id}
               className="flex items-center gap-3 rounded-card border border-line bg-main-850 px-4 py-3 shadow-card hover:border-line-strong"
             >
@@ -251,7 +252,6 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
               <button
                 type="button"
                 className="flex min-w-0 flex-1 flex-col text-left"
-                onClick={() => void store.open(scenario.id)}
               >
                 <span className="truncate text-[13.5px] font-semibold text-main-50">
                   {scenario.name}
@@ -269,8 +269,7 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
                 </span>
               ))}
               <Button
-                type="button"
-                tone="ghost"
+                tone="danger"
                 aria-label="Удалить сценарий"
                 disabled={store.removingId === scenario.id}
                 needConfirm
