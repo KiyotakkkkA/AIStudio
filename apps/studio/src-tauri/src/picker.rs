@@ -45,4 +45,19 @@ impl PickerPort for DialogPicker {
             .map_err(|_| AppError::new(AppErrorCode::Unknown, PICKER_CLOSED))?;
         Ok(paths.into_iter().filter_map(path_text).collect())
     }
+
+    async fn save_as(&self, suggested_name: &str) -> Result<Option<String>, AppError> {
+        let (sender, receiver) = oneshot::channel::<Option<FilePath>>();
+        let mut dialog = self.0.dialog().file().set_file_name(suggested_name);
+        if let Some(studio) = self.0.get_window(window::STUDIO) {
+            dialog = dialog.set_parent(&studio);
+        }
+        dialog.save_file(move |path| {
+            let _ = sender.send(path);
+        });
+        let path = receiver
+            .await
+            .map_err(|_| AppError::new(AppErrorCode::Unknown, PICKER_CLOSED))?;
+        Ok(path.and_then(path_text))
+    }
 }

@@ -10,8 +10,14 @@ export const DOCUMENT_BYTES_DATA_MAX = Math.ceil(DOCUMENT_BYTES_PAGE_MAX / 3) * 
 const Count = z.number().int().nonnegative();
 const Positive = z.number().int().positive();
 
-export const DocumentKind = z.enum(["pdf", "image", "markdown", "code", "csv", "text"]);
+export const DocumentKind = z.enum(["pdf", "image", "markdown", "code", "csv", "text", "office"]);
 export type DocumentKind = z.infer<typeof DocumentKind>;
+
+export const DocumentOfficeFormat = z.enum(["docx", "xlsx", "pptx"]);
+export type DocumentOfficeFormat = z.infer<typeof DocumentOfficeFormat>;
+
+export const DocumentRendering = z.enum(["native", "converted", "approximate"]);
+export type DocumentRendering = z.infer<typeof DocumentRendering>;
 
 export const DocumentTextEncoding = z.enum(["utf-8", "utf-16le", "utf-16be", "windows-1251"]);
 export type DocumentTextEncoding = z.infer<typeof DocumentTextEncoding>;
@@ -26,21 +32,33 @@ export const DocumentRef = z.discriminatedUnion("source", [
 ]);
 export type DocumentRef = z.infer<typeof DocumentRef>;
 
-export const DocumentDto = z.object({
-  id: DocumentId,
-  contentHash: z.string().min(1).max(128),
-  name: z.string().min(1).max(1024),
-  sourcePath: z.string().min(1).max(DOCUMENT_PATH_MAX),
-  kind: DocumentKind,
-  mimeType: z.string().min(1).max(128),
-  language: z.string().min(1).max(64).optional(),
-  sizeBytes: Count,
-  pageCount: Positive.optional(),
-  partCount: Positive,
-  initialPage: Positive.optional(),
-  open: z.boolean(),
-  openedAt: Count,
-});
+export const DocumentDto = z
+  .object({
+    id: DocumentId,
+    contentHash: z.string().min(1).max(128),
+    name: z.string().min(1).max(1024),
+    sourcePath: z.string().min(1).max(DOCUMENT_PATH_MAX),
+    kind: DocumentKind,
+    mimeType: z.string().min(1).max(128),
+    rendering: DocumentRendering,
+    officeFormat: DocumentOfficeFormat.optional(),
+    language: z.string().min(1).max(64).optional(),
+    sizeBytes: Count,
+    pageCount: Positive.optional(),
+    partCount: Positive,
+    initialPage: Positive.optional(),
+    open: z.boolean(),
+    openedAt: Count,
+  })
+  .refine(
+    (dto) => {
+      const office = dto.officeFormat !== undefined;
+      if (dto.rendering === "native") return !office && dto.kind !== "office";
+      if (dto.rendering === "converted") return office && dto.kind === "pdf";
+      return office && dto.kind === "office";
+    },
+    { path: ["rendering"], message: "kind" },
+  );
 export type DocumentDto = z.infer<typeof DocumentDto>;
 
 export const DocumentHandle = z.object({ id: DocumentId });

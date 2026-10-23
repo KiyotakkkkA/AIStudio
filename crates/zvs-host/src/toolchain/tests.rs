@@ -13,8 +13,9 @@ use zvs_contract::{
 };
 
 use super::definitions::{companion_name, primary_name};
+use super::msi::MsiExtractor;
 use super::probe::primary_for;
-use super::releases::{checksum_line, newest_lts};
+use super::releases::{checksum_line, newest_listed, newest_lts};
 use super::service::{ALREADY_DOWNLOADING, NO_CHECKSUM, NOT_MANAGED, SETTINGS_HINT};
 use super::*;
 use crate::data::schema::DownloadRow;
@@ -152,10 +153,22 @@ async fn mock_resolver(platform: Platform) -> (MockServer, ToolchainResolver) {
             HASH_A.to_uppercase()
         )),
     );
+    server.reply(
+        "/libreoffice/",
+        Reply::text(
+            "<a href=\"../\">Parent</a><a href=\"25.8.7/\">25.8.7/</a>\
+             <a href=\"26.8.1/\">26.8.1/</a><a href=\"26.2.6/\">26.2.6/</a>",
+        ),
+    );
+    server.reply(
+        "/libreoffice/26.8.1/win/x86_64/LibreOffice_26.8.1_Win_x86-64.msi.sha256",
+        Reply::text(format!("{HASH_A}  LibreOffice_26.8.1_Win_x86-64.msi\n")),
+    );
     let resolver = ToolchainResolver::new(ToolchainResolverOptions {
         node_index_url: server.url("/index.json"),
         node_dist_url: server.url("/dist"),
         uv_releases_url: server.url("/releases"),
+        libreoffice_url: server.url("/libreoffice"),
         platform,
         ..ToolchainResolverOptions::new(
             direct_http(),
@@ -183,6 +196,14 @@ impl Harness {
     }
 
     async fn with_path(path: Option<OsString>) -> Self {
+        Self::with_options(path, Vec::new(), Arc::new(FakeMsi)).await
+    }
+
+    async fn with_options(
+        path: Option<OsString>,
+        system_dirs: Vec<PathBuf>,
+        msi: Arc<dyn MsiExtractor>,
+    ) -> Self {
         let database = temporary_database();
         let workspace = temporary_directory("toolchain-");
         let (server, resolver) = mock_resolver(Platform::current()).await;
@@ -194,6 +215,8 @@ impl Harness {
             probe: probe.clone(),
             picker: Some(picker.clone()),
             path_env: Some(path.unwrap_or_default()),
+            system_dirs: Some(system_dirs),
+            msi,
             ..ToolchainServiceOptions::new(
                 workspace.join("mcp-toolchain"),
                 SettingService::new(database.shared(), Arc::new(FakeClock::default())),
@@ -234,6 +257,7 @@ fn banner(runtime: ToolchainRuntime, version: &str) -> String {
     match runtime {
         ToolchainRuntime::Node => format!("v{version}"),
         ToolchainRuntime::Uv => format!("uv {version} (abcdef 2025-10-21)"),
+        ToolchainRuntime::LibreOffice => format!("LibreOffice {version}.1 bf6ef2662401"),
     }
 }
 
@@ -1023,7 +1047,7 @@ async fn the_downloads_catalogue_shows_both_runtimes_in_the_settings_state() {
             .find(|row| row.item_ref == toolchain_catalogue_ref(runtime))
             .and_then(|row| row.state)
     };
-    assert_eq!(rows.len(), 2);
+    assert_eq!(rows.len(), if cfg!(windows) { 3 } else { 2 });
     assert!(rows.iter().all(|row| row.kind == DownloadItemKind::Runtime));
     assert_eq!(
         state(ToolchainRuntime::Node, &rows),
@@ -1058,4 +1082,178 @@ async fn the_downloads_catalogue_shows_both_runtimes_in_the_settings_state() {
     );
     assert_eq!(runtime_of_catalogue_ref("runtime:uv"), None);
     assert!(parse_toolchain_ref("toolchain:node:22.1.0:../evil.zip").is_none());
+}
+
+struct FakeMsi;
+
+#[async_trait]
+impl MsiExtractor for FakeMsi {
+    async fn extract(&self, package: &Path, target: &Path) -> Result<(), AppError> {
+        let version = std::fs::read_to_string(package).expect("reads the package");
+        install_copy(
+            &target.join("program"),
+            ToolchainRuntime::LibreOffice,
+            &banner(ToolchainRuntime::LibreOffice, version.trim()),
+        );
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn libreoffice_resolves_the_newest_stable_msi_with_its_published_checksum() {
+    let (_server, resolver) = mock_resolver(WINDOWS).await;
+    let build = resolver
+        .latest(ToolchainRuntime::LibreOffice, true)
+        .await
+        .expect("resolves");
+    assert_eq!(build.version, Version::new(26, 8, 1));
+    assert_eq!(build.asset_name, "LibreOffice_26.8.1_Win_x86-64.msi");
+    assert!(
+        build
+            .url
+            .ends_with("/26.8.1/win/x86_64/LibreOffice_26.8.1_Win_x86-64.msi")
+    );
+    assert_eq!(build.checksum.value, HASH_A);
+    let (_server, linux) = mock_resolver(Platform::new("linux", "x64")).await;
+    let error = linux
+        .latest(ToolchainRuntime::LibreOffice, true)
+        .await
+        .expect_err("no managed build");
+    assert_eq!(error.code, AppErrorCode::UnsupportedFormat);
+    assert_eq!(
+        newest_listed("<a href=\"7.6.0/\">"),
+        Some(Version::new(7, 6, 0))
+    );
+    assert_eq!(newest_listed("<a href=\"latest/\">"), None);
+}
+
+#[tokio::test]
+async fn libreoffice_installed_in_the_system_is_found_and_connected_as_a_system_copy() {
+    let workspace = temporary_directory("toolchain-office-");
+    let program = workspace.join("LibreOffice").join("program");
+    let expected = install_copy(
+        &program,
+        ToolchainRuntime::LibreOffice,
+        &banner(ToolchainRuntime::LibreOffice, "26.8.1"),
+    );
+    let harness = Harness::with_options(None, vec![program], Arc::new(FakeMsi)).await;
+    let dto = harness
+        .service
+        .scan(ToolchainRuntime::LibreOffice)
+        .await
+        .expect("finds");
+    assert_eq!(dto.source, Some(ToolchainSource::System));
+    assert_eq!(dto.version.as_deref(), Some("26.8.1"));
+    assert_eq!(
+        dto.executable_path.as_deref(),
+        Some(expected.to_string_lossy().as_ref())
+    );
+
+    let empty = Harness::new().await;
+    let missing = empty
+        .service
+        .scan(ToolchainRuntime::LibreOffice)
+        .await
+        .expect_err("absent");
+    assert_eq!(missing.code, AppErrorCode::NotFound);
+    assert_eq!(missing.message, "LibreOffice не найден в системе");
+}
+
+#[tokio::test]
+async fn the_converter_detects_an_installed_libreoffice_on_first_use() {
+    let workspace = temporary_directory("toolchain-office-");
+    let program = workspace.join("program");
+    let old = install_copy(
+        &program,
+        ToolchainRuntime::LibreOffice,
+        &banner(ToolchainRuntime::LibreOffice, "6.4.7"),
+    );
+    let harness = Harness::with_options(None, vec![program.clone()], Arc::new(FakeMsi)).await;
+    assert_eq!(harness.service.office_executable().await, None);
+    assert_eq!(
+        harness
+            .service
+            .get(ToolchainRuntime::LibreOffice)
+            .expect("reads")
+            .status,
+        ToolchainStatus::Missing
+    );
+    std::fs::write(&old, banner(ToolchainRuntime::LibreOffice, "26.8.1")).expect("upgrades");
+    assert_eq!(harness.service.office_executable().await, Some(old.clone()));
+    let dto = harness
+        .service
+        .get(ToolchainRuntime::LibreOffice)
+        .expect("reads");
+    assert_eq!(dto.status, ToolchainStatus::Ready);
+    assert_eq!(dto.source, Some(ToolchainSource::System));
+}
+
+#[tokio::test]
+async fn a_libreoffice_msi_is_unpacked_through_the_msi_extractor_and_connected() {
+    let harness = Harness::new().await;
+    let package = harness.workspace.join("LibreOffice_26.8.1_Win_x86-64.msi");
+    std::fs::write(&package, "26.8.1").expect("writes");
+    let row = row_for(
+        "toolchain:libreoffice:26.8.1:LibreOffice_26.8.1_Win_x86-64.msi",
+        &package,
+        Some(HASH_A.to_owned()),
+    );
+    harness
+        .service
+        .unpack_download(&row)
+        .await
+        .expect("unpacks");
+    let dto = harness
+        .service
+        .get(ToolchainRuntime::LibreOffice)
+        .expect("reads");
+    assert_eq!(dto.status, ToolchainStatus::Ready);
+    assert_eq!(dto.source, Some(ToolchainSource::Managed));
+    assert_eq!(dto.managed_versions, ["26.8.1"]);
+    let executable = PathBuf::from(dto.executable_path.expect("a path"));
+    assert!(
+        executable.starts_with(
+            harness
+                .service
+                .root()
+                .join("libreoffice")
+                .join("26.8.1")
+                .join("program")
+        )
+    );
+    assert_eq!(harness.service.office_executable().await, Some(executable));
+    assert!(!package.exists());
+}
+
+#[test]
+fn an_admin_image_loses_its_copy_of_the_package() {
+    let workspace = temporary_directory("toolchain-msi-");
+    let target = workspace.join("image");
+    std::fs::create_dir_all(target.join("program")).expect("creates");
+    std::fs::write(target.join("lo.msi"), "package").expect("writes");
+    std::fs::write(target.join("program").join("soffice.com"), "x").expect("writes");
+    super::msi::remove_packages(&target);
+    assert!(!target.join("lo.msi").exists());
+    assert!(target.join("program").join("soffice.com").exists());
+}
+
+#[tokio::test]
+async fn libreoffice_is_a_component_in_the_downloads_catalogue() {
+    let harness = Harness::new().await;
+    let rows = harness
+        .service
+        .catalogue_provider()
+        .list()
+        .await
+        .expect("lists");
+    let office = rows
+        .iter()
+        .find(|row| row.item_ref == toolchain_catalogue_ref(ToolchainRuntime::LibreOffice));
+    if cfg!(windows) {
+        let office = office.expect("a LibreOffice row on Windows");
+        assert_eq!(office.tags, ["компонент"]);
+        assert_eq!(office.state, Some(CatalogueItemState::Available));
+    } else {
+        assert!(office.is_none());
+    }
 }

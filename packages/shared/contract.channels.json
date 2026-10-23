@@ -4,6 +4,8 @@
   "accounts.list",
   "accounts.refresh",
   "accounts.unlink",
+  "artifacts.reveal",
+  "artifacts.save",
   "chat.bindFolder",
   "chat.cancel",
   "chat.context",

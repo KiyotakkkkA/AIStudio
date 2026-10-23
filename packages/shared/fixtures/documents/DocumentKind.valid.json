@@ -4,5 +4,6 @@
   { "name": "markdown", "value": "markdown" },
   { "name": "code", "value": "code" },
   { "name": "csv", "value": "csv" },
-  { "name": "text", "value": "text" }
+  { "name": "text", "value": "text" },
+  { "name": "office", "value": "office" }
 ]

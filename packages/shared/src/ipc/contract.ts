@@ -24,6 +24,7 @@ import {
   ExplorerReadInput,
   ExplorerWatchDto,
 } from "../explorer.js";
+import { ArtifactRef, ArtifactSaveResult } from "../artifacts.js";
 import {
   DocumentDto,
   DocumentHandle,
@@ -226,6 +227,8 @@ export const contract = defineContract({
   "documents.close": { input: DocumentHandle, output: z.void() },
   "documents.list": { input: z.void(), output: z.array(DocumentDto) },
   "documents.reveal": { input: DocumentHandle, output: z.void() },
+  "artifacts.save": { input: ArtifactRef, output: ArtifactSaveResult },
+  "artifacts.reveal": { input: ArtifactRef, output: z.void() },
   "runs.approve": {
     input: RunIdInput.extend({ approvalId: z.string().uuid(), always: z.boolean().default(false) }),
     output: z.void(),

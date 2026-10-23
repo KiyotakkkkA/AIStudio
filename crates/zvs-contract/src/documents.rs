@@ -27,6 +27,19 @@ wire_enum!(DocumentKind {
     Code => "code",
     Csv => "csv",
     Text => "text",
+    Office => "office",
+});
+
+wire_enum!(DocumentOfficeFormat {
+    Docx => "docx",
+    Xlsx => "xlsx",
+    Pptx => "pptx",
+});
+
+wire_enum!(DocumentRendering {
+    Native => "native",
+    Converted => "converted",
+    Approximate => "approximate",
 });
 
 impl DocumentKind {
@@ -82,6 +95,9 @@ pub struct DocumentDto {
     pub source_path: String,
     pub kind: DocumentKind,
     pub mime_type: String,
+    pub rendering: DocumentRendering,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub office_format: Option<DocumentOfficeFormat>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub language: Option<String>,
     pub size_bytes: u64,
@@ -104,6 +120,15 @@ impl Validate for DocumentDto {
         check::max_len("sourcePath", &self.source_path, DOCUMENT_PATH_MAX)?;
         check::non_empty("mimeType", &self.mime_type)?;
         check::max_len("mimeType", &self.mime_type, DOCUMENT_MIME_MAX)?;
+        let office = self.office_format.is_some();
+        let consistent = match self.rendering {
+            DocumentRendering::Native => !office && self.kind != DocumentKind::Office,
+            DocumentRendering::Converted => office && self.kind == DocumentKind::Pdf,
+            DocumentRendering::Approximate => office && self.kind == DocumentKind::Office,
+        };
+        if !consistent {
+            return Err(invalid("rendering", "kind"));
+        }
         if let Some(language) = &self.language {
             check::non_empty("language", language)?;
             check::max_len("language", language, DOCUMENT_LANGUAGE_MAX)?;

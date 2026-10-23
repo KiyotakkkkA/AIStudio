@@ -6,9 +6,10 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use zvs_contract::validate::{check, invalid};
-use zvs_contract::{AppError, AppErrorCode, Validate};
+use zvs_contract::{AppError, AppErrorCode, ArtifactDto, Validate};
 
 use super::library::SkillLibrary;
+use crate::artifacts::{ArtifactStore, mentioned_paths, produced, snapshot};
 use crate::kernel::{NodeDef, PermissionRequirement, StepContext};
 use crate::toolchain::CommandLauncher;
 use crate::toolchain::process::{
@@ -125,6 +126,8 @@ pub struct SkillScriptOutput {
     pub stderr: String,
     pub text: String,
     pub is_error: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<ArtifactDto>,
 }
 
 impl Validate for SkillScriptOutput {
@@ -139,6 +142,7 @@ pub struct SkillScriptOptions {
     pub scratch: PathBuf,
     pub timeout: Duration,
     pub output_bytes: usize,
+    pub artifacts: Option<ArtifactStore>,
 }
 
 impl SkillScriptOptions {
@@ -148,6 +152,7 @@ impl SkillScriptOptions {
             scratch,
             timeout: SCRIPT_TIMEOUT,
             output_bytes: SCRIPT_OUTPUT_BYTES,
+            artifacts: None,
         }
     }
 }
@@ -224,7 +229,9 @@ impl NodeDef for SkillScriptNode {
                     .or_insert_with(|| (*value).to_owned());
             }
         }
-        spec.cwd = Some(scratch);
+        spec.cwd = Some(scratch.clone());
+        let before = snapshot(&scratch);
+        let started = std::time::SystemTime::now();
         context.check_cancelled()?;
         let limits = ProcessLimits {
             timeout: self.options.timeout,
@@ -238,6 +245,30 @@ impl NodeDef for SkillScriptNode {
             SCRIPT_NOT_STARTED,
         )
         .await?;
+        let artifacts = self
+            .options
+            .artifacts
+            .as_ref()
+            .map_or_else(Vec::new, |store| {
+                let mentioned = mentioned_paths(&input.args, &scratch);
+                store.keep(
+                    &context.run_id.to_string(),
+                    &produced(&scratch, &before, &mentioned, started),
+                )
+            });
+        let mut text = process_text(&run, "script", limits);
+        if !artifacts.is_empty() {
+            let names: Vec<&str> = artifacts
+                .iter()
+                .map(|artifact| artifact.name.as_str())
+                .collect();
+            text.push_str(&format!(
+                "
+
+Files shown to the user with download buttons: {}",
+                names.join(", ")
+            ));
+        }
         Ok(SkillScriptOutput {
             key: input.key,
             path: script.path,
@@ -245,11 +276,20 @@ impl NodeDef for SkillScriptNode {
             exit_code: run.exit_code,
             timed_out: run.timed_out,
             truncated: run.truncated,
-            text: process_text(&run, "script", limits),
+            text,
             is_error: run.failed(),
             stdout: run.stdout,
             stderr: run.stderr,
+            artifacts,
         })
+    }
+
+    fn tool_meta(
+        &self,
+        _input: &serde_json::Value,
+        output: &SkillScriptOutput,
+    ) -> Option<serde_json::Value> {
+        (!output.artifacts.is_empty()).then(|| serde_json::json!({ "artifacts": output.artifacts }))
     }
 }
 

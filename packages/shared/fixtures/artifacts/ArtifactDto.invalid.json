@@ -1,0 +1,20 @@
+[
+  {
+    "name": "an id that climbs out",
+    "value": {
+      "id": "../secrets.txt",
+      "name": "secrets.txt",
+      "format": "txt",
+      "sizeBytes": 1
+    }
+  },
+  {
+    "name": "no format",
+    "value": {
+      "id": "run/a",
+      "name": "a",
+      "format": "",
+      "sizeBytes": 1
+    }
+  }
+]

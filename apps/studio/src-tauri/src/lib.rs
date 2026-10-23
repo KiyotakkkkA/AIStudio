@@ -12,12 +12,15 @@ use std::sync::Arc;
 
 use serde_json::json;
 use tauri::{App, AppHandle, Manager, RunEvent, WindowEvent};
+use zvs_host::artifacts::ArtifactStore;
 use zvs_host::browser::{BrowserLifecycle, profile_dir};
 use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::data::Repositories;
 use zvs_host::data::repositories::{ProviderFilter, SecretFilter};
 use zvs_host::data::{MigrationFailed, PrepareOptions, prepare_database};
-use zvs_host::documents::{DocumentService, DocumentServiceOptions};
+use zvs_host::documents::{
+    DocumentService, DocumentServiceOptions, KernelDocumentConverter, register_document_nodes,
+};
 use zvs_host::downloads::{
     CatalogueService, CatalogueServiceOptions, CuratedProvider, DiskService, DiskServiceOptions,
     DownloadService, DownloadServiceOptions, OllamaProvider,
@@ -610,13 +613,18 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             tools.clone(),
         )
     });
+    let artifacts =
+        ArtifactStore::new(paths.data_dir.join("artifacts")).with_picker(Arc::clone(&picker));
     register_skill_nodes(
         &nodes,
         &skill_library,
-        SkillScriptOptions::new(
-            Some(Arc::new(toolchain.clone())),
-            paths.cache_dir.join("skill-scripts"),
-        ),
+        SkillScriptOptions {
+            artifacts: Some(artifacts.clone()),
+            ..SkillScriptOptions::new(
+                Some(Arc::new(toolchain.clone())),
+                paths.cache_dir.join("skill-scripts"),
+            )
+        },
     )?;
     register_kernel_tools(&nodes, &tools)?;
     if let Err(error) = skill_library.install_bundled(BUNDLED_SKILLS) {
@@ -678,8 +686,17 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         forbidden.clone(),
         clock.clone(),
     );
+    register_document_nodes(
+        &nodes,
+        Arc::new(sidecar.clone()),
+        paths.cache_dir.join("documents"),
+    )?;
     let documents = DocumentService::new(DocumentServiceOptions {
         forbidden: Some(forbidden),
+        converter: Some(Arc::new(KernelDocumentConverter::new(
+            runs.clone(),
+            Arc::new(toolchain.clone()),
+        ))),
         clock: clock.clone(),
         logger: logger.clone(),
         ..DocumentServiceOptions::new(
@@ -835,6 +852,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         chat,
         explorer: explorer.clone(),
         documents,
+        artifacts,
         folders,
         picker: Some(picker),
     });

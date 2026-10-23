@@ -8,12 +8,14 @@ use crate::validate::{Validate, check, invalid};
 wire_enum!(ToolchainRuntime {
     Uv => "uv",
     Node => "node",
+    LibreOffice => "libreoffice",
 });
 
 wire_enum!(ToolchainSource {
     Managed => "managed",
     Path => "path",
     Manual => "manual",
+    System => "system",
 });
 
 wire_enum!(ToolchainStatus {

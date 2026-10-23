@@ -9,13 +9,12 @@ use base64::engine::general_purpose::STANDARD;
 use serde_json::json;
 use zvs_contract::{
     AppError, AppErrorCode, ChatCitationDto, DOCUMENT_BYTES_PAGE_MAX, DOCUMENT_TEXT_PAGE_MAX,
-    DocumentDto, DocumentId, DocumentKind, DocumentPageDto, DocumentRef, Timestamp,
+    DocumentDto, DocumentId, DocumentKind, DocumentOfficeFormat, DocumentPageDto, DocumentRef,
+    DocumentRendering, Timestamp,
 };
 
 use super::cache::{DocumentCache, cache_file_name, eviction_plan};
-use super::kind::{
-    Detected, Detection, OfficeFormat, code_language, detect, pdf_page_estimate, unsupported,
-};
+use super::kind::{Detected, Detection, OfficeFormat, code_language, detect, pdf_page_estimate};
 use super::text::{decode, first_line, paginate};
 use crate::data::{Database, Repositories, schema::DocumentRow};
 use crate::drivers::core::SharedTextCore;
@@ -43,9 +42,19 @@ pub const DOCUMENT_TOO_LARGE: &str = "Файл слишком большой д�
 pub const DOCUMENT_UNREADABLE: &str = "Не удалось прочитать файл";
 pub const DOCUMENT_CACHE_FAILED: &str = "Не удалось подготовить документ к просмотру";
 pub const STORE_DOCUMENT_NOT_FOUND: &str = "Документ хранилища не найден";
+pub const CONVERSION_UNAVAILABLE: &str = "Преобразование документов в PDF недоступно: подключите LibreOffice в разделе «Настройки → Компоненты»";
+
+fn conversion_unavailable(format: OfficeFormat) -> AppError {
+    AppError::new(AppErrorCode::UnsupportedFormat, CONVERSION_UNAVAILABLE)
+        .with_detail("format", format.extension())
+}
 
 #[async_trait]
 pub trait DocumentConverter: Send + Sync {
+    async fn ready(&self) -> bool {
+        true
+    }
+
     async fn convert_to_pdf(
         &self,
         source: &Path,
@@ -111,9 +120,19 @@ pub struct DocumentService {
 struct Prepared {
     kind: DocumentKind,
     mime_type: &'static str,
+    office_format: Option<DocumentOfficeFormat>,
     cached_file: String,
     page_count: Option<u64>,
     part_count: u64,
+    copy_source: bool,
+}
+
+fn rendering(kind: DocumentKind, office_format: Option<DocumentOfficeFormat>) -> DocumentRendering {
+    match (kind, office_format) {
+        (_, None) => DocumentRendering::Native,
+        (DocumentKind::Office, Some(_)) => DocumentRendering::Approximate,
+        (_, Some(_)) => DocumentRendering::Converted,
+    }
 }
 
 fn not_found(message: &str) -> AppError {
@@ -296,7 +315,7 @@ impl DocumentService {
     ) -> Result<Prepared, AppError> {
         match detection {
             Detection::Native(detected) => self.prepare_native(hash, bytes, detected),
-            Detection::Office(format) => self.prepare_office(source, hash, format).await,
+            Detection::Office(format) => self.prepare_office(source, hash, bytes, format).await,
         }
     }
 
@@ -313,6 +332,7 @@ impl DocumentService {
                 part_count_of(size, self.options().bytes_page_max),
             ),
             DocumentKind::Image => (Some(1), part_count_of(size, self.options().bytes_page_max)),
+            DocumentKind::Office => (None, part_count_of(size, self.options().bytes_page_max)),
             DocumentKind::Markdown
             | DocumentKind::Code
             | DocumentKind::Csv
@@ -333,36 +353,85 @@ impl DocumentService {
         Ok(Prepared {
             kind: detected.kind,
             mime_type: detected.mime_type,
+            office_format: None,
             cached_file: cache_file_name(hash, detected.extension),
             page_count,
             part_count,
+            copy_source: true,
         })
+    }
+
+    async fn ready_converter(&self) -> Option<SharedDocumentConverter> {
+        let converter = self.options().converter.clone()?;
+        converter.ready().await.then_some(converter)
     }
 
     async fn prepare_office(
         &self,
         source: &Path,
         hash: &str,
+        bytes: &[u8],
         format: OfficeFormat,
     ) -> Result<Prepared, AppError> {
-        let Some(converter) = self.options().converter.clone() else {
-            return Err(unsupported(source));
-        };
         let cached_file = cache_file_name(hash, "pdf");
         if !self.inner.cache.contains(&cached_file) {
-            std::fs::create_dir_all(extended(self.inner.cache.dir()))
-                .map_err(|error| cache_failure(&error))?;
-            let temporary = self.inner.cache.temporary(&cached_file);
-            let converted = converter.convert_to_pdf(source, format, &temporary).await;
-            if let Err(error) = converted {
-                let _ = std::fs::remove_file(extended(&temporary));
-                return Err(error);
+            let Some(converter) = self.ready_converter().await else {
+                return Ok(Self::approximate(
+                    hash,
+                    bytes,
+                    format,
+                    self.options().bytes_page_max,
+                ));
+            };
+            self.convert(&converter, source, format, &cached_file)
+                .await?;
+            let stale = cache_file_name(hash, format.extension());
+            if self.inner.cache.contains(&stale) {
+                let _ = self.inner.cache.remove(&stale);
             }
-            self.inner
-                .cache
-                .commit(&temporary, &cached_file)
-                .map_err(|error| cache_failure(&error))?;
         }
+        self.converted(cached_file, format).await
+    }
+
+    fn approximate(hash: &str, bytes: &[u8], format: OfficeFormat, page_max: usize) -> Prepared {
+        let size = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        Prepared {
+            kind: DocumentKind::Office,
+            mime_type: format.mime_type(),
+            office_format: Some(format.wire()),
+            cached_file: cache_file_name(hash, format.extension()),
+            page_count: None,
+            part_count: part_count_of(size, page_max),
+            copy_source: true,
+        }
+    }
+
+    async fn convert(
+        &self,
+        converter: &SharedDocumentConverter,
+        source: &Path,
+        format: OfficeFormat,
+        cached_file: &str,
+    ) -> Result<(), AppError> {
+        std::fs::create_dir_all(extended(self.inner.cache.dir()))
+            .map_err(|error| cache_failure(&error))?;
+        let temporary = self.inner.cache.temporary(cached_file);
+        let converted = converter.convert_to_pdf(source, format, &temporary).await;
+        if let Err(error) = converted {
+            let _ = std::fs::remove_file(extended(&temporary));
+            return Err(error);
+        }
+        self.inner
+            .cache
+            .commit(&temporary, cached_file)
+            .map_err(|error| cache_failure(&error))
+    }
+
+    async fn converted(
+        &self,
+        cached_file: String,
+        format: OfficeFormat,
+    ) -> Result<Prepared, AppError> {
         let path = self.inner.cache.path(&cached_file);
         let converted =
             blocking(move || std::fs::read(extended(&path)).map_err(|error| cache_failure(&error)))
@@ -371,9 +440,11 @@ impl DocumentService {
         Ok(Prepared {
             kind: DocumentKind::Pdf,
             mime_type: "application/pdf",
+            office_format: Some(format.wire()),
             cached_file,
             page_count: pdf_page_estimate(&converted),
             part_count: part_count_of(size, self.options().bytes_page_max),
+            copy_source: false,
         })
     }
 
@@ -393,6 +464,7 @@ impl DocumentService {
                 source_path: path_text(source),
                 kind: prepared.kind,
                 mime_type: prepared.mime_type.to_owned(),
+                office_format: prepared.office_format,
                 page_count: prepared.page_count.map(count),
                 part_count: count(prepared.part_count),
                 size_bytes: count(size),
@@ -436,7 +508,7 @@ impl DocumentService {
         let size = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
         let prepared = self.prepare(&source, &hash, &bytes, detection).await?;
         let row = self.record(&source, &hash, size, &prepared)?;
-        if matches!(detection, Detection::Native(_))
+        if prepared.copy_source
             && let Err(error) = self.materialize(&row.cached_file, bytes).await
         {
             self.release(&row.id);
@@ -517,10 +589,16 @@ impl DocumentService {
             return Err(changed());
         }
         match detect(&source, &bytes).map_err(|_| changed())? {
-            Detection::Native(_) => self.materialize(&row.cached_file, bytes).await?,
-            Detection::Office(format) => {
-                self.prepare_office(&source, &row.content_hash, format)
+            Detection::Office(format) if row.kind == DocumentKind::Pdf => {
+                let converter = self
+                    .ready_converter()
+                    .await
+                    .ok_or_else(|| conversion_unavailable(format))?;
+                self.convert(&converter, &source, format, &row.cached_file)
                     .await?;
+            }
+            Detection::Native(_) | Detection::Office(_) => {
+                self.materialize(&row.cached_file, bytes).await?;
             }
         }
         Ok(path)
@@ -579,6 +657,8 @@ impl DocumentService {
             source_path: row.source_path.clone(),
             kind: row.kind,
             mime_type: row.mime_type.clone(),
+            rendering: rendering(row.kind, row.office_format),
+            office_format: row.office_format,
             language: (row.kind == DocumentKind::Code)
                 .then(|| code_language(Path::new(&row.source_path)))
                 .flatten()

@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod ai;
+pub mod artifacts;
 pub mod browser;
 pub mod channels;
 pub mod chat;
@@ -40,6 +41,7 @@ pub use ai::{
     AuthMode, HonoursDto, LOCAL_BASE_URL, ProvidersAdaptersOutput, ToolMode, TunableParameter,
     model_tool_support, resolve_tool_mode,
 };
+pub use artifacts::{ArtifactDto, ArtifactRef, ArtifactSaveResult};
 pub use browser::{
     BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie, BrowserSecurity,
     BrowserState, BrowserTab,
@@ -56,8 +58,8 @@ pub use chat::{
 };
 pub use documents::{
     DOCUMENT_BYTES_DATA_MAX, DOCUMENT_BYTES_PAGE_MAX, DOCUMENT_LIST_MAX, DOCUMENT_PATH_MAX,
-    DOCUMENT_TEXT_PAGE_MAX, DocumentDto, DocumentHandle, DocumentKind, DocumentPageDto,
-    DocumentPageInput, DocumentRef, DocumentTextEncoding,
+    DOCUMENT_TEXT_PAGE_MAX, DocumentDto, DocumentHandle, DocumentKind, DocumentOfficeFormat,
+    DocumentPageDto, DocumentPageInput, DocumentRef, DocumentRendering, DocumentTextEncoding,
 };
 pub use downloads::{
     CatalogueFilter, CatalogueItemDto, CatalogueItemState, CatalogueSource, ChecksumAlgorithm,

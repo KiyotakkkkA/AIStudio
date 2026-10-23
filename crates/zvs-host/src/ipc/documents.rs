@@ -109,11 +109,28 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_unsupported_file_is_refused_with_its_code() {
+    async fn an_office_file_without_a_converter_opens_for_approximate_rendering() {
         let (_host, server) = server();
         let folder = tempfile::tempdir().expect("a temporary folder");
         let path = folder.path().join("letter.docx");
         std::fs::write(&path, b"PK\x03\x04word/document.xml").expect("writes");
+        let opened = call(
+            &server,
+            "documents.open",
+            json!({ "source": "path", "path": path.to_string_lossy() }),
+        )
+        .await;
+        assert_eq!(opened["kind"], json!("office"));
+        assert_eq!(opened["rendering"], json!("approximate"));
+        assert_eq!(opened["officeFormat"], json!("docx"));
+    }
+
+    #[tokio::test]
+    async fn an_unsupported_file_is_refused_with_its_code() {
+        let (_host, server) = server();
+        let folder = tempfile::tempdir().expect("a temporary folder");
+        let path = folder.path().join("archive.bin");
+        std::fs::write(&path, b"\0\x01\x02\x03").expect("writes");
         assert_eq!(
             failure(
                 &server,

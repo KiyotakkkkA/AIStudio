@@ -37,6 +37,7 @@ import ConversationVm from "./ConversationVm";
 import { adapterLabel } from "../providers/accountPresentation";
 import { suggestedBaseUrl } from "../providers/providerPresentation";
 import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
+import ArtifactActions from "./ArtifactActions";
 import ExplorerStore from "./explorer/ExplorerStore";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
@@ -88,6 +89,7 @@ export default class ChatStore {
   folderPrompt: { path: string } | null = null;
   pendingTurn = false;
   readonly explorer: ExplorerStore;
+  readonly artifacts: ArtifactActions;
   outcome: "ok" | "cancelled" | "failed" | null = null;
   private buffer = "";
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -104,6 +106,7 @@ export default class ChatStore {
     private readonly events: EventRouter,
   ) {
     this.explorer = new ExplorerStore(ipc, events);
+    this.artifacts = new ArtifactActions(ipc);
     makeAutoObservable<
       ChatStore,
       | "ipc"
@@ -123,6 +126,7 @@ export default class ChatStore {
         ipc: false,
         events: false,
         explorer: false,
+        artifacts: false,
         buffer: false,
         timer: false,
         unsubscribe: false,

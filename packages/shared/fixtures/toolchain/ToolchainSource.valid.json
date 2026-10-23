@@ -10,5 +10,9 @@
   {
     "name": "manual",
     "value": "manual"
+  },
+  {
+    "name": "system",
+    "value": "system"
   }
 ]

@@ -413,10 +413,15 @@ pub fn test_services(system: SystemService) -> TestServices {
     crate::skills::register_skill_nodes(
         &nodes,
         &skill_library,
-        crate::skills::SkillScriptOptions::new(
-            Some(Arc::new(toolchain.clone())),
-            workspace.join("skill-scripts"),
-        ),
+        crate::skills::SkillScriptOptions {
+            artifacts: Some(crate::artifacts::ArtifactStore::new(
+                workspace.join("artifacts"),
+            )),
+            ..crate::skills::SkillScriptOptions::new(
+                Some(Arc::new(toolchain.clone())),
+                workspace.join("skill-scripts"),
+            )
+        },
     )
     .expect("registers the skill nodes");
     crate::tools::register_kernel_tools(&nodes, &tools).expect("registers the kernel tools");
@@ -525,6 +530,8 @@ pub fn test_services(system: SystemService) -> TestServices {
                 run_bus.clone(),
                 std::time::Duration::from_millis(50),
             ),
+            artifacts: crate::artifacts::ArtifactStore::new(workspace.join("artifacts"))
+                .with_revealer(Arc::new(|_: &Path| Ok(()))),
             documents: crate::documents::DocumentService::new(
                 crate::documents::DocumentServiceOptions {
                     clock: clock.clone(),
@@ -661,6 +668,19 @@ impl crate::platform::picker::PickerPort for FakePicker {
         let mut state = self.0.lock().unwrap_or_else(PoisonError::into_inner);
         state.1.push(kind);
         Ok(state.0.clone())
+    }
+
+    async fn save_as(
+        &self,
+        _suggested_name: &str,
+    ) -> Result<Option<String>, zvs_contract::AppError> {
+        Ok(self
+            .0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .0
+            .first()
+            .cloned())
     }
 }
 

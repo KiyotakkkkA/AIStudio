@@ -90,5 +90,6 @@ pub struct Services {
     pub folders: FolderAccessService,
     pub explorer: ExplorerService,
     pub documents: DocumentService,
+    pub artifacts: crate::artifacts::ArtifactStore,
     pub picker: Option<SharedPicker>,
 }

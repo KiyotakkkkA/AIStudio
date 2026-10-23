@@ -1,14 +1,17 @@
 pub mod definitions;
 pub mod launch;
+pub mod msi;
 pub mod probe;
 pub mod process;
 pub mod releases;
 pub mod service;
 
 pub use definitions::{
-    TOOLCHAIN_DEFINITIONS, ToolchainCommand, ToolchainDefinition, Version, definition,
+    TOOLCHAIN_DEFINITIONS, ToolchainCategory, ToolchainCommand, ToolchainDefinition, Version,
+    definition,
 };
 pub use launch::{LaunchSpec, prepend_path};
+pub use msi::{MsiExtractor, MsiexecExtractor, SharedMsiExtractor};
 pub use probe::{Probed, ProcessProbe, SharedProbe, VersionProbe, probe};
 pub use process::{ProcessLimits, ProcessRun, prepare_scratch, run_process};
 pub use releases::{ToolchainBuild, ToolchainResolver, ToolchainResolverOptions};

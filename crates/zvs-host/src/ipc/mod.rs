@@ -1,4 +1,5 @@
 pub mod accounts;
+pub mod artifacts;
 pub mod chat;
 pub mod documents;
 pub mod downloads;
@@ -39,6 +40,7 @@ pub fn register(server: &mut IpcServer) {
     folders::register(server);
     workspace::register(server);
     documents::register(server);
+    artifacts::register(server);
 }
 
 #[cfg(test)]
@@ -75,6 +77,8 @@ mod tests {
                 "accounts.list",
                 "accounts.refresh",
                 "accounts.unlink",
+                "artifacts.reveal",
+                "artifacts.save",
                 "chat.bindFolder",
                 "chat.cancel",
                 "chat.context",

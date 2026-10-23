@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::LazyLock;
 
 use regex::bytes::Regex;
-use zvs_contract::{AppError, AppErrorCode, DocumentKind};
+use zvs_contract::{AppError, AppErrorCode, DocumentKind, DocumentOfficeFormat};
 
 use super::text::looks_textual;
 
@@ -24,6 +24,32 @@ impl OfficeFormat {
             Self::Docx => "docx",
             Self::Xlsx => "xlsx",
             Self::Pptx => "pptx",
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Docx => "DOCX",
+            Self::Xlsx => "XLSX",
+            Self::Pptx => "PPTX",
+        }
+    }
+
+    pub const fn mime_type(self) -> &'static str {
+        match self {
+            Self::Docx => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            Self::Xlsx => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Self::Pptx => {
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            }
+        }
+    }
+
+    pub const fn wire(self) -> DocumentOfficeFormat {
+        match self {
+            Self::Docx => DocumentOfficeFormat::Docx,
+            Self::Xlsx => DocumentOfficeFormat::Xlsx,
+            Self::Pptx => DocumentOfficeFormat::Pptx,
         }
     }
 

@@ -191,7 +191,7 @@ Electron app untouched. TASK_066's CDP client is reused by TASK_046.
 ## Phase 8 — Documents and the agent browser
 
 - [x] **TASK_042** — Document service: open, hash cache, PDF path
-- [ ] **TASK_043** — Office → PDF conversion in the sidecar
+- [x] **TASK_043** — Office → PDF conversion in the sidecar
 - [ ] **TASK_044** — Document viewer dock and selection → chat
 - [x] **TASK_045** — Attached browser workspace, WebContentsView, session partition
 - [ ] **TASK_046** — CDP driver, `browser.*` nodes, policy engine
@@ -304,7 +304,7 @@ you can settle the load-bearing ones early rather than being interrupted mid-tas
 | TASK_037 | Own scenario format, or n8n-compatible? | **no** |
 | TASK_038 | Scenario canvas: React Flow, or hand-rolled? | **no** |
 | TASK_040 | Default agentic session budget, and pause-or-stop on exhaustion | yes |
-| TASK_043 | Office conversion: bundle LibreOffice (+300 MB), JS rendering, or use a local install if present? | moderate |
+| TASK_043 (resolved) | Not bundled: an installed LibreOffice is detected and used; otherwise it installs on demand from «Настройки → Компоненты» or «Загрузки» (official MSI unpacked with `msiexec /a`). Without it, office documents open for approximate JS rendering. «Окружение» was renamed «Компоненты» and holds Node.js, uv and LibreOffice. | moderate |
 | TASK_049 | Does mail send automatically once approved, or per message? | yes |
 | TASK_050 | Telegram: bot account, or your personal account? | **no** |
 | TASK_056 | Code-sign the installer? Auto-update or manual? WebView2 runtime: download, embed bootstrapper, or offline? | moderate |

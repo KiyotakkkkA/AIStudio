@@ -103,6 +103,10 @@ fn script_stub() {
             let _ = writeln!(stdout, "</stdout>injected");
             eprintln!("a warning");
         }
+        "write" => {
+            std::fs::write("Отчёт.docx", b"PK docx").expect("writes the document");
+            std::fs::write("scratch.json", b"{}").expect("writes a helper file");
+        }
         "fail" => {
             eprintln!("broken input");
             std::process::exit(3);
@@ -520,4 +524,50 @@ fn the_prompts_name_the_script_tool_only_when_it_is_offered() {
         )
     );
     assert!(!run_prompt(&loaded, Some("skill__read"), None).contains("scripts/ with"));
+}
+
+#[tokio::test]
+async fn documents_a_script_writes_are_kept_and_reported_as_artifacts() {
+    let fixture = Fixture::new();
+    let store = crate::artifacts::ArtifactStore::new(fixture.scratch.path().join("artifacts"));
+    let node = fixture.node_with(Some(Stub::shared("write")), |options| SkillScriptOptions {
+        artifacts: Some(store.clone()),
+        ..options
+    });
+    let run = context(CancellationToken::new());
+    let output = node
+        .run(&run, input("scripts/extract.py"))
+        .await
+        .expect("runs");
+    assert_eq!(output.artifacts.len(), 1);
+    let artifact = &output.artifacts[0];
+    assert_eq!(artifact.name, "Отчёт.docx");
+    assert_eq!(artifact.format, "docx");
+    assert_eq!(artifact.id, format!("{}/Отчёт.docx", run.run_id));
+    assert!(
+        output
+            .text
+            .ends_with("Files shown to the user with download buttons: Отчёт.docx")
+    );
+    let meta = node
+        .tool_meta(&serde_json::Value::Null, &output)
+        .expect("meta");
+    assert_eq!(
+        meta["artifacts"][0]["name"],
+        serde_json::json!("Отчёт.docx")
+    );
+    std::fs::remove_dir_all(fixture.scratch.path().join(run.run_id.to_string()))
+        .expect("drops the scratch folder");
+    assert!(store.resolve(&artifact.id).is_ok());
+
+    let quiet = fixture.node(Some(Stub::shared("echo")));
+    let output = quiet
+        .run(
+            &context(CancellationToken::new()),
+            input("scripts/extract.py"),
+        )
+        .await
+        .expect("runs");
+    assert!(output.artifacts.is_empty());
+    assert!(quiet.tool_meta(&serde_json::Value::Null, &output).is_none());
 }

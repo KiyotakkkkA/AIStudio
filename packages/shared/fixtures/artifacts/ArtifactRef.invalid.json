@@ -1,0 +1,14 @@
+[
+  {
+    "name": "nested",
+    "value": {
+      "id": "run/a/b.pdf"
+    }
+  },
+  {
+    "name": "a bare name",
+    "value": {
+      "id": "report.pdf"
+    }
+  }
+]

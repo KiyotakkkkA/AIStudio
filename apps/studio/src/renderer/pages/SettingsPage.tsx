@@ -1,16 +1,16 @@
 import { mdiTuneVariant } from "@mdi/js";
 import { useState } from "react";
 import HostCheck from "../features/diagnostics/HostCheck";
-import EnvironmentTab from "../features/toolchain/EnvironmentTab";
+import ComponentsTab from "../features/toolchain/ComponentsTab";
 import SegmentedControl from "../ui/atoms/SegmentedControl";
 import PageShell from "../ui/templates/PageShell";
 
-const TABS = [{ value: "environment", label: "Окружение" }] as const;
+const TABS = [{ value: "components", label: "Компоненты" }] as const;
 
 type TabValue = (typeof TABS)[number]["value"];
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<TabValue>("environment");
+  const [tab, setTab] = useState<TabValue>("components");
 
   return (
     <PageShell
@@ -27,7 +27,7 @@ export default function SettingsPage() {
         />
       }
     >
-      {tab === "environment" ? <EnvironmentTab /> : null}
+      {tab === "components" ? <ComponentsTab /> : null}
       <HostCheck />
     </PageShell>
   );

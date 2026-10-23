@@ -80,7 +80,7 @@ async fn the_channels_connect_a_picked_copy_refuse_an_empty_path_and_disconnect(
     let (host, server) = registered();
     let listed = server.dispatch("toolchain.list", json!({})).await;
     assert_eq!(listed["ok"], json!(true), "{listed}");
-    assert_eq!(listed["data"].as_array().map(Vec::len), Some(2));
+    assert_eq!(listed["data"].as_array().map(Vec::len), Some(3));
     assert_eq!(runtime_of(&listed, "node").status, ToolchainStatus::Missing);
 
     let primary = copy_in(

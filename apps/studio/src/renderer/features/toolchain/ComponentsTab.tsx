@@ -4,7 +4,7 @@ import { useStore } from "../../stores/useStore";
 import ToolchainCard from "./ToolchainCard";
 import type { ToolchainAction } from "./toolchainPresentation";
 
-function EnvironmentTab() {
+function ComponentsTab() {
   const { toolchain } = useStore();
 
   useEffect(() => {
@@ -37,4 +37,4 @@ function EnvironmentTab() {
   );
 }
 
-export default observer(EnvironmentTab);
+export default observer(ComponentsTab);

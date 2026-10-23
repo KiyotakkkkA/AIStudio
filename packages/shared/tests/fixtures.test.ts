@@ -10,6 +10,7 @@ import * as processes from "../src/process.js";
 import * as folders from "../src/folders.js";
 import * as explorer from "../src/explorer.js";
 import * as documents from "../src/documents.js";
+import * as artifacts from "../src/artifacts.js";
 import {
   AccountDto,
   ChatCitationDto,
@@ -198,7 +199,12 @@ const schemas: Record<string, z.ZodType> = {
   "explorer/ExplorerChangeDto": explorer.ExplorerChangeDto,
   "explorer/ExplorerChangesDto": explorer.ExplorerChangesDto,
   "explorer/ExplorerWatchDto": explorer.ExplorerWatchDto,
+  "artifacts/ArtifactDto": artifacts.ArtifactDto,
+  "artifacts/ArtifactRef": artifacts.ArtifactRef,
+  "artifacts/ArtifactSaveResult": artifacts.ArtifactSaveResult,
   "documents/DocumentKind": documents.DocumentKind,
+  "documents/DocumentOfficeFormat": documents.DocumentOfficeFormat,
+  "documents/DocumentRendering": documents.DocumentRendering,
   "documents/DocumentTextEncoding": documents.DocumentTextEncoding,
   "documents/DocumentRef": documents.DocumentRef,
   "documents/DocumentDto": documents.DocumentDto,

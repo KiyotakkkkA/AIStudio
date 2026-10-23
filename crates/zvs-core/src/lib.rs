@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod chunk;
+pub mod convert;
 pub mod embed;
 pub mod error;
 pub mod graph;

@@ -1,8 +1,10 @@
 import { useState, type ReactNode } from "react";
 import type { ChatCitationDto, VectorStoreDto, VectorStoreId } from "@zvs/shared";
 import { Accordion, ScrollArea, SlidedPanel, Tabs } from "@kiyotakkkka/zvs-uikit-lib";
-import { mdiDatabaseOutline, mdiThoughtBubbleOutline } from "@mdi/js";
+import { mdiThoughtBubbleOutline } from "@mdi/js";
 import ChatMarkdown from "./ChatMarkdown";
+import ChatSources from "./ChatSources";
+import { citationSources } from "./citations";
 import MessageActions from "../../ui/molecules/MessageActions";
 import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
 import Icon from "../../ui/atoms/Icon";
@@ -18,6 +20,7 @@ export default function ChatMessage({
   status = "Обработка запроса",
   usage,
   tools,
+  artifacts,
   onEdit,
   onRefresh,
   onDelete,
@@ -31,6 +34,7 @@ export default function ChatMessage({
   readonly status?: string;
   readonly usage?: string;
   readonly tools?: ReactNode;
+  readonly artifacts?: ReactNode;
   readonly onEdit?: () => void;
   readonly onRefresh?: () => void;
   readonly onDelete?: () => void;
@@ -44,6 +48,10 @@ export default function ChatMessage({
       : (citationStoreIds[0] ?? "");
   const selectedCitations = citations.filter((citation) => citation.storeId === selectedStoreId);
   const thinking = generating && content === "";
+  const sources = citationSources(
+    citations,
+    (storeId) => stores.find((store) => store.id === storeId)?.name ?? "Хранилище",
+  );
 
   return (
     <article aria-label="Ответ ассистента" className="group flex min-w-0 gap-3">
@@ -86,19 +94,15 @@ export default function ChatMessage({
             }}
           />
           {generating && <GenerationStatus label={status} />}
-          {citations.length > 0 && (
-            <button
-              type="button"
-              className="inline-flex h-7.5 items-center gap-2 rounded-full bg-main-800 pr-1.5 pl-3 text-[12px] font-medium text-main-300 hover:bg-main-700 hover:text-main-50"
-              onClick={() => setSourcesOpen(true)}
-            >
-              <Icon path={mdiDatabaseOutline} size={15} className="text-accent-medium" />
-              Источники
-              <span className="rounded-full bg-accent-soft px-1.75 py-0.5 text-[11px] text-accent-medium tabular-nums">
-                {citations.length}
-              </span>
-            </button>
-          )}
+          <ChatSources
+            sources={sources}
+            fragments={citations.length}
+            onOpen={(storeId) => {
+              if (storeId !== undefined) setActiveStoreId(storeId);
+              setSourcesOpen(true);
+            }}
+          />
+          {artifacts}
           {partial && !generating && (
             <p className="text-[12px] text-warn">Частичный ответ · генерация не завершена</p>
           )}

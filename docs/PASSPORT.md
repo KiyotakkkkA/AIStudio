@@ -689,6 +689,12 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   and there is no sandbox. `skill.script`, `code.run` and `shell.run` share one runner
   (`toolchain/process.rs`): scratch folders, a timeout, kill-tree on cancel, capped streams and
   fenced output.
+- **Created files** (`zvs-host/src/artifacts.rs`, TASK_043). After `skill.script` runs, the
+  documents it created or changed in its scratch folder (and paths named in its arguments) are
+  copied to `<app data>/artifacts/<runId>/` and reported in the tool call's `meta.artifacts`
+  (`ArtifactDto`, id `<runId>/<name>`). The chat shows each as a card with «Скачать»
+  (`artifacts.save`: a save dialog, then a copy) and «Перейти» (`artifacts.reveal`). Ids never
+  resolve outside the artifact folder.
 - **Working folder explorer** (`zvs-host/src/workspace/explorer.rs`, TASK_036_EXTRA_4). The
   «Файлы» side panel in the chat is the user browsing their own folder, not a tool call:
   `workspace.list` / `workspace.read` raise **no** access request, but they require the chat's
@@ -781,9 +787,13 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
    start, without a `t()` shim. Developer communication and code identifiers remain English.
 7. `@kiyotakkkka/zvs-uikit-lib` is ESM-only and Tailwind-based; the app's Tailwind config
    must include its `dist` in `content` for class scanning.
-8. Office→PDF conversion uses a bundled headless LibreOffice invoked by the sidecar. It would
-   be the only heavyweight third-party binary in the installer (roughly 300 MB). If that is
-   unacceptable, the fallback is JS rendering at lower fidelity — decide before §19 step 11.
+8. **Confirmed (TASK_043, 2026-10-23):** LibreOffice is **not** bundled. Office→PDF conversion
+   uses a LibreOffice the user already has (Program Files or `PATH`, detected on first use) or
+   a managed copy installed from «Настройки → Компоненты» or «Загрузки»: the official MSI
+   (~360 MB, SHA-256 from the TDF mirror) unpacked with `msiexec /a` into
+   `<app data>/mcp-toolchain/libreoffice/<version>` — no admin rights, no system install.
+   Without LibreOffice an office document opens with `rendering: "approximate"` and the viewer
+   renders it in JavaScript with a visible note.
 9. The browser ships one profile ("work", the WebView2 data directory `<app data>/browser/work`).
    Multiple named profiles come later, as further data directories under `browser/`.
 10. **Confirmed (2026-10-10):** no import of Electron-era data. The Tauri build starts from an
@@ -833,12 +843,17 @@ in a run, a document row in a vector store, or a drop onto the window.
 | PDF | `pdf.js` in the renderer, rendered to canvas per page, virtualised |
 | Images | Native `<img>` with pan/zoom |
 | Markdown / code / CSV | Rendered in-app; code via the kit's `./code-view` (shiki) |
-| DOCX · XLSX · PPTX | **Converted to PDF by the sidecar on open**, then the PDF path |
+| DOCX · XLSX · PPTX | **Converted to PDF by the sidecar on open** when LibreOffice is connected, then the PDF path; otherwise `kind: "office"` bytes for approximate JS rendering (docx-preview, SheetJS; PPTX falls back to extracted text) |
 
-Conversion is an ordinary kernel job: it shows on the Tasks page, reports progress, and is
-cancellable. The result is cached at `<app data>/cache/documents/<sha256>.pdf`, keyed by content
-hash — so reopening is instant and the cache is safe to delete at any time. Eviction is LRU
-against a size ceiling set in Settings.
+Conversion is an ordinary kernel job: a `job` run titled «Преобразование «name» в PDF» with
+one `document.convert` node, which runs the sidecar job `job.document.convert` (`zvs-core`
+`OfficeConverter`, backend `SofficeConverter`: headless `soffice --convert-to pdf` with a
+fresh profile per job, kill-tree on cancel and on a 10-minute timeout). It shows on the Tasks
+page, reports progress, and is cancellable; a cancelled, failed or timed-out conversion leaves
+no file in the cache. The node only writes into the document cache. The result is cached at
+`<app data>/cache/documents/<hash>.pdf`, keyed by the **source** content hash — so reopening is
+instant, one file at two paths converts once, and the cache is safe to delete at any time.
+Eviction is LRU against a size ceiling set in Settings.
 
 ### State
 
@@ -869,8 +884,12 @@ viewer at the right page, and a selection there feeds the next turn.
   GIF, WEBP, BMP, the OOXML package parts, text without control bytes). A mismatch fails with
   `UNSUPPORTED_FORMAT` (`reason: "mislabelled"`) and never renders. An unknown extension is
   read by its content. Native kinds: `pdf`, `image`, `markdown`, `code` (with a shiki
-  `language`), `csv`, `text`. DOCX, XLSX and PPTX go through the `DocumentConverter` hook to
-  `<hash>.pdf`; with no converter registered they fail with `UNSUPPORTED_FORMAT`.
+  `language`), `csv`, `text`. DOCX, XLSX and PPTX carry `officeFormat` and a `rendering`:
+  `converted` (`kind: "pdf"`, through the `DocumentConverter` hook to `<hash>.pdf`) when a
+  converter is ready or the PDF is already cached, otherwise `approximate` (`kind: "office"`,
+  the original bytes cached as `<hash>.<ext>`). A converter that becomes ready later replaces
+  the approximate copy on the next open. A document the converter cannot read fails with
+  `UNSUPPORTED_FORMAT` and «Не удалось преобразовать документ DOCX в PDF».
 - **Cache.** `<cache>/documents/<hash>.<ext>` holds a copy of the file, so a moved or deleted
   source keeps serving and reopening costs one hash. Only hash-named files belong to the cache,
   so the indexing scratch folders beside them are ignored. Eviction is LRU by `opened_at`
@@ -890,8 +909,9 @@ viewer at the right page, and a selection there feeds the next turn.
 
 `documents.open`, `documents.page`, `documents.close`, `documents.list` (the registry,
 newest first, each with `open`), `documents.reveal` (shows the source file in the OS file
-manager), and `documents.convert` (TASK_043; returns a run handle, and progress arrives on
-the event channel).
+manager). There is no separate `documents.convert`: `documents.open` starts the conversion
+run itself and resolves when it ends; the viewer follows progress through the run on the
+event channel.
 
 ---
 

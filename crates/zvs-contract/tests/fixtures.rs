@@ -705,8 +705,28 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::explorer::ExplorerWatchDto>,
     ),
     (
+        "artifacts/ArtifactDto",
+        round_trip::<zvs_contract::artifacts::ArtifactDto>,
+    ),
+    (
+        "artifacts/ArtifactRef",
+        round_trip::<zvs_contract::artifacts::ArtifactRef>,
+    ),
+    (
+        "artifacts/ArtifactSaveResult",
+        round_trip::<zvs_contract::artifacts::ArtifactSaveResult>,
+    ),
+    (
         "documents/DocumentKind",
         round_trip::<zvs_contract::documents::DocumentKind>,
+    ),
+    (
+        "documents/DocumentOfficeFormat",
+        round_trip::<zvs_contract::documents::DocumentOfficeFormat>,
+    ),
+    (
+        "documents/DocumentRendering",
+        round_trip::<zvs_contract::documents::DocumentRendering>,
     ),
     (
         "documents/DocumentTextEncoding",

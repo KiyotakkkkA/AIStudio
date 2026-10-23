@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod convert;
 pub mod kind;
 pub mod service;
 pub mod text;
@@ -7,6 +8,10 @@ pub mod text;
 mod tests;
 
 pub use cache::{CacheEntry, DocumentCache, cache_file_name, eviction_plan};
+pub use convert::{
+    DOCUMENT_CONVERT_NODE, KernelDocumentConverter, OfficeLocator, SharedOfficeLocator,
+    register_document_nodes,
+};
 pub use kind::{
     Detected, Detection, MISLABELLED_DOCUMENT, OfficeFormat, UNSUPPORTED_DOCUMENT, detect,
 };

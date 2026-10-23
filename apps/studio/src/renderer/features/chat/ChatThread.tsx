@@ -16,6 +16,8 @@ import ChatWorkingFolder from "./ChatWorkingFolder";
 import FolderAccessModal from "./FolderAccessModal";
 import ChatToolCalls from "./ChatToolCalls";
 import { answerCitations } from "./citations";
+import { answerArtifacts } from "./artifacts";
+import ChatArtifacts from "./ChatArtifacts";
 import { shouldPinToBottom } from "./scroll";
 import type ChatStore from "./ChatStore";
 import { CONTEXT_PANEL, FILES_PANEL, PANEL_GROUP_LABEL } from "./explorer/explorerCopy";
@@ -204,6 +206,12 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                 stores={store.stores}
                 partial={message.partial}
                 tools={<ChatToolCalls calls={message.toolCalls} />}
+                artifacts={
+                  <ChatArtifacts
+                    artifacts={answerArtifacts(message.toolCalls)}
+                    actions={store.artifacts}
+                  />
+                }
                 usage={`${message.usageEstimated ? "~" : ""}${message.tokensIn} вход. · ${message.tokensOut} выход. · ${(message.durationMs / 1000).toFixed(1)} с`}
               />
             ),
@@ -223,6 +231,12 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
               stores={store.stores}
               generating={store.generating}
               status={generationPhase(store)}
+              artifacts={
+                <ChatArtifacts
+                  artifacts={answerArtifacts(store.liveToolCalls)}
+                  actions={store.artifacts}
+                />
+              }
               partial={store.outcome !== "ok"}
               tools={
                 <ChatToolCalls

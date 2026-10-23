@@ -7,7 +7,10 @@ use zvs_contract::{
     AppError, AppErrorCode, ChecksumAlgorithm, ChecksumDto, Timestamp, ToolchainRuntime,
 };
 
-use super::definitions::{Version, node_asset_name, node_file_key, uv_asset_name};
+use super::definitions::{
+    Version, libreoffice_asset_name, libreoffice_build, node_asset_name, node_file_key,
+    uv_asset_name,
+};
 use crate::drivers::ai::HttpClient;
 use crate::platform::clock::SharedClock;
 use crate::platform::logger::{LogLevel, SharedLogger};
@@ -17,6 +20,8 @@ use crate::runtimes::releases::RATE_LIMITED_MESSAGE;
 pub const NODE_INDEX_URL: &str = "https://nodejs.org/dist/index.json";
 pub const NODE_DIST_URL: &str = "https://nodejs.org/dist";
 pub const UV_RELEASES_URL: &str = "https://api.github.com/repos/astral-sh/uv/releases?per_page=10";
+pub const LIBREOFFICE_STABLE_URL: &str =
+    "https://download.documentfoundation.org/libreoffice/stable";
 pub const DEFAULT_LATEST_TTL: Duration = Duration::from_secs(6 * 60 * 60);
 pub const NO_BUILD: &str = "Для этой системы нет подходящей сборки";
 pub const UNEXPECTED_INDEX: &str = "Сервер выпусков вернул неожиданный ответ";
@@ -39,6 +44,7 @@ pub struct ToolchainResolverOptions {
     pub node_index_url: String,
     pub node_dist_url: String,
     pub uv_releases_url: String,
+    pub libreoffice_url: String,
     pub platform: Platform,
     pub ttl: Duration,
     pub clock: SharedClock,
@@ -52,6 +58,7 @@ impl ToolchainResolverOptions {
             node_index_url: NODE_INDEX_URL.to_owned(),
             node_dist_url: NODE_DIST_URL.to_owned(),
             uv_releases_url: UV_RELEASES_URL.to_owned(),
+            libreoffice_url: LIBREOFFICE_STABLE_URL.to_owned(),
             platform: Platform::current(),
             ttl: DEFAULT_LATEST_TTL,
             clock,
@@ -108,6 +115,16 @@ pub fn checksum_file(text: &str) -> Option<String> {
         .next()
         .filter(|hash| is_sha256(hash))
         .map(str::to_ascii_lowercase)
+}
+
+pub fn newest_listed(listing: &str) -> Option<Version> {
+    listing
+        .split("href=\"")
+        .skip(1)
+        .filter_map(|rest| rest.split('"').next())
+        .filter_map(|target| target.strip_suffix('/'))
+        .filter_map(Version::parse)
+        .max()
 }
 
 pub fn newest_lts(index: &Value, file_key: &str) -> Option<String> {
@@ -215,6 +232,7 @@ impl ToolchainResolver {
         let build = match runtime {
             ToolchainRuntime::Node => self.node().await?,
             ToolchainRuntime::Uv => self.uv().await?,
+            ToolchainRuntime::LibreOffice => self.libreoffice().await?,
         };
         self.inner.options.logger.log(
             LogLevel::Info,
@@ -367,6 +385,32 @@ impl ToolchainResolver {
             asset_name: asset_name.to_owned(),
             url: archive.url.clone(),
             size_bytes: archive.size_bytes,
+            checksum: sha256(&checksum),
+        })
+    }
+
+    async fn libreoffice(&self) -> Result<ToolchainBuild, AppError> {
+        let options = &self.inner.options;
+        let runtime = ToolchainRuntime::LibreOffice;
+        let (directory, _) =
+            libreoffice_build(options.platform).ok_or_else(|| self.no_build(runtime))?;
+        let base = options.libreoffice_url.trim_end_matches('/');
+        let listing = self.text(&format!("{base}/")).await?;
+        let version = newest_listed(&listing).ok_or_else(unexpected)?;
+        let asset_name = libreoffice_asset_name(&version.to_string(), options.platform)
+            .ok_or_else(|| self.no_build(runtime))?;
+        let url = format!("{base}/{version}/win/{directory}/{asset_name}");
+        let checksum =
+            checksum_file(&self.text(&format!("{url}.sha256")).await?).ok_or_else(|| {
+                AppError::new(AppErrorCode::NotFound, NO_CHECKSUM)
+                    .with_detail("asset", asset_name.clone())
+            })?;
+        Ok(ToolchainBuild {
+            runtime,
+            version,
+            asset_name,
+            url,
+            size_bytes: 0,
             checksum: sha256(&checksum),
         })
     }

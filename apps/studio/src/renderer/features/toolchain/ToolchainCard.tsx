@@ -5,13 +5,13 @@ import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
 import { STATUS_TONE_TEXT } from "../../ui/atoms/statusTone";
 import {
-  ACTION_LABELS,
   INSTALLING_HINT,
   RUNTIME_HINTS,
   RUNTIME_ICONS,
   SOURCE_LABELS,
   STATUS_LABELS,
   STATUS_TONES,
+  actionLabel,
   availableActions,
   removalCopy,
   removalLabel,
@@ -89,7 +89,7 @@ export default function ToolchainCard({ dto, busy, error, onAction }: ToolchainC
                 needConfirm
                 modalSetup={{
                   title: `${removalLabel(dto)} ${dto.displayName}?`,
-                  content: removalCopy(dto.displayName),
+                  content: removalCopy(dto.displayName, dto.runtime),
                   confirmLabel: removalLabel(dto),
                 }}
                 onClick={() => onAction(action)}
@@ -103,7 +103,9 @@ export default function ToolchainCard({ dto, busy, error, onAction }: ToolchainC
                 disabled={busy !== undefined}
                 onClick={() => onAction(action)}
               >
-                {busy === action ? `${ACTION_LABELS[action]}…` : ACTION_LABELS[action]}
+                {busy === action
+                  ? `${actionLabel(action, dto.runtime)}…`
+                  : actionLabel(action, dto.runtime)}
               </Button>
             ),
           )}

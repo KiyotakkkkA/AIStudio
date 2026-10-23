@@ -6,7 +6,8 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use zvs_contract::{
     AppError, AppErrorCode, ChatCitationDto, DocumentDto, DocumentId, DocumentKind,
-    DocumentPageDto, DocumentRef, DocumentTextEncoding, VectorStoreId,
+    DocumentOfficeFormat, DocumentPageDto, DocumentRef, DocumentRendering, DocumentTextEncoding,
+    VectorStoreId,
 };
 
 use super::*;
@@ -90,6 +91,10 @@ impl Fixture {
 
     fn cache(&self) -> DocumentCache {
         DocumentCache::new(self.folder.path().join("cache").join("documents"))
+    }
+
+    fn cache_dir(&self) -> PathBuf {
+        self.folder.path().join("cache").join("documents")
     }
 
     fn cached(&self) -> Vec<CacheEntry> {
@@ -247,13 +252,31 @@ async fn a_mislabelled_file_fails_without_touching_the_cache() {
 }
 
 #[tokio::test]
-async fn an_unsupported_format_fails_cleanly() {
+async fn an_office_file_without_a_converter_opens_for_approximate_rendering() {
     let fixture = fixture();
     let docx = fixture.write("letter.docx", DOCX_BYTES);
-    let error = fixture.open(&docx).await.expect_err("no converter");
-    assert_eq!(error.code, AppErrorCode::UnsupportedFormat);
-    assert_eq!(error.message, UNSUPPORTED_DOCUMENT);
+    let opened = fixture.open(&docx).await.expect("opens");
+    assert_eq!(opened.kind, DocumentKind::Office);
+    assert_eq!(opened.rendering, DocumentRendering::Approximate);
+    assert_eq!(opened.office_format, Some(DocumentOfficeFormat::Docx));
+    assert_eq!(opened.page_count, None);
+    assert_eq!(
+        fixture
+            .cached()
+            .into_iter()
+            .map(|entry| entry.name)
+            .collect::<Vec<_>>(),
+        [format!("{}.docx", opened.content_hash)]
+    );
+    let page = fixture.service.page(&opened.id, 0).await.expect("serves");
+    assert!(
+        matches!(page, DocumentPageDto::Bytes { total_bytes, .. } if total_bytes == DOCX_BYTES.len() as u64)
+    );
+}
 
+#[tokio::test]
+async fn an_unsupported_format_fails_cleanly() {
+    let fixture = fixture();
     let binary = fixture.write("archive.bin", b"\0\x01\x02\x03");
     let error = fixture.open(&binary).await.expect_err("unknown binary");
     assert_eq!(error.code, AppErrorCode::UnsupportedFormat);
@@ -274,6 +297,108 @@ impl DocumentConverter for FakeConverter {
         assert_eq!(format, OfficeFormat::Docx);
         std::fs::write(target, PDF_BYTES).expect("writes the converted file");
         Ok(())
+    }
+}
+
+#[derive(Default)]
+struct CountingConverter {
+    ready: std::sync::atomic::AtomicBool,
+    calls: std::sync::atomic::AtomicUsize,
+    fail: Option<AppErrorCode>,
+}
+
+impl CountingConverter {
+    fn ready(fail: Option<AppErrorCode>) -> Arc<Self> {
+        Arc::new(Self {
+            ready: std::sync::atomic::AtomicBool::new(true),
+            calls: std::sync::atomic::AtomicUsize::new(0),
+            fail,
+        })
+    }
+
+    fn calls(&self) -> usize {
+        self.calls.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+#[async_trait]
+impl DocumentConverter for CountingConverter {
+    async fn ready(&self) -> bool {
+        self.ready.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    async fn convert_to_pdf(
+        &self,
+        _source: &Path,
+        _format: OfficeFormat,
+        target: &Path,
+    ) -> Result<(), AppError> {
+        self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        std::fs::write(target, b"%PDF-partial").expect("writes a partial file");
+        match self.fail {
+            Some(code) => Err(AppError::new(code, "failed")),
+            None => {
+                std::fs::write(target, PDF_BYTES).expect("writes the converted file");
+                Ok(())
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn conversion_is_cached_by_source_hash_across_paths() {
+    let converter = CountingConverter::ready(None);
+    let shared = converter.clone();
+    let fixture = fixture_with(move |options| options.converter = Some(shared));
+    let first = fixture.write("a/letter.docx", DOCX_BYTES);
+    let second = fixture.write("b/copy.docx", DOCX_BYTES);
+    let opened = fixture.open(&first).await.expect("converts");
+    let again = fixture.open(&second).await.expect("reuses");
+    assert_eq!(converter.calls(), 1);
+    assert_eq!(opened.id, again.id);
+    assert_eq!(again.rendering, DocumentRendering::Converted);
+    assert_eq!(again.office_format, Some(DocumentOfficeFormat::Docx));
+}
+
+#[tokio::test]
+async fn a_converter_that_becomes_ready_replaces_the_approximate_copy() {
+    let converter = Arc::new(CountingConverter::default());
+    let shared = converter.clone();
+    let fixture = fixture_with(move |options| options.converter = Some(shared));
+    let docx = fixture.write("letter.docx", DOCX_BYTES);
+    let approximate = fixture.open(&docx).await.expect("opens");
+    assert_eq!(approximate.rendering, DocumentRendering::Approximate);
+    assert_eq!(converter.calls(), 0);
+    converter
+        .ready
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let converted = fixture.open(&docx).await.expect("converts");
+    assert_eq!(converted.id, approximate.id);
+    assert_eq!(converted.kind, DocumentKind::Pdf);
+    assert_eq!(
+        fixture
+            .cached()
+            .into_iter()
+            .map(|entry| entry.name)
+            .collect::<Vec<_>>(),
+        [format!("{}.pdf", converted.content_hash)]
+    );
+}
+
+#[tokio::test]
+async fn a_failed_or_cancelled_conversion_leaves_no_partial_file_in_the_cache() {
+    for code in [AppErrorCode::UnsupportedFormat, AppErrorCode::RunCancelled] {
+        let converter = CountingConverter::ready(Some(code));
+        let fixture = fixture_with(move |options| options.converter = Some(converter));
+        let docx = fixture.write("letter.docx", DOCX_BYTES);
+        let error = fixture.open(&docx).await.expect_err("fails");
+        assert_eq!(error.code, code);
+        assert!(fixture.cached().is_empty());
+        assert!(fixture.service.list().expect("lists").is_empty());
+        let leftovers = std::fs::read_dir(fixture.cache_dir())
+            .map(|entries| entries.count())
+            .unwrap_or(0);
+        assert_eq!(leftovers, 0);
     }
 }
 

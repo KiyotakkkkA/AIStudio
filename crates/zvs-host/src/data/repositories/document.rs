@@ -45,9 +45,10 @@ impl<'c> DocumentRepository<'c> {
     pub fn record_opened(&self, row: &DocumentRow) -> rusqlite::Result<DocumentRow> {
         self.connection
             .prepare_cached(&format!(
-                "INSERT INTO document ({columns}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) \
+                "INSERT INTO document ({columns}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) \
                  ON CONFLICT (content_hash) DO UPDATE SET source_path = excluded.source_path, \
                  kind = excluded.kind, mime_type = excluded.mime_type, \
+                 office_format = excluded.office_format, \
                  page_count = excluded.page_count, part_count = excluded.part_count, \
                  size_bytes = excluded.size_bytes, cached_file = excluded.cached_file, \
                  opened_at = excluded.opened_at \
@@ -61,6 +62,7 @@ impl<'c> DocumentRepository<'c> {
                     row.source_path,
                     EnumColumn(row.kind),
                     row.mime_type,
+                    row.office_format.map(EnumColumn),
                     row.page_count,
                     row.part_count,
                     row.size_bytes,
@@ -95,6 +97,7 @@ mod tests {
             source_path: path.to_owned(),
             kind: DocumentKind::Pdf,
             mime_type: "application/pdf".to_owned(),
+            office_format: None,
             page_count: Some(3),
             part_count: 1,
             size_bytes: 120,

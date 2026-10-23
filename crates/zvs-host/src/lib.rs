@@ -1,5 +1,6 @@
 #![deny(clippy::await_holding_lock)]
 
+pub mod artifacts;
 pub mod browser;
 pub mod commands;
 pub mod data;

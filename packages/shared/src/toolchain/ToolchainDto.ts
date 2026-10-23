@@ -7,10 +7,10 @@ export const TOOLCHAIN_PROBLEM_MAX = 600;
 export const TOOLCHAIN_MANAGED_MAX = 16;
 export const TOOLCHAIN_REFS_MAX = 4;
 
-export const ToolchainRuntime = z.enum(["uv", "node"]);
+export const ToolchainRuntime = z.enum(["uv", "node", "libreoffice"]);
 export type ToolchainRuntime = z.infer<typeof ToolchainRuntime>;
 
-export const ToolchainSource = z.enum(["managed", "path", "manual"]);
+export const ToolchainSource = z.enum(["managed", "path", "manual", "system"]);
 export type ToolchainSource = z.infer<typeof ToolchainSource>;
 
 export const ToolchainStatus = z.enum(["missing", "installing", "ready", "broken"]);

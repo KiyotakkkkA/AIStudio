@@ -2,7 +2,7 @@
 task: TASK_043
 title: Office → PDF conversion in the sidecar
 phase: 8 — Documents and the agent browser
-status: todo
+status: done
 depends_on: [TASK_042, TASK_076]
 unblocks: [TASK_044]
 estimate: 3 h
@@ -98,5 +98,61 @@ Manual check: Convert the reference document from `/references` (a real .docx) a
 ## Handoff
 
 **Built:**
+- Decision: neither bundled nor JS-only. LibreOffice is a third `ToolchainRuntime`
+  (`libreoffice`, category «компонент») beside uv and Node: detected in `PATH` and in
+  `Program Files\LibreOffice\program` (new `ToolchainSource::System`), auto-detected the first
+  time a conversion needs it, or installed as a managed copy — the official MSI from
+  `download.documentfoundation.org/libreoffice/stable` with its `.sha256`, queued through
+  `DownloadService` and unpacked by `toolchain/msi.rs` (`msiexec /a … /qn TARGETDIR=`, then the
+  MSI copy the admin image keeps is deleted). The probe reads `soffice.com --version`
+  (`LibreOffice 26.8.1.1 …`; `Version::find` now accepts a four-part build number). The Settings
+  tab «Окружение» is renamed «Компоненты» and shows all three cards; Downloads shows the
+  LibreOffice row through the existing `toolchain:*` routing.
+- `zvs-core::convert`: the `OfficeConverter` trait and `SofficeConverter` (headless
+  `--convert-to pdf`, a fresh `-env:UserInstallation` profile per job as a percent-encoded file
+  URL, polling for cancel and timeout, `taskkill /T /F` on Windows, `Error::Unsupported` →
+  `UNSUPPORTED_FORMAT` when no PDF appears).
+- `zvs-jobd` job `job.document.convert` (`{ executable, source, target, timeoutMs? }`): works in
+  `.<target>.work`, renames the PDF onto the target, always cleans up; no target on failure.
+- `zvs-host/src/documents/convert.rs`: the kernel node `document.convert` (target confined to
+  the document cache, host-side deadline that cancels only the job, Russian failure copy) and
+  `KernelDocumentConverter`, the `DocumentConverter` behind `documents.open`: it starts a `job`
+  run titled «Преобразование «name» в PDF», waits for its end and maps the outcome back to a
+  code. `DocumentConverter::ready()` decides between converting and the approximate path.
+- Contract: `DocumentKind::Office`, `DocumentOfficeFormat`, `DocumentRendering`
+  (`native | converted | approximate`), `DocumentDto.rendering` and `officeFormat` (with a
+  consistency refinement on both sides), migration `0009_document_office.sql`, fixtures.
+- Also asked for in this session: the chat shows a visible «Источники:» list under an answer
+  (documents grouped from `knowledge.search` / `knowledge.read` citations with store and pages;
+  a click opens the existing sources panel on that store), and files a `skill.script` creates
+  are kept in `<app data>/artifacts/<runId>/` and shown as cards with «Скачать» and «Перейти»
+  (`zvs-host/src/artifacts.rs`, `ArtifactDto`, channels `artifacts.save` and
+  `artifacts.reveal`, a `save_as` on `PickerPort`).
+- Tests: `zvs-core` converter (URL encoding, arguments, timeout, cancel, no output), `zvs-jobd`
+  job (parameters, cleanup, cancel, and a real two-page DOCX when `ZVS_SOFFICE` is set — it
+  passed against LibreOffice 26.8.1), documents (approximate open, cache by source hash across
+  paths, a converter becoming ready, no partial file after failure or cancel), the conversion
+  run (title and kind, not ready, unreadable document, timeout, cancel, refused target),
+  toolchain (release resolution, system detection, auto-detect, MSI staging, admin-image
+  cleanup, catalogue row), artifacts (diffing, copies, collisions, confinement, save and
+  reveal, the skill script end to end, the channels), renderer (`chatArtifacts.test.ts`,
+  sources grouping, LibreOffice in the toolchain store).
+
 **Deviated from plan:**
+- No `documents.convert` channel: `documents.open` runs the conversion itself and resolves when
+  the run ends. PASSPORT §20 is updated.
+- Step 7 needed no new code: indexing already extracts DOCX, XLSX and PPTX text natively from
+  OOXML (TASK_028_EXTRA_2), which is faster than converting first and parsing the PDF.
+- The run outcome only carries permission codes (scheduler), so `KernelDocumentConverter` maps
+  the node's own host-side messages back to `LIMIT_EXCEEDED` / `UNSUPPORTED_FORMAT`.
+- Approximate rendering means the host serves the original bytes; the JS renderers themselves
+  belong to the viewer (TASK_044).
+
 **Next session should know:**
+- TASK_044 renders `rendering: "approximate"` (`kind: "office"`, bytes parts) with docx-preview
+  and SheetJS plus a visible «приближённое отображение» note, shows the «преобразовано в PDF»
+  chip for `converted`, and can link to «Настройки → Компоненты».
+- Not run here: `pnpm build`, `pnpm test:e2e`, and the manual page-by-page comparison with Word
+  in «Verify». `pnpm typecheck` still fails only at `tests/renderer/fileChanges.test.ts:59`, as
+  on `main` before this task.
+- Managed LibreOffice is Windows-only (MSI); elsewhere it is detected or picked manually.
