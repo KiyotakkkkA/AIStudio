@@ -13,9 +13,26 @@ import PreferencesDialog from "../features/preferences/PreferencesDialog";
 import { fontStack } from "../features/preferences/preferencesPresentation";
 
 function AppFrame() {
-  const { ui, chat } = useStore();
+  const { ui, chat, appSettings } = useStore();
   const navigation = useAppNavigation();
   const restoredOnce = useRef(false);
+
+  const follow = useCallback(
+    (path: unknown, conversationId?: unknown) => {
+      if (path === ROUTES.browser || path === ROUTES.providers) navigation.go(path);
+      if (path === ROUTES.downloads) {
+        ui.closePreferences();
+        navigation.go(path);
+      }
+      if (path === ROUTES.chat) {
+        ui.closePreferences();
+        navigation.go(path);
+        const conversation = ConversationId.safeParse(conversationId);
+        if (conversation.success) void chat.open(conversation.data);
+      }
+    },
+    [navigation, ui, chat],
+  );
 
   useEffect(
     () =>
@@ -23,27 +40,20 @@ function AppFrame() {
         const parsed = HostEvent.safeParse(payload);
         if (!parsed.success || parsed.data.type !== "step") return;
         const { domain, path, conversationId } = parsed.data.step;
-        if (domain !== NAVIGATION_STEP_DOMAIN) return;
-        if (path === ROUTES.browser || path === ROUTES.providers) navigation.go(path);
-        if (path === ROUTES.downloads) {
-          ui.closePreferences();
-          navigation.go(path);
-        }
-        if (path === ROUTES.chat) {
-          ui.closePreferences();
-          navigation.go(path);
-          const conversation = ConversationId.safeParse(conversationId);
-          if (conversation.success) void chat.open(conversation.data);
-        }
+        if (domain === NAVIGATION_STEP_DOMAIN) follow(path, conversationId);
       }),
-    [navigation, ui, chat],
+    [follow],
   );
 
   useEffect(() => {
     if (!ui.restored || restoredOnce.current) return;
     restoredOnce.current = true;
     navigation.replace(ui.activeRoute);
-  }, [ui.restored, ui.activeRoute, navigation]);
+    void appSettings.takePendingTarget().then((target) => {
+      if (target?.kind === "conversation") follow(ROUTES.chat, target.conversationId);
+      if (target?.kind === "downloads") follow(ROUTES.downloads);
+    });
+  }, [ui.restored, ui.activeRoute, navigation, appSettings, follow]);
 
   useEffect(() => {
     const root = document.documentElement;

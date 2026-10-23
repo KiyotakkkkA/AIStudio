@@ -6,7 +6,10 @@ use zvs_contract::{
 };
 
 use super::copy;
-use super::{COALESCE_WINDOW_MS, NotificationService, NotificationServiceOptions, RunSubject};
+use super::{
+    ACTIVATION_REPEAT_MS, COALESCE_WINDOW_MS, NotificationService, NotificationServiceOptions,
+    RunSubject,
+};
 use crate::platform::events::EventBus;
 use crate::platform::shell::{NotificationKind, TRAY_SETTING_KEY};
 use crate::services::SettingService;
@@ -254,12 +257,8 @@ fn bodies_are_clipped_and_carry_no_message_text() {
     assert_eq!(copy::approval_body(None, "Диалог"), "Диалог «Диалог»");
 }
 
-#[test]
-fn activation_navigates_the_renderer_to_the_target() {
-    let fixture = fixture();
-    fixture.service.activated(conversation());
-    fixture.service.activated(NotificationTargetDto::Downloads);
-    let steps: Vec<_> = fixture
+fn navigations(fixture: &Fixture) -> Vec<serde_json::Value> {
+    fixture
         .sink
         .events()
         .into_iter()
@@ -267,14 +266,58 @@ fn activation_navigates_the_renderer_to_the_target() {
             HostEventDraft::Step { step } => Some(serde_json::Value::Object(step)),
             _ => None,
         })
-        .collect();
+        .collect()
+}
+
+#[test]
+fn activation_navigates_the_renderer_to_the_target() {
+    let fixture = fixture();
+    assert_eq!(fixture.service.take_pending(), None);
+    fixture.service.activated(conversation());
+    fixture.service.activated(NotificationTargetDto::Downloads);
     assert_eq!(
-        steps,
+        navigations(&fixture),
         [
             json!({ "domain": "navigation", "path": "/chat", "conversationId": CONVERSATION }),
             json!({ "domain": "navigation", "path": "/downloads" }),
         ]
     );
+}
+
+#[test]
+fn a_cold_start_target_waits_for_the_first_subscriber_only() {
+    let fixture = fixture();
+    fixture.service.activated(conversation());
+    assert!(navigations(&fixture).is_empty());
+    assert_eq!(fixture.service.take_pending(), Some(conversation()));
+    assert_eq!(fixture.service.take_pending(), None);
+    assert!(navigations(&fixture).is_empty());
+}
+
+#[test]
+fn a_later_activation_replaces_an_undelivered_target() {
+    let fixture = fixture();
+    fixture.service.activated(conversation());
+    fixture.service.activated(NotificationTargetDto::Downloads);
+    assert_eq!(
+        fixture.service.take_pending(),
+        Some(NotificationTargetDto::Downloads)
+    );
+}
+
+#[test]
+fn one_click_delivered_twice_opens_the_target_once() {
+    let fixture = fixture();
+    fixture.service.take_pending();
+    fixture.service.activated(conversation());
+    fixture.clock.advance(ACTIVATION_REPEAT_MS - 1);
+    fixture.service.activated(conversation());
+    assert_eq!(navigations(&fixture).len(), 1);
+    fixture.service.activated(NotificationTargetDto::Downloads);
+    assert_eq!(navigations(&fixture).len(), 2);
+    fixture.clock.advance(ACTIVATION_REPEAT_MS);
+    fixture.service.activated(conversation());
+    assert_eq!(navigations(&fixture).len(), 3);
 }
 
 #[test]

@@ -405,6 +405,7 @@ export const contract = defineContract({
     }),
   },
   "notifications.clear": { input: NotificationTargetDto, output: z.void() },
+  "notifications.pending": { input: z.void(), output: NotificationTargetDto.nullable() },
   "settings.set": {
     input: z.object({ key: SettingKey, value: Json }),
     output: z.object({ key: SettingKey, value: Json, updatedAt: Timestamp }),

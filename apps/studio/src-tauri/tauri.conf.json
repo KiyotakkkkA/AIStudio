@@ -35,6 +35,13 @@
       "capabilities": ["studio", "browser-ui"]
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["zvs-studio"]
+      }
+    }
+  },
   "bundle": {
     "active": false,
     "icon": [

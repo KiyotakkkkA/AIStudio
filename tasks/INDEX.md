@@ -146,7 +146,7 @@ against; 016 can be started earlier if you are prepared to render the Account op
 - [x] **TASK_036_EXTRA_3** — Code and commands: a shared process runner, `code.run` and `shell.run`
 - [x] **TASK_036_EXTRA_4** — Working folder explorer: the chat side panel toggle, a live file tree and the file view
 - [x] **TASK_036_EXTRA_5** — Preferences «Общие» and «Уведомления»: start with the system, the tray, OS notifications
-- [ ] **TASK_036_EXTRA_6** — Notification activation through `zvs-studio://`: Action Center clicks and cold start
+- [x] **TASK_036_EXTRA_6** — Notification activation through `zvs-studio://`: Action Center clicks and cold start
 
 ## Phase M — Migration to Tauri (done)
 

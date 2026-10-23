@@ -139,6 +139,7 @@ mod tests {
                 "mcp.test",
                 "mcp.update",
                 "notifications.clear",
+                "notifications.pending",
                 "providers.adapters",
                 "providers.create",
                 "providers.get",

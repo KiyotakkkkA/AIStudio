@@ -2,7 +2,7 @@
 task: TASK_036_EXTRA_6
 title: Notification activation through the `zvs-studio://` protocol — Action Center clicks and cold start
 phase: 6 — Tools, MCP and Skills
-status: todo
+status: done
 depends_on: [TASK_036_EXTRA_5]
 unblocks: []
 estimate: 4 h
@@ -142,15 +142,60 @@ Manual check on the installed build:
 
 ## Definition of done
 
-- [ ] `zvs-studio://` registered by the installer and removed by the uninstaller; dev
+- [x] `zvs-studio://` registered by the installer and removed by the uninstaller; dev
       registration at runtime
-- [ ] Action Center clicks and clicks after quitting open the toast's target
-- [ ] Cold start delivers the pending target once
-- [ ] Navigation only, strict parsing, length cap; PASSPORT §14 updated
-- [ ] Plugin pinned exactly
-- [ ] Gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Action Center clicks and clicks after quitting open the toast's target
+- [x] Cold start delivers the pending target once
+- [x] Navigation only, strict parsing, length cap; PASSPORT §14 updated
+- [x] Plugin pinned exactly
+- [x] Gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
-_To be filled in by the implementing session._
+**Built:**
+- Shell: `tauri-plugin-deep-link` pinned `=2.6.2` (latest stable), `tauri-plugin-single-instance`
+  `=2.5.2` with the `deep-link` feature. The scheme is declared in `tauri.conf.json`
+  (`plugins.deep-link.desktop.schemes`). Dev builds call `register("zvs-studio")` in
+  `compose`; e2e and packaged builds skip it. Dev registration points
+  `HKCU\Software\Classes\zvs-studio` at the dev exe it was last run from.
+- `toast.rs`: `launch_url(args)` returns the first argument that starts with `zvs-studio://`,
+  and `launch_target(url)` drops anything over 256 characters before `from_url`. The toast XML
+  uses `activationType="protocol"` with the unchanged `launch` URL.
+- Warm start: the single-instance callback runs `open_launch_link`. With no link, it focuses the
+  window as before. A valid link goes through the activation slot (focus and
+  `NotificationService::activated`). A rejected link logs one `Warn` line, with the length only,
+  and shows nothing.
+- Cold start: `compose` reads `std::env::args()` and passes a valid target to `activated`. A
+  launch from a toast is never hidden, even with `--autostart` and the tray on.
+- Host: `NotificationService` holds one pending target until the renderer takes it through the
+  new `notifications.pending` channel (`void` → `NotificationTargetDto | null`). Activations
+  before that replace the held target, so cold-start clicks and early warm clicks both land.
+  After the first take, activations emit the `navigation` step as before. Repeats of one target
+  within `ACTIVATION_REPEAT_MS` (2 s) are dropped, so an in-process `Activated` plus a protocol
+  launch for the same click open it once.
+- Renderer: `AppFrame` takes the pending target once `ui` has restored the last route, so the
+  restore cannot override it. `ChatStore.open` falls back to no selection, with no error, for a
+  conversation that is not in the list, both before and after the page mounts.
+- PASSPORT §14 has the paragraph on the `zvs-studio://` scheme, and §15 «Notifications» has a
+  line on protocol activation and the pending target.
+
+**Deviated from plan:**
+- There is no `notifications.watch`, because TASK_036_EXTRA_5 reused the `navigation` step.
+  "The first subscriber" is the first `notifications.pending` call, which the renderer makes once
+  after it subscribes to events.
+- The in-process `Activated` handler is kept. Whether Windows still raises it for protocol
+  toasts was not checked on a running app, so de-duplication covers both cases.
+- Warm start reads the single-instance callback's arguments, not `on_open_url`. Both receive
+  the same link, and the arguments keep one strict parser for both the warm and cold paths.
+- The bundle is still inactive (`bundle.active: false`, TASK_056). The installer and uninstaller
+  registration of `HKCU\Software\Classes\zvs-studio` comes from the plugin config once
+  TASK_056 turns the bundle on. Until then, only dev builds register the scheme, at runtime.
+
+**Next session should know:**
+- Gates run: `cargo fmt --check`, `cargo clippy --workspace --all-targets -D warnings`,
+  `cargo test --workspace -j 2`, `pnpm lint`, `pnpm test` (1726 passed), `pnpm format:check`.
+  `pnpm typecheck` fails only on `tests/renderer/fileChanges.test.ts:59`, as on HEAD.
+- Not run: `pnpm build`, `pnpm test:e2e`, and the manual check (Action Center click, click
+  after quit, `start zvs-studio://…`, uninstall). These need a running or installed app.
+- TASK_056 should check that the NSIS and MSI uninstallers remove the `zvs-studio` key.

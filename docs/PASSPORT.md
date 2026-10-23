@@ -715,6 +715,16 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   reaches a model, and a tool call the model then proposes is authorised by the permission
   model alone — never by something the content asked for. This is the largest attack surface
   the browser window introduces; a regression here is a security bug, not a UX one.
+- **The `zvs-studio://` scheme is an untrusted, navigation-only entry point** (TASK_036_EXTRA_6).
+  Any web page, document or program can open it, so it is treated like any other untrusted
+  input. The shell reads only the first `zvs-studio://` argument of a launch (cold start) or of
+  a second instance (warm start), drops it when it is longer than 256 characters, and parses it
+  in one place, `NotificationTargetDto::from_url`, which accepts `conversation/<uuid>` and
+  `downloads` and nothing else. A rejected link is logged and otherwise ignored. An accepted
+  one may only show the window and open the chat route with a conversation selected, or
+  «Загрузки». A conversation that does not exist opens the chat with no selection and no
+  error. The scheme never approves, runs, sends, deletes or changes anything, and it never
+  carries text that gets rendered. A new route needs its own task and its own note here.
 
 ---
 
@@ -738,8 +748,12 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   contents, no paths. The shell shows it through the `ShellPort`. On Windows, that is
   `Windows.UI.Notifications` directly, with the AUMID registered per user, a `zvs-studio://`
   URL in `launch`, and the subject id and kind as tag and group. A click shows the window and
-  emits a `navigation` step that opens the conversation or «Загрузки». The URL is parsed by
-  `NotificationTargetDto::from_url` alone, and it only navigates.
+  emits a `navigation` step that opens the conversation or «Загрузки». The toast activates
+  through the `zvs-studio://` protocol, so Action Center clicks and clicks after quitting reach
+  the app too. Until the renderer takes it through `notifications.pending`, the service holds
+  one target and a later activation replaces it; repeats of one target within 2 s are
+  dropped. The URL is parsed by `NotificationTargetDto::from_url` alone, and it only navigates
+  (§14).
 - **Tray and autostart** — with `app.tray` on, closing the studio window hides it. Runs,
   streams and downloads keep going, and only «Выход» in the tray menu goes through the shutdown
   coordinator. `app.autostart` is mirrored from the OS registration, which is the source of

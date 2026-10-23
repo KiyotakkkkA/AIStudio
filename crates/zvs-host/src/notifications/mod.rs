@@ -5,5 +5,6 @@ pub mod service;
 mod tests;
 
 pub use service::{
-    COALESCE_WINDOW_MS, NotificationService, NotificationServiceOptions, RunSubject,
+    ACTIVATION_REPEAT_MS, COALESCE_WINDOW_MS, NotificationService, NotificationServiceOptions,
+    RunSubject,
 };

@@ -21,6 +21,12 @@ use crate::platform::shell::{
 use crate::services::SettingService;
 
 pub const COALESCE_WINDOW_MS: Timestamp = 5_000;
+pub const ACTIVATION_REPEAT_MS: Timestamp = 2_000;
+
+enum Delivery {
+    Waiting(Option<NotificationTargetDto>),
+    Live,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunSubject {
@@ -65,6 +71,8 @@ struct Inner {
     clock: SharedClock,
     logger: SharedLogger,
     recent: Mutex<HashMap<(NotificationKind, String), Timestamp>>,
+    activations: Mutex<HashMap<NotificationTargetDto, Timestamp>>,
+    delivery: Mutex<Delivery>,
 }
 
 #[derive(Clone)]
@@ -83,6 +91,8 @@ impl NotificationService {
                 clock: options.clock,
                 logger: options.logger,
                 recent: Mutex::new(HashMap::new()),
+                activations: Mutex::new(HashMap::new()),
+                delivery: Mutex::new(Delivery::Waiting(None)),
             }),
         }
     }
@@ -193,6 +203,20 @@ impl NotificationService {
     }
 
     pub fn activated(&self, target: NotificationTargetDto) {
+        if self.repeated(target) {
+            return;
+        }
+        {
+            let mut delivery = self
+                .inner
+                .delivery
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            if let Delivery::Waiting(pending) = &mut *delivery {
+                *pending = Some(target);
+                return;
+            }
+        }
         let Ok(stream) = self.inner.events.open_stream() else {
             return;
         };
@@ -204,6 +228,29 @@ impl NotificationService {
         }
         stream.emit(HostEventDraft::Step { step });
         stream.end(ok_outcome());
+    }
+
+    pub fn take_pending(&self) -> Option<NotificationTargetDto> {
+        let mut delivery = self
+            .inner
+            .delivery
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        match std::mem::replace(&mut *delivery, Delivery::Live) {
+            Delivery::Waiting(pending) => pending,
+            Delivery::Live => None,
+        }
+    }
+
+    fn repeated(&self, target: NotificationTargetDto) -> bool {
+        let now = self.inner.clock.now();
+        let mut activations = self
+            .inner
+            .activations
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        activations.retain(|_, at| now - *at < ACTIVATION_REPEAT_MS);
+        activations.insert(target, now).is_some()
     }
 
     pub fn clear(&self, target: NotificationTargetDto) {

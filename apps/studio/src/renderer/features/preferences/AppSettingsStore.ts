@@ -1,6 +1,6 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import { isIpcError, type IpcClient } from "@zvs/ipc";
-import { AppErrorCode, type Contract } from "@zvs/shared";
+import { AppErrorCode, type Contract, type NotificationTargetDto } from "@zvs/shared";
 import { AUTOSTART_FAILED, SETTING_SAVE_FAILED } from "./preferencesPresentation";
 
 export const APP_SETTING_KEYS = [
@@ -54,6 +54,14 @@ export default class AppSettingsStore {
       }
       this.loaded = true;
     });
+  }
+
+  async takePendingTarget(): Promise<NotificationTargetDto | null> {
+    try {
+      return await this.ipc.call("notifications.pending", undefined);
+    } catch {
+      return null;
+    }
   }
 
   async set(key: AppSettingKey, value: boolean) {

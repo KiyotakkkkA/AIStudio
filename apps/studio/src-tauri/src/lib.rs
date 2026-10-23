@@ -14,6 +14,8 @@ use std::sync::{Arc, OnceLock};
 
 use serde_json::json;
 use tauri::{App, AppHandle, Manager, RunEvent, WindowEvent};
+use tauri_plugin_deep_link::DeepLinkExt;
+use zvs_contract::{NOTIFICATION_SCHEME, NotificationTargetDto};
 use zvs_host::artifacts::ArtifactStore;
 use zvs_host::browser::{BrowserLifecycle, profile_dir};
 use zvs_host::commands::{CommandToolOptions, register_command_nodes};
@@ -131,11 +133,12 @@ pub fn run() {
     let builder = if e2e::data_dir().is_some() {
         builder
     } else {
-        builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            window::focus_studio(app);
+        builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            open_launch_link(app, &args);
         }))
     };
     builder
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_autostart::Builder::new()
@@ -250,6 +253,56 @@ fn probe_gateway(gateway: Arc<AccountGateway>, logger: SharedLogger) {
     });
 }
 
+fn open_launch_link(app: &AppHandle, args: &[String]) {
+    let Some(url) = toast::launch_url(args) else {
+        window::focus_studio(app);
+        return;
+    };
+    let Some(target) = toast::launch_target(url) else {
+        if let Some(lifecycle) = app.try_state::<Lifecycle>() {
+            reject_launch_link(&lifecycle.logger, url);
+        }
+        return;
+    };
+    match app
+        .try_state::<toast::ActivationSlot>()
+        .and_then(|slot| slot.get().cloned())
+    {
+        Some(activate) => activate(target),
+        None => window::focus_studio(app),
+    }
+}
+
+fn cold_launch_target(logger: &SharedLogger) -> Option<NotificationTargetDto> {
+    let args: Vec<String> = std::env::args().collect();
+    let url = toast::launch_url(&args)?;
+    let target = toast::launch_target(url);
+    if target.is_none() {
+        reject_launch_link(logger, url);
+    }
+    target
+}
+
+fn reject_launch_link(logger: &SharedLogger, url: &str) {
+    logger.log(
+        LogLevel::Warn,
+        "shell",
+        "Ignored a malformed zvs-studio link",
+        &[("length", json!(url.len()))],
+    );
+}
+
+fn register_link_scheme(app: &App, logger: &SharedLogger) {
+    if let Err(error) = app.deep_link().register(NOTIFICATION_SCHEME) {
+        logger.log(
+            LogLevel::Warn,
+            "shell",
+            "Could not register the zvs-studio scheme",
+            &[("error", json!(error.to_string()))],
+        );
+    }
+}
+
 fn warm_sidecar(sidecar: SidecarDriver, logger: SharedLogger) {
     tauri::async_runtime::spawn(async move {
         if let Err(error) = sidecar.ping().await {
@@ -349,6 +402,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let theme: SharedThemePort = Arc::new(TauriTheme::new(app.handle().clone()));
     let shell_state = ShellState::shared();
     let activation: toast::ActivationSlot = Arc::new(OnceLock::new());
+    app.manage(Arc::clone(&activation));
+    if !paths.packaged && e2e::data_dir().is_none() {
+        register_link_scheme(app, &logger);
+    }
     let toast_icon = write_toast_icon(&paths.data_dir);
     let toaster = platform::toaster(
         &app.config().identifier,
@@ -884,7 +941,11 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     });
     runs.watch(notifications.watcher());
     notifications.start()?;
-    let hidden = shell::launched_by_autostart() && shell_state.tray();
+    let launched = cold_launch_target(&logger);
+    if let Some(target) = launched {
+        notifications.activated(target);
+    }
+    let hidden = launched.is_none() && shell::launched_by_autostart() && shell_state.tray();
 
     let services = Arc::new(Services {
         system,

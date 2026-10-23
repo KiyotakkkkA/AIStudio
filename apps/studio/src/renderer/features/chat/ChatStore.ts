@@ -567,8 +567,10 @@ export default class ChatStore {
       const pending = this.pendingOpen;
       this.pendingOpen = null;
       if (this.run) this.subscribe();
-      else if (pending !== null) await this.select(pending);
-      else if (this.active) await this.select(this.active.id);
+      else if (pending !== null) {
+        if (this.listed(pending)) await this.select(pending);
+        else this.newChat();
+      } else if (this.active) await this.select(this.active.id);
     } catch (error) {
       runInAction(() => {
         if (revision === this.revision) {
@@ -584,10 +586,18 @@ export default class ChatStore {
       this.pendingOpen = id;
       return;
     }
+    if (!this.listed(id)) {
+      this.newChat();
+      return;
+    }
     await this.select(id);
     runInAction(() => {
       this.revealed += 1;
     });
+  }
+
+  private listed(id: ConversationId) {
+    return this.conversations.some((conversation) => conversation.id === id);
   }
 
   async select(id: ConversationId) {

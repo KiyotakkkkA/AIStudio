@@ -1,9 +1,16 @@
 import { expect, test, vi } from "vitest";
 import { createIpcClient } from "@zvs/ipc";
-import { AppErrorCode, ConversationDetailDto, contract, type Contract } from "@zvs/shared";
+import {
+  AppErrorCode,
+  ConversationDetailDto,
+  ConversationId,
+  contract,
+  type Contract,
+} from "@zvs/shared";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import ChatStore from "../../src/renderer/features/chat/ChatStore.ts";
+import AppSettingsStore from "../../src/renderer/features/preferences/AppSettingsStore.ts";
 import { provider } from "./providerFixtures.ts";
 
 const saved = provider();
@@ -72,4 +79,32 @@ test("a failed clear never blocks selecting the conversation", async () => {
   expect(store.active?.id).toBe(first.id);
   expect(store.error).toBeNull();
   store.dispose();
+});
+
+test("a link to a conversation that no longer exists opens the chat with no selection", async () => {
+  const { bridge, store } = setup();
+  const missing = ConversationId.parse("0199ee11-5555-7111-8111-0000000000ff");
+  await store.open(missing);
+  await store.mount();
+  expect(store.active).toBeNull();
+  expect(store.error).toBeNull();
+  await store.select(first.id);
+  await store.open(missing);
+  expect(store.active).toBeNull();
+  expect(store.error).toBeNull();
+  const fetched = bridge.calls
+    .filter((call) => call.channel === "chat.conversations.get")
+    .map((call) => call.payload);
+  expect(fetched).not.toContainEqual({ id: missing });
+  store.dispose();
+});
+
+test("the pending target from a cold start is taken once and a failure reads as none", async () => {
+  const bridge = createFakeBridge<Contract>().handle("notifications.pending", () => ({
+    kind: "downloads" as const,
+  }));
+  const settings = new AppSettingsStore(createIpcClient(contract, bridge));
+  expect(await settings.takePendingTarget()).toEqual({ kind: "downloads" });
+  bridge.fail("notifications.pending", AppErrorCode.NATIVE_ERROR, "x");
+  expect(await settings.takePendingTarget()).toBeNull();
 });
