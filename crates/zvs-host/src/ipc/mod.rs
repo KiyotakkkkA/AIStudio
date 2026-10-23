@@ -6,6 +6,7 @@ pub mod downloads;
 pub mod folders;
 pub mod graph_relations;
 pub mod mcp;
+pub mod memory;
 pub mod notifications;
 pub mod providers;
 pub mod runs;
@@ -43,6 +44,7 @@ pub fn register(server: &mut IpcServer) {
     toolchain::register(server);
     chat::register(server);
     folders::register(server);
+    memory::register(server);
     workspace::register(server);
     terminal::register(server);
     documents::register(server);
@@ -144,6 +146,11 @@ mod tests {
                 "mcp.stop",
                 "mcp.test",
                 "mcp.update",
+                "memory.clear",
+                "memory.create",
+                "memory.list",
+                "memory.remove",
+                "memory.update",
                 "notifications.clear",
                 "notifications.pending",
                 "providers.adapters",

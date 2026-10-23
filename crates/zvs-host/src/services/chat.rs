@@ -30,12 +30,16 @@ use super::chat_history::{
     MESSAGE_OVERHEAD, RelatedSource, RetrievedSource, estimate_tokens, measure_context, tokens,
     window_chat_history, with_selections,
 };
+use super::chat_memory::{
+    MEMORY_FAILED, MEMORY_TOOL, MemoryRefs, apply_memory_call, memory_section, memory_tool,
+};
 use super::chat_tools::{
     CHAT_TOOL_CALLS, CHAT_TOOL_ROUNDS, HYBRID_INSTRUCTION, KNOWLEDGE_INSTRUCTION, KnowledgeText,
     OfferedTool, TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text,
     fence_tool_result, knowledge_catalogue, offered_tools, parse_tool_arguments, read_result_text,
     search_result_text, tool_result_budget, tool_result_text, tool_specs, tool_specs_json,
 };
+use super::memory::MemoryService;
 use super::retrieval_merge::{CHAT_FETCH_K, MergeOptions, StoreHits, merge_retrieval};
 use super::retrieval_query::retrieval_query;
 use super::runs::RunService;
@@ -157,6 +161,7 @@ struct Inner {
     tools: Option<ToolRegistry>,
     skills: Option<Arc<dyn SkillCatalogue>>,
     folders: FolderAccessService,
+    memory: MemoryService,
     logger: SharedLogger,
     clock: SharedClock,
     listeners: Mutex<Vec<ChatMessageListener>>,
@@ -296,6 +301,28 @@ impl Inner {
     ) -> Result<T, AppError> {
         self.database
             .with_connection(|connection| work(&Repositories::new(connection)))
+    }
+
+    fn memory_prompt(
+        &self,
+        conversation_id: &str,
+        tools_usable: bool,
+        offered: &mut Vec<OfferedTool>,
+    ) -> Result<(String, MemoryRefs), AppError> {
+        let switches = self.memory.switches()?;
+        if !switches.enabled {
+            return Ok((String::new(), MemoryRefs::default()));
+        }
+        if switches.model && tools_usable {
+            offered.push(memory_tool(offered));
+        }
+        Ok(memory_section(
+            &self.memory.snapshot(conversation_id)?,
+            offered
+                .iter()
+                .find(|tool| tool.key == MEMORY_TOOL)
+                .map(|tool| tool.name.as_str()),
+        ))
     }
 
     fn conversation(&self, id: &str) -> Result<ConversationRow, AppError> {
@@ -690,6 +717,8 @@ pub struct ChatGenerateRequest {
     pub knowledge: KnowledgeContext,
     #[serde(default)]
     pub conversation_id: String,
+    #[serde(default)]
+    pub memory: MemoryRefs,
 }
 
 impl Validate for ChatGenerateRequest {
@@ -1189,11 +1218,14 @@ impl NodeDef for PrepareNode {
         if tools_usable {
             offered.push(ask_tool(&offered));
         }
+        let (memory, memory_refs) =
+            inner.memory_prompt(&input.conversation_id, tools_usable, &mut offered)?;
         let files = file_tools_section(&offered);
         let processes = process_tools_section(&offered);
         let asking = ask_section(&offered);
         let prompt = [
             details.system_prompt.clone(),
+            memory,
             prompt,
             guidance,
             skill_note,
@@ -1316,6 +1348,7 @@ impl NodeDef for PrepareNode {
                 context_budget: model.context_window - model.max_output_tokens,
             },
             conversation_id: input.conversation_id.clone(),
+            memory: memory_refs,
         })
     }
 }
@@ -1334,6 +1367,7 @@ struct CallOptions<'a> {
     scope: &'a [VectorStoreId],
     book: &'a Mutex<Vec<ChatCitationDto>>,
     conversation: &'a str,
+    memory: &'a Mutex<MemoryRefs>,
 }
 
 struct PendingCall<'a> {
@@ -1569,6 +1603,26 @@ impl GenerateChatNode {
                 ))),
             };
         }
+        if tool.key == MEMORY_TOOL {
+            let arguments = calls.lock().unwrap_or_else(PoisonError::into_inner)[index]
+                .arguments
+                .clone();
+            let outcome = {
+                let mut refs = options
+                    .memory
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner);
+                apply_memory_call(&inner.memory, &arguments, options.conversation, &mut refs)
+            };
+            return Ok(plain(match outcome {
+                Ok(result) => settle(ChatToolCallStatus::Succeeded, None, Some(result)),
+                Err(problem) => settle(
+                    ChatToolCallStatus::Failed,
+                    Some(MEMORY_FAILED),
+                    Some(problem),
+                ),
+            }));
+        }
         let mut arguments = calls.lock().unwrap_or_else(PoisonError::into_inner)[index]
             .arguments
             .clone();
@@ -1710,8 +1764,10 @@ impl GenerateChatNode {
             tool_result_chars,
             knowledge,
             conversation_id,
+            memory,
         } = request;
         let book = Mutex::new(knowledge.citations.clone());
+        let memory = Mutex::new(memory);
         let mut compactable: Vec<Compactable> = Vec::new();
         let raw = providers.text(&base.provider_id)?;
         let mode = if tools.is_empty() {
@@ -1879,6 +1935,7 @@ impl GenerateChatNode {
                                 scope: &knowledge.store_ids,
                                 book: &book,
                                 conversation: &conversation_id,
+                                memory: &memory,
                             },
                         )
                     }))
@@ -2028,11 +2085,13 @@ impl ChatService {
                 options.clock.clone(),
             )
         });
+        let memory = MemoryService::new(Arc::clone(&options.database), options.clock.clone());
         let inner = Arc::new(Inner {
             database: options.database,
             tools: options.tools,
             skills: options.skills,
             folders,
+            memory,
             logger: options.logger,
             clock: options.clock,
             listeners: Mutex::new(Vec::new()),
@@ -2058,6 +2117,10 @@ impl ChatService {
         rows.into_iter()
             .map(|row| conversation_dto(row, &grants))
             .collect()
+    }
+
+    pub fn memory(&self) -> MemoryService {
+        self.inner.memory.clone()
     }
 
     pub fn folders(&self) -> FolderAccessService {
@@ -2562,9 +2625,22 @@ impl ChatService {
         } else {
             working_folder_section(folder, None)
         };
-        if model.supports_tools != Some(false) {
+        let tools_usable = model.supports_tools != Some(false);
+        if tools_usable {
             offered.push(ask_tool(&offered));
         }
+        let conversation_id = input
+            .conversation_id
+            .map(|id| id.to_string())
+            .unwrap_or_default();
+        let (memory, _) = self
+            .inner
+            .memory_prompt(&conversation_id, tools_usable, &mut offered)?;
+        let system_prompt = [system_prompt, memory]
+            .into_iter()
+            .filter(|part| !part.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join("\n\n");
         let tool_block = [
             guidance,
             workspace,

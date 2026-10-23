@@ -3,11 +3,13 @@ pub mod approvals;
 pub mod chat;
 pub mod chat_ask;
 pub mod chat_history;
+pub mod chat_memory;
 pub mod chat_tools;
 pub mod crypto;
 pub mod graph;
 pub mod health_check;
 pub mod mcp;
+pub mod memory;
 pub mod permissions;
 pub mod probe_outcome;
 pub mod provider_status;
@@ -40,6 +42,7 @@ pub use crypto::{
 pub use graph::{GraphService, GraphServiceOptions};
 pub use health_check::{HealthCheckOptions, HealthCheckService};
 pub use mcp::{McpService, McpServiceOptions};
+pub use memory::MemoryService;
 pub use permissions::{Admission, PermissionContext, PermissionService};
 pub use providers::{
     DriverSource, ProbeInput, ProbeResult, ProviderDraftInput, ProviderService,
@@ -97,6 +100,7 @@ pub struct Services {
     pub scenarios: ScenarioService,
     pub scenario_runs: ScenarioRunner,
     pub chat: ChatService,
+    pub memory: MemoryService,
     pub folders: FolderAccessService,
     pub explorer: ExplorerService,
     pub terminals: TerminalService,

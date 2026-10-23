@@ -133,11 +133,12 @@ function appSettings(seed: Record<string, Json> = {}) {
   return { bridge, stored, store: new AppSettingsStore(createIpcClient(contract, bridge)) };
 }
 
-test("the application group lists general, appearance, notifications and about in order", () => {
+test("the application group lists general, appearance, notifications, memory and about in order", () => {
   expect(PREFERENCE_SECTIONS.map((section) => SECTION_LABELS[section])).toEqual([
     "Общие",
     "Внешний вид",
     "Уведомления",
+    "Память",
     "О системе",
   ]);
   expect(GENERAL_ROWS.map((row) => row.key)).toEqual(["app.autostart", "app.tray"]);
@@ -159,6 +160,8 @@ test("application settings load with their defaults and persist each toggle", as
     "notifications.approval": true,
     "notifications.turn": true,
     "notifications.download": true,
+    "memory.enabled": true,
+    "memory.model": true,
   });
   await store.set("notifications.enabled", false);
   await store.set("app.autostart", true);

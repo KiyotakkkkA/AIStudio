@@ -19,6 +19,13 @@ import {
 import { AnswerFolderRequestInput, FolderGrantDto, FolderGrantRef } from "../folders.js";
 import { ChatAnswerInput, ChatSkipInput } from "../questions.js";
 import {
+  ClearMemoryInput,
+  CreateMemoryInput,
+  MemoryDto,
+  MemoryRef,
+  UpdateMemoryInput,
+} from "../memory.js";
+import {
   ExplorerFileDto,
   ExplorerListInput,
   ExplorerListingDto,
@@ -251,6 +258,11 @@ export const contract = defineContract({
   "folders.list": { input: z.void(), output: z.array(FolderGrantDto) },
   "folders.revoke": { input: FolderGrantRef, output: z.void() },
   "folders.answer": { input: AnswerFolderRequestInput, output: z.void() },
+  "memory.list": { input: z.void(), output: z.array(MemoryDto) },
+  "memory.create": { input: CreateMemoryInput, output: MemoryDto },
+  "memory.update": { input: UpdateMemoryInput, output: MemoryDto },
+  "memory.remove": { input: MemoryRef, output: z.void() },
+  "memory.clear": { input: ClearMemoryInput, output: z.void() },
   "workspace.list": { input: ExplorerListInput, output: ExplorerListingDto },
   "workspace.read": { input: ExplorerReadInput, output: ExplorerFileDto },
   "workspace.watch": { input: ConversationRef, output: ExplorerWatchDto },

@@ -81,3 +81,6 @@ export type FolderGrantId = z.infer<typeof FolderGrantId>;
 
 export const TerminalId = brandedId("TerminalId");
 export type TerminalId = z.infer<typeof TerminalId>;
+
+export const MemoryId = brandedId("MemoryId");
+export type MemoryId = z.infer<typeof MemoryId>;

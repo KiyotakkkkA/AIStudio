@@ -9,6 +9,7 @@ import {
   processSummary,
 } from "./processCopy";
 import { ASK_TOOL, questionRecord, recordSummary } from "./questionCopy";
+import { MEMORY_TOOL, memoryCallSummary } from "../memory/memoryCopy";
 
 export function toolArgumentsSummary(value: Json): string {
   const text = typeof value === "string" ? value : JSON.stringify(value);
@@ -48,6 +49,10 @@ export function toolCallSummary(call: ChatToolCallDto): string {
   if (call.key === ASK_TOOL) {
     const record = questionRecord(call.meta);
     if (record) return recordSummary(record, call.status === "awaiting-answer");
+  }
+  if (call.key === MEMORY_TOOL) {
+    const summary = memoryCallSummary(call.arguments);
+    if (summary !== null) return summary;
   }
   if (call.key === FILE_TOOL_APPLY) {
     const changes = fileChanges(call.meta);

@@ -10,6 +10,8 @@ export const APP_SETTING_KEYS = [
   "notifications.approval",
   "notifications.turn",
   "notifications.download",
+  "memory.enabled",
+  "memory.model",
 ] as const;
 export type AppSettingKey = (typeof APP_SETTING_KEYS)[number];
 
@@ -20,6 +22,8 @@ export const APP_SETTING_DEFAULTS: Record<AppSettingKey, boolean> = {
   "notifications.approval": true,
   "notifications.turn": true,
   "notifications.download": true,
+  "memory.enabled": true,
+  "memory.model": true,
 };
 
 function failureCopy(key: AppSettingKey, error: unknown): string {

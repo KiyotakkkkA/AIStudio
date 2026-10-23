@@ -1,0 +1,15 @@
+[
+  {
+    "name": "dialog without a chat",
+    "value": {
+      "scope": "conversation"
+    }
+  },
+  {
+    "name": "account with a chat",
+    "value": {
+      "scope": "account",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111"
+    }
+  }
+]

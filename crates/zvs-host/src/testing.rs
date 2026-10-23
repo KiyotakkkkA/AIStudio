@@ -570,6 +570,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             skills,
             scenarios,
             scenario_runs,
+            memory: chat.memory(),
             chat,
             explorer: crate::workspace::ExplorerService::with_debounce(
                 folders.clone(),

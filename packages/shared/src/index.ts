@@ -23,6 +23,7 @@ export * from "./artifacts.js";
 export * from "./process.js";
 export * from "./questions.js";
 export * from "./folders.js";
+export * from "./memory.js";
 export * from "./providers/index.js";
 export * from "./accounts.js";
 export * from "./vectorStores/index.js";

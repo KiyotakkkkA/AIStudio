@@ -1,4 +1,5 @@
 mod knowledge;
+mod memory;
 mod tool_loop;
 mod workspace;
 
@@ -247,6 +248,7 @@ pub(super) struct HarnessOptions {
     pub capabilities: Vec<ProviderCapability>,
     pub context_window: i64,
     pub max_output: i64,
+    pub memory: bool,
 }
 
 impl Default for HarnessOptions {
@@ -263,6 +265,7 @@ impl Default for HarnessOptions {
             capabilities: vec![ProviderCapability::Text, ProviderCapability::Embedding],
             context_window: 1024,
             max_output: 128,
+            memory: false,
         }
     }
 }
@@ -346,6 +349,11 @@ impl Harness {
                         max_output: Some(options.max_output),
                         ..ModelDraft::new("fake-model", "Fake", 1)
                     }],
+                    1,
+                )?;
+                repositories.settings.set(
+                    crate::services::memory::MEMORY_ENABLED_KEY,
+                    &options.memory.to_string(),
                     1,
                 )?;
                 Ok((provider.id, models[0].id.clone()))

@@ -20,6 +20,7 @@ import ScenarioStore from "../features/scenarios/ScenarioStore";
 import PermissionsStore from "../features/permissions/PermissionsStore";
 import AboutStore from "../features/preferences/AboutStore";
 import AppSettingsStore from "../features/preferences/AppSettingsStore";
+import MemoryStore from "../features/memory/MemoryStore";
 
 export interface RootStoreEnvironment {
   readonly ipc: IpcClient<Contract>;
@@ -45,6 +46,7 @@ export class RootStore {
   readonly permissions: PermissionsStore;
   readonly about: AboutStore;
   readonly appSettings: AppSettingsStore;
+  readonly memory: MemoryStore;
 
   constructor(private readonly environment: RootStoreEnvironment) {
     this.ui = new UiStore(environment.ipc);
@@ -67,6 +69,7 @@ export class RootStore {
     this.permissions = new PermissionsStore(environment.ipc);
     this.about = new AboutStore(environment.ipc);
     this.appSettings = new AppSettingsStore(environment.ipc);
+    this.memory = new MemoryStore(environment.ipc);
     makeAutoObservable<RootStore, "environment">(
       this,
       {
@@ -89,6 +92,7 @@ export class RootStore {
         permissions: false,
         about: false,
         appSettings: false,
+        memory: false,
       },
       { autoBind: true },
     );
@@ -120,6 +124,7 @@ export class RootStore {
     this.skills.dispose();
     this.scenarios.dispose();
     this.permissions.dispose();
+    this.memory.dispose();
     this.environment.events.dispose();
   }
 }

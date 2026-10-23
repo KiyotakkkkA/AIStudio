@@ -1,0 +1,9 @@
+[
+  {
+    "name": "not a uuid",
+    "value": {
+      "id": "x",
+      "title": "Планы"
+    }
+  }
+]

@@ -1,4 +1,5 @@
 import type { PreferenceSection } from "../../stores/UiStore";
+import { ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
 import {
   APP_ROW_LABELS,
   DEVICE_ROW_LABELS,
@@ -50,6 +51,8 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
     label: row.label,
     fallback: NOTIFICATIONS_ROW.key,
   })),
+  { id: ENABLED_ROW.key, section: "memory", label: ENABLED_ROW.label },
+  { id: MODEL_ROW.key, section: "memory", label: MODEL_ROW.label, fallback: ENABLED_ROW.key },
   ...[...Object.values(APP_ROW_LABELS), ...Object.values(DEVICE_ROW_LABELS)].map((label) => ({
     id: aboutSettingId(label),
     section: "about" as const,

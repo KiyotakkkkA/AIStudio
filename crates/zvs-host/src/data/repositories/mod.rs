@@ -6,6 +6,7 @@ pub mod folder_grant;
 pub mod graph_edge;
 pub mod graph_relation;
 pub mod mcp_server;
+pub mod memory;
 pub mod model;
 pub mod permission;
 pub mod provider;
@@ -32,6 +33,7 @@ pub use folder_grant::FolderGrantRepository;
 pub use graph_edge::{GraphEdgeDraft, GraphEdgeLookup, GraphEdgeRepository};
 pub use graph_relation::GraphRelationRepository;
 pub use mcp_server::{CapabilityCounts, McpServerPatch, McpServerRepository};
+pub use memory::MemoryRepository;
 pub use model::{ModelDraft, ModelRepository};
 pub use permission::PermissionRepository;
 pub use provider::{ProviderDraft, ProviderFilter, ProviderPatch, ProviderRepository};
@@ -73,6 +75,7 @@ pub struct Repositories<'c> {
     pub folder_grants: FolderGrantRepository<'c>,
     pub documents: DocumentRepository<'c>,
     pub scenarios: ScenarioRepository<'c>,
+    pub memory: MemoryRepository<'c>,
 }
 
 impl<'c> Repositories<'c> {
@@ -99,6 +102,7 @@ impl<'c> Repositories<'c> {
             folder_grants: FolderGrantRepository::new(connection),
             documents: DocumentRepository::new(connection),
             scenarios: ScenarioRepository::new(connection),
+            memory: MemoryRepository::new(connection),
         }
     }
 }

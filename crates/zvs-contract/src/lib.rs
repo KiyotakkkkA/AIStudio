@@ -17,6 +17,7 @@ pub mod graph;
 pub mod graph_expansion;
 pub mod ids;
 pub mod mcp;
+pub mod memory;
 pub mod notifications;
 pub mod primitives;
 pub mod process;
@@ -112,6 +113,11 @@ pub use mcp::{
     McpEnv, McpHeaders, McpHealthDto, McpLogLevel, McpLogLineDto, McpOAuthState, McpRemoveOutput,
     McpServerDetailDto, McpServerDto, McpServerRef, McpServerStatus, McpStartup, McpTestResultDto,
     McpTransport, McpValue, UpdateMcpServerInput,
+};
+pub use memory::{
+    ClearMemoryInput, CreateMemoryInput, MEMORY_ACCOUNT_MAX, MEMORY_CONTENT_MAX,
+    MEMORY_CONVERSATION_MAX, MemoryChatDto, MemoryDto, MemoryListOutput, MemoryRef, MemoryScope,
+    MemorySource, UpdateMemoryInput, check_memory_content,
 };
 pub use notifications::{
     NAVIGATION_STEP_DOMAIN, NOTIFICATION_SCHEME, NOTIFICATION_URL_MAX, NotificationTargetDto,

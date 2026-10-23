@@ -1018,6 +1018,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         skills,
         scenarios,
         scenario_runs,
+        memory: chat.memory(),
         chat,
         explorer: explorer.clone(),
         terminals,

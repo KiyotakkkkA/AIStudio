@@ -1,0 +1,29 @@
+[
+  {
+    "name": "account",
+    "value": {
+      "id": "0199aa11-7777-7111-8111-111111111111",
+      "scope": "account",
+      "conversation": null,
+      "content": "Пишет на Rust и TypeScript",
+      "source": "model",
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "dialog",
+    "value": {
+      "id": "0199aa11-7777-7111-8111-111111111111",
+      "scope": "conversation",
+      "conversation": {
+        "id": "0199aa11-2222-7111-8111-111111111111",
+        "title": "Планы"
+      },
+      "content": "Проект называется ZVS",
+      "source": "user",
+      "createdAt": 1,
+      "updatedAt": 1
+    }
+  }
+]

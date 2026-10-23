@@ -3,6 +3,7 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import {
   mdiBellOutline,
+  mdiBrain,
   mdiClose,
   mdiCogOutline,
   mdiInformationOutline,
@@ -54,6 +55,8 @@ import {
   type ToggleRowCopy,
 } from "./preferencesPresentation";
 import PreferencesSearch from "./PreferencesSearch";
+import MemoryFacts from "../memory/MemoryFacts";
+import { DISABLED_NOTE, ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
 import { aboutSettingId, SETTING_ENTRIES, SETTING_IDS } from "./settingsIndex";
 
 const REVEAL_MS = 1600;
@@ -63,6 +66,7 @@ const SECTION_ICONS: Record<PreferenceSection, string> = {
   general: mdiCogOutline,
   appearance: mdiPaletteOutline,
   notifications: mdiBellOutline,
+  memory: mdiBrain,
   about: mdiInformationOutline,
 };
 
@@ -236,6 +240,27 @@ const NotificationsSection = observer(function NotificationsSection() {
   );
 });
 
+const MemorySection = observer(function MemorySection() {
+  const { appSettings } = useStore();
+  useEffect(() => {
+    void appSettings.load();
+  }, [appSettings]);
+  const enabled = appSettings.values[ENABLED_ROW.key];
+  return (
+    <div className="flex flex-col">
+      <ToggleSettingRow row={ENABLED_ROW} />
+      {enabled ? (
+        <div className="ml-1 flex flex-col pl-5">
+          <ToggleSettingRow row={MODEL_ROW} />
+        </div>
+      ) : (
+        <p className="m-0 pt-1 text-[12px] text-main-500">{DISABLED_NOTE}</p>
+      )}
+      <MemoryFacts />
+    </div>
+  );
+});
+
 const AboutSection = observer(function AboutSection() {
   const { about } = useStore();
   useEffect(() => {
@@ -364,6 +389,7 @@ function PreferencesDialog() {
           {section === "general" ? <GeneralSection /> : null}
           {section === "appearance" ? <AppearanceSection /> : null}
           {section === "notifications" ? <NotificationsSection /> : null}
+          {section === "memory" ? <MemorySection /> : null}
           {section === "about" ? <AboutSection /> : null}
         </ScrollArea>
       </div>

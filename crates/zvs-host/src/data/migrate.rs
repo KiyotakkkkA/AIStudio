@@ -125,6 +125,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0015_scenario_overlap",
         sql: include_str!("../../migrations/0015_scenario_overlap.sql"),
     },
+    Migration {
+        id: 16,
+        name: "0016_memory",
+        sql: include_str!("../../migrations/0016_memory.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

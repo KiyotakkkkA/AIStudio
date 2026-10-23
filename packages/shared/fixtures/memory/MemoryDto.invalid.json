@@ -1,0 +1,65 @@
+[
+  {
+    "name": "dialog without a chat",
+    "value": {
+      "id": "0199aa11-7777-7111-8111-111111111111",
+      "scope": "conversation",
+      "conversation": null,
+      "content": "Проект называется ZVS",
+      "source": "user",
+      "createdAt": 1,
+      "updatedAt": 1
+    }
+  },
+  {
+    "name": "account with a chat",
+    "value": {
+      "id": "0199aa11-7777-7111-8111-111111111111",
+      "scope": "account",
+      "conversation": {
+        "id": "0199aa11-2222-7111-8111-111111111111",
+        "title": "Планы"
+      },
+      "content": "Пишет на Rust и TypeScript",
+      "source": "model",
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "blank content",
+    "value": {
+      "id": "0199aa11-7777-7111-8111-111111111111",
+      "scope": "account",
+      "conversation": null,
+      "content": "   ",
+      "source": "model",
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "content too long",
+    "value": {
+      "id": "0199aa11-7777-7111-8111-111111111111",
+      "scope": "account",
+      "conversation": null,
+      "content": "яяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяя",
+      "source": "model",
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "unknown source",
+    "value": {
+      "id": "0199aa11-7777-7111-8111-111111111111",
+      "scope": "account",
+      "conversation": null,
+      "content": "Пишет на Rust и TypeScript",
+      "source": "system",
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  }
+]

@@ -1,0 +1,24 @@
+[
+  {
+    "name": "dialog without a chat",
+    "value": {
+      "scope": "conversation",
+      "content": "Ветка main"
+    }
+  },
+  {
+    "name": "account with a chat",
+    "value": {
+      "scope": "account",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "content": "Отвечать кратко"
+    }
+  },
+  {
+    "name": "blank content",
+    "value": {
+      "scope": "account",
+      "content": " "
+    }
+  }
+]

@@ -9,6 +9,7 @@ import type {
 import { toolCallSummary } from "./toolCallSummary";
 import {
   mdiBookOpenPageVariantOutline,
+  mdiBrain,
   mdiCodeBraces,
   mdiCommentQuestionOutline,
   mdiConsoleLine,
@@ -47,6 +48,7 @@ import {
   fileChanges,
 } from "./fileChangesCopy";
 import { ASK_TOOL, QUESTIONS_SKIPPED, QUESTIONS_UNANSWERED, questionRecord } from "./questionCopy";
+import { MEMORY_TOOL } from "../memory/memoryCopy";
 
 export const TOOL_CALL_STATUS: Record<
   ChatToolCallDto["status"],
@@ -71,6 +73,7 @@ function toolIcon(key: string): string {
   if (key === "knowledge.search") return mdiDatabaseSearchOutline;
   if (key === "knowledge.read") return mdiBookOpenPageVariantOutline;
   if (key === ASK_TOOL) return mdiCommentQuestionOutline;
+  if (key === MEMORY_TOOL) return mdiBrain;
   if (key === FILE_TOOL_APPLY) return mdiFileDocumentEditOutline;
   if (key === PROCESS_TOOL_CODE) return mdiCodeBraces;
   if (key === PROCESS_TOOL_SHELL) return mdiConsoleLine;

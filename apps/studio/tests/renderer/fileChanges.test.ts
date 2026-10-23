@@ -55,8 +55,10 @@ const moved: FileDiffDto = {
 };
 
 test("tool meta yields the changes only when it matches the contract", () => {
+  const unsourced: FileDiffDto = { ...moved };
+  delete unsourced.from;
   expect(fileChanges({ changes: [edited, moved] })).toEqual([edited, moved]);
-  expect(fileChanges({ changes: [{ ...moved, from: undefined }] })).toEqual([]);
+  expect(fileChanges({ changes: [unsourced] })).toEqual([]);
   expect(fileChanges(null)).toEqual([]);
 });
 

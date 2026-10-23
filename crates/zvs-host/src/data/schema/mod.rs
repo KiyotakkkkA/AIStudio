@@ -7,6 +7,7 @@ pub mod folder_grant;
 pub mod graph_edge;
 pub mod graph_relation;
 pub mod mcp;
+pub mod memory;
 pub mod model;
 pub mod permission;
 pub mod provider;
@@ -31,6 +32,7 @@ pub use folder_grant::FolderGrantRow;
 pub use graph_edge::GraphEdgeRow;
 pub use graph_relation::GraphRelationRow;
 pub use mcp::{McpCapabilityRow, McpServerRow};
+pub use memory::MemoryRow;
 pub use model::ModelRow;
 pub use permission::{
     ApprovalDecision, PendingApprovalRow, PermissionUseRow, ToolCeilingRow, ToolPermissionRow,

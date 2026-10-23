@@ -10,6 +10,7 @@ import * as files from "../src/files.js";
 import * as processes from "../src/process.js";
 import * as questions from "../src/questions.js";
 import * as folders from "../src/folders.js";
+import * as memory from "../src/memory.js";
 import * as explorer from "../src/explorer.js";
 import * as terminal from "../src/terminal.js";
 import * as notifications from "../src/notifications.js";
@@ -194,6 +195,14 @@ const schemas: Record<string, z.ZodType> = {
   "process/ProcessPlanDto": processes.ProcessPlanDto,
   "process/ProcessResultDto": processes.ProcessResultDto,
   "process/ProcessApprovalDto": processes.ProcessApprovalDto,
+  "memory/MemoryScope": memory.MemoryScope,
+  "memory/MemorySource": memory.MemorySource,
+  "memory/MemoryChatDto": memory.MemoryChatDto,
+  "memory/MemoryDto": memory.MemoryDto,
+  "memory/CreateMemoryInput": memory.CreateMemoryInput,
+  "memory/UpdateMemoryInput": memory.UpdateMemoryInput,
+  "memory/MemoryRef": memory.MemoryRef,
+  "memory/ClearMemoryInput": memory.ClearMemoryInput,
   "questions/QuestionKind": questions.QuestionKind,
   "questions/QuestionOptionDto": questions.QuestionOptionDto,
   "questions/QuestionDto": questions.QuestionDto,

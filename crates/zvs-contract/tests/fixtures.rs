@@ -697,6 +697,38 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::questions::ChatSkipInput>,
     ),
     (
+        "memory/MemoryScope",
+        round_trip::<zvs_contract::memory::MemoryScope>,
+    ),
+    (
+        "memory/MemorySource",
+        round_trip::<zvs_contract::memory::MemorySource>,
+    ),
+    (
+        "memory/MemoryChatDto",
+        round_trip::<zvs_contract::memory::MemoryChatDto>,
+    ),
+    (
+        "memory/MemoryDto",
+        round_trip::<zvs_contract::memory::MemoryDto>,
+    ),
+    (
+        "memory/CreateMemoryInput",
+        round_trip::<zvs_contract::memory::CreateMemoryInput>,
+    ),
+    (
+        "memory/UpdateMemoryInput",
+        round_trip::<zvs_contract::memory::UpdateMemoryInput>,
+    ),
+    (
+        "memory/MemoryRef",
+        round_trip::<zvs_contract::memory::MemoryRef>,
+    ),
+    (
+        "memory/ClearMemoryInput",
+        round_trip::<zvs_contract::memory::ClearMemoryInput>,
+    ),
+    (
         "notifications/NotificationTargetDto",
         round_trip::<zvs_contract::notifications::NotificationTargetDto>,
     ),
