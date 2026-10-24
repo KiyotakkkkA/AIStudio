@@ -6,6 +6,7 @@ import type { AccountFamily } from "@zvs/shared";
 import Icon from "../../ui/atoms/Icon";
 import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import { useStore } from "../../stores/useStore";
+import VendorMark from "./VendorMark";
 import { adapterLabel } from "./accountPresentation";
 
 const TRIGGER = [
@@ -58,10 +59,15 @@ function AccountLoginMenu() {
                 start(family);
               }}
             >
-              <span className="flex w-full items-baseline justify-between gap-2">
-                <span className="font-medium">{adapterLabel(family)}</span>
-                <span className="text-[11px] text-main-400">
-                  {accounts.accountFor(family) === null ? "Откроется сайт вендора" : "Уже привязан"}
+              <span className="flex w-full items-center gap-2.5">
+                <VendorMark family={family} size="sm" />
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="font-medium">{adapterLabel(family)}</span>
+                  <span className="text-[11px] text-main-400">
+                    {accounts.accountFor(family) === null
+                      ? "Откроется сайт вендора"
+                      : "Уже привязан"}
+                  </span>
                 </span>
               </span>
             </Dropdown.Item>

@@ -1,9 +1,10 @@
-import { mdiAccountCircleOutline } from "@mdi/js";
+import { mdiAccountCircleOutline, mdiShieldSyncOutline } from "@mdi/js";
 import { Loader, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
 import type { AccountFamily } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
+import Icon from "../../ui/atoms/Icon";
 import EmptyState from "../../ui/molecules/EmptyState";
 import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import { useAppNavigation } from "../../hooks/useAppNavigation";
@@ -32,7 +33,8 @@ function AccountsTab() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {accounts.accounts.length > 0 ? (
-        <p className="text-[12px] text-main-400">
+        <p className="flex items-center gap-2 text-[12px] text-main-400">
+          <Icon path={mdiShieldSyncOutline} size={15} className="flex-none text-main-500" />
           Сессии проверяются автоматически; новые данные входа сохраняются, когда вендор их выдаёт.
         </p>
       ) : null}

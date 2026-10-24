@@ -65,9 +65,7 @@ test("chat streams grounded answers, preserves scroll, cancels and fits a narrow
     page.on("pageerror", (error) => errors.push(error.message));
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.locator("nav").getByText("Чат", { exact: true }).click();
-    await expect(
-      page.getByRole("link", { name: /Open AI Providers|Открыть провайдеров ИИ/ }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: /AI Providers|Провайдеры ИИ/ })).toBeVisible();
     const provider = await rpc<{ id: string }>(page, "providers.create", {
       name: "Local chat fixture",
       kind: "openai-compatible",

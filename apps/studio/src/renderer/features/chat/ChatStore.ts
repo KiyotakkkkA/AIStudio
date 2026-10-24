@@ -13,6 +13,7 @@ import {
   resolveToolMode,
   type ToolMode,
   type AccountDto,
+  type AccountFamily,
   type AccountId,
   type AdapterDescriptorDto,
   type ChatCitationDto,
@@ -55,6 +56,8 @@ export interface AccountChoice {
   readonly value: string;
   readonly label: string;
   readonly accountId: AccountId;
+  readonly adapter: AccountFamily;
+  readonly detail: string | null;
 }
 
 export default class ChatStore {
@@ -68,6 +71,7 @@ export default class ChatStore {
   servers: McpServerDto[] = [];
   context: ChatContextDto | null = null;
   connecting = false;
+  connectingAccountId: AccountId | null = null;
   composer = new ConversationVm();
   query = "";
   sidePanel: SidePanel = "context";
@@ -234,12 +238,15 @@ export default class ChatStore {
         value: `${ACCOUNT_OPTION_PREFIX}${account.id}`,
         label: `${adapterLabel(account.adapter)} · аккаунт`,
         accountId: account.id,
+        adapter: account.adapter,
+        detail: account.emailMasked ?? account.displayName,
       }));
   }
   async connectAccount(accountId: AccountId) {
     const account = this.accounts.find((entry) => entry.id === accountId);
     if (!account || this.connecting) return;
     this.connecting = true;
+    this.connectingAccountId = account.id;
     this.error = null;
     try {
       const created =
@@ -280,11 +287,13 @@ export default class ChatStore {
         this.providers = [...this.providers.filter((item) => item.id !== provider.id), provider];
         this.composer.selectProvider(provider);
         this.connecting = false;
+        this.connectingAccountId = null;
       });
     } catch (error) {
       runInAction(() => {
         this.error = errorCopy(error);
         this.connecting = false;
+        this.connectingAccountId = null;
       });
     }
   }

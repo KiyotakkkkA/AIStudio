@@ -1,13 +1,23 @@
-import { mdiAccountPlusOutline, mdiLinkVariantOff, mdiRefresh } from "@mdi/js";
+import {
+  mdiAccountPlusOutline,
+  mdiAlertCircleOutline,
+  mdiClockOutline,
+  mdiCookieOutline,
+  mdiLinkVariant,
+  mdiLinkVariantOff,
+  mdiRefresh,
+} from "@mdi/js";
 import { observer } from "mobx-react-lite";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { AccountDto } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
-import { STATUS_TONE_TEXT } from "../../ui/atoms/statusTone";
+import { STATUS_TONE_TEXT, type StatusTone } from "../../ui/atoms/statusTone";
+import VendorMark from "./VendorMark";
 import {
+  ACCOUNT_STATUS_SHORT,
   accountInitials,
   accountStatusLine,
   accountStatusTone,
@@ -16,6 +26,14 @@ import {
   expiryLine,
   providersWord,
 } from "./accountPresentation";
+
+const PILL_TONES: Record<StatusTone, string> = {
+  ok: "bg-ok-soft text-ok",
+  warn: "bg-warn-soft text-warn",
+  err: "bg-err-soft text-err",
+  idle: "bg-main-700 text-main-400",
+  accent: "bg-accent-soft text-accent-medium",
+};
 
 interface AccountCardProps {
   readonly account: AccountDto;
@@ -26,6 +44,30 @@ interface AccountCardProps {
   readonly onRecheck: () => void;
   readonly onUnlink: () => void;
   readonly onOpenSites: () => void;
+}
+
+function DetailRow({
+  icon,
+  label,
+  tone = "idle",
+  children,
+}: {
+  readonly icon: string;
+  readonly label: string;
+  readonly tone?: StatusTone;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2.5 px-3 py-2">
+      <Icon path={icon} size={15} className="flex-none text-main-500" />
+      <span className="w-24 flex-none text-[12px] text-main-400">{label}</span>
+      <span
+        className={`min-w-0 flex-1 truncate text-[12px] ${tone === "idle" ? "text-main-200" : STATUS_TONE_TEXT[tone]}`}
+      >
+        {children}
+      </span>
+    </div>
+  );
 }
 
 function AccountCard({
@@ -43,33 +85,41 @@ function AccountCard({
   const tone = accountStatusTone(account, now);
   const expiry = expiryLine(account, now);
   const showAvatar = account.avatarUrl !== null && !avatarBroken;
+  const detail = account.detail !== null && account.detail.length > 0 ? account.detail : null;
 
   return (
-    <div
-      className={`flex min-w-0 flex-col gap-3 rounded-card border bg-main-900 p-4 ${
-        needsRelink ? "border-warning-dark" : "border-line"
+    <article
+      className={`flex min-w-0 flex-col rounded-card border bg-main-900 shadow-card ${
+        needsRelink ? "border-warn-line" : "border-line"
       }`}
     >
-      <div className="flex min-w-0 items-start gap-3">
-        {showAvatar ? (
-          <img
-            src={account.avatarUrl ?? ""}
-            alt=""
-            referrerPolicy="no-referrer"
-            className="size-9 flex-none rounded-control object-cover"
-            onError={() => {
-              setAvatarBroken(true);
-            }}
+      <header className="flex min-w-0 items-center gap-3 px-4 pt-4 pb-3">
+        <span className="relative flex-none">
+          {showAvatar ? (
+            <img
+              src={account.avatarUrl ?? ""}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="size-10 rounded-control object-cover"
+              onError={() => {
+                setAvatarBroken(true);
+              }}
+            />
+          ) : (
+            <span className="flex size-10 items-center justify-center rounded-control bg-main-700 text-[13px] font-semibold text-main-200">
+              {accountInitials(account)}
+            </span>
+          )}
+          <VendorMark
+            family={account.adapter}
+            size="xs"
+            className="absolute -right-1.5 -bottom-1.5 border-2 border-main-900"
           />
-        ) : (
-          <span className="flex size-9 flex-none items-center justify-center rounded-control bg-main-700 text-[12px] font-semibold text-accent-medium">
-            {accountInitials(account)}
-          </span>
-        )}
+        </span>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-[13px] font-semibold text-main-50">
+            <span className="truncate text-[13.5px] font-semibold text-main-50">
               {accountTitle(account)}
             </span>
             <Chip tone="accent">{adapterLabel(account.adapter)}</Chip>
@@ -79,74 +129,81 @@ function AccountCard({
           </span>
         </div>
 
-        <span className="flex flex-none items-center pt-1.5">
-          <StatusDot tone={tone} title={accountStatusLine(account)} />
+        <span
+          className={`inline-flex h-6 flex-none items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium ${PILL_TONES[tone]}`}
+          title={accountStatusLine(account)}
+        >
+          <StatusDot tone={tone} />
+          {ACCOUNT_STATUS_SHORT[account.status]}
         </span>
-      </div>
+      </header>
 
-      <div className="flex flex-col gap-1 text-[12px]">
-        <span className={STATUS_TONE_TEXT[tone]}>{accountStatusLine(account)}</span>
-        {expiry === null ? null : (
-          <span className={STATUS_TONE_TEXT[expiry.tone]}>{expiry.text}</span>
+      <div className="mx-4 flex flex-col divide-y divide-line rounded-control bg-main-800">
+        {detail === null ? null : (
+          <DetailRow icon={mdiAlertCircleOutline} label="Состояние" tone={tone}>
+            {detail}
+          </DetailRow>
         )}
-        <span className="text-main-400">
+        <DetailRow icon={mdiClockOutline} label="Сессия" tone={expiry?.tone ?? "idle"}>
+          {expiry === null ? "Срок не сообщается" : expiry.text}
+        </DetailRow>
+        <DetailRow icon={mdiLinkVariant} label="Подключения">
           {account.linkedProvidersCount === 0
-            ? "Подключения не используют этот аккаунт"
+            ? "Не используется"
             : `Используется: ${providersWord(account.linkedProvidersCount)}`}
-        </span>
+        </DetailRow>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {needsRelink ? (
-          <Button type="button" tone="primary" disabled={unlinking} onClick={onRelink}>
-            <Icon path={mdiAccountPlusOutline} size={15} />
-            Перепривязать
-          </Button>
-        ) : (
+      <footer className="mt-3 flex items-start gap-2 border-t border-line px-4 py-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          {needsRelink ? (
+            <Button type="button" tone="primary" disabled={unlinking} onClick={onRelink}>
+              <Icon path={mdiAccountPlusOutline} size={15} />
+              Перепривязать
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              tone="secondary"
+              disabled={checking || unlinking}
+              onClick={onRecheck}
+            >
+              <Icon path={mdiRefresh} size={15} className={checking ? "animate-spin" : undefined} />
+              {checking ? "Проверка…" : "Проверить сессию"}
+            </Button>
+          )}
           <Button
             type="button"
-            tone="secondary"
+            tone="danger-soft"
             disabled={checking || unlinking}
-            onClick={onRecheck}
+            needConfirm
+            modalSetup={{
+              title: "Отвязать аккаунт?",
+              content: (
+                <>
+                  {account.linkedProvidersCount === 0
+                    ? "Ни одно подключение не использует этот аккаунт."
+                    : `${providersWord(account.linkedProvidersCount)} перестанут работать и покажут «аккаунт не привязан».`}{" "}
+                  Настройки моделей и модель по умолчанию сохранятся — подключения не удаляются.
+                  Сессия {adapterLabel(account.adapter)} в браузере останется активной: выйти из неё
+                  можно только в разделе «Сайты и куки».
+                </>
+              ),
+              tone: "danger",
+              confirmLabel: "Отвязать",
+            }}
+            onClick={onUnlink}
           >
-            <Icon path={mdiRefresh} size={15} />
-            {checking ? "Проверка…" : "Проверить сессию"}
+            <Icon path={mdiLinkVariantOff} size={15} />
+            {unlinking ? "Отвязка…" : "Отвязать"}
           </Button>
-        )}
-        <Button
-          type="button"
-          tone="danger"
-          disabled={checking || unlinking}
-          needConfirm
-          modalSetup={{
-            title: "Отвязать аккаунт?",
-            content: (
-              <>
-                {account.linkedProvidersCount === 0
-                  ? "Ни одно подключение не использует этот аккаунт."
-                  : `${providersWord(account.linkedProvidersCount)} перестанут работать и покажут «аккаунт не привязан».`}{" "}
-                Настройки моделей и модель по умолчанию сохранятся — подключения не удаляются.
-                Сессия {adapterLabel(account.adapter)} в браузере останется активной: выйти из неё
-                можно только в разделе «Сайты и куки».
-              </>
-            ),
-            tone: "danger",
-            confirmLabel: "Отвязать",
-          }}
-          onClick={onUnlink}
-        >
-          <Icon path={mdiLinkVariantOff} size={15} />
-          {unlinking ? "Отвязываем…" : "Отвязать"}
-        </Button>
-        <button
-          type="button"
-          className="text-[12px] text-main-400 hover:text-main-100"
-          onClick={onOpenSites}
-        >
+        </div>
+        <Button type="button" tone="ghost" onClick={onOpenSites}>
+          <Icon path={mdiCookieOutline} size={15} />
           Сайты и куки
-        </button>
-      </div>
-    </div>
+        </Button>
+      </footer>
+    </article>
   );
 }
 

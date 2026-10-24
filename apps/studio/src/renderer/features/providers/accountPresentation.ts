@@ -15,6 +15,22 @@ export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, string> = {
   revoked: "Доступ отозван",
 };
 
+export const ACCOUNT_STATUS_SHORT: Record<AccountStatus, string> = {
+  linked: "Привязан",
+  "needs-relink": "Нужен вход",
+  revoked: "Отозван",
+};
+
+export interface VendorMarkStyle {
+  readonly glyph: string;
+  readonly tile: string;
+}
+
+export const ACCOUNT_VENDOR_MARKS: Record<AccountFamily, VendorMarkStyle> = {
+  "qwen-web": { glyph: "Q", tile: "bg-accent-soft text-accent-medium" },
+  "zai-web": { glyph: "Z", tile: "bg-info-soft text-info" },
+};
+
 export function adapterLabel(adapter: AccountFamily): string {
   return ACCOUNT_ADAPTER_LABELS[adapter];
 }
@@ -42,9 +58,9 @@ export interface ExpiryLine {
 export function expiryLine(account: AccountDto, now: number): ExpiryLine | null {
   if (account.expiresAt === null) return null;
   const left = account.expiresAt - now;
-  if (left <= 0) return { text: "Сессия истекла", tone: "err" };
+  if (left <= 0) return { text: "Истекла", tone: "err" };
   const days = Math.max(1, Math.round(left / 86_400_000));
-  const text = `Сессия истекает через ${daysWord(days)}`;
+  const text = `Истекает через ${daysWord(days)}`;
   return { text, tone: left <= EXPIRY_WARNING_WINDOW_MS ? "warn" : "idle" };
 }
 

@@ -117,7 +117,7 @@ async function launch(): Promise<void> {
 async function openBrowser(): Promise<void> {
   await studio.locator("aside").getByText("Браузер", { exact: true }).click();
   chrome = await app.chrome();
-  await expect(chrome.getByRole("button", { name: "Сайты & cookies" })).toBeVisible();
+  await expect(chrome.getByRole("button", { name: "Сайты и куки" })).toBeVisible();
   await expect
     .poll(() => chrome.evaluate(() => innerWidth), { timeout: 30_000 })
     .toBeGreaterThan(100);
@@ -275,7 +275,7 @@ test("isolated browser, navigation, cookie management and restart persistence", 
   await chrome.getByRole("button", { name: "Вперед", exact: true }).click();
   await expect(chrome.getByRole("tab", { name: "Second page" })).toBeVisible();
   await go("file:///etc/passwd");
-  await expect(chrome.getByRole("status")).toContainText("Action failed");
+  await expect(chrome.getByRole("status")).toContainText("Действие не выполнено");
 
   await go(`${origin}/second?do=popup`);
   await expect(chrome.getByRole("tab")).toHaveCount(2);
@@ -323,7 +323,7 @@ test("isolated browser, navigation, cookie management and restart persistence", 
     .click();
   await expect(chrome.getByRole("tab")).toHaveCount(1);
 
-  await chrome.getByRole("button", { name: "Сайты & cookies" }).click();
+  await chrome.getByRole("button", { name: "Сайты и куки" }).click();
   await expect(chrome.getByRole("cell", { name: "login /" })).toBeVisible();
   expect(await chrome.locator("body").innerText()).not.toContain("private-value");
   await chrome.screenshot({ path: "test-results/browser-cookies.png" });
@@ -343,25 +343,25 @@ test("isolated browser, navigation, cookie management and restart persistence", 
   await app.close();
   await launch();
   await openBrowser();
-  await chrome.getByRole("button", { name: "Сайты & cookies" }).click();
+  await chrome.getByRole("button", { name: "Сайты и куки" }).click();
   await expect(chrome.getByRole("cell", { name: "login /" })).toBeVisible();
   await chrome.getByRole("button", { name: "Удалить", exact: true }).click();
-  await chrome.getByRole("button", { name: "Confirm removal" }).click();
-  await expect(chrome.getByText("Нет куки.", { exact: false })).toBeVisible();
+  await chrome.getByRole("button", { name: "Подтвердить удаление" }).click();
+  await expect(chrome.getByText("Куки нет.", { exact: true })).toBeVisible();
   expect(await profileCookies()).toEqual([]);
 
   await go(`http://localhost:${port}/`);
   await expect(chrome.getByRole("tab", { name: "Test site" })).toBeVisible();
   await go(`${origin}/`);
   await expect.poll(async () => (await profileCookies()).length).toBe(2);
-  await chrome.getByRole("button", { name: "Сайты & cookies" }).click();
+  await chrome.getByRole("button", { name: "Сайты и куки" }).click();
   await chrome.getByRole("button", { name: "Обновить", exact: true }).click();
   await chrome
     .locator("article")
     .filter({ has: chrome.getByRole("heading", { name: "127.0.0.1", exact: true }) })
-    .getByRole("button", { name: "Очистить cookies" })
+    .getByRole("button", { name: "Очистить куки" })
     .click();
-  await chrome.getByRole("button", { name: "Confirm removal" }).click();
+  await chrome.getByRole("button", { name: "Подтвердить удаление" }).click();
   await expect(chrome.getByRole("heading", { name: "127.0.0.1", exact: true })).toHaveCount(0);
   await expect(chrome.getByRole("heading", { name: "localhost", exact: true })).toBeVisible();
 });

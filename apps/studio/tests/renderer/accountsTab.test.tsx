@@ -134,7 +134,8 @@ test("a needs-relink account promotes Re-link and keeps the session detail visib
   ]);
   await openAccountsTab(bridge);
 
-  assert.equal((await screen.findAllByText("Сессия истекла — войдите заново")).length, 2);
+  assert.equal((await screen.findAllByText("Сессия истекла — войдите заново")).length, 1);
+  assert.equal(screen.getByTitle("Сессия истекла — войдите заново").textContent, "Нужен вход");
   assert.ok(screen.getByRole("button", { name: "Перепривязать" }));
   assert.equal(screen.queryByRole("button", { name: "Проверить сессию" }), null);
 });
@@ -143,7 +144,7 @@ test("an expiring session reuses the amber expiry line", async () => {
   const bridge = renderTab([account({ expiresAt: Date.now() + 3 * 86_400_000 })]);
   await openAccountsTab(bridge);
 
-  const line = await screen.findByText("Сессия истекает через 3 дня");
+  const line = await screen.findByText("Истекает через 3 дня");
   assert.ok(line.className.includes("text-warn"));
 });
 

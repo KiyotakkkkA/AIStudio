@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
-import { Link } from "react-router-dom";
 import {
   mdiChevronDown,
   mdiClose,
@@ -19,6 +18,7 @@ import SegmentedControl from "../../ui/atoms/SegmentedControl";
 import Toggle from "../../ui/atoms/Toggle";
 import { RETRIEVAL_MODES, retrievalHint } from "./retrievalModes";
 import ChatContextMeter from "./ChatContextMeter";
+import ChatModelGate from "./ChatModelGate";
 import ChatToolPicker from "./ChatToolPicker";
 import SelectionChips from "./SelectionChips";
 import type ChatStore from "./ChatStore";
@@ -49,29 +49,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
   return (
     <div className="mx-auto w-full max-w-4xl shrink-0 px-6 pt-2 pb-4">
       {!store.available && !store.loading ? (
-        <div className="rounded-card bg-main-800 p-4 text-[13px] text-main-300">
-          Выберите доступную текстовую модель, чтобы начать диалог.{" "}
-          <Link
-            className="font-medium text-accent-medium underline decoration-accent-line underline-offset-2 hover:decoration-accent-medium"
-            to="/providers"
-          >
-            Открыть провайдеров ИИ
-          </Link>
-          {store.accountChoices.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {store.accountChoices.map((choice) => (
-                <Button
-                  key={choice.value}
-                  tone="primary"
-                  disabled={store.connecting}
-                  onClick={() => void store.connectAccount(choice.accountId)}
-                >
-                  {store.connecting ? "Подключение…" : `Подключить ${choice.label}`}
-                </Button>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        <ChatModelGate store={store} />
       ) : (
         <form
           ref={formRef}

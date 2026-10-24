@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-export type ButtonTone = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonTone = "primary" | "secondary" | "ghost" | "danger" | "danger-soft";
 
 const TONES: Record<ButtonTone, string> = {
   primary:
@@ -9,6 +9,8 @@ const TONES: Record<ButtonTone, string> = {
     "border-line bg-main-900 text-main-100 shadow-[0_1px_2px_rgb(40_25_10/0.05)] hover:border-line-strong hover:bg-main-850",
   ghost: "border-transparent bg-transparent text-main-300 hover:bg-main-700 hover:text-main-50",
   danger: "border-transparent bg-danger-medium text-white hover:bg-danger-dark",
+  "danger-soft":
+    "border-transparent bg-err-soft text-err hover:bg-danger-medium hover:text-white disabled:hover:bg-err-soft disabled:hover:text-err",
 };
 
 export type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> & {

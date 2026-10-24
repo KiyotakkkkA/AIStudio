@@ -299,7 +299,11 @@ test("a linked account whose family generates is offered in chat and becomes a p
     );
   await store.mount();
   expect(store.accountChoices.map((choice) => choice.label)).toEqual(["Qwen · аккаунт"]);
-  await store.connectAccount(qwenId);
+  expect(store.accountChoices[0]?.adapter).toBe("qwen-web");
+  const connecting = store.connectAccount(qwenId);
+  expect(store.connectingAccountId).toBe(qwenId);
+  await connecting;
+  expect(store.connectingAccountId).toBeNull();
   expect(store.error).toBeNull();
   const create = bridge.calls.find((call) => call.channel === "providers.create");
   expect(create?.payload).toMatchObject({

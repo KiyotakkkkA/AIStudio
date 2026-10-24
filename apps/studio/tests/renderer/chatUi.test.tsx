@@ -44,9 +44,7 @@ test("no provider routes to configuration and does not leave a dead composer", a
     </MemoryRouter>,
   );
   expect(
-    screen
-      .getByRole("link", { name: /Open AI Providers|Открыть провайдеров ИИ/ })
-      .getAttribute("href"),
+    screen.getByRole("link", { name: /AI Providers|Провайдеры ИИ/ }).getAttribute("href"),
   ).toBe("/providers");
   expect(screen.queryByRole("textbox", { name: /Message|Сообщение/ })).toBeNull();
   store.dispose();
@@ -68,7 +66,7 @@ test("with no provider yet, a linked Qwen account can be connected straight from
       <ChatComposer store={store} />
     </MemoryRouter>,
   );
-  expect(screen.getByRole("button", { name: "Подключить Qwen · аккаунт" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Подключить Qwen" })).toBeTruthy();
   store.dispose();
   events.dispose();
 });
