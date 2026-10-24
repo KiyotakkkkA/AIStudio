@@ -14,7 +14,7 @@ use crate::drivers::ai::adapters::wire::stringify;
 use crate::kernel::knowledge_nodes::{KnowledgeReadOutput, KnowledgeSearchOutput};
 
 pub const CHAT_TOOL_ROUNDS: usize = 4;
-pub const CHAT_TOOL_CALLS: usize = 8;
+pub const CHAT_TOOL_CALLS: usize = 15;
 pub const TOOL_RESULT_MAX_CHARS: usize = 8000;
 pub const TOOL_RESULT_MIN_CHARS: usize = 500;
 pub const TOOL_PREVIEW_CHARS: usize = 2000;
@@ -152,9 +152,9 @@ pub fn tool_specs_json(tools: &[OfferedTool]) -> String {
     ))
 }
 
-pub fn tool_result_budget(free_tokens: i64) -> usize {
+pub fn tool_result_budget(free_tokens: i64, calls: usize) -> usize {
     let free = usize::try_from(free_tokens.max(0)).unwrap_or(usize::MAX);
-    let chars = free.saturating_mul(3) / CHAT_TOOL_CALLS;
+    let chars = free.saturating_mul(3) / calls.max(1);
     chars.clamp(TOOL_RESULT_MIN_CHARS, TOOL_RESULT_MAX_CHARS)
 }
 
@@ -466,8 +466,8 @@ mod tests {
             })),
             json!({ "properties": {}, "type": "object" })
         );
-        assert_eq!(tool_result_budget(-5), 500);
-        assert_eq!(tool_result_budget(1_000_000), 8000);
+        assert_eq!(tool_result_budget(-5, CHAT_TOOL_CALLS), 500);
+        assert_eq!(tool_result_budget(1_000_000, CHAT_TOOL_CALLS), 8000);
 
         let offered = offered_tools(
             &[

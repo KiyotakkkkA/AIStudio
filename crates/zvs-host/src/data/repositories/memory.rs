@@ -135,6 +135,7 @@ mod tests {
             retrieval_mode: RetrievalMode::Hybrid,
             working_folder: None,
             turn_folder: None,
+            profile: String::new(),
             created_at: 1,
             updated_at: 1,
         }

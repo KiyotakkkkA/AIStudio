@@ -20,6 +20,7 @@ pub struct ConversationRow {
     pub retrieval_mode: RetrievalMode,
     pub working_folder: Option<String>,
     pub turn_folder: Option<String>,
+    pub profile: String,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
@@ -27,7 +28,7 @@ pub struct ConversationRow {
 impl ConversationRow {
     pub const COLUMNS: &str = "id, title, provider_id, model_id, settings, system_prompt, \
         attached_store_ids, use_relations, enabled_tools, retrieval_mode, working_folder, turn_folder, \
-        created_at, updated_at";
+        profile, created_at, updated_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -43,6 +44,7 @@ impl ConversationRow {
             retrieval_mode: row.get::<_, EnumColumn<RetrievalMode>>("retrieval_mode")?.0,
             working_folder: row.get("working_folder")?,
             turn_folder: row.get("turn_folder")?,
+            profile: row.get("profile")?,
             created_at: row.get("created_at")?,
             updated_at: row.get("updated_at")?,
         })

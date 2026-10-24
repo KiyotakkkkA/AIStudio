@@ -1,4 +1,4 @@
-import { AppErrorCode, MEMORY_CONTENT_MAX, type MemoryDto } from "@zvs/shared";
+import { AppErrorCode, type MemoryDto } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 import { plural } from "../connections/connectionPresentation";
 
@@ -68,10 +68,6 @@ export function memoryErrorCopy(error: unknown): string {
 
 export function factsLabel(count: number): string {
   return plural(count, "запись", "записи", "записей");
-}
-
-export function counterLabel(length: number): string {
-  return `${length.toLocaleString("ru-RU")} / ${MEMORY_CONTENT_MAX.toLocaleString("ru-RU")}`;
 }
 
 export function memoryDate(memory: MemoryDto): string {

@@ -159,8 +159,8 @@ impl<'c> ChatRepository<'c> {
     pub fn create(&self, row: &ConversationRow) -> rusqlite::Result<ConversationRow> {
         self.connection
             .prepare_cached(&format!(
-                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, enabled_tools, retrieval_mode, working_folder, turn_folder, created_at, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14) RETURNING {}",
+                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, enabled_tools, retrieval_mode, working_folder, turn_folder, profile, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) RETURNING {}",
                 ConversationRow::COLUMNS
             ))?
             .query_row(
@@ -177,6 +177,7 @@ impl<'c> ChatRepository<'c> {
                     EnumColumn(row.retrieval_mode),
                     row.working_folder,
                     row.turn_folder,
+                    row.profile,
                     row.created_at,
                     row.updated_at,
                 ],
@@ -329,6 +330,7 @@ mod tests {
             retrieval_mode: RetrievalMode::Hybrid,
             working_folder: None,
             turn_folder: None,
+            profile: String::new(),
             created_at: 1,
             updated_at,
         }

@@ -2,6 +2,7 @@ import { observer } from "mobx-react-lite";
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import {
+  mdiAccountCircleOutline,
   mdiBellOutline,
   mdiBrain,
   mdiClose,
@@ -10,10 +11,13 @@ import {
   mdiPaletteOutline,
 } from "@mdi/js";
 import IconButton from "../../ui/atoms/buttons/IconButton";
+import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import SegmentedControl from "../../ui/atoms/SegmentedControl";
 import SelectInput from "../../ui/atoms/SelectInput";
+import TextInput from "../../ui/atoms/TextInput";
 import Toggle from "../../ui/atoms/Toggle";
+import TextComposer from "../../ui/molecules/TextComposer";
 import AppLogo from "../../ui/atoms/AppLogo";
 import { useStore } from "../../stores/useStore";
 import {
@@ -58,12 +62,33 @@ import PreferencesSearch from "./PreferencesSearch";
 import MemoryFacts from "../memory/MemoryFacts";
 import { DISABLED_NOTE, ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
 import { aboutSettingId, SETTING_ENTRIES, SETTING_IDS } from "./settingsIndex";
+import {
+  PROFILE_ABOUT_MAX,
+  PROFILE_STYLE_MAX,
+  TOOL_CALLS_MAX,
+  TOOL_CALLS_MIN,
+} from "./ProfileStore";
+import {
+  ABOUT_NEW_DIALOGS,
+  ABOUT_PLACEHOLDER,
+  ABOUT_ROW,
+  CANCEL,
+  CUSTOM_STYLE_EMPTY,
+  CUSTOM_STYLE_LABEL,
+  CUSTOM_STYLE_PLACEHOLDER,
+  SAVE,
+  STYLE_DESCRIPTIONS,
+  STYLE_OPTIONS,
+  STYLE_ROW,
+  TOOL_CALLS_ROW,
+} from "./profileCopy";
 
 const REVEAL_MS = 1600;
 const REVEAL_ATTEMPTS = 10;
 
 const SECTION_ICONS: Record<PreferenceSection, string> = {
   general: mdiCogOutline,
+  profile: mdiAccountCircleOutline,
   appearance: mdiPaletteOutline,
   notifications: mdiBellOutline,
   memory: mdiBrain,
@@ -75,19 +100,21 @@ const SettingRow = observer(function SettingRow({
   label,
   hint,
   error,
+  stacked = false,
   children,
 }: {
   readonly id: string;
   readonly label: string;
   readonly hint: string;
   readonly error?: string | undefined;
+  readonly stacked?: boolean;
   readonly children: ReactNode;
 }) {
   const { ui } = useStore();
   return (
     <div
       data-setting={id}
-      className={`-mx-3 flex flex-wrap items-center gap-x-6 gap-y-2.5 rounded-control border-b [clip-path:inset(0_round_12px)] border-line px-3 py-4 transition-colors duration-500 last:border-b-0 ${
+      className={`-mx-3 flex flex-wrap ${stacked ? "flex-col items-stretch" : "items-center"} gap-x-6 gap-y-2.5 rounded-control border-b [clip-path:inset(0_round_12px)] border-line px-3 py-4 transition-colors duration-500 last:border-b-0 ${
         ui.preferenceTarget === id ? "bg-accent-soft" : ""
       }`}
     >
@@ -100,7 +127,9 @@ const SettingRow = observer(function SettingRow({
           </span>
         )}
       </div>
-      <div className="flex flex-none items-center">{children}</div>
+      <div className={stacked ? "flex flex-col gap-2.5" : "flex flex-none items-center"}>
+        {children}
+      </div>
     </div>
   );
 });
@@ -207,16 +236,124 @@ const ToggleSettingRow = observer(function ToggleSettingRow({
   );
 });
 
+const ToolCallsRow = observer(function ToolCallsRow() {
+  const { profile } = useStore();
+  return (
+    <SettingRow
+      id={TOOL_CALLS_ROW.key}
+      label={TOOL_CALLS_ROW.label}
+      hint={TOOL_CALLS_ROW.hint}
+      error={profile.errors.toolCalls}
+    >
+      <div className="w-24">
+        <TextInput
+          aria-label={TOOL_CALLS_ROW.label}
+          mono
+          type="number"
+          min={TOOL_CALLS_MIN}
+          max={TOOL_CALLS_MAX}
+          step={1}
+          value={profile.toolCallsDraft}
+          disabled={profile.pending.toolCalls !== undefined}
+          onChange={(event) => profile.setToolCallsDraft(event.target.value)}
+          onBlur={() => void profile.commitToolCalls()}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+          }}
+        />
+      </div>
+    </SettingRow>
+  );
+});
+
 const GeneralSection = observer(function GeneralSection() {
-  const { appSettings } = useStore();
+  const { appSettings, profile } = useStore();
   useEffect(() => {
     void appSettings.load();
-  }, [appSettings]);
+    void profile.load();
+  }, [appSettings, profile]);
   return (
     <div className="flex flex-col">
       {GENERAL_ROWS.map((row) => (
         <ToggleSettingRow key={row.key} row={row} />
       ))}
+      <ToolCallsRow />
+    </div>
+  );
+});
+
+const ProfileSection = observer(function ProfileSection() {
+  const { profile } = useStore();
+  useEffect(() => {
+    void profile.load();
+  }, [profile]);
+  return (
+    <div className="flex flex-col">
+      <SettingRow
+        id={STYLE_ROW.key}
+        label={STYLE_ROW.label}
+        hint={STYLE_ROW.hint}
+        error={profile.errors.style ?? profile.errors.custom}
+        stacked
+      >
+        <div className="flex">
+          <SegmentedControl
+            label={STYLE_ROW.label}
+            value={profile.style}
+            options={STYLE_OPTIONS}
+            onChange={(style) => void profile.setStyle(style)}
+          />
+        </div>
+        <p className="m-0 text-[12px] text-main-400">{STYLE_DESCRIPTIONS[profile.style]}</p>
+        {profile.style === "custom" ? (
+          <>
+            <TextComposer
+              label={CUSTOM_STYLE_LABEL}
+              placeholder={CUSTOM_STYLE_PLACEHOLDER}
+              value={profile.customDraft}
+              max={PROFILE_STYLE_MAX}
+              submitLabel={SAVE}
+              canSubmit={profile.customDirty}
+              disabled={profile.pending.custom !== undefined}
+              onChange={profile.setCustomDraft}
+              onSubmit={() => void profile.saveCustom()}
+              {...(profile.customDirty
+                ? { cancelLabel: CANCEL, onCancel: profile.resetCustom }
+                : {})}
+            />
+            {profile.custom.length === 0 ? (
+              <p className="m-0 text-[12px] text-main-500">{CUSTOM_STYLE_EMPTY}</p>
+            ) : null}
+          </>
+        ) : null}
+      </SettingRow>
+      <SettingRow
+        id={ABOUT_ROW.key}
+        label={ABOUT_ROW.label}
+        hint={ABOUT_ROW.hint}
+        error={profile.errors.about}
+        stacked
+      >
+        <div className="flex">
+          <Chip tone="accent">
+            <Icon path={mdiInformationOutline} size={12} />
+            {ABOUT_NEW_DIALOGS}
+          </Chip>
+        </div>
+        <TextComposer
+          label={ABOUT_ROW.label}
+          placeholder={ABOUT_PLACEHOLDER}
+          value={profile.aboutDraft}
+          max={PROFILE_ABOUT_MAX}
+          minRows={3}
+          submitLabel={SAVE}
+          canSubmit={profile.aboutDirty}
+          disabled={profile.pending.about !== undefined}
+          onChange={profile.setAboutDraft}
+          onSubmit={() => void profile.saveAbout()}
+          {...(profile.aboutDirty ? { cancelLabel: CANCEL, onCancel: profile.resetAbout } : {})}
+        />
+      </SettingRow>
     </div>
   );
 });
@@ -387,6 +524,7 @@ function PreferencesDialog() {
         </div>
         <ScrollArea className="min-h-0 flex-1 px-7 pb-6">
           {section === "general" ? <GeneralSection /> : null}
+          {section === "profile" ? <ProfileSection /> : null}
           {section === "appearance" ? <AppearanceSection /> : null}
           {section === "notifications" ? <NotificationsSection /> : null}
           {section === "memory" ? <MemorySection /> : null}

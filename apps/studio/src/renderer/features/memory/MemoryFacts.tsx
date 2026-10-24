@@ -15,9 +15,9 @@ import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import SegmentedControl from "../../ui/atoms/SegmentedControl";
 import SelectInput from "../../ui/atoms/SelectInput";
-import TextArea from "../../ui/atoms/TextArea";
 import ConfirmModal from "../../ui/molecules/ConfirmModal";
 import EmptyState from "../../ui/molecules/EmptyState";
+import TextComposer from "../../ui/molecules/TextComposer";
 import { useStore } from "../../stores/useStore";
 import {
   ACCOUNT_EMPTY,
@@ -46,7 +46,6 @@ import {
   SCOPE_TABS_LABEL,
   SOURCE_MODEL,
   SOURCE_USER,
-  counterLabel,
   factsLabel,
   memoryDate,
 } from "./memoryCopy";
@@ -60,34 +59,25 @@ const MemoryRow = observer(function MemoryRow({ memory }: { readonly memory: Mem
   const byModel = memory.source === "model";
   if (editing !== null)
     return (
-      <li className="flex flex-col gap-2 px-4 py-3">
-        <TextArea
-          aria-label={EDIT}
+      <li className="px-3 py-3">
+        <TextComposer
+          label={EDIT}
+          placeholder={ACCOUNT_PLACEHOLDER}
           value={editing}
-          maxLength={MEMORY_CONTENT_MAX}
+          max={MEMORY_CONTENT_MAX}
           autoFocus
-          onChange={(event) => setEditing(event.target.value)}
+          submitLabel={SAVE}
+          canSubmit={editing.trim().length > 0 && editing.trim() !== memory.content}
+          disabled={store.saving}
+          cancelLabel={CANCEL}
+          onCancel={() => setEditing(null)}
+          onChange={setEditing}
+          onSubmit={() => {
+            void store.edit(memory.id, editing).then((saved) => {
+              if (saved) setEditing(null);
+            });
+          }}
         />
-        <div className="flex items-center justify-end gap-2">
-          <span className="mr-auto font-mono text-[11px] text-main-500">
-            {counterLabel(editing.length)}
-          </span>
-          <Button type="button" tone="ghost" onClick={() => setEditing(null)}>
-            {CANCEL}
-          </Button>
-          <Button
-            type="button"
-            tone="primary"
-            disabled={editing.trim().length === 0 || store.saving}
-            onClick={() => {
-              void store.edit(memory.id, editing).then((saved) => {
-                if (saved) setEditing(null);
-              });
-            }}
-          >
-            {SAVE}
-          </Button>
-        </div>
       </li>
     );
   return (
@@ -183,31 +173,24 @@ const Composer = observer(function Composer({ scope }: { readonly scope: Scope }
         {NO_DIALOGS}
       </p>
     );
-  const blocked = content.trim().length === 0 || memory.saving || (dialog && chosen === undefined);
-  const submit = () => {
-    if (blocked) return;
-    void memory.add(content, dialog ? chosen : undefined).then((saved) => {
-      if (saved) setContent("");
-    });
-  };
+  const ready = content.trim().length > 0 && (!dialog || chosen !== undefined);
   return (
-    <div className="rounded-card bg-main-850 px-1.5 pt-1.5 pb-2">
-      <TextArea
-        noBorder
-        aria-label={dialog ? DIALOG_PLACEHOLDER : ACCOUNT_PLACEHOLDER}
-        placeholder={dialog ? DIALOG_PLACEHOLDER : ACCOUNT_PLACEHOLDER}
-        value={content}
-        maxLength={MEMORY_CONTENT_MAX}
-        onChange={(event) => setContent(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-            event.preventDefault();
-            submit();
-          }
-        }}
-      />
-      <div className="flex items-center gap-2 px-1.5">
-        {dialog ? (
+    <TextComposer
+      label={dialog ? DIALOG_PLACEHOLDER : ACCOUNT_PLACEHOLDER}
+      placeholder={dialog ? DIALOG_PLACEHOLDER : ACCOUNT_PLACEHOLDER}
+      value={content}
+      max={MEMORY_CONTENT_MAX}
+      submitLabel={ADD}
+      canSubmit={ready}
+      disabled={memory.saving}
+      onChange={setContent}
+      onSubmit={() => {
+        void memory.add(content, dialog ? chosen : undefined).then((saved) => {
+          if (saved) setContent("");
+        });
+      }}
+      leading={
+        dialog ? (
           <div className="w-60 min-w-0">
             <SelectInput
               label={DIALOG_PICKER}
@@ -220,15 +203,9 @@ const Composer = observer(function Composer({ scope }: { readonly scope: Scope }
               onChange={setTarget}
             />
           </div>
-        ) : null}
-        <span className="ml-auto font-mono text-[11px] text-main-500">
-          {counterLabel(content.length)}
-        </span>
-        <Button type="button" tone="primary" disabled={blocked} onClick={submit}>
-          {ADD}
-        </Button>
-      </div>
-    </div>
+        ) : null
+      }
+    />
   );
 });
 

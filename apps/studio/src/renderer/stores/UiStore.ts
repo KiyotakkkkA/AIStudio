@@ -26,6 +26,7 @@ export const DEFAULT_FONT_SIZE: FontSize = 13;
 
 export const PREFERENCE_SECTIONS = [
   "general",
+  "profile",
   "appearance",
   "notifications",
   "memory",

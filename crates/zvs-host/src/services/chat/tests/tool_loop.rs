@@ -29,9 +29,8 @@ use crate::kernel::{
     FnNode, NodeRegistry, PermissionRequirement, StepContext, register_core_nodes,
 };
 use crate::services::chat_ask::{ASK_MALFORMED, ASK_ONCE, ASK_SKIPPED, ASK_TOOL};
-use crate::services::chat_tools::{
-    CHAT_TOOL_CALLS, CHAT_TOOL_ROUNDS, TOOL_BUDGET_NOTE, TOOL_RESULTS_INSTRUCTION,
-};
+use crate::services::chat_tools::{CHAT_TOOL_CALLS, TOOL_BUDGET_NOTE, TOOL_RESULTS_INSTRUCTION};
+use crate::services::profile::TOOL_CALLS_KEY;
 use crate::testing::{FAKE_CAPABILITIES, TemporaryDatabase, temporary_database};
 use crate::tools::{ToolDescriptor, ToolRegistry, ToolRegistryOptions};
 
@@ -568,8 +567,28 @@ async fn a_denied_approval_is_reported_to_the_model_and_the_turn_still_answers()
     );
 }
 
+fn assert_stops_after(test: &Loop, handle: &RunHandleDto, created: ConversationId, cap: usize) {
+    assert_eq!(test.harness.status(handle), RunStatus::Succeeded);
+    assert_eq!(test.calls.lookups().len(), cap);
+    let requests = test.driver.requests();
+    assert_eq!(requests.len(), cap + 1);
+    assert!(
+        requests[cap]
+            .messages
+            .iter()
+            .any(|message| message.content == TOOL_BUDGET_NOTE)
+    );
+    let assistant = test.harness.last(created);
+    assert_eq!(assistant.tool_calls.len(), cap + 1);
+    assert_eq!(
+        assistant.tool_calls[cap].status,
+        ChatToolCallStatus::Refused
+    );
+    assert_eq!(test.tool_steps(handle).len(), cap);
+}
+
 #[tokio::test]
-async fn the_loop_stops_at_the_round_cap_and_answers_without_running_more_tools() {
+async fn the_loop_stops_at_the_default_cap_and_answers_without_running_more_tools() {
     let test = Loop::new();
     test.driver
         .fallback(|count| vec![call("demo__lookup", &json!({ "query": count.to_string() }))]);
@@ -577,23 +596,28 @@ async fn the_loop_stops_at_the_round_cap_and_answers_without_running_more_tools(
 
     let handle = test.turn(created, "Question").await;
 
-    assert_eq!(test.harness.status(&handle), RunStatus::Succeeded);
-    assert_eq!(test.calls.lookups().len(), CHAT_TOOL_ROUNDS);
-    let requests = test.driver.requests();
-    assert_eq!(requests.len(), CHAT_TOOL_ROUNDS + 1);
-    assert!(
-        requests[CHAT_TOOL_ROUNDS]
-            .messages
-            .iter()
-            .any(|message| message.content == TOOL_BUDGET_NOTE)
-    );
-    let assistant = test.harness.last(created);
-    assert_eq!(assistant.tool_calls.len(), CHAT_TOOL_ROUNDS + 1);
-    assert_eq!(
-        assistant.tool_calls[CHAT_TOOL_ROUNDS].status,
-        ChatToolCallStatus::Refused
-    );
-    assert_eq!(test.tool_steps(&handle).len(), CHAT_TOOL_ROUNDS);
+    assert_stops_after(&test, &handle, created, CHAT_TOOL_CALLS);
+}
+
+#[tokio::test]
+async fn the_stored_tool_call_limit_caps_the_loop() {
+    let test = Loop::new();
+    test.harness
+        .database
+        .with_connection(|connection| {
+            Repositories::new(connection)
+                .settings
+                .set(TOOL_CALLS_KEY, "3", 2)?;
+            Ok(())
+        })
+        .expect("a setting");
+    test.driver
+        .fallback(|count| vec![call("demo__lookup", &json!({ "query": count.to_string() }))]);
+    let created = test.conversation(&["demo.lookup"]);
+
+    let handle = test.turn(created, "Question").await;
+
+    assert_stops_after(&test, &handle, created, 3);
 }
 
 #[tokio::test]

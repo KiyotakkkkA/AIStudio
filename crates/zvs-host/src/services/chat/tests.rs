@@ -1,5 +1,6 @@
 mod knowledge;
 mod memory;
+mod profile;
 mod tool_loop;
 mod workspace;
 

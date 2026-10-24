@@ -25,7 +25,9 @@ use crate::data::schema::ProviderRow;
 use crate::data::{Database, Repositories};
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 use crate::platform::picker::SharedPicker;
-use crate::services::chat_tools::{OfferedTool, offered_tools, tool_result_budget};
+use crate::services::chat_tools::{
+    CHAT_TOOL_CALLS, OfferedTool, offered_tools, tool_result_budget,
+};
 use crate::services::providers::DriverSource;
 use crate::services::{RunService, SettingService};
 
@@ -648,8 +650,10 @@ impl SkillService {
             tools: offered,
             model_tools: model.supports_tools,
             max_output_tokens: u64::try_from(model.max_output_tokens).ok(),
-            tool_result_chars: tool_result_budget(model.context_window - model.max_output_tokens)
-                as u64,
+            tool_result_chars: tool_result_budget(
+                model.context_window - model.max_output_tokens,
+                CHAT_TOOL_CALLS,
+            ) as u64,
         };
         let input_value = serde_json::to_value(&request)
             .map_err(|error| AppError::new(AppErrorCode::Unknown, error.to_string()))?;

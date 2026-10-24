@@ -12,6 +12,7 @@ pub mod mcp;
 pub mod memory;
 pub mod permissions;
 pub mod probe_outcome;
+pub mod profile;
 pub mod provider_status;
 pub mod providers;
 pub mod questions;

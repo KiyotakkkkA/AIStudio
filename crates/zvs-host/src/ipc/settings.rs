@@ -8,6 +8,7 @@ use crate::platform::theme::{
 };
 use crate::services::Services;
 use crate::services::health_check::is_health_check_key;
+use crate::services::profile::check_setting;
 
 pub fn register(server: &mut IpcServer) {
     server
@@ -27,6 +28,7 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "settings.set",
             |services: Arc<Services>, input: SettingsSetInput| async move {
+                check_setting(&input.key, &input.value)?;
                 services.notifications.apply(&input.key, &input.value)?;
                 let result = services.settings.set(&input.key, &input.value)?;
                 if is_health_check_key(&input.key) {
@@ -189,5 +191,31 @@ mod tests {
             .await;
         assert_eq!(response["error"]["code"], json!("VALIDATION_FAILED"));
         assert!(host.settings.list().expect("lists").is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_out_of_range_profile_value_is_rejected_and_not_stored() {
+        let (host, server) = server();
+        for (key, value) in [
+            ("chat.toolcalls", json!(0)),
+            ("profile.style", json!("loud")),
+        ] {
+            let response = server
+                .dispatch("settings.set", json!({ "key": key, "value": value }))
+                .await;
+            assert_eq!(
+                response["error"]["code"],
+                json!("VALIDATION_FAILED"),
+                "{key}"
+            );
+        }
+        assert!(host.settings.list().expect("lists").is_empty());
+        let response = server
+            .dispatch(
+                "settings.set",
+                json!({ "key": "chat.toolcalls", "value": 20 }),
+            )
+            .await;
+        assert_eq!(response["ok"], json!(true));
     }
 }

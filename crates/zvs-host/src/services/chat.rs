@@ -34,12 +34,15 @@ use super::chat_memory::{
     MEMORY_FAILED, MEMORY_TOOL, MemoryRefs, apply_memory_call, memory_section, memory_tool,
 };
 use super::chat_tools::{
-    CHAT_TOOL_CALLS, CHAT_TOOL_ROUNDS, HYBRID_INSTRUCTION, KNOWLEDGE_INSTRUCTION, KnowledgeText,
-    OfferedTool, TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text,
-    fence_tool_result, knowledge_catalogue, offered_tools, parse_tool_arguments, read_result_text,
-    search_result_text, tool_result_budget, tool_result_text, tool_specs, tool_specs_json,
+    CHAT_TOOL_CALLS, HYBRID_INSTRUCTION, KNOWLEDGE_INSTRUCTION, KnowledgeText, OfferedTool,
+    TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result,
+    knowledge_catalogue, offered_tools, parse_tool_arguments, read_result_text, search_result_text,
+    tool_result_budget, tool_result_text, tool_specs, tool_specs_json,
 };
 use super::memory::MemoryService;
+use super::profile::{
+    self, ProfileSettings, TOOL_CALLS_MAX, TOOL_CALLS_MIN, about_section, style_section,
+};
 use super::retrieval_merge::{CHAT_FETCH_K, MergeOptions, StoreHits, merge_retrieval};
 use super::retrieval_query::retrieval_query;
 use super::runs::RunService;
@@ -323,6 +326,20 @@ impl Inner {
                 .find(|tool| tool.key == MEMORY_TOOL)
                 .map(|tool| tool.name.as_str()),
         ))
+    }
+
+    fn profile(&self) -> Result<ProfileSettings, AppError> {
+        self.read(profile::load)
+    }
+
+    fn profile_prompt(&self, about: &str) -> Result<(String, usize), AppError> {
+        let settings = self.profile()?;
+        let section = [style_section(&settings), about_section(about)]
+            .into_iter()
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        Ok((section, settings.tool_calls))
     }
 
     fn conversation(&self, id: &str) -> Result<ConversationRow, AppError> {
@@ -676,6 +693,10 @@ const fn default_tool_result_chars() -> u64 {
     DEFAULT_TOOL_RESULT_CHARS
 }
 
+const fn default_tool_calls() -> u64 {
+    CHAT_TOOL_CALLS as u64
+}
+
 const fn unlimited_budget() -> i64 {
     i64::MAX
 }
@@ -713,6 +734,8 @@ pub struct ChatGenerateRequest {
     pub model_tools: Option<bool>,
     #[serde(default = "default_tool_result_chars")]
     pub tool_result_chars: u64,
+    #[serde(default = "default_tool_calls")]
+    pub tool_calls: u64,
     #[serde(default)]
     pub knowledge: KnowledgeContext,
     #[serde(default)]
@@ -726,7 +749,8 @@ impl Validate for ChatGenerateRequest {
         self.base.validate()?;
         nested("tools", self.tools.validate())?;
         check::safe_integer("toolResultChars", self.tool_result_chars)?;
-        check::int_range("toolResultChars", self.tool_result_chars, 1, u64::MAX)
+        check::int_range("toolResultChars", self.tool_result_chars, 1, u64::MAX)?;
+        check::int_range("toolCalls", self.tool_calls, TOOL_CALLS_MIN, TOOL_CALLS_MAX)
     }
 }
 
@@ -1220,11 +1244,13 @@ impl NodeDef for PrepareNode {
         }
         let (memory, memory_refs) =
             inner.memory_prompt(&input.conversation_id, tools_usable, &mut offered)?;
+        let (profile, tool_calls) = inner.profile_prompt(&row.profile)?;
         let files = file_tools_section(&offered);
         let processes = process_tools_section(&offered);
         let asking = ask_section(&offered);
         let prompt = [
             details.system_prompt.clone(),
+            profile,
             memory,
             prompt,
             guidance,
@@ -1341,7 +1367,9 @@ impl NodeDef for PrepareNode {
             model_tools: model.supports_tools,
             tool_result_chars: tool_result_budget(
                 model.context_window - model.max_output_tokens - prepared.tokens_in,
+                tool_calls,
             ) as u64,
+            tool_calls: tool_calls as u64,
             knowledge: KnowledgeContext {
                 store_ids: details.attached_store_ids.clone(),
                 citations: prepared.citations,
@@ -1762,10 +1790,12 @@ impl GenerateChatNode {
             tools,
             model_tools,
             tool_result_chars,
+            tool_calls,
             knowledge,
             conversation_id,
             memory,
         } = request;
+        let budget = usize::try_from(tool_calls).unwrap_or(CHAT_TOOL_CALLS);
         let book = Mutex::new(knowledge.citations.clone());
         let memory = Mutex::new(memory);
         let mut compactable: Vec<Compactable> = Vec::new();
@@ -1824,7 +1854,7 @@ impl GenerateChatNode {
         let mut round = 0;
         let outcome: Result<(), AppError> = async {
             loop {
-                let last = round >= CHAT_TOOL_ROUNDS || executed >= CHAT_TOOL_CALLS;
+                let last = round >= budget || executed >= budget;
                 if last && !specs.is_empty() {
                     messages.push(ChatMessage::user(TOOL_BUDGET_NOTE));
                 }
@@ -1891,7 +1921,7 @@ impl GenerateChatNode {
                         guard.len() - 1
                     };
                     let asking = tool.is_some_and(|tool| tool.key == ASK_TOOL);
-                    let refuse = if last || executed >= CHAT_TOOL_CALLS {
+                    let refuse = if last || executed >= budget {
                         Some(BUDGET_EXHAUSTED)
                     } else if asking && asked {
                         Some(ASK_ONCE)
@@ -2140,6 +2170,7 @@ impl ChatService {
         self.inner.require_stores(&stores)?;
         let tools = input.enabled_tools();
         self.inner.require_tools(&tools)?;
+        let profile = self.inner.profile()?;
         let now = self.inner.now();
         let row = ConversationRow {
             id: new_id().hyphenated().to_string(),
@@ -2154,6 +2185,7 @@ impl ChatService {
             retrieval_mode: input.retrieval_mode(),
             working_folder: None,
             turn_folder: None,
+            profile: profile.about,
             created_at: now,
             updated_at: now,
         };
@@ -2636,7 +2668,12 @@ impl ChatService {
         let (memory, _) = self
             .inner
             .memory_prompt(&conversation_id, tools_usable, &mut offered)?;
-        let system_prompt = [system_prompt, memory]
+        let about = match &input.conversation_id {
+            Some(id) => self.inner.conversation(&id.to_string())?.profile,
+            None => self.inner.profile()?.about,
+        };
+        let (profile, _) = self.inner.profile_prompt(&about)?;
+        let system_prompt = [system_prompt, profile, memory]
             .into_iter()
             .filter(|part| !part.trim().is_empty())
             .collect::<Vec<_>>()

@@ -1,5 +1,6 @@
 import type { PreferenceSection } from "../../stores/UiStore";
 import { ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
+import { ABOUT_ROW, STYLE_ROW, TOOL_CALLS_ROW } from "./profileCopy";
 import {
   APP_ROW_LABELS,
   DEVICE_ROW_LABELS,
@@ -40,6 +41,9 @@ export function aboutSettingId(label: string): string {
 
 export const SETTING_ENTRIES: readonly SettingEntry[] = [
   ...GENERAL_ROWS.map((row) => ({ id: row.key, section: "general" as const, label: row.label })),
+  { id: TOOL_CALLS_ROW.key, section: "general", label: TOOL_CALLS_ROW.label },
+  { id: STYLE_ROW.key, section: "profile", label: STYLE_ROW.label },
+  { id: ABOUT_ROW.key, section: "profile", label: ABOUT_ROW.label },
   { id: SETTING_IDS.theme, section: "appearance", label: THEME_LABEL },
   { id: SETTING_IDS.railPicker, section: "appearance", label: RAIL_PICKER_LABEL },
   { id: SETTING_IDS.fontFamily, section: "appearance", label: FONT_FAMILY_LABEL },

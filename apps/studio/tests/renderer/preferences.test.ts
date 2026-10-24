@@ -133,9 +133,10 @@ function appSettings(seed: Record<string, Json> = {}) {
   return { bridge, stored, store: new AppSettingsStore(createIpcClient(contract, bridge)) };
 }
 
-test("the application group lists general, appearance, notifications, memory and about in order", () => {
+test("the application group lists general, profile, appearance, notifications, memory and about in order", () => {
   expect(PREFERENCE_SECTIONS.map((section) => SECTION_LABELS[section])).toEqual([
     "Общие",
+    "Профиль",
     "Внешний вид",
     "Уведомления",
     "Память",

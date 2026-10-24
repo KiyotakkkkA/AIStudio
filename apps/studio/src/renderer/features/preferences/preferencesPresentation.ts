@@ -25,6 +25,7 @@ export const CLOSE_PREFERENCES = "Закрыть параметры";
 
 export const SECTION_LABELS: Record<PreferenceSection, string> = {
   general: "Общие",
+  profile: "Профиль",
   appearance: "Внешний вид",
   notifications: "Уведомления",
   memory: "Память",
@@ -32,7 +33,8 @@ export const SECTION_LABELS: Record<PreferenceSection, string> = {
 };
 
 export const SECTION_HINTS: Record<PreferenceSection, string> = {
-  general: "Запуск и работа в фоне.",
+  general: "Запуск, работа в фоне и ограничения генерации.",
+  profile: "Стиль ответов модели и сведения о вас.",
   appearance: "Тема, шрифт и размер текста интерфейса.",
   notifications: "Системные уведомления о событиях приложения.",
   memory: "Факты о пользователе и диалогах, которые модель получает в каждом ходе.",
