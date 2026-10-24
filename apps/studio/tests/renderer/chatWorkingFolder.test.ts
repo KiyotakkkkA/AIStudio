@@ -138,3 +138,31 @@ test("the folder name is the last path segment", () => {
   expect(folderName("D:\\work\\site\\")).toBe("site");
   expect(folderName("/home/me/notes")).toBe("notes");
 });
+
+test("the active panel button hides the panel and the other one switches it", async () => {
+  const { bridge, store } = setup();
+  await store.mount();
+  bridge.handle("chat.conversations.get", () => bound("granted").conversation);
+  await store.select(conversation.id);
+
+  expect(store.isPanelShown("context")).toBe(true);
+  store.showPanel("context");
+  expect(store.isPanelShown("context")).toBe(false);
+  store.showPanel("files");
+  expect(store.isPanelShown("files")).toBe(true);
+  expect(store.isPanelShown("context")).toBe(false);
+  store.showPanel("context");
+  expect(store.isPanelShown("context")).toBe(true);
+  expect(store.isPanelShown("files")).toBe(false);
+  store.showPanel("context");
+  expect(store.panelOpen).toBe(false);
+});
+
+test("the conversation list hides and shows again", () => {
+  const { store } = setup();
+  expect(store.listOpen).toBe(true);
+  store.toggleList();
+  expect(store.listOpen).toBe(false);
+  store.toggleList();
+  expect(store.listOpen).toBe(true);
+});

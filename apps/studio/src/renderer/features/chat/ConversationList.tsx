@@ -2,6 +2,7 @@ import { observer } from "mobx-react-lite";
 import {
   mdiChatOutline,
   mdiDeleteOutline,
+  mdiDockLeft,
   mdiDotsVertical,
   mdiPencilOutline,
   mdiSquareEditOutline,
@@ -19,6 +20,7 @@ import TextInput from "../../ui/atoms/TextInput";
 import ConfirmModal from "../../ui/molecules/ConfirmModal";
 import type { ConversationDto } from "@zvs/shared";
 import type ChatStore from "./ChatStore";
+import { HIDE_CONVERSATIONS } from "./conversationListCopy";
 
 export default observer(function ConversationList({ store }: { readonly store: ChatStore }) {
   const [renameTarget, setRenameTarget] = useState<ConversationDto | null>(null);
@@ -43,6 +45,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
     },
     { name: "Ранее", rows: store.visibleConversations.filter((item) => item.updatedAt < +week) },
   ];
+  if (!store.listOpen) return null;
   return (
     <aside
       aria-label="Диалоги"
@@ -62,6 +65,13 @@ export default observer(function ConversationList({ store }: { readonly store: C
           iconSize={17}
           disabled={store.generating}
           onClick={store.newChat}
+        />
+        <IconButton
+          label={HIDE_CONVERSATIONS}
+          tooltip="bottom-center"
+          path={mdiDockLeft}
+          iconSize={17}
+          onClick={store.toggleList}
         />
       </div>
       <div className="shrink-0 px-3 pb-2">

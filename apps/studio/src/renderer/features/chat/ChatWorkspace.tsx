@@ -24,7 +24,7 @@ export default observer(function ChatWorkspace() {
       <ChatThread store={chat} />
       {viewer.isOpen ? (
         <ViewerDock />
-      ) : chat.activePanel === "files" ? (
+      ) : chat.isPanelShown("files") ? (
         <ExplorerFileView explorer={chat.explorer} />
       ) : null}
       {chat.activePanel === "files" ? <ChatExplorer store={chat} /> : <RunContext store={chat} />}

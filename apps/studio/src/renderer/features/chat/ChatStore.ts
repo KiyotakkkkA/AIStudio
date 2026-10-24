@@ -71,7 +71,8 @@ export default class ChatStore {
   composer = new ConversationVm();
   query = "";
   sidePanel: SidePanel = "context";
-  panelOpen = false;
+  panelOpen = true;
+  listOpen = true;
   loading = false;
   sending = false;
   stopping = false;
@@ -406,8 +407,14 @@ export default class ChatStore {
   setQuery(value: string) {
     this.query = value;
   }
+  toggleList() {
+    this.listOpen = !this.listOpen;
+  }
   get activePanel(): SidePanel {
     return this.sidePanel === "files" && this.workingFolder !== null ? "files" : "context";
+  }
+  isPanelShown(panel: SidePanel) {
+    return this.panelOpen && this.activePanel === panel;
   }
   showPanel(panel: SidePanel) {
     if (this.activePanel === panel) {

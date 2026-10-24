@@ -2,7 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
-import { mdiConsole, mdiDatabaseOutline, mdiFolderOutline, mdiTuneVariant } from "@mdi/js";
+import {
+  mdiConsole,
+  mdiDatabaseOutline,
+  mdiDockLeft,
+  mdiFolderOutline,
+  mdiTuneVariant,
+} from "@mdi/js";
 import Chip from "../../ui/atoms/Chip";
 import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
 import Icon from "../../ui/atoms/Icon";
@@ -28,6 +34,7 @@ import { AnimatePresence, motion } from "motion/react";
 import FadeIn from "../../ui/motion/FadeIn";
 import { useFx, useTransition } from "../../ui/motion/fx";
 import { toolTitle } from "./toolCallCopy";
+import { SHOW_CONVERSATIONS } from "./conversationListCopy";
 
 function PanelButton({
   label,
@@ -94,6 +101,16 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
   return (
     <section aria-label="Лента чата" className="flex min-h-0 min-w-0 flex-1 flex-col">
       <header className="flex h-14 shrink-0 items-center gap-2.5 px-6">
+        {store.listOpen ? null : (
+          <IconButton
+            label={SHOW_CONVERSATIONS}
+            tooltip="bottom-left"
+            path={mdiDockLeft}
+            iconSize={17}
+            className="-ml-2.5 rotate-180"
+            onClick={store.toggleList}
+          />
+        )}
         <h2 className="min-w-0 flex-1 truncate text-[14px] font-medium text-main-100">
           {store.active?.title ?? "Новый диалог"}
         </h2>
@@ -113,14 +130,14 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           <PanelButton
             label={CONTEXT_PANEL}
             path={mdiTuneVariant}
-            active={store.activePanel === "context"}
+            active={store.isPanelShown("context")}
             onClick={() => store.showPanel("context")}
           />
           {store.workingFolder === null ? null : (
             <PanelButton
               label={FILES_PANEL}
               path={mdiFolderOutline}
-              active={store.activePanel === "files"}
+              active={store.isPanelShown("files")}
               onClick={() => store.showPanel("files")}
             />
           )}

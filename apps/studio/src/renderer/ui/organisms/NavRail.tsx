@@ -8,6 +8,7 @@ import {
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import AppLogo from "../atoms/AppLogo";
 import Icon from "../atoms/Icon";
+import IconButton from "../atoms/buttons/IconButton";
 import NavRailItem from "../molecules/NavRailItem";
 import type { NavGroupModel, NavItemModel, RailIdentity, RailTheme } from "./NavRailTypes";
 
@@ -30,8 +31,9 @@ export interface NavRailProps {
   readonly onThemeChange: (theme: RailTheme) => void;
 }
 
-const RAIL_ICON_BUTTON =
-  "flex size-7 flex-none items-center justify-center rounded-control text-main-500 hover:bg-main-900/70 hover:text-main-100";
+const RAIL_ICON_TONE = "text-main-500 hover:bg-main-900/70 hover:text-main-100";
+
+const RAIL_ICON_BUTTON = `flex size-7 flex-none items-center justify-center rounded-control ${RAIL_ICON_TONE}`;
 
 export default function NavRail({
   groups,
@@ -62,15 +64,14 @@ export default function NavRail({
             <span className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-[-0.01em] text-main-50">
               ZVS AI Studio
             </span>
-            <button
-              type="button"
-              aria-label="Свернуть панель навигации"
-              title="Свернуть панель навигации"
+            <IconButton
+              label="Свернуть панель навигации"
+              tooltip="bottom-center"
+              path={mdiDockLeft}
+              iconSize={16}
+              toneClassName={RAIL_ICON_TONE}
               onClick={onToggleCollapse}
-              className={RAIL_ICON_BUTTON}
-            >
-              <Icon path={mdiDockLeft} size={16} />
-            </button>
+            />
           </>
         )}
       </div>
@@ -150,29 +151,28 @@ export default function NavRail({
                 </span>
                 <span className="truncate text-[11px] text-main-500">{identity.hint}</span>
               </div>
-              <button
-                type="button"
-                aria-label="Открыть параметры"
-                title="Открыть параметры"
+              <IconButton
+                tooltip="top-center"
+                label="Открыть параметры"
+                path={mdiCogOutline}
+                iconSize={16}
                 onClick={onOpenIdentity}
                 className={RAIL_ICON_BUTTON}
-              >
-                <Icon path={mdiCogOutline} size={16} />
-              </button>
+                />
             </>
           )}
         </div>
 
         {collapsed ? (
-          <button
-            type="button"
-            aria-label="Развернуть панель навигации"
-            title="Развернуть панель навигации"
+          <IconButton
+            label="Развернуть панель навигации"
+            tooltip="right-center"
+            path={mdiDockLeft}
+            iconSize={16}
+            toneClassName={RAIL_ICON_TONE}
+            className="rotate-180"
             onClick={onToggleCollapse}
-            className={RAIL_ICON_BUTTON}
-          >
-            <Icon path={mdiDockLeft} size={16} className="rotate-180" />
-          </button>
+          />
         ) : null}
       </div>
     </aside>
