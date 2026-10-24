@@ -129,7 +129,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
                             label="Действия"
                             tooltip="right-center"
                             path={mdiDotsVertical}
-                            className="invisible size-6 justify-center gap-0 border-transparent bg-transparent p-0 text-main-400 group-focus-within:visible group-hover:visible hover:border-transparent hover:bg-main-700 hover:text-main-100"
+                            className="invisible size-6 justify-center gap-0 border-none cursor-auto bg-transparent p-0 text-main-400 group-focus-within:visible group-hover:visible hover:border-transparent hover:bg-main-700 hover:text-main-100"
                             iconSize={18}
                             onClick={(event) => event.stopPropagation()}
                           />

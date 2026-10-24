@@ -96,7 +96,7 @@ const OpenMenu = observer(function OpenMenu({
         iconSize={16}
         rounded="rounded-lg"
         disabled={disabled}
-        className="size-8 justify-center gap-0 border-transparent bg-main-800 p-0 text-main-400 hover:bg-main-700 hover:text-main-50"
+        className="size-8 justify-center gap-0 border-none cursor-auto bg-main-800 p-0 text-main-400 hover:bg-main-700 hover:text-main-50"
       />
       <Dropdown.Menu
         role="menu"

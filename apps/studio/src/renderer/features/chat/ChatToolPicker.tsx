@@ -110,7 +110,7 @@ export default observer(function ChatToolPicker({ store }: { readonly store: Cha
           aria-label="Инструменты для модели"
           rounded="rounded-lg"
           icon={false}
-          className={`h-8 w-auto min-w-8 justify-center gap-0 border-transparent px-2 text-[12px] font-medium ${
+          className={`h-8 w-auto min-w-8 justify-center gap-0 border-none cursor-auto border-transparent px-2 text-[12px] font-medium ${
             count > 0
               ? unsupported
                 ? "bg-main-800 text-main-400 hover:bg-main-700"

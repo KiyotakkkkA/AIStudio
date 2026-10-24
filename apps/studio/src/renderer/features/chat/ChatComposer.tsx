@@ -161,7 +161,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 label="Прикрепить файлы"
                 tooltip="top-center"
                 path={mdiPaperclip}
-                className="size-8 justify-center gap-0 border-transparent bg-transparent p-0 text-main-400 hover:bg-main-700 hover:text-main-100"
+                className="size-8 justify-center gap-0 border-none cursor-auto bg-transparent p-0 text-main-400 hover:bg-main-700 hover:text-main-100"
                 rounded="rounded-lg"
                 iconSize={18}
               />
@@ -202,7 +202,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 title="Провайдер и модель"
                 rounded="rounded-lg"
                 icon={<Icon path={mdiChevronDown} size={15} className="shrink-0 text-main-500" />}
-                className="h-8 w-auto max-w-64 min-w-0 gap-1 border-transparent bg-transparent px-2 text-[12.5px] text-main-200 hover:bg-main-700 hover:text-main-50"
+                className="h-8 w-auto max-w-64 min-w-0 gap-1 border-none cursor-auto bg-transparent px-2 text-[12.5px] text-main-200 hover:bg-main-700 hover:text-main-50"
               >
                 <span className="flex min-w-0 items-center gap-1.5">
                   {store.provider ? (
