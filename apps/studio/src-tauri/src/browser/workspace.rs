@@ -3,27 +3,36 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
+use std::time::{SystemTime, UNIX_EPOCH};
 
+use async_trait::async_trait;
+use serde_json::Value;
 use tauri::ipc::Channel;
 use tauri::webview::{NewWindowFeatures, NewWindowResponse, PermissionResponse, WebviewBuilder};
 use tauri::window::WindowBuilder;
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Url, Webview, WebviewUrl, Window, WindowEvent,
 };
+use tauri_plugin_dialog::DialogExt;
 use zvs_contract::{
-    BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie, BrowserState,
+    BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie, BrowserNetworkDetail,
+    BrowserNetworkLog, BrowserNetworkSaved, BrowserState,
 };
+use zvs_host::browser::network::{NetworkLog, har};
 use zvs_host::browser::{
-    BrowserLifecycle, BrowserLifecycleEvent, LifecycleSubscription, navigation_url,
+    BrowserLifecycle, BrowserLifecycleEvent, LifecycleSubscription, NetworkCapture, navigation_url,
 };
 use zvs_host::platform::ids::new_id;
 use zvs_host::platform::navigation::{SharedNavigator, WorkspaceRoute};
+use zvs_host::platform::paths::utc_stamp;
 
 use crate::browser::bearer::{BearerTokens, request_filters};
+use crate::browser::cdp::WebviewCdp;
 use crate::browser::cookies::{CookieMeta, cleared_domains};
 use crate::browser::model::{
-    LinkTabs, Model, NO_ACTIVE_TAB, PageSignal, Rect, TAB_LIMIT_REACHED, Tab,
+    LinkTabs, Model, NO_ACTIVE_TAB, PageSignal, Rect, TAB_LIMIT_REACHED, Tab, UNKNOWN_TAB,
 };
+use crate::browser::network::NetworkRecorder;
 use crate::platform::site;
 use crate::window::{STUDIO, app_origin, same_origin};
 
@@ -33,6 +42,9 @@ const SITE_PREFIX: &str = "browser-site-";
 const BLANK: &str = "about:blank";
 const UNAVAILABLE: &str = "Studio window is unavailable";
 const CHROME_RADIUS: f64 = 15.0;
+const HAR_CREATOR: &str = "ZVS AI Studio";
+const HAR_FILTER: &str = "Архив HTTP (HAR)";
+const HAR_FALLBACK_NAME: &str = "network";
 
 enum Work {
     Signal(String, PageSignal),
@@ -53,6 +65,7 @@ struct Inner {
     chrome: Mutex<Option<Webview>>,
     creating: Mutex<()>,
     sites: Mutex<HashMap<String, Webview>>,
+    recorders: Mutex<HashMap<String, Arc<NetworkRecorder>>>,
     shown: Mutex<Option<String>>,
     subscribers: Mutex<Vec<Channel<BrowserState>>>,
     work: Mutex<Sender<Work>>,
@@ -103,6 +116,7 @@ impl BrowserWorkspace {
             chrome: Mutex::default(),
             creating: Mutex::default(),
             sites: Mutex::default(),
+            recorders: Mutex::default(),
             shown: Mutex::default(),
             subscribers: Mutex::default(),
             work: Mutex::new(sender),
@@ -144,6 +158,17 @@ impl BrowserWorkspace {
         let label = self.open_tab(Some(url))?;
         lock(&self.0.links).opened(label, url);
         Ok(())
+    }
+
+    pub fn zoom(&self, factor: f64) {
+        if !lock(&self.0.model).set_zoom(factor) {
+            return;
+        }
+        let chrome = lock(&self.0.chrome).clone();
+        if let Some(chrome) = chrome {
+            let _ = chrome.set_zoom(lock(&self.0.model).zoom());
+        }
+        self.post(Work::Layout);
     }
 
     pub fn hide(&self) {
@@ -216,6 +241,34 @@ impl BrowserWorkspace {
                     .emit(&BrowserLifecycleEvent::CookiesCleared { domain });
                 return self.cookies().map(BrowserCommandOutput::Cookies);
             }
+            BrowserCommand::Devtools { visible } => {
+                lock(&self.0.model).set_devtools_visible(visible);
+            }
+            BrowserCommand::Network => {
+                return Ok(BrowserCommandOutput::Network(self.active_network_log()));
+            }
+            BrowserCommand::NetworkRecord { recording } => {
+                let id = self.active_id().ok_or(NO_ACTIVE_TAB)?;
+                return self
+                    .record(&id, recording)
+                    .map(BrowserCommandOutput::Network);
+            }
+            BrowserCommand::NetworkClear => {
+                let id = self.active_id().ok_or(NO_ACTIVE_TAB)?;
+                return self.clear_network(&id).map(BrowserCommandOutput::Network);
+            }
+            BrowserCommand::NetworkSave => {
+                let id = self.active_id().ok_or(NO_ACTIVE_TAB)?;
+                return self
+                    .save_network(&id)
+                    .map(BrowserCommandOutput::NetworkSaved);
+            }
+            BrowserCommand::NetworkDetail { id } => {
+                let tab = self.active_id().ok_or(NO_ACTIVE_TAB)?;
+                return self
+                    .network_detail(&tab, &id)
+                    .map(|detail| BrowserCommandOutput::NetworkDetail(Box::new(detail)));
+            }
         }
         self.publish();
         Ok(BrowserCommandOutput::State(lock(&self.0.model).state()))
@@ -243,6 +296,111 @@ impl BrowserWorkspace {
     fn active_webview(&self) -> Option<Webview> {
         let label = lock(&self.0.model).active()?.label.clone();
         lock(&self.0.sites).get(&label).cloned()
+    }
+
+    fn active_id(&self) -> Option<String> {
+        lock(&self.0.model).active().map(|tab| tab.id.clone())
+    }
+
+    fn recorder(&self, tab_id: &str, create: bool) -> Result<Option<Arc<NetworkRecorder>>, String> {
+        let label = lock(&self.0.model).label_of(tab_id).ok_or(UNKNOWN_TAB)?;
+        if let Some(recorder) = lock(&self.0.recorders).get(&label) {
+            return Ok(Some(Arc::clone(recorder)));
+        }
+        if !create {
+            return Ok(None);
+        }
+        let webview = lock(&self.0.sites)
+            .get(&label)
+            .cloned()
+            .ok_or(UNKNOWN_TAB)?;
+        let recorder = Arc::new(NetworkRecorder::new(Arc::new(WebviewCdp::new(webview))));
+        lock(&self.0.recorders).insert(label, Arc::clone(&recorder));
+        Ok(Some(recorder))
+    }
+
+    fn network_log(&self, tab_id: &str) -> Result<BrowserNetworkLog, String> {
+        let id = Some(tab_id.to_owned());
+        Ok(self.recorder(tab_id, false)?.map_or_else(
+            || NetworkLog::default().snapshot(id.clone()),
+            |recorder| recorder.snapshot(id.clone()),
+        ))
+    }
+
+    fn active_network_log(&self) -> BrowserNetworkLog {
+        self.active_id()
+            .and_then(|id| self.network_log(&id).ok())
+            .unwrap_or_else(|| NetworkLog::default().snapshot(None))
+    }
+
+    fn record(&self, tab_id: &str, recording: bool) -> Result<BrowserNetworkLog, String> {
+        if let Some(recorder) = self.recorder(tab_id, recording)? {
+            if recording {
+                recorder.start()?;
+            } else {
+                recorder.stop();
+            }
+        }
+        self.network_log(tab_id)
+    }
+
+    fn clear_network(&self, tab_id: &str) -> Result<BrowserNetworkLog, String> {
+        if let Some(recorder) = self.recorder(tab_id, false)? {
+            recorder.clear();
+        }
+        self.network_log(tab_id)
+    }
+
+    fn network_detail(&self, tab_id: &str, entry_id: &str) -> Result<BrowserNetworkDetail, String> {
+        self.recorder(tab_id, false)?
+            .ok_or(zvs_host::browser::network::NO_NETWORK_ENTRY)?
+            .detail(entry_id)
+    }
+
+    fn network_har(&self, tab_id: &str) -> Result<Value, String> {
+        let details = self
+            .recorder(tab_id, false)?
+            .map(|recorder| recorder.export())
+            .unwrap_or_default();
+        Ok(har(&details, HAR_CREATOR, env!("CARGO_PKG_VERSION")))
+    }
+
+    fn save_network(&self, tab_id: &str) -> Result<BrowserNetworkSaved, String> {
+        let archive = self.network_har(tab_id)?;
+        let page = lock(&self.0.model)
+            .active()
+            .map(|tab| tab.page.url.clone())
+            .unwrap_or_default();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |elapsed| i64::try_from(elapsed.as_millis()).unwrap_or(0));
+        let mut dialog = self
+            .0
+            .app
+            .dialog()
+            .file()
+            .set_file_name(har_file_name(&page, now))
+            .add_filter(HAR_FILTER, &["har"]);
+        if let Ok(window) = self.studio() {
+            dialog = dialog.set_parent(&window);
+        }
+        let Some(path) = dialog
+            .blocking_save_file()
+            .and_then(|path| path.into_path().ok())
+        else {
+            return Ok(BrowserNetworkSaved {
+                saved: false,
+                file_name: None,
+            });
+        };
+        let bytes = serde_json::to_vec_pretty(&archive).map_err(failed)?;
+        std::fs::write(&path, bytes).map_err(failed)?;
+        Ok(BrowserNetworkSaved {
+            saved: true,
+            file_name: path
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned()),
+        })
     }
 
     fn any_site(&self) -> Option<Webview> {
@@ -302,6 +460,7 @@ impl BrowserWorkspace {
                 LogicalSize::new(1.0, 1.0),
             )
             .map_err(failed)?;
+        let _ = chrome.set_zoom(lock(&self.0.model).zoom());
         *lock(&self.0.chrome) = Some(chrome);
         Ok(())
     }
@@ -448,6 +607,7 @@ impl BrowserWorkspace {
         if lock(&self.0.shown).as_deref() == Some(label) {
             *lock(&self.0.shown) = None;
         }
+        lock(&self.0.recorders).remove(label);
         let removed = lock(&self.0.sites).remove(label);
         if let Some(webview) = removed {
             let _ = webview.close();
@@ -536,6 +696,7 @@ impl BrowserWorkspace {
             .emit(&BrowserLifecycleEvent::WorkspaceClosed);
         lock(&self.0.links).clear();
         lock(&self.0.model).clear();
+        lock(&self.0.recorders).clear();
         lock(&self.0.sites).clear();
         lock(&self.0.subscribers).clear();
         *lock(&self.0.chrome) = None;
@@ -590,6 +751,77 @@ impl BrowserWorkspace {
     }
 }
 
+async fn off_thread<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(failed)?
+}
+
+#[async_trait]
+impl NetworkCapture for BrowserWorkspace {
+    async fn start(&self, tab_id: Option<String>) -> Result<BrowserNetworkLog, String> {
+        let workspace = self.clone();
+        off_thread(move || {
+            let id = tab_id
+                .or_else(|| workspace.active_id())
+                .ok_or(NO_ACTIVE_TAB)?;
+            workspace.record(&id, true)
+        })
+        .await
+    }
+
+    async fn stop(&self, tab_id: String) -> Result<BrowserNetworkLog, String> {
+        let workspace = self.clone();
+        off_thread(move || workspace.record(&tab_id, false)).await
+    }
+
+    async fn clear(&self, tab_id: String) -> Result<BrowserNetworkLog, String> {
+        let workspace = self.clone();
+        off_thread(move || workspace.clear_network(&tab_id)).await
+    }
+
+    async fn log(&self, tab_id: String) -> Result<BrowserNetworkLog, String> {
+        let workspace = self.clone();
+        off_thread(move || workspace.network_log(&tab_id)).await
+    }
+
+    async fn detail(
+        &self,
+        tab_id: String,
+        entry_id: String,
+    ) -> Result<BrowserNetworkDetail, String> {
+        let workspace = self.clone();
+        off_thread(move || workspace.network_detail(&tab_id, &entry_id)).await
+    }
+
+    async fn har(&self, tab_id: String) -> Result<Value, String> {
+        let workspace = self.clone();
+        off_thread(move || workspace.network_har(&tab_id)).await
+    }
+}
+
+pub fn har_file_name(page: &str, now: i64) -> String {
+    let host = Url::parse(page)
+        .ok()
+        .and_then(|url| url.host_str().map(str::to_owned))
+        .map(|host| {
+            host.chars()
+                .map(|char| {
+                    if char.is_ascii_alphanumeric() || char == '.' || char == '-' {
+                        char
+                    } else {
+                        '-'
+                    }
+                })
+                .collect::<String>()
+        })
+        .filter(|host| !host.is_empty())
+        .unwrap_or_else(|| HAR_FALLBACK_NAME.to_owned());
+    format!("{host}_{}.har", utc_stamp(now))
+}
+
 fn run(inner: &Weak<Inner>, receiver: &Receiver<Work>) {
     while let Ok(work) = receiver.recv() {
         let Some(inner) = inner.upgrade() else {
@@ -602,5 +834,26 @@ fn run(inner: &Weak<Inner>, receiver: &Receiver<Work>) {
             Work::Layout => workspace.layout(),
             Work::Closed => workspace.closed(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_har_file_is_named_after_the_page_host_and_the_utc_time() {
+        assert_eq!(
+            har_file_name("https://chat.qwen.ai/c/1", 1_700_000_000_000),
+            "chat.qwen.ai_2023-11-14T22-13-20.har"
+        );
+        assert_eq!(
+            har_file_name("http://[::1]:8080/", 1_700_000_000_000),
+            "---1-_2023-11-14T22-13-20.har"
+        );
+        assert_eq!(
+            har_file_name("", 1_700_000_000_000),
+            "network_2023-11-14T22-13-20.har"
+        );
     }
 }

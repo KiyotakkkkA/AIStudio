@@ -987,7 +987,7 @@ the route is left they are hidden, and tabs are kept.
 ```
 studio window
 ├─ studio webview (renderer)        the app; /browser reserves the area
-├─ chrome webview (browser-ui)      tabs · toolbar · Sites & cookies · agent panel · approval bar
+├─ chrome webview (browser-ui)      tabs · toolbar · Sites & cookies · Network · agent panel · approval bar
 └─ site webview per tab             the actual site — never trusted
 ```
 
@@ -1034,6 +1034,18 @@ absent.
 Grants are stored per origin, not per session, and are listed and revocable in the agent panel
 and in Settings. The tiers compose with the global tool ceiling (§14): the browser can never
 exceed what Tools allows, only narrow it.
+
+### Network recording
+
+The chrome's developer tools have one panel, Network. Recording is per tab: the host enables
+the CDP `Network` domain on that site webview and folds its events into a capped log
+(`zvs-host/src/browser/network.rs`, 1000 entries, 64 KB of request body, 1 MB of response
+body on demand). The values of `Cookie`, `Set-Cookie`, `Authorization`,
+`Proxy-Authorization` and `X-CSRF-Token` never leave the host; those headers arrive marked
+`redacted`, and are left out of a saved recording. A recording saves as HAR 1.2 through
+the system save dialog. Agents reach the same recorder through the `NetworkCapture` port
+(`start` · `stop` · `clear` · `log` · `detail` · `har`, plus `record_for` for a timed window),
+which `BrowserWorkspace` implements; no kernel node uses it yet.
 
 ### Making actions visible
 

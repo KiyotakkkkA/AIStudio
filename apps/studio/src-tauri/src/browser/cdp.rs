@@ -437,6 +437,10 @@ fn evaluation(value: Value) -> Result<RemoteObject, CdpError> {
 pub struct WebviewCdp(Webview);
 
 impl WebviewCdp {
+    pub const fn new(webview: Webview) -> Self {
+        Self(webview)
+    }
+
     pub fn client(webview: Webview, timeout: Duration) -> CdpClient {
         CdpClient::with_timeout(Arc::new(Self(webview)), timeout)
     }

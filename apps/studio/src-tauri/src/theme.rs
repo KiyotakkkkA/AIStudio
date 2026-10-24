@@ -26,6 +26,9 @@ impl<R: Runtime> ThemePort for TauriTheme<R> {
         if let Some(studio) = self.0.get_webview(crate::window::STUDIO) {
             let _ = studio.set_zoom(factor);
         }
+        if let Some(workspace) = self.0.try_state::<crate::browser::BrowserWorkspace>() {
+            workspace.zoom(factor);
+        }
     }
 }
 

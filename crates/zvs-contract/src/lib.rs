@@ -48,8 +48,9 @@ pub use ai::{
 };
 pub use artifacts::{ArtifactApplicationDto, ArtifactDto, ArtifactRef, ArtifactSaveResult};
 pub use browser::{
-    BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie, BrowserSecurity,
-    BrowserState, BrowserTab,
+    BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie, BrowserHeader,
+    BrowserNetworkBody, BrowserNetworkDetail, BrowserNetworkEntry, BrowserNetworkLog,
+    BrowserNetworkSaved, BrowserRequestState, BrowserSecurity, BrowserState, BrowserTab,
 };
 pub use channels::{CHANNELS, is_channel};
 pub use chat::{

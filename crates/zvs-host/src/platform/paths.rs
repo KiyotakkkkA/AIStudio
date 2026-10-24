@@ -194,6 +194,29 @@ pub fn is_backup_file(name: &str) -> bool {
     name.starts_with(BACKUP_PREFIX) && name.ends_with(BACKUP_SUFFIX)
 }
 
+pub fn utc_iso(at: Timestamp) -> String {
+    let time = at.rem_euclid(86_400_000);
+    format!(
+        "{}T{:02}:{:02}:{:02}.{:03}Z",
+        utc_date(at),
+        time / 3_600_000,
+        time / 60_000 % 60,
+        time / 1_000 % 60,
+        time % 1_000
+    )
+}
+
+pub fn utc_stamp(at: Timestamp) -> String {
+    let time = at.rem_euclid(86_400_000);
+    format!(
+        "{}T{:02}-{:02}-{:02}",
+        utc_date(at),
+        time / 3_600_000,
+        time / 60_000 % 60,
+        time / 1_000 % 60
+    )
+}
+
 fn utc_date(at: Timestamp) -> String {
     let days = at.div_euclid(86_400_000);
     let shifted = days + 719_468;
@@ -362,6 +385,12 @@ mod tests {
         assert_eq!(utc_date(1_709_251_199_999), "2024-02-29");
         assert_eq!(utc_date(1_735_689_600_000), "2025-01-01");
         assert_eq!(utc_date(-1), "1969-12-31");
+    }
+
+    #[test]
+    fn instants_format_as_iso_8601_and_as_a_file_safe_stamp() {
+        assert_eq!(utc_iso(1_709_251_199_999), "2024-02-29T23:59:59.999Z");
+        assert_eq!(utc_stamp(1_700_000_000_000), "2023-11-14T22-13-20");
     }
 
     #[test]

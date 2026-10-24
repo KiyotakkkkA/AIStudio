@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use zvs_contract::{BrowserBounds, BrowserSecurity, BrowserState, BrowserTab};
-use zvs_host::browser::{CHROME_HEIGHT, NAVIGATION_BLOCKED, STATUS_HEIGHT, TAB_LIMIT};
+use zvs_host::browser::{
+    CHROME_HEIGHT, NAVIGATION_BLOCKED, STATUS_HEIGHT, TAB_LIMIT, devtools_height,
+};
 
 pub const NEW_TAB_TITLE: &str = "Новая вкладка";
 pub const PROCESS_GONE: &str = "Page process stopped. Reload to retry.";
@@ -117,11 +119,24 @@ pub struct Model {
     tabs: Vec<Tab>,
     active: Option<String>,
     sites_visible: bool,
+    devtools_visible: bool,
     visible: bool,
     bounds: BrowserBounds,
+    zoom: Option<f64>,
 }
 
 impl Model {
+    pub fn set_zoom(&mut self, factor: f64) -> bool {
+        let next = (factor.is_finite() && factor > 0.0).then_some(factor);
+        let changed = next != self.zoom;
+        self.zoom = next;
+        changed
+    }
+
+    pub fn zoom(&self) -> f64 {
+        self.zoom.unwrap_or(1.0)
+    }
+
     pub fn mount(&mut self, bounds: BrowserBounds) {
         self.bounds = bounds;
         self.visible = true;
@@ -204,6 +219,17 @@ impl Model {
         self.sites_visible = visible;
     }
 
+    pub const fn set_devtools_visible(&mut self, visible: bool) {
+        self.devtools_visible = visible;
+    }
+
+    pub fn label_of(&self, id: &str) -> Option<String> {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == id)
+            .map(|tab| tab.label.clone())
+    }
+
     pub fn is_empty(&self) -> bool {
         self.tabs.is_empty()
     }
@@ -211,6 +237,7 @@ impl Model {
     pub fn clear(&mut self) -> Vec<Tab> {
         self.active = None;
         self.sites_visible = false;
+        self.devtools_visible = false;
         self.visible = false;
         std::mem::take(&mut self.tabs)
     }
@@ -248,6 +275,7 @@ impl Model {
             tabs: self.tabs.iter().map(Tab::state).collect(),
             active_id: self.active.clone(),
             sites_visible: self.sites_visible,
+            devtools_visible: self.devtools_visible,
         }
     }
 
@@ -266,13 +294,20 @@ impl Model {
             .active()
             .filter(|tab| self.visible && !self.sites_visible && !tab.page.url.is_empty())
             .map(|tab| {
+                let chrome_height = CHROME_HEIGHT * self.zoom();
+                let content = (height - chrome_height - STATUS_HEIGHT * self.zoom()).max(0.0);
+                let devtools = if self.devtools_visible {
+                    devtools_height(content)
+                } else {
+                    0.0
+                };
                 (
                     tab.label.clone(),
                     Rect {
                         x,
-                        y: y + CHROME_HEIGHT,
+                        y: y + chrome_height,
                         width,
-                        height: (height - CHROME_HEIGHT - STATUS_HEIGHT).max(0.0),
+                        height: content - devtools,
                     },
                 )
             });
@@ -555,6 +590,37 @@ mod tests {
     }
 
     #[test]
+    fn the_chrome_and_status_bar_scale_with_the_interface_zoom() {
+        let mut model = three();
+        model.mount(BrowserBounds {
+            x: 0.0,
+            y: 0.0,
+            width: 800.0,
+            height: 600.0,
+        });
+        model.apply(
+            "site-c",
+            PageSignal::Snapshot(page("https://c.example/", "C")),
+        );
+        assert!(model.set_zoom(1.25));
+        assert!(!model.set_zoom(1.25));
+        let site = |model: &Model| model.layout(800.0, 600.0).site.map(|(_, rect)| rect);
+        assert_eq!(
+            site(&model),
+            Some(Rect {
+                x: 0.0,
+                y: 185.0,
+                width: 800.0,
+                height: 380.0
+            })
+        );
+        model.set_devtools_visible(true);
+        assert_eq!(site(&model).map(|rect| rect.height), Some(209.0));
+        assert!(model.set_zoom(f64::NAN));
+        assert!((model.zoom() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
     fn layout_is_clamped_to_the_window() {
         let mut model = three();
         model.mount(BrowserBounds {
@@ -593,6 +659,12 @@ mod tests {
         model.set_sites_visible(true);
         assert_eq!(model.layout(800.0, 600.0).site, None);
         model.set_sites_visible(false);
+        model.set_devtools_visible(true);
+        assert_eq!(
+            model.layout(800.0, 600.0).site.map(|(_, rect)| rect.height),
+            Some(233.0)
+        );
+        assert!(model.state().devtools_visible);
         model.hide();
         let hidden = model.layout(800.0, 600.0);
         assert!(!hidden.visible);
@@ -603,6 +675,8 @@ mod tests {
     #[test]
     fn clearing_drops_every_tab() {
         let mut model = three();
+        model.set_devtools_visible(true);
+        assert_eq!(model.label_of(A).as_deref(), Some("site-a"));
         assert_eq!(model.clear().len(), 3);
         assert_eq!(model.state(), BrowserState::default());
     }

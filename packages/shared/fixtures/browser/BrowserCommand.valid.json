@@ -24,5 +24,11 @@
     "name": "remove cookie",
     "value": { "action": "removeCookie", "id": "[\"example.com\",\"/\",\"sid\",true]" }
   },
-  { "name": "clear site", "value": { "action": "clearSite", "domain": ".example.com" } }
+  { "name": "clear site", "value": { "action": "clearSite", "domain": ".example.com" } },
+  { "name": "show devtools", "value": { "action": "devtools", "visible": true } },
+  { "name": "network log", "value": { "action": "network" } },
+  { "name": "start recording", "value": { "action": "networkRecord", "recording": true } },
+  { "name": "clear network log", "value": { "action": "networkClear" } },
+  { "name": "save network log", "value": { "action": "networkSave" } },
+  { "name": "network detail", "value": { "action": "networkDetail", "id": "1234.56:1" } }
 ]

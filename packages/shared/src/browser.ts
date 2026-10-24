@@ -21,6 +21,12 @@ export const BrowserCommand = z.discriminatedUnion("action", [
   z.object({ action: z.literal("cookies") }),
   z.object({ action: z.literal("removeCookie"), id: z.string().min(1).max(32768) }),
   z.object({ action: z.literal("clearSite"), domain: z.string().min(1).max(253) }),
+  z.object({ action: z.literal("devtools"), visible: z.boolean() }),
+  z.object({ action: z.literal("network") }),
+  z.object({ action: z.literal("networkRecord"), recording: z.boolean() }),
+  z.object({ action: z.literal("networkClear") }),
+  z.object({ action: z.literal("networkSave") }),
+  z.object({ action: z.literal("networkDetail"), id: z.string().min(1).max(256) }),
 ]);
 export type BrowserCommand = z.infer<typeof BrowserCommand>;
 
@@ -39,6 +45,7 @@ export interface BrowserState {
   tabs: BrowserTab[];
   activeId: string | null;
   sitesVisible: boolean;
+  devtoolsVisible: boolean;
 }
 
 export interface BrowserCookie {
@@ -50,4 +57,55 @@ export interface BrowserCookie {
   httpOnly: boolean;
   session: boolean;
   expirationDate?: number;
+}
+
+export type BrowserRequestState = "pending" | "finished" | "failed";
+
+export interface BrowserHeader {
+  name: string;
+  value: string;
+  redacted: boolean;
+}
+
+export interface BrowserNetworkEntry {
+  id: string;
+  url: string;
+  method: string;
+  resourceType: string;
+  state: BrowserRequestState;
+  status?: number;
+  mimeType?: string;
+  startedAt: number;
+  duration?: number;
+  size?: number;
+  fromCache: boolean;
+  error?: string;
+}
+
+export interface BrowserNetworkLog {
+  tabId: string | null;
+  recording: boolean;
+  revision: number;
+  dropped: number;
+  entries: BrowserNetworkEntry[];
+}
+
+export interface BrowserNetworkBody {
+  text: string;
+  base64: boolean;
+  truncated: boolean;
+}
+
+export interface BrowserNetworkDetail {
+  entry: BrowserNetworkEntry;
+  statusText?: string;
+  requestHeaders: BrowserHeader[];
+  responseHeaders: BrowserHeader[];
+  postData?: string;
+  body?: BrowserNetworkBody;
+}
+
+export interface BrowserNetworkSaved {
+  saved: boolean;
+  fileName?: string;
 }

@@ -10,5 +10,8 @@
   { "name": "empty navigate url", "value": { "action": "navigate", "url": "" } },
   { "name": "null new url", "value": { "action": "new", "url": null } },
   { "name": "sites without visibility", "value": { "action": "sites" } },
-  { "name": "empty cookie id", "value": { "action": "removeCookie", "id": "" } }
+  { "name": "empty cookie id", "value": { "action": "removeCookie", "id": "" } },
+  { "name": "devtools without visibility", "value": { "action": "devtools" } },
+  { "name": "recording without flag", "value": { "action": "networkRecord" } },
+  { "name": "empty network entry id", "value": { "action": "networkDetail", "id": "" } }
 ]

@@ -9,6 +9,7 @@ pub const BROWSER_PARTITION: &str = "persist:browser-work";
 pub const PROFILE_DIR: [&str; 2] = ["browser", "work"];
 pub const CHROME_HEIGHT: f64 = 148.0;
 pub const STATUS_HEIGHT: f64 = 28.0;
+pub const DEVTOOLS_SHARE: f64 = 0.45;
 pub const TAB_LIMIT: usize = 30;
 pub const ONLY_WEB_ADDRESSES: &str = "Only HTTP and HTTPS addresses are allowed";
 pub const NAVIGATION_BLOCKED: &str = "Navigation blocked: only HTTP/HTTPS is allowed";
@@ -22,6 +23,10 @@ pub fn profile_dir(data_dir: &Path) -> PathBuf {
     PROFILE_DIR
         .iter()
         .fold(data_dir.to_path_buf(), |path, part| path.join(part))
+}
+
+pub fn devtools_height(content: f64) -> f64 {
+    (content.max(0.0) * DEVTOOLS_SHARE).round()
 }
 
 fn parse_web(value: &str) -> Option<Url> {
@@ -96,6 +101,13 @@ mod tests {
         assert!(is_web_url("https://example.com/"));
         assert!(is_web_url("http://127.0.0.1:8080/a?b#c"));
         assert!(!is_web_url("example.com"));
+    }
+
+    #[test]
+    fn devtools_take_a_rounded_share_of_the_content_area() {
+        assert_eq!(devtools_height(700.0), 315.0);
+        assert_eq!(devtools_height(101.0), 45.0);
+        assert_eq!(devtools_height(-5.0), 0.0);
     }
 
     #[test]

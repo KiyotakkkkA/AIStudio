@@ -7,6 +7,7 @@ use crate::validate::{Validate, check, invalid};
 pub const URL_MAX: usize = 8192;
 pub const COOKIE_ID_MAX: usize = 32768;
 pub const DOMAIN_MAX: usize = 253;
+pub const NETWORK_ENTRY_ID_MAX: usize = 256;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -69,6 +70,18 @@ pub enum BrowserCommand {
     ClearSite {
         domain: String,
     },
+    Devtools {
+        visible: bool,
+    },
+    Network,
+    NetworkRecord {
+        recording: bool,
+    },
+    NetworkClear,
+    NetworkSave,
+    NetworkDetail {
+        id: String,
+    },
 }
 
 fn tab_id(id: &str) -> Result<(), AppError> {
@@ -102,12 +115,21 @@ impl Validate for BrowserCommand {
                 check::non_empty("domain", domain)?;
                 check::max_len("domain", domain, DOMAIN_MAX)
             }
+            Self::NetworkDetail { id } => {
+                check::non_empty("id", id)?;
+                check::max_len("id", id, NETWORK_ENTRY_ID_MAX)
+            }
             Self::State
             | Self::Back
             | Self::Forward
             | Self::Reload
             | Self::Sites { .. }
-            | Self::Cookies => Ok(()),
+            | Self::Cookies
+            | Self::Devtools { .. }
+            | Self::Network
+            | Self::NetworkRecord { .. }
+            | Self::NetworkClear
+            | Self::NetworkSave => Ok(()),
         }
     }
 }
@@ -146,6 +168,7 @@ pub struct BrowserState {
     #[serde(deserialize_with = "crate::wire::nullable")]
     pub active_id: Option<String>,
     pub sites_visible: bool,
+    pub devtools_visible: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -166,11 +189,129 @@ pub struct BrowserCookie {
     pub expiration_date: Option<f64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BrowserRequestState {
+    Pending,
+    Finished,
+    Failed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserHeader {
+    pub name: String,
+    pub value: String,
+    pub redacted: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserNetworkEntry {
+    pub id: String,
+    pub url: String,
+    pub method: String,
+    pub resource_type: String,
+    pub state: BrowserRequestState,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub status: Option<u16>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub mime_type: Option<String>,
+    pub started_at: f64,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub duration: Option<f64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub size: Option<f64>,
+    pub from_cache: bool,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserNetworkLog {
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub tab_id: Option<String>,
+    pub recording: bool,
+    pub revision: u64,
+    pub dropped: u64,
+    pub entries: Vec<BrowserNetworkEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserNetworkBody {
+    pub text: String,
+    pub base64: bool,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserNetworkDetail {
+    pub entry: BrowserNetworkEntry,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub status_text: Option<String>,
+    pub request_headers: Vec<BrowserHeader>,
+    pub response_headers: Vec<BrowserHeader>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub post_data: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub body: Option<BrowserNetworkBody>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserNetworkSaved {
+    pub saved: bool,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub file_name: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum BrowserCommandOutput {
     State(BrowserState),
     Cookies(Vec<BrowserCookie>),
+    Network(BrowserNetworkLog),
+    NetworkDetail(Box<BrowserNetworkDetail>),
+    NetworkSaved(BrowserNetworkSaved),
 }
 
 #[cfg(test)]
@@ -194,6 +335,15 @@ mod tests {
             BrowserCommand::New { url: None }
         );
         assert_eq!(
+            parse::<BrowserCommand>(json!({ "action": "networkRecord", "recording": true }))
+                .expect("parses"),
+            BrowserCommand::NetworkRecord { recording: true }
+        );
+        assert_eq!(
+            parse::<BrowserCommand>(json!({ "action": "networkClear" })).expect("parses"),
+            BrowserCommand::NetworkClear
+        );
+        assert_eq!(
             parse::<BrowserCommand>(json!({ "action": "reorder", "id": TAB, "index": 2 }))
                 .expect("parses"),
             BrowserCommand::Reorder {
@@ -215,6 +365,10 @@ mod tests {
             json!({ "action": "navigate", "url": "a".repeat(URL_MAX + 1) }),
             json!({ "action": "new", "url": null }),
             json!({ "action": "clearSite", "domain": "a".repeat(DOMAIN_MAX + 1) }),
+            json!({ "action": "networkDetail", "id": "" }),
+            json!({ "action": "networkDetail", "id": "a".repeat(NETWORK_ENTRY_ID_MAX + 1) }),
+            json!({ "action": "networkRecord" }),
+            json!({ "action": "devtools" }),
             json!({}),
         ] {
             assert!(parse::<BrowserCommand>(value.clone()).is_err(), "{value}");
@@ -247,6 +401,7 @@ mod tests {
             }],
             active_id: None,
             sites_visible: false,
+            devtools_visible: true,
         };
         assert_eq!(
             serde_json::to_value(BrowserCommandOutput::State(state)).expect("serialises"),
@@ -262,6 +417,7 @@ mod tests {
                 }],
                 "activeId": null,
                 "sitesVisible": false,
+                "devtoolsVisible": true,
             })
         );
     }
@@ -294,5 +450,47 @@ mod tests {
             }])
         );
         assert!(value[0].get("value").is_none());
+    }
+
+    #[test]
+    fn a_network_log_keeps_a_null_tab_and_omits_absent_response_fields() {
+        let log = BrowserNetworkLog {
+            tab_id: None,
+            recording: true,
+            revision: 3,
+            dropped: 0,
+            entries: vec![BrowserNetworkEntry {
+                id: "17.2".into(),
+                url: "https://a.example/api".into(),
+                method: "GET".into(),
+                resource_type: "Fetch".into(),
+                state: BrowserRequestState::Pending,
+                status: None,
+                mime_type: None,
+                started_at: 1_800_000_000_000.0,
+                duration: None,
+                size: None,
+                from_cache: false,
+                error: None,
+            }],
+        };
+        assert_eq!(
+            serde_json::to_value(BrowserCommandOutput::Network(log)).expect("serialises"),
+            json!({
+                "tabId": null,
+                "recording": true,
+                "revision": 3,
+                "dropped": 0,
+                "entries": [{
+                    "id": "17.2",
+                    "url": "https://a.example/api",
+                    "method": "GET",
+                    "resourceType": "Fetch",
+                    "state": "pending",
+                    "startedAt": 1_800_000_000_000.0,
+                    "fromCache": false,
+                }],
+            })
+        );
     }
 }

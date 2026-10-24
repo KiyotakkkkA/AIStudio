@@ -4,6 +4,7 @@ pub mod cdp;
 pub mod cookies;
 pub mod gateway;
 pub mod model;
+pub mod network;
 mod workspace;
 
 pub use accounts::{WorkspaceOpener, gateway_sessions};
