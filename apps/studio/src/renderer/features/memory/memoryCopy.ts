@@ -14,13 +14,13 @@ export const PANEL_OFF = "Память выключена: факты не пе�
 export const ENABLED_ROW = {
   key: "memory.enabled",
   label: "Память",
-  hint: "Добавлять сохранённые факты в каждый ход модели.",
+  hint: "Добавлять сохранённые факты о вас при генерации ответа",
 } as const;
 
 export const MODEL_ROW = {
   key: "memory.model",
   label: "Сохранение моделью",
-  hint: "Модель сохраняет, изменяет и удаляет факты во время диалога. Каждое изменение видно в ответе.",
+  hint: "Разрешить модели сохранять, изменять и удалять данные о вас.",
 } as const;
 
 export const SCOPE_TABS_LABEL = "Область памяти";
