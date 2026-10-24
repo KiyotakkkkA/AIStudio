@@ -4,6 +4,8 @@ import {
   FONT_SIZES,
   type FontFamily,
   type FontSize,
+  type FxLevel,
+  type FxPreset,
   type PreferenceSection,
   type ThemeMode,
 } from "../../stores/UiStore";
@@ -35,7 +37,7 @@ export const SECTION_LABELS: Record<PreferenceSection, string> = {
 export const SECTION_HINTS: Record<PreferenceSection, string> = {
   general: "Запуск, работа в фоне и ограничения генерации.",
   profile: "Стиль ответов модели и сведения о вас.",
-  appearance: "Тема, шрифт и размер текста интерфейса.",
+  appearance: "Тема, шрифт, размер текста и эффекты интерфейса.",
   notifications: "Системные уведомления о событиях приложения.",
   memory: "Факты о пользователе и диалогах, которые модель получает в каждом ходе.",
   about: "Версия приложения и характеристики компьютера.",
@@ -111,6 +113,29 @@ export const FONT_FAMILY_OPTIONS: readonly { value: FontFamily; label: string }[
 
 export const FONT_SIZE_LABEL = "Размер шрифта";
 export const FONT_SIZE_HINT = "Масштаб текста и элементов интерфейса.";
+
+export const FX_LABEL = "Эффекты";
+export const FX_HINT = "Анимации переходов и состояний.";
+export const FX_OS_NOTE = "Сейчас уровень выбран по настройке анимаций Windows.";
+export const FX_OPTIONS: readonly { value: FxPreset; label: string }[] = [
+  { value: "none", label: "Нет" },
+  { value: "reduced", label: "Меньше" },
+  { value: "full", label: "Все" },
+  { value: "custom", label: "Пользовательские" },
+];
+
+export const FX_LEVEL_OPTIONS: readonly { value: FxLevel; label: string }[] = [
+  { value: "none", label: "Нет" },
+  { value: "reduced", label: "Меньше" },
+  { value: "full", label: "Все" },
+];
+
+export const FX_MOTION_LABEL = "Анимации";
+export const FX_MOTION_HINT =
+  "Появление, раскрытие и перемещение элементов, индикаторы выполнения и ожидания.";
+export const FX_EFFECTS_LABEL = "Визуальные эффекты";
+export const FX_EFFECTS_HINT =
+  "Тени и глубина, подсветка активных элементов, размытие под окнами, акцентные рамки.";
 
 const FONT_STACKS: Record<FontFamily, string | null> = {
   onest: null,

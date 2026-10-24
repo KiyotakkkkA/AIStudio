@@ -20,7 +20,7 @@ export default function ButtonBase({ tone = "secondary", children, ...props }: B
   return (
     <button
       {...props}
-      className={`inline-flex h-8 flex-none items-center justify-center gap-1.5 rounded-control border px-3 text-[13px] font-medium whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-45 ${TONES[tone]}`}
+      className={`zvs-press inline-flex h-8 flex-none items-center justify-center gap-1.5 rounded-control border px-3 text-[13px] font-medium whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-45 ${TONES[tone]}`}
     >
       {children}
     </button>

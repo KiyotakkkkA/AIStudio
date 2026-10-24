@@ -2,6 +2,7 @@ import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import type { Contract } from "@zvs/shared";
 import { DEFAULT_ROUTE, isRoutePath, type RoutePath } from "../app/routes";
+import { FX_LEVELS, type FxLevel } from "../ui/motion/levels";
 
 const RAIL_COLLAPSED_KEY = "ui.rail.collapsed";
 const LAST_ROUTE_KEY = "ui.route.last";
@@ -9,6 +10,9 @@ const THEME_KEY = "ui.theme";
 const RAIL_THEME_PICKER_KEY = "ui.rail.themepicker";
 const FONT_FAMILY_KEY = "ui.font.family";
 const FONT_SIZE_KEY = "ui.font.size";
+const FX_PRESET_KEY = "ui.fx.preset";
+const FX_MOTION_KEY = "ui.fx.motion";
+const FX_EFFECTS_KEY = "ui.fx.effects";
 
 export const THEME_MODES = ["system", "light", "dark"] as const;
 export type ThemeMode = (typeof THEME_MODES)[number];
@@ -23,6 +27,19 @@ export type FontFamily = (typeof FONT_FAMILIES)[number];
 export const FONT_SIZES = [12, 13, 14, 15, 16] as const;
 export type FontSize = (typeof FONT_SIZES)[number];
 export const DEFAULT_FONT_SIZE: FontSize = 13;
+
+export { FX_LEVELS, type FxLevel };
+
+export const FX_PRESETS = ["none", "reduced", "full", "custom"] as const;
+export type FxPreset = (typeof FX_PRESETS)[number];
+
+function isFxLevel(value: unknown): value is FxLevel {
+  return typeof value === "string" && (FX_LEVELS as readonly string[]).includes(value);
+}
+
+function isFxPreset(value: unknown): value is FxPreset {
+  return typeof value === "string" && (FX_PRESETS as readonly string[]).includes(value);
+}
 
 export const PREFERENCE_SECTIONS = [
   "general",
@@ -49,32 +66,63 @@ export class UiStore {
   railThemePicker = true;
   fontFamily: FontFamily = "onest";
   fontSize: FontSize = DEFAULT_FONT_SIZE;
+  fxPreset: FxPreset | null = null;
+  customMotion: FxLevel = "full";
+  customEffects: FxLevel = "full";
+  osReducedMotion = false;
+  private customChosen = false;
   preferences: PreferenceSection | null = null;
   preferenceTarget: string | null = null;
   restored = false;
 
   constructor(private readonly ipc: IpcClient<Contract>) {
-    makeAutoObservable<UiStore, "ipc">(this, { ipc: false }, { autoBind: true });
+    makeAutoObservable<UiStore, "ipc" | "customChosen">(
+      this,
+      { ipc: false, customChosen: false },
+      { autoBind: true },
+    );
   }
 
   get railWidth(): number {
     return this.railCollapsed ? 64 : 244;
   }
 
+  get fxShown(): FxPreset {
+    return this.fxPreset ?? (this.osReducedMotion ? "reduced" : "full");
+  }
+
+  get motion(): FxLevel {
+    const preset = this.fxShown;
+    return preset === "custom" ? this.customMotion : preset;
+  }
+
+  get effects(): FxLevel {
+    if (this.fxPreset === null) return "full";
+    return this.fxPreset === "custom" ? this.customEffects : this.fxPreset;
+  }
+
   async restore(): Promise<void> {
-    const [collapsed, route, theme, picker, family, size] = await Promise.all([
-      this.read(RAIL_COLLAPSED_KEY),
-      this.read(LAST_ROUTE_KEY),
-      this.read(THEME_KEY),
-      this.read(RAIL_THEME_PICKER_KEY),
-      this.read(FONT_FAMILY_KEY),
-      this.read(FONT_SIZE_KEY),
-    ]);
+    const [collapsed, route, theme, picker, family, size, preset, motion, effects] =
+      await Promise.all([
+        this.read(RAIL_COLLAPSED_KEY),
+        this.read(LAST_ROUTE_KEY),
+        this.read(THEME_KEY),
+        this.read(RAIL_THEME_PICKER_KEY),
+        this.read(FONT_FAMILY_KEY),
+        this.read(FONT_SIZE_KEY),
+        this.read(FX_PRESET_KEY),
+        this.read(FX_MOTION_KEY),
+        this.read(FX_EFFECTS_KEY),
+      ]);
     runInAction(() => {
       if (isThemeMode(theme)) this.theme = theme;
       if (typeof picker === "boolean") this.railThemePicker = picker;
       if (isFontFamily(family)) this.fontFamily = family;
       if (isFontSize(size)) this.fontSize = size;
+      if (isFxPreset(preset)) this.fxPreset = preset;
+      if (isFxLevel(motion)) this.customMotion = motion;
+      if (isFxLevel(effects)) this.customEffects = effects;
+      this.customChosen = isFxLevel(motion) || isFxLevel(effects);
       if (typeof collapsed === "boolean") this.railCollapsed = collapsed;
       if (isRoutePath(route)) this.activeRoute = route;
       this.restored = true;
@@ -113,6 +161,37 @@ export class UiStore {
     if (this.fontSize === size) return;
     this.fontSize = size;
     void this.write(FONT_SIZE_KEY, size);
+  }
+
+  setFxPreset(preset: FxPreset): void {
+    if (this.fxPreset === preset) return;
+    if (preset === "custom" && !this.customChosen) {
+      this.customChosen = true;
+      this.customMotion = this.motion;
+      this.customEffects = this.effects;
+      void this.write(FX_MOTION_KEY, this.customMotion);
+      void this.write(FX_EFFECTS_KEY, this.customEffects);
+    }
+    this.fxPreset = preset;
+    void this.write(FX_PRESET_KEY, preset);
+  }
+
+  setCustomMotion(level: FxLevel): void {
+    this.customChosen = true;
+    if (this.customMotion === level) return;
+    this.customMotion = level;
+    void this.write(FX_MOTION_KEY, level);
+  }
+
+  setCustomEffects(level: FxLevel): void {
+    this.customChosen = true;
+    if (this.customEffects === level) return;
+    this.customEffects = level;
+    void this.write(FX_EFFECTS_KEY, level);
+  }
+
+  setOsReducedMotion(reduced: boolean): void {
+    this.osReducedMotion = reduced;
   }
 
   openPreferences(section: PreferenceSection = "appearance"): void {

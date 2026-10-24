@@ -127,7 +127,7 @@ export default function ChatMessage({
           {partial && !generating && (
             <p className="text-[12px] text-warn">Частичный ответ · генерация не завершена</p>
           )}
-          {usage && <p className="font-mono text-[11px] text-main-500">{usage}</p>}
+          {usage && <p className="pt-2 font-mono text-[11px] text-main-500">{usage}</p>}
         </div>
         <div className="mt-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <MessageActions

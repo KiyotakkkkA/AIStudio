@@ -8,6 +8,9 @@ import {
 } from "@mdi/js";
 import { Dropdown, Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import ActivePill from "../../ui/motion/ActivePill";
+import { useFx, useTransition } from "../../ui/motion/fx";
 import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import IconButton from "../../ui/atoms/buttons/IconButton";
@@ -21,6 +24,8 @@ export default observer(function ConversationList({ store }: { readonly store: C
   const [renameTarget, setRenameTarget] = useState<ConversationDto | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ConversationDto | null>(null);
+  const { motion: level } = useFx();
+  const settle = useTransition("layout");
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const week = new Date(today);
@@ -76,72 +81,89 @@ export default observer(function ConversationList({ store }: { readonly store: C
                 <h2 className="px-2.5 pt-2 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                   {group.name}
                 </h2>
-                {group.rows.map((conversation) => (
-                  <div
-                    onClick={() => void store.select(conversation.id)}
-                    key={conversation.id}
-                    className={`group mb-0.5 flex h-8.5 w-full cursor-pointer items-center rounded-control pr-1 pl-2.5 ${
-                      store.active?.id === conversation.id
-                        ? "bg-main-900 text-main-50 shadow-[0_1px_3px_rgb(40_25_10/0.08)]"
-                        : "text-main-300 hover:bg-main-700 hover:text-main-100"
-                    }`}
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                      <span
-                        className={`size-1.5 shrink-0 rounded-full ${store.active?.id === conversation.id ? "bg-accent-dark" : "bg-main-600"}`}
-                      />
-                      <span className="truncate text-[13px]">{conversation.title}</span>
-                    </div>
-                    <Dropdown menuWidth={160} menuPlacement="bottom-right">
-                      <IconDropdownButton
-                        rounded="rounded-lg"
-                        aria-label={`Действия для ${conversation.title}`}
-                        label="Действия"
-                        tooltip="right-center"
-                        path={mdiDotsVertical}
-                        className="invisible size-6 justify-center gap-0 border-transparent bg-transparent p-0 text-main-400 group-focus-within:visible group-hover:visible hover:border-transparent hover:bg-main-700 hover:text-main-100"
-                        iconSize={18}
-                        onClick={(event) => event.stopPropagation()}
-                      />
-                      <Dropdown.Menu
-                        role="menu"
-                        aria-label="Действия диалога"
-                        rounded="rounded-lg"
-                        className="rounded-card border-line bg-main-900 p-1 shadow-pop"
+                <AnimatePresence initial={false}>
+                  {group.rows.map((conversation) => (
+                    <motion.div
+                      onClick={() => void store.select(conversation.id)}
+                      key={conversation.id}
+                      layout={level === "full" ? "position" : false}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={settle}
+                      className="overflow-hidden"
+                    >
+                      <div
+                        className={`group relative mb-0.5 flex h-8.5 w-full cursor-pointer items-center rounded-control pr-1 pl-2.5 ${
+                          store.active?.id === conversation.id
+                            ? "text-main-50"
+                            : "text-main-300 hover:bg-main-700 hover:text-main-100"
+                        }`}
                       >
-                        <Dropdown.Item
-                          role="menuitem"
-                          rounded="rounded-lg"
-                          className="text-[13px] text-main-100"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setRenameTarget(conversation);
-                            setRenameTitle(conversation.title);
-                          }}
-                        >
-                          <span className="flex items-center gap-2">
-                            <Icon path={mdiPencilOutline} size={16} className="text-main-400" />
-                            Переименовать
-                          </span>
-                        </Dropdown.Item>
-                        <Dropdown.Item
-                          role="menuitem"
-                          rounded="rounded-lg"
-                          className="text-[13px] text-err hover:bg-err-soft hover:text-err"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setDeleteTarget(conversation);
-                          }}
-                        >
-                          <span className="flex items-center gap-2">
-                            <Icon path={mdiDeleteOutline} size={16} />
-                            Удалить
-                          </span>
-                        </Dropdown.Item>
-                      </Dropdown.Menu>
-                    </Dropdown>
-                  </div>
-                ))}
+                        {store.active?.id === conversation.id ? (
+                          <ActivePill
+                            layoutId="conversation-active"
+                            className="rounded-control bg-main-900 fx-on:shadow-[0_1px_3px_rgb(40_25_10/0.08)]"
+                          />
+                        ) : null}
+                        <div className="relative flex min-w-0 flex-1 items-center gap-2.5 text-left">
+                          <span
+                            className={`size-1.5 shrink-0 rounded-full ${store.active?.id === conversation.id ? "bg-accent-dark" : "bg-main-600"}`}
+                          />
+                          <span className="truncate text-[13px]">{conversation.title}</span>
+                        </div>
+                        <Dropdown menuWidth={160} menuPlacement="bottom-right">
+                          <IconDropdownButton
+                            rounded="rounded-lg"
+                            aria-label={`Действия для ${conversation.title}`}
+                            label="Действия"
+                            tooltip="right-center"
+                            path={mdiDotsVertical}
+                            className="invisible size-6 justify-center gap-0 border-transparent bg-transparent p-0 text-main-400 group-focus-within:visible group-hover:visible hover:border-transparent hover:bg-main-700 hover:text-main-100"
+                            iconSize={18}
+                            onClick={(event) => event.stopPropagation()}
+                          />
+                          <Dropdown.Menu
+                            role="menu"
+                            aria-label="Действия диалога"
+                            rounded="rounded-lg"
+                            className="rounded-card border-line bg-main-900 p-1 shadow-pop"
+                          >
+                            <Dropdown.Item
+                              role="menuitem"
+                              rounded="rounded-lg"
+                              className="text-[13px] text-main-100"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setRenameTarget(conversation);
+                                setRenameTitle(conversation.title);
+                              }}
+                            >
+                              <span className="flex items-center gap-2">
+                                <Icon path={mdiPencilOutline} size={16} className="text-main-400" />
+                                Переименовать
+                              </span>
+                            </Dropdown.Item>
+                            <Dropdown.Item
+                              role="menuitem"
+                              rounded="rounded-lg"
+                              className="text-[13px] text-err hover:bg-err-soft hover:text-err"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setDeleteTarget(conversation);
+                              }}
+                            >
+                              <span className="flex items-center gap-2">
+                                <Icon path={mdiDeleteOutline} size={16} />
+                                Удалить
+                              </span>
+                            </Dropdown.Item>
+                          </Dropdown.Menu>
+                        </Dropdown>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </section>
             ),
         )}

@@ -10,6 +10,7 @@ import Icon from "../../ui/atoms/Icon";
 import { TIER_HINTS, TIER_LABELS } from "../connections/connectionPresentation";
 import { matchesQuery, sourceGroups, sourceKey } from "../tools/toolFilters";
 import type ChatStore from "./ChatStore";
+import { isBuiltinTool, toolTitle } from "./toolCallCopy";
 import { isAutomaticTool, toolBlockReason } from "./toolSets";
 
 export const TOOLS_UNSUPPORTED =
@@ -35,6 +36,8 @@ const ToolRow = observer(function ToolRow({
   const automatic = isAutomaticTool(tool.key);
   const selected = automatic || store.enabledTools.includes(tool.key);
   const blocked = toolBlockReason(tool);
+  const builtin = isBuiltinTool(tool.key);
+  const name = builtin ? toolTitle(tool.key) : tool.key;
   const description =
     blocked ?? (automatic ? AUTOMATIC_TOOL_HINT : tool.description || "Описание не задано");
   return (
@@ -44,7 +47,7 @@ const ToolRow = observer(function ToolRow({
       } ${blocked && !selected ? "opacity-55" : automatic ? "" : "cursor-pointer hover:bg-main-850"}`}
     >
       <InputCheckBox
-        aria-label={`Предлагать модели: ${tool.key}`}
+        aria-label={`Предлагать модели: ${name}`}
         checked={selected}
         disabled={automatic || !store.canConfigure || (blocked !== null && !selected)}
         onChange={() => void store.toggleTool(tool.key)}
@@ -52,12 +55,15 @@ const ToolRow = observer(function ToolRow({
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
           <span
-            className={`min-w-0 truncate font-mono text-[12px] font-medium ${
+            className={`min-w-0 truncate text-[12px] font-medium ${builtin ? "" : "font-mono"} ${
               selected ? "text-accent-medium" : "text-main-100"
             }`}
           >
-            {tool.key}
+            {name}
           </span>
+          {builtin && (
+            <span className="shrink-0 font-mono text-[10.5px] text-main-500">{tool.key}</span>
+          )}
           {tool.destructive && (
             <span className="shrink-0 rounded-full bg-err-soft px-1.5 text-[10.5px]/4  text-err">
               разрушающий

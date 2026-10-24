@@ -41,14 +41,7 @@ test("the store restores rail and route from the host through the real bridge co
   assert.equal(ui.railWidth, 64);
   assert.deepEqual(
     bridge.calls.map((call) => call.channel),
-    [
-      "settings.get",
-      "settings.get",
-      "settings.get",
-      "settings.get",
-      "settings.get",
-      "settings.get",
-    ],
+    Array.from({ length: 9 }, () => "settings.get"),
   );
 });
 
@@ -105,6 +98,68 @@ test("the theme mode restores, rejects unknown values and writes through once", 
   const fallback = new UiStore(client(settingsBridge({ "ui.theme": "sepia" }).bridge));
   await fallback.restore();
   assert.equal(fallback.theme, "system");
+});
+
+test("effects follow the OS until a preset is picked, then the preset decides", async () => {
+  const { bridge, stored } = settingsBridge();
+  const ui = new UiStore(client(bridge));
+  await ui.restore();
+
+  assert.equal(ui.fxShown, "full");
+  assert.equal(ui.motion, "full");
+  assert.equal(ui.effects, "full");
+
+  ui.setOsReducedMotion(true);
+  assert.equal(ui.fxShown, "reduced");
+  assert.equal(ui.motion, "reduced");
+  assert.equal(ui.effects, "full");
+
+  ui.setFxPreset("none");
+  await Promise.resolve();
+  assert.equal(ui.motion, "none");
+  assert.equal(ui.effects, "none");
+  assert.equal(stored.get("ui.fx.preset"), "none");
+
+  ui.setOsReducedMotion(false);
+  assert.equal(ui.motion, "none");
+});
+
+test("custom starts from the current levels once and keeps its own levels afterwards", async () => {
+  const { bridge, stored } = settingsBridge({ "ui.fx.preset": "reduced" });
+  const ui = new UiStore(client(bridge));
+  await ui.restore();
+  assert.equal(ui.motion, "reduced");
+
+  ui.setFxPreset("custom");
+  assert.equal(ui.customMotion, "reduced");
+  assert.equal(ui.customEffects, "reduced");
+
+  ui.setCustomMotion("none");
+  ui.setCustomEffects("full");
+  await Promise.resolve();
+  assert.equal(ui.motion, "none");
+  assert.equal(ui.effects, "full");
+  assert.equal(stored.get("ui.fx.motion"), "none");
+  assert.equal(stored.get("ui.fx.effects"), "full");
+
+  ui.setFxPreset("full");
+  assert.equal(ui.motion, "full");
+  ui.setFxPreset("custom");
+  assert.equal(ui.motion, "none");
+  assert.equal(ui.effects, "full");
+});
+
+test("stored effect values that are not levels fall back to the defaults", async () => {
+  const { bridge } = settingsBridge({
+    "ui.fx.preset": "loud",
+    "ui.fx.motion": 3,
+    "ui.fx.effects": "custom",
+  });
+  const ui = new UiStore(client(bridge));
+  await ui.restore();
+  assert.equal(ui.fxPreset, null);
+  assert.equal(ui.customMotion, "full");
+  assert.equal(ui.customEffects, "full");
 });
 
 test("events pushed through the bridge reach the router that subscribed to the stream", () => {

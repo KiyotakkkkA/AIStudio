@@ -24,6 +24,10 @@ import { CONTEXT_PANEL, FILES_PANEL, PANEL_GROUP_LABEL } from "./explorer/explor
 import TerminalDock from "../terminal/TerminalDock";
 import { TERMINAL_PANEL } from "../terminal/terminalCopy";
 import MemoryDropdown from "../memory/MemoryDropdown";
+import { AnimatePresence, motion } from "motion/react";
+import FadeIn from "../../ui/motion/FadeIn";
+import { useFx, useTransition } from "../../ui/motion/fx";
+import { toolTitle } from "./toolCallCopy";
 
 function PanelButton({
   label,
@@ -59,6 +63,8 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
   const answerSelections = questionSelections(store.active?.messages ?? []);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
+  const { motion: level } = useFx();
+  const pop = useTransition("reveal");
   const scrollLatest = () => {
     const element = viewport.current;
     if (element) element.scrollTop = element.scrollHeight;
@@ -158,7 +164,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
             <div className="flex flex-col items-center py-20 text-center">
               <AssistantAvatar
                 size={56}
-                className="mb-4 drop-shadow-[0_8px_20px_rgb(180_80_20/0.3)]"
+                className="mb-4 fx-full:drop-shadow-[0_8px_20px_rgb(180_80_20/0.3)]"
               />
               <h2 className="mb-1.5 text-[20px] font-semibold tracking-[-0.02em] text-main-50">
                 Начните диалог
@@ -247,32 +253,34 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
             </div>
           )}
           {(store.generating || store.liveText) && (
-            <ChatMessage
-              content={store.liveText}
-              reasoning={store.liveReasoning}
-              citations={answerCitations(store.liveCitations, store.liveToolCalls)}
-              selections={store.liveSelections}
-              stores={store.stores}
-              generating={store.generating}
-              status={generationPhase(store)}
-              artifacts={
-                <ChatArtifacts
-                  artifacts={answerArtifacts(store.liveToolCalls)}
-                  actions={store.artifacts}
-                />
-              }
-              partial={store.outcome !== "ok"}
-              tools={
-                <ChatToolCalls
-                  calls={store.liveToolCalls}
-                  approvalFor={store.approvalFor}
-                  onDecide={(id, approve) => void store.decideApproval(id, approve)}
-                  questionFor={store.questionFor}
-                  onAnswer={(id, answers) => void store.answerQuestion(id, answers)}
-                  onSkip={(id) => void store.skipQuestion(id)}
-                />
-              }
-            />
+            <FadeIn>
+              <ChatMessage
+                content={store.liveText}
+                reasoning={store.liveReasoning}
+                citations={answerCitations(store.liveCitations, store.liveToolCalls)}
+                selections={store.liveSelections}
+                stores={store.stores}
+                generating={store.generating}
+                status={generationPhase(store)}
+                artifacts={
+                  <ChatArtifacts
+                    artifacts={answerArtifacts(store.liveToolCalls)}
+                    actions={store.artifacts}
+                  />
+                }
+                partial={store.outcome !== "ok"}
+                tools={
+                  <ChatToolCalls
+                    calls={store.liveToolCalls}
+                    approvalFor={store.approvalFor}
+                    onDecide={(id, approve) => void store.decideApproval(id, approve)}
+                    questionFor={store.questionFor}
+                    onAnswer={(id, answers) => void store.answerQuestion(id, answers)}
+                    onSkip={(id) => void store.skipQuestion(id)}
+                  />
+                }
+              />
+            </FadeIn>
           )}
           {store.outcome === "cancelled" && (
             <p
@@ -283,42 +291,52 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
             </p>
           )}
           {store.error && (
-            <div
-              role="alert"
-              className="space-y-2.5 rounded-card bg-err-soft p-3.5 text-[13px] text-err"
-            >
-              <p>{store.error}</p>
-              {store.canRetry ? (
-                <Button onClick={store.retry} disabled={!store.available || store.loading}>
-                  Повторить сообщение
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => void store.mount()}
-                  disabled={store.generating || store.loading}
-                >
-                  Перезагрузить чат
-                </Button>
-              )}
-            </div>
+            <FadeIn>
+              <div
+                role="alert"
+                className="space-y-2.5 rounded-card bg-err-soft p-3.5 text-[13px] text-err"
+              >
+                <p>{store.error}</p>
+                {store.canRetry ? (
+                  <Button onClick={store.retry} disabled={!store.available || store.loading}>
+                    Повторить сообщение
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => void store.mount()}
+                    disabled={store.generating || store.loading}
+                  >
+                    Перезагрузить чат
+                  </Button>
+                )}
+              </div>
+            </FadeIn>
           )}
         </div>
       </ScrollArea>
-      {jump && (
-        <div className="pointer-events-none relative z-10 -mt-12 flex justify-center pb-2">
-          <span className="pointer-events-auto rounded-control shadow-pop">
-            <Button
-              onClick={() => {
-                pinned.current = true;
-                setJump(false);
-                scrollLatest();
-              }}
-            >
-              К последнему сообщению ↓
-            </Button>
-          </span>
-        </div>
-      )}
+      <AnimatePresence>
+        {jump && (
+          <motion.div
+            initial={{ opacity: 0, y: level === "full" ? 10 : 0 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: level === "full" ? 10 : 0 }}
+            transition={pop}
+            className="pointer-events-none relative z-10 -mt-12 flex justify-center pb-2"
+          >
+            <span className="pointer-events-auto rounded-control shadow-pop">
+              <Button
+                onClick={() => {
+                  pinned.current = true;
+                  setJump(false);
+                  scrollLatest();
+                }}
+              >
+                К последнему сообщению ↓
+              </Button>
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="px-6">
         <div className="mx-auto w-full max-w-4xl">
           <ChatApprovals store={store} />
@@ -341,7 +359,7 @@ function generationPhase(store: ChatStore): string {
     return "Ожидает подтверждения";
   if (store.questions.length > 0) return "Ожидает ответа";
   const running = store.liveToolCalls.find((call) => call.status === "running");
-  if (running) return `Вызов ${running.key}`;
+  if (running) return toolTitle(running.key);
   if (store.liveText) return "Генерация ответа";
   if (store.liveReasoning) return "Размышления";
   return "Обработка запроса";

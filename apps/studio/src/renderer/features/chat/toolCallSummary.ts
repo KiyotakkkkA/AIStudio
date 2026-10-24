@@ -10,6 +10,8 @@ import {
 } from "./processCopy";
 import { ASK_TOOL, questionRecord, recordSummary } from "./questionCopy";
 import { MEMORY_TOOL, memoryCallSummary } from "../memory/memoryCopy";
+import { WORKING_FOLDER } from "./toolCallCopy";
+import { toolCallView, type ToolCallView } from "./toolCallView";
 
 export function toolArgumentsSummary(value: Json): string {
   const text = typeof value === "string" ? value : JSON.stringify(value);
@@ -68,5 +70,32 @@ export function toolCallSummary(call: ChatToolCallDto): string {
     if (language === "python" || language === "javascript" || language === "powershell")
       return LANGUAGE_LABEL[language];
   }
-  return toolArgumentsSummary(call.arguments);
+  const view = toolCallView(call);
+  const described = view === null ? null : viewSummary(view);
+  return described ?? toolArgumentsSummary(call.arguments);
+}
+
+function viewSummary(view: ToolCallView): string | null {
+  switch (view.kind) {
+    case "search":
+      return `«${view.query}»`;
+    case "folder":
+      return view.glob === null
+        ? (view.path ?? WORKING_FOLDER)
+        : `${view.path ?? WORKING_FOLDER} · ${view.glob}`;
+    case "files": {
+      const names = view.files.map((file) => file.path);
+      return names.length > 2
+        ? `${names.slice(0, 2).join(", ")} и ещё ${String(names.length - 2)}`
+        : names.join(", ");
+    }
+    case "grep":
+      return `«${view.query}»`;
+    case "skill":
+      return view.path === null ? view.skill : `${view.skill} · ${view.path}`;
+    case "fields":
+      return view.fields.map((field) => field.value).join(" · ");
+    default:
+      return null;
+  }
 }

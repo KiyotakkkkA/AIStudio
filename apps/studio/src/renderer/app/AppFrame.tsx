@@ -1,5 +1,6 @@
 import { observer } from "mobx-react-lite";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { MotionConfig } from "motion/react";
 import { Outlet } from "react-router-dom";
 import { useAppNavigation } from "../hooks/useAppNavigation";
 import { useStore } from "../stores/useStore";
@@ -11,6 +12,9 @@ import { ConversationId, HostEvent, NAVIGATION_STEP_DOMAIN } from "@zvs/shared";
 import { ROUTES } from "./routes";
 import PreferencesDialog from "../features/preferences/PreferencesDialog";
 import { fontStack } from "../features/preferences/preferencesPresentation";
+import { FxContext } from "../ui/motion/fx";
+
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 function AppFrame() {
   const { ui, chat, appSettings } = useStore();
@@ -63,6 +67,23 @@ function AppFrame() {
   }, [ui.theme]);
 
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia(REDUCED_MOTION_QUERY);
+    const sync = () => ui.setOsReducedMotion(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, [ui]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.motion = ui.motion;
+    root.dataset.effects = ui.effects;
+  }, [ui.motion, ui.effects]);
+
+  const fx = useMemo(() => ({ motion: ui.motion, effects: ui.effects }), [ui.motion, ui.effects]);
+
+  useEffect(() => {
     const stack = fontStack(ui.fontFamily);
     const root = document.documentElement;
     if (stack === null) root.style.removeProperty("--font-sans");
@@ -91,25 +112,29 @@ function AppFrame() {
   }, [ui]);
 
   return (
-    <AppShell
-      rail={
-        <NavRail
-          groups={NAV_GROUPS}
-          identity={RAIL_IDENTITY}
-          collapsed={ui.railCollapsed}
-          theme={ui.theme}
-          themePicker={ui.railThemePicker}
-          isActive={isActive}
-          onSelect={select}
-          onToggleCollapse={ui.toggleRail}
-          onOpenIdentity={openPreferences}
-          onThemeChange={ui.setTheme}
-        />
-      }
-    >
-      <Outlet />
-      <PreferencesDialog />
-    </AppShell>
+    <FxContext value={fx}>
+      <MotionConfig reducedMotion={ui.motion === "none" ? "always" : "never"}>
+        <AppShell
+          rail={
+            <NavRail
+              groups={NAV_GROUPS}
+              identity={RAIL_IDENTITY}
+              collapsed={ui.railCollapsed}
+              theme={ui.theme}
+              themePicker={ui.railThemePicker}
+              isActive={isActive}
+              onSelect={select}
+              onToggleCollapse={ui.toggleRail}
+              onOpenIdentity={openPreferences}
+              onThemeChange={ui.setTheme}
+            />
+          }
+        >
+          <Outlet />
+          <PreferencesDialog />
+        </AppShell>
+      </MotionConfig>
+    </FxContext>
   );
 }
 

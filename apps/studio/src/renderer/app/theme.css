@@ -5,6 +5,11 @@
 
 @source "../../../node_modules/@kiyotakkkka/zvs-uikit-lib/dist";
 
+@custom-variant anim-on (&:where([data-motion="reduced"] *, [data-motion="full"] *));
+@custom-variant anim-full (&:where([data-motion="full"] *));
+@custom-variant fx-on (&:where([data-effects="reduced"] *, [data-effects="full"] *));
+@custom-variant fx-full (&:where([data-effects="full"] *));
+
 /*
  * ZVS Warm — the studio design system.
  *
@@ -93,6 +98,7 @@
   --animate-zvs-rise: zvs-rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-zvs-shimmer-text: zvs-shimmer-text 2.4s linear infinite;
   --animate-zvs-sweep: zvs-sweep 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  --animate-zvs-halo: zvs-halo 1.6s cubic-bezier(0.3, 0, 0.2, 1) infinite;
 
   @keyframes zvs-rise {
     from {
@@ -113,6 +119,17 @@
     }
     to {
       background-position: 0% 0;
+    }
+  }
+
+  @keyframes zvs-halo {
+    0% {
+      box-shadow: 0 0 0 0 currentColor;
+      opacity: 1;
+    }
+    70%,
+    100% {
+      box-shadow: 0 0 0 5px transparent;
     }
   }
 
@@ -345,36 +362,97 @@ select:focus-visible,
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .zvs-shimmer-text {
-    animation: none;
-    background: none;
-    color: var(--color-main-400);
-  }
+.zvs-beam {
+  position: relative;
+  isolation: isolate;
+}
 
-  .zvs-trace {
-    stroke-dasharray: none;
-    animation: none;
-  }
+:root[data-effects="full"] .zvs-beam::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 1px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--zvs-beam-angle),
+    transparent 0turn,
+    transparent 0.62turn,
+    var(--zvs-beam-color, var(--color-accent-dark)) 0.86turn,
+    transparent 1turn
+  );
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+}
 
-  .animate-zvs-rise,
-  .animate-zvs-sweep {
-    animation: none;
+:root[data-effects="full"][data-motion="full"] .zvs-beam::before {
+  animation: zvs-beam 3.2s linear infinite;
+}
+
+@property --zvs-beam-angle {
+  syntax: "<angle>";
+  initial-value: 40deg;
+  inherits: false;
+}
+
+@keyframes zvs-beam {
+  to {
+    --zvs-beam-angle: 400deg;
   }
+}
+
+:root[data-motion="none"] *,
+:root[data-motion="none"] *::before,
+:root[data-motion="none"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+:root[data-motion="none"] .zvs-shimmer-text {
+  animation: none;
+  background: none;
+  color: var(--color-main-400);
+}
+
+:root[data-motion="none"] .zvs-trace {
+  stroke-dasharray: none;
+  animation: none;
+}
+
+:root[data-motion="none"] .animate-zvs-sweep,
+:root[data-motion="none"] .zvs-shimmer::after {
+  animation: none;
+  opacity: 0;
+}
+
+:root[data-effects="none"] {
+  --zvs-shadow-card: none;
+  --zvs-shadow-frame: none;
+  --zvs-shadow-pop: 0 0 0 1px var(--zvs-line-strong);
+}
+
+:root[data-effects="none"] *,
+:root[data-effects="none"] *::before,
+:root[data-effects="none"] *::after {
+  backdrop-filter: none !important;
 }
 
 .zvs-shimmer::after {
   background: linear-gradient(90deg, transparent, var(--zvs-shimmer), transparent);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  button,
-  a,
-  [role="tab"] {
-    transition-property: color, background-color, border-color, box-shadow, opacity;
-    transition-duration: 120ms;
-    transition-timing-function: ease-out;
-  }
+:where(:root:not([data-motion="none"]) :is(button, a, [role="tab"])) {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 120ms;
+  transition-timing-function: ease-out;
+}
+
+:root[data-motion="full"] .zvs-press:not(:disabled):active {
+  transform: scale(0.97);
 }
 
 .textLayer {

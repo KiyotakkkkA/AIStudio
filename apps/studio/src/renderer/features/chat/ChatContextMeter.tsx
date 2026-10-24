@@ -1,4 +1,5 @@
 import { observer } from "mobx-react-lite";
+import { isBuiltinTool, toolTitle as builtinTitle } from "./toolCallCopy";
 import { Dropdown, Tooltip } from "@kiyotakkkka/zvs-uikit-lib";
 import type { ChatContextDto, ToolDto } from "@zvs/shared";
 import { sourceGroups, sourceKey } from "../tools/toolFilters";
@@ -69,7 +70,7 @@ function StackedBar({
         part.tokens > 0 ? (
           <span
             key={part.key}
-            className={`h-full min-w-0.5 ${part.fill}`}
+            className={`h-full min-w-0.5 anim-on:transition-[width] anim-on:duration-300 ${part.fill}`}
             style={{ width: `${share(part.tokens, total)}%` }}
           />
         ) : null,
@@ -171,13 +172,13 @@ function ToolUsage({
               <li key={tool.key} className="flex items-center gap-2">
                 <span
                   className="min-w-0 flex-1 truncate font-mono text-[11px] text-main-400"
-                  title={toolTitle(tool)}
+                  title={toolHint(tool)}
                 >
-                  {tool.key}
+                  {isBuiltinTool(tool.key) ? builtinTitle(tool.key) : tool.key}
                 </span>
                 <span className="h-1 w-16 shrink-0 overflow-hidden rounded-full bg-main-700">
                   <span
-                    className="block h-full rounded-full bg-info"
+                    className="block h-full rounded-full bg-info anim-on:transition-[width] anim-on:duration-300"
                     style={{ width: `${Math.max(4, share(cost, context.contextWindow))}%` }}
                   />
                 </span>
@@ -193,7 +194,7 @@ function ToolUsage({
   );
 }
 
-function toolTitle(tool: ToolDto): string {
+function toolHint(tool: ToolDto): string {
   return tool.displayName && tool.displayName !== tool.key
     ? `${tool.displayName} — ${tool.key}`
     : tool.key;

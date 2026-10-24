@@ -19,10 +19,15 @@ import TextInput from "../../ui/atoms/TextInput";
 import Toggle from "../../ui/atoms/Toggle";
 import TextComposer from "../../ui/molecules/TextComposer";
 import AppLogo from "../../ui/atoms/AppLogo";
+import Reveal from "../../ui/motion/Reveal";
+import ActivePill from "../../ui/motion/ActivePill";
+import FadeIn from "../../ui/motion/FadeIn";
 import { useStore } from "../../stores/useStore";
 import {
   FONT_FAMILIES,
   FONT_SIZES,
+  FX_LEVELS,
+  FX_PRESETS,
   PREFERENCE_SECTIONS,
   type PreferenceSection,
 } from "../../stores/UiStore";
@@ -38,6 +43,15 @@ import {
   FONT_SIZE_HINT,
   FONT_SIZE_LABEL,
   FONT_SIZE_OPTIONS,
+  FX_EFFECTS_HINT,
+  FX_EFFECTS_LABEL,
+  FX_HINT,
+  FX_LABEL,
+  FX_LEVEL_OPTIONS,
+  FX_MOTION_HINT,
+  FX_MOTION_LABEL,
+  FX_OPTIONS,
+  FX_OS_NOTE,
   GENERAL_ROWS,
   NOTIFICATION_KIND_ROWS,
   NOTIFICATIONS_ROW,
@@ -213,6 +227,47 @@ const AppearanceSection = observer(function AppearanceSection() {
           }}
         />
       </SettingRow>
+      <SettingRow
+        id={SETTING_IDS.fx}
+        label={FX_LABEL}
+        hint={ui.fxPreset === null && ui.osReducedMotion ? `${FX_HINT} ${FX_OS_NOTE}` : FX_HINT}
+      >
+        <SegmentedControl
+          label={FX_LABEL}
+          value={ui.fxShown}
+          options={FX_OPTIONS}
+          onChange={(value) => {
+            const preset = FX_PRESETS.find((option) => option === value);
+            if (preset !== undefined) ui.setFxPreset(preset);
+          }}
+        />
+      </SettingRow>
+      <Reveal show={ui.fxPreset === "custom"}>
+        <div className="ml-4 border-line pl-4">
+          <SettingRow id={SETTING_IDS.fxMotion} label={FX_MOTION_LABEL} hint={FX_MOTION_HINT}>
+            <SegmentedControl
+              label={FX_MOTION_LABEL}
+              value={ui.customMotion}
+              options={FX_LEVEL_OPTIONS}
+              onChange={(value) => {
+                const level = FX_LEVELS.find((option) => option === value);
+                if (level !== undefined) ui.setCustomMotion(level);
+              }}
+            />
+          </SettingRow>
+          <SettingRow id={SETTING_IDS.fxEffects} label={FX_EFFECTS_LABEL} hint={FX_EFFECTS_HINT}>
+            <SegmentedControl
+              label={FX_EFFECTS_LABEL}
+              value={ui.customEffects}
+              options={FX_LEVEL_OPTIONS}
+              onChange={(value) => {
+                const level = FX_LEVELS.find((option) => option === value);
+                if (level !== undefined) ui.setCustomEffects(level);
+              }}
+            />
+          </SettingRow>
+        </div>
+      </Reveal>
     </div>
   );
 });
@@ -494,14 +549,17 @@ function PreferencesDialog() {
             type="button"
             aria-current={section === item ? "page" : undefined}
             onClick={() => ui.openPreferences(item)}
-            className={`flex h-8.5 items-center gap-2.5 rounded-control px-2.5 text-left text-[13px] ${
+            className={`relative flex h-8.5 items-center gap-2.5 rounded-control px-2.5 text-left text-[13px] ${
               section === item
-                ? "bg-main-800 font-medium text-main-50"
+                ? "font-medium text-main-50"
                 : "text-main-300 hover:bg-main-900 hover:text-main-100"
             }`}
           >
-            <Icon path={SECTION_ICONS[item]} size={16} className="flex-none" />
-            {SECTION_LABELS[item]}
+            {section === item ? (
+              <ActivePill layoutId="preferences-section" className="rounded-control bg-main-800" />
+            ) : null}
+            <Icon path={SECTION_ICONS[item]} size={16} className="relative flex-none" />
+            <span className="relative">{SECTION_LABELS[item]}</span>
           </button>
         ))}
       </nav>
@@ -523,12 +581,14 @@ function PreferencesDialog() {
           />
         </div>
         <ScrollArea className="min-h-0 flex-1 px-7 pb-6">
-          {section === "general" ? <GeneralSection /> : null}
-          {section === "profile" ? <ProfileSection /> : null}
-          {section === "appearance" ? <AppearanceSection /> : null}
-          {section === "notifications" ? <NotificationsSection /> : null}
-          {section === "memory" ? <MemorySection /> : null}
-          {section === "about" ? <AboutSection /> : null}
+          <FadeIn key={section}>
+            {section === "general" ? <GeneralSection /> : null}
+            {section === "profile" ? <ProfileSection /> : null}
+            {section === "appearance" ? <AppearanceSection /> : null}
+            {section === "notifications" ? <NotificationsSection /> : null}
+            {section === "memory" ? <MemorySection /> : null}
+            {section === "about" ? <AboutSection /> : null}
+          </FadeIn>
         </ScrollArea>
       </div>
     </Modal>

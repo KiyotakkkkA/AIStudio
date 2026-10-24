@@ -6,6 +6,9 @@ import {
   DEVICE_ROW_LABELS,
   FONT_FAMILY_LABEL,
   FONT_SIZE_LABEL,
+  FX_EFFECTS_LABEL,
+  FX_LABEL,
+  FX_MOTION_LABEL,
   GENERAL_ROWS,
   NOTIFICATION_KIND_ROWS,
   NOTIFICATIONS_ROW,
@@ -31,6 +34,9 @@ export const SETTING_IDS = {
   railPicker: "appearance.railPicker",
   fontFamily: "appearance.fontFamily",
   fontSize: "appearance.fontSize",
+  fx: "appearance.fx",
+  fxMotion: "appearance.fxMotion",
+  fxEffects: "appearance.fxEffects",
 } as const;
 
 const SEARCH_LIMIT = 8;
@@ -48,6 +54,19 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: SETTING_IDS.railPicker, section: "appearance", label: RAIL_PICKER_LABEL },
   { id: SETTING_IDS.fontFamily, section: "appearance", label: FONT_FAMILY_LABEL },
   { id: SETTING_IDS.fontSize, section: "appearance", label: FONT_SIZE_LABEL },
+  { id: SETTING_IDS.fx, section: "appearance", label: FX_LABEL },
+  {
+    id: SETTING_IDS.fxMotion,
+    section: "appearance",
+    label: FX_MOTION_LABEL,
+    fallback: SETTING_IDS.fx,
+  },
+  {
+    id: SETTING_IDS.fxEffects,
+    section: "appearance",
+    label: FX_EFFECTS_LABEL,
+    fallback: SETTING_IDS.fx,
+  },
   { id: NOTIFICATIONS_ROW.key, section: "notifications", label: NOTIFICATIONS_ROW.label },
   ...NOTIFICATION_KIND_ROWS.map((row) => ({
     id: row.key,
