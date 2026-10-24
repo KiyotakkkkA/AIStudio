@@ -20,11 +20,11 @@ use webview2_com::Microsoft::Web::WebView2::Win32::{
     ICoreWebView2Settings2,
 };
 use webview2_com::{
-    CallDevToolsProtocolMethodCompletedHandler, DevToolsProtocolEventReceivedEventHandler,
-    DocumentTitleChangedEventHandler, GetCookiesCompletedHandler, HistoryChangedEventHandler,
-    NavigationCompletedEventHandler, NavigationStartingEventHandler, ProcessFailedEventHandler,
-    SourceChangedEventHandler, WebResourceRequestedEventHandler, WindowCloseRequestedEventHandler,
-    take_pwstr,
+    CallDevToolsProtocolMethodCompletedHandler, DOMContentLoadedEventHandler,
+    DevToolsProtocolEventReceivedEventHandler, DocumentTitleChangedEventHandler,
+    GetCookiesCompletedHandler, HistoryChangedEventHandler, NavigationCompletedEventHandler,
+    NavigationStartingEventHandler, ProcessFailedEventHandler, SourceChangedEventHandler,
+    WebResourceRequestedEventHandler, WindowCloseRequestedEventHandler, take_pwstr,
 };
 use zvs_host::browser::is_web_url;
 
@@ -194,6 +194,15 @@ pub fn observe_site(platform: &PlatformWebview, sink: SignalSink) -> ::windows::
                 if let Some(sender) = sender {
                     signal(PageSignal::Snapshot(snapshot(&sender)));
                 }
+                Ok(())
+            })),
+            &raw mut token,
+        )?;
+
+        let signal = Arc::clone(&sink);
+        webview.cast::<ICoreWebView2_2>()?.add_DOMContentLoaded(
+            &DOMContentLoadedEventHandler::create(Box::new(move |_, _| {
+                signal(PageSignal::Interactive);
                 Ok(())
             })),
             &raw mut token,

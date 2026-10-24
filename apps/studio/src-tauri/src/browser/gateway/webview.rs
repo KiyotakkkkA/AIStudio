@@ -60,6 +60,7 @@ pub struct PageWatch {
     page: Url,
     current: String,
     ready: bool,
+    settling: bool,
     broken: bool,
 }
 
@@ -69,6 +70,7 @@ impl PageWatch {
             page: page.clone(),
             current: String::new(),
             ready: false,
+            settling: false,
             broken: false,
         }
     }
@@ -88,6 +90,16 @@ impl PageWatch {
                 self.current.clone_from(&snapshot.url);
                 (self.ready && !allowed_location(&self.page, &snapshot.url))
                     .then_some(Watch::Broken)
+            }
+            PageSignal::Interactive
+                if !self.ready && !self.settling && allowed_location(&self.page, &self.current) =>
+            {
+                self.settling = true;
+                Some(Watch::Loaded)
+            }
+            PageSignal::Finished(_) if self.settling => {
+                self.settling = false;
+                None
             }
             PageSignal::Finished(None)
                 if !self.ready && allowed_location(&self.page, &self.current) =>
@@ -311,7 +323,7 @@ impl WebviewPages {
             .as_ref()
             .and_then(|value| value.get("readyState"))
             .and_then(Value::as_str)
-            != Some("complete")
+            .is_none_or(|state| state == "loading")
         {
             cdp.close();
             return Err("the gateway document has not finished loading".to_owned());
@@ -503,6 +515,32 @@ mod tests {
             watch.apply(&PageSignal::Finished(None)),
             Some(Watch::Loaded)
         );
+    }
+
+    #[test]
+    fn a_parsed_document_is_ready_without_waiting_for_slow_subresources() {
+        let page = Url::parse("https://chat.z.ai/").unwrap();
+        let mut watch = PageWatch::new(&page);
+        assert_eq!(watch.apply(&at(BLANK)), None);
+        assert_eq!(watch.apply(&PageSignal::Interactive), None);
+        watch.apply(&at("https://chat.z.ai/?fr=default"));
+        assert_eq!(watch.apply(&PageSignal::Interactive), Some(Watch::Loaded));
+        watch.mark_ready();
+        assert_eq!(watch.apply(&PageSignal::Finished(None)), None);
+        assert_eq!(
+            watch.apply(&PageSignal::Finished(None)),
+            Some(Watch::Broken)
+        );
+
+        let mut slow = PageWatch::new(&page);
+        slow.apply(&at("https://chat.z.ai/"));
+        assert_eq!(slow.apply(&PageSignal::Interactive), Some(Watch::Loaded));
+        assert_eq!(
+            slow.apply(&PageSignal::Finished(Some(LoadFailure::Other(7)))),
+            None
+        );
+        slow.mark_ready();
+        assert_eq!(slow.apply(&PageSignal::Started), Some(Watch::Broken));
     }
 
     #[test]

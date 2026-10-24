@@ -484,7 +484,7 @@ impl AccountGateway {
 
     async fn live(&self, origin: &str, page: &Url) -> Result<Live, AppError> {
         let slot = Arc::clone(lock(&self.slots).entry(origin.to_owned()).or_default());
-        let mut current = slot.lock().await;
+        let mut current = slot.lock_owned().await;
         if let Some(live) = current.as_ref().filter(|live| live.page.healthy()) {
             return Ok(live.clone());
         }
@@ -498,36 +498,45 @@ impl AccountGateway {
                 &[("origin", json!(origin))],
             );
         }
-        let routes = Routes::shared();
-        let opened = tokio::time::timeout(
+        let (factory, logger, ready_timeout) = (
+            Arc::clone(&self.factory),
+            self.logger.clone(),
             self.options.ready_timeout,
-            self.factory.open(origin, page, Arc::clone(&routes)),
-        )
-        .await;
-        let page = match opened {
-            Ok(Ok(page)) => page,
-            Ok(Err(error)) => {
-                self.logger.log(
-                    LogLevel::Warn,
-                    "browser",
-                    "Could not open the account gateway",
-                    &[("origin", json!(origin)), ("error", json!(error))],
-                );
-                return Err(unreachable());
-            }
-            Err(_) => {
-                self.logger.log(
-                    LogLevel::Warn,
-                    "browser",
-                    "The account gateway did not become ready",
-                    &[("origin", json!(origin))],
-                );
-                return Err(timed_out(seconds(self.options.ready_timeout)));
-            }
-        };
-        let live = Live { page, routes };
-        *current = Some(live.clone());
-        Ok(live)
+        );
+        let (origin, page) = (origin.to_owned(), page.clone());
+        let opening = tokio::spawn(async move {
+            let routes = Routes::shared();
+            let opened = tokio::time::timeout(
+                ready_timeout,
+                factory.open(&origin, &page, Arc::clone(&routes)),
+            )
+            .await;
+            let page = match opened {
+                Ok(Ok(page)) => page,
+                Ok(Err(error)) => {
+                    logger.log(
+                        LogLevel::Warn,
+                        "browser",
+                        "Could not open the account gateway",
+                        &[("origin", json!(origin)), ("error", json!(error))],
+                    );
+                    return Err(unreachable());
+                }
+                Err(_) => {
+                    logger.log(
+                        LogLevel::Warn,
+                        "browser",
+                        "The account gateway did not become ready",
+                        &[("origin", json!(origin))],
+                    );
+                    return Err(timed_out(seconds(ready_timeout)));
+                }
+            };
+            let live = Live { page, routes };
+            *current = Some(live.clone());
+            Ok(live)
+        });
+        opening.await.map_err(|_| unreachable())?
     }
 
     async fn discard(&self, origin: &str, broken: &Live) {

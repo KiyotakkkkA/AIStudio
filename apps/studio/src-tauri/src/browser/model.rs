@@ -44,6 +44,7 @@ pub enum PageSignal {
     Started,
     Snapshot(PageSnapshot),
     Finished(Option<LoadFailure>),
+    Interactive,
     Blocked,
     Crashed,
     CloseRequested,
@@ -265,7 +266,7 @@ impl Model {
             }
             PageSignal::Blocked => tab.error = Some(NAVIGATION_BLOCKED.to_owned()),
             PageSignal::Crashed => tab.error = Some(PROCESS_GONE.to_owned()),
-            PageSignal::CloseRequested => return false,
+            PageSignal::CloseRequested | PageSignal::Interactive => return false,
         }
         true
     }

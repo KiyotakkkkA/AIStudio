@@ -589,22 +589,27 @@ async fn scenario(app: AppHandle, profile: PathBuf, port: u16, fixture: Arc<Fixt
     );
 
     if std::env::var_os("ZVS_LIVE_VENDOR").is_some() {
-        let live = within(gateway.fetch(
+        for endpoint in [
             "https://chat.qwen.ai/api/v1/auths/",
-            SessionRequest::new("GET").with_header("accept", "application/json"),
-            &CancellationToken::new(),
-        ))
-        .await;
-        match live {
-            Some(Ok(response)) => println!(
-                "live    chat.qwen.ai identity answered {} ({:?})",
-                response.status,
-                response.headers.get("content-type")
-            ),
-            other => println!(
-                "live    chat.qwen.ai identity failed: {:?}",
-                other.map(|result| result.err())
-            ),
+            "https://chat.z.ai/api/v1/auths/",
+        ] {
+            let live = within(gateway.fetch(
+                endpoint,
+                SessionRequest::new("GET").with_header("accept", "application/json"),
+                &CancellationToken::new(),
+            ))
+            .await;
+            match live {
+                Some(Ok(response)) => println!(
+                    "live    {endpoint} answered {} ({:?})",
+                    response.status,
+                    response.headers.get("content-type")
+                ),
+                other => println!(
+                    "live    {endpoint} failed: {:?}",
+                    other.map(|result| result.err())
+                ),
+            }
         }
     }
 

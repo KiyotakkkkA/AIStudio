@@ -215,6 +215,8 @@ struct FakePages {
     pages: Mutex<Vec<(String, Arc<FakePage>)>>,
     failures: AtomicUsize,
     hang: AtomicBool,
+    load_time: Mutex<Option<Duration>>,
+    opens: AtomicUsize,
     disposed: AtomicBool,
     renewal: Arc<Mutex<Value>>,
 }
@@ -262,8 +264,13 @@ impl PageFactory for FakePages {
     ) -> Result<SharedPage, String> {
         assert_eq!(Some(page), page_url(origin).as_ref());
         assert_eq!(page.origin().ascii_serialization(), origin);
+        self.opens.fetch_add(1, Ordering::SeqCst);
         if self.hang.load(Ordering::SeqCst) {
             std::future::pending::<()>().await;
+        }
+        let load_time = *lock(&self.load_time);
+        if let Some(load_time) = load_time {
+            tokio::time::sleep(load_time).await;
         }
         if self
             .failures
@@ -644,6 +651,27 @@ async fn a_page_that_never_loads_times_out() {
         .expect_err("times out");
     assert_eq!(error.message, TIMED_OUT_MESSAGE);
     assert_eq!(error.details.expect("details")["timeoutSeconds"], 5);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_caller_that_gives_up_leaves_a_slow_page_loading_for_the_next_one() {
+    let pages = FakePages::shared(respond(200, vec![b"ok".to_vec()]));
+    *lock(&pages.load_time) = Some(Duration::from_secs(3));
+    let gateway = gateway(&pages);
+    let early = tokio::time::timeout(
+        Duration::from_secs(1),
+        gateway.fetch(QWEN, request(), &CancellationToken::new()),
+    )
+    .await;
+    assert!(
+        early.is_err(),
+        "the first caller gave up before the page loaded"
+    );
+    gateway
+        .fetch(QWEN, request(), &CancellationToken::new())
+        .await
+        .expect("the next caller gets the page that kept loading");
+    assert_eq!(pages.opens.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test]
