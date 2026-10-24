@@ -21,7 +21,7 @@ import {
   type Contract,
   type ConversationDetailDto,
   type ConversationDto,
-  type ConversationId,
+  ConversationId,
   type DocumentSelectionDto,
   type FolderAccessAnswer,
   type FolderGrantScope,
@@ -46,6 +46,7 @@ import TerminalStore from "../terminal/TerminalStore";
 import { isAutomaticTool, RECOMMENDED_TOOLS, toolBlockReason } from "./toolSets";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
+const LAST_CONVERSATION_KEY = "chat.conversation.last";
 export const SELECTIONS_FULL = "К сообщению можно приложить не больше 8 фрагментов документов.";
 
 export type SidePanel = "context" | "files";
@@ -108,6 +109,7 @@ export default class ChatStore {
   private revision = 0;
   private mounted = false;
   private pendingOpen: ConversationId | null = null;
+  private remembered: ConversationId | null | undefined;
   private ready = false;
   private retryText = "";
   private contextRevision = 0;
@@ -131,6 +133,7 @@ export default class ChatStore {
       | "revision"
       | "mounted"
       | "pendingOpen"
+      | "remembered"
       | "ready"
       | "retryText"
       | "contextRevision"
@@ -150,6 +153,7 @@ export default class ChatStore {
         revision: false,
         mounted: false,
         pendingOpen: false,
+        remembered: false,
         ready: false,
         retryText: false,
         contextRevision: false,
@@ -558,7 +562,7 @@ export default class ChatStore {
     this.error = null;
     const revision = ++this.revision;
     try {
-      const [conversations, summaries, stores, tools, accounts, adapters, servers] =
+      const [conversations, summaries, stores, tools, accounts, adapters, servers, last] =
         await Promise.all([
           this.ipc.call("chat.conversations.list", undefined),
           this.ipc.call("providers.list", { capability: "text", enabled: true }),
@@ -569,6 +573,7 @@ export default class ChatStore {
           this.ipc.call("accounts.list", undefined).catch((): AccountDto[] => []),
           this.ipc.call("providers.adapters", undefined).catch((): AdapterDescriptorDto[] => []),
           this.ipc.call("mcp.list", undefined).catch((): McpServerDto[] => this.servers),
+          this.lastConversation(),
         ]);
       const providers = await Promise.all(
         summaries.map((provider) =>
@@ -584,6 +589,7 @@ export default class ChatStore {
         this.accounts = accounts;
         this.adapters = adapters;
         this.servers = servers;
+        this.remembered = last;
         if (!this.composer.providerId && providers[0]) this.composer.selectProvider(providers[0]);
         this.loading = false;
       });
@@ -606,6 +612,7 @@ export default class ChatStore {
         if (this.listed(pending)) await this.select(pending);
         else this.newChat();
       } else if (this.active) await this.select(this.active.id);
+      else if (last !== null && this.listed(last)) await this.select(last);
     } catch (error) {
       runInAction(() => {
         if (revision === this.revision) {
@@ -631,6 +638,24 @@ export default class ChatStore {
     });
   }
 
+  private async lastConversation(): Promise<ConversationId | null> {
+    try {
+      const stored = await this.ipc.call("settings.get", { key: LAST_CONVERSATION_KEY });
+      const parsed = ConversationId.safeParse(stored.value);
+      return parsed.success ? parsed.data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private remember(id: ConversationId | null) {
+    if (this.remembered === id) return;
+    this.remembered = id;
+    void this.ipc
+      .call("settings.set", { key: LAST_CONVERSATION_KEY, value: id })
+      .catch(() => undefined);
+  }
+
   private listed(id: ConversationId) {
     return this.conversations.some((conversation) => conversation.id === id);
   }
@@ -650,6 +675,7 @@ export default class ChatStore {
       runInAction(() => {
         if (revision !== this.revision) return;
         this.active = active;
+        this.remember(active.id);
         const activeProvider = this.providers.find((provider) => provider.id === active.providerId);
         if (activeProvider) {
           this.composer.selectProvider(activeProvider);
@@ -681,6 +707,7 @@ export default class ChatStore {
     if (this.generating) return;
     ++this.revision;
     this.active = null;
+    this.remember(null);
     this.loading = false;
     this.error = null;
     this.folderError = null;
@@ -784,6 +811,7 @@ export default class ChatStore {
     });
     runInAction(() => {
       this.active = { ...conversation, messages: [] };
+      this.remember(conversation.id);
       this.conversations.unshift(conversation);
     });
     return conversation.id;

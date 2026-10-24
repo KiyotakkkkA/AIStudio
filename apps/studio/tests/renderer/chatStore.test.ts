@@ -8,6 +8,7 @@ import {
   MessageDto,
   DocumentSelectionDto,
   type Contract,
+  type Json,
   VectorStoreId,
   type AccountDto,
   type ProviderId,
@@ -430,5 +431,34 @@ test("attaching past the limit reports it instead of dropping silently", async (
   expect(store.composer.selections).toHaveLength(8);
   expect(store.error).toBe(SELECTIONS_FULL);
   store.dispose();
+  events.dispose();
+});
+
+test("the last opened conversation is remembered and reopened on the next mount", async () => {
+  const stored = new Map<string, Json>([["chat.conversation.last", id]]);
+  const { store, bridge, events } = setup();
+  bridge
+    .handle("settings.get", ({ key }) => ({ key, value: stored.get(key) }))
+    .handle("settings.set", ({ key, value }) => {
+      stored.set(key, value);
+      return { key, value, updatedAt: Date.now() };
+    });
+  await store.mount();
+  expect(store.active?.id).toBe(id);
+  expect(bridge.calls.some((call) => call.channel === "settings.set")).toBe(false);
+  store.newChat();
+  await vi.waitFor(() => expect(stored.get("chat.conversation.last")).toBeNull());
+  store.dispose();
+  const fresh = new ChatStore(createIpcClient(contract, bridge), events);
+  await fresh.mount();
+  expect(fresh.active).toBeNull();
+  await fresh.select(conversation.id);
+  await vi.waitFor(() => expect(stored.get("chat.conversation.last")).toBe(id));
+  fresh.dispose();
+  stored.set("chat.conversation.last", "0199bb11-4444-7111-8111-0000000000ff");
+  const stale = new ChatStore(createIpcClient(contract, bridge), events);
+  await stale.mount();
+  expect(stale.active).toBeNull();
+  stale.dispose();
   events.dispose();
 });
