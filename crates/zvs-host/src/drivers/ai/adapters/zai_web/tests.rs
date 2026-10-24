@@ -110,6 +110,7 @@ async fn visible_models_are_listed_with_their_reasoning_and_output_limit() {
             DiscoveredModel {
                 display_name: "GLM-5.3-Flash".to_owned(),
                 family: Some("glm".to_owned()),
+                context_window: Some(1_000_000),
                 max_output: Some(128_000),
                 capabilities: vec![ModelCapability::Streaming, ModelCapability::Reasoning],
                 ..DiscoveredModel::named("x-preview-l")
@@ -117,6 +118,7 @@ async fn visible_models_are_listed_with_their_reasoning_and_output_limit() {
             DiscoveredModel {
                 display_name: "GLM-5.2".to_owned(),
                 family: Some("glm".to_owned()),
+                context_window: Some(1_000_000),
                 max_output: Some(64_064),
                 capabilities: vec![ModelCapability::Streaming, ModelCapability::Reasoning],
                 ..DiscoveredModel::named("glm-5.2")
@@ -127,6 +129,21 @@ async fn visible_models_are_listed_with_their_reasoning_and_output_limit() {
     assert_eq!(call.header("x-fe-version").as_deref(), Some(ZAI_FE_VERSION));
     assert_eq!(call.header("x-region").as_deref(), Some("overseas"));
     const { assert!(ZAI_WEB_CAPABILITIES.live_model_list) };
+}
+
+#[test]
+fn an_unlisted_model_gets_the_default_window_and_its_output_stays_inside_it() {
+    let models = map_zai_models(&json!({ "data": [
+        { "id": "glm-4.7", "name": "GLM-4.7", "info": { "params": { "max_tokens": 1_000_000 },
+          "meta": { "capabilities": { "think": true } } } },
+        { "id": "GLM-5-Turbo", "name": "GLM-5-Turbo", "info": { "params": { "max_tokens": 300_000 },
+          "meta": { "capabilities": { "think": true } } } },
+    ] }))
+    .expect("maps");
+    assert_eq!(models[0].context_window, Some(ZAI_DEFAULT_CONTEXT_WINDOW));
+    assert_eq!(models[0].max_output, Some(ZAI_DEFAULT_CONTEXT_WINDOW));
+    assert_eq!(models[1].context_window, Some(204_800));
+    assert_eq!(models[1].max_output, Some(204_800));
 }
 
 #[tokio::test]

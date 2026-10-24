@@ -50,6 +50,7 @@ struct ModelsPayload {
 pub struct ZaiModel {
     pub id: String,
     pub display_name: String,
+    pub context_window: Option<i64>,
     pub max_output: Option<i64>,
     pub thinking: bool,
     pub reasoning_efforts: Vec<String>,
@@ -103,13 +104,31 @@ fn efforts(meta: Option<&ModelMeta>) -> Vec<String> {
     }
 }
 
+pub const CONTEXT_WINDOWS: [(&str, i64); 3] = [
+    ("glm-5.3", 1_000_000),
+    ("glm-5.2", 1_000_000),
+    ("glm-5", 204_800),
+];
+
+pub fn known_context_window(id: &str, display_name: &str) -> Option<i64> {
+    let names = [display_name.to_ascii_lowercase(), id.to_ascii_lowercase()];
+    CONTEXT_WINDOWS.iter().find_map(|(prefix, window)| {
+        names
+            .iter()
+            .any(|name| name.starts_with(prefix))
+            .then_some(*window)
+    })
+}
+
 fn to_model(id: String, entry: &ModelEntry) -> ZaiModel {
     let info = entry.info.as_ref();
     let meta = info.and_then(|info| info.meta.as_ref());
+    let display_name = text(entry.name.as_deref())
+        .or_else(|| text(info.and_then(|info| info.name.as_deref())))
+        .unwrap_or_else(|| id.clone());
     ZaiModel {
-        display_name: text(entry.name.as_deref())
-            .or_else(|| text(info.and_then(|info| info.name.as_deref())))
-            .unwrap_or_else(|| id.clone()),
+        context_window: known_context_window(&id, &display_name),
+        display_name,
         max_output: positive(
             info.and_then(|info| info.params.as_ref())
                 .and_then(|params| params.max_tokens.as_ref()),
@@ -179,11 +198,29 @@ mod tests {
             panic!("three models");
         };
         assert_eq!(fresh.max_output, Some(128_000));
+        assert_eq!(fresh.context_window, Some(1_000_000));
+        assert_eq!(plain.context_window, Some(1_000_000));
+        assert_eq!(hidden.context_window, None);
         assert_eq!(fresh.reasoning_efforts, ["low", "max"]);
         assert_eq!(plain.display_name, "GLM-5.2");
         assert_eq!(plain.reasoning_efforts, ["high", "max"]);
         assert!(hidden.hidden && !hidden.thinking);
         assert!(hidden.reasoning_efforts.is_empty());
+    }
+
+    #[test]
+    fn context_windows_follow_the_published_glm_sizes_by_name_or_id() {
+        for (id, name, window) in [
+            ("x-preview-l", "GLM-5.3-Flash", Some(1_000_000)),
+            ("glm-5.3", "GLM-5.3", Some(1_000_000)),
+            ("glm-5.2", "GLM-5.2", Some(1_000_000)),
+            ("GLM-5-Turbo", "GLM-5-Turbo", Some(204_800)),
+            ("GLM-5v-Turbo", "GLM-5V-Turbo", Some(204_800)),
+            ("glm-4.7", "GLM-4.7", None),
+            ("0727-360B-API", "GLM-4.5", None),
+        ] {
+            assert_eq!(known_context_window(id, name), window, "{id}");
+        }
     }
 
     #[test]

@@ -41,6 +41,7 @@ pub use zvs_zai_web::protocol::{
 pub const ZAI_GENERATION_ABORTED_MESSAGE: &str = "Вендор прервал генерацию";
 pub const ZAI_CHAINS_MAX: usize = 256;
 pub const ZAI_MODELS_TTL_MS: i64 = 60 * 60 * 1000;
+pub const ZAI_DEFAULT_CONTEXT_WINDOW: i64 = 131_072;
 
 pub const ZAI_WEB_CAPABILITIES: AdapterCapabilities = AdapterCapabilities {
     family: AdapterFamily::ZaiWeb,
@@ -56,6 +57,7 @@ pub const ZAI_WEB_CAPABILITIES: AdapterCapabilities = AdapterCapabilities {
 const FAMILY: AdapterFamily = AdapterFamily::ZaiWeb;
 
 fn to_discovered_model(model: ZaiModel) -> DiscoveredModel {
+    let context_window = model.context_window.unwrap_or(ZAI_DEFAULT_CONTEXT_WINDOW);
     let mut capabilities = vec![ModelCapability::Streaming];
     if model.thinking {
         capabilities.push(ModelCapability::Reasoning);
@@ -63,7 +65,8 @@ fn to_discovered_model(model: ZaiModel) -> DiscoveredModel {
     DiscoveredModel {
         display_name: model.display_name,
         family: Some("glm".to_owned()),
-        max_output: model.max_output,
+        context_window: Some(context_window),
+        max_output: model.max_output.map(|limit| limit.min(context_window)),
         capabilities,
         ..DiscoveredModel::named(model.id)
     }

@@ -5,7 +5,7 @@ pub mod request;
 pub mod signature;
 pub mod stream;
 
-pub use models::{ModelList, ZaiModel, parse_models};
+pub use models::{ModelList, ZaiModel, known_context_window, parse_models};
 pub use page::{
     BEARER_QUERY, CAPTCHA, CAPTCHA_FIELD, CAPTCHA_REQUIRED_CODE, CHALLENGE_PATTERN, Captcha,
     FE_VERSION_HEADER, PAGE_BEARER_KEY, is_turn, needs_captcha,
