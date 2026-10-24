@@ -1,4 +1,5 @@
 import type { DeviceProfileDto } from "@zvs/shared";
+import { APP_CHANNEL, APP_VERSION } from "../../app/appEnv";
 import {
   DEFAULT_FONT_SIZE,
   FONT_SIZES,
@@ -13,8 +14,6 @@ import { formatBytes } from "../downloads/downloadPresentation";
 import type { AppSettingKey } from "./AppSettingsStore";
 
 export const APP_NAME = "ZVS AI Studio";
-const APP_VERSION = "1.0.0";
-const APP_CHANNEL = "BETA";
 export const APP_VERSION_LABEL = `${APP_CHANNEL} v${APP_VERSION}`;
 export const APP_EDITION = "Локальная установка";
 

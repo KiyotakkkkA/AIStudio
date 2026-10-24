@@ -17,6 +17,7 @@ harness = false
 required-features = ["e2e"]
 
 [build-dependencies]
+serde_json = { workspace = true }
 tauri-build = { version = "=2.7.1", features = ["isolation"] }
 
 [features]

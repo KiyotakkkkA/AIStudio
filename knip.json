@@ -3,7 +3,8 @@
   "workspaces": {
     ".": {
       "entry": ["scripts/*.mjs", "e2e/**/*.ts", "test/helpers/fakeMcpServer.mjs"],
-      "ignoreBinaries": ["tauri"]
+      "ignoreBinaries": ["tauri"],
+      "ignore": ["scripts/app-env.d.mts"]
     },
     "apps/studio": {
       "entry": [

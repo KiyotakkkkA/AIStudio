@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+import { appEnvDefine } from "./scripts/app-env.mjs";
 
 const from = (relative: string): string => fileURLToPath(new URL(relative, import.meta.url));
 
@@ -10,6 +11,7 @@ const alias = {
 
 const shared = {
   resolve: { alias },
+  define: appEnvDefine(),
   esbuild: { jsx: "automatic" as const },
 };
 

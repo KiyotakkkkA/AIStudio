@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type Plugin } from "vite";
+import { APP_ENV_PATH, appEnvDefine } from "../../scripts/app-env.mjs";
 
 interface TauriConfig {
   build: { devUrl: string };
@@ -42,6 +43,18 @@ function tauriContentSecurityPolicy(command: "build" | "serve", nonce: string): 
   };
 }
 
+function appEnvReload(): Plugin {
+  return {
+    name: "zvs-app-env-reload",
+    configureServer(server) {
+      server.watcher.add(APP_ENV_PATH);
+      server.watcher.on("change", (path) => {
+        if (path === APP_ENV_PATH) void server.restart();
+      });
+    },
+  };
+}
+
 export default defineConfig(({ command }) => {
   const nonce = randomBytes(16).toString("base64");
   const devPort = Number(new URL(tauriConfig.build.devUrl).port);
@@ -63,9 +76,10 @@ export default defineConfig(({ command }) => {
     },
     define: {
       __ZVS_VALIDATE_IPC__: JSON.stringify(process.env.ZVS_VALIDATE_IPC !== "false"),
+      ...appEnvDefine(),
     },
     html: command === "serve" ? { cspNonce: nonce } : {},
-    plugins: [tailwindcss(), tauriContentSecurityPolicy(command, nonce)],
+    plugins: [tailwindcss(), tauriContentSecurityPolicy(command, nonce), appEnvReload()],
     server: {
       port: devPort,
       strictPort: true,

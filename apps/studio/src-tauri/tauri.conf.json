@@ -1,7 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ZVS AI Studio",
-  "version": "1.0.0",
   "mainBinaryName": "zvs-studio",
   "identifier": "com.zvs.aistudio",
   "build": {

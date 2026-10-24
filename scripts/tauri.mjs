@@ -3,6 +3,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 import process from "node:process";
+import { readAppEnv } from "./app-env.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const localProtoc = join(
@@ -44,15 +45,15 @@ const sidecar = join(
   "target/release",
   process.platform === "win32" ? "zvs-jobd.exe" : "zvs-jobd",
 );
-const overlay = join(root, "target/tauri.bundle.json");
-if (bundling) {
-  writeFileSync(
-    overlay,
-    JSON.stringify({ bundle: { resources: { [sidecar]: basename(sidecar) } } }),
-  );
-}
-const bundle = bundling ? ["--config", overlay] : [];
-const tauri = spawnSync("pnpm", ["exec", "tauri", command, ...rest, ...bundle], {
+const overlay = join(root, "target/tauri.overlay.json");
+writeFileSync(
+  overlay,
+  JSON.stringify({
+    version: readAppEnv().ZVS_APP_VERSION,
+    ...(bundling ? { bundle: { resources: { [sidecar]: basename(sidecar) } } } : {}),
+  }),
+);
+const tauri = spawnSync("pnpm", ["exec", "tauri", command, ...rest, "--config", overlay], {
   cwd: join(root, "apps/studio"),
   stdio: "inherit",
   shell: process.platform === "win32",
