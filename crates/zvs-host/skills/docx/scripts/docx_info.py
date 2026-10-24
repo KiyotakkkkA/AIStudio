@@ -11,6 +11,8 @@ from collections import Counter
 from docx import Document
 from docx.shared import Length
 
+from _blocks import BLOCK_TAGS, page_numbers
+
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
@@ -59,13 +61,16 @@ def main() -> int:
         }
         for section in document.sections
     ]
+    pages, page_source = page_numbers(document)
     normal = document.styles["Normal"].font
     info = {
-        "blocks": sum(1 for child in body.iterchildren() if child.tag in (f"{W}p", f"{W}tbl")),
+        "blocks": sum(1 for child in body.iterchildren() if child.tag in BLOCK_TAGS),
         "paragraphs": len(paragraphs),
         "words": words,
         "tables": [{"rows": len(table.rows), "columns": len(table.columns)} for table in document.tables],
-        "images": len([name for name in names if name.startswith("word/media/")]),
+        "pages": max(pages, default=0),
+        "pagesSource": page_source,
+        "images": document_xml.count("<a:blip ") + document_xml.count("<v:imagedata "),
         "comments": comments,
         "trackedChanges": document_xml.count("<w:ins ") + document_xml.count("<w:del "),
         "fields": document_xml.count("<w:fldChar ") // 2 + document_xml.count("<w:fldSimple "),

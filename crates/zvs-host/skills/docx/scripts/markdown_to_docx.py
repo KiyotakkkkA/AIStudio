@@ -14,6 +14,8 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Mm, Pt, RGBColor
 
+from _blocks import prune_relationships
+
 INLINE = re.compile(r"(\*\*\*.+?\*\*\*|\*\*.+?\*\*|__.+?__|(?<![*\w])\*(?!\s).+?(?<!\s)\*(?!\*)|`[^`]+`|\[[^\]]+\]\([^)]+\))")
 
 
@@ -229,6 +231,8 @@ def main() -> int:
         document.core_properties.title = args.title
 
     build(document, markdown, args.mono_font)
+    if args.template:
+        prune_relationships(document.part)
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     document.save(output)

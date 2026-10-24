@@ -9,6 +9,8 @@ from docx import Document
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
+from _blocks import body_blocks, page_numbers
+
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
@@ -37,7 +39,10 @@ def numbering_formats(document) -> dict[tuple[str, str], str]:
 
 def run_text(paragraph: Paragraph) -> str:
     parts = []
-    for run in paragraph.runs:
+    runs = []
+    for item in paragraph.iter_inner_content():
+        runs.extend(item.runs if hasattr(item, "runs") else [item])
+    for run in runs:
         if run.element.findall(f".//{A}blip"):
             parts.append("![image]")
         text = run.text
@@ -109,30 +114,40 @@ def main() -> int:
     parser.add_argument("file")
     parser.add_argument("--start", type=int, default=0, help="index of the first block")
     parser.add_argument("--limit", type=int, default=300, help="how many blocks to print")
-    parser.add_argument("--with-index", action="store_true", help="prefix every block with its index")
+    parser.add_argument("--with-index", action="store_true", help="prefix every block with its index and mark page starts")
     args = parser.parse_args()
 
     document = Document(args.file)
     formats = numbering_formats(document)
     shift = 1 if any(p.style is not None and p.style.name == "Title" for p in document.paragraphs) else 0
-    blocks = []
-    for child in document.element.body.iterchildren():
-        if child.tag == f"{W}p":
-            blocks.append(Paragraph(child, document))
-        elif child.tag == f"{W}tbl":
-            blocks.append(Table(child, document))
+    elements = body_blocks(document.element.body)
+    pages, page_source = page_numbers(document)
 
-    end = min(len(blocks), args.start + max(args.limit, 1))
+    def render(element) -> str:
+        if element.tag == f"{W}tbl":
+            return table_markdown(Table(element, document))
+        if element.tag == f"{W}p":
+            return paragraph_markdown(Paragraph(element, document), formats, shift)
+        parts = [paragraph_markdown(Paragraph(node, document), formats, shift) for node in element.iter(f"{W}p")]
+        return "\n\n".join(part for part in parts if part)
+
+    start = max(args.start, 0)
+    end = min(len(elements), start + max(args.limit, 1))
     out = []
-    for index in range(max(args.start, 0), end):
-        block = blocks[index]
-        text = table_markdown(block) if isinstance(block, Table) else paragraph_markdown(block, formats, shift)
+    if args.with_index:
+        out.append(f"[pages counted from {page_source}; blocks are 0-based, pages 1-based]")
+    for index in range(start, end):
+        if args.with_index and (index == start or pages[index] != pages[index - 1]):
+            out.append(f"--- page {pages[index]} ---")
+        text = render(elements[index])
         if not text:
+            if args.with_index:
+                out.append(f"[{index}] (empty)")
             continue
         out.append(f"[{index}] {text}" if args.with_index else text)
     sys.stdout.write("\n\n".join(out) + "\n")
-    if end < len(blocks):
-        print(f"\n[blocks {args.start}-{end - 1} of {len(blocks)}; continue with --start {end}]")
+    if end < len(elements):
+        print(f"\n[blocks {start}-{end - 1} of {len(elements)}; continue with --start {end}]")
     return 0
 
 

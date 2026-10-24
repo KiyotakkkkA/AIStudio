@@ -1,6 +1,6 @@
 ---
 name: pdf
-description: "Работа с PDF-файлами: чтение и извлечение текста и таблиц, сведения о документе, объединение и разделение, поворот страниц, водяной знак, шифрование, заполнение PDF-форм и создание нового PDF из текста. Используется, когда в запросе есть файл .pdf или результат нужен в виде PDF."
+description: "Работа с PDF-файлами: чтение и извлечение текста и таблиц, поиск страниц по тексту, сведения о документе, выбор, удаление и перестановка страниц, объединение и разделение, поворот страниц, водяной знак, шифрование, заполнение PDF-форм, преобразование документов Word, Excel и PowerPoint в PDF и создание нового PDF из текста. Используется, когда в запросе есть файл .pdf или результат нужен в виде PDF."
 metadata:
   display-name: PDF
 ---
@@ -11,6 +11,24 @@ Work with PDF files through the scripts in `scripts/`. Every script is a Python 
 
 Output on stdout is capped at 64 KiB. For long documents read the text in page ranges instead of all at once.
 
+## The rule that matters most
+
+**Pages that already exist are moved, kept or removed as they are. They are never recreated.**
+
+Extracting the text of a page and writing it into a new PDF with `create_pdf.py` loses the layout, fonts, images and signatures, and the result is not the same document. `create_pdf.py` is for content that does not exist yet.
+
+| The user wants                                                  | Use                                |
+| --------------------------------------------------------------- | ---------------------------------- |
+| Some pages as one file: the title page, pages 3–5, the appendix | `select_pages.py --pages`          |
+| The document without some pages                                 | `select_pages.py --pages … --drop` |
+| Pages in another order                                          | `select_pages.py --pages 3,1,2`    |
+| Each part as a separate file                                    | `split.py`                         |
+| A PDF of a Word, Excel or PowerPoint file                       | `convert_to_pdf.py`                |
+| To know which page a section, word or name is on                | `find_text.py`                     |
+| A new document written from scratch                             | `create_pdf.py`                    |
+
+A page of a `.docx` that should stay a `.docx` belongs to the `docx` skill, `extract_blocks.py`.
+
 ## Quick reference
 
 | Task                                                 | Script                                                                                             |
@@ -18,6 +36,9 @@ Output on stdout is capped at 64 KiB. For long documents read the text in page r
 | Pages, metadata, encryption, form fields, text layer | `scripts/pdf_info.py <file>`                                                                       |
 | Text, page by page                                   | `scripts/extract_text.py <file> [--pages 1-3,7] [--layout]`                                        |
 | Tables as Markdown or CSV                            | `scripts/extract_tables.py <file> [--pages 2] [--format csv] [--out-dir <dir>]`                    |
+| Find the pages that contain a text                   | `scripts/find_text.py <file> "СОДЕРЖАНИЕ" ["второй запрос" …]`                                     |
+| Pick, drop or reorder pages into one file            | `scripts/select_pages.py <file> <out.pdf> --pages 1,3-5 [--drop]`                                  |
+| Word, Excel or PowerPoint to PDF                     | `scripts/convert_to_pdf.py <file.docx> <out.pdf> [--engine office or libreoffice]`                 |
 | Merge files                                          | `scripts/merge.py <out.pdf> <a.pdf> <b.pdf> …`                                                     |
 | Split or pick pages                                  | `scripts/split.py <file> <out-dir> [--ranges 1-3,4-6] [--each]`                                    |
 | Rotate pages                                         | `scripts/rotate.py <file> <out.pdf> --angle 90 [--pages 1,3]`                                      |
@@ -38,8 +59,14 @@ Output on stdout is capped at 64 KiB. For long documents read the text in page r
 ## Changing a PDF
 
 - Never overwrite the input. Write a new file and name it in the answer.
+- To locate a part, run `find_text.py` with a heading or a phrase from it; it prints the pages and the words around each match. A title page is page 1.
+- `select_pages.py` writes one file with the pages in the order listed; `--drop` keeps every page except the listed ones. Check `pages` and `pageCount` in its output against the request.
 - `split.py --ranges` writes one file per range; `--each` writes one file per page.
 - Page numbers are 1-based everywhere, as the user sees them.
+
+## Converting to PDF
+
+`convert_to_pdf.py` opens the file in Microsoft Office when it is installed (Windows), otherwise in LibreOffice, and prints the engine used and the page count. Word updates the table of contents and page fields before exporting; `--no-update-fields` keeps them as saved. The input file is opened read-only and never changed. When neither application is installed, the script says so: tell the user, do not recreate the document with `create_pdf.py`.
 
 ## Forms
 
