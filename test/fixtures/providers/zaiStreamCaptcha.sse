@@ -1,0 +1,4 @@
+data: {"data": {"data": {"done": true, "error": {"captcha_error_type": "missing_param", "code": "FRONTEND_CAPTCHA_REQUIRED", "detail": "Please refresh the page to update the app, then try again.", "error_code": "FRONTEND_CAPTCHA_REQUIRED"}}, "done": true, "error": {"captcha_error_type": "missing_param", "code": "FRONTEND_CAPTCHA_REQUIRED", "detail": "Please refresh the page to update the app, then try again.", "error_code": "FRONTEND_CAPTCHA_REQUIRED"}}, "type": "chat:completion"}
+
+data: [DONE]
+

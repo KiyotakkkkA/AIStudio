@@ -29,10 +29,8 @@ const VERIFY_SIZE: (f64, f64) = (480.0, 720.0);
 
 static LABELS: AtomicU64 = AtomicU64::new(0);
 
-// Qwen is a SPA: same-origin history changes keep the execution context alive.
-// Other providers and test fixtures keep the static-page policy.
 fn application_page(page: &Url) -> bool {
-    page.as_str() == "https://chat.qwen.ai/"
+    super::application_page(page)
 }
 
 fn allowed_location(page: &Url, location: &str) -> bool {

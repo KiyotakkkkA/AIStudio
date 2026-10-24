@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import { CreateProviderInput, type ProbeResultDto } from "@zvs/shared";
-import { ProviderFormVm } from "../../src/renderer/features/providers/ProviderFormVm.ts";
+import {
+  ProviderFormVm,
+  ZAI_WEB_DEFAULT_TIMEOUT_SECONDS,
+} from "../../src/renderer/features/providers/ProviderFormVm.ts";
 import { ACCOUNTS, ADAPTERS, provider, SECRET } from "./providerFixtures.ts";
 
 function formFor(existing = false): ProviderFormVm {
@@ -93,6 +96,13 @@ test("Qwen web uses a ten-minute default request timeout while other providers k
 
   vm.setSetting("timeoutSeconds", 180);
   assert.equal(vm.settingOf("timeoutSeconds"), 180);
+});
+
+test("Z.ai web uses the same ten-minute default request timeout as Qwen web", () => {
+  const vm = formFor();
+  vm.setAdapter("zai-web");
+  assert.equal(vm.settingOf("timeoutSeconds"), ZAI_WEB_DEFAULT_TIMEOUT_SECONDS);
+  assert.equal(ZAI_WEB_DEFAULT_TIMEOUT_SECONDS, 600);
 });
 
 test("settings round-trip through the form untouched", () => {

@@ -38,23 +38,39 @@ pub fn parse_chat_created(payload: &Value) -> Option<String> {
     (!id.is_empty()).then(|| id.to_owned())
 }
 
-/// One user turn in a freshly created vendor chat.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThinkingMode {
+    Auto,
+    Thinking,
+    Fast,
+}
+
+impl ThinkingMode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Auto => "Auto",
+            Self::Thinking => "Thinking",
+            Self::Fast => "Fast",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompletionTurn<'a> {
     pub chat_id: &'a str,
     pub model: &'a str,
-    /// The whole conversation flattened into one user message.
     pub prompt: &'a str,
-    pub thinking: bool,
-    /// The client-side id of the message.
+    pub thinking: ThinkingMode,
+    pub parent_id: Option<&'a str>,
     pub fid: &'a str,
+    pub answer_fid: &'a str,
     pub now_ms: i64,
 }
 
 impl CompletionTurn<'_> {
-    /// The body of `POST /api/v2/chat/completions?chat_id=…`, streamed in the `phase` schema.
     pub fn body(&self) -> Value {
         let timestamp = self.now_ms.div_euclid(1000);
+        let parent = self.parent_id.map_or(Value::Null, |id| json!(id));
         json!({
             "chatId": self.chat_id,
             "chat_id": self.chat_id,
@@ -64,9 +80,9 @@ impl CompletionTurn<'_> {
             "messages": [{
                 "id": null,
                 "fid": self.fid,
-                "parentId": null,
-                "parent_id": null,
-                "childrenIds": [],
+                "parentId": parent,
+                "parent_id": parent,
+                "childrenIds": [self.answer_fid],
                 "role": "user",
                 "content": self.prompt,
                 "user_action": "chat",
@@ -77,10 +93,10 @@ impl CompletionTurn<'_> {
                 "chat_type": CHAT_TYPE,
                 "sub_chat_type": CHAT_TYPE,
                 "feature_config": {
-                    "thinking_enabled": self.thinking,
+                    "thinking_enabled": self.thinking != ThinkingMode::Fast,
                     "thinking_format": "summary",
-                    "thinking_mode": if self.thinking { "Thinking" } else { "Fast" },
-                    "auto_thinking": false,
+                    "thinking_mode": self.thinking.as_str(),
+                    "auto_thinking": self.thinking == ThinkingMode::Auto,
                     "auto_search": false,
                     "output_schema": "phase",
                     "research_mode": "normal",
@@ -88,8 +104,8 @@ impl CompletionTurn<'_> {
                 "extra": { "meta": { "subChatType": CHAT_TYPE } },
             }],
             "model": self.model,
-            "parentId": null,
-            "parent_id": null,
+            "parentId": self.parent_id.unwrap_or_default(),
+            "parent_id": parent,
             "stream": true,
             "timestamp": timestamp,
             "version": API_VERSION,
@@ -101,36 +117,55 @@ impl CompletionTurn<'_> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn a_turn_selects_thinking_or_fast_and_uses_seconds() {
-        let turn = CompletionTurn {
+    fn turn(thinking: ThinkingMode, parent_id: Option<&'static str>) -> CompletionTurn<'static> {
+        CompletionTurn {
             chat_id: "chat",
             model: "qwen3.7-plus",
             prompt: "Привет",
-            thinking: true,
+            thinking,
+            parent_id,
             fid: "fid",
+            answer_fid: "answer",
             now_ms: 1_788_994_021_999,
-        };
-        let body = turn.body();
+        }
+    }
+
+    #[test]
+    fn a_first_turn_has_no_parent_and_names_its_answer_in_advance() {
+        let body = turn(ThinkingMode::Auto, None).body();
         assert_eq!(body["chat_id"], "chat");
         assert_eq!(body["timestamp"], 1_788_994_021);
         assert_eq!(body["version"], API_VERSION);
+        assert_eq!(body["parentId"], "");
+        assert_eq!(body["parent_id"], Value::Null);
         let message = &body["messages"][0];
         assert_eq!(message["content"], "Привет");
-        assert_eq!(message["feature_config"]["thinking_mode"], "Thinking");
-        let fast = CompletionTurn {
-            thinking: false,
-            ..turn
+        assert_eq!(message["parent_id"], Value::Null);
+        assert_eq!(message["childrenIds"], json!(["answer"]));
+    }
+
+    #[test]
+    fn a_follow_up_turn_hangs_off_the_previous_answer() {
+        let body = turn(ThinkingMode::Auto, Some("response")).body();
+        assert_eq!(body["parentId"], "response");
+        assert_eq!(body["parent_id"], "response");
+        assert_eq!(body["messages"][0]["parentId"], "response");
+        assert_eq!(body["messages"][0]["parent_id"], "response");
+    }
+
+    #[test]
+    fn each_thinking_mode_sets_the_flags_the_client_sends() {
+        for (mode, enabled, auto) in [
+            (ThinkingMode::Auto, true, true),
+            (ThinkingMode::Thinking, true, false),
+            (ThinkingMode::Fast, false, false),
+        ] {
+            let config = &turn(mode, None).body()["messages"][0]["feature_config"];
+            assert_eq!(config["thinking_mode"], mode.as_str());
+            assert_eq!(config["thinking_enabled"], enabled);
+            assert_eq!(config["auto_thinking"], auto);
+            assert_eq!(config["auto_search"], false);
         }
-        .body();
-        assert_eq!(
-            fast["messages"][0]["feature_config"]["thinking_mode"],
-            "Fast"
-        );
-        assert_eq!(
-            fast["messages"][0]["feature_config"]["thinking_enabled"],
-            false
-        );
     }
 
     #[test]

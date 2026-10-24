@@ -10,7 +10,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use futures::{StreamExt, stream};
 use serde_json::{Value, json};
-use tokio::sync::mpsc;
+use tokio::sync::{OwnedMutexGuard, mpsc};
 use tokio_util::sync::CancellationToken;
 use url::Url;
 use zvs_contract::{AppError, AppErrorCode};
@@ -24,7 +24,7 @@ use zvs_host::drivers::ai::{
 };
 use zvs_host::platform::ids::new_id;
 use zvs_host::platform::logger::{LogLevel, SharedLogger, silent_logger};
-use zvs_qwen_web::{PagePlan, PageTransport};
+use zvs_qwen_web::{FrontendVersion, PagePlan, PageTransport};
 
 use self::routes::{PageMessage, Routes, SharedRoutes};
 use crate::browser::bearer::{BearerTokens, account_origin, origin_of};
@@ -76,9 +76,11 @@ pub struct GatewayOptions {
     /// A watched request still without a response after this long is shown to the user,
     /// since the vendor may be waiting for a verification nobody can see.
     pub reveal_after: Duration,
+    pub stream_reveal_after: Duration,
     /// How long a shown verification may take before the request fails.
     pub challenge_timeout: Duration,
     pub renew_reuse: Duration,
+    pub pace_gap: Duration,
 }
 
 impl Default for GatewayOptions {
@@ -91,8 +93,10 @@ impl Default for GatewayOptions {
             window: 8,
             ack_every: 4,
             reveal_after: Duration::from_secs(10),
+            stream_reveal_after: Duration::from_secs(30),
             challenge_timeout: Duration::from_secs(300),
             renew_reuse: Duration::from_secs(5),
+            pace_gap: Duration::from_millis(1500),
         }
     }
 }
@@ -135,6 +139,15 @@ struct Live {
 }
 
 type Slot = Arc<tokio::sync::Mutex<Option<Live>>>;
+type Pace = Arc<tokio::sync::Mutex<Option<tokio::time::Instant>>>;
+
+struct Turn(OwnedMutexGuard<Option<tokio::time::Instant>>);
+
+impl Drop for Turn {
+    fn drop(&mut self) {
+        *self.0 = Some(tokio::time::Instant::now());
+    }
+}
 type Renewal = Arc<tokio::sync::Mutex<Option<(tokio::time::Instant, Result<bool, AppError>)>>>;
 
 pub struct AccountGateway {
@@ -144,6 +157,7 @@ pub struct AccountGateway {
     logger: SharedLogger,
     slots: Mutex<HashMap<String, Slot>>,
     renewals: Mutex<HashMap<String, Renewal>>,
+    paces: Mutex<HashMap<String, Pace>>,
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -166,9 +180,20 @@ fn seconds(duration: Duration) -> f64 {
     duration.as_secs_f64()
 }
 
+pub const APPLICATION_ORIGINS: [&str; 2] = [
+    zvs_qwen_web::protocol::ORIGIN,
+    zvs_zai_web::protocol::ORIGIN,
+];
+
+pub fn application_page(page: &Url) -> bool {
+    page.path() == "/"
+        && page.query().is_none()
+        && APPLICATION_ORIGINS.contains(&page.origin().ascii_serialization().as_str())
+}
+
 pub fn page_url(origin: &str) -> Option<Url> {
     let origin = Url::parse(origin).ok()?;
-    let path = if origin.origin().ascii_serialization() == "https://chat.qwen.ai" {
+    let path = if APPLICATION_ORIGINS.contains(&origin.origin().ascii_serialization().as_str()) {
         "/"
     } else {
         PAGE_PATH
@@ -180,14 +205,52 @@ pub fn page_url(origin: &str) -> Option<Url> {
 fn page_plan(origin: &str, url: &str) -> PagePlan {
     if origin == zvs_qwen_web::protocol::ORIGIN {
         zvs_qwen_web::page_plan(url)
+    } else if origin == zvs_zai_web::protocol::ORIGIN {
+        PagePlan {
+            transport: PageTransport::Fetch,
+            challenge_pattern: Some(zvs_zai_web::CHALLENGE_PATTERN),
+            page_bearer_key: Some(zvs_zai_web::PAGE_BEARER_KEY),
+            session_refresh: None,
+            frontend_version: Some(FrontendVersion {
+                header: zvs_zai_web::FE_VERSION_HEADER,
+                script_pattern: zvs_zai_web::protocol::FE_VERSION_PATTERN,
+            }),
+            paced: zvs_zai_web::is_turn(url),
+            timezone_header: false,
+        }
     } else {
         PagePlan {
             transport: PageTransport::Fetch,
             challenge_pattern: None,
             page_bearer_key: None,
             session_refresh: None,
+            frontend_version: None,
+            paced: false,
+            timezone_header: false,
         }
     }
+}
+
+fn captcha_command(origin: &str, url: &str) -> Value {
+    if origin != zvs_zai_web::protocol::ORIGIN || !zvs_zai_web::needs_captcha(url) {
+        return Value::Null;
+    }
+    let captcha = zvs_zai_web::CAPTCHA;
+    json!({
+        "script_url": captcha.script_url,
+        "region": captcha.region,
+        "prefix": captcha.prefix,
+        "scene_id": captcha.scene_id,
+        "mode": captcha.mode,
+        "element_id": captcha.element_id,
+        "button_id": captcha.button_id,
+        "timeout_ms": captcha.timeout_ms,
+        "field": captcha.field,
+    })
+}
+
+fn bearer_query(origin: &str) -> Option<&'static str> {
+    (origin == zvs_zai_web::protocol::ORIGIN).then_some(zvs_zai_web::BEARER_QUERY)
 }
 
 fn session_revoked(answer: &Value) -> bool {
@@ -260,10 +323,12 @@ struct Exchange {
     routes: SharedRoutes,
     id: String,
     armed: bool,
+    turn: Option<Turn>,
 }
 
 impl Exchange {
     fn abort(&mut self) {
+        self.turn = None;
         if self.armed {
             self.armed = false;
             self.routes.unregister(&self.id);
@@ -272,6 +337,7 @@ impl Exchange {
     }
 
     fn settle(&mut self) {
+        self.turn = None;
         self.armed = false;
         self.routes.unregister(&self.id);
     }
@@ -376,7 +442,31 @@ impl AccountGateway {
             logger,
             slots: Mutex::default(),
             renewals: Mutex::default(),
+            paces: Mutex::default(),
         }
+    }
+
+    pub async fn warm(&self, origin: &str) -> Result<(), AppError> {
+        let origin = account_origin(origin).ok_or_else(refused_origin)?;
+        let page = page_url(&origin).ok_or_else(refused_origin)?;
+        self.live(&origin, &page).await.map(|_| ())
+    }
+
+    async fn pace(&self, origin: &str, cancel: &CancellationToken) -> Result<Turn, AppError> {
+        let pace = Arc::clone(lock(&self.paces).entry(origin.to_owned()).or_default());
+        let guard = tokio::select! {
+            biased;
+            () = cancel.cancelled() => return Err(cancelled()),
+            guard = pace.lock_owned() => guard,
+        };
+        if let Some(last) = *guard {
+            tokio::select! {
+                biased;
+                () = cancel.cancelled() => return Err(cancelled()),
+                () = tokio::time::sleep_until(last + self.options.pace_gap) => {}
+            }
+        }
+        Ok(Turn(guard))
     }
 
     pub fn dispose(&self) {
@@ -459,12 +549,13 @@ impl AccountGateway {
     async fn start(
         &self,
         origin: &str,
-        page: &Url,
         url: &str,
         request: &SessionRequest,
         plan: PagePlan,
+        mut turn: Option<Turn>,
         cancel: &CancellationToken,
     ) -> Result<(Exchange, mpsc::UnboundedReceiver<PageMessage>), AppError> {
+        let page = &page_url(origin).ok_or_else(refused_origin)?;
         let mut attempts = 0;
         loop {
             attempts += 1;
@@ -486,6 +577,7 @@ impl AccountGateway {
                 routes: Arc::clone(&live.routes),
                 id: id.clone(),
                 armed: true,
+                turn: turn.take(),
             };
             let command = json!({
                 "op": "start",
@@ -496,12 +588,20 @@ impl AccountGateway {
                 "body": request.body,
                 "referrer": referrer(request, origin),
                 "page": page.as_str(),
+                "app": application_page(page),
                 "chunk": self.options.chunk_size,
                 "window": self.options.window,
                 "transport": plan.transport.as_str(),
                 "challenge": plan.challenge_pattern,
                 "bearer_key": plan.page_bearer_key,
                 "session": session_command(plan),
+                "version": plan.frontend_version.map(|version| json!({
+                    "header": version.header,
+                    "pattern": version.script_pattern,
+                })),
+                "timezone": plan.timezone_header,
+                "captcha": captcha_command(origin, url),
+                "bearer_query": bearer_query(origin),
             });
             let started = tokio::select! {
                 biased;
@@ -512,6 +612,7 @@ impl AccountGateway {
                 Ok(Value::Bool(true)) => return Ok((exchange, receiver)),
                 Ok(_) | Err(_) => {
                     let mut exchange = exchange;
+                    turn = exchange.turn.take();
                     exchange.settle();
                     self.logger.log(
                         LogLevel::Warn,
@@ -546,7 +647,11 @@ impl AccountGateway {
     ) -> Result<Head, AppError> {
         let watched = plan.challenge_pattern.is_some();
         let started = tokio::time::Instant::now();
-        let reveal_at = started + self.options.reveal_after;
+        let silent_after = match plan.transport {
+            PageTransport::Xhr => self.options.reveal_after,
+            PageTransport::Fetch => self.options.stream_reveal_after,
+        };
+        let reveal_at = started + silent_after;
         let mut deadline = started + self.options.head_timeout;
         let mut revealed = false;
         let outcome = loop {
@@ -697,13 +802,18 @@ impl SessionGateway for AccountGateway {
         cancel: &CancellationToken,
     ) -> Result<SessionResponse, AppError> {
         let origin = account_origin(url).ok_or_else(refused_origin)?;
-        let page = page_url(&origin).ok_or_else(refused_origin)?;
+        page_url(&origin).ok_or_else(refused_origin)?;
         if cancel.is_cancelled() {
             return Err(cancelled());
         }
         let plan = page_plan(&origin, url);
+        let turn = if plan.paced {
+            Some(self.pace(&origin, cancel).await?)
+        } else {
+            None
+        };
         let (mut exchange, mut receiver) = self
-            .start(&origin, &page, url, &request, plan, cancel)
+            .start(&origin, url, &request, plan, turn, cancel)
             .await?;
         let (status, headers, final_url, redirected) = match self
             .head(&origin, &mut exchange, plan, &mut receiver, cancel)

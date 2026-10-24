@@ -23,7 +23,8 @@ pub const CHAT_MODE: &str = "normal";
 pub const CHAT_TYPE: &str = "t2t";
 pub const API_VERSION: &str = "2.1";
 /// The frontend build the client announces in its `Version` header.
-pub const WEB_VERSION: &str = "0.3.20";
+pub const WEB_VERSION: &str = "0.3.22";
+pub const WEB_VERSION_PATTERN: &str = r"/qwen-chat-fe/(\d+\.\d+\.\d+)/";
 pub const SOURCE: &str = "web";
 
 /// Thinking turns can run for minutes before the first answer token.
@@ -35,8 +36,8 @@ pub const MODELS_OBSERVATION: Observation = Observation {
 };
 
 pub const GENERATION_OBSERVATION: Observation = Observation {
-    source: "https://chat.qwen.ai/api/v2/chats/new then POST /api/v2/chat/completions?chat_id=… (SSE, FE Version 0.3.20)",
-    observed_at: "2026-10-19",
+    source: "https://chat.qwen.ai/api/v2/chats/new then POST /api/v2/chat/completions?chat_id=… (SSE, FE Version 0.3.22, turns chained by parent_id)",
+    observed_at: "2026-10-24",
 };
 
 pub fn chat_referer_path(chat_id: &str) -> String {

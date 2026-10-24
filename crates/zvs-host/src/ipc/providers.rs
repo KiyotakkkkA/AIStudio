@@ -244,6 +244,7 @@ mod tests {
             [
                 json!(["openai-compatible", true]),
                 json!(["qwen-web", true]),
+                json!(["zai-web", true]),
                 json!(["local", true]),
             ]
         );

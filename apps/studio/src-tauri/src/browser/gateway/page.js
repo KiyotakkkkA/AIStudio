@@ -143,17 +143,64 @@ export default function gateway(command) {
     return true;
   }
   if (command.op !== "start") throw new Error("Unknown gateway command");
-  const sameQwenOrigin =
-    command.page === "https://chat.qwen.ai/" &&
-    new globalThis.URL(globalThis.location.href).origin === "https://chat.qwen.ai";
-  if (globalThis.location.href !== command.page && !sameQwenOrigin) {
+  const appPage = new globalThis.URL(command.page);
+  const sameAppOrigin =
+    command.app === true &&
+    appPage.pathname === "/" &&
+    new globalThis.URL(globalThis.location.href).origin === appPage.origin;
+  if (globalThis.location.href !== command.page && !sameAppOrigin) {
     throw new Error("The gateway page moved");
   }
   if (state.requests.has(command.id)) throw new Error("Duplicate gateway request");
 
+  const pageVersion = (version) => {
+    if (object(version) === null || typeof version.pattern !== "string") return null;
+    state.versions ??= new Map();
+    if (state.versions.has(version.pattern)) return state.versions.get(version.pattern);
+    let pattern;
+    try {
+      pattern = new RegExp(version.pattern);
+    } catch {
+      return null;
+    }
+    const sources = [
+      ...[...(globalThis.document?.scripts ?? [])].map((script) => script.src),
+      ...(globalThis.performance?.getEntriesByType?.("resource") ?? []).map((entry) => entry.name),
+    ];
+    for (const source of sources) {
+      const found = typeof source === "string" ? pattern.exec(source) : null;
+      if (typeof found?.[1] === "string" && found[1].length > 0) {
+        state.versions.set(version.pattern, found[1]);
+        return found[1];
+      }
+    }
+    return null;
+  };
+  const replaceHeader = (headers, name, value) => [
+    ...headers.filter(([key]) => key.toLowerCase() !== name.toLowerCase()),
+    [name, value],
+  ];
+  const prepareHeaders = async () => {
+    let headers = await bearerHeaders();
+    if (!Array.isArray(headers)) return headers;
+    const version = pageVersion(command.version);
+    const header = command.version?.header;
+    if (
+      version !== null &&
+      typeof header === "string" &&
+      headers.some(([name]) => name.toLowerCase() === header.toLowerCase())
+    ) {
+      headers = replaceHeader(headers, header, version);
+    }
+    if (command.timezone === true) {
+      headers = replaceHeader(headers, "timezone", new Date().toString().replace(/\s*\(.*\)$/, ""));
+    }
+    return headers;
+  };
+
   // A request that carries a bearer uses the one the vendor's own app keeps current in the page,
   // as the app's requests do; the token never leaves the page. Cookie-only requests stay so.
-  const prepareHeaders = async () => {
+  const bearerHeaders = async () => {
     if (typeof command.bearer_key !== "string" || !Array.isArray(command.headers)) {
       return command.headers;
     }
@@ -175,6 +222,139 @@ export default function gateway(command) {
   const controller = new globalThis.AbortController();
   const entry = { controller, credit: command.window, wake: null };
   state.requests.set(command.id, entry);
+
+  const prepareUrl = () => {
+    if (typeof command.bearer_query !== "string" || typeof command.bearer_key !== "string") {
+      return command.url;
+    }
+    const current = readStorage(command.bearer_key);
+    const url = new globalThis.URL(command.url);
+    if (typeof current !== "string" || current.length === 0) return command.url;
+    if (!url.searchParams.has(command.bearer_query)) return command.url;
+    url.searchParams.set(command.bearer_query, current);
+    return url.toString();
+  };
+
+  const loadCaptcha = (captcha) =>
+    (state.captchaScript ??= new Promise((resolve, reject) => {
+      if (typeof globalThis.initAliyunCaptcha === "function") {
+        resolve();
+        return;
+      }
+      globalThis.AliyunCaptchaConfig ??= { region: captcha.region, prefix: captcha.prefix };
+      const script = globalThis.document.createElement("script");
+      script.src = captcha.script_url;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("The captcha script did not load"));
+      globalThis.document.head.appendChild(script);
+    }).catch((error) => {
+      state.captchaScript = null;
+      throw error;
+    }));
+  const hidden = (tag, id, style) => {
+    const document = globalThis.document;
+    const existing = document.getElementById(id);
+    if (existing !== null) return existing;
+    const element = document.createElement(tag);
+    element.id = id;
+    element.style.cssText = style;
+    if (tag === "button") {
+      element.type = "button";
+      element.tabIndex = -1;
+      element.setAttribute("aria-hidden", "true");
+    }
+    document.body.appendChild(element);
+    return element;
+  };
+  const captchaInstance = (captcha) =>
+    (state.captchaInstance ??= loadCaptcha(captcha)
+      .then(
+        () =>
+          new Promise((resolve) => {
+            hidden(
+              "div",
+              captcha.element_id,
+              "position:absolute;left:-99999px;top:-99999px;width:0;height:0;overflow:hidden;pointer-events:none;",
+            );
+            const button = hidden(
+              "button",
+              captcha.button_id,
+              "position:absolute;left:-99999px;top:-99999px;width:1px;height:1px;opacity:0;",
+            );
+            const settle = (outcome, value) => {
+              const waiter = state.captchaWaiter;
+              state.captchaWaiter = null;
+              waiter?.[outcome](value);
+            };
+            globalThis.initAliyunCaptcha({
+              SceneId: captcha.scene_id,
+              mode: captcha.mode,
+              element: `#${captcha.element_id}`,
+              button: `#${captcha.button_id}`,
+              language: "en",
+              timeout: captcha.timeout_ms,
+              delayBeforeSuccess: false,
+              success: (param) => {
+                settle("resolve", param);
+                try {
+                  state.captcha?.refresh?.();
+                } catch {
+                  state.captchaInstance = null;
+                }
+              },
+              fail: () => {
+                if (state.captchaWaiter) button.click();
+              },
+              onError: () => settle("reject", new Error("The captcha service failed")),
+              onClose: () => settle("reject", new Error("The captcha was closed")),
+              getInstance: (instance) => {
+                state.captcha = instance;
+                resolve(button);
+              },
+            });
+          }),
+      )
+      .catch((error) => {
+        state.captchaInstance = null;
+        throw error;
+      }));
+  const captchaParam = async (captcha) => {
+    const button = await captchaInstance(captcha);
+    controller.signal.throwIfAborted();
+    return new Promise((resolve, reject) => {
+      state.captchaWaiter?.reject(new Error("The captcha was superseded"));
+      state.captchaWaiter = { resolve, reject };
+      controller.signal.addEventListener(
+        "abort",
+        () => {
+          if (state.captchaWaiter?.resolve === resolve) state.captchaWaiter = null;
+          reject(new globalThis.DOMException("The request was aborted", "AbortError"));
+        },
+        { once: true },
+      );
+      button.click();
+    });
+  };
+  const prepareBody = async () => {
+    const captcha = object(command.captcha);
+    if (captcha === null || typeof command.body !== "string") return command.body;
+    let param;
+    try {
+      param = await captchaParam(captcha);
+    } catch (error) {
+      if (controller.signal.aborted) throw error;
+      return command.body;
+    }
+    if (typeof param !== "string" || param.length === 0) return command.body;
+    try {
+      const payload = JSON.parse(command.body);
+      if (object(payload) === null) return command.body;
+      payload[captcha.field] = param;
+      return JSON.stringify(payload);
+    } catch {
+      return command.body;
+    }
+  };
 
   const encode = (bytes) => {
     let binary = "";
@@ -224,7 +404,7 @@ export default function gateway(command) {
     return () => observer.disconnect();
   };
 
-  const viaFetch = async (headers) => {
+  const viaFetch = async (url, headers, body) => {
     const init = {
       method: command.method,
       headers,
@@ -233,9 +413,9 @@ export default function gateway(command) {
       redirect: "follow",
       signal: controller.signal,
     };
-    if (typeof command.body === "string") init.body = command.body;
+    if (typeof body === "string") init.body = body;
     if (typeof command.referrer === "string") init.referrer = command.referrer;
-    const response = await globalThis.fetch(command.url, init);
+    const response = await globalThis.fetch(url, init);
     const received = [];
     response.headers.forEach((value, name) => received.push([name, value]));
     const reader = response.body?.getReader();
@@ -250,10 +430,10 @@ export default function gateway(command) {
 
   // XHR follows redirects and sends credentials for same-origin URLs; the referrer is the
   // page's own location.
-  const viaXhr = (headers) =>
+  const viaXhr = (url, headers, body) =>
     new Promise((resolve, reject) => {
       const xhr = new globalThis.XMLHttpRequest();
-      xhr.open(command.method, command.url, true);
+      xhr.open(command.method, url, true);
       xhr.withCredentials = true;
       xhr.responseType = "arraybuffer";
       for (const [name, value] of headers) xhr.setRequestHeader(name, value);
@@ -275,7 +455,7 @@ export default function gateway(command) {
           status: xhr.status,
           headers: received,
           final_url: xhr.responseURL || null,
-          redirected: Boolean(xhr.responseURL) && xhr.responseURL !== command.url,
+          redirected: Boolean(xhr.responseURL) && xhr.responseURL !== url,
           read: async () => {
             if (body === null || body.length === 0) return { done: true };
             const value = body;
@@ -288,14 +468,18 @@ export default function gateway(command) {
       xhr.ontimeout = xhr.onerror;
       xhr.onabort = () =>
         reject(new globalThis.DOMException("The request was aborted", "AbortError"));
-      xhr.send(typeof command.body === "string" ? command.body : null);
+      xhr.send(typeof body === "string" ? body : null);
     });
 
   void (async () => {
     const unwatch = watchChallenge();
     try {
       const headers = await prepareHeaders();
-      const response = await (command.transport === "xhr" ? viaXhr(headers) : viaFetch(headers));
+      const body = await prepareBody();
+      const url = prepareUrl();
+      const response = await (command.transport === "xhr"
+        ? viaXhr(url, headers, body)
+        : viaFetch(url, headers, body));
       unwatch();
       post({
         id: command.id,

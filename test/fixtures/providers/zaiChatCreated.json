@@ -1,0 +1,16 @@
+{
+  "id": "0d9f6c1a-3b2e-4f5a-8c7d-6e5f4a3b2c1d",
+  "user_id": "5f0c2b1e-8a43-4d7e-9c1a-2b3c4d5e6f70",
+  "title": "New Chat",
+  "chat": {
+    "id": "0d9f6c1a-3b2e-4f5a-8c7d-6e5f4a3b2c1d",
+    "models": ["glm-5.2"]
+  },
+  "share_id": null,
+  "archived": false,
+  "pinned": false,
+  "meta": {
+    "flags": []
+  },
+  "type": "default"
+}

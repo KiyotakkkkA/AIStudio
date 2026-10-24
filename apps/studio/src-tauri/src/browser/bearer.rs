@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use url::Url;
 use zvs_host::drivers::ai::AccountToken;
 
-pub const ACCOUNT_ORIGINS: [&str; 1] = ["https://chat.qwen.ai"];
+pub const ACCOUNT_ORIGINS: [&str; 2] = ["https://chat.qwen.ai", "https://chat.z.ai"];
 const FIXTURE_HOST: &str = "127.0.0.1";
 const BEARER: &str = "bearer";
 
@@ -181,7 +181,14 @@ mod tests {
             account_origin(QWEN).as_deref(),
             Some("https://chat.qwen.ai")
         );
+        assert_eq!(
+            account_origin("https://chat.z.ai/api/v1/auths/").as_deref(),
+            Some("https://chat.z.ai")
+        );
         for refused in [
+            "http://chat.z.ai/",
+            "https://chat.z.ai.evil.example/",
+            "https://z.ai/",
             "http://chat.qwen.ai/",
             "https://chat.qwen.ai.evil.example/",
             "https://evil.chat.qwen.ai/",
@@ -196,6 +203,6 @@ mod tests {
             account_origin("http://127.0.0.1:4100/robots.txt").as_deref(),
             Some("http://127.0.0.1:4100")
         );
-        assert_eq!(request_filters().len(), 2);
+        assert_eq!(request_filters().len(), 3);
     }
 }

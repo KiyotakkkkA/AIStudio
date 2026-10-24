@@ -7,14 +7,15 @@ the response headers (never `Set-Cookie`) and the body bytes, and nothing else.
 
 ## Pages
 
-- The allow-list is `https://chat.qwen.ai`
+- The allow-list is `https://chat.qwen.ai` and `https://chat.z.ai`
   (`bearer::ACCOUNT_ORIGINS`). Builds with `cfg(test)` or the `e2e` feature also allow
   `http://127.0.0.1:<port>` for the fixture server. Any other URL is refused before a page
   exists.
 - One gateway page per origin, created on first use: a child webview labelled
   `account-gateway-N` in the hidden window `account-gateway`, with the same `browser/work`
   data directory as the site tabs. It starts on `about:blank`, loses the Tauri scripts and
-  web messages (`strip_host_bridge`), then loads the Qwen app at `https://chat.qwen.ai/`. Same-origin navigation is allowed
+  web messages (`strip_host_bridge`), then loads the vendor's app at its root (`APPLICATION_ORIGINS`: `https://chat.qwen.ai/`,
+  `https://chat.z.ai/`); `start` carries `app` for these pages. Same-origin navigation is allowed
   while loading; SPA history changes keep the context alive. Fixture pages still use
   `<origin>/robots.txt` with exact URL matching. Cross-origin navigation, and new windows, downloads and permissions are denied.
 - Once loaded, the host attaches over CDP (`browser::cdp`): `Runtime.enable`,
@@ -45,8 +46,14 @@ argument. The URL, method, headers and body are never part of the source.
 verification dialog. While such a request waits for its head the page posts `challenge` once
 if a matching element appears; the host then shows the gateway window (`reveal`) so the user
 can pass the check, waits up to `challenge_timeout` (5 min) instead of the head timeout, and
-hides it again (`conceal`). A watched request silent for `reveal_after` (10 s) is shown too.
-Closing the shown window only hides it.
+hides it again (`conceal`). A watched request with no head is shown too: after `reveal_after`
+(10 s) for XHR requests, and after `stream_reveal_after` (30 s) for streamed fetches, which a
+slow network delays without any dialog. Closing the shown window only hides it.
+
+`start` also carries `version` and `timezone` from the plan. `version` names a header and a
+pattern over the page's own script URLs (`/qwen-chat-fe/<build>/`); when the request carries that
+header, the page replaces it with the build it actually loaded. `timezone` adds the browser's
+`timezone` header as the client does. Both are computed in the page, from the page.
 | `ack` | Gives the request `credit` more chunks |
 | `abort` | Aborts the request's `AbortController` |
 | `renew` | Awaited. Refresh the vendor session as its client does (`session`); returns `status`, `success`, `code`, `details`, field names, `stored`, `changed` |
@@ -67,6 +74,31 @@ the fetch `referrer`.
 Defaults (`GatewayOptions`): page ready 30 s, response head 120 s, body idle 300 s, 32 KiB
 chunks, a window of 8, acknowledged every 4. The provider timeout in `AccountTransport` sits
 on top. Cancellation, a timeout or dropping the body aborts the page request.
+
+## Pacing and warm-up
+
+Requests whose plan is `paced` (the `chats/new` and completions of Qwen and Z.ai) go out one at a time per
+origin: a turn holds the origin until its body ends, fails or is dropped, and the next one starts
+no sooner than `pace_gap` (1.5 s) later. Waiting is cancellable and sends nothing. Model lists and
+other reads are not paced.
+
+When a Qwen or Z.ai account is linked, the app opens its gateway page at startup (`warm`), so the
+vendor's scripts have initialised before the first request.
+
+## Z.ai
+
+Z.ai signs each completion (`X-Signature`, computed by `zvs-zai-web` in the adapter) and requires a
+token from Alibaba Cloud's captcha, which only its own SDK in the page can produce. For a
+completion, `start` carries `captcha`: the page loads the SDK the vendor's app uses (if the app has
+not), creates its own hidden element and trigger (`zvs-captcha-*`, apart from the app's), and asks
+the SDK for a token, which it writes into the body field the plan names. The SDK usually answers
+without showing anything. When it shows a puzzle, its elements match the plan's `challenge`
+(`aliyunCaptcha`) and the host reveals the page for the person to solve it. Nothing is solved or
+forged by the host; if no token comes, the request goes out without one and the vendor refuses it
+(`FRONTEND_CAPTCHA_REQUIRED`), which the adapter reports as a browser verification.
+
+`start` also carries `bearer_query`: when the request URL has that query parameter, the page sets
+it to the bearer its app keeps, as the client sends it.
 
 ## Bearer capture
 

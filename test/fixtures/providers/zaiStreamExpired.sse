@@ -1,0 +1,4 @@
+data: {"type": "chat:completion", "data": {"done": true, "error": {"code": "401", "detail": "Token expired"}}}
+
+data: [DONE]
+

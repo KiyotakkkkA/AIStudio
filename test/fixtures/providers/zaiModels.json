@@ -1,0 +1,75 @@
+{
+  "data": [
+    {
+      "id": "x-preview-l",
+      "name": "GLM-5.3-Flash",
+      "object": "model",
+      "owned_by": "openai",
+      "info": {
+        "id": "x-preview-l",
+        "name": "GLM-5.3-Flash",
+        "is_active": true,
+        "params": {
+          "max_tokens": 128000,
+          "temperature": 1,
+          "top_p": 0.95
+        },
+        "meta": {
+          "capabilities": {
+            "think": true,
+            "reasoning_effort": true,
+            "web_search": true,
+            "vision": true
+          },
+          "info": {
+            "thinking_effort_level": ["low", "high", "max"]
+          },
+          "tags": [
+            {
+              "name": "NEW"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "glm-5.2",
+      "name": "GLM-5.2",
+      "object": "model",
+      "owned_by": "openai",
+      "info": {
+        "id": "glm-5.2",
+        "name": "GLM-5.2",
+        "is_active": true,
+        "params": {
+          "max_tokens": 64064,
+          "temperature": 1,
+          "top_p": 0.95
+        },
+        "meta": {
+          "capabilities": {
+            "think": true,
+            "reasoning_effort": true
+          }
+        }
+      }
+    },
+    {
+      "id": "glm-4-air-250414",
+      "name": "GLM-4-32B",
+      "object": "model",
+      "owned_by": "openai",
+      "info": {
+        "id": "glm-4-air-250414",
+        "name": "GLM-4-32B",
+        "is_active": true,
+        "meta": {
+          "hidden": true,
+          "capabilities": {
+            "think": false
+          }
+        }
+      }
+    }
+  ]
+}

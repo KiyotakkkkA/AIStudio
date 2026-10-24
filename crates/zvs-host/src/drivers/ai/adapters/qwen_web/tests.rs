@@ -58,6 +58,7 @@ fn options(server: &MockServer) -> AccountAdapterOptions {
     AccountAdapterOptions {
         clock: Arc::new(FakeClock::new(FIXED_NOW)),
         new_id: Arc::new(|| FIXED_FID.to_owned()),
+        retry_delay: Duration::ZERO,
         ..AccountAdapterOptions::new(transport_for(&server.url(BASE)))
     }
 }
@@ -386,7 +387,15 @@ async fn the_qwen_family_opens_a_chat_and_streams_reasoning_and_answer_as_distin
     let completion = &calls[2];
     assert_eq!(
         completion.header("accept").as_deref(),
-        Some("text/event-stream")
+        Some("application/json")
+    );
+    assert_eq!(
+        completion.header("x-accel-buffering").as_deref(),
+        Some("no")
+    );
+    assert_eq!(
+        completion.header("x-request-id").as_deref(),
+        Some(FIXED_FID)
     );
     assert_eq!(
         completion.header("version").as_deref(),
@@ -409,7 +418,7 @@ async fn the_qwen_family_opens_a_chat_and_streams_reasoning_and_answer_as_distin
     assert_eq!(body["stream"], json!(true));
     assert_eq!(body["incremental_output"], json!(true));
     assert_eq!(body["version"], json!("2.1"));
-    assert_eq!(body["parentId"], Value::Null);
+    assert_eq!(body["parentId"], json!(""));
     assert_eq!(body["parent_id"], Value::Null);
     assert_eq!(body["timestamp"], json!(FIXED_NOW / 1000));
     let message = &body["messages"][0];
@@ -417,6 +426,7 @@ async fn the_qwen_family_opens_a_chat_and_streams_reasoning_and_answer_as_distin
     assert_eq!(message["role"], json!("user"));
     assert_eq!(message["content"], json!("Привет"));
     assert_eq!(message["parent_id"], Value::Null);
+    assert_eq!(message["childrenIds"], json!([FIXED_FID]));
     assert_eq!(message["models"], json!(["qwen3.7-plus"]));
     assert_eq!(
         String::from_utf8_lossy(&completion.body)
@@ -427,7 +437,7 @@ async fn the_qwen_family_opens_a_chat_and_streams_reasoning_and_answer_as_distin
             r#"{{"chatId":"{QWEN_CHAT_ID}","chat_id":"{QWEN_CHAT_ID}","chat_mode":"normal","chat_type":"t2t","incremental_output":true,"#
         )
     );
-    assert_eq!(QWEN_GENERATION_OBSERVATION.observed_at, "2026-10-19");
+    assert_eq!(QWEN_GENERATION_OBSERVATION.observed_at, "2026-10-24");
 }
 
 #[tokio::test]
@@ -480,9 +490,10 @@ async fn qwen_selects_thinking_from_discovery_and_reuses_the_model_list() {
         assert_eq!(config["thinking_enabled"], json!(thinking), "{model}");
         assert_eq!(
             config["thinking_mode"],
-            json!(if thinking { "Thinking" } else { "Fast" }),
+            json!(if thinking { "Auto" } else { "Fast" }),
             "{model}"
         );
+        assert_eq!(config["auto_thinking"], json!(thinking), "{model}");
     }
     assert_eq!(
         server
@@ -988,43 +999,96 @@ fn count(server: &MockServer, path: &str) -> usize {
         .count()
 }
 
-#[tokio::test]
-async fn one_verified_chat_serves_every_turn_of_a_model_until_it_is_refused() {
-    let server = qwen_server(fixture_frames("qwenStream.sse")).await;
-    let qwen = adapter(&server);
-    for _ in 0..3 {
-        qwen.generate(&prompt(), &token()).await.expect("generates");
-    }
-    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 1);
-    assert_eq!(count(&server, &route(QWEN_COMPLETIONS_PATH)), 3);
-    assert_eq!(qwen.idle_chats(), 1);
-    let chats: Vec<String> = server
+const FIXTURE_RESPONSE_ID: &str = "3112202d-2c44-4b3f-8fc8-783e8b17dbc0";
+
+fn follow_up(answer: &str, question: &str) -> GenerateRequest {
+    GenerateRequest::new(
+        "qwen3.7-plus",
+        vec![
+            ChatMessage::user("Привет"),
+            ChatMessage::assistant(answer),
+            ChatMessage::user(question),
+        ],
+    )
+}
+
+fn completions(server: &MockServer) -> Vec<Value> {
+    server
         .calls()
         .iter()
         .filter(|call| call.path == route(QWEN_COMPLETIONS_PATH))
-        .map(|call| {
-            call.json()["chat_id"]
-                .as_str()
-                .unwrap_or_default()
-                .to_owned()
-        })
-        .collect();
-    assert!(chats.iter().all(|chat| chat == &chats[0]), "{chats:?}");
-    qwen.generate(
-        &GenerateRequest {
-            model: "qwen3.5-plus".to_owned(),
-            ..prompt()
-        },
-        &token(),
-    )
-    .await
-    .expect("generates");
-    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 2);
-    assert_eq!(qwen.idle_chats(), 2);
+        .map(Recorded::json)
+        .collect()
 }
 
 #[tokio::test]
-async fn a_reused_chat_the_vendor_refuses_is_replaced_by_a_new_one_within_the_same_turn() {
+async fn a_follow_up_continues_the_vendor_chat_with_only_the_new_message() {
+    let server = qwen_server(fixture_frames("qwenStream.sse")).await;
+    let qwen = adapter(&server);
+    qwen.generate(&prompt(), &token()).await.expect("generates");
+    assert_eq!(qwen.chained_chats(), 1);
+    qwen.generate(&follow_up("Привет, мир!", "Как дела?"), &token())
+        .await
+        .expect("continues");
+    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 1);
+    let bodies = completions(&server);
+    assert_eq!(bodies.len(), 2);
+    let second = &bodies[1];
+    assert_eq!(second["chat_id"], bodies[0]["chat_id"]);
+    assert_eq!(second["parent_id"], json!(FIXTURE_RESPONSE_ID));
+    assert_eq!(second["parentId"], json!(FIXTURE_RESPONSE_ID));
+    assert_eq!(
+        second["messages"][0]["parent_id"],
+        json!(FIXTURE_RESPONSE_ID)
+    );
+    assert_eq!(second["messages"][0]["content"], json!("Как дела?"));
+    assert_eq!(qwen.chained_chats(), 2);
+}
+
+#[tokio::test]
+async fn a_dialog_the_adapter_has_not_seen_opens_its_own_chat_with_the_whole_history() {
+    let server = qwen_server(fixture_frames("qwenStream.sse")).await;
+    let qwen = adapter(&server);
+    qwen.generate(&prompt(), &token()).await.expect("generates");
+    let edited = GenerateRequest {
+        system: Some("Отвечай кратко".to_owned()),
+        ..follow_up("Привет, мир!", "Как дела?")
+    };
+    qwen.generate(&edited, &token()).await.expect("generates");
+    let mut changed_question = follow_up("Привет, мир!", "Как дела?");
+    changed_question.messages[0] = ChatMessage::user("Здравствуйте");
+    qwen.generate(&changed_question, &token())
+        .await
+        .expect("generates");
+    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 3);
+    let bodies = completions(&server);
+    assert_eq!(bodies[1]["parent_id"], Value::Null);
+    assert_eq!(
+        bodies[1]["messages"][0]["content"],
+        json!(
+            "System: Отвечай кратко\n\nUser: Привет\n\nAssistant: Привет, мир!\n\nUser: Как дела?"
+        )
+    );
+    assert_eq!(bodies[2]["parent_id"], Value::Null);
+}
+
+#[tokio::test]
+async fn the_vendor_keeps_its_own_answer_so_a_reworded_reply_still_continues_the_chat() {
+    let server = qwen_server(fixture_frames("qwenStream.sse")).await;
+    let qwen = adapter(&server);
+    qwen.generate(&prompt(), &token()).await.expect("generates");
+    qwen.generate(&follow_up("Другой ответ", "Как дела?"), &token())
+        .await
+        .expect("continues");
+    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 1);
+    assert_eq!(
+        completions(&server)[1]["parent_id"],
+        json!(FIXTURE_RESPONSE_ID)
+    );
+}
+
+#[tokio::test]
+async fn a_refused_chained_turn_is_retried_once_in_a_new_chat_and_the_dead_chat_is_forgotten() {
     let server = qwen_server(fixture_frames("qwenStream.sse")).await;
     let qwen = adapter(&server);
     qwen.generate(&prompt(), &token()).await.expect("generates");
@@ -1033,61 +1097,91 @@ async fn a_reused_chat_the_vendor_refuses_is_replaced_by_a_new_one_within_the_sa
         Reply::json(json!({ "detail": "chat not found" })).with_status(404),
     );
     let error = qwen
-        .generate(&prompt(), &token())
+        .generate(&follow_up("Привет, мир!", "Как дела?"), &token())
         .await
         .expect_err("the fresh chat fails too");
     assert_ne!(error.code, AppErrorCode::ProviderSessionExpired);
     assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 2);
     assert_eq!(count(&server, &route(QWEN_COMPLETIONS_PATH)), 3);
-    assert_eq!(qwen.idle_chats(), 0);
+    assert_eq!(qwen.chained_chats(), 0);
+    let retried = &completions(&server)[2];
+    assert_eq!(retried["parent_id"], Value::Null);
+    assert_eq!(
+        retried["messages"][0]["content"],
+        json!("User: Привет\n\nAssistant: Привет, мир!\n\nUser: Как дела?")
+    );
     server.reply(
         &route(QWEN_COMPLETIONS_PATH),
         Reply::chunks(fixture_frames("qwenStream.sse")),
     );
-    qwen.generate(&prompt(), &token()).await.expect("generates");
+    qwen.generate(&follow_up("Привет, мир!", "Как дела?"), &token())
+        .await
+        .expect("generates");
     assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 3);
-    assert_eq!(qwen.idle_chats(), 1);
+    assert_eq!(qwen.chained_chats(), 1);
 }
 
 #[tokio::test]
-async fn an_expired_session_forgets_every_reused_chat() {
+async fn a_rate_limited_chained_turn_is_not_retried() {
     let server = qwen_server(fixture_frames("qwenStream.sse")).await;
     let qwen = adapter(&server);
     qwen.generate(&prompt(), &token()).await.expect("generates");
-    assert_eq!(qwen.idle_chats(), 1);
+    server.reply(
+        &route(QWEN_COMPLETIONS_PATH),
+        Reply::json(json!({ "detail": "too many requests" })).with_status(429),
+    );
+    let error = qwen
+        .generate(&follow_up("Привет, мир!", "Как дела?"), &token())
+        .await
+        .expect_err("limited");
+    assert_eq!(error.code, AppErrorCode::RateLimited);
+    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 1);
+    assert_eq!(count(&server, &route(QWEN_COMPLETIONS_PATH)), 2);
+    assert_eq!(qwen.chained_chats(), 1);
+}
+
+#[tokio::test]
+async fn an_expired_session_forgets_every_chain() {
+    let server = qwen_server(fixture_frames("qwenStream.sse")).await;
+    let qwen = adapter(&server);
+    qwen.generate(&prompt(), &token()).await.expect("generates");
+    assert_eq!(qwen.chained_chats(), 1);
     server.reply(
         &route(QWEN_COMPLETIONS_PATH),
         Reply::chunks(fixture_frames("qwenStreamStatus401.sse")),
     );
     let error = qwen
-        .generate(&prompt(), &token())
+        .generate(&follow_up("Привет, мир!", "Как дела?"), &token())
         .await
         .expect_err("expires");
     assert_eq!(error.code, AppErrorCode::ProviderSessionExpired);
-    assert_eq!(qwen.idle_chats(), 0);
+    assert_eq!(qwen.chained_chats(), 0);
     assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 1);
 }
 
 #[tokio::test]
-async fn concurrent_turns_rotate_through_separate_chats_and_keep_them_for_later() {
+async fn the_model_list_is_refreshed_after_its_lifetime_and_a_failed_refresh_keeps_the_old_one() {
     let server = qwen_server(fixture_frames("qwenStream.sse")).await;
+    let clock = Arc::new(FakeClock::new(FIXED_NOW));
+    let qwen = QwenWebAdapter::new(AccountAdapterOptions {
+        clock: clock.clone(),
+        ..options(&server)
+    });
+    qwen.generate(&prompt(), &token()).await.expect("generates");
+    clock.advance(MODELS_TTL_MS - 1);
+    qwen.generate(&prompt(), &token()).await.expect("generates");
+    assert_eq!(count(&server, "/api/v2/models/"), 1);
+    clock.advance(1);
     server.reply(
-        &route(QWEN_COMPLETIONS_PATH),
-        Reply::chunks(fixture_frames("qwenStream.sse")).with_gap(Duration::from_millis(20)),
+        &route(QWEN_MODELS_PATH),
+        Reply::json(json!({ "detail": "busy" })).with_status(503),
     );
-    let qwen = adapter(&server);
-    let request = prompt();
-    let cancel = token();
-    let (first, second) = tokio::join!(
-        qwen.generate(&request, &cancel),
-        qwen.generate(&request, &cancel)
+    qwen.generate(&prompt(), &token())
+        .await
+        .expect("uses the old list");
+    assert_eq!(count(&server, "/api/v2/models/"), 2);
+    assert_eq!(
+        server.last_body()["messages"][0]["feature_config"]["thinking_mode"],
+        json!("Auto")
     );
-    first.expect("first");
-    second.expect("second");
-    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 2);
-    assert_eq!(qwen.idle_chats(), 2);
-    for _ in 0..2 {
-        qwen.generate(&request, &token()).await.expect("generates");
-    }
-    assert_eq!(count(&server, &route(QWEN_CHATS_NEW_PATH)), 2);
 }

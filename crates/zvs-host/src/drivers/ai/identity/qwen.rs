@@ -17,7 +17,7 @@ pub fn map_qwen_identity(payload: &Value) -> Result<ProbeResult, AppError> {
     parse(payload).ok_or_else(|| malformed_identity(FAMILY))
 }
 
-fn parse(payload: &Value) -> Option<ProbeResult> {
+pub(super) fn parse(payload: &Value) -> Option<ProbeResult> {
     let data = Payload::of(payload)?;
     let id = data.id("id").ok()?;
     let email = data.text("email").ok()?;

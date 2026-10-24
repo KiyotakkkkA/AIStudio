@@ -1,4 +1,6 @@
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, VecDeque};
+use std::hash::{Hash, Hasher};
 use std::mem;
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -10,7 +12,7 @@ use url::Url;
 use zvs_contract::{AdapterFamily, AppError, AppErrorCode, AuthMode, ModelCapability, ToolMode};
 use zvs_qwen_web::protocol::{self, chat_referer_path};
 use zvs_qwen_web::{
-    CompletionTurn, ModelsDiagnostics, QwenModel, RowProblem, TurnDecoder, TurnEvent,
+    CompletionTurn, ModelsDiagnostics, QwenModel, RowProblem, ThinkingMode, TurnDecoder, TurnEvent,
     VendorFailure, new_chat_body, parse_chat_created, parse_models,
 };
 
@@ -23,8 +25,8 @@ use crate::drivers::ai::errors::{
     html_title, is_cancellation, is_session_expired, request_failed, session_expired,
 };
 use crate::drivers::ai::ports::{
-    DeltaStream, DiscoveredModel, FinishReason, GenerateRequest, GenerateResult, TextDelta,
-    TextGenerationDriver, TokenUsage,
+    ChatMessage, ChatRole, DeltaStream, DiscoveredModel, FinishReason, GenerateRequest,
+    GenerateResult, TextDelta, TextGenerationDriver, TokenUsage,
 };
 use crate::drivers::ai::sse::FrameStream;
 use crate::drivers::ai::transport::{RequestSpec, TransportResponse};
@@ -41,7 +43,8 @@ pub use zvs_qwen_web::protocol::{
 
 pub const GENERATION_ABORTED_MESSAGE: &str = "Вендор прервал генерацию";
 pub const MODELS_REFUSED_MESSAGE: &str = "Qwen отклонил запрос списка моделей";
-pub const CHAT_TURNS_MAX: u32 = 200;
+pub const CHAINS_MAX: usize = 256;
+pub const MODELS_TTL_MS: i64 = 60 * 60 * 1000;
 
 pub const QWEN_WEB_CAPABILITIES: AdapterCapabilities = AdapterCapabilities {
     family: AdapterFamily::QwenWeb,
@@ -183,30 +186,83 @@ fn with_summary(summary: &SharedSummary, update: impl FnOnce(&mut TurnSummary)) 
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ChatLease {
+struct Chain {
     chat_id: String,
-    model: String,
-    turns: u32,
+    response_id: String,
+}
+
+#[derive(Debug, Default)]
+struct Chains {
+    order: VecDeque<u64>,
+    by_key: HashMap<u64, Chain>,
+}
+
+impl Chains {
+    fn insert(&mut self, key: u64, chain: Chain) {
+        if self.by_key.insert(key, chain).is_none() {
+            self.order.push_back(key);
+        }
+        while self.order.len() > CHAINS_MAX {
+            if let Some(oldest) = self.order.pop_front() {
+                self.by_key.remove(&oldest);
+            }
+        }
+    }
+
+    fn forget_chat(&mut self, chat_id: &str) {
+        self.by_key.retain(|_, chain| chain.chat_id != chat_id);
+        let by_key = &self.by_key;
+        self.order.retain(|key| by_key.contains_key(key));
+    }
+
+    fn clear(&mut self) {
+        self.order.clear();
+        self.by_key.clear();
+    }
+}
+
+fn history_key(model: &str, system: Option<&str>, messages: &[ChatMessage]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    model.hash(&mut hasher);
+    system.map(str::trim).unwrap_or_default().hash(&mut hasher);
+    for message in messages {
+        message.role.hash(&mut hasher);
+        message.content.hash(&mut hasher);
+        message.tool_call_id.hash(&mut hasher);
+        format!("{:?}", message.tool_calls).hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
+fn request_key(request: &GenerateRequest) -> u64 {
+    history_key(&request.model, request.system.as_deref(), &request.messages)
 }
 
 struct Opened {
     frames: FrameStream,
-    lease: ChatLease,
-    reused: bool,
+    chat_id: String,
+    chained: bool,
 }
 
 fn retryable_on_new_chat(error: &AppError) -> bool {
     !is_cancellation(error)
         && !is_session_expired(error)
-        && error.code != AppErrorCode::ProviderUnreachable
+        && !matches!(
+            error.code,
+            AppErrorCode::ProviderUnreachable | AppErrorCode::RateLimited
+        )
+}
+
+struct CachedModels {
+    models: Vec<DiscoveredModel>,
+    fetched_at: i64,
 }
 
 struct Shared {
     core: AccountAdapterCore,
-    models: Mutex<Option<Vec<DiscoveredModel>>>,
-    /// The client creates one chat at a time; so does the adapter, to stay client-like.
+    models: Mutex<Option<CachedModels>>,
     creating: tokio::sync::Mutex<()>,
-    idle: Mutex<HashMap<String, Vec<ChatLease>>>,
+    chains: Mutex<Chains>,
 }
 
 impl Shared {
@@ -219,6 +275,7 @@ impl Shared {
         Ok(spec
             .with_header("source", protocol::SOURCE)
             .with_header("Version", QWEN_WEB_VERSION)
+            .with_header("x-request-id", (self.core.new_id)())
             .with_header("referer", referer.to_string()))
     }
 
@@ -263,65 +320,106 @@ impl Shared {
             .into_iter()
             .map(to_discovered_model)
             .collect::<Vec<_>>();
-        *self.models.lock().unwrap_or_else(PoisonError::into_inner) = Some(models.clone());
+        *self.models.lock().unwrap_or_else(PoisonError::into_inner) = Some(CachedModels {
+            models: models.clone(),
+            fetched_at: self.core.clock.now(),
+        });
         Ok(models)
     }
 
-    fn checkout(&self, model: &str) -> Option<ChatLease> {
-        self.idle
+    async fn models(&self, cancel: &CancellationToken) -> Result<Vec<DiscoveredModel>, AppError> {
+        let now = self.core.clock.now();
+        let cached = self
+            .models
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .get_mut(model)
-            .and_then(Vec::pop)
+            .as_ref()
+            .map(|cached| {
+                (
+                    cached.models.clone(),
+                    now - cached.fetched_at < MODELS_TTL_MS,
+                )
+            });
+        match cached {
+            Some((models, true)) => Ok(models),
+            Some((stale, false)) => match self.list_models(cancel).await {
+                Ok(models) => Ok(models),
+                Err(error) if is_cancellation(&error) || is_session_expired(&error) => Err(error),
+                Err(_) => Ok(stale),
+            },
+            None => self.list_models(cancel).await,
+        }
     }
 
-    fn release(&self, mut lease: ChatLease) {
-        lease.turns += 1;
-        if lease.turns >= CHAT_TURNS_MAX {
-            return;
-        }
-        self.idle
+    fn continuation(&self, request: &GenerateRequest) -> Option<(Chain, String)> {
+        let last = request
+            .messages
+            .iter()
+            .rposition(|message| message.role == ChatRole::Assistant)?;
+        let tail = request
+            .messages
+            .get(last + 1..)
+            .filter(|tail| !tail.is_empty())?;
+        let key = history_key(
+            &request.model,
+            request.system.as_deref(),
+            &request.messages[..last],
+        );
+        let chain = self
+            .chains
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .entry(lease.model.clone())
-            .or_default()
-            .push(lease);
+            .by_key
+            .get(&key)
+            .cloned()?;
+        let prompt = flatten_prompt(&GenerateRequest::new(request.model.clone(), tail.to_vec()));
+        Some((chain, prompt))
+    }
+
+    fn remember(&self, request: &GenerateRequest, chat_id: String, response_id: String) {
+        self.chains
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(
+                request_key(request),
+                Chain {
+                    chat_id,
+                    response_id,
+                },
+            );
     }
 
     fn forget_chats(&self) {
-        self.idle
+        self.chains
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clear();
     }
 
-    fn idle_chats(&self) -> usize {
-        self.idle
+    fn chained_chats(&self) -> usize {
+        self.chains
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .values()
-            .map(Vec::len)
-            .sum()
+            .by_key
+            .len()
     }
 
-    fn retire(&self, lease: &ChatLease, error: &AppError) {
+    fn retire(&self, chat_id: Option<&str>, error: &AppError) {
+        if let Some(chat_id) = chat_id {
+            self.chains
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .forget_chat(chat_id);
+        }
         self.core.logger.log(
             LogLevel::Info,
             "ai",
-            "Qwen refused a reused chat; opening a new one",
+            "Qwen refused a chained turn; opening a new chat",
             &[
                 ("family", json!(FAMILY.as_str())),
-                ("turns", json!(lease.turns)),
                 ("code", json!(error.code)),
             ],
         );
-    }
-
-    fn cached_models(&self) -> Option<Vec<DiscoveredModel>> {
-        self.models
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
     }
 
     async fn create_chat(
@@ -361,24 +459,29 @@ impl Shared {
     fn turn(
         &self,
         chat_id: &str,
-        request: &GenerateRequest,
-        thinking: bool,
+        model: &str,
+        prompt: &str,
+        thinking: ThinkingMode,
+        parent_id: Option<&str>,
     ) -> Result<RequestSpec, AppError> {
-        let prompt = flatten_prompt(request);
         let fid = (self.core.new_id)();
+        let answer_fid = (self.core.new_id)();
         let body = CompletionTurn {
             chat_id,
-            model: &request.model,
-            prompt: &prompt,
+            model,
+            prompt,
             thinking,
+            parent_id,
             fid: &fid,
+            answer_fid: &answer_fid,
             now_ms: self.core.clock.now(),
         }
         .body();
         self.web_request(
             RequestSpec::post(QWEN_COMPLETIONS_PATH, body)
                 .with_query("chat_id", chat_id)
-                .with_accept("text/event-stream"),
+                .with_accept("application/json")
+                .with_header("x-accel-buffering", "no"),
             &chat_referer_path(chat_id),
         )
     }
@@ -390,43 +493,51 @@ impl Shared {
         fresh: bool,
     ) -> Result<Opened, AppError> {
         self.core.drop_unsupported(request);
-        let models = match self.cached_models() {
-            Some(models) => models,
-            None => self.list_models(cancel).await?,
-        };
-        let thinking = models
+        let models = self.models(cancel).await?;
+        let thinking = if models
             .iter()
             .find(|model| model.external_id == request.model)
-            .is_some_and(|model| model.capabilities.contains(&ModelCapability::Reasoning));
-        let idle = if fresh {
+            .is_some_and(|model| model.capabilities.contains(&ModelCapability::Reasoning))
+        {
+            ThinkingMode::Auto
+        } else {
+            ThinkingMode::Fast
+        };
+        let continued = if fresh {
             None
         } else {
-            self.checkout(&request.model)
+            self.continuation(request)
         };
-        let (lease, reused) = match idle {
-            Some(lease) => (lease, true),
+        let (chat_id, prompt, parent_id) = match continued {
+            Some((chain, prompt)) => (chain.chat_id, prompt, Some(chain.response_id)),
             None => (
-                ChatLease {
-                    chat_id: self.create_chat(&request.model, cancel).await?,
-                    model: request.model.clone(),
-                    turns: 0,
-                },
-                false,
+                self.create_chat(&request.model, cancel).await?,
+                flatten_prompt(request),
+                None,
             ),
         };
-        let frames = self
-            .core
-            .frames(self.turn(&lease.chat_id, request, thinking)?, cancel);
+        let chained = parent_id.is_some();
+        let frames = self.core.frames(
+            self.turn(
+                &chat_id,
+                &request.model,
+                &prompt,
+                thinking,
+                parent_id.as_deref(),
+            )?,
+            cancel,
+        );
         Ok(Opened {
             frames,
-            lease,
-            reused,
+            chat_id,
+            chained,
         })
     }
 }
 
 enum Phase {
     Open,
+    Retry,
     Frames(FrameStream),
     Done,
 }
@@ -440,8 +551,9 @@ struct Run {
     decoder: TurnDecoder,
     finished: bool,
     summary: Option<SharedSummary>,
-    lease: Option<ChatLease>,
-    reused: bool,
+    chat_id: Option<String>,
+    response_id: Option<String>,
+    chained: bool,
     produced: bool,
     fresh: bool,
 }
@@ -451,20 +563,19 @@ impl Run {
         if is_session_expired(&error) {
             self.shared.forget_chats();
         }
-        self.lease = None;
+        self.chat_id = None;
         self.queue.push_back(Err(error));
         self.phase = Phase::Done;
     }
 
     fn settle(&mut self, error: AppError) {
-        if self.reused && !self.produced && !self.fresh && retryable_on_new_chat(&error) {
-            if let Some(lease) = self.lease.take() {
-                self.shared.retire(&lease, &error);
-            }
+        if self.chained && !self.produced && !self.fresh && retryable_on_new_chat(&error) {
+            self.shared.retire(self.chat_id.take().as_deref(), &error);
+            self.response_id = None;
             self.decoder = TurnDecoder::new();
             self.finished = false;
             self.fresh = true;
-            self.phase = Phase::Open;
+            self.phase = Phase::Retry;
             return;
         }
         self.fail(error);
@@ -478,6 +589,7 @@ impl Run {
                     self.settle(failure);
                     return;
                 }
+                TurnEvent::Started(response_id) => self.response_id = Some(response_id),
                 TurnEvent::Usage(usage) => {
                     if let Some(summary) = &self.summary {
                         with_summary(summary, |summary| summary.usage = Some(to_usage(usage)));
@@ -499,14 +611,25 @@ impl Run {
     async fn advance(&mut self) {
         match mem::replace(&mut self.phase, Phase::Done) {
             Phase::Done => {}
+            Phase::Retry => {
+                tokio::select! {
+                    biased;
+                    () = self.cancel.cancelled() => {
+                        self.fail(crate::drivers::ai::errors::cancelled());
+                    }
+                    () = tokio::time::sleep(self.shared.core.retry_delay) => {
+                        self.phase = Phase::Open;
+                    }
+                }
+            }
             Phase::Open => match self
                 .shared
                 .open(&self.request, &self.cancel, self.fresh)
                 .await
             {
                 Ok(opened) => {
-                    self.lease = Some(opened.lease);
-                    self.reused = opened.reused;
+                    self.chat_id = Some(opened.chat_id);
+                    self.chained = opened.chained;
                     self.phase = Phase::Frames(opened.frames);
                 }
                 Err(error) => self.fail(error),
@@ -517,8 +640,10 @@ impl Run {
                         self.fail(truncated_stream(FAMILY, QWEN_COMPLETIONS_PATH));
                         return;
                     }
-                    if let Some(lease) = self.lease.take() {
-                        self.shared.release(lease);
+                    if let (Some(chat_id), Some(response_id)) =
+                        (self.chat_id.take(), self.response_id.take())
+                    {
+                        self.shared.remember(&self.request, chat_id, response_id);
                     }
                     if let Some(summary) = &self.summary {
                         with_summary(summary, |summary| {
@@ -547,13 +672,13 @@ impl QwenWebAdapter {
                 core: AccountAdapterCore::new(options, QWEN_WEB_CAPABILITIES),
                 models: Mutex::new(None),
                 creating: tokio::sync::Mutex::new(()),
-                idle: Mutex::new(HashMap::new()),
+                chains: Mutex::new(Chains::default()),
             }),
         }
     }
 
-    pub fn idle_chats(&self) -> usize {
-        self.shared.idle_chats()
+    pub fn chained_chats(&self) -> usize {
+        self.shared.chained_chats()
     }
 
     fn run(
@@ -571,8 +696,9 @@ impl QwenWebAdapter {
             decoder: TurnDecoder::new(),
             finished: false,
             summary,
-            lease: None,
-            reused: false,
+            chat_id: None,
+            response_id: None,
+            chained: false,
             produced: false,
             fresh: false,
         };

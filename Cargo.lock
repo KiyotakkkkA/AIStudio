@@ -9667,6 +9667,7 @@ dependencies = [
  "zvs-contract",
  "zvs-core",
  "zvs-qwen-web",
+ "zvs-zai-web",
 ]
 
 [[package]]
@@ -9722,4 +9723,15 @@ dependencies = [
  "zvs-contract",
  "zvs-host",
  "zvs-qwen-web",
+ "zvs-zai-web",
+]
+
+[[package]]
+name = "zvs-zai-web"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
 ]

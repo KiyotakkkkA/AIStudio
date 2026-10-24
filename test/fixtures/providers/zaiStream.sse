@@ -1,0 +1,10 @@
+data: {"type": "chat:completion", "data": {"phase": "other", "usage": {"prompt_tokens": 621, "completion_tokens": 3, "total_tokens": 624, "prompt_tokens_details": {"cached_tokens": 512}}}}
+
+data: {"type": "chat:completion", "data": {"delta_content": "Привет", "phase": "answer"}}
+
+data: {"type": "chat:completion", "data": {"delta_content": ", мир!", "phase": "answer"}}
+
+data: {"type": "chat:completion", "data": {"phase": "done", "done": true}}
+
+data: [DONE]
+

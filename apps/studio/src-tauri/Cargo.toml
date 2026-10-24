@@ -41,6 +41,7 @@ url = { workspace = true }
 zeroize = { workspace = true }
 zvs-host = { path = "../../../crates/zvs-host" }
 zvs-qwen-web = { path = "../../../crates/zvs-qwen-web" }
+zvs-zai-web = { path = "../../../crates/zvs-zai-web" }
 
 [dev-dependencies]
 axum = { workspace = true }

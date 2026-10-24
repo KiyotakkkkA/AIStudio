@@ -65,12 +65,25 @@ impl<'de> Deserialize<'de> for VendorError {
 
 #[derive(Deserialize)]
 struct StreamFrame {
-    choices: Option<Vec<Choice>>,
-    usage: Option<RawUsage>,
     success: Option<bool>,
     status: Option<i64>,
     code: Option<VendorCode>,
     error: Option<VendorError>,
+}
+
+#[derive(Deserialize)]
+struct Created {
+    response_id: Option<String>,
+    response_index: Option<Value>,
+}
+
+#[derive(Deserialize)]
+struct StreamContent {
+    #[serde(rename = "response.created")]
+    created: Option<Created>,
+    response_id: Option<String>,
+    choices: Option<Vec<Choice>>,
+    usage: Option<RawUsage>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -91,6 +104,7 @@ pub struct VendorFailure {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TurnEvent {
+    Started(String),
     Reasoning(String),
     Text(String),
     Usage(Usage),
@@ -148,6 +162,7 @@ fn failure(frame: &StreamFrame) -> Option<VendorFailure> {
 #[derive(Debug, Default)]
 pub struct TurnDecoder {
     emitted: Vec<String>,
+    response_id: Option<String>,
 }
 
 impl TurnDecoder {
@@ -186,15 +201,36 @@ impl TurnDecoder {
         if let Some(failure) = failure(&frame) {
             return vec![TurnEvent::Failure(failure)];
         }
+        let Ok(content) = StreamContent::deserialize(&value) else {
+            return Vec::new();
+        };
+        if let Some(created) = &content.created {
+            let primary = created
+                .response_index
+                .as_ref()
+                .is_none_or(|index| index.as_str() == Some("0") || index.as_u64() == Some(0));
+            return match created.response_id.as_deref().map(str::trim) {
+                Some(id) if primary && !id.is_empty() && self.response_id.is_none() => {
+                    self.response_id = Some(id.to_owned());
+                    vec![TurnEvent::Started(id.to_owned())]
+                }
+                _ => Vec::new(),
+            };
+        }
+        if let (Some(primary), Some(id)) = (&self.response_id, &content.response_id)
+            && primary != id
+        {
+            return Vec::new();
+        }
         let mut events = Vec::new();
-        if let Some(raw) = &frame.usage {
+        if let Some(raw) = &content.usage {
             events.push(TurnEvent::Usage(Usage {
                 input_tokens: raw.input_tokens,
                 output_tokens: raw.output_tokens,
                 total_tokens: raw.total_tokens,
             }));
         }
-        let Some(delta) = frame
+        let Some(delta) = content
             .choices
             .and_then(|choices| choices.into_iter().next())
             .and_then(|choice| choice.delta)
@@ -289,6 +325,36 @@ mod tests {
     }
 
     #[test]
+    fn only_the_primary_response_is_followed() {
+        let mut decoder = TurnDecoder::new();
+        let created = |id: &str, index: &str| {
+            json!({ "response.created": { "chat_id": "c", "parent_id": "p",
+                    "response_id": id, "response_index": index } })
+            .to_string()
+        };
+        let answer = |id: &str, text: &str| {
+            json!({ "response_id": id,
+                    "choices": [{ "delta": { "phase": "answer", "content": text } }] })
+            .to_string()
+        };
+        assert_eq!(decoder.push(&created("second", "1")), []);
+        assert_eq!(
+            decoder.push(&created("first", "0")),
+            [TurnEvent::Started("first".into())]
+        );
+        assert_eq!(decoder.push(&created("again", "0")), []);
+        assert_eq!(decoder.push(&answer("second", "нет")), []);
+        assert_eq!(
+            decoder.push(&answer("first", "да")),
+            [TurnEvent::Text("да".into())]
+        );
+        assert_eq!(
+            decoder.push(&frame(&json!({ "phase": "answer", "content": "!" }))),
+            [TurnEvent::Text("!".into())]
+        );
+    }
+
+    #[test]
     fn error_frames_fail_the_turn_and_auth_codes_are_flagged() {
         let mut decoder = TurnDecoder::new();
         let failed = |value: Value| match TurnDecoder::new().push(&value.to_string()).as_slice() {
@@ -325,5 +391,32 @@ mod tests {
         );
         assert_eq!(failed(json!({ "status": 200, "choices": [] })), None);
         assert_eq!(decoder.push(&json!({ "error": 5 }).to_string()), []);
+    }
+
+    #[test]
+    fn failures_survive_malformed_optional_completion_fields() {
+        for payload in [
+            json!({ "status": 401, "choices": "unavailable" }),
+            json!({ "status": 403, "usage": { "input_tokens": "unknown" } }),
+            json!({ "success": false, "error": { "code": "TokenExpired" },
+                    "choices": [{ "delta": { "content": [] } }] }),
+        ] {
+            assert!(
+                matches!(
+                    TurnDecoder::new().push(&payload.to_string()).as_slice(),
+                    [TurnEvent::Failure(VendorFailure { auth: true, .. })]
+                ),
+                "{payload}"
+            );
+        }
+        assert_eq!(
+            TurnDecoder::new()
+                .push(&json!({ "success": false, "code": "RateLimited", "usage": [] }).to_string()),
+            [TurnEvent::Failure(VendorFailure {
+                code: Some(json!("RateLimited")),
+                status: None,
+                auth: false,
+            })]
+        );
     }
 }

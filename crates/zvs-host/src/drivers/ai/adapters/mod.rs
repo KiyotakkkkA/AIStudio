@@ -4,6 +4,7 @@ pub mod ollama;
 pub mod openai_compatible;
 pub mod qwen_web;
 pub mod wire;
+pub mod zai_web;
 
 use std::sync::Arc;
 
@@ -20,6 +21,9 @@ pub use openai_compatible::{
 };
 pub use qwen_web::{
     QWEN_DEFAULT_TIMEOUT_SECONDS, QWEN_WEB_CAPABILITIES, QwenWebAdapter, map_qwen_models,
+};
+pub use zai_web::{
+    ZAI_DEFAULT_TIMEOUT_SECONDS, ZAI_WEB_CAPABILITIES, ZaiWebAdapter, map_zai_models,
 };
 
 use super::capabilities::AdapterCapabilities;
@@ -119,6 +123,11 @@ impl AdapterFamilyEntry {
                 embedding: None,
                 image: None,
             }),
+            AdapterFamily::ZaiWeb => Ok(AiDriver {
+                text: Some(Arc::new(ZaiWebAdapter::new(context.account_options()?))),
+                embedding: None,
+                image: None,
+            }),
         }
     }
 }
@@ -135,6 +144,10 @@ pub const fn adapter_entry(family: AdapterFamily) -> AdapterFamilyEntry {
         },
         AdapterFamily::QwenWeb => AdapterFamilyEntry {
             capabilities: QWEN_WEB_CAPABILITIES,
+            implemented: true,
+        },
+        AdapterFamily::ZaiWeb => AdapterFamilyEntry {
+            capabilities: ZAI_WEB_CAPABILITIES,
             implemented: true,
         },
     }

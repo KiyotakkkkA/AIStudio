@@ -1,0 +1,17 @@
+{
+  "id": "5f0c2b1e-8a43-4d7e-9c1a-2b3c4d5e6f70",
+  "email": "person@example.com",
+  "name": "Пример",
+  "role": "user",
+  "idp": "email",
+  "phone_num": null,
+  "profile_image_url": "/user.png",
+  "token": "fixture-token",
+  "token_type": "Bearer",
+  "expires_at": null,
+  "permissions": {
+    "chat": {
+      "edit": true
+    }
+  }
+}

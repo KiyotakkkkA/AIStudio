@@ -8,7 +8,7 @@ use zvs_contract::{
 
 use super::adapters::{
     AdapterContext, OLLAMA_CAPABILITIES, OllamaAdapter, QWEN_DEFAULT_TIMEOUT_SECONDS,
-    SharedEmbeddingEngine, SharedModelStore, adapter_entry_named,
+    SharedEmbeddingEngine, SharedModelStore, ZAI_DEFAULT_TIMEOUT_SECONDS, adapter_entry_named,
 };
 use super::capabilities::AdapterCapabilities;
 use super::errors::session_expired;
@@ -69,8 +69,13 @@ pub fn account_not_linked(provider: &ProviderRow) -> AppError {
 
 fn account_timeout_seconds(provider: &ProviderRow) -> Option<f64> {
     provider.settings.timeout_seconds().or_else(|| {
-        (provider.adapter == AdapterFamily::QwenWeb.as_str())
-            .then_some(QWEN_DEFAULT_TIMEOUT_SECONDS)
+        if provider.adapter == AdapterFamily::QwenWeb.as_str() {
+            Some(QWEN_DEFAULT_TIMEOUT_SECONDS)
+        } else if provider.adapter == AdapterFamily::ZaiWeb.as_str() {
+            Some(ZAI_DEFAULT_TIMEOUT_SECONDS)
+        } else {
+            None
+        }
     })
 }
 

@@ -4,5 +4,11 @@
     "value": {
       "adapter": "qwen-web"
     }
+  },
+  {
+    "name": "zai",
+    "value": {
+      "adapter": "zai-web"
+    }
   }
 ]

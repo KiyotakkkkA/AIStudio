@@ -309,8 +309,10 @@ fn options() -> GatewayOptions {
         window: 4,
         ack_every: 2,
         reveal_after: Duration::from_secs(60),
+        stream_reveal_after: Duration::from_secs(60),
         challenge_timeout: Duration::from_secs(120),
         renew_reuse: Duration::from_secs(5),
+        pace_gap: Duration::from_millis(1500),
     }
 }
 
@@ -946,4 +948,196 @@ async fn origins_without_a_client_session_refresh_are_not_renewed() {
             .await
             .is_err()
     );
+}
+
+const QWEN_MODELS: &str = "https://chat.qwen.ai/api/v2/models/";
+
+#[tokio::test]
+async fn qwen_turns_read_the_client_version_and_carry_the_browser_timezone() {
+    let pages = FakePages::shared(respond(200, vec![b"{}".to_vec()]));
+    let gateway = gateway(&pages);
+    for url in [QWEN, QWEN_MODELS, FIXTURE] {
+        gateway
+            .fetch(url, request(), &CancellationToken::new())
+            .await
+            .expect("responds");
+    }
+    let qwen = pages.page(0).commands("start");
+    assert_eq!(qwen[0]["version"]["header"], "version");
+    assert_eq!(
+        qwen[0]["version"]["pattern"],
+        zvs_qwen_web::protocol::WEB_VERSION_PATTERN
+    );
+    assert_eq!(qwen[0]["timezone"], true);
+    assert_eq!(qwen[1]["timezone"], false);
+    assert_eq!(qwen[1]["version"]["header"], "version");
+    let fixture = &pages.page(1).commands("start")[0];
+    assert_eq!(fixture["version"], Value::Null);
+    assert_eq!(fixture["timezone"], false);
+}
+
+#[tokio::test(start_paused = true)]
+async fn qwen_turns_go_out_one_at_a_time_with_a_gap_after_the_previous_one_ends() {
+    let pages = FakePages::shared(respond(200, vec![b"ok".to_vec()]));
+    let gateway = Arc::new(gateway(&pages));
+    let first = gateway
+        .fetch(QWEN, request(), &CancellationToken::new())
+        .await
+        .expect("responds");
+    let second = tokio::spawn({
+        let gateway = Arc::clone(&gateway);
+        async move {
+            gateway
+                .fetch(QWEN_NEW_CHAT, request(), &CancellationToken::new())
+                .await
+        }
+    });
+    gateway
+        .fetch(QWEN_MODELS, request(), &CancellationToken::new())
+        .await
+        .expect("a model list is not paced");
+    tokio::time::sleep(Duration::from_secs(30)).await;
+    let page = pages.page(0);
+    assert_eq!(page.commands("start").len(), 2);
+    drop(first);
+    tokio::time::sleep(Duration::from_millis(1400)).await;
+    assert_eq!(page.commands("start").len(), 2);
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(page.commands("start").len(), 3);
+    second.await.expect("joins").expect("responds");
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_cancelled_turn_waiting_for_its_pace_sends_nothing() {
+    let pages = FakePages::shared(respond(200, vec![b"ok".to_vec()]));
+    let gateway = gateway(&pages);
+    let first = gateway
+        .fetch(QWEN, request(), &CancellationToken::new())
+        .await
+        .expect("responds");
+    let cancel = CancellationToken::new();
+    let waiting = gateway.fetch(QWEN, request(), &cancel);
+    cancel.cancel();
+    assert_eq!(
+        waiting.await.expect_err("cancelled").message,
+        CANCELLED_MESSAGE
+    );
+    assert_eq!(pages.page(0).commands("start").len(), 1);
+    drop(first);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_silent_streamed_turn_waits_longer_before_the_page_is_shown() {
+    let pages = FakePages::shared(Plan::Silent);
+    let gateway = AccountGateway::with_options(
+        pages.clone(),
+        BearerTokens::default(),
+        GatewayOptions {
+            reveal_after: Duration::from_secs(5),
+            stream_reveal_after: Duration::from_secs(60),
+            ..options()
+        },
+        silent_logger(),
+    );
+    let error = gateway
+        .fetch(QWEN, request(), &CancellationToken::new())
+        .await
+        .expect_err("times out");
+    assert_eq!(error.message, TIMED_OUT_MESSAGE);
+    assert_eq!(pages.page(0).revealed.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn warming_opens_the_account_page_once_and_refuses_other_origins() {
+    let pages = FakePages::shared(respond(200, vec![b"ok".to_vec()]));
+    let gateway = gateway(&pages);
+    gateway.warm("https://chat.qwen.ai").await.expect("warms");
+    gateway.warm("https://chat.qwen.ai").await.expect("warm");
+    assert_eq!(pages.origins(), ["https://chat.qwen.ai"]);
+    assert!(gateway.warm("https://evil.example").await.is_err());
+    gateway
+        .fetch(QWEN, request(), &CancellationToken::new())
+        .await
+        .expect("responds");
+    assert_eq!(pages.pages().len(), 1);
+}
+
+const ZAI: &str = "https://chat.z.ai/api/v2/chat/completions?timestamp=1&token=";
+const ZAI_NEW_CHAT: &str = "https://chat.z.ai/api/v1/chats/new";
+const ZAI_MODELS: &str = "https://chat.z.ai/api/models";
+
+#[tokio::test]
+async fn zai_completions_carry_the_vendor_captcha_and_the_page_bearer_in_the_query() {
+    let pages = FakePages::shared(respond(200, vec![b"{}".to_vec()]));
+    let gateway = gateway(&pages);
+    for url in [ZAI, ZAI_NEW_CHAT, ZAI_MODELS] {
+        gateway
+            .fetch(url, request(), &CancellationToken::new())
+            .await
+            .expect("responds");
+    }
+    assert_eq!(pages.origins(), ["https://chat.z.ai"]);
+    let starts = pages.page(0).commands("start");
+    let completion = &starts[0];
+    assert_eq!(completion["page"], "https://chat.z.ai/");
+    assert_eq!(completion["app"], true);
+    assert_eq!(completion["transport"], "fetch");
+    assert_eq!(completion["challenge"], zvs_zai_web::CHALLENGE_PATTERN);
+    assert_eq!(completion["bearer_key"], "token");
+    assert_eq!(completion["bearer_query"], "token");
+    assert_eq!(completion["session"], Value::Null);
+    assert_eq!(completion["version"]["header"], "x-fe-version");
+    assert_eq!(completion["captcha"]["scene_id"], "didk33e0");
+    assert_eq!(completion["captcha"]["field"], "captcha_verify_param");
+    assert_eq!(completion["captcha"]["element_id"], "zvs-captcha-element");
+    for other in &starts[1..] {
+        assert_eq!(other["captcha"], Value::Null);
+        assert_eq!(other["bearer_query"], "token");
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn zai_turns_are_paced_but_its_model_list_is_not() {
+    let pages = FakePages::shared(respond(200, vec![b"ok".to_vec()]));
+    let gateway = Arc::new(gateway(&pages));
+    let first = gateway
+        .fetch(ZAI_NEW_CHAT, request(), &CancellationToken::new())
+        .await
+        .expect("responds");
+    let second = tokio::spawn({
+        let gateway = Arc::clone(&gateway);
+        async move {
+            gateway
+                .fetch(ZAI, request(), &CancellationToken::new())
+                .await
+        }
+    });
+    gateway
+        .fetch(ZAI_MODELS, request(), &CancellationToken::new())
+        .await
+        .expect("not paced");
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    assert_eq!(pages.page(0).commands("start").len(), 2);
+    drop(first);
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    assert_eq!(pages.page(0).commands("start").len(), 3);
+    second.await.expect("joins").expect("responds");
+}
+
+#[test]
+fn both_account_apps_load_at_their_root_and_fixtures_keep_the_static_page() {
+    for origin in ["https://chat.qwen.ai", "https://chat.z.ai"] {
+        let page = page_url(origin).expect("a page");
+        assert_eq!(page.as_str(), format!("{origin}/"));
+        assert!(application_page(&page));
+    }
+    let fixture = page_url("http://127.0.0.1:4100").expect("a page");
+    assert_eq!(fixture.as_str(), "http://127.0.0.1:4100/robots.txt");
+    assert!(!application_page(&fixture));
+    assert!(!application_page(
+        &Url::parse("https://chat.z.ai/c/1").expect("a url")
+    ));
+    assert!(!application_page(
+        &Url::parse("https://chat.z.ai.evil.test/").expect("a url")
+    ));
 }

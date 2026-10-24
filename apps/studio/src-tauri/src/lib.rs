@@ -258,6 +258,49 @@ fn probe_gateway(gateway: Arc<AccountGateway>, logger: SharedLogger) {
     });
 }
 
+fn warm_account_pages(
+    accounts: &AccountService,
+    gateway: Arc<AccountGateway>,
+    logger: SharedLogger,
+) {
+    let Ok(accounts) = accounts.list() else {
+        return;
+    };
+    let origins: Vec<&'static str> = [
+        (
+            zvs_contract::AccountFamily::QwenWeb,
+            zvs_qwen_web::protocol::ORIGIN,
+        ),
+        (
+            zvs_contract::AccountFamily::ZaiWeb,
+            zvs_zai_web::protocol::ORIGIN,
+        ),
+    ]
+    .into_iter()
+    .filter(|(family, _)| {
+        accounts.iter().any(|account| {
+            account.adapter == *family && account.status == zvs_contract::AccountStatus::Linked
+        })
+    })
+    .map(|(_, origin)| origin)
+    .collect();
+    if origins.is_empty() {
+        return;
+    }
+    tauri::async_runtime::spawn(async move {
+        for origin in origins {
+            if let Err(error) = gateway.warm(origin).await {
+                logger.log(
+                    LogLevel::Info,
+                    "browser",
+                    "Could not warm the account gateway",
+                    &[("origin", json!(origin)), ("code", json!(error.code))],
+                );
+            }
+        }
+    });
+}
+
 fn open_launch_link(app: &AppHandle, args: &[String]) {
     let Some(url) = toast::launch_url(args) else {
         window::focus_studio(app);
@@ -1039,6 +1082,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     ipc::register(&mut server);
     server.finish();
     services.accounts.start_auto_refresh()?;
+    warm_account_pages(&services.accounts, Arc::clone(&gateway), logger.clone());
     services.health.start();
     retention.start();
     services.runs.recover()?;

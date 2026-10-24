@@ -695,10 +695,15 @@ fn adapter_descriptors_list_every_family_with_its_wiring_state() {
         [
             (AdapterFamily::OpenaiCompatible, true),
             (AdapterFamily::QwenWeb, true),
+            (AdapterFamily::ZaiWeb, true),
             (AdapterFamily::Local, true),
         ]
     );
-    let local = &descriptors[2].capabilities;
+    let local = &descriptors
+        .iter()
+        .find(|descriptor| descriptor.capabilities.family == AdapterFamily::Local)
+        .expect("the local family")
+        .capabilities;
     assert!(local.embedding);
     assert!(!local.streaming);
 }

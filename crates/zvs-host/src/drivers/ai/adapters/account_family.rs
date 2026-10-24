@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::StreamExt;
 use serde_json::{Value, json};
@@ -44,7 +45,10 @@ pub struct AccountAdapterOptions {
     pub clock: SharedClock,
     pub new_id: NewId,
     pub on_session_expired: Option<SessionExpiredHook>,
+    pub retry_delay: Duration,
 }
+
+pub const DEFAULT_RETRY_DELAY: Duration = Duration::from_secs(2);
 
 impl AccountAdapterOptions {
     pub fn new(transport: SharedTransport) -> Self {
@@ -54,6 +58,7 @@ impl AccountAdapterOptions {
             clock: Arc::new(SystemClock),
             new_id: Arc::new(|| new_id().hyphenated().to_string()),
             on_session_expired: None,
+            retry_delay: DEFAULT_RETRY_DELAY,
         }
     }
 }
@@ -185,6 +190,7 @@ pub struct AccountAdapterCore {
     pub clock: SharedClock,
     pub new_id: NewId,
     pub capabilities: AdapterCapabilities,
+    pub retry_delay: Duration,
     on_session_expired: Option<SessionExpiredHook>,
 }
 
@@ -196,6 +202,7 @@ impl AccountAdapterCore {
             clock: options.clock,
             new_id: options.new_id,
             capabilities,
+            retry_delay: options.retry_delay,
             on_session_expired: options.on_session_expired,
         }
     }

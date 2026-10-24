@@ -6,6 +6,7 @@ use crate::validate::no_refinements;
 wire_enum!(AdapterFamily {
     OpenaiCompatible => "openai-compatible",
     QwenWeb => "qwen-web",
+    ZaiWeb => "zai-web",
     Local => "local",
 });
 
@@ -16,6 +17,7 @@ wire_enum!(AuthMode {
 
 wire_enum!(AccountFamily {
     QwenWeb => "qwen-web",
+    ZaiWeb => "zai-web",
 });
 
 wire_enum!(TunableParameter {
@@ -81,6 +83,7 @@ impl AdapterFamily {
     pub const fn account_family(self) -> Option<AccountFamily> {
         match self {
             Self::QwenWeb => Some(AccountFamily::QwenWeb),
+            Self::ZaiWeb => Some(AccountFamily::ZaiWeb),
             Self::OpenaiCompatible | Self::Local => None,
         }
     }
@@ -120,7 +123,7 @@ mod tests {
                 .iter()
                 .map(|family| family.as_str())
                 .collect::<Vec<_>>(),
-            ["openai-compatible", "qwen-web", "local"]
+            ["openai-compatible", "qwen-web", "zai-web", "local"]
         );
         assert_eq!(
             serde_json::to_value(TunableParameter::MaxOutputTokens).expect("serialises"),
@@ -134,6 +137,10 @@ mod tests {
         assert_eq!(
             AdapterFamily::QwenWeb.account_family(),
             Some(AccountFamily::QwenWeb)
+        );
+        assert_eq!(
+            AdapterFamily::ZaiWeb.account_family(),
+            Some(AccountFamily::ZaiWeb)
         );
         assert_eq!(AdapterFamily::OpenaiCompatible.account_family(), None);
         assert_eq!(LOCAL_BASE_URL, "local://models");

@@ -2,6 +2,7 @@ pub mod probe_credentials;
 pub mod qwen;
 pub mod session;
 pub mod store;
+pub mod zai;
 
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
@@ -20,6 +21,7 @@ pub use session::{StoredTokenSession, account_session};
 pub use store::{
     ACCOUNT_TOKEN_SECRET_TYPE, AccountCredentialStore, TOKEN_SKEW_SECONDS, to_identity,
 };
+pub use zai::{ZAI_IDENTITY_ENDPOINT, ZAI_LOGIN_URL, ZaiIdentityProbe, map_zai_identity};
 
 use super::errors::{
     HttpFailure, account_page_error, cancelled, http_failure, is_html, is_session_expired,
@@ -73,10 +75,12 @@ pub type SharedIdentityProbe = Arc<dyn IdentityProbe>;
 pub type ProbeFactory = Arc<dyn Fn(AccountFamily) -> SharedIdentityProbe + Send + Sync>;
 
 static QWEN: LazyLock<SharedIdentityProbe> = LazyLock::new(|| Arc::new(QwenIdentityProbe));
+static ZAI: LazyLock<SharedIdentityProbe> = LazyLock::new(|| Arc::new(ZaiIdentityProbe));
 
 pub fn identity_probe(family: AccountFamily) -> SharedIdentityProbe {
     match family {
         AccountFamily::QwenWeb => Arc::clone(&QWEN),
+        AccountFamily::ZaiWeb => Arc::clone(&ZAI),
     }
 }
 

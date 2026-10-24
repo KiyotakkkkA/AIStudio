@@ -1,6 +1,8 @@
 //! How the gateway page sends a request so that it leaves the browser the way the client's does.
 
-use crate::protocol::{API_BASE, CHATS_NEW_PATH, SESSION_REFRESH_URL};
+use crate::protocol::{
+    API_BASE, CHATS_NEW_PATH, COMPLETIONS_PATH, SESSION_REFRESH_URL, WEB_VERSION_PATTERN,
+};
 
 /// The page API a request goes through. The vendor's anti-abuse SDK instruments the page's
 /// XHR, and the client creates chats over XHR; streamed completions use `fetch`.
@@ -57,13 +59,27 @@ pub struct PagePlan {
     /// key. A request sent without `Authorization` stays on the cookie session.
     pub page_bearer_key: Option<&'static str>,
     pub session_refresh: Option<SessionRefresh>,
+    pub frontend_version: Option<FrontendVersion>,
+    pub paced: bool,
+    pub timezone_header: bool,
 }
 
-/// The plan for `url`, an absolute URL on the Qwen origin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FrontendVersion {
+    pub header: &'static str,
+    pub script_pattern: &'static str,
+}
+
+pub const FRONTEND_VERSION: FrontendVersion = FrontendVersion {
+    header: "version",
+    script_pattern: WEB_VERSION_PATTERN,
+};
+
 pub fn page_plan(url: &str) -> PagePlan {
     let path = url
         .strip_prefix(API_BASE)
         .map(|rest| rest.split(['?', '#']).next().unwrap_or_default());
+    let turn = matches!(path, Some(CHATS_NEW_PATH | COMPLETIONS_PATH));
     PagePlan {
         transport: if path == Some(CHATS_NEW_PATH) {
             PageTransport::Xhr
@@ -73,6 +89,9 @@ pub fn page_plan(url: &str) -> PagePlan {
         challenge_pattern: Some(CHALLENGE_PATTERN),
         page_bearer_key: Some(PAGE_BEARER_KEY),
         session_refresh: Some(SESSION_REFRESH),
+        frontend_version: Some(FRONTEND_VERSION),
+        paced: turn,
+        timezone_header: turn,
     }
 }
 
@@ -111,5 +130,24 @@ mod tests {
             .expect("a session refresh");
         assert_eq!(refresh.url, "https://auth.qwen.ai/api/v2/auths/refresh");
         assert_eq!(refresh.state_key, "qwen_access_token_state");
+    }
+
+    #[test]
+    fn only_turn_requests_are_paced_and_every_request_reads_the_page_version() {
+        for (url, turn) in [
+            ("https://chat.qwen.ai/api/v2/chats/new", true),
+            (
+                "https://chat.qwen.ai/api/v2/chat/completions?chat_id=a",
+                true,
+            ),
+            ("https://chat.qwen.ai/api/v2/models/", false),
+            ("https://chat.qwen.ai/api/v2/chats/newer", false),
+        ] {
+            let plan = page_plan(url);
+            assert_eq!(plan.paced, turn, "{url}");
+            assert_eq!(plan.timezone_header, turn, "{url}");
+            assert_eq!(plan.frontend_version, Some(FRONTEND_VERSION), "{url}");
+        }
+        assert_eq!(FRONTEND_VERSION.header, "version");
     }
 }

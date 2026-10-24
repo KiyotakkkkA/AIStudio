@@ -17,6 +17,7 @@ use crate::services::accounts::AccountBrowser;
 
 pub const FAKE_IDENTITY_ENDPOINT: &str = "https://example.com/identity";
 pub const FAKE_QWEN_LOGIN: &str = "https://chat.qwen.ai/";
+pub const FAKE_ZAI_LOGIN: &str = "https://chat.z.ai/";
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
@@ -137,6 +138,7 @@ impl IdentityProbe for FakeProbe {
     fn login_url(&self) -> &str {
         match self.family {
             AccountFamily::QwenWeb => FAKE_QWEN_LOGIN,
+            AccountFamily::ZaiWeb => FAKE_ZAI_LOGIN,
         }
     }
 

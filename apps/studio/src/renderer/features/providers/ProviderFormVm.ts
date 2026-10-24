@@ -31,6 +31,7 @@ export const SETTING_DEFAULTS = {
 } as const;
 
 export const QWEN_WEB_DEFAULT_TIMEOUT_SECONDS = 600;
+export const ZAI_WEB_DEFAULT_TIMEOUT_SECONDS = 600;
 
 export const SETTING_BOUNDS = {
   temperature: { min: 0, max: 2, step: 0.01 },
@@ -300,6 +301,9 @@ export class ProviderFormVm {
   settingOf(key: SettingKey): number {
     if (key === "timeoutSeconds" && this.adapter === "qwen-web") {
       return this.settings.timeoutSeconds ?? QWEN_WEB_DEFAULT_TIMEOUT_SECONDS;
+    }
+    if (key === "timeoutSeconds" && this.adapter === "zai-web") {
+      return this.settings.timeoutSeconds ?? ZAI_WEB_DEFAULT_TIMEOUT_SECONDS;
     }
     return this.settings[key] ?? SETTING_DEFAULTS[key];
   }
