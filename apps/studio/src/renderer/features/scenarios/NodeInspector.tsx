@@ -58,6 +58,7 @@ import {
 } from "./runCopy";
 import { TOOL_SET_PARAM, TOOL_SET_TYPE, toolSetKeys } from "./toolSet";
 import ToolSetPicker from "./ToolSetPicker";
+import Alert from "../../ui/molecules/Alert";
 
 const PARAMS_INVALID = "Параметры должны быть JSON-объектом";
 const SECTION = "m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase";
@@ -421,9 +422,7 @@ const ParamsTab = observer(function ParamsTab({
         <p className="m-0 text-[12px] leading-relaxed text-main-400">{description}</p>
       )}
       {run?.status === "failed" && run.error !== null ? (
-        <p role="alert" className="m-0 rounded-control bg-err-soft px-3 py-2 text-[12px] text-err">
-          {`${STEP_STATUS_LABELS.failed}: ${run.error}`}
-        </p>
+        <Alert>{`${STEP_STATUS_LABELS.failed}: ${run.error}`}</Alert>
       ) : null}
       <Field label="Название" htmlFor="scenario-node-name">
         <CommitInput

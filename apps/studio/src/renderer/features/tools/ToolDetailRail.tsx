@@ -16,7 +16,6 @@ import EmptyState from "../../ui/molecules/EmptyState";
 import SchemaView from "./SchemaView";
 import type ToolStore from "./ToolStore";
 import { sourceLabel } from "./toolPresentation";
-import TryItPanel from "./TryItPanel";
 
 const TIER_OPTIONS: readonly { value: ToolTier; label: string }[] = [
   { value: "auto", label: "auto" },
@@ -34,13 +33,16 @@ function ToolDetailRail({ store }: { readonly store: ToolStore }) {
   const references = store.detail?.id === tool?.id ? (store.detail?.references ?? null) : null;
 
   return (
-    <aside aria-label="Инструмент" className="flex min-h-0 w-85 flex-none flex-col bg-main-800">
+    <aside
+      aria-label="Инструмент"
+      className="flex min-h-0 w-85 flex-none flex-col border-l border-line bg-main-800"
+    >
       {tool === null || tier === null ? (
-        <div className="flex flex-1 items-center justify-center">
+        <div className="flex flex-1 items-center justify-center p-4">
           <EmptyState
             icon={mdiWrenchOutline}
             title="Инструмент не выбран"
-            description="Выберите инструмент в таблице, чтобы увидеть его схему и попробовать вызов."
+            description="Выберите инструмент в таблице, чтобы увидеть его схему и разрешение."
           />
         </div>
       ) : (
@@ -103,11 +105,6 @@ function ToolDetailRail({ store }: { readonly store: ToolStore }) {
                 }}
               />
             </div>
-            {tool.destructive && tier !== "off" ? (
-              <p className="m-0 mt-1.5 text-[11px] text-warn">
-                Разрушающий инструмент включён: каждый пробный вызов потребует подтверждения.
-              </p>
-            ) : null}
           </div>
 
           <h3 className={`m-0 mt-0.5 ${SECTION}`}>Входная схема</h3>
@@ -150,11 +147,6 @@ function ToolDetailRail({ store }: { readonly store: ToolStore }) {
               ))}
             </div>
           )}
-
-          <div className="min-h-2 flex-1" />
-
-          <h3 className={`m-0 ${SECTION}`}>Попробовать</h3>
-          <TryItPanel store={store} />
         </ScrollArea>
       )}
     </aside>

@@ -10,7 +10,7 @@ export interface PagePlaceholderProps {
 
 export default function PagePlaceholder({ icon, title, description, task }: PagePlaceholderProps) {
   return (
-    <div className="flex flex-1 items-center justify-center rounded-card bg-main-800">
+    <div className="flex flex-1 items-center justify-center">
       <EmptyState
         className="max-w-110 border-0 bg-transparent px-6 py-10 text-center shadow-none"
         icon={

@@ -116,14 +116,8 @@ async fn setting_a_tool_to_off_through_the_channel_fails_the_run_at_admission() 
 }
 
 #[tokio::test]
-async fn the_try_it_and_defaults_channels_match_the_contract() {
-    let (host, server) = registered();
-    let tool = mail(&host);
-    let invoked = server
-        .dispatch("tools.invoke", json!({ "id": tool.id.to_string() }))
-        .await;
-    assert_eq!(invoked["data"]["ok"], json!(true), "{invoked}");
-    assert_eq!(invoked["data"]["output"], json!("executed"));
+async fn the_defaults_channels_match_the_contract() {
+    let (_host, server) = registered();
     let set = server
         .dispatch("tools.setDefaults", json!({ "mcp": "off" }))
         .await;
@@ -131,13 +125,6 @@ async fn the_try_it_and_defaults_channels_match_the_contract() {
     assert_eq!(set["data"]["builtin"], json!("inferred"));
     let defaults = server.dispatch("tools.defaults", Value::Null).await;
     assert_eq!(defaults["data"]["mcp"], json!("off"), "{defaults}");
-    let refused = server
-        .dispatch(
-            "tools.invoke",
-            json!({ "id": tool.id.to_string(), "input": {}, "confirmed": null }),
-        )
-        .await;
-    assert_eq!(refused["error"]["code"], json!("VALIDATION_FAILED"));
 }
 
 #[tokio::test]

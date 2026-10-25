@@ -29,7 +29,7 @@ fn registered() -> (TestServices, IpcServer) {
 }
 
 #[tokio::test]
-async fn the_channels_create_list_test_and_remove_a_skill_in_the_contract_shape() {
+async fn the_channels_create_list_export_and_remove_a_skill_in_the_contract_shape() {
     let (host, server) = registered();
     let created = server
         .dispatch(
@@ -52,17 +52,6 @@ async fn the_channels_create_list_test_and_remove_a_skill_in_the_contract_shape(
     let id = created["data"]["id"].clone();
     let listed = server.dispatch("skills.list", json!(null)).await;
     assert_eq!(listed["data"][0]["key"], json!("inbox"), "{listed}");
-    let tested = server
-        .dispatch(
-            "skills.test",
-            json!({ "message": "разбери входящие письма" }),
-        )
-        .await;
-    assert_eq!(
-        tested["data"]["matches"][0]["triggered"],
-        json!(true),
-        "{tested}"
-    );
     host.picker.answer(&[]);
     let exported = server.dispatch("skills.export", json!({ "id": id })).await;
     assert_eq!(exported["data"]["path"], json!(null), "{exported}");

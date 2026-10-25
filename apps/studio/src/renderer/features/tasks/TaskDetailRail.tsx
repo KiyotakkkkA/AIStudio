@@ -24,7 +24,7 @@ export default observer(function TaskDetailRail({ store }: { readonly store: Tas
   return (
     <aside
       aria-label="Детали запуска"
-      className="flex w-80 flex-none flex-col bg-main-800"
+      className="flex w-80 flex-none flex-col border-l border-line bg-main-800"
     >
       {run === null ? (
         <div className="flex flex-1 items-center justify-center p-4">

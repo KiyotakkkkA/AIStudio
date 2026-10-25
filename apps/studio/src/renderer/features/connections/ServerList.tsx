@@ -30,7 +30,7 @@ function ServerList({ store }: { readonly store: ConnectionStore }) {
       ) : null}
 
       {store.isEmpty && store.form === null ? (
-        <div className="flex items-center justify-center rounded-card bg-main-800 px-2">
+        <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">
           <EmptyState
             icon={mdiPowerPlugOutline}
             title="Серверов нет"

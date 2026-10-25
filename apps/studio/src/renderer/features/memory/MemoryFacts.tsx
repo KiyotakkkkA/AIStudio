@@ -49,6 +49,7 @@ import {
   factsLabel,
   memoryDate,
 } from "./memoryCopy";
+import Alert from "../../ui/molecules/Alert";
 
 type Scope = "account" | "dialog";
 
@@ -285,11 +286,7 @@ function MemoryFacts() {
           <ClearButton title={CLEAR_ACCOUNT_TITLE} />
         ) : null}
       </div>
-      {memory.error === null ? null : (
-        <p role="alert" className="m-0 rounded-control bg-err-soft px-3 py-2 text-[12px] text-err">
-          {memory.error}
-        </p>
-      )}
+      {memory.error === null ? null : <Alert>{memory.error}</Alert>}
       <Composer key={scope} scope={scope} />
       {scope === "account" ? <AccountFacts /> : <DialogFacts />}
     </div>

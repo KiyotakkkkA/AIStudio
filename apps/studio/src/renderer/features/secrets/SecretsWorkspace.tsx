@@ -7,6 +7,7 @@ import { useStore } from "../../stores/useStore";
 import SecretConflictDialog from "./SecretConflictDialog";
 import SecretForm from "./SecretForm";
 import SecretList from "./SecretList";
+import Alert from "../../ui/molecules/Alert";
 
 function SecretsWorkspace() {
   const { secrets } = useStore();
@@ -18,15 +19,9 @@ function SecretsWorkspace() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {secrets.error === null ? null : (
-        <div
-          role="alert"
-          className="mx-6 mt-3 flex flex-none items-center gap-3 rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err"
-        >
-          <span className="flex-1">{secrets.error}</span>
-          <button type="button" className="text-main-400" onClick={secrets.dismissError}>
-            Скрыть
-          </button>
-        </div>
+        <Alert className="mx-6 mt-3" onDismiss={secrets.dismissError}>
+          {secrets.error}
+        </Alert>
       )}
 
       <div className="flex min-h-0 flex-1">

@@ -1,5 +1,4 @@
 import {
-  mdiClose,
   mdiFitToScreenOutline,
   mdiFormatAlignLeft,
   mdiMagnifyMinusOutline,
@@ -43,6 +42,7 @@ import type ScenarioEditor from "./ScenarioEditor";
 import ScenarioEdgeView from "./ScenarioEdgeView";
 import ScenarioNodeView from "./ScenarioNodeView";
 import { canvasCommand, isEditableTarget } from "./shortcuts";
+import Alert from "../../ui/molecules/Alert";
 
 const NODE_TYPES = { scenario: ScenarioNodeView };
 const EDGE_TYPES = { scenario: ScenarioEdgeView };
@@ -299,19 +299,12 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
         <ApprovalBar editor={editor} />
 
         {editor.refusal === null || editor.execution.approval !== null ? null : (
-          <div
-            role="alert"
-            className="absolute top-4 left-1/2 z-20 flex max-w-[min(560px,calc(100%-120px))] -translate-x-1/2 items-center gap-2.5 rounded-control border border-err-border bg-err-soft px-3 py-2.25 text-[12px] text-err shadow-card"
+          <Alert
+            onDismiss={editor.dismissRefusal}
+            className="absolute top-4 left-1/2 z-20 max-w-[min(560px,calc(100%-120px))] -translate-x-1/2 shadow-card"
           >
-            <span className="min-w-0 flex-1">{editor.refusal}</span>
-            <IconButton
-              path={mdiClose}
-              label="Скрыть"
-              tooltip="bottom-center"
-              onClick={editor.dismissRefusal}
-              className="size-5 text-err/80 hover:bg-transparent hover:text-err"
-            />
-          </div>
+            {editor.refusal}
+          </Alert>
         )}
 
         <div className="absolute top-4 right-4.5 z-10">

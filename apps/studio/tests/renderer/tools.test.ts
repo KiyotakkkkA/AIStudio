@@ -1,17 +1,13 @@
 import { expect, test } from "vitest";
 import { createIpcClient } from "@zvs/ipc";
 import {
-  AppError,
   AppErrorCode,
   contract,
-  RunId,
-  toolNeedsConfirmation,
   type Contract,
   type McpServerDto,
   type McpServerId,
   type ToolDto,
   type ToolId,
-  type ToolInvokeRequest,
 } from "@zvs/shared";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import ToolStore from "../../src/renderer/features/tools/ToolStore.ts";
@@ -23,21 +19,14 @@ import {
   sourceGroups,
   tierCounts,
 } from "../../src/renderer/features/tools/toolFilters.ts";
-import {
-  describeSchema,
-  parseInput,
-  schemaType,
-  seedInput,
-} from "../../src/renderer/features/tools/schemaFields.ts";
+import { describeSchema, schemaType } from "../../src/renderer/features/tools/schemaFields.ts";
 import {
   formatLastUsed,
-  resultLine,
   unavailability,
 } from "../../src/renderer/features/tools/toolPresentation.ts";
 
 const QDRANT = "0199cc11-1111-7111-8111-000000000001" as McpServerId;
 const FILES = "0199cc11-1111-7111-8111-000000000002" as McpServerId;
-const RUN = RunId.parse("0199cc11-5555-7111-8111-000000000001");
 
 function id(n: number): ToolId {
   return `0199cc11-4444-7111-8111-${String(n).padStart(12, "0")}` as ToolId;
@@ -227,20 +216,6 @@ test("a JSON Schema renders as readable fields with required marks and defaults"
   expect(describeSchema({ type: "string" })).toMatchObject({ kind: "raw" });
 });
 
-test("try-it input is seeded from schema defaults and required fields", () => {
-  expect(seedInput(SEARCH_SCHEMA)).toEqual({
-    collection: "",
-    query: "",
-    k: 5,
-    min_score: 0,
-    mode: "hybrid",
-  });
-  expect(seedInput(null)).toEqual({});
-  expect(parseInput("")).toEqual({ ok: true, value: {} });
-  expect(parseInput('{"k": 3}')).toEqual({ ok: true, value: { k: 3 } });
-  expect(parseInput("{k: 3}").ok).toBe(false);
-});
-
 test("an offline source explains why its tools are unavailable", () => {
   const files = SERVERS[1]!;
   expect(unavailability(REGISTRY[4]!, files)).toEqual({
@@ -252,24 +227,17 @@ test("an offline source explains why its tools are unavailable", () => {
   expect(unavailability(REGISTRY[0]!, null)).toBeNull();
 });
 
-test("presentation formats last use and the result line", () => {
+test("presentation formats last use", () => {
   const now = 10 * 24 * 60 * 60 * 1000;
   expect(formatLastUsed(null, now)).toBe("никогда");
   expect(formatLastUsed(now - 2 * 60_000, now)).toBe("2 м назад");
   expect(formatLastUsed(now - 3 * 60 * 60_000, now)).toBe("3 ч назад");
   expect(formatLastUsed(now - 30 * 60 * 60_000, now)).toBe("вчера");
-  expect(resultLine({ runId: RUN, ok: true, durationMs: 61, output: [1, 2, 3], error: null })).toBe(
-    "3 элемента · 61 ms",
-  );
-  expect(resultLine({ runId: RUN, ok: false, durationMs: 9, output: null, error: "x" })).toBe(
-    "ошибка · 9 ms",
-  );
 });
 
 function fakeHost(rows: ToolDto[] = REGISTRY) {
   const bridge = createFakeBridge<Contract>();
   const registry = new Map(rows.map((row) => [row.id, { ...row }]));
-  const invocations: ToolInvokeRequest[] = [];
   bridge.handle("tools.list", () => [...registry.values()]);
   bridge.handle("mcp.list", () => SERVERS);
   bridge.handle("tools.get", ({ id: toolId }) => ({
@@ -286,18 +254,11 @@ function fakeHost(rows: ToolDto[] = REGISTRY) {
     registry.set(toolId, next);
     return next;
   });
-  bridge.handle("tools.invoke", (input) => {
-    invocations.push(input);
-    const row = registry.get(input.id)!;
-    if (toolNeedsConfirmation(row) && !input.confirmed)
-      throw new AppError(AppErrorCode.APPROVAL_DENIED, "Вызов требует явного подтверждения");
-    return { runId: RUN, ok: true, durationMs: 12, output: { echoed: input.input }, error: null };
-  });
   const store = new ToolStore(createIpcClient(contract, bridge), { pollMs: 0, clock: () => 5_000 });
-  return { bridge, store, registry, invocations };
+  return { bridge, store, registry };
 }
 
-test("the store loads the registry, selects the first visible tool and seeds its input", async () => {
+test("the store loads the registry, selects the first visible tool and its references", async () => {
   const { store } = fakeHost();
   await store.load();
   expect(store.tools).toHaveLength(7);
@@ -305,13 +266,6 @@ test("the store loads the registry, selects the first visible tool and seeds its
   store.setSource(`mcp:${QDRANT}`);
   expect(store.visible.map((row) => row.key)).toEqual(["qdrant.deleteCollection", "qdrant.search"]);
   await store.select(id(3));
-  expect(JSON.parse(store.inputText)).toEqual({
-    collection: "",
-    query: "",
-    k: 5,
-    min_score: 0,
-    mode: "hybrid",
-  });
   expect(store.detail?.references).toEqual([
     { kind: "scenario", refId: "s1", name: "Support triage bot" },
   ]);
@@ -321,56 +275,13 @@ test("the store loads the registry, selects the first visible tool and seeds its
   expect(store.tier).toBe("all");
 });
 
-test("a destructive tool asks for confirmation before try-it calls the host", async () => {
-  const { store, registry, invocations } = fakeHost();
-  await store.load();
-  await store.select(id(4));
-  expect(store.blockedReason).toBe("Разрешение «off» запрещает вызов");
-  store.requestRun();
-  expect(invocations).toHaveLength(0);
-
-  await store.setTier(id(4), "auto");
-  expect(registry.get(id(4))?.tier).toBe("auto");
-  expect(store.needsConfirmation).toBe(true);
-  store.setInputText('{"collection": "old"}');
-  store.requestRun();
-  expect(store.confirming).toBe(true);
-  expect(invocations).toHaveLength(0);
-
-  store.cancelRun();
-  expect(store.confirming).toBe(false);
-  expect(invocations).toHaveLength(0);
-
-  store.requestRun();
-  store.confirmRun();
-  await expect.poll(() => store.result).not.toBeNull();
-  expect(invocations).toEqual([{ id: id(4), input: { collection: "old" }, confirmed: true }]);
-  expect(store.result?.output).toEqual({ echoed: { collection: "old" } });
-});
-
-test("a read-only auto tool runs straight away and bad JSON never reaches the host", async () => {
-  const { store, invocations } = fakeHost();
-  await store.load();
-  await store.select(id(1));
-  expect(store.needsConfirmation).toBe(false);
-  store.setInputText("{not json");
-  expect(store.canRun).toBe(false);
-  store.requestRun();
-  expect(invocations).toHaveLength(0);
-  store.resetInput();
-  store.requestRun();
-  await expect.poll(() => store.result).not.toBeNull();
-  expect(invocations).toEqual([{ id: id(1), input: {}, confirmed: false }]);
-});
-
-test("a host refusal is shown, not swallowed", async () => {
+test("a host refusal to change a tier is shown, not swallowed", async () => {
   const { store, bridge } = fakeHost();
-  bridge.fail("tools.invoke", AppErrorCode.PERMISSION_DENIED, "Инструмент выключен");
+  bridge.fail("tools.setTier", AppErrorCode.PERMISSION_DENIED, "Инструмент выключен");
   await store.load();
-  await store.select(id(1));
-  await store.run(false);
-  expect(store.runError).toBe("Инструмент выключен");
-  expect(store.result).toBeNull();
+  await store.setTier(id(1), "ask");
+  expect(store.error).toBe("Инструмент выключен");
+  expect(store.isBusy(id(1))).toBe(false);
 });
 
 test("raising a disabled tool above off re-enables it; off keeps it as the user left it", async () => {

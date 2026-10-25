@@ -17,6 +17,7 @@ import DownloadFilterRail from "./DownloadFilterRail";
 import DownloadProgressRow from "./DownloadProgressRow";
 import DownloadQueueRow from "./DownloadQueueRow";
 import { formatBytes, formatRate, SECTION_LABELS } from "./downloadPresentation";
+import Alert from "../../ui/molecules/Alert";
 
 const CatalogueEntry = observer(function CatalogueEntry({
   item,
@@ -93,20 +94,22 @@ export default observer(function DownloadsWorkspace() {
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {store.error === null ? null : (
-            <div
-              role="alert"
-              className="flex items-center gap-3 bg-err-soft px-5 py-2.5 text-[12.5px] text-err"
+            <Alert
+              bar
+              action={
+                <Button
+                  size="sm"
+                  tone="ghost"
+                  onClick={() => {
+                    void store.load();
+                  }}
+                >
+                  Повторить
+                </Button>
+              }
             >
-              <span className="min-w-0 flex-1">{store.error}</span>
-              <Button
-                tone="ghost"
-                onClick={() => {
-                  void store.load();
-                }}
-              >
-                Повторить
-              </Button>
-            </div>
+              {store.error}
+            </Alert>
           )}
 
           <ScrollArea className="flex min-h-0 flex-1 flex-col">

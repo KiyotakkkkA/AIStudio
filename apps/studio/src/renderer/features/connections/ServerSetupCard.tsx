@@ -16,6 +16,7 @@ import { STARTUP_LABELS, STATE_LABELS, STATE_TONES } from "./connectionPresentat
 import type { ServerFormVm } from "./ServerFormVm";
 import TestResultLine from "./TestResultLine";
 import ValueTable from "./ValueTable";
+import Alert from "../../ui/molecules/Alert";
 
 const TRANSPORTS: readonly { value: McpTransport; label: string }[] = [
   { value: "stdio", label: "stdio" },
@@ -284,11 +285,7 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
         </details>
       )}
 
-      {vm.banner === null ? null : (
-        <p role="alert" className="rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err">
-          {vm.banner}
-        </p>
-      )}
+      {vm.banner === null ? null : <Alert>{vm.banner}</Alert>}
     </section>
   );
 }

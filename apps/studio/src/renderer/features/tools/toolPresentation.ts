@@ -1,11 +1,4 @@
-import {
-  AppErrorCode,
-  type Json,
-  type McpServerDto,
-  type ToolDefaultTier,
-  type ToolDto,
-  type ToolInvokeResultDto,
-} from "@zvs/shared";
+import { AppErrorCode, type McpServerDto, type ToolDefaultTier, type ToolDto } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 import {
@@ -111,39 +104,6 @@ export function unavailability(tool: ToolDto, server: McpServerDto | null): Unav
     title: "Инструмент недоступен",
     detail: "Источник больше не предоставляет этот инструмент.",
   };
-}
-
-function isRecord(value: Json): value is { [key: string]: Json } {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function itemsWord(count: number): string {
-  return plural(count, "элемент", "элемента", "элементов");
-}
-
-function outputSummary(output: Json): string {
-  if (Array.isArray(output)) return itemsWord(output.length);
-  if (isRecord(output)) {
-    if (Array.isArray(output.structured)) return itemsWord(output.structured.length);
-    if (Array.isArray(output.hits)) return itemsWord(output.hits.length);
-    if (Array.isArray(output.content)) return itemsWord(output.content.length);
-  }
-  return "ok";
-}
-
-export function resultLine(result: ToolInvokeResultDto): string {
-  const timing = `${String(result.durationMs)} ms`;
-  if (!result.ok) return `ошибка · ${timing}`;
-  return `${outputSummary(result.output)} · ${timing}`;
-}
-
-export function resultPreview(result: ToolInvokeResultDto, limit = 4000): string {
-  const output = result.output;
-  const text =
-    isRecord(output) && typeof output.text === "string" && output.text.length > 0
-      ? output.text
-      : JSON.stringify(output, null, 2);
-  return text.length > limit ? `${text.slice(0, limit)}\n…` : text;
 }
 
 export const UNKNOWN_TOOL_ERROR = "Не удалось выполнить операцию. Попробуйте ещё раз.";

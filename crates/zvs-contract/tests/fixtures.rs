@@ -128,14 +128,6 @@ const TABLE: &[(&str, Check)] = &[
         "tools/ToolDefaultsDto",
         round_trip::<zvs_contract::ToolDefaultsDto>,
     ),
-    (
-        "tools/ToolInvokeInput",
-        round_trip::<zvs_contract::ToolInvokeInput>,
-    ),
-    (
-        "tools/ToolInvokeResultDto",
-        round_trip::<zvs_contract::ToolInvokeResultDto>,
-    ),
     ("mcp/McpTransport", round_trip::<zvs_contract::McpTransport>),
     ("mcp/McpStartup", round_trip::<zvs_contract::McpStartup>),
     (
@@ -921,10 +913,6 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::skills::SkillStatus>,
     ),
     (
-        "skills/SkillMatchMethod",
-        round_trip::<zvs_contract::skills::SkillMatchMethod>,
-    ),
-    (
         "skills/SkillFileEncoding",
         round_trip::<zvs_contract::skills::SkillFileEncoding>,
     ),
@@ -979,22 +967,6 @@ const TABLE: &[(&str, Check)] = &[
     (
         "skills/UpdateSkillInput",
         round_trip::<zvs_contract::skills::UpdateSkillInput>,
-    ),
-    (
-        "skills/SkillTestInput",
-        round_trip::<zvs_contract::skills::SkillTestInput>,
-    ),
-    (
-        "skills/SkillMatchDto",
-        round_trip::<zvs_contract::skills::SkillMatchDto>,
-    ),
-    (
-        "skills/SkillTestResultDto",
-        round_trip::<zvs_contract::skills::SkillTestResultDto>,
-    ),
-    (
-        "skills/SkillRunInput",
-        round_trip::<zvs_contract::skills::SkillRunInput>,
     ),
     (
         "skills/SkillImportInput",

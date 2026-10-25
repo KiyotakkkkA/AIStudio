@@ -268,13 +268,21 @@ async fn a_follow_up_continues_the_chat_with_the_whole_dialog_and_the_previous_a
     assert_eq!(count(&server, ZAI_USER_PATH), 1);
     let bodies: Vec<Value> = completions(&server).iter().map(Recorded::json).collect();
     assert_eq!(bodies[1]["current_user_message_parent_id"], Value::Null);
-    assert_eq!(bodies[1]["messages"][0]["role"], "system");
+    assert_eq!(
+        bodies[1]["messages"][0],
+        json!({ "role": "user", "content": "System: Отвечай кратко\n\nUser: Привет" })
+    );
+    assert!(
+        bodies[1]["messages"]
+            .as_array()
+            .is_some_and(|messages| messages.iter().all(|message| message["role"] != "system"))
+    );
     let third = &bodies[2];
     assert_eq!(third["chat_id"], bodies[1]["chat_id"]);
     assert_eq!(third["current_user_message_parent_id"], bodies[1]["id"]);
-    assert_eq!(third["messages"].as_array().map(Vec::len), Some(6));
+    assert_eq!(third["messages"].as_array().map(Vec::len), Some(5));
     assert_eq!(
-        third["messages"][4],
+        third["messages"][3],
         json!({ "role": "assistant", "content": "Хорошо" })
     );
     assert_eq!(third["signature_prompt"], "Спасибо");

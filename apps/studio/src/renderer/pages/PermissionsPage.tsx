@@ -18,6 +18,7 @@ import { useStore } from "../stores/useStore";
 import SegmentedControl from "../ui/atoms/SegmentedControl";
 import EmptyState from "../ui/molecules/EmptyState";
 import PageShell from "../ui/templates/PageShell";
+import Alert from "../ui/molecules/Alert";
 
 const TABS = [
   { value: "folders", label: FOLDERS_TAB },
@@ -57,15 +58,9 @@ function PermissionsPage() {
       }
     >
       {permissions.error === null ? null : (
-        <div
-          role="alert"
-          className="mx-6 mt-3 flex flex-none items-center gap-3 rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err"
-        >
-          <span className="flex-1">{permissions.error}</span>
-          <button type="button" className="text-main-400" onClick={permissions.dismissError}>
-            Скрыть
-          </button>
-        </div>
+        <Alert className="mx-6 mt-3" onDismiss={permissions.dismissError}>
+          {permissions.error}
+        </Alert>
       )}
       {tab === TOOLS_TAB_PARAM ? (
         <ToolDefaultsTable />

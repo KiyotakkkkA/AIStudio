@@ -25,6 +25,7 @@ import SkillManifestView from "./SkillManifestView";
 import SkillRail from "./SkillRail";
 import { MANIFEST_PATH } from "./SkillStore";
 import { headerLine } from "./skillPresentation";
+import Alert from "../../ui/molecules/Alert";
 
 const MENU_ITEM = "text-[13px] text-main-100";
 
@@ -62,15 +63,9 @@ function SkillsWorkspace() {
       />
 
       {store.error === null ? null : (
-        <div
-          role="alert"
-          className="mx-6 mt-3 flex flex-none items-center gap-3 rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err"
-        >
-          <span className="flex-1">{store.error}</span>
-          <button type="button" className="text-main-400" onClick={store.dismissError}>
-            Скрыть
-          </button>
-        </div>
+        <Alert className="mx-6 mt-3" onDismiss={store.dismissError}>
+          {store.error}
+        </Alert>
       )}
       {store.notice === null ? null : (
         <div className="mx-6 mt-3 flex flex-none items-center gap-3 rounded-control bg-ok-soft px-3 py-2.25 text-[12px] text-ok">
@@ -124,9 +119,9 @@ function SkillsWorkspace() {
                   <Dropdown menuWidth={220} menuPlacement="bottom-right">
                     <IconDropdownButton
                       label="Действия с навыком"
-                      tooltip="bottom-left"
+                      tooltip="bottom-center"
                       path={mdiDotsHorizontal}
-                      className="size-8 justify-center gap-0 border-transparent bg-transparent p-0 text-main-400 hover:bg-main-700 hover:text-main-100"
+                      className="size-8 justify-center gap-0 border-none cursor-auto bg-transparent p-0 text-main-400 hover:bg-main-700 hover:text-main-100"
                       rounded="rounded-lg"
                       iconSize={18}
                     />

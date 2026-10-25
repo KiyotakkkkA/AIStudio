@@ -141,13 +141,6 @@ async fn a_tier_set_through_the_tools_channel_is_what_the_registry_holds_for_an_
         ),
         (&json!("off"), &json!(false), &json!(true))
     );
-    let invoked = server
-        .dispatch(
-            "tools.invoke",
-            json!({ "id": search["id"], "input": { "query": "x" } }),
-        )
-        .await;
-    assert_eq!(invoked["error"]["code"], json!("PERMISSION_DENIED"));
     server
         .dispatch(
             "tools.setTier",
@@ -160,16 +153,12 @@ async fn a_tier_set_through_the_tools_channel_is_what_the_registry_holds_for_an_
             json!({ "id": search["id"], "enabled": true }),
         )
         .await;
-    let invoked = server
-        .dispatch(
-            "tools.invoke",
-            json!({ "id": search["id"], "input": { "query": "x" } }),
-        )
+    let raised = server
+        .dispatch("tools.get", json!({ "id": search["id"] }))
         .await;
-    assert_eq!(invoked["data"]["ok"], json!(true), "{invoked}");
     assert_eq!(
-        invoked["data"]["output"]["text"],
-        json!(r#"search:{"query":"x"}"#)
+        (&raised["data"]["tier"], &raised["data"]["enabled"]),
+        (&json!("auto"), &json!(true))
     );
     host.mcp.dispose().await;
 }

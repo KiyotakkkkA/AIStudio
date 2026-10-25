@@ -10,16 +10,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, ChatToolCallStatus, CreateSkillInput, GraphNode, ProviderCapability,
-    ProviderId, ProviderKind, RetryPolicy, RunGraph, RunKind, RunStatus, SKILL_TRIGGER_KEY,
-    SkillExportInput, SkillFileEncoding, SkillFileInput, SkillImportInput, SkillIssueDto,
-    SkillIssueRule, SkillMatchMethod, SkillModelDto, SkillRunInput, SkillSource, SkillStatus,
-    SkillTestInput, StartRunInput, ToolDto, ToolSource, ToolTier, UpdateSkillInput, Validate,
+    AppError, AppErrorCode, CreateSkillInput, GraphNode, ProviderCapability, ProviderId,
+    ProviderKind, RetryPolicy, RunGraph, RunKind, SKILL_TRIGGER_KEY, SkillDto, SkillExportInput,
+    SkillFileEncoding, SkillFileInput, SkillImportInput, SkillIssueDto, SkillIssueRule,
+    SkillModelDto, SkillSource, SkillStatus, StartRunInput, ToolDto, ToolSource, ToolTier,
+    UpdateSkillInput, Validate,
 };
 
-use super::library::{SKILL_DISABLED, SKILL_FILE_NOT_FOUND};
+use super::library::SKILL_FILE_NOT_FOUND;
 use super::manifest::SKILL_FILE;
-use super::nodes::SkillGenerateOutput;
 use super::*;
 use crate::data::Repositories;
 use crate::data::repositories::{ModelDraft, ProviderDraft};
@@ -28,7 +27,7 @@ use crate::drivers::ai::capabilities::AdapterCapabilities;
 use crate::drivers::ai::ports::{EmbeddingDriver, SharedTextDriver};
 use crate::drivers::ai::{
     AiDriver, DeltaStream, DiscoveredModel, GenerateRequest, GenerateResult, TextDelta,
-    TextGenerationDriver, ToolCall,
+    TextGenerationDriver,
 };
 use crate::kernel::{
     FnNode, KernelServices, NodeRegistry, PermissionRequirement, StepContext, TextDrivers,
@@ -48,22 +47,6 @@ use crate::tools::{ToolDescriptor, ToolRegistry, ToolRegistryOptions, register_k
 struct Scripted {
     rounds: Mutex<VecDeque<Vec<TextDelta>>>,
     requests: Mutex<Vec<GenerateRequest>>,
-}
-
-impl Scripted {
-    fn round(&self, deltas: Vec<TextDelta>) {
-        self.rounds
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .push_back(deltas);
-    }
-
-    fn requests(&self) -> Vec<GenerateRequest> {
-        self.requests
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
-    }
 }
 
 #[async_trait]
@@ -200,8 +183,6 @@ struct Host {
     runs: RunService,
     nodes: Arc<NodeRegistry>,
     service: SkillService,
-    driver: Arc<Scripted>,
-    calls: Arc<Calls>,
     picker: Arc<FakePicker>,
     lookup: ToolDto,
     off: ToolDto,
@@ -358,7 +339,7 @@ fn host_with(drivers: Option<Arc<dyn DriverSource>>) -> Host {
         drivers,
         settings: Some(settings),
         picker: Some(picker.clone()),
-        ..SkillServiceOptions::new(library, runs.clone(), database.shared())
+        ..SkillServiceOptions::new(library, database.shared())
     });
     Host {
         database,
@@ -367,8 +348,6 @@ fn host_with(drivers: Option<Arc<dyn DriverSource>>) -> Host {
         runs,
         nodes,
         service,
-        driver,
-        calls,
         picker,
         lookup,
         off,
@@ -892,51 +871,21 @@ async fn a_foreign_skill_imports_with_its_unknown_tools_flagged_and_loose_files_
 #[tokio::test]
 async fn trigger_scoring_ranks_a_matching_phrase_above_an_unrelated_one() {
     let host = host();
-    let notes_skill = host.service.create(&notes(&[])).expect("creates notes");
+    host.service.create(&notes(&[])).expect("creates notes");
     host.service.create(&weather()).expect("creates weather");
     let cancel = CancellationToken::new();
-    let result = host
+    let keys = |skills: Vec<SkillDto>| {
+        skills
+            .into_iter()
+            .map(|skill| skill.key)
+            .collect::<Vec<_>>()
+    };
+    let everything = host
         .service
-        .test(
-            &SkillTestInput {
-                message: "Составь заметки к выпуску 2.4".to_owned(),
-                id: None,
-                description: None,
-                threshold: None,
-            },
-            &cancel,
-        )
+        .select("Прогноз погоды", &cancel)
         .await
-        .expect("scores");
-    assert_eq!(result.method, SkillMatchMethod::Lexical);
-    assert_eq!(
-        result.threshold,
-        zvs_contract::skills::DEFAULT_SKILL_THRESHOLD
-    );
-    assert_eq!(result.matches[0].key, "release-notes");
-    assert!(result.matches[0].triggered);
-    assert!(result.matches[0].score > result.matches[1].score);
-    assert!(!result.matches[1].triggered);
-    let draft = host
-        .service
-        .test(
-            &SkillTestInput {
-                message: "Какая погода завтра".to_owned(),
-                id: Some(notes_skill.skill.id),
-                description: Some("Прогноз погоды на завтра".to_owned()),
-                threshold: Some(0.9),
-            },
-            &cancel,
-        )
-        .await
-        .expect("scores a draft description");
-    let drafted = draft
-        .matches
-        .iter()
-        .find(|entry| entry.id == Some(notes_skill.skill.id))
-        .expect("the draft is scored");
-    assert!(drafted.score >= 0.6, "{}", drafted.score);
-    assert!(!drafted.triggered);
+        .expect("selects");
+    assert_eq!(keys(everything).len(), 2);
     host.database
         .with_connection(|connection| {
             Repositories::new(connection).settings.set(
@@ -948,18 +897,18 @@ async fn trigger_scoring_ranks_a_matching_phrase_above_an_unrelated_one() {
         })
         .expect("configures the threshold");
     assert!((host.service.trigger_settings().threshold - 0.2).abs() < f64::EPSILON);
-    let picked = host
+    let weather = host
         .service
         .select("Прогноз погоды", &cancel)
         .await
         .expect("selects");
-    assert_eq!(
-        picked
-            .iter()
-            .map(|skill| skill.key.as_str())
-            .collect::<Vec<_>>(),
-        ["weather"]
-    );
+    assert_eq!(keys(weather), ["weather"]);
+    let notes = host
+        .service
+        .select("Составь заметки к выпуску 2.4", &cancel)
+        .await
+        .expect("selects");
+    assert_eq!(keys(notes), ["release-notes"]);
 }
 
 #[tokio::test]
@@ -985,7 +934,7 @@ async fn trigger_scoring_uses_the_embedding_provider_when_one_is_configured() {
                 SKILL_TRIGGER_KEY,
                 &json!({
                     "threshold": 0.8,
-                    "catalogueLimit": 20,
+                    "catalogueLimit": 1,
                     "embedding": { "providerId": embedding, "modelId": "embed" }
                 })
                 .to_string(),
@@ -996,101 +945,17 @@ async fn trigger_scoring_uses_the_embedding_provider_when_one_is_configured() {
         .expect("configures embeddings");
     host.service.create(&notes(&[])).expect("creates notes");
     host.service.create(&weather()).expect("creates weather");
-    let result = host
+    let picked = host
         .service
-        .test(
-            &SkillTestInput {
-                message: "нужен текст к выпуску".to_owned(),
-                id: None,
-                description: None,
-                threshold: None,
-            },
-            &CancellationToken::new(),
-        )
+        .select("Прогноз погоды к выпуску", &CancellationToken::new())
         .await
-        .expect("scores");
-    assert_eq!(result.method, SkillMatchMethod::Embedding);
-    assert_eq!(result.matches[0].key, "release-notes");
-    assert!(
-        (result.matches[0].score - 0.995).abs() < 0.01,
-        "{}",
-        result.matches[0].score
-    );
-    assert!(result.matches[0].triggered);
-    assert!(!result.matches[1].triggered);
-}
-
-#[tokio::test]
-async fn a_skill_run_executes_with_the_narrowed_set_and_is_refused_a_tool_outside_it() {
-    let host = host();
-    let saved = host
-        .service
-        .create(&notes(&["demo.lookup"]))
-        .expect("creates");
-    host.driver.round(vec![
-        TextDelta::ToolCall(ToolCall::new(
-            "call_1",
-            "demo__lookup",
-            json!({ "query": "2.4" }).to_string(),
-        )),
-        TextDelta::ToolCall(ToolCall::new("call_2", "demo__drop", json!({}).to_string())),
-    ]);
-    host.driver.round(vec![TextDelta::text("Заметки готовы.")]);
-    let handle = host
-        .service
-        .run(&SkillRunInput {
-            id: saved.skill.id,
-            message: "Составь заметки к выпуску 2.4".to_owned(),
-            provider_id: Some(host.provider_id),
-            model_id: Some("fake-model".to_owned()),
-        })
-        .expect("starts");
-    let run = finished(&host, &handle).await;
-    assert_eq!(run.status, RunStatus::Succeeded, "{:?}", run.error);
-    assert_eq!(run.kind, RunKind::Skill);
-    assert_eq!(run.subject_id, Some(saved.skill.id.to_string()));
+        .expect("selects");
     assert_eq!(
-        run.graph.allowed_tools,
-        Some(vec!["demo.lookup".to_owned(), SKILL_READ.to_owned()])
-    );
-    assert_eq!(
-        run.graph.permission_scopes,
-        Some(vec!["skill:release-notes".to_owned()])
-    );
-    let first = &host.driver.requests()[0];
-    let mut offered: Vec<&str> = first.tools.iter().map(|tool| tool.name.as_str()).collect();
-    offered.sort_unstable();
-    assert_eq!(offered, ["demo__lookup", "skill__read"]);
-    let system = first.system.clone().unwrap_or_default();
-    assert!(system.contains("Сгруппируйте изменения по разделам."));
-    assert!(system.contains("references/style.md"));
-    let step = host
-        .runs
-        .steps(&handle.id)
-        .expect("steps")
-        .into_iter()
-        .find(|step| step.node_id == "skill")
-        .expect("the skill step");
-    let output: SkillGenerateOutput =
-        serde_json::from_value(step.output.expect("an output")).expect("the output shape");
-    assert_eq!(output.text, "Заметки готовы.");
-    assert_eq!(output.calls[0].status, ChatToolCallStatus::Succeeded);
-    assert_eq!(output.calls[1].status, ChatToolCallStatus::Refused);
-    assert_eq!(
-        *host
-            .calls
-            .lookups
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner),
-        ["2.4"]
-    );
-    assert_eq!(
-        *host
-            .calls
-            .drops
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner),
-        0
+        picked
+            .iter()
+            .map(|skill| skill.key.as_str())
+            .collect::<Vec<_>>(),
+        ["release-notes"]
     );
 }
 
@@ -1152,46 +1017,6 @@ async fn the_kernel_refuses_a_model_call_outside_the_runs_allowed_tools() {
     )
     .await;
     assert_eq!(open["admitted"], json!(true));
-}
-
-#[tokio::test]
-async fn a_run_needs_a_model_and_a_usable_skill() {
-    let host = host();
-    let saved = host
-        .service
-        .create(&notes(&["demo.lookup"]))
-        .expect("creates");
-    let input = SkillRunInput {
-        id: saved.skill.id,
-        message: "Составь заметки".to_owned(),
-        provider_id: None,
-        model_id: None,
-    };
-    let error = host.service.run(&input).expect_err("no model");
-    assert_eq!(error.message, service::NO_MODEL);
-    host.service
-        .update(&UpdateSkillInput {
-            model_override: Some(Some(SkillModelDto {
-                provider_id: host.provider_id,
-                model_id: "fake-model".to_owned(),
-            })),
-            enabled: Some(false),
-            ..update(saved.skill.id)
-        })
-        .expect("updates");
-    let disabled = host.service.run(&input).expect_err("a disabled skill");
-    assert_eq!(disabled.message, SKILL_DISABLED);
-    host.service
-        .update(&UpdateSkillInput {
-            enabled: Some(true),
-            ..update(saved.skill.id)
-        })
-        .expect("updates");
-    let handle = host
-        .service
-        .run(&input)
-        .expect("the override model is used");
-    assert_eq!(finished(&host, &handle).await.status, RunStatus::Succeeded);
 }
 
 #[tokio::test]

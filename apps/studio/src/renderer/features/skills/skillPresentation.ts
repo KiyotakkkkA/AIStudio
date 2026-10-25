@@ -4,7 +4,6 @@ import {
   type SkillDto,
   type SkillIssueDto,
   type SkillIssueRule,
-  type SkillMatchMethod,
   type SkillSource,
   type ToolDto,
 } from "@zvs/shared";
@@ -21,11 +20,6 @@ export const SOURCE_LABELS: Record<SkillSource, string> = {
   local: "локальный",
   imported: "импортирован",
   bundled: "встроенный",
-};
-
-export const METHOD_LABELS: Record<SkillMatchMethod, string> = {
-  embedding: "по смыслу",
-  lexical: "по совпадению слов",
 };
 
 const FILE_DIR_LABELS = {
@@ -191,10 +185,6 @@ export function headerLine(skills: readonly SkillDto[]): string {
 
 function skillsCount(count: number): string {
   return plural(count, "навык", "навыка", "навыков");
-}
-
-export function formatScore(score: number): string {
-  return score.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 const TRANSLIT: Record<string, string> = {

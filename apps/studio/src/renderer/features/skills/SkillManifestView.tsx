@@ -1,4 +1,4 @@
-import { mdiAlertCircleOutline, mdiPowerPlugOffOutline } from "@mdi/js";
+import { mdiPowerPlugOffOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Icon from "../../ui/atoms/Icon";
@@ -9,6 +9,7 @@ import type { SkillFormVm } from "./SkillFormVm";
 import type SkillStore from "./SkillStore";
 import InstructionEditor from "./InstructionEditor";
 import { issueLine } from "./skillPresentation";
+import Alert from "../../ui/molecules/Alert";
 
 function keyError(error: string | undefined): string | undefined {
   return error === undefined
@@ -29,22 +30,13 @@ function SkillManifestView({
   return (
     <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3.5 px-4.5 py-4">
       {storedIssues.length > 0 ? (
-        <div
-          role="alert"
-          className="flex flex-none gap-2.5 rounded-control bg-err-soft px-3 py-2.5 text-[12px] text-err"
-        >
-          <Icon path={mdiAlertCircleOutline} size={16} />
-          <div className="flex min-w-0 flex-col gap-1">
-            <span className="font-medium">
-              Навык не может быть использован, пока ошибки не исправлены.
-            </span>
-            {storedIssues.map((issue) => (
-              <span key={`${issue.field}:${issue.rule}`}>
-                {issueLine(issue, skill?.allowedTools ?? [])}
-              </span>
-            ))}
-          </div>
-        </div>
+        <Alert title="Навык не может быть использован, пока ошибки не исправлены.">
+          {storedIssues.map((issue) => (
+            <p key={`${issue.field}:${issue.rule}`} className="m-0">
+              {issueLine(issue, skill?.allowedTools ?? [])}
+            </p>
+          ))}
+        </Alert>
       ) : null}
 
       {skill !== null && !skill.enabled ? (
@@ -54,14 +46,7 @@ function SkillManifestView({
         </div>
       ) : null}
 
-      {vm.banner === null ? null : (
-        <div
-          role="alert"
-          className="flex-none rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err"
-        >
-          {vm.banner}
-        </div>
-      )}
+      {vm.banner === null ? null : <Alert>{vm.banner}</Alert>}
 
       <div className="flex-none">
         <Field

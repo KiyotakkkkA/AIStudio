@@ -4,14 +4,10 @@ import type {
   Contract,
   McpServerDto,
   ProviderDto,
-  RunId,
-  RunSummaryDto,
   SkillDetailDto,
   SkillDto,
   SkillId,
-  SkillMatchDto,
   SkillModelDto,
-  SkillTestResultDto,
   ToolDto,
 } from "@zvs/shared";
 import { sourceGroups } from "../tools/toolFilters";
@@ -57,7 +53,6 @@ export interface ModelOption {
 }
 
 const MODEL_SEPARATOR = "::";
-const RUNS_LIMIT = 50;
 
 export function modelValue(model: SkillModelDto | null): string {
   return model === null ? "" : `${model.providerId}${MODEL_SEPARATOR}${model.modelId}`;
@@ -80,20 +75,10 @@ export default class SkillStore {
   openPath: string = MANIFEST_PATH;
   openFile: OpenFile | null = null;
   fileLoading = false;
-  advancedOpen = false;
   query = "";
   tools: ToolDto[] = [];
   servers: McpServerDto[] = [];
   providers: ProviderDto[] = [];
-  runs: RunSummaryDto[] = [];
-  runsLoading = false;
-  phrase = "";
-  testing = false;
-  testResult: SkillTestResultDto | null = null;
-  runMessage = "";
-  runModel = "";
-  running = false;
-  lastRunId: RunId | null = null;
   pending: PendingIntent | null = null;
   loading = false;
   loaded = false;
@@ -170,10 +155,6 @@ export default class SkillStore {
     return groups;
   }
 
-  get allowedCount(): number {
-    return this.form?.allowedTools.length ?? 0;
-  }
-
   get modelOptions(): ModelOption[] {
     const options: ModelOption[] = [];
     for (const provider of this.providers) {
@@ -190,35 +171,6 @@ export default class SkillStore {
       options.unshift({ value: modelValue(current), label: `${current.modelId} · недоступна` });
     }
     return options;
-  }
-
-  get ownMatch(): SkillMatchDto | null {
-    const result = this.testResult;
-    if (result === null) return null;
-    const id = this.form?.isNew === false ? this.selectedId : null;
-    return result.matches.find((match) => match.id === id) ?? null;
-  }
-
-  get rival(): SkillMatchDto | null {
-    const own = this.ownMatch;
-    const top = this.testResult?.matches[0] ?? null;
-    if (top === null || own === null || top === own || !top.triggered) return null;
-    return top.score > own.score ? top : null;
-  }
-
-  get effectiveRunModel(): SkillModelDto | null {
-    return modelOf(this.runModel) ?? this.selectedSkill?.modelOverride ?? null;
-  }
-
-  get runBlocker(): string | null {
-    const skill = this.selectedSkill;
-    if (skill === null || this.form === null || this.form.isNew) return "Сохраните навык.";
-    if (this.form.dirty) return "Есть несохранённые изменения.";
-    if (skill.status === "invalid") return "Навык содержит ошибки.";
-    if (!skill.enabled) return "Навык выключен.";
-    if (this.effectiveRunModel === null) return "Выберите модель.";
-    if (this.runMessage.trim().length === 0) return "Введите запрос.";
-    return null;
   }
 
   isSwitching(id: SkillId): boolean {
@@ -278,10 +230,6 @@ export default class SkillStore {
     this.query = query;
   }
 
-  setAdvancedOpen(open: boolean): void {
-    this.advancedOpen = open;
-  }
-
   async open(path: string): Promise<void> {
     this.openPath = path;
     this.openFile = null;
@@ -312,18 +260,6 @@ export default class SkillStore {
     this.openFile = null;
   }
 
-  setPhrase(phrase: string): void {
-    this.phrase = phrase;
-  }
-
-  setRunMessage(message: string): void {
-    this.runMessage = message;
-  }
-
-  setRunModel(value: string): void {
-    this.runModel = value;
-  }
-
   setModelOverride(value: string): void {
     this.form?.setModelOverride(modelOf(value));
   }
@@ -340,10 +276,6 @@ export default class SkillStore {
     this.openPath = MANIFEST_PATH;
     this.openFile = null;
     this.selectedId = id;
-    this.testResult = null;
-    this.runs = [];
-    this.lastRunId = null;
-    this.runModel = "";
     try {
       const detail = await this.ipc.call("skills.get", { id });
       runInAction(() => {
@@ -352,7 +284,6 @@ export default class SkillStore {
         this.mergeSkill(detail);
         this.form = new SkillFormVm({ skill: detail });
       });
-      await this.loadRuns();
     } catch (error: unknown) {
       runInAction(() => {
         if (this.selectedId !== id) return;
@@ -373,8 +304,6 @@ export default class SkillStore {
   startCreate(): void {
     this.selectedId = null;
     this.detail = null;
-    this.testResult = null;
-    this.runs = [];
     this.openPath = MANIFEST_PATH;
     this.openFile = null;
     this.form = new SkillFormVm();
@@ -429,7 +358,6 @@ export default class SkillStore {
     form.setBanner(null);
     if (!form.validate()) {
       form.setBanner(SKILL_INVALID_BANNER);
-      if (form.errorOf("key") !== undefined) this.advancedOpen = true;
       return false;
     }
     this.saving = true;
@@ -456,11 +384,6 @@ export default class SkillStore {
         }
         if (issues.length > 0) {
           this.form.applyIssues(issues);
-          if (
-            this.form.errorOf("key") !== undefined ||
-            issues.some((issue) => issue.field.startsWith("allowedTools"))
-          )
-            this.advancedOpen = true;
           this.form.setBanner(SKILL_INVALID_BANNER);
         } else {
           this.form.setBanner(skillErrorCopy(error));
@@ -483,8 +406,6 @@ export default class SkillStore {
         this.selectedId = null;
         this.detail = null;
         this.form = null;
-        this.runs = [];
-        this.testResult = null;
       });
       if (this.skills[0] !== undefined) await this.select(this.skills[0].id);
       return true;
@@ -582,86 +503,6 @@ export default class SkillStore {
         this.exporting = false;
         this.error = skillErrorCopy(error);
       });
-    }
-  }
-
-  async testTrigger(): Promise<void> {
-    const form = this.form;
-    const message = this.phrase.trim();
-    if (form === null || message.length === 0 || this.testing) return;
-    this.testing = true;
-    const description = form.description.trim();
-    try {
-      const result = await this.ipc.call("skills.test", {
-        message,
-        id: form.isNew || this.selectedId === null ? undefined : this.selectedId,
-        description: description.length > 0 ? description : undefined,
-      });
-      runInAction(() => {
-        this.testing = false;
-        this.testResult = result;
-      });
-    } catch (error: unknown) {
-      runInAction(() => {
-        this.testing = false;
-        this.testResult = null;
-        this.error = skillErrorCopy(error);
-      });
-    }
-  }
-
-  async loadRuns(): Promise<void> {
-    const id = this.selectedId;
-    if (id === null || this.form?.isNew === true) {
-      this.runs = [];
-      return;
-    }
-    this.runsLoading = true;
-    try {
-      const page = await this.ipc.call("runs.list", {
-        kinds: ["skill"],
-        subjectId: id,
-        live: false,
-        limit: RUNS_LIMIT,
-      });
-      runInAction(() => {
-        this.runsLoading = false;
-        if (this.selectedId === id) this.runs = [...page.items];
-      });
-    } catch (error: unknown) {
-      runInAction(() => {
-        this.runsLoading = false;
-        this.error = skillErrorCopy(error);
-      });
-    }
-  }
-
-  async run(): Promise<RunId | null> {
-    const id = this.selectedId;
-    const model = this.effectiveRunModel;
-    if (id === null || this.running || this.runBlocker !== null || model === null) return null;
-    this.running = true;
-    this.error = null;
-    try {
-      const handle = await this.ipc.call("skills.run", {
-        id,
-        message: this.runMessage.trim(),
-        providerId: model.providerId,
-        modelId: model.modelId,
-      });
-      runInAction(() => {
-        this.running = false;
-        this.lastRunId = handle.id;
-        this.runMessage = "";
-      });
-      await this.loadRuns();
-      return handle.id;
-    } catch (error: unknown) {
-      runInAction(() => {
-        this.running = false;
-        this.error = skillErrorCopy(error);
-      });
-      return null;
     }
   }
 

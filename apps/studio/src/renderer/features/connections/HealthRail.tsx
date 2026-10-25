@@ -21,7 +21,10 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
 
   if (server === null || store.form?.isNew === true) {
     return (
-      <aside aria-label="Состояние сервера" className="flex w-71.5 flex-none flex-col bg-main-800">
+      <aside
+        aria-label="Состояние сервера"
+        className="flex w-71.5 flex-none flex-col border-l border-line bg-main-800"
+      >
         <div className="flex flex-1 items-center justify-center p-4">
           <EmptyState
             icon={mdiHeartPulse}
@@ -50,7 +53,7 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
   return (
     <aside
       aria-label="Состояние сервера"
-      className="flex min-h-0 w-71.5 flex-none flex-col gap-3 bg-main-800 px-3.5 py-4"
+      className="flex min-h-0 w-71.5 flex-none flex-col gap-3 border-l border-line bg-main-800 px-3.5 py-4"
     >
       <div className={HEADING}>Состояние</div>
       <div className="flex flex-none flex-col gap-2.25 rounded-card border border-line bg-main-900 p-3">

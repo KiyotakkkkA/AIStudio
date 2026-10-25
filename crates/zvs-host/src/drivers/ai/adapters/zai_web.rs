@@ -17,7 +17,7 @@ use zvs_zai_web::{
 
 use super::account_family::{
     AccountAdapterCore, AccountAdapterOptions, malformed_payload, malformed_turn,
-    response_diagnostics, truncated_stream,
+    response_diagnostics, role_label, truncated_stream,
 };
 use crate::drivers::ai::capabilities::{AdapterCapabilities, Honours};
 use crate::drivers::ai::errors::{
@@ -121,21 +121,37 @@ const fn role_name(role: ChatRole) -> &'static str {
 }
 
 fn dialog(request: &GenerateRequest) -> Vec<(&'static str, String)> {
-    let system = request
+    let mut system = request
         .system
         .as_deref()
         .map(str::trim)
         .filter(|system| !system.is_empty());
-    system
-        .map(|system| ("system", system.to_owned()))
-        .into_iter()
-        .chain(
-            request
-                .messages
-                .iter()
-                .map(|message| (role_name(message.role), message.content.clone())),
-        )
-        .collect()
+    let mut turns: Vec<(&'static str, String)> = request
+        .messages
+        .iter()
+        .map(|message| {
+            let content = match system.take_if(|_| message.role == ChatRole::User) {
+                Some(system) => format!(
+                    "{}: {system}\n\n{}: {}",
+                    role_label(ChatRole::System),
+                    role_label(ChatRole::User),
+                    message.content
+                ),
+                None => message.content.clone(),
+            };
+            (role_name(message.role), content)
+        })
+        .collect();
+    if let Some(system) = system {
+        turns.insert(
+            0,
+            (
+                "user",
+                format!("{}: {system}", role_label(ChatRole::System)),
+            ),
+        );
+    }
+    turns
 }
 
 #[derive(Debug, Default)]

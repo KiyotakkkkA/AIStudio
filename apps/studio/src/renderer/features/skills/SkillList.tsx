@@ -31,7 +31,7 @@ function SkillList({ store }: { readonly store: SkillStore }) {
       ) : null}
 
       {store.isEmpty && draft === null ? (
-        <div className="flex items-center justify-center rounded-card bg-main-800 px-2">
+        <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">
           <EmptyState
             icon={mdiBookOpenOutline}
             title="Навыков нет"

@@ -28,6 +28,7 @@ import {
   statusTone,
 } from "./providerPresentation";
 import { useStore } from "../../stores/useStore";
+import Alert from "../../ui/molecules/Alert";
 
 interface ConnectionCardProps {
   readonly vm: ProviderFormVm;
@@ -268,11 +269,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
         <ProbeResultLine result={vm.probeResult} probing={providers.probing} />
       </div>
 
-      {vm.banner === null ? null : (
-        <p role="alert" className="rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err">
-          {vm.banner}
-        </p>
-      )}
+      {vm.banner === null ? null : <Alert>{vm.banner}</Alert>}
     </section>
   );
 }

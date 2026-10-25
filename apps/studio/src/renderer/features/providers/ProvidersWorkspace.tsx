@@ -14,6 +14,7 @@ import ModelGrid from "./ModelGrid";
 import ModelSettingsCard from "./ModelSettingsCard";
 import ProviderList from "./ProviderList";
 import { modelsWord } from "./providerPresentation";
+import Alert from "../../ui/molecules/Alert";
 
 function ProvidersWorkspace() {
   const { providers } = useStore();
@@ -39,15 +40,9 @@ function ProvidersWorkspace() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {providers.error === null ? null : (
-        <div
-          role="alert"
-          className="mx-6 mt-3 flex flex-none items-center gap-3 rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err"
-        >
-          <span className="flex-1">{providers.error}</span>
-          <button type="button" className="text-main-400" onClick={providers.dismissError}>
-            Скрыть
-          </button>
-        </div>
+        <Alert className="mx-6 mt-3" onDismiss={providers.dismissError}>
+          {providers.error}
+        </Alert>
       )}
 
       <div className="flex min-h-0 flex-1">

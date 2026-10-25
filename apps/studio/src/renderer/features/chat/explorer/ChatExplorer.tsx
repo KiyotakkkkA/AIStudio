@@ -38,6 +38,7 @@ import {
   MARK_MODIFIED,
   TREE_LABEL,
 } from "./explorerCopy";
+import Alert from "../../../ui/molecules/Alert";
 
 const MARK_STYLES = {
   created: { className: "bg-ok", label: MARK_CREATED },
@@ -216,14 +217,7 @@ export default observer(function ChatExplorer({ store }: { readonly store: ChatS
           ) : null}
         </ScrollArea>
       )}
-      {explorer.error === null ? null : (
-        <p
-          role="alert"
-          className="mx-4 mb-3 rounded-control bg-err-soft px-3 py-2 text-[12px] text-err"
-        >
-          {explorer.error}
-        </p>
-      )}
+      {explorer.error === null ? null : <Alert className="mx-4 mb-3">{explorer.error}</Alert>}
     </SidePanelFrame>
   );
 });

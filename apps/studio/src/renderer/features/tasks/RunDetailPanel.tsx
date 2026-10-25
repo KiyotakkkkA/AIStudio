@@ -21,7 +21,7 @@ export default observer(function RunDetailPanel({ store }: { readonly store: Run
     return (
       <section
         aria-label="Детали запуска"
-        className="flex w-105 flex-none items-center justify-center bg-main-800 p-4"
+        className="flex w-105 flex-none items-center justify-center border-l border-line bg-main-800 p-4"
       >
         <EmptyState
           icon={mdiHistory}
@@ -34,7 +34,7 @@ export default observer(function RunDetailPanel({ store }: { readonly store: Run
   return (
     <section
       aria-label="Детали запуска"
-      className="flex w-105 flex-none flex-col bg-main-800"
+      className="flex w-105 flex-none flex-col border-l border-line bg-main-800"
     >
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 p-3.5">
         <div className="flex items-center gap-2">

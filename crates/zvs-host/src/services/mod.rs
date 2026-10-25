@@ -72,7 +72,7 @@ use crate::scenarios::{ScenarioRunner, ScenarioService};
 use crate::skills::SkillService;
 use crate::terminal::TerminalService;
 use crate::toolchain::ToolchainService;
-use crate::tools::{ToolInvoker, ToolRegistry};
+use crate::tools::ToolRegistry;
 use crate::workspace::{ExplorerService, FolderAccessService};
 
 pub struct Services {
@@ -95,7 +95,6 @@ pub struct Services {
     pub runtimes: RuntimeService,
     pub toolchain: ToolchainService,
     pub tools: ToolRegistry,
-    pub tool_invoker: ToolInvoker,
     pub mcp: McpService,
     pub skills: SkillService,
     pub scenarios: ScenarioService,

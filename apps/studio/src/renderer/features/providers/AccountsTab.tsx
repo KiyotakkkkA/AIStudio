@@ -13,6 +13,7 @@ import { useStore } from "../../stores/useStore";
 import AccountCard from "./AccountCard";
 import AccountLoginMenu from "./AccountLoginMenu";
 import { adapterLabel, secondsLeftLabel } from "./accountPresentation";
+import Alert from "../../ui/molecules/Alert";
 
 function AccountsTab() {
   const { accounts } = useStore();
@@ -39,15 +40,7 @@ function AccountsTab() {
         </p>
       ) : null}
       {accounts.error === null ? null : (
-        <div
-          role="alert"
-          className="flex flex-none items-center gap-3 rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err"
-        >
-          <span className="flex-1">{accounts.error}</span>
-          <button type="button" className="text-main-400" onClick={accounts.dismissError}>
-            Скрыть
-          </button>
-        </div>
+        <Alert onDismiss={accounts.dismissError}>{accounts.error}</Alert>
       )}
 
       {linking === null || linking.phase === "cancelled" ? null : (

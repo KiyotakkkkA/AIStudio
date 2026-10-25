@@ -15,6 +15,7 @@ import TagsInput from "../../ui/molecules/TagsInput";
 import SecretCredentialField from "./SecretCredentialField";
 import { ROTATION_OPTIONS, type SecretFormVm } from "./SecretFormVm";
 import { maskedHint, SCOPE_OPTIONS } from "./secretPresentation";
+import Alert from "../../ui/molecules/Alert";
 
 interface SecretFormProps {
   readonly vm: SecretFormVm;
@@ -69,11 +70,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
       </div>
 
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-5 p-4.5">
-        {vm.banner === null ? null : (
-          <p role="alert" className="rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err">
-            {vm.banner}
-          </p>
-        )}
+        {vm.banner === null ? null : <Alert>{vm.banner}</Alert>}
 
         <section className="flex flex-col gap-3">
           <h3 className="text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">

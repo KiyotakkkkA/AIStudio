@@ -44,7 +44,7 @@ function VectorStoreDetail() {
   const detail = store.detail;
   if (!detail)
     return (
-      <div className="flex min-w-0 flex-1 items-center justify-center rounded-card border border-line bg-main-900">
+      <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
         <EmptyState
           icon={mdiDatabaseOutline}
           title={

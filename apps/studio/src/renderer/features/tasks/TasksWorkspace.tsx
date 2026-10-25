@@ -10,6 +10,7 @@ import EmptyState from "../../ui/molecules/EmptyState";
 import TaskDetailRail from "./TaskDetailRail";
 import TaskFilterRail from "./TaskFilterRail";
 import TaskRow from "./TaskRow";
+import Alert from "../../ui/molecules/Alert";
 
 const GROUP_TITLES = {
   running: "Выполняется",
@@ -77,20 +78,22 @@ export default observer(function TasksWorkspace() {
         <TaskFilterRail store={store} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {store.error === null ? null : (
-            <div
-              role="alert"
-              className="flex items-center gap-3 bg-err-soft px-5 py-2.5 text-[12.5px] text-err"
-            >
-              <span className="min-w-0 flex-1">{store.error}</span>
-              <Button
-                tone="ghost"
-                onClick={() => {
-                  void store.load();
-                }}
-              >
-                Повторить
-              </Button>
-            </div>
+            <Alert
+  bar
+  action={
+    <Button
+      size="sm"
+      tone="ghost"
+      onClick={() => {
+        void store.load();
+      }}
+    >
+      Повторить
+    </Button>
+  }
+>
+  {store.error}
+</Alert>
           )}
           <ScrollArea className="flex min-h-0 flex-1 flex-col">
             {sections.map((group) => (

@@ -2,12 +2,10 @@ import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
   ToolDto,
-  toolNeedsConfirmation,
   type Contract,
   type McpServerDto,
   type ToolDetailDto,
   type ToolId,
-  type ToolInvokeResultDto,
   type ToolTier,
 } from "@zvs/shared";
 import {
@@ -21,7 +19,6 @@ import {
   type TierFilter,
   type ToolFilter,
 } from "./toolFilters";
-import { parseInput, seedText } from "./schemaFields";
 import { toolErrorCopy, unavailability, type Unavailability } from "./toolPresentation";
 
 export interface ToolStoreOptions {
@@ -37,12 +34,6 @@ export default class ToolStore {
   query = "";
   selectedId: ToolId | null = null;
   detail: ToolDetailDto | null = null;
-  inputText = "{}";
-  inputDirty = false;
-  running = false;
-  confirming = false;
-  result: ToolInvokeResultDto | null = null;
-  runError: string | null = null;
   busyIds: ToolId[] = [];
   loading = false;
   loaded = false;
@@ -110,27 +101,6 @@ export default class ToolStore {
   get selectedUnavailability(): Unavailability | null {
     const tool = this.selected;
     return tool === null ? null : unavailability(tool, this.selectedServer);
-  }
-
-  get parsedInput() {
-    return parseInput(this.inputText);
-  }
-
-  get needsConfirmation(): boolean {
-    const tool = this.selected;
-    return tool !== null && toolNeedsConfirmation(tool);
-  }
-
-  get blockedReason(): string | null {
-    const tool = this.selected;
-    if (tool === null) return "Инструмент не выбран";
-    if (!tool.available) return "Инструмент недоступен";
-    if (effectiveTier(tool) === "off") return "Разрешение «off» запрещает вызов";
-    return null;
-  }
-
-  get canRun(): boolean {
-    return !this.running && this.blockedReason === null && this.parsedInput.ok;
   }
 
   isBusy(id: ToolId): boolean {
@@ -222,12 +192,6 @@ export default class ToolStore {
     if (this.selectedId === id && this.detail?.id === id) return;
     this.selectedId = id;
     this.detail = null;
-    this.result = null;
-    this.runError = null;
-    this.confirming = false;
-    const tool = this.selected;
-    this.inputText = seedText(tool?.inputSchema ?? null);
-    this.inputDirty = false;
     await this.loadDetail(id);
   }
 
@@ -238,7 +202,6 @@ export default class ToolStore {
         if (this.selectedId !== id) return;
         this.detail = detail;
         this.replace(detail);
-        if (!this.inputDirty) this.inputText = seedText(detail.inputSchema);
       });
     } catch (error: unknown) {
       runInAction(() => {
@@ -277,77 +240,8 @@ export default class ToolStore {
     }
   }
 
-  setInputText(text: string): void {
-    this.inputText = text;
-    this.inputDirty = true;
-  }
-
-  resetInput(): void {
-    this.inputText = seedText(this.selected?.inputSchema ?? null);
-    this.inputDirty = false;
-  }
-
-  requestRun(): void {
-    if (!this.canRun) return;
-    if (this.needsConfirmation) {
-      this.confirming = true;
-      return;
-    }
-    void this.run(false);
-  }
-
-  cancelRun(): void {
-    this.confirming = false;
-  }
-
-  confirmRun(): void {
-    this.confirming = false;
-    void this.run(true);
-  }
-
-  async run(confirmed: boolean): Promise<void> {
-    const tool = this.selected;
-    const parsed = this.parsedInput;
-    if (tool === null || !parsed.ok || this.running) return;
-    this.running = true;
-    this.result = null;
-    this.runError = null;
-    try {
-      const result = await this.ipc.call("tools.invoke", {
-        id: tool.id,
-        input: parsed.value,
-        confirmed,
-      });
-      runInAction(() => {
-        if (this.selectedId === tool.id) this.result = result;
-      });
-      await this.refreshTool(tool.id);
-    } catch (error: unknown) {
-      runInAction(() => {
-        if (this.selectedId === tool.id) this.runError = toolErrorCopy(error);
-      });
-    } finally {
-      runInAction(() => {
-        this.running = false;
-      });
-    }
-  }
-
   dismissError(): void {
     this.error = null;
-  }
-
-  private async refreshTool(id: ToolId): Promise<void> {
-    try {
-      const detail = await this.ipc.call("tools.get", { id });
-      runInAction(() => {
-        this.replace(detail);
-        if (this.selectedId === id) this.detail = detail;
-        this.now = this.clock();
-      });
-    } catch {
-      return;
-    }
   }
 
   private local(tool: ToolDto): ToolDto {

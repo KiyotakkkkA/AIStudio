@@ -88,7 +88,7 @@ use zvs_host::terminal::{NativePty, SystemShells, TerminalService, TerminalServi
 use zvs_host::toolchain::{
     ToolchainResolver, ToolchainResolverOptions, ToolchainService, ToolchainServiceOptions,
 };
-use zvs_host::tools::{ToolInvoker, ToolRegistry, ToolRegistryOptions, register_kernel_tools};
+use zvs_host::tools::{ToolRegistry, ToolRegistryOptions, register_kernel_tools};
 use zvs_host::workspace::{ExplorerService, FolderAccessService, ForbiddenFolders};
 use zvs_host::{IpcServer, ipc};
 
@@ -835,7 +835,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         settings: Some(settings.clone()),
         picker: Some(Arc::clone(&picker)),
         logger: logger.clone(),
-        ..SkillServiceOptions::new(skill_library, runs.clone(), Arc::clone(&database))
+        ..SkillServiceOptions::new(skill_library, Arc::clone(&database))
     });
     let scenarios = ScenarioService::new(ScenarioServiceOptions {
         tools: Some(tools.clone()),
@@ -903,7 +903,6 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             .map(std::path::PathBuf::from)
             .unwrap_or_default(),
     });
-    let tool_invoker = ToolInvoker::new(tools.clone(), nodes, runs.clone(), clock.clone());
     downloads.attach(Arc::new(runs.clone()));
     let retention = RetentionService::new(RetentionServiceOptions {
         settings: Some(settings.clone()),
@@ -1056,7 +1055,6 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         runtimes,
         toolchain,
         tools,
-        tool_invoker,
         mcp,
         skills,
         scenarios,

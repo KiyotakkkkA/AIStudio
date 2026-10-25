@@ -57,7 +57,7 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
       ) : null}
 
       {secrets.isEmpty ? (
-        <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-4">
+        <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">
           <EmptyState
             icon={mdiKeyPlus}
             title="Секретов пока нет"

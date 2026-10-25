@@ -14,6 +14,7 @@ import RunHistoryRow from "./RunHistoryRow";
 import FilterRailButton from "../../ui/molecules/FilterRailButton";
 import { KIND_FILTER_LABELS, STATUS_LABELS, STATUS_TONES } from "./runPresentation";
 import type { RunRangeKey } from "./RunHistoryStore";
+import Alert from "../../ui/molecules/Alert";
 
 const RANGES: readonly { key: RunRangeKey; label: string }[] = [
   { key: "all", label: "За всё время" },
@@ -68,7 +69,7 @@ export default observer(function RunsWorkspace() {
       <div className="flex min-h-0 flex-1">
         <aside
           aria-label="Фильтры истории"
-          className="flex w-56 flex-none flex-col gap-0.5 bg-main-800 py-3.5 pr-2.5 pl-3"
+          className="flex w-56 flex-none flex-col gap-0.5 border-r border-line bg-main-800 py-3.5 pr-2.5 pl-3"
         >
           <p className="px-2 pb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             Период
@@ -111,20 +112,22 @@ export default observer(function RunsWorkspace() {
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {store.error === null ? null : (
-            <div
-              role="alert"
-              className="flex items-center gap-3 bg-err-soft px-5 py-2.5 text-[12.5px] text-err"
-            >
-              <span className="min-w-0 flex-1">{store.error}</span>
-              <Button
-                tone="ghost"
-                onClick={() => {
-                  void store.load();
-                }}
-              >
-                Повторить
-              </Button>
-            </div>
+            <Alert
+  bar
+  action={
+    <Button
+      size="sm"
+      tone="ghost"
+      onClick={() => {
+        void store.load();
+      }}
+    >
+      Повторить
+    </Button>
+  }
+>
+  {store.error}
+</Alert>
           )}
           <ScrollArea className="flex min-h-0 flex-1 flex-col">
             {store.runs.map((run) => (

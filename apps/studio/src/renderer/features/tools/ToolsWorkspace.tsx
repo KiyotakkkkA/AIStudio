@@ -13,6 +13,7 @@ import ToolDetailRail from "./ToolDetailRail";
 import ToolFilterRail from "./ToolFilterRail";
 import { headerLine } from "./toolPresentation";
 import ToolTable from "./ToolTable";
+import Alert from "../../ui/molecules/Alert";
 
 function ToolsWorkspace() {
   const { tools: store } = useStore();
@@ -56,15 +57,9 @@ function ToolsWorkspace() {
       />
 
       {store.error === null ? null : (
-        <div
-          role="alert"
-          className="mx-6 mt-3 flex flex-none items-center gap-3 rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err"
-        >
-          <span className="flex-1">{store.error}</span>
-          <button type="button" className="text-main-400" onClick={store.dismissError}>
-            Скрыть
-          </button>
-        </div>
+        <Alert className="mx-6 mt-3" onDismiss={store.dismissError}>
+          {store.error}
+        </Alert>
       )}
 
       <div className="flex min-h-0 flex-1">

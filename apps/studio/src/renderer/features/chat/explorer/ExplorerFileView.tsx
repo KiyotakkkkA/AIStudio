@@ -27,6 +27,7 @@ import {
   isMarkdown,
   modifiedLabel,
 } from "./explorerCopy";
+import Alert from "../../../ui/molecules/Alert";
 
 type Mode = "preview" | "text";
 
@@ -146,12 +147,7 @@ export default observer(function ExplorerFileView({
         </div>
       ) : null}
       {explorer.fileError === null || file === null ? null : (
-        <div
-          role="alert"
-          className="mx-4 mb-2 rounded-control bg-err-soft px-3 py-2 text-[12px] text-err"
-        >
-          {explorer.fileError}
-        </div>
+        <Alert className="mx-4 mb-2">{explorer.fileError}</Alert>
       )}
       <div
         className={`flex min-h-0 flex-1 flex-col border-t border-line ${explorer.fileRemoved ? "opacity-60" : ""}`}

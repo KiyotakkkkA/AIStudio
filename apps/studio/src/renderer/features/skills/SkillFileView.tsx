@@ -8,6 +8,7 @@ import EmptyState from "../../ui/molecules/EmptyState";
 import type { SkillFormVm } from "./SkillFormVm";
 import type SkillStore from "./SkillStore";
 import { formatSize } from "./skillPresentation";
+import Alert from "../../ui/molecules/Alert";
 
 const LANGUAGES: Record<string, string> = {
   py: "python",
@@ -53,14 +54,7 @@ function SkillFileView({ store, vm }: { readonly store: SkillStore; readonly vm:
           Удалить файл
         </Button>
       </div>
-      {error === undefined ? null : (
-        <div
-          role="alert"
-          className="mx-4.5 mt-3 rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err"
-        >
-          {error}
-        </div>
-      )}
+      {error === undefined ? null : <Alert className="mx-4.5 mt-3">{error}</Alert>}
       <div className="flex min-h-0 flex-1 flex-col p-4.5">
         {row?.added === true ? (
           <div className="flex flex-1 items-center justify-center">

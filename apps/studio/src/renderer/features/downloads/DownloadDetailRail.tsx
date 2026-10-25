@@ -18,6 +18,7 @@ import {
   STATUS_LABELS,
 } from "./downloadPresentation";
 import { isToolchainRef } from "../toolchain/toolchainPresentation";
+import Alert from "../../ui/molecules/Alert";
 
 export default observer(function DownloadDetailRail({ store }: { readonly store: DownloadStore }) {
   const item = store.selectedItem;
@@ -25,7 +26,10 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
 
   if (item === null && download === null) {
     return (
-      <aside aria-label="Детали загрузки" className="flex w-78.5 flex-none flex-col bg-main-800">
+      <aside
+        aria-label="Детали загрузки"
+        className="flex w-78.5 flex-none flex-col border-l border-line bg-main-800"
+      >
         <div className="flex flex-1 items-center justify-center p-4">
           <EmptyState
             icon={mdiTrayArrowDown}
@@ -59,7 +63,10 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
   const removable = item !== null && installed && store.isRemovable(item);
 
   return (
-    <aside aria-label="Детали загрузки" className="flex w-78.5 flex-none flex-col bg-main-800">
+    <aside
+      aria-label="Детали загрузки"
+      className="flex w-78.5 flex-none flex-col border-l border-line bg-main-800"
+    >
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 px-3.5 py-4">
         {item?.kind === "runtime" && isToolchainRef(item.ref) && store.runtimeError !== null ? (
           <span role="alert" className="text-[11px] text-err">
@@ -143,11 +150,7 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
           </div>
         </dl>
 
-        {download?.error === undefined ? null : (
-          <p role="alert" className="m-0 rounded-card bg-err-soft p-2.75 text-[12px] text-err">
-            {download.error}
-          </p>
-        )}
+        {download?.error === undefined ? null : <Alert>{download.error}</Alert>}
 
         <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           Назначение

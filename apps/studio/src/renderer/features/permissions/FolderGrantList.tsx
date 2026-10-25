@@ -75,7 +75,7 @@ function FolderGrantList() {
       ) : null}
 
       {permissions.isEmpty ? (
-        <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-4">
+        <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">
           <EmptyState icon={mdiShieldOutline} title={EMPTY_TITLE} description={EMPTY_DESCRIPTION} />
         </div>
       ) : null}

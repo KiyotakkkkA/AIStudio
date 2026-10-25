@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::enums::wire_enum;
 use crate::errors::AppError;
-use crate::ids::{RunId, ToolId};
+use crate::ids::ToolId;
 use crate::primitives::{Json, Timestamp};
 use crate::validate::{Validate, check, invalid, js_trim, nested, no_refinements};
 
@@ -284,61 +284,6 @@ impl ToolDefaultsDto {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ToolInvokeInput {
-    pub id: ToolId,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub input: Option<Json>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub confirmed: Option<bool>,
-}
-
-impl ToolInvokeInput {
-    pub fn new(id: ToolId) -> Self {
-        Self {
-            id,
-            input: None,
-            confirmed: None,
-        }
-    }
-
-    pub fn input(&self) -> Json {
-        self.input
-            .clone()
-            .unwrap_or_else(|| Json::Object(serde_json::Map::new()))
-    }
-
-    pub fn confirmed(&self) -> bool {
-        self.confirmed.unwrap_or(false)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ToolInvokeResultDto {
-    pub run_id: RunId,
-    pub ok: bool,
-    pub duration_ms: u64,
-    pub output: Json,
-    #[serde(deserialize_with = "crate::wire::nullable")]
-    pub error: Option<String>,
-}
-
-impl Validate for ToolInvokeResultDto {
-    fn validate(&self) -> Result<(), AppError> {
-        check::safe_integer("durationMs", self.duration_ms)
-    }
-}
-
 pub const fn tool_needs_confirmation(tier: ToolTier, destructive: bool) -> bool {
     destructive || matches!(tier, ToolTier::Ask)
 }
@@ -349,12 +294,6 @@ no_refinements!(
     SetToolEnabledInput,
     ToolDefaultsDto
 );
-
-impl Validate for ToolInvokeInput {
-    fn validate(&self) -> Result<(), AppError> {
-        Ok(())
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -398,15 +337,10 @@ mod tests {
     }
 
     #[test]
-    fn the_filter_and_the_invoke_input_apply_their_defaults() {
+    fn the_filter_and_the_defaults_apply_their_defaults() {
         let filter = parse::<ToolListFilter>(json!({})).expect("parses");
         assert!(filter.include_unavailable());
         assert!(parse::<ToolListFilter>(json!({ "query": null })).is_err());
-        let invoke =
-            parse::<ToolInvokeInput>(json!({ "id": "0199aa11-1111-7111-8111-111111111111" }))
-                .expect("parses");
-        assert_eq!(invoke.input(), json!({}));
-        assert!(!invoke.confirmed());
         let defaults = parse::<ToolDefaultsDto>(json!({ "mcp": "off" })).expect("parses");
         assert_eq!(defaults.for_source(ToolSource::Mcp), ToolDefaultTier::Off);
         assert_eq!(defaults.builtin, ToolDefaultTier::Inferred);

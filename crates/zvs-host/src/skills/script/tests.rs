@@ -19,7 +19,7 @@ use crate::platform::ids::new_id;
 use crate::services::SystemService;
 use crate::skills::library::{SKILL_FILE_NOT_FOUND, SKILL_SCRIPT_OUTSIDE};
 use crate::skills::nodes::{SKILL_LOAD, SKILL_READ};
-use crate::skills::service::{CATALOGUE_SCRIPTS, RUN_SCRIPTS, has_scripts, run_prompt};
+use crate::skills::service::{CATALOGUE_SCRIPTS, has_scripts};
 use crate::testing::{TemporaryDirectory, TestServices, temporary_directory, test_services};
 use crate::toolchain::LaunchSpec;
 
@@ -492,7 +492,7 @@ fn old_scratch_folders_are_pruned() {
 }
 
 #[test]
-fn the_prompts_name_the_script_tool_only_when_it_is_offered() {
+fn the_catalogue_names_the_script_tool_only_when_it_is_offered() {
     let fixture = Fixture::new();
     let registered = fixture
         .host
@@ -515,15 +515,6 @@ fn the_prompts_name_the_script_tool_only_when_it_is_offered() {
     assert!(!without.contains(&script.name));
     let loaded = fixture.host.skills.library().load(KEY).expect("loads");
     assert!(has_scripts(&loaded));
-    let prompt = run_prompt(&loaded, Some("skill__read"), Some(&script.name));
-    assert!(
-        prompt.ends_with(
-            &RUN_SCRIPTS
-                .replace("{script}", &script.name)
-                .replace("{key}", KEY)
-        )
-    );
-    assert!(!run_prompt(&loaded, Some("skill__read"), None).contains("scripts/ with"));
 }
 
 #[tokio::test]

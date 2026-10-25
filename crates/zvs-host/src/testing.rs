@@ -456,12 +456,6 @@ pub fn test_services(system: SystemService) -> TestServices {
     })
     .expect("a run service");
     downloads.attach(Arc::new(runs.clone()));
-    let tool_invoker = crate::tools::ToolInvoker::new(
-        tools.clone(),
-        Arc::clone(&nodes),
-        runs.clone(),
-        clock.clone(),
-    );
     let mcp = crate::services::McpService::new(crate::services::McpServiceOptions {
         clock: clock.clone(),
         request_timeout: std::time::Duration::from_secs(5),
@@ -478,7 +472,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         drivers: Some(drivers.clone()),
         settings: Some(settings.clone()),
         picker: Some(picker.clone()),
-        ..crate::skills::SkillServiceOptions::new(skill_library, runs.clone(), database.shared())
+        ..crate::skills::SkillServiceOptions::new(skill_library, database.shared())
     });
     let scenarios =
         crate::scenarios::ScenarioService::new(crate::scenarios::ScenarioServiceOptions {
@@ -565,7 +559,6 @@ pub fn test_services(system: SystemService) -> TestServices {
             runtimes,
             toolchain,
             tools,
-            tool_invoker,
             mcp,
             skills,
             scenarios,

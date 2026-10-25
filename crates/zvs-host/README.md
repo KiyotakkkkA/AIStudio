@@ -458,8 +458,7 @@ In `ToolRegistry`, a tool row's tier is the permission ceiling: registering
 writes the `global` grant (`granted_by = registry`), `set_tier` rewrites it, and `RunService`
 (given `tools`) refuses a disabled or unavailable tool before composing scopes and counts a use
 after every admitted step. `register_kernel_tools` registers every tool-gated kernel node except
-`llm.generate`, with its `schemars` input schema. `ToolInvoker` runs `tools.invoke` as a one-node
-`job` run and approves its own `ask` admission when the call was confirmed.
+`llm.generate`, with its `schemars` input schema.
 
 `McpService` works over the official SDK, `rmcp =3.5.0` (client side only, no
 default features). `rmcp` speaks the protocol (handshake, requests, timeouts with

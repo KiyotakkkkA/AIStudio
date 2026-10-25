@@ -35,6 +35,7 @@ import FadeIn from "../../ui/motion/FadeIn";
 import { useFx, useTransition } from "../../ui/motion/fx";
 import { toolTitle } from "./toolCallCopy";
 import { SHOW_CONVERSATIONS } from "./conversationListCopy";
+import Alert from "../../ui/molecules/Alert";
 
 function PanelButton({
   label,
@@ -306,24 +307,28 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
           )}
           {store.error && (
             <FadeIn>
-              <div
-                role="alert"
-                className="space-y-2.5 rounded-card bg-err-soft p-3.5 text-[13px] text-err"
-              >
-                <p>{store.error}</p>
-                {store.canRetry ? (
-                  <Button onClick={store.retry} disabled={!store.available || store.loading}>
-                    Повторить сообщение
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => void store.mount()}
-                    disabled={store.generating || store.loading}
-                  >
-                    Перезагрузить чат
-                  </Button>
-                )}
-              </div>
+              <Alert
+                title={store.error}
+                action={
+                  store.canRetry ? (
+                    <Button
+                      size="sm"
+                      onClick={store.retry}
+                      disabled={!store.available || store.loading}
+                    >
+                      Повторить сообщение
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => void store.mount()}
+                      disabled={store.generating || store.loading}
+                    >
+                      Перезагрузить чат
+                    </Button>
+                  )
+                }
+              />
             </FadeIn>
           )}
         </div>

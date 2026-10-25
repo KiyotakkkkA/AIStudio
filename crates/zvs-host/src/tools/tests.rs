@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -7,8 +7,8 @@ use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, AppErrorCode, HostEventDraft, RunHandleDto, RunId, RunStatus, ToolDefaultTier,
-    ToolDefaultsDto, ToolDto, ToolInvokeInput, ToolListFilter, ToolReferenceDto, ToolReferenceKind,
-    ToolSource, ToolTier, VectorSearchHitDto,
+    ToolDefaultsDto, ToolDto, ToolListFilter, ToolReferenceDto, ToolReferenceKind, ToolSource,
+    ToolTier, VectorSearchHitDto,
 };
 
 use super::*;
@@ -31,7 +31,6 @@ struct Host {
     sink: Arc<MemorySink>,
     clock: Arc<FakeClock>,
     executed: Arc<AtomicUsize>,
-    fail_next: Arc<AtomicBool>,
 }
 
 fn run_service(host: &Host, services: KernelServices) -> RunService {
@@ -50,10 +49,8 @@ fn host() -> Host {
     let database = temporary_database();
     let nodes = Arc::new(NodeRegistry::new());
     let executed = Arc::new(AtomicUsize::new(0));
-    let fail_next = Arc::new(AtomicBool::new(false));
     {
         let executed = Arc::clone(&executed);
-        let fail_next = Arc::clone(&fail_next);
         nodes
             .register(FnNode::new(
                 "tool",
@@ -61,14 +58,7 @@ fn host() -> Host {
                 true,
                 move |_context, _input: Value| {
                     executed.fetch_add(1, Ordering::SeqCst);
-                    let fail = fail_next.swap(false, Ordering::SeqCst);
-                    async move {
-                        if fail {
-                            Err(AppError::new(AppErrorCode::Unknown, "upstream exploded"))
-                        } else {
-                            Ok("executed".to_owned())
-                        }
-                    }
+                    async { Ok::<_, AppError>("executed".to_owned()) }
                 },
             ))
             .expect("registers");
@@ -95,7 +85,6 @@ fn host() -> Host {
         sink,
         clock,
         executed,
-        fail_next,
     }
 }
 
@@ -172,14 +161,6 @@ impl Host {
             .expect("reads")
     }
 
-    fn approvals(&self) -> usize {
-        self.sink
-            .events()
-            .iter()
-            .filter(|event| matches!(event.body, HostEventDraft::Approval { .. }))
-            .count()
-    }
-
     async fn approval(&self) -> String {
         for _ in 0..5_000 {
             let found = self
@@ -198,15 +179,6 @@ impl Host {
             tokio::time::sleep(Duration::from_millis(1)).await;
         }
         panic!("no approval was requested");
-    }
-
-    fn invoker(&self) -> ToolInvoker {
-        ToolInvoker::new(
-            self.tools.clone(),
-            Arc::clone(&self.nodes),
-            self.runs.clone(),
-            self.clock.clone(),
-        )
     }
 
     fn keys(&self, filter: &ToolListFilter) -> Vec<String> {
@@ -849,151 +821,5 @@ async fn permission_defaults_apply_to_newly_registered_tools_only() {
             )
             .expect("admits"),
         Admission::Deny
-    );
-}
-
-fn invoke(id: &ToolDto, input: Value, confirmed: Option<bool>) -> ToolInvokeInput {
-    ToolInvokeInput {
-        input: Some(input),
-        confirmed,
-        ..ToolInvokeInput::new(id.id)
-    }
-}
-
-#[tokio::test]
-async fn try_it_refuses_a_tool_that_is_off_disabled_or_unavailable_without_running_it() {
-    let host = host();
-    let registered = host.register(&read_only());
-    let id = registered.id.to_string();
-    host.tools
-        .set_tier(&id, ToolTier::Off, "user")
-        .expect("sets");
-    let refused = |result: Result<_, AppError>| result.expect_err("refused").code;
-    assert_eq!(
-        refused(
-            host.invoker()
-                .invoke(&invoke(&registered, json!({}), None))
-                .await
-        ),
-        AppErrorCode::PermissionDenied
-    );
-    host.tools
-        .set_tier(&id, ToolTier::Auto, "user")
-        .expect("sets");
-    host.tools.set_enabled(&id, false).expect("disables");
-    assert_eq!(
-        refused(
-            host.invoker()
-                .invoke(&invoke(&registered, json!({}), Some(true)))
-                .await
-        ),
-        AppErrorCode::PermissionDenied
-    );
-    host.tools.set_enabled(&id, true).expect("enables");
-    host.tools.deregister("mail.send").expect("deregisters");
-    assert_eq!(
-        refused(
-            host.invoker()
-                .invoke(&invoke(&registered, json!({}), None))
-                .await
-        ),
-        AppErrorCode::Conflict
-    );
-    assert_eq!(host.executed(), 0);
-}
-
-#[tokio::test]
-async fn a_destructive_tool_needs_an_explicit_confirm_before_try_it_runs_it() {
-    let host = host();
-    let registered = host.register(&ToolDescriptor {
-        destructive: true,
-        ..descriptor()
-    });
-    assert_eq!(registered.tier, ToolTier::Off);
-    host.tools
-        .set_tier(&registered.id.to_string(), ToolTier::Auto, "user")
-        .expect("sets");
-    let refused = host
-        .invoker()
-        .invoke(&invoke(&registered, json!({}), None))
-        .await
-        .expect_err("needs a confirm");
-    assert_eq!(refused.code, AppErrorCode::ApprovalDenied);
-    assert_eq!(host.executed(), 0);
-    assert!(
-        host.runs
-            .list(&zvs_contract::RunListFilter::default())
-            .expect("lists")
-            .items
-            .is_empty()
-    );
-    let result = host
-        .invoker()
-        .invoke(&invoke(&registered, json!({ "to": "a" }), Some(true)))
-        .await
-        .expect("runs");
-    assert!(result.ok);
-    assert_eq!(result.output, json!("executed"));
-    assert_eq!(result.error, None);
-    assert_eq!(host.executed(), 1);
-    let run = host.runs.get(&result.run_id).expect("a run");
-    assert_eq!(
-        (run.kind, run.status),
-        (zvs_contract::RunKind::Job, RunStatus::Succeeded)
-    );
-    assert_eq!(
-        host.tools
-            .get(&registered.id.to_string())
-            .expect("a tool")
-            .tool
-            .call_count,
-        1
-    );
-}
-
-#[tokio::test]
-async fn an_ask_tier_tool_is_approved_by_the_try_it_confirm_exactly_as_a_run_approval() {
-    let host = host();
-    let registered = host.register(&descriptor());
-    assert_eq!(registered.tier, ToolTier::Ask);
-    assert_eq!(
-        host.invoker()
-            .invoke(&invoke(&registered, json!({}), None))
-            .await
-            .expect_err("needs a confirm")
-            .code,
-        AppErrorCode::ApprovalDenied
-    );
-    let result = host
-        .invoker()
-        .invoke(&invoke(&registered, json!({}), Some(true)))
-        .await
-        .expect("runs");
-    assert!(result.ok);
-    assert!(host.approvals() > 0);
-    assert_eq!(host.grants(), 1);
-}
-
-#[tokio::test]
-async fn a_failing_tool_reports_the_error_and_the_timing_instead_of_throwing() {
-    let host = host();
-    let registered = host.register(&read_only());
-    host.fail_next.store(true, Ordering::SeqCst);
-    let result = host
-        .invoker()
-        .invoke(&invoke(&registered, json!({}), None))
-        .await
-        .expect("reports");
-    assert!(!result.ok);
-    assert!(
-        result
-            .error
-            .as_deref()
-            .is_some_and(|error| error.contains("upstream exploded")),
-        "{result:?}"
-    );
-    assert_eq!(
-        host.runs.get(&result.run_id).expect("a run").status,
-        RunStatus::Failed
     );
 }

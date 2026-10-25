@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { RunId, ToolId } from "../primitives/branded.js";
+import { ToolId } from "../primitives/branded.js";
 import { Json } from "../primitives/json.js";
 import { Timestamp } from "../primitives/time.js";
 
@@ -86,23 +86,3 @@ export const ToolDefaultsDto = z.object({
 });
 export type ToolDefaultsDto = z.infer<typeof ToolDefaultsDto>;
 export type ToolDefaultsRequest = z.input<typeof ToolDefaultsDto>;
-
-export const ToolInvokeInput = ToolRef.extend({
-  input: Json.default({}),
-  confirmed: z.boolean().default(false),
-});
-export type ToolInvokeInput = z.infer<typeof ToolInvokeInput>;
-export type ToolInvokeRequest = z.input<typeof ToolInvokeInput>;
-
-export const ToolInvokeResultDto = z.object({
-  runId: RunId,
-  ok: z.boolean(),
-  durationMs: z.number().int().nonnegative(),
-  output: Json,
-  error: z.string().nullable(),
-});
-export type ToolInvokeResultDto = z.infer<typeof ToolInvokeResultDto>;
-
-export function toolNeedsConfirmation(tool: Pick<ToolDto, "tier" | "destructive">): boolean {
-  return tool.destructive || tool.tier === "ask";
-}

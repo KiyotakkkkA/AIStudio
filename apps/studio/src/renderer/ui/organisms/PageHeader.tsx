@@ -11,7 +11,7 @@ export interface PageHeaderProps {
 
 export default function PageHeader({ icon, title, subtitle, meta, actions }: PageHeaderProps) {
   return (
-    <header className="flex h-header flex-none items-center gap-4 px-6">
+    <header className="flex h-header flex-none items-center gap-4 border-b border-line px-6">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span className="flex size-9 flex-none items-center justify-center rounded-control bg-accent-soft text-accent-medium">
           <Icon path={icon} size={18} />

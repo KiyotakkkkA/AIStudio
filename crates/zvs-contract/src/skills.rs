@@ -4,7 +4,7 @@ use crate::enums::wire_enum;
 use crate::errors::AppError;
 use crate::ids::{ProviderId, SkillId};
 use crate::primitives::Timestamp;
-use crate::validate::{Validate, check, invalid, js_trim, nested, no_refinements};
+use crate::validate::{Validate, check, invalid, nested, no_refinements};
 
 wire_enum!(SkillSource {
     Local => "local",
@@ -15,11 +15,6 @@ wire_enum!(SkillSource {
 wire_enum!(SkillStatus {
     Ready => "ready",
     Invalid => "invalid",
-});
-
-wire_enum!(SkillMatchMethod {
-    Embedding => "embedding",
-    Lexical => "lexical",
 });
 
 wire_enum!(SkillFileEncoding {
@@ -54,7 +49,6 @@ pub const SKILL_PATH_MAX: usize = 240;
 pub const SKILL_FILES_MAX: usize = 200;
 pub const SKILL_FILE_MAX_BYTES: u64 = 1024 * 1024;
 pub const SKILL_TOTAL_MAX_BYTES: u64 = 10 * 1024 * 1024;
-pub const SKILL_MESSAGE_MAX: usize = 8000;
 pub const SKILL_MODEL_MAX: usize = 256;
 pub const SKILL_ISSUES_MAX: usize = 64;
 pub const SKILL_FILE_DIRS: &[&str] = &["references", "scripts", "assets"];
@@ -424,108 +418,6 @@ impl Validate for UpdateSkillInput {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillTestInput {
-    pub message: String,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub id: Option<SkillId>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub description: Option<String>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub threshold: Option<f64>,
-}
-
-impl Validate for SkillTestInput {
-    fn validate(&self) -> Result<(), AppError> {
-        check::non_empty("message", js_trim(&self.message))?;
-        check::max_len("message", &self.message, SKILL_MESSAGE_MAX)?;
-        if let Some(description) = &self.description {
-            check::max_len("description", description, SKILL_DESCRIPTION_MAX)?;
-        }
-        if let Some(threshold) = self.threshold {
-            check::number_range("threshold", threshold, 0.0, 1.0)?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillMatchDto {
-    #[serde(deserialize_with = "crate::wire::nullable")]
-    pub id: Option<SkillId>,
-    pub key: String,
-    pub name: String,
-    pub score: f64,
-    pub triggered: bool,
-}
-
-impl Validate for SkillMatchDto {
-    fn validate(&self) -> Result<(), AppError> {
-        check::max_len("key", &self.key, SKILL_KEY_MAX)?;
-        check::max_len("name", &self.name, SKILL_NAME_MAX)?;
-        check::number_range("score", self.score, -1.0, 1.0)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillTestResultDto {
-    pub method: SkillMatchMethod,
-    pub threshold: f64,
-    pub matches: Vec<SkillMatchDto>,
-}
-
-impl Validate for SkillTestResultDto {
-    fn validate(&self) -> Result<(), AppError> {
-        check::number_range("threshold", self.threshold, 0.0, 1.0)?;
-        nested("matches", self.matches.validate())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillRunInput {
-    pub id: SkillId,
-    pub message: String,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub provider_id: Option<ProviderId>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub model_id: Option<String>,
-}
-
-impl Validate for SkillRunInput {
-    fn validate(&self) -> Result<(), AppError> {
-        check::non_empty("message", js_trim(&self.message))?;
-        check::max_len("message", &self.message, SKILL_MESSAGE_MAX)?;
-        if let Some(model) = &self.model_id {
-            check::trimmed_name("modelId", model, SKILL_MODEL_MAX)?;
-        }
-        Ok(())
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillImportInput {
@@ -721,13 +613,5 @@ mod tests {
         assert!(parse::<SkillTriggerSettingsDto>(json!({ "threshold": 1.5 })).is_err());
         assert!(parse::<SkillTriggerSettingsDto>(json!({ "catalogueLimit": 0 })).is_err());
         assert!(parse::<SkillTriggerSettingsDto>(json!({ "embedding": null })).is_err());
-    }
-
-    #[test]
-    fn a_test_needs_a_message_and_a_threshold_inside_the_unit_range() {
-        assert!(parse::<SkillTestInput>(json!({ "message": "  " })).is_err());
-        assert!(parse::<SkillTestInput>(json!({ "message": "a", "threshold": -0.1 })).is_err());
-        let input = parse::<SkillTestInput>(json!({ "message": "a" })).expect("parses");
-        assert_eq!(input.threshold, None);
     }
 }

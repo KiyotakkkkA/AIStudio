@@ -15,6 +15,7 @@ import ListRow from "../../ui/molecules/ListRow";
 import Icon from "../../ui/atoms/Icon";
 import EmptyState from "../../ui/molecules/EmptyState";
 import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
+import Alert from "../../ui/molecules/Alert";
 
 function VectorStoresWorkspace() {
   const { vectorStores: store } = useStore();
@@ -46,20 +47,22 @@ function VectorStoresWorkspace() {
       }
     >
       {store.error ? (
-        <div
-          role="alert"
-          className="mx-6 mt-3 flex flex-none items-center gap-3 rounded-control bg-err-soft px-3 py-2.25 text-[12px] text-err"
+        <Alert
+          className="mx-6 mt-3"
+          action={
+            <Button
+              size="sm"
+              disabled={store.loading || store.busy}
+              onClick={() => {
+                void store.load();
+              }}
+            >
+              Обновить
+            </Button>
+          }
         >
-          <span className="flex-1">{store.error}</span>
-          <Button
-            disabled={store.loading || store.busy}
-            onClick={() => {
-              void store.load();
-            }}
-          >
-            Обновить
-          </Button>
-        </div>
+          {store.error}
+        </Alert>
       ) : null}
       <div className="flex min-h-0 flex-1">
         <EntityListPanel

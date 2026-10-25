@@ -11,7 +11,6 @@ export const SKILL_PATH_MAX = 240;
 export const SKILL_FILES_MAX = 200;
 export const SKILL_FILE_MAX_BYTES = 1024 * 1024;
 export const SKILL_TOTAL_MAX_BYTES = 10 * 1024 * 1024;
-export const SKILL_MESSAGE_MAX = 8000;
 export const SKILL_MODEL_MAX = 256;
 export const SKILL_ISSUES_MAX = 64;
 export const SKILL_FILE_DIRS = ["references", "scripts", "assets"] as const;
@@ -25,9 +24,6 @@ export type SkillSource = z.infer<typeof SkillSource>;
 
 export const SkillStatus = z.enum(["ready", "invalid"]);
 export type SkillStatus = z.infer<typeof SkillStatus>;
-
-export const SkillMatchMethod = z.enum(["embedding", "lexical"]);
-export type SkillMatchMethod = z.infer<typeof SkillMatchMethod>;
 
 export const SkillFileEncoding = z.enum(["utf8", "base64"]);
 export type SkillFileEncoding = z.infer<typeof SkillFileEncoding>;
@@ -169,43 +165,6 @@ export const UpdateSkillInput = z.object({
   removeFiles: z.array(z.string().max(SKILL_PATH_MAX)).max(SKILL_FILES_MAX).optional(),
 });
 export type UpdateSkillInput = z.infer<typeof UpdateSkillInput>;
-
-const Message = z
-  .string()
-  .max(SKILL_MESSAGE_MAX)
-  .refine((value) => value.trim().length > 0);
-
-export const SkillTestInput = z.object({
-  message: Message,
-  id: SkillId.optional(),
-  description: z.string().max(SKILL_DESCRIPTION_MAX).optional(),
-  threshold: z.number().min(0).max(1).optional(),
-});
-export type SkillTestInput = z.infer<typeof SkillTestInput>;
-
-export const SkillMatchDto = z.object({
-  id: SkillId.nullable(),
-  key: z.string().max(SKILL_KEY_MAX),
-  name: z.string().max(SKILL_NAME_MAX),
-  score: z.number().min(-1).max(1),
-  triggered: z.boolean(),
-});
-export type SkillMatchDto = z.infer<typeof SkillMatchDto>;
-
-export const SkillTestResultDto = z.object({
-  method: SkillMatchMethod,
-  threshold: z.number().min(0).max(1),
-  matches: z.array(SkillMatchDto),
-});
-export type SkillTestResultDto = z.infer<typeof SkillTestResultDto>;
-
-export const SkillRunInput = z.object({
-  id: SkillId,
-  message: Message,
-  providerId: ProviderId.optional(),
-  modelId: z.string().trim().min(1).max(SKILL_MODEL_MAX).optional(),
-});
-export type SkillRunInput = z.infer<typeof SkillRunInput>;
 
 export const SkillImportInput = z.object({
   path: z.string().trim().min(1).max(4096).optional(),

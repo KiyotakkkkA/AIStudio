@@ -40,6 +40,7 @@ import {
   TABS_LABEL,
   exitLabel,
 } from "./terminalCopy";
+import Alert from "../../ui/molecules/Alert";
 
 const THREAD_MIN = 220;
 
@@ -245,18 +246,9 @@ export default observer(function TerminalDock({
         <IconButton label={HIDE_DOCK} path={mdiClose} iconSize={16} onClick={store.hide} />
       </div>
       {store.error === null ? null : (
-        <div
-          role="alert"
-          className="flex flex-none items-center gap-2 border-b border-line bg-err-soft px-4 py-1.5 text-[12px] text-err"
-        >
-          <span className="min-w-0 flex-1 truncate">{store.error}</span>
-          <IconButton
-            label={DISMISS_ERROR}
-            path={mdiClose}
-            iconSize={14}
-            onClick={store.dismissError}
-          />
-        </div>
+        <Alert bar onDismiss={store.dismissError} dismissLabel={DISMISS_ERROR}>
+          {store.error}
+        </Alert>
       )}
       <div className="relative min-h-0 flex-1">
         {!available ? (
