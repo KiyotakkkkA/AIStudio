@@ -166,21 +166,22 @@ export default class AgenticStore {
     this.mounted = true;
     await Promise.all([this.load(), this.loadProviders()]);
     if (!this.mounted) return;
+    if (this.activeId !== null && this.session !== null && this.streamLoaded) return;
     const reopen = this.activeId ?? this.ordered.find((entry) => entry.status === "running")?.id;
     if (reopen !== undefined) await this.open(reopen);
   }
 
   unmount(): void {
     this.mounted = false;
-    this.revision += 1;
-    this.stopListening();
   }
 
   async load(): Promise<void> {
     try {
       const sessions = await this.ipc.call("agentic.list", undefined);
       runInAction(() => {
-        this.sessions = sessions;
+        this.sessions = sessions.map((session) =>
+          newerSession(this.sessions.find((entry) => entry.id === session.id) ?? null, session),
+        );
         this.loaded = true;
         this.error = null;
       });
@@ -605,6 +606,8 @@ export default class AgenticStore {
   }
 
   dispose(): void {
-    this.unmount();
+    this.mounted = false;
+    this.revision += 1;
+    this.stopListening();
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { observer } from "mobx-react-lite";
-import { mdiArrowLeft, mdiCreationOutline, mdiDeleteOutline, mdiPlus } from "@mdi/js";
+import { mdiArrowLeft, mdiCreationOutline, mdiDeleteOutline, mdiPlus, mdiStop } from "@mdi/js";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
@@ -163,7 +163,9 @@ const SessionHeader = observer(function SessionHeader({ store }: { readonly stor
       <span className="flex-1" />
       {isFinished(session) ? (
         <Button
-          tone="ghost"
+          tone="danger"
+          aria-label={REMOVE_SESSION}
+          title={REMOVE_SESSION}
           disabled={store.removingId === session.id}
           needConfirm
           modalSetup={{
@@ -174,11 +176,17 @@ const SessionHeader = observer(function SessionHeader({ store }: { readonly stor
           }}
           onClick={() => void store.remove(session.id)}
         >
-          {REMOVE_SESSION}
+          <Icon path={mdiDeleteOutline} size={15} />
         </Button>
       ) : (
-        <Button tone="danger-soft" disabled={store.stopping} onClick={() => void store.cancel()}>
-          {STOP_SESSION}
+        <Button
+          tone="danger"
+          aria-label={STOP_SESSION}
+          title={STOP_SESSION}
+          disabled={store.stopping}
+          onClick={() => void store.cancel()}
+        >
+          <Icon path={mdiStop} size={15} />
         </Button>
       )}
       <NewSessionButton store={store} />

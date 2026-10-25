@@ -29,15 +29,10 @@ import {
   renameEdit,
   replay,
   sessionPhase,
+  streamBlocks,
   type StreamState,
 } from "../../src/renderer/features/agentic/sessionModel.ts";
-import {
-  cardBody,
-  cardResult,
-  cardTarget,
-  exitCodeLabel,
-  outputPreview,
-} from "../../src/renderer/features/agentic/toolCardModel.ts";
+import { callOf } from "../../src/renderer/features/agentic/toolCardModel.ts";
 import type { RunStep } from "../../src/renderer/features/scenarios/runModel.ts";
 
 const SESSION = "0199aa11-8888-7111-8111-111111111111";
@@ -337,59 +332,66 @@ function runStep(patch: Partial<RunStep>): RunStep {
   };
 }
 
-const PROCESS = {
-  program: "npm.cmd",
-  argv: ["npm", "test"],
-  cwd: "C:\\work\\studio",
-  packages: [],
+const APPROVAL_VIEW = {
+  id: APPROVAL,
+  runId: RUN,
+  subject: "fs.apply",
+  action: null,
+  changes: [],
+  process: null,
 };
 
-describe("tool cards", () => {
-  test("a file change card carries the diff and no separate result chip", () => {
-    const step = runStep({ output: { text: "Изменён 1 файл", changes: [DIFF], paths: [] } });
-    const body = cardBody(step);
-    expect(body?.kind).toBe("changes");
-    expect(cardResult(step)).toBeNull();
-  });
-
-  test("a command card shows its output and exit code", () => {
-    const ok = runStep({
-      type: "shell.run",
-      input: { argv: ["npm", "test"], conversationId: SESSION },
-      output: {
-        text: "",
-        isError: false,
-        exitCode: 0,
-        timedOut: false,
-        truncated: false,
-        durationMs: 4200,
-        stdout: "PASS\n",
-        stderr: "",
-        process: PROCESS,
-      },
+describe("tool calls", () => {
+  test("a kernel tool step becomes a chat tool call without the session owner", () => {
+    const call = callOf(
+      runStep({
+        input: { conversationId: SESSION, paths: [{ path: "a.ts" }] },
+        output: { text: "готово", changes: [DIFF], paths: [] },
+      }),
+    );
+    expect(call).toMatchObject({
+      key: "fs.apply",
+      status: "succeeded",
+      arguments: { paths: [{ path: "a.ts" }] },
+      result: "готово",
+      durationMs: 10,
+      approvalId: null,
     });
-    expect(cardTarget(ok)).toBe("npm test");
-    expect(cardBody(ok)).toMatchObject({ kind: "process", stdout: "PASS\n", stderr: "" });
-    expect(cardResult(ok)).toEqual({ tone: "ok", label: exitCodeLabel(0) });
-    const failed = runStep({
-      type: "shell.run",
-      output: { ...(ok.output as object), exitCode: 1 },
+    expect(callOf(runStep({ output: {} })).result).toBeNull();
+  });
+
+  test("a running call of the asked tool waits for approval", () => {
+    const running = runStep({ status: "running", finishedAt: null });
+    expect(callOf(running, APPROVAL_VIEW)).toMatchObject({
+      status: "awaiting-approval",
+      approvalId: APPROVAL,
+      durationMs: 0,
     });
-    expect(cardResult(failed)).toEqual({ tone: "err", label: exitCodeLabel(1) });
+    expect(callOf({ ...running, type: "fs.read" }, APPROVAL_VIEW).status).toBe("running");
+    expect(callOf(runStep({ status: "abandoned" })).status).toBe("cancelled");
   });
 
-  test("a failed call shows the host's error", () => {
-    const step = runStep({ status: "failed", error: "Действие отклонено" });
-    expect(cardBody(step)).toEqual({ kind: "error", text: "Действие отклонено" });
-    expect(cardResult(step)?.tone).toBe("err");
+  test("consecutive calls are grouped between text blocks", () => {
+    const state = fold([
+      event(1, { type: "token", delta: "Сначала", kind: "text" }),
+      toolEvent(2, "running"),
+      toolEvent(3, "succeeded", { id: "0199aa11-6666-7111-8111-222222222222" }),
+      event(4, { type: "token", delta: "Затем", kind: "text" }),
+    ]);
+    const blocks = streamBlocks(state.entries);
+    expect(blocks.map((block) => block.kind)).toEqual(["text", "tools", "text"]);
+    expect(blocks[1]).toMatchObject({
+      kind: "tools",
+      steps: [{ id: STEP }, { status: "succeeded" }],
+    });
   });
 
-  test("long output is collapsed to a preview", () => {
-    const text = Array.from({ length: 20 }, (_, index) => `строка ${String(index)}`).join("\n");
-    const preview = outputPreview(`${text}\n`, 12);
-    expect(preview.hidden).toBe(8);
-    expect(preview.shown.split("\n")).toHaveLength(12);
-    expect(outputPreview("одна", 12)).toEqual({ shown: "одна", hidden: 0 });
+  test("the last step event's time is kept for the working timer", () => {
+    const state = fold([
+      HostEvent.parse({ streamId: STREAM, seq: 1, ts: 500, type: "token", delta: "x" }),
+      HostEvent.parse({ ...toolEvent(2, "running"), ts: 700 }),
+    ]);
+    expect(state.stepAt).toBe(700);
   });
 });
 
@@ -607,6 +609,19 @@ describe("agentic store", () => {
     await store.instruct();
     expect(calls("agentic.instruct")).toEqual([{ id: SESSION, text: "Не трогай миграции" }]);
     expect(store.instruction).toBe("");
+  });
+
+  test("leaving the page keeps following a live session", async () => {
+    const { store, emit, calls } = rig();
+    await store.mount();
+    store.unmount();
+    emit({
+      type: "approval",
+      request: { id: APPROVAL, runId: RUN, subject: "shell.run", scope: "run", expiresAt: 10 },
+    });
+    await store.mount();
+    expect(store.stream.approval?.id).toBe(APPROVAL);
+    expect(calls("runs.detail")).toHaveLength(1);
   });
 
   test("a paused session is extended and its new run is followed", async () => {

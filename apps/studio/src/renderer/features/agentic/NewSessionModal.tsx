@@ -81,7 +81,7 @@ export default observer(function NewSessionModal({ store }: { readonly store: Ag
         <Field label={FORM_WORKSPACE} required help={FORM_WORKSPACE_HELP}>
           <div className="flex items-center gap-2">
             <span
-              className={`min-w-0 flex-1 truncate rounded-control border border-line bg-main-850 px-3 py-2 font-mono text-[12px] ${draft.workspace === null ? "text-main-500" : "text-main-100"}`}
+              className={`min-w-0 flex-1 truncate rounded-control bg-main-850 px-3 py-2 font-mono text-[12px] ${draft.workspace === null ? "text-main-500" : "text-main-100"}`}
               title={draft.workspace ?? undefined}
             >
               {draft.workspace ?? FORM_NO_FOLDER}

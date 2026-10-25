@@ -208,6 +208,33 @@ test("disposal flushes the buffer and remount replays held events once", async (
   events.dispose();
 });
 
+test("leaving the page keeps a live turn's approvals, text and start time", async () => {
+  const { store, token, events } = setup();
+  await store.mount();
+  store.composer.setText("hello");
+  await store.send();
+  const startedAt = store.runStartedAt;
+  expect(startedAt).not.toBeNull();
+  store.unmount();
+  const approvalId = "0199bb11-5555-7111-8111-000000000003";
+  for (let seq = 1; seq <= 300; seq += 1) token(seq, "x");
+  events.dispatch({
+    type: "approval",
+    streamId: handle.streamId,
+    seq: 301,
+    ts: Date.now(),
+    request: { id: approvalId, runId: handle.id, subject: "shell.run" },
+  });
+  await store.mount();
+  await vi.waitFor(() => {
+    expect(store.liveText).toHaveLength(300);
+  });
+  expect(store.approvals.map((request) => request.id)).toEqual([approvalId]);
+  expect(store.runStartedAt).toBe(startedAt);
+  store.dispose();
+  events.dispose();
+});
+
 test("end replayed synchronously during subscribe does not leak a listener", async () => {
   const { store, bridge, end, events } = setup();
   const subscribe = vi.spyOn(events, "subscribe");

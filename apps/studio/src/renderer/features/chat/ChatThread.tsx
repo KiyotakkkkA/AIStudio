@@ -277,6 +277,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                 stores={store.stores}
                 generating={store.generating}
                 status={generationPhase(store)}
+                since={store.runStartedAt}
                 artifacts={
                   <ChatArtifacts
                     artifacts={answerArtifacts(store.liveToolCalls)}

@@ -12,7 +12,7 @@ export default observer(function ChatWorkspace() {
   const { chat, viewer } = useStore();
   useEffect(() => {
     void chat.mount();
-    return chat.dispose;
+    return chat.unmount;
   }, [chat]);
   const activeId = chat.active?.id ?? null;
   useEffect(() => {

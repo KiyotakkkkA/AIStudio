@@ -39,6 +39,7 @@ export interface StreamState {
   readonly approval: SessionApproval | null;
   readonly seqs: Readonly<Record<string, number>>;
   readonly open: string | null;
+  readonly stepAt: number | null;
 }
 
 export interface StreamUpdate {
@@ -47,7 +48,13 @@ export interface StreamUpdate {
   readonly ended: boolean;
 }
 
-export const EMPTY_STREAM: StreamState = { entries: [], approval: null, seqs: {}, open: null };
+export const EMPTY_STREAM: StreamState = {
+  entries: [],
+  approval: null,
+  seqs: {},
+  open: null,
+  stepAt: null,
+};
 
 type Payload = Readonly<Record<string, Json>>;
 
@@ -109,15 +116,16 @@ export function applyEvent(state: StreamState, event: HostEvent): StreamUpdate {
         ended: false,
       };
     case "step": {
+      const stamped: StreamState = { ...next, stepAt: event.ts };
       const session = sessionFromStep(event.step);
-      if (session !== null) return { state: { ...next, open: null }, session, ended: false };
+      if (session !== null) return { state: { ...stamped, open: null }, session, ended: false };
       const step = stepFromEvent(event.step);
       if (step === null || !step.nodeId.startsWith(CALL_PREFIX)) {
-        return { state: next, session: null, ended: false };
+        return { state: stamped, session: null, ended: false };
       }
       const approval = step.status === "running" ? next.approval : null;
       return {
-        state: { ...next, entries: upsertTool(next.entries, step), approval, open: null },
+        state: { ...stamped, entries: upsertTool(next.entries, step), approval, open: null },
         session: null,
         ended: false,
       };
@@ -338,6 +346,27 @@ export function relativePath(path: string, workspace: string): string {
     return path.slice(base.length + 1);
   }
   return path;
+}
+
+export type StreamBlock =
+  | { readonly kind: "text"; readonly id: string; readonly text: string }
+  | { readonly kind: "tools"; readonly id: string; readonly steps: readonly RunStep[] };
+
+export function streamBlocks(entries: readonly StreamEntry[]): StreamBlock[] {
+  const blocks: StreamBlock[] = [];
+  for (const entry of entries) {
+    if (entry.kind === "text") {
+      blocks.push(entry);
+      continue;
+    }
+    const last = blocks.at(-1);
+    if (last?.kind === "tools") {
+      blocks[blocks.length - 1] = { ...last, steps: [...last.steps, entry.step] };
+    } else {
+      blocks.push({ kind: "tools", id: entry.id, steps: [entry.step] });
+    }
+  }
+  return blocks;
 }
 
 export function runningCall(entries: readonly StreamEntry[]): RunStep | null {

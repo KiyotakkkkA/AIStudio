@@ -185,9 +185,7 @@ function ToolCallCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22 }}
       style={{ "--zvs-beam-color": "var(--color-warn)" } as CSSProperties}
-      className={`relative overflow-hidden rounded-card bg-main-800 ${
-        blocking ? "zvs-beam shadow-[inset_0_0_0_1px_var(--color-warn-line)]" : ""
-      }`}
+      className={`relative overflow-hidden rounded-card bg-main-800 ${blocking ? "zvs-beam" : ""}`}
     >
       <button
         type="button"

@@ -82,6 +82,7 @@ export default class ChatStore {
   stopping = false;
   error: string | null = null;
   run: RunHandleDto | null = null;
+  runStartedAt: number | null = null;
   liveText = "";
   liveReasoning = "";
   liveCitations: ChatCitationDto[] = [];
@@ -773,6 +774,7 @@ export default class ChatStore {
     if (!this.canSend) return;
     const text = this.composer.text.trim();
     this.sending = true;
+    this.runStartedAt = Date.now();
     this.error = null;
     this.outcome = null;
     this.retryText = text;
@@ -807,6 +809,7 @@ export default class ChatStore {
         this.error = errorCopy(error);
         this.outcome = "failed";
         this.sending = false;
+        this.runStartedAt = null;
         this.pendingTurn = false;
       });
     }
@@ -1170,6 +1173,7 @@ export default class ChatStore {
       this.unsubscribe?.();
       this.unsubscribe = undefined;
       this.run = null;
+      this.runStartedAt = null;
       this.approvals = [];
       this.questions = [];
       this.folderRequests = [];
@@ -1231,14 +1235,24 @@ export default class ChatStore {
     }
   }
 
+  unmount() {
+    this.release(false);
+  }
+
   dispose() {
+    this.release(true);
+  }
+
+  private release(full: boolean) {
     this.mounted = false;
     this.ready = false;
     ++this.revision;
     this.loading = false;
     this.flush();
-    this.unsubscribe?.();
-    this.unsubscribe = undefined;
+    if (full || this.run === null) {
+      this.unsubscribe?.();
+      this.unsubscribe = undefined;
+    }
     this.stopContext?.();
     this.stopContext = undefined;
     this.explorer.dispose();

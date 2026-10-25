@@ -35,6 +35,7 @@ export default function ChatMessage({
   partial = false,
   generating = false,
   status = "Обработка запроса",
+  since = null,
   usage,
   tools,
   artifacts,
@@ -50,6 +51,7 @@ export default function ChatMessage({
   readonly partial?: boolean;
   readonly generating?: boolean;
   readonly status?: string;
+  readonly since?: number | null;
   readonly usage?: string;
   readonly tools?: ReactNode;
   readonly artifacts?: ReactNode;
@@ -114,7 +116,7 @@ export default function ChatMessage({
             citations={citations}
             onCite={view}
           />
-          {generating && <GenerationStatus label={status} />}
+          {generating && <GenerationStatus label={status} since={since} />}
           <ChatSources
             sources={sources}
             selections={selectionSources(selections)}

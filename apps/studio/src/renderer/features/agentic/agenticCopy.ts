@@ -60,10 +60,6 @@ export const CHANGED_TITLE = "Изменённые файлы";
 export const CHANGED_EMPTY = "Файлы не изменялись";
 export const BUDGET_TITLE = "Бюджет";
 
-export const SHOW_LESS = "Свернуть";
-export const STDERR_TITLE = "stderr";
-export const NO_OUTPUT = "Вывода нет";
-
 export const FORM_GOAL = "Цель";
 export const FORM_GOAL_PLACEHOLDER = "Что нужно сделать в рабочей папке";
 export const FORM_WORKSPACE = "Рабочая папка";
@@ -146,10 +142,6 @@ export function callsWord(count: number): string {
 
 export function toolsWord(count: number): string {
   return plural(count, "инструмент", "инструмента", "инструментов");
-}
-
-export function linesHidden(count: number): string {
-  return `ещё ${plural(count, "строка", "строки", "строк")}`;
 }
 
 function compactNumber(value: number): string {

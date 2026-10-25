@@ -9,6 +9,7 @@ import Icon from "../../ui/atoms/Icon";
 import GenerationStatus from "../../ui/molecules/GenerationStatus";
 import TextComposer from "../../ui/molecules/TextComposer";
 import ChatMarkdown from "../chat/ChatMarkdown";
+import ChatToolCalls from "../chat/ChatToolCalls";
 import FileChangeList from "../chat/FileChangeList";
 import { commandLine } from "../chat/processCopy";
 import { toolTitle } from "../chat/toolCallCopy";
@@ -33,8 +34,8 @@ import {
   SUMMARY_TITLE,
 } from "./agenticCopy";
 import type AgenticStore from "./AgenticStore";
-import type { SessionApproval } from "./sessionModel";
-import ToolCard from "./ToolCard";
+import { streamBlocks, type SessionApproval } from "./sessionModel";
+import { callOf } from "./toolCardModel";
 
 function Eyebrow({ children }: { readonly children: string }) {
   return (
@@ -61,7 +62,7 @@ const ApprovalBar = observer(function ApprovalBar({ store }: { readonly store: A
     <div
       role="alert"
       style={{ "--zvs-beam-color": "var(--color-warn)" } as CSSProperties}
-      className="zvs-beam flex flex-col gap-2.5 rounded-card border border-warn-line bg-warn-soft px-3.5 py-3"
+      className="zvs-beam flex flex-col gap-2.5 rounded-card bg-warn-soft px-3.5 py-3"
     >
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-warn">
@@ -112,7 +113,7 @@ const Outcome = observer(function Outcome({ store }: { readonly store: AgenticSt
   if (session === null || phase === null) return null;
   if (phase === "completed") {
     return (
-      <div className="rounded-card border border-ok-line bg-ok-soft px-4 py-3">
+      <div className="rounded-card bg-ok-soft px-4 py-3">
         <Eyebrow>{SUMMARY_TITLE}</Eyebrow>
         {session.summary === null ? (
           <p className="m-0 text-[13px] text-main-100">{STOP_REASON_COPY.goal}</p>
@@ -125,7 +126,7 @@ const Outcome = observer(function Outcome({ store }: { readonly store: AgenticSt
   if (phase === "budget") {
     const budget = store.extension;
     return (
-      <div className="flex flex-wrap items-center gap-3 rounded-card border border-warn-line bg-warn-soft px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-card bg-warn-soft px-4 py-3">
         <div className="min-w-0 flex-1">
           <p className="m-0 text-[13px] font-semibold text-main-50">{PHASE_LABELS.budget}</p>
           <p className="m-0 mt-0.5 text-[12px] text-main-300">
@@ -143,7 +144,7 @@ const Outcome = observer(function Outcome({ store }: { readonly store: AgenticSt
   }
   if (phase === "failed") {
     return (
-      <div className="rounded-card border border-err-border bg-err-soft px-4 py-3 text-[13px] text-err">
+      <div className="rounded-card bg-err-soft px-4 py-3 text-[13px] text-err">
         {session.error ?? STOP_REASON_COPY.error}
       </div>
     );
@@ -151,7 +152,7 @@ const Outcome = observer(function Outcome({ store }: { readonly store: AgenticSt
   if (phase === "stopped" || phase === "cancelled") {
     const reason = session.stopReason ?? (phase === "cancelled" ? "cancelled" : "loop");
     return (
-      <div className="rounded-card border border-line bg-main-850 px-4 py-3 text-[13px] text-main-300">
+      <div className="rounded-card bg-main-850 px-4 py-3 text-[13px] text-main-300">
         {STOP_REASON_COPY[reason]}
       </div>
     );
@@ -159,7 +160,10 @@ const Outcome = observer(function Outcome({ store }: { readonly store: AgenticSt
   const working =
     store.activeCall === null && store.stream.open === null && store.stream.approval === null;
   return working ? (
-    <GenerationStatus label={phase === "planning" ? PHASE_LABELS.planning : STEP_WORKING} />
+    <GenerationStatus
+      label={phase === "planning" ? PHASE_LABELS.planning : STEP_WORKING}
+      since={store.stream.stepAt ?? session.updatedAt}
+    />
   ) : null;
 });
 
@@ -239,7 +243,7 @@ export default observer(function SessionStream({ store }: { readonly store: Agen
         className="min-h-0 flex-1 px-6 pt-5 [overflow-anchor:none]"
       >
         <div ref={content} className="mx-auto flex w-full max-w-4xl flex-col gap-3.5 pb-5">
-          <div className="rounded-card border border-line bg-main-850 px-4 py-3">
+          <div className="rounded-card bg-main-850 px-4 py-3">
             <Eyebrow>{GOAL_TITLE}</Eyebrow>
             <p className="m-0 text-[13px] leading-relaxed whitespace-pre-wrap text-main-100">
               {session.goal}
@@ -250,9 +254,13 @@ export default observer(function SessionStream({ store }: { readonly store: Agen
               {LOADING}
             </p>
           ) : null}
-          {entries.map((entry) =>
-            entry.kind === "tool" ? (
-              <ToolCard key={entry.id} step={entry.step} />
+          {streamBlocks(entries).map((entry) =>
+            entry.kind === "tools" ? (
+              <div key={entry.id} className="[&>ul]:mb-0">
+                <ChatToolCalls
+                  calls={entry.steps.map((step) => callOf(step, store.stream.approval))}
+                />
+              </div>
             ) : entry.text.trim().length === 0 ? null : (
               <div key={entry.id} className="flex gap-3">
                 <AssistantAvatar

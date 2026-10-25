@@ -3,18 +3,20 @@ import GenerationTrace from "../atoms/GenerationTrace";
 
 export interface GenerationStatusProps {
   readonly label: string;
+  readonly since?: number | null;
 }
 
-export default function GenerationStatus({ label }: GenerationStatusProps) {
-  const [startedAt] = useState(() => Date.now());
-  const [now, setNow] = useState(startedAt);
+export default function GenerationStatus({ label, since = null }: GenerationStatusProps) {
+  const [mountedAt] = useState(() => Date.now());
+  const startedAt = since ?? mountedAt;
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(intervalId);
   }, []);
 
-  const seconds = Math.floor((now - startedAt) / 1000);
+  const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
 
   return (
     <p role="status" className="flex h-6 items-center gap-2 text-[12.5px] font-medium">
