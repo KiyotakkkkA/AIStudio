@@ -16,6 +16,8 @@ use zvs_qwen_web::{
     VendorFailure, new_chat_body, parse_chat_created, parse_models,
 };
 
+use dialect::QwenDialect;
+
 use super::account_family::{
     AccountAdapterCore, AccountAdapterOptions, MALFORMED_MODELS_MESSAGE, flatten_prompt,
     malformed_turn, response_diagnostics, truncated_stream,
@@ -26,11 +28,14 @@ use crate::drivers::ai::errors::{
 };
 use crate::drivers::ai::ports::{
     ChatMessage, ChatRole, DeltaStream, DiscoveredModel, FinishReason, GenerateRequest,
-    GenerateResult, TextDelta, TextGenerationDriver, TokenUsage,
+    GenerateResult, SharedTextDriver, TextDelta, TextGenerationDriver, TokenUsage,
 };
 use crate::drivers::ai::sse::FrameStream;
+use crate::drivers::ai::tool_dialect::with_tool_dialect;
 use crate::drivers::ai::transport::{RequestSpec, TransportResponse};
 use crate::platform::logger::{LogLevel, SharedLogger};
+
+pub mod dialect;
 
 pub use zvs_qwen_web::protocol::{
     API_VERSION as QWEN_API_VERSION, CHAT_MODE as QWEN_CHAT_MODE, CHAT_TYPE as QWEN_CHAT_TYPE,
@@ -765,6 +770,14 @@ impl TextGenerationDriver for QwenWebAdapter {
     ) -> Result<Vec<DiscoveredModel>, AppError> {
         self.shared.list_models(cancel).await
     }
+}
+
+pub fn qwen_web_driver(options: AccountAdapterOptions) -> SharedTextDriver {
+    with_tool_dialect(
+        Arc::new(QwenWebAdapter::new(options)),
+        Arc::new(QwenDialect),
+        None,
+    )
 }
 
 #[cfg(test)]

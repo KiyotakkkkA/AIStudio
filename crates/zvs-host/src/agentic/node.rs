@@ -18,9 +18,7 @@ use super::plan::{
 use super::store::SessionStore;
 use crate::commands::PROCESS_TOOLS;
 use crate::data::schema::{AgenticSessionRow, TranscriptCall, TranscriptEntry};
-use crate::drivers::ai::{
-    ChatMessage, ChatRole, GenerateRequest, ToolCall, ToolSpec, with_injected_tools,
-};
+use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, ToolCall, ToolSpec};
 use crate::files::FILE_TOOLS;
 use crate::kernel::nodes::PROVIDERS_UNAVAILABLE;
 use crate::kernel::{NodeDef, PermissionRequirement, StepContext, ToolStepRequest};
@@ -427,15 +425,8 @@ impl SessionNode {
         tool: &OfferedTool,
         call: &ToolCall,
         progress: &mut Progress,
-        native: bool,
     ) -> Result<String, AppError> {
-        let shape = |status: &str, text: String| {
-            if native {
-                fence_tool_result(&call.name, status, &text)
-            } else {
-                text
-            }
-        };
+        let shape = |status: &str, text: String| fence_tool_result(&call.name, status, &text);
         let mut arguments = parse_tool_arguments(&call.arguments).unwrap_or_default();
         if FILE_TOOLS.contains(&tool.key.as_str()) || PROCESS_TOOLS.contains(&tool.key.as_str()) {
             arguments.insert("conversationId".to_owned(), json!(session_id));
@@ -568,20 +559,14 @@ impl NodeDef for SessionNode {
         let Some(providers) = &context.services.providers else {
             return Err(AppError::new(AppErrorCode::Conflict, PROVIDERS_UNAVAILABLE));
         };
-        let raw = providers.text(&row.provider_id)?;
-        let tool_mode = resolve_tool_mode(raw.capabilities().tools, None);
+        let driver = providers.text(&row.provider_id)?;
+        let tool_mode = resolve_tool_mode(driver.capabilities().tools, None);
         if tool_mode == ToolMode::None {
             return Err(AppError::new(
                 AppErrorCode::ValidationFailed,
                 NO_TOOL_SUPPORT,
             ));
         }
-        let native = tool_mode == ToolMode::Native;
-        let driver = if tool_mode == ToolMode::Injected {
-            with_injected_tools(raw, None)
-        } else {
-            raw
-        };
         let started = self.store.now();
         let base_elapsed = row.usage.elapsed_ms;
         let mut progress = Progress {
@@ -657,19 +642,14 @@ impl NodeDef for SessionNode {
                             &mut tripped,
                             &mut finished,
                         );
-                        if native {
-                            fence_tool_result(&call.name, "succeeded", &text)
-                        } else {
-                            text
-                        }
+                        fence_tool_result(&call.name, "succeeded", &text)
                     }
                     name => match by_name.get(name) {
                         Some(tool) => {
-                            self.call_tool(context, &id, tool, call, &mut progress, native)
+                            self.call_tool(context, &id, tool, call, &mut progress)
                                 .await?
                         }
-                        None if native => fence_tool_result(name, "refused", TOOL_NOT_OFFERED),
-                        None => TOOL_NOT_OFFERED.to_owned(),
+                        None => fence_tool_result(name, "refused", TOOL_NOT_OFFERED),
                     },
                 };
                 progress

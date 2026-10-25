@@ -52,7 +52,6 @@ use crate::data::repositories::{ConversationPatch, MessagePatch, ProviderFilter,
 use crate::data::schema::{ConversationRow, FolderGrantRow, MessageRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::ports::SharedTextDriver;
-use crate::drivers::ai::with_injected_tools;
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta, ToolCall};
 use crate::files::FILE_TOOLS;
 use crate::kernel::knowledge_nodes::{KNOWLEDGE_SEARCH, KNOWLEDGE_TOOLS, KnowledgeResult};
@@ -1806,21 +1805,16 @@ impl GenerateChatNode {
         let book = Mutex::new(knowledge.citations.clone());
         let memory = Mutex::new(memory);
         let mut compactable: Vec<Compactable> = Vec::new();
-        let raw = providers.text(&base.provider_id)?;
+        let driver = providers.text(&base.provider_id)?;
         let mode = if tools.is_empty() {
             ToolMode::None
         } else {
-            resolve_tool_mode(raw.capabilities().tools, model_tools)
+            resolve_tool_mode(driver.capabilities().tools, model_tools)
         };
         let offered: Vec<OfferedTool> = if mode == ToolMode::None {
             Vec::new()
         } else {
             tools.clone()
-        };
-        let driver = if mode == ToolMode::Injected {
-            with_injected_tools(raw, None)
-        } else {
-            raw
         };
         let specs = tool_specs(&offered);
         let by_name: HashMap<&str, &OfferedTool> = offered
@@ -1983,11 +1977,7 @@ impl GenerateChatNode {
                             [entry.index]
                             .status;
                         let shape = |content: String| {
-                            if mode == ToolMode::Native {
-                                fence_tool_result(&entry.call.name, status.as_str(), &content)
-                            } else {
-                                content
-                            }
+                            fence_tool_result(&entry.call.name, status.as_str(), &content)
                         };
                         if let Some(compact) = outcome.compact {
                             compactable.push(Compactable {

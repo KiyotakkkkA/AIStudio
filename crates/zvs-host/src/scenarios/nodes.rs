@@ -17,7 +17,7 @@ use super::catalogue::{
 };
 use super::compile::FROM_PREFIX;
 use super::template::{TemplateScope, civil_date, render, text_of};
-use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, ToolCall, with_injected_tools};
+use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, ToolCall};
 use crate::kernel::nodes::PROVIDERS_UNAVAILABLE;
 use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext, ToolStepRequest};
 use crate::services::chat::GenerateChatNode;
@@ -394,22 +394,17 @@ impl NodeDef for AgentNode {
         let Some(providers) = &context.services.providers else {
             return Err(AppError::new(AppErrorCode::Conflict, PROVIDERS_UNAVAILABLE));
         };
-        let raw = providers.text(provider_id)?;
+        let driver = providers.text(provider_id)?;
         let offered = self.offered(&input.tools)?;
         let mode = if offered.is_empty() {
             ToolMode::None
         } else {
-            resolve_tool_mode(raw.capabilities().tools, None)
+            resolve_tool_mode(driver.capabilities().tools, None)
         };
         let offered = if mode == ToolMode::None {
             Vec::new()
         } else {
             offered
-        };
-        let driver = if mode == ToolMode::Injected {
-            with_injected_tools(raw, None)
-        } else {
-            raw
         };
         let by_name: HashMap<&str, &OfferedTool> = offered
             .iter()
@@ -478,9 +473,7 @@ impl NodeDef for AgentNode {
             );
             for call in output.tool_calls {
                 calls += 1;
-                let content = self
-                    .call(context, &by_name, &call, calls, mode == ToolMode::Native)
-                    .await?;
+                let content = self.call(context, &by_name, &call, calls).await?;
                 messages.push(ChatMessage::tool(call.id.clone(), content));
             }
         }
@@ -500,15 +493,8 @@ impl AgentNode {
         by_name: &HashMap<&str, &OfferedTool>,
         call: &ToolCall,
         index: u64,
-        native: bool,
     ) -> Result<String, AppError> {
-        let shape = |status: &str, text: String| {
-            if native {
-                fence_tool_result(&call.name, status, &text)
-            } else {
-                text
-            }
-        };
+        let shape = |status: &str, text: String| fence_tool_result(&call.name, status, &text);
         let Some(tool) = by_name.get(call.name.as_str()) else {
             return Ok(shape("refused", UNKNOWN_TOOL.to_owned()));
         };

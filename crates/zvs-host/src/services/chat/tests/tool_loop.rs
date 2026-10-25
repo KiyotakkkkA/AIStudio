@@ -18,8 +18,11 @@ use super::{Harness, HarnessOptions, OneDriver, eventually, within};
 use crate::data::Repositories;
 use crate::data::repositories::ModelDraft;
 use crate::drivers::ai::capabilities::AdapterCapabilities;
-use crate::drivers::ai::injected_tools::{INJECTED_CALL_KEY, INJECTED_RESULT_PREFIX};
 use crate::drivers::ai::ports::SharedTextDriver;
+use crate::drivers::ai::tool_dialect::tests::counted_ids;
+use crate::drivers::ai::tool_dialect::{
+    DefaultDialect, INJECTED_CALL_KEY, INJECTED_RESULT_PREFIX, with_tool_dialect,
+};
 use crate::drivers::ai::{
     ChatMessage, ChatRole, DeltaStream, DiscoveredModel, GenerateRequest, GenerateResult,
     TextDelta, TextGenerationDriver, ToolCall, ToolSpec,
@@ -276,6 +279,14 @@ fn register_demo_nodes(registry: &NodeRegistry, calls: &Arc<Calls>) {
 
 impl Loop {
     fn new() -> Self {
+        Self::build(false)
+    }
+
+    fn web() -> Self {
+        Self::build(true)
+    }
+
+    fn build(web: bool) -> Self {
         let database = temporary_database();
         let registry = Arc::new(NodeRegistry::new());
         register_core_nodes(&registry).expect("registers the core nodes");
@@ -306,9 +317,19 @@ impl Loop {
             })
             .expect("registers slow");
         let driver = Scripted::new();
+        let shared: SharedTextDriver = if web {
+            *driver.mode.lock().unwrap_or_else(PoisonError::into_inner) = ToolMode::Injected;
+            with_tool_dialect(
+                Arc::clone(&driver) as SharedTextDriver,
+                Arc::new(DefaultDialect),
+                Some(counted_ids()),
+            )
+        } else {
+            Arc::clone(&driver) as SharedTextDriver
+        };
         let harness = Harness::with(HarnessOptions {
             database: Some(database.shared()),
-            providers: Some(Arc::new(OneDriver(Arc::clone(&driver) as SharedTextDriver))),
+            providers: Some(Arc::new(OneDriver(shared))),
             tools: Some(tools.clone()),
             registry: Some(registry),
             capabilities: vec![ProviderCapability::Text],
@@ -499,8 +520,8 @@ async fn awaiting_approval(test: &Loop, created: ConversationId) -> String {
             .harness
             .last(created)
             .tool_calls
-            .first()
-            .filter(|record| record.status == ChatToolCallStatus::AwaitingApproval)
+            .iter()
+            .find(|record| record.status == ChatToolCallStatus::AwaitingApproval)
             .and_then(|record| record.approval_id.clone());
         approval.is_some()
     })
@@ -744,13 +765,8 @@ async fn malformed_arguments_fail_the_call_without_running_the_tool() {
 }
 
 #[tokio::test]
-async fn an_injected_adapter_calls_the_tool_from_a_json_reply_that_never_reaches_the_user() {
-    let test = Loop::new();
-    *test
-        .driver
-        .mode
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner) = ToolMode::Injected;
+async fn a_web_driver_calls_the_tool_from_a_json_reply_that_never_reaches_the_user() {
+    let test = Loop::web();
     test.driver.round(|_| {
         vec![
             text(&format!("{{\"{INJECTED_CALL_KEY}\": \"demo__")),
@@ -774,7 +790,7 @@ async fn an_injected_adapter_calls_the_tool_from_a_json_reply_that_never_reaches
     assert_eq!(
         requests[1].messages.last(),
         Some(&ChatMessage::user(format!(
-            "{INJECTED_RESULT_PREFIX} demo__lookup\n```\nfound y\n```"
+            "{INJECTED_RESULT_PREFIX} demo__lookup\n```\n<tool_result name=\"demo__lookup\" status=\"succeeded\">\nfound y\n</tool_result>\n```"
         )))
     );
     assert_eq!(test.harness.last(created).content, "It is y.");
@@ -789,6 +805,89 @@ async fn an_injected_adapter_calls_the_tool_from_a_json_reply_that_never_reaches
         })
         .collect();
     assert_eq!(tokens, "It is y.");
+}
+
+fn injected_call(name: &str, arguments: &Value) -> String {
+    format!("{{\"{INJECTED_CALL_KEY}\": \"{name}\", \"arguments\": {arguments}}}\n")
+}
+
+#[tokio::test]
+async fn a_web_driver_reads_three_files_in_one_round() {
+    let test = Loop::web();
+    test.driver.round(|_| {
+        vec![
+            text(&injected_call("demo__lookup", &json!({ "query": "a.md" }))),
+            text(&injected_call("demo__lookup", &json!({ "query": "b.md" }))),
+            text(&injected_call("demo__lookup", &json!({ "query": "c.md" }))),
+        ]
+    });
+    test.driver.fallback(|_| vec![text("Three summaries.")]);
+    let created = test.conversation(&["demo.lookup"]);
+
+    let handle = test.turn(created, "Summarise a, b and c").await;
+
+    assert_eq!(test.harness.status(&handle), RunStatus::Succeeded);
+    assert_eq!(test.calls.lookups(), ["a.md", "b.md", "c.md"]);
+    let requests = test.driver.requests();
+    assert_eq!(requests.len(), 2);
+    let results: Vec<&str> = requests[1]
+        .messages
+        .iter()
+        .filter(|message| message.content.starts_with(INJECTED_RESULT_PREFIX))
+        .map(|message| message.content.as_str())
+        .collect();
+    assert_eq!(results.len(), 3);
+    assert!(results[2].contains("found c.md"));
+    let assistant = test.harness.last(created);
+    assert_eq!(
+        assistant
+            .tool_calls
+            .iter()
+            .map(|record| (record.id.as_str(), record.round))
+            .collect::<Vec<_>>(),
+        [("call_1", 0), ("call_2", 0), ("call_3", 0)]
+    );
+    assert_eq!(assistant.content, "Three summaries.");
+}
+
+#[tokio::test]
+async fn a_web_reply_with_a_read_and_a_write_runs_the_read_first_and_the_write_still_asks() {
+    let test = Loop::web();
+    test.set_tier(&test.drop, ToolTier::Ask);
+    test.driver.round(|_| {
+        vec![text(&format!(
+            "{}{}",
+            injected_call("demo__lookup", &json!({ "query": "x" })),
+            injected_call("demo__drop", &json!({}))
+        ))]
+    });
+    test.driver.fallback(|_| vec![text("Done.")]);
+    let created = test.conversation(&["demo.lookup", "demo.drop"]);
+    let handle = test.harness.send(created, "Look up and drop");
+
+    let approval = within(awaiting_approval(&test, created)).await;
+    assert_eq!(test.calls.lookups(), ["x"]);
+    assert_eq!(test.calls.drops(), 0);
+    test.harness
+        .runs
+        .approve(&handle.id, &approval, false)
+        .expect("approves");
+    within(test.harness.runs.wait(&handle.id)).await;
+
+    assert_eq!(test.calls.drops(), 1);
+    assert_eq!(test.driver.requests().len(), 2);
+    assert_eq!(
+        test.harness
+            .last(created)
+            .tool_calls
+            .iter()
+            .map(|record| (record.name.clone(), record.status))
+            .collect::<Vec<_>>(),
+        [
+            ("demo__lookup".to_owned(), ChatToolCallStatus::Succeeded),
+            ("demo__drop".to_owned(), ChatToolCallStatus::Succeeded)
+        ]
+    );
 }
 
 #[tokio::test]

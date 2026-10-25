@@ -16,7 +16,7 @@ use zvs_contract::{
 
 use super::library::{AuthoredSkill, SkillLibrary};
 use crate::commands::SHELL_RUN;
-use crate::drivers::ai::{ChatMessage, GenerateRequest, with_injected_tools};
+use crate::drivers::ai::{ChatMessage, GenerateRequest};
 use crate::files::roots::SKILL_ROOT;
 use crate::files::{FS_APPLY, FS_LIST, FS_READ};
 use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateRole};
@@ -428,21 +428,16 @@ impl NodeDef for SkillGenerateNode {
             .providers
             .as_ref()
             .ok_or_else(|| AppError::new(AppErrorCode::Conflict, NO_PROVIDERS))?;
-        let raw = providers.text(&input.provider_id)?;
+        let driver = providers.text(&input.provider_id)?;
         let mode = if input.tools.is_empty() {
             ToolMode::None
         } else {
-            resolve_tool_mode(raw.capabilities().tools, input.model_tools)
+            resolve_tool_mode(driver.capabilities().tools, input.model_tools)
         };
         let offered: Vec<OfferedTool> = if mode == ToolMode::None {
             Vec::new()
         } else {
             input.tools.clone()
-        };
-        let driver = if mode == ToolMode::Injected {
-            with_injected_tools(raw, None)
-        } else {
-            raw
         };
         let specs = tool_specs(&offered);
         let by_name: HashMap<&str, &OfferedTool> = offered
@@ -517,11 +512,8 @@ impl NodeDef for SkillGenerateNode {
                     )
                     .await?
                 };
-                let content = if mode == ToolMode::Native {
-                    fence_tool_result(&call.name, outcome.status.as_str(), &outcome.content)
-                } else {
-                    outcome.content
-                };
+                let content =
+                    fence_tool_result(&call.name, outcome.status.as_str(), &outcome.content);
                 messages.push(ChatMessage::tool(call.id.clone(), content));
                 calls.push(SkillCallRecord {
                     key: tool.map_or_else(|| call.name.clone(), |tool| tool.key.clone()),

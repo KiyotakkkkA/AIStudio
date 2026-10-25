@@ -2,7 +2,7 @@
 task: TASK_045_EXTRA_2
 title: Tool dialects in the web adapters — the injected protocol leaves the service layer
 phase: 8 — Documents and the agent browser
-status: todo
+status: done
 depends_on: [TASK_045]
 unblocks: []
 estimate: 4 h
@@ -105,15 +105,44 @@ folder and summarise them; confirm one round with three calls, and that a write 
 
 ## Definition of done
 
-- [ ] No service decides on `ToolMode::Injected`; web adapters emit native tool-call deltas
-- [ ] Qwen quirks live in the Qwen dialect with their tests
-- [ ] Several read-only calls in one reply run in one round
-- [ ] Contract change, if any, touches Rust type, Zod schema and fixture
-- [ ] Gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] No service decides on `ToolMode::Injected`; web adapters emit native tool-call deltas
+- [x] Qwen quirks live in the Qwen dialect with their tests
+- [x] Several read-only calls in one reply run in one round
+- [x] Contract change, if any, touches Rust type, Zod schema and fixture
+- [x] Gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- `drivers/ai/tool_dialect.rs` (was `injected_tools.rs`): the `ToolDialect` trait (`prompt`,
+  `encode_history`, `parse_stream`), `DefaultDialect`, a `Grammar` (optional tag, name keys,
+  aliases) behind a shared `ReplyParser`, and `with_tool_dialect`, which wraps a driver and
+  emits native `TextDelta::ToolCall`s.
+- `adapters/qwen_web/dialect.rs`: `QwenDialect` owns `<tool_call>`, the `name` key and the
+  code-interpreter aliases, with its tests beside it. An alias target is the one offered tool
+  whose schema has `language` and `source`; none or several such tools means no alias.
+- `qwen_web_driver` / `zai_web_driver` wrap the adapters; the family table builds them. Z.ai uses
+  `DefaultDialect`: nothing in its tests or fixtures shows a different call shape.
+- The four call sites lost their wrap branch; `chat.rs`, `agentic/node.rs`, `scenarios/nodes.rs`
+  and `skills/nodes.rs` always fence tool results.
+- Multi-call replies: several envelopes (bare, fenced or tagged) or one JSON array; ids in order;
+  a malformed later call stays a `Malformed` call next to the good ones. The prompt allows several
+  read-only calls per reply and puts a call that changes data last.
+- Round trips for a three-file read on the fake web driver (`a_web_driver_reads_three_files_in_one_round`):
+  before, 4 requests (one call per reply, three tool rounds plus the answer); after, 2.
+
 **Deviated from plan:**
+- `ToolMode::Injected` stays in the contract as a descriptive value; the adapters still report it
+  and the renderer only tests for `none`. No DTO, schema or fixture change.
+- Result shaping moved out of the services by always fencing: web models now see
+  `<tool_result name status>` inside the `[SYSTEM_TOOL_RESULT]` message, matching
+  `TOOL_RESULTS_INSTRUCTION`, which the chat already sent them.
+
 **Next session should know:**
+- The 64 Ki UTF-16 capture limit now covers every call in a reply together, not one call.
+- A lone `[` streamed before an array of calls is released as text before the capture starts;
+  the prompt asks for one object per line, so this only affects models that ignore it.
+- Manual check with a linked Qwen account not run here.
+- `pnpm format:check` flags `apps/studio/src/renderer/ui/organisms/NavRail.tsx`; that file was
+  already like that and this task did not touch it.

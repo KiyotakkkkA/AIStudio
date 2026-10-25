@@ -199,7 +199,7 @@ Electron app untouched. TASK_066's CDP client is reused by TASK_046.
 - [x] **TASK_044_EXTRA_1** — Questions to the user: the `chat.ask` bridge, a question gate in the kernel, the answer card
 - [x] **TASK_045** — Attached browser workspace, WebContentsView, session partition
 - [x] **TASK_045_EXTRA_1** — Tool surface consolidation: fewer, non-overlapping model tools and no leaked kernel jobs
-- [ ] **TASK_045_EXTRA_2** — Tool dialects in the web adapters: the injected protocol leaves the service layer
+- [x] **TASK_045_EXTRA_2** — Tool dialects in the web adapters: the injected protocol leaves the service layer
 - [ ] **TASK_045_EXTRA_3** — Chat turn reattach: a reopened chat shows the live turn, its approvals and its questions
 - [ ] **TASK_045_EXTRA_4** — Skill read-first files: required references arrive with `skill.load`, tool names match the wire *(after TASK_045_EXTRA_1)*
 - [ ] **TASK_045_EXTRA_5** — Storage: lean run events, one folder per conversation, disk usage by category *(after TASK_045_EXTRA_3)*

@@ -8,12 +8,12 @@ use zvs_contract::{AppErrorCode, DeltaKind, HostEventDraft, RunOutcomeStatus, Tu
 
 use super::*;
 use crate::drivers::ai::adapters::account_family::AccountAdapterOptions;
-use crate::drivers::ai::injected_tools::{INJECTED_CALL_KEY, with_injected_tools};
 use crate::drivers::ai::mock::{
     MockServer, Recorded, Reply, fixture_frames, fixture_text, search_tool, transport_for,
 };
-use crate::drivers::ai::ports::{ChatMessage, ToolCall};
+use crate::drivers::ai::ports::ChatMessage;
 use crate::drivers::ai::stream_to_events::stream_to_events;
+use crate::drivers::ai::tool_dialect::INJECTED_CALL_KEY;
 use crate::drivers::ai::transport::{AccountTransport, AccountTransportOptions};
 use crate::platform::clock::FakeClock;
 use crate::platform::events::{EventBus, EventBusOptions};
@@ -817,12 +817,9 @@ async fn a_malformed_chat_create_reply_fails_before_any_completion_request_is_ma
 }
 
 #[tokio::test]
-async fn qwen_web_calls_a_tool_through_the_injected_protocol_from_a_recorded_stream() {
+async fn the_qwen_driver_emits_a_native_tool_call_from_a_recorded_injected_stream() {
     let server = qwen_server(fixture_frames("qwenToolCall.sse")).await;
-    let driver = with_injected_tools(
-        Arc::new(adapter(&server)),
-        Some(Arc::new(|| "call_q1".to_owned())),
-    );
+    let driver = qwen_web_driver(options(&server));
     let deltas = drain(driver.stream(
         &GenerateRequest {
             tools: vec![search_tool()],
@@ -832,13 +829,13 @@ async fn qwen_web_calls_a_tool_through_the_injected_protocol_from_a_recorded_str
     ))
     .await
     .expect("streams");
+    let [TextDelta::ToolCall(call)] = deltas.as_slice() else {
+        panic!("one tool call: {deltas:?}");
+    };
+    assert!(call.id.starts_with("call_"));
     assert_eq!(
-        deltas,
-        [TextDelta::ToolCall(ToolCall::new(
-            "call_q1",
-            "docs__search",
-            r#"{"query":"rotate token"}"#
-        ))]
+        (call.name.as_str(), call.arguments.as_str()),
+        ("docs__search", r#"{"query":"rotate token"}"#)
     );
     let sent = server.last_body().to_string();
     assert!(sent.contains("AVAILABLE TOOLS"));

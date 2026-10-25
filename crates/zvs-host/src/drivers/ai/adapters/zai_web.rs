@@ -25,9 +25,10 @@ use crate::drivers::ai::errors::{
 };
 use crate::drivers::ai::ports::{
     ChatMessage, ChatRole, DeltaStream, DiscoveredModel, FinishReason, GenerateRequest,
-    GenerateResult, TextDelta, TextGenerationDriver, TokenUsage,
+    GenerateResult, SharedTextDriver, TextDelta, TextGenerationDriver, TokenUsage,
 };
 use crate::drivers::ai::sse::FrameStream;
+use crate::drivers::ai::tool_dialect::{DefaultDialect, with_tool_dialect};
 use crate::drivers::ai::transport::RequestSpec;
 use crate::platform::logger::LogLevel;
 
@@ -762,6 +763,14 @@ impl TextGenerationDriver for ZaiWebAdapter {
     ) -> Result<Vec<DiscoveredModel>, AppError> {
         self.shared.list_models(cancel).await
     }
+}
+
+pub fn zai_web_driver(options: AccountAdapterOptions) -> SharedTextDriver {
+    with_tool_dialect(
+        Arc::new(ZaiWebAdapter::new(options)),
+        Arc::new(DefaultDialect),
+        None,
+    )
 }
 
 #[cfg(test)]

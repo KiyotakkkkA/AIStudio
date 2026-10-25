@@ -21,9 +21,11 @@ pub use openai_compatible::{
 };
 pub use qwen_web::{
     QWEN_DEFAULT_TIMEOUT_SECONDS, QWEN_WEB_CAPABILITIES, QwenWebAdapter, map_qwen_models,
+    qwen_web_driver,
 };
 pub use zai_web::{
     ZAI_DEFAULT_TIMEOUT_SECONDS, ZAI_WEB_CAPABILITIES, ZaiWebAdapter, map_zai_models,
+    zai_web_driver,
 };
 
 use super::capabilities::AdapterCapabilities;
@@ -119,12 +121,12 @@ impl AdapterFamilyEntry {
                 })
             }
             AdapterFamily::QwenWeb => Ok(AiDriver {
-                text: Some(Arc::new(QwenWebAdapter::new(context.account_options()?))),
+                text: Some(qwen_web_driver(context.account_options()?)),
                 embedding: None,
                 image: None,
             }),
             AdapterFamily::ZaiWeb => Ok(AiDriver {
-                text: Some(Arc::new(ZaiWebAdapter::new(context.account_options()?))),
+                text: Some(zai_web_driver(context.account_options()?)),
                 embedding: None,
                 image: None,
             }),

@@ -242,7 +242,7 @@ in `docs/adr/0001-account-provider-limitations.md`.
 | `errors`           | `http_failure`, `network_failure`, `cancelled`, `timed_out`, `session_expired`, raw text                          |
 | `adapters`         | `openai-compatible`, `ollama`, `local`, `qwen-web`, the family table                                              |
 | `identity`         | Identity probes per account family, `ProbeAccountCredentials`, `AccountCredentialStore`                           |
-| `injected_tools`   | The `zvs_call_tool` prompt protocol and `with_injected_tools`                                                     |
+| `tool_dialect`     | `ToolDialect`, the `zvs_call_tool` prompt protocol, `with_tool_dialect`; web adapters wrap themselves             |
 | `stream_to_events` | Deltas re-emitted as `token` events, ended with the run outcome                                                   |
 | `registry`         | `ProviderRegistry`, `ProviderSource`, `AccountPort`, `DatabaseAccounts`, `UnlinkedAccounts`                       |
 
@@ -497,8 +497,9 @@ The tool loop offers the conversation's picked tools that are enabled, available
 under wire-safe names. It runs at most 4 rounds and 8 calls, then asks for an answer with the
 budget note. Each call is a kernel step `generate.callN` through `StepContext::invoke_tool`, which
 admits it as a model call (`AdmissionOrigin::Model`, the ceiling and the run gate apply, a
-destructive tool needs at least `ask`) and reports approvals to the call record. Native adapters
-get fenced tool results; the injected adapter (Qwen) goes through `with_injected_tools`.
+destructive tool needs at least `ask`) and reports approvals to the call record. Tool results are
+always fenced. Web adapters apply their `ToolDialect` inside the driver and emit native tool-call
+deltas, several per reply, so services never branch on `ToolMode::Injected`.
 `KernelServices` gains `graph` (`GraphNeighbors`) and `VectorSearch` gains `chunks` and
 `related_chunks` behind `has_chunks` / `has_related_chunks`.
 
