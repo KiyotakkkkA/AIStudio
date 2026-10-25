@@ -127,6 +127,19 @@ function plainFields(args: JsonObject): ViewField[] {
   });
 }
 
+function documentView(call: Pick<ChatToolCallDto, "meta">, args: JsonObject): ToolCallView | null {
+  const cited = callCitations(call)?.[0];
+  const document = cited?.sourcePath ?? text(args, "documentId");
+  if (document === null) return null;
+  return {
+    kind: "document",
+    document,
+    section: text(args, "section"),
+    from: count(args, "fromChunk"),
+    to: count(args, "toChunk"),
+  };
+}
+
 function isLanguage(value: string | null): value is CodeLanguage {
   return value !== null && value in LANGUAGE_LABEL;
 }
@@ -139,6 +152,8 @@ export function toolCallView(
   switch (call.key) {
     case "knowledge.search":
     case "vector.search": {
+      if (call.key === "knowledge.search" && text(args, "documentId") !== null)
+        return documentView(call, args);
       const query = text(args, "query");
       if (query === null) return null;
       return {
@@ -149,18 +164,8 @@ export function toolCallView(
         citations: callCitations(call),
       };
     }
-    case "knowledge.read": {
-      const cited = callCitations(call)?.[0];
-      const document = cited?.sourcePath ?? text(args, "documentId");
-      if (document === null) return null;
-      return {
-        kind: "document",
-        document,
-        section: text(args, "section"),
-        from: count(args, "fromChunk"),
-        to: count(args, "toChunk"),
-      };
-    }
+    case "knowledge.read":
+      return documentView(call, args);
     case "fs.list":
       return {
         kind: "folder",

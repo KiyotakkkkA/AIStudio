@@ -260,7 +260,11 @@ impl ScenarioCatalogue {
                     .any(|prefix| node.node_type().starts_with(prefix))
             })
             .fold(Self::builtin(), |catalogue, node| {
-                let tool_key = node.permission().tool_key().map(str::to_owned);
+                let tool_key = node
+                    .permission()
+                    .tool_key()
+                    .filter(|key| !crate::tools::NOT_TOOLS.contains(key))
+                    .map(str::to_owned);
                 catalogue.with(NodeSpec {
                     fills: if tool_key.is_some() {
                         vec![ScenarioSlot::Tool]

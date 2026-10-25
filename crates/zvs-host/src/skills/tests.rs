@@ -292,12 +292,7 @@ fn host_with(drivers: Option<Arc<dyn DriverSource>>) -> Host {
         workspace.join(SKILLS_DIR),
         tools.clone(),
     ));
-    register_skill_nodes(
-        &nodes,
-        &library,
-        SkillScriptOptions::new(None, workspace.join("skill-scripts")),
-    )
-    .expect("registers the skill nodes");
+    register_skill_nodes(&nodes, &library).expect("registers the skill nodes");
     register_kernel_tools(&nodes, &tools).expect("registers the kernel tools");
     let driver = Arc::new(Scripted::default());
     let runs = RunService::new(RunServiceOptions {
@@ -1057,7 +1052,7 @@ async fn skill_load_and_skill_read_serve_the_instructions_and_stay_inside_the_fo
         .expect("skill.load is a tool");
     assert!(load.read_only);
     assert_eq!(load.tier, ToolTier::Auto);
-    assert!(tools.iter().any(|tool| tool.key == SKILL_READ));
+    assert!(tools.iter().all(|tool| tool.key != "skill.read"));
     assert!(tools.iter().all(|tool| tool.key != SKILL_GENERATE));
 }
 
@@ -1084,7 +1079,7 @@ async fn the_chat_catalogue_lists_usable_skills_with_the_wire_tool_names() {
         }]
     );
     let offered = crate::services::chat_tools::offered_tools(
-        &[SKILL_LOAD.to_owned(), SKILL_READ.to_owned()],
+        &[SKILL_LOAD.to_owned(), crate::files::FS_READ.to_owned()],
         &host
             .tools
             .list(&zvs_contract::ToolListFilter::default())
@@ -1092,7 +1087,7 @@ async fn the_chat_catalogue_lists_usable_skills_with_the_wire_tool_names() {
     );
     let text = catalogue_text(&entries, &offered);
     assert!(text.contains("call skill__load with its key"));
-    assert!(text.contains("with skill__read only"));
+    assert!(text.contains("at skill:<key>/<path> only"));
     assert!(text.ends_with(
         "<skills>\n- release-notes: Составляет заметки о выпуске по списку изменений\n</skills>"
     ));

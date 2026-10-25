@@ -123,7 +123,31 @@ impl PermissionService {
             PermissionRequirement::Tool { tool, tier } => {
                 self.admit_subject(tool, context, tier.unwrap_or(ToolTier::Auto))
             }
+            PermissionRequirement::AppFolder { tool } => self.admit_app_folder(tool, context),
         }
+    }
+
+    pub fn admit_app_folder(
+        &self,
+        subject: &str,
+        context: &PermissionContext,
+    ) -> Result<Admission, AppError> {
+        self.database.with_connection(|connection| {
+            let repositories = Repositories::new(connection);
+            let closed = repositories
+                .permissions
+                .tool_ceiling(subject)?
+                .is_some_and(|tool| !tool.enabled || !tool.available || tool.tier == ToolTier::Off);
+            let refused = repositories.permissions.list(subject)?.iter().any(|row| {
+                row.tier == ToolTier::Off
+                    && (row.scope == GLOBAL_SCOPE || context.scopes.contains(&row.scope))
+            });
+            Ok(if closed || refused {
+                Admission::Deny
+            } else {
+                Admission::Allow
+            })
+        })
     }
 
     pub fn admit_subject(

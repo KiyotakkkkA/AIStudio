@@ -32,6 +32,8 @@ use crate::services::SystemService;
 use crate::testing::{TestServices, temporary_directory, test_services};
 use crate::workspace::canonical;
 
+mod roots;
+
 #[derive(Default)]
 struct FakeDisk {
     files: HashMap<String, Vec<u8>>,
@@ -249,6 +251,7 @@ fn read_input_is_capped_at_sixteen_paths() {
             })
             .collect(),
         conversation_id: String::new(),
+        roots_only: false,
     };
     use zvs_contract::Validate;
     assert!(input(READ_PATHS_MAX).validate().is_ok());

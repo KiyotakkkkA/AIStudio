@@ -1055,7 +1055,14 @@ async fn a_turn_lists_the_skills_and_offers_skill_load_even_when_the_conversatio
     offered.sort_unstable();
     assert_eq!(
         offered,
-        ["ask_user", "skill__load", "skill__read", "skill__script"]
+        [
+            "ask_user",
+            "fs__apply",
+            "fs__list",
+            "fs__read",
+            "shell__run",
+            "skill__load"
+        ]
     );
     let system = requests[0].system.clone().unwrap_or_default();
     assert!(system.contains("call skill__load with its key"), "{system}");

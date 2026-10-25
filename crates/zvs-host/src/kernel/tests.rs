@@ -1200,9 +1200,7 @@ fn typed_nodes_publish_json_schema_for_tool_exposure() {
             ("vector.search".to_owned(), false),
             ("vector.list".to_owned(), false),
             ("vector.index".to_owned(), true),
-            ("knowledge.list".to_owned(), false),
             ("knowledge.search".to_owned(), false),
-            ("knowledge.read".to_owned(), false),
             ("flow.branch".to_owned(), false),
             ("flow.map".to_owned(), false),
             ("job.run".to_owned(), true),
@@ -1227,7 +1225,12 @@ fn typed_nodes_publish_json_schema_for_tool_exposure() {
         json!(["condition", "then", "else"])
     );
     let knowledge = registry.resolve("knowledge.search").expect("a node");
-    assert_eq!(knowledge.input_schema()["required"], json!(["query"]));
+    assert_eq!(knowledge.input_schema()["required"], Value::Null);
+    assert!(
+        knowledge.input_schema()["properties"]
+            .get("documentId")
+            .is_some()
+    );
     assert!(
         knowledge.input_schema()["properties"]
             .get("scope")

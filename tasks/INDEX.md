@@ -198,7 +198,7 @@ Electron app untouched. TASK_066's CDP client is reused by TASK_046.
 - [x] **TASK_044** — Document viewer dock and selection → chat
 - [x] **TASK_044_EXTRA_1** — Questions to the user: the `chat.ask` bridge, a question gate in the kernel, the answer card
 - [x] **TASK_045** — Attached browser workspace, WebContentsView, session partition
-- [ ] **TASK_045_EXTRA_1** — Tool surface consolidation: fewer, non-overlapping model tools and no leaked kernel jobs
+- [x] **TASK_045_EXTRA_1** — Tool surface consolidation: fewer, non-overlapping model tools and no leaked kernel jobs
 - [ ] **TASK_045_EXTRA_2** — Tool dialects in the web adapters: the injected protocol leaves the service layer
 - [ ] **TASK_045_EXTRA_3** — Chat turn reattach: a reopened chat shows the live turn, its approvals and its questions
 - [ ] **TASK_045_EXTRA_4** — Skill read-first files: required references arrive with `skill.load`, tool names match the wire *(after TASK_045_EXTRA_1)*
@@ -320,7 +320,7 @@ you can settle the load-bearing ones early rather than being interrupted mid-tas
 | TASK_038 (resolved) | React Flow now, revisit if it fights the design (option c). The graph lives in our own model (`graphModel.ts` reducers, `ScenarioEditor`); React Flow only renders it, so a hand-rolled canvas stays open. | **no** |
 | TASK_040 (resolved) | Option (a): 25 steps, 200 000 tokens, 15 minutes; exhaustion pauses the session and `agentic.extend` continues it. The three limits are read from settings (`agentic.budget.maxSteps`, `maxTokens`, `maxMinutes`) for TASK_052 to expose. | yes |
 | TASK_043 (superseded by ADR 0003) | LibreOffice integration removed in TASK_044 after the managed copy crashed on almost every conversion. Office documents render in the renderer (docx-preview, an OOXML sheet reader, slide text). «Компоненты» holds Node.js and uv. | moderate |
-| TASK_045_EXTRA_1 | Merge `chat.file`, `skill.read` and `skill.script` into `fs.*` / `shell.run` through virtual roots: all three, only the read-only merge, or none (fallback: none — only the leaked jobs and knowledge duplicates go)? | yes |
+| TASK_045_EXTRA_1 (resolved) | Option (a), all three: `chat.file` → `fs.*` on `chat:`, `skill.read` → `fs.read` on `skill:<key>/`, `skill.script` → `shell.run` with `argv[0] = skill:<key>/scripts/<file>`. The tier of a `chat:` or `skill:` call is decided in the permission resolver (`AppFolder`). | yes |
 | TASK_045_EXTRA_5 | Existing chat folders and artifacts: migrate to `conversations/<id>/…` on first start, new layout for new conversations only, or skip the layout and do events and usage only (fallback)? | **no** — moves user data |
 | TASK_049 | Does mail send automatically once approved, or per message? | yes |
 | TASK_050 | Telegram: bot account, or your personal account? | **no** |

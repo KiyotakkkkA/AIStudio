@@ -41,6 +41,9 @@ pub enum PermissionRequirement {
         tool: String,
         tier: Option<ToolTier>,
     },
+    AppFolder {
+        tool: String,
+    },
 }
 
 impl PermissionRequirement {
@@ -58,10 +61,14 @@ impl PermissionRequirement {
         }
     }
 
+    pub fn app_folder(tool: impl Into<String>) -> Self {
+        Self::AppFolder { tool: tool.into() }
+    }
+
     pub fn tool_key(&self) -> Option<&str> {
         match self {
             Self::None => None,
-            Self::Tool { tool, .. } => Some(tool),
+            Self::Tool { tool, .. } | Self::AppFolder { tool } => Some(tool),
         }
     }
 }

@@ -479,7 +479,10 @@ Core concepts:
 - **Per-input permission** — admission (graph steps and model tool calls alike) asks
   `permission_for(input)`, so one call of a tool can need a stricter minimum tier than
   another; `fs.apply` asks at least `ask` when its batch deletes a file. The ceiling still
-  applies on top, and `off` still denies.
+  applies on top, and `off` still denies. A call that touches only the app's own folders
+  (`chat:`, `skill:<key>/`) returns `PermissionRequirement::AppFolder`, and the permission
+  service resolves it to allow unless the tool is disabled or `off`; an explicit `ask` minimum
+  (an agentic session in `ask` mode) still turns it into an approval.
 - **Deferred approval** — a node with `defers_approval()` does not suspend at admission. When
   the tier says `ask`, admission hands it a ticket on the `StepContext` instead, and the node
   raises one approval itself once it can show what it is about to do (`fs.apply`: the combined
@@ -672,7 +675,13 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
 - **File tools** (`zvs-host/src/files/`, TASK_036_EXTRA_2) are offered in every chat whose
   model can call tools: `fs.list`, `fs.read`, `fs.search` (`auto`, side-effect free, output
   fenced) and `fs.apply` (`ask` by default). Each resolves its paths through `FolderAccessService`
-  and acts on the canonical path, never the model's spelling. `.gitignore` is honoured by
+  and acts on the canonical path, never the model's spelling. Two virtual roots
+  (`files/roots.rs`, TASK_045_EXTRA_1) bypass folder access: `chat:` is the conversation's
+  file folder (below) and `skill:<key>/` a usable skill's folder, read-only — `fs.apply` and a
+  `shell.run` cwd refuse it. Every segment under a root is checked (no `..`, hidden, drive or
+  reserved names) and the resolved path must stay inside the root. `chat:` changes skip the
+  read-before-write rule and the diff approval; a batch that mixes roots and real paths is
+  approved as one diff. `.gitignore` is honoured by
   listings and search; links are not followed. `fs.apply` takes 1–32 changes (`write`, `edit`,
   `move`, `delete`, ≤ 1 MiB of text), plans them in memory over the disk, refuses the whole
   batch on any forbidden or escaping path, on a binary or non-UTF-8 target, or on a file this
@@ -688,14 +697,16 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File`) and `shell.run`
   (an argument vector, never a shell string; `argv[0]` resolved through the connected toolchain
   folders first, then `PATH`; cwd is the working folder or a `cwd` that goes through
-  `ensure_access`, and with neither the call is refused). Both are destructive with a minimum
+  `ensure_access`, and with neither the call is refused; `argv[0] = skill:<key>/scripts/<file>`
+  runs a skill script through uv (`.py`) or Node.js (`.js`, `.mjs`, `.cjs`) with
+  `ZVS_SKILL_DIR`, in `chat:` by default). Both are destructive with a minimum
   tier of `ask` through `permission_for`, so `auto` still asks and `off` denies; each raises one
   `kind: "process"` approval showing the program, the cwd, the full source or argv and the
   package list. Folder grants do **not** limit them: the process runs with the user's rights
-  and there is no sandbox. `skill.script`, `code.run` and `shell.run` share one runner
+  and there is no sandbox. `code.run` and `shell.run` share one runner
   (`toolchain/process.rs`): scratch folders, a timeout, kill-tree on cancel, capped streams and
   fenced output.
-- **Created files** (`zvs-host/src/artifacts.rs`, TASK_043). After `skill.script` runs, the
+- **Created files** (`zvs-host/src/artifacts.rs`, TASK_043). After a skill script runs, the
   documents it created or changed in its scratch folder (and paths named in its arguments) are
   copied to `<app data>/artifacts/<runId>/` and reported in the tool call's `meta.artifacts`
   (`ArtifactDto`, id `<runId>/<name>`). The chat shows each as a card with «Скачать»
@@ -703,7 +714,7 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   resolve outside the artifact folder.
 - **Artifact libraries and pages.** A library is a named app folder whose files are reported
   in place instead of copied: `dashboards` (`<app data>/dashboards/`, id `dashboards/<name>`).
-  `skill.script` passes each library to the script as `ZVS_<NAME>_DIR` and reports the files
+  A skill script gets each library as `ZVS_<NAME>_DIR`, and `shell.run` reports the files
   the run created or changed directly in it; ids never resolve into subfolders or outside.
   Agentic sessions show the same cards, taken from the tool steps' output.
   `artifacts.browsers` lists the browsers registered under `StartMenuInternet` whose program
@@ -718,12 +729,12 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
 - **Chat working folder** (`zvs-host/src/chat_files.rs`). Each conversation, and each agentic
   session, owns `<app data>/artifacts/chats/<id>/`, created on first use and removed with the
   conversation or session. It is the one app folder an agent reaches without a grant: in a
-  chat or session `skill.script` runs with it as the working directory and `ZVS_CHAT_DIR`
-  (other callers keep the per-run scratch folder), and `chat.file` writes, reads and lists text
-  files in it with tier `auto` by default. `chat.file` is offered automatically wherever
-  `skill.script` is, and nowhere else. The host resolves every `chat.file` path inside the
-  folder (relative only; no `..`, drive, hidden or reserved names), caps a file at 1 MiB and the
-  folder at 200 MB and 1000 files, and writes through a temporary file. Names whose path has a
+  chat or session a skill script runs with it as the working directory and `ZVS_CHAT_DIR`
+  (other callers keep the per-run scratch folder), and the file tools reach it as `chat:`
+  without an approval. When a skill matches a turn, the chat adds `skill.load`, `fs.read`,
+  `fs.list`, `fs.apply` and `shell.run` for that turn; the ones the user did not enable are
+  limited to `chat:` and `skill:` paths (`rootsOnly`). The folder is capped at 200 MB and
+  1000 files, and writes go through `fs.apply`'s temporary files. Names whose path has a
   segment starting with `_` are working files: they never become artifact cards. Other
   documents a script creates there are reported like scratch results (copied to
   `<app data>/artifacts/<runId>/`). Nothing in the folder is ever opened or run by the host.

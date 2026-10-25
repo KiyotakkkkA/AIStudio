@@ -47,8 +47,7 @@ use super::retrieval_merge::{CHAT_FETCH_K, MergeOptions, StoreHits, merge_retrie
 use super::retrieval_query::retrieval_query;
 use super::runs::RunService;
 use super::vector_stores::VectorSearchOptions;
-use crate::chat_files::CHAT_FILE;
-use crate::commands::PROCESS_TOOLS;
+use crate::commands::{PROCESS_TOOLS, SHELL_RUN};
 use crate::data::repositories::{ConversationPatch, MessagePatch, ProviderFilter, RunPatch};
 use crate::data::schema::{ConversationRow, FolderGrantRow, MessageRow};
 use crate::data::{DataError, Database, Repositories};
@@ -56,9 +55,7 @@ use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::ai::with_injected_tools;
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta, ToolCall};
 use crate::files::FILE_TOOLS;
-use crate::kernel::knowledge_nodes::{
-    KNOWLEDGE_READ, KNOWLEDGE_SEARCH, KNOWLEDGE_TOOLS, KnowledgeReadOutput, KnowledgeSearchOutput,
-};
+use crate::kernel::knowledge_nodes::{KNOWLEDGE_SEARCH, KNOWLEDGE_TOOLS, KnowledgeResult};
 use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateOutput, GenerateRole};
 use crate::kernel::{
     ApprovalDecision, NodeDef, NodeRegistry, PermissionRequirement, QuestionOutcome, RunObserver,
@@ -68,10 +65,8 @@ use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 use crate::services::mcp::{RESOURCE_READER, tool_key};
-use crate::skills::{SKILL_LOAD, SKILL_SCRIPT, SKILL_TOOLS, SkillCatalogue, catalogue_text};
-
-pub const CHAT_SCOPED_TOOLS: [&str; 2] = [SKILL_SCRIPT, CHAT_FILE];
-use crate::tools::ToolRegistry;
+use crate::skills::{SKILL_LOAD, SKILL_TOOLS, SkillCatalogue, catalogue_text};
+use crate::tools::{ToolRegistry, model_tool};
 use crate::workspace::{FolderAccessService, ForbiddenFolders, folder_access};
 use zvs_contract::mcp::MCP_INSTRUCTIONS_MAX;
 use zvs_contract::{BindFolderInput, BindFolderResultDto};
@@ -126,7 +121,7 @@ pub const WORKING_FOLDER_CHANGED: &str = "The working folder changed since the p
 pub const FILE_TOOLS_HEADING: &str = "File tools";
 pub const PROCESS_TOOLS_HEADING: &str = "Process tools";
 pub const PROCESS_TOOLS_RULES: &str = "Use the code tool for a quick computation or conversion, and the shell tool to run the project's own build and test commands, then read their output to check a change. The user approves every run after seeing the full source or command. Pass a command as an argument vector, not a shell string: there are no pipes, redirections or glob expansion. Servers, background processes and interactive input are not supported, and each run has a time limit.";
-pub const FILE_TOOLS_RULES: &str = "Read a file with the read tool in this turn before you change it; a change to a file that was not read, or that changed since it was read, is refused. Put every change of one task into a single apply call, so the user reviews and applies it as one diff. Paths may be absolute; relative paths resolve against the working folder.";
+pub const FILE_TOOLS_RULES: &str = "Read a file with the read tool in this turn before you change it; a change to a file that was not read, or that changed since it was read, is refused. Put every change of one task into a single apply call, so the user reviews and applies it as one diff. Paths may be absolute; relative paths resolve against the working folder. A path that starts with chat: is in this conversation's own file folder, which needs neither a prior read nor approval; skill:<key>/ paths are read-only skill folders.";
 
 pub struct ChatServiceOptions {
     pub database: Arc<Database>,
@@ -233,7 +228,11 @@ pub fn working_folder_section(folder: Option<&str>, previous: Option<Option<&str
 pub fn file_tools_section(offered: &[OfferedTool]) -> String {
     let names: Vec<&str> = FILE_TOOLS
         .iter()
-        .filter_map(|key| offered.iter().find(|tool| tool.key == *key))
+        .filter_map(|key| {
+            offered
+                .iter()
+                .find(|tool| tool.key == *key && !tool.roots_only)
+        })
         .map(|tool| tool.name.as_str())
         .collect();
     if names.is_empty() {
@@ -248,7 +247,11 @@ pub fn file_tools_section(offered: &[OfferedTool]) -> String {
 pub fn process_tools_section(offered: &[OfferedTool]) -> String {
     let names: Vec<&str> = PROCESS_TOOLS
         .iter()
-        .filter_map(|key| offered.iter().find(|tool| tool.key == *key))
+        .filter_map(|key| {
+            offered
+                .iter()
+                .find(|tool| tool.key == *key && !tool.roots_only)
+        })
         .map(|tool| tool.name.as_str())
         .collect();
     if names.is_empty() {
@@ -1141,15 +1144,22 @@ impl NodeDef for PrepareNode {
             (Some(skills), true) => skills.catalogue(&user.content, &context.cancel).await,
             _ => Vec::new(),
         };
+        let mut automatic: Vec<&str> = Vec::new();
         if !skill_entries.is_empty() {
-            for key in SKILL_TOOLS.into_iter().chain([CHAT_FILE]) {
+            for key in SKILL_TOOLS {
                 if !enabled.iter().any(|known| known == key) {
                     enabled.push(key.to_owned());
+                    automatic.push(key);
                 }
             }
         }
+        enabled.retain(|key| model_tool(key));
         let guidance = inner.mcp_guidance(&mut enabled, &registered)?;
         let mut offered = offered_tools(&enabled, &registered);
+        for tool in &mut offered {
+            tool.roots_only = automatic.contains(&tool.key.as_str())
+                && (FILE_TOOLS.contains(&tool.key.as_str()) || tool.key == SHELL_RUN);
+        }
         let skill_note =
             if !skill_entries.is_empty() && offered.iter().any(|tool| tool.key == SKILL_LOAD) {
                 catalogue_text(&skill_entries, &offered)
@@ -1413,19 +1423,10 @@ struct CallOutcome {
     compact: Option<String>,
 }
 
-fn knowledge_text(
-    key: &str,
-    output: &Value,
-    book: &mut Vec<ChatCitationDto>,
-) -> Option<KnowledgeText> {
-    match key {
-        KNOWLEDGE_SEARCH => serde_json::from_value::<KnowledgeSearchOutput>(output.clone())
-            .ok()
-            .map(|output| search_result_text(&output, book)),
-        KNOWLEDGE_READ => serde_json::from_value::<KnowledgeReadOutput>(output.clone())
-            .ok()
-            .map(|output| read_result_text(&output, book)),
-        _ => None,
+fn knowledge_text(output: &Value, book: &mut Vec<ChatCitationDto>) -> Option<KnowledgeText> {
+    match serde_json::from_value::<KnowledgeResult>(output.clone()).ok()? {
+        KnowledgeResult::Search(output) => Some(search_result_text(&output, book)),
+        KnowledgeResult::Read(output) => Some(read_result_text(&output, book)),
     }
 }
 
@@ -1668,11 +1669,11 @@ impl GenerateChatNode {
         if knowledge {
             fields.insert("scope".to_owned(), json!(options.scope));
         }
-        if FILE_TOOLS.contains(&tool.key.as_str())
-            || PROCESS_TOOLS.contains(&tool.key.as_str())
-            || CHAT_SCOPED_TOOLS.contains(&tool.key.as_str())
-        {
+        if FILE_TOOLS.contains(&tool.key.as_str()) || PROCESS_TOOLS.contains(&tool.key.as_str()) {
             fields.insert("conversationId".to_owned(), json!(options.conversation));
+        }
+        if tool.roots_only {
+            fields.insert("rootsOnly".to_owned(), json!(true));
         }
         let observer_inner = Arc::clone(inner);
         let observer_context = context.clone();
@@ -1724,7 +1725,7 @@ impl GenerateChatNode {
                 if knowledge {
                     let formatted = {
                         let mut book = options.book.lock().unwrap_or_else(PoisonError::into_inner);
-                        knowledge_text(&tool.key, &result.output, &mut book)
+                        knowledge_text(&result.output, &mut book)
                             .map(|formatted| (formatted, book.clone()))
                     };
                     if let Some((formatted, citations)) = formatted {

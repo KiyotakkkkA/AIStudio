@@ -49,10 +49,12 @@ test("knowledge calls are summarised by their query and what was found", () => {
     ),
   ).toBe("«leave policy» · найдено фрагментов: 1");
   expect(
-    toolCallSummary(knowledgeCall("knowledge.read", { documentId: "d", section: "Отпуск" })),
+    toolCallSummary(knowledgeCall("knowledge.search", { documentId: "d", section: "Отпуск" })),
   ).toBe("раздел «Отпуск»");
   expect(
-    toolCallSummary(knowledgeCall("knowledge.read", { documentId: "d", fromChunk: 0, toChunk: 3 })),
+    toolCallSummary(
+      knowledgeCall("knowledge.search", { documentId: "d", fromChunk: 0, toChunk: 3 }),
+    ),
   ).toBe("фрагменты 1–4");
   expect(toolCallSummary(knowledgeCall("demo.lookup", { q: "x" }))).toBe('{"q":"x"}');
 });

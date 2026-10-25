@@ -3,13 +3,13 @@ name: docx
 description: "Работа с документами Word (.docx): чтение текста, заголовков и таблиц по страницам, сведения о документе, извлечение и удаление частей документа (титульный лист, страницы, разделы) с сохранением оформления, проверка форматирования и сравнение с исходным файлом, создание нового документа из Markdown, замена текста и заполнение шаблонов с полями {{…}}, правка разметки OOXML. Используется, когда в запросе есть файл .docx или результат нужен в виде документа Word."
 metadata:
   display-name: Word
-  version: "1.0.0"
+  version: "1.1.0"
   author: ZVS AI Studio
 ---
 
 # Word (.docx)
 
-Work with Word documents through the scripts in `scripts/`. Every script is a Python file run with `skill.script`; dependencies are declared inside each script and installed on first use. `scripts/_blocks.py` is a shared module the scripts import, not a script to run. Pass file paths as absolute paths. A relative output path lands in the run's scratch folder, so always write results to the absolute path the user named, or next to the input file when they did not name one, and report that path. Never overwrite the input.
+Work with Word documents through the scripts in `scripts/`. Every script is a Python file run with `shell.run`, its path as the first argument (`argv: ["skill:docx/scripts/<file>", …]`); dependencies are declared inside each script and installed on first use. `scripts/_blocks.py` is a shared module the scripts import, not a script to run. Pass file paths as absolute paths. A relative output path lands in the run's scratch folder, so always write results to the absolute path the user named, or next to the input file when they did not name one, and report that path. Never overwrite the input.
 
 Output on stdout is capped at 64 KiB. Read long documents in slices.
 

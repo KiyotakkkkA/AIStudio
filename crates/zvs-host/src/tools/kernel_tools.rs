@@ -3,27 +3,21 @@ use std::collections::BTreeMap;
 use zvs_contract::{AppError, ToolDto, ToolSource, ToolTier};
 
 use super::registry::{ToolDescriptor, ToolRegistry};
-use crate::chat_files::{CHAT_FILE, CHAT_FILE_DESCRIPTION};
 use crate::commands::nodes::{CODE_DESCRIPTION, CODE_RUN, SHELL_DESCRIPTION, SHELL_RUN};
 use crate::files::nodes::{
     APPLY_DESCRIPTION as FS_APPLY_DESCRIPTION, FS_APPLY, FS_LIST, FS_READ, FS_SEARCH,
     LIST_DESCRIPTION as FS_LIST_DESCRIPTION, READ_DESCRIPTION as FS_READ_DESCRIPTION,
     SEARCH_DESCRIPTION as FS_SEARCH_DESCRIPTION,
 };
-use crate::kernel::knowledge_nodes::{
-    KNOWLEDGE_LIST, KNOWLEDGE_READ, KNOWLEDGE_SEARCH, LIST_DESCRIPTION, READ_DESCRIPTION,
-    SEARCH_DESCRIPTION,
-};
+use crate::kernel::knowledge_nodes::{KNOWLEDGE_SEARCH, SEARCH_DESCRIPTION};
 use crate::kernel::{NodeRegistry, PermissionRequirement};
 use crate::skills::nodes::{
-    LOAD_DESCRIPTION as SKILL_LOAD_DESCRIPTION, READ_DESCRIPTION as SKILL_READ_DESCRIPTION,
-    SAVE_DESCRIPTION as SKILL_SAVE_DESCRIPTION, SKILL_LOAD, SKILL_READ, SKILL_SAVE,
+    LOAD_DESCRIPTION as SKILL_LOAD_DESCRIPTION, SAVE_DESCRIPTION as SKILL_SAVE_DESCRIPTION,
+    SKILL_LOAD, SKILL_SAVE,
 };
-use crate::skills::script::{SCRIPT_DESCRIPTION as SKILL_SCRIPT_DESCRIPTION, SKILL_SCRIPT};
 
-const NOT_TOOLS: &[&str] = &["llm.generate"];
+pub const NOT_TOOLS: &[&str] = &["llm.generate", "vector.index", "job.run", "download.fetch"];
 const ASK_BY_DEFAULT: &[&str] = &[FS_APPLY];
-const AUTO_BY_DEFAULT: &[&str] = &[CHAT_FILE];
 
 struct BuiltinToolMeta {
     display_name: &'static str,
@@ -57,22 +51,6 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
         },
     ),
     (
-        KNOWLEDGE_READ,
-        BuiltinToolMeta {
-            display_name: "knowledge.read",
-            description: READ_DESCRIPTION,
-            destructive: false,
-        },
-    ),
-    (
-        KNOWLEDGE_LIST,
-        BuiltinToolMeta {
-            display_name: "knowledge.list",
-            description: LIST_DESCRIPTION,
-            destructive: false,
-        },
-    ),
-    (
         SKILL_LOAD,
         BuiltinToolMeta {
             display_name: "skill.load",
@@ -81,35 +59,11 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
         },
     ),
     (
-        SKILL_READ,
-        BuiltinToolMeta {
-            display_name: "skill.read",
-            description: SKILL_READ_DESCRIPTION,
-            destructive: false,
-        },
-    ),
-    (
-        SKILL_SCRIPT,
-        BuiltinToolMeta {
-            display_name: "skill.script",
-            description: SKILL_SCRIPT_DESCRIPTION,
-            destructive: true,
-        },
-    ),
-    (
         SKILL_SAVE,
         BuiltinToolMeta {
             display_name: "skill.save",
             description: SKILL_SAVE_DESCRIPTION,
             destructive: true,
-        },
-    ),
-    (
-        CHAT_FILE,
-        BuiltinToolMeta {
-            display_name: "chat.file",
-            description: CHAT_FILE_DESCRIPTION,
-            destructive: false,
         },
     ),
     (
@@ -160,31 +114,43 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
             destructive: true,
         },
     ),
-    (
-        "vector.index",
-        BuiltinToolMeta {
-            display_name: "vector.index",
-            description: "Индексация источников хранилища: извлечение текста, нарезка и эмбеддинги.",
-            destructive: false,
-        },
-    ),
-    (
-        "download.fetch",
-        BuiltinToolMeta {
-            display_name: "download.fetch",
-            description: "Загрузка файла из очереди загрузок с докачкой и проверкой контрольной суммы.",
-            destructive: false,
-        },
-    ),
-    (
-        "job.run",
-        BuiltinToolMeta {
-            display_name: "job.run",
-            description: "Запуск задания в сайдкаре с передачей прогресса в поток выполнения.",
-            destructive: false,
-        },
-    ),
 ];
+
+pub const GRAPH_ONLY_TOOLS: &[&str] = &["vector.search", "vector.list"];
+
+const RENAMED_TOOLS: &[(&str, &[&str])] = &[
+    ("chat.file", &[FS_READ, FS_LIST, FS_APPLY]),
+    ("skill.read", &[FS_READ]),
+    ("skill.script", &[SHELL_RUN]),
+    ("knowledge.read", &[KNOWLEDGE_SEARCH]),
+    ("knowledge.list", &[KNOWLEDGE_SEARCH]),
+    ("vector.index", &[]),
+    ("job.run", &[]),
+    ("download.fetch", &[]),
+];
+
+pub fn current_tool_keys(keys: &[String]) -> Vec<String> {
+    let mut current: Vec<String> = Vec::with_capacity(keys.len());
+    for key in keys {
+        let renamed = RENAMED_TOOLS
+            .iter()
+            .find(|(old, _)| old == key)
+            .map_or_else(
+                || vec![key.clone()],
+                |(_, new)| new.iter().map(|key| (*key).to_owned()).collect(),
+            );
+        for key in renamed {
+            if !current.contains(&key) {
+                current.push(key);
+            }
+        }
+    }
+    current
+}
+
+pub fn model_tool(key: &str) -> bool {
+    !GRAPH_ONLY_TOOLS.contains(&key) && !NOT_TOOLS.contains(&key)
+}
 
 fn meta(key: &str) -> Option<&'static BuiltinToolMeta> {
     BUILTIN
@@ -217,13 +183,9 @@ pub fn register_kernel_tools(
             input_schema: node.input_schema().clone(),
             read_only: node.side_effect_free() && previous,
             destructive: meta.is_some_and(|meta| meta.destructive),
-            tier: if AUTO_BY_DEFAULT.contains(&key.as_str()) {
-                Some(ToolTier::Auto)
-            } else {
-                (meta.is_some_and(|meta| meta.destructive)
-                    || ASK_BY_DEFAULT.contains(&key.as_str()))
-                .then_some(ToolTier::Ask)
-            },
+            tier: (meta.is_some_and(|meta| meta.destructive)
+                || ASK_BY_DEFAULT.contains(&key.as_str()))
+            .then_some(ToolTier::Ask),
             ..ToolDescriptor::new(key.clone(), ToolSource::Builtin)
         })?;
         if !order.contains(key) {

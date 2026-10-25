@@ -5,7 +5,7 @@ Numbers in documents come as tables or as figures inside text. Extract them with
 ## Tables in a PDF
 
 ```
-skill.script  key: pdf   path: scripts/extract_tables.py   args: ["C:/docs/report.pdf", "--pages", "3-5", "--format", "csv", "--out-dir", "C:/Reports/data/report_tables"]
+shell.run  argv: ["skill:pdf/scripts/extract_tables.py", "C:/docs/report.pdf", "--pages", "3-5", "--format", "csv", "--out-dir", "C:/Reports/data/report_tables"]
 ```
 
 - Each table becomes one CSV file in the folder. Add `--text-strategy` for tables drawn without ruling lines.
@@ -20,7 +20,7 @@ Extract the text of the relevant pages with `extract_text.py --pages …`, read 
 ## Word documents
 
 ```
-skill.script  key: docx  path: scripts/docx_to_markdown.py  args: ["C:/docs/report.docx", "--with-index"]
+shell.run  argv: ["skill:docx/scripts/docx_to_markdown.py", "C:/docs/report.docx", "--with-index"]
 ```
 
 Tables come out as Markdown tables; copy the needed ones into a CSV with `fs.apply` (keep headers, convert `1 234,5` to `1234.5`). For a long document, page through with `--start` and `--limit`.

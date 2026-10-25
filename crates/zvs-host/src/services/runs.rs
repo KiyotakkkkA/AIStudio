@@ -101,6 +101,46 @@ struct Gate {
 }
 
 impl Gate {
+    fn check_enabled(&self, tool: &str) -> Result<(), AppError> {
+        if let Some(tools) = &self.tools
+            && tools
+                .ceiling(tool)?
+                .is_some_and(|ceiling| !ceiling.enabled || !ceiling.available)
+        {
+            return Err(AppError::new(
+                AppErrorCode::PermissionDenied,
+                "Tool disabled",
+            ));
+        }
+        Ok(())
+    }
+
+    fn admit_app_folder(
+        &self,
+        tool: &str,
+        context: &StepContext,
+        origin: AdmissionOrigin,
+    ) -> Result<(), AppError> {
+        let run = read_run(&self.database, &context.run_id.to_string())?;
+        if origin == AdmissionOrigin::Model && !run.graph.allows_tool(tool) {
+            return Err(
+                AppError::new(AppErrorCode::PermissionDenied, OUTSIDE_ALLOWED_TOOLS)
+                    .with_detail("key", tool),
+            );
+        }
+        self.check_enabled(tool)?;
+        match self
+            .permissions
+            .admit_app_folder(tool, &permission_context(&run))?
+        {
+            Admission::Deny => Err(AppError::new(
+                AppErrorCode::PermissionDenied,
+                "Permission denied",
+            )),
+            Admission::Allow | Admission::Ask => Ok(()),
+        }
+    }
+
     async fn admit_tool(
         &self,
         tool: String,
@@ -129,26 +169,8 @@ impl Gate {
                 return Ok(());
             }
         }
-        if let Some(tools) = &self.tools
-            && tools
-                .ceiling(&tool)?
-                .is_some_and(|ceiling| !ceiling.enabled || !ceiling.available)
-        {
-            return Err(AppError::new(
-                AppErrorCode::PermissionDenied,
-                "Tool disabled",
-            ));
-        }
-        let mut scopes = run.graph.permission_scopes().to_vec();
-        if run.kind == RunKind::Scenario
-            && let Some(subject) = &run.subject_id
-        {
-            scopes.push(format!("scenario:{subject}"));
-        }
-        let permission = PermissionContext {
-            run_id: run.id.clone(),
-            scopes,
-        };
+        self.check_enabled(&tool)?;
+        let permission = permission_context(&run);
         let minimum = tier.unwrap_or(ToolTier::Auto);
         match self
             .permissions
@@ -188,6 +210,19 @@ impl Gate {
                 Ok(())
             }
         }
+    }
+}
+
+fn permission_context(run: &RunRow) -> PermissionContext {
+    let mut scopes = run.graph.permission_scopes().to_vec();
+    if run.kind == RunKind::Scenario
+        && let Some(subject) = &run.subject_id
+    {
+        scopes.push(format!("scenario:{subject}"));
+    }
+    PermissionContext {
+        run_id: run.id.clone(),
+        scopes,
     }
 }
 
@@ -314,6 +349,13 @@ impl RunService {
                         PermissionRequirement::None => Ok(()),
                         PermissionRequirement::Tool { tool, tier } => {
                             gate.admit_tool(tool.clone(), tier, context, origin).await?;
+                            if let Some(tools) = &gate.tools {
+                                tools.record_use(&tool, gate.clock.now())?;
+                            }
+                            Ok(())
+                        }
+                        PermissionRequirement::AppFolder { tool } => {
+                            gate.admit_app_folder(&tool, &context, origin)?;
                             if let Some(tools) = &gate.tools {
                                 tools.record_use(&tool, gate.clock.now())?;
                             }

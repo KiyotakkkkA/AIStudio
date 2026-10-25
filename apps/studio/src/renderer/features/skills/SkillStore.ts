@@ -36,7 +36,7 @@ export type PendingIntent =
   | { readonly kind: "select"; readonly id: SkillId }
   | { readonly kind: "duplicate" };
 
-const MANAGED_TOOLS: readonly string[] = ["skill.load", "skill.read", "skill.script"];
+const MANAGED_TOOLS: readonly string[] = ["skill.load"];
 
 export interface ToolRow {
   readonly key: string;

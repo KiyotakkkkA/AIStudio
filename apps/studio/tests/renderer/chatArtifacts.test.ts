@@ -27,10 +27,10 @@ const artifact = (name: string, sizeBytes = 2048) => ({
 const call = (status: string, meta: unknown) =>
   ChatToolCallDto.parse({
     id: "call_1",
-    key: "skill.script",
-    name: "skill__script",
+    key: "shell.run",
+    name: "shell__run",
     round: 0,
-    arguments: { key: "docx", path: "scripts/build.py" },
+    arguments: { argv: ["skill:docx/scripts/build.py"] },
     status,
     meta,
   });

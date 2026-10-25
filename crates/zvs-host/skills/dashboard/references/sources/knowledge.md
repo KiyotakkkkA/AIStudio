@@ -4,9 +4,9 @@ The app's knowledge stores hold documents split into fragments. They are good fo
 
 ## Collect
 
-1. `knowledge.list` shows the stores attached to the conversation and their documents.
+1. The system message lists the stores attached to the conversation and their documents.
 2. `knowledge.search` with short, specific queries, one per fact type: «сумма договора», «дата подписания», «штраф за просрочку». Repeat with other wordings until new searches return nothing new.
-3. `knowledge.read` the documents that matter in full when a fragment is cut off or a table spans fragments.
+3. Read the documents that matter in full when a fragment is cut off or a table spans fragments: `knowledge.search` with a passage's `documentId` and its `section` (or `fromChunk`–`toChunk`) instead of `query`.
 4. When a store holds the original files (spreadsheets, PDFs) and their paths are known, read the files themselves (see `files.md` and `documents.md`) — that is complete where search is not.
 
 ## Record

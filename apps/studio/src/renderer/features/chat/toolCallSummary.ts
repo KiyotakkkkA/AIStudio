@@ -24,20 +24,25 @@ function field(value: Json, name: string): Json | undefined {
     : undefined;
 }
 
+function isDocumentRead(call: ChatToolCallDto): boolean {
+  const document = field(call.arguments, "documentId");
+  return call.key === "knowledge.search" && typeof document === "string" && document.length > 0;
+}
+
 function foundCount(call: ChatToolCallDto): number | null {
   const citations = field(call.meta, "citations");
   return Array.isArray(citations) ? citations.length : null;
 }
 
 export function toolCallSummary(call: ChatToolCallDto): string {
-  if (call.key === "knowledge.search") {
+  if (call.key === "knowledge.search" && !isDocumentRead(call)) {
     const query = field(call.arguments, "query");
     if (typeof query === "string") {
       const found = foundCount(call);
       return found === null ? `«${query}»` : `«${query}» · найдено фрагментов: ${String(found)}`;
     }
   }
-  if (call.key === "knowledge.read") {
+  if (call.key === "knowledge.read" || isDocumentRead(call)) {
     const section = field(call.arguments, "section");
     if (typeof section === "string" && section.length > 0) return `раздел «${section}»`;
     const from = field(call.arguments, "fromChunk");

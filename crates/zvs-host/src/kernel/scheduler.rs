@@ -744,6 +744,14 @@ impl Scheduler {
                     tier: Some(ToolTier::Ask),
                 }
             }
+            PermissionRequirement::AppFolder { tool }
+                if request.minimum_tier == Some(ToolTier::Ask) =>
+            {
+                PermissionRequirement::Tool {
+                    tool,
+                    tier: Some(ToolTier::Ask),
+                }
+            }
             other => other,
         };
         let context = context.with_link(Arc::new(ObservedLink {

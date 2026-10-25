@@ -139,8 +139,9 @@ async fn the_kernel_tools_are_registered_once_in_the_composed_host() {
         .iter()
         .filter_map(|tool| tool["key"].as_str())
         .collect();
-    assert!(keys.contains(&"vector.index"), "{keys:?}");
-    assert!(keys.contains(&"download.fetch"), "{keys:?}");
-    assert!(!keys.contains(&"llm.generate"));
+    assert!(keys.contains(&"fs.apply"), "{keys:?}");
+    for internal in crate::tools::NOT_TOOLS {
+        assert!(!keys.contains(internal), "{internal}");
+    }
     drop(host);
 }

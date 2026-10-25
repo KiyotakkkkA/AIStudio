@@ -44,7 +44,7 @@ import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
 import ArtifactActions from "./ArtifactActions";
 import ExplorerStore from "./explorer/ExplorerStore";
 import TerminalStore from "../terminal/TerminalStore";
-import { isAutomaticTool, RECOMMENDED_TOOLS, toolBlockReason } from "./toolSets";
+import { isAutomaticTool, isModelTool, RECOMMENDED_TOOLS, toolBlockReason } from "./toolSets";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
 const LAST_CONVERSATION_KEY = "chat.conversation.last";
@@ -318,7 +318,9 @@ export default class ChatStore {
   }
   get selectableTools() {
     return this.tools
-      .filter((tool) => tool.available || this.enabledTools.includes(tool.key))
+      .filter(
+        (tool) => isModelTool(tool.key) && (tool.available || this.enabledTools.includes(tool.key)),
+      )
       .slice()
       .sort((left, right) => left.key.localeCompare(right.key));
   }

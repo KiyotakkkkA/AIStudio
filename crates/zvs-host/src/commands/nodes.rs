@@ -8,16 +8,24 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use zvs_contract::validate::{check, invalid};
 use zvs_contract::{
-    AppError, AppErrorCode, CodeLanguage, PROCESS_APPROVAL_KIND, PROCESS_ARG_MAX, PROCESS_ARGV_MAX,
-    PROCESS_PACKAGE_MAX, PROCESS_PACKAGES_MAX, PROCESS_SOURCE_MAX, ProcessPlanDto,
-    ProcessResultDto, ToolTier, Validate,
+    AppError, AppErrorCode, ArtifactDto, CodeLanguage, PROCESS_APPROVAL_KIND, PROCESS_ARG_MAX,
+    PROCESS_ARGV_MAX, PROCESS_PACKAGE_MAX, PROCESS_PACKAGES_MAX, PROCESS_SOURCE_MAX,
+    ProcessPlanDto, ProcessResultDto, ToolTier, Validate,
 };
 
+use crate::artifacts::{Snapshot, library_env, mentioned_paths, produced, snapshot};
+use crate::chat_files::{CHAT_DIR_ENV, is_working};
+use crate::files::roots::{
+    PathRoot, ROOTS_ONLY, ROOTS_UNAVAILABLE, RootKind, SKILL_READ_ONLY, VirtualRoots, path_root,
+};
 use crate::kernel::{
     ApprovalDecision, DeferredApproval, NodeDef, NodeRegistry, PermissionRequirement, StepContext,
 };
 use crate::platform::ids::new_id;
 use crate::services::approvals::ApprovalService;
+use crate::skills::script::{
+    SCRIPT_NO_TOOLCHAIN, SCRIPT_NOT_STARTED, SCRIPT_UNSUPPORTED, SKILL_DIR_ENV, ScriptRuntime,
+};
 use crate::toolchain::CommandLauncher;
 use crate::toolchain::LaunchSpec;
 use crate::toolchain::process::{
@@ -32,7 +40,7 @@ pub const SHELL_RUN: &str = "shell.run";
 pub const PROCESS_TOOLS: [&str; 2] = [CODE_RUN, SHELL_RUN];
 
 pub const CODE_DESCRIPTION: &str = "Запуск короткой программы, написанной моделью. language: python — выполняется через uv run; зависимости объявляются в начале source заголовком PEP 723 (# /// script, dependencies = [\"…\"], # ///), uv устанавливает их в собственный кэш приложения, глобальная установка не выполняется. javascript — выполняется через Node.js как ES-модуль (import, не require); пакеты из packages устанавливаются во временную папку через npm install с отключёнными скриптами установки. powershell — выполняется через powershell.exe без профиля. Рабочая папка процесса — временная папка запуска; рабочая папка диалога, если она выбрана, передаётся в переменной окружения ZVS_WORKSPACE_DIR. Разрешения на папки этот инструмент не ограничивают: процесс работает с правами пользователя, и пользователь подтверждает каждый запуск по полному тексту программы. Время выполнения ограничено, интерактивный ввод не поддерживается. Возвращает код завершения, stdout и stderr.";
-pub const SHELL_DESCRIPTION: &str = "Запуск программы проекта, например npm test или cargo check. argv — массив: argv[0] — программа, остальные элементы — аргументы. Строка командной оболочки не разбирается, поэтому конвейеры, перенаправления и подстановки недоступны. Программа ищется сначала в папках подключённых сред, затем в PATH. Рабочая папка процесса — cwd или, если cwd не указан, рабочая папка диалога; без них команда не запускается. Доступ к cwd вне выданных разрешений подтверждает пользователь, но сам процесс работает с правами пользователя и разрешениями на папки не ограничивается. Пользователь подтверждает каждый запуск по полной команде. Время выполнения ограничено; серверы, фоновые и интерактивные процессы не поддерживаются, стандартный ввод передаётся только из stdin. Возвращает код завершения, stdout и stderr.";
+pub const SHELL_DESCRIPTION: &str = "Запуск программы проекта, например npm test или cargo check, или скрипта навыка. argv — массив: argv[0] — программа, остальные элементы — аргументы. Строка командной оболочки не разбирается, поэтому конвейеры, перенаправления и подстановки недоступны. Программа ищется сначала в папках подключённых сред, затем в PATH. Скрипт навыка указывается как argv[0] = skill:<ключ>/scripts/<файл>: .py выполняется через uv, .js, .mjs и .cjs — через Node.js, папка навыка передаётся в ZVS_SKILL_DIR. Рабочая папка процесса — cwd (путь или chat:); без cwd — рабочая папка диалога, а для скрипта навыка — chat:. Доступ к cwd вне выданных разрешений подтверждает пользователь, но сам процесс работает с правами пользователя. Пользователь подтверждает каждый запуск по полной команде. Время выполнения ограничено; серверы, фоновые и интерактивные процессы не поддерживаются, стандартный ввод передаётся только из stdin. Возвращает код завершения, stdout и stderr.";
 
 pub const CODE_ACTION: &str = "запуск кода";
 pub const SHELL_ACTION: &str = "запуск команды";
@@ -117,6 +125,7 @@ pub struct CommandToolOptions {
     pub scratch: PathBuf,
     pub limits: ProcessLimits,
     pub powershell: String,
+    pub roots: VirtualRoots,
 }
 
 impl CommandToolOptions {
@@ -126,6 +135,7 @@ impl CommandToolOptions {
             scratch,
             limits: ProcessLimits::default(),
             powershell: POWERSHELL.to_owned(),
+            roots: VirtualRoots::default(),
         }
     }
 }
@@ -142,6 +152,8 @@ pub struct ProcessToolOutput {
     pub stdout: String,
     pub stderr: String,
     pub process: ProcessPlanDto,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<ArtifactDto>,
 }
 
 impl Validate for ProcessToolOutput {
@@ -162,17 +174,24 @@ impl ProcessToolOutput {
             stdout: run.stdout.clone(),
             stderr: run.stderr.clone(),
             process,
+            artifacts: Vec::new(),
         }
     }
 
     fn meta(&self) -> Value {
-        json!(ProcessResultDto {
+        let mut meta = json!(ProcessResultDto {
             process: self.process.clone(),
             exit_code: self.exit_code,
             duration_ms: self.duration_ms,
             timed_out: self.timed_out,
             truncated: self.truncated,
-        })
+        });
+        if !self.artifacts.is_empty()
+            && let Some(fields) = meta.as_object_mut()
+        {
+            fields.insert("artifacts".to_owned(), json!(self.artifacts));
+        }
+        meta
     }
 }
 
@@ -483,12 +502,12 @@ impl NodeDef for CodeRunNode {
 #[serde(rename_all = "camelCase")]
 pub struct ShellRunInput {
     #[schemars(
-        description = "Программа и аргументы по отдельности, например [\"npm\", \"test\"] или [\"cargo\", \"check\"]"
+        description = "Программа и аргументы по отдельности, например [\"npm\", \"test\"] или [\"skill:dashboard/scripts/build_dashboard.py\", \"_spec.json\"]"
     )]
     pub argv: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(
-        description = "Рабочая папка процесса: абсолютный путь или путь относительно рабочей папки диалога; по умолчанию рабочая папка диалога"
+        description = "Рабочая папка процесса: абсолютный путь, путь относительно рабочей папки диалога или chat:"
     )]
     pub cwd: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -497,6 +516,9 @@ pub struct ShellRunInput {
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
+    #[serde(default)]
+    #[schemars(skip)]
+    pub roots_only: bool,
 }
 
 impl Validate for ShellRunInput {
@@ -529,6 +551,62 @@ pub fn shell_spec(argv: &[String], cwd: &Path, dirs: &[PathBuf]) -> Result<Launc
     })
 }
 
+pub struct SkillScript {
+    pub spec: LaunchSpec,
+    pub dir: PathBuf,
+}
+
+fn outside_roots() -> AppError {
+    AppError::new(AppErrorCode::PermissionDenied, ROOTS_ONLY)
+}
+
+pub fn skill_script(
+    options: &CommandToolOptions,
+    key: &str,
+    path: &str,
+    args: &[String],
+) -> Result<SkillScript, AppError> {
+    let library = options
+        .roots
+        .skills()
+        .ok_or_else(|| AppError::new(AppErrorCode::Conflict, ROOTS_UNAVAILABLE))?;
+    let script = library.script(key, path)?;
+    let runtime = ScriptRuntime::of(&script.path)
+        .ok_or_else(|| AppError::new(AppErrorCode::UnsupportedFormat, SCRIPT_UNSUPPORTED))?;
+    let launcher = options
+        .launcher
+        .as_ref()
+        .ok_or_else(|| AppError::new(AppErrorCode::NotFound, SCRIPT_NO_TOOLCHAIN))?;
+    let mut spec = launcher
+        .launch_command(
+            runtime.command(),
+            &runtime.args(&path_text(&script.file), args),
+        )
+        .unwrap_or_else(|| {
+            Err(AppError::new(
+                AppErrorCode::NotFound,
+                format!(
+                    "Для запуска скрипта нужен {}. {SETTINGS_HINT}",
+                    runtime.display_name()
+                ),
+            )
+            .with_detail("runtime", runtime.command()))
+        })?;
+    spec.env
+        .insert(SKILL_DIR_ENV.to_owned(), path_text(&script.dir));
+    if runtime == ScriptRuntime::Python {
+        for (name, value) in PYTHON_UTF8_ENV {
+            spec.env
+                .entry((*name).to_owned())
+                .or_insert_with(|| (*value).to_owned());
+        }
+    }
+    Ok(SkillScript {
+        spec,
+        dir: script.dir,
+    })
+}
+
 pub struct ShellRunNode(Tools);
 
 impl ShellRunNode {
@@ -540,8 +618,48 @@ impl ShellRunNode {
         Self(Tools::new(folders, approvals, options))
     }
 
-    async fn cwd(&self, context: &StepContext, input: &ShellRunInput) -> Result<PathBuf, AppError> {
+    fn chat_folder(&self, conversation: &str) -> Option<PathBuf> {
+        let roots = &self.0.options.roots;
+        roots.chats()?;
+        roots.chat_folder(conversation).ok()
+    }
+
+    async fn cwd(
+        &self,
+        context: &StepContext,
+        input: &ShellRunInput,
+        script: bool,
+    ) -> Result<PathBuf, AppError> {
         let tools = &self.0;
+        let located = input
+            .cwd
+            .as_deref()
+            .map(|cwd| tools.options.roots.locate(&input.conversation_id, cwd))
+            .transpose()?
+            .flatten();
+        if let Some(located) = located {
+            if located.kind == RootKind::Skill {
+                return Err(AppError::new(
+                    AppErrorCode::PermissionDenied,
+                    SKILL_READ_ONLY,
+                ));
+            }
+            return if located.path.is_dir() {
+                Ok(located.path)
+            } else {
+                Err(AppError::new(AppErrorCode::NotFound, FOLDER_MISSING)
+                    .with_detail("path", path_text(&located.path)))
+            };
+        }
+        if input.roots_only && input.cwd.is_some() {
+            return Err(outside_roots());
+        }
+        if script && input.cwd.is_none() {
+            return match self.chat_folder(&input.conversation_id) {
+                Some(folder) => Ok(folder),
+                None => prepare_scratch(&tools.options.scratch, &context.run_id.to_string()),
+            };
+        }
         let folder = match &input.cwd {
             Some(cwd) => {
                 let call = tools.folders.call(&input.conversation_id, SHELL_RUN);
@@ -600,12 +718,36 @@ impl NodeDef for ShellRunNode {
         let approval = context.take_deferred_approval();
         context.check_cancelled()?;
         let tools = &self.0;
-        let cwd = self.cwd(context, &input).await?;
-        let dirs = tools.options.launcher.as_ref().map_or_else(
-            || path_dirs(std::env::var_os("PATH").as_ref()),
-            |launcher| launcher.program_dirs(),
-        );
-        let spec = shell_spec(&input.argv, &cwd, &dirs)?;
+        let program = input.argv.first().map(String::as_str).unwrap_or_default();
+        let skill = match path_root(program) {
+            PathRoot::Skill { key, rest } => {
+                Some(skill_script(&tools.options, key, rest, &input.argv[1..])?)
+            }
+            _ if input.roots_only => return Err(outside_roots()),
+            _ => None,
+        };
+        let cwd = self.cwd(context, &input, skill.is_some()).await?;
+        let chat = skill
+            .as_ref()
+            .and_then(|_| self.chat_folder(&input.conversation_id));
+        let spec = match &skill {
+            Some(script) => {
+                let mut spec = script.spec.clone();
+                spec.cwd = Some(cwd.clone());
+                spec.env.insert(SCRATCH_DIR_ENV.to_owned(), path_text(&cwd));
+                if let Some(folder) = &chat {
+                    spec.env.insert(CHAT_DIR_ENV.to_owned(), path_text(folder));
+                }
+                spec
+            }
+            None => {
+                let dirs = tools.options.launcher.as_ref().map_or_else(
+                    || path_dirs(std::env::var_os("PATH").as_ref()),
+                    |launcher| launcher.program_dirs(),
+                );
+                shell_spec(&input.argv, &cwd, &dirs)?
+            }
+        };
         let process = ProcessPlanDto {
             program: spec.command.clone(),
             language: None,
@@ -626,16 +768,73 @@ impl NodeDef for ShellRunNode {
             .await?;
         context.check_cancelled()?;
         let limits = tools.options.limits;
+        let Some(script) = skill else {
+            let run = run_process(
+                &spec,
+                input.stdin.as_deref(),
+                limits,
+                &context.cancel,
+                SHELL_NOT_STARTED,
+            )
+            .await?;
+            let text = process_text(&run, "process", limits);
+            return Ok(ProcessToolOutput::of(&run, text, process));
+        };
+        let mut spec = spec;
+        let store = tools.options.roots.chats();
+        let libraries: Vec<(String, PathBuf, Snapshot)> = store.map_or_else(Vec::new, |store| {
+            store
+                .libraries()
+                .iter()
+                .map(|(name, folder)| {
+                    let _ = std::fs::create_dir_all(folder);
+                    spec.env.insert(library_env(name), path_text(folder));
+                    (name.clone(), folder.clone(), snapshot(folder))
+                })
+                .collect()
+        });
+        let before = snapshot(&cwd);
+        let started = std::time::SystemTime::now();
         let run = run_process(
             &spec,
             input.stdin.as_deref(),
             limits,
             &context.cancel,
-            SHELL_NOT_STARTED,
+            SCRIPT_NOT_STARTED,
         )
         .await?;
-        let text = process_text(&run, "process", limits);
-        Ok(ProcessToolOutput::of(&run, text, process))
+        let artifacts = store.map_or_else(Vec::new, |store| {
+            let mentioned = mentioned_paths(&input.argv[1..], &cwd);
+            let results: Vec<PathBuf> = produced(&cwd, &before, &mentioned, started)
+                .into_iter()
+                .filter(|path| {
+                    !path.starts_with(&script.dir)
+                        && path
+                            .strip_prefix(&cwd)
+                            .map_or(true, |relative| !is_working(relative))
+                })
+                .collect();
+            let mut kept = store.keep(&context.run_id.to_string(), &results);
+            for (name, folder, previous) in &libraries {
+                kept.extend(store.adopt(name, &produced(folder, previous, &[], started)));
+            }
+            kept
+        });
+        let mut text = process_text(&run, "script", limits);
+        if !artifacts.is_empty() {
+            let names: Vec<&str> = artifacts
+                .iter()
+                .map(|artifact| artifact.name.as_str())
+                .collect();
+            text.push_str(&format!(
+                "\n\nFiles shown to the user with download buttons: {}",
+                names.join(", ")
+            ));
+        }
+        Ok(ProcessToolOutput {
+            artifacts,
+            ..ProcessToolOutput::of(&run, text, process)
+        })
     }
 
     fn tool_meta(&self, _input: &Value, output: &ProcessToolOutput) -> Option<Value> {

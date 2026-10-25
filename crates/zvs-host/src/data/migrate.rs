@@ -145,6 +145,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0019_skill_version",
         sql: include_str!("../../migrations/0019_skill_version.sql"),
     },
+    Migration {
+        id: 20,
+        name: "0020_tool_surface",
+        sql: include_str!("../../migrations/0020_tool_surface.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -514,6 +519,58 @@ mod tests {
                 r#"["mail.send","fs.read","fs.list","fs.search","fs.apply","code.run","shell.run"]"#,
                 r#"["fs.list","fs.read","fs.search","fs.apply","code.run","shell.run"]"#,
             ]
+        );
+    }
+
+    #[test]
+    fn merged_and_leaked_tools_leave_every_stored_tool_list() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..20], &options(&backups, &clock)).expect("applies");
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    r#"INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, enabled_tools, created_at, updated_at) VALUES ('c1', 't', 'p', 'm', '{}', '', '[]', '["fs.read","chat.file","job.run","vector.index","download.fetch","vector.search","mail.send"]', 1, 1), ('c2', 't', 'p', 'm', '{}', '', '[]', '["skill.script","knowledge.read","knowledge.list","knowledge.search"]', 1, 1), ('c3', 't', 'p', 'm', '{}', '', '[]', '["fs.apply"]', 1, 1);
+                    INSERT INTO agentic_session (id, goal, status, mode, workspace, provider_id, model_id, tools, budget, usage, created_at, updated_at) VALUES ('s1', 'g', 'done', 'ask', 'C:/w', 'p', 'm', '["skill.read","fs.list","vector.list"]', '{}', '{}', 1, 1);
+                    INSERT INTO skill (id, key, name, description, allowed_tools, content_hash, path, created_at, updated_at) VALUES ('k1', 'notes', 'n', 'd', '["skill.read","vector.search","job.run"]', 'h', 'C:/s', 1, 1);
+                    INSERT INTO tool (id, key, source, display_name, tier, registered_at, updated_at) VALUES ('t1', 'chat.file', 'builtin', 'chat.file', 'auto', 1, 1), ('t2', 'job.run', 'builtin', 'job.run', 'ask', 1, 1), ('t3', 'fs.read', 'builtin', 'fs.read', 'auto', 1, 1), ('t4', 'vector.search', 'builtin', 'vector.search', 'auto', 1, 1);
+                    INSERT INTO tool_reference (id, tool_id, kind, ref_id, name) VALUES ('r1', 't1', 'skill', 'k1', 'notes');
+                    INSERT INTO tool_permission (id, subject, scope, tier, granted_at, granted_by) VALUES ('g1', 'chat.file', 'global', 'auto', 1, 'registry'), ('g2', 'job.run', 'global', 'auto', 1, 'user'), ('g3', 'fs.read', 'global', 'auto', 1, 'registry');"#,
+                )?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        assert_eq!(
+            query(
+                &database,
+                "SELECT enabled_tools FROM conversation ORDER BY id"
+            ),
+            [
+                r#"["fs.read","fs.list","fs.apply","mail.send"]"#,
+                r#"["shell.run","knowledge.search"]"#,
+                r#"["fs.apply"]"#,
+            ]
+        );
+        assert_eq!(
+            query(&database, "SELECT tools FROM agentic_session"),
+            [r#"["fs.read","fs.list"]"#]
+        );
+        assert_eq!(
+            query(&database, "SELECT allowed_tools FROM skill"),
+            [r#"["fs.read","vector.search"]"#]
+        );
+        assert_eq!(
+            query(&database, "SELECT key FROM tool ORDER BY key"),
+            ["fs.read", "vector.search"]
+        );
+        assert!(query(&database, "SELECT id FROM tool_reference").is_empty());
+        assert_eq!(
+            query(
+                &database,
+                "SELECT subject FROM tool_permission ORDER BY subject"
+            ),
+            ["fs.read", "job.run"]
         );
     }
 

@@ -37,6 +37,8 @@ pub struct OfferedTool {
     pub destructive: bool,
     #[serde(default)]
     pub read_only: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub roots_only: bool,
 }
 
 impl Validate for OfferedTool {
@@ -121,6 +123,7 @@ pub fn offered_tools(enabled: &[String], registered: &[ToolDto]) -> Vec<OfferedT
                 parameters: tool_parameters(&tool.input_schema),
                 destructive: tool.destructive,
                 read_only: tool.read_only,
+                roots_only: false,
             }
         })
         .collect()
@@ -232,7 +235,7 @@ pub fn parse_tool_arguments(raw: &str) -> Option<Map<String, Value>> {
     }
 }
 
-pub const KNOWLEDGE_INSTRUCTION: &str = "Knowledge bases are attached to this conversation. Decide yourself whether a message needs them: greetings, small talk and questions about the conversation itself do not. When the answer may be in the documents, call knowledge_search with a focused query; search once per part of a comparison or multi-part question, and search again with different wording when the passages are thin. Use knowledge_read when a passage is too short. Every passage carries a number: cite each claim taken from it as [n] with that number. If the knowledge bases do not contain the answer after searching, say so plainly instead of guessing.";
+pub const KNOWLEDGE_INSTRUCTION: &str = "Knowledge bases are attached to this conversation. Decide yourself whether a message needs them: greetings, small talk and questions about the conversation itself do not. When the answer may be in the documents, call knowledge_search with a focused query; search once per part of a comparison or multi-part question, and search again with different wording when the passages are thin. When a passage is too short, call knowledge_search again with its documentId and section, or a fromChunk-toChunk range, instead of a query. Every passage carries a number: cite each claim taken from it as [n] with that number. If the knowledge bases do not contain the answer after searching, say so plainly instead of guessing.";
 pub const HYBRID_INSTRUCTION: &str = "A few sources were already retrieved for the current message and appear above it; search further only when they are not enough.";
 
 pub fn knowledge_catalogue(stores: &[(String, String, u64)]) -> String {
@@ -321,7 +324,7 @@ fn compact_line(kind: &str, subject: &str, cited: &[(usize, String, String)]) ->
             .join("; ")
     };
     format!(
-        "[Earlier {kind} {subject}: the passage text was removed to free context. Sources: {sources}. Call knowledge_read with a documentId to see the text again; keep citing these numbers.]"
+        "[Earlier {kind} {subject}: the passage text was removed to free context. Sources: {sources}. Call knowledge_search with a documentId to see the text again; keep citing these numbers.]"
     )
 }
 
@@ -402,7 +405,7 @@ pub fn read_result_text(
     KnowledgeText {
         text: format!("Document span, cite it as [{id}].\n\n{block}"),
         compact: compact_line(
-            "knowledge_read",
+            "knowledge_search read",
             &format!("of {}", output.path),
             &[(id, label, output.document_id.clone())],
         ),

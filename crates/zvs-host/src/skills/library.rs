@@ -29,7 +29,7 @@ use crate::data::{Database, Repositories};
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
-use crate::tools::{ToolReferenceSubject, ToolRegistry};
+use crate::tools::{ToolReferenceSubject, ToolRegistry, current_tool_keys};
 
 pub const SKILLS_DIR: &str = "skills";
 pub const SKILL_NOT_FOUND: &str = "Навык не найден";
@@ -603,7 +603,7 @@ impl SkillLibrary {
                 if let Some(manifest) = &manifest {
                     next.name = display_name(manifest, &row.key);
                     next.description = js_trim(&manifest.description).to_owned();
-                    next.allowed_tools = unique(manifest.allowed_tools.clone());
+                    next.allowed_tools = unique(current_tool_keys(&manifest.allowed_tools));
                     next.model_override.clone_from(&manifest.model);
                     next.version = limited(manifest.meta(VERSION), SKILL_VERSION_MAX);
                     next.author = limited(manifest.meta(AUTHOR), SKILL_AUTHOR_MAX);
@@ -1458,6 +1458,16 @@ impl SkillLibrary {
             dir,
             file,
         })
+    }
+
+    pub fn folder(&self, key: &str) -> Result<PathBuf, AppError> {
+        let row = self.usable_row(key)?;
+        let dir = PathBuf::from(&row.path);
+        if dir.is_dir() {
+            Ok(dir)
+        } else {
+            Err(not_found())
+        }
     }
 
     fn locate(&self, key: &str, path: &str) -> Result<(PathBuf, PathBuf), AppError> {

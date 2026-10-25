@@ -62,6 +62,16 @@ pub struct AccessPlan {
     used: Vec<String>,
 }
 
+impl AccessPlan {
+    pub const fn empty() -> Self {
+        Self {
+            resolved: Vec::new(),
+            folders: Vec::new(),
+            used: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Review {
     pub approval: Option<DeferredApproval>,

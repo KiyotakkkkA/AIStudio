@@ -153,15 +153,7 @@ async fn in_agentic_mode_a_greeting_searches_nothing_but_the_knowledge_tools_are
         .iter()
         .map(|tool| tool.name.as_str())
         .collect();
-    assert_eq!(
-        names,
-        [
-            "knowledge_list",
-            "knowledge_read",
-            "knowledge_search",
-            "ask_user"
-        ]
-    );
+    assert_eq!(names, ["knowledge_search", "ask_user"]);
     let search = requests[0]
         .tools
         .iter()
@@ -390,7 +382,7 @@ async fn reading_a_document_returns_the_span_and_reuses_the_number_of_a_cited_ch
         .round(|_| vec![call("knowledge_search", &json!({ "query": "leave" }))]);
     test.driver.round(|_| {
         vec![call(
-            "knowledge_read",
+            "knowledge_search",
             &json!({ "documentId": LEAVE, "section": "leave" }),
         )]
     });

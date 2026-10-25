@@ -124,6 +124,7 @@ pub fn memory_tool(offered: &[OfferedTool]) -> OfferedTool {
         parameters: memory_parameters(),
         destructive: false,
         read_only: false,
+        roots_only: false,
     }
 }
 

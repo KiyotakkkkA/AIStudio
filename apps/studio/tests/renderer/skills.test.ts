@@ -161,7 +161,7 @@ test("tools above the ceiling are listed disabled with the reason, never hidden"
     tool(2, "demo.off", { tier: "off" }),
     tool(3, "demo.disabled", { enabled: false }),
     tool(4, "qdrant.find", { source: "mcp", sourceRef: SERVER_ID, available: false }),
-    tool(5, "skill.read"),
+    tool(5, "skill.load"),
   ]);
   await store.mount();
   const rows = store.toolGroups.flatMap((group) => group.rows);

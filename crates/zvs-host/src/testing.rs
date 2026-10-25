@@ -427,20 +427,11 @@ pub fn test_services(system: SystemService) -> TestServices {
             tools.clone(),
         )
     });
-    crate::skills::register_skill_nodes(
-        &nodes,
-        &skill_library,
-        crate::skills::SkillScriptOptions {
-            artifacts: Some(crate::artifacts::ArtifactStore::new(
-                workspace.join("artifacts"),
-            )),
-            ..crate::skills::SkillScriptOptions::new(
-                Some(Arc::new(toolchain.clone())),
-                workspace.join("skill-scripts"),
-            )
-        },
-    )
-    .expect("registers the skill nodes");
+    let roots = crate::files::VirtualRoots::new(
+        Some(test_artifacts(workspace.join("artifacts"))),
+        Some(skill_library.clone()),
+    );
+    crate::skills::register_skill_nodes(&nodes, &skill_library).expect("registers the skill nodes");
     crate::tools::register_kernel_tools(&nodes, &tools).expect("registers the kernel tools");
     let runs = RunService::new(RunServiceOptions {
         clock: clock.clone(),
@@ -493,17 +484,23 @@ pub fn test_services(system: SystemService) -> TestServices {
     crate::files::register_file_nodes(
         &nodes,
         &folders,
-        crate::files::FileToolOptions::new(workspace.join("runs")),
+        crate::files::FileToolOptions {
+            roots: roots.clone(),
+            ..crate::files::FileToolOptions::new(workspace.join("runs"))
+        },
     )
     .expect("registers the file nodes");
     crate::commands::register_command_nodes(
         &nodes,
         &folders,
         runs.approvals(),
-        crate::commands::CommandToolOptions::new(
-            Some(Arc::new(toolchain.clone())),
-            workspace.join("code-runs"),
-        ),
+        crate::commands::CommandToolOptions {
+            roots,
+            ..crate::commands::CommandToolOptions::new(
+                Some(Arc::new(toolchain.clone())),
+                workspace.join("code-runs"),
+            )
+        },
     )
     .expect("registers the command nodes");
     crate::tools::register_kernel_tools(&nodes, &tools).expect("registers the file tools");

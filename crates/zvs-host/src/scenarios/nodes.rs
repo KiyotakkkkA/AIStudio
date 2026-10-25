@@ -357,6 +357,7 @@ impl AgentNode {
                     parameters: tool_parameters(node.input_schema()),
                     destructive: false,
                     read_only: node.side_effect_free(),
+                    roots_only: false,
                 })
             })
             .collect())

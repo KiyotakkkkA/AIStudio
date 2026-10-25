@@ -3,13 +3,13 @@ name: pdf
 description: "Работа с PDF-файлами: чтение и извлечение текста и таблиц, поиск страниц по тексту, сведения о документе, выбор, удаление и перестановка страниц, объединение и разделение, поворот страниц, водяной знак, шифрование, заполнение PDF-форм, преобразование документов Word, Excel и PowerPoint в PDF и создание нового PDF из текста. Используется, когда в запросе есть файл .pdf или результат нужен в виде PDF."
 metadata:
   display-name: PDF
-  version: "1.0.0"
+  version: "1.1.0"
   author: ZVS AI Studio
 ---
 
 # PDF
 
-Work with PDF files through the scripts in `scripts/`. Every script is a Python file run with `skill.script`; dependencies are declared inside each script and installed on first use. Pass file paths as absolute paths. A relative output path lands in the run's scratch folder, so always write results to the absolute path the user named, or next to the input file when they did not name one, and report that path.
+Work with PDF files through the scripts in `scripts/`. Every script is a Python file run with `shell.run`, its path as the first argument (`argv: ["skill:pdf/scripts/<file>", …]`); dependencies are declared inside each script and installed on first use. Pass file paths as absolute paths. A relative output path lands in the run's scratch folder, so always write results to the absolute path the user named, or next to the input file when they did not name one, and report that path.
 
 Output on stdout is capped at 64 KiB. For long documents read the text in page ranges instead of all at once.
 

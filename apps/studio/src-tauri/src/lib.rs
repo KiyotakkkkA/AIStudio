@@ -36,7 +36,7 @@ use zvs_host::drivers::ai::{
 use zvs_host::drivers::core::InProcessCore;
 use zvs_host::drivers::mcp::TOOLCHAIN_DIR;
 use zvs_host::drivers::sidecar::{SidecarDriver, SidecarOptions};
-use zvs_host::files::{FileToolOptions, register_file_nodes};
+use zvs_host::files::{FileToolOptions, VirtualRoots, register_file_nodes};
 use zvs_host::indexing::{
     DocumentExtractorOptions, ImageExtractor, IndexingService, IndexingServiceOptions,
     PdfExtractor, image_extensions,
@@ -82,8 +82,8 @@ use zvs_host::services::{
     VectorSourceService, VectorSourceServiceOptions, VectorStoreService, VectorStoreServiceOptions,
 };
 use zvs_host::skills::{
-    SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillScriptOptions, SkillService,
-    SkillServiceOptions, register_skill_nodes,
+    SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillService, SkillServiceOptions,
+    register_skill_nodes,
 };
 use zvs_host::terminal::{NativePty, SystemShells, TerminalService, TerminalServiceOptions};
 use zvs_host::toolchain::{
@@ -783,18 +783,8 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         .with_picker(Arc::clone(&picker))
         .with_launcher(platform::file_launcher())
         .with_pages(Arc::new(WorkspacePages(workspace.clone())));
-    register_skill_nodes(
-        &nodes,
-        &skill_library,
-        SkillScriptOptions {
-            artifacts: Some(artifacts.clone()),
-            ..SkillScriptOptions::new(
-                Some(Arc::new(toolchain.clone())),
-                paths.cache_dir.join("skill-scripts"),
-            )
-        },
-    )?;
-    zvs_host::chat_files::register_chat_file_node(&nodes, &artifacts)?;
+    let roots = VirtualRoots::new(Some(artifacts.clone()), Some(skill_library.clone()));
+    register_skill_nodes(&nodes, &skill_library)?;
     register_kernel_tools(&nodes, &tools)?;
     if let Err(error) = skill_library.install_bundled() {
         logger.log(
@@ -875,16 +865,22 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     register_file_nodes(
         &nodes,
         &folders,
-        FileToolOptions::new(paths.runs_dir.clone()),
+        FileToolOptions {
+            roots: roots.clone(),
+            ..FileToolOptions::new(paths.runs_dir.clone())
+        },
     )?;
     register_command_nodes(
         &nodes,
         &folders,
         runs.approvals(),
-        CommandToolOptions::new(
-            Some(Arc::new(toolchain.clone())),
-            paths.cache_dir.join("code-runs"),
-        ),
+        CommandToolOptions {
+            roots,
+            ..CommandToolOptions::new(
+                Some(Arc::new(toolchain.clone())),
+                paths.cache_dir.join("code-runs"),
+            )
+        },
     )?;
     register_kernel_tools(&nodes, &tools)?;
     let agentic = AgenticService::new(AgenticServiceOptions {

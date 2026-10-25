@@ -23,6 +23,8 @@ use crate::services::vector_stores::VectorSearchOptions;
 use crate::services::{RunService, RunServiceOptions, SettingService};
 use crate::testing::{CLOCK_ORIGIN, MemorySink, TemporaryDatabase, temporary_database};
 
+mod catalogue;
+
 struct Host {
     database: TemporaryDatabase,
     nodes: Arc<NodeRegistry>,
@@ -689,31 +691,77 @@ async fn kernel_nodes_register_themselves_as_builtin_capabilities_exactly_once()
     assert_eq!(
         host.keys(&ToolListFilter::default()),
         [
-            "knowledge.list",
-            "knowledge.read",
             "knowledge.search",
             "mail.send",
-            "vector.index",
             "vector.list",
             "vector.search"
         ]
     );
     let tools = host.tools.list(&ToolListFilter::default()).expect("lists");
-    let index = tools
+    let search = tools
         .iter()
-        .find(|tool| tool.key == "vector.index")
-        .expect("vector.index");
+        .find(|tool| tool.key == "knowledge.search")
+        .expect("knowledge.search");
     assert_eq!(
-        (index.source, index.read_only, index.tier),
-        (ToolSource::Builtin, false, ToolTier::Ask)
+        (search.source, search.read_only, search.tier),
+        (ToolSource::Builtin, true, ToolTier::Auto)
     );
-    assert!(!index.input_schema.is_null());
+    assert!(!search.input_schema.is_null());
     assert_eq!(
         tools
             .iter()
             .find(|tool| tool.key == "vector.search")
             .map(|tool| tool.tier),
         Some(ToolTier::Auto)
+    );
+}
+
+#[tokio::test]
+async fn kernel_jobs_never_become_tools() {
+    let host = host();
+    register_core_nodes(&host.nodes).expect("registers");
+    crate::kernel::register_job_nodes(&host.nodes).expect("registers");
+    crate::kernel::register_download_nodes(&host.nodes).expect("registers");
+    let registered: Vec<String> = register_kernel_tools(&host.nodes, &host.tools)
+        .expect("registers")
+        .into_iter()
+        .map(|tool| tool.key)
+        .collect();
+    for job in ["vector.index", "job.run", "download.fetch"] {
+        assert!(host.nodes.get(job).is_ok(), "{job} is a kernel node");
+        assert!(!registered.contains(&job.to_owned()), "{job}");
+        assert_eq!(host.tools.ceiling(job).expect("reads"), None, "{job}");
+        assert!(!model_tool(job), "{job}");
+    }
+    assert!(!model_tool("vector.search"));
+    assert!(model_tool("fs.read"));
+}
+
+#[test]
+fn old_tool_keys_map_onto_the_merged_tools() {
+    let keys = [
+        "skill.load",
+        "chat.file",
+        "fs.read",
+        "skill.script",
+        "skill.read",
+        "knowledge.read",
+        "knowledge.list",
+        "job.run",
+        "mcp.server.tool",
+    ]
+    .map(str::to_owned);
+    assert_eq!(
+        current_tool_keys(&keys),
+        [
+            "skill.load",
+            "fs.read",
+            "fs.list",
+            "fs.apply",
+            "shell.run",
+            "knowledge.search",
+            "mcp.server.tool"
+        ]
     );
 }
 

@@ -11,10 +11,7 @@ mod tests;
 
 pub use bundled::{BUNDLED_SKILLS, BundledFile, BundledSkill};
 pub use library::{AuthoredSkill, SKILLS_DIR, SkillLibrary, SkillLibraryOptions};
-pub use nodes::{
-    SKILL_GENERATE, SKILL_LOAD, SKILL_READ, SKILL_SAVE, SKILL_TOOLS, register_skill_nodes,
-};
-pub use script::{SKILL_SCRIPT, SkillScriptOptions};
+pub use nodes::{SKILL_GENERATE, SKILL_LOAD, SKILL_SAVE, SKILL_TOOLS, register_skill_nodes};
 pub use service::{
     SkillCatalogue, SkillCatalogueEntry, SkillService, SkillServiceOptions, catalogue_text,
 };

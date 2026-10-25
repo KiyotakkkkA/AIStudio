@@ -3,13 +3,13 @@ name: xlsx
 description: "Работа с таблицами Excel (.xlsx, .xlsm) и CSV: чтение листов и диапазонов, сведения о книге, создание книги с формулами, форматами чисел и стилями, правка ячеек существующей книги, проверка формул на ошибки, преобразование CSV в Excel и обратно. Используется, когда в запросе есть файл .xlsx или .csv или результат нужен в виде таблицы Excel."
 metadata:
   display-name: Excel
-  version: "1.0.0"
+  version: "1.1.0"
   author: ZVS AI Studio
 ---
 
 # Excel (.xlsx)
 
-Work with spreadsheets through the scripts in `scripts/`. Every script is a Python file run with `skill.script`; dependencies are declared inside each script and installed on first use. Pass file paths as absolute paths. A relative output path lands in the run's scratch folder, so always write results to the absolute path the user named, or next to the input file when they did not name one, and report that path. Never overwrite the input unless the user asked for it.
+Work with spreadsheets through the scripts in `scripts/`. Every script is a Python file run with `shell.run`, its path as the first argument (`argv: ["skill:xlsx/scripts/<file>", …]`); dependencies are declared inside each script and installed on first use. Pass file paths as absolute paths. A relative output path lands in the run's scratch folder, so always write results to the absolute path the user named, or next to the input file when they did not name one, and report that path. Never overwrite the input unless the user asked for it.
 
 Output on stdout is capped at 64 KiB. Read large sheets in row windows.
 

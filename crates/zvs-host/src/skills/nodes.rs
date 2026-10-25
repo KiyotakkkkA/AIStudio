@@ -15,8 +15,10 @@ use zvs_contract::{
 };
 
 use super::library::{AuthoredSkill, SkillLibrary};
-use super::script::{SKILL_SCRIPT, SkillScriptNode, SkillScriptOptions};
+use crate::commands::SHELL_RUN;
 use crate::drivers::ai::{ChatMessage, GenerateRequest, with_injected_tools};
+use crate::files::roots::SKILL_ROOT;
+use crate::files::{FS_APPLY, FS_LIST, FS_READ};
 use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateRole};
 use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext, ToolStepRequest};
 use crate::services::chat::GenerateChatNode;
@@ -26,14 +28,12 @@ use crate::services::chat_tools::{
 };
 
 pub const SKILL_LOAD: &str = "skill.load";
-pub const SKILL_READ: &str = "skill.read";
 pub const SKILL_GENERATE: &str = "skill.generate";
 pub const SKILL_SAVE: &str = "skill.save";
-pub const SKILL_TOOLS: [&str; 3] = [SKILL_LOAD, SKILL_READ, SKILL_SCRIPT];
+pub const SKILL_TOOLS: [&str; 5] = [SKILL_LOAD, FS_READ, FS_LIST, FS_APPLY, SHELL_RUN];
 
-pub const LOAD_DESCRIPTION: &str = "Загрузка навыка по идентификатору из списка навыков в системном сообщении. Возвращает инструкции навыка и перечень его файлов; при выполнении запроса следуйте этим инструкциям. Вызывайте только для навыка, который соответствует запросу.";
+pub const LOAD_DESCRIPTION: &str = "Загрузка навыка по идентификатору из списка навыков в системном сообщении. Возвращает инструкции навыка, его папку skill:<ключ>/ и перечень файлов: файлы читаются через fs.read, скрипты из scripts/ запускаются через shell.run. При выполнении запроса следуйте инструкциям навыка. Вызывайте только для навыка, который соответствует запросу.";
 pub const SAVE_DESCRIPTION: &str = "Сохранение навыка в библиотеку навыков пользователя: идентификатор, название, описание, по которому навык выбирается, инструкции в Markdown и текстовые файлы в папках references/, scripts/ и assets/. Навык с тем же идентификатором перезаписывается только при replace: true, встроенные навыки не перезаписываются. Каждый вызов подтверждает пользователь. Возвращает состояние навыка и найденные ошибки.";
-pub const READ_DESCRIPTION: &str = "Чтение файла навыка из папок references/, scripts/ или assets/ по идентификатору навыка и пути из результата skill.load. Текстовый файл возвращается целиком, для двоичного сообщается только размер.";
 
 pub const NO_PROVIDERS: &str = "Сервис провайдеров недоступен";
 pub const NOT_OFFERED: &str = "Модель вызвала инструмент, который не был ей предложен";
@@ -43,7 +43,6 @@ pub const NO_TOOL_CALLS: &str = "Вызов инструментов недос�
 pub const CALL_DENIED: &str = "Вызов отклонён пользователем";
 pub const CALL_FORBIDDEN: &str = "Инструмент запрещён разрешением или не входит в набор навыка";
 pub const TOOL_REPORTED_ERROR: &str = "Инструмент вернул ошибку";
-pub const BINARY_FILE: &str = "Binary file; its contents are not returned as text.";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -71,45 +70,12 @@ pub struct SkillFileEntry {
 pub struct SkillLoadOutput {
     pub key: String,
     pub name: String,
+    pub folder: String,
     pub instructions: String,
     pub files: Vec<SkillFileEntry>,
 }
 
 impl Validate for SkillLoadOutput {
-    fn validate(&self) -> Result<(), AppError> {
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillReadInput {
-    #[schemars(description = "Идентификатор навыка")]
-    pub key: String,
-    #[schemars(description = "Путь файла из результата skill.load, например references/style.md")]
-    pub path: String,
-}
-
-impl Validate for SkillReadInput {
-    fn validate(&self) -> Result<(), AppError> {
-        check::non_empty("key", &self.key)?;
-        check::max_len("key", &self.key, 128)?;
-        check::non_empty("path", &self.path)?;
-        check::max_len("path", &self.path, 512)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillReadOutput {
-    pub key: String,
-    pub path: String,
-    pub size: u64,
-    pub text: String,
-    pub binary: bool,
-}
-
-impl Validate for SkillReadOutput {
     fn validate(&self) -> Result<(), AppError> {
         Ok(())
     }
@@ -214,7 +180,6 @@ pub fn explained(error: AppError) -> AppError {
 }
 
 struct SkillLoadNode(SkillLibrary);
-struct SkillReadNode(SkillLibrary);
 struct SkillSaveNode(SkillLibrary);
 
 #[async_trait]
@@ -293,6 +258,7 @@ impl NodeDef for SkillLoadNode {
         context.check_cancelled()?;
         let loaded = self.0.load(&input.key)?;
         Ok(SkillLoadOutput {
+            folder: format!("{SKILL_ROOT}{}/", loaded.skill.key),
             key: loaded.skill.key,
             name: loaded.skill.name,
             instructions: loaded.instructions,
@@ -304,40 +270,6 @@ impl NodeDef for SkillLoadNode {
                     size: file.size,
                 })
                 .collect(),
-        })
-    }
-}
-
-#[async_trait]
-impl NodeDef for SkillReadNode {
-    type Input = SkillReadInput;
-    type Output = SkillReadOutput;
-
-    fn node_type(&self) -> &str {
-        SKILL_READ
-    }
-
-    fn permission(&self) -> PermissionRequirement {
-        PermissionRequirement::tool(SKILL_READ)
-    }
-
-    fn side_effect(&self) -> bool {
-        false
-    }
-
-    async fn run(
-        &self,
-        context: &StepContext,
-        input: SkillReadInput,
-    ) -> Result<SkillReadOutput, AppError> {
-        context.check_cancelled()?;
-        let file = self.0.read(&input.key, &input.path)?;
-        Ok(SkillReadOutput {
-            key: input.key,
-            path: file.path,
-            size: file.size,
-            binary: file.text.is_none(),
-            text: file.text.unwrap_or_else(|| BINARY_FILE.to_owned()),
         })
     }
 }
@@ -612,14 +544,8 @@ impl NodeDef for SkillGenerateNode {
     }
 }
 
-pub fn register_skill_nodes(
-    nodes: &NodeRegistry,
-    library: &SkillLibrary,
-    scripts: SkillScriptOptions,
-) -> Result<(), AppError> {
+pub fn register_skill_nodes(nodes: &NodeRegistry, library: &SkillLibrary) -> Result<(), AppError> {
     nodes.register(SkillLoadNode(library.clone()))?;
-    nodes.register(SkillReadNode(library.clone()))?;
     nodes.register(SkillSaveNode(library.clone()))?;
-    nodes.register(SkillScriptNode::new(library.clone(), scripts))?;
     nodes.register(SkillGenerateNode)
 }

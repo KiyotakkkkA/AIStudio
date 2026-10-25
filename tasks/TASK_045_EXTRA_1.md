@@ -2,7 +2,7 @@
 task: TASK_045_EXTRA_1
 title: Tool surface consolidation — fewer, non-overlapping model tools and no leaked kernel jobs
 phase: 8 — Documents and the agent browser
-status: todo
+status: done
 depends_on: [TASK_045]
 unblocks: [TASK_045_EXTRA_4]
 estimate: 5 h
@@ -133,16 +133,55 @@ completes the flow with the merged tools.
 
 ## Definition of done
 
-- [ ] `vector.index`, `job.run`, `download.fetch` are not tools; migration tested
-- [ ] Decision recorded; the chosen merges implemented with tests for every root
-- [ ] `chat:` tier decided in the resolver, not in a caller
-- [ ] Knowledge duplicates gone from the model surface
-- [ ] Catalogue size before / after recorded in Handoff
-- [ ] Gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] `vector.index`, `job.run`, `download.fetch` are not tools; migration tested
+- [x] Decision recorded; the chosen merges implemented with tests for every root
+- [x] `chat:` tier decided in the resolver, not in a caller
+- [x] Knowledge duplicates gone from the model surface
+- [x] Catalogue size before / after recorded in Handoff
+- [x] Gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- Decision (a), all three merges. `vector.index`, `job.run`, `download.fetch` are in `NOT_TOOLS`
+  and no longer reach the registry, the chat picker or a scenario tool slot; `vector.search` and
+  `vector.list` stay registered for graphs but leave every model surface (`GRAPH_ONLY_TOOLS`,
+  `model_tool`, renderer `isModelTool`).
+- `files/roots.rs`: `chat:` (the conversation's file folder) and `skill:<key>/` (read-only)
+  roots, one segment check for both, containment checked on the canonical path. `fs.list`,
+  `fs.read`, `fs.search` and `fs.apply` accept them; `fs.apply` and a `shell.run` cwd refuse
+  `skill:`. `chat:` writes skip the read-before-write rule and keep the 200 MB / 1000 files quota.
+- Tier by root lives in the resolver: nodes return `PermissionRequirement::AppFolder` when every
+  path is virtual, `PermissionService::admit_app_folder` allows unless the tool is disabled or
+  `off`. An explicit `ask` minimum (agentic `ask` mode) upgrades it to an approval in the
+  scheduler, and `fs.apply` then raises the diff approval even for a `chat:`-only batch.
+- `shell.run` runs `argv[0] = skill:<key>/scripts/<file>` through uv / Node.js with
+  `ZVS_SKILL_DIR`, cwd `chat:` by default (scratch outside a chat), and reports artifacts in its
+  output and meta (`ProcessResultDto` plus `artifacts`).
+- `knowledge.search` has a read mode (`documentId` + `section` or `fromChunk`–`toChunk`) and
+  returns `KnowledgeResult`; `knowledge.read`, `knowledge.list`, `chat.file`, `skill.read` and
+  `skill.script` are gone. `skill.load` returns `folder: "skill:<key>/"`.
+- Migration `0020_tool_surface` renames old keys in `conversation.enabled_tools`,
+  `agentic_session.tools` and `skill.allowed_tools`, strips the jobs (and `vector.*` from the two
+  model lists), deletes the removed tools' rows, references and permissions. Manifests on disk
+  are renamed on re-read through `current_tool_keys`.
+- Catalogue (`tools::tests::catalogue`, same fixture both times, `chat.ask` and `chat.memory`
+  included): **before 19 tools, 17 014 characters; after 11 tools, 13 803 characters**.
+- Bundled skills rewritten for the merged tools; versions raised (dashboard 1.5.0, docx/pdf/xlsx
+  1.1.0, skill-creator 1.2.0). PASSPORT §11 and §14 updated.
+
 **Deviated from plan:**
+- `CHAT_TOOL_ROUNDS` is not unused: `skill.generate` reads it. Left in place.
+- Tools a skill match adds on its own (`fs.read`, `fs.list`, `fs.apply`, `shell.run`) carry a
+  hidden `rootsOnly` flag when the user did not enable them, so a skill match never opens real
+  paths that `chat.file` / `skill.script` could not reach before.
+- `fs.search` accepts the roots too: it shares the folder resolver with `fs.list`.
+- The «Инструменты»-page jobs keep their permission rows; the demo job on the diagnostics page
+  still asks for approval as before.
+
 **Next session should know:**
+- Not run here: `pnpm build`, `pnpm test:e2e`, and the manual dashboard check from Verify.
+- `pnpm format:check` reports `ui/organisms/NavRail.tsx`, untouched by this task.
+- Stored tool calls in old conversations keep their old keys; the renderer still has their
+  titles and views.

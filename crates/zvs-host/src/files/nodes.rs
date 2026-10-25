@@ -16,12 +16,16 @@ use zvs_contract::{
 use super::commit::{Fault, commit, snapshot};
 use super::ledger::ReadLedger;
 use super::plan::{Change, Edit, Plan, RealDisk, plan};
+use super::roots::{
+    CHAT_ROOT, Located, ROOTS_ONLY, RootKind, SKILL_READ_ONLY, VirtualRoots, is_virtual,
+};
 use super::text::{Decoded, content_hash, decode};
 use super::walk::{WalkOptions, walk};
+use crate::chat_files::within_quota;
 use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext};
 use crate::platform::ids::new_id;
 use crate::platform::long_path::extended;
-use crate::workspace::{FolderAccessService, FolderTarget, GrantTarget, Review};
+use crate::workspace::{AccessPlan, FolderAccessService, FolderTarget, Review};
 
 pub const FS_LIST: &str = "fs.list";
 pub const FS_READ: &str = "fs.read";
@@ -29,10 +33,10 @@ pub const FS_SEARCH: &str = "fs.search";
 pub const FS_APPLY: &str = "fs.apply";
 pub const FILE_TOOLS: [&str; 4] = [FS_LIST, FS_READ, FS_SEARCH, FS_APPLY];
 
-pub const LIST_DESCRIPTION: &str = "Список файлов и папок. Относительный путь разрешается от рабочей папки диалога; если рабочей папки нет, путь должен быть абсолютным. Файлы и папки из .gitignore пропускаются. recursive обходит вложенные папки, glob отбирает файлы по шаблону, например **/*.rs. Доступ к папке, которая ещё не открыта, подтверждает пользователь.";
-pub const READ_DESCRIPTION: &str = "Чтение до 16 текстовых файлов за вызов; для каждого можно указать диапазон строк startLine–endLine. Объём содержимого ограничен, для двоичных файлов сообщается только размер. Существующий файл нужно прочитать этим инструментом в текущем ходе диалога, прежде чем изменять его через fs.apply.";
-pub const SEARCH_DESCRIPTION: &str = "Поиск текста по файлам папки с учётом .gitignore. По умолчанию query ищется как обычная строка, regex: true включает регулярные выражения, ignoreCase отключает учёт регистра, glob ограничивает набор файлов. Возвращает путь, номер строки и саму строку для каждого совпадения.";
-pub const APPLY_DESCRIPTION: &str = "Набор изменений файлов за один вызов: write записывает файл целиком, edit заменяет фрагменты old на new (каждый old должен встречаться в файле ровно один раз), move перемещает файл, delete удаляет файл. Изменения выполняются по порядку, и каждое видит результат предыдущих. Существующий файл, который изменяется, перезаписывается или удаляется, должен быть прочитан через fs.read в текущем ходе и не измениться после чтения. Пользователь подтверждает набор целиком по общему диффу. Набор применяется полностью или не применяется вовсе: при ошибке записи уже изменённые файлы восстанавливаются из снимков. Окончания строк и BOM сохраняются, двоичные файлы не изменяются.";
+pub const LIST_DESCRIPTION: &str = "Список файлов и папок. Путь — абсолютный, относительный от рабочей папки диалога, chat: (папка файлов диалога) или skill:<ключ>/ (папка навыка, только для чтения). Файлы из .gitignore пропускаются. recursive обходит вложенные папки, glob отбирает файлы по шаблону, например **/*.rs. Доступ к папке вне выданных разрешений подтверждает пользователь.";
+pub const READ_DESCRIPTION: &str = "Чтение до 16 текстовых файлов за вызов; для каждого можно указать диапазон строк startLine–endLine. Пути — как в fs.list, например chat:_spec.json или skill:dashboard/references/spec.md. Объём содержимого ограничен, для двоичных файлов сообщается только размер. Существующий файл вне chat: нужно прочитать в текущем ходе, прежде чем изменять его через fs.apply.";
+pub const SEARCH_DESCRIPTION: &str = "Поиск текста по файлам папки с учётом .gitignore; путь — как в fs.list. По умолчанию query ищется как обычная строка, regex: true включает регулярные выражения, ignoreCase отключает учёт регистра, glob ограничивает набор файлов. Возвращает путь, номер строки и саму строку для каждого совпадения.";
+pub const APPLY_DESCRIPTION: &str = "Набор изменений файлов за один вызов: write записывает файл целиком, edit заменяет фрагменты old на new (каждый old встречается в файле ровно один раз), move перемещает файл, delete удаляет файл. Изменения выполняются по порядку, каждое видит результат предыдущих. Пути — как в fs.list; папки skill: только для чтения. Существующий файл вне chat: перед изменением читается через fs.read в текущем ходе и не должен измениться после чтения. Пользователь подтверждает набор целиком по общему диффу; изменения только в chat: подтверждения не требуют. Набор применяется полностью или не применяется вовсе. Окончания строк и BOM сохраняются, двоичные файлы не изменяются.";
 
 pub const LIST_ACTION: &str = "просмотр папки";
 pub const READ_ACTION: &str = "чтение файлов";
@@ -96,11 +100,41 @@ fn limit(value: Option<u64>, default: u64, max: u64) -> usize {
     usize::try_from(value.unwrap_or(default).clamp(1, max)).unwrap_or(usize::MAX)
 }
 
+fn outside_roots() -> AppError {
+    AppError::new(AppErrorCode::PermissionDenied, ROOTS_ONLY)
+}
+
+fn read_only_skill() -> AppError {
+    AppError::new(AppErrorCode::PermissionDenied, SKILL_READ_ONLY)
+}
+
+fn listed_path(path: Option<&str>, roots_only: bool) -> Option<&str> {
+    path.or_else(|| roots_only.then_some(CHAT_ROOT))
+}
+
+fn listing_permission(tool: &str, input: &Value) -> PermissionRequirement {
+    let only = input.get("rootsOnly").and_then(Value::as_bool) == Some(true);
+    match listed_path(input.get("path").and_then(Value::as_str), only) {
+        Some(path) if is_virtual(path) => PermissionRequirement::app_folder(tool),
+        _ => PermissionRequirement::tool(tool),
+    }
+}
+
+fn all_virtual<'a>(paths: impl IntoIterator<Item = Option<&'a str>>) -> bool {
+    let mut any = false;
+    let all = paths.into_iter().all(|path| {
+        any = true;
+        path.is_some_and(is_virtual)
+    });
+    any && all
+}
+
 #[derive(Clone)]
 pub struct FileToolOptions {
     pub runs_dir: PathBuf,
     pub ledger: ReadLedger,
     pub fault: Option<Fault>,
+    pub roots: VirtualRoots,
 }
 
 impl FileToolOptions {
@@ -109,6 +143,7 @@ impl FileToolOptions {
             runs_dir,
             ledger: ReadLedger::new(),
             fault: None,
+            roots: VirtualRoots::default(),
         }
     }
 }
@@ -120,6 +155,10 @@ struct Tools {
 }
 
 impl Tools {
+    fn located(&self, conversation: &str, path: &str) -> Result<Option<Located>, AppError> {
+        self.options.roots.locate(conversation, path)
+    }
+
     async fn folder(
         &self,
         context: &StepContext,
@@ -127,7 +166,25 @@ impl Tools {
         tool: &str,
         action: &str,
         path: Option<&str>,
+        roots_only: bool,
     ) -> Result<PathBuf, AppError> {
+        let path = listed_path(path, roots_only);
+        if let Some(located) = path
+            .map(|path| self.located(conversation, path))
+            .transpose()?
+            .flatten()
+        {
+            return match std::fs::metadata(extended(&located.path)) {
+                Ok(metadata) if metadata.is_dir() => Ok(located.path),
+                Ok(_) => Err(AppError::new(AppErrorCode::ValidationFailed, NOT_A_FOLDER)
+                    .with_detail("path", path_text(&located.path))),
+                Err(_) => Err(AppError::new(AppErrorCode::NotFound, FOLDER_MISSING)
+                    .with_detail("path", path_text(&located.path))),
+            };
+        }
+        if roots_only {
+            return Err(outside_roots());
+        }
         let call = self.folders.call(conversation, tool);
         let target = FolderTarget::folder(path.unwrap_or("."));
         let resolved = self
@@ -162,7 +219,7 @@ async fn blocking<T: Send + 'static>(
 pub struct FsListInput {
     #[serde(default)]
     #[schemars(
-        description = "Папка: абсолютный путь или путь относительно рабочей папки; по умолчанию рабочая папка"
+        description = "Папка: абсолютный путь, путь относительно рабочей папки, chat: или skill:<ключ>/; по умолчанию рабочая папка"
     )]
     pub path: Option<String>,
     #[serde(default)]
@@ -177,6 +234,9 @@ pub struct FsListInput {
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
+    #[serde(default)]
+    #[schemars(skip)]
+    pub roots_only: bool,
 }
 
 impl Validate for FsListInput {
@@ -218,6 +278,10 @@ impl NodeDef for FsListNode {
         PermissionRequirement::tool(FS_LIST)
     }
 
+    fn permission_for(&self, input: &Value) -> PermissionRequirement {
+        listing_permission(FS_LIST, input)
+    }
+
     fn side_effect(&self) -> bool {
         false
     }
@@ -235,6 +299,7 @@ impl NodeDef for FsListNode {
                 FS_LIST,
                 LIST_ACTION,
                 input.path.as_deref(),
+                input.roots_only,
             )
             .await?;
         let cancel = context.cancel.clone();
@@ -285,7 +350,9 @@ impl NodeDef for FsListNode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FsReadTarget {
-    #[schemars(description = "Файл: абсолютный путь или путь относительно рабочей папки")]
+    #[schemars(
+        description = "Файл: абсолютный путь, путь относительно рабочей папки, chat:<путь> или skill:<ключ>/<путь>"
+    )]
     pub path: String,
     #[serde(default)]
     #[schemars(description = "Первая строка, начиная с 1")]
@@ -303,6 +370,9 @@ pub struct FsReadInput {
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
+    #[serde(default)]
+    #[schemars(skip)]
+    pub roots_only: bool,
 }
 
 impl Validate for FsReadInput {
@@ -484,6 +554,23 @@ impl NodeDef for FsReadNode {
         PermissionRequirement::tool(FS_READ)
     }
 
+    fn permission_for(&self, input: &Value) -> PermissionRequirement {
+        let paths = input
+            .get("paths")
+            .and_then(Value::as_array)
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        if all_virtual(
+            paths
+                .iter()
+                .map(|target| target.get("path").and_then(Value::as_str)),
+        ) {
+            PermissionRequirement::app_folder(FS_READ)
+        } else {
+            self.permission()
+        }
+    }
+
     fn side_effect(&self) -> bool {
         false
     }
@@ -493,17 +580,38 @@ impl NodeDef for FsReadNode {
         context: &StepContext,
         input: FsReadInput,
     ) -> Result<FsReadOutput, AppError> {
-        let call = self.0.folders.call(&input.conversation_id, FS_READ);
+        let mut located: Vec<Option<PathBuf>> = Vec::with_capacity(input.paths.len());
+        for target in &input.paths {
+            located.push(
+                self.0
+                    .located(&input.conversation_id, &target.path)?
+                    .map(|found| found.path),
+            );
+        }
         let targets: Vec<FolderTarget> = input
             .paths
             .iter()
-            .map(|target| FolderTarget::file(&target.path))
+            .zip(&located)
+            .filter(|(_, found)| found.is_none())
+            .map(|(target, _)| FolderTarget::file(&target.path))
             .collect();
-        let resolved = self
-            .0
-            .folders
-            .ensure_access(context, &call, READ_ACTION, &targets)
-            .await?;
+        if input.roots_only && !targets.is_empty() {
+            return Err(outside_roots());
+        }
+        let granted = if targets.is_empty() {
+            Vec::new()
+        } else {
+            let call = self.0.folders.call(&input.conversation_id, FS_READ);
+            self.0
+                .folders
+                .ensure_access(context, &call, READ_ACTION, &targets)
+                .await?
+        };
+        let mut granted = granted.into_iter().map(|target| target.path);
+        let resolved: Vec<PathBuf> = located
+            .into_iter()
+            .map(|found| found.or_else(|| granted.next()).unwrap_or_default())
+            .collect();
         let ledger = self.0.options.ledger.clone();
         let run = context.run_id.to_string();
         blocking(move || {
@@ -512,8 +620,8 @@ impl NodeDef for FsReadNode {
             };
             let mut sections = Vec::with_capacity(resolved.len());
             let mut files = Vec::with_capacity(resolved.len());
-            for (target, request) in resolved.iter().zip(&input.paths) {
-                let (section, file) = read_one(&target.path, request, &mut budget, &ledger, &run);
+            for (path, request) in resolved.iter().zip(&input.paths) {
+                let (section, file) = read_one(path, request, &mut budget, &ledger, &run);
                 sections.push(section);
                 files.push(file);
             }
@@ -549,6 +657,9 @@ pub struct FsSearchInput {
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
+    #[serde(default)]
+    #[schemars(skip)]
+    pub roots_only: bool,
 }
 
 impl Validate for FsSearchInput {
@@ -660,6 +771,10 @@ impl NodeDef for FsSearchNode {
         PermissionRequirement::tool(FS_SEARCH)
     }
 
+    fn permission_for(&self, input: &Value) -> PermissionRequirement {
+        listing_permission(FS_SEARCH, input)
+    }
+
     fn side_effect(&self) -> bool {
         false
     }
@@ -687,6 +802,7 @@ impl NodeDef for FsSearchNode {
                 FS_SEARCH,
                 SEARCH_ACTION,
                 input.path.as_deref(),
+                input.roots_only,
             )
             .await?;
         let cancel = context.cancel.clone();
@@ -736,6 +852,9 @@ pub struct FsApplyInput {
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
+    #[serde(default)]
+    #[schemars(skip)]
+    pub roots_only: bool,
 }
 
 impl Validate for FsApplyInput {
@@ -802,22 +921,40 @@ pub fn deletes(input: &Value) -> bool {
         })
 }
 
-fn targets(changes: &[FsChange]) -> Vec<FolderTarget> {
+fn change_paths(changes: &[FsChange]) -> Vec<&str> {
     changes
         .iter()
         .flat_map(|change| match change {
             FsChange::Write { path, .. }
             | FsChange::Edit { path, .. }
             | FsChange::Delete { path } => {
-                vec![FolderTarget::file(path)]
+                vec![path.as_str()]
             }
-            FsChange::Move { from, to } => vec![FolderTarget::file(from), FolderTarget::file(to)],
+            FsChange::Move { from, to } => vec![from.as_str(), to.as_str()],
         })
         .collect()
 }
 
-fn resolved_changes(changes: &[FsChange], resolved: &[GrantTarget]) -> Vec<Change> {
-    let mut paths = resolved.iter().map(|target| target.path.clone());
+fn field<'a>(change: &'a Value, name: &str) -> Option<&'a str> {
+    change.get(name).and_then(Value::as_str)
+}
+
+fn input_paths(input: &Value) -> Vec<Option<&str>> {
+    input
+        .get("changes")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+        .iter()
+        .flat_map(|change| match change.get("op").and_then(Value::as_str) {
+            Some("move") => vec![field(change, "from"), field(change, "to")],
+            _ => vec![field(change, "path")],
+        })
+        .collect()
+}
+
+fn resolved_changes(changes: &[FsChange], resolved: &[PathBuf]) -> Vec<Change> {
+    let mut paths = resolved.iter().cloned();
     let mut next = || paths.next().unwrap_or_default();
     changes
         .iter()
@@ -845,8 +982,16 @@ fn resolved_changes(changes: &[FsChange], resolved: &[GrantTarget]) -> Vec<Chang
         .collect()
 }
 
-fn check_fresh(planned: &Plan, ledger: &ReadLedger, run: &str) -> Result<(), AppError> {
+fn check_fresh(
+    planned: &Plan,
+    ledger: &ReadLedger,
+    run: &str,
+    exempt: &[PathBuf],
+) -> Result<(), AppError> {
     for path in &planned.fresh {
+        if exempt.iter().any(|base| path.starts_with(base)) {
+            continue;
+        }
         let Some(before) = planned
             .files
             .iter()
@@ -923,7 +1068,9 @@ impl NodeDef for FsApplyNode {
     }
 
     fn permission_for(&self, input: &Value) -> PermissionRequirement {
-        if deletes(input) {
+        if all_virtual(input_paths(input)) {
+            PermissionRequirement::app_folder(FS_APPLY)
+        } else if deletes(input) {
             PermissionRequirement::tool_at(FS_APPLY, ToolTier::Ask)
         } else {
             self.permission()
@@ -945,12 +1092,67 @@ impl NodeDef for FsApplyNode {
     ) -> Result<FsApplyOutput, AppError> {
         let approval = context.take_deferred_approval();
         let tools = &self.0;
+        let paths = change_paths(&input.changes);
+        let mut located: Vec<Option<Located>> = Vec::with_capacity(paths.len());
+        for path in &paths {
+            let found = tools.located(&input.conversation_id, path)?;
+            if found
+                .as_ref()
+                .is_some_and(|found| found.kind == RootKind::Skill)
+            {
+                return Err(read_only_skill());
+            }
+            located.push(found);
+        }
+        let real: Vec<FolderTarget> = paths
+            .iter()
+            .zip(&located)
+            .filter(|(_, found)| found.is_none())
+            .map(|(path, _)| FolderTarget::file(path))
+            .collect();
+        if input.roots_only && !real.is_empty() {
+            return Err(outside_roots());
+        }
         let call = tools.folders.call(&input.conversation_id, FS_APPLY);
-        let access = tools.folders.resolve(&call, &targets(&input.changes))?;
-        let changes = resolved_changes(&input.changes, &access.resolved);
+        let access = if real.is_empty() {
+            AccessPlan::empty()
+        } else {
+            tools.folders.resolve(&call, &real)?
+        };
+        let mut bases: Vec<PathBuf> = Vec::new();
+        for found in located.iter().flatten() {
+            if !bases.contains(&found.base) {
+                bases.push(found.base.clone());
+            }
+        }
+        let mut granted = access.resolved.iter().map(|target| target.path.clone());
+        let resolved: Vec<PathBuf> = located
+            .into_iter()
+            .map(|found| {
+                found
+                    .map(|found| found.path)
+                    .or_else(|| granted.next())
+                    .unwrap_or_default()
+            })
+            .collect();
+        let changes = resolved_changes(&input.changes, &resolved);
         let planned = blocking(move || plan(&changes, &RealDisk)).await?;
         let run = context.run_id.to_string();
-        check_fresh(&planned, &tools.options.ledger, &run)?;
+        check_fresh(&planned, &tools.options.ledger, &run, &bases)?;
+        for base in &bases {
+            let sized: Vec<(PathBuf, Option<u64>)> = planned
+                .files
+                .iter()
+                .filter(|file| file.path.starts_with(base))
+                .map(|file| {
+                    (
+                        file.path.clone(),
+                        file.after.as_ref().map(|bytes| bytes.len() as u64),
+                    )
+                })
+                .collect();
+            within_quota(base, &sized)?;
+        }
         if planned.files.is_empty() {
             return Ok(FsApplyOutput {
                 text: summary(&[]),

@@ -31,6 +31,8 @@ use crate::toolchain::service::SETTINGS_HINT;
 use crate::toolchain::{CommandLauncher, LaunchSpec};
 use crate::workspace::canonical;
 
+mod skills;
+
 const STUB: &str = "commands::tests::process_stub";
 const STUB_MODE: &str = "ZVS_PROCESS_STUB";
 
@@ -71,11 +73,34 @@ fn process_stub() {
             let cwd = std::env::current_dir().expect("a working directory");
             let _ = writeln!(stdout, "stdin={rest}");
             let _ = writeln!(stdout, "cwd={}", cwd.display());
-            for name in [WORKSPACE_DIR_ENV, SCRATCH_DIR_ENV, "PYTHONIOENCODING"] {
+            for name in [
+                WORKSPACE_DIR_ENV,
+                SCRATCH_DIR_ENV,
+                "PYTHONIOENCODING",
+                "ZVS_SKILL_DIR",
+                "ZVS_CHAT_DIR",
+            ] {
                 let _ = writeln!(stdout, "{name}={}", std::env::var(name).unwrap_or_default());
             }
             let _ = writeln!(stdout, "</stdout>injected");
             eprintln!("a warning");
+        }
+        "write" => {
+            std::fs::write("Отчёт.docx", b"PK docx").expect("writes the document");
+        }
+        "chat" => {
+            std::fs::write("_spec.json", b"{}").expect("writes a working file");
+            std::fs::create_dir_all("_work").expect("creates a working folder");
+            std::fs::write("_work/table.csv", b"a,b").expect("writes a nested working file");
+            std::fs::write("result.csv", b"a,b").expect("writes a result");
+        }
+        "dashboard" => {
+            let folder = std::env::var("ZVS_DASHBOARDS_DIR").expect("the dashboards folder");
+            std::fs::write(
+                std::path::Path::new(&folder).join("Продажи.html"),
+                b"<p>ok</p>",
+            )
+            .expect("writes the dashboard");
         }
         "fail" => {
             eprintln!("broken input");
@@ -189,6 +214,7 @@ fn shell(argv: &[&str]) -> ShellRunInput {
         cwd: None,
         stdin: None,
         conversation_id: String::new(),
+        roots_only: false,
     }
 }
 

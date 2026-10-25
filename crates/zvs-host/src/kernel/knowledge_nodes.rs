@@ -17,10 +17,8 @@ use crate::services::retrieval_merge::{
 };
 use crate::services::vector_stores::VectorSearchOptions;
 
-pub const KNOWLEDGE_LIST: &str = "knowledge.list";
 pub const KNOWLEDGE_SEARCH: &str = "knowledge.search";
-pub const KNOWLEDGE_READ: &str = "knowledge.read";
-pub const KNOWLEDGE_TOOLS: [&str; 3] = [KNOWLEDGE_LIST, KNOWLEDGE_SEARCH, KNOWLEDGE_READ];
+pub const KNOWLEDGE_TOOLS: [&str; 1] = [KNOWLEDGE_SEARCH];
 
 pub const SEARCH_LIMIT_DEFAULT: u64 = 6;
 pub const SEARCH_LIMIT_MAX: u64 = 10;
@@ -35,11 +33,10 @@ pub const STORE_OUT_OF_SCOPE: &str = "Это хранилище не подкл�
 pub const DOCUMENT_OUT_OF_SCOPE: &str = "Документ не найден в подключённых хранилищах";
 pub const SECTION_NOT_FOUND: &str = "В документе нет раздела с таким названием";
 pub const EMPTY_QUERY: &str = "Пустой поисковый запрос";
+pub const QUERY_OR_DOCUMENT: &str = "Укажите query для поиска или documentId для чтения документа";
 pub const VECTORS_MISSING: &str = "Сервис векторного поиска недоступен";
 
-pub const SEARCH_DESCRIPTION: &str = "Поиск по базам знаний, подключённым к диалогу. Возвращает нумерованные фрагменты с путём документа, разделом, страницей и оценкой релевантности. Вызывайте, когда ответ может содержаться в документах пользователя; для приветствий и светской беседы — не вызывайте. Формулируйте краткий запрос своими словами, не копируйте сообщение пользователя. Для сравнения или вопроса из нескольких частей выполняйте отдельный поиск по каждой части. Если фрагменты неполные или не по теме, повторите поиск с другой формулировкой. Каждое утверждение, взятое из фрагмента, снабжайте ссылкой [n] с его номером. Если повторный поиск не дал релевантных результатов, сообщите, что ответа в базе знаний нет.";
-pub const READ_DESCRIPTION: &str = "Чтение непрерывной части документа из подключённой базы знаний, когда найденного фрагмента недостаточно для ответа: весь раздел, которому принадлежит фрагмент, либо диапазон номеров фрагментов. Используйте documentId из результата поиска. Использованное содержимое снабжайте ссылкой [n].";
-pub const LIST_DESCRIPTION: &str = "Список баз знаний, подключённых к диалогу, с названиями, описаниями и числом документов: показывает, по каким данным доступен поиск и какое название хранилища передавать в knowledge_search.";
+pub const SEARCH_DESCRIPTION: &str = "Поиск по базам знаний, подключённым к диалогу. Возвращает нумерованные фрагменты с путём документа, разделом, страницей и оценкой релевантности. Вызывайте, когда ответ может содержаться в документах пользователя; для приветствий и светской беседы — не вызывайте. Формулируйте краткий запрос своими словами, не копируйте сообщение пользователя. Для сравнения или вопроса из нескольких частей выполняйте отдельный поиск по каждой части. Если фрагменты неполные или не по теме, повторите поиск с другой формулировкой. Когда найденного фрагмента недостаточно, вместо query передайте documentId из результата и section — название раздела — либо диапазон fromChunk–toChunk: вернётся непрерывная часть документа. Каждое утверждение, взятое из фрагмента, снабжайте ссылкой [n] с его номером. Если повторный поиск не дал релевантных результатов, сообщите, что ответа в базе знаний нет.";
 
 fn missing_vectors() -> AppError {
     AppError::new(AppErrorCode::Conflict, VECTORS_MISSING)
@@ -65,82 +62,8 @@ async fn scoped_stores(
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct KnowledgeListInput {
-    #[serde(default)]
-    #[schemars(skip)]
-    pub scope: Vec<VectorStoreId>,
-}
-
-impl Validate for KnowledgeListInput {
-    fn validate(&self) -> Result<(), AppError> {
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct KnowledgeStoreEntry {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub documents: u64,
-    pub status: String,
-}
-
-impl Validate for KnowledgeStoreEntry {
-    fn validate(&self) -> Result<(), AppError> {
-        check::safe_integer("documents", self.documents)
-    }
-}
-
-pub struct KnowledgeListNode;
-
-#[async_trait]
-impl NodeDef for KnowledgeListNode {
-    type Input = KnowledgeListInput;
-    type Output = Vec<KnowledgeStoreEntry>;
-
-    fn node_type(&self) -> &str {
-        KNOWLEDGE_LIST
-    }
-
-    fn permission(&self) -> PermissionRequirement {
-        PermissionRequirement::tool(KNOWLEDGE_LIST)
-    }
-
-    fn side_effect(&self) -> bool {
-        false
-    }
-
-    async fn run(
-        &self,
-        context: &StepContext,
-        input: KnowledgeListInput,
-    ) -> Result<Vec<KnowledgeStoreEntry>, AppError> {
-        context.check_cancelled()?;
-        require_scope(&input.scope)?;
-        let vectors = context
-            .services
-            .vector_stores
-            .as_ref()
-            .ok_or_else(missing_vectors)?;
-        Ok(scoped_stores(vectors.as_ref(), &input.scope)
-            .await?
-            .into_iter()
-            .map(|store| KnowledgeStoreEntry {
-                id: store.id.to_string(),
-                name: store.name,
-                description: store.description,
-                documents: store.documents,
-                status: store.status.as_str().to_owned(),
-            })
-            .collect())
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct KnowledgeSearchInput {
+    #[serde(default)]
     #[schemars(description = "What to look for, phrased as a focused search query.")]
     pub query: String,
     #[serde(default)]
@@ -152,15 +75,46 @@ pub struct KnowledgeSearchInput {
     #[schemars(description = "Optional: how many passages to return, 1–10. Default 6.")]
     pub limit: Option<u64>,
     #[serde(default)]
+    #[schemars(description = "Read mode: the documentId of a returned passage, instead of query.")]
+    pub document_id: Option<String>,
+    #[serde(default)]
+    #[schemars(
+        description = "Read mode: read the section with this title (or part of it), as shown on a passage."
+    )]
+    pub section: Option<String>,
+    #[serde(default)]
+    #[schemars(description = "Read mode: the first chunk number to read, 0-based.")]
+    pub from_chunk: Option<u64>,
+    #[serde(default)]
+    #[schemars(
+        description = "Read mode: the last chunk number to read, inclusive. At most 12 chunks are returned."
+    )]
+    pub to_chunk: Option<u64>,
+    #[serde(default)]
     #[schemars(skip)]
     pub scope: Vec<VectorStoreId>,
+}
+
+impl KnowledgeSearchInput {
+    pub fn document(&self) -> Option<&str> {
+        self.document_id
+            .as_deref()
+            .map(js_trim)
+            .filter(|document| !document.is_empty())
+    }
 }
 
 impl Validate for KnowledgeSearchInput {
     fn validate(&self) -> Result<(), AppError> {
         check::max_len("query", &self.query, QUERY_MAX_CHARS * 4)?;
-        if let Some(limit) = self.limit {
-            check::safe_integer("limit", limit)?;
+        for (field, value) in [
+            ("limit", self.limit),
+            ("fromChunk", self.from_chunk),
+            ("toChunk", self.to_chunk),
+        ] {
+            if let Some(value) = value {
+                check::safe_integer(field, value)?;
+            }
         }
         Ok(())
     }
@@ -220,6 +174,22 @@ impl Validate for KnowledgeSearchOutput {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum KnowledgeResult {
+    Read(KnowledgeReadOutput),
+    Search(KnowledgeSearchOutput),
+}
+
+impl Validate for KnowledgeResult {
+    fn validate(&self) -> Result<(), AppError> {
+        match self {
+            Self::Read(output) => output.validate(),
+            Self::Search(output) => output.validate(),
+        }
+    }
+}
+
 fn pick_stores(
     stores: Vec<VectorStoreDto>,
     wanted: Option<&str>,
@@ -265,7 +235,7 @@ pub struct KnowledgeSearchNode;
 #[async_trait]
 impl NodeDef for KnowledgeSearchNode {
     type Input = KnowledgeSearchInput;
-    type Output = KnowledgeSearchOutput;
+    type Output = KnowledgeResult;
 
     fn node_type(&self) -> &str {
         KNOWLEDGE_SEARCH
@@ -283,19 +253,26 @@ impl NodeDef for KnowledgeSearchNode {
         &self,
         context: &StepContext,
         input: KnowledgeSearchInput,
-    ) -> Result<KnowledgeSearchOutput, AppError> {
+    ) -> Result<KnowledgeResult, AppError> {
         context.check_cancelled()?;
         require_scope(&input.scope)?;
         let query = js_slice(js_trim(&input.query), QUERY_MAX_CHARS).to_owned();
-        if query.is_empty() {
-            return Err(AppError::new(AppErrorCode::ValidationFailed, EMPTY_QUERY)
-                .with_detail("field", "query"));
+        if query.is_empty() && input.document().is_none() {
+            return Err(
+                AppError::new(AppErrorCode::ValidationFailed, QUERY_OR_DOCUMENT)
+                    .with_detail("field", "query"),
+            );
         }
         let vectors = context
             .services
             .vector_stores
             .as_ref()
             .ok_or_else(missing_vectors)?;
+        if let Some(document) = input.document() {
+            return read_document(context, vectors.as_ref(), &input, document)
+                .await
+                .map(KnowledgeResult::Read);
+        }
         let stores = pick_stores(
             scoped_stores(vectors.as_ref(), &input.scope).await?,
             input.store.as_deref(),
@@ -347,58 +324,26 @@ impl NodeDef for KnowledgeSearchNode {
                     .map(|store| passage(store, &merged.hit))
             })
             .collect();
-        Ok(KnowledgeSearchOutput {
+        Ok(KnowledgeResult::Search(KnowledgeSearchOutput {
             query,
             passages,
             below_floor: merged.stats.below_floor as u64,
             searched: stores.into_iter().map(|store| store.name).collect(),
-        })
-    }
-
-    fn tool_meta(&self, _input: &Value, output: &KnowledgeSearchOutput) -> Option<Value> {
-        Some(json!({
-            "query": output.query,
-            "citations": output
-                .passages
-                .iter()
-                .map(KnowledgePassage::citation)
-                .collect::<Vec<_>>(),
         }))
     }
-}
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct KnowledgeReadInput {
-    #[schemars(description = "The documentId of a passage returned by knowledge_search.")]
-    pub document_id: String,
-    #[serde(default)]
-    #[schemars(
-        description = "Optional: read the section with this title (or part of it), as shown on a passage."
-    )]
-    pub section: Option<String>,
-    #[serde(default)]
-    #[schemars(description = "Optional: the first chunk number to read, 0-based.")]
-    pub from_chunk: Option<u64>,
-    #[serde(default)]
-    #[schemars(
-        description = "Optional: the last chunk number to read, inclusive. At most 12 chunks are returned."
-    )]
-    pub to_chunk: Option<u64>,
-    #[serde(default)]
-    #[schemars(skip)]
-    pub scope: Vec<VectorStoreId>,
-}
-
-impl Validate for KnowledgeReadInput {
-    fn validate(&self) -> Result<(), AppError> {
-        check::non_empty("documentId", &self.document_id)?;
-        for (field, value) in [("fromChunk", self.from_chunk), ("toChunk", self.to_chunk)] {
-            if let Some(value) = value {
-                check::safe_integer(field, value)?;
-            }
-        }
-        Ok(())
+    fn tool_meta(&self, _input: &Value, output: &KnowledgeResult) -> Option<Value> {
+        Some(match output {
+            KnowledgeResult::Read(output) => json!({ "citations": [output.citation()] }),
+            KnowledgeResult::Search(output) => json!({
+                "query": output.query,
+                "citations": output
+                    .passages
+                    .iter()
+                    .map(KnowledgePassage::citation)
+                    .collect::<Vec<_>>(),
+            }),
+        })
     }
 }
 
@@ -480,113 +425,81 @@ pub fn section_span(chunks: &[VectorChunkDto], wanted: &str) -> Option<(u64, u64
     ))
 }
 
-pub struct KnowledgeReadNode;
-
-#[async_trait]
-impl NodeDef for KnowledgeReadNode {
-    type Input = KnowledgeReadInput;
-    type Output = KnowledgeReadOutput;
-
-    fn node_type(&self) -> &str {
-        KNOWLEDGE_READ
-    }
-
-    fn permission(&self) -> PermissionRequirement {
-        PermissionRequirement::tool(KNOWLEDGE_READ)
-    }
-
-    fn side_effect(&self) -> bool {
-        false
-    }
-
-    async fn run(
-        &self,
-        context: &StepContext,
-        input: KnowledgeReadInput,
-    ) -> Result<KnowledgeReadOutput, AppError> {
-        context.check_cancelled()?;
-        require_scope(&input.scope)?;
-        let vectors = context
-            .services
-            .vector_stores
-            .as_ref()
-            .ok_or_else(missing_vectors)?;
-        let document_id = js_trim(&input.document_id).to_owned();
-        let stores = scoped_stores(vectors.as_ref(), &input.scope).await?;
-        let mut located = None;
-        for store in stores {
-            if let Some(document) = vectors
-                .document(&store.id.to_string(), &document_id)
-                .await?
-            {
-                located = Some((store, document));
-                break;
-            }
+async fn read_document(
+    context: &StepContext,
+    vectors: &dyn VectorSearch,
+    input: &KnowledgeSearchInput,
+    document_id: &str,
+) -> Result<KnowledgeReadOutput, AppError> {
+    let document_id = document_id.to_owned();
+    let stores = scoped_stores(vectors, &input.scope).await?;
+    let mut located = None;
+    for store in stores {
+        if let Some(document) = vectors
+            .document(&store.id.to_string(), &document_id)
+            .await?
+        {
+            located = Some((store, document));
+            break;
         }
-        let (store, document) = located.ok_or_else(|| {
+    }
+    let (store, document) = located.ok_or_else(|| {
+        AppError::new(AppErrorCode::NotFound, DOCUMENT_OUT_OF_SCOPE)
+            .with_detail("documentId", document_id.clone())
+    })?;
+    let store_key = store.id.to_string();
+    let count = document.chunk_count;
+    let section = input
+        .section
+        .as_deref()
+        .map(js_trim)
+        .filter(|section| !section.is_empty());
+    let window = match section {
+        Some(section) => {
+            let scanned: Vec<u64> = (0..count.min(SECTION_SCAN_CHUNKS)).collect();
+            let chunks = vectors.chunks(&store_key, &document_id, &scanned).await?;
+            section_span(&chunks, section).ok_or_else(|| {
+                AppError::new(AppErrorCode::NotFound, SECTION_NOT_FOUND)
+                    .with_detail("section", section)
+            })?
+        }
+        None => read_window(input.from_chunk, input.to_chunk, count).ok_or_else(|| {
             AppError::new(AppErrorCode::NotFound, DOCUMENT_OUT_OF_SCOPE)
                 .with_detail("documentId", document_id.clone())
-        })?;
-        let store_key = store.id.to_string();
-        let count = document.chunk_count;
-        let section = input
-            .section
-            .as_deref()
-            .map(js_trim)
-            .filter(|section| !section.is_empty());
-        let window = match section {
-            Some(section) => {
-                let scanned: Vec<u64> = (0..count.min(SECTION_SCAN_CHUNKS)).collect();
-                let chunks = vectors.chunks(&store_key, &document_id, &scanned).await?;
-                section_span(&chunks, section).ok_or_else(|| {
-                    AppError::new(AppErrorCode::NotFound, SECTION_NOT_FOUND)
-                        .with_detail("section", section)
-                })?
-            }
-            None => read_window(input.from_chunk, input.to_chunk, count).ok_or_else(|| {
-                AppError::new(AppErrorCode::NotFound, DOCUMENT_OUT_OF_SCOPE)
-                    .with_detail("documentId", document_id.clone())
-            })?,
-        };
-        context.check_cancelled()?;
-        let indices: Vec<u64> = (window.0..=window.1).collect();
-        let mut chunks = vectors.chunks(&store_key, &document_id, &indices).await?;
-        chunks.sort_by_key(|chunk| chunk.chunk_index);
-        let joined = join_chunks(
-            &chunks
-                .iter()
-                .map(|chunk| ChunkPiece {
-                    text: chunk.text.clone(),
-                    payload: chunk.payload.clone(),
-                })
-                .collect::<Vec<_>>(),
-        );
-        let sliced = js_slice(&joined, READ_MAX_CHARS);
-        let first = chunks.first();
-        Ok(KnowledgeReadOutput {
-            store_id: store.id,
-            store: store.name,
-            document_id,
-            path: first.map_or_else(|| document.source_path.clone(), |chunk| chunk.path.clone()),
-            section: first.map(|chunk| chunk.section.clone()).unwrap_or_default(),
-            page: first.and_then(|chunk| chunk.page),
-            from_chunk: window.0,
-            to_chunk: chunks.last().map_or(window.1, |chunk| chunk.chunk_index),
-            chunk_count: count,
-            truncated: sliced.len() < joined.len(),
-            text: sliced.to_owned(),
-        })
-    }
-
-    fn tool_meta(&self, _input: &Value, output: &KnowledgeReadOutput) -> Option<Value> {
-        Some(json!({ "citations": [output.citation()] }))
-    }
+        })?,
+    };
+    context.check_cancelled()?;
+    let indices: Vec<u64> = (window.0..=window.1).collect();
+    let mut chunks = vectors.chunks(&store_key, &document_id, &indices).await?;
+    chunks.sort_by_key(|chunk| chunk.chunk_index);
+    let joined = join_chunks(
+        &chunks
+            .iter()
+            .map(|chunk| ChunkPiece {
+                text: chunk.text.clone(),
+                payload: chunk.payload.clone(),
+            })
+            .collect::<Vec<_>>(),
+    );
+    let sliced = js_slice(&joined, READ_MAX_CHARS);
+    let first = chunks.first();
+    Ok(KnowledgeReadOutput {
+        store_id: store.id,
+        store: store.name,
+        document_id,
+        path: first.map_or_else(|| document.source_path.clone(), |chunk| chunk.path.clone()),
+        section: first.map(|chunk| chunk.section.clone()).unwrap_or_default(),
+        page: first.and_then(|chunk| chunk.page),
+        from_chunk: window.0,
+        to_chunk: chunks.last().map_or(window.1, |chunk| chunk.chunk_index),
+        chunk_count: count,
+        truncated: sliced.len() < joined.len(),
+        text: sliced.to_owned(),
+    })
 }
 
 pub fn register_knowledge_nodes(registry: &NodeRegistry) -> Result<(), AppError> {
-    registry.register(KnowledgeListNode)?;
-    registry.register(KnowledgeSearchNode)?;
-    registry.register(KnowledgeReadNode)
+    registry.register(KnowledgeSearchNode)
 }
 
 #[cfg(test)]
