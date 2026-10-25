@@ -8,6 +8,7 @@ import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import ChatStore from "../../src/renderer/features/chat/ChatStore.ts";
 import ChatComposer from "../../src/renderer/features/chat/ChatComposer";
 import ChatMarkdown from "../../src/renderer/features/chat/ChatMarkdown";
+import { isFenceOpen } from "../../src/renderer/features/chat/codeFence.ts";
 import { ADAPTERS, provider } from "./providerFixtures.ts";
 import { account } from "./accountFixtures.ts";
 
@@ -19,6 +20,30 @@ test("Markdown drops raw HTML and remote images and renders fenced code as escap
   expect(container.querySelector("strong")?.textContent).toBe("Safe");
   await waitFor(() => expect(container.textContent).toContain("<img src=x onerror=alert(1)>"));
   expect(container.querySelector("script, img, iframe, a[href^='javascript:']")).toBeNull();
+});
+
+test("a code fence is open until its closing line arrives and nothing follows it", () => {
+  const open = "Text\n\n```python\nprint(1)\n";
+  expect(isFenceOpen(open, 6, open.length)).toBe(true);
+  const closed = "Text\n\n```python\nprint(1)\n```\n";
+  expect(isFenceOpen(closed, 6, closed.length - 1)).toBe(false);
+  const followed = "```\na\n\nMore text";
+  expect(isFenceOpen(followed, 0, 6)).toBe(false);
+  expect(isFenceOpen(open, undefined, undefined)).toBe(false);
+});
+
+test("a streamed code block keeps its element and is highlighted only once it is closed", async () => {
+  const start = "Код:\n\n```python\nprint(1)\n";
+  const { container, rerender } = render(<ChatMarkdown content={start} streaming />);
+  const block = container.querySelector("pre");
+  expect(block?.textContent).toBe("print(1)");
+  expect(container.querySelector(".animate-pulse")).toBeNull();
+  rerender(<ChatMarkdown content={`${start}print(2)\n`} streaming />);
+  expect(container.querySelector("pre")).toBe(block);
+  expect(block?.textContent).toBe("print(1)\nprint(2)");
+  rerender(<ChatMarkdown content={`${start}print(2)\n\`\`\``} streaming />);
+  expect(container.querySelector(".animate-pulse")).toBeNull();
+  await waitFor(() => expect(container.textContent).toContain("print(2)"));
 });
 
 test("Markdown renders GFM tables", () => {
