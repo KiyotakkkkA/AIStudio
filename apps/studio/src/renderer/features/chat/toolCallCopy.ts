@@ -1,4 +1,5 @@
 import {
+  mdiAlertCircleOutline,
   mdiBookOpenPageVariantOutline,
   mdiBrain,
   mdiCodeBraces,
@@ -70,6 +71,11 @@ export const TOOL_PRESENTATION: Readonly<Record<string, ToolPresentation>> = {
   "skill.script": { title: "Скрипт навыка", icon: mdiScriptTextPlayOutline, category: "skills" },
   "download.fetch": { title: "Загрузка файла", icon: mdiDownloadOutline, category: "data" },
   "chat.ask": { title: "Вопрос пользователю", icon: mdiCommentQuestionOutline, category: "dialog" },
+  invalid_tool_call: {
+    title: "Некорректный вызов инструмента",
+    icon: mdiAlertCircleOutline,
+    category: "other",
+  },
   "chat.memory": { title: "Память", icon: mdiBrain, category: "dialog" },
 };
 
