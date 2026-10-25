@@ -1,0 +1,31 @@
+[
+  {
+    "name": "blank title",
+    "value": {
+      "id": "p2",
+      "title": "  ",
+      "status": "queued",
+      "stepIds": [],
+      "summary": null
+    }
+  },
+  {
+    "name": "unknown status",
+    "value": {
+      "id": "p2",
+      "title": "Написать сводку",
+      "status": "skipped",
+      "stepIds": [],
+      "summary": null
+    }
+  },
+  {
+    "name": "missing summary",
+    "value": {
+      "id": "p2",
+      "title": "Написать сводку",
+      "status": "queued",
+      "stepIds": []
+    }
+  }
+]

@@ -158,3 +158,33 @@ Counts use `estimate_tokens`, a conservative script-aware estimate, and are mark
 output defaults to at most 1024, the model's output limit, and one quarter of context. An
 untouched default title is derived from the first question after an answer arrives, without
 another model call.
+
+## Agentic sessions
+
+`AgenticService` (`zvs-host/src/agentic/`) owns the `agentic_session` row: goal, permission
+mode, workspace, provider and model, the permitted tool keys, budget, usage, plan, pending
+user edits, changed files and the model transcript. Each start or extension is one
+`RunKind::Agentic` run of a single `agentic.session` node whose `allowedTools` is the
+session's tool set. The node runs the loop: at every boundary it applies pending plan edits,
+mode changes and instructions (and tells the model in a user message), checks the budget, then
+makes one model round offering the registry tools and three bridges that are not registry
+tools: `update_plan` (replaces the steps that are not done), `complete_step` and `finish`.
+Each registry call goes through `StepContext::invoke_tool`, so it is its own step
+(`session.callN`) under the same admission and approval rules as chat, and its step id is
+linked to the running plan step. A step is one model round; usage tokens are estimated.
+
+Modes narrow, never widen: `read-only` offers only read-only tools, `ask` asks at least for
+every tool that is not read-only, `auto` asks for destructive tools; the Tools page tier and
+`off` still apply on top. File and process tools receive the session id as their owner, and
+`FolderAccessService` resolves it to the workspace: relative paths resolve against it, nothing
+outside it is reachable, and no folder request is raised.
+
+A session ends `completed` (`finish`, or an answer without tool calls), `paused` on the step,
+token or time budget (`agentic.extend` raises the limits and starts a new run from the saved
+transcript), `stopped` on a loop (three identical rounds in a row, or four plan revisions
+without a completed step), or `failed`/`cancelled` when its run ends that way; reads settle a
+session whose run ended without the node closing it. The default budget is 25 steps, 200 000
+tokens and 15 minutes, overridable by the settings `agentic.budget.maxSteps`, `maxTokens` and
+`maxMinutes`. Channels: `agentic.list|get|create|updatePlan|setMode|instruct|extend|cancel|
+remove`. Live state travels as `step` events `{ domain: "agentic", sessionId, session }` on the
+run stream.

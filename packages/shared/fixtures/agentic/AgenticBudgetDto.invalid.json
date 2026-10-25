@@ -1,0 +1,26 @@
+[
+  {
+    "name": "no steps",
+    "value": {
+      "maxSteps": 0,
+      "maxTokens": 200000,
+      "maxMinutes": 15
+    }
+  },
+  {
+    "name": "too few tokens",
+    "value": {
+      "maxSteps": 25,
+      "maxTokens": 999,
+      "maxMinutes": 15
+    }
+  },
+  {
+    "name": "over a day",
+    "value": {
+      "maxSteps": 25,
+      "maxTokens": 200000,
+      "maxMinutes": 1441
+    }
+  }
+]

@@ -119,7 +119,7 @@ impl Gate {
             let shortcut = matches!(
                 (run.kind, tool.as_str()),
                 (
-                    RunKind::Chat | RunKind::Skill | RunKind::Scenario,
+                    RunKind::Chat | RunKind::Skill | RunKind::Scenario | RunKind::Agentic,
                     "llm.generate"
                 ) | (RunKind::Chat, "vector.search")
                     | (RunKind::Indexing, "vector.index")

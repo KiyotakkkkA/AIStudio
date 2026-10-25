@@ -1,5 +1,14 @@
 import { z } from "zod";
 import {
+  AgenticInstructInput,
+  AgenticSessionDto,
+  AgenticSessionRef,
+  CreateAgenticSessionInput,
+  ExtendAgenticSessionInput,
+  SetAgenticModeInput,
+  UpdateAgenticPlanInput,
+} from "../agentic.js";
+import {
   ChatContextDto,
   ChatContextInput,
   ChatEnabledTools,
@@ -253,6 +262,15 @@ export const contract = defineContract({
   "folders.list": { input: z.void(), output: z.array(FolderGrantDto) },
   "folders.revoke": { input: FolderGrantRef, output: z.void() },
   "folders.answer": { input: AnswerFolderRequestInput, output: z.void() },
+  "agentic.list": { input: z.void(), output: z.array(AgenticSessionDto) },
+  "agentic.get": { input: AgenticSessionRef, output: AgenticSessionDto },
+  "agentic.create": { input: CreateAgenticSessionInput, output: AgenticSessionDto },
+  "agentic.updatePlan": { input: UpdateAgenticPlanInput, output: AgenticSessionDto },
+  "agentic.setMode": { input: SetAgenticModeInput, output: AgenticSessionDto },
+  "agentic.instruct": { input: AgenticInstructInput, output: AgenticSessionDto },
+  "agentic.extend": { input: ExtendAgenticSessionInput, output: AgenticSessionDto },
+  "agentic.cancel": { input: AgenticSessionRef, output: z.void() },
+  "agentic.remove": { input: AgenticSessionRef, output: z.void() },
   "memory.list": { input: z.void(), output: z.array(MemoryDto) },
   "memory.create": { input: CreateMemoryInput, output: MemoryDto },
   "memory.update": { input: UpdateMemoryInput, output: MemoryDto },

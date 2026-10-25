@@ -721,6 +721,70 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::memory::ClearMemoryInput>,
     ),
     (
+        "agentic/AgenticPermissionMode",
+        round_trip::<zvs_contract::agentic::AgenticPermissionMode>,
+    ),
+    (
+        "agentic/AgenticSessionStatus",
+        round_trip::<zvs_contract::agentic::AgenticSessionStatus>,
+    ),
+    (
+        "agentic/AgenticStopReason",
+        round_trip::<zvs_contract::agentic::AgenticStopReason>,
+    ),
+    (
+        "agentic/AgenticPlanStepStatus",
+        round_trip::<zvs_contract::agentic::AgenticPlanStepStatus>,
+    ),
+    (
+        "agentic/AgenticBudgetDto",
+        round_trip::<zvs_contract::agentic::AgenticBudgetDto>,
+    ),
+    (
+        "agentic/AgenticUsageDto",
+        round_trip::<zvs_contract::agentic::AgenticUsageDto>,
+    ),
+    (
+        "agentic/AgenticPlanStepDto",
+        round_trip::<zvs_contract::agentic::AgenticPlanStepDto>,
+    ),
+    (
+        "agentic/AgenticPlanEditDto",
+        round_trip::<zvs_contract::agentic::AgenticPlanEditDto>,
+    ),
+    (
+        "agentic/AgenticChangedFileDto",
+        round_trip::<zvs_contract::agentic::AgenticChangedFileDto>,
+    ),
+    (
+        "agentic/AgenticSessionDto",
+        round_trip::<zvs_contract::agentic::AgenticSessionDto>,
+    ),
+    (
+        "agentic/CreateAgenticSessionInput",
+        round_trip::<zvs_contract::agentic::CreateAgenticSessionInput>,
+    ),
+    (
+        "agentic/AgenticSessionRef",
+        round_trip::<zvs_contract::agentic::AgenticSessionRef>,
+    ),
+    (
+        "agentic/UpdateAgenticPlanInput",
+        round_trip::<zvs_contract::agentic::UpdateAgenticPlanInput>,
+    ),
+    (
+        "agentic/SetAgenticModeInput",
+        round_trip::<zvs_contract::agentic::SetAgenticModeInput>,
+    ),
+    (
+        "agentic/AgenticInstructInput",
+        round_trip::<zvs_contract::agentic::AgenticInstructInput>,
+    ),
+    (
+        "agentic/ExtendAgenticSessionInput",
+        round_trip::<zvs_contract::agentic::ExtendAgenticSessionInput>,
+    ),
+    (
         "notifications/NotificationTargetDto",
         round_trip::<zvs_contract::notifications::NotificationTargetDto>,
     ),

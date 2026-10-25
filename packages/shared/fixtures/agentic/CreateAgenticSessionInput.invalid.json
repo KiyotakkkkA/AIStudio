@@ -1,0 +1,49 @@
+[
+  {
+    "name": "no workspace",
+    "value": {
+      "goal": "Прочитать файлы в папке и написать сводку",
+      "workspace": "",
+      "providerId": "0199aa11-3333-7111-8111-111111111111",
+      "modelId": "qwen3-coder",
+      "mode": "ask"
+    }
+  },
+  {
+    "name": "bad tool key",
+    "value": {
+      "goal": "Прочитать файлы в папке и написать сводку",
+      "workspace": "C:\\work\\notes",
+      "providerId": "0199aa11-3333-7111-8111-111111111111",
+      "modelId": "qwen3-coder",
+      "mode": "ask",
+      "tools": ["not a key"]
+    }
+  },
+  {
+    "name": "budget out of range",
+    "value": {
+      "goal": "Прочитать файлы в папке и написать сводку",
+      "workspace": "C:\\work\\notes",
+      "providerId": "0199aa11-3333-7111-8111-111111111111",
+      "modelId": "qwen3-coder",
+      "mode": "ask",
+      "budget": {
+        "maxSteps": 0,
+        "maxTokens": 200000,
+        "maxMinutes": 15
+      }
+    }
+  },
+  {
+    "name": "null budget",
+    "value": {
+      "goal": "Прочитать файлы в папке и написать сводку",
+      "workspace": "C:\\work\\notes",
+      "providerId": "0199aa11-3333-7111-8111-111111111111",
+      "modelId": "qwen3-coder",
+      "mode": "ask",
+      "budget": null
+    }
+  }
+]

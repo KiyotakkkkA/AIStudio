@@ -1,0 +1,26 @@
+[
+  {
+    "name": "running",
+    "value": "running"
+  },
+  {
+    "name": "paused",
+    "value": "paused"
+  },
+  {
+    "name": "completed",
+    "value": "completed"
+  },
+  {
+    "name": "stopped",
+    "value": "stopped"
+  },
+  {
+    "name": "failed",
+    "value": "failed"
+  },
+  {
+    "name": "cancelled",
+    "value": "cancelled"
+  }
+]

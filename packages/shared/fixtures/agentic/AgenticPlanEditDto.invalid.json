@@ -1,0 +1,15 @@
+[
+  {
+    "name": "blank",
+    "value": {
+      "title": ""
+    }
+  },
+  {
+    "name": "empty id",
+    "value": {
+      "id": "",
+      "title": "Шаг"
+    }
+  }
+]

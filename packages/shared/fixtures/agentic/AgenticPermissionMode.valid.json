@@ -1,0 +1,14 @@
+[
+  {
+    "name": "read-only",
+    "value": "read-only"
+  },
+  {
+    "name": "ask",
+    "value": "ask"
+  },
+  {
+    "name": "auto",
+    "value": "auto"
+  }
+]

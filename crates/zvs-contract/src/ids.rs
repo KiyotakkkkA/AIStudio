@@ -83,6 +83,7 @@ branded_ids!(
     FolderGrantId,
     TerminalId,
     MemoryId,
+    AgenticSessionId,
 );
 
 pub fn is_wire_uuid(value: &str) -> bool {

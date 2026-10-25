@@ -1,0 +1,28 @@
+[
+  {
+    "name": "defaults",
+    "value": {
+      "goal": "Прочитать файлы в папке и написать сводку",
+      "workspace": "C:\\work\\notes",
+      "providerId": "0199aa11-3333-7111-8111-111111111111",
+      "modelId": "qwen3-coder",
+      "mode": "ask"
+    }
+  },
+  {
+    "name": "with a budget and tools",
+    "value": {
+      "goal": "Прочитать файлы в папке и написать сводку",
+      "workspace": "C:\\work\\notes",
+      "providerId": "0199aa11-3333-7111-8111-111111111111",
+      "modelId": "qwen3-coder",
+      "mode": "ask",
+      "budget": {
+        "maxSteps": 100,
+        "maxTokens": 1000000,
+        "maxMinutes": 60
+      },
+      "tools": ["fs.read", "fs.list"]
+    }
+  }
+]

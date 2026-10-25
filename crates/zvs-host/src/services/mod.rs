@@ -60,6 +60,7 @@ pub use vector_stores::{VectorSearchOptions, VectorStoreService, VectorStoreServ
 
 use std::sync::Arc;
 
+use crate::agentic::AgenticService;
 use crate::documents::DocumentService;
 use crate::downloads::DownloadService;
 use crate::indexing::IndexingService;
@@ -101,6 +102,7 @@ pub struct Services {
     pub scenario_runs: ScenarioRunner,
     pub chat: ChatService,
     pub memory: MemoryService,
+    pub agentic: AgenticService,
     pub folders: FolderAccessService,
     pub explorer: ExplorerService,
     pub terminals: TerminalService,

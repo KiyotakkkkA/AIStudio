@@ -1,4 +1,5 @@
 pub mod accounts;
+pub mod agentic;
 pub mod ai;
 pub mod artifacts;
 pub mod browser;
@@ -40,6 +41,16 @@ pub mod wire;
 pub use accounts::{
     AccountDto, AccountLinkInput, AccountLinkResult, AccountRef, AccountsCancelLinkOutput,
     AccountsListOutput, AccountsUnlinkOutput,
+};
+pub use agentic::{
+    AGENTIC_DEFAULT_MINUTES, AGENTIC_DEFAULT_STEPS, AGENTIC_DEFAULT_TOKENS, AGENTIC_GOAL_MAX,
+    AGENTIC_INSTRUCTION_MAX, AGENTIC_MINUTES_MAX, AGENTIC_PLAN_MAX, AGENTIC_STEP_TITLE_MAX,
+    AGENTIC_STEPS_MAX, AGENTIC_SUMMARY_MAX, AGENTIC_TOKENS_MAX, AGENTIC_TOKENS_MIN,
+    AGENTIC_TOOLS_MAX, AgenticBudgetDto, AgenticChangedFileDto, AgenticInstructInput,
+    AgenticListOutput, AgenticPermissionMode, AgenticPlanEditDto, AgenticPlanStepDto,
+    AgenticPlanStepStatus, AgenticSessionDto, AgenticSessionRef, AgenticSessionStatus,
+    AgenticStopReason, AgenticUsageDto, CreateAgenticSessionInput, ExtendAgenticSessionInput,
+    SetAgenticModeInput, UpdateAgenticPlanInput,
 };
 pub use ai::{
     AccountFamily, AccountStatus, AdapterCapabilitiesDto, AdapterDescriptorDto, AdapterFamily,

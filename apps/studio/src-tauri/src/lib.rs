@@ -16,6 +16,7 @@ use serde_json::json;
 use tauri::{App, AppHandle, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use zvs_contract::{NOTIFICATION_SCHEME, NotificationTargetDto};
+use zvs_host::agentic::{AgenticService, AgenticServiceOptions, register_agentic_nodes};
 use zvs_host::artifacts::ArtifactStore;
 use zvs_host::browser::{BrowserLifecycle, profile_dir};
 use zvs_host::commands::{CommandToolOptions, register_command_nodes};
@@ -882,6 +883,16 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         ),
     )?;
     register_kernel_tools(&nodes, &tools)?;
+    let agentic = AgenticService::new(AgenticServiceOptions {
+        clock: clock.clone(),
+        ..AgenticServiceOptions::new(
+            Arc::clone(&database),
+            runs.clone(),
+            folders.clone(),
+            tools.clone(),
+        )
+    });
+    register_agentic_nodes(&nodes, agentic.store(), tools.clone())?;
     let chat = ChatService::new(ChatServiceOptions {
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),
@@ -1060,6 +1071,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         scenarios,
         scenario_runs,
         memory: chat.memory(),
+        agentic,
         chat,
         explorer: explorer.clone(),
         terminals,

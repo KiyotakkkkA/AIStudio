@@ -2,7 +2,7 @@
 task: TASK_040
 title: Agentic session engine — planning loop and self-extending runs
 phase: 7 — Scenarios and Agentic Build
-status: todo
+status: done
 depends_on: [TASK_039, TASK_076, TASK_036_EXTRA_2, TASK_036_EXTRA_3]
 unblocks: [TASK_041]
 estimate: 4 h
@@ -88,18 +88,72 @@ Manual check: Run a real multi-step session against a live model in a scratch wo
 
 ## Definition of done
 
-- [ ] Planning loop runs, revises and terminates on goal or budget
-- [ ] Tool calls honour the registry and approval flow
-- [ ] Plan edits applied at step boundaries
-- [ ] Budgets enforced with a clear stop reason
-- [ ] Workspace paths validated host-side, never trusted from the model
-- [ ] Loop detection stops non-convergent sessions
-- [ ] Tests and gates pass
+- [x] Planning loop runs, revises and terminates on goal or budget
+- [x] Tool calls honour the registry and approval flow
+- [x] Plan edits applied at step boundaries
+- [x] Budgets enforced with a clear stop reason
+- [x] Workspace paths validated host-side, never trusted from the model
+- [x] Loop detection stops non-convergent sessions
+- [x] Tests and gates pass
 - [ ] `pnpm typecheck && pnpm lint && pnpm build` pass
 - [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- Decision: option (a) as the user chose — 25 steps, 200 000 tokens, 15 minutes, pausing
+  rather than stopping. `AgenticService::default_budget` reads `agentic.budget.maxSteps`,
+  `agentic.budget.maxTokens`, `agentic.budget.maxMinutes` from settings (falls back to the
+  defaults when absent or out of range); TASK_052 only needs the UI.
+- Contract `zvs_contract::agentic` / `packages/shared/src/agentic.ts`: `AgenticSessionId`,
+  `AgenticPermissionMode` (`read-only | ask | auto`), `AgenticSessionStatus`
+  (`running | paused | completed | stopped | failed | cancelled`), `AgenticStopReason`
+  (`goal | steps | tokens | time | loop | cancelled | error`), `AgenticPlanStepStatus`,
+  `AgenticBudgetDto`, `AgenticUsageDto`, `AgenticPlanStepDto` (with `stepIds` linking kernel
+  steps), `AgenticPlanEditDto`, `AgenticChangedFileDto`, `AgenticSessionDto` and the inputs.
+  Fixtures in `fixtures/agentic/`. Channels `agentic.list|get|create|updatePlan|setMode|
+  instruct|extend|cancel|remove`.
+- Migration `0018_agentic_session`, `AgenticSessionRow` (JSON columns for budget, usage, plan,
+  pending edits, changed files and the transcript), `AgenticSessionRepository`.
+- `zvs-host/src/agentic/`: `plan.rs` (pure plan logic: model proposals, user edits on queued
+  steps only, linking, changed-file totals, `LoopGuard`), `node.rs` (`agentic.session`, the
+  loop), `store.rs` (row access and DTO mapping), `service.rs` (`AgenticService`). The kernel
+  admits `llm.generate` for `RunKind::Agentic` like the other front-ends. Wired into
+  `Services::agentic`, the Tauri composition root and `test_services`.
+- `FolderAccessService` resolves a session id as an owner: the workspace is the base and the
+  boundary (`OUTSIDE_WORKSPACE`), with no folder requests and no grants. PASSPORT §14 and the
+  kernel README describe it.
+- Tests: `agentic/tests.rs` with a scripted fake model (goal completion, plain-answer finish,
+  step/time/token budgets, extend after pause with the transcript kept, approval approve and
+  deny, Tools-page `ask` and `off` under auto, read-only mode, plan edits at the boundary with
+  the removed step kept out, mode and instruction at the boundary, repeated-round and
+  endless-revision loops, provider failure, no tool support, cancel, retry of a finished run,
+  creation refusals, workspace path scoping), `plan.rs` unit tests, the repository test.
+
 **Deviated from plan:**
+- The graph does not literally grow: a session run is one `agentic.session` node, and every
+  tool call becomes its own kernel step (`session.callN`) through `invoke_tool`, as in the
+  scenario agent. Plan steps link to those step ids. A budget "step" is one model round.
+- Budget exhaustion ends the run (`succeeded`, session `paused`); `agentic.extend` starts a new
+  run from the saved transcript. A run interrupted by a restart is not resumed: the session is
+  settled as `failed` with «Выполнение прервано» when it is next read.
+- The workspace is the whole allow-list for a session; it does not consult folder grants and
+  never raises a folder request.
+- `agentic.instruct` (mid-session instructions for TASK_041's composer) was added because it
+  rides the same boundary mechanism as plan edits.
+
 **Next session should know:**
+- The page subscribes to the run's `streamId` from `AgenticSessionDto`. Each boundary emits a
+  `step` event `{ domain: "agentic", sessionId, session }` carrying the whole DTO; tokens stream
+  as usual; tool calls appear as ordinary step events with `nodeId` `session.callN`; approvals
+  use the existing `approval` event and `runs.approve` / `runs.deny`. Plan edits and mode
+  changes are visible at once as `pendingPlan` / `pendingMode` until the next boundary.
+- The model's tool-call wire names are the chat ones (`fs__read`); bridges are `update_plan`,
+  `complete_step`, `finish`. Token usage is an estimate (`estimate_tokens`).
+- `fs.apply`'s read ledger is per run, so after an extension the model must re-read a file
+  before changing it.
+- Gates run: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -D warnings`,
+  `cargo test --workspace`, `pnpm typecheck`, `pnpm lint`, `pnpm test`,
+  `pnpm contract:channels:check`. `pnpm format:check` reports only
+  `apps/studio/src/renderer/ui/organisms/NavRail.tsx`, which this task did not touch.
+  `pnpm build` and the manual walk with a live model were not done in this session.

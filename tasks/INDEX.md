@@ -188,7 +188,7 @@ Electron app untouched. TASK_066's CDP client is reused by TASK_046.
 - [x] **TASK_038** — Scenario canvas editor
 - [x] **TASK_039** — Scenario execution, node inspector, run log
 - [x] **TASK_039_EXTRA_1** — Memory engine: account and dialog memory, prompt injection, the «Память» preferences section
-- [ ] **TASK_040** — Agentic session engine: planning loop and self-extending runs
+- [x] **TASK_040** — Agentic session engine: planning loop and self-extending runs
 - [ ] **TASK_041** — Agentic Build page
 
 ## Phase 8 — Documents and the agent browser
@@ -308,7 +308,7 @@ you can settle the load-bearing ones early rather than being interrupted mid-tas
 | TASK_036_EXTRA_5 (resolved) | Native toasts for every enabled event whatever window is in front, as in Electron. Built on `Windows.UI.Notifications` directly (own AUMID, `zvs-studio://` launch URL, tag and group), not a wrapper crate. A click opens its conversation, or «Загрузки». Action Center and cold-start clicks follow in TASK_036_EXTRA_6 through protocol activation. | yes |
 | TASK_037 (resolved) | Own format matched to the kernel (option a); no n8n import. A best-effort importer is a candidate later task. | **no** |
 | TASK_038 (resolved) | React Flow now, revisit if it fights the design (option c). The graph lives in our own model (`graphModel.ts` reducers, `ScenarioEditor`); React Flow only renders it, so a hand-rolled canvas stays open. | **no** |
-| TASK_040 | Default agentic session budget, and pause-or-stop on exhaustion | yes |
+| TASK_040 (resolved) | Option (a): 25 steps, 200 000 tokens, 15 minutes; exhaustion pauses the session and `agentic.extend` continues it. The three limits are read from settings (`agentic.budget.maxSteps`, `maxTokens`, `maxMinutes`) for TASK_052 to expose. | yes |
 | TASK_043 (superseded by ADR 0003) | LibreOffice integration removed in TASK_044 after the managed copy crashed on almost every conversion. Office documents render in the renderer (docx-preview, an OOXML sheet reader, slide text). «Компоненты» holds Node.js and uv. | moderate |
 | TASK_049 | Does mail send automatically once approved, or per message? | yes |
 | TASK_050 | Telegram: bot account, or your personal account? | **no** |

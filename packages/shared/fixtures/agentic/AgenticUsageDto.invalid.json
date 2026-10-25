@@ -1,0 +1,11 @@
+[
+  {
+    "name": "negative",
+    "value": {
+      "steps": -1,
+      "tokens": 0,
+      "elapsedMs": 0,
+      "toolCalls": 0
+    }
+  }
+]

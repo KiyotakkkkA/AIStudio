@@ -84,3 +84,6 @@ export type TerminalId = z.infer<typeof TerminalId>;
 
 export const MemoryId = brandedId("MemoryId");
 export type MemoryId = z.infer<typeof MemoryId>;
+
+export const AgenticSessionId = brandedId("AgenticSessionId");
+export type AgenticSessionId = z.infer<typeof AgenticSessionId>;

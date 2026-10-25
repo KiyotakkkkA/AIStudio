@@ -11,6 +11,7 @@ import * as processes from "../src/process.js";
 import * as questions from "../src/questions.js";
 import * as folders from "../src/folders.js";
 import * as memory from "../src/memory.js";
+import * as agentic from "../src/agentic.js";
 import * as explorer from "../src/explorer.js";
 import * as terminal from "../src/terminal.js";
 import * as notifications from "../src/notifications.js";
@@ -191,6 +192,22 @@ const schemas: Record<string, z.ZodType> = {
   "process/ProcessPlanDto": processes.ProcessPlanDto,
   "process/ProcessResultDto": processes.ProcessResultDto,
   "process/ProcessApprovalDto": processes.ProcessApprovalDto,
+  "agentic/AgenticPermissionMode": agentic.AgenticPermissionMode,
+  "agentic/AgenticSessionStatus": agentic.AgenticSessionStatus,
+  "agentic/AgenticStopReason": agentic.AgenticStopReason,
+  "agentic/AgenticPlanStepStatus": agentic.AgenticPlanStepStatus,
+  "agentic/AgenticBudgetDto": agentic.AgenticBudgetDto,
+  "agentic/AgenticUsageDto": agentic.AgenticUsageDto,
+  "agentic/AgenticPlanStepDto": agentic.AgenticPlanStepDto,
+  "agentic/AgenticPlanEditDto": agentic.AgenticPlanEditDto,
+  "agentic/AgenticChangedFileDto": agentic.AgenticChangedFileDto,
+  "agentic/AgenticSessionDto": agentic.AgenticSessionDto,
+  "agentic/CreateAgenticSessionInput": agentic.CreateAgenticSessionInput,
+  "agentic/AgenticSessionRef": agentic.AgenticSessionRef,
+  "agentic/UpdateAgenticPlanInput": agentic.UpdateAgenticPlanInput,
+  "agentic/SetAgenticModeInput": agentic.SetAgenticModeInput,
+  "agentic/AgenticInstructInput": agentic.AgenticInstructInput,
+  "agentic/ExtendAgenticSessionInput": agentic.ExtendAgenticSessionInput,
   "memory/MemoryScope": memory.MemoryScope,
   "memory/MemorySource": memory.MemorySource,
   "memory/MemoryChatDto": memory.MemoryChatDto,

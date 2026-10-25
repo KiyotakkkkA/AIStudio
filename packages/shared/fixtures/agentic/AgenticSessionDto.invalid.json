@@ -1,0 +1,257 @@
+[
+  {
+    "name": "running with a stop reason",
+    "value": {
+      "id": "0199aa11-8888-7111-8111-111111111111",
+      "goal": "Прочитать файлы в папке и написать сводку",
+      "status": "running",
+      "stopReason": "goal",
+      "error": null,
+      "mode": "ask",
+      "pendingMode": null,
+      "workspace": "C:\\work\\notes",
+      "providerId": "0199aa11-3333-7111-8111-111111111111",
+      "modelId": "qwen3-coder",
+      "tools": ["fs.read", "fs.apply"],
+      "budget": {
+        "maxSteps": 25,
+        "maxTokens": 200000,
+        "maxMinutes": 15
+      },
+      "usage": {
+        "steps": 3,
+        "tokens": 12000,
+        "elapsedMs": 45000,
+        "toolCalls": 4
+      },
+      "plan": [
+        {
+          "id": "p1",
+          "title": "Прочитать файлы",
+          "status": "done",
+          "stepIds": ["0199aa11-6666-7111-8111-111111111111"],
+          "summary": "Прочитано три файла"
+        },
+        {
+          "id": "p2",
+          "title": "Написать сводку",
+          "status": "running",
+          "stepIds": [],
+          "summary": null
+        }
+      ],
+      "pendingPlan": null,
+      "pendingInstructions": [],
+      "changedFiles": [],
+      "runId": "0199aa11-4444-7111-8111-111111111111",
+      "streamId": "0199aa11-5555-7111-8111-111111111111",
+      "summary": null,
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "paused without a reason",
+    "value": {
+      "id": "0199aa11-8888-7111-8111-111111111111",
+      "goal": "Прочитать файлы в папке и написать сводку",
+      "status": "paused",
+      "stopReason": null,
+      "error": null,
+      "mode": "ask",
+      "pendingMode": null,
+      "workspace": "C:\\work\\notes",
+      "providerId": "0199aa11-3333-7111-8111-111111111111",
+      "modelId": "qwen3-coder",
+      "tools": ["fs.read", "fs.apply"],
+      "budget": {
+        "maxSteps": 25,
+        "maxTokens": 200000,
+        "maxMinutes": 15
+      },
+      "usage": {
+        "steps": 3,
+        "tokens": 12000,
+        "elapsedMs": 45000,
+        "toolCalls": 4
+      },
+      "plan": [
+        {
+          "id": "p1",
+          "title": "Прочитать файлы",
+          "status": "done",
+          "stepIds": ["0199aa11-6666-7111-8111-111111111111"],
+          "summary": "Прочитано три файла"
+        },
+        {
+          "id": "p2",
+          "title": "Написать сводку",
+          "status": "running",
+          "stepIds": [],
+          "summary": null
+        }
+      ],
+      "pendingPlan": null,
+      "pendingInstructions": [],
+      "changedFiles": [],
+      "runId": "0199aa11-4444-7111-8111-111111111111",
+      "streamId": "0199aa11-5555-7111-8111-111111111111",
+      "summary": null,
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "run without a stream",
+    "value": {
+      "id": "0199aa11-8888-7111-8111-111111111111",
+      "goal": "Прочитать файлы в папке и написать сводку",
+      "status": "running",
+      "stopReason": null,
+      "error": null,
+      "mode": "ask",
+      "pendingMode": null,
+      "workspace": "C:\\work\\notes",
+      "providerId": "0199aa11-3333-7111-8111-111111111111",
+      "modelId": "qwen3-coder",
+      "tools": ["fs.read", "fs.apply"],
+      "budget": {
+        "maxSteps": 25,
+        "maxTokens": 200000,
+        "maxMinutes": 15
+      },
+      "usage": {
+        "steps": 3,
+        "tokens": 12000,
+        "elapsedMs": 45000,
+        "toolCalls": 4
+      },
+      "plan": [
+        {
+          "id": "p1",
+          "title": "Прочитать файлы",
+          "status": "done",
+          "stepIds": ["0199aa11-6666-7111-8111-111111111111"],
+          "summary": "Прочитано три файла"
+        },
+        {
+          "id": "p2",
+          "title": "Написать сводку",
+          "status": "running",
+          "stepIds": [],
+          "summary": null
+        }
+      ],
+      "pendingPlan": null,
+      "pendingInstructions": [],
+      "changedFiles": [],
+      "runId": "0199aa11-4444-7111-8111-111111111111",
+      "streamId": null,
+      "summary": null,
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "blank goal",
+    "value": {
+      "id": "0199aa11-8888-7111-8111-111111111111",
+      "goal": " ",
+      "status": "running",
+      "stopReason": null,
+      "error": null,
+      "mode": "ask",
+      "pendingMode": null,
+      "workspace": "C:\\work\\notes",
+      "providerId": "0199aa11-3333-7111-8111-111111111111",
+      "modelId": "qwen3-coder",
+      "tools": ["fs.read", "fs.apply"],
+      "budget": {
+        "maxSteps": 25,
+        "maxTokens": 200000,
+        "maxMinutes": 15
+      },
+      "usage": {
+        "steps": 3,
+        "tokens": 12000,
+        "elapsedMs": 45000,
+        "toolCalls": 4
+      },
+      "plan": [
+        {
+          "id": "p1",
+          "title": "Прочитать файлы",
+          "status": "done",
+          "stepIds": ["0199aa11-6666-7111-8111-111111111111"],
+          "summary": "Прочитано три файла"
+        },
+        {
+          "id": "p2",
+          "title": "Написать сводку",
+          "status": "running",
+          "stepIds": [],
+          "summary": null
+        }
+      ],
+      "pendingPlan": null,
+      "pendingInstructions": [],
+      "changedFiles": [],
+      "runId": "0199aa11-4444-7111-8111-111111111111",
+      "streamId": "0199aa11-5555-7111-8111-111111111111",
+      "summary": null,
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  },
+  {
+    "name": "unknown mode",
+    "value": {
+      "id": "0199aa11-8888-7111-8111-111111111111",
+      "goal": "Прочитать файлы в папке и написать сводку",
+      "status": "running",
+      "stopReason": null,
+      "error": null,
+      "mode": "yolo",
+      "pendingMode": null,
+      "workspace": "C:\\work\\notes",
+      "providerId": "0199aa11-3333-7111-8111-111111111111",
+      "modelId": "qwen3-coder",
+      "tools": ["fs.read", "fs.apply"],
+      "budget": {
+        "maxSteps": 25,
+        "maxTokens": 200000,
+        "maxMinutes": 15
+      },
+      "usage": {
+        "steps": 3,
+        "tokens": 12000,
+        "elapsedMs": 45000,
+        "toolCalls": 4
+      },
+      "plan": [
+        {
+          "id": "p1",
+          "title": "Прочитать файлы",
+          "status": "done",
+          "stepIds": ["0199aa11-6666-7111-8111-111111111111"],
+          "summary": "Прочитано три файла"
+        },
+        {
+          "id": "p2",
+          "title": "Написать сводку",
+          "status": "running",
+          "stepIds": [],
+          "summary": null
+        }
+      ],
+      "pendingPlan": null,
+      "pendingInstructions": [],
+      "changedFiles": [],
+      "runId": "0199aa11-4444-7111-8111-111111111111",
+      "streamId": "0199aa11-5555-7111-8111-111111111111",
+      "summary": null,
+      "createdAt": 1,
+      "updatedAt": 2
+    }
+  }
+]

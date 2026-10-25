@@ -1,4 +1,5 @@
 pub mod account;
+pub mod agentic;
 pub mod chat;
 pub mod columns;
 pub mod document;
@@ -24,6 +25,7 @@ pub mod vector_source;
 pub mod vector_store;
 
 pub use account::{AccountRow, SESSION_EXPIRED_DETAIL};
+pub use agentic::{AgenticSessionRow, TranscriptCall, TranscriptEntry};
 pub use chat::{ConversationRow, MessageRow};
 pub use columns::EnumColumn;
 pub use document::DocumentRow;

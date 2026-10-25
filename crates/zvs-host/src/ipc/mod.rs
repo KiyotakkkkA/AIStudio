@@ -1,4 +1,5 @@
 pub mod accounts;
+pub mod agentic;
 pub mod artifacts;
 pub mod chat;
 pub mod documents;
@@ -45,6 +46,7 @@ pub fn register(server: &mut IpcServer) {
     chat::register(server);
     folders::register(server);
     memory::register(server);
+    agentic::register(server);
     workspace::register(server);
     terminal::register(server);
     documents::register(server);
@@ -85,6 +87,15 @@ mod tests {
                 "accounts.list",
                 "accounts.refresh",
                 "accounts.unlink",
+                "agentic.cancel",
+                "agentic.create",
+                "agentic.extend",
+                "agentic.get",
+                "agentic.instruct",
+                "agentic.list",
+                "agentic.remove",
+                "agentic.setMode",
+                "agentic.updatePlan",
                 "artifacts.application",
                 "artifacts.open",
                 "artifacts.reveal",

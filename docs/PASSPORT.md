@@ -723,6 +723,11 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   the renderer drops events it already has. The host answers ConPTY's startup cursor query
   itself, because a session can start before any view is attached. Closing a session,
   deleting its dialog or quitting kills the shell's whole process tree.
+- **Agentic workspace** (`zvs-host/src/agentic/`, TASK_040). A session is bound to one
+  workspace folder, chosen by the user at creation, canonicalised and checked against the
+  forbidden folders. File and process tools called by the session resolve paths against it and
+  are refused with `PermissionDenied` outside it; the session raises no folder requests and uses
+  no grants. The model never supplies the owner: the host injects the session id into each call.
 - **Folder access and tool tiers are separate axes.** A grant says *where* a tool may act;
   the tier on the Tools page says *whether* and with what confirmation it may act. Neither
   widens the other.

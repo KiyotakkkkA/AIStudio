@@ -1,0 +1,11 @@
+[
+  {
+    "name": "midway",
+    "value": {
+      "steps": 3,
+      "tokens": 12000,
+      "elapsedMs": 45000,
+      "toolCalls": 4
+    }
+  }
+]

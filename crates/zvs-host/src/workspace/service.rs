@@ -32,6 +32,7 @@ pub const NO_WORKING_FOLDER: &str =
     "Относительный путь нельзя разрешить: у диалога нет рабочей папки";
 pub const CONVERSATION_MISSING: &str = "Диалог не найден";
 pub const CHANGES_DENIED: &str = "Изменения файлов отклонены";
+pub const OUTSIDE_WORKSPACE: &str = "Путь находится вне рабочей папки сессии";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FolderTarget {
@@ -91,6 +92,11 @@ impl FolderCall {
             .unwrap_or_else(PoisonError::into_inner)
             .extend(folders.iter().cloned());
     }
+}
+
+enum Owner {
+    Conversation(Option<PathBuf>),
+    Session(PathBuf),
 }
 
 struct Pending {
@@ -234,14 +240,30 @@ impl FolderAccessService {
             .find(|grant| covers(Path::new(&grant.path), folder)))
     }
 
+    fn owner(&self, id: &str) -> Result<Owner, AppError> {
+        let (conversation, workspace) = self.read(|repositories| {
+            Ok((
+                repositories.chat.get(id)?,
+                repositories.agentic_sessions.workspace(id)?,
+            ))
+        })?;
+        match (conversation, workspace) {
+            (Some(conversation), _) => Ok(Owner::Conversation(
+                conversation.working_folder.map(PathBuf::from),
+            )),
+            (None, Some(workspace)) => Ok(Owner::Session(PathBuf::from(workspace))),
+            (None, None) => Err(AppError::new(AppErrorCode::NotFound, CONVERSATION_MISSING)),
+        }
+    }
+
     pub fn working_folder_of(&self, conversation_id: &str) -> Result<Option<PathBuf>, AppError> {
         if conversation_id.is_empty() {
             return Ok(None);
         }
-        let conversation = self
-            .read(|repositories| Ok(repositories.chat.get(conversation_id)?))?
-            .ok_or_else(|| AppError::new(AppErrorCode::NotFound, CONVERSATION_MISSING))?;
-        Ok(conversation.working_folder.map(PathBuf::from))
+        Ok(match self.owner(conversation_id)? {
+            Owner::Conversation(folder) => folder,
+            Owner::Session(workspace) => Some(workspace),
+        })
     }
 
     pub fn covered(&self, conversation_id: &str, folder: &Path) -> Result<bool, AppError> {
@@ -370,17 +392,13 @@ impl FolderAccessService {
 
     fn targets(
         &self,
-        conversation_id: &str,
+        base: Option<&Path>,
         targets: &[FolderTarget],
     ) -> Result<Vec<GrantTarget>, AppError> {
-        let conversation = self
-            .read(|repositories| Ok(repositories.chat.get(conversation_id)?))?
-            .ok_or_else(|| AppError::new(AppErrorCode::NotFound, CONVERSATION_MISSING))?;
-        let base = conversation.working_folder.map(PathBuf::from);
         targets
             .iter()
             .map(|target| {
-                let absolute = resolve(base.as_deref(), &target.path).ok_or_else(|| {
+                let absolute = resolve(base, &target.path).ok_or_else(|| {
                     if target.path.is_absolute() || base.is_some() {
                         AppError::new(AppErrorCode::ValidationFailed, INVALID_PATH)
                     } else {
@@ -403,7 +421,23 @@ impl FolderAccessService {
         call: &FolderCall,
         targets: &[FolderTarget],
     ) -> Result<AccessPlan, AppError> {
-        let resolved = self.targets(&call.conversation_id, targets)?;
+        let resolved = match self.owner(&call.conversation_id)? {
+            Owner::Conversation(base) => self.targets(base.as_deref(), targets)?,
+            Owner::Session(workspace) => {
+                let resolved = self.targets(Some(&workspace), targets)?;
+                if let Some(outside) = resolved
+                    .iter()
+                    .find(|target| !covers(&workspace, &target.folder))
+                {
+                    return Err(denied(OUTSIDE_WORKSPACE, &outside.folder));
+                }
+                return Ok(AccessPlan {
+                    resolved,
+                    folders: Vec::new(),
+                    used: Vec::new(),
+                });
+            }
+        };
         let grants = self.read(|repositories| {
             Ok(repositories
                 .folder_grants

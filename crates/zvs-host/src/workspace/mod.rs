@@ -11,5 +11,5 @@ pub use paths::{
 };
 pub use service::{
     AccessPlan, CHANGES_DENIED, FOLDER_ACCESS_DENIED, FOLDER_FORBIDDEN, FOLDER_SUBJECT,
-    FolderAccessService, FolderCall, FolderTarget, Review, folder_access,
+    FolderAccessService, FolderCall, FolderTarget, OUTSIDE_WORKSPACE, Review, folder_access,
 };

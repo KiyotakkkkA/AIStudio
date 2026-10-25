@@ -507,6 +507,17 @@ pub fn test_services(system: SystemService) -> TestServices {
     )
     .expect("registers the command nodes");
     crate::tools::register_kernel_tools(&nodes, &tools).expect("registers the file tools");
+    let agentic = crate::agentic::AgenticService::new(crate::agentic::AgenticServiceOptions {
+        clock: clock.clone(),
+        ..crate::agentic::AgenticServiceOptions::new(
+            database.shared(),
+            runs.clone(),
+            folders.clone(),
+            tools.clone(),
+        )
+    });
+    crate::agentic::register_agentic_nodes(&nodes, agentic.store(), tools.clone())
+        .expect("registers the agentic node");
     let chat = crate::services::ChatService::new(crate::services::ChatServiceOptions {
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),
@@ -564,6 +575,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             scenarios,
             scenario_runs,
             memory: chat.memory(),
+            agentic,
             chat,
             explorer: crate::workspace::ExplorerService::with_debounce(
                 folders.clone(),

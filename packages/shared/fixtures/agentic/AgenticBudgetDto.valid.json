@@ -1,0 +1,10 @@
+[
+  {
+    "name": "default",
+    "value": {
+      "maxSteps": 25,
+      "maxTokens": 200000,
+      "maxMinutes": 15
+    }
+  }
+]

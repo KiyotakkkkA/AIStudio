@@ -1,0 +1,30 @@
+[
+  {
+    "name": "goal",
+    "value": "goal"
+  },
+  {
+    "name": "steps",
+    "value": "steps"
+  },
+  {
+    "name": "tokens",
+    "value": "tokens"
+  },
+  {
+    "name": "time",
+    "value": "time"
+  },
+  {
+    "name": "loop",
+    "value": "loop"
+  },
+  {
+    "name": "cancelled",
+    "value": "cancelled"
+  },
+  {
+    "name": "error",
+    "value": "error"
+  }
+]
