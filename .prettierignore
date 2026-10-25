@@ -12,3 +12,4 @@ references/
 tasks/
 docs/PASSPORT.md
 test/fixtures/indexing/corpus/
+crates/zvs-host/skills/dashboard/assets/template.html

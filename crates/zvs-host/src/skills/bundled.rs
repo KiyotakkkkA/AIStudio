@@ -121,4 +121,28 @@ pub const BUNDLED_SKILLS: &[BundledSkill] = &[
             "scripts/check_skill.py",
         ]
     ),
+    bundled_skill!(
+        "dashboard",
+        [
+            "assets/spec.example.json",
+            "assets/template.html",
+            "assets/zvs-dash.css",
+            "assets/zvs-dash.js",
+            "references/aggregation.md",
+            "references/components.md",
+            "references/layout.md",
+            "references/sources/apis.md",
+            "references/sources/databases.md",
+            "references/sources/documents.md",
+            "references/sources/files.md",
+            "references/sources/knowledge.md",
+            "references/sources/logs.md",
+            "references/spec.md",
+            "scripts/_sources.py",
+            "scripts/build_dashboard.py",
+            "scripts/check_dashboard.py",
+            "scripts/profile_data.py",
+            "scripts/query_data.py",
+        ]
+    ),
 ];

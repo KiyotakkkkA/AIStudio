@@ -1,0 +1,243 @@
+{
+  "title": "Продажи и поддержка, 2026",
+  "subtitle": "Выручка по регионам и продуктам, воронка и нагрузка на поддержку",
+  "period": "Январь — октябрь 2026",
+  "sources": ["CRM, выгрузка от 24.10.2026"],
+  "notes": ["Выручка указана без НДС. **Октябрь** — неполный месяц."],
+  "datasets": {
+    "sales": {
+      "path": "C:/Reports/data/sales_by_month.csv"
+    },
+    "funnel": {
+      "rows": [
+        {
+          "stage": "Визит",
+          "users": 48210
+        },
+        {
+          "stage": "Регистрация",
+          "users": 9120
+        },
+        {
+          "stage": "Пробный период",
+          "users": 3410
+        },
+        {
+          "stage": "Оплата",
+          "users": 1180
+        }
+      ]
+    }
+  },
+  "filters": [
+    {
+      "type": "dateRange",
+      "field": "date",
+      "label": "Период"
+    },
+    {
+      "type": "select",
+      "field": "region",
+      "label": "Регион"
+    }
+  ],
+  "sections": [
+    {
+      "title": "Итоги",
+      "items": [
+        {
+          "type": "kpi",
+          "dataset": "sales",
+          "value": {
+            "field": "revenue",
+            "period": "last",
+            "by": "date"
+          },
+          "format": "currency:RUB",
+          "hero": true,
+          "span": 2,
+          "compare": {
+            "field": "revenue",
+            "period": "previous",
+            "by": "date"
+          },
+          "compareLabel": "к прошлому месяцу",
+          "spark": {
+            "x": "date",
+            "y": "revenue"
+          },
+          "label": "Выручка за последний месяц"
+        },
+        {
+          "type": "kpi",
+          "label": "Заказы",
+          "dataset": "sales",
+          "value": {
+            "field": "orders",
+            "period": "last",
+            "by": "date"
+          },
+          "format": "integer",
+          "compare": {
+            "field": "orders",
+            "period": "previous",
+            "by": "date"
+          },
+          "goodWhen": "up",
+          "compareLabel": "к прошлому месяцу"
+        },
+        {
+          "type": "kpi",
+          "label": "Средний чек за месяц",
+          "dataset": "sales",
+          "value": {
+            "ratio": [
+              {
+                "field": "revenue",
+                "period": "last",
+                "by": "date"
+              },
+              {
+                "field": "orders",
+                "period": "last",
+                "by": "date"
+              }
+            ]
+          },
+          "format": "currency:RUB"
+        },
+        {
+          "type": "meter",
+          "title": "План года",
+          "dataset": "sales",
+          "value": "revenue",
+          "target": 150000000,
+          "format": "currency:RUB"
+        }
+      ]
+    },
+    {
+      "title": "Динамика",
+      "description": "Помесячно; фильтры сверху применяются ко всем блокам.",
+      "items": [
+        {
+          "type": "line",
+          "title": "Выручка по продуктам",
+          "dataset": "sales",
+          "x": "date",
+          "y": "revenue",
+          "series": "product",
+          "format": "currency:RUB",
+          "span": 2
+        },
+        {
+          "type": "area",
+          "title": "Выручка всего",
+          "dataset": "sales",
+          "x": "date",
+          "y": "revenue",
+          "format": "currency:RUB",
+          "span": 2
+        },
+        {
+          "type": "bar",
+          "title": "Выручка по регионам",
+          "dataset": "sales",
+          "x": "region",
+          "y": "revenue",
+          "format": "currency:RUB",
+          "span": 2
+        },
+        {
+          "type": "bar",
+          "title": "Заказы по месяцам и продуктам",
+          "dataset": "sales",
+          "x": "date",
+          "y": "orders",
+          "series": "product",
+          "stacked": true,
+          "span": 2
+        },
+        {
+          "type": "donut",
+          "title": "Доля продуктов",
+          "dataset": "sales",
+          "label": "product",
+          "value": "revenue",
+          "format": "currency:RUB",
+          "span": 2
+        },
+        {
+          "type": "funnel",
+          "title": "Воронка",
+          "dataset": "funnel",
+          "label": "stage",
+          "value": "users",
+          "span": 2
+        },
+        {
+          "type": "scatter",
+          "title": "Заказы и выручка",
+          "dataset": "sales",
+          "x": "orders",
+          "y": "revenue",
+          "series": "product",
+          "format": "compact",
+          "span": 2,
+          "xLabel": "Заказы",
+          "yLabel": "Выручка, ₽"
+        }
+      ]
+    },
+    {
+      "title": "Детали",
+      "columns": 1,
+      "items": [
+        {
+          "type": "table",
+          "title": "Все строки",
+          "dataset": "sales",
+          "columns": [
+            {
+              "field": "date",
+              "label": "Месяц",
+              "format": "month"
+            },
+            {
+              "field": "region",
+              "label": "Регион"
+            },
+            {
+              "field": "product",
+              "label": "Продукт"
+            },
+            {
+              "field": "revenue",
+              "label": "Выручка",
+              "format": "currency:RUB",
+              "bar": true
+            },
+            {
+              "field": "orders",
+              "label": "Заказы"
+            },
+            {
+              "field": "margin",
+              "label": "Маржа",
+              "format": "percent"
+            }
+          ],
+          "sort": {
+            "field": "revenue",
+            "dir": "desc"
+          },
+          "limit": 15
+        },
+        {
+          "type": "text",
+          "text": "Выводы:\n- Москва даёт **наибольшую** выручку\n- Внедрение растёт быстрее остальных"
+        }
+      ]
+    }
+  ]
+}
