@@ -77,7 +77,6 @@ function VectorStoreForm() {
               Эмбеддинги и индексация
             </h2>
             <Button
-              type="button"
               tone="ghost"
               disabled={store.busy}
               title="Подобрать все настройки, кроме названия и описания, по этому устройству и установленным моделям"
@@ -253,7 +252,6 @@ function VectorStoreForm() {
             {store.busy ? "Сохранение…" : "Сохранить"}
           </Button>
           <Button
-            type="button"
             tone="secondary"
             disabled={store.busy}
             needConfirm

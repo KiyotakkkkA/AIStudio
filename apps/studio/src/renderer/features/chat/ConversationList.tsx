@@ -210,11 +210,10 @@ export default observer(function ConversationList({ store }: { readonly store: C
           />
         </div>
         <div className="mt-5 flex justify-end gap-2 bg-main-850 px-5 py-3">
-          <Button type="button" tone="secondary" onClick={() => setRenameTarget(null)}>
+          <Button tone="secondary" onClick={() => setRenameTarget(null)}>
             Отмена
           </Button>
           <Button
-            type="button"
             tone="primary"
             disabled={!renameTitle.trim() || store.generating}
             onClick={() => {

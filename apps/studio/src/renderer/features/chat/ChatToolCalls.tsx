@@ -292,13 +292,18 @@ function ToolCallCard({
               <FileChangeList changes={proposed} expanded />
               <div className="flex gap-2">
                 <Button
+                  size="sm"
                   disabled={approval.busy}
                   tone="primary"
                   onClick={() => onDecide?.(approval.id, true)}
                 >
                   {APPROVE_CHANGES}
                 </Button>
-                <Button disabled={approval.busy} onClick={() => onDecide?.(approval.id, false)}>
+                <Button
+                  size="sm"
+                  disabled={approval.busy}
+                  onClick={() => onDecide?.(approval.id, false)}
+                >
                   {REJECT_CHANGES}
                 </Button>
               </div>
@@ -310,13 +315,18 @@ function ToolCallCard({
               <ProcessPlanView plan={proposedProcess} expanded />
               <div className="flex gap-2">
                 <Button
+                  size="sm"
                   disabled={approval.busy}
                   tone="primary"
                   onClick={() => onDecide?.(approval.id, true)}
                 >
                   {RUN_PROCESS}
                 </Button>
-                <Button disabled={approval.busy} onClick={() => onDecide?.(approval.id, false)}>
+                <Button
+                  size="sm"
+                  disabled={approval.busy}
+                  onClick={() => onDecide?.(approval.id, false)}
+                >
                   {REJECT_PROCESS}
                 </Button>
               </div>
@@ -338,13 +348,18 @@ function ToolCallCard({
               </p>
               <div className="flex gap-2">
                 <Button
+                  size="sm"
                   disabled={approval.busy}
                   tone="primary"
                   onClick={() => onDecide?.(approval.id, true)}
                 >
                   {ALLOW_ONCE}
                 </Button>
-                <Button disabled={approval.busy} onClick={() => onDecide?.(approval.id, false)}>
+                <Button
+                  size="sm"
+                  disabled={approval.busy}
+                  onClick={() => onDecide?.(approval.id, false)}
+                >
                   {FORBID}
                 </Button>
               </div>

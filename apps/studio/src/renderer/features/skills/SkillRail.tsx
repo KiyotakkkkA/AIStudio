@@ -171,7 +171,6 @@ const RunPanel = observer(function RunPanel({ store }: { readonly store: SkillSt
         onChange={store.setRunModel}
       />
       <Button
-        type="button"
         tone="primary"
         disabled={blocker !== null || store.running}
         title={blocker ?? undefined}

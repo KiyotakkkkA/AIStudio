@@ -51,11 +51,10 @@ function RegistryDialog({ store }: { readonly store: ConnectionStore }) {
         ))}
       </ScrollArea>
       <div className="flex justify-end gap-2 bg-main-850 px-5 py-3">
-        <Button type="button" tone="secondary" onClick={store.closeRegistry}>
+        <Button tone="secondary" onClick={store.closeRegistry}>
           Закрыть
         </Button>
         <Button
-          type="button"
           tone="primary"
           onClick={() => {
             store.requestCreate(null);

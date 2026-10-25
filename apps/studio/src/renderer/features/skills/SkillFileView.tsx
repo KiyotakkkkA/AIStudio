@@ -48,7 +48,7 @@ function SkillFileView({ store, vm }: { readonly store: SkillStore; readonly vm:
         {row === null ? null : (
           <span className="font-mono text-[11px] text-main-500">{formatSize(row.size)}</span>
         )}
-        <Button type="button" tone="ghost" onClick={store.removeOpenFile}>
+        <Button tone="ghost" onClick={store.removeOpenFile}>
           <Icon path={mdiDeleteOutline} size={15} />
           Удалить файл
         </Button>

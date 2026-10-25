@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import ConfirmModal, { type ConfirmModalSetup } from "../../molecules/ConfirmModal";
 import ButtonBase, { type ButtonProps as ButtonBaseProps } from "./ButtonBase";
 
-export type { ButtonTone } from "./ButtonBase";
+export type { ButtonSize, ButtonTone } from "./ButtonBase";
 
 export type ButtonProps = ButtonBaseProps &
   (

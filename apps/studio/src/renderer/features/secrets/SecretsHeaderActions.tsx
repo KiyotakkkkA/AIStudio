@@ -11,10 +11,10 @@ function SecretsHeaderActions() {
 
   return (
     <div className="flex flex-none items-center gap-3">
-      <Button type="button" tone="secondary" disabled title={IMPORT_HINT}>
+      <Button tone="secondary" disabled title={IMPORT_HINT}>
         Импорт .env
       </Button>
-      <Button type="button" tone="primary" onClick={secrets.requestCreate}>
+      <Button tone="primary" onClick={secrets.requestCreate}>
         <Icon path={mdiPlus} size={15} />
         Новый секрет
       </Button>

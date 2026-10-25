@@ -36,7 +36,6 @@ function TryItPanel({ store }: { readonly store: ToolStore }) {
 
       <div className="flex items-center gap-2.5">
         <Button
-          type="button"
           tone="primary"
           disabled={!store.canRun}
           title={blocked ?? undefined}

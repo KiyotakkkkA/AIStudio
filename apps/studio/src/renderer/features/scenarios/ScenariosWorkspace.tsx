@@ -115,7 +115,6 @@ const EditorHeader = observer(function EditorHeader({
         />
       )}
       <Button
-        type="button"
         tone="primary"
         disabled={!editor.dirty || editor.saving}
         onClick={() => void editor.save()}
@@ -216,12 +215,7 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
         title="Сценарии"
         subtitle={store.loaded ? scenariosWord(store.scenarios.length) : "Загрузка…"}
         actions={
-          <Button
-            type="button"
-            tone="primary"
-            disabled={store.creating}
-            onClick={() => void store.create()}
-          >
+          <Button tone="primary" disabled={store.creating} onClick={() => void store.create()}>
             <Icon path={mdiPlus} size={15} />
             Новый сценарий
           </Button>
@@ -246,7 +240,7 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
             title="Сценариев нет"
             description="Сценарий связывает триггер, ИИ-агента и действия в граф, который запускается сам."
             action={
-              <Button type="button" tone="primary" onClick={() => void store.create()}>
+              <Button tone="primary" onClick={() => void store.create()}>
                 <Icon path={mdiPlus} size={15} />
                 Новый сценарий
               </Button>

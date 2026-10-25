@@ -166,7 +166,6 @@ export default observer(function ChatExplorer({ store }: { readonly store: ChatS
             description={ACCESS_MISSING_HINT}
             action={
               <Button
-                type="button"
                 disabled={!store.canChangeFolder}
                 onClick={() => void store.restoreFolderAccess()}
               >

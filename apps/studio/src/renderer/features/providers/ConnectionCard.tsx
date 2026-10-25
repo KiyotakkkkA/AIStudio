@@ -212,7 +212,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
                   }}
                 />
               </span>
-              <Button type="button" tone="ghost" onClick={onManageSecrets}>
+              <Button tone="ghost" onClick={onManageSecrets}>
                 <Icon path={mdiKeyOutline} size={15} />
                 Секреты
               </Button>
@@ -250,7 +250,6 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
 
       <div className="mt-0.5 flex items-center gap-3">
         <Button
-          type="button"
           tone="primary"
           disabled={providers.probing}
           onClick={() => {

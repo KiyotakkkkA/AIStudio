@@ -288,7 +288,7 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
               <span className="text-[12.5px] leading-relaxed text-main-400">
                 Сценарий начинается с триггера. Добавьте его, затем шаги, которые он запускает.
               </span>
-              <Button type="button" tone="primary" onClick={editor.openPalette}>
+              <Button tone="primary" onClick={editor.openPalette}>
                 <Icon path={mdiPlus} size={15} />
                 Добавить шаг
               </Button>
@@ -335,7 +335,6 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
           <div className="absolute bottom-4.5 left-1/2 z-10 flex -translate-x-1/2 gap-2">
             {editor.execution.running ? (
               <Button
-                type="button"
                 tone="primary"
                 disabled={editor.execution.cancelling || editor.execution.view === null}
                 onClick={() => void editor.execution.cancel()}
@@ -345,7 +344,6 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
               </Button>
             ) : (
               <Button
-                type="button"
                 tone="primary"
                 disabled={editor.issues.length > 0}
                 title={editor.issues.length > 0 ? TEST_BLOCKED : undefined}
@@ -355,7 +353,7 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
                 Тестовый запуск
               </Button>
             )}
-            <Button type="button" tone="secondary" onClick={editor.openPalette}>
+            <Button tone="secondary" onClick={editor.openPalette}>
               <Icon path={mdiPlus} size={15} />
               Добавить шаг
             </Button>

@@ -119,7 +119,6 @@ function ValueTable({ vm, table, secrets, namePlaceholder, empty }: ValueTablePr
       </div>
       <div className="flex gap-1.5">
         <Button
-          type="button"
           tone="ghost"
           onClick={() => {
             vm.addRow(table, "literal");
@@ -129,7 +128,6 @@ function ValueTable({ vm, table, secrets, namePlaceholder, empty }: ValueTablePr
           Значение
         </Button>
         <Button
-          type="button"
           tone="ghost"
           onClick={() => {
             vm.addRow(table, "secret");

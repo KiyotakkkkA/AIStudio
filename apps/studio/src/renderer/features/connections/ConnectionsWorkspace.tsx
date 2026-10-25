@@ -32,12 +32,11 @@ function ConnectionsWorkspace() {
         subtitle={`MCP-серверы · ${serversWord(store.servers.length)} · ${toolsWord(store.exposedToolCount)} доступно`}
         actions={
           <>
-            <Button type="button" tone="secondary" onClick={store.openRegistry}>
+            <Button tone="secondary" onClick={store.openRegistry}>
               <Icon path={mdiViewGridPlusOutline} size={15} />
               Каталог
             </Button>
             <Button
-              type="button"
               tone="primary"
               onClick={() => {
                 store.requestCreate(null);
@@ -77,7 +76,7 @@ function ConnectionsWorkspace() {
               }
               action={
                 store.isEmpty ? (
-                  <Button type="button" tone="primary" onClick={store.openRegistry}>
+                  <Button tone="primary" onClick={store.openRegistry}>
                     <Icon path={mdiViewGridPlusOutline} size={15} />
                     Открыть каталог
                   </Button>
@@ -94,7 +93,6 @@ function ConnectionsWorkspace() {
               {form.isNew ? null : (
                 <Button
                   key={form.serverId}
-                  type="button"
                   tone="danger"
                   disabled={store.removing}
                   needConfirm
@@ -120,7 +118,6 @@ function ConnectionsWorkspace() {
               )}
               <span className="flex-1" />
               <Button
-                type="button"
                 tone="secondary"
                 disabled={(!form.isNew && !form.dirty) || store.saving}
                 onClick={store.resetForm}
@@ -128,7 +125,6 @@ function ConnectionsWorkspace() {
                 Отменить
               </Button>
               <Button
-                type="button"
                 tone="primary"
                 disabled={store.saving || (!form.isNew && !form.dirty)}
                 onClick={() => {

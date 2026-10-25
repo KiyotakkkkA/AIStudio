@@ -53,13 +53,10 @@ export default function ConfirmModal({
         <div className="mt-2 text-[13px] leading-relaxed text-main-400">{content}</div>
       </div>
       <div className="mt-5 flex flex-wrap justify-end gap-2 bg-main-850 px-5 py-3">
-        <ButtonBase type="button" onClick={onCancel}>
-          {cancelLabel}
-        </ButtonBase>
+        <ButtonBase onClick={onCancel}>{cancelLabel}</ButtonBase>
         {buttons.map((action) => (
           <ButtonBase
             key={action.label}
-            type="button"
             tone={action.tone ?? tone}
             disabled={disabled}
             onClick={action.onSelect}

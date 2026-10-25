@@ -35,11 +35,11 @@ export default function ConfirmDialog({
         <div className="mt-2 text-[13px] leading-relaxed text-main-400">{children}</div>
       </div>
       <div className="mt-5 flex justify-end gap-2 bg-main-850 px-5 py-3">
-        <Button type="button" tone="secondary" onClick={onCancel}>
+        <Button tone="secondary" onClick={onCancel}>
           {cancelLabel}
         </Button>
         {onConfirm === undefined || confirmLabel === undefined ? null : (
-          <Button type="button" tone={confirmTone} onClick={onConfirm}>
+          <Button tone={confirmTone} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         )}

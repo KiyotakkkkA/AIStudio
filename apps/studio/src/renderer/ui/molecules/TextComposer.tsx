@@ -77,11 +77,11 @@ export default function TextComposer({
           {composerCounter(value.length, max)}
         </span>
         {onCancel !== undefined && cancelLabel !== undefined ? (
-          <Button type="button" tone="ghost" disabled={disabled} onClick={onCancel}>
+          <Button size="sm" tone="ghost" disabled={disabled} onClick={onCancel}>
             {cancelLabel}
           </Button>
         ) : null}
-        <Button type="button" tone="primary" disabled={!canSubmit || disabled} onClick={submit}>
+        <Button size="sm" tone="primary" disabled={!canSubmit || disabled} onClick={submit}>
           {submitLabel}
         </Button>
       </div>

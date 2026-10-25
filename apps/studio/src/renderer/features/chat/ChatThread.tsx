@@ -204,11 +204,8 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                         autoFocus
                       />
                       <div className="flex justify-end gap-2">
-                        <Button type="button" onClick={() => setEditingId(null)}>
-                          Отмена
-                        </Button>
+                        <Button onClick={() => setEditingId(null)}>Отмена</Button>
                         <Button
-                          type="button"
                           tone="primary"
                           disabled={!editingText.trim() || store.generating}
                           onClick={() => {

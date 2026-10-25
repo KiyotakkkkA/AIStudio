@@ -61,7 +61,6 @@ function AccountsTab() {
                   подтвердит вход.
                 </span>
                 <Button
-                  type="button"
                   tone="secondary"
                   onClick={() => {
                     void accounts.cancelLink();
@@ -84,7 +83,6 @@ function AccountsTab() {
                 отведённое время.
               </span>
               <Button
-                type="button"
                 tone="secondary"
                 onClick={() => {
                   void accounts.link(linking.adapter);
@@ -92,7 +90,7 @@ function AccountsTab() {
               >
                 Попробовать снова
               </Button>
-              <Button type="button" tone="ghost" onClick={accounts.dismissLinking}>
+              <Button tone="ghost" onClick={accounts.dismissLinking}>
                 Закрыть
               </Button>
             </div>
@@ -104,7 +102,7 @@ function AccountsTab() {
                 {adapterLabel(linking.adapter)} привязан.
                 {linking.detail === null ? "" : ` ${linking.detail}`}
               </span>
-              <Button type="button" tone="ghost" onClick={accounts.dismissLinking}>
+              <Button tone="ghost" onClick={accounts.dismissLinking}>
                 Закрыть
               </Button>
             </div>

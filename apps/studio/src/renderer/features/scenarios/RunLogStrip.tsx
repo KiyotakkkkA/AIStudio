@@ -173,7 +173,7 @@ const StepActions = observer(function StepActions({ editor }: { readonly editor:
         />
       ) : null}
       {retry ? (
-        <Button type="button" tone="secondary" onClick={() => void editor.retryStep(step.nodeId)}>
+        <Button tone="secondary" onClick={() => void editor.retryStep(step.nodeId)}>
           <Icon path={mdiReplay} size={14} />
           Повторить с этого шага
         </Button>

@@ -37,7 +37,6 @@ function ProvidersPage() {
         ) : (
           <>
             <Button
-              type="button"
               tone="secondary"
               disabled={providers.refreshing}
               onClick={() => {
@@ -47,7 +46,7 @@ function ProvidersPage() {
               <Icon path={mdiRefresh} size={15} />
               {providers.refreshing ? "Обновляем…" : "Обновить все"}
             </Button>
-            <Button type="button" tone="primary" onClick={providers.requestCreate}>
+            <Button tone="primary" onClick={providers.requestCreate}>
               <Icon path={mdiPlus} size={15} />
               Новое подключение
             </Button>

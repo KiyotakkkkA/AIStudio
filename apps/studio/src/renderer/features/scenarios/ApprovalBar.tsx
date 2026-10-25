@@ -19,7 +19,7 @@ function ApprovalBar({ editor }: { readonly editor: ScenarioEditor }) {
         {`${APPROVAL_PROMPT} «${editor.labelOf(approval.subject)}»`}
       </span>
       <Button
-        type="button"
+        size="sm"
         tone="primary"
         disabled={run.deciding}
         onClick={() => void run.decide(true)}
@@ -27,19 +27,14 @@ function ApprovalBar({ editor }: { readonly editor: ScenarioEditor }) {
         Разрешить
       </Button>
       <Button
-        type="button"
+        size="sm"
         tone="secondary"
         disabled={run.deciding}
         onClick={() => void run.decide(true, true)}
       >
         Разрешать всегда
       </Button>
-      <Button
-        type="button"
-        tone="ghost"
-        disabled={run.deciding}
-        onClick={() => void run.decide(false)}
-      >
+      <Button size="sm" tone="ghost" disabled={run.deciding} onClick={() => void run.decide(false)}>
         Отклонить
       </Button>
     </div>

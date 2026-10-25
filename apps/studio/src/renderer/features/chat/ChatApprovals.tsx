@@ -28,6 +28,7 @@ export default observer(function ChatApprovals({ store }: { readonly store: Chat
             </p>
             <div className="flex gap-2">
               <Button
+                size="sm"
                 disabled={request.busy}
                 tone="primary"
                 onClick={() => void store.decideApproval(request.id, true)}
@@ -35,6 +36,7 @@ export default observer(function ChatApprovals({ store }: { readonly store: Chat
                 Разрешить один раз
               </Button>
               <Button
+                size="sm"
                 disabled={request.busy}
                 onClick={() => void store.decideApproval(request.id, false)}
               >

@@ -148,7 +148,6 @@ const ClearButton = observer(function ClearButton({
   const { memory } = useStore();
   return (
     <Button
-      type="button"
       tone="ghost"
       disabled={memory.saving}
       needConfirm

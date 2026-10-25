@@ -112,12 +112,12 @@ export default function TaskRow({
         <span className={STATUS_TONE_TEXT[tone]}>{STATUS_LABELS[run.status]}</span>
       </Chip>
       {run.status === "blocked" && run.approval !== undefined ? (
-        <Button tone="primary" disabled={busy} onClick={onReview}>
+        <Button size="sm" tone="primary" disabled={busy} onClick={onReview}>
           Решить
         </Button>
       ) : null}
       {run.status === "failed" || run.status === "interrupted" ? (
-        <Button tone="secondary" disabled={busy} onClick={onRetry}>
+        <Button size="sm" tone="secondary" disabled={busy} onClick={onRetry}>
           <Icon path={mdiRefresh} size={14} />
           Повторить
         </Button>

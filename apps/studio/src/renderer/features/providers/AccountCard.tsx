@@ -157,23 +157,17 @@ function AccountCard({
       <footer className="mt-3 flex items-start gap-2 border-t border-line px-4 py-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           {needsRelink ? (
-            <Button type="button" tone="primary" disabled={unlinking} onClick={onRelink}>
+            <Button tone="primary" disabled={unlinking} onClick={onRelink}>
               <Icon path={mdiAccountPlusOutline} size={15} />
               Перепривязать
             </Button>
           ) : (
-            <Button
-              type="button"
-              tone="secondary"
-              disabled={checking || unlinking}
-              onClick={onRecheck}
-            >
+            <Button tone="secondary" disabled={checking || unlinking} onClick={onRecheck}>
               <Icon path={mdiRefresh} size={15} className={checking ? "animate-spin" : undefined} />
               {checking ? "Проверка…" : "Проверить сессию"}
             </Button>
           )}
           <Button
-            type="button"
             tone="danger-soft"
             disabled={checking || unlinking}
             needConfirm
@@ -198,7 +192,7 @@ function AccountCard({
             {unlinking ? "Отвязка…" : "Отвязать"}
           </Button>
         </div>
-        <Button type="button" tone="ghost" onClick={onOpenSites}>
+        <Button tone="ghost" onClick={onOpenSites}>
           <Icon path={mdiCookieOutline} size={15} />
           Сайты и куки
         </Button>

@@ -79,7 +79,6 @@ function ProvidersWorkspace() {
               {form.isNew ? null : (
                 <Button
                   key={form.providerId}
-                  type="button"
                   tone="danger"
                   disabled={providers.removing}
                   needConfirm
@@ -107,7 +106,6 @@ function ProvidersWorkspace() {
                 </Button>
               )}
               <Button
-                type="button"
                 tone="secondary"
                 disabled={!form.dirty || providers.saving}
                 needConfirm
@@ -121,7 +119,6 @@ function ProvidersWorkspace() {
                 Отменить
               </Button>
               <Button
-                type="button"
                 tone="primary"
                 disabled={providers.saving}
                 onClick={() => {

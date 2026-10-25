@@ -194,7 +194,6 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
 
       <div className="mt-0.5 flex items-center gap-3">
         <Button
-          type="button"
           tone="primary"
           disabled={store.testing || store.saving || !vm.enabled}
           onClick={() => {
@@ -206,7 +205,6 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
         </Button>
         {vm.isNew ? null : running ? (
           <Button
-            type="button"
             tone="secondary"
             disabled={store.switching}
             onClick={() => {
@@ -218,7 +216,6 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
           </Button>
         ) : (
           <Button
-            type="button"
             tone="secondary"
             disabled={store.switching || !vm.enabled || vm.dirty}
             onClick={() => {
@@ -231,7 +228,6 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
         )}
         {store.signingIn ? (
           <Button
-            type="button"
             tone="secondary"
             onClick={() => {
               void store.cancelSignIn();
@@ -242,7 +238,6 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
           </Button>
         ) : needsSignIn ? (
           <Button
-            type="button"
             tone="primary"
             disabled={store.switching || !vm.enabled}
             onClick={() => {
@@ -254,7 +249,6 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
           </Button>
         ) : signedIn ? (
           <Button
-            type="button"
             tone="ghost"
             disabled={store.switching}
             onClick={() => {

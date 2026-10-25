@@ -43,7 +43,6 @@ function ToolsWorkspace() {
               />
             </div>
             <Button
-              type="button"
               tone="secondary"
               onClick={() => {
                 void navigate(`${ROUTES.permissions}?tab=${TOOLS_TAB_PARAM}`);

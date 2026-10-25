@@ -51,7 +51,6 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
         {vm.isNew ? null : (
           <Button
             key={vm.secretId}
-            type="button"
             tone="danger"
             disabled={saving}
             needConfirm
@@ -217,7 +216,6 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
           машину, пока его не запросит провайдер.
         </span>
         <Button
-          type="button"
           tone="secondary"
           onClick={onCancel}
           disabled={saving}

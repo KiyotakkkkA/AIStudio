@@ -188,13 +188,14 @@ export default function ChatQuestionCard({
       ))}
       <div className="flex gap-2">
         <Button
+          size="sm"
           tone="primary"
           disabled={busy || answers.length === 0}
           onClick={() => onAnswer(answers)}
         >
           {SUBMIT_ANSWERS}
         </Button>
-        <Button disabled={busy} onClick={onSkip}>
+        <Button size="sm" disabled={busy} onClick={onSkip}>
           {SKIP_QUESTIONS}
         </Button>
       </div>

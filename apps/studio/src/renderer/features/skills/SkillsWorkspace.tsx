@@ -46,7 +46,6 @@ function SkillsWorkspace() {
         actions={
           <>
             <Button
-              type="button"
               tone="secondary"
               disabled={store.importing}
               onClick={() => void store.importFolder()}
@@ -54,7 +53,7 @@ function SkillsWorkspace() {
               <Icon path={mdiFolderDownloadOutline} size={15} />
               Импорт папки
             </Button>
-            <Button type="button" tone="primary" onClick={store.requestCreate}>
+            <Button tone="primary" onClick={store.requestCreate}>
               <Icon path={mdiPlus} size={15} />
               Новый навык
             </Button>
@@ -96,7 +95,7 @@ function SkillsWorkspace() {
                   : "Выберите навык слева или создайте новый."
               }
               action={
-                <Button type="button" tone="primary" onClick={store.requestCreate}>
+                <Button tone="primary" onClick={store.requestCreate}>
                   <Icon path={mdiPlus} size={15} />
                   Новый навык
                 </Button>
@@ -175,7 +174,6 @@ function SkillsWorkspace() {
                 {form.isNew ? null : (
                   <Button
                     key={form.skillId}
-                    type="button"
                     tone="danger"
                     disabled={store.removing}
                     needConfirm
@@ -198,7 +196,6 @@ function SkillsWorkspace() {
                 )}
                 <span className="flex-1" />
                 <Button
-                  type="button"
                   tone="secondary"
                   disabled={(!form.isNew && !form.dirty) || store.saving}
                   onClick={store.resetForm}
@@ -206,7 +203,6 @@ function SkillsWorkspace() {
                   Отменить
                 </Button>
                 <Button
-                  type="button"
                   tone="primary"
                   disabled={store.saving || (!form.isNew && !form.dirty)}
                   onClick={() => void store.submit()}

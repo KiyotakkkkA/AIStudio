@@ -696,12 +696,12 @@ const NotesTab = observer(function NotesTab({
 function SelectionActions({ editor }: { readonly editor: ScenarioEditor }) {
   return (
     <div className="flex flex-none gap-2 border-t border-line px-3.5 py-3">
-      <Button type="button" tone="secondary" onClick={editor.duplicateSelection}>
+      <Button tone="secondary" onClick={editor.duplicateSelection}>
         <Icon path={mdiContentCopy} size={15} />
         Дублировать
       </Button>
       <span className="flex-1" />
-      <Button type="button" tone="danger" onClick={editor.deleteSelection}>
+      <Button tone="danger" onClick={editor.deleteSelection}>
         <Icon path={mdiDeleteOutline} size={15} />
         Удалить
       </Button>
@@ -723,7 +723,6 @@ const NodeActions = observer(function NodeActions({
       {runnable ? (
         <span className="flex flex-1 [&>button]:w-full">
           <Button
-            type="button"
             tone="secondary"
             disabled={editor.execution.running}
             onClick={() => void editor.runNode(node.id)}
@@ -736,7 +735,6 @@ const NodeActions = observer(function NodeActions({
         <span className="flex-1" />
       )}
       <Button
-        type="button"
         tone="ghost"
         onClick={() => {
           editor.toggleDisabled(node.id);

@@ -271,7 +271,6 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             </Dropdown>
             {store.generating ? (
               <Button
-                type="button"
                 tone="danger"
                 disabled={!store.run || store.stopping}
                 onClick={() => void store.stop()}
@@ -358,7 +357,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
           </div>
         </div>
         <div className="mt-5 flex justify-end bg-main-850 px-5 py-3">
-          <Button type="button" tone="secondary" onClick={() => setStoresOpen(false)}>
+          <Button tone="secondary" onClick={() => setStoresOpen(false)}>
             Готово
           </Button>
         </div>
