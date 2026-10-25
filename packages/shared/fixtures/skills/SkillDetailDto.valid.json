@@ -6,8 +6,6 @@
       "key": "release-notes",
       "name": "Заметки о выпуске",
       "description": "Составляет заметки о выпуске по списку изменений",
-      "allowedTools": ["vector.search", "skill.read"],
-      "modelOverride": null,
       "enabled": true,
       "source": "local",
       "status": "ready",

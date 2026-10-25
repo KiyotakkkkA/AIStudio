@@ -43,14 +43,12 @@ impl<'c> SkillRepository<'c> {
     }
 
     pub fn save(&self, row: &SkillRow) -> rusqlite::Result<SkillRow> {
-        let model_override = row.model_override.as_ref().map(json_text).transpose()?;
         self.connection
             .prepare_cached(&format!(
                 "INSERT INTO skill ({columns}) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) \
                  ON CONFLICT (id) DO UPDATE SET key = excluded.key, name = excluded.name, \
-                 description = excluded.description, allowed_tools = excluded.allowed_tools, \
-                 model_override = excluded.model_override, enabled = excluded.enabled, \
+                 description = excluded.description, enabled = excluded.enabled, \
                  source = excluded.source, status = excluded.status, issues = excluded.issues, \
                  file_count = excluded.file_count, content_hash = excluded.content_hash, \
                  path = excluded.path, version = excluded.version, author = excluded.author, \
@@ -64,8 +62,6 @@ impl<'c> SkillRepository<'c> {
                     row.key,
                     row.name,
                     row.description,
-                    json_text(&row.allowed_tools)?,
-                    model_override,
                     row.enabled,
                     EnumColumn(row.source),
                     EnumColumn(row.status),
@@ -103,8 +99,6 @@ mod tests {
             key: key.to_owned(),
             name: "Навык".to_owned(),
             description: "Описание".to_owned(),
-            allowed_tools: vec!["vector.search".to_owned()],
-            model_override: None,
             enabled: true,
             source: SkillSource::Local,
             status: SkillStatus::Ready,
@@ -138,8 +132,8 @@ mod tests {
                 let changed = skills.save(&SkillRow {
                     status: SkillStatus::Invalid,
                     issues: vec![SkillIssueDto {
-                        field: "allowedTools.0".to_owned(),
-                        rule: SkillIssueRule::ToolOff,
+                        field: "files".to_owned(),
+                        rule: SkillIssueRule::Path,
                     }],
                     updated_at: 5,
                     created_at: 99,

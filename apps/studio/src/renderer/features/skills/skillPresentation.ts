@@ -1,16 +1,14 @@
 import {
   AppErrorCode,
-  type McpServerDto,
   type SkillDto,
   type SkillIssueDto,
   type SkillIssueRule,
   type SkillSource,
   type SkillUpdateDto,
-  type ToolDto,
 } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 import type { StatusTone } from "../../ui/atoms/statusTone";
-import { plural, serverState, STATE_LABELS } from "../connections/connectionPresentation";
+import { plural } from "../connections/connectionPresentation";
 
 export { formatBytes as formatSize } from "../tasks/runPresentation";
 
@@ -38,7 +36,6 @@ const FIELD_LABELS: Record<string, string> = {
   name: "Название",
   description: "Описание",
   instructions: "Инструкции",
-  allowedTools: "Разрешённые инструменты",
   files: "Файлы",
   removeFiles: "Файлы",
   path: "Папка навыка",
@@ -49,10 +46,6 @@ const RULE_COPY: Record<SkillIssueRule, string> = {
   pattern: "Строчная латиница, цифры и одиночные дефисы, начиная с буквы.",
   tooLong: "Слишком длинное значение.",
   duplicate: "Навык с таким идентификатором уже есть.",
-  unknownTool: "Инструмент не найден в реестре.",
-  toolOff: "Инструмент запрещён на странице «Инструменты».",
-  toolDisabled: "Инструмент выключен на странице «Инструменты».",
-  toolUnavailable: "Источник инструмента недоступен.",
   path: "Недопустимый путь: файлы лежат в references/, scripts/ или assets/.",
   fileTooLarge: "Файл больше 1 МБ.",
   skillTooLarge: "Файлы навыка вместе больше 10 МБ.",
@@ -71,16 +64,9 @@ export function issueField(issue: SkillIssueDto): string {
   return head;
 }
 
-export function issueLine(issue: SkillIssueDto, allowedTools: readonly string[] = []): string {
+export function issueLine(issue: SkillIssueDto): string {
   const field = issueField(issue);
   const label = FIELD_LABELS[field] ?? field;
-  if (field === "allowedTools") {
-    const index = Number(issue.field.split(".")[1]);
-    const key = Number.isInteger(index) ? allowedTools[index] : undefined;
-    return key === undefined
-      ? `${label}: ${issueCopy(issue.rule)}`
-      : `${key}: ${issueCopy(issue.rule)}`;
-  }
   return `${label}: ${issueCopy(issue.rule)}`;
 }
 
@@ -116,39 +102,6 @@ export function skillIssuesOf(error: unknown): SkillIssueDto[] {
   return issues.filter(isIssue).filter((issue) => issue.rule in RULE_COPY);
 }
 
-type ToolBlock = "unavailable" | "offline" | "disabled" | "off";
-
-export interface ToolCeiling {
-  readonly block: ToolBlock | null;
-  readonly reason: string | null;
-}
-
-export function toolCeiling(tool: ToolDto, server: McpServerDto | null): ToolCeiling {
-  if (!tool.available) {
-    if (tool.source === "mcp" && server !== null) {
-      const state = serverState(server, null);
-      return {
-        block: "offline",
-        reason: `Сервер «${server.name}» недоступен: ${STATE_LABELS[state].toLowerCase()}.`,
-      };
-    }
-    return {
-      block: "unavailable",
-      reason:
-        tool.source === "mcp"
-          ? "MCP-сервер инструмента удалён."
-          : "Источник больше не предоставляет инструмент.",
-    };
-  }
-  if (!tool.enabled) {
-    return { block: "disabled", reason: "Выключен на странице «Инструменты»." };
-  }
-  if (tool.tier === "off") {
-    return { block: "off", reason: "Запрещён на странице «Инструменты» (off)." };
-  }
-  return { block: null, reason: null };
-}
-
 export function skillTone(skill: SkillDto): StatusTone {
   if (skill.status === "invalid") return "err";
   return skill.enabled ? "ok" : "idle";
@@ -157,14 +110,7 @@ export function skillTone(skill: SkillDto): StatusTone {
 export function skillLine(skill: SkillDto): string {
   if (skill.status === "invalid") return `Ошибки: ${issuesWord(skill.issues.length)}`;
   if (!skill.enabled) return "Выключен";
-  const parts: string[] = [];
-  if (skill.allowedTools.length > 0) parts.push(toolCount(skill.allowedTools.length));
-  if (skill.fileCount > 0) parts.push(filesWord(skill.fileCount));
-  return parts.length > 0 ? parts.join(" · ") : "Без инструментов и файлов";
-}
-
-function toolCount(count: number): string {
-  return plural(count, "инструмент", "инструмента", "инструментов");
+  return skill.fileCount > 0 ? filesWord(skill.fileCount) : "Без файлов";
 }
 
 function issuesWord(count: number): string {

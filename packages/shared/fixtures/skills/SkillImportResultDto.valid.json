@@ -7,8 +7,6 @@
         "key": "release-notes",
         "name": "Заметки о выпуске",
         "description": "Составляет заметки о выпуске по списку изменений",
-        "allowedTools": [],
-        "modelOverride": null,
         "enabled": true,
         "source": "imported",
         "status": "ready",

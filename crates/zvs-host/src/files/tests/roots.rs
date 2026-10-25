@@ -20,8 +20,6 @@ fn with_skill(host: &Host) {
             name: "Извлечение".to_owned(),
             description: "Извлекает таблицы из документов".to_owned(),
             instructions: "Прочитайте references/guide.md.".to_owned(),
-            allowed_tools: None,
-            model_override: None,
             enabled: None,
             files: Some(vec![zvs_contract::SkillFileInput {
                 path: "references/guide.md".to_owned(),

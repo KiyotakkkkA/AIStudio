@@ -10,11 +10,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, CreateSkillInput, GraphNode, ProviderCapability, ProviderId,
-    ProviderKind, RetryPolicy, RunGraph, RunKind, SKILL_TRIGGER_KEY, SkillDto, SkillExportInput,
+    AppError, AppErrorCode, CreateSkillInput, GraphNode, ProviderCapability, ProviderKind,
+    RetryPolicy, RunGraph, RunKind, SKILL_TRIGGER_KEY, SkillDto, SkillExportInput,
     SkillFileEncoding, SkillFileInput, SkillImportInput, SkillIssueDto, SkillIssueRule,
-    SkillModelDto, SkillSource, SkillStatus, SkillUpdateDto, StartRunInput, ToolDto, ToolSource,
-    ToolTier, UpdateSkillInput, Validate,
+    SkillSource, SkillStatus, SkillUpdateDto, StartRunInput, ToolSource, ToolTier,
+    UpdateSkillInput, Validate,
 };
 
 use super::bundled::is_newer;
@@ -185,9 +185,6 @@ struct Host {
     nodes: Arc<NodeRegistry>,
     service: SkillService,
     picker: Arc<FakePicker>,
-    lookup: ToolDto,
-    off: ToolDto,
-    provider_id: ProviderId,
 }
 
 fn register_demo_nodes(nodes: &NodeRegistry, calls: &Arc<Calls>) {
@@ -277,20 +274,11 @@ fn host_with(drivers: Option<Arc<dyn DriverSource>>) -> Host {
             })
             .expect("registers a tool")
     };
-    let lookup = register("demo.lookup");
+    register("demo.lookup");
     register("demo.drop");
-    let off = register("demo.off");
-    let disabled = register("demo.disabled");
-    tools
-        .set_tier(&off.id.to_string(), ToolTier::Off, "test")
-        .expect("turns a tool off");
-    tools
-        .set_enabled(&disabled.id.to_string(), false)
-        .expect("disables a tool");
     let library = SkillLibrary::new(SkillLibraryOptions::new(
         database.shared(),
         workspace.join(SKILLS_DIR),
-        tools.clone(),
     ));
     register_skill_nodes(&nodes, &library).expect("registers the skill nodes");
     register_kernel_tools(&nodes, &tools).expect("registers the kernel tools");
@@ -304,7 +292,7 @@ fn host_with(drivers: Option<Arc<dyn DriverSource>>) -> Host {
         ..RunServiceOptions::new(database.shared(), EventBus::default(), Arc::clone(&nodes))
     })
     .expect("a run service");
-    let provider_id = database
+    database
         .with_connection(|connection| {
             let repositories = Repositories::new(connection);
             let provider = repositories.providers.create(&ProviderDraft::new(
@@ -323,7 +311,7 @@ fn host_with(drivers: Option<Arc<dyn DriverSource>>) -> Host {
                 }],
                 1,
             )?;
-            Ok(provider.id)
+            Ok(())
         })
         .expect("seeds a provider");
     let picker = FakePicker::shared();
@@ -345,20 +333,15 @@ fn host_with(drivers: Option<Arc<dyn DriverSource>>) -> Host {
         nodes,
         service,
         picker,
-        lookup,
-        off,
-        provider_id: ProviderId::parse(&provider_id).expect("a provider id"),
     }
 }
 
-fn notes(allowed: &[&str]) -> CreateSkillInput {
+fn notes() -> CreateSkillInput {
     CreateSkillInput {
         key: "release-notes".to_owned(),
         name: "Заметки о выпуске".to_owned(),
         description: "Составляет заметки о выпуске по списку изменений".to_owned(),
         instructions: "# Заметки\n\nСгруппируйте изменения по разделам.".to_owned(),
-        allowed_tools: Some(allowed.iter().map(|key| (*key).to_owned()).collect()),
-        model_override: None,
         enabled: None,
         files: Some(vec![
             SkillFileInput {
@@ -381,8 +364,6 @@ fn weather() -> CreateSkillInput {
         name: "Погода".to_owned(),
         description: "Рассказывает прогноз погоды в городе".to_owned(),
         instructions: "Назовите температуру.".to_owned(),
-        allowed_tools: None,
-        model_override: None,
         enabled: None,
         files: None,
     }
@@ -417,10 +398,7 @@ async fn finished(host: &Host, handle: &zvs_contract::RunHandleDto) -> zvs_contr
 #[test]
 fn a_skill_is_saved_as_a_folder_with_its_manifest_and_files_and_indexed_in_the_database() {
     let host = host();
-    let detail = host
-        .service
-        .create(&notes(&["demo.lookup"]))
-        .expect("creates the skill");
+    let detail = host.service.create(&notes()).expect("creates the skill");
     assert_eq!(detail.skill.status, SkillStatus::Ready);
     assert_eq!(detail.skill.source, SkillSource::Local);
     assert_eq!(detail.skill.file_count, 2);
@@ -439,16 +417,11 @@ fn a_skill_is_saved_as_a_folder_with_its_manifest_and_files_and_indexed_in_the_d
     let folder = host.workspace.join(SKILLS_DIR).join("release-notes");
     let manifest = fs::read_to_string(folder.join(SKILL_FILE)).expect("a manifest");
     assert!(manifest.starts_with("---\nname: \"release-notes\"\n"));
-    assert!(manifest.contains("allowed-tools: \"demo.lookup\""));
+    assert!(!manifest.contains("allowed-tools"));
     assert_eq!(
         fs::read(folder.join("assets").join("logo.bin")).expect("an asset"),
         [0, 1, 2]
     );
-    let usage = host
-        .tools
-        .usage(&host.lookup.id.to_string())
-        .expect("usage");
-    assert_eq!(usage.references[0].name, "Заметки о выпуске");
     let entries: Vec<String> = fs::read_dir(host.workspace.join(SKILLS_DIR))
         .expect("the skills folder")
         .map(|entry| {
@@ -462,62 +435,6 @@ fn a_skill_is_saved_as_a_folder_with_its_manifest_and_files_and_indexed_in_the_d
     assert_eq!(entries, ["release-notes"]);
 }
 
-#[test]
-fn allowed_tools_can_never_exceed_the_ceiling_on_the_tools_page() {
-    let host = host();
-    let error = host
-        .service
-        .create(&notes(&[
-            "demo.lookup",
-            "demo.off",
-            "demo.disabled",
-            "demo.missing",
-        ]))
-        .expect_err("the widening attempt is rejected");
-    assert_eq!(error.code, AppErrorCode::ValidationFailed);
-    assert_eq!(error.message, library::SKILL_INVALID);
-    assert_eq!(
-        issues_of(&error),
-        [
-            issue("allowedTools.1", SkillIssueRule::ToolOff),
-            issue("allowedTools.2", SkillIssueRule::ToolDisabled),
-            issue("allowedTools.3", SkillIssueRule::UnknownTool),
-        ]
-    );
-    assert!(host.service.list().expect("lists").is_empty());
-    assert!(
-        !host
-            .workspace
-            .join(SKILLS_DIR)
-            .join("release-notes")
-            .exists()
-    );
-    let saved = host
-        .service
-        .create(&notes(&["demo.lookup"]))
-        .expect("a narrowed skill is accepted");
-    let widened = host
-        .service
-        .update(&UpdateSkillInput {
-            id: saved.skill.id,
-            allowed_tools: Some(vec!["demo.lookup".to_owned(), host.off.key.clone()]),
-            ..update(saved.skill.id)
-        })
-        .expect_err("widening an existing skill is rejected");
-    assert_eq!(
-        issues_of(&widened),
-        [issue("allowedTools.1", SkillIssueRule::ToolOff)]
-    );
-    assert_eq!(
-        host.service
-            .get(&saved.skill.id)
-            .expect("gets")
-            .skill
-            .allowed_tools,
-        ["demo.lookup"]
-    );
-}
-
 fn update(id: zvs_contract::SkillId) -> UpdateSkillInput {
     UpdateSkillInput {
         id,
@@ -525,8 +442,6 @@ fn update(id: zvs_contract::SkillId) -> UpdateSkillInput {
         name: None,
         description: None,
         instructions: None,
-        allowed_tools: None,
-        model_override: None,
         enabled: None,
         files: None,
         remove_files: None,
@@ -544,8 +459,6 @@ fn every_field_problem_is_reported_at_once_for_the_editor() {
             name: " ".to_owned(),
             description: String::new(),
             instructions: "\n".to_owned(),
-            allowed_tools: None,
-            model_override: None,
             enabled: None,
             files: Some(vec![
                 SkillFileInput {
@@ -588,10 +501,7 @@ fn every_field_problem_is_reported_at_once_for_the_editor() {
 #[test]
 fn an_update_renames_the_folder_replaces_files_and_keeps_the_rest() {
     let host = host();
-    let saved = host
-        .service
-        .create(&notes(&["demo.lookup"]))
-        .expect("creates");
+    let saved = host.service.create(&notes()).expect("creates");
     let updated = host
         .service
         .update(&UpdateSkillInput {
@@ -639,12 +549,9 @@ fn an_update_renames_the_folder_replaces_files_and_keeps_the_rest() {
 }
 
 #[test]
-fn a_hand_edit_is_re_read_and_a_broken_or_widened_skill_is_reported_invalid() {
+fn a_hand_edit_is_re_read_and_a_broken_skill_is_reported_invalid() {
     let host = host();
-    let saved = host
-        .service
-        .create(&notes(&["demo.lookup"]))
-        .expect("creates");
+    let saved = host.service.create(&notes()).expect("creates");
     let manifest = host
         .workspace
         .join(SKILLS_DIR)
@@ -659,17 +566,6 @@ fn a_hand_edit_is_re_read_and_a_broken_or_widened_skill_is_reported_invalid() {
     assert_eq!(edited.skill.description, "Отредактировано вручную");
     assert_eq!(edited.instructions, "Новая инструкция.");
     assert_eq!(edited.skill.status, SkillStatus::Ready);
-    fs::write(
-        &manifest,
-        "---\nname: release-notes\ndescription: Расширено\nallowed-tools: demo.lookup demo.off\n---\n\nТекст.\n",
-    )
-    .expect("widens by hand");
-    let widened = host.service.get(&saved.skill.id).expect("re-reads");
-    assert_eq!(widened.skill.status, SkillStatus::Invalid);
-    assert_eq!(
-        widened.skill.issues,
-        [issue("allowedTools.1", SkillIssueRule::ToolOff)]
-    );
     fs::write(&manifest, "no frontmatter").expect("breaks the manifest");
     let broken = host.service.get(&saved.skill.id).expect("re-reads");
     assert_eq!(broken.skill.status, SkillStatus::Invalid);
@@ -680,35 +576,6 @@ fn a_hand_edit_is_re_read_and_a_broken_or_widened_skill_is_reported_invalid() {
             .contains(&issue("instructions", SkillIssueRule::Manifest))
     );
     assert!(host.service.library().usable().expect("lists").is_empty());
-}
-
-#[test]
-fn turning_a_tool_off_later_invalidates_the_skills_that_allow_it() {
-    let host = host();
-    let saved = host
-        .service
-        .create(&notes(&["demo.lookup"]))
-        .expect("creates");
-    host.tools
-        .set_tier(&host.lookup.id.to_string(), ToolTier::Off, "user")
-        .expect("turns the tool off");
-    let listed = host.service.list().expect("lists");
-    assert_eq!(listed[0].status, SkillStatus::Invalid);
-    assert_eq!(
-        listed[0].issues,
-        [issue("allowedTools.0", SkillIssueRule::ToolOff)]
-    );
-    host.tools
-        .set_tier(&host.lookup.id.to_string(), ToolTier::Auto, "user")
-        .expect("turns the tool back on");
-    assert_eq!(
-        host.service
-            .get(&saved.skill.id)
-            .expect("gets")
-            .skill
-            .status,
-        SkillStatus::Ready
-    );
 }
 
 #[test]
@@ -741,16 +608,7 @@ fn a_folder_dropped_into_the_skills_directory_is_adopted_on_reconcile() {
 #[tokio::test]
 async fn import_and_export_round_trip_a_skill_folder() {
     let host = host();
-    let original = host
-        .service
-        .create(&CreateSkillInput {
-            model_override: Some(Some(SkillModelDto {
-                provider_id: host.provider_id,
-                model_id: "fake-model".to_owned(),
-            })),
-            ..notes(&["demo.lookup"])
-        })
-        .expect("creates");
+    let original = host.service.create(&notes()).expect("creates");
     let exports = temporary_directory("studio-skill-export-");
     host.picker.answer(&[&exports.path().to_string_lossy()]);
     let exported = host
@@ -794,8 +652,6 @@ async fn import_and_export_round_trip_a_skill_folder() {
     assert_eq!(imported.skill.key, original.skill.key);
     assert_eq!(imported.skill.name, original.skill.name);
     assert_eq!(imported.skill.description, original.skill.description);
-    assert_eq!(imported.skill.allowed_tools, original.skill.allowed_tools);
-    assert_eq!(imported.skill.model_override, original.skill.model_override);
     assert_eq!(imported.instructions, original.instructions);
     assert_eq!(imported.files, original.files);
     host.picker.answer(&[]);
@@ -808,7 +664,7 @@ async fn import_and_export_round_trip_a_skill_folder() {
 }
 
 #[tokio::test]
-async fn a_foreign_skill_imports_with_its_unknown_tools_flagged_and_loose_files_moved() {
+async fn a_foreign_skill_imports_ready_with_its_tool_list_kept_and_loose_files_moved() {
     let host = host();
     let foreign = temporary_directory("studio-skill-foreign-");
     let folder = foreign.join("pdf-tools");
@@ -828,14 +684,8 @@ async fn a_foreign_skill_imports_with_its_unknown_tools_flagged_and_loose_files_
         .expect("imports")
         .skill
         .expect("a skill");
-    assert_eq!(imported.skill.status, SkillStatus::Invalid);
-    assert_eq!(
-        imported.skill.issues,
-        [
-            issue("allowedTools.0", SkillIssueRule::UnknownTool),
-            issue("allowedTools.1", SkillIssueRule::UnknownTool),
-        ]
-    );
+    assert_eq!(imported.skill.status, SkillStatus::Ready);
+    assert!(imported.skill.issues.is_empty());
     assert_eq!(imported.files[0].path, "references/REFERENCE.md");
     let manifest = fs::read_to_string(
         host.workspace
@@ -845,14 +695,7 @@ async fn a_foreign_skill_imports_with_its_unknown_tools_flagged_and_loose_files_
     )
     .expect("a manifest");
     assert!(manifest.contains("license: \"MIT\""));
-    let fixed = host
-        .service
-        .update(&UpdateSkillInput {
-            allowed_tools: Some(vec!["demo.lookup".to_owned()]),
-            ..update(imported.skill.id)
-        })
-        .expect("the editor fixes it");
-    assert_eq!(fixed.skill.status, SkillStatus::Ready);
+    assert!(manifest.contains("allowed-tools: \"Read Grep\""));
     let empty = temporary_directory("studio-skill-empty-");
     let refused = host
         .service
@@ -867,7 +710,7 @@ async fn a_foreign_skill_imports_with_its_unknown_tools_flagged_and_loose_files_
 #[tokio::test]
 async fn trigger_scoring_ranks_a_matching_phrase_above_an_unrelated_one() {
     let host = host();
-    host.service.create(&notes(&[])).expect("creates notes");
+    host.service.create(&notes()).expect("creates notes");
     host.service.create(&weather()).expect("creates weather");
     let cancel = CancellationToken::new();
     let keys = |skills: Vec<SkillDto>| {
@@ -939,7 +782,7 @@ async fn trigger_scoring_uses_the_embedding_provider_when_one_is_configured() {
             Ok(())
         })
         .expect("configures embeddings");
-    host.service.create(&notes(&[])).expect("creates notes");
+    host.service.create(&notes()).expect("creates notes");
     host.service.create(&weather()).expect("creates weather");
     let picked = host
         .service
@@ -1018,9 +861,7 @@ async fn the_kernel_refuses_a_model_call_outside_the_runs_allowed_tools() {
 #[tokio::test]
 async fn skill_load_and_skill_read_serve_the_instructions_and_stay_inside_the_folder() {
     let host = host();
-    host.service
-        .create(&notes(&["demo.lookup"]))
-        .expect("creates");
+    host.service.create(&notes()).expect("creates");
     let library = host.service.library();
     let loaded = library.load("release-notes").expect("loads");
     assert_eq!(
@@ -1059,7 +900,7 @@ async fn skill_load_and_skill_read_serve_the_instructions_and_stay_inside_the_fo
 #[tokio::test]
 async fn the_chat_catalogue_lists_usable_skills_with_the_wire_tool_names() {
     let host = host();
-    host.service.create(&notes(&[])).expect("creates notes");
+    host.service.create(&notes()).expect("creates notes");
     let skipped = host.service.create(&weather()).expect("creates weather");
     host.service
         .update(&UpdateSkillInput {
@@ -1187,10 +1028,7 @@ fn a_bundled_key_already_taken_by_the_user_is_left_alone() {
 #[test]
 fn a_duplicate_copies_the_folder_under_a_free_key() {
     let host = host();
-    let original = host
-        .service
-        .create(&notes(&["demo.lookup"]))
-        .expect("creates");
+    let original = host.service.create(&notes()).expect("creates");
     let first = host
         .service
         .duplicate(&original.skill.id)
@@ -1198,7 +1036,6 @@ fn a_duplicate_copies_the_folder_under_a_free_key() {
     assert_eq!(first.skill.key, "release-notes-copy");
     assert_eq!(first.skill.name, "Заметки о выпуске (копия)");
     assert_eq!(first.skill.source, SkillSource::Local);
-    assert_eq!(first.skill.allowed_tools, ["demo.lookup"]);
     assert_eq!(first.instructions, original.instructions);
     assert_eq!(first.files, original.files);
     assert_ne!(first.skill.id, original.skill.id);
@@ -1220,18 +1057,10 @@ fn a_duplicate_copies_the_folder_under_a_free_key() {
 #[test]
 fn enabling_does_not_rewrite_the_folder_and_works_on_an_invalid_skill() {
     let host = host();
-    let saved = host
-        .service
-        .create(&notes(&["demo.lookup"]))
-        .expect("creates");
-    host.tools
-        .set_tier(&host.lookup.id.to_string(), ToolTier::Off, "user")
-        .expect("turns the tool off");
-    let manifest = host
-        .workspace
-        .join(SKILLS_DIR)
-        .join("release-notes")
-        .join(SKILL_FILE);
+    let saved = host.service.create(&notes()).expect("creates");
+    let folder = host.workspace.join(SKILLS_DIR).join("release-notes");
+    fs::write(folder.join("stray.txt"), "x").expect("drops a stray file");
+    let manifest = folder.join(SKILL_FILE);
     let before = fs::metadata(&manifest)
         .and_then(|metadata| metadata.modified())
         .expect("a manifest");
@@ -1257,7 +1086,7 @@ fn enabling_does_not_rewrite_the_folder_and_works_on_an_invalid_skill() {
 #[test]
 fn a_file_is_readable_by_id_even_when_the_skill_is_off_and_never_outside_its_folder() {
     let host = host();
-    let saved = host.service.create(&notes(&[])).expect("creates");
+    let saved = host.service.create(&notes()).expect("creates");
     host.service
         .set_enabled(&saved.skill.id, false)
         .expect("disables");
@@ -1311,11 +1140,7 @@ const NOTES_V2: &[BundledSkill] = &[BundledSkill {
 fn library_of(host: &Host, bundled: &'static [BundledSkill]) -> SkillLibrary {
     SkillLibrary::new(SkillLibraryOptions {
         bundled,
-        ..SkillLibraryOptions::new(
-            host.database.shared(),
-            host.workspace.join(SKILLS_DIR),
-            host.tools.clone(),
-        )
+        ..SkillLibraryOptions::new(host.database.shared(), host.workspace.join(SKILLS_DIR))
     })
 }
 
@@ -1513,7 +1338,6 @@ fn authored(key: &str) -> AuthoredSkill {
         name: "Отчёт о провайдерах".to_owned(),
         description: "Составляет отчёт о состоянии провайдеров".to_owned(),
         instructions: "# Отчёт\n\nПеречислите провайдеров.".to_owned(),
-        allowed_tools: vec!["demo.lookup".to_owned()],
         files: vec![(
             "references/format.md".to_owned(),
             "Таблица: провайдер, состояние.".to_owned(),
@@ -1585,7 +1409,7 @@ fn an_authored_skill_is_saved_as_a_local_versioned_skill_with_its_files() {
 }
 
 #[test]
-fn an_authored_skill_never_overwrites_a_bundled_one_or_names_unknown_tools() {
+fn an_authored_skill_never_overwrites_a_bundled_one_or_writes_outside_its_folders() {
     let host = host();
     let library = host.service.library();
     library.install_bundled().expect("installs");
@@ -1600,26 +1424,11 @@ fn an_authored_skill_never_overwrites_a_bundled_one_or_names_unknown_tools() {
 
     let error = library
         .author(&AuthoredSkill {
-            allowed_tools: vec!["demo.lookup".to_owned(), "web.nowhere".to_owned()],
-            ..authored("provider-report")
-        })
-        .expect_err("an unknown tool is refused");
-    assert_eq!(
-        issues_of(&error),
-        [issue("allowedTools.1", SkillIssueRule::UnknownTool)]
-    );
-    let explained = nodes::explained(error);
-    assert!(
-        explained
-            .message
-            .ends_with(": allowedTools.1 (unknownTool)")
-    );
-
-    let error = library
-        .author(&AuthoredSkill {
             files: vec![("notes.md".to_owned(), "x".to_owned())],
             ..authored("provider-report")
         })
         .expect_err("a file outside the skill folders is refused");
     assert_eq!(issues_of(&error), [issue("files.0", SkillIssueRule::Path)]);
+    let explained = nodes::explained(error);
+    assert!(explained.message.ends_with(": files.0 (path)"));
 }

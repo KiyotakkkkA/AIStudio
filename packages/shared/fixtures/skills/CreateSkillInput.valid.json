@@ -15,8 +15,6 @@
       "name": "PDF",
       "description": "Работа с PDF",
       "instructions": "Шаги",
-      "allowedTools": ["vector.search"],
-      "modelOverride": null,
       "enabled": false,
       "files": [
         {
@@ -24,19 +22,6 @@
           "content": "print(1)"
         }
       ]
-    }
-  },
-  {
-    "name": "with model",
-    "value": {
-      "key": "pdf",
-      "name": "PDF",
-      "description": "d",
-      "instructions": "i",
-      "modelOverride": {
-        "providerId": "0199aa11-2222-7222-8222-222222222222",
-        "modelId": "gpt-4o-mini"
-      }
     }
   }
 ]

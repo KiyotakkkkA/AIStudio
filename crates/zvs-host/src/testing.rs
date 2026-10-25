@@ -424,7 +424,6 @@ pub fn test_services(system: SystemService) -> TestServices {
         ..crate::skills::SkillLibraryOptions::new(
             database.shared(),
             workspace.join(crate::skills::SKILLS_DIR),
-            tools.clone(),
         )
     });
     let roots = crate::files::VirtualRoots::new(

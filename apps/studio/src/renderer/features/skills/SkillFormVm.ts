@@ -2,7 +2,6 @@ import { makeAutoObservable } from "mobx";
 import {
   isSkillKey,
   isSkillPath,
-  SKILL_ALLOWED_TOOLS_MAX,
   SKILL_DESCRIPTION_MAX,
   SKILL_FILE_MAX_BYTES,
   SKILL_FILES_MAX,
@@ -16,7 +15,6 @@ import {
   type SkillFileInput,
   type SkillId,
   type SkillIssueDto,
-  type SkillModelDto,
   type UpdateSkillInput,
 } from "@zvs/shared";
 import { issueCopy, issueField, slugify } from "./skillPresentation";
@@ -35,11 +33,6 @@ export interface FileRow {
 
 export const KEY_HINT = "Строчная латиница, цифры и дефисы. Имя папки навыка и ключ для вызова.";
 
-function sameModel(left: SkillModelDto | null, right: SkillModelDto | null): boolean {
-  if (left === null || right === null) return left === right;
-  return left.providerId === right.providerId && left.modelId === right.modelId;
-}
-
 export class SkillFormVm {
   readonly skillId: SkillId | null;
   readonly stored: SkillDetailDto | null;
@@ -48,8 +41,6 @@ export class SkillFormVm {
   name = "";
   description = "";
   instructions = "";
-  allowedTools: string[] = [];
-  modelOverride: SkillModelDto | null = null;
   files: readonly SkillFileDto[] = [];
   added: PendingFile[] = [];
   removed: string[] = [];
@@ -75,8 +66,6 @@ export class SkillFormVm {
       this.name = source.name;
       this.description = source.description;
       this.instructions = source.instructions;
-      this.allowedTools = [...source.allowedTools];
-      this.modelOverride = source.modelOverride;
       this.keyTouched = true;
     }
     if (skill !== null) this.files = skill.files;
@@ -109,10 +98,6 @@ export class SkillFormVm {
     return this.fileRows.reduce((total, row) => total + row.size, 0);
   }
 
-  allows(key: string): boolean {
-    return this.allowedTools.includes(key);
-  }
-
   setName(name: string): void {
     this.name = name;
     this.clearError("name");
@@ -138,17 +123,6 @@ export class SkillFormVm {
     this.clearError("instructions");
   }
 
-  setToolAllowed(key: string, allowed: boolean): void {
-    if (allowed && !this.allowedTools.includes(key))
-      this.allowedTools = [...this.allowedTools, key];
-    if (!allowed) this.allowedTools = this.allowedTools.filter((entry) => entry !== key);
-    this.clearPrefix("allowedTools");
-  }
-
-  setModelOverride(model: SkillModelDto | null): void {
-    this.modelOverride = model;
-  }
-
   addFile(file: PendingFile): void {
     this.added = [...this.added.filter((entry) => entry.path !== file.path), file];
     this.removed = this.removed.filter((path) => path !== file.path);
@@ -169,11 +143,6 @@ export class SkillFormVm {
     return this.errors[field];
   }
 
-  toolErrorOf(key: string): string | undefined {
-    const index = this.allowedTools.indexOf(key);
-    return index === -1 ? undefined : this.errors[`allowedTools.${String(index)}`];
-  }
-
   fileErrorOf(path: string): string | undefined {
     const index = this.added.findIndex((entry) => entry.path === path);
     return index === -1 ? undefined : this.errors[`files.${String(index)}`];
@@ -190,10 +159,7 @@ export class SkillFormVm {
   applyIssues(issues: readonly SkillIssueDto[]): void {
     const errors: Record<string, string> = {};
     for (const issue of issues) {
-      const key =
-        issueField(issue) === "allowedTools" || issue.field.startsWith("files.")
-          ? issue.field
-          : issueField(issue);
+      const key = issue.field.startsWith("files.") ? issue.field : issueField(issue);
       errors[key] ??= issueCopy(issue.rule);
     }
     this.errors = errors;
@@ -219,9 +185,6 @@ export class SkillFormVm {
     else if (this.instructions.length > SKILL_INSTRUCTIONS_MAX)
       errors.instructions = issueCopy("tooLong");
 
-    if (this.allowedTools.length > SKILL_ALLOWED_TOOLS_MAX)
-      errors.allowedTools = issueCopy("tooLong");
-
     this.added.forEach((file, index) => {
       if (!isSkillPath(file.path)) errors[`files.${String(index)}`] = issueCopy("path");
       else if (file.size > SKILL_FILE_MAX_BYTES)
@@ -241,25 +204,19 @@ export class SkillFormVm {
       name: this.name.trim(),
       description: this.description.trim(),
       instructions: this.instructions,
-      allowedTools: [...this.allowedTools],
-      modelOverride: this.modelOverride,
       files: this.fileInputs(),
     };
   }
 
   toUpdateInput(): UpdateSkillInput {
     if (this.skillId === null) throw new Error("The form is not bound to a skill");
-    const stored = this.stored;
     const input: UpdateSkillInput = {
       id: this.skillId,
       key: this.key.trim(),
       name: this.name.trim(),
       description: this.description.trim(),
       instructions: this.instructions,
-      allowedTools: [...this.allowedTools],
     };
-    if (stored === null || !sameModel(stored.modelOverride, this.modelOverride))
-      input.modelOverride = this.modelOverride;
     if (this.added.length > 0) input.files = this.fileInputs();
     const removed = this.removed.filter((path) => !this.added.some((entry) => entry.path === path));
     if (removed.length > 0) input.removeFiles = removed;
@@ -299,8 +256,6 @@ export class SkillFormVm {
       this.name,
       this.description,
       this.instructions,
-      [...this.allowedTools].sort(),
-      this.modelOverride,
       this.added.map((file) => [file.path, file.size]),
       [...this.removed].sort(),
     ]);

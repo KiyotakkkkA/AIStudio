@@ -150,6 +150,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0020_tool_surface",
         sql: include_str!("../../migrations/0020_tool_surface.sql"),
     },
+    Migration {
+        id: 21,
+        name: "0021_skill_restrictions",
+        sql: include_str!("../../migrations/0021_skill_restrictions.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -509,7 +514,7 @@ mod tests {
                 Ok(())
             })
             .expect("seeds");
-        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        migrate(&database, &MIGRATIONS[..21], &options(&backups, &clock)).expect("applies");
         assert_eq!(
             query(
                 &database,
@@ -540,7 +545,7 @@ mod tests {
                 Ok(())
             })
             .expect("seeds");
-        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        migrate(&database, &MIGRATIONS[..21], &options(&backups, &clock)).expect("applies");
         assert_eq!(
             query(
                 &database,
@@ -571,6 +576,43 @@ mod tests {
                 "SELECT subject FROM tool_permission ORDER BY subject"
             ),
             ["fs.read", "job.run"]
+        );
+    }
+
+    #[test]
+    fn skills_lose_their_tool_and_model_restrictions_and_the_issues_they_raised() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..21], &options(&backups, &clock)).expect("applies");
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    r#"INSERT INTO skill (id, key, name, description, allowed_tools, model_override, status, issues, content_hash, path, created_at, updated_at) VALUES ('k1', 'tools', 'n', 'd', '["mail.send"]', '{"providerId":"p","modelId":"m"}', 'invalid', '[{"field":"allowedTools.0","rule":"unknownTool"}]', 'h', 'C:/s/tools', 1, 1), ('k2', 'mixed', 'n', 'd', '["mail.send"]', NULL, 'invalid', '[{"field":"allowedTools.0","rule":"toolOff"},{"field":"files","rule":"path"}]', 'h', 'C:/s/mixed', 1, 1), ('k3', 'clean', 'n', 'd', '[]', NULL, 'ready', '[]', 'h', 'C:/s/clean', 1, 1);
+                    INSERT INTO tool (id, key, source, display_name, tier, registered_at, updated_at) VALUES ('t1', 'mail.send', 'builtin', 'mail.send', 'auto', 1, 1);
+                    INSERT INTO tool_reference (id, tool_id, kind, ref_id, name) VALUES ('r1', 't1', 'skill', 'k1', 'tools'), ('r2', 't1', 'scenario', 's1', 'flow');"#,
+                )?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        assert_eq!(
+            query(
+                &database,
+                "SELECT key || ' ' || status || ' ' || issues FROM skill ORDER BY id"
+            ),
+            [
+                "tools ready []",
+                r#"mixed invalid [{"field":"files","rule":"path"}]"#,
+                "clean ready []",
+            ]
+        );
+        assert_eq!(query(&database, "SELECT id FROM tool_reference"), ["r2"]);
+        assert!(
+            query(
+                &database,
+                "SELECT name FROM pragma_table_info('skill') WHERE name IN ('allowed_tools', 'model_override')"
+            )
+            .is_empty()
         );
     }
 

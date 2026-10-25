@@ -6,13 +6,5 @@
       "refId": "s1",
       "name": "Триаж"
     }
-  },
-  {
-    "name": "skill",
-    "value": {
-      "kind": "skill",
-      "refId": "k1",
-      "name": "Ответ клиенту"
-    }
   }
 ]

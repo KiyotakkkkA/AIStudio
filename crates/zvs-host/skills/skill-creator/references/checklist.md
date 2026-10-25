@@ -28,7 +28,3 @@
 - [ ] Python scripts declare their dependencies with exact versions in the `# /// script` header.
 - [ ] Scripts take paths as arguments, write nothing into the skill folder and print compact output.
 - [ ] At most 200 files, 1 MiB each, 10 MiB in total.
-
-## Tools
-
-- [ ] `allowedTools` lists only keys that exist in this app and only tools the skill cannot work without.

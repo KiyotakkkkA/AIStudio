@@ -39,7 +39,6 @@ async fn the_channels_create_list_export_and_remove_a_skill_in_the_contract_shap
                 "name": "Почта",
                 "description": "Разбирает входящие письма",
                 "instructions": "Прочитайте письма.",
-                "allowedTools": ["mail.read"],
                 "files": [{ "path": "references/rules.md", "content": "Правила" }]
             }),
         )
@@ -58,14 +57,14 @@ async fn the_channels_create_list_export_and_remove_a_skill_in_the_contract_shap
     let rejected = server
         .dispatch(
             "skills.update",
-            json!({ "id": id, "allowedTools": ["mail.send"] }),
+            json!({ "id": id, "files": [{ "path": "other/a.md", "content": "a" }] }),
         )
         .await;
     assert_eq!(rejected["ok"], json!(false));
     assert_eq!(rejected["error"]["code"], json!("VALIDATION_FAILED"));
     assert_eq!(
         rejected["error"]["details"]["issues"],
-        json!([{ "field": "allowedTools.0", "rule": "unknownTool" }])
+        json!([{ "field": "files.0", "rule": "path" }])
     );
     let removed = server.dispatch("skills.remove", json!({ "id": id })).await;
     assert_eq!(

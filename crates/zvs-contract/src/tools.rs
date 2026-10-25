@@ -22,7 +22,6 @@ wire_enum!(ToolSource {
 
 wire_enum!(ToolReferenceKind {
     Scenario => "scenario",
-    Skill => "skill",
 });
 
 wire_enum!(ToolDefaultTier {

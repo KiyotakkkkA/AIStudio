@@ -98,10 +98,6 @@ export function scenariosWord(count: number): string {
   return plural(count, "сценарий", "сценария", "сценариев");
 }
 
-export function skillsWord(count: number): string {
-  return plural(count, "навык", "навыка", "навыков");
-}
-
 export function serverLine(server: McpServerDto, state: ServerState): string {
   if (state !== "connected") return STATE_LABELS[state];
   const parts = [STATE_LABELS.connected, toolsWord(server.toolCount)];

@@ -1,7 +1,7 @@
 use rusqlite::Row;
-use zvs_contract::{SkillIssueDto, SkillModelDto, SkillSource, SkillStatus, Timestamp};
+use zvs_contract::{SkillIssueDto, SkillSource, SkillStatus, Timestamp};
 
-use super::columns::{EnumColumn, json_column, optional_json_column};
+use super::columns::{EnumColumn, json_column};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillRow {
@@ -9,8 +9,6 @@ pub struct SkillRow {
     pub key: String,
     pub name: String,
     pub description: String,
-    pub allowed_tools: Vec<String>,
-    pub model_override: Option<SkillModelDto>,
     pub enabled: bool,
     pub source: SkillSource,
     pub status: SkillStatus,
@@ -25,9 +23,8 @@ pub struct SkillRow {
 }
 
 impl SkillRow {
-    pub const COLUMNS: &str = "id, key, name, description, allowed_tools, model_override, enabled, \
-        source, status, issues, file_count, content_hash, path, version, author, created_at, \
-        updated_at";
+    pub const COLUMNS: &str = "id, key, name, description, enabled, source, status, issues, \
+        file_count, content_hash, path, version, author, created_at, updated_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -35,8 +32,6 @@ impl SkillRow {
             key: row.get("key")?,
             name: row.get("name")?,
             description: row.get("description")?,
-            allowed_tools: json_column(row, "allowed_tools")?,
-            model_override: optional_json_column(row, "model_override")?,
             enabled: row.get("enabled")?,
             source: row.get::<_, EnumColumn<SkillSource>>("source")?.0,
             status: row.get::<_, EnumColumn<SkillStatus>>("status")?.0,

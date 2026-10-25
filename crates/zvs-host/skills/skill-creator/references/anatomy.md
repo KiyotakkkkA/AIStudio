@@ -14,7 +14,6 @@ release-notes/
 ---
 name: release-notes
 description: "Составляет заметки о выпуске по списку изменений … Используется, когда …"
-allowed-tools: "fs.read fs.apply"
 metadata:
   display-name: Заметки о выпуске
   version: "1.0.0"
@@ -30,7 +29,6 @@ Instructions in Markdown.
 | ----------------------- | -------------------------------------------------------------------------------------------------- |
 | `name`                  | The identifier. Equals the folder name. Lowercase Latin letters, digits and single hyphens, starts with a letter, at most 64 characters: `release-notes`, `pdf`, `invoice-check-2`. |
 | `description`           | Required, at most 1024 characters, one line. Says what the skill does and when it is used.         |
-| `allowed-tools`         | Optional. Space-separated tool keys the skill needs. Every key must exist in the app, otherwise the skill is invalid. A tool that is turned off makes the skill unusable, so list only tools the skill cannot work without. |
 | `metadata.display-name` | The name shown to the user, at most 120 characters.                                                |
 | `metadata.version`      | `major.minor.patch`. Start at `1.0.0`.                                                              |
 | `metadata.author`       | Optional.                                                                                           |

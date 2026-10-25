@@ -37,8 +37,6 @@ fn host() -> TestServices {
             name: "Извлечение".to_owned(),
             description: "Извлекает таблицы из документов".to_owned(),
             instructions: "Запустите scripts/extract.py.".to_owned(),
-            allowed_tools: None,
-            model_override: None,
             enabled: None,
             files: Some(vec![SkillFileInput {
                 path: "references/guide.md".to_owned(),

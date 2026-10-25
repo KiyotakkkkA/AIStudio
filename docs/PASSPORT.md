@@ -648,7 +648,7 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   overrides before the first webview is created.
 - **Tool permission ceiling** — as the maket states: a tool is registered once (built-in, MCP,
   or granted by a connected integration) and given `auto | ask | off` on the Tools page. A
-  skill or scenario may narrow that, never widen it. The kernel enforces it at step
+  scenario may narrow that, never widen it. The kernel enforces it at step
   admission; the UI only reflects it.
 - Sidecar runs with the app's privileges but no elevated rights; workspace roots are an
   explicit allow-list checked host-side, not in Rust.

@@ -6,7 +6,6 @@ export const SKILL_KEY_MAX = 64;
 export const SKILL_NAME_MAX = 120;
 export const SKILL_DESCRIPTION_MAX = 1024;
 export const SKILL_INSTRUCTIONS_MAX = 100_000;
-export const SKILL_ALLOWED_TOOLS_MAX = 64;
 export const SKILL_PATH_MAX = 240;
 export const SKILL_FILES_MAX = 200;
 export const SKILL_FILE_MAX_BYTES = 1024 * 1024;
@@ -35,10 +34,6 @@ export const SkillIssueRule = z.enum([
   "pattern",
   "tooLong",
   "duplicate",
-  "unknownTool",
-  "toolOff",
-  "toolDisabled",
-  "toolUnavailable",
   "path",
   "fileTooLarge",
   "skillTooLarge",
@@ -73,8 +68,6 @@ export function isSkillPath(value: string): boolean {
   );
 }
 
-const ToolKeyList = z.array(z.string().max(128)).max(SKILL_ALLOWED_TOOLS_MAX);
-
 export const SkillModelDto = z.object({
   providerId: ProviderId,
   modelId: z.string().trim().min(1).max(SKILL_MODEL_MAX),
@@ -104,8 +97,6 @@ export const SkillDto = z.object({
   key: z.string().min(1).max(SKILL_KEY_MAX),
   name: z.string().max(SKILL_NAME_MAX),
   description: z.string().max(SKILL_DESCRIPTION_MAX),
-  allowedTools: ToolKeyList,
-  modelOverride: SkillModelDto.nullable(),
   enabled: z.boolean(),
   source: SkillSource,
   status: SkillStatus,
@@ -156,8 +147,6 @@ export const CreateSkillInput = z.object({
   name: z.string().max(SKILL_NAME_MAX),
   description: z.string().max(SKILL_DESCRIPTION_MAX),
   instructions: z.string().max(SKILL_INSTRUCTIONS_MAX),
-  allowedTools: ToolKeyList.optional(),
-  modelOverride: SkillModelDto.nullable().optional(),
   enabled: z.boolean().optional(),
   files: z.array(SkillFileInput).max(SKILL_FILES_MAX).optional(),
 });
@@ -169,8 +158,6 @@ export const UpdateSkillInput = z.object({
   name: z.string().max(SKILL_NAME_MAX).optional(),
   description: z.string().max(SKILL_DESCRIPTION_MAX).optional(),
   instructions: z.string().max(SKILL_INSTRUCTIONS_MAX).optional(),
-  allowedTools: ToolKeyList.optional(),
-  modelOverride: SkillModelDto.nullable().optional(),
   enabled: z.boolean().optional(),
   files: z.array(SkillFileInput).max(SKILL_FILES_MAX).optional(),
   removeFiles: z.array(z.string().max(SKILL_PATH_MAX)).max(SKILL_FILES_MAX).optional(),

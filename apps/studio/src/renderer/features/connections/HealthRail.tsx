@@ -1,4 +1,4 @@
-import { mdiBookOpenOutline, mdiHeartPulse, mdiSitemapOutline } from "@mdi/js";
+import { mdiHeartPulse, mdiSitemapOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Icon from "../../ui/atoms/Icon";
@@ -10,7 +10,6 @@ import {
   formatUptime,
   LOG_LEVEL_TEXT,
   scenariosWord,
-  skillsWord,
 } from "./connectionPresentation";
 
 const HEADING = "text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase";
@@ -36,7 +35,7 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
     );
   }
 
-  const usedBy = store.usedBy;
+  const usedBy = store.usedByScenarios;
   const metrics: readonly { label: string; value: string; warn?: boolean }[] = [
     { label: "Время работы", value: formatUptime(health?.uptimeMs ?? null) },
     { label: "Перезапуски за сессию", value: String(health?.restarts ?? 0) },
@@ -68,27 +67,15 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
       </div>
 
       <div className={`mt-0.5 ${HEADING}`}>Используется</div>
-      {usedBy.scenarios === 0 && usedBy.skills === 0 ? (
+      {usedBy === 0 ? (
         <div className="flex-none rounded-card bg-main-800 px-2.75 py-2.5 text-[12px] text-main-500">
-          Ни сценарии, ни навыки не ссылаются на инструменты этого сервера.
+          Ни один сценарий не ссылается на инструменты этого сервера.
         </div>
       ) : (
-        <>
-          {usedBy.scenarios === 0 ? null : (
-            <div className="flex flex-none items-center gap-2.25 rounded-card border border-line bg-main-900 px-2.75 py-2.5">
-              <Icon path={mdiSitemapOutline} size={15} className="text-main-400" />
-              <span className="flex-1 text-[12px] text-main-100">
-                {scenariosWord(usedBy.scenarios)}
-              </span>
-            </div>
-          )}
-          {usedBy.skills === 0 ? null : (
-            <div className="flex flex-none items-center gap-2.25 rounded-card border border-line bg-main-900 px-2.75 py-2.5">
-              <Icon path={mdiBookOpenOutline} size={15} className="text-main-400" />
-              <span className="flex-1 text-[12px] text-main-100">{skillsWord(usedBy.skills)}</span>
-            </div>
-          )}
-        </>
+        <div className="flex flex-none items-center gap-2.25 rounded-card border border-line bg-main-900 px-2.75 py-2.5">
+          <Icon path={mdiSitemapOutline} size={15} className="text-main-400" />
+          <span className="flex-1 text-[12px] text-main-100">{scenariosWord(usedBy)}</span>
+        </div>
       )}
 
       <div className={`mt-0.5 ${HEADING}`}>Журнал</div>

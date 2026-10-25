@@ -6,8 +6,6 @@
       "key": "release-notes",
       "name": "Заметки о выпуске",
       "description": "Составляет заметки о выпуске по списку изменений",
-      "allowedTools": ["vector.search", "skill.read"],
-      "modelOverride": null,
       "enabled": true,
       "source": "local",
       "status": "ready",
@@ -30,18 +28,13 @@
       "key": "release-notes",
       "name": "Заметки о выпуске",
       "description": "Составляет заметки о выпуске по списку изменений",
-      "allowedTools": ["vector.search", "skill.read"],
-      "modelOverride": {
-        "providerId": "0199aa11-2222-7222-8222-222222222222",
-        "modelId": "gpt-4o-mini"
-      },
       "enabled": true,
       "source": "imported",
       "status": "invalid",
       "issues": [
         {
-          "field": "allowedTools.0",
-          "rule": "toolOff"
+          "field": "files",
+          "rule": "path"
         }
       ],
       "fileCount": 1,

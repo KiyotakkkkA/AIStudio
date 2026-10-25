@@ -1,9 +1,9 @@
 [
   {
-    "name": "tool",
+    "name": "file",
     "value": {
-      "field": "allowedTools.1",
-      "rule": "unknownTool"
+      "field": "files.1",
+      "rule": "fileTooLarge"
     }
   }
 ]

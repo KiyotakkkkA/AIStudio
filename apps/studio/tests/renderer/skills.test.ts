@@ -6,18 +6,11 @@ import {
   contract,
   SKILL_FILE_MAX_BYTES,
   type Contract,
-  McpServerDto,
   type SkillDetailDto,
-  type ToolDto,
 } from "@zvs/shared";
-import serverFixtures from "../../../../packages/shared/fixtures/mcp/McpServerDto.valid.json";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { SkillFormVm } from "../../src/renderer/features/skills/SkillFormVm.ts";
-import SkillStore, {
-  MANIFEST_PATH,
-  modelOf,
-  modelValue,
-} from "../../src/renderer/features/skills/SkillStore.ts";
+import SkillStore, { MANIFEST_PATH } from "../../src/renderer/features/skills/SkillStore.ts";
 import {
   issueCopy,
   skillErrorCopy,
@@ -30,7 +23,6 @@ import {
 import { markdownLines } from "../../src/renderer/features/skills/markdownTokens.ts";
 
 const SKILL_ID = "0199aa11-1111-7111-8111-111111111111" as SkillDetailDto["id"];
-const SERVER_ID = "0199aa11-1111-7111-8111-222222222222";
 
 function detail(overrides: Partial<SkillDetailDto> = {}): SkillDetailDto {
   return {
@@ -38,8 +30,6 @@ function detail(overrides: Partial<SkillDetailDto> = {}): SkillDetailDto {
     key: "release-notes",
     name: "Заметки о выпуске",
     description: "Составляет заметки о выпуске",
-    allowedTools: ["demo.lookup"],
-    modelOverride: null,
     enabled: true,
     source: "local",
     status: "ready",
@@ -56,46 +46,10 @@ function detail(overrides: Partial<SkillDetailDto> = {}): SkillDetailDto {
   };
 }
 
-function tool(n: number, key: string, overrides: Partial<ToolDto> = {}): ToolDto {
-  return {
-    id: `0199aa11-1111-7111-8111-00000000000${String(n)}` as ToolDto["id"],
-    key,
-    source: "builtin",
-    sourceRef: null,
-    displayName: key,
-    description: `${key} description`,
-    inputSchema: null,
-    readOnly: true,
-    destructive: false,
-    tier: "auto",
-    enabled: true,
-    available: true,
-    lastUsedAt: null,
-    callCount: 0,
-    registeredAt: 1_000,
-    updatedAt: 1_000,
-    ...overrides,
-  };
-}
-
-function server(): McpServerDto {
-  const [fixture] = serverFixtures as { value: unknown }[];
-  return McpServerDto.parse({
-    ...(fixture?.value as object),
-    id: SERVER_ID,
-    name: "qdrant",
-    enabled: true,
-    status: "failed",
-  });
-}
-
-function setup(tools: ToolDto[] = []) {
+function setup() {
   const bridge = createFakeBridge<Contract>()
     .handle("skills.list", () => [detail()])
-    .handle("skills.get", () => detail())
-    .handle("tools.list", () => tools)
-    .handle("mcp.list", () => [server()])
-    .handle("providers.list", () => []);
+    .handle("skills.get", () => detail());
   const store = new SkillStore(createIpcClient(contract, bridge));
   return { store, bridge };
 }
@@ -134,56 +88,23 @@ test("host issues land on the fields they name and a draft tracks its changes", 
   const vm = new SkillFormVm({ skill: detail() });
   expect(vm.dirty).toBe(false);
   vm.applyIssues([
-    { field: "allowedTools.0", rule: "toolOff" },
+    { field: "files.0", rule: "path" },
     { field: "key", rule: "duplicate" },
   ]);
-  expect(vm.toolErrorOf("demo.lookup")).toBe(issueCopy("toolOff"));
+  expect(vm.errorOf("files.0")).toBe(issueCopy("path"));
   expect(vm.errorOf("key")).toBe(issueCopy("duplicate"));
 
   vm.removeFile("references/style.md");
-  vm.setToolAllowed("demo.lookup", false);
   expect(vm.dirty).toBe(true);
-  expect(vm.toolErrorOf("demo.lookup")).toBeUndefined();
+  expect(vm.errorOf("files.0")).toBeUndefined();
   expect(vm.toUpdateInput()).toEqual({
     id: SKILL_ID,
     key: "release-notes",
     name: "Заметки о выпуске",
     description: "Составляет заметки о выпуске",
     instructions: "# Заметки",
-    allowedTools: [],
     removeFiles: ["references/style.md"],
   });
-});
-
-test("tools above the ceiling are listed disabled with the reason, never hidden", async () => {
-  const { store } = setup([
-    tool(1, "demo.lookup"),
-    tool(2, "demo.off", { tier: "off" }),
-    tool(3, "demo.disabled", { enabled: false }),
-    tool(4, "qdrant.find", { source: "mcp", sourceRef: SERVER_ID, available: false }),
-    tool(5, "skill.load"),
-  ]);
-  await store.mount();
-  const rows = store.toolGroups.flatMap((group) => group.rows);
-  const byKey = Object.fromEntries(rows.map((row) => [row.key, row.ceiling]));
-  expect(Object.keys(byKey).sort()).toEqual([
-    "demo.disabled",
-    "demo.lookup",
-    "demo.off",
-    "qdrant.find",
-  ]);
-  expect(byKey["demo.lookup"]?.block).toBeNull();
-  expect(byKey["demo.off"]?.block).toBe("off");
-  expect(byKey["demo.disabled"]?.block).toBe("disabled");
-  expect(byKey["qdrant.find"]?.block).toBe("offline");
-  expect(byKey["qdrant.find"]?.reason).toContain("qdrant");
-});
-
-test("an allowed tool missing from the registry is shown so it can be unchecked", async () => {
-  const { store } = setup([]);
-  await store.mount();
-  const unknown = store.toolGroups.find((group) => group.key === "unknown");
-  expect(unknown?.rows.map((row) => row.key)).toEqual(["demo.lookup"]);
 });
 
 test("a remount while the first load is in flight still finishes loading", async () => {
@@ -216,10 +137,7 @@ test("a rejected save maps host issues onto the form", async () => {
   expect(store.form?.banner).toBe(SKILL_INVALID_BANNER);
 });
 
-test("helpers: model values round-trip, keys slugify, errors map by code", () => {
-  const model = { providerId: SERVER_ID as never, modelId: "gpt-oss:120b" };
-  expect(modelOf(modelValue(model))).toEqual(model);
-  expect(modelOf("")).toBeNull();
+test("helpers: keys slugify, errors map by code", () => {
   expect(slugify("  Проверка 2 провайдеров!  ")).toBe("proverka-2-provayderov");
   expect(skillErrorCopy(new Error("x"))).not.toBe("");
   expect(

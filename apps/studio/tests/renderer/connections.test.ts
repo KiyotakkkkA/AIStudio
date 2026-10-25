@@ -176,7 +176,7 @@ function fakeHost() {
       id === SEARCH
         ? [
             { kind: "scenario" as const, refId: "s1", name: "Support triage" },
-            { kind: "skill" as const, refId: "k1", name: "Research" },
+            { kind: "scenario" as const, refId: "s2", name: "Research" },
           ]
         : [{ kind: "scenario" as const, refId: "s1", name: "Support triage" }],
   }));
@@ -351,10 +351,10 @@ test("tier and enable changes write through the registry and the page reads them
   assert.equal(store.enabledToolCount, 1);
 });
 
-test("used-by counts distinct scenarios and skills across the server's tools", async () => {
+test("used-by counts distinct scenarios across the server's tools", async () => {
   const { store } = fakeHost();
   await store.load();
-  assert.deepEqual(store.usedBy, { scenarios: 1, skills: 1 });
+  assert.equal(store.usedByScenarios, 2);
   assert.equal(store.selectedHealth?.medianLatencyMs, 64);
   assert.equal(store.selectedState, "connected");
 });

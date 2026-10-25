@@ -27,10 +27,6 @@ wire_enum!(SkillIssueRule {
     Pattern => "pattern",
     TooLong => "tooLong",
     Duplicate => "duplicate",
-    UnknownTool => "unknownTool",
-    ToolOff => "toolOff",
-    ToolDisabled => "toolDisabled",
-    ToolUnavailable => "toolUnavailable",
     Path => "path",
     FileTooLarge => "fileTooLarge",
     SkillTooLarge => "skillTooLarge",
@@ -44,7 +40,6 @@ pub const SKILL_KEY_MAX: usize = 64;
 pub const SKILL_NAME_MAX: usize = 120;
 pub const SKILL_DESCRIPTION_MAX: usize = 1024;
 pub const SKILL_INSTRUCTIONS_MAX: usize = 100_000;
-pub const SKILL_ALLOWED_TOOLS_MAX: usize = 64;
 pub const SKILL_PATH_MAX: usize = 240;
 pub const SKILL_FILES_MAX: usize = 200;
 pub const SKILL_FILE_MAX_BYTES: u64 = 1024 * 1024;
@@ -152,9 +147,6 @@ pub struct SkillDto {
     pub key: String,
     pub name: String,
     pub description: String,
-    pub allowed_tools: Vec<String>,
-    #[serde(deserialize_with = "crate::wire::nullable")]
-    pub model_override: Option<SkillModelDto>,
     pub enabled: bool,
     pub source: SkillSource,
     pub status: SkillStatus,
@@ -176,8 +168,6 @@ impl Validate for SkillDto {
         check::max_len("key", &self.key, SKILL_KEY_MAX)?;
         check::max_len("name", &self.name, SKILL_NAME_MAX)?;
         check::max_len("description", &self.description, SKILL_DESCRIPTION_MAX)?;
-        check_tool_list("allowedTools", &self.allowed_tools)?;
-        nested("modelOverride", self.model_override.validate())?;
         if self.issues.len() > SKILL_ISSUES_MAX {
             return Err(invalid("issues", "maxLength"));
         }
@@ -283,16 +273,6 @@ impl Validate for SkillFileInput {
     }
 }
 
-fn check_tool_list(field: &str, tools: &[String]) -> Result<(), AppError> {
-    if tools.len() > SKILL_ALLOWED_TOOLS_MAX {
-        return Err(invalid(field, "maxLength"));
-    }
-    for (index, tool) in tools.iter().enumerate() {
-        check::max_len(&format!("{field}.{index}"), tool, 128)?;
-    }
-    Ok(())
-}
-
 fn check_files(field: &str, files: &Vec<SkillFileInput>) -> Result<(), AppError> {
     if files.len() > SKILL_FILES_MAX {
         return Err(invalid(field, "maxLength"));
@@ -307,18 +287,6 @@ pub struct CreateSkillInput {
     pub name: String,
     pub description: String,
     pub instructions: String,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub allowed_tools: Option<Vec<String>>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::optional_nullable"
-    )]
-    pub model_override: Option<Option<SkillModelDto>>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -339,12 +307,6 @@ impl Validate for CreateSkillInput {
         check::max_len("name", &self.name, SKILL_NAME_MAX)?;
         check::max_len("description", &self.description, SKILL_DESCRIPTION_MAX)?;
         check::max_len("instructions", &self.instructions, SKILL_INSTRUCTIONS_MAX)?;
-        if let Some(tools) = &self.allowed_tools {
-            check_tool_list("allowedTools", tools)?;
-        }
-        if let Some(Some(model)) = &self.model_override {
-            nested("modelOverride", model.validate())?;
-        }
         if let Some(files) = &self.files {
             check_files("files", files)?;
         }
@@ -385,18 +347,6 @@ pub struct UpdateSkillInput {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "crate::wire::present"
     )]
-    pub allowed_tools: Option<Vec<String>>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::optional_nullable"
-    )]
-    pub model_override: Option<Option<SkillModelDto>>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
     pub enabled: Option<bool>,
     #[serde(
         default,
@@ -425,12 +375,6 @@ impl Validate for UpdateSkillInput {
         }
         if let Some(instructions) = &self.instructions {
             check::max_len("instructions", instructions, SKILL_INSTRUCTIONS_MAX)?;
-        }
-        if let Some(tools) = &self.allowed_tools {
-            check_tool_list("allowedTools", tools)?;
-        }
-        if let Some(Some(model)) = &self.model_override {
-            nested("modelOverride", model.validate())?;
         }
         if let Some(files) = &self.files {
             check_files("files", files)?;

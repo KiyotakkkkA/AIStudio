@@ -534,9 +534,9 @@ async fn references_are_a_replaceable_reverse_index_over_scenarios_and_skills() 
     host.tools
         .record_references(
             &ToolReferenceSubject {
-                kind: ToolReferenceKind::Skill,
-                ref_id: "k1".to_owned(),
-                name: "Ответ клиенту".to_owned(),
+                kind: ToolReferenceKind::Scenario,
+                ref_id: "s2".to_owned(),
+                name: "Эскалация".to_owned(),
             },
             &["mail.send"],
         )
@@ -550,7 +550,7 @@ async fn references_are_a_replaceable_reverse_index_over_scenarios_and_skills() 
         host.tools.get(&mail).expect("a tool").references,
         [
             reference(ToolReferenceKind::Scenario, "s1", "Триаж"),
-            reference(ToolReferenceKind::Skill, "k1", "Ответ клиенту"),
+            reference(ToolReferenceKind::Scenario, "s2", "Эскалация"),
         ]
     );
     host.tools
@@ -558,7 +558,7 @@ async fn references_are_a_replaceable_reverse_index_over_scenarios_and_skills() 
         .expect("records");
     assert_eq!(
         host.tools.get(&mail).expect("a tool").references,
-        [reference(ToolReferenceKind::Skill, "k1", "Ответ клиенту")]
+        [reference(ToolReferenceKind::Scenario, "s2", "Эскалация")]
     );
     assert_eq!(
         host.tools.references(&search).expect("references"),

@@ -106,9 +106,6 @@ pub struct SkillSaveInput {
     #[schemars(description = "Инструкции навыка в Markdown без блока frontmatter")]
     pub instructions: String,
     #[serde(default)]
-    #[schemars(description = "Ключи инструментов, которые нужны навыку, например fs.read")]
-    pub allowed_tools: Vec<String>,
-    #[serde(default)]
     #[schemars(description = "Файлы навыка")]
     pub files: Vec<SkillSaveFile>,
     #[serde(default)]
@@ -212,7 +209,6 @@ impl NodeDef for SkillSaveNode {
                 name: input.name,
                 description: input.description,
                 instructions: input.instructions,
-                allowed_tools: input.allowed_tools,
                 files: input
                     .files
                     .into_iter()

@@ -33,7 +33,7 @@ function SkillManifestView({
         <Alert title="Навык не может быть использован, пока ошибки не исправлены.">
           {storedIssues.map((issue) => (
             <p key={`${issue.field}:${issue.rule}`} className="m-0">
-              {issueLine(issue, skill?.allowedTools ?? [])}
+              {issueLine(issue)}
             </p>
           ))}
         </Alert>

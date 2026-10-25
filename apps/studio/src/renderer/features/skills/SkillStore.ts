@@ -1,26 +1,14 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
-import type {
-  Contract,
-  McpServerDto,
-  ProviderDto,
-  SkillDetailDto,
-  SkillDto,
-  SkillId,
-  SkillModelDto,
-  ToolDto,
-} from "@zvs/shared";
-import { sourceGroups } from "../tools/toolFilters";
+import type { Contract, SkillDetailDto, SkillDto, SkillId } from "@zvs/shared";
 import { SkillFormVm, type PendingFile } from "./SkillFormVm";
 import {
   SKILL_INVALID_BANNER,
   skillErrorCopy,
   skillIssuesOf,
-  toolCeiling,
   UPDATE_GUARD,
   updatedAllNotice,
   updatedNotice,
-  type ToolCeiling,
 } from "./skillPresentation";
 
 export const MANIFEST_PATH = "SKILL.md";
@@ -36,40 +24,6 @@ export type PendingIntent =
   | { readonly kind: "select"; readonly id: SkillId }
   | { readonly kind: "duplicate" };
 
-const MANAGED_TOOLS: readonly string[] = ["skill.load"];
-
-export interface ToolRow {
-  readonly key: string;
-  readonly tool: ToolDto | null;
-  readonly ceiling: ToolCeiling;
-}
-
-export interface ToolGroup {
-  readonly key: string;
-  readonly label: string;
-  readonly rows: readonly ToolRow[];
-}
-
-export interface ModelOption {
-  readonly value: string;
-  readonly label: string;
-}
-
-const MODEL_SEPARATOR = "::";
-
-export function modelValue(model: SkillModelDto | null): string {
-  return model === null ? "" : `${model.providerId}${MODEL_SEPARATOR}${model.modelId}`;
-}
-
-export function modelOf(value: string): SkillModelDto | null {
-  const at = value.indexOf(MODEL_SEPARATOR);
-  if (at <= 0) return null;
-  return {
-    providerId: value.slice(0, at) as SkillModelDto["providerId"],
-    modelId: value.slice(at + MODEL_SEPARATOR.length),
-  };
-}
-
 export default class SkillStore {
   skills: SkillDto[] = [];
   selectedId: SkillId | null = null;
@@ -79,9 +33,6 @@ export default class SkillStore {
   openFile: OpenFile | null = null;
   fileLoading = false;
   query = "";
-  tools: ToolDto[] = [];
-  servers: McpServerDto[] = [];
-  providers: ProviderDto[] = [];
   pending: PendingIntent | null = null;
   loading = false;
   loaded = false;
@@ -133,59 +84,6 @@ export default class SkillStore {
     return this.skills.find((skill) => skill.id === this.selectedId) ?? null;
   }
 
-  get toolGroups(): ToolGroup[] {
-    const form = this.form;
-    const visible = this.tools.filter((tool) => !MANAGED_TOOLS.includes(tool.key));
-    const groups: ToolGroup[] = sourceGroups(visible, this.servers).map((group) => ({
-      key: group.key,
-      label: group.label,
-      rows: visible
-        .filter(
-          (tool) =>
-            tool.source === group.source &&
-            (group.source === "builtin" || tool.sourceRef === group.sourceRef),
-        )
-        .sort((left, right) => left.key.localeCompare(right.key))
-        .map((tool) => ({
-          key: tool.key,
-          tool,
-          ceiling: toolCeiling(tool, group.server),
-        })),
-    }));
-    const known = new Set(this.tools.map((tool) => tool.key));
-    const unknown = (form?.allowedTools ?? []).filter((key) => !known.has(key));
-    if (unknown.length > 0) {
-      groups.push({
-        key: "unknown",
-        label: "Нет в реестре",
-        rows: unknown.map((key) => ({
-          key,
-          tool: null,
-          ceiling: { block: "unavailable", reason: "Инструмент не найден в реестре." },
-        })),
-      });
-    }
-    return groups;
-  }
-
-  get modelOptions(): ModelOption[] {
-    const options: ModelOption[] = [];
-    for (const provider of this.providers) {
-      for (const model of provider.models) {
-        if (!model.available) continue;
-        options.push({
-          value: modelValue({ providerId: provider.id, modelId: model.externalId }),
-          label: `${provider.name} · ${model.displayName || model.externalId}`,
-        });
-      }
-    }
-    const current = this.form?.modelOverride ?? null;
-    if (current !== null && !options.some((option) => option.value === modelValue(current))) {
-      options.unshift({ value: modelValue(current), label: `${current.modelId} · недоступна` });
-    }
-    return options;
-  }
-
   isSwitching(id: SkillId): boolean {
     return this.switchingIds.includes(id);
   }
@@ -207,23 +105,10 @@ export default class SkillStore {
     this.error = null;
     const revision = ++this.revision;
     try {
-      const [skills, tools, servers, summaries] = await Promise.all([
-        this.ipc.call("skills.list", undefined),
-        this.ipc.call("tools.list", { includeUnavailable: true }),
-        this.ipc.call("mcp.list", undefined).catch((): McpServerDto[] => []),
-        this.ipc.call("providers.list", { capability: "text", enabled: true }).catch(() => []),
-      ]);
-      const providers = await Promise.all(
-        summaries.map((provider) =>
-          this.ipc.call("providers.get", { id: provider.id, selectedOnly: true }),
-        ),
-      ).catch((): ProviderDto[] => []);
+      const skills = await this.ipc.call("skills.list", undefined);
       if (revision !== this.revision) return;
       runInAction(() => {
         this.skills = [...skills];
-        this.tools = [...tools];
-        this.servers = [...servers];
-        this.providers = providers;
         this.loaded = true;
         this.loading = false;
       });
@@ -275,10 +160,6 @@ export default class SkillStore {
     this.form?.removeFile(path);
     this.openPath = MANIFEST_PATH;
     this.openFile = null;
-  }
-
-  setModelOverride(value: string): void {
-    this.form?.setModelOverride(modelOf(value));
   }
 
   dismissError(): void {
@@ -591,8 +472,6 @@ export default class SkillStore {
       key: skill.key,
       name: skill.name,
       description: skill.description,
-      allowedTools: [...skill.allowedTools],
-      modelOverride: skill.modelOverride,
       enabled: skill.enabled,
       source: skill.source,
       status: skill.status,

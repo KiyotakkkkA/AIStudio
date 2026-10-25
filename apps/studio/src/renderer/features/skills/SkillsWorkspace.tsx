@@ -255,7 +255,7 @@ function SkillsWorkspace() {
                 </Button>
               </div>
             </div>
-            <SkillRail store={store} vm={form} />
+            <SkillRail vm={form} />
           </>
         )}
       </div>

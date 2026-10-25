@@ -28,11 +28,6 @@ export interface ToolRow {
   readonly tool: ToolDto | null;
 }
 
-export interface UsedBy {
-  readonly scenarios: number;
-  readonly skills: number;
-}
-
 export interface ConnectionStoreOptions {
   readonly pollMs?: number;
 }
@@ -129,14 +124,8 @@ export default class ConnectionStore {
       .reduce((total, server) => total + server.toolCount, 0);
   }
 
-  get usedBy(): UsedBy {
-    const scenarios = new Set<string>();
-    const skills = new Set<string>();
-    for (const reference of this.references) {
-      if (reference.kind === "scenario") scenarios.add(reference.refId);
-      else skills.add(reference.refId);
-    }
-    return { scenarios: scenarios.size, skills: skills.size };
+  get usedByScenarios(): number {
+    return new Set(this.references.map((reference) => reference.refId)).size;
   }
 
   get isEmpty(): boolean {

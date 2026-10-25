@@ -1,9 +1,4 @@
-import {
-  mdiAlertCircleOutline,
-  mdiBookOpenPageVariantOutline,
-  mdiGraphOutline,
-  mdiWrenchOutline,
-} from "@mdi/js";
+import { mdiAlertCircleOutline, mdiGraphOutline, mdiWrenchOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useNavigate } from "react-router-dom";
@@ -115,7 +110,7 @@ function ToolDetailRail({ store }: { readonly store: ToolStore }) {
             <span className="text-[12px] text-main-500">Загрузка…</span>
           ) : references.length === 0 ? (
             <span className="text-[12px] text-main-500">
-              Ни один сценарий или навык не ссылается на инструмент.
+              Ни один сценарий не ссылается на инструмент.
             </span>
           ) : (
             <div className="flex flex-col gap-1.25">
@@ -125,24 +120,14 @@ function ToolDetailRail({ store }: { readonly store: ToolStore }) {
                   type="button"
                   className="flex items-center gap-2.25 rounded-card border border-line bg-main-900 px-2.75 py-2.25 text-left hover:border-accent-line hover:bg-accent-soft"
                   onClick={() =>
-                    void navigate(
-                      `${reference.kind === "scenario" ? ROUTES.scenarios : ROUTES.skills}?id=${encodeURIComponent(reference.refId)}`,
-                    )
+                    void navigate(`${ROUTES.scenarios}?id=${encodeURIComponent(reference.refId)}`)
                   }
                 >
-                  <Icon
-                    path={
-                      reference.kind === "scenario"
-                        ? mdiGraphOutline
-                        : mdiBookOpenPageVariantOutline
-                    }
-                    size={14}
-                    className="flex-none text-main-400"
-                  />
+                  <Icon path={mdiGraphOutline} size={14} className="flex-none text-main-400" />
                   <span className="min-w-0 flex-1 truncate text-[12px] text-main-100">
                     {reference.name}
                   </span>
-                  <Chip>{reference.kind === "scenario" ? "сценарий" : "навык"}</Chip>
+                  <Chip>сценарий</Chip>
                 </button>
               ))}
             </div>

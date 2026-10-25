@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -11,9 +11,8 @@ use sha2::{Digest, Sha256};
 use zvs_contract::validate::js_trim;
 use zvs_contract::{
     AppError, AppErrorCode, CreateSkillInput, SkillDetailDto, SkillDto, SkillFileDto,
-    SkillFileEncoding, SkillFileInput, SkillId, SkillIssueDto, SkillIssueRule, SkillModelDto,
-    SkillSource, SkillStatus, SkillUpdateDto, ToolDto, ToolListFilter, ToolReferenceKind, ToolTier,
-    UpdateSkillInput, is_skill_key, is_skill_path,
+    SkillFileEncoding, SkillFileInput, SkillId, SkillIssueDto, SkillIssueRule, SkillSource,
+    SkillStatus, SkillUpdateDto, UpdateSkillInput, is_skill_key, is_skill_path,
     skills::{
         SKILL_AUTHOR_MAX, SKILL_FILE_MAX_BYTES, SKILL_FILES_MAX, SKILL_KEY_MAX, SKILL_NAME_MAX,
         SKILL_TOTAL_MAX_BYTES, SKILL_VERSION_MAX,
@@ -29,7 +28,6 @@ use crate::data::{Database, Repositories};
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
-use crate::tools::{ToolReferenceSubject, ToolRegistry, current_tool_keys};
 
 pub const SKILLS_DIR: &str = "skills";
 pub const SKILL_NOT_FOUND: &str = "Навык не найден";
@@ -54,29 +52,20 @@ const COPY_NAME_SUFFIX: &str = " (копия)";
 const STAGING_PREFIX: &str = ".staging-";
 const SCRIPTS_PREFIX: &str = "scripts/";
 const TRASH_PREFIX: &str = ".trash-";
-const TOOL_FIELD: &str = "allowedTools";
-const TOOL_RULES: [SkillIssueRule; 4] = [
-    SkillIssueRule::UnknownTool,
-    SkillIssueRule::ToolOff,
-    SkillIssueRule::ToolDisabled,
-    SkillIssueRule::ToolUnavailable,
-];
 
 pub struct SkillLibraryOptions {
     pub database: Arc<Database>,
     pub root: PathBuf,
-    pub tools: ToolRegistry,
     pub logger: SharedLogger,
     pub clock: SharedClock,
     pub bundled: &'static [BundledSkill],
 }
 
 impl SkillLibraryOptions {
-    pub fn new(database: Arc<Database>, root: PathBuf, tools: ToolRegistry) -> Self {
+    pub fn new(database: Arc<Database>, root: PathBuf) -> Self {
         Self {
             database,
             root,
-            tools,
             logger: silent_logger(),
             clock: Arc::new(SystemClock),
             bundled: BUNDLED_SKILLS,
@@ -87,7 +76,6 @@ impl SkillLibraryOptions {
 struct Inner {
     database: Arc<Database>,
     root: PathBuf,
-    tools: ToolRegistry,
     logger: SharedLogger,
     clock: SharedClock,
     bundled: &'static [BundledSkill],
@@ -134,7 +122,6 @@ pub struct AuthoredSkill {
     pub name: String,
     pub description: String,
     pub instructions: String,
-    pub allowed_tools: Vec<String>,
     pub files: Vec<(String, String)>,
     pub version: Option<String>,
     pub replace: bool,
@@ -163,8 +150,6 @@ struct Draft {
     name: String,
     description: String,
     instructions: String,
-    allowed_tools: Vec<String>,
-    model_override: Option<SkillModelDto>,
     enabled: bool,
     source: SkillSource,
     extra: Vec<(String, String)>,
@@ -208,15 +193,6 @@ fn not_found() -> AppError {
 
 fn malformed() -> AppError {
     AppError::new(AppErrorCode::Unknown, "Навык хранится в повреждённом виде")
-}
-
-fn unique(values: Vec<String>) -> Vec<String> {
-    let mut seen = HashSet::new();
-    values
-        .into_iter()
-        .map(|value| js_trim(&value).to_owned())
-        .filter(|value| !value.is_empty() && seen.insert(value.clone()))
-        .collect()
 }
 
 fn walk(
@@ -326,8 +302,6 @@ fn skill_dto(row: &SkillRow, update: Option<SkillUpdateDto>) -> Result<SkillDto,
         key: row.key.clone(),
         name: row.name.clone(),
         description: row.description.clone(),
-        allowed_tools: row.allowed_tools.clone(),
-        model_override: row.model_override.clone(),
         enabled: row.enabled,
         source: row.source,
         status: row.status,
@@ -340,32 +314,6 @@ fn skill_dto(row: &SkillRow, update: Option<SkillUpdateDto>) -> Result<SkillDto,
         updated_at: row.updated_at,
     };
     Ok(dto)
-}
-
-fn tool_issues(allowed: &[String], registered: &[ToolDto]) -> Vec<SkillIssueDto> {
-    let by_key: HashMap<&str, &ToolDto> = registered
-        .iter()
-        .map(|tool| (tool.key.as_str(), tool))
-        .collect();
-    allowed
-        .iter()
-        .enumerate()
-        .filter_map(|(index, key)| {
-            let field = format!("{TOOL_FIELD}.{index}");
-            let rule = match by_key.get(key.as_str()) {
-                None => SkillIssueRule::UnknownTool,
-                Some(tool) if !tool.available => SkillIssueRule::ToolUnavailable,
-                Some(tool) if !tool.enabled => SkillIssueRule::ToolDisabled,
-                Some(tool) if tool.tier == ToolTier::Off => SkillIssueRule::ToolOff,
-                Some(_) => return None,
-            };
-            Some(issue(field, rule))
-        })
-        .collect()
-}
-
-fn is_tool_issue(issue: &SkillIssueDto) -> bool {
-    TOOL_RULES.contains(&issue.rule)
 }
 
 fn status_of(issues: &[SkillIssueDto]) -> SkillStatus {
@@ -453,7 +401,6 @@ impl SkillLibrary {
             inner: Arc::new(Inner {
                 database: options.database,
                 root: options.root,
-                tools: options.tools,
                 logger: options.logger,
                 clock: options.clock,
                 bundled: options.bundled,
@@ -464,10 +411,6 @@ impl SkillLibrary {
 
     pub fn root(&self) -> &Path {
         &self.inner.root
-    }
-
-    pub fn tools(&self) -> &ToolRegistry {
-        &self.inner.tools
     }
 
     fn now(&self) -> i64 {
@@ -561,28 +504,7 @@ impl SkillLibrary {
         self.dto_with(row, &self.read_marker())
     }
 
-    fn registered(&self) -> Result<Vec<ToolDto>, AppError> {
-        self.inner.tools.list(&ToolListFilter::default())
-    }
-
-    fn link_tools(&self, row: &SkillRow, keys: &[String]) {
-        let keys: Vec<&str> = keys.iter().map(String::as_str).collect();
-        let subject = ToolReferenceSubject {
-            kind: ToolReferenceKind::Skill,
-            ref_id: row.id.clone(),
-            name: row.name.clone(),
-        };
-        if let Err(error) = self.inner.tools.record_references(&subject, &keys) {
-            self.inner.logger.log(
-                LogLevel::Warn,
-                "skills",
-                "Could not record the tools a skill references",
-                &[("skill", json!(row.key)), ("error", json!(error.message))],
-            );
-        }
-    }
-
-    fn refresh_with(&self, row: SkillRow, registered: &[ToolDto]) -> Result<SkillRow, AppError> {
+    fn refresh_with(&self, row: SkillRow) -> Result<SkillRow, AppError> {
         let dir = PathBuf::from(&row.path);
         let scanned = if dir.join(SKILL_FILE).is_file() {
             scan(&dir).ok()
@@ -603,14 +525,10 @@ impl SkillLibrary {
                 if let Some(manifest) = &manifest {
                     next.name = display_name(manifest, &row.key);
                     next.description = js_trim(&manifest.description).to_owned();
-                    next.allowed_tools = unique(current_tool_keys(&manifest.allowed_tools));
-                    next.model_override.clone_from(&manifest.model);
                     next.version = limited(manifest.meta(VERSION), SKILL_VERSION_MAX);
                     next.author = limited(manifest.meta(AUTHOR), SKILL_AUTHOR_MAX);
                 }
-                let mut issues = content_issues(&scanned, manifest.as_ref().ok_or(()), &row.key);
-                issues.extend(tool_issues(&next.allowed_tools, registered));
-                next.issues = issues;
+                next.issues = content_issues(&scanned, manifest.as_ref().ok_or(()), &row.key);
                 next.file_count = scanned.files.len() as i64;
                 next.content_hash = scanned.fingerprint;
                 self.inner.logger.log(
@@ -624,14 +542,8 @@ impl SkillLibrary {
                 );
             }
             Some(_) => {
-                let mut issues: Vec<SkillIssueDto> = row
-                    .issues
-                    .iter()
-                    .filter(|issue| !is_tool_issue(issue) && issue.rule != SkillIssueRule::Missing)
-                    .cloned()
-                    .collect();
-                issues.extend(tool_issues(&row.allowed_tools, registered));
-                next.issues = issues;
+                next.issues
+                    .retain(|issue| issue.rule != SkillIssueRule::Missing);
             }
         }
         next.status = status_of(&next.issues);
@@ -639,19 +551,16 @@ impl SkillLibrary {
             return Ok(row);
         }
         next.updated_at = self.now();
-        let saved = self.save(&next)?;
-        self.link_tools(&saved, &saved.allowed_tools);
-        Ok(saved)
+        self.save(&next)
     }
 
     fn refresh(&self, row: SkillRow) -> Result<SkillRow, AppError> {
-        let registered = self.registered()?;
         let _guard = self
             .inner
             .writing
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
-        self.refresh_with(row, &registered)
+        self.refresh_with(row)
     }
 
     pub fn reconcile(&self) -> Result<Vec<SkillDto>, AppError> {
@@ -681,8 +590,6 @@ impl SkillLibrary {
                 key: name.clone(),
                 name: name.clone(),
                 description: String::new(),
-                allowed_tools: Vec::new(),
-                model_override: None,
                 enabled: true,
                 source: SkillSource::Local,
                 status: SkillStatus::Invalid,
@@ -700,11 +607,10 @@ impl SkillLibrary {
     }
 
     fn list_unlocked(&self) -> Result<Vec<SkillDto>, AppError> {
-        let registered = self.registered()?;
         let seeded = self.read_marker();
         self.rows()?
             .into_iter()
-            .map(|row| self.refresh_with(row, &registered))
+            .map(|row| self.refresh_with(row))
             .map(|row| self.dto_with(&row?, &seeded))
             .collect()
     }
@@ -802,7 +708,6 @@ impl SkillLibrary {
                 issues.push(issue(field, SkillIssueRule::Required));
             }
         }
-        issues.extend(tool_issues(&draft.allowed_tools, &self.registered()?));
         if draft.files.len() > SKILL_FILES_MAX {
             issues.push(issue("files", SkillIssueRule::TooManyFiles));
         }
@@ -822,9 +727,7 @@ impl SkillLibrary {
         let manifest = Manifest {
             name: draft.key.clone(),
             description: js_trim(&draft.description).to_owned(),
-            allowed_tools: draft.allowed_tools.clone(),
             display_name: Some(js_trim(&draft.name).to_owned()),
-            model: draft.model_override.clone(),
             extra: draft.extra.clone(),
             metadata: draft.metadata.clone(),
             instructions: draft.instructions.clone(),
@@ -871,16 +774,10 @@ impl SkillLibrary {
         &self,
         existing: Option<&SkillRow>,
         draft: Draft,
-        tolerate_tools: bool,
     ) -> Result<SkillDetailDto, AppError> {
         let id = existing.map(|row| row.id.clone());
         let issues = self.check(&draft, id.as_deref())?;
-        let blocking: Vec<SkillIssueDto> = issues
-            .iter()
-            .filter(|issue| !(tolerate_tools && is_tool_issue(issue)))
-            .cloned()
-            .collect();
-        if !blocking.is_empty() {
+        if !issues.is_empty() {
             return Err(rejected(&issues));
         }
         let target = self.inner.root.join(&draft.key);
@@ -907,8 +804,6 @@ impl SkillLibrary {
             key: draft.key.clone(),
             name: js_trim(&draft.name).to_owned(),
             description: js_trim(&draft.description).to_owned(),
-            allowed_tools: draft.allowed_tools.clone(),
-            model_override: draft.model_override.clone(),
             enabled: draft.enabled,
             source: draft.source,
             status: status_of(&issues),
@@ -921,16 +816,11 @@ impl SkillLibrary {
             created_at: existing.map_or(now, |row| row.created_at),
             updated_at: now,
         })?;
-        self.link_tools(&row, &row.allowed_tools);
         self.inner.logger.log(
             LogLevel::Info,
             "skills",
             "Saved a skill",
-            &[
-                ("skill", json!(row.key)),
-                ("tools", json!(row.allowed_tools)),
-                ("files", json!(row.file_count)),
-            ],
+            &[("skill", json!(row.key)), ("files", json!(row.file_count))],
         );
         self.detail(&row)
     }
@@ -946,8 +836,6 @@ impl SkillLibrary {
             name: input.name.clone(),
             description: input.description.clone(),
             instructions: input.instructions.trim().to_owned(),
-            allowed_tools: unique(input.allowed_tools.clone().unwrap_or_default()),
-            model_override: input.model_override.clone().flatten(),
             enabled: input.enabled.unwrap_or(true),
             source: SkillSource::Local,
             extra: Vec::new(),
@@ -960,7 +848,7 @@ impl SkillLibrary {
             "files",
             &mut draft,
         );
-        self.commit(None, draft, false)
+        self.commit(None, draft)
     }
 
     fn draft_of(row: &SkillRow) -> Result<Draft, AppError> {
@@ -990,8 +878,6 @@ impl SkillLibrary {
             name: row.name.clone(),
             description: row.description.clone(),
             instructions: manifest.instructions,
-            allowed_tools: row.allowed_tools.clone(),
-            model_override: row.model_override.clone(),
             enabled: row.enabled,
             source: row.source,
             extra: manifest.extra,
@@ -1021,12 +907,6 @@ impl SkillLibrary {
         if let Some(instructions) = &input.instructions {
             instructions.trim().clone_into(&mut draft.instructions);
         }
-        if let Some(tools) = &input.allowed_tools {
-            draft.allowed_tools = unique(tools.clone());
-        }
-        if let Some(model) = &input.model_override {
-            draft.model_override.clone_from(model);
-        }
         if let Some(enabled) = input.enabled {
             draft.enabled = enabled;
         }
@@ -1043,11 +923,10 @@ impl SkillLibrary {
             "files",
             &mut draft,
         );
-        self.commit(Some(&row), draft, false)
+        self.commit(Some(&row), draft)
     }
 
     pub fn set_enabled(&self, id: &SkillId, enabled: bool) -> Result<SkillDto, AppError> {
-        let registered = self.registered()?;
         let _guard = self
             .inner
             .writing
@@ -1063,11 +942,10 @@ impl SkillLibrary {
                 ..row
             })?
         };
-        self.dto(&self.refresh_with(saved, &registered)?)
+        self.dto(&self.refresh_with(saved)?)
     }
 
     pub fn author(&self, input: &AuthoredSkill) -> Result<SkillDetailDto, AppError> {
-        let registered = self.registered()?;
         let _guard = self
             .inner
             .writing
@@ -1101,8 +979,6 @@ impl SkillLibrary {
             name: input.name.clone(),
             description: input.description.clone(),
             instructions: input.instructions.trim().to_owned(),
-            allowed_tools: unique(input.allowed_tools.clone()),
-            model_override: existing.as_ref().and_then(|row| row.model_override.clone()),
             enabled: existing.as_ref().is_none_or(|row| row.enabled),
             source: SkillSource::Local,
             extra: Vec::new(),
@@ -1120,14 +996,7 @@ impl SkillLibrary {
             })
             .collect();
         Self::stage_inputs(&files, "files", &mut draft);
-        let unknown: Vec<SkillIssueDto> = tool_issues(&draft.allowed_tools, &registered)
-            .into_iter()
-            .filter(|issue| issue.rule == SkillIssueRule::UnknownTool)
-            .collect();
-        if !unknown.is_empty() {
-            return Err(rejected(&unknown));
-        }
-        self.commit(existing.as_ref(), draft, true)
+        self.commit(existing.as_ref(), draft)
     }
 
     pub fn duplicate(&self, id: &SkillId) -> Result<SkillDetailDto, AppError> {
@@ -1144,7 +1013,7 @@ impl SkillLibrary {
         });
         draft.name = copy_name(&row.name);
         draft.source = SkillSource::Local;
-        self.commit(None, draft, true)
+        self.commit(None, draft)
     }
 
     fn bundled_draft(skill: &BundledSkill) -> Result<Draft, AppError> {
@@ -1169,8 +1038,6 @@ impl SkillLibrary {
             key: skill.key.to_owned(),
             description: manifest.description.clone(),
             instructions: manifest.instructions.trim().to_owned(),
-            allowed_tools: unique(manifest.allowed_tools.clone()),
-            model_override: manifest.model.clone(),
             enabled: true,
             source: SkillSource::Bundled,
             extra: manifest.extra.clone(),
@@ -1204,7 +1071,7 @@ impl SkillLibrary {
                 self.find_key(skill.key)?.is_some() || self.inner.root.join(skill.key).exists();
             let mut entry = Seeded::default();
             if !taken {
-                self.commit(None, Self::bundled_draft(skill)?, true)?;
+                self.commit(None, Self::bundled_draft(skill)?)?;
                 entry = Self::seeded_entry(skill, &self.inner.root.join(skill.key));
                 installed.push(skill.key.to_owned());
             }
@@ -1233,8 +1100,7 @@ impl SkillLibrary {
             .ok_or_else(|| AppError::new(AppErrorCode::Conflict, SKILL_UP_TO_DATE))?;
         let mut draft = Self::bundled_draft(skill)?;
         draft.enabled = row.enabled;
-        draft.model_override.clone_from(&row.model_override);
-        let detail = self.commit(Some(row), draft, true)?;
+        let detail = self.commit(Some(row), draft)?;
         seeded.insert(
             row.key.clone(),
             Self::seeded_entry(skill, &self.inner.root.join(&row.key)),
@@ -1308,7 +1174,6 @@ impl SkillLibrary {
             Repositories::new(connection).skills.remove(&row.id)?;
             Ok(())
         })?;
-        self.link_tools(&row, &[]);
         Ok(())
     }
 
@@ -1376,8 +1241,6 @@ impl SkillLibrary {
             key,
             description: manifest.description.clone(),
             instructions: manifest.instructions.clone(),
-            allowed_tools: unique(manifest.allowed_tools.clone()),
-            model_override: manifest.model.clone(),
             enabled: true,
             source: SkillSource::Imported,
             extra: manifest.extra.clone(),
@@ -1385,7 +1248,7 @@ impl SkillLibrary {
             files,
             issues: Vec::new(),
         };
-        self.commit(None, draft, true)
+        self.commit(None, draft)
     }
 
     pub fn export(&self, id: &SkillId, destination: &Path) -> Result<PathBuf, AppError> {

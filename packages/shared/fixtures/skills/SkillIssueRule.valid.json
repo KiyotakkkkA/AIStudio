@@ -16,22 +16,6 @@
     "value": "duplicate"
   },
   {
-    "name": "unknownTool",
-    "value": "unknownTool"
-  },
-  {
-    "name": "toolOff",
-    "value": "toolOff"
-  },
-  {
-    "name": "toolDisabled",
-    "value": "toolDisabled"
-  },
-  {
-    "name": "toolUnavailable",
-    "value": "toolUnavailable"
-  },
-  {
     "name": "path",
     "value": "path"
   },

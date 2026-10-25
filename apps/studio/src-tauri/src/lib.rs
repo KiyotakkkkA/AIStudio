@@ -772,11 +772,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let skill_library = SkillLibrary::new(SkillLibraryOptions {
         logger: logger.clone(),
         clock: clock.clone(),
-        ..SkillLibraryOptions::new(
-            Arc::clone(&database),
-            paths.data_dir.join(SKILLS_DIR),
-            tools.clone(),
-        )
+        ..SkillLibraryOptions::new(Arc::clone(&database), paths.data_dir.join(SKILLS_DIR))
     });
     let artifacts = ArtifactStore::new(paths.data_dir.join("artifacts"))
         .with_library(DASHBOARDS, paths.data_dir.join(DASHBOARDS))

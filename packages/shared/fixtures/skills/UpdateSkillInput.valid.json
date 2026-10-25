@@ -13,8 +13,6 @@
       "name": "PDF",
       "description": "d",
       "instructions": "i",
-      "allowedTools": [],
-      "modelOverride": null,
       "enabled": true,
       "files": [
         {

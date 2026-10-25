@@ -1,5 +1,3 @@
-use zvs_contract::{ProviderId, SkillModelDto};
-
 pub const SKILL_FILE: &str = "SKILL.md";
 
 const FENCE: &str = "---";
@@ -8,8 +6,6 @@ const DESCRIPTION: &str = "description";
 const ALLOWED_TOOLS: &str = "allowed-tools";
 const METADATA: &str = "metadata";
 const DISPLAY_NAME: &str = "display-name";
-const MODEL_PROVIDER: &str = "model-provider";
-const MODEL: &str = "model";
 pub const VERSION: &str = "version";
 pub const AUTHOR: &str = "author";
 
@@ -17,9 +13,7 @@ pub const AUTHOR: &str = "author";
 pub struct Manifest {
     pub name: String,
     pub description: String,
-    pub allowed_tools: Vec<String>,
     pub display_name: Option<String>,
-    pub model: Option<SkillModelDto>,
     pub extra: Vec<(String, String)>,
     pub metadata: Vec<(String, String)>,
     pub instructions: String,
@@ -102,8 +96,6 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, ManifestError> {
         .map(|(index, _)| index)
         .ok_or(ManifestError { line: lines.len() })?;
     let mut manifest = Manifest::default();
-    let mut provider: Option<String> = None;
-    let mut model: Option<String> = None;
     let mut index = 1;
     while index < close {
         let number = index + 1;
@@ -140,48 +132,41 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, ManifestError> {
                     let value = unquote(&value, number)?;
                     match name.as_str() {
                         DISPLAY_NAME => manifest.display_name = Some(value),
-                        MODEL_PROVIDER => provider = Some(value),
-                        MODEL => model = Some(value),
                         _ => manifest.metadata.push((name, value)),
                     }
                 }
             }
-            ALLOWED_TOOLS if value.trim().is_empty() => {
-                let (nested, next) = nested_lines();
-                index = next;
-                for (number, entry) in nested {
-                    let item = entry
-                        .strip_prefix('-')
-                        .ok_or(ManifestError { line: number })?;
-                    manifest.allowed_tools.push(unquote(item, number)?);
-                }
-            }
             ALLOWED_TOOLS => {
-                let value = value.trim();
-                if let Some(inner) = value
+                let mut tools = Vec::new();
+                if value.trim().is_empty() {
+                    let (nested, next) = nested_lines();
+                    index = next;
+                    for (number, entry) in nested {
+                        let item = entry
+                            .strip_prefix('-')
+                            .ok_or(ManifestError { line: number })?;
+                        tools.push(unquote(item, number)?);
+                    }
+                } else if let Some(inner) = value
+                    .trim()
                     .strip_prefix('[')
                     .and_then(|rest| rest.strip_suffix(']'))
                 {
                     for item in inner.split(',').filter(|item| !item.trim().is_empty()) {
-                        manifest.allowed_tools.push(unquote(item, number)?);
+                        tools.push(unquote(item, number)?);
                     }
                 } else {
-                    manifest.allowed_tools = tool_list(&unquote(value, number)?);
+                    tools = tool_list(&unquote(&value, number)?);
                 }
+                manifest
+                    .extra
+                    .push((ALLOWED_TOOLS.to_owned(), tools.join(" ")));
             }
             NAME => manifest.name = unquote(&value, number)?,
             DESCRIPTION => manifest.description = unquote(&value, number)?,
             _ => manifest.extra.push((key, unquote(&value, number)?)),
         }
     }
-    manifest.model = match (provider, model) {
-        (Some(provider), Some(model)) => Some(SkillModelDto {
-            provider_id: ProviderId::parse(provider.trim()).ok_or(ManifestError { line: 1 })?,
-            model_id: model,
-        }),
-        (None, None) => None,
-        _ => return Err(ManifestError { line: 1 }),
-    };
     manifest.instructions = lines[close + 1..].join("\n").trim().to_owned();
     Ok(manifest)
 }
@@ -195,22 +180,12 @@ pub fn render_manifest(manifest: &Manifest) -> String {
         "{DESCRIPTION}: {}\n",
         quote(&manifest.description)
     ));
-    if !manifest.allowed_tools.is_empty() {
-        out.push_str(&format!(
-            "{ALLOWED_TOOLS}: {}\n",
-            quote(&manifest.allowed_tools.join(" "))
-        ));
-    }
     for (key, value) in &manifest.extra {
         out.push_str(&format!("{key}: {}\n", quote(value)));
     }
     let mut metadata: Vec<(&str, String)> = Vec::new();
     if let Some(display_name) = &manifest.display_name {
         metadata.push((DISPLAY_NAME, display_name.clone()));
-    }
-    if let Some(model) = &manifest.model {
-        metadata.push((MODEL_PROVIDER, model.provider_id.to_string()));
-        metadata.push((MODEL, model.model_id.clone()));
     }
     for (key, value) in &manifest.metadata {
         metadata.push((key.as_str(), value.clone()));
@@ -236,14 +211,11 @@ mod tests {
         Manifest {
             name: "release-notes".to_owned(),
             description: "Составляет заметки: \"кратко\" и по делу".to_owned(),
-            allowed_tools: vec!["vector.search".to_owned(), "skill.read".to_owned()],
             display_name: Some("Заметки о выпуске".to_owned()),
-            model: Some(SkillModelDto {
-                provider_id: ProviderId::parse("0199aa11-2222-7222-8222-222222222222")
-                    .expect("an id"),
-                model_id: "gpt-4o-mini".to_owned(),
-            }),
-            extra: vec![("license".to_owned(), "MIT".to_owned())],
+            extra: vec![
+                ("allowed-tools".to_owned(), "fs.read shell.run".to_owned()),
+                ("license".to_owned(), "MIT".to_owned()),
+            ],
             metadata: vec![("author".to_owned(), "team".to_owned())],
             instructions: "# Шаги\n\n1. Сгруппируйте изменения.".to_owned(),
         }
@@ -263,19 +235,30 @@ mod tests {
         let manifest = parse_manifest(text).expect("parses");
         assert_eq!(manifest.name, "pdf");
         assert_eq!(manifest.description, "Extract text from PDF files");
-        assert_eq!(manifest.allowed_tools, ["vector.search", "skill.read"]);
         assert_eq!(
             manifest.extra,
-            [("license".to_owned(), "it's fine".to_owned())]
+            [
+                (
+                    "allowed-tools".to_owned(),
+                    "vector.search skill.read".to_owned()
+                ),
+                ("license".to_owned(), "it's fine".to_owned())
+            ]
         );
         assert_eq!(manifest.display_name.as_deref(), Some("PDF"));
         assert_eq!(manifest.instructions, "Use the tools.");
         let inline =
             parse_manifest("---\nname: a\nallowed-tools: [a.b, c.d]\n---\n").expect("parses");
-        assert_eq!(inline.allowed_tools, ["a.b", "c.d"]);
+        assert_eq!(
+            inline.extra,
+            [("allowed-tools".to_owned(), "a.b c.d".to_owned())]
+        );
         let spaced =
             parse_manifest("---\nname: a\nallowed-tools: a.b c.d, e.f\n---\n").expect("parses");
-        assert_eq!(spaced.allowed_tools, ["a.b", "c.d", "e.f"]);
+        assert_eq!(
+            spaced.extra,
+            [("allowed-tools".to_owned(), "a.b c.d e.f".to_owned())]
+        );
     }
 
     #[test]
@@ -290,6 +273,5 @@ mod tests {
             parse_manifest("---\ndescription: >\n  folded\n---\n"),
             Err(ManifestError { line: 2 })
         );
-        assert!(parse_manifest("---\nmetadata:\n  model: m\n---\n").is_err());
     }
 }
