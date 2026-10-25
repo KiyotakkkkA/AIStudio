@@ -160,6 +160,14 @@ impl BrowserWorkspace {
         Ok(())
     }
 
+    pub fn open_page_tab(&self, url: &str) -> Result<(), String> {
+        self.0.navigator.navigate(WorkspaceRoute::Browser);
+        let _creating = lock(&self.0.creating);
+        self.ensure_chrome()?;
+        self.open_tab(Some(url))?;
+        Ok(())
+    }
+
     pub fn zoom(&self, factor: f64) {
         if !lock(&self.0.model).set_zoom(factor) {
             return;

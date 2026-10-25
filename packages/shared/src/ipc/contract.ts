@@ -52,7 +52,13 @@ import {
   TerminalWriteInput,
 } from "../terminal.js";
 import { NotificationTargetDto } from "../notifications.js";
-import { ArtifactApplicationDto, ArtifactRef, ArtifactSaveResult } from "../artifacts.js";
+import {
+  ArtifactApplicationDto,
+  ArtifactBrowsersDto,
+  ArtifactRef,
+  ArtifactSaveResult,
+  OpenArtifactInBrowserInput,
+} from "../artifacts.js";
 import {
   DocumentDto,
   DocumentHandle,
@@ -300,6 +306,9 @@ export const contract = defineContract({
   "artifacts.reveal": { input: ArtifactRef, output: z.void() },
   "artifacts.open": { input: ArtifactRef, output: z.void() },
   "artifacts.application": { input: ArtifactRef, output: ArtifactApplicationDto },
+  "artifacts.browsers": { input: z.void(), output: ArtifactBrowsersDto },
+  "artifacts.openInBrowser": { input: OpenArtifactInBrowserInput, output: z.void() },
+  "artifacts.openInApp": { input: ArtifactRef, output: z.void() },
   "runs.approve": {
     input: RunIdInput.extend({ approvalId: z.string().uuid(), always: z.boolean().default(false) }),
     output: z.void(),

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use zvs_contract::ArtifactRef;
+use zvs_contract::{ArtifactRef, OpenArtifactInBrowserInput};
 
 use super::IpcServer;
 use crate::services::Services;
@@ -29,6 +29,26 @@ pub fn register(server: &mut IpcServer) {
             "artifacts.application",
             |services: Arc<Services>, input: ArtifactRef| async move {
                 services.artifacts.application(&input.id)
+            },
+        )
+        .handle(
+            "artifacts.browsers",
+            |services: Arc<Services>, _input: ()| async move {
+                Ok::<_, zvs_contract::AppError>(services.artifacts.browsers())
+            },
+        )
+        .handle(
+            "artifacts.openInBrowser",
+            |services: Arc<Services>, input: OpenArtifactInBrowserInput| async move {
+                services
+                    .artifacts
+                    .open_in_browser(&input.id, &input.browser)
+            },
+        )
+        .handle(
+            "artifacts.openInApp",
+            |services: Arc<Services>, input: ArtifactRef| async move {
+                services.artifacts.open_in_app(&input.id).await
             },
         );
 }

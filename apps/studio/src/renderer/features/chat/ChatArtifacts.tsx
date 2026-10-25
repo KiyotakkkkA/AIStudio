@@ -1,7 +1,14 @@
 import { observer } from "mobx-react-lite";
 import type { ArtifactDto } from "@zvs/shared";
 import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
-import { mdiEyeOutline, mdiOpenInNew, mdiFolderOpenOutline, mdiTrayArrowDown } from "@mdi/js";
+import {
+  mdiEyeOutline,
+  mdiOpenInNew,
+  mdiFolderOpenOutline,
+  mdiTrayArrowDown,
+  mdiWeb,
+  mdiApplicationOutline,
+} from "@mdi/js";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import { useStore } from "../../stores/useStore";
@@ -13,12 +20,16 @@ import {
   ARTIFACTS_LABEL,
   DOWNLOAD_ARTIFACT,
   OPEN_ARTIFACT,
+  OPEN_IN_BUILT_IN_BROWSER,
   OPEN_IN_VIEWER,
   REVEAL_ARTIFACT,
   VIEWER_UNAVAILABLE,
   artifactSubtitle,
   openInApplication,
+  opensAsPage,
 } from "./artifacts";
+
+const MENU_ITEM = "text-[13px] text-main-100";
 
 const OpenMenu = observer(function OpenMenu({
   artifact,
@@ -31,13 +42,16 @@ const OpenMenu = observer(function OpenMenu({
 }) {
   const { viewer } = useStore();
   const viewable = viewerCanShow(artifact.format);
+  const page = opensAsPage(artifact.format);
   return (
     <Dropdown
-      menuWidth={260}
+      menuWidth={280}
       menuPlacement="bottom-right"
       disabled={disabled}
       onOpenChange={(open) => {
-        if (open) void actions.loadApplication(artifact.id, artifact.format);
+        if (!open) return;
+        void actions.loadApplication(artifact.id, artifact.format);
+        if (page) void actions.loadBrowsers();
       }}
     >
       <IconDropdownButton
@@ -68,6 +82,35 @@ const OpenMenu = observer(function OpenMenu({
             </span>
           </span>
         </Dropdown.Item>
+        {page
+          ? actions.browsersFor(artifact.format).map((browser) => (
+              <Dropdown.Item
+                key={browser.id}
+                role="menuitem"
+                rounded="rounded-lg"
+                className={MENU_ITEM}
+                onClick={() => void actions.openInBrowser(artifact.id, browser.id)}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <Icon path={mdiWeb} size={17} className="flex-none text-main-400" />
+                  <span className="truncate">{openInApplication(browser.name)}</span>
+                </span>
+              </Dropdown.Item>
+            ))
+          : null}
+        {page ? (
+          <Dropdown.Item
+            role="menuitem"
+            rounded="rounded-lg"
+            className={MENU_ITEM}
+            onClick={() => void actions.openInApp(artifact.id)}
+          >
+            <span className="flex items-center gap-2">
+              <Icon path={mdiApplicationOutline} size={17} className="flex-none text-main-400" />
+              {OPEN_IN_BUILT_IN_BROWSER}
+            </span>
+          </Dropdown.Item>
+        ) : null}
         <Dropdown.Item
           role="menuitem"
           rounded="rounded-lg"

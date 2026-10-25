@@ -8,6 +8,8 @@ pub const ARTIFACT_NAME_MAX: usize = 255;
 pub const ARTIFACT_FORMAT_MAX: usize = 16;
 pub const ARTIFACT_PATH_MAX: usize = 32_767;
 pub const ARTIFACT_APPLICATION_MAX: usize = 256;
+pub const BROWSER_ID_MAX: usize = 256;
+pub const BROWSERS_MAX: usize = 32;
 
 fn check_id(id: &str) -> Result<(), AppError> {
     check_artifact_id("id", id)
@@ -95,6 +97,52 @@ impl Validate for ArtifactApplicationDto {
             check::max_len("name", name, ARTIFACT_APPLICATION_MAX)?;
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstalledBrowserDto {
+    pub id: String,
+    pub name: String,
+}
+
+impl Validate for InstalledBrowserDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("id", &self.id)?;
+        check::max_len("id", &self.id, BROWSER_ID_MAX)?;
+        check::non_empty("name", &self.name)?;
+        check::max_len("name", &self.name, ARTIFACT_APPLICATION_MAX)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactBrowsersDto {
+    pub browsers: Vec<InstalledBrowserDto>,
+}
+
+impl Validate for ArtifactBrowsersDto {
+    fn validate(&self) -> Result<(), AppError> {
+        if self.browsers.len() > BROWSERS_MAX {
+            return Err(invalid("browsers", "maxLength"));
+        }
+        crate::validate::nested("browsers", self.browsers.validate())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenArtifactInBrowserInput {
+    pub id: String,
+    pub browser: String,
+}
+
+impl Validate for OpenArtifactInBrowserInput {
+    fn validate(&self) -> Result<(), AppError> {
+        check_id(&self.id)?;
+        check::non_empty("browser", &self.browser)?;
+        check::max_len("browser", &self.browser, BROWSER_ID_MAX)
     }
 }
 

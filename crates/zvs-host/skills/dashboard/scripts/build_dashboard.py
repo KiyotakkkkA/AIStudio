@@ -13,6 +13,9 @@ import re
 import sys
 from pathlib import Path
 
+DASHBOARDS_ENV = "ZVS_DASHBOARDS_DIR"
+NAME_MAX = 120
+UNSAFE_NAME = re.compile(r'[\x00-\x1f<>:"/\\|?*]+')
 ROWS_DEFAULT = 50_000
 ROWS_CEILING = 200_000
 WARN_BYTES = 5 * 1024 * 1024
@@ -56,6 +59,17 @@ class Problems:
 
     def warn(self, text: str) -> None:
         self.warnings.append(text)
+
+
+def file_name(name: str | None, title: str) -> str:
+    base = (name or "").strip()
+    if base.lower().endswith(".html"):
+        base = base[:-5]
+    if not base:
+        base = f"{title} {dt.date.today().isoformat()}"
+    base = UNSAFE_NAME.sub(" ", base)
+    base = re.sub(r"\s+", " ", base).strip(" .")[:NAME_MAX].strip(" .")
+    return f"{base or 'dashboard'}.html"
 
 
 def assets_dir() -> Path:
@@ -545,8 +559,19 @@ def main() -> int:
         description="Validate a dashboard spec, load its datasets and write one self-contained HTML file."
     )
     parser.add_argument("spec", help="absolute path of the dashboard JSON spec")
-    parser.add_argument("--out", required=True, help="absolute path of the HTML file to write")
+    parser.add_argument(
+        "--name",
+        help="file name of the dashboard without folders, for example «Продажи 2026»; the title and today's date by default",
+    )
+    parser.add_argument(
+        "--out",
+        help="absolute path of an extra copy; outside the app it is the only output",
+    )
     args = parser.parse_args()
+    library = os.environ.get(DASHBOARDS_ENV)
+    if not library and not args.out:
+        print("--out is required when the dashboards folder is not set", file=sys.stderr)
+        return 2
 
     spec_path = Path(args.spec)
     try:
@@ -582,12 +607,17 @@ def main() -> int:
         return 1
     if size > WARN_BYTES:
         problems.warn(f"the page is {size // 1024} KiB; it opens slowly, consider aggregating")
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(page, encoding="utf-8")
+    targets = []
+    if library:
+        targets.append(Path(library) / file_name(args.name, spec["title"]))
+    if args.out:
+        targets.append(Path(args.out))
+    for target in targets:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(page, encoding="utf-8")
     report = {
         "ok": True,
-        "out": str(out),
+        "out": str(targets[0]),
         "kib": round(size / 1024, 1),
         "datasets": {
             name: {"rows": len(data["rows"]), "columns": {c["name"]: c["type"] for c in data["columns"]}}
@@ -596,6 +626,8 @@ def main() -> int:
         "components": sum(len(section.get("items", [])) for section in spec["sections"]),
         "warnings": problems.warnings,
     }
+    if len(targets) > 1:
+        report["copy"] = str(targets[1])
     print(json.dumps(report, ensure_ascii=False, indent=1))
     return 0
 

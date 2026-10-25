@@ -1,6 +1,6 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
-import type { Contract } from "@zvs/shared";
+import type { Contract, InstalledBrowserDto } from "@zvs/shared";
 import { ARTIFACT_SAVED, artifactErrorCopy } from "./artifacts";
 
 export type ArtifactAction = "save" | "reveal" | "open";
@@ -10,6 +10,7 @@ export default class ArtifactActions {
   errors: Record<string, string> = {};
   notices: Record<string, string> = {};
   applications: Record<string, string | null> = {};
+  browsers: InstalledBrowserDto[] | null = null;
 
   constructor(private readonly ipc: IpcClient<Contract>) {
     makeAutoObservable<ArtifactActions, "ipc">(this, { ipc: false }, { autoBind: true });
@@ -47,6 +48,40 @@ export default class ArtifactActions {
 
   applicationOf(format: string): string | null {
     return this.applications[format.toLowerCase()] ?? null;
+  }
+
+  async loadBrowsers(): Promise<void> {
+    if (this.browsers !== null) return;
+    this.browsers = [];
+    try {
+      const result = await this.ipc.call("artifacts.browsers", undefined);
+      runInAction(() => {
+        this.browsers = result.browsers;
+      });
+    } catch {
+      runInAction(() => {
+        this.browsers = null;
+      });
+    }
+  }
+
+  browsersFor(format: string): InstalledBrowserDto[] {
+    const application = this.applicationOf(format);
+    return (this.browsers ?? []).filter((browser) => browser.name !== application);
+  }
+
+  openInBrowser(id: string, browser: string) {
+    return this.act(id, "open", async () => {
+      await this.ipc.call("artifacts.openInBrowser", { id, browser });
+      return null;
+    });
+  }
+
+  openInApp(id: string) {
+    return this.act(id, "open", async () => {
+      await this.ipc.call("artifacts.openInApp", { id });
+      return null;
+    });
   }
 
   reveal(id: string) {

@@ -885,6 +885,18 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::artifacts::ArtifactApplicationDto>,
     ),
     (
+        "artifacts/InstalledBrowserDto",
+        round_trip::<zvs_contract::artifacts::InstalledBrowserDto>,
+    ),
+    (
+        "artifacts/ArtifactBrowsersDto",
+        round_trip::<zvs_contract::artifacts::ArtifactBrowsersDto>,
+    ),
+    (
+        "artifacts/OpenArtifactInBrowserInput",
+        round_trip::<zvs_contract::artifacts::OpenArtifactInBrowserInput>,
+    ),
+    (
         "chat/DocumentSelectionDto",
         round_trip::<zvs_contract::chat::DocumentSelectionDto>,
     ),

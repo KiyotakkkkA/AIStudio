@@ -27,6 +27,7 @@ import {
   REMOVE_FAILED,
   STOP_FAILED,
 } from "./agenticCopy";
+import ArtifactActions from "../chat/ArtifactActions";
 import ExplorerStore from "../chat/explorer/ExplorerStore";
 import TerminalStore from "../terminal/TerminalStore";
 import SessionDraft from "./SessionDraft";
@@ -91,6 +92,7 @@ export default class AgenticStore {
   panelOpen = true;
   readonly explorer: ExplorerStore;
   readonly terminal: TerminalStore;
+  readonly artifacts: ArtifactActions;
 
   private detach: (() => void) | null = null;
   private listening: StreamId | null = null;
@@ -105,6 +107,7 @@ export default class AgenticStore {
   ) {
     this.explorer = new ExplorerStore(ipc, events);
     this.terminal = new TerminalStore(ipc, events);
+    this.artifacts = new ArtifactActions(ipc);
     makeAutoObservable<
       AgenticStore,
       "ipc" | "events" | "detach" | "listening" | "syncing" | "held" | "revision" | "mounted"
@@ -121,6 +124,7 @@ export default class AgenticStore {
         mounted: false,
         explorer: false,
         terminal: false,
+        artifacts: false,
       },
       { autoBind: true },
     );

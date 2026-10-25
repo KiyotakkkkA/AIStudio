@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 
@@ -10,6 +10,14 @@ pub type PathRevealer = Arc<dyn Fn(&Path) -> Result<(), AppError> + Send + Sync>
 pub const OPEN_FAILED: &str = "Не удалось открыть браузер";
 pub const REVEAL_FAILED: &str = "Не удалось показать файл в папке";
 pub const LAUNCH_FAILED: &str = "Не удалось открыть файл в приложении";
+pub const BROWSER_LAUNCH_FAILED: &str = "Не удалось открыть файл в браузере";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstalledBrowser {
+    pub id: String,
+    pub name: String,
+    pub program: PathBuf,
+}
 
 pub trait FileLauncher: Send + Sync {
     fn application(&self, _extension: &str) -> Option<String> {
@@ -17,6 +25,28 @@ pub trait FileLauncher: Send + Sync {
     }
 
     fn open(&self, path: &Path) -> Result<(), AppError>;
+
+    fn browsers(&self) -> Vec<InstalledBrowser> {
+        Vec::new()
+    }
+
+    fn open_in_browser(&self, browser: &InstalledBrowser, path: &Path) -> Result<(), AppError> {
+        open_with_program(&browser.program, path)
+    }
+}
+
+pub fn open_with_program(program: &Path, path: &Path) -> Result<(), AppError> {
+    Command::new(program)
+        .arg(path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| ())
+        .map_err(|cause| {
+            AppError::new(AppErrorCode::Unknown, BROWSER_LAUNCH_FAILED)
+                .with_detail("raw", cause.to_string())
+        })
 }
 
 pub type SharedFileLauncher = Arc<dyn FileLauncher>;

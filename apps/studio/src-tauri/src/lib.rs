@@ -17,7 +17,7 @@ use tauri::{App, AppHandle, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use zvs_contract::{NOTIFICATION_SCHEME, NotificationTargetDto};
 use zvs_host::agentic::{AgenticService, AgenticServiceOptions, register_agentic_nodes};
-use zvs_host::artifacts::ArtifactStore;
+use zvs_host::artifacts::{ArtifactStore, DASHBOARDS};
 use zvs_host::browser::{BrowserLifecycle, profile_dir};
 use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::data::Repositories;
@@ -95,7 +95,8 @@ use zvs_host::{IpcServer, ipc};
 
 use crate::browser::gateway::GatewayOptions;
 use crate::browser::{
-    AccountGateway, BearerTokens, BrowserWorkspace, WebviewPages, WorkspaceOpener, gateway_sessions,
+    AccountGateway, BearerTokens, BrowserWorkspace, WebviewPages, WorkspaceOpener, WorkspacePages,
+    gateway_sessions,
 };
 use crate::commands::Host;
 use crate::picker::DialogPicker;
@@ -778,8 +779,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         )
     });
     let artifacts = ArtifactStore::new(paths.data_dir.join("artifacts"))
+        .with_library(DASHBOARDS, paths.data_dir.join(DASHBOARDS))
         .with_picker(Arc::clone(&picker))
-        .with_launcher(platform::file_launcher());
+        .with_launcher(platform::file_launcher())
+        .with_pages(Arc::new(WorkspacePages(workspace.clone())));
     register_skill_nodes(
         &nodes,
         &skill_library,

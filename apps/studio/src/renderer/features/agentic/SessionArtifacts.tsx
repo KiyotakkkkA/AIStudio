@@ -5,7 +5,14 @@ import { useStore } from "../../stores/useStore";
 import type ViewerStore from "../../stores/ViewerStore";
 import { extensionOf, opensInViewer } from "../../viewer/viewerModel";
 import ArtifactTile from "../chat/ArtifactTile";
-import { ARTIFACTS_LABEL, OPEN_ARTIFACT, REVEAL_ARTIFACT, artifactKind } from "../chat/artifacts";
+import ChatArtifacts from "../chat/ChatArtifacts";
+import {
+  ARTIFACTS_LABEL,
+  OPEN_ARTIFACT,
+  REVEAL_ARTIFACT,
+  artifactKind,
+  stepArtifacts,
+} from "../chat/artifacts";
 import type AgenticStore from "./AgenticStore";
 import { resolveArtifact, sessionArtifacts, type ArtifactFile } from "./sessionModel";
 
@@ -41,47 +48,58 @@ async function openArtifact(store: AgenticStore, viewer: ViewerStore, file: Arti
 
 export default observer(function SessionArtifacts({ store }: { readonly store: AgenticStore }) {
   const { viewer } = useStore();
+  const produced = stepArtifacts(
+    store.stream.entries.flatMap((entry) =>
+      entry.kind === "tool" && entry.step.status === "succeeded" ? [entry.step.output] : [],
+    ),
+  );
   const workspace = store.workingFolder;
-  if (workspace === null) return null;
   const files = new Map<string, ArtifactFile>();
-  for (const path of sessionArtifacts(store.stream.entries, store.session?.summary ?? null)) {
-    const file = resolveArtifact(path, workspace);
-    files.set(file.absolute.toLowerCase(), file);
+  if (workspace !== null) {
+    for (const path of sessionArtifacts(store.stream.entries, store.session?.summary ?? null)) {
+      const file = resolveArtifact(path, workspace);
+      files.set(file.absolute.toLowerCase(), file);
+    }
   }
-  if (files.size === 0) return null;
+  if (files.size === 0 && produced.length === 0) return null;
   return (
-    <ul aria-label={ARTIFACTS_LABEL} className="m-0 flex list-none flex-col gap-2 p-0">
-      {[...files.values()].map((file) => {
-        const relative = file.relative;
-        return (
-          <ArtifactTile
-            key={file.absolute}
-            name={nameOf(file.absolute)}
-            format={extensionOf(file.absolute)}
-            subtitle={artifactLine(file)}
-            actions={
-              <>
-                <IconButton
-                  path={mdiEyeOutline}
-                  label={OPEN_ARTIFACT}
-                  iconSize={16}
-                  className="size-8 bg-main-800"
-                  onClick={() => void openArtifact(store, viewer, file)}
-                />
-                {relative === null ? null : (
-                  <IconButton
-                    path={mdiFolderOpenOutline}
-                    label={REVEAL_ARTIFACT}
-                    iconSize={16}
-                    className="size-8 bg-main-800"
-                    onClick={() => void store.revealInExplorer(relative)}
-                  />
-                )}
-              </>
-            }
-          />
-        );
-      })}
-    </ul>
+    <div className="flex flex-col gap-2">
+      <ChatArtifacts artifacts={produced} actions={store.artifacts} />
+      {files.size === 0 ? null : (
+        <ul aria-label={ARTIFACTS_LABEL} className="m-0 flex list-none flex-col gap-2 p-0">
+          {[...files.values()].map((file) => {
+            const relative = file.relative;
+            return (
+              <ArtifactTile
+                key={file.absolute}
+                name={nameOf(file.absolute)}
+                format={extensionOf(file.absolute)}
+                subtitle={artifactLine(file)}
+                actions={
+                  <>
+                    <IconButton
+                      path={mdiEyeOutline}
+                      label={OPEN_ARTIFACT}
+                      iconSize={16}
+                      className="size-8 bg-main-800"
+                      onClick={() => void openArtifact(store, viewer, file)}
+                    />
+                    {relative === null ? null : (
+                      <IconButton
+                        path={mdiFolderOpenOutline}
+                        label={REVEAL_ARTIFACT}
+                        iconSize={16}
+                        className="size-8 bg-main-800"
+                        onClick={() => void store.revealInExplorer(relative)}
+                      />
+                    )}
+                  </>
+                }
+              />
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 });

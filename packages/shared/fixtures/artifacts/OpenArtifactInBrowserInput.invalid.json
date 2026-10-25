@@ -1,0 +1,16 @@
+[
+  {
+    "name": "escaping id",
+    "value": {
+      "id": "../sales.html",
+      "browser": "Google Chrome"
+    }
+  },
+  {
+    "name": "empty browser",
+    "value": {
+      "id": "dashboards/sales.html",
+      "browser": ""
+    }
+  }
+]

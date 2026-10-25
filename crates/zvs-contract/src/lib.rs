@@ -57,7 +57,10 @@ pub use ai::{
     AuthMode, HonoursDto, LOCAL_BASE_URL, ProvidersAdaptersOutput, ToolMode, TunableParameter,
     model_tool_support, resolve_tool_mode,
 };
-pub use artifacts::{ArtifactApplicationDto, ArtifactDto, ArtifactRef, ArtifactSaveResult};
+pub use artifacts::{
+    ArtifactApplicationDto, ArtifactBrowsersDto, ArtifactDto, ArtifactRef, ArtifactSaveResult,
+    InstalledBrowserDto, OpenArtifactInBrowserInput,
+};
 pub use browser::{
     BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie, BrowserHeader,
     BrowserNetworkBody, BrowserNetworkDetail, BrowserNetworkEntry, BrowserNetworkLog,

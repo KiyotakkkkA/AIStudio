@@ -1,0 +1,23 @@
+[
+  {
+    "name": "two",
+    "value": {
+      "browsers": [
+        {
+          "id": "Google Chrome",
+          "name": "Google Chrome"
+        },
+        {
+          "id": "Microsoft Edge",
+          "name": "Microsoft Edge"
+        }
+      ]
+    }
+  },
+  {
+    "name": "none",
+    "value": {
+      "browsers": []
+    }
+  }
+]

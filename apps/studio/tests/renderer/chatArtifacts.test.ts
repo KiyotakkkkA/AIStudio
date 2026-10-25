@@ -7,9 +7,12 @@ import { formatBytes } from "../../src/renderer/features/downloads/downloadPrese
 import {
   ARTIFACT_ERROR_COPY,
   ARTIFACT_SAVED,
+  DASHBOARD_KIND,
   answerArtifacts,
   artifactKind,
   artifactSubtitle,
+  opensAsPage,
+  stepArtifacts,
 } from "../../src/renderer/features/chat/artifacts.ts";
 
 const RUN = "0199aa11-4444-7444-8444-444444444444";
@@ -86,4 +89,52 @@ test("a failed action shows the host's wording or mapped copy", async () => {
   bridge.handle("artifacts.reveal", () => undefined);
   expect(await store.reveal(id)).toBe(true);
   expect(store.errors[id]).toBeUndefined();
+});
+
+const dashboard = {
+  id: "dashboards/Продажи 2026.html",
+  name: "Продажи 2026.html",
+  format: "html",
+  sizeBytes: 4096,
+};
+
+test("files in agentic tool steps become artifacts and dashboards are named as such", () => {
+  expect(
+    stepArtifacts([
+      { artifacts: [dashboard] },
+      { text: "no files" },
+      null,
+      { artifacts: [{ ...dashboard, id: "../escape.html" }] },
+    ]),
+  ).toEqual([dashboard]);
+  expect(artifactSubtitle(dashboard)).toBe(`${DASHBOARD_KIND} · HTML · ${formatBytes(4096)}`);
+  expect(opensAsPage("HTML")).toBe(true);
+  expect(opensAsPage("svg")).toBe(true);
+  expect(opensAsPage("docx")).toBe(false);
+});
+
+test("a page opens in a listed browser or the built-in one, never offering the default twice", async () => {
+  const { bridge, store } = actions();
+  bridge
+    .handle("artifacts.application", () => ({ name: "Google Chrome" }))
+    .handle("artifacts.browsers", () => ({
+      browsers: [
+        { id: "Google Chrome", name: "Google Chrome" },
+        { id: "Microsoft Edge", name: "Microsoft Edge" },
+      ],
+    }))
+    .handle("artifacts.openInBrowser", () => undefined)
+    .handle("artifacts.openInApp", () => undefined);
+  await store.loadApplication(dashboard.id, "html");
+  await store.loadBrowsers();
+  await store.loadBrowsers();
+  expect(store.browsersFor("html").map((browser) => browser.id)).toEqual(["Microsoft Edge"]);
+  expect(await store.openInBrowser(dashboard.id, "Microsoft Edge")).toBe(true);
+  expect(await store.openInApp(dashboard.id)).toBe(true);
+  expect(bridge.calls.map((call) => [call.channel, call.payload])).toEqual([
+    ["artifacts.application", { id: dashboard.id }],
+    ["artifacts.browsers", undefined],
+    ["artifacts.openInBrowser", { id: dashboard.id, browser: "Microsoft Edge" }],
+    ["artifacts.openInApp", { id: dashboard.id }],
+  ]);
 });

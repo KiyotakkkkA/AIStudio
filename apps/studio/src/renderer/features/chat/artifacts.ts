@@ -12,6 +12,36 @@ export const OPEN_ARTIFACT = "Открыть";
 export const OPEN_IN_VIEWER = "Открыть в просмотрщике";
 export const OPEN_IN_DEFAULT_APP = "Открыть в приложении по умолчанию";
 export const VIEWER_UNAVAILABLE = "Формат не поддерживается просмотрщиком";
+export const OPEN_IN_BUILT_IN_BROWSER = "Открыть во встроенном браузере";
+export const DASHBOARD_KIND = "Дашборд";
+
+const PAGE_FORMATS = new Set(["html", "htm", "svg", "pdf", "png", "jpg", "jpeg"]);
+const DASHBOARDS_PREFIX = "dashboards/";
+
+export function opensAsPage(format: string): boolean {
+  return PAGE_FORMATS.has(format.toLowerCase());
+}
+
+export function isDashboard(artifact: ArtifactDto): boolean {
+  return artifact.id.startsWith(DASHBOARDS_PREFIX);
+}
+
+export function stepArtifacts(outputs: readonly unknown[]): ArtifactDto[] {
+  const byId = new Map<string, ArtifactDto>();
+  for (const output of outputs) {
+    const listed =
+      typeof output === "object" && output !== null && !Array.isArray(output)
+        ? (output as Record<string, unknown>).artifacts
+        : null;
+    const parsed = ToolArtifacts.safeParse(listed);
+    if (!parsed.success) continue;
+    for (const artifact of parsed.data) {
+      byId.delete(artifact.id);
+      byId.set(artifact.id, artifact);
+    }
+  }
+  return [...byId.values()];
+}
 
 export function openInApplication(name: string | null): string {
   return name === null ? OPEN_IN_DEFAULT_APP : `Открыть в ${name}`;
@@ -69,7 +99,7 @@ export function artifactKind(format: string): ArtifactKind {
 
 export function artifactSubtitle(artifact: ArtifactDto): string {
   return [
-    artifactKind(artifact.format).label,
+    isDashboard(artifact) ? DASHBOARD_KIND : artifactKind(artifact.format).label,
     artifact.format.toUpperCase(),
     formatBytes(artifact.sizeBytes),
   ].join(" · ");

@@ -107,6 +107,14 @@ fn script_stub() {
             std::fs::write("Отчёт.docx", b"PK docx").expect("writes the document");
             std::fs::write("scratch.json", b"{}").expect("writes a helper file");
         }
+        "dashboard" => {
+            let folder = std::env::var("ZVS_DASHBOARDS_DIR").expect("the dashboards folder");
+            std::fs::write(
+                std::path::Path::new(&folder).join("Продажи.html"),
+                b"<p>ok</p>",
+            )
+            .expect("writes the dashboard");
+        }
         "fail" => {
             eprintln!("broken input");
             std::process::exit(3);
@@ -561,4 +569,38 @@ async fn documents_a_script_writes_are_kept_and_reported_as_artifacts() {
         .expect("runs");
     assert!(output.artifacts.is_empty());
     assert!(quiet.tool_meta(&serde_json::Value::Null, &output).is_none());
+}
+
+#[tokio::test]
+async fn a_dashboard_written_to_its_library_folder_is_reported_where_it_lies() {
+    let fixture = Fixture::new();
+    let dashboards = fixture.scratch.path().join("dashboards");
+    let store = crate::artifacts::ArtifactStore::new(fixture.scratch.path().join("artifacts"))
+        .with_library(crate::artifacts::DASHBOARDS, dashboards.clone());
+    let node = fixture.node_with(Some(Stub::shared("dashboard")), |options| {
+        SkillScriptOptions {
+            artifacts: Some(store.clone()),
+            ..options
+        }
+    });
+    let output = node
+        .run(
+            &context(CancellationToken::new()),
+            input("scripts/extract.py"),
+        )
+        .await
+        .expect("runs");
+    assert_eq!(
+        output
+            .artifacts
+            .iter()
+            .map(|artifact| artifact.id.as_str())
+            .collect::<Vec<_>>(),
+        ["dashboards/Продажи.html"]
+    );
+    assert_eq!(
+        store.resolve("dashboards/Продажи.html").expect("resolves"),
+        dashboards.join("Продажи.html")
+    );
+    assert!(!fixture.scratch.path().join("artifacts").exists());
 }

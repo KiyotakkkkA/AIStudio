@@ -9,7 +9,7 @@ use zvs_contract::validate::{check, invalid};
 use zvs_contract::{AppError, AppErrorCode, ArtifactDto, Validate};
 
 use super::library::SkillLibrary;
-use crate::artifacts::{ArtifactStore, mentioned_paths, produced, snapshot};
+use crate::artifacts::{ArtifactStore, library_env, mentioned_paths, produced, snapshot};
 use crate::kernel::{NodeDef, PermissionRequirement, StepContext};
 use crate::toolchain::CommandLauncher;
 use crate::toolchain::process::{
@@ -230,6 +230,22 @@ impl NodeDef for SkillScriptNode {
             }
         }
         spec.cwd = Some(scratch.clone());
+        let libraries: Vec<(String, PathBuf, crate::artifacts::Snapshot)> = self
+            .options
+            .artifacts
+            .as_ref()
+            .map_or_else(Vec::new, |store| {
+                store
+                    .libraries()
+                    .iter()
+                    .map(|(name, folder)| {
+                        let _ = std::fs::create_dir_all(folder);
+                        spec.env
+                            .insert(library_env(name), folder.to_string_lossy().into_owned());
+                        (name.clone(), folder.clone(), snapshot(folder))
+                    })
+                    .collect()
+            });
         let before = snapshot(&scratch);
         let started = std::time::SystemTime::now();
         context.check_cancelled()?;
@@ -251,10 +267,14 @@ impl NodeDef for SkillScriptNode {
             .as_ref()
             .map_or_else(Vec::new, |store| {
                 let mentioned = mentioned_paths(&input.args, &scratch);
-                store.keep(
+                let mut kept = store.keep(
                     &context.run_id.to_string(),
                     &produced(&scratch, &before, &mentioned, started),
-                )
+                );
+                for (name, folder, previous) in &libraries {
+                    kept.extend(store.adopt(name, &produced(folder, previous, &[], started)));
+                }
+                kept
             });
         let mut text = process_text(&run, "script", limits);
         if !artifacts.is_empty() {

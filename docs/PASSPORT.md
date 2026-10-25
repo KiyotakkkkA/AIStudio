@@ -701,6 +701,20 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   (`ArtifactDto`, id `<runId>/<name>`). The chat shows each as a card with «Скачать»
   (`artifacts.save`: a save dialog, then a copy) and «Перейти» (`artifacts.reveal`). Ids never
   resolve outside the artifact folder.
+- **Artifact libraries and pages.** A library is a named app folder whose files are reported
+  in place instead of copied: `dashboards` (`<app data>/dashboards/`, id `dashboards/<name>`).
+  `skill.script` passes each library to the script as `ZVS_<NAME>_DIR` and reports the files
+  the run created or changed directly in it; ids never resolve into subfolders or outside.
+  Agentic sessions show the same cards, taken from the tool steps' output.
+  `artifacts.browsers` lists the browsers registered under `StartMenuInternet` whose program
+  exists; `artifacts.openInBrowser` takes a listed browser **id**, never a program path.
+  `artifacts.openInApp` opens HTML, SVG, PDF and images in the agent browser (§21) without
+  relaxing its web-only navigation: the host serves them from a loopback page server
+  (`zvs-host/src/artifact_pages.rs`) started on first use, bound to `127.0.0.1` on a random
+  port, `GET /<token>/<run>/<name>` only, with a per-launch random token, a `Host` check
+  against DNS rebinding, and `Content-Security-Policy: default-src 'none'; script-src
+  'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'` — a
+  page can run its own inline code but cannot load or send anything.
 - **Working folder explorer** (`zvs-host/src/workspace/explorer.rs`, TASK_036_EXTRA_4). The
   «Файлы» side panel in the chat is the user browsing their own folder, not a tool call:
   `workspace.list` / `workspace.read` raise **no** access request, but they require the chat's

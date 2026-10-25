@@ -7,7 +7,7 @@ use ::windows::Win32::UI::Shell::{
 };
 use ::windows::core::{HSTRING, PCWSTR, PWSTR};
 use zvs_contract::AppError;
-use zvs_host::platform::external::{FileLauncher, open_with_default_application};
+use zvs_host::platform::external::{FileLauncher, InstalledBrowser, open_with_default_application};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ShellLauncher;
@@ -53,6 +53,10 @@ impl FileLauncher for ShellLauncher {
 
     fn open(&self, path: &Path) -> Result<(), AppError> {
         open_with_default_application(path)
+    }
+
+    fn browsers(&self) -> Vec<InstalledBrowser> {
+        super::browsers::installed()
     }
 }
 

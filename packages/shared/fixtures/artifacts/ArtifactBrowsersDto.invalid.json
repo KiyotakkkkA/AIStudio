@@ -1,0 +1,17 @@
+[
+  {
+    "name": "missing list",
+    "value": {}
+  },
+  {
+    "name": "bad entry",
+    "value": {
+      "browsers": [
+        {
+          "id": "",
+          "name": "x"
+        }
+      ]
+    }
+  }
+]

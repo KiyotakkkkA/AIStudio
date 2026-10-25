@@ -3,10 +3,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use zvs_contract::artifacts::BROWSERS_MAX;
 use zvs_contract::{
-    AppError, AppErrorCode, ArtifactApplicationDto, ArtifactDto, ArtifactSaveResult,
+    AppError, AppErrorCode, ArtifactApplicationDto, ArtifactBrowsersDto, ArtifactDto,
+    ArtifactSaveResult, InstalledBrowserDto,
 };
 
+use crate::artifact_pages::{
+    NOT_A_PAGE, PAGES_UNAVAILABLE, PageResolver, PageServer, SharedPageOpener, page_type,
+};
 use crate::platform::external::{
     PathRevealer, SharedFileLauncher, system_file_launcher, system_path_revealer,
 };
@@ -24,6 +29,8 @@ const SNAPSHOT_FILES_MAX: usize = 4096;
 
 pub const ARTIFACT_NOT_FOUND: &str = "Файл не найден";
 pub const ARTIFACT_SAVE_FAILED: &str = "Не удалось сохранить файл";
+pub const BROWSER_NOT_FOUND: &str = "Браузер не найден";
+pub const DASHBOARDS: &str = "dashboards";
 
 pub type Snapshot = HashMap<PathBuf, (u64, Option<SystemTime>)>;
 
@@ -140,19 +147,79 @@ fn unique_name(name: &str, taken: &mut HashSet<String>) -> String {
 #[derive(Clone)]
 pub struct ArtifactStore {
     root: PathBuf,
+    libraries: Vec<(String, PathBuf)>,
     picker: Option<SharedPicker>,
     reveal: PathRevealer,
     launcher: SharedFileLauncher,
+    pages: Option<SharedPageOpener>,
+    server: Arc<tokio::sync::OnceCell<PageServer>>,
+}
+
+pub fn library_env(name: &str) -> String {
+    format!("ZVS_{}_DIR", name.to_ascii_uppercase())
 }
 
 impl ArtifactStore {
     pub fn new(root: PathBuf) -> Self {
         Self {
             root,
+            libraries: Vec::new(),
             picker: None,
             reveal: system_path_revealer(),
             launcher: system_file_launcher(),
+            pages: None,
+            server: Arc::new(tokio::sync::OnceCell::new()),
         }
+    }
+
+    #[must_use]
+    pub fn with_library(mut self, name: &str, folder: PathBuf) -> Self {
+        self.libraries.push((name.to_owned(), folder));
+        self
+    }
+
+    #[must_use]
+    pub fn with_pages(mut self, pages: SharedPageOpener) -> Self {
+        self.pages = Some(pages);
+        self
+    }
+
+    pub fn libraries(&self) -> &[(String, PathBuf)] {
+        &self.libraries
+    }
+
+    fn library(&self, name: &str) -> Option<&Path> {
+        self.libraries
+            .iter()
+            .find(|(known, _)| known == name)
+            .map(|(_, folder)| folder.as_path())
+    }
+
+    pub fn adopt(&self, library: &str, files: &[PathBuf]) -> Vec<ArtifactDto> {
+        let Some(folder) = self.library(library) else {
+            return Vec::new();
+        };
+        files
+            .iter()
+            .filter(|file| file.parent() == Some(folder))
+            .filter_map(|file| {
+                let name = file.file_name()?.to_string_lossy().into_owned();
+                let size_bytes = std::fs::metadata(extended(file))
+                    .ok()
+                    .filter(std::fs::Metadata::is_file)?
+                    .len();
+                let format = Path::new(&name)
+                    .extension()
+                    .map(|extension| extension.to_string_lossy().to_ascii_lowercase())
+                    .unwrap_or_default();
+                Some(ArtifactDto {
+                    id: format!("{library}/{name}"),
+                    name,
+                    format,
+                    size_bytes,
+                })
+            })
+            .collect()
     }
 
     #[must_use]
@@ -213,10 +280,19 @@ impl ArtifactStore {
     pub fn resolve(&self, id: &str) -> Result<PathBuf, AppError> {
         zvs_contract::Validate::validate(&zvs_contract::ArtifactRef { id: id.to_owned() })?;
         let (run, name) = id.split_once('/').ok_or_else(|| not_found(id))?;
-        let path = self.root.join(run).join(name);
-        if path.parent().and_then(Path::parent) != Some(self.root.as_path()) {
-            return Err(not_found(id));
-        }
+        let path = if let Some(folder) = self.library(run) {
+            let path = folder.join(name);
+            if path.parent() != Some(folder) {
+                return Err(not_found(id));
+            }
+            path
+        } else {
+            let path = self.root.join(run).join(name);
+            if path.parent().and_then(Path::parent) != Some(self.root.as_path()) {
+                return Err(not_found(id));
+            }
+            path
+        };
         if std::fs::metadata(extended(&path)).is_ok_and(|metadata| metadata.is_file()) {
             Ok(path)
         } else {
@@ -248,6 +324,53 @@ impl ArtifactStore {
                     .collect()
             });
         Ok(ArtifactApplicationDto { name })
+    }
+
+    pub fn browsers(&self) -> ArtifactBrowsersDto {
+        let browsers = self
+            .launcher
+            .browsers()
+            .into_iter()
+            .take(BROWSERS_MAX)
+            .map(|browser| InstalledBrowserDto {
+                id: browser.id,
+                name: browser.name,
+            })
+            .collect();
+        ArtifactBrowsersDto { browsers }
+    }
+
+    pub fn open_in_browser(&self, id: &str, browser: &str) -> Result<(), AppError> {
+        let path = self.resolve(id)?;
+        let installed = self
+            .launcher
+            .browsers()
+            .into_iter()
+            .find(|candidate| candidate.id == browser)
+            .ok_or_else(|| AppError::new(AppErrorCode::NotFound, BROWSER_NOT_FOUND))?;
+        self.launcher.open_in_browser(&installed, &path)
+    }
+
+    pub async fn open_in_app(&self, id: &str) -> Result<(), AppError> {
+        let path = self.resolve(id)?;
+        let name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if page_type(&name).is_none() {
+            return Err(AppError::new(AppErrorCode::ValidationFailed, NOT_A_PAGE));
+        }
+        let pages = self
+            .pages
+            .clone()
+            .ok_or_else(|| AppError::new(AppErrorCode::NotImplemented, PAGES_UNAVAILABLE))?;
+        let store = self.clone();
+        let resolve: PageResolver = Arc::new(move |id: &str| store.resolve(id));
+        let server = self
+            .server
+            .get_or_try_init(|| PageServer::start(resolve))
+            .await?;
+        pages.open(&server.url(id)?).await
     }
 
     pub async fn save(&self, id: &str) -> Result<ArtifactSaveResult, AppError> {
@@ -484,5 +607,154 @@ mod tests {
             revealed.lock().expect("reads").as_slice(),
             [root.path().join("run").join("plan.pdf")]
         );
+    }
+
+    struct Browsers {
+        launched: Mutex<Vec<(String, PathBuf)>>,
+    }
+
+    impl crate::platform::external::FileLauncher for Browsers {
+        fn open(&self, _path: &Path) -> Result<(), AppError> {
+            Ok(())
+        }
+
+        fn browsers(&self) -> Vec<crate::platform::external::InstalledBrowser> {
+            vec![crate::platform::external::InstalledBrowser {
+                id: "Google Chrome".to_owned(),
+                name: "Google Chrome".to_owned(),
+                program: PathBuf::from("C:/Chrome/chrome.exe"),
+            }]
+        }
+
+        fn open_in_browser(
+            &self,
+            browser: &crate::platform::external::InstalledBrowser,
+            path: &Path,
+        ) -> Result<(), AppError> {
+            self.launched
+                .lock()
+                .expect("records")
+                .push((browser.id.clone(), path.to_path_buf()));
+            Ok(())
+        }
+    }
+
+    struct Pages(Mutex<Vec<String>>);
+
+    #[async_trait::async_trait]
+    impl crate::artifact_pages::PageOpener for Pages {
+        async fn open(&self, url: &str) -> Result<(), AppError> {
+            self.0.lock().expect("records").push(url.to_owned());
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn library_files_are_adopted_in_place_and_never_resolve_outside_their_folder() {
+        let root = tempfile::tempdir().expect("the data folder");
+        let dashboards = root.path().join(DASHBOARDS);
+        let store = ArtifactStore::new(root.path().join("artifacts"))
+            .with_library(DASHBOARDS, dashboards.clone());
+        write(&dashboards.join("Продажи.html"), "<p>ok</p>");
+        write(&dashboards.join("nested").join("deep.html"), "x");
+        write(&root.path().join("secret.html"), "x");
+        let adopted = store.adopt(
+            DASHBOARDS,
+            &[
+                dashboards.join("Продажи.html"),
+                dashboards.join("nested").join("deep.html"),
+                root.path().join("secret.html"),
+            ],
+        );
+        assert_eq!(
+            adopted
+                .iter()
+                .map(|artifact| (artifact.id.as_str(), artifact.format.as_str()))
+                .collect::<Vec<_>>(),
+            [("dashboards/Продажи.html", "html")]
+        );
+        assert_eq!(adopted[0].size_bytes, 9);
+        assert_eq!(
+            store.resolve("dashboards/Продажи.html").expect("resolves"),
+            dashboards.join("Продажи.html")
+        );
+        assert!(store.resolve("dashboards/..").is_err());
+        assert!(store.resolve("dashboards/missing.html").is_err());
+        assert!(
+            store
+                .adopt("unknown", &[dashboards.join("Продажи.html")])
+                .is_empty()
+        );
+        assert_eq!(library_env(DASHBOARDS), "ZVS_DASHBOARDS_DIR");
+    }
+
+    #[test]
+    fn a_file_opens_only_in_a_browser_the_system_lists() {
+        let root = tempfile::tempdir().expect("the data folder");
+        let dashboards = root.path().join(DASHBOARDS);
+        write(&dashboards.join("sales.html"), "x");
+        let launcher = Arc::new(Browsers {
+            launched: Mutex::new(Vec::new()),
+        });
+        let store = ArtifactStore::new(root.path().join("artifacts"))
+            .with_library(DASHBOARDS, dashboards.clone())
+            .with_launcher(launcher.clone());
+        assert_eq!(
+            store.browsers().browsers,
+            [InstalledBrowserDto {
+                id: "Google Chrome".to_owned(),
+                name: "Google Chrome".to_owned(),
+            }]
+        );
+        store
+            .open_in_browser("dashboards/sales.html", "Google Chrome")
+            .expect("opens");
+        let error = store
+            .open_in_browser("dashboards/sales.html", "C:/Windows/System32/cmd.exe")
+            .expect_err("an unlisted program is refused");
+        assert_eq!(error.code, AppErrorCode::NotFound);
+        assert_eq!(error.message, BROWSER_NOT_FOUND);
+        assert_eq!(
+            launcher.launched.lock().expect("reads").as_slice(),
+            [("Google Chrome".to_owned(), dashboards.join("sales.html"))]
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_page_opens_in_the_app_through_one_loopback_server() {
+        let root = tempfile::tempdir().expect("the data folder");
+        let dashboards = root.path().join(DASHBOARDS);
+        write(&dashboards.join("sales.html"), "x");
+        write(&dashboards.join("data.xlsx"), "x");
+        let pages = Arc::new(Pages(Mutex::new(Vec::new())));
+        let without = ArtifactStore::new(root.path().join("artifacts"))
+            .with_library(DASHBOARDS, dashboards.clone());
+        assert_eq!(
+            without
+                .open_in_app("dashboards/sales.html")
+                .await
+                .expect_err("no browser")
+                .code,
+            AppErrorCode::NotImplemented
+        );
+        let store = without.with_pages(pages.clone());
+        store
+            .open_in_app("dashboards/sales.html")
+            .await
+            .expect("opens");
+        store
+            .open_in_app("dashboards/sales.html")
+            .await
+            .expect("opens again");
+        let error = store
+            .open_in_app("dashboards/data.xlsx")
+            .await
+            .expect_err("not a page");
+        assert_eq!(error.message, crate::artifact_pages::NOT_A_PAGE);
+        let opened = pages.0.lock().expect("reads").clone();
+        assert_eq!(opened.len(), 2);
+        assert_eq!(opened[0], opened[1]);
+        assert!(opened[0].starts_with("http://127.0.0.1:"));
+        assert!(opened[0].ends_with("/dashboards/sales.html"));
     }
 }
