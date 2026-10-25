@@ -130,6 +130,7 @@ pub const BUNDLED_SKILLS: &[BundledSkill] = &[
             "assets/zvs-dash.js",
             "references/aggregation.md",
             "references/components.md",
+            "references/exploration.md",
             "references/layout.md",
             "references/sources/apis.md",
             "references/sources/databases.md",
