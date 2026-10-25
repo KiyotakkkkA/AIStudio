@@ -1,6 +1,6 @@
 # Dashboard spec
 
-The spec is one JSON file. `build_dashboard.py` reads it, loads the datasets, checks every block against the columns and writes the page. Relative dataset paths resolve from the spec's folder.
+The spec is one JSON object. Pass it to `build_dashboard.py` on standard input (`-` as the spec argument) or as a file. The builder runs the dataset queries, checks every block against the columns and writes the page. Relative dataset paths resolve from the spec's folder, or from the run folder when the spec comes on standard input; use absolute paths.
 
 ```json
 {
@@ -52,6 +52,10 @@ The build time is stamped automatically as `generatedAt`.
 
 ```json
 "datasets": {
+  "monthly": {
+    "sources": { "sales": "C:/data/sales.xlsx#2026" },
+    "sql": "SELECT date_trunc('month', \"Дата\")::DATE AS month, \"Регион\" AS region, sum(\"Сумма\") AS revenue FROM sales GROUP BY ALL"
+  },
   "sales":  { "path": "C:/data/sales.csv" },
   "plan":   { "path": "C:/data/plan.xlsx", "sheet": "2026" },
   "stages": { "rows": [ { "stage": "Визит", "users": 48210 }, { "stage": "Оплата", "users": 1180 } ] }
@@ -60,7 +64,10 @@ The build time is stamped automatically as `generatedAt`.
 
 | Key         | Meaning                                                                                  |
 | ----------- | ---------------------------------------------------------------------------------------- |
-| `path`      | CSV, TSV, JSON (array of objects, or an object with `rows`), JSONL, XLSX. Other formats: convert with `query_data.py --out result.csv`. |
+| `sql`       | **Preferred.** One DuckDB `SELECT` run while building. Needs `sources`. Name output columns in snake_case. |
+| `sources`   | For `sql`: `{ "NAME": "ABSOLUTE_PATH" }`; add `#SHEET` for Excel, `#TABLE` for SQLite. The SQL reads each source by NAME. Reads CSV, TSV, JSON, JSONL, Parquet, XLSX and SQLite. |
+| `dateFormat` | For `sql` over CSV: the date format, for example `%d.%m.%Y`.                            |
+| `path`      | A ready file: CSV, TSV, JSON (array of objects, or an object with `rows`), JSONL, XLSX.   |
 | `rows`      | Inline rows as objects, for a handful of values taken from text or a document.           |
 | `sheet`     | Excel sheet name; the first sheet by default.                                            |
 | `delimiter` | CSV delimiter when detection fails.                                                      |

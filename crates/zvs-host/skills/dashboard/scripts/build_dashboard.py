@@ -1,6 +1,6 @@
 # /// script
-# requires-python = ">=3.10"
-# dependencies = ["openpyxl==3.1.5"]
+# requires-python = ">=3.11"
+# dependencies = ["duckdb==2.0.0", "openpyxl==3.1.5"]
 # ///
 import argparse
 import csv
@@ -223,16 +223,48 @@ def convert(value, kind: str, decimal_comma: bool):
     return str(value).strip()
 
 
+def load_sql(name: str, spec: dict) -> tuple[list[str], list[list]]:
+    import tempfile
+
+    import duckdb
+
+    from _sources import SourceError, parse_named, register
+
+    sources = spec.get("sources") or {}
+    if not isinstance(sources, dict) or not sources:
+        raise ValueError('give "sources": {"NAME": "ABSOLUTE_PATH"} for the tables the SQL reads')
+    connection = duckdb.connect()
+    try:
+        with tempfile.TemporaryDirectory() as work:
+            for source_name, path in sources.items():
+                source_name, path = parse_named(f"{source_name}={path}")
+                register(
+                    connection,
+                    source_name,
+                    path,
+                    Path(work),
+                    spec.get("decimal") == ",",
+                    spec.get("dateFormat"),
+                )
+            cursor = connection.execute(str(spec["sql"]).strip().rstrip(";"))
+            header = [column[0] for column in cursor.description]
+            return header, [list(row) for row in cursor.fetchall()]
+    except (SourceError, duckdb.Error) as error:
+        raise ValueError(f"{error}".strip()) from error
+
+
 def load_dataset(name: str, spec, base: Path, problems: Problems) -> dict | None:
     if isinstance(spec, list):
         spec = {"rows": spec}
     if not isinstance(spec, dict):
-        problems.error(f"datasets.{name}: expected an object with path or rows")
+        problems.error(f"datasets.{name}: expected an object with sql, path or rows")
         return None
     delimiter = None
     try:
         if "rows" in spec:
             header, rows = from_records(spec["rows"])
+        elif "sql" in spec:
+            header, rows = load_sql(name, spec)
         elif "path" in spec:
             path = Path(spec["path"])
             if not path.is_absolute():
@@ -253,7 +285,7 @@ def load_dataset(name: str, spec, base: Path, problems: Problems) -> dict | None
                 )
                 return None
         else:
-            problems.error(f"datasets.{name}: give path or rows")
+            problems.error(f"datasets.{name}: give sql with sources, path or rows")
             return None
     except (ValueError, KeyError, OSError, json.JSONDecodeError) as error:
         problems.error(f"datasets.{name}: {error}")
@@ -558,7 +590,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Validate a dashboard spec, load its datasets and write one self-contained HTML file."
     )
-    parser.add_argument("spec", help="absolute path of the dashboard JSON spec")
+    parser.add_argument(
+        "spec",
+        nargs="?",
+        default="-",
+        help="absolute path of the dashboard JSON spec, or - to read it from standard input",
+    )
     parser.add_argument(
         "--name",
         help="file name of the dashboard without folders, for example «Продажи 2026»; the title and today's date by default",
@@ -573,10 +610,19 @@ def main() -> int:
         print("--out is required when the dashboards folder is not set", file=sys.stderr)
         return 2
 
-    spec_path = Path(args.spec)
+    from_stdin = args.spec == "-"
+    spec_path = Path.cwd() / "spec.json" if from_stdin else Path(args.spec)
     try:
-        spec = json.loads(read_text(spec_path))
-    except (OSError, json.JSONDecodeError) as error:
+        if from_stdin:
+            text = sys.stdin.buffer.read().decode("utf-8-sig")
+            if not text.strip():
+                raise ValueError("nothing on standard input; pass the spec JSON as stdin or give a file path")
+        else:
+            text = read_text(spec_path)
+        spec = json.loads(text)
+        if not isinstance(spec, dict):
+            raise ValueError("the spec must be a JSON object")
+    except (OSError, ValueError) as error:
         print(json.dumps({"ok": False, "problems": [f"spec: {error}"]}, ensure_ascii=False))
         return 1
     problems = Problems()

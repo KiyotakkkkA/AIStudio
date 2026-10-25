@@ -495,7 +495,13 @@
     frame.xs = kept.concat([other]);
   }
 
-  function niceScale(min, max, count) {
+  function wholeNumbers(component) {
+    return (
+      component.format === "integer" || component.agg === "count" || component.agg === "distinct"
+    );
+  }
+
+  function niceScale(min, max, count, whole) {
     let low = min;
     let high = max;
     if (low === high) {
@@ -507,7 +513,8 @@
     const raw = span / (count || 5);
     const base = Math.pow(10, Math.floor(Math.log10(raw)));
     const ratio = raw / base;
-    const step = base * (ratio >= 7.5 ? 10 : ratio >= 3.5 ? 5 : ratio >= 1.5 ? 2 : 1);
+    const nice = base * (ratio >= 7.5 ? 10 : ratio >= 3.5 ? 5 : ratio >= 1.5 ? 2 : 1);
+    const step = whole ? Math.max(1, nice) : nice;
     const lo = Math.floor(low / step + 1e-9) * step;
     const hi = Math.ceil(high / step - 1e-9) * step;
     const ticks = [];
@@ -719,7 +726,7 @@
     if (!Number.isFinite(low)) return emptyState(entry);
     if (low >= 0 && (filled || low < high * 0.5)) low = 0;
     if (high <= 0) high = 0;
-    const scale = niceScale(low, high, 5);
+    const scale = niceScale(low, high, 5, wholeNumbers(c));
     const ticks = tickFormatter(c.format);
     const labelEnds =
       !stacked && frame.series.length <= 4 && frame.xs.length > 1 && c.endLabels !== false;
@@ -955,7 +962,7 @@
       }
       return list;
     });
-    const scale = niceScale(low, high, 5);
+    const scale = niceScale(low, high, 5, wholeNumbers(c));
     const ticks = tickFormatter(c.format);
     const lanes = stacked ? 1 : frame.series.length;
     const showValues = c.valueLabels !== false && lanes === 1 && !stacked;

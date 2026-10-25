@@ -12,6 +12,25 @@ import duckdb
 
 from _sources import SourceError, json_value, literal, parse_named, register
 
+FILE_FUNCTIONS = ("read_excel", "read_xlsx", "st_read", "read_sqlite", "sqlite_scan")
+
+
+def hint(message: str, names: list[str]) -> str:
+    lowered = message.lower()
+    tables = ", ".join(names) if names else "none yet"
+    if any(function in lowered for function in FILE_FUNCTIONS):
+        return (
+            "Hint: files are not read with table functions here. Pass each file as --source NAME=PATH "
+            "(add #SHEET for Excel, #TABLE for SQLite) and query it by NAME. "
+            f"Source names in this call: {tables}."
+        )
+    if "table with name" in lowered and "does not exist" in lowered:
+        return f"Hint: query the sources by their names. Source names in this call: {tables}."
+    if "referenced column" in lowered and "not found" in lowered:
+        return 'Hint: quote column names with spaces or Cyrillic letters in double quotes, for example "Тип узла".'
+    return ""
+
+
 FORMATS = {".csv": "FORMAT csv, HEADER true", ".json": "FORMAT json, ARRAY true", ".parquet": "FORMAT parquet"}
 
 
@@ -61,7 +80,9 @@ def main() -> int:
                 out.parent.mkdir(parents=True, exist_ok=True)
                 connection.execute(f"COPY ({sql}) TO {literal(out)} ({FORMATS[out.suffix.lower()]})")
     except (SourceError, duckdb.Error, OSError) as error:
-        print(str(error), file=sys.stderr)
+        message = str(error)
+        extra = hint(message, [source["name"] for source in sources])
+        print(f"{message}\n{extra}" if extra else message, file=sys.stderr)
         return 1
     report = {
         "sources": [{key: value for key, value in source.items() if value is not None} for source in sources],

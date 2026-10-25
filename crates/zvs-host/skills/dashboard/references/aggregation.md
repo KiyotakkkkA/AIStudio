@@ -1,13 +1,20 @@
 # Aggregation with DuckDB
 
-Shape the data with `query_data.py` before building. Each `--source NAME=PATH` becomes a view named `NAME`; the SQL is DuckDB's dialect.
+Try each dataset query with `query_data.py`, read the preview, then put the same SQL into the spec as a dataset; the builder runs it again while building, so nothing has to be saved in between. Each source becomes a view named after it; the SQL is DuckDB's dialect and reads sources only by name.
 
 ```
 query_data.py --source sales=C:/data/sales.xlsx#2026 --source managers=C:/data/managers.csv
-  --sql "SELECT ..." --out C:/Reports/data/sales_by_month.csv
+  --sql "SELECT ..." --preview 20
 ```
 
-Write the SQL into a file and pass `--sql-file` when it is longer than a few lines. Name the output columns in snake_case.
+```json
+"monthly": {
+  "sources": { "sales": "C:/data/sales.xlsx#2026", "managers": "C:/data/managers.csv" },
+  "sql": "SELECT ..."
+}
+```
+
+Name the output columns in snake_case. Quote source columns with spaces or Cyrillic letters in double quotes: `"Тип узла"`; inside the spec's JSON string that is `\"Тип узла\"`.
 
 ## Choose the grain
 
@@ -101,7 +108,7 @@ Run each of these and compare:
 
 ```sql
 SELECT count(*), sum(amount), min(order_date), max(order_date) FROM sales            -- the source
-SELECT sum(revenue), min(month), max(month) FROM read_csv('C:/Reports/data/sales_by_month.csv')  -- the result
+SELECT sum(revenue), min(month), max(month) FROM (<the dataset SQL>)                  -- the dataset
 ```
 
 - Totals match (or differ by exactly what you excluded, and you can say what).
