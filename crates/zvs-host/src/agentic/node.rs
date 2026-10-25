@@ -365,6 +365,7 @@ impl SessionNode {
         guard: &mut LoopGuard,
     ) -> Result<(), AppError> {
         let mut changed_mode = None;
+        let mut delivered = Vec::new();
         let (row, notes) = self.store.update(id, |row| {
             let mut notes = Vec::new();
             if let Some(mode) = row.pending_mode.take()
@@ -383,6 +384,7 @@ impl SessionNode {
             }
             for text in std::mem::take(&mut row.pending_instructions) {
                 notes.push(format!("Instruction from the user: {text}"));
+                delivered.push(text);
             }
             row.mode = progress.mode;
             row.plan = progress.plan.clone();
@@ -397,6 +399,14 @@ impl SessionNode {
                     ("mode", json!(mode.as_str())),
                 ]),
             })?;
+        }
+        if !delivered.is_empty() {
+            let step = Map::from_iter([
+                ("domain".to_owned(), json!(AGENTIC_DOMAIN)),
+                ("sessionId".to_owned(), json!(row.id)),
+                ("instructions".to_owned(), json!(delivered)),
+            ]);
+            context.emit(HostEventDraft::Step { step })?;
         }
         if !notes.is_empty() {
             progress

@@ -893,6 +893,11 @@ async fn a_mode_change_and_an_instruction_apply_at_the_next_boundary() {
         &event.body,
         HostEventDraft::Log { line } if line.get("message") == Some(&json!("permission mode changed"))
     )));
+    assert!(rig.sink.events().iter().any(|event| matches!(
+        &event.body,
+        HostEventDraft::Step { step }
+            if step.get("instructions") == Some(&json!(["Не трогай папку tests"]))
+    )));
 }
 
 #[tokio::test]

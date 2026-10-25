@@ -115,7 +115,7 @@ const Outcome = observer(function Outcome({ store }: { readonly store: AgenticSt
   if (phase === "completed") {
     const summary = session.summary === null ? "" : splitArtifacts(session.summary).text;
     return (
-      <div className="rounded-card bg-ok-soft px-4 py-3">
+      <div>
         <Eyebrow>{SUMMARY_TITLE}</Eyebrow>
         {summary.length === 0 ? (
           <p className="m-0 text-[13px] text-main-100">{STOP_REASON_COPY.goal}</p>
@@ -169,6 +169,21 @@ const Outcome = observer(function Outcome({ store }: { readonly store: AgenticSt
   ) : null;
 });
 
+function UserInput({ text, note }: { readonly text: string; readonly note?: string }) {
+  return (
+    <div className="flex justify-end">
+      <div className="flex max-w-[78%] flex-col items-end gap-1">
+        <div
+          className={`rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed wrap-break-word whitespace-pre-wrap text-main-50 ${note === undefined ? "" : "opacity-70"}`}
+        >
+          {text}
+        </div>
+        {note === undefined ? null : <span className="text-[11px] text-main-500">{note}</span>}
+      </div>
+    </div>
+  );
+}
+
 function AgentText({
   text,
   reasoning,
@@ -195,18 +210,6 @@ const Composer = observer(function Composer({ store }: { readonly store: Agentic
   if (session === null || !store.editable) return null;
   return (
     <div className="flex flex-col gap-2">
-      {session.pendingInstructions.length === 0 ? null : (
-        <div className="rounded-card bg-main-850 px-3 py-2">
-          <Eyebrow>{INSTRUCTIONS_QUEUED}</Eyebrow>
-          <ul className="m-0 flex list-none flex-col gap-1 p-0">
-            {session.pendingInstructions.map((text, index) => (
-              <li key={index} className="truncate text-[12px] text-main-300" title={text}>
-                {text}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
       <TextComposer
         label={INSTRUCTION_LABEL}
         placeholder={INSTRUCTION_PLACEHOLDER}
@@ -277,7 +280,9 @@ export default observer(function SessionStream({ store }: { readonly store: Agen
             </p>
           ) : null}
           {streamBlocks(entries).map((entry) =>
-            entry.kind === "tools" ? (
+            entry.kind === "instruction" ? (
+              <UserInput key={entry.id} text={entry.text} />
+            ) : entry.kind === "tools" ? (
               <div key={entry.id} className="[&>ul]:mb-0">
                 <ChatToolCalls
                   calls={entry.steps.map((step) => callOf(step, store.stream.approval))}
@@ -294,6 +299,15 @@ export default observer(function SessionStream({ store }: { readonly store: Agen
           )}
           {store.streamLoaded ? <Outcome store={store} /> : null}
           <SessionArtifacts store={store} />
+          {store.editable
+            ? session.pendingInstructions.map((text, index) => (
+                <UserInput
+                  key={`pending-${String(index)}`}
+                  text={text}
+                  note={INSTRUCTIONS_QUEUED}
+                />
+              ))
+            : null}
         </div>
       </ScrollArea>
       <div className="flex-none px-6 pb-5">

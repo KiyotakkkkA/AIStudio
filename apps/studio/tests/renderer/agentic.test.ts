@@ -29,6 +29,7 @@ import {
   renameEdit,
   replay,
   sessionArtifacts,
+  resolveArtifact,
   sessionPhase,
   splitArtifacts,
   streamBlocks,
@@ -250,6 +251,41 @@ describe("artifacts", () => {
     expect(
       sessionArtifacts(state.entries, "Сводка\n<artifacts>\na.md\nb.md\n</artifacts>"),
     ).toEqual(["a.md", "b.md"]);
+  });
+});
+
+describe("user inputs and artifact paths", () => {
+  test("instructions delivered at a boundary become stream entries in order", () => {
+    const state = fold([
+      event(1, { type: "token", delta: "Работаю", kind: "text" }),
+      event(2, {
+        type: "step",
+        step: { domain: "agentic", sessionId: SESSION, instructions: ["Не трогай тесты", " "] },
+      }),
+      event(3, { type: "token", delta: "Учту", kind: "text" }),
+    ]);
+    expect(state.entries.map((entry) => entry.kind)).toEqual(["text", "instruction", "text"]);
+    expect(state.entries[1]).toMatchObject({ kind: "instruction", text: "Не трогай тесты" });
+    expect(streamBlocks(state.entries).map((block) => block.kind)).toEqual([
+      "text",
+      "instruction",
+      "text",
+    ]);
+  });
+
+  test("relative and absolute declarations resolve against the workspace", () => {
+    expect(resolveArtifact("docs/report.docx", "C:\\work\\studio")).toEqual({
+      absolute: "C:\\work\\studio\\docs\\report.docx",
+      relative: "docs/report.docx",
+    });
+    expect(resolveArtifact("C:/work/studio/docs/report.docx", "C:\\work\\studio")).toEqual({
+      absolute: "C:\\work\\studio\\docs\\report.docx",
+      relative: "docs/report.docx",
+    });
+    expect(resolveArtifact("D:/other/a.md", "C:\\work\\studio")).toEqual({
+      absolute: "D:\\other\\a.md",
+      relative: null,
+    });
   });
 });
 

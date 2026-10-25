@@ -16,6 +16,7 @@ import {
   type HostEvent,
   type Json,
 } from "@zvs/shared";
+import { joinFolderPath } from "../../viewer/viewerModel";
 import { stepFromEvent, type RunStep } from "../scenarios/runModel";
 
 const AGENTIC_DOMAIN = "agentic";
@@ -28,7 +29,8 @@ export type StreamEntry =
       readonly text: string;
       readonly reasoning: string;
     }
-  | { readonly kind: "tool"; readonly id: string; readonly step: RunStep };
+  | { readonly kind: "tool"; readonly id: string; readonly step: RunStep }
+  | { readonly kind: "instruction"; readonly id: string; readonly text: string };
 
 export interface SessionApproval {
   readonly id: string;
@@ -82,6 +84,13 @@ function approvalFrom(request: Payload): SessionApproval | null {
     changes: changes.success ? changes.data.changes : [],
     process: process.success ? process.data : null,
   };
+}
+
+function instructionsFromStep(step: Payload): string[] {
+  if (step.domain !== AGENTIC_DOMAIN || !Array.isArray(step.instructions)) return [];
+  return step.instructions.filter(
+    (text): text is string => typeof text === "string" && text.trim().length > 0,
+  );
 }
 
 function sessionFromStep(step: Payload): AgenticSessionDto | null {
@@ -138,6 +147,19 @@ export function applyEvent(state: StreamState, event: HostEvent): StreamUpdate {
       const stamped: StreamState = { ...next, stepAt: event.ts };
       const session = sessionFromStep(event.step);
       if (session !== null) return { state: { ...stamped, open: null }, session, ended: false };
+      const instructions = instructionsFromStep(event.step);
+      if (instructions.length > 0) {
+        const added: StreamEntry[] = instructions.map((text, index) => ({
+          kind: "instruction",
+          id: `${event.streamId}:${String(event.seq)}:${String(index)}`,
+          text,
+        }));
+        return {
+          state: { ...stamped, entries: [...stamped.entries, ...added], open: null },
+          session: null,
+          ended: false,
+        };
+      }
       const step = stepFromEvent(event.step);
       if (step === null || !step.nodeId.startsWith(CALL_PREFIX)) {
         return { state: stamped, session: null, ended: false };
@@ -368,6 +390,7 @@ export function relativePath(path: string, workspace: string): string {
 }
 
 export type StreamBlock =
+  | { readonly kind: "instruction"; readonly id: string; readonly text: string }
   | {
       readonly kind: "text";
       readonly id: string;
@@ -379,7 +402,7 @@ export type StreamBlock =
 export function streamBlocks(entries: readonly StreamEntry[]): StreamBlock[] {
   const blocks: StreamBlock[] = [];
   for (const entry of entries) {
-    if (entry.kind === "text") {
+    if (entry.kind !== "tool") {
       blocks.push(entry);
       continue;
     }
@@ -440,6 +463,27 @@ export function sessionArtifacts(
     for (const path of splitArtifacts(source).paths) if (!paths.includes(path)) paths.push(path);
   }
   return paths;
+}
+
+export interface ArtifactFile {
+  readonly absolute: string;
+  readonly relative: string | null;
+}
+
+function isAbsolutePath(path: string): boolean {
+  return /^[a-z]:[\\/]/iu.test(path) || path.startsWith("/") || path.startsWith("\\\\");
+}
+
+export function resolveArtifact(path: string, workspace: string): ArtifactFile {
+  if (!isAbsolutePath(path)) {
+    return { absolute: joinFolderPath(workspace, path), relative: path };
+  }
+  const absolute = workspace.includes("\\") ? path.replaceAll("/", "\\") : path;
+  const inside = relativePath(absolute, workspace);
+  return {
+    absolute,
+    relative: inside === absolute ? null : inside.replaceAll("\\", "/"),
+  };
 }
 
 export function runningCall(entries: readonly StreamEntry[]): RunStep | null {
