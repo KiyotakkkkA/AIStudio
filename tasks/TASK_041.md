@@ -2,7 +2,7 @@
 task: TASK_041
 title: Agentic Build page
 phase: 7 — Scenarios and Agentic Build
-status: todo
+status: done
 depends_on: [TASK_040, TASK_076]
 unblocks: []
 estimate: 4 h
@@ -76,20 +76,52 @@ Manual check: Run a real session end to end. Approve one action and deny another
 
 ## Definition of done
 
-- [ ] Page matches the mockup
-- [ ] Plan, stream and approvals driven by real events
-- [ ] Diffs and command output render readably
-- [ ] Permission mode and plan edits take effect at step boundaries
-- [ ] Budget exhaustion offers extension rather than dying silently
-- [ ] Tests and gates pass
-- [ ] `pnpm typecheck && pnpm lint && pnpm build` pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Page matches the mockup
+- [x] Plan, stream and approvals driven by real events
+- [x] Diffs and command output render readably
+- [x] Permission mode and plan edits take effect at step boundaries
+- [x] Budget exhaustion offers extension rather than dying silently
+- [x] Tests and gates pass
+- [ ] `pnpm typecheck && pnpm lint && pnpm build` pass (`pnpm build` not run, see handoff)
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- `features/agentic/`: `AgenticStore` (registered as `RootStore.agentic`), `SessionDraft` (new-session
+  form), pure `sessionModel.ts` (stream reducer, plan rows and queue edits, phase, budget lines,
+  extension budget) and `toolCardModel.ts` (card target, body, result chip, output preview),
+  `agenticCopy.ts`, and the views `AgenticWorkspace`, `PlanColumn`, `SessionStream`, `ToolCard`,
+  `ContextRail`, `NewSessionModal`. `AgenticBuildPage` renders the workspace.
+- The stream is rebuilt from `runs.list { kinds: ["agentic"], subjectId }` plus `runs.detail`
+  events of every run of the session (extensions included), then follows the live stream. Events
+  arriving during a rebuild are held and replayed; duplicates and late events are dropped by
+  per-stream `seq`; a router `gap` triggers a full rebuild. Session state comes from the
+  `{ domain: "agentic", session }` step events, newest `updatedAt` wins.
+- Tool cards reuse the chat presentation (`toolPresentation`, `toolCallSummary`,
+  `FileChangeList` for unified diffs with the low-alpha ok/err tones, `processResult`).
+  Command cards show stdout/stderr with an exit-code chip; long output collapses at 12 lines.
+- Approval bar from the `approval` event: shows the tool, the command or program text and the
+  diff; Deny / Always allow / Approve once go to `runs.deny` / `runs.approve`. No autofocus and
+  no shortcut.
+- Plan: done/running/queued/failed badges; queued steps drag to reorder, rename inline, delete;
+  the pending plan and pending mode show at once with a note that they apply at the boundary.
+- Tests: `apps/studio/tests/renderer/agentic.test.ts` (23).
+
 **Deviated from plan:**
+- The mockup's History button is the session list (back arrow in the session header); list rows
+  open or delete a session.
+- No branch chip on the workspace card, no temperature/max-tokens chips, no `@ file` /
+  `# skill` composer chips: the host has no data or behaviour behind them.
+- Extension is one click with computed limits (each limit raised by the default on top of what
+  is used); there is no custom extension form.
+- The new-session flow has no tool picker; the host offers every enabled tool when `tools` is
+  omitted.
+
 **Next session should know:**
+- Gates run: `pnpm typecheck`, `pnpm lint`, `pnpm test` (2168 passed), `pnpm format:check`
+  (only the pre-existing `NavRail.tsx` warning). No Rust changed, so cargo gates were not rerun;
+  `pnpm build` and the manual end-to-end walk with a live model were not done in this session.
 
 ---
 

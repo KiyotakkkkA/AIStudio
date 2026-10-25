@@ -17,6 +17,7 @@ import ToolStore from "../features/tools/ToolStore";
 import ToolchainStore from "../features/toolchain/ToolchainStore";
 import SkillStore from "../features/skills/SkillStore";
 import ScenarioStore from "../features/scenarios/ScenarioStore";
+import AgenticStore from "../features/agentic/AgenticStore";
 import PermissionsStore from "../features/permissions/PermissionsStore";
 import AboutStore from "../features/preferences/AboutStore";
 import AppSettingsStore from "../features/preferences/AppSettingsStore";
@@ -44,6 +45,7 @@ export class RootStore {
   readonly toolchain: ToolchainStore;
   readonly skills: SkillStore;
   readonly scenarios: ScenarioStore;
+  readonly agentic: AgenticStore;
   readonly permissions: PermissionsStore;
   readonly about: AboutStore;
   readonly appSettings: AppSettingsStore;
@@ -68,6 +70,7 @@ export class RootStore {
     this.toolchain = new ToolchainStore(environment.ipc, environment.events);
     this.skills = new SkillStore(environment.ipc);
     this.scenarios = new ScenarioStore(environment.ipc, {}, environment.events);
+    this.agentic = new AgenticStore(environment.ipc, environment.events);
     this.permissions = new PermissionsStore(environment.ipc);
     this.about = new AboutStore(environment.ipc);
     this.appSettings = new AppSettingsStore(environment.ipc);
@@ -92,6 +95,7 @@ export class RootStore {
         toolchain: false,
         skills: false,
         scenarios: false,
+        agentic: false,
         permissions: false,
         about: false,
         appSettings: false,
@@ -127,6 +131,7 @@ export class RootStore {
     this.toolchain.dispose();
     this.skills.dispose();
     this.scenarios.dispose();
+    this.agentic.dispose();
     this.permissions.dispose();
     this.memory.dispose();
     this.environment.events.dispose();
