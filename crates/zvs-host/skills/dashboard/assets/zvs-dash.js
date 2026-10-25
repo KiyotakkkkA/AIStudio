@@ -112,7 +112,7 @@
     if (measureContext === null) {
       try {
         measureContext = document.createElement("canvas").getContext("2d") || false;
-      } catch (error) {
+      } catch {
         measureContext = false;
       }
     }
@@ -2091,7 +2091,7 @@
     let mode = "auto";
     try {
       mode = window.localStorage.getItem("zvs-dashboard-theme") || spec.theme || "auto";
-    } catch (error) {
+    } catch {
       mode = spec.theme || "auto";
     }
     if (!THEMES.includes(mode)) mode = "auto";
@@ -2104,7 +2104,7 @@
       toggle.textContent = state.copy.theme[mode];
       try {
         window.localStorage.setItem("zvs-dashboard-theme", mode);
-      } catch (error) {
+      } catch {
         return;
       }
     });

@@ -51,6 +51,21 @@ export function createConfig(root) {
         "import/no-restricted-paths": restrictedPaths(zones),
       },
     },
+    {
+      files: ["crates/*/skills/*/assets/**/*.js"],
+      languageOptions: {
+        sourceType: "script",
+        globals: {
+          window: "readonly",
+          document: "readonly",
+          console: "readonly",
+          Option: "readonly",
+          ResizeObserver: "readonly",
+          requestAnimationFrame: "readonly",
+          cancelAnimationFrame: "readonly",
+        },
+      },
+    },
   ];
 }
 
