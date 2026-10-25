@@ -124,9 +124,11 @@ const SessionList = observer(function SessionList({ store }: { readonly store: A
                   </span>
                 </button>
                 {session.status === "running" ? null : (
-                  <Button
+                  <IconButton
                     tone="danger"
-                    aria-label={REMOVE_SESSION}
+                    size="md"
+                    path={mdiDeleteOutline}
+                    label={REMOVE_SESSION}
                     disabled={store.removingId === session.id}
                     needConfirm
                     modalSetup={{
@@ -136,9 +138,7 @@ const SessionList = observer(function SessionList({ store }: { readonly store: A
                       confirmLabel: REMOVE_SESSION,
                     }}
                     onClick={() => void store.remove(session.id)}
-                  >
-                    <Icon path={mdiDeleteOutline} size={15} />
-                  </Button>
+                  />
                 )}
               </li>
             );
@@ -211,10 +211,12 @@ const SessionHeader = observer(function SessionHeader({ store }: { readonly stor
         />
       </div>
       {isFinished(session) ? (
-        <Button
+        <IconButton
           tone="danger"
-          aria-label={REMOVE_SESSION}
-          title={REMOVE_SESSION}
+          size="md"
+          tooltip="bottom-center"
+          path={mdiDeleteOutline}
+          label={REMOVE_SESSION}
           disabled={store.removingId === session.id}
           needConfirm
           modalSetup={{
@@ -224,19 +226,16 @@ const SessionHeader = observer(function SessionHeader({ store }: { readonly stor
             confirmLabel: REMOVE_SESSION,
           }}
           onClick={() => void store.remove(session.id)}
-        >
-          <Icon path={mdiDeleteOutline} size={15} />
-        </Button>
+        />
       ) : (
-        <Button
+        <IconButton
           tone="danger"
-          aria-label={STOP_SESSION}
-          title={STOP_SESSION}
+          size="md"
+          path={mdiStop}
+          label={STOP_SESSION}
           disabled={store.stopping}
           onClick={() => void store.cancel()}
-        >
-          <Icon path={mdiStop} size={15} />
-        </Button>
+        />
       )}
       <NewSessionButton store={store} />
     </header>

@@ -1,5 +1,7 @@
+import { mdiDeleteOutline } from "@mdi/js";
 import type { ToolchainDto } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
@@ -82,9 +84,12 @@ export default function ToolchainCard({ dto, busy, error, onAction }: ToolchainC
         <div className="flex flex-wrap gap-2">
           {actions.map((action) =>
             action === "remove" ? (
-              <Button
+              <IconButton
                 key={action}
                 tone="danger"
+                size="md"
+                path={mdiDeleteOutline}
+                label={removalLabel(dto)}
                 disabled={busy !== undefined}
                 needConfirm
                 modalSetup={{
@@ -93,9 +98,7 @@ export default function ToolchainCard({ dto, busy, error, onAction }: ToolchainC
                   confirmLabel: removalLabel(dto),
                 }}
                 onClick={() => onAction(action)}
-              >
-                {removalLabel(dto)}
-              </Button>
+              />
             ) : (
               <Button
                 key={action}

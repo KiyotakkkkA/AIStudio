@@ -11,6 +11,7 @@ import { observer } from "mobx-react-lite";
 import { useState, type ReactNode } from "react";
 import type { AccountDto } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
@@ -167,8 +168,11 @@ function AccountCard({
               {checking ? "Проверка…" : "Проверить сессию"}
             </Button>
           )}
-          <Button
-            tone="danger-soft"
+          <IconButton
+            tone="danger"
+            size="md"
+            path={mdiLinkVariantOff}
+            label={unlinking ? "Отвязка…" : "Отвязать"}
             disabled={checking || unlinking}
             needConfirm
             modalSetup={{
@@ -187,10 +191,7 @@ function AccountCard({
               confirmLabel: "Отвязать",
             }}
             onClick={onUnlink}
-          >
-            <Icon path={mdiLinkVariantOff} size={15} />
-            {unlinking ? "Отвязка…" : "Отвязать"}
-          </Button>
+          />
         </div>
         <Button tone="ghost" onClick={onOpenSites}>
           <Icon path={mdiCookieOutline} size={15} />

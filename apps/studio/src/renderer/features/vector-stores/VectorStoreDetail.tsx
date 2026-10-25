@@ -2,6 +2,8 @@ import {
   mdiClockOutline,
   mdiDatabaseCogOutline,
   mdiDatabaseOutline,
+  mdiDeleteOutline,
+  mdiDeleteSweepOutline,
   mdiFileDocumentMultipleOutline,
   mdiFolderOutline,
   mdiHeartPulse,
@@ -17,6 +19,7 @@ import { ScrollArea, Switcher } from "@kiyotakkkka/zvs-uikit-lib";
 import { VECTOR_SCHEMA_VERSION } from "@zvs/shared";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import TextInput from "../../ui/atoms/TextInput";
@@ -115,10 +118,12 @@ function VectorStoreDetail() {
             >
               Сверить
             </Button>
-            <Button
+            <IconButton
               tone="danger"
+              size="md"
+              path={mdiDeleteSweepOutline}
+              label="Очистить содержимое, не удаляя хранилище"
               disabled={disabled || (detail.documents === 0 && detail.vectors === 0)}
-              title="Очистить содержимое, не удаляя хранилище"
               needConfirm
               modalSetup={{
                 title: `Очистить «${detail.name}»?`,
@@ -129,11 +134,12 @@ function VectorStoreDetail() {
               onClick={() => {
                 void store.clear();
               }}
-            >
-              Сброс
-            </Button>
-            <Button
+            />
+            <IconButton
               tone="danger"
+              size="md"
+              path={mdiDeleteOutline}
+              label="Удалить"
               disabled={disabled}
               needConfirm
               modalSetup={{
@@ -145,9 +151,7 @@ function VectorStoreDetail() {
               onClick={() => {
                 void store.remove();
               }}
-            >
-              Удалить
-            </Button>
+            />
           </div>
         </div>
         <div className="flex overflow-hidden rounded-[9px] bg-main-800">

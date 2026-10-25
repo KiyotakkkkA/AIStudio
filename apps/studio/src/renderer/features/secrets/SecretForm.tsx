@@ -3,6 +3,7 @@ import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import type { SecretTypeKey } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import SegmentedControl from "../../ui/atoms/SegmentedControl";
@@ -50,9 +51,12 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
           </p>
         </div>
         {vm.isNew ? null : (
-          <Button
+          <IconButton
             key={vm.secretId}
             tone="danger"
+            size="md"
+            path={mdiDeleteOutline}
+            label="Удалить"
             disabled={saving}
             needConfirm
             modalSetup={{
@@ -62,10 +66,7 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
               confirmLabel: "Удалить",
             }}
             onClick={onDelete}
-          >
-            <Icon path={mdiDeleteOutline} size={15} />
-            Удалить
-          </Button>
+          />
         )}
       </div>
 

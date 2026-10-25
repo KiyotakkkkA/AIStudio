@@ -1,10 +1,11 @@
-import { mdiFileDocumentOutline, mdiFolderOutline, mdiTrashCan } from "@mdi/js";
+import { mdiClose, mdiFileDocumentOutline, mdiFolderOutline, mdiStop, mdiTrashCan } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { plural } from "../connections/connectionPresentation";
 import { useRef, useState } from "react";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import SegmentedControl from "../../ui/atoms/SegmentedControl";
@@ -115,15 +116,16 @@ function VectorDocumentsPanel() {
                 {source.path}
                 {source.include.length > 0 ? ` · ${source.include.join(" ")}` : ""}
               </span>
-              <Button
+              <IconButton
                 tone="danger"
+                size="md"
+                path={mdiClose}
+                label="Удалить источник"
                 disabled={busy}
                 onClick={() => {
                   void store.removeSource(source.id);
                 }}
-              >
-                ✕
-              </Button>
+              />
             </span>
           ))
         )}
@@ -148,14 +150,15 @@ function VectorDocumentsPanel() {
           Полная переиндексация
         </Button>
         {run ? (
-          <Button
+          <IconButton
             tone="danger"
+            size="md"
+            path={mdiStop}
+            label="Остановить"
             onClick={() => {
               void store.cancelIndex();
             }}
-          >
-            Остановить
-          </Button>
+          />
         ) : null}
         <Chip>{store.documents.length} документов</Chip>
       </div>
@@ -252,8 +255,12 @@ function VectorDocumentsPanel() {
                         {formatBytes(document.bytes)} · {formatIndexedAt(document.indexedAt)}
                       </div>
                     </div>
-                    <Button
+                    <IconButton
                       tone="danger"
+                      size="md"
+                      path={mdiTrashCan}
+                      iconSize={16}
+                      label="Удалить документ"
                       disabled={busy}
                       needConfirm
                       modalSetup={{
@@ -265,9 +272,7 @@ function VectorDocumentsPanel() {
                       onClick={() => {
                         void store.removeDocument(document.id);
                       }}
-                    >
-                      <Icon path={mdiTrashCan} size={16} />
-                    </Button>
+                    />
                   </article>
                 );
               })}

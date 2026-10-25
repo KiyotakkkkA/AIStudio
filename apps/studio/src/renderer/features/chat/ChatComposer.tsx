@@ -5,11 +5,13 @@ import {
   mdiClose,
   mdiDatabaseOutline,
   mdiPaperclip,
+  mdiStop,
   mdiUpload,
   mdiWrenchOutline,
 } from "@mdi/js";
 import { Dropdown, InputCheckBox, Modal } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import SelectInput from "../../ui/atoms/SelectInput";
@@ -270,13 +272,14 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               </Dropdown.Menu>
             </Dropdown>
             {store.generating ? (
-              <Button
+              <IconButton
                 tone="danger"
+                size="md"
+                path={mdiStop}
+                label={store.stopping ? "Остановка…" : "Стоп"}
                 disabled={!store.run || store.stopping}
                 onClick={() => void store.stop()}
-              >
-                {store.stopping ? "Остановка…" : "Стоп"}
-              </Button>
+              />
             ) : (
               <Button type="submit" tone="primary" disabled={!store.canSend}>
                 Отправить

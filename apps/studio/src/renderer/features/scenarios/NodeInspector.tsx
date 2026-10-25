@@ -700,10 +700,13 @@ function SelectionActions({ editor }: { readonly editor: ScenarioEditor }) {
         Дублировать
       </Button>
       <span className="flex-1" />
-      <Button tone="danger" onClick={editor.deleteSelection}>
-        <Icon path={mdiDeleteOutline} size={15} />
-        Удалить
-      </Button>
+      <IconButton
+        tone="danger"
+        size="md"
+        path={mdiDeleteOutline}
+        label="Удалить"
+        onClick={editor.deleteSelection}
+      />
     </div>
   );
 }

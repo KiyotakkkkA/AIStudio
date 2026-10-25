@@ -1,9 +1,10 @@
 import { observer } from "mobx-react-lite";
-import { mdiHistory } from "@mdi/js";
+import { mdiHistory, mdiStop } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../../app/routes";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
 import EmptyState from "../../ui/molecules/EmptyState";
 import JsonBlock from "./JsonBlock";
@@ -126,13 +127,14 @@ export default observer(function TaskDetailRail({ store }: { readonly store: Tas
             >
               Полный журнал
             </Button>
-            <Button
+            <IconButton
               tone="danger"
+              size="md"
+              path={mdiStop}
+              label="Остановить"
               disabled={store.busyId !== null || run.finishedAt !== undefined}
               onClick={() => void store.stop(run.id)}
-            >
-              Остановить
-            </Button>
+            />
           </div>
         </ScrollArea>
       )}

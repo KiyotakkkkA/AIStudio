@@ -11,6 +11,7 @@ import { observer } from "mobx-react-lite";
 import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
 import { useEffect } from "react";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import Icon from "../../ui/atoms/Icon";
 import Toggle from "../../ui/atoms/Toggle";
@@ -167,9 +168,12 @@ function SkillsWorkspace() {
               </div>
               <div className="flex flex-none items-center gap-3 border-t border-line bg-main-900 px-4.5 py-3">
                 {form.isNew ? null : (
-                  <Button
+                  <IconButton
                     key={form.skillId}
                     tone="danger"
+                    size="md"
+                    path={mdiDeleteOutline}
+                    label="Удалить навык"
                     disabled={store.removing}
                     needConfirm
                     modalSetup={{
@@ -184,10 +188,7 @@ function SkillsWorkspace() {
                       confirmLabel: "Удалить",
                     }}
                     onClick={() => void store.removeSelected()}
-                  >
-                    <Icon path={mdiDeleteOutline} size={15} />
-                    Удалить
-                  </Button>
+                  />
                 )}
                 <span className="flex-1" />
                 <Button

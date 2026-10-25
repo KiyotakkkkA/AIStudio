@@ -1,7 +1,8 @@
 import { observer } from "mobx-react-lite";
-import { mdiTrayArrowDown } from "@mdi/js";
+import { mdiClose, mdiDeleteOutline, mdiTrayArrowDown } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
 import Toggle from "../../ui/atoms/Toggle";
 import EmptyState from "../../ui/molecules/EmptyState";
@@ -193,8 +194,11 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
             </Button>
           )}
           {item === null || !removable || (download !== null && pausable) ? null : (
-            <Button
+            <IconButton
               tone="danger"
+              size="md"
+              path={mdiDeleteOutline}
+              label="Удалить"
               disabled={busy}
               needConfirm
               modalSetup={{
@@ -203,9 +207,7 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
                 confirmLabel: "Удалить",
               }}
               onClick={() => void store.uninstall(item)}
-            >
-              Удалить
-            </Button>
+            />
           )}
           {download === null || !pausable ? null : (
             <Button
@@ -230,15 +232,16 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
             </Button>
           ) : null}
           {download === null || download.status === "succeeded" ? null : (
-            <Button
+            <IconButton
               tone="danger"
+              size="md"
+              path={mdiClose}
+              label="Отменить"
               disabled={busy}
               onClick={() => {
                 void store.cancel(download.id);
               }}
-            >
-              Отменить
-            </Button>
+            />
           )}
         </div>
       </ScrollArea>

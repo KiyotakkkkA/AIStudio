@@ -1,5 +1,7 @@
+import { mdiDeleteOutline } from "@mdi/js";
 import type { CatalogueItemDto } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
@@ -93,10 +95,12 @@ export default function CatalogueRow({
         <span className={STATUS_TONE_TEXT[tone]}>{STATE_LABELS[item.state]}</span>
       </Chip>
       {inFlight ? null : installed ? (
-        <Button
+        <IconButton
           tone="danger"
+          size="md"
+          path={mdiDeleteOutline}
+          label={removable ? "Удалить" : "Файл установлен не через этот каталог"}
           disabled={busy || !removable}
-          title={removable ? undefined : "Файл установлен не через этот каталог"}
           needConfirm
           modalSetup={{
             title: `Удалить «${item.displayName}»?`,
@@ -104,9 +108,7 @@ export default function CatalogueRow({
             confirmLabel: "Удалить",
           }}
           onClick={onRemove}
-        >
-          Удалить
-        </Button>
+        />
       ) : (
         <Button
           tone="secondary"

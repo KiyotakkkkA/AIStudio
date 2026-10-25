@@ -3,11 +3,12 @@ import {
   mdiChatOutline,
   mdiClockOutline,
   mdiFolderOutline,
+  mdiFolderRemoveOutline,
   mdiShieldCheckOutline,
 } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import type { FolderGrantDto } from "@zvs/shared";
-import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import InfoTable from "../../ui/molecules/InfoTable";
 import {
   REVOKE,
@@ -40,8 +41,11 @@ function FolderGrantDetail({ grant, now, revoking, onRevoke }: FolderGrantDetail
           </h2>
           <p className="mt-1 text-[12px] text-main-400">{scopeLabel(grant)}</p>
         </div>
-        <Button
+        <IconButton
           tone="danger"
+          size="md"
+          path={mdiFolderRemoveOutline}
+          label={REVOKE}
           disabled={revoking}
           needConfirm={true}
           modalSetup={{
@@ -50,9 +54,7 @@ function FolderGrantDetail({ grant, now, revoking, onRevoke }: FolderGrantDetail
             confirmLabel: REVOKE,
           }}
           onClick={onRevoke}
-        >
-          {REVOKE}
-        </Button>
+        />
       </div>
       <InfoTable
         label="Сведения о разрешении"

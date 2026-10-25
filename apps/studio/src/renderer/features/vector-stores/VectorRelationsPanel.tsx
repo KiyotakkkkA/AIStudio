@@ -4,6 +4,7 @@ import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import type { VectorDocumentDto } from "@zvs/shared";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import SelectInput from "../../ui/atoms/SelectInput";
@@ -181,8 +182,11 @@ function EdgeLine({ outgoing, relation, other, document, busy, onRemove }: EdgeL
       <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-main-300" title={other}>
         {other}
       </span>
-      <Button
+      <IconButton
         tone="danger"
+        size="md"
+        path={mdiTrashCan}
+        label="Удалить связь"
         disabled={busy}
         needConfirm
         modalSetup={{
@@ -192,9 +196,7 @@ function EdgeLine({ outgoing, relation, other, document, busy, onRemove }: EdgeL
           confirmLabel: "Удалить",
         }}
         onClick={onRemove}
-      >
-        <Icon path={mdiTrashCan} size={15} />
-      </Button>
+      />
     </div>
   );
 }

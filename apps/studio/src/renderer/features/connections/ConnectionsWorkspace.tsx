@@ -3,6 +3,7 @@ import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useEffect } from "react";
 import Button from "../../ui/atoms/buttons/Button";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
 import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import EmptyState from "../../ui/molecules/EmptyState";
@@ -86,9 +87,12 @@ function ConnectionsWorkspace() {
 
             <div className="flex flex-none items-center gap-3 rounded-card border border-line bg-main-900 px-4 py-3">
               {form.isNew ? null : (
-                <Button
+                <IconButton
                   key={form.serverId}
                   tone="danger"
+                  size="md"
+                  path={mdiDeleteOutline}
+                  label="Удалить сервер"
                   disabled={store.removing}
                   needConfirm
                   modalSetup={{
@@ -106,10 +110,7 @@ function ConnectionsWorkspace() {
                   onClick={() => {
                     void store.removeSelected();
                   }}
-                >
-                  <Icon path={mdiDeleteOutline} size={15} />
-                  Удалить
-                </Button>
+                />
               )}
               <span className="flex-1" />
               <Button

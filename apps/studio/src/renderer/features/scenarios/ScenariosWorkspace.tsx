@@ -275,9 +275,11 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
                   {tag}
                 </span>
               ))}
-              <Button
+              <IconButton
                 tone="danger"
-                aria-label="Удалить сценарий"
+                size="md"
+                path={mdiDeleteOutline}
+                label="Удалить сценарий"
                 disabled={store.removingId === scenario.id}
                 needConfirm
                 modalSetup={{
@@ -292,9 +294,7 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
                   confirmLabel: "Удалить",
                 }}
                 onClick={() => void store.remove(scenario.id)}
-              >
-                <Icon path={mdiDeleteOutline} size={15} />
-              </Button>
+              />
             </li>
           ))}
         </ul>

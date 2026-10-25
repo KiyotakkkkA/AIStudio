@@ -3,7 +3,7 @@ import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useEffect } from "react";
 import Button from "../../ui/atoms/buttons/Button";
-import Icon from "../../ui/atoms/Icon";
+import IconButton from "../../ui/atoms/buttons/IconButton";
 import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import EmptyState from "../../ui/molecules/EmptyState";
 import { useAppNavigation } from "../../hooks/useAppNavigation";
@@ -72,9 +72,12 @@ function ProvidersWorkspace() {
 
             <div className="flex flex-none items-center gap-3 rounded-card border border-line bg-main-900 px-4 py-3">
               {form.isNew ? null : (
-                <Button
+                <IconButton
                   key={form.providerId}
                   tone="danger"
+                  size="md"
+                  path={mdiDeleteOutline}
+                  label="Удалить подключение"
                   disabled={providers.removing}
                   needConfirm
                   modalSetup={{
@@ -95,10 +98,7 @@ function ProvidersWorkspace() {
                   onClick={() => {
                     void providers.removeSelected();
                   }}
-                >
-                  <Icon path={mdiDeleteOutline} size={15} />
-                  Удалить
-                </Button>
+                />
               )}
               <Button
                 tone="secondary"
