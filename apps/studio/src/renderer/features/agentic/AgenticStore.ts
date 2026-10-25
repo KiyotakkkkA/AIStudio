@@ -1,15 +1,16 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
-import type {
-  AgenticPermissionMode,
-  AgenticPlanEditDto,
-  AgenticSessionDto,
-  AgenticSessionId,
-  Contract,
-  HostEvent,
-  ProviderDto,
-  RunId,
-  StreamId,
+import {
+  ConversationId,
+  type AgenticPermissionMode,
+  type AgenticPlanEditDto,
+  type AgenticSessionDto,
+  type AgenticSessionId,
+  type Contract,
+  type HostEvent,
+  type ProviderDto,
+  type RunId,
+  type StreamId,
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import {
@@ -26,6 +27,8 @@ import {
   REMOVE_FAILED,
   STOP_FAILED,
 } from "./agenticCopy";
+import ExplorerStore from "../chat/explorer/ExplorerStore";
+import TerminalStore from "../terminal/TerminalStore";
 import SessionDraft from "./SessionDraft";
 import {
   applyEvent,
@@ -50,6 +53,7 @@ import {
 } from "./sessionModel";
 
 export type ApprovalAnswer = "once" | "always" | "deny";
+export type SessionPanel = "session" | "files";
 
 const FINISHED = new Set<AgenticSessionDto["status"]>([
   "completed",
@@ -83,6 +87,10 @@ export default class AgenticStore {
   planBusy = false;
   modeBusy = false;
   removingId: AgenticSessionId | null = null;
+  sidePanel: SessionPanel = "session";
+  panelOpen = true;
+  readonly explorer: ExplorerStore;
+  readonly terminal: TerminalStore;
 
   private detach: (() => void) | null = null;
   private listening: StreamId | null = null;
@@ -93,8 +101,10 @@ export default class AgenticStore {
 
   constructor(
     private readonly ipc: IpcClient<Contract>,
-    private readonly events: EventRouter | null,
+    private readonly events: EventRouter,
   ) {
+    this.explorer = new ExplorerStore(ipc, events);
+    this.terminal = new TerminalStore(ipc, events);
     makeAutoObservable<
       AgenticStore,
       "ipc" | "events" | "detach" | "listening" | "syncing" | "held" | "revision" | "mounted"
@@ -109,6 +119,8 @@ export default class AgenticStore {
         held: false,
         revision: false,
         mounted: false,
+        explorer: false,
+        terminal: false,
       },
       { autoBind: true },
     );
@@ -158,6 +170,50 @@ export default class AgenticStore {
     return model?.displayName && model.displayName.length > 0 ? model.displayName : session.modelId;
   }
 
+  get explorerOwner(): ConversationId | null {
+    const parsed = ConversationId.safeParse(this.activeId);
+    return parsed.success ? parsed.data : null;
+  }
+
+  get workingFolder(): string | null {
+    return this.session?.workspace ?? null;
+  }
+
+  get activePanel(): SessionPanel {
+    return this.sidePanel === "files" && this.workingFolder !== null ? "files" : "session";
+  }
+
+  isPanelShown(panel: SessionPanel): boolean {
+    return this.panelOpen && this.activePanel === panel;
+  }
+
+  showPanel(panel: SessionPanel): void {
+    if (this.activePanel === panel) {
+      this.panelOpen = !this.panelOpen;
+      return;
+    }
+    this.sidePanel = panel;
+    this.panelOpen = true;
+  }
+
+  closePanel(): void {
+    this.panelOpen = false;
+  }
+
+  async revealInExplorer(path: string): Promise<void> {
+    const owner = this.explorerOwner;
+    if (owner === null) return;
+    this.sidePanel = "files";
+    this.panelOpen = true;
+    await this.explorer.show(owner);
+    const parts = path.split("/").filter((part) => part.length > 0);
+    for (let depth = 1; depth < parts.length; depth += 1) {
+      const folder = parts.slice(0, depth).join("/");
+      if (!this.explorer.expanded.has(folder)) await this.explorer.toggle(folder);
+    }
+    this.explorer.focus(parts.join("/"));
+  }
+
   get canCreate(): boolean {
     return !this.creating && this.draft.input !== null;
   }
@@ -173,6 +229,8 @@ export default class AgenticStore {
 
   unmount(): void {
     this.mounted = false;
+    this.explorer.dispose();
+    this.terminal.dispose();
   }
 
   async load(): Promise<void> {
@@ -302,7 +360,6 @@ export default class AgenticStore {
   private listen(streamId: StreamId): void {
     if (this.listening === streamId) return;
     this.stopListening();
-    if (this.events === null) return;
     this.listening = streamId;
     this.detach = this.events.subscribe(streamId, this.receive);
   }
@@ -606,6 +663,8 @@ export default class AgenticStore {
   }
 
   dispose(): void {
+    this.explorer.dispose();
+    this.terminal.dispose();
     this.mounted = false;
     this.revision += 1;
     this.stopListening();

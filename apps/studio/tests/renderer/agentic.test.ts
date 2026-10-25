@@ -28,7 +28,9 @@ import {
   relativePath,
   renameEdit,
   replay,
+  sessionArtifacts,
   sessionPhase,
+  splitArtifacts,
   streamBlocks,
   type StreamState,
 } from "../../src/renderer/features/agentic/sessionModel.ts";
@@ -149,7 +151,11 @@ describe("session stream", () => {
       event(5, { type: "token", delta: "Готово", kind: "text" }),
     ]);
     expect(state.entries.map((entry) => entry.kind)).toEqual(["text", "tool", "text"]);
-    expect(state.entries[0]).toMatchObject({ kind: "text", text: "Читаю код" });
+    expect(state.entries[0]).toMatchObject({
+      kind: "text",
+      text: "Читаю код",
+      reasoning: "размышление",
+    });
     expect(state.entries[2]).toMatchObject({ kind: "text", text: "Готово" });
   });
 
@@ -221,6 +227,29 @@ describe("session stream", () => {
     ]);
     expect(result.session?.updatedAt).toBe(5);
     expect(result.state.entries).toHaveLength(1);
+  });
+});
+
+describe("artifacts", () => {
+  test("a declared section is cut from the text and its paths are collected", () => {
+    const split = splitArtifacts(
+      "Готово.\n\n<artifacts>\n- `docs/report.md`\n.\\out\\table.xlsx\n\ndocs/report.md\n</artifacts>\n",
+    );
+    expect(split.text).toBe("Готово.");
+    expect(split.paths).toEqual(["docs/report.md", "out/table.xlsx"]);
+  });
+
+  test("an unfinished section is hidden while it streams", () => {
+    expect(splitArtifacts("Итог\n<artifacts>\ndocs/a")).toEqual({ text: "Итог", paths: [] });
+  });
+
+  test("files declared in the text and in the summary are listed once", () => {
+    const state = fold([
+      event(1, { type: "token", delta: "<artifacts>\na.md\n</artifacts>", kind: "text" }),
+    ]);
+    expect(
+      sessionArtifacts(state.entries, "Сводка\n<artifacts>\na.md\nb.md\n</artifacts>"),
+    ).toEqual(["a.md", "b.md"]);
   });
 });
 
@@ -451,6 +480,37 @@ function rig(initial: AgenticSessionDto = session(), history: readonly HostEvent
     .handle("agentic.list", () => [current])
     .handle("agentic.get", () => current)
     .handle("providers.list", () => [])
+    .handle("workspace.list", ({ path }) => ({
+      path,
+      entries:
+        path === ""
+          ? [
+              {
+                name: "docs",
+                path: "docs",
+                kind: "folder",
+                size: 0,
+                modifiedAt: null,
+                ignored: false,
+              },
+            ]
+          : path === "docs"
+            ? [
+                {
+                  name: "report.md",
+                  path: "docs/report.md",
+                  kind: "file",
+                  size: 10,
+                  modifiedAt: null,
+                  ignored: false,
+                },
+              ]
+            : [],
+      truncated: false,
+    }))
+    .handle("workspace.watch", () => ({
+      streamId: "0199aa11-9999-7111-8111-111111111111" as StreamId,
+    }))
     .handle("runs.list", () => ({
       items: [
         RunSummaryDto.parse({
@@ -622,6 +682,20 @@ describe("agentic store", () => {
     await store.mount();
     expect(store.stream.approval?.id).toBe(APPROVAL);
     expect(calls("runs.detail")).toHaveLength(1);
+  });
+
+  test("the session panel toggles like the chat context panel and reveal opens the files", async () => {
+    const { store } = rig();
+    await store.mount();
+    expect(store.isPanelShown("session")).toBe(true);
+    store.showPanel("session");
+    expect(store.panelOpen).toBe(false);
+    store.showPanel("files");
+    expect(store.isPanelShown("files")).toBe(true);
+    await store.revealInExplorer("docs/report.md");
+    expect(store.explorer.expanded.has("docs")).toBe(true);
+    expect(store.explorer.focused).toBe("docs/report.md");
+    expect(store.explorer.rows.map((row) => row.entry.path)).toEqual(["docs", "docs/report.md"]);
   });
 
   test("a paused session is extended and its new run is followed", async () => {

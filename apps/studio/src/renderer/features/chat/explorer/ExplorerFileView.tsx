@@ -56,8 +56,10 @@ function PlainText({ text }: { readonly text: string }) {
 
 export default observer(function ExplorerFileView({
   explorer,
+  backLabel = BACK_TO_CHAT,
 }: {
   readonly explorer: ExplorerStore;
+  readonly backLabel?: string;
 }) {
   const [mode, setMode] = useState<Mode>("preview");
   const path = explorer.openPath;
@@ -103,7 +105,7 @@ export default observer(function ExplorerFileView({
       <div className="flex h-14 flex-none items-center gap-2 px-4">
         <span className="min-[1251px]:hidden">
           <IconButton
-            label={BACK_TO_CHAT}
+            label={backLabel}
             tooltip="bottom-center"
             path={mdiArrowLeft}
             iconSize={17}

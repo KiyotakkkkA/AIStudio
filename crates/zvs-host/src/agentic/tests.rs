@@ -19,8 +19,8 @@ use zvs_contract::{
 };
 
 use super::node::{
-    AGENTIC_DOMAIN, COMPLETE_TOOL, FINISH_TOOL, NO_TOOL_SUPPORT, NOT_THIS_RUN, PLAN_TOOL,
-    TOOL_NOT_OFFERED,
+    AGENTIC_DOMAIN, ARTIFACTS_RULES, COMPLETE_TOOL, FINISH_TOOL, NO_TOOL_SUPPORT, NOT_THIS_RUN,
+    PLAN_TOOL, TOOL_NOT_OFFERED,
 };
 use super::service::{
     BUDGET_NOT_ABOVE_USAGE, SESSION_FINISHED, SESSION_NOT_PAUSED, SESSION_RUNNING, TOOL_UNKNOWN,
@@ -512,6 +512,7 @@ async fn the_loop_plans_executes_observes_and_finishes_on_the_goal() {
     );
     let system = rig.driver.requests()[0].system.clone().unwrap_or_default();
     assert!(system.contains("update_plan"));
+    assert!(system.contains(ARTIFACTS_RULES));
     assert!(rig.sink.events().iter().any(|event| matches!(
         &event.body,
         HostEventDraft::Step { step } if step.get("domain") == Some(&json!(AGENTIC_DOMAIN))
@@ -758,6 +759,8 @@ async fn read_only_mode_offers_and_runs_only_reading_tools() {
     let offered = rig.offered_names(0);
     assert!(offered.contains(&READ_NAME.to_owned()));
     assert!(!offered.contains(&WRITE_NAME.to_owned()));
+    let system = rig.driver.requests()[0].system.clone().unwrap_or_default();
+    assert!(!system.contains(ARTIFACTS_RULES));
     assert!(rig.effects.writes().is_empty());
     assert_eq!(rig.effects.reads(), ["a.md"]);
 }
@@ -1093,6 +1096,17 @@ async fn paths_resolve_against_the_workspace_and_never_leave_it() {
         assert_eq!(refused.code, AppErrorCode::PermissionDenied);
         assert_eq!(refused.message, OUTSIDE_WORKSPACE);
     }
+    assert!(
+        rig.folders
+            .covered(&session.id.to_string(), &strip(&canonical))
+            .expect("coverage is known"),
+        "the workspace covers itself for the explorer"
+    );
+    assert!(
+        !rig.folders
+            .covered(&session.id.to_string(), outside.path())
+            .expect("coverage is known")
+    );
     assert_eq!(
         rig.folders
             .working_folder_of(&session.id.to_string())

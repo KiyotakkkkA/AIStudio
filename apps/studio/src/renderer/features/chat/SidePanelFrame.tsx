@@ -2,7 +2,11 @@ import type { ReactNode } from "react";
 import { observer } from "mobx-react-lite";
 import { mdiClose } from "@mdi/js";
 import IconButton from "../../ui/atoms/buttons/IconButton";
-import type ChatStore from "./ChatStore";
+
+export interface PanelHost {
+  readonly panelOpen: boolean;
+  closePanel(): void;
+}
 
 export default observer(function SidePanelFrame({
   store,
@@ -11,7 +15,7 @@ export default observer(function SidePanelFrame({
   actions,
   children,
 }: {
-  readonly store: ChatStore;
+  readonly store: PanelHost;
   readonly title: string;
   readonly titleHint?: string;
   readonly actions?: ReactNode;

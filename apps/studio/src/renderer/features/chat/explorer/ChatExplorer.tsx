@@ -14,12 +14,22 @@ import Button from "../../../ui/atoms/buttons/Button";
 import Icon from "../../../ui/atoms/Icon";
 import IconButton from "../../../ui/atoms/buttons/IconButton";
 import EmptyState from "../../../ui/molecules/EmptyState";
-import SidePanelFrame from "../SidePanelFrame";
-import type ChatStore from "../ChatStore";
+import SidePanelFrame, { type PanelHost } from "../SidePanelFrame";
+import type ExplorerStore from "./ExplorerStore";
 import { useStore } from "../../../stores/useStore";
 import { openEntry, viewedPath } from "./openEntry";
 import { RESTORE_FOLDER_ACCESS, folderName } from "../workingFolderCopy";
 import type { ExplorerRow } from "./ExplorerStore";
+import type { ConversationId } from "@zvs/shared";
+
+interface ExplorerHost extends PanelHost {
+  readonly explorer: ExplorerStore;
+  readonly explorerOwner: ConversationId | null;
+  readonly workingFolder: string | null;
+  readonly workingFolderAccess?: unknown;
+  readonly canChangeFolder?: boolean;
+  restoreFolderAccess?(): Promise<void>;
+}
 import {
   ACCESS_MISSING,
   ACCESS_MISSING_HINT,
@@ -54,7 +64,7 @@ const ExplorerRowView = observer(function ExplorerRowView({
   store,
   row,
 }: {
-  readonly store: ChatStore;
+  readonly store: ExplorerHost;
   readonly row: ExplorerRow;
 }) {
   const explorer = store.explorer;
@@ -105,10 +115,10 @@ const ExplorerRowView = observer(function ExplorerRowView({
   );
 });
 
-export default observer(function ChatExplorer({ store }: { readonly store: ChatStore }) {
+export default observer(function ChatExplorer({ store }: { readonly store: ExplorerHost }) {
   const explorer = store.explorer;
   const { viewer } = useStore();
-  const conversationId = store.active?.id ?? null;
+  const conversationId = store.explorerOwner;
   const folder = store.workingFolder;
   const access = store.workingFolderAccess;
 
@@ -166,12 +176,14 @@ export default observer(function ChatExplorer({ store }: { readonly store: ChatS
             title={ACCESS_MISSING}
             description={ACCESS_MISSING_HINT}
             action={
-              <Button
-                disabled={!store.canChangeFolder}
-                onClick={() => void store.restoreFolderAccess()}
-              >
-                {RESTORE_FOLDER_ACCESS}
-              </Button>
+              store.restoreFolderAccess === undefined ? undefined : (
+                <Button
+                  disabled={store.canChangeFolder === false}
+                  onClick={() => void store.restoreFolderAccess?.()}
+                >
+                  {RESTORE_FOLDER_ACCESS}
+                </Button>
+              )
             }
           />
         </div>

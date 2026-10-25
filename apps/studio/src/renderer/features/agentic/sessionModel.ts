@@ -22,7 +22,12 @@ const AGENTIC_DOMAIN = "agentic";
 const CALL_PREFIX = "session.";
 
 export type StreamEntry =
-  | { readonly kind: "text"; readonly id: string; readonly text: string }
+  | {
+      readonly kind: "text";
+      readonly id: string;
+      readonly text: string;
+      readonly reasoning: string;
+    }
   | { readonly kind: "tool"; readonly id: string; readonly step: RunStep };
 
 export interface SessionApproval {
@@ -92,13 +97,24 @@ function upsertTool(entries: readonly StreamEntry[], step: RunStep): StreamEntry
   return entries.map((current, position) => (position === index ? entry : current));
 }
 
-function appendText(state: StreamState, id: string, delta: string): StreamState {
+function appendText(
+  state: StreamState,
+  id: string,
+  delta: string,
+  field: "text" | "reasoning",
+): StreamState {
   const last = state.entries.at(-1);
   if (state.open !== null && last?.kind === "text" && last.id === state.open) {
-    const entries = [...state.entries.slice(0, -1), { ...last, text: last.text + delta }];
+    const entries = [...state.entries.slice(0, -1), { ...last, [field]: last[field] + delta }];
     return { ...state, entries };
   }
-  return { ...state, entries: [...state.entries, { kind: "text", id, text: delta }], open: id };
+  const entry: StreamEntry = {
+    kind: "text",
+    id,
+    text: field === "text" ? delta : "",
+    reasoning: field === "reasoning" ? delta : "",
+  };
+  return { ...state, entries: [...state.entries, entry], open: id };
 }
 
 export function applyEvent(state: StreamState, event: HostEvent): StreamUpdate {
@@ -107,11 +123,14 @@ export function applyEvent(state: StreamState, event: HostEvent): StreamUpdate {
   const next: StreamState = { ...state, seqs: { ...state.seqs, [event.streamId]: event.seq } };
   switch (event.type) {
     case "token":
-      if (event.kind === "reasoning" || event.delta.length === 0) {
-        return { state: next, session: null, ended: false };
-      }
+      if (event.delta.length === 0) return { state: next, session: null, ended: false };
       return {
-        state: appendText(next, `${event.streamId}:${String(event.seq)}`, event.delta),
+        state: appendText(
+          next,
+          `${event.streamId}:${String(event.seq)}`,
+          event.delta,
+          event.kind === "reasoning" ? "reasoning" : "text",
+        ),
         session: null,
         ended: false,
       };
@@ -349,7 +368,12 @@ export function relativePath(path: string, workspace: string): string {
 }
 
 export type StreamBlock =
-  | { readonly kind: "text"; readonly id: string; readonly text: string }
+  | {
+      readonly kind: "text";
+      readonly id: string;
+      readonly text: string;
+      readonly reasoning: string;
+    }
   | { readonly kind: "tools"; readonly id: string; readonly steps: readonly RunStep[] };
 
 export function streamBlocks(entries: readonly StreamEntry[]): StreamBlock[] {
@@ -367,6 +391,55 @@ export function streamBlocks(entries: readonly StreamEntry[]): StreamBlock[] {
     }
   }
   return blocks;
+}
+
+const ARTIFACTS_SECTION = /<artifacts>([\s\S]*?)<\/artifacts>/giu;
+const OPEN_ARTIFACTS = /<artifacts>[\s\S]*$/iu;
+
+export interface ArtifactSplit {
+  readonly text: string;
+  readonly paths: readonly string[];
+}
+
+function artifactPath(line: string): string | null {
+  const path = line
+    .trim()
+    .replace(/^[-*•]\s+/u, "")
+    .replace(/^`(.*)`$/u, "$1")
+    .trim()
+    .replaceAll("\\", "/")
+    .replace(/^\.\//u, "");
+  return path.length === 0 ? null : path;
+}
+
+export function splitArtifacts(text: string): ArtifactSplit {
+  const paths: string[] = [];
+  const stripped = text
+    .replace(ARTIFACTS_SECTION, (_, body: string) => {
+      for (const line of body.split("\n")) {
+        const path = artifactPath(line);
+        if (path !== null && !paths.includes(path)) paths.push(path);
+      }
+      return "";
+    })
+    .replace(OPEN_ARTIFACTS, "")
+    .trim();
+  return { text: stripped, paths };
+}
+
+export function sessionArtifacts(
+  entries: readonly StreamEntry[],
+  summary: string | null,
+): string[] {
+  const paths: string[] = [];
+  const sources = [
+    ...entries.flatMap((entry) => (entry.kind === "text" ? [entry.text] : [])),
+    ...(summary === null ? [] : [summary]),
+  ];
+  for (const source of sources) {
+    for (const path of splitArtifacts(source).paths) if (!paths.includes(path)) paths.push(path);
+  }
+  return paths;
 }
 
 export function runningCall(entries: readonly StreamEntry[]): RunStep | null {

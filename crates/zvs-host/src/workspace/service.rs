@@ -267,6 +267,10 @@ impl FolderAccessService {
     }
 
     pub fn covered(&self, conversation_id: &str, folder: &Path) -> Result<bool, AppError> {
+        if let Owner::Session(workspace) = self.owner(conversation_id)? {
+            let workspace = canonical(&workspace).unwrap_or(workspace);
+            return Ok(covers(&workspace, folder));
+        }
         self.covering(conversation_id, folder)
             .map(|grant| grant.is_some())
     }

@@ -36,32 +36,7 @@ import { useFx, useTransition } from "../../ui/motion/fx";
 import { toolTitle } from "./toolCallCopy";
 import { SHOW_CONVERSATIONS } from "./conversationListCopy";
 import Alert from "../../ui/molecules/Alert";
-
-function PanelButton({
-  label,
-  path,
-  active,
-  activeClassName = "bg-main-700 text-main-50",
-  onClick,
-}: {
-  readonly label: string;
-  readonly path: string;
-  readonly active: boolean;
-  readonly activeClassName?: string;
-  readonly onClick: () => void;
-}) {
-  return (
-    <IconButton
-      label={label}
-      tooltip="bottom-center"
-      aria-pressed={active}
-      path={path}
-      iconSize={16}
-      onClick={onClick}
-      {...(active ? { toneClassName: activeClassName } : {})}
-    />
-  );
-}
+import PanelButton from "./PanelButton";
 
 export default observer(function ChatThread({ store }: { readonly store: ChatStore }) {
   const viewport = useRef<HTMLDivElement>(null);

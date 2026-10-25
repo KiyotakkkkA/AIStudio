@@ -5,10 +5,11 @@ import type {
   VectorStoreDto,
   VectorStoreId,
 } from "@zvs/shared";
-import { Accordion, ScrollArea, SlidedPanel, Tabs } from "@kiyotakkkka/zvs-uikit-lib";
-import { mdiFileEyeOutline, mdiThoughtBubbleOutline } from "@mdi/js";
+import { ScrollArea, SlidedPanel, Tabs } from "@kiyotakkkka/zvs-uikit-lib";
+import { mdiFileEyeOutline } from "@mdi/js";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import ChatMarkdown from "./ChatMarkdown";
+import ReasoningBlock from "./ReasoningBlock";
 import ChatSources from "./ChatSources";
 import {
   OPEN_CITATION,
@@ -23,7 +24,6 @@ import { excerptPreview } from "./selectionCopy";
 import { useStore } from "../../stores/useStore";
 import MessageActions from "../../ui/molecules/MessageActions";
 import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
-import Icon from "../../ui/atoms/Icon";
 import GenerationStatus from "../../ui/molecules/GenerationStatus";
 
 export default function ChatMessage({
@@ -84,31 +84,7 @@ export default function ChatMessage({
       <AssistantAvatar size={28} live={generating} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <div className="space-y-3">
-          {reasoning && (
-            <Accordion className="rounded-card bg-main-800">
-              <Accordion.Summary className="min-h-9.5 gap-2.5 rounded-card px-3 py-1.5 text-[12px] font-medium text-main-300 transition-colors hover:text-main-50">
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <span
-                    aria-hidden="true"
-                    className="flex size-6 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-accent-medium"
-                  >
-                    <Icon path={mdiThoughtBubbleOutline} size={14} />
-                  </span>
-                  <span className={`truncate ${thinking ? "zvs-shimmer-text" : ""}`}>
-                    {thinking ? "Размышления…" : "Размышления"}
-                  </span>
-                  <span className="shrink-0 font-mono text-[11px] font-normal text-main-500 tabular-nums">
-                    {reasoningWords(reasoning)} сл.
-                  </span>
-                </span>
-              </Accordion.Summary>
-              <Accordion.Content className="border-transparent px-3 pt-1 pb-3">
-                <ScrollArea className="max-h-80 border-l-2 border-accent-line pr-1 pl-3 text-[12.5px]/relaxed whitespace-pre-wrap text-main-400">
-                  {reasoning}
-                </ScrollArea>
-              </Accordion.Content>
-            </Accordion>
-          )}
+          {reasoning && <ReasoningBlock reasoning={reasoning} thinking={thinking} />}
           {tools}
           <ChatMarkdown
             content={content}
@@ -253,10 +229,6 @@ export default function ChatMessage({
 
 const SELECTIONS_KEY = "selections";
 const SELECTION_EXCERPT = 600;
-
-function reasoningWords(reasoning: string): number {
-  return reasoning.split(/\s+/u).filter(Boolean).length;
-}
 
 function citationPlace(citation: ChatCitationDto): string {
   return [

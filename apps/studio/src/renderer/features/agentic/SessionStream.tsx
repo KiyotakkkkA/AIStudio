@@ -3,13 +3,13 @@ import { observer } from "mobx-react-lite";
 import { mdiShieldAlertOutline } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { AGENTIC_INSTRUCTION_MAX } from "@zvs/shared";
-import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
 import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import GenerationStatus from "../../ui/molecules/GenerationStatus";
 import TextComposer from "../../ui/molecules/TextComposer";
 import ChatMarkdown from "../chat/ChatMarkdown";
 import ChatToolCalls from "../chat/ChatToolCalls";
+import ReasoningBlock from "../chat/ReasoningBlock";
 import FileChangeList from "../chat/FileChangeList";
 import { commandLine } from "../chat/processCopy";
 import { toolTitle } from "../chat/toolCallCopy";
@@ -34,7 +34,8 @@ import {
   SUMMARY_TITLE,
 } from "./agenticCopy";
 import type AgenticStore from "./AgenticStore";
-import { streamBlocks, type SessionApproval } from "./sessionModel";
+import SessionArtifacts from "./SessionArtifacts";
+import { splitArtifacts, streamBlocks, type SessionApproval } from "./sessionModel";
 import { callOf } from "./toolCardModel";
 
 function Eyebrow({ children }: { readonly children: string }) {
@@ -112,13 +113,14 @@ const Outcome = observer(function Outcome({ store }: { readonly store: AgenticSt
   const phase = store.phase;
   if (session === null || phase === null) return null;
   if (phase === "completed") {
+    const summary = session.summary === null ? "" : splitArtifacts(session.summary).text;
     return (
       <div className="rounded-card bg-ok-soft px-4 py-3">
         <Eyebrow>{SUMMARY_TITLE}</Eyebrow>
-        {session.summary === null ? (
+        {summary.length === 0 ? (
           <p className="m-0 text-[13px] text-main-100">{STOP_REASON_COPY.goal}</p>
         ) : (
-          <ChatMarkdown content={session.summary} />
+          <ChatMarkdown content={summary} />
         )}
       </div>
     );
@@ -166,6 +168,27 @@ const Outcome = observer(function Outcome({ store }: { readonly store: AgenticSt
     />
   ) : null;
 });
+
+function AgentText({
+  text,
+  reasoning,
+  streaming,
+}: {
+  readonly text: string;
+  readonly reasoning: string;
+  readonly streaming: boolean;
+}) {
+  const content = splitArtifacts(text).text;
+  if (content.length === 0 && reasoning.trim().length === 0) return null;
+  return (
+    <div className="min-w-0 space-y-3">
+      {reasoning.trim().length === 0 ? null : (
+        <ReasoningBlock reasoning={reasoning} thinking={streaming && content.length === 0} />
+      )}
+      {content.length === 0 ? null : <ChatMarkdown content={content} streaming={streaming} />}
+    </div>
+  );
+}
 
 const Composer = observer(function Composer({ store }: { readonly store: AgenticStore }) {
   const session = store.session;
@@ -227,7 +250,6 @@ export default observer(function SessionStream({ store }: { readonly store: Agen
   }, []);
   if (session === null) return null;
   const live = session.status === "running";
-  const lastText = entries.at(-1)?.id;
   return (
     <section aria-label={STREAM_TITLE} className="flex min-h-0 min-w-0 flex-1 flex-col">
       <ScrollArea
@@ -261,21 +283,17 @@ export default observer(function SessionStream({ store }: { readonly store: Agen
                   calls={entry.steps.map((step) => callOf(step, store.stream.approval))}
                 />
               </div>
-            ) : entry.text.trim().length === 0 ? null : (
-              <div key={entry.id} className="flex gap-3">
-                <AssistantAvatar
-                  size={24}
-                  live={live && entry.id === lastText && store.stream.open === entry.id}
-                  className="mt-0.5"
-                />
-                <ChatMarkdown
-                  content={entry.text}
-                  streaming={live && store.stream.open === entry.id}
-                />
-              </div>
+            ) : (
+              <AgentText
+                key={entry.id}
+                text={entry.text}
+                reasoning={entry.reasoning}
+                streaming={live && store.stream.open === entry.id}
+              />
             ),
           )}
           {store.streamLoaded ? <Outcome store={store} /> : null}
+          <SessionArtifacts store={store} />
         </div>
       </ScrollArea>
       <div className="flex-none px-6 pb-5">

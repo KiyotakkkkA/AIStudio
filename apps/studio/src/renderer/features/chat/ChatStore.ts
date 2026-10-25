@@ -195,6 +195,9 @@ export default class ChatStore {
   get workingFolder() {
     return this.active?.workingFolder ?? null;
   }
+  get explorerOwner() {
+    return this.active?.id ?? null;
+  }
   get workingFolderAccess() {
     return this.active?.workingFolderAccess ?? null;
   }

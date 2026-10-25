@@ -10,6 +10,7 @@ export const START_SESSION = "Запустить";
 export const STOP_SESSION = "Остановить";
 export const REMOVE_SESSION = "Удалить";
 export const BACK_TO_LIST = "К списку сессий";
+export const BACK_TO_SESSION = "Назад к сессии";
 export const EXTEND_SESSION = "Продлить";
 
 export const LOAD_FAILED = "Не удалось загрузить сессии.";

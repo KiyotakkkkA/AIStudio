@@ -48,6 +48,7 @@ pub const FINISH_DESCRIPTION: &str =
     "Завершить сессию, когда цель достигнута. В summary — итог для пользователя.";
 pub const AGENT_RULES: &str = "You are an agent working toward the user's goal in a workspace folder. Work in steps. First call update_plan with a short ordered plan. Then carry out the steps one at a time with the tools offered. When a step is done, call complete_step with a one-line summary of what it produced. When what you learn changes the remaining work, revise it with update_plan. When the goal is reached, call finish with a summary for the user. Messages that start with \"Plan changed by the user\" or \"Instruction from the user\" come from the user: follow them, and never add back a step the user removed. Every tool call is checked by the host against the permission model; a refused or denied call is final, so choose another way or finish.";
 pub const READ_ONLY_RULES: &str = "This session is read-only: only tools that read are offered. Do not attempt to change files or run programs.";
+pub const ARTIFACTS_RULES: &str = "Declare every file you created for the user in an <artifacts> section of your final summary: the opening tag <artifacts> on its own line, then one workspace-relative path per line, then the closing tag </artifacts> on its own line. List only files that exist in the workspace when you finish; leave the section out when you created none. Do not describe the files inside the section.";
 pub const ASK_RULES: &str = "The user approves every action that changes something before it runs.";
 pub const NO_STEP_RUNNING: &str = "No plan step is in progress. Call update_plan first.";
 pub const PLAN_EMPTY: &str = "The plan must list at least one step that is not yet done.";
@@ -233,8 +234,8 @@ fn system_prompt(offered: &[OfferedTool], mode: AgenticPermissionMode) -> String
     let mut parts = vec![AGENT_RULES, TOOL_RESULTS_INSTRUCTION];
     match mode {
         AgenticPermissionMode::ReadOnly => parts.push(READ_ONLY_RULES),
-        AgenticPermissionMode::Ask => parts.push(ASK_RULES),
-        AgenticPermissionMode::Auto => {}
+        AgenticPermissionMode::Ask => parts.extend([ASK_RULES, ARTIFACTS_RULES]),
+        AgenticPermissionMode::Auto => parts.push(ARTIFACTS_RULES),
     }
     if offered
         .iter()

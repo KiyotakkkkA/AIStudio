@@ -55,6 +55,7 @@ export default class ExplorerStore {
   viewWidth = VIEW_WIDTH_DEFAULT;
   private streamId: StreamId | null = null;
   private stop: (() => void) | undefined;
+  private showing: Promise<void> | null = null;
   private generation = 0;
   private fileGeneration = 0;
 
@@ -64,7 +65,7 @@ export default class ExplorerStore {
   ) {
     makeAutoObservable<
       ExplorerStore,
-      "ipc" | "events" | "streamId" | "stop" | "generation" | "fileGeneration"
+      "ipc" | "events" | "streamId" | "stop" | "showing" | "generation" | "fileGeneration"
     >(
       this,
       {
@@ -72,6 +73,7 @@ export default class ExplorerStore {
         events: false,
         streamId: false,
         stop: false,
+        showing: false,
         generation: false,
         fileGeneration: false,
       },
@@ -123,15 +125,25 @@ export default class ExplorerStore {
 
   async show(conversationId: ConversationId) {
     if (this.conversationId === conversationId && this.streamId !== null) return;
+    if (this.conversationId === conversationId && this.showing !== null) return this.showing;
     this.hide();
     this.conversationId = conversationId;
     const generation = this.generation;
-    await this.load("");
-    if (generation !== this.generation || this.root !== "ready") return;
-    await this.watch(generation);
+    const showing = (async () => {
+      await this.load("");
+      if (generation !== this.generation || this.root !== "ready") return;
+      await this.watch(generation);
+    })();
+    this.showing = showing;
+    try {
+      await showing;
+    } finally {
+      if (this.showing === showing) this.showing = null;
+    }
   }
 
   hide() {
+    this.showing = null;
     this.generation += 1;
     this.fileGeneration += 1;
     this.stop?.();

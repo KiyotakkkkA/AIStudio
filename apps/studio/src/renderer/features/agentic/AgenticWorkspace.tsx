@@ -1,6 +1,15 @@
 import { useEffect } from "react";
 import { observer } from "mobx-react-lite";
-import { mdiArrowLeft, mdiCreationOutline, mdiDeleteOutline, mdiPlus, mdiStop } from "@mdi/js";
+import {
+  mdiArrowLeft,
+  mdiConsole,
+  mdiCreationOutline,
+  mdiDeleteOutline,
+  mdiFolderOutline,
+  mdiPlus,
+  mdiStop,
+  mdiTuneVariant,
+} from "@mdi/js";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
@@ -11,8 +20,16 @@ import EmptyState from "../../ui/molecules/EmptyState";
 import PageHeader from "../../ui/organisms/PageHeader";
 import { useStore } from "../../stores/useStore";
 import { formatLastUsed } from "../tools/toolPresentation";
+import PanelButton from "../chat/PanelButton";
+import ChatExplorer from "../chat/explorer/ChatExplorer";
+import ExplorerFileView from "../chat/explorer/ExplorerFileView";
+import { FILES_PANEL, PANEL_GROUP_LABEL } from "../chat/explorer/explorerCopy";
+import TerminalDock from "../terminal/TerminalDock";
+import { TERMINAL_PANEL } from "../terminal/terminalCopy";
+import ViewerDock from "../../viewer/ViewerDock";
 import {
   BACK_TO_LIST,
+  BACK_TO_SESSION,
   EMPTY_DESCRIPTION,
   EMPTY_TITLE,
   LOADING,
@@ -23,6 +40,7 @@ import {
   progressLabel,
   REMOVE_SESSION,
   removeLead,
+  SESSION_TITLE,
   sessionsWord,
   STOP_SESSION,
 } from "./agenticCopy";
@@ -161,6 +179,37 @@ const SessionHeader = observer(function SessionHeader({ store }: { readonly stor
           : ""}
       </span>
       <span className="flex-1" />
+      <div
+        role="group"
+        aria-label={PANEL_GROUP_LABEL}
+        className="flex flex-none items-center gap-0.5 rounded-control bg-main-800 p-0.5"
+      >
+        <PanelButton
+          label={SESSION_TITLE}
+          path={mdiTuneVariant}
+          active={store.isPanelShown("session")}
+          onClick={() => store.showPanel("session")}
+        />
+        <PanelButton
+          label={FILES_PANEL}
+          path={mdiFolderOutline}
+          active={store.isPanelShown("files")}
+          onClick={() => store.showPanel("files")}
+        />
+      </div>
+      <div
+        role="group"
+        aria-label={PANEL_GROUP_LABEL}
+        className="flex flex-none items-center gap-0.5 rounded-control bg-main-800 p-0.5"
+      >
+        <PanelButton
+          label={TERMINAL_PANEL}
+          path={mdiConsole}
+          active={store.terminal.open}
+          activeClassName="bg-accent-soft text-accent-medium hover:bg-accent-soft hover:text-accent-light"
+          onClick={() => void store.terminal.toggle()}
+        />
+      </div>
       {isFinished(session) ? (
         <Button
           tone="danger"
@@ -195,6 +244,11 @@ const SessionHeader = observer(function SessionHeader({ store }: { readonly stor
 });
 
 const SessionView = observer(function SessionView({ store }: { readonly store: AgenticStore }) {
+  const { viewer } = useStore();
+  const owner = store.explorerOwner;
+  useEffect(() => {
+    void store.terminal.show(owner);
+  }, [store, owner]);
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <SessionHeader store={store} />
@@ -204,10 +258,24 @@ const SessionView = observer(function SessionView({ store }: { readonly store: A
           {LOADING}
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <PlanColumn store={store} />
-          <SessionStream store={store} />
-          <ContextRail store={store} />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <SessionStream store={store} />
+            <TerminalDock store={store.terminal} available={store.session !== null} />
+          </div>
+          {viewer.isOpen ? (
+            <ViewerDock />
+          ) : store.isPanelShown("files") ? (
+            <ExplorerFileView explorer={store.explorer} backLabel={BACK_TO_SESSION} />
+          ) : null}
+          {store.activePanel === "files" ? (
+            <div className={store.panelOpen ? "flex border-l border-line" : "hidden"}>
+              <ChatExplorer store={store} />
+            </div>
+          ) : store.panelOpen ? (
+            <ContextRail store={store} />
+          ) : null}
         </div>
       )}
     </div>
