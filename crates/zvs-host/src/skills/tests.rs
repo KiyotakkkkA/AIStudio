@@ -18,7 +18,7 @@ use zvs_contract::{
 };
 
 use super::bundled::is_newer;
-use super::library::{SKILL_FILE_NOT_FOUND, SKILL_UP_TO_DATE};
+use super::library::{SKILL_BUNDLED_PROTECTED, SKILL_FILE_NOT_FOUND, SKILL_UP_TO_DATE};
 use super::manifest::SKILL_FILE;
 use super::*;
 use crate::data::Repositories;
@@ -1171,7 +1171,14 @@ fn a_bundled_key_already_taken_by_the_user_is_left_alone() {
     };
     host.service.create(&mine).expect("creates");
     let installed = host.service.library().install_bundled().expect("installs");
-    assert_eq!(installed, ["docx", "xlsx"]);
+    assert_eq!(
+        installed,
+        BUNDLED_SKILLS
+            .iter()
+            .map(|skill| skill.key)
+            .filter(|key| *key != "pdf")
+            .collect::<Vec<_>>()
+    );
     let pdf = host
         .service
         .library()
@@ -1503,4 +1510,121 @@ fn a_user_skill_sharing_a_bundled_key_is_never_offered_an_update() {
             .code,
         AppErrorCode::Conflict
     );
+}
+
+fn authored(key: &str) -> AuthoredSkill {
+    AuthoredSkill {
+        key: key.to_owned(),
+        name: "Отчёт о провайдерах".to_owned(),
+        description: "Составляет отчёт о состоянии провайдеров".to_owned(),
+        instructions: "# Отчёт\n\nПеречислите провайдеров.".to_owned(),
+        allowed_tools: vec!["demo.lookup".to_owned()],
+        files: vec![(
+            "references/format.md".to_owned(),
+            "Таблица: провайдер, состояние.".to_owned(),
+        )],
+        ..AuthoredSkill::default()
+    }
+}
+
+#[test]
+fn skill_save_is_a_destructive_tool_that_asks_before_every_call() {
+    let host = host();
+    let tool = host
+        .tools
+        .list(&zvs_contract::ToolListFilter::default())
+        .expect("lists")
+        .into_iter()
+        .find(|tool| tool.key == SKILL_SAVE)
+        .expect("skill.save is registered");
+    assert!(tool.destructive);
+    assert!(!tool.read_only);
+    assert_eq!(tool.tier, ToolTier::Ask);
+    assert!(!SKILL_TOOLS.contains(&SKILL_SAVE));
+}
+
+#[test]
+fn an_authored_skill_is_saved_as_a_local_versioned_skill_with_its_files() {
+    let host = host();
+    let library = host.service.library();
+    let saved = library.author(&authored("provider-report")).expect("saves");
+    assert_eq!(saved.skill.source, SkillSource::Local);
+    assert_eq!(saved.skill.status, SkillStatus::Ready);
+    assert_eq!(saved.skill.version.as_deref(), Some("1.0.0"));
+    assert!(saved.skill.enabled);
+    assert_eq!(saved.skill.name, "Отчёт о провайдерах");
+    assert_eq!(saved.instructions, "# Отчёт\n\nПеречислите провайдеров.");
+    assert_eq!(
+        saved
+            .files
+            .iter()
+            .map(|file| file.path.as_str())
+            .collect::<Vec<_>>(),
+        ["references/format.md"]
+    );
+    let manifest = fs::read_to_string(
+        host.workspace
+            .join(SKILLS_DIR)
+            .join("provider-report")
+            .join(SKILL_FILE),
+    )
+    .expect("reads the manifest");
+    assert!(manifest.contains("version: \"1.0.0\""));
+
+    let error = library
+        .author(&authored("provider-report"))
+        .expect_err("the key is taken");
+    assert_eq!(issues_of(&error), [issue("key", SkillIssueRule::Duplicate)]);
+
+    let replaced = library
+        .author(&AuthoredSkill {
+            replace: true,
+            version: Some("1.1.0".to_owned()),
+            files: Vec::new(),
+            ..authored("provider-report")
+        })
+        .expect("replaces");
+    assert_eq!(replaced.skill.id, saved.skill.id);
+    assert_eq!(replaced.skill.version.as_deref(), Some("1.1.0"));
+    assert!(replaced.files.is_empty());
+}
+
+#[test]
+fn an_authored_skill_never_overwrites_a_bundled_one_or_names_unknown_tools() {
+    let host = host();
+    let library = host.service.library();
+    library.install_bundled().expect("installs");
+    let error = library
+        .author(&AuthoredSkill {
+            replace: true,
+            ..authored("pdf")
+        })
+        .expect_err("bundled skills are protected");
+    assert_eq!(error.code, AppErrorCode::Conflict);
+    assert_eq!(error.message, SKILL_BUNDLED_PROTECTED);
+
+    let error = library
+        .author(&AuthoredSkill {
+            allowed_tools: vec!["demo.lookup".to_owned(), "web.nowhere".to_owned()],
+            ..authored("provider-report")
+        })
+        .expect_err("an unknown tool is refused");
+    assert_eq!(
+        issues_of(&error),
+        [issue("allowedTools.1", SkillIssueRule::UnknownTool)]
+    );
+    let explained = nodes::explained(error);
+    assert!(
+        explained
+            .message
+            .ends_with(": allowedTools.1 (unknownTool)")
+    );
+
+    let error = library
+        .author(&AuthoredSkill {
+            files: vec![("notes.md".to_owned(), "x".to_owned())],
+            ..authored("provider-report")
+        })
+        .expect_err("a file outside the skill folders is refused");
+    assert_eq!(issues_of(&error), [issue("files.0", SkillIssueRule::Path)]);
 }

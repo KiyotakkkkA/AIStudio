@@ -188,6 +188,7 @@ export function toolCallView(
     }
     case "skill.load":
     case "skill.read":
+    case "skill.save":
     case "skill.script": {
       const skill = text(args, "key");
       if (skill === null) return null;

@@ -4,12 +4,17 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use zvs_contract::skills::{
+    SKILL_DESCRIPTION_MAX, SKILL_FILES_MAX, SKILL_INSTRUCTIONS_MAX, SKILL_KEY_MAX, SKILL_NAME_MAX,
+    SKILL_PATH_MAX, SKILL_VERSION_MAX,
+};
 use zvs_contract::validate::check;
 use zvs_contract::{
-    AppError, AppErrorCode, ChatToolCallStatus, ToolMode, ToolTier, Validate, resolve_tool_mode,
+    AppError, AppErrorCode, ChatToolCallStatus, SkillIssueDto, ToolMode, ToolTier, Validate,
+    resolve_tool_mode,
 };
 
-use super::library::SkillLibrary;
+use super::library::{AuthoredSkill, SkillLibrary};
 use super::script::{SKILL_SCRIPT, SkillScriptNode, SkillScriptOptions};
 use crate::drivers::ai::{ChatMessage, GenerateRequest, with_injected_tools};
 use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateRole};
@@ -23,9 +28,11 @@ use crate::services::chat_tools::{
 pub const SKILL_LOAD: &str = "skill.load";
 pub const SKILL_READ: &str = "skill.read";
 pub const SKILL_GENERATE: &str = "skill.generate";
+pub const SKILL_SAVE: &str = "skill.save";
 pub const SKILL_TOOLS: [&str; 3] = [SKILL_LOAD, SKILL_READ, SKILL_SCRIPT];
 
 pub const LOAD_DESCRIPTION: &str = "Загрузка навыка по идентификатору из списка навыков в системном сообщении. Возвращает инструкции навыка и перечень его файлов; при выполнении запроса следуйте этим инструкциям. Вызывайте только для навыка, который соответствует запросу.";
+pub const SAVE_DESCRIPTION: &str = "Сохранение навыка в библиотеку навыков пользователя: идентификатор, название, описание, по которому навык выбирается, инструкции в Markdown и текстовые файлы в папках references/, scripts/ и assets/. Навык с тем же идентификатором перезаписывается только при replace: true, встроенные навыки не перезаписываются. Каждый вызов подтверждает пользователь. Возвращает состояние навыка и найденные ошибки.";
 pub const READ_DESCRIPTION: &str = "Чтение файла навыка из папок references/, scripts/ или assets/ по идентификатору навыка и пути из результата skill.load. Текстовый файл возвращается целиком, для двоичного сообщается только размер.";
 
 pub const NO_PROVIDERS: &str = "Сервис провайдеров недоступен";
@@ -108,8 +115,158 @@ impl Validate for SkillReadOutput {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillSaveFile {
+    #[schemars(description = "Путь внутри навыка: references/…, scripts/… или assets/…")]
+    pub path: String,
+    #[schemars(description = "Текстовое содержимое файла")]
+    pub content: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillSaveInput {
+    #[schemars(
+        description = "Идентификатор: строчные латинские буквы, цифры и дефисы, например release-notes"
+    )]
+    pub key: String,
+    #[schemars(description = "Название навыка, которое видит пользователь")]
+    pub name: String,
+    #[schemars(
+        description = "Что делает навык и в каких запросах он нужен; по этому тексту навык выбирается"
+    )]
+    pub description: String,
+    #[schemars(description = "Инструкции навыка в Markdown без блока frontmatter")]
+    pub instructions: String,
+    #[serde(default)]
+    #[schemars(description = "Ключи инструментов, которые нужны навыку, например fs.read")]
+    pub allowed_tools: Vec<String>,
+    #[serde(default)]
+    #[schemars(description = "Файлы навыка")]
+    pub files: Vec<SkillSaveFile>,
+    #[serde(default)]
+    #[schemars(description = "Версия навыка, по умолчанию 1.0.0")]
+    pub version: Option<String>,
+    #[serde(default)]
+    #[schemars(
+        description = "true — перезаписать навык пользователя с тем же идентификатором целиком"
+    )]
+    pub replace: bool,
+}
+
+impl Validate for SkillSaveInput {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("key", &self.key)?;
+        check::max_len("key", &self.key, SKILL_KEY_MAX)?;
+        check::max_len("name", &self.name, SKILL_NAME_MAX)?;
+        check::max_len("description", &self.description, SKILL_DESCRIPTION_MAX)?;
+        check::max_len("instructions", &self.instructions, SKILL_INSTRUCTIONS_MAX)?;
+        if self.files.len() > SKILL_FILES_MAX {
+            return Err(zvs_contract::validate::invalid("files", "maxLength"));
+        }
+        for (index, file) in self.files.iter().enumerate() {
+            check::max_len(&format!("files.{index}.path"), &file.path, SKILL_PATH_MAX)?;
+        }
+        if let Some(version) = &self.version {
+            check::max_len("version", version, SKILL_VERSION_MAX)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillSaveOutput {
+    pub key: String,
+    pub name: String,
+    pub status: String,
+    pub version: Option<String>,
+    pub files: Vec<String>,
+    pub issues: Vec<String>,
+}
+
+impl Validate for SkillSaveOutput {
+    fn validate(&self) -> Result<(), AppError> {
+        Ok(())
+    }
+}
+
+fn issue_text(issue: &SkillIssueDto) -> String {
+    format!("{} ({})", issue.field, issue.rule.as_str())
+}
+
+pub fn explained(error: AppError) -> AppError {
+    let issues: Vec<SkillIssueDto> = error
+        .details
+        .as_ref()
+        .and_then(|details| details.get("issues"))
+        .and_then(|issues| serde_json::from_value(issues.clone()).ok())
+        .unwrap_or_default();
+    if issues.is_empty() {
+        return error;
+    }
+    let list: Vec<String> = issues.iter().map(issue_text).collect();
+    AppError {
+        message: format!("{}: {}", error.message, list.join(", ")),
+        ..error
+    }
+}
+
 struct SkillLoadNode(SkillLibrary);
 struct SkillReadNode(SkillLibrary);
+struct SkillSaveNode(SkillLibrary);
+
+#[async_trait]
+impl NodeDef for SkillSaveNode {
+    type Input = SkillSaveInput;
+    type Output = SkillSaveOutput;
+
+    fn node_type(&self) -> &str {
+        SKILL_SAVE
+    }
+
+    fn permission(&self) -> PermissionRequirement {
+        PermissionRequirement::tool(SKILL_SAVE)
+    }
+
+    fn side_effect(&self) -> bool {
+        true
+    }
+
+    async fn run(
+        &self,
+        context: &StepContext,
+        input: SkillSaveInput,
+    ) -> Result<SkillSaveOutput, AppError> {
+        context.check_cancelled()?;
+        let saved = self
+            .0
+            .author(&AuthoredSkill {
+                key: input.key,
+                name: input.name,
+                description: input.description,
+                instructions: input.instructions,
+                allowed_tools: input.allowed_tools,
+                files: input
+                    .files
+                    .into_iter()
+                    .map(|file| (file.path, file.content))
+                    .collect(),
+                version: input.version,
+                replace: input.replace,
+            })
+            .map_err(explained)?;
+        Ok(SkillSaveOutput {
+            key: saved.skill.key,
+            name: saved.skill.name,
+            status: saved.skill.status.as_str().to_owned(),
+            version: saved.skill.version,
+            files: saved.files.into_iter().map(|file| file.path).collect(),
+            issues: saved.skill.issues.iter().map(issue_text).collect(),
+        })
+    }
+}
 
 #[async_trait]
 impl NodeDef for SkillLoadNode {
@@ -462,6 +619,7 @@ pub fn register_skill_nodes(
 ) -> Result<(), AppError> {
     nodes.register(SkillLoadNode(library.clone()))?;
     nodes.register(SkillReadNode(library.clone()))?;
+    nodes.register(SkillSaveNode(library.clone()))?;
     nodes.register(SkillScriptNode::new(library.clone(), scripts))?;
     nodes.register(SkillGenerateNode)
 }

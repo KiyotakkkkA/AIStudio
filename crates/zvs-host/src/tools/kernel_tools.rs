@@ -16,7 +16,7 @@ use crate::kernel::knowledge_nodes::{
 use crate::kernel::{NodeRegistry, PermissionRequirement};
 use crate::skills::nodes::{
     LOAD_DESCRIPTION as SKILL_LOAD_DESCRIPTION, READ_DESCRIPTION as SKILL_READ_DESCRIPTION,
-    SKILL_LOAD, SKILL_READ,
+    SAVE_DESCRIPTION as SKILL_SAVE_DESCRIPTION, SKILL_LOAD, SKILL_READ, SKILL_SAVE,
 };
 use crate::skills::script::{SCRIPT_DESCRIPTION as SKILL_SCRIPT_DESCRIPTION, SKILL_SCRIPT};
 
@@ -91,6 +91,14 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
         BuiltinToolMeta {
             display_name: "skill.script",
             description: SKILL_SCRIPT_DESCRIPTION,
+            destructive: true,
+        },
+    ),
+    (
+        SKILL_SAVE,
+        BuiltinToolMeta {
+            display_name: "skill.save",
+            description: SKILL_SAVE_DESCRIPTION,
             destructive: true,
         },
     ),

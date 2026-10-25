@@ -110,4 +110,15 @@ pub const BUNDLED_SKILLS: &[BundledSkill] = &[
             "scripts/xlsx_info.py",
         ]
     ),
+    bundled_skill!(
+        "skill-creator",
+        [
+            "assets/SKILL.template.md",
+            "references/anatomy.md",
+            "references/checklist.md",
+            "references/interview.md",
+            "references/writing.md",
+            "scripts/check_skill.py",
+        ]
+    ),
 ];

@@ -44,6 +44,9 @@ pub const SKILL_IMPORT_NO_MANIFEST: &str = "В выбранной папке н�
 pub const SKILL_EXPORT_TAKEN: &str =
     "В папке назначения уже есть папка с идентификатором этого навыка";
 pub const SKILL_UP_TO_DATE: &str = "Для навыка нет обновления";
+pub const SKILL_BUNDLED_PROTECTED: &str =
+    "Встроенный навык нельзя перезаписать. Сохраните навык под другим идентификатором";
+pub const AUTHORED_VERSION: &str = "1.0.0";
 
 const BUNDLED_MARKER: &str = ".bundled.json";
 const COPY_SUFFIX: &str = "-copy";
@@ -123,6 +126,18 @@ pub struct SkillScriptFile {
     pub path: String,
     pub dir: PathBuf,
     pub file: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct AuthoredSkill {
+    pub key: String,
+    pub name: String,
+    pub description: String,
+    pub instructions: String,
+    pub allowed_tools: Vec<String>,
+    pub files: Vec<(String, String)>,
+    pub version: Option<String>,
+    pub replace: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1049,6 +1064,70 @@ impl SkillLibrary {
             })?
         };
         self.dto(&self.refresh_with(saved, &registered)?)
+    }
+
+    pub fn author(&self, input: &AuthoredSkill) -> Result<SkillDetailDto, AppError> {
+        let registered = self.registered()?;
+        let _guard = self
+            .inner
+            .writing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let key = js_trim(&input.key).to_owned();
+        let existing = if key.is_empty() {
+            None
+        } else {
+            self.find_key(&key)?
+        };
+        if let Some(row) = &existing {
+            if !input.replace {
+                return Err(rejected(&[issue("key", SkillIssueRule::Duplicate)]));
+            }
+            if row.source == SkillSource::Bundled {
+                return Err(AppError::new(
+                    AppErrorCode::Conflict,
+                    SKILL_BUNDLED_PROTECTED,
+                ));
+            }
+        }
+        let version = input
+            .version
+            .as_deref()
+            .map(js_trim)
+            .filter(|version| !version.is_empty())
+            .unwrap_or(AUTHORED_VERSION);
+        let mut draft = Draft {
+            key,
+            name: input.name.clone(),
+            description: input.description.clone(),
+            instructions: input.instructions.trim().to_owned(),
+            allowed_tools: unique(input.allowed_tools.clone()),
+            model_override: existing.as_ref().and_then(|row| row.model_override.clone()),
+            enabled: existing.as_ref().is_none_or(|row| row.enabled),
+            source: SkillSource::Local,
+            extra: Vec::new(),
+            metadata: vec![(VERSION.to_owned(), version.to_owned())],
+            files: BTreeMap::new(),
+            issues: Vec::new(),
+        };
+        let files: Vec<SkillFileInput> = input
+            .files
+            .iter()
+            .map(|(path, content)| SkillFileInput {
+                path: path.clone(),
+                content: content.clone(),
+                encoding: None,
+            })
+            .collect();
+        Self::stage_inputs(&files, "files", &mut draft);
+        let unknown: Vec<SkillIssueDto> = tool_issues(&draft.allowed_tools, &registered)
+            .into_iter()
+            .filter(|issue| issue.rule == SkillIssueRule::UnknownTool)
+            .collect();
+        if !unknown.is_empty() {
+            return Err(rejected(&unknown));
+        }
+        self.commit(existing.as_ref(), draft, true)
     }
 
     pub fn duplicate(&self, id: &SkillId) -> Result<SkillDetailDto, AppError> {
