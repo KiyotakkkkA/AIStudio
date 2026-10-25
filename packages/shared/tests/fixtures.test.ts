@@ -20,6 +20,7 @@ import * as artifacts from "../src/artifacts.js";
 import {
   AccountDto,
   ChatCitationDto,
+  ChatAttachDto,
   ChatSettings,
   ChatToolCallDto,
   ChatToolCallStatus,
@@ -468,6 +469,8 @@ const schemas: Record<string, z.ZodType> = {
   "chat/MessageDto": MessageDto,
   "chat/ConversationDetailDto": ConversationDetailDto,
   "chat/ChatSendInput": contract["chat.send"].input,
+  "chat/ChatAttachInput": contract["chat.attach"].input,
+  "chat/ChatAttachDto": ChatAttachDto,
   "chat/ChatContextInput": contract["chat.context"].input,
   "chat/ChatContextDto": contract["chat.context"].output,
   "chat/TruncateConversationInput": contract["chat.conversations.truncate"].input,

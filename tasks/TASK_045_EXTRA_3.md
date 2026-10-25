@@ -2,7 +2,7 @@
 task: TASK_045_EXTRA_3
 title: Chat turn reattach — a reopened chat shows the live turn, its approvals and its questions
 phase: 8 — Documents and the agent browser
-status: todo
+status: done
 depends_on: [TASK_045]
 unblocks: []
 estimate: 4 h
@@ -102,15 +102,49 @@ the turn finish with live tokens. Repeat with a `chat.ask` question.
 
 ## Definition of done
 
-- [ ] `chat.attach` with tests; contract in three places
-- [ ] A reopened chat shows the live turn, approvals, folder requests and questions
-- [ ] A pending approval or question can be answered after reopening
-- [ ] No English user-facing string left in `ChatStore`
-- [ ] Gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] `chat.attach` with tests; contract in three places
+- [x] A reopened chat shows the live turn, approvals, folder requests and questions
+- [x] A pending approval or question can be answered after reopening
+- [x] No English user-facing string left in `ChatStore`
+- [x] Gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- `chat.attach { conversationId }` → `ChatAttachDto | null` (Rust type, Zod schema, fixtures in
+  `fixtures/chat/ChatAttach*`). `ChatService::attach` finds the live chat run the way
+  `require_idle` does, replays its `run_event` rows into the text and reasoning (token deltas,
+  overridden by a succeeded `persist` step), the latest `tool-calls` snapshot and the approval
+  events whose `pending_approval` row is still undecided and unexpired
+  (`ApprovalService::is_pending`); questions come from `QuestionService::pending`. `seq` is the
+  last persisted seq, `null` before the first event; `startedAt` falls back to `createdAt`.
+- Host tests (`tool_loop.rs`): no live turn and a finished turn → `null`; a turn waiting on an
+  approval returns its text, calls, approval and `seq`; a turn waiting on a question returns it.
+- `ChatStore.select()` (and so `mount()`, which ends in `select`) calls `chat.attach` beside
+  `chat.conversations.get`, restores `run`, `runStartedAt`, `liveText`, `liveReasoning`,
+  `liveToolCalls`, `approvals`, `folderRequests`, `questions` and `lastSeq`, hides the run's
+  stored partial assistant message, then subscribes. Approvals go through one `admitApproval`
+  for both live events and the attach payload.
+- Gaps: a router-flagged gap, or a first event after an attach that is not `seq + 1`, holds the
+  event and re-attaches; events arriving meanwhile are held and drained through the seq filter.
+  A run that is gone after the re-attach ends locally and the conversation reloads. An `end`
+  event never re-attaches.
+- `GENERATION_FAILED` replaces the English failure string; tests assert the constant.
+
 **Deviated from plan:**
+- Store tests use `vi.useFakeTimers()` like the existing chat tests: `ChatStore` has no clock
+  dependency, its token flush is a plain `setTimeout`, so `createFakeClock()` has nothing to
+  drive.
+- The initial attach does not hold events: the store is not subscribed yet, and the router keeps
+  up to 256 events for an unsubscribed stream, delivered on subscribe and filtered by `seq`.
+
 **Next session should know:**
+- Partial text is rebuilt from stored `token` events. TASK_045_EXTRA_5 (lean run events) must
+  keep tokens for a live run, or persist the partial text another way, or attach loses it.
+- The app builds `RunService` with `DEFAULT_APPROVAL_TIMEOUT` (60 s): a turn reopened more than
+  a minute after it asked has its approval denied already, so the manual check must reopen
+  within that window. Out of scope here; worth its own task.
+- Manual check with the window closed to the tray was not run here.
+- `pnpm format:check` still flags `apps/studio/src/renderer/ui/organisms/NavRail.tsx`, which
+  this task did not touch.

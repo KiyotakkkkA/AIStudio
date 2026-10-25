@@ -129,6 +129,10 @@ with ordered messages. Send accepts `{ conversationId, text }` and returns `{ id
 cancel accepts `{ id }` with the run ID. Only one turn may run in a conversation at a time.
 Removal rejects active conversations and cascades messages while retaining run history.
 `chat.answer` and `chat.skip` resolve a question the model asked through `chat.ask`.
+`chat.attach` accepts `{ conversationId }` and returns `null` without a live turn; otherwise the
+run handle, the last persisted event `seq`, the text and reasoning rebuilt from the stored
+tokens, the latest tool-call snapshot, the approvals still pending and the questions still
+waiting. A renderer that reopens a chat restores from it and subscribes for events after `seq`.
 
 Every turn whose model can call tools is offered `chat.ask` (wire name `ask_user`) with a short
 prompt section, whatever tools the conversation picked. The loop intercepts it before tool

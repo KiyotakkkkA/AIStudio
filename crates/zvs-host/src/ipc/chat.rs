@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use zvs_contract::{
-    AppError, AppErrorCode, BindFolderInput, ChatAnswerInput, ChatContextInput, ChatEvalInput,
-    ChatSendInput, ChatSkipInput, ConversationRef, CreateConversationInput, PickFolderResultDto,
-    RenameConversationInput, RunIdInput, TruncateConversationInput,
+    AppError, AppErrorCode, BindFolderInput, ChatAnswerInput, ChatAttachInput, ChatContextInput,
+    ChatEvalInput, ChatSendInput, ChatSkipInput, ConversationRef, CreateConversationInput,
+    PickFolderResultDto, RenameConversationInput, RunIdInput, TruncateConversationInput,
     UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
     UpdateConversationStoresInput, UpdateConversationToolsInput, VectorSourceKind,
 };
@@ -130,6 +130,12 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "chat.send",
             |services: Arc<Services>, input: ChatSendInput| async move { services.chat.send(&input) },
+        )
+        .handle(
+            "chat.attach",
+            |services: Arc<Services>, input: ChatAttachInput| async move {
+                services.chat.attach(&input.conversation_id)
+            },
         )
         .handle(
             "chat.cancel",

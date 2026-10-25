@@ -11,16 +11,16 @@ use serde_json::{Value, json};
 use zvs_contract::validate::{check, js_slice, nested};
 use zvs_contract::vector_stores::DEFAULT_CHAT_MIN_SCORE;
 use zvs_contract::{
-    AppError, AppErrorCode, ChatCitationDto, ChatContextDto, ChatContextInput, ChatContextToolDto,
-    ChatEvalCaseDto, ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto, ChatSendInput, ChatSettings,
-    ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationId,
-    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DeltaKind, DocumentId,
-    GRAPH_EXPANSION_DEFAULT_MAX, GraphDirection, GraphExpansionDocument, GraphNeighborhood,
-    GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId, MessageRole,
-    ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph, RunHandleDto,
-    RunId, RunKind, RunStatus, StartRunInput, ToolListFilter, ToolMode, ToolTier, Validate,
-    VectorSearchHitDto, VectorStoreId, log_line, merge_graph_neighbors, model_tool_support,
-    resolve_tool_mode,
+    AppError, AppErrorCode, ChatAttachDto, ChatCitationDto, ChatContextDto, ChatContextInput,
+    ChatContextToolDto, ChatEvalCaseDto, ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto,
+    ChatSendInput, ChatSettings, ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto,
+    ConversationDto, ConversationId, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
+    DeltaKind, DocumentId, GRAPH_EXPANSION_DEFAULT_MAX, GraphDirection, GraphExpansionDocument,
+    GraphNeighborhood, GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId,
+    MessageRole, ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph,
+    RunHandleDto, RunId, RunKind, RunStatus, StartRunInput, StreamId, ToolListFilter, ToolMode,
+    ToolTier, Validate, VectorSearchHitDto, VectorStoreId, log_line, merge_graph_neighbors,
+    model_tool_support, resolve_tool_mode,
 };
 
 use super::chat_ask::{
@@ -2840,6 +2840,73 @@ impl ChatService {
                 }
             }
         }
+    }
+
+    pub fn attach(&self, id: &ConversationId) -> Result<Option<ChatAttachDto>, AppError> {
+        let subject = id.to_string();
+        let Some(row) = self
+            .inner
+            .read(|repositories| Ok(repositories.runs.unfinished()?))?
+            .into_iter()
+            .find(|run| run.kind == RunKind::Chat && run.subject_id.as_deref() == Some(&subject))
+        else {
+            return Ok(None);
+        };
+        let run = RunHandleDto {
+            id: RunId::parse(&row.id).ok_or_else(|| malformed("runId"))?,
+            stream_id: StreamId::parse(&row.stream_id).ok_or_else(|| malformed("streamId"))?,
+        };
+        let approvals = self.runs.approvals();
+        let mut attached = ChatAttachDto {
+            run,
+            seq: None,
+            started_at: row.started_at.unwrap_or(row.created_at),
+            content: String::new(),
+            reasoning: String::new(),
+            tool_calls: Vec::new(),
+            approvals: Vec::new(),
+            questions: self.runs.questions().pending(&row.id),
+        };
+        for event in self.runs.record(&row.id)? {
+            attached.seq = Some(attached.seq.map_or(event.seq, |seq| seq.max(event.seq)));
+            match event.body {
+                HostEventDraft::Token { delta, kind } => match kind {
+                    Some(DeltaKind::Reasoning) => attached.reasoning.push_str(&delta),
+                    _ => attached.content.push_str(&delta),
+                },
+                HostEventDraft::Step { step } => {
+                    if step.get("domain").and_then(Value::as_str) == Some("tool-calls")
+                        && let Some(Ok(calls)) = step
+                            .get("calls")
+                            .map(|calls| serde_json::from_value(calls.clone()))
+                    {
+                        attached.tool_calls = calls;
+                    }
+                    if step.get("nodeId").and_then(Value::as_str) == Some("persist")
+                        && step.get("status").and_then(Value::as_str) == Some("succeeded")
+                        && let Some(Ok(message)) = step
+                            .get("output")
+                            .map(|output| serde_json::from_value::<MessageDto>(output.clone()))
+                    {
+                        attached.content = message.content;
+                        attached.reasoning = message.reasoning;
+                    }
+                }
+                HostEventDraft::Approval { request } => {
+                    let pending = request
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .map(|approval| approvals.is_pending(&row.id, approval))
+                        .transpose()?
+                        .unwrap_or(false);
+                    if pending {
+                        attached.approvals.push(request);
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(Some(attached))
     }
 
     pub async fn cancel(&self, id: &RunId) -> Result<(), AppError> {

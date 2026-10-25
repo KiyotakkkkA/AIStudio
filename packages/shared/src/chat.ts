@@ -10,6 +10,10 @@ import {
 import { Json } from "./primitives/json.js";
 import { FolderGrantScope, FolderPath, WorkingFolderAccess } from "./folders.js";
 import { ToolKey } from "./tools/ToolDto.js";
+import { RunHandleDto } from "./runs/RunDto.js";
+import { ApprovalRequestDto, EventSeq } from "./events/HostEvent.js";
+import { QuestionRequestDto } from "./questions.js";
+import { Timestamp } from "./primitives/time.js";
 
 export const ChatSettings = z.object({
   temperature: z.number().min(0).max(2).optional(),
@@ -212,3 +216,16 @@ export const BindFolderResultDto = z.discriminatedUnion("status", [
 export type BindFolderResultDto = z.infer<typeof BindFolderResultDto>;
 export const PickFolderResultDto = z.object({ path: FolderPath.nullable() });
 export type PickFolderResultDto = z.infer<typeof PickFolderResultDto>;
+export const ChatAttachInput = z.object({ conversationId: ConversationId });
+export type ChatAttachInput = z.infer<typeof ChatAttachInput>;
+export const ChatAttachDto = z.object({
+  run: RunHandleDto,
+  seq: EventSeq.nullable(),
+  startedAt: Timestamp,
+  content: z.string(),
+  reasoning: z.string(),
+  toolCalls: z.array(ChatToolCallDto),
+  approvals: z.array(ApprovalRequestDto),
+  questions: z.array(QuestionRequestDto),
+});
+export type ChatAttachDto = z.infer<typeof ChatAttachDto>;

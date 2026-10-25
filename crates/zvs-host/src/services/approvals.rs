@@ -137,6 +137,12 @@ impl ApprovalService {
         Ok(decision)
     }
 
+    pub fn is_pending(&self, run_id: &str, id: &str) -> Result<bool, AppError> {
+        Ok(self.row(id)?.is_some_and(|row| {
+            row.run_id == run_id && row.decision.is_none() && row.expires_at > self.clock.now()
+        }))
+    }
+
     pub fn decide(
         &self,
         run_id: &str,

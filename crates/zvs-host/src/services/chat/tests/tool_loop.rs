@@ -1400,3 +1400,100 @@ async fn a_model_without_tool_calling_is_not_offered_the_question_bridge() {
     let system = test.driver.requests()[0].system.clone().unwrap_or_default();
     assert!(!system.contains(crate::services::chat_ask::ASK_HEADING));
 }
+
+fn attached(test: &Loop, created: ConversationId) -> Option<zvs_contract::ChatAttachDto> {
+    test.harness.chat.attach(&created).expect("attaches")
+}
+
+#[tokio::test]
+async fn attaching_without_a_live_turn_returns_nothing_and_a_finished_turn_is_not_live() {
+    let test = Loop::new();
+    let created = test.conversation(&["demo.lookup"]);
+    assert_eq!(attached(&test, created), None);
+
+    test.driver.fallback(|_| vec![text("Done.")]);
+    test.turn(created, "Question").await;
+
+    assert_eq!(attached(&test, created), None);
+}
+
+#[tokio::test]
+async fn attaching_to_a_turn_waiting_on_an_approval_returns_the_text_the_calls_and_the_approval() {
+    let test = Loop::new();
+    test.set_tier(&test.drop, ToolTier::Ask);
+    test.driver.round(|_| {
+        vec![
+            text("Сначала "),
+            text("удаление."),
+            call("demo__drop", &json!({})),
+        ]
+    });
+    let created = test.conversation(&["demo.drop"]);
+    let handle = test.harness.send(created, "Drop it");
+    let approval = within(awaiting_approval(&test, created)).await;
+
+    let mut live = None;
+    within(eventually(|| {
+        live = attached(&test, created).filter(|live| !live.approvals.is_empty());
+        live.is_some()
+    }))
+    .await;
+    let live = live.expect("a live turn");
+
+    assert_eq!(live.run, handle);
+    assert_eq!(live.content, "Сначала удаление.");
+    assert_eq!(live.approvals[0].get("id"), Some(&json!(approval)));
+    assert_eq!(live.tool_calls.len(), 1);
+    assert_eq!(
+        live.tool_calls[0].approval_id.as_deref(),
+        Some(approval.as_str())
+    );
+    assert!(live.questions.is_empty());
+    let last = test
+        .harness
+        .runs
+        .record(&handle.id.to_string())
+        .expect("events")
+        .last()
+        .map(|event| event.seq);
+    assert_eq!(live.seq, last);
+
+    test.harness
+        .runs
+        .approve(&handle.id, &approval, false)
+        .expect("approves");
+    within(test.harness.runs.wait(&handle.id)).await;
+    assert_eq!(test.calls.drops(), 1);
+    assert_eq!(attached(&test, created), None);
+}
+
+#[tokio::test]
+async fn attaching_to_a_turn_waiting_on_a_question_returns_the_question() {
+    let test = Loop::new();
+    test.driver
+        .round(|_| vec![call("ask_user", &format_question())]);
+    test.driver.fallback(|_| vec![text("PDF it is.")]);
+    let created = test.conversation(&[]);
+    let handle = test.harness.send(created, "Make a report");
+    let record = within(awaiting_answer(&test, created)).await;
+
+    let mut live = None;
+    within(eventually(|| {
+        live = attached(&test, created).filter(|live| !live.questions.is_empty());
+        live.is_some()
+    }))
+    .await;
+    let live = live.expect("a live turn");
+
+    assert_eq!(live.run, handle);
+    assert_eq!(live.questions, std::slice::from_ref(&record.request));
+    assert!(live.approvals.is_empty());
+
+    test.harness
+        .runs
+        .questions()
+        .skip(&handle.id.to_string(), &record.request.id)
+        .expect("skips");
+    within(test.harness.runs.wait(&handle.id)).await;
+    assert_eq!(attached(&test, created), None);
+}

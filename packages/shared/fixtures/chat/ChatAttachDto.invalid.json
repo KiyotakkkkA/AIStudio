@@ -1,0 +1,30 @@
+[
+  {
+    "name": "missing run",
+    "value": {
+      "seq": null,
+      "startedAt": 1767225600000,
+      "content": "",
+      "reasoning": "",
+      "toolCalls": [],
+      "approvals": [],
+      "questions": []
+    }
+  },
+  {
+    "name": "negative seq",
+    "value": {
+      "run": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "streamId": "0199aa11-4444-7444-8444-444444444444"
+      },
+      "seq": -1,
+      "startedAt": 1767225600000,
+      "content": "",
+      "reasoning": "",
+      "toolCalls": [],
+      "approvals": [],
+      "questions": []
+    }
+  }
+]

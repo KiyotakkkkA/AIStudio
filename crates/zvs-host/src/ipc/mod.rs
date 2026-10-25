@@ -104,6 +104,7 @@ mod tests {
                 "artifacts.reveal",
                 "artifacts.save",
                 "chat.answer",
+                "chat.attach",
                 "chat.bindFolder",
                 "chat.cancel",
                 "chat.context",

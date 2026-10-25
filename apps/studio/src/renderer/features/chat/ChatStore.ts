@@ -16,6 +16,8 @@ import {
   type AccountFamily,
   type AccountId,
   type AdapterDescriptorDto,
+  type ApprovalRequestDto,
+  type ChatAttachDto,
   type ChatCitationDto,
   type ChatContextDto,
   type ChatContextInput,
@@ -33,6 +35,7 @@ import {
   type QuestionRequestDto,
   type RetrievalMode,
   type RunHandleDto,
+  type RunOutcomeDto,
   type ToolDto,
   type VectorStoreDto,
 } from "@zvs/shared";
@@ -49,6 +52,7 @@ import { isAutomaticTool, isModelTool, RECOMMENDED_TOOLS, toolBlockReason } from
 export const ACCOUNT_OPTION_PREFIX = "account:";
 const LAST_CONVERSATION_KEY = "chat.conversation.last";
 export const SELECTIONS_FULL = "К сообщению можно приложить не больше 8 фрагментов документов.";
+export const GENERATION_FAILED = "Не удалось получить ответ. Повторите запрос.";
 
 export type SidePanel = "context" | "files";
 
@@ -120,6 +124,9 @@ export default class ChatStore {
   private retryText = "";
   private contextRevision = 0;
   private stopContext: (() => void) | undefined;
+  private attaching = false;
+  private contiguous = false;
+  private held: RoutedEvent[] = [];
 
   constructor(
     private readonly ipc: IpcClient<Contract>,
@@ -144,6 +151,9 @@ export default class ChatStore {
       | "retryText"
       | "contextRevision"
       | "stopContext"
+      | "attaching"
+      | "contiguous"
+      | "held"
     >(
       this,
       {
@@ -164,6 +174,9 @@ export default class ChatStore {
         retryText: false,
         contextRevision: false,
         stopContext: false,
+        attaching: false,
+        contiguous: false,
+        held: false,
       },
       { autoBind: true },
     );
@@ -690,7 +703,10 @@ export default class ChatStore {
     this.folderError = null;
     this.folderPrompt = null;
     try {
-      const active = await this.ipc.call("chat.conversations.get", { id });
+      const [active, live] = await Promise.all([
+        this.ipc.call("chat.conversations.get", { id }),
+        this.attachment(id),
+      ]);
       void this.ipc
         .call("notifications.clear", { kind: "conversation", conversationId: id })
         .catch(() => undefined);
@@ -713,6 +729,10 @@ export default class ChatStore {
         this.retryText = "";
         this.pendingTurn = false;
         this.composer.setText("");
+        if (live !== null && this.run === null) {
+          this.restore(live);
+          if (this.mounted) this.subscribe();
+        }
       });
     } catch (error) {
       runInAction(() => {
@@ -1095,32 +1115,97 @@ export default class ChatStore {
     else this.unsubscribe = stop;
   }
 
-  private receive(event: RoutedEvent) {
-    if (!this.run || event.streamId !== this.run.streamId || event.seq <= this.lastSeq) return;
-    this.lastSeq = event.seq;
-    const folderRequest =
-      event.type === "approval" ? FolderApprovalDto.safeParse(event.request) : null;
-    if (folderRequest?.success === true && folderRequest.data.runId === this.run.id) {
-      if (!this.folderRequests.some((request) => request.id === folderRequest.data.id))
-        this.folderRequests.push(folderRequest.data);
-    } else if (
-      event.type === "approval" &&
-      event.request.runId === this.run.id &&
-      typeof event.request.id === "string" &&
-      typeof event.request.subject === "string"
-    ) {
-      if (!this.approvals.some((request) => request.id === event.request.id)) {
-        const files = FilesApprovalDto.safeParse(event.request);
-        const process = ProcessApprovalDto.safeParse(event.request);
-        this.approvals.push({
-          id: event.request.id,
-          subject: event.request.subject,
-          busy: false,
-          changes: files.success ? files.data.changes : [],
-          ...(process.success ? { process: process.data.process } : {}),
-        });
-      }
+  private attachment(id: ConversationId): Promise<ChatAttachDto | null> {
+    return this.ipc.call("chat.attach", { conversationId: id }).catch(() => null);
+  }
+
+  private restore(live: ChatAttachDto) {
+    if (this.timer !== undefined) clearTimeout(this.timer);
+    this.timer = undefined;
+    this.buffer = "";
+    this.run = live.run;
+    this.runStartedAt = live.startedAt;
+    this.lastSeq = live.seq ?? -1;
+    this.contiguous = live.seq !== null;
+    this.liveText = live.content;
+    this.liveReasoning = live.reasoning;
+    this.liveToolCalls = live.toolCalls;
+    this.approvals = [];
+    this.folderRequests = [];
+    for (const request of live.approvals) this.admitApproval(request);
+    this.questions = live.questions.map((request) => ({ request, busy: false }));
+    this.outcome = null;
+    this.stopping = false;
+    if (this.active)
+      this.active = {
+        ...this.active,
+        messages: this.active.messages.filter(
+          (message) => !(message.partial && message.runId === live.run.id),
+        ),
+      };
+  }
+
+  private async reattach() {
+    const run = this.run;
+    const id = this.active?.id;
+    if (!run || !id || this.attaching) return;
+    this.attaching = true;
+    const live = await this.attachment(id);
+    runInAction(() => {
+      this.attaching = false;
+      const held = this.held;
+      this.held = [];
+      if (this.run?.id !== run.id) return;
+      if (live?.run.id === run.id) this.restore(live);
+      for (const event of held) if (this.run?.streamId === event.streamId) this.absorb(event);
+      if (live?.run.id !== run.id && this.run?.id === run.id) this.end(null);
+    });
+  }
+
+  private admitApproval(request: ApprovalRequestDto) {
+    const run = this.run;
+    if (!run) return;
+    const folder = FolderApprovalDto.safeParse(request);
+    if (folder.success && folder.data.runId === run.id) {
+      if (!this.folderRequests.some((item) => item.id === folder.data.id))
+        this.folderRequests.push(folder.data);
+      return;
     }
+    const id = request.id;
+    const subject = request.subject;
+    if (request.runId !== run.id || typeof id !== "string" || typeof subject !== "string") return;
+    if (this.approvals.some((item) => item.id === id)) return;
+    const files = FilesApprovalDto.safeParse(request);
+    const process = ProcessApprovalDto.safeParse(request);
+    this.approvals.push({
+      id,
+      subject,
+      busy: false,
+      changes: files.success ? files.data.changes : [],
+      ...(process.success ? { process: process.data.process } : {}),
+    });
+  }
+
+  private receive(event: RoutedEvent) {
+    if (!this.run || event.streamId !== this.run.streamId) return;
+    if (this.attaching) {
+      this.held.push(event);
+      return;
+    }
+    const missed = (event.gap ?? 0) > 0 || (this.contiguous && event.seq > this.lastSeq + 1);
+    if (missed && event.type !== "end" && event.seq > this.lastSeq) {
+      this.held.push(event);
+      void this.reattach();
+      return;
+    }
+    this.absorb(event);
+  }
+
+  private absorb(event: RoutedEvent) {
+    if (!this.run || event.seq <= this.lastSeq) return;
+    this.lastSeq = event.seq;
+    this.contiguous = false;
+    if (event.type === "approval") this.admitApproval(event.request);
     if (
       event.type === "question" &&
       event.request.runId === this.run.id &&
@@ -1170,21 +1255,22 @@ export default class ChatStore {
         }
       }
     }
-    if (event.type === "end") {
-      this.flush();
-      this.outcome = event.outcome.status;
-      if (event.outcome.status === "failed")
-        this.error = event.outcome.message ?? "Generation failed. Try again.";
-      this.unsubscribe?.();
-      this.unsubscribe = undefined;
-      this.run = null;
-      this.runStartedAt = null;
-      this.approvals = [];
-      this.questions = [];
-      this.folderRequests = [];
-      this.stopping = false;
-      void this.refreshCompleted();
-    }
+    if (event.type === "end") this.end(event.outcome);
+  }
+
+  private end(outcome: RunOutcomeDto | null) {
+    this.flush();
+    this.outcome = outcome?.status ?? null;
+    if (outcome?.status === "failed") this.error = outcome.message ?? GENERATION_FAILED;
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
+    this.run = null;
+    this.runStartedAt = null;
+    this.approvals = [];
+    this.questions = [];
+    this.folderRequests = [];
+    this.stopping = false;
+    void this.refreshCompleted();
   }
 
   private flush() {

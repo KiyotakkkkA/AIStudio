@@ -1,0 +1,76 @@
+[
+  {
+    "name": "waiting on an approval and a question",
+    "value": {
+      "run": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "streamId": "0199aa11-4444-7444-8444-444444444444"
+      },
+      "seq": 41,
+      "startedAt": 1767225600000,
+      "content": "Проверка файла.",
+      "reasoning": "",
+      "toolCalls": [
+        {
+          "id": "call_1",
+          "key": "code.run",
+          "name": "code__run",
+          "round": 0,
+          "arguments": {
+            "language": "python",
+            "source": "print(1)"
+          },
+          "status": "awaiting-approval",
+          "result": null,
+          "truncated": false,
+          "error": null,
+          "approvalId": "0199aa11-5555-7555-8555-555555555555",
+          "stepId": null,
+          "durationMs": 0,
+          "meta": null
+        }
+      ],
+      "approvals": [
+        {
+          "id": "0199aa11-5555-7555-8555-555555555555",
+          "runId": "0199aa11-1111-7111-8111-111111111111",
+          "subject": "code.run",
+          "scope": "global",
+          "expiresAt": 1767225660000
+        }
+      ],
+      "questions": [
+        {
+          "id": "0199aa11-2222-7222-8222-222222222222",
+          "runId": "0199aa11-1111-7111-8111-111111111111",
+          "conversationId": "0199aa11-3333-7333-8333-333333333333",
+          "questions": [
+            {
+              "id": "q1",
+              "title": "Имя отчёта",
+              "kind": "text",
+              "options": [],
+              "allowOther": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "no events yet",
+    "value": {
+      "run": {
+        "id": "0199aa11-1111-7111-8111-111111111111",
+        "streamId": "0199aa11-4444-7444-8444-444444444444"
+      },
+      "seq": null,
+      "startedAt": 1767225600000,
+      "content": "",
+      "reasoning": "",
+      "toolCalls": [],
+      "approvals": [],
+      "questions": []
+    }
+  }
+]

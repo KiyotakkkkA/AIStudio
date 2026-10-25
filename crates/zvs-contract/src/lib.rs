@@ -68,12 +68,13 @@ pub use browser::{
 };
 pub use channels::{CHANNELS, is_channel};
 pub use chat::{
-    ChatCitationDto, ChatContextDto, ChatContextInput, ChatContextToolDto,
-    ChatConversationsListOutput, ChatEvalCaseDto, ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto,
-    ChatSendInput, ChatSettings, ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto,
-    ConversationDto, ConversationRef, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
-    DocumentSelectionDto, MessageDto, MessageRole, RenameConversationInput, RetrievalMode,
-    TruncateConversationInput, UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    ChatAttachDto, ChatAttachInput, ChatAttachOutput, ChatCitationDto, ChatContextDto,
+    ChatContextInput, ChatContextToolDto, ChatConversationsListOutput, ChatEvalCaseDto,
+    ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto, ChatSendInput, ChatSettings, ChatToolCallDto,
+    ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationRef,
+    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DocumentSelectionDto, MessageDto,
+    MessageRole, RenameConversationInput, RetrievalMode, TruncateConversationInput,
+    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
     UpdateConversationStoresInput, UpdateConversationToolsInput,
 };
 pub use documents::{

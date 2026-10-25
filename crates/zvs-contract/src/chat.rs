@@ -2,9 +2,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::enums::wire_enum;
 use crate::errors::AppError;
+use crate::events::{ApprovalRequestDto, EventSeq};
 use crate::folders::{WorkingFolderAccess, check_folder_path};
 use crate::ids::{ConversationId, DocumentId, MessageId, ProviderId, RunId, VectorStoreId};
 use crate::primitives::{Json, Timestamp};
+use crate::questions::QuestionRequestDto;
+use crate::runs::RunHandleDto;
 use crate::tools::check_tool_key;
 use crate::validate::{Validate, check, invalid, js_trim, nested};
 use crate::vector_stores::VectorSearchHitDto;
@@ -794,7 +797,41 @@ impl Validate for ChatEvalRunDto {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatAttachInput {
+    pub conversation_id: ConversationId,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatAttachDto {
+    pub run: RunHandleDto,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub seq: Option<EventSeq>,
+    pub started_at: Timestamp,
+    pub content: String,
+    pub reasoning: String,
+    pub tool_calls: Vec<ChatToolCallDto>,
+    pub approvals: Vec<ApprovalRequestDto>,
+    pub questions: Vec<QuestionRequestDto>,
+}
+
+impl Validate for ChatAttachDto {
+    fn validate(&self) -> Result<(), AppError> {
+        if let Some(seq) = self.seq {
+            check::safe_integer("seq", seq)?;
+        }
+        check_int("startedAt", self.started_at)?;
+        nested("toolCalls", self.tool_calls.validate())?;
+        nested("questions", self.questions.validate())
+    }
+}
+
+pub type ChatAttachOutput = Option<ChatAttachDto>;
+
 crate::validate::no_refinements!(
+    ChatAttachInput,
     ConversationRef,
     TruncateConversationInput,
     UpdateConversationRelationsInput,
