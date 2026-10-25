@@ -47,6 +47,7 @@ use super::retrieval_merge::{CHAT_FETCH_K, MergeOptions, StoreHits, merge_retrie
 use super::retrieval_query::retrieval_query;
 use super::runs::RunService;
 use super::vector_stores::VectorSearchOptions;
+use crate::chat_files::CHAT_FILE;
 use crate::commands::PROCESS_TOOLS;
 use crate::data::repositories::{ConversationPatch, MessagePatch, ProviderFilter, RunPatch};
 use crate::data::schema::{ConversationRow, FolderGrantRow, MessageRow};
@@ -67,7 +68,9 @@ use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 use crate::services::mcp::{RESOURCE_READER, tool_key};
-use crate::skills::{SKILL_LOAD, SKILL_TOOLS, SkillCatalogue, catalogue_text};
+use crate::skills::{SKILL_LOAD, SKILL_SCRIPT, SKILL_TOOLS, SkillCatalogue, catalogue_text};
+
+pub const CHAT_SCOPED_TOOLS: [&str; 2] = [SKILL_SCRIPT, CHAT_FILE];
 use crate::tools::ToolRegistry;
 use crate::workspace::{FolderAccessService, ForbiddenFolders, folder_access};
 use zvs_contract::mcp::MCP_INSTRUCTIONS_MAX;
@@ -1139,7 +1142,7 @@ impl NodeDef for PrepareNode {
             _ => Vec::new(),
         };
         if !skill_entries.is_empty() {
-            for key in SKILL_TOOLS {
+            for key in SKILL_TOOLS.into_iter().chain([CHAT_FILE]) {
                 if !enabled.iter().any(|known| known == key) {
                     enabled.push(key.to_owned());
                 }
@@ -1665,7 +1668,10 @@ impl GenerateChatNode {
         if knowledge {
             fields.insert("scope".to_owned(), json!(options.scope));
         }
-        if FILE_TOOLS.contains(&tool.key.as_str()) || PROCESS_TOOLS.contains(&tool.key.as_str()) {
+        if FILE_TOOLS.contains(&tool.key.as_str())
+            || PROCESS_TOOLS.contains(&tool.key.as_str())
+            || CHAT_SCOPED_TOOLS.contains(&tool.key.as_str())
+        {
             fields.insert("conversationId".to_owned(), json!(options.conversation));
         }
         let observer_inner = Arc::clone(inner);

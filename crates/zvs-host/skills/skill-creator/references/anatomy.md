@@ -58,8 +58,10 @@ Values are plain one-line strings. Quote a value that contains `:` or `#`. Multi
   # ///
   ```
 
-- The working directory is a temporary folder of the run. The skill folder is in the environment variable `ZVS_SKILL_DIR` and is read-only: read templates from there, never write there.
-- Take input and output paths as arguments. Tell the model to pass absolute paths; a relative output path lands in the temporary folder.
+- In a chat or an agentic session the working directory is the chat's working folder (`ZVS_CHAT_DIR`); it lives as long as the chat, so files written in one turn are there in the next. Elsewhere it is a temporary folder of the run. The skill folder is in `ZVS_SKILL_DIR` and is read-only: read templates from there, never write there.
+- Names starting with `_` (`_spec.json`, `_work/…`) are working files and stay hidden from the user. Documents a script creates in the working folder under other names are shown to the user as results. Tell the model to use `_` names for everything intermediate.
+- The model can write and read files in the working folder with the `chat.file` tool, without asking for permission: inputs for a script (a spec, a config) are written there first and passed by relative path.
+- Take input and output paths as arguments. Relative paths resolve against the working folder; paths to the user's own files are absolute.
 - stdout is capped at 64 KiB. Print compact JSON or short text, and let large results go to files.
 - Exit with a non-zero code and a one-line message on stderr when something fails, so the model can react.
 - Use `argparse` with a `description`, so `--help` explains the script.

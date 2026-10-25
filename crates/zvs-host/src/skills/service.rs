@@ -18,6 +18,7 @@ use super::library::{LoadedSkill, SkillLibrary};
 use super::matching::{cosine, lexical_score};
 use super::nodes::{SKILL_LOAD, SKILL_READ};
 use super::script::{SKILL_SCRIPT, ScriptRuntime};
+use crate::chat_files::CHAT_FILE;
 use crate::data::repositories::ProviderFilter;
 use crate::data::schema::ProviderRow;
 use crate::data::{Database, Repositories};
@@ -31,6 +32,7 @@ pub const NO_PICKER: &str = "Выбор папки недоступен";
 pub const EMBEDDING_FAILED: &str = "Skill trigger embeddings failed; lexical matching used";
 
 pub const CATALOGUE_SCRIPTS: &str = "Run a file from a skill's scripts/ folder with {script} only when that skill's instructions say to run it.";
+pub const CATALOGUE_FILES: &str = "Skill scripts run in this conversation's working folder, which keeps its files between turns. Write working files there with {file}, give them names that start with _ (for example _spec.json), and pass them to scripts by relative path; never put working files next to the user's data.";
 pub const CATALOGUE_INSTRUCTION: &str = "Skills are packaged instructions for specific jobs. When the user's request matches one of the skills below, call {load} with its key before answering and follow the instructions it returns. Read the files it lists with {read} only when the instructions need them. Do not load a skill that does not fit the request.";
 
 const EMBEDDING_TIMEOUT: Duration = Duration::from_secs(20);
@@ -64,6 +66,10 @@ pub fn catalogue_text(entries: &[SkillCatalogueEntry], offered: &[OfferedTool]) 
     if offered.iter().any(|tool| tool.key == SKILL_SCRIPT) {
         instruction.push(' ');
         instruction.push_str(&CATALOGUE_SCRIPTS.replace("{script}", &name(SKILL_SCRIPT)));
+        if offered.iter().any(|tool| tool.key == CHAT_FILE) {
+            instruction.push(' ');
+            instruction.push_str(&CATALOGUE_FILES.replace("{file}", &name(CHAT_FILE)));
+        }
     }
     format!("{instruction}\n<skills>\n{}\n</skills>", lines.join("\n"))
 }

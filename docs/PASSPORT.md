@@ -715,6 +715,18 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   against DNS rebinding, and `Content-Security-Policy: default-src 'none'; script-src
   'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'` — a
   page can run its own inline code but cannot load or send anything.
+- **Chat working folder** (`zvs-host/src/chat_files.rs`). Each conversation, and each agentic
+  session, owns `<app data>/artifacts/chats/<id>/`, created on first use and removed with the
+  conversation or session. It is the one app folder an agent reaches without a grant: in a
+  chat or session `skill.script` runs with it as the working directory and `ZVS_CHAT_DIR`
+  (other callers keep the per-run scratch folder), and `chat.file` writes, reads and lists text
+  files in it with tier `auto` by default. `chat.file` is offered automatically wherever
+  `skill.script` is, and nowhere else. The host resolves every `chat.file` path inside the
+  folder (relative only; no `..`, drive, hidden or reserved names), caps a file at 1 MiB and the
+  folder at 200 MB and 1000 files, and writes through a temporary file. Names whose path has a
+  segment starting with `_` are working files: they never become artifact cards. Other
+  documents a script creates there are reported like scratch results (copied to
+  `<app data>/artifacts/<runId>/`). Nothing in the folder is ever opened or run by the host.
 - **Working folder explorer** (`zvs-host/src/workspace/explorer.rs`, TASK_036_EXTRA_4). The
   «Файлы» side panel in the chat is the user browsing their own folder, not a tool call:
   `workspace.list` / `workspace.read` raise **no** access request, but they require the chat's

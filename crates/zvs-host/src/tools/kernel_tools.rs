@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use zvs_contract::{AppError, ToolDto, ToolSource, ToolTier};
 
 use super::registry::{ToolDescriptor, ToolRegistry};
+use crate::chat_files::{CHAT_FILE, CHAT_FILE_DESCRIPTION};
 use crate::commands::nodes::{CODE_DESCRIPTION, CODE_RUN, SHELL_DESCRIPTION, SHELL_RUN};
 use crate::files::nodes::{
     APPLY_DESCRIPTION as FS_APPLY_DESCRIPTION, FS_APPLY, FS_LIST, FS_READ, FS_SEARCH,
@@ -22,6 +23,7 @@ use crate::skills::script::{SCRIPT_DESCRIPTION as SKILL_SCRIPT_DESCRIPTION, SKIL
 
 const NOT_TOOLS: &[&str] = &["llm.generate"];
 const ASK_BY_DEFAULT: &[&str] = &[FS_APPLY];
+const AUTO_BY_DEFAULT: &[&str] = &[CHAT_FILE];
 
 struct BuiltinToolMeta {
     display_name: &'static str,
@@ -100,6 +102,14 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
             display_name: "skill.save",
             description: SKILL_SAVE_DESCRIPTION,
             destructive: true,
+        },
+    ),
+    (
+        CHAT_FILE,
+        BuiltinToolMeta {
+            display_name: "chat.file",
+            description: CHAT_FILE_DESCRIPTION,
+            destructive: false,
         },
     ),
     (
@@ -207,9 +217,13 @@ pub fn register_kernel_tools(
             input_schema: node.input_schema().clone(),
             read_only: node.side_effect_free() && previous,
             destructive: meta.is_some_and(|meta| meta.destructive),
-            tier: (meta.is_some_and(|meta| meta.destructive)
-                || ASK_BY_DEFAULT.contains(&key.as_str()))
-            .then_some(ToolTier::Ask),
+            tier: if AUTO_BY_DEFAULT.contains(&key.as_str()) {
+                Some(ToolTier::Auto)
+            } else {
+                (meta.is_some_and(|meta| meta.destructive)
+                    || ASK_BY_DEFAULT.contains(&key.as_str()))
+                .then_some(ToolTier::Ask)
+            },
             ..ToolDescriptor::new(key.clone(), ToolSource::Builtin)
         })?;
         if !order.contains(key) {

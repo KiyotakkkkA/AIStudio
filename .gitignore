@@ -21,3 +21,4 @@ coverage/
 # Test output
 test-results/
 playwright-report/
+__pycache__/

@@ -794,6 +794,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             )
         },
     )?;
+    zvs_host::chat_files::register_chat_file_node(&nodes, &artifacts)?;
     register_kernel_tools(&nodes, &tools)?;
     if let Err(error) = skill_library.install_bundled() {
         logger.log(

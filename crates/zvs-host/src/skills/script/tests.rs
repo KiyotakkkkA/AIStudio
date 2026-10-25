@@ -107,6 +107,17 @@ fn script_stub() {
             std::fs::write("Отчёт.docx", b"PK docx").expect("writes the document");
             std::fs::write("scratch.json", b"{}").expect("writes a helper file");
         }
+        "chat" => {
+            std::fs::write("_spec.json", b"{}").expect("writes a working file");
+            std::fs::create_dir_all("_work").expect("creates a working folder");
+            std::fs::write("_work/table.csv", b"a,b").expect("writes a nested working file");
+            std::fs::write("result.csv", b"a,b").expect("writes a result");
+            let _ = writeln!(
+                stdout,
+                "chat={}",
+                std::env::var("ZVS_CHAT_DIR").unwrap_or_default()
+            );
+        }
         "dashboard" => {
             let folder = std::env::var("ZVS_DASHBOARDS_DIR").expect("the dashboards folder");
             std::fs::write(
@@ -226,6 +237,7 @@ fn input(path: &str) -> SkillScriptInput {
         path: path.to_owned(),
         args: vec!["--table".to_owned(), "1".to_owned()],
         stdin: None,
+        conversation_id: String::new(),
     }
 }
 
@@ -519,6 +531,17 @@ fn the_catalogue_names_the_script_tool_only_when_it_is_offered() {
     }];
     let catalogue = crate::skills::catalogue_text(&entries, &offered);
     assert!(catalogue.contains(&CATALOGUE_SCRIPTS.replace("{script}", &script.name)));
+    assert!(!catalogue.contains("working folder"));
+    let mut with_files = offered.clone();
+    with_files.push(crate::services::chat_tools::OfferedTool {
+        key: crate::chat_files::CHAT_FILE.to_owned(),
+        name: "chat__file".to_owned(),
+        ..script.clone()
+    });
+    let files = crate::skills::catalogue_text(&entries, &with_files);
+    assert!(
+        files.contains(&crate::skills::service::CATALOGUE_FILES.replace("{file}", "chat__file"))
+    );
     let without = crate::skills::catalogue_text(&entries, &offered[..2]);
     assert!(!without.contains(&script.name));
     let loaded = fixture.host.skills.library().load(KEY).expect("loads");
@@ -603,4 +626,41 @@ async fn a_dashboard_written_to_its_library_folder_is_reported_where_it_lies() {
         dashboards.join("Продажи.html")
     );
     assert!(!fixture.scratch.path().join("artifacts").exists());
+}
+
+#[tokio::test]
+async fn in_a_chat_a_script_runs_in_the_chat_folder_and_only_its_results_are_shown() {
+    let fixture = Fixture::new();
+    let store = crate::artifacts::ArtifactStore::new(fixture.scratch.path().join("artifacts"));
+    let node = fixture.node_with(Some(Stub::shared("chat")), |options| SkillScriptOptions {
+        artifacts: Some(store.clone()),
+        ..options
+    });
+    let chat = "01a17431-1de8-713c-9981-dbd5ddd5b80b";
+    let output = node
+        .run(
+            &context(CancellationToken::new()),
+            SkillScriptInput {
+                conversation_id: chat.to_owned(),
+                ..input("scripts/extract.py")
+            },
+        )
+        .await
+        .expect("runs");
+    let folder = crate::chat_files::chat_dir(&store, chat).expect("the chat folder");
+    assert!(
+        output
+            .stdout
+            .contains(&format!("chat={}", folder.display()))
+    );
+    assert!(folder.join("_spec.json").is_file());
+    assert!(folder.join("_work").join("table.csv").is_file());
+    assert_eq!(
+        output
+            .artifacts
+            .iter()
+            .map(|artifact| artifact.name.as_str())
+            .collect::<Vec<_>>(),
+        ["result.csv"]
+    );
 }

@@ -314,7 +314,9 @@ impl SessionNode {
         mode: AgenticPermissionMode,
     ) -> Result<Vec<OfferedTool>, AppError> {
         let registered = self.tools.list(&ToolListFilter::default())?;
-        let mut offered = offered_tools(keys, &registered);
+        let mut keys = keys.to_vec();
+        crate::chat_files::with_chat_files(&mut keys);
+        let mut offered = offered_tools(&keys, &registered);
         offered
             .retain(|tool| ![PLAN_TOOL, COMPLETE_TOOL, FINISH_TOOL].contains(&tool.name.as_str()));
         if mode == AgenticPermissionMode::ReadOnly {
@@ -434,7 +436,10 @@ impl SessionNode {
             }
         };
         let mut arguments = parse_tool_arguments(&call.arguments).unwrap_or_default();
-        if FILE_TOOLS.contains(&tool.key.as_str()) || PROCESS_TOOLS.contains(&tool.key.as_str()) {
+        if FILE_TOOLS.contains(&tool.key.as_str())
+            || PROCESS_TOOLS.contains(&tool.key.as_str())
+            || crate::services::chat::CHAT_SCOPED_TOOLS.contains(&tool.key.as_str())
+        {
             arguments.insert("conversationId".to_owned(), json!(session_id));
         }
         progress.usage.tool_calls += 1;

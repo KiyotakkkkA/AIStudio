@@ -92,6 +92,9 @@ pub struct SkillScriptInput {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(description = "Текст, передаваемый скрипту на стандартный ввод")]
     pub stdin: Option<String>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    #[schemars(skip)]
+    pub conversation_id: String,
 }
 
 impl Validate for SkillScriptInput {
@@ -213,7 +216,22 @@ impl NodeDef for SkillScriptNode {
         let mut spec = launcher
             .launch_command(runtime.command(), &args)
             .unwrap_or_else(|| Err(missing()))?;
-        let scratch = prepare_scratch(&self.options.scratch, &context.run_id.to_string())?;
+        let chat = match (&self.options.artifacts, input.conversation_id.is_empty()) {
+            (Some(store), false) => {
+                Some(crate::chat_files::chat_dir(store, &input.conversation_id)?)
+            }
+            _ => None,
+        };
+        let scratch = match &chat {
+            Some(folder) => folder.clone(),
+            None => prepare_scratch(&self.options.scratch, &context.run_id.to_string())?,
+        };
+        if let Some(folder) = &chat {
+            spec.env.insert(
+                crate::chat_files::CHAT_DIR_ENV.to_owned(),
+                folder.to_string_lossy().into_owned(),
+            );
+        }
         spec.env.insert(
             SKILL_DIR_ENV.to_owned(),
             script.dir.to_string_lossy().into_owned(),
@@ -267,10 +285,14 @@ impl NodeDef for SkillScriptNode {
             .as_ref()
             .map_or_else(Vec::new, |store| {
                 let mentioned = mentioned_paths(&input.args, &scratch);
-                let mut kept = store.keep(
-                    &context.run_id.to_string(),
-                    &produced(&scratch, &before, &mentioned, started),
-                );
+                let results: Vec<PathBuf> = produced(&scratch, &before, &mentioned, started)
+                    .into_iter()
+                    .filter(|path| {
+                        path.strip_prefix(&scratch)
+                            .map_or(true, |relative| !crate::chat_files::is_working(relative))
+                    })
+                    .collect();
+                let mut kept = store.keep(&context.run_id.to_string(), &results);
                 for (name, folder, previous) in &libraries {
                     kept.extend(store.adopt(name, &produced(folder, previous, &[], started)));
                 }

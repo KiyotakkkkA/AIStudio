@@ -67,6 +67,7 @@ export const TOOL_PRESENTATION: Readonly<Record<string, ToolPresentation>> = {
   "job.run": { title: "Фоновое задание", icon: mdiCogPlayOutline, category: "process" },
   "skill.load": { title: "Загрузка навыка", icon: mdiPuzzleOutline, category: "skills" },
   "skill.read": { title: "Файл навыка", icon: mdiPuzzleOutline, category: "skills" },
+  "chat.file": { title: "Рабочая папка диалога", icon: mdiFolderOpenOutline, category: "files" },
   "skill.save": { title: "Сохранение навыка", icon: mdiPuzzleEditOutline, category: "skills" },
   "skill.script": { title: "Скрипт навыка", icon: mdiScriptTextPlayOutline, category: "skills" },
   "download.fetch": { title: "Загрузка файла", icon: mdiDownloadOutline, category: "data" },
