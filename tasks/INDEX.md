@@ -198,6 +198,16 @@ Electron app untouched. TASK_066's CDP client is reused by TASK_046.
 - [x] **TASK_044** — Document viewer dock and selection → chat
 - [x] **TASK_044_EXTRA_1** — Questions to the user: the `chat.ask` bridge, a question gate in the kernel, the answer card
 - [x] **TASK_045** — Attached browser workspace, WebContentsView, session partition
+- [ ] **TASK_045_EXTRA_1** — Tool surface consolidation: fewer, non-overlapping model tools and no leaked kernel jobs
+- [ ] **TASK_045_EXTRA_2** — Tool dialects in the web adapters: the injected protocol leaves the service layer
+- [ ] **TASK_045_EXTRA_3** — Chat turn reattach: a reopened chat shows the live turn, its approvals and its questions
+- [ ] **TASK_045_EXTRA_4** — Skill read-first files: required references arrive with `skill.load`, tool names match the wire *(after TASK_045_EXTRA_1)*
+- [ ] **TASK_045_EXTRA_5** — Storage: lean run events, one folder per conversation, disk usage by category *(after TASK_045_EXTRA_3)*
+
+The five `TASK_045_EXTRA_` tasks come from the 2026-10-25 audit of tools, tool-call parsing,
+chat restore, skills and storage. They sit under TASK_045 by numbering only and do not depend
+on its code. Suggested order: 045_EXTRA_3 → 045_EXTRA_5 (part A) → 045_EXTRA_1 →
+045_EXTRA_4 → 045_EXTRA_2.
 - [ ] **TASK_046** — CDP driver, `browser.*` nodes, policy engine
 - [ ] **TASK_047** — Browser agent panel, approvals, rate limiter
 
@@ -310,6 +320,8 @@ you can settle the load-bearing ones early rather than being interrupted mid-tas
 | TASK_038 (resolved) | React Flow now, revisit if it fights the design (option c). The graph lives in our own model (`graphModel.ts` reducers, `ScenarioEditor`); React Flow only renders it, so a hand-rolled canvas stays open. | **no** |
 | TASK_040 (resolved) | Option (a): 25 steps, 200 000 tokens, 15 minutes; exhaustion pauses the session and `agentic.extend` continues it. The three limits are read from settings (`agentic.budget.maxSteps`, `maxTokens`, `maxMinutes`) for TASK_052 to expose. | yes |
 | TASK_043 (superseded by ADR 0003) | LibreOffice integration removed in TASK_044 after the managed copy crashed on almost every conversion. Office documents render in the renderer (docx-preview, an OOXML sheet reader, slide text). «Компоненты» holds Node.js and uv. | moderate |
+| TASK_045_EXTRA_1 | Merge `chat.file`, `skill.read` and `skill.script` into `fs.*` / `shell.run` through virtual roots: all three, only the read-only merge, or none (fallback: none — only the leaked jobs and knowledge duplicates go)? | yes |
+| TASK_045_EXTRA_5 | Existing chat folders and artifacts: migrate to `conversations/<id>/…` on first start, new layout for new conversations only, or skip the layout and do events and usage only (fallback)? | **no** — moves user data |
 | TASK_049 | Does mail send automatically once approved, or per message? | yes |
 | TASK_050 | Telegram: bot account, or your personal account? | **no** |
 | TASK_056 | Code-sign the installer? Auto-update or manual? WebView2 runtime: download, embed bootstrapper, or offline? | moderate |
