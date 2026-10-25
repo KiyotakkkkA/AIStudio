@@ -1183,6 +1183,137 @@ async fn a_turn_lists_the_skills_and_offers_skill_load_even_when_the_conversatio
 }
 
 #[tokio::test]
+async fn a_skill_script_waits_for_its_required_reading_and_the_hint_costs_no_budget() {
+    let database = temporary_database();
+    database
+        .with_connection(|connection| {
+            Repositories::new(connection)
+                .settings
+                .set(TOOL_CALLS_KEY, "4", 2)?;
+            Ok(())
+        })
+        .expect("a setting");
+    let registry = Arc::new(NodeRegistry::new());
+    register_core_nodes(&registry).expect("registers the core nodes");
+    registry
+        .register(FnNode::new(
+            crate::skills::SKILL_LOAD,
+            PermissionRequirement::tool(crate::skills::SKILL_LOAD),
+            false,
+            |_context: StepContext, _input: Value| async move {
+                Ok(
+                    serde_json::from_value::<crate::skills::nodes::SkillLoadOutput>(json!({
+                        "key": "dashboard",
+                        "name": "Дашборды",
+                        "folder": "skill:dashboard/",
+                        "files": [],
+                        "inlined": [],
+                        "required": ["references/spec.md"],
+                        "requires": { "scripts/build.py": ["references/spec.md"] },
+                        "text": "Read references/spec.md with fs.read, then build with shell.run."
+                    }))
+                    .expect("a load output"),
+                )
+            },
+        ))
+        .expect("registers skill.load");
+    registry
+        .register(FnNode::new(
+            crate::files::FS_READ,
+            PermissionRequirement::tool(crate::files::FS_READ),
+            false,
+            |_context: StepContext, _input: Value| async move {
+                Ok(TextOutput {
+                    text: "spec".to_owned(),
+                })
+            },
+        ))
+        .expect("registers fs.read");
+    let runs = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&runs);
+    registry
+        .register(FnNode::new(
+            crate::commands::SHELL_RUN,
+            PermissionRequirement::tool(crate::commands::SHELL_RUN),
+            false,
+            move |_context: StepContext, _input: Value| {
+                let counted = Arc::clone(&counted);
+                async move {
+                    counted.fetch_add(1, Ordering::SeqCst);
+                    Ok(TextOutput {
+                        text: "built".to_owned(),
+                    })
+                }
+            },
+        ))
+        .expect("registers shell.run");
+    let tools = ToolRegistry::new(ToolRegistryOptions::new(database.shared()));
+    for key in crate::skills::SKILL_TOOLS {
+        tools
+            .register(&ToolDescriptor {
+                read_only: key != crate::commands::SHELL_RUN,
+                tier: Some(ToolTier::Auto),
+                ..ToolDescriptor::new(key, ToolSource::Builtin)
+            })
+            .expect("registers a skill tool");
+    }
+    let build = json!({ "argv": ["skill:dashboard/scripts/build.py", "_spec.json"] });
+    let spec = json!({ "paths": [{ "path": "skill:dashboard/references/spec.md" }] });
+    let driver = Scripted::new();
+    driver.round(|_| vec![call("skill__load", &json!({ "key": "dashboard" }))]);
+    let (first, second) = (build.clone(), spec.clone());
+    driver.round(move |_| {
+        vec![
+            call_with_id("shell__run", &first, "early"),
+            call_with_id("fs__read", &second, "read"),
+            call_with_id("shell__run", &first, "build"),
+        ]
+    });
+    driver.round(move |_| vec![call_with_id("fs__read", &spec, "again")]);
+    driver.fallback(|_| vec![text("Built.")]);
+    let harness = Harness::with(HarnessOptions {
+        database: Some(database.shared()),
+        providers: Some(Arc::new(OneDriver(Arc::clone(&driver) as SharedTextDriver))),
+        tools: Some(tools),
+        skills: Some(Arc::new(OneSkill)),
+        registry: Some(registry),
+        capabilities: vec![ProviderCapability::Text],
+        context_window: 16384,
+        max_output: 512,
+        ..HarnessOptions::default()
+    });
+    let created = harness.create(harness.input());
+
+    let handle = within(harness.turn(created, "Write the release notes")).await;
+
+    assert_eq!(harness.status(&handle), RunStatus::Succeeded);
+    let calls = harness.last(created).tool_calls;
+    assert_eq!(
+        calls[0].result.as_deref(),
+        Some("Read references/spec.md with fs__read, then build with shell__run.")
+    );
+    assert_eq!(calls[1].status, ChatToolCallStatus::Refused);
+    assert_eq!(
+        calls[1].error.as_deref(),
+        Some(
+            format!(
+                "{}: skill:dashboard/references/spec.md",
+                crate::skills::turn::READ_BEFORE_RUN
+            )
+            .as_str()
+        )
+    );
+    assert_eq!(
+        calls[2..]
+            .iter()
+            .map(|call| call.status)
+            .collect::<Vec<_>>(),
+        [ChatToolCallStatus::Succeeded; 3]
+    );
+    assert_eq!(runs.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
 async fn read_only_calls_of_one_round_overlap_and_return_in_call_order() {
     let test = Loop::new();
     test.driver.round(|_| {

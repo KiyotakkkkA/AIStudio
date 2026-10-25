@@ -20,6 +20,8 @@ FILES_MAX = 200
 FILE_MAX = 1024 * 1024
 TOTAL_MAX = 10 * 1024 * 1024
 PATH_MAX = 240
+READ_FIRST_BUDGET = 16_000
+TOKEN = re.compile(r"\"([^\"]*)\"|'([^']*)'|([^\s,\[\]{}:\"']+)")
 
 
 def unquote(value: str) -> str:
@@ -137,6 +139,19 @@ def check(folder: Path) -> dict:
         problems.append(f"{len(files)} files, the limit is {FILES_MAX}")
     if total > TOTAL_MAX:
         problems.append("the files exceed 10 MiB in total")
+    for field, dirs in (("read-first", ("references/", "assets/")), ("requires", ("references/", "assets/", "scripts/"))):
+        listed = [next(part for part in token if part) for token in TOKEN.findall(metadata.get(field, ""))]
+        for path in listed:
+            if not path.startswith(dirs):
+                problems.append(f"metadata.{field}: {path} must be under {' or '.join(dirs)}")
+            elif path not in files:
+                problems.append(f"metadata.{field}: {path} is not in this skill")
+        if field == "read-first" and len(listed) != len(set(listed)):
+            problems.append("metadata.read-first lists a file twice")
+        if field == "read-first":
+            size = sum(len((folder / path).read_text(encoding="utf-8", errors="replace")) for path in listed if path in files)
+            if size > READ_FIRST_BUDGET:
+                warnings.append(f"metadata.read-first files hold {size} characters; only about {READ_FIRST_BUDGET} are sent with the skill")
     for match in re.findall(r"`((?:references|scripts|assets)/[^`\s]+)`", instructions):
         if match not in files and "…" not in match and "*" not in match:
             warnings.append(f"the instructions mention {match}, which is not in this skill")

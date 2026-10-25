@@ -3,13 +3,13 @@ name: skill-creator
 description: "Создание нового навыка и доработка существующего: выяснение задачи у пользователя, описание, по которому навык срабатывает, инструкции, справочные материалы, скрипты и шаблоны, проверка и сохранение в библиотеку навыков. Используется, когда пользователь просит создать, написать, придумать или улучшить навык, сохранить повторяющийся порядок работы как навык или научить приложение новой задаче."
 metadata:
   display-name: Создание навыков
-  version: "1.2.1"
+  version: "1.3.0"
   author: ZVS AI Studio
 ---
 
 # Skill creator
 
-A skill is a folder the app offers to the model when a request matches it: `SKILL.md` holds the frontmatter and the instructions, and `references/`, `scripts/` and `assets/` hold the files the instructions point to. Only the description is always visible to the model; the instructions are loaded when the skill is chosen, and the files are read only when the instructions need them. Write every skill with that order in mind.
+A skill is a folder the app offers to the model when a request matches it: `SKILL.md` holds the frontmatter and the instructions, and `references/`, `scripts/` and `assets/` hold the files the instructions point to. Only the description is always visible to the model; the instructions are loaded when the skill is chosen, together with the files listed in `metadata.read-first`, and the other files are read only when the instructions need them. Write every skill with that order in mind.
 
 ## Workflow
 
@@ -22,7 +22,7 @@ A skill is a folder the app offers to the model when a request matches it: `SKIL
 
 ## Saving
 
-- **`skill.save` is offered:** call it with `key`, `name`, `description`, `instructions` (the Markdown body without frontmatter) and `files` (each with `path` and text `content`). The user confirms every call. The result reports `status` and `issues`; when it reports issues, fix them and call again with `replace: true`.
+- **`skill.save` is offered:** call it with `key`, `name`, `description`, `instructions` (the Markdown body without frontmatter), `files` (each with `path` and text `content`) and, when the skill needs them, `readFirst` and `requires` (see `references/anatomy.md`). The user confirms every call. The result reports `status` and `issues`; when it reports issues, fix them and call again with `replace: true`.
 - An error ending with a list such as `key (duplicate)` or `files.0 (path)` names the fields to fix. `duplicate` means a skill with that identifier exists: pick another identifier, or set `replace: true` only when the user asked to rewrite their own skill. Bundled skills are never overwritten; suggest a new identifier instead.
 - **`skill.save` is not offered, but `fs.apply` is:** write the folder `<key>/` with `SKILL.md` and its files into the conversation's workspace, run `skill:skill-creator/scripts/check_skill.py` on it with `shell.run` when it is offered, and tell the user to add it with «Импорт папки» on the «Навыки» page.
 - **Neither is offered:** give the complete `SKILL.md` and every file in code blocks, each with its path, and say how to create the folder and import it. Mention that enabling the `skill.save` tool for the conversation lets the skill be saved directly.

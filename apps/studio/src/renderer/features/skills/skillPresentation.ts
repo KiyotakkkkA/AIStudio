@@ -36,6 +36,8 @@ const FIELD_LABELS: Record<string, string> = {
   name: "Название",
   description: "Описание",
   instructions: "Инструкции",
+  readFirst: "Обязательные файлы",
+  requires: "Файлы перед запуском скриптов",
   files: "Файлы",
   removeFiles: "Файлы",
   path: "Папка навыка",

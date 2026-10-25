@@ -858,6 +858,186 @@ async fn the_kernel_refuses_a_model_call_outside_the_runs_allowed_tools() {
     assert_eq!(open["admitted"], json!(true));
 }
 
+fn rewrite_metadata(host: &Host, key: &str, metadata: &str) {
+    let manifest = host.workspace.join(SKILLS_DIR).join(key).join(SKILL_FILE);
+    let text = fs::read_to_string(&manifest).expect("a manifest");
+    let text = text.replacen("metadata:\n", &format!("metadata:\n{metadata}"), 1);
+    fs::write(&manifest, text).expect("rewrites the manifest");
+}
+
+#[test]
+fn read_first_and_requires_must_name_files_of_the_skill_once_in_the_right_folders() {
+    let host = host();
+    let saved = host.service.create(&notes()).expect("creates");
+    rewrite_metadata(
+        &host,
+        "release-notes",
+        "  read-first: [references/style.md, references/none.md, scripts/x.py, references/style.md]\n  \
+         requires: { references/style.md: [references/style.md], scripts/none.py: [assets/none.png, assets/logo.bin, assets/logo.bin] }\n",
+    );
+    let checked = host.service.get(&saved.skill.id).expect("re-reads");
+    assert_eq!(checked.skill.status, SkillStatus::Invalid);
+    assert_eq!(
+        checked.skill.issues,
+        [
+            issue("readFirst.1", SkillIssueRule::Missing),
+            issue("readFirst.2", SkillIssueRule::Path),
+            issue("readFirst.3", SkillIssueRule::Duplicate),
+            issue("requires.0", SkillIssueRule::Path),
+            issue("requires.1", SkillIssueRule::Missing),
+            issue("requires.1.0", SkillIssueRule::Missing),
+            issue("requires.1.2", SkillIssueRule::Duplicate),
+        ]
+    );
+    let other = host.service.create(&weather()).expect("creates weather");
+    rewrite_metadata(&host, "weather", "  read-first: [references/a.md\n");
+    assert_eq!(
+        host.service
+            .get(&other.skill.id)
+            .expect("re-reads")
+            .skill
+            .issues,
+        [issue("readFirst", SkillIssueRule::Manifest)]
+    );
+}
+
+async fn loaded_output(host: &Host, key: &str) -> Value {
+    let handle = host
+        .runs
+        .start(StartRunInput {
+            kind: RunKind::Skill,
+            subject_id: None,
+            title: None,
+            retry_of_id: None,
+            graph: RunGraph {
+                nodes: vec![GraphNode {
+                    dependencies: Some(Vec::new()),
+                    input: Some(json!({ "key": key })),
+                    bindings: Some(std::collections::BTreeMap::new()),
+                    retry: Some(RetryPolicy::default()),
+                    ..GraphNode::new("probe", SKILL_LOAD)
+                }],
+                permission_scopes: Some(vec![format!("skill:{key}")]),
+                allowed_tools: None,
+            },
+            input: None,
+            concurrency: Some(1),
+        })
+        .expect("starts");
+    probe_output(host, handle).await
+}
+
+#[tokio::test]
+async fn skill_load_inlines_read_first_files_in_order_within_the_budget_and_describes_every_file() {
+    let host = host();
+    let text = |content: String, path: &str| SkillFileInput {
+        path: path.to_owned(),
+        content,
+        encoding: None,
+    };
+    let long = |heading: &str, size: usize| format!("# {heading}\n\n{}", "x".repeat(size));
+    host.service
+        .create(&CreateSkillInput {
+            files: Some(vec![
+                text(long("Alpha", 10_000), "references/a.md"),
+                text(long("Beta", 7_000), "references/b.md"),
+                text("# Gamma\n\nshort".to_owned(), "references/c.md"),
+                text(
+                    "\"\"\"Build the page from a spec.\"\"\"\nimport sys\n".to_owned(),
+                    "scripts/run.py",
+                ),
+                SkillFileInput {
+                    path: "assets/logo.bin".to_owned(),
+                    content: "AAEC".to_owned(),
+                    encoding: Some(SkillFileEncoding::Base64),
+                },
+            ]),
+            instructions: "Read with fs.read, run with shell.run.".to_owned(),
+            ..notes()
+        })
+        .expect("creates");
+    rewrite_metadata(
+        &host,
+        "release-notes",
+        "  read-first: [assets/logo.bin, references/a.md, references/b.md, references/c.md]\n  \
+         requires: { scripts/run.py: [references/b.md] }\n",
+    );
+    let output = loaded_output(&host, "release-notes").await;
+    assert_eq!(output["inlined"], json!(["references/a.md"]));
+    assert_eq!(
+        output["required"],
+        json!(["references/b.md", "references/c.md"])
+    );
+    assert_eq!(
+        output["requires"],
+        json!({ "scripts/run.py": ["references/b.md"] })
+    );
+    let purposes: Vec<(String, Value)> = output["files"]
+        .as_array()
+        .expect("files")
+        .iter()
+        .map(|file| {
+            (
+                file["path"].as_str().unwrap_or_default().to_owned(),
+                file["purpose"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        purposes,
+        [
+            ("assets/logo.bin".to_owned(), Value::Null),
+            ("references/a.md".to_owned(), json!("Alpha")),
+            ("references/b.md".to_owned(), json!("Beta")),
+            ("references/c.md".to_owned(), json!("Gamma")),
+            (
+                "scripts/run.py".to_owned(),
+                json!("Build the page from a spec.")
+            ),
+        ]
+    );
+    let text = output["text"].as_str().expect("a text");
+    assert!(
+        text.contains("<instructions>\nRead with fs.read, run with shell.run.\n</instructions>")
+    );
+    assert!(text.contains("<file path=\"skill:release-notes/references/a.md\">\n# Alpha"));
+    assert!(!text.contains("# Beta"));
+    assert!(!text.contains("<file path=\"skill:release-notes/assets/logo.bin\">"));
+    assert!(text.contains(
+        "read skill:release-notes/references/b.md, skill:release-notes/references/c.md with fs.read"
+    ));
+    assert!(text.contains("- references/a.md (10009 B): Alpha [included below]"));
+    assert!(text.chars().count() < 12_000);
+}
+
+#[tokio::test]
+async fn the_bundled_dashboard_arrives_with_its_spec_and_exploration_guide_in_one_call() {
+    let host = host();
+    host.service.library().install_bundled().expect("installs");
+    let output = loaded_output(&host, "dashboard").await;
+    assert_eq!(
+        output["inlined"],
+        json!(["references/spec.md", "references/exploration.md"])
+    );
+    assert_eq!(output["required"], json!([]));
+    assert_eq!(
+        output["requires"],
+        json!({ "scripts/build_dashboard.py": ["references/spec.md"] })
+    );
+    assert!(
+        output["files"]
+            .as_array()
+            .expect("files")
+            .iter()
+            .filter(|file| file["path"]
+                .as_str()
+                .is_some_and(|path| path.ends_with(".md")))
+            .all(|file| file["purpose"].is_string())
+    );
+    let text = output["text"].as_str().expect("a text");
+    assert!(text.chars().count() <= turn::SKILL_LOAD_RESULT_MAX_CHARS);
+}
+
 #[tokio::test]
 async fn skill_load_and_skill_read_serve_the_instructions_and_stay_inside_the_folder() {
     let host = host();
@@ -1406,6 +1586,47 @@ fn an_authored_skill_is_saved_as_a_local_versioned_skill_with_its_files() {
     assert_eq!(replaced.skill.id, saved.skill.id);
     assert_eq!(replaced.skill.version.as_deref(), Some("1.1.0"));
     assert!(replaced.files.is_empty());
+}
+
+#[test]
+fn an_authored_skill_keeps_its_read_first_files_and_script_requirements() {
+    let host = host();
+    let library = host.service.library();
+    let requires = vec![(
+        "scripts/build.py".to_owned(),
+        vec!["references/format.md".to_owned()],
+    )];
+    let saved = library
+        .author(&AuthoredSkill {
+            files: vec![
+                (
+                    "references/format.md".to_owned(),
+                    "# Format\n\nТаблица.".to_owned(),
+                ),
+                (
+                    "scripts/build.py".to_owned(),
+                    "\"\"\"Build.\"\"\"\n".to_owned(),
+                ),
+            ],
+            read_first: vec!["references/format.md".to_owned()],
+            requires: requires.clone(),
+            ..authored("provider-report")
+        })
+        .expect("saves");
+    assert_eq!(saved.skill.status, SkillStatus::Ready);
+    let loaded = library.load("provider-report").expect("loads");
+    assert_eq!(loaded.read_first, ["references/format.md"]);
+    assert_eq!(loaded.requires, requires);
+    let error = library
+        .author(&AuthoredSkill {
+            read_first: vec!["references/none.md".to_owned()],
+            ..authored("other-report")
+        })
+        .expect_err("a missing read-first file is refused");
+    assert_eq!(
+        issues_of(&error),
+        [issue("readFirst.0", SkillIssueRule::Missing)]
+    );
 }
 
 #[test]

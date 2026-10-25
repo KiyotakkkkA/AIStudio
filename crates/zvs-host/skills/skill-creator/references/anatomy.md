@@ -18,6 +18,8 @@ metadata:
   display-name: Заметки о выпуске
   version: "1.0.0"
   author: Имя автора
+  read-first: [references/style.md]
+  requires: { scripts/build.py: [references/format.md] }
 ---
 
 # Release notes
@@ -32,10 +34,12 @@ Instructions in Markdown.
 | `metadata.display-name` | The name shown to the user, at most 120 characters.                                                |
 | `metadata.version`      | `major.minor.patch`. Start at `1.0.0`.                                                              |
 | `metadata.author`       | Optional.                                                                                           |
+| `metadata.read-first`   | Optional. A list of files under `references/` or `assets/` the model needs for every request. Their text is sent with the instructions when the skill is loaded, in the listed order, up to about 16 000 characters in total; files past that are named as required reading. List only what every run needs. |
+| `metadata.requires`     | Optional. Maps a script to the files that must be read before it runs: `{ scripts/build.py: [references/format.md] }`. Running the script before those files were loaded or read in the same turn returns a hint naming them instead of running. |
 
 With `skill.save` you pass these as arguments and the app writes the frontmatter itself; `instructions` is only the Markdown body.
 
-Values are plain one-line strings. Quote a value that contains `:` or `#`. Multi-line values (`|`, `>`) are not supported.
+Values are plain one-line strings. Quote a value that contains `:` or `#`. Multi-line values (`|`, `>`) are not supported. `read-first` and `requires` are written on one line in square and curly brackets, as above. Every path in them must exist in the skill, appear once, and sit in an allowed folder, otherwise the skill is invalid.
 
 ## Files
 
@@ -67,7 +71,7 @@ Values are plain one-line strings. Quote a value that contains `:` or `#`. Multi
 ## How the skill is used
 
 1. The model sees `name: description` for the skills that match the request.
-2. It calls `skill.load` and receives the instructions and the file list.
+2. It calls `skill.load` and receives the instructions, the file list with a one-line purpose of each file (a reference's first heading, a script's docstring or `argparse` description) and the text of the `read-first` files.
 3. It reads files with `fs.read` at `skill:<key>/<path>` and runs scripts with `shell.run` (`argv: ["skill:<key>/scripts/<file>", …]`) when the instructions say so.
 
-Point to files by their exact path in the instructions (`Read references/style.md before writing`), and say when each one is needed.
+Point to files by their exact path in the instructions (`Read references/style.md before writing`), and say when each one is needed. Start every reference with a `#` heading and every script with a docstring: that line is what the model sees in the file list. Name tools by their key (`fs.read`, `shell.run`); the app replaces the keys with the names the model is offered.

@@ -64,7 +64,9 @@ use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 use crate::services::mcp::{RESOURCE_READER, tool_key};
-use crate::skills::{SKILL_LOAD, SKILL_TOOLS, SkillCatalogue, catalogue_text};
+use crate::skills::{
+    SKILL_LOAD, SKILL_TOOLS, SkillCatalogue, SkillTurn, catalogue_text, presented, result_limit,
+};
 use crate::tools::{ToolRegistry, model_tool};
 use crate::workspace::{FolderAccessService, ForbiddenFolders, folder_access};
 use zvs_contract::mcp::MCP_INSTRUCTIONS_MAX;
@@ -1408,6 +1410,8 @@ struct CallOptions<'a> {
     book: &'a Mutex<Vec<ChatCitationDto>>,
     conversation: &'a str,
     memory: &'a Mutex<MemoryRefs>,
+    offered: &'a [OfferedTool],
+    skills: &'a Mutex<SkillTurn>,
 }
 
 struct PendingCall<'a> {
@@ -1420,6 +1424,7 @@ struct PendingCall<'a> {
 struct CallOutcome {
     content: String,
     compact: Option<String>,
+    refund: bool,
 }
 
 fn knowledge_text(output: &Value, book: &mut Vec<ChatCitationDto>) -> Option<KnowledgeText> {
@@ -1531,10 +1536,13 @@ impl GenerateChatNode {
         let plain = |content: String| CallOutcome {
             content,
             compact: None,
+            refund: false,
         };
         let inner = &self.0;
         let started = inner.now();
-        let limit = options.limit;
+        let limit = options
+            .tool
+            .map_or(options.limit, |tool| result_limit(&tool.key, options.limit));
         let settle =
             |status: ChatToolCallStatus, error: Option<&str>, result: Option<String>| -> String {
                 {
@@ -1674,6 +1682,18 @@ impl GenerateChatNode {
         if tool.roots_only {
             fields.insert("rootsOnly".to_owned(), json!(true));
         }
+        let hint = options
+            .skills
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .hint(&tool.key, &arguments);
+        if let Some(hint) = hint {
+            return Ok(CallOutcome {
+                refund: true,
+                ..plain(settle(ChatToolCallStatus::Refused, Some(&hint), None))
+            });
+        }
+        let observed = arguments.clone();
         let observer_inner = Arc::clone(inner);
         let observer_context = context.clone();
         let observer_calls = Arc::clone(calls);
@@ -1751,6 +1771,7 @@ impl GenerateChatNode {
                                 Some(formatted.text),
                             ),
                             compact: Some(formatted.compact),
+                            refund: false,
                         });
                     }
                 }
@@ -1762,7 +1783,16 @@ impl GenerateChatNode {
                         Some(text.text),
                     )
                 } else {
-                    settle(ChatToolCallStatus::Succeeded, None, Some(text.text))
+                    options
+                        .skills
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .observe(&tool.key, &observed, &result.output);
+                    settle(
+                        ChatToolCallStatus::Succeeded,
+                        None,
+                        Some(presented(&tool.key, text.text, options.offered)),
+                    )
                 }))
             }
             Err(error) if context.is_cancelled() => Err(error),
@@ -1804,6 +1834,7 @@ impl GenerateChatNode {
         let budget = usize::try_from(tool_calls).unwrap_or(CHAT_TOOL_CALLS);
         let book = Mutex::new(knowledge.citations.clone());
         let memory = Mutex::new(memory);
+        let skills = Mutex::new(SkillTurn::default());
         let mut compactable: Vec<Compactable> = Vec::new();
         let driver = providers.text(&base.provider_id)?;
         let mode = if tools.is_empty() {
@@ -1967,12 +1998,17 @@ impl GenerateChatNode {
                                 book: &book,
                                 conversation: &conversation_id,
                                 memory: &memory,
+                                offered: &offered,
+                                skills: &skills,
                             },
                         )
                     }))
                     .await;
                     for (entry, outcome) in group.iter().zip(outcomes) {
                         let outcome = outcome?;
+                        if outcome.refund {
+                            executed -= 1;
+                        }
                         let status = calls.lock().unwrap_or_else(PoisonError::into_inner)
                             [entry.index]
                             .status;

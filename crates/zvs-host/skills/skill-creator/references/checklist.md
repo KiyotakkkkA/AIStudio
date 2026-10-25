@@ -28,3 +28,6 @@
 - [ ] Python scripts declare their dependencies with exact versions in the `# /// script` header.
 - [ ] Scripts take paths as arguments, write nothing into the skill folder and print compact output.
 - [ ] At most 200 files, 1 MiB each, 10 MiB in total.
+- [ ] Every reference starts with a `#` heading and every script with a docstring that says what it does.
+- [ ] `read-first` lists only the references every run needs, at most about 16 000 characters together.
+- [ ] `requires` names, for each script that fails without it, the reference the model must read first.

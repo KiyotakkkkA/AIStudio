@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
@@ -15,6 +15,7 @@ use zvs_contract::{
 };
 
 use super::library::{AuthoredSkill, SkillLibrary};
+use super::turn::{SkillTurn, presented, result_limit};
 use crate::commands::SHELL_RUN;
 use crate::drivers::ai::{ChatMessage, GenerateRequest};
 use crate::files::roots::SKILL_ROOT;
@@ -32,7 +33,7 @@ pub const SKILL_GENERATE: &str = "skill.generate";
 pub const SKILL_SAVE: &str = "skill.save";
 pub const SKILL_TOOLS: [&str; 5] = [SKILL_LOAD, FS_READ, FS_LIST, FS_APPLY, SHELL_RUN];
 
-pub const LOAD_DESCRIPTION: &str = "Загрузка навыка по идентификатору из списка навыков в системном сообщении. Возвращает инструкции навыка, его папку skill:<ключ>/ и перечень файлов: файлы читаются через fs.read, скрипты из scripts/ запускаются через shell.run. При выполнении запроса следуйте инструкциям навыка. Вызывайте только для навыка, который соответствует запросу.";
+pub const LOAD_DESCRIPTION: &str = "Загрузка навыка по идентификатору из списка навыков в системном сообщении. Возвращает инструкции навыка, его папку skill:<ключ>/, перечень файлов с назначением каждого и содержимое файлов, обязательных для чтения; остальные файлы читаются через fs.read, скрипты из scripts/ запускаются через shell.run. При выполнении запроса следуйте инструкциям навыка. Вызывайте только для навыка, который соответствует запросу.";
 pub const SAVE_DESCRIPTION: &str = "Сохранение навыка в библиотеку навыков пользователя: идентификатор, название, описание, по которому навык выбирается, инструкции в Markdown и текстовые файлы в папках references/, scripts/ и assets/. Навык с тем же идентификатором перезаписывается только при replace: true, встроенные навыки не перезаписываются. Каждый вызов подтверждает пользователь. Возвращает состояние навыка и найденные ошибки.";
 
 pub const NO_PROVIDERS: &str = "Сервис провайдеров недоступен";
@@ -63,6 +64,8 @@ impl Validate for SkillLoadInput {
 pub struct SkillFileEntry {
     pub path: String,
     pub size: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -71,8 +74,14 @@ pub struct SkillLoadOutput {
     pub key: String,
     pub name: String,
     pub folder: String,
-    pub instructions: String,
     pub files: Vec<SkillFileEntry>,
+    #[serde(default)]
+    pub inlined: Vec<String>,
+    #[serde(default)]
+    pub required: Vec<String>,
+    #[serde(default)]
+    pub requires: BTreeMap<String, Vec<String>>,
+    pub text: String,
 }
 
 impl Validate for SkillLoadOutput {
@@ -113,6 +122,16 @@ pub struct SkillSaveInput {
     pub version: Option<String>,
     #[serde(default)]
     #[schemars(
+        description = "Файлы из references/ или assets/, которые нужны при каждом запросе: их текст передаётся вместе с инструкциями"
+    )]
+    pub read_first: Vec<String>,
+    #[serde(default)]
+    #[schemars(
+        description = "Скрипты и файлы, которые нужно прочитать до их запуска, например {\"scripts/build.py\": [\"references/format.md\"]}"
+    )]
+    pub requires: BTreeMap<String, Vec<String>>,
+    #[serde(default)]
+    #[schemars(
         description = "true — перезаписать навык пользователя с тем же идентификатором целиком"
     )]
     pub replace: bool,
@@ -133,6 +152,24 @@ impl Validate for SkillSaveInput {
         }
         if let Some(version) = &self.version {
             check::max_len("version", version, SKILL_VERSION_MAX)?;
+        }
+        if self.read_first.len() > SKILL_FILES_MAX {
+            return Err(zvs_contract::validate::invalid("readFirst", "maxLength"));
+        }
+        for (index, path) in self.read_first.iter().enumerate() {
+            check::max_len(&format!("readFirst.{index}"), path, SKILL_PATH_MAX)?;
+        }
+        if self.requires.len() > SKILL_FILES_MAX {
+            return Err(zvs_contract::validate::invalid("requires", "maxLength"));
+        }
+        for (script, files) in &self.requires {
+            check::max_len("requires", script, SKILL_PATH_MAX)?;
+            if files.len() > SKILL_FILES_MAX {
+                return Err(zvs_contract::validate::invalid("requires", "maxLength"));
+            }
+            for path in files {
+                check::max_len("requires", path, SKILL_PATH_MAX)?;
+            }
         }
         Ok(())
     }
@@ -215,6 +252,8 @@ impl NodeDef for SkillSaveNode {
                     .map(|file| (file.path, file.content))
                     .collect(),
                 version: input.version,
+                read_first: input.read_first,
+                requires: input.requires.into_iter().collect(),
                 replace: input.replace,
             })
             .map_err(explained)?;
@@ -253,21 +292,97 @@ impl NodeDef for SkillLoadNode {
     ) -> Result<SkillLoadOutput, AppError> {
         context.check_cancelled()?;
         let loaded = self.0.load(&input.key)?;
-        Ok(SkillLoadOutput {
+        let mut remaining = READ_FIRST_BUDGET;
+        let mut inlined: Vec<(String, String)> = Vec::new();
+        let mut required = Vec::new();
+        for path in &loaded.read_first {
+            let Some(text) = self
+                .0
+                .read(&loaded.skill.key, path)
+                .ok()
+                .and_then(|content| content.text)
+            else {
+                continue;
+            };
+            let length = text.chars().count();
+            if required.is_empty() && length <= remaining {
+                remaining -= length;
+                inlined.push((path.clone(), text));
+            } else {
+                required.push(path.clone());
+            }
+        }
+        let output = SkillLoadOutput {
             folder: format!("{SKILL_ROOT}{}/", loaded.skill.key),
-            key: loaded.skill.key,
-            name: loaded.skill.name,
-            instructions: loaded.instructions,
             files: loaded
                 .files
-                .into_iter()
+                .iter()
                 .map(|file| SkillFileEntry {
-                    path: file.path,
+                    path: file.path.clone(),
                     size: file.size,
+                    purpose: file.purpose.clone(),
                 })
                 .collect(),
+            inlined: inlined.iter().map(|(path, _)| path.clone()).collect(),
+            required,
+            requires: loaded.requires.iter().cloned().collect(),
+            text: String::new(),
+            key: loaded.skill.key,
+            name: loaded.skill.name,
+        };
+        Ok(SkillLoadOutput {
+            text: load_text(&output, &loaded.instructions, &inlined),
+            ..output
         })
     }
+}
+
+pub const READ_FIRST_BUDGET: usize = 16_000;
+
+fn load_text(output: &SkillLoadOutput, instructions: &str, inlined: &[(String, String)]) -> String {
+    let folder = &output.folder;
+    let mut text = format!(
+        "Skill \"{}\" ({}) is loaded. Its folder is {folder}: read its files with fs.read at {folder}<path> and run its scripts with shell.run as {folder}scripts/<file>. Follow the instructions below.\n\n<instructions>\n{}\n</instructions>",
+        output.name,
+        output.key,
+        instructions.trim()
+    );
+    if !output.files.is_empty() {
+        text.push_str("\n\nFiles:");
+        for file in &output.files {
+            text.push_str(&format!("\n- {} ({} B)", file.path, file.size));
+            if let Some(purpose) = &file.purpose {
+                text.push_str(&format!(": {purpose}"));
+            }
+            if output.inlined.contains(&file.path) {
+                text.push_str(" [included below]");
+            }
+        }
+    }
+    if !output.required.is_empty() {
+        let paths: Vec<String> = output
+            .required
+            .iter()
+            .map(|path| format!("{folder}{path}"))
+            .collect();
+        text.push_str(&format!(
+            "\n\nRequired reading, not included here: read {} with fs.read before you start.",
+            paths.join(", ")
+        ));
+    }
+    for (script, needed) in &output.requires {
+        text.push_str(&format!(
+            "\n{script} runs only after {} was read in this turn.",
+            needed.join(", ")
+        ));
+    }
+    for (path, content) in inlined {
+        text.push_str(&format!(
+            "\n\n<file path=\"{folder}{path}\">\n{}\n</file>",
+            content.trim_end()
+        ));
+    }
+    text
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -329,6 +444,7 @@ struct Settled {
     error: Option<String>,
     content: String,
     step_id: Option<String>,
+    refund: bool,
 }
 
 fn settled(status: ChatToolCallStatus, error: &str) -> Settled {
@@ -337,6 +453,7 @@ fn settled(status: ChatToolCallStatus, error: &str) -> Settled {
         error: Some(error.to_owned()),
         content: format!("Tool call {}: {error}", status.as_str()),
         step_id: None,
+        refund: false,
     }
 }
 
@@ -347,6 +464,8 @@ impl SkillGenerateNode {
         arguments: &str,
         label: String,
         limit: usize,
+        offered: &[OfferedTool],
+        turn: &mut SkillTurn,
     ) -> Result<Settled, AppError> {
         let Some(tool) = tool else {
             return Ok(settled(ChatToolCallStatus::Refused, NOT_OFFERED));
@@ -354,9 +473,17 @@ impl SkillGenerateNode {
         let Some(arguments) = parse_tool_arguments(arguments) else {
             return Ok(settled(ChatToolCallStatus::Failed, NOT_AN_OBJECT));
         };
+        let arguments = Value::Object(arguments);
+        if let Some(hint) = turn.hint(&tool.key, &arguments) {
+            return Ok(Settled {
+                refund: true,
+                ..settled(ChatToolCallStatus::Refused, &hint)
+            });
+        }
+        let limit = result_limit(&tool.key, limit);
         let request = ToolStepRequest {
             key: tool.key.clone(),
-            input: Value::Object(arguments),
+            input: arguments.clone(),
             label,
             minimum_tier: tool.destructive.then_some(ToolTier::Ask),
             on_approval: None,
@@ -367,7 +494,11 @@ impl SkillGenerateNode {
         match invocation.await {
             Ok(result) => {
                 let text = tool_result_text(&result.output);
-                let capped = cap_text(&text.text, limit);
+                if !text.is_error {
+                    turn.observe(&tool.key, &arguments, &result.output);
+                }
+                let shown = presented(&tool.key, text.text, offered);
+                let capped = cap_text(&shown, limit);
                 let content = if capped.truncated {
                     format!("{}\n[result truncated to {limit} characters]", capped.text)
                 } else {
@@ -382,6 +513,7 @@ impl SkillGenerateNode {
                     error: text.is_error.then(|| TOOL_REPORTED_ERROR.to_owned()),
                     content,
                     step_id: Some(result.step_id),
+                    refund: false,
                 })
             }
             Err(error) if context.is_cancelled() => Err(error),
@@ -469,6 +601,7 @@ impl NodeDef for SkillGenerateNode {
         let mut calls: Vec<SkillCallRecord> = Vec::new();
         let mut executed = 0;
         let mut round = 0;
+        let mut turn = SkillTurn::default();
         loop {
             let last = round >= CHAT_TOOL_ROUNDS || executed >= CHAT_TOOL_CALLS;
             if last && !specs.is_empty() {
@@ -499,14 +632,20 @@ impl NodeDef for SkillGenerateNode {
                     settled(ChatToolCallStatus::Refused, BUDGET_EXHAUSTED)
                 } else {
                     executed += 1;
-                    Self::call(
+                    let settled = Self::call(
                         context,
                         tool,
                         &call.arguments,
                         format!("call{}", calls.len() + 1),
                         limit,
+                        &offered,
+                        &mut turn,
                     )
-                    .await?
+                    .await?;
+                    if settled.refund {
+                        executed -= 1;
+                    }
+                    settled
                 };
                 let content =
                     fence_tool_result(&call.name, outcome.status.as_str(), &outcome.content);

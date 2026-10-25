@@ -221,6 +221,51 @@ pub fn cap_text(text: &str, limit: usize) -> Capped {
     }
 }
 
+fn key_character(character: char) -> bool {
+    character.is_ascii_alphanumeric() || character == '_'
+}
+
+pub fn wire_names<'a>(text: &str, offered: impl IntoIterator<Item = &'a OfferedTool>) -> String {
+    let mut renamed: Vec<(&str, &str)> = offered
+        .into_iter()
+        .filter(|tool| tool.key != tool.name)
+        .map(|tool| (tool.key.as_str(), tool.name.as_str()))
+        .collect();
+    renamed.sort_by_key(|(key, _)| std::cmp::Reverse(key.len()));
+    let mut out = text.to_owned();
+    for (key, name) in renamed {
+        let mut result = String::with_capacity(out.len());
+        let mut rest = out.as_str();
+        let mut previous: Option<char> = None;
+        while let Some(at) = rest.find(key) {
+            let before = rest[..at].chars().next_back().or(previous);
+            let after = &rest[at + key.len()..];
+            let mut following = after.chars();
+            let next = following.next();
+            let bounded_before = !before.is_some_and(|character| {
+                key_character(character) || matches!(character, '.' | '-')
+            });
+            let bounded_after = match next {
+                None => true,
+                Some(character) if key_character(character) => false,
+                Some('.' | '-') => !following.next().is_some_and(key_character),
+                Some(_) => true,
+            };
+            result.push_str(&rest[..at]);
+            result.push_str(if bounded_before && bounded_after {
+                name
+            } else {
+                key
+            });
+            previous = key.chars().next_back();
+            rest = after;
+        }
+        result.push_str(rest);
+        out = result;
+    }
+    out
+}
+
 pub fn fence_tool_result(name: &str, status: &str, text: &str) -> String {
     let body = RESULT_FENCE.replace_all(text, "<$1 $2");
     format!("<tool_result name=\"{name}\" status=\"{status}\">\n{body}\n</tool_result>")
@@ -416,6 +461,39 @@ pub fn read_result_text(
 mod tests {
     use super::*;
     use serde_json::from_value;
+
+    #[test]
+    fn tool_keys_in_skill_text_become_the_offered_wire_names_on_word_boundaries() {
+        let registered: Vec<ToolDto> = ["fs.read", "shell.run", "skill.load"]
+            .into_iter()
+            .map(|key| tool(key, json!({ "source": "builtin" })))
+            .collect();
+        let native = offered_tools(
+            &[
+                "fs.read".to_owned(),
+                "shell.run".to_owned(),
+                "skill.load".to_owned(),
+            ],
+            &registered,
+        );
+        let text = "Read with `fs.read`, then shell.run. Not fs.reader, myfs.read, fs.read_all or fs.read.x; skill.load fs.read";
+        assert_eq!(
+            wire_names(text, &native),
+            "Read with `fs__read`, then shell__run. Not fs.reader, myfs.read, fs.read_all or fs.read.x; skill__load fs__read"
+        );
+        let web: Vec<OfferedTool> = native
+            .iter()
+            .map(|tool| OfferedTool {
+                name: tool.key.replace('.', "_"),
+                ..tool.clone()
+            })
+            .collect();
+        assert_eq!(
+            wire_names("fs.read then shell.run", &web),
+            "fs_read then shell_run"
+        );
+        assert_eq!(wire_names("fs.read", &[] as &[OfferedTool]), "fs.read");
+    }
 
     fn tool(key: &str, extra: Value) -> ToolDto {
         let mut base = json!({

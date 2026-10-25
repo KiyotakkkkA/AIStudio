@@ -2,7 +2,7 @@
 task: TASK_045_EXTRA_4
 title: Skill read-first files — required references arrive with skill.load, tool names match the wire
 phase: 8 — Documents and the agent browser
-status: todo
+status: done
 depends_on: [TASK_045, TASK_045_EXTRA_1]
 unblocks: []
 estimate: 3 h
@@ -99,15 +99,65 @@ and confirm the model writes a valid spec on the first build attempt without rea
 
 ## Definition of done
 
-- [ ] `read-first` and `requires` parsed, validated and tested
-- [ ] `skill.load` inlines read-first files within budget and describes every file
-- [ ] Tool names in loaded instructions match the wire names
-- [ ] Bundled skills and `skill-creator` updated, versions bumped
-- [ ] Gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] `read-first` and `requires` parsed, validated and tested
+- [x] `skill.load` inlines read-first files within budget and describes every file
+- [x] Tool names in loaded instructions match the wire names
+- [x] Bundled skills and `skill-creator` updated, versions bumped
+- [x] Gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- `metadata.read-first: [<path>, …]` and `metadata.requires: { <script>: [<path>, …] }` are
+  one-line flow collections parsed in `manifest.rs` (`read_first`, `requires`) and checked in
+  `library.rs` (`reference_issues`) for folder skills, editor drafts and `skill.save`. Issues
+  use the existing rules on `readFirst.N` / `requires.N[.M]`: `path` (wrong folder),
+  `missing` (not in the skill), `duplicate`, `manifest` (syntax). The editor labels them
+  «Обязательные файлы» and «Файлы перед запуском скриптов».
+- `skill.load` returns `text` (instructions, file list, required reading, script
+  preconditions, inlined files) plus `files[].purpose`, `inlined`, `required`, `requires`.
+  Read-first files are inlined in order up to `READ_FIRST_BUDGET` (16 000 chars); the first
+  file that does not fit and all after it become required reads; binary files are never
+  inlined. A purpose is a reference's first heading or first line, a script's docstring,
+  `argparse` description or leading comment, at most 120 chars (`skills/purpose.rs`).
+- Tool keys in a `skill.load` result are rewritten to the wire names offered in the turn
+  (`chat_tools::wire_names`, on word boundaries) in the chat, `skill.generate`, agentic and
+  scenario loops. Its result limit is six times the per-call share, at most 40 000 chars
+  (`turn::result_limit`); before, the 8.5k dashboard instructions alone were cut at 8 000.
+- `skills/turn.rs` `SkillTurn` tracks what a turn loaded and read. In the chat and
+  `skill.generate` loops a `shell.run` of a script listed in `requires` is refused with
+  `READ_BEFORE_RUN: skill:<key>/<path>` until the file was inlined by `skill.load` or read
+  with `fs.read` in the same turn. The hint is refunded from the call budget.
+- `skill.save` takes optional `readFirst` and `requires`.
+- Dashboard 1.6.0: `spec.md` and `exploration.md` are read-first (14 632 chars together),
+  `build_dashboard.py` requires `spec.md`. Skill-creator 1.3.0 documents both keys, file
+  purposes and tool-key rewriting; `check_skill.py` validates the keys.
+- Reading calls on the dashboard flow, fake driver (`the_bundled_dashboard_arrives_with_its_
+  spec_and_exploration_guide_in_one_call`, `a_skill_script_waits_for_its_required_reading_
+  and_the_hint_costs_no_budget`): before, `skill.load` plus `fs.read` of `spec.md` and
+  `exploration.md`, 3 calls (2 when the model batches both paths in one `fs.read`); after, 1.
+  The other references (`aggregation`, `layout`, `components`, one source guide) are still
+  read on demand.
+
 **Deviated from plan:**
+- The precondition only applies once the skill was loaded in the same turn: `SkillTurn`
+  learns `requires` from the `skill.load` result, so a script run in a later turn, with the
+  load in the history, runs without the check.
+- Agentic and scenario loops get the rewrite and the larger limit but not the precondition;
+  there `skill.load` is reached only when the user enables it.
+- A purpose is only taken from Markdown, text and scripts; a first line of JSON, HTML or CSS
+  says nothing, so other assets have none.
+- The flow form is the only supported form of the two keys; nested block YAML under
+  `metadata` is not parsed.
+- The restriction removal the user asked for went into a separate commit before this one
+  (`refactor: drop skill tool and model restrictions`).
+
 **Next session should know:**
+- The manual check with a small local model or a Qwen web account was not run.
+- `pnpm build`, `pnpm test:e2e` and the e2e smoke of the skill editor were not run.
+- Under full parallel `cargo test` on this machine, two skill tests failed once each with
+  «Отказано в доступе (os error 5)» on a folder rename and passed on rerun; it looks like the
+  antivirus, not the code.
+- `pnpm format:check` still flags `apps/studio/src/renderer/ui/organisms/NavRail.tsx`, which
+  this task did not touch.

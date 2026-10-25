@@ -8,6 +8,10 @@ const METADATA: &str = "metadata";
 const DISPLAY_NAME: &str = "display-name";
 pub const VERSION: &str = "version";
 pub const AUTHOR: &str = "author";
+pub const READ_FIRST: &str = "read-first";
+pub const REQUIRES: &str = "requires";
+
+pub type Requires = Vec<(String, Vec<String>)>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Manifest {
@@ -31,6 +35,156 @@ pub fn meta<'a>(metadata: &'a [(String, String)], key: &str) -> Option<&'a str> 
         .find(|(name, _)| name == key)
         .map(|(_, value)| value.trim())
         .filter(|value| !value.is_empty())
+}
+
+pub fn read_first(metadata: &[(String, String)]) -> Option<Vec<String>> {
+    meta(metadata, READ_FIRST).map_or(Some(Vec::new()), |value| match Flow::parse(value)? {
+        Flow::List(items) => items.into_iter().map(Flow::scalar).collect(),
+        Flow::Scalar(item) => Some(vec![item]),
+        Flow::Map(_) => None,
+    })
+}
+
+pub fn requires(metadata: &[(String, String)]) -> Option<Requires> {
+    meta(metadata, REQUIRES).map_or(Some(Vec::new()), |value| {
+        let Flow::Map(entries) = Flow::parse(value)? else {
+            return None;
+        };
+        entries
+            .into_iter()
+            .map(|(script, files)| {
+                let files = match files {
+                    Flow::List(items) => items.into_iter().map(Flow::scalar).collect(),
+                    Flow::Scalar(item) => Some(vec![item]),
+                    Flow::Map(_) => None,
+                }?;
+                Some((script, files))
+            })
+            .collect()
+    })
+}
+
+enum Flow {
+    Scalar(String),
+    List(Vec<Flow>),
+    Map(Vec<(String, Flow)>),
+}
+
+impl Flow {
+    fn parse(text: &str) -> Option<Self> {
+        let chars: Vec<char> = text.chars().collect();
+        let mut cursor = 0;
+        let value = Self::value(&chars, &mut cursor)?;
+        Self::skip(&chars, &mut cursor);
+        (cursor == chars.len()).then_some(value)
+    }
+
+    fn scalar(self) -> Option<String> {
+        match self {
+            Self::Scalar(value) => Some(value),
+            Self::List(_) | Self::Map(_) => None,
+        }
+    }
+
+    fn skip(chars: &[char], cursor: &mut usize) {
+        while chars
+            .get(*cursor)
+            .is_some_and(|character| character.is_whitespace())
+        {
+            *cursor += 1;
+        }
+    }
+
+    fn value(chars: &[char], cursor: &mut usize) -> Option<Self> {
+        Self::skip(chars, cursor);
+        match chars.get(*cursor)? {
+            '[' => {
+                *cursor += 1;
+                let mut items = Vec::new();
+                loop {
+                    Self::skip(chars, cursor);
+                    if chars.get(*cursor) == Some(&']') {
+                        *cursor += 1;
+                        return Some(Self::List(items));
+                    }
+                    items.push(Self::value(chars, cursor)?);
+                    Self::skip(chars, cursor);
+                    match chars.get(*cursor)? {
+                        ',' => *cursor += 1,
+                        ']' => {}
+                        _ => return None,
+                    }
+                }
+            }
+            '{' => {
+                *cursor += 1;
+                let mut entries = Vec::new();
+                loop {
+                    Self::skip(chars, cursor);
+                    if chars.get(*cursor) == Some(&'}') {
+                        *cursor += 1;
+                        return Some(Self::Map(entries));
+                    }
+                    let Self::Scalar(key) = Self::value(chars, cursor)? else {
+                        return None;
+                    };
+                    Self::skip(chars, cursor);
+                    if chars.get(*cursor) != Some(&':') {
+                        return None;
+                    }
+                    *cursor += 1;
+                    entries.push((key, Self::value(chars, cursor)?));
+                    Self::skip(chars, cursor);
+                    match chars.get(*cursor)? {
+                        ',' => *cursor += 1,
+                        '}' => {}
+                        _ => return None,
+                    }
+                }
+            }
+            '"' => {
+                let start = *cursor;
+                *cursor += 1;
+                while *cursor < chars.len() && chars[*cursor] != '"' {
+                    *cursor += if chars[*cursor] == '\\' { 2 } else { 1 };
+                }
+                *cursor += 1;
+                let quoted: String = chars.get(start..*cursor)?.iter().collect();
+                serde_json::from_str(&quoted).ok().map(Self::Scalar)
+            }
+            '\'' => {
+                *cursor += 1;
+                let mut value = String::new();
+                loop {
+                    match chars.get(*cursor)? {
+                        '\'' if chars.get(*cursor + 1) == Some(&'\'') => {
+                            value.push('\'');
+                            *cursor += 2;
+                        }
+                        '\'' => {
+                            *cursor += 1;
+                            return Some(Self::Scalar(value));
+                        }
+                        character => {
+                            value.push(*character);
+                            *cursor += 1;
+                        }
+                    }
+                }
+            }
+            _ => {
+                let start = *cursor;
+                while chars.get(*cursor).is_some_and(|character| {
+                    !matches!(character, ',' | ':' | ']' | '}' | '[' | '{')
+                }) {
+                    *cursor += 1;
+                }
+                let bare: String = chars[start..*cursor].iter().collect();
+                let bare = bare.trim();
+                (!bare.is_empty()).then(|| Self::Scalar(bare.to_owned()))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -193,7 +347,14 @@ pub fn render_manifest(manifest: &Manifest) -> String {
     if !metadata.is_empty() {
         out.push_str(&format!("{METADATA}:\n"));
         for (key, value) in metadata {
-            out.push_str(&format!("  {key}: {}\n", quote(&value)));
+            let flow = matches!(key, READ_FIRST | REQUIRES)
+                && !value.contains(" #")
+                && Flow::parse(&value).is_some_and(|flow| !matches!(flow, Flow::Scalar(_)));
+            if flow {
+                out.push_str(&format!("  {key}: {}\n", value.trim()));
+            } else {
+                out.push_str(&format!("  {key}: {}\n", quote(&value)));
+            }
         }
     }
     out.push_str(FENCE);
@@ -259,6 +420,48 @@ mod tests {
             spaced.extra,
             [("allowed-tools".to_owned(), "a.b c.d e.f".to_owned())]
         );
+    }
+
+    #[test]
+    fn read_first_and_requires_are_flow_collections_that_survive_a_render() {
+        let text = "---\nname: dashboard\ndescription: d\nmetadata:\n  \
+            read-first: [references/spec.md, \"references/exploration.md\"]\n  \
+            requires: { \"scripts/build.py\": [references/spec.md], scripts/check.py: 'assets/a b.json' }\n\
+            ---\n\nSteps.\n";
+        let manifest = parse_manifest(text).expect("parses");
+        assert_eq!(
+            read_first(&manifest.metadata),
+            Some(vec![
+                "references/spec.md".to_owned(),
+                "references/exploration.md".to_owned()
+            ])
+        );
+        let expected = vec![
+            (
+                "scripts/build.py".to_owned(),
+                vec!["references/spec.md".to_owned()],
+            ),
+            (
+                "scripts/check.py".to_owned(),
+                vec!["assets/a b.json".to_owned()],
+            ),
+        ];
+        assert_eq!(requires(&manifest.metadata), Some(expected.clone()));
+        let rendered = render_manifest(&manifest);
+        assert!(
+            rendered
+                .contains("  read-first: [references/spec.md, \"references/exploration.md\"]\n")
+        );
+        let again = parse_manifest(&rendered).expect("parses again");
+        assert_eq!(requires(&again.metadata), Some(expected));
+        assert_eq!(read_first(&[]), Some(Vec::new()));
+        assert_eq!(requires(&[]), Some(Vec::new()));
+        for broken in ["[a, b", "{a: [b]", "[a] tail", "{a}", "[[a]]"] {
+            let metadata = [(READ_FIRST.to_owned(), broken.to_owned())];
+            assert_eq!(read_first(&metadata), None, "{broken}");
+        }
+        let listed = [(REQUIRES.to_owned(), "[scripts/a.py]".to_owned())];
+        assert_eq!(requires(&listed), None);
     }
 
     #[test]

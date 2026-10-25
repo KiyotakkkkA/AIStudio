@@ -28,6 +28,7 @@ use crate::services::chat_tools::{
     offered_tools, parse_tool_arguments, tool_result_text, tool_specs,
 };
 use crate::services::token_estimate::estimate_tokens;
+use crate::skills::{presented, result_limit};
 use crate::tools::ToolRegistry;
 
 pub const AGENTIC_SESSION: &str = "agentic.session";
@@ -423,6 +424,7 @@ impl SessionNode {
         context: &StepContext,
         session_id: &str,
         tool: &OfferedTool,
+        by_name: &HashMap<&str, &OfferedTool>,
         call: &ToolCall,
         progress: &mut Progress,
     ) -> Result<String, AppError> {
@@ -446,7 +448,8 @@ impl SessionNode {
                 link(&mut progress.plan, &result.step_id);
                 record_changes(&mut progress.changed, &result.output);
                 let rendered = tool_result_text(&result.output);
-                let capped = cap_text(&rendered.text, TOOL_RESULT_MAX_CHARS);
+                let shown = presented(&tool.key, rendered.text, by_name.values().copied());
+                let capped = cap_text(&shown, result_limit(&tool.key, TOOL_RESULT_MAX_CHARS));
                 Ok(shape(
                     if rendered.is_error {
                         "failed"
@@ -646,7 +649,7 @@ impl NodeDef for SessionNode {
                     }
                     name => match by_name.get(name) {
                         Some(tool) => {
-                            self.call_tool(context, &id, tool, call, &mut progress)
+                            self.call_tool(context, &id, tool, &by_name, call, &mut progress)
                                 .await?
                         }
                         None => fence_tool_result(name, "refused", TOOL_NOT_OFFERED),

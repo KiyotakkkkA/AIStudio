@@ -26,6 +26,7 @@ use crate::services::chat_tools::{
     fence_tool_result, offered_tools, parse_tool_arguments, tool_parameters, tool_result_text,
     tool_specs, wire_tool_name,
 };
+use crate::skills::{presented, result_limit};
 use crate::tools::ToolRegistry;
 
 pub const EFFECTS_UNAVAILABLE: &str = "Действия сценария недоступны";
@@ -511,7 +512,8 @@ impl AgentNode {
         match invocation.await {
             Ok(result) => {
                 let rendered = tool_result_text(&result.output);
-                let capped = cap_text(&rendered.text, TOOL_RESULT_MAX_CHARS);
+                let shown = presented(&tool.key, rendered.text, by_name.values().copied());
+                let capped = cap_text(&shown, result_limit(&tool.key, TOOL_RESULT_MAX_CHARS));
                 Ok(shape(
                     if rendered.is_error {
                         "failed"

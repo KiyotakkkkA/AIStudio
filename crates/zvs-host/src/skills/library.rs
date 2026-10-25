@@ -21,8 +21,10 @@ use zvs_contract::{
 
 use super::bundled::{BUNDLED_SKILLS, BundledSkill, is_newer};
 use super::manifest::{
-    AUTHOR, Manifest, SKILL_FILE, VERSION, meta, parse_manifest, render_manifest,
+    AUTHOR, Manifest, READ_FIRST, REQUIRES, Requires, SKILL_FILE, VERSION, meta, parse_manifest,
+    read_first, render_manifest, requires,
 };
+use super::purpose::purpose_of;
 use crate::data::schema::SkillRow;
 use crate::data::{Database, Repositories};
 use crate::platform::clock::{SharedClock, SystemClock};
@@ -106,7 +108,16 @@ pub struct SkillLibrary {
 pub struct LoadedSkill {
     pub skill: SkillDto,
     pub instructions: String,
-    pub files: Vec<SkillFileDto>,
+    pub files: Vec<LoadedFile>,
+    pub read_first: Vec<String>,
+    pub requires: Requires,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LoadedFile {
+    pub path: String,
+    pub size: u64,
+    pub purpose: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,6 +135,8 @@ pub struct AuthoredSkill {
     pub instructions: String,
     pub files: Vec<(String, String)>,
     pub version: Option<String>,
+    pub read_first: Vec<String>,
+    pub requires: Requires,
     pub replace: bool,
 }
 
@@ -356,6 +369,79 @@ fn display_name(manifest: &Manifest, key: &str) -> String {
         .unwrap_or_else(|| key.to_owned())
 }
 
+pub const READ_FIRST_FIELD: &str = "readFirst";
+pub const REQUIRES_FIELD: &str = "requires";
+const READ_FIRST_DIRS: [&str; 2] = ["references/", "assets/"];
+
+fn reference_issues(metadata: &[(String, String)], files: &BTreeSet<&str>) -> Vec<SkillIssueDto> {
+    let mut issues = Vec::new();
+    let checked = |field: String, path: &str, seen: &mut HashSet<String>, dirs: &[&str]| {
+        if !is_skill_path(path) || !dirs.iter().any(|dir| path.starts_with(dir)) {
+            Some(issue(field, SkillIssueRule::Path))
+        } else if !files.contains(path) {
+            Some(issue(field, SkillIssueRule::Missing))
+        } else if !seen.insert(path.to_owned()) {
+            Some(issue(field, SkillIssueRule::Duplicate))
+        } else {
+            None
+        }
+    };
+    match read_first(metadata) {
+        None => issues.push(issue(READ_FIRST_FIELD, SkillIssueRule::Manifest)),
+        Some(paths) => {
+            let mut seen = HashSet::new();
+            for (index, path) in paths.iter().enumerate() {
+                issues.extend(checked(
+                    format!("{READ_FIRST_FIELD}.{index}"),
+                    path,
+                    &mut seen,
+                    &READ_FIRST_DIRS,
+                ));
+            }
+        }
+    }
+    match requires(metadata) {
+        None => issues.push(issue(REQUIRES_FIELD, SkillIssueRule::Manifest)),
+        Some(entries) => {
+            let mut scripts = HashSet::new();
+            for (index, (script, needed)) in entries.iter().enumerate() {
+                issues.extend(checked(
+                    format!("{REQUIRES_FIELD}.{index}"),
+                    script,
+                    &mut scripts,
+                    &[SCRIPTS_PREFIX],
+                ));
+                let mut seen = HashSet::new();
+                for (position, path) in needed.iter().enumerate() {
+                    issues.extend(checked(
+                        format!("{REQUIRES_FIELD}.{index}.{position}"),
+                        path,
+                        &mut seen,
+                        &["references/", "assets/", SCRIPTS_PREFIX],
+                    ));
+                }
+            }
+        }
+    }
+    issues
+}
+
+fn authored_metadata(version: &str, input: &AuthoredSkill) -> Vec<(String, String)> {
+    let mut metadata = vec![(VERSION.to_owned(), version.to_owned())];
+    if !input.read_first.is_empty() {
+        metadata.push((READ_FIRST.to_owned(), json!(input.read_first).to_string()));
+    }
+    if !input.requires.is_empty() {
+        let requires: BTreeMap<&str, &Vec<String>> = input
+            .requires
+            .iter()
+            .map(|(script, files)| (script.as_str(), files))
+            .collect();
+        metadata.push((REQUIRES.to_owned(), json!(requires).to_string()));
+    }
+    metadata
+}
+
 fn content_issues(
     scanned: &Scanned,
     manifest: Result<&Manifest, ()>,
@@ -374,6 +460,12 @@ fn content_issues(
             if js_trim(&manifest.instructions).is_empty() {
                 issues.push(issue("instructions", SkillIssueRule::Required));
             }
+            let files: BTreeSet<&str> = scanned
+                .files
+                .iter()
+                .map(|(path, _, _)| path.as_str())
+                .collect();
+            issues.extend(reference_issues(&manifest.metadata, &files));
         }
     }
     if !scanned.strays.is_empty() {
@@ -708,6 +800,8 @@ impl SkillLibrary {
                 issues.push(issue(field, SkillIssueRule::Required));
             }
         }
+        let files: BTreeSet<&str> = draft.files.keys().map(String::as_str).collect();
+        issues.extend(reference_issues(&draft.metadata, &files));
         if draft.files.len() > SKILL_FILES_MAX {
             issues.push(issue("files", SkillIssueRule::TooManyFiles));
         }
@@ -982,7 +1076,7 @@ impl SkillLibrary {
             enabled: existing.as_ref().is_none_or(|row| row.enabled),
             source: SkillSource::Local,
             extra: Vec::new(),
-            metadata: vec![(VERSION.to_owned(), version.to_owned())],
+            metadata: authored_metadata(version, input),
             files: BTreeMap::new(),
             issues: Vec::new(),
         };
@@ -1294,11 +1388,26 @@ impl SkillLibrary {
 
     pub fn load(&self, key: &str) -> Result<LoadedSkill, AppError> {
         let row = self.usable_row(key)?;
-        let detail = self.detail(&row)?;
+        let scanned = scan(Path::new(&row.path)).map_err(|error| storage(&error))?;
+        let manifest = scanned
+            .manifest
+            .as_deref()
+            .and_then(|text| parse_manifest(text).ok())
+            .unwrap_or_default();
         Ok(LoadedSkill {
-            skill: detail.skill,
-            instructions: detail.instructions,
-            files: detail.files,
+            skill: self.dto(&row)?,
+            read_first: read_first(&manifest.metadata).unwrap_or_default(),
+            requires: requires(&manifest.metadata).unwrap_or_default(),
+            instructions: manifest.instructions,
+            files: scanned
+                .files
+                .iter()
+                .map(|(path, file, size)| LoadedFile {
+                    purpose: purpose_of(path, file),
+                    path: path.clone(),
+                    size: *size,
+                })
+                .collect(),
         })
     }
 

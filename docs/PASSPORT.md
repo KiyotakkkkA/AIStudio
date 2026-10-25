@@ -733,7 +733,13 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   (other callers keep the per-run scratch folder), and the file tools reach it as `chat:`
   without an approval. When a skill matches a turn, the chat adds `skill.load`, `fs.read`,
   `fs.list`, `fs.apply` and `shell.run` for that turn; the ones the user did not enable are
-  limited to `chat:` and `skill:` paths (`rootsOnly`). The folder is capped at 200 MB and
+  limited to `chat:` and `skill:` paths (`rootsOnly`). `skill.load` returns the instructions,
+  each file with a one-line purpose, and the text of the manifest's `metadata.read-first` files
+  up to 16 000 characters (the rest are named as required reading); tool keys in its result
+  are rewritten to the names offered in that turn, and its result limit is six times the
+  per-call share, at most 40 000 characters. A script listed in `metadata.requires` is refused
+  with a hint, not counted against the call budget, until its files were loaded or read in the
+  same turn. The folder is capped at 200 MB and
   1000 files, and writes go through `fs.apply`'s temporary files. Names whose path has a
   segment starting with `_` are working files: they never become artifact cards. Other
   documents a script creates there are reported like scratch results (copied to
