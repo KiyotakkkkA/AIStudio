@@ -5,21 +5,25 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::UNIX_EPOCH;
 
 use base64::Engine;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use zvs_contract::validate::js_trim;
 use zvs_contract::{
     AppError, AppErrorCode, CreateSkillInput, SkillDetailDto, SkillDto, SkillFileDto,
     SkillFileEncoding, SkillFileInput, SkillId, SkillIssueDto, SkillIssueRule, SkillModelDto,
-    SkillSource, SkillStatus, ToolDto, ToolListFilter, ToolReferenceKind, ToolTier,
+    SkillSource, SkillStatus, SkillUpdateDto, ToolDto, ToolListFilter, ToolReferenceKind, ToolTier,
     UpdateSkillInput, is_skill_key, is_skill_path,
     skills::{
-        SKILL_FILE_MAX_BYTES, SKILL_FILES_MAX, SKILL_KEY_MAX, SKILL_NAME_MAX, SKILL_TOTAL_MAX_BYTES,
+        SKILL_AUTHOR_MAX, SKILL_FILE_MAX_BYTES, SKILL_FILES_MAX, SKILL_KEY_MAX, SKILL_NAME_MAX,
+        SKILL_TOTAL_MAX_BYTES, SKILL_VERSION_MAX,
     },
 };
 
-use super::bundled::BundledSkill;
-use super::manifest::{Manifest, SKILL_FILE, parse_manifest, render_manifest};
+use super::bundled::{BUNDLED_SKILLS, BundledSkill, is_newer};
+use super::manifest::{
+    AUTHOR, Manifest, SKILL_FILE, VERSION, meta, parse_manifest, render_manifest,
+};
 use crate::data::schema::SkillRow;
 use crate::data::{Database, Repositories};
 use crate::platform::clock::{SharedClock, SystemClock};
@@ -39,6 +43,7 @@ pub const SKILL_STORAGE_FAILED: &str = "Не удалось сохранить �
 pub const SKILL_IMPORT_NO_MANIFEST: &str = "В выбранной папке нет файла SKILL.md";
 pub const SKILL_EXPORT_TAKEN: &str =
     "В папке назначения уже есть папка с идентификатором этого навыка";
+pub const SKILL_UP_TO_DATE: &str = "Для навыка нет обновления";
 
 const BUNDLED_MARKER: &str = ".bundled.json";
 const COPY_SUFFIX: &str = "-copy";
@@ -60,6 +65,7 @@ pub struct SkillLibraryOptions {
     pub tools: ToolRegistry,
     pub logger: SharedLogger,
     pub clock: SharedClock,
+    pub bundled: &'static [BundledSkill],
 }
 
 impl SkillLibraryOptions {
@@ -70,6 +76,7 @@ impl SkillLibraryOptions {
             tools,
             logger: silent_logger(),
             clock: Arc::new(SystemClock),
+            bundled: BUNDLED_SKILLS,
         }
     }
 }
@@ -80,7 +87,23 @@ struct Inner {
     tools: ToolRegistry,
     logger: SharedLogger,
     clock: SharedClock,
+    bundled: &'static [BundledSkill],
     writing: Mutex<()>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct Seeded {
+    #[serde(default)]
+    version: Option<String>,
+    #[serde(default)]
+    digest: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Marker {
+    Installed(BTreeMap<String, Seeded>),
+    Keys(BTreeSet<String>),
 }
 
 #[derive(Clone)]
@@ -233,17 +256,34 @@ fn scan(dir: &Path) -> std::io::Result<Scanned> {
             strays.push(relative);
         }
     }
-    let fingerprint = hasher
-        .finalize()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
+    let fingerprint = hex(&hasher.finalize());
     Ok(Scanned {
         manifest,
         files,
         strays,
         fingerprint,
     })
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn digest(dir: &Path) -> std::io::Result<String> {
+    let mut entries = Vec::new();
+    walk(dir, dir, &mut entries)?;
+    let mut hasher = Sha256::new();
+    for (relative, path, _, _) in entries {
+        hasher.update(relative.as_bytes());
+        hasher.update([0]);
+        hasher.update(fs::read(&path)?);
+        hasher.update([0]);
+    }
+    Ok(hex(&hasher.finalize()))
+}
+
+fn limited(value: Option<&str>, max: usize) -> Option<String> {
+    value.map(|value| value.chars().take(max).collect())
 }
 
 fn decode(input: &SkillFileInput) -> Option<Vec<u8>> {
@@ -265,7 +305,7 @@ fn file_dtos(files: &[(String, PathBuf, u64)]) -> Vec<SkillFileDto> {
         .collect()
 }
 
-fn skill_dto(row: &SkillRow) -> Result<SkillDto, AppError> {
+fn skill_dto(row: &SkillRow, update: Option<SkillUpdateDto>) -> Result<SkillDto, AppError> {
     let dto = SkillDto {
         id: SkillId::parse(&row.id).ok_or_else(malformed)?,
         key: row.key.clone(),
@@ -278,6 +318,9 @@ fn skill_dto(row: &SkillRow) -> Result<SkillDto, AppError> {
         status: row.status,
         issues: row.issues.clone(),
         file_count: u64::try_from(row.file_count).unwrap_or(0),
+        version: row.version.clone(),
+        author: row.author.clone(),
+        update,
         created_at: row.created_at,
         updated_at: row.updated_at,
     };
@@ -398,6 +441,7 @@ impl SkillLibrary {
                 tools: options.tools,
                 logger: options.logger,
                 clock: options.clock,
+                bundled: options.bundled,
                 writing: Mutex::new(()),
             }),
         }
@@ -440,6 +484,66 @@ impl SkillLibrary {
         self.inner
             .database
             .with_connection(|connection| Ok(Repositories::new(connection).skills.save(row)?))
+    }
+
+    fn read_marker(&self) -> BTreeMap<String, Seeded> {
+        let marker = fs::read_to_string(self.inner.root.join(BUNDLED_MARKER))
+            .ok()
+            .and_then(|text| serde_json::from_str::<Marker>(&text).ok());
+        match marker {
+            Some(Marker::Installed(seeded)) => seeded,
+            Some(Marker::Keys(keys)) => keys
+                .into_iter()
+                .map(|key| (key, Seeded::default()))
+                .collect(),
+            None => BTreeMap::new(),
+        }
+    }
+
+    fn write_marker(&self, seeded: &BTreeMap<String, Seeded>) -> Result<(), AppError> {
+        let text = serde_json::to_string(seeded).unwrap_or_else(|_| "{}".to_owned());
+        fs::write(self.inner.root.join(BUNDLED_MARKER), text).map_err(|error| storage(&error))
+    }
+
+    fn bundled_of(&self, key: &str) -> Option<&'static BundledSkill> {
+        self.inner.bundled.iter().find(|skill| skill.key == key)
+    }
+
+    fn update_of(
+        &self,
+        row: &SkillRow,
+        seeded: &BTreeMap<String, Seeded>,
+    ) -> Option<SkillUpdateDto> {
+        if row.source != SkillSource::Bundled {
+            return None;
+        }
+        let version = self.bundled_of(&row.key)?.version()?;
+        if !is_newer(&version, row.version.as_deref()) {
+            return None;
+        }
+        let recorded = seeded
+            .get(&row.key)
+            .and_then(|entry| entry.digest.as_deref());
+        let modified = match (recorded, digest(Path::new(&row.path))) {
+            (Some(recorded), Ok(current)) => recorded != current,
+            _ => true,
+        };
+        Some(SkillUpdateDto {
+            version: limited(Some(&version), SKILL_VERSION_MAX).unwrap_or_default(),
+            modified,
+        })
+    }
+
+    fn dto_with(
+        &self,
+        row: &SkillRow,
+        seeded: &BTreeMap<String, Seeded>,
+    ) -> Result<SkillDto, AppError> {
+        skill_dto(row, self.update_of(row, seeded))
+    }
+
+    fn dto(&self, row: &SkillRow) -> Result<SkillDto, AppError> {
+        self.dto_with(row, &self.read_marker())
     }
 
     fn registered(&self) -> Result<Vec<ToolDto>, AppError> {
@@ -486,6 +590,8 @@ impl SkillLibrary {
                     next.description = js_trim(&manifest.description).to_owned();
                     next.allowed_tools = unique(manifest.allowed_tools.clone());
                     next.model_override.clone_from(&manifest.model);
+                    next.version = limited(manifest.meta(VERSION), SKILL_VERSION_MAX);
+                    next.author = limited(manifest.meta(AUTHOR), SKILL_AUTHOR_MAX);
                 }
                 let mut issues = content_issues(&scanned, manifest.as_ref().ok_or(()), &row.key);
                 issues.extend(tool_issues(&next.allowed_tools, registered));
@@ -569,6 +675,8 @@ impl SkillLibrary {
                 file_count: 0,
                 content_hash: String::new(),
                 path: path.to_string_lossy().into_owned(),
+                version: None,
+                author: None,
                 created_at: now,
                 updated_at: now,
             })?;
@@ -578,10 +686,11 @@ impl SkillLibrary {
 
     fn list_unlocked(&self) -> Result<Vec<SkillDto>, AppError> {
         let registered = self.registered()?;
+        let seeded = self.read_marker();
         self.rows()?
             .into_iter()
             .map(|row| self.refresh_with(row, &registered))
-            .map(|row| skill_dto(&row?))
+            .map(|row| self.dto_with(&row?, &seeded))
             .collect()
     }
 
@@ -617,7 +726,7 @@ impl SkillLibrary {
             Err(_) => (String::new(), Vec::new()),
         };
         Ok(SkillDetailDto {
-            skill: skill_dto(row)?,
+            skill: self.dto(row)?,
             instructions,
             files,
         })
@@ -630,7 +739,7 @@ impl SkillLibrary {
 
     pub fn find_by_key(&self, key: &str) -> Result<Option<SkillDto>, AppError> {
         self.find_key(key)?
-            .map(|row| self.refresh(row).and_then(|row| skill_dto(&row)))
+            .map(|row| self.refresh(row).and_then(|row| self.dto(&row)))
             .transpose()
     }
 
@@ -792,6 +901,8 @@ impl SkillLibrary {
             file_count: scanned.files.len() as i64,
             content_hash: scanned.fingerprint,
             path: target.to_string_lossy().into_owned(),
+            version: limited(meta(&draft.metadata, VERSION), SKILL_VERSION_MAX),
+            author: limited(meta(&draft.metadata, AUTHOR), SKILL_AUTHOR_MAX),
             created_at: existing.map_or(now, |row| row.created_at),
             updated_at: now,
         })?;
@@ -937,7 +1048,7 @@ impl SkillLibrary {
                 ..row
             })?
         };
-        skill_dto(&self.refresh_with(saved, &registered)?)
+        self.dto(&self.refresh_with(saved, &registered)?)
     }
 
     pub fn duplicate(&self, id: &SkillId) -> Result<SkillDetailDto, AppError> {
@@ -957,63 +1068,70 @@ impl SkillLibrary {
         self.commit(None, draft, true)
     }
 
-    pub fn install_bundled(&self, bundled: &[BundledSkill]) -> Result<Vec<String>, AppError> {
+    fn bundled_draft(skill: &BundledSkill) -> Result<Draft, AppError> {
+        let manifest = parse_manifest(skill.manifest)
+            .map_err(|_| rejected(&[issue("instructions", SkillIssueRule::Manifest)]))?;
+        let files = skill
+            .files
+            .iter()
+            .map(|file| {
+                (
+                    file.path.to_owned(),
+                    Staged {
+                        field: "files".to_owned(),
+                        size: file.content.len() as u64,
+                        source: Source::Bytes(file.content.as_bytes().to_vec()),
+                    },
+                )
+            })
+            .collect();
+        Ok(Draft {
+            name: display_name(&manifest, skill.key),
+            key: skill.key.to_owned(),
+            description: manifest.description.clone(),
+            instructions: manifest.instructions.trim().to_owned(),
+            allowed_tools: unique(manifest.allowed_tools.clone()),
+            model_override: manifest.model.clone(),
+            enabled: true,
+            source: SkillSource::Bundled,
+            extra: manifest.extra.clone(),
+            metadata: manifest.metadata,
+            files,
+            issues: Vec::new(),
+        })
+    }
+
+    fn seeded_entry(skill: &BundledSkill, dir: &Path) -> Seeded {
+        Seeded {
+            version: skill.version(),
+            digest: digest(dir).ok(),
+        }
+    }
+
+    pub fn install_bundled(&self) -> Result<Vec<String>, AppError> {
         let _guard = self
             .inner
             .writing
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         fs::create_dir_all(&self.inner.root).map_err(|error| storage(&error))?;
-        let marker = self.inner.root.join(BUNDLED_MARKER);
-        let mut seeded: BTreeSet<String> = fs::read_to_string(&marker)
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_default();
+        let mut seeded = self.read_marker();
         let mut installed = Vec::new();
-        for skill in bundled {
-            if seeded.contains(skill.key) {
+        for skill in self.inner.bundled {
+            if seeded.contains_key(skill.key) {
                 continue;
             }
             let taken =
                 self.find_key(skill.key)?.is_some() || self.inner.root.join(skill.key).exists();
+            let mut entry = Seeded::default();
             if !taken {
-                let manifest = parse_manifest(skill.manifest)
-                    .map_err(|_| rejected(&[issue("instructions", SkillIssueRule::Manifest)]))?;
-                let files = skill
-                    .files
-                    .iter()
-                    .map(|file| {
-                        (
-                            file.path.to_owned(),
-                            Staged {
-                                field: "files".to_owned(),
-                                size: file.content.len() as u64,
-                                source: Source::Bytes(file.content.as_bytes().to_vec()),
-                            },
-                        )
-                    })
-                    .collect();
-                let draft = Draft {
-                    name: display_name(&manifest, skill.key),
-                    key: skill.key.to_owned(),
-                    description: manifest.description.clone(),
-                    instructions: manifest.instructions.trim().to_owned(),
-                    allowed_tools: unique(manifest.allowed_tools.clone()),
-                    model_override: manifest.model.clone(),
-                    enabled: true,
-                    source: SkillSource::Bundled,
-                    extra: manifest.extra.clone(),
-                    metadata: manifest.metadata.clone(),
-                    files,
-                    issues: Vec::new(),
-                };
-                self.commit(None, draft, true)?;
+                self.commit(None, Self::bundled_draft(skill)?, true)?;
+                entry = Self::seeded_entry(skill, &self.inner.root.join(skill.key));
                 installed.push(skill.key.to_owned());
             }
-            seeded.insert(skill.key.to_owned());
+            seeded.insert(skill.key.to_owned(), entry);
         }
-        let text = serde_json::to_string(&seeded).unwrap_or_else(|_| "[]".to_owned());
-        fs::write(&marker, text).map_err(|error| storage(&error))?;
+        self.write_marker(&seeded)?;
         if !installed.is_empty() {
             self.inner.logger.log(
                 LogLevel::Info,
@@ -1023,6 +1141,72 @@ impl SkillLibrary {
             );
         }
         Ok(installed)
+    }
+
+    fn apply_update(
+        &self,
+        row: &SkillRow,
+        seeded: &mut BTreeMap<String, Seeded>,
+    ) -> Result<SkillDetailDto, AppError> {
+        let skill = self
+            .update_of(row, seeded)
+            .and_then(|_| self.bundled_of(&row.key))
+            .ok_or_else(|| AppError::new(AppErrorCode::Conflict, SKILL_UP_TO_DATE))?;
+        let mut draft = Self::bundled_draft(skill)?;
+        draft.enabled = row.enabled;
+        draft.model_override.clone_from(&row.model_override);
+        let detail = self.commit(Some(row), draft, true)?;
+        seeded.insert(
+            row.key.clone(),
+            Self::seeded_entry(skill, &self.inner.root.join(&row.key)),
+        );
+        self.inner.logger.log(
+            LogLevel::Info,
+            "skills",
+            "Updated a bundled skill",
+            &[
+                ("skill", json!(row.key)),
+                ("from", json!(row.version)),
+                ("to", json!(detail.skill.version)),
+            ],
+        );
+        Ok(detail)
+    }
+
+    pub fn update_bundled(&self, id: &SkillId) -> Result<SkillDetailDto, AppError> {
+        let _guard = self
+            .inner
+            .writing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let row = self.find(&id.to_string())?;
+        let mut seeded = self.read_marker();
+        let detail = self.apply_update(&row, &mut seeded)?;
+        self.write_marker(&seeded)?;
+        Ok(detail)
+    }
+
+    pub fn update_all_bundled(&self) -> Result<Vec<SkillDto>, AppError> {
+        let _guard = self
+            .inner
+            .writing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let mut seeded = self.read_marker();
+        let mut failure = None;
+        for row in self.rows()? {
+            if self.update_of(&row, &seeded).is_none() {
+                continue;
+            }
+            if let Err(error) = self.apply_update(&row, &mut seeded) {
+                failure.get_or_insert(error);
+            }
+        }
+        self.write_marker(&seeded)?;
+        match failure {
+            Some(error) => Err(error),
+            None => self.list_unlocked(),
+        }
     }
 
     pub fn remove(&self, id: &SkillId) -> Result<(), AppError> {

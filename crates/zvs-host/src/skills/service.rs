@@ -186,6 +186,14 @@ impl SkillService {
         self.inner.library.duplicate(id)
     }
 
+    pub fn update_bundled(&self, id: &SkillId) -> Result<SkillDetailDto, AppError> {
+        self.inner.library.update_bundled(id)
+    }
+
+    pub fn update_all_bundled(&self) -> Result<Vec<SkillDto>, AppError> {
+        self.inner.library.update_all_bundled()
+    }
+
     pub fn read_file(&self, id: &SkillId, path: &str) -> Result<SkillFileContentDto, AppError> {
         let content = self.inner.library.read_file(id, path)?;
         Ok(SkillFileContentDto {

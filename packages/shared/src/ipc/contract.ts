@@ -392,6 +392,8 @@ export const contract = defineContract({
   "skills.remove": { input: SkillRef, output: SkillRemoveOutput },
   "skills.setEnabled": { input: SetSkillEnabledInput, output: SkillDto },
   "skills.duplicate": { input: SkillRef, output: SkillDetailDto },
+  "skills.updateBundled": { input: SkillRef, output: SkillDetailDto },
+  "skills.updateAllBundled": { input: z.void(), output: z.array(SkillDto) },
   "skills.readFile": { input: SkillFileRef, output: SkillFileContentDto },
   "skills.import": { input: SkillImportInput, output: SkillImportResultDto },
   "skills.export": { input: SkillExportInput, output: SkillExportResultDto },

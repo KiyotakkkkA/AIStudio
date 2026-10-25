@@ -18,13 +18,16 @@ pub struct SkillRow {
     pub file_count: i64,
     pub content_hash: String,
     pub path: String,
+    pub version: Option<String>,
+    pub author: Option<String>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
 
 impl SkillRow {
     pub const COLUMNS: &str = "id, key, name, description, allowed_tools, model_override, enabled, \
-        source, status, issues, file_count, content_hash, path, created_at, updated_at";
+        source, status, issues, file_count, content_hash, path, version, author, created_at, \
+        updated_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -41,6 +44,8 @@ impl SkillRow {
             file_count: row.get("file_count")?,
             content_hash: row.get("content_hash")?,
             path: row.get("path")?,
+            version: row.get("version")?,
+            author: row.get("author")?,
             created_at: row.get("created_at")?,
             updated_at: row.get("updated_at")?,
         })

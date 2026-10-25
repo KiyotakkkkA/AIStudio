@@ -51,6 +51,8 @@ pub const SKILL_FILE_MAX_BYTES: u64 = 1024 * 1024;
 pub const SKILL_TOTAL_MAX_BYTES: u64 = 10 * 1024 * 1024;
 pub const SKILL_MODEL_MAX: usize = 256;
 pub const SKILL_ISSUES_MAX: usize = 64;
+pub const SKILL_VERSION_MAX: usize = 32;
+pub const SKILL_AUTHOR_MAX: usize = 120;
 pub const SKILL_FILE_DIRS: &[&str] = &["references", "scripts", "assets"];
 pub const DEFAULT_SKILL_THRESHOLD: f64 = 0.5;
 pub const DEFAULT_SKILL_CATALOGUE_LIMIT: u64 = 20;
@@ -131,6 +133,20 @@ impl Validate for SkillFileDto {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SkillUpdateDto {
+    pub version: String,
+    pub modified: bool,
+}
+
+impl Validate for SkillUpdateDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("version", &self.version)?;
+        check::max_len("version", &self.version, SKILL_VERSION_MAX)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SkillDto {
     pub id: SkillId,
     pub key: String,
@@ -144,6 +160,12 @@ pub struct SkillDto {
     pub status: SkillStatus,
     pub issues: Vec<SkillIssueDto>,
     pub file_count: u64,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub version: Option<String>,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub author: Option<String>,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub update: Option<SkillUpdateDto>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
@@ -161,6 +183,13 @@ impl Validate for SkillDto {
         }
         nested("issues", self.issues.validate())?;
         check::safe_integer("fileCount", self.file_count)?;
+        if let Some(version) = &self.version {
+            check::max_len("version", version, SKILL_VERSION_MAX)?;
+        }
+        if let Some(author) = &self.author {
+            check::max_len("author", author, SKILL_AUTHOR_MAX)?;
+        }
+        nested("update", self.update.validate())?;
         check::timestamp("createdAt", self.created_at)?;
         check::timestamp("updatedAt", self.updated_at)
     }

@@ -6,6 +6,7 @@ import {
   mdiExport,
   mdiFolderDownloadOutline,
   mdiPlus,
+  mdiUpdate,
 } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
@@ -25,7 +26,16 @@ import SkillList from "./SkillList";
 import SkillManifestView from "./SkillManifestView";
 import SkillRail from "./SkillRail";
 import { MANIFEST_PATH } from "./SkillStore";
-import { headerLine } from "./skillPresentation";
+import {
+  headerLine,
+  UPDATE_ALL_TITLE,
+  UPDATE_CONFIRM_LABEL,
+  UPDATE_MODIFIED_WARNING,
+  UPDATE_SKILL_TITLE,
+  updateAllLabel,
+  updateAllWarning,
+  updateLabel,
+} from "./skillPresentation";
 import Alert from "../../ui/molecules/Alert";
 
 const MENU_ITEM = "text-[13px] text-main-100";
@@ -33,6 +43,8 @@ const MENU_ITEM = "text-[13px] text-main-100";
 function SkillsWorkspace() {
   const { skills: store } = useStore();
   const form = store.form;
+  const selected = store.selectedSkill;
+  const update = selected?.update ?? null;
 
   useEffect(() => {
     void store.mount();
@@ -47,6 +59,24 @@ function SkillsWorkspace() {
         subtitle={headerLine(store.skills)}
         actions={
           <>
+            {store.updatable.length === 0 ? null : (
+              <IconButton
+                path={mdiUpdate}
+                label={updateAllLabel(store.updatable.length)}
+                tooltip="bottom-center"
+                iconSize={16}
+                size="md"
+                className="bg-main-800"
+                disabled={store.updatingAll}
+                needConfirm={store.modifiedUpdates > 0}
+                modalSetup={{
+                  title: UPDATE_ALL_TITLE,
+                  content: updateAllWarning(store.modifiedUpdates),
+                  confirmLabel: UPDATE_CONFIRM_LABEL,
+                }}
+                onClick={() => void store.updateAll()}
+              />
+            )}
             <Button
               tone="secondary"
               disabled={store.importing}
@@ -105,6 +135,24 @@ function SkillsWorkspace() {
                 <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-main-50">
                   {form.isNew ? "Новый навык" : form.name}
                 </span>
+                {selected === null || update === null || form.isNew ? null : (
+                  <IconButton
+                    key={`${selected.id}:${update.version}`}
+                    path={mdiUpdate}
+                    label={updateLabel(update)}
+                    tooltip="bottom-center"
+                    iconSize={17}
+                    size="md"
+                    disabled={store.isUpdating(selected.id)}
+                    needConfirm={update.modified}
+                    modalSetup={{
+                      title: UPDATE_SKILL_TITLE,
+                      content: UPDATE_MODIFIED_WARNING,
+                      confirmLabel: UPDATE_CONFIRM_LABEL,
+                    }}
+                    onClick={() => void store.updateSkill(selected.id)}
+                  />
+                )}
                 {store.selectedSkill === null || form.isNew ? null : (
                   <Toggle
                     label="Включён"

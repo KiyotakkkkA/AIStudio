@@ -82,8 +82,8 @@ use zvs_host::services::{
     VectorSourceService, VectorSourceServiceOptions, VectorStoreService, VectorStoreServiceOptions,
 };
 use zvs_host::skills::{
-    BUNDLED_SKILLS, SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillScriptOptions,
-    SkillService, SkillServiceOptions, register_skill_nodes,
+    SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillScriptOptions, SkillService,
+    SkillServiceOptions, register_skill_nodes,
 };
 use zvs_host::terminal::{NativePty, SystemShells, TerminalService, TerminalServiceOptions};
 use zvs_host::toolchain::{
@@ -792,7 +792,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         },
     )?;
     register_kernel_tools(&nodes, &tools)?;
-    if let Err(error) = skill_library.install_bundled(BUNDLED_SKILLS) {
+    if let Err(error) = skill_library.install_bundled() {
         logger.log(
             LogLevel::Warn,
             "skills",

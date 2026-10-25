@@ -17,6 +17,9 @@ import {
   skillErrorCopy,
   skillIssuesOf,
   toolCeiling,
+  UPDATE_GUARD,
+  updatedAllNotice,
+  updatedNotice,
   type ToolCeiling,
 } from "./skillPresentation";
 
@@ -87,7 +90,9 @@ export default class SkillStore {
   duplicating = false;
   importing = false;
   exporting = false;
+  updatingAll = false;
   switchingIds: SkillId[] = [];
+  updatingIds: SkillId[] = [];
   error: string | null = null;
   notice: string | null = null;
 
@@ -114,6 +119,14 @@ export default class SkillStore {
         skill.key.includes(query) ||
         skill.description.toLowerCase().includes(query),
     );
+  }
+
+  get updatable(): SkillDto[] {
+    return this.skills.filter((skill) => skill.update !== null);
+  }
+
+  get modifiedUpdates(): number {
+    return this.updatable.filter((skill) => skill.update?.modified === true).length;
   }
 
   get selectedSkill(): SkillDto | null {
@@ -175,6 +188,10 @@ export default class SkillStore {
 
   isSwitching(id: SkillId): boolean {
     return this.switchingIds.includes(id);
+  }
+
+  isUpdating(id: SkillId): boolean {
+    return this.updatingAll || this.updatingIds.includes(id);
   }
 
   async mount(): Promise<void> {
@@ -459,6 +476,68 @@ export default class SkillStore {
     }
   }
 
+  async updateSkill(id: SkillId): Promise<void> {
+    if (this.isUpdating(id)) return;
+    if (this.selectedId === id && this.form?.dirty === true) {
+      this.error = UPDATE_GUARD;
+      return;
+    }
+    this.updatingIds = [...this.updatingIds, id];
+    this.error = null;
+    this.notice = null;
+    try {
+      const detail = await this.ipc.call("skills.updateBundled", { id });
+      runInAction(() => {
+        this.mergeSkill(detail);
+        this.notice = updatedNotice(detail.name, detail.version);
+        if (this.selectedId === detail.id) {
+          this.detail = detail;
+          this.form = new SkillFormVm({ skill: detail });
+          this.openPath = MANIFEST_PATH;
+          this.openFile = null;
+        }
+      });
+    } catch (error: unknown) {
+      runInAction(() => {
+        this.error = skillErrorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.updatingIds = this.updatingIds.filter((entry) => entry !== id);
+      });
+    }
+  }
+
+  async updateAll(): Promise<void> {
+    if (this.updatingAll) return;
+    if (this.form?.dirty === true && (this.selectedSkill?.update ?? null) !== null) {
+      this.error = UPDATE_GUARD;
+      return;
+    }
+    const count = this.updatable.length;
+    if (count === 0) return;
+    this.updatingAll = true;
+    this.error = null;
+    this.notice = null;
+    try {
+      const skills = await this.ipc.call("skills.updateAllBundled", undefined);
+      runInAction(() => {
+        this.skills = [...skills];
+        this.updatingAll = false;
+        this.notice = updatedAllNotice(count);
+      });
+      const selected = this.selectedId;
+      if (selected !== null && this.form?.dirty !== true) await this.select(selected);
+    } catch (error: unknown) {
+      const message = skillErrorCopy(error);
+      await this.load();
+      runInAction(() => {
+        this.updatingAll = false;
+        this.error = message;
+      });
+    }
+  }
+
   async importFolder(): Promise<void> {
     if (this.importing) return;
     if (this.form?.dirty === true) {
@@ -519,6 +598,9 @@ export default class SkillStore {
       status: skill.status,
       issues: [...skill.issues],
       fileCount: skill.fileCount,
+      version: skill.version,
+      author: skill.author,
+      update: skill.update,
       createdAt: skill.createdAt,
       updatedAt: skill.updatedAt,
     };

@@ -10,6 +10,8 @@ const METADATA: &str = "metadata";
 const DISPLAY_NAME: &str = "display-name";
 const MODEL_PROVIDER: &str = "model-provider";
 const MODEL: &str = "model";
+pub const VERSION: &str = "version";
+pub const AUTHOR: &str = "author";
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Manifest {
@@ -21,6 +23,20 @@ pub struct Manifest {
     pub extra: Vec<(String, String)>,
     pub metadata: Vec<(String, String)>,
     pub instructions: String,
+}
+
+impl Manifest {
+    pub fn meta(&self, key: &str) -> Option<&str> {
+        meta(&self.metadata, key)
+    }
+}
+
+pub fn meta<'a>(metadata: &'a [(String, String)], key: &str) -> Option<&'a str> {
+    metadata
+        .iter()
+        .find(|(name, _)| name == key)
+        .map(|(_, value)| value.trim())
+        .filter(|value| !value.is_empty())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

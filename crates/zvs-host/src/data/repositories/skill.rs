@@ -47,13 +47,14 @@ impl<'c> SkillRepository<'c> {
         self.connection
             .prepare_cached(&format!(
                 "INSERT INTO skill ({columns}) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17) \
                  ON CONFLICT (id) DO UPDATE SET key = excluded.key, name = excluded.name, \
                  description = excluded.description, allowed_tools = excluded.allowed_tools, \
                  model_override = excluded.model_override, enabled = excluded.enabled, \
                  source = excluded.source, status = excluded.status, issues = excluded.issues, \
                  file_count = excluded.file_count, content_hash = excluded.content_hash, \
-                 path = excluded.path, updated_at = excluded.updated_at \
+                 path = excluded.path, version = excluded.version, author = excluded.author, \
+                 updated_at = excluded.updated_at \
                  RETURNING {columns}",
                 columns = SkillRow::COLUMNS
             ))?
@@ -72,6 +73,8 @@ impl<'c> SkillRepository<'c> {
                     row.file_count,
                     row.content_hash,
                     row.path,
+                    row.version,
+                    row.author,
                     row.created_at,
                     row.updated_at,
                 ],
@@ -109,6 +112,8 @@ mod tests {
             file_count: 0,
             content_hash: "h".to_owned(),
             path: format!("C:/skills/{key}"),
+            version: None,
+            author: None,
             created_at: 1,
             updated_at: 1,
         }

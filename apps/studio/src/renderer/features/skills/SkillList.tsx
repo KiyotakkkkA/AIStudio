@@ -1,4 +1,4 @@
-import { mdiBookOpenOutline, mdiPlus } from "@mdi/js";
+import { mdiBookOpenOutline, mdiPlus, mdiUpdate } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import EntityListPanel from "../../ui/molecules/EntityListPanel";
 import Chip from "../../ui/atoms/Chip";
@@ -8,7 +8,7 @@ import EmptyState from "../../ui/molecules/EmptyState";
 import ListRow from "../../ui/molecules/ListRow";
 import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import type SkillStore from "./SkillStore";
-import { skillLine, skillTone, SOURCE_LABELS } from "./skillPresentation";
+import { skillLine, skillTone, SOURCE_LABELS, updateLabel } from "./skillPresentation";
 
 function SkillList({ store }: { readonly store: SkillStore }) {
   const draft = store.form?.isNew === true ? store.form : null;
@@ -55,6 +55,12 @@ function SkillList({ store }: { readonly store: SkillStore }) {
                 <span className="flex-1 truncate text-[12.5px] font-medium text-main-50">
                   {skill.name}
                 </span>
+                {skill.update === null ? null : (
+                  <Chip tone="accent" title={updateLabel(skill.update)}>
+                    <Icon path={mdiUpdate} size={11} />
+                    {skill.update.version}
+                  </Chip>
+                )}
                 <Chip>{SOURCE_LABELS[skill.source]}</Chip>
               </span>
               <span className={`truncate text-[11px] ${invalid ? "text-err" : "text-main-400"}`}>

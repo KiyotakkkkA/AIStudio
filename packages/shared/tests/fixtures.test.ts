@@ -309,6 +309,7 @@ const schemas: Record<string, z.ZodType> = {
   "skills/SkillModelDto": skills.SkillModelDto,
   "skills/SkillIssueDto": skills.SkillIssueDto,
   "skills/SkillFileDto": skills.SkillFileDto,
+  "skills/SkillUpdateDto": skills.SkillUpdateDto,
   "skills/SkillDto": skills.SkillDto,
   "skills/SkillDetailDto": skills.SkillDetailDto,
   "skills/SkillRef": skills.SkillRef,

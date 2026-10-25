@@ -13,6 +13,9 @@
       "status": "ready",
       "issues": [],
       "fileCount": 1,
+      "version": null,
+      "author": null,
+      "update": null,
       "createdAt": 1700000000000,
       "updatedAt": 1700000000000
     }
@@ -30,6 +33,9 @@
       "status": "ready",
       "issues": [],
       "fileCount": 1,
+      "version": null,
+      "author": null,
+      "update": null,
       "createdAt": 1700000000000,
       "updatedAt": 1700000000000
     }
@@ -48,6 +54,33 @@
       "status": "ready",
       "issues": [],
       "fileCount": 1,
+      "version": null,
+      "author": null,
+      "update": null,
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000000000
+    }
+  },
+  {
+    "name": "empty update version",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "key": "pdf",
+      "name": "PDF",
+      "description": "Работа с PDF-файлами",
+      "allowedTools": [],
+      "modelOverride": null,
+      "enabled": true,
+      "source": "bundled",
+      "status": "ready",
+      "issues": [],
+      "fileCount": 1,
+      "version": null,
+      "author": null,
+      "update": {
+        "version": "",
+        "modified": false
+      },
       "createdAt": 1700000000000,
       "updatedAt": 1700000000000
     }

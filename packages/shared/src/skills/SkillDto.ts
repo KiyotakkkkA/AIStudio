@@ -13,6 +13,8 @@ export const SKILL_FILE_MAX_BYTES = 1024 * 1024;
 export const SKILL_TOTAL_MAX_BYTES = 10 * 1024 * 1024;
 export const SKILL_MODEL_MAX = 256;
 export const SKILL_ISSUES_MAX = 64;
+export const SKILL_VERSION_MAX = 32;
+export const SKILL_AUTHOR_MAX = 120;
 export const SKILL_FILE_DIRS = ["references", "scripts", "assets"] as const;
 export const DEFAULT_SKILL_THRESHOLD = 0.5;
 export const DEFAULT_SKILL_CATALOGUE_LIMIT = 20;
@@ -91,6 +93,12 @@ export const SkillFileDto = z.object({
 });
 export type SkillFileDto = z.infer<typeof SkillFileDto>;
 
+export const SkillUpdateDto = z.object({
+  version: z.string().min(1).max(SKILL_VERSION_MAX),
+  modified: z.boolean(),
+});
+export type SkillUpdateDto = z.infer<typeof SkillUpdateDto>;
+
 export const SkillDto = z.object({
   id: SkillId,
   key: z.string().min(1).max(SKILL_KEY_MAX),
@@ -103,6 +111,9 @@ export const SkillDto = z.object({
   status: SkillStatus,
   issues: z.array(SkillIssueDto).max(SKILL_ISSUES_MAX),
   fileCount: z.number().int().nonnegative(),
+  version: z.string().max(SKILL_VERSION_MAX).nullable(),
+  author: z.string().max(SKILL_AUTHOR_MAX).nullable(),
+  update: SkillUpdateDto.nullable(),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 });

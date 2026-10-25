@@ -23,6 +23,9 @@ import {
   skillErrorCopy,
   slugify,
   SKILL_INVALID_BANNER,
+  UPDATE_GUARD,
+  updatedAllNotice,
+  updatedNotice,
 } from "../../src/renderer/features/skills/skillPresentation.ts";
 import { markdownLines } from "../../src/renderer/features/skills/markdownTokens.ts";
 
@@ -42,6 +45,9 @@ function detail(overrides: Partial<SkillDetailDto> = {}): SkillDetailDto {
     status: "ready",
     issues: [],
     fileCount: 1,
+    version: null,
+    author: null,
+    update: null,
     createdAt: 1_000,
     updatedAt: 1_000,
     instructions: "# Заметки",
@@ -236,4 +242,71 @@ test("opening a file in the tree reads it from the host and removing it stages t
   expect(store.openPath).toBe(MANIFEST_PATH);
   expect(store.form?.removed).toEqual(["references/style.md"]);
   expect(store.form?.dirty).toBe(true);
+});
+
+function outdated(modified = false): SkillDetailDto {
+  return detail({
+    source: "bundled",
+    version: "1.0.0",
+    author: "ZVS AI Studio",
+    update: { version: "1.1.0", modified },
+  });
+}
+
+function current(): SkillDetailDto {
+  return detail({
+    source: "bundled",
+    version: "1.1.0",
+    author: "ZVS AI Studio",
+    instructions: "# Заметки по разделам",
+  });
+}
+
+test("an outdated bundled skill updates in place and the open form follows the new version", async () => {
+  const { store, bridge } = setup();
+  bridge
+    .handle("skills.list", () => [outdated()])
+    .handle("skills.get", () => outdated())
+    .handle("skills.updateBundled", () => current());
+  await store.mount();
+  expect(store.updatable.map((skill) => skill.id)).toEqual([SKILL_ID]);
+  expect(store.modifiedUpdates).toBe(0);
+  await store.updateSkill(SKILL_ID);
+  expect(bridge.calls.at(-1)).toEqual({
+    channel: "skills.updateBundled",
+    payload: { id: SKILL_ID },
+  });
+  expect(store.updatable).toEqual([]);
+  expect(store.selectedSkill?.version).toBe("1.1.0");
+  expect(store.form?.instructions).toBe("# Заметки по разделам");
+  expect(store.notice).toBe(updatedNotice("Заметки о выпуске", "1.1.0"));
+  expect(store.isUpdating(SKILL_ID)).toBe(false);
+});
+
+test("unsaved changes in a skill block its update", async () => {
+  const { store, bridge } = setup();
+  bridge.handle("skills.list", () => [outdated(true)]).handle("skills.get", () => outdated(true));
+  await store.mount();
+  store.form?.setName("Другое имя");
+  await store.updateSkill(SKILL_ID);
+  await store.updateAll();
+  expect(store.error).toBe(UPDATE_GUARD);
+  expect(bridge.calls.some((call) => call.channel.startsWith("skills.update"))).toBe(false);
+});
+
+test("updating everything replaces the list with the host's", async () => {
+  const { store, bridge } = setup();
+  bridge
+    .handle("skills.list", () => [outdated(true)])
+    .handle("skills.get", () => outdated(true))
+    .handle("skills.updateAllBundled", () => [current()]);
+  await store.mount();
+  expect(store.modifiedUpdates).toBe(1);
+  bridge.handle("skills.get", () => current());
+  await store.updateAll();
+  expect(store.updatable).toEqual([]);
+  expect(store.skills[0]?.version).toBe("1.1.0");
+  expect(store.form?.instructions).toBe("# Заметки по разделам");
+  expect(store.notice).toBe(updatedAllNotice(1));
+  expect(store.updatingAll).toBe(false);
 });

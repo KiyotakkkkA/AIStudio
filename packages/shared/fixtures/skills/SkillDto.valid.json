@@ -13,6 +13,12 @@
       "status": "ready",
       "issues": [],
       "fileCount": 1,
+      "version": "1.0.0",
+      "author": "ZVS",
+      "update": {
+        "version": "1.1.0",
+        "modified": false
+      },
       "createdAt": 1700000000000,
       "updatedAt": 1700000000000
     }
@@ -39,6 +45,9 @@
         }
       ],
       "fileCount": 1,
+      "version": null,
+      "author": null,
+      "update": null,
       "createdAt": 1700000000000,
       "updatedAt": 1700000000000
     }

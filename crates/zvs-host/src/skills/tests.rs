@@ -13,11 +13,12 @@ use zvs_contract::{
     AppError, AppErrorCode, CreateSkillInput, GraphNode, ProviderCapability, ProviderId,
     ProviderKind, RetryPolicy, RunGraph, RunKind, SKILL_TRIGGER_KEY, SkillDto, SkillExportInput,
     SkillFileEncoding, SkillFileInput, SkillImportInput, SkillIssueDto, SkillIssueRule,
-    SkillModelDto, SkillSource, SkillStatus, StartRunInput, ToolDto, ToolSource, ToolTier,
-    UpdateSkillInput, Validate,
+    SkillModelDto, SkillSource, SkillStatus, SkillUpdateDto, StartRunInput, ToolDto, ToolSource,
+    ToolTier, UpdateSkillInput, Validate,
 };
 
-use super::library::SKILL_FILE_NOT_FOUND;
+use super::bundled::is_newer;
+use super::library::{SKILL_FILE_NOT_FOUND, SKILL_UP_TO_DATE};
 use super::manifest::SKILL_FILE;
 use super::*;
 use crate::data::Repositories;
@@ -1101,8 +1102,14 @@ async fn the_chat_catalogue_lists_usable_skills_with_the_wire_tool_names() {
 fn the_bundled_skills_install_once_as_ready_skills_with_their_scripts() {
     let host = host();
     let library = host.service.library();
-    let installed = library.install_bundled(BUNDLED_SKILLS).expect("installs");
-    assert_eq!(installed, ["pdf", "docx", "xlsx"]);
+    let installed = library.install_bundled().expect("installs");
+    assert_eq!(
+        installed,
+        BUNDLED_SKILLS
+            .iter()
+            .map(|skill| skill.key)
+            .collect::<Vec<_>>()
+    );
     let skills = host.service.list().expect("lists");
     for bundled in BUNDLED_SKILLS {
         let skill = skills
@@ -1131,7 +1138,7 @@ fn the_bundled_skills_install_once_as_ready_skills_with_their_scripts() {
     }
     assert!(
         library
-            .install_bundled(BUNDLED_SKILLS)
+            .install_bundled()
             .expect("installs again")
             .is_empty()
     );
@@ -1142,7 +1149,7 @@ fn the_bundled_skills_install_once_as_ready_skills_with_their_scripts() {
     host.service.remove(&pdf.id).expect("removes");
     assert!(
         library
-            .install_bundled(BUNDLED_SKILLS)
+            .install_bundled()
             .expect("installs after a removal")
             .is_empty()
     );
@@ -1163,11 +1170,7 @@ fn a_bundled_key_already_taken_by_the_user_is_left_alone() {
         ..weather()
     };
     host.service.create(&mine).expect("creates");
-    let installed = host
-        .service
-        .library()
-        .install_bundled(BUNDLED_SKILLS)
-        .expect("installs");
+    let installed = host.service.library().install_bundled().expect("installs");
     assert_eq!(installed, ["docx", "xlsx"]);
     let pdf = host
         .service
@@ -1274,4 +1277,230 @@ fn a_file_is_readable_by_id_even_when_the_skill_is_off_and_never_outside_its_fol
             .expect_err("refused");
         assert_eq!(error.code, AppErrorCode::NotFound, "{path}");
     }
+}
+
+const NOTES_V0: &[BundledSkill] = &[BundledSkill {
+    key: "notes",
+    manifest: "---\nname: notes\ndescription: Составляет заметки о выпуске\n---\n\nСгруппируйте изменения.\n",
+    files: &[BundledFile {
+        path: "references/style.md",
+        content: "Кратко.",
+    }],
+}];
+
+const NOTES_V1: &[BundledSkill] = &[BundledSkill {
+    key: "notes",
+    manifest: "---\nname: notes\ndescription: Составляет заметки о выпуске\nmetadata:\n  version: \"1.0.0\"\n  author: ZVS AI Studio\n---\n\nСгруппируйте изменения.\n",
+    files: &[BundledFile {
+        path: "references/style.md",
+        content: "Кратко.",
+    }],
+}];
+
+const NOTES_V2: &[BundledSkill] = &[BundledSkill {
+    key: "notes",
+    manifest: "---\nname: notes\ndescription: Составляет заметки о выпуске\nmetadata:\n  version: \"1.1.0\"\n  author: ZVS AI Studio\n---\n\nСгруппируйте изменения по разделам.\n",
+    files: &[BundledFile {
+        path: "references/style.md",
+        content: "Кратко и по делу.",
+    }],
+}];
+
+fn library_of(host: &Host, bundled: &'static [BundledSkill]) -> SkillLibrary {
+    SkillLibrary::new(SkillLibraryOptions {
+        bundled,
+        ..SkillLibraryOptions::new(
+            host.database.shared(),
+            host.workspace.join(SKILLS_DIR),
+            host.tools.clone(),
+        )
+    })
+}
+
+fn notes_in(library: &SkillLibrary) -> SkillDto {
+    library
+        .list()
+        .expect("lists")
+        .into_iter()
+        .find(|skill| skill.key == "notes")
+        .expect("the notes skill")
+}
+
+#[test]
+fn versions_compare_by_their_numeric_parts() {
+    assert!(is_newer("1.0.0", None));
+    assert!(is_newer("1.0.0", Some("бессмыслица")));
+    assert!(is_newer("1.10.0", Some("1.9.3")));
+    assert!(is_newer("v2", Some("1.9")));
+    assert!(is_newer("1.0.1-beta", Some("1.0.0")));
+    assert!(!is_newer("1.0.0", Some("1.0.0")));
+    assert!(!is_newer("1.0.0", Some("1.2.0")));
+    assert!(!is_newer("бессмыслица", None));
+    assert!(!is_newer("1.0.0.0", None));
+}
+
+#[test]
+fn every_bundled_skill_declares_its_version_and_author_and_ships_every_file() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("skills");
+    for skill in BUNDLED_SKILLS {
+        let manifest = manifest::parse_manifest(skill.manifest).expect("parses");
+        assert_eq!(manifest.name, skill.key);
+        let version = skill.version().expect("a version");
+        assert!(bundled::version_order(&version).is_some(), "{}", skill.key);
+        assert!(manifest.meta("author").is_some(), "{}", skill.key);
+        let base = root.join(skill.key);
+        let mut on_disk = Vec::new();
+        let mut pending = vec![base.clone()];
+        while let Some(dir) = pending.pop() {
+            for entry in fs::read_dir(&dir).expect("reads the skill folder") {
+                let path = entry.expect("an entry").path();
+                if path.is_dir() {
+                    if !path.ends_with("__pycache__") {
+                        pending.push(path);
+                    }
+                    continue;
+                }
+                let relative = path
+                    .strip_prefix(&base)
+                    .expect("inside the skill")
+                    .components()
+                    .map(|part| part.as_os_str().to_string_lossy().into_owned())
+                    .collect::<Vec<_>>()
+                    .join("/");
+                if relative != SKILL_FILE {
+                    on_disk.push(relative);
+                }
+            }
+        }
+        on_disk.sort();
+        let mut listed: Vec<String> = skill
+            .files
+            .iter()
+            .map(|file| file.path.to_owned())
+            .collect();
+        listed.sort();
+        assert_eq!(listed, on_disk, "{}", skill.key);
+    }
+}
+
+#[test]
+fn a_newer_bundled_version_is_offered_and_replaces_the_skill_in_place() {
+    let host = host();
+    let first = library_of(&host, NOTES_V1);
+    assert_eq!(first.install_bundled().expect("installs"), ["notes"]);
+    let installed = notes_in(&first);
+    assert_eq!(installed.version.as_deref(), Some("1.0.0"));
+    assert_eq!(installed.author.as_deref(), Some("ZVS AI Studio"));
+    assert_eq!(installed.update, None);
+    first
+        .set_enabled(&installed.id, false)
+        .expect("turns the skill off");
+
+    let next = library_of(&host, NOTES_V2);
+    assert!(next.install_bundled().expect("installs").is_empty());
+    assert_eq!(
+        notes_in(&next).update,
+        Some(SkillUpdateDto {
+            version: "1.1.0".to_owned(),
+            modified: false,
+        })
+    );
+    let updated = next.update_bundled(&installed.id).expect("updates");
+    assert_eq!(updated.skill.id, installed.id);
+    assert_eq!(updated.skill.version.as_deref(), Some("1.1.0"));
+    assert_eq!(updated.skill.update, None);
+    assert!(!updated.skill.enabled);
+    assert_eq!(updated.skill.source, SkillSource::Bundled);
+    assert_eq!(updated.instructions, "Сгруппируйте изменения по разделам.");
+    let style = next
+        .read_file(&installed.id, "references/style.md")
+        .expect("reads");
+    assert_eq!(style.text.as_deref(), Some("Кратко и по делу."));
+    assert_eq!(notes_in(&next).update, None);
+
+    let error = next
+        .update_bundled(&installed.id)
+        .expect_err("nothing to update");
+    assert_eq!(error.code, AppErrorCode::Conflict);
+    assert_eq!(error.message, SKILL_UP_TO_DATE);
+}
+
+#[test]
+fn a_bundled_skill_changed_by_the_user_reports_the_update_as_modified() {
+    let host = host();
+    library_of(&host, NOTES_V1)
+        .install_bundled()
+        .expect("installs");
+    fs::write(
+        host.workspace
+            .join(SKILLS_DIR)
+            .join("notes")
+            .join("references")
+            .join("style.md"),
+        "Моя версия.",
+    )
+    .expect("edits a file");
+    let next = library_of(&host, NOTES_V2);
+    assert_eq!(
+        notes_in(&next).update,
+        Some(SkillUpdateDto {
+            version: "1.1.0".to_owned(),
+            modified: true,
+        })
+    );
+    let listed = next.update_all_bundled().expect("updates everything");
+    let skill = listed
+        .iter()
+        .find(|skill| skill.key == "notes")
+        .expect("the notes skill");
+    assert_eq!(skill.version.as_deref(), Some("1.1.0"));
+    assert_eq!(skill.update, None);
+}
+
+#[test]
+fn a_skill_seeded_before_versions_existed_is_offered_the_update() {
+    let host = host();
+    library_of(&host, NOTES_V0)
+        .install_bundled()
+        .expect("installs");
+    fs::write(
+        host.workspace.join(SKILLS_DIR).join(".bundled.json"),
+        "[\"notes\"]",
+    )
+    .expect("writes the old marker");
+    let next = library_of(&host, NOTES_V1);
+    assert!(next.install_bundled().expect("installs").is_empty());
+    let skill = notes_in(&next);
+    assert_eq!(skill.version, None);
+    assert_eq!(
+        skill.update,
+        Some(SkillUpdateDto {
+            version: "1.0.0".to_owned(),
+            modified: true,
+        })
+    );
+    let updated = next.update_bundled(&skill.id).expect("updates");
+    assert_eq!(updated.skill.version.as_deref(), Some("1.0.0"));
+}
+
+#[test]
+fn a_user_skill_sharing_a_bundled_key_is_never_offered_an_update() {
+    let host = host();
+    host.service
+        .create(&CreateSkillInput {
+            key: "notes".to_owned(),
+            ..weather()
+        })
+        .expect("creates");
+    let next = library_of(&host, NOTES_V2);
+    assert!(next.install_bundled().expect("installs").is_empty());
+    let skill = notes_in(&next);
+    assert_eq!(skill.source, SkillSource::Local);
+    assert_eq!(skill.update, None);
+    assert_eq!(
+        next.update_bundled(&skill.id)
+            .expect_err("not bundled")
+            .code,
+        AppErrorCode::Conflict
+    );
 }

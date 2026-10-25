@@ -53,6 +53,18 @@ pub fn register(server: &mut IpcServer) {
             },
         )
         .handle(
+            "skills.updateBundled",
+            |services: Arc<Services>, input: SkillRef| async move {
+                services.skills.update_bundled(&input.id)
+            },
+        )
+        .handle(
+            "skills.updateAllBundled",
+            |services: Arc<Services>, _input: ()| async move {
+                services.skills.update_all_bundled()
+            },
+        )
+        .handle(
             "skills.readFile",
             |services: Arc<Services>, input: SkillFileRef| async move {
                 services.skills.read_file(&input.id, &input.path)

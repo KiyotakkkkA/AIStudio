@@ -220,6 +220,8 @@ mod tests {
                 "skills.remove",
                 "skills.setEnabled",
                 "skills.update",
+                "skills.updateAllBundled",
+                "skills.updateBundled",
                 "system.demoJob",
                 "system.demoStream",
                 "system.device",

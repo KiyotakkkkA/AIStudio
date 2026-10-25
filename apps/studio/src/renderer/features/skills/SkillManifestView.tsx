@@ -8,7 +8,7 @@ import Field from "../../ui/molecules/Field";
 import type { SkillFormVm } from "./SkillFormVm";
 import type SkillStore from "./SkillStore";
 import InstructionEditor from "./InstructionEditor";
-import { issueLine } from "./skillPresentation";
+import { issueLine, versionLine } from "./skillPresentation";
 import Alert from "../../ui/molecules/Alert";
 
 function keyError(error: string | undefined): string | undefined {
@@ -53,7 +53,12 @@ function SkillManifestView({
           label="Название"
           htmlFor="skill-name"
           required
-          help={`Идентификатор: ${vm.key.length > 0 ? vm.key : "—"}`}
+          help={[
+            `Идентификатор: ${vm.key.length > 0 ? vm.key : "—"}`,
+            skill === null ? null : versionLine(skill),
+          ]
+            .filter((part) => part !== null)
+            .join(" · ")}
           error={vm.errorOf("name") ?? keyError(vm.errorOf("key"))}
         >
           <TextInput

@@ -5,6 +5,7 @@ import {
   type SkillIssueDto,
   type SkillIssueRule,
   type SkillSource,
+  type SkillUpdateDto,
   type ToolDto,
 } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
@@ -185,6 +186,42 @@ export function headerLine(skills: readonly SkillDto[]): string {
 
 function skillsCount(count: number): string {
   return plural(count, "навык", "навыка", "навыков");
+}
+
+export const UPDATE_CONFIRM_LABEL = "Обновить";
+export const UPDATE_SKILL_TITLE = "Обновить навык?";
+export const UPDATE_ALL_TITLE = "Обновить встроенные навыки?";
+export const UPDATE_MODIFIED_WARNING =
+  "Файлы навыка будут заменены версией из приложения. Изменения, внесённые в навык, будут потеряны.";
+export const UPDATE_GUARD = "Сохраните или отмените изменения перед обновлением.";
+
+export function updateLabel(update: SkillUpdateDto): string {
+  return `Обновить до версии ${update.version}`;
+}
+
+export function updateAllLabel(count: number): string {
+  return `Обновить всё: ${skillsCount(count)}`;
+}
+
+export function updateAllWarning(modified: number): string {
+  return `Навыки будут заменены версиями из приложения. Изменения в ${plural(modified, "навыке", "навыках", "навыках")} будут потеряны.`;
+}
+
+export function updatedNotice(name: string, version: string | null): string {
+  return version === null
+    ? `Навык «${name}» обновлён`
+    : `Навык «${name}» обновлён до версии ${version}`;
+}
+
+export function updatedAllNotice(count: number): string {
+  return `Обновлено: ${skillsCount(count)}`;
+}
+
+export function versionLine(skill: SkillDto): string | null {
+  const parts: string[] = [];
+  if (skill.version !== null) parts.push(`Версия ${skill.version}`);
+  if (skill.author !== null) parts.push(`Автор: ${skill.author}`);
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 const TRANSLIT: Record<string, string> = {

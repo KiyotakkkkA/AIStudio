@@ -186,7 +186,7 @@ pub use skills::{
     SkillExportInput, SkillExportResultDto, SkillFileContentDto, SkillFileDto, SkillFileEncoding,
     SkillFileInput, SkillFileRef, SkillImportInput, SkillImportResultDto, SkillIssueDto,
     SkillIssueRule, SkillModelDto, SkillRef, SkillRemoveOutput, SkillSource, SkillStatus,
-    SkillTriggerSettingsDto, UpdateSkillInput, is_skill_key, is_skill_path,
+    SkillTriggerSettingsDto, SkillUpdateDto, UpdateSkillInput, is_skill_key, is_skill_path,
 };
 pub use system::{
     DeviceGpuDto, DeviceProfileDto, DeviceTier, ResourceSampleDto, SystemDemoJobInput,
