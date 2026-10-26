@@ -13,7 +13,7 @@ import {
 } from "@zvs/shared";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
-import ChatStore from "../../src/renderer/features/chat/ChatStore.ts";
+import ChatStore, { BROWSER_DOCK_MIN_WIDTH } from "../../src/renderer/features/chat/ChatStore.ts";
 import ExplorerStore from "../../src/renderer/features/chat/explorer/ExplorerStore.ts";
 import { provider } from "./providerFixtures.ts";
 
@@ -268,5 +268,12 @@ test("the side panel falls back to the run context without a working folder", as
   expect(chat.panelOpen).toBe(true);
   chat.closePanel();
   expect(chat.panelOpen).toBe(false);
+  chat.showPanel("browser");
+  expect(chat.isPanelShown("browser")).toBe(true);
+  expect(chat.isPanelShown("context")).toBe(false);
+  chat.showPanel("browser");
+  expect(chat.panelOpen).toBe(false);
+  chat.setBrowserWidth(100);
+  expect(chat.browserWidth).toBe(BROWSER_DOCK_MIN_WIDTH);
   chat.dispose();
 });

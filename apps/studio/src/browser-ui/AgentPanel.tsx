@@ -18,12 +18,9 @@ import {
   AGENT_CLOSE,
   AGENT_TITLE,
   NO_ACTIONS,
-  NO_SITE,
-  NO_TASK,
   RESUME,
   REVOKE,
   RIGHTS_TITLE,
-  RIGHT_TIER_LABELS,
   STATUS_LABELS,
   STATUS_TONES,
   STOP,
@@ -35,10 +32,8 @@ import {
   canResume,
   canStop,
   canTakeControl,
-  paceLabel,
   siteName,
   siteRights,
-  stepLabel,
 } from "./agentCopy";
 
 const ACTION_ICONS: Record<BrowserAgentAction["state"], string> = {
@@ -57,12 +52,16 @@ interface AgentPanelProps {
 }
 
 export default function AgentPanel({ agent, busy, send }: AgentPanelProps) {
-  const tone = STATUS_TONES[agent.status];
   const actions = [...agent.actions].reverse();
+  const rights = agent.origin ? siteRights(agent.grants) : [];
   return (
     <aside className="agent-panel" aria-label={AGENT_TITLE}>
       <div className="agent-head">
-        <span className="agent-title">{AGENT_TITLE}</span>
+        <span className={`agent-dot ${STATUS_TONES[agent.status]}`} aria-hidden="true" />
+        <div className="agent-heading">
+          <span className="agent-section">{AGENT_TITLE}</span>
+          <strong>{STATUS_LABELS[agent.status]}</strong>
+        </div>
         <IconButton
           path={mdiClose}
           label={AGENT_CLOSE}
@@ -71,102 +70,92 @@ export default function AgentPanel({ agent, busy, send }: AgentPanelProps) {
         />
       </div>
       <div className="agent-body">
-        <div className="agent-card agent-state">
-          <span className={`agent-dot ${tone}`} aria-hidden="true" />
-          <div>
-            <strong>{STATUS_LABELS[agent.status]}</strong>
-            {agent.status !== "idle" && (
-              <small>
-                {stepLabel(agent.steps)} · {paceLabel(agent.pace, agent.limit)}
-              </small>
-            )}
-          </div>
-        </div>
-        <section>
-          <h2 className="agent-section">{TASK_TITLE}</h2>
-          <p className="agent-card agent-task">{agent.task ?? NO_TASK}</p>
-        </section>
+        {agent.task && (
+          <section className="agent-group">
+            <h2 className="agent-section">{TASK_TITLE}</h2>
+            <p className="agent-task">{agent.task}</p>
+          </section>
+        )}
         {agent.target && (
           <div className="agent-target" role="status">
             <span>{TARGET_LABEL}</span>
             <code>{agent.target}</code>
           </div>
         )}
-        <h2 className="agent-section">{ACTIONS_TITLE}</h2>
-        <ScrollArea orientation="vertical" className="agent-log">
-          {actions.length === 0 ? (
-            <p className="agent-empty">{NO_ACTIONS}</p>
-          ) : (
-            <ol>
-              {actions.map((action) => (
-                <li key={action.id} className={`agent-action ${action.state}`}>
-                  <span className="agent-action-mark" aria-hidden="true">
-                    <Icon path={ACTION_ICONS[action.state]} size={11} />
-                  </span>
-                  <div>
-                    <code>{actionTitle(action)}</code>
-                    <small>{actionMeta(action)}</small>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-        </ScrollArea>
-        <div className="agent-card agent-rights">
-          <h2 className="agent-section">{RIGHTS_TITLE}</h2>
-          {agent.origin ? (
-            <>
-              <span className="agent-site">{siteName(agent.origin)}</span>
-              {siteRights(agent.grants).map((right) => (
-                <div className="agent-right" key={right.label}>
-                  <span>{right.label}</span>
-                  <span className={`agent-tier ${right.tier}`}>
-                    {RIGHT_TIER_LABELS[right.tier]}
-                  </span>
-                  {right.grant ? (
-                    <IconButton
-                      path={mdiLinkVariantOff}
-                      label={REVOKE}
-                      tooltip="top-right"
-                      iconSize={14}
-                      className="agent-revoke"
-                      disabled={busy}
-                      onClick={() => send({ action: "agentRevoke", id: right.grant!.id })}
-                    />
-                  ) : null}
-                </div>
-              ))}
-            </>
-          ) : (
-            <p className="agent-empty">{NO_SITE}</p>
-          )}
-        </div>
-        <div className="agent-controls">
-          {canResume(agent.status) ? (
-            <button type="button" disabled={busy} onClick={() => send({ action: "agentResume" })}>
-              <Icon path={mdiPlay} size={15} />
-              {RESUME}
-            </button>
-          ) : (
+        <section className="agent-group agent-log-group">
+          <h2 className="agent-section">{ACTIONS_TITLE}</h2>
+          <ScrollArea orientation="vertical" className="agent-log">
+            {actions.length === 0 ? (
+              <p className="agent-empty">{NO_ACTIONS}</p>
+            ) : (
+              <ol>
+                {actions.map((action) => {
+                  const meta = actionMeta(action);
+                  return (
+                    <li key={action.id} className={`agent-action ${action.state}`}>
+                      <span className="agent-action-mark" aria-hidden="true">
+                        <Icon path={ACTION_ICONS[action.state]} size={11} />
+                      </span>
+                      <div>
+                        <span className="agent-action-title">{actionTitle(action)}</span>
+                        {meta && <small>{meta}</small>}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </ScrollArea>
+        </section>
+        {rights.length > 0 && agent.origin && (
+          <section className="agent-group">
+            <h2 className="agent-section">
+              {RIGHTS_TITLE} {siteName(agent.origin)}
+            </h2>
+            {rights.map((right) => (
+              <div className="agent-right" key={right.grant.id}>
+                <span>{right.label}</span>
+                <IconButton
+                  path={mdiLinkVariantOff}
+                  label={REVOKE}
+                  tooltip="top-right"
+                  iconSize={14}
+                  className="agent-revoke"
+                  disabled={busy}
+                  onClick={() => send({ action: "agentRevoke", id: right.grant.id })}
+                />
+              </div>
+            ))}
+          </section>
+        )}
+        {canStop(agent.status) && (
+          <div className="agent-controls">
+            {canResume(agent.status) ? (
+              <button type="button" disabled={busy} onClick={() => send({ action: "agentResume" })}>
+                <Icon path={mdiPlay} size={15} />
+                {RESUME}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={busy || !canTakeControl(agent.status)}
+                onClick={() => send({ action: "agentControl" })}
+              >
+                <Icon path={mdiHandBackRightOutline} size={15} />
+                {TAKE_CONTROL}
+              </button>
+            )}
             <button
               type="button"
-              disabled={busy || !canTakeControl(agent.status)}
-              onClick={() => send({ action: "agentControl" })}
+              className="danger-soft"
+              disabled={busy}
+              onClick={() => send({ action: "agentStop" })}
             >
-              <Icon path={mdiHandBackRightOutline} size={15} />
-              {TAKE_CONTROL}
+              <Icon path={mdiStop} size={15} />
+              {STOP}
             </button>
-          )}
-          <button
-            type="button"
-            className="danger-soft"
-            disabled={busy || !canStop(agent.status)}
-            onClick={() => send({ action: "agentStop" })}
-          >
-            <Icon path={mdiStop} size={15} />
-            {STOP}
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </aside>
   );

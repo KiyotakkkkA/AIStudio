@@ -13,7 +13,6 @@ import {
   canStop,
   canTakeControl,
   offersAlways,
-  paceLabel,
   siteRights,
   timeLabel,
 } from "../../src/browser-ui/agentCopy";
@@ -44,17 +43,16 @@ function approval(overrides: Partial<BrowserAgentApproval>): BrowserAgentApprova
 }
 
 describe("browser agent panel", () => {
-  it("names the authorisation of every logged action", () => {
-    expect(authorisationLabel({ kind: "auto" })).toBe("авто");
-    expect(authorisationLabel({ kind: "granted", at: AT })).toBe(
-      `разрешено для сайта · ${timeLabel(AT)}`,
-    );
+  it("names only the authorisations the user granted", () => {
+    expect(authorisationLabel({ kind: "auto" })).toBeNull();
+    expect(authorisationLabel({ kind: "granted", at: AT })).toBe("разрешено для сайта");
     expect(authorisationLabel({ kind: "approved", at: AT })).toBe(
       `подтверждено в ${timeLabel(AT)}`,
     );
-    expect(actionMeta(action({ authorisation: { kind: "auto" }, durationMs: 412 }))).toBe(
-      "авто · 412 мс",
-    );
+    expect(actionMeta(action({ authorisation: { kind: "auto" }, durationMs: 412 }))).toBeNull();
+    expect(
+      actionMeta(action({ authorisation: { kind: "approved", at: AT }, durationMs: 412 })),
+    ).toBe(`подтверждено в ${timeLabel(AT)}`);
     expect(
       actionMeta(
         action({
@@ -64,7 +62,7 @@ describe("browser agent panel", () => {
           error: "Элемент перекрыт",
         }),
       ),
-    ).toBe(`разрешено для сайта · ${timeLabel(AT)} · 1,5 с · Элемент перекрыт`);
+    ).toBe("Элемент перекрыт");
     expect(actionMeta(action({ state: "waiting" }))).toBe("ожидает подтверждения");
     expect(actionMeta(action({ state: "denied" }))).toBe("отклонено");
     expect(actionMeta(action({ state: "paused", error: RATE_LIMIT_PAUSE }))).toBe(RATE_LIMIT_PAUSE);
@@ -93,12 +91,10 @@ describe("browser agent panel", () => {
     );
   });
 
-  it("derives the site rights from the grants", () => {
+  it("lists only the revocable grants of the site", () => {
     const grant = { id: "g", tool: "browser.click", grantedAt: AT };
-    const rights = siteRights([grant]);
-    expect(rights.map((right) => right.tier)).toEqual(["auto", "granted", "ask", "ask", "never"]);
-    expect(rights[1].grant).toEqual(grant);
-    expect(siteRights([]).some((right) => right.tier === "granted")).toBe(false);
+    expect(siteRights([grant])).toEqual([{ label: "Нажатия", grant }]);
+    expect(siteRights([])).toEqual([]);
   });
 
   it("offers each control only in the states it applies to", () => {
@@ -113,11 +109,5 @@ describe("browser agent panel", () => {
     expect(canStop("finished")).toBe(false);
     expect(canStop("stopped")).toBe(false);
     expect(STATUS_LINES.idle).toBe("");
-  });
-
-  it("counts the pace with Russian plurals", () => {
-    expect(paceLabel(1, 20)).toBe("1 действие за минуту из 20");
-    expect(paceLabel(4, 20)).toBe("4 действия за минуту из 20");
-    expect(paceLabel(11, 20)).toBe("11 действий за минуту из 20");
   });
 });

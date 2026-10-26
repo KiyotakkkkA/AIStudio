@@ -36,7 +36,6 @@ import {
   AGENT_OPEN,
   STATUS_LINES,
   STATUS_TONES,
-  paceLabel,
 } from "./agentCopy";
 import { DEVTOOLS_CLOSE, DEVTOOLS_OPEN } from "./networkCopy";
 import {
@@ -520,7 +519,6 @@ function BrowserApp() {
           <span className="status-dot" aria-hidden="true" />
           {statusText}
         </span>
-        {agentActive && <span className="agent-line">{paceLabel(agent.pace, agent.limit)}</span>}
         <span className="profile-line">
           <Icon path={mdiDownloadOffOutline} size={12} />
           {PROFILE_FOOTER}

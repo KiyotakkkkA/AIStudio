@@ -60,7 +60,9 @@ const LAST_CONVERSATION_KEY = "chat.conversation.last";
 export const SELECTIONS_FULL = "К сообщению можно приложить не больше 8 фрагментов документов.";
 export const GENERATION_FAILED = "Не удалось получить ответ. Повторите запрос.";
 
-export type SidePanel = "context" | "files";
+export type SidePanel = "context" | "files" | "browser";
+export const BROWSER_DOCK_MIN_WIDTH = 560;
+export const BROWSER_DOCK_DEFAULT_WIDTH = 820;
 
 export interface AccountChoice {
   readonly value: string;
@@ -89,6 +91,7 @@ export default class ChatStore {
   query = "";
   sidePanel: SidePanel = "context";
   panelOpen = true;
+  browserWidth = BROWSER_DOCK_DEFAULT_WIDTH;
   listOpen = true;
   loading = false;
   sending = false;
@@ -478,7 +481,8 @@ export default class ChatStore {
     this.listOpen = !this.listOpen;
   }
   get activePanel(): SidePanel {
-    return this.sidePanel === "files" && this.workingFolder !== null ? "files" : "context";
+    if (this.sidePanel === "files") return this.workingFolder === null ? "context" : "files";
+    return this.sidePanel;
   }
   isPanelShown(panel: SidePanel) {
     return this.panelOpen && this.activePanel === panel;
@@ -493,6 +497,9 @@ export default class ChatStore {
   }
   closePanel() {
     this.panelOpen = false;
+  }
+  setBrowserWidth(width: number) {
+    this.browserWidth = Math.max(BROWSER_DOCK_MIN_WIDTH, Math.round(width));
   }
   attachSelection(selection: DocumentSelectionDto) {
     if (this.composer.addSelection(selection)) this.error = null;

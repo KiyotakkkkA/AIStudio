@@ -8,6 +8,7 @@ import {
   mdiDockLeft,
   mdiFolderOutline,
   mdiTuneVariant,
+  mdiWeb,
 } from "@mdi/js";
 import Chip from "../../ui/atoms/Chip";
 import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
@@ -30,6 +31,7 @@ import type ChatStore from "./ChatStore";
 import { CONTEXT_PANEL, FILES_PANEL, PANEL_GROUP_LABEL } from "./explorer/explorerCopy";
 import TerminalDock from "../terminal/TerminalDock";
 import { TERMINAL_PANEL } from "../terminal/terminalCopy";
+import { BROWSER_PANEL } from "../browser/browserCopy";
 import MemoryDropdown from "../memory/MemoryDropdown";
 import { AnimatePresence, motion } from "motion/react";
 import FadeIn from "../../ui/motion/FadeIn";
@@ -78,7 +80,10 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
     return () => resize.disconnect();
   }, []);
   return (
-    <section aria-label="Лента чата" className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <section
+      aria-label="Лента чата"
+      className={`flex min-h-0 flex-1 flex-col ${store.isPanelShown("browser") ? "min-w-90" : "min-w-0"}`}
+    >
       <header className="flex h-14 shrink-0 items-center gap-2.5 px-6">
         {store.listOpen ? null : (
           <IconButton
@@ -120,6 +125,12 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
               onClick={() => store.showPanel("files")}
             />
           )}
+          <PanelButton
+            label={BROWSER_PANEL}
+            path={mdiWeb}
+            active={store.isPanelShown("browser")}
+            onClick={() => store.showPanel("browser")}
+          />
         </div>
         <div
           role="group"
