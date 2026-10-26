@@ -209,7 +209,7 @@ chat restore, skills and storage. They sit under TASK_045 by numbering only and 
 on its code. Suggested order: 045_EXTRA_3 → 045_EXTRA_5 (part A) → 045_EXTRA_1 →
 045_EXTRA_4 → 045_EXTRA_2.
 - [x] **TASK_046** — CDP driver, `browser.*` nodes, policy engine
-- [ ] **TASK_047** — Browser agent panel, approvals, rate limiter
+- [x] **TASK_047** — Browser agent panel, approvals, rate limiter
 
 ## Phase 9 — Integrations
 

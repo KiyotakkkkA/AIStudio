@@ -18,6 +18,7 @@ import {
   mdiPlus,
   mdiRefresh,
   mdiReload,
+  mdiRobotOutline,
   mdiTrashCanOutline,
   mdiWeb,
 } from "@mdi/js";
@@ -25,8 +26,18 @@ import "../renderer/app/theme.css";
 import "./style.css";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Icon from "./Icon";
+import AgentPanel from "./AgentPanel";
+import ApprovalBar from "./ApprovalBar";
 import IconButton from "./IconButton";
 import NetworkPanel from "./NetworkPanel";
+import {
+  AGENT_ACTION_FAILED,
+  AGENT_CLOSE,
+  AGENT_OPEN,
+  STATUS_LINES,
+  STATUS_TONES,
+  paceLabel,
+} from "./agentCopy";
 import { DEVTOOLS_CLOSE, DEVTOOLS_OPEN } from "./networkCopy";
 import {
   ACTION_FAILED,
@@ -78,12 +89,27 @@ function BrowserApp() {
     activeId: null,
     sitesVisible: false,
     devtoolsVisible: false,
+    agentVisible: false,
+    agent: {
+      status: "idle",
+      runId: null,
+      task: null,
+      steps: 0,
+      pace: 0,
+      limit: 0,
+      target: null,
+      approval: null,
+      actions: [],
+      origin: null,
+      grants: [],
+    },
   });
   const [address, setAddress] = useState("");
   const [error, setError] = useState("");
   const [cookies, setCookies] = useState<BrowserCookie[]>([]);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const [agentBusy, setAgentBusy] = useState(false);
   const [confirmation, setConfirmation] = useState<BrowserCommand | null>(null);
   const active = state.tabs.find((tab) => tab.id === state.activeId);
   const security = active?.security ?? "none";
@@ -95,8 +121,13 @@ function BrowserApp() {
       if (Array.isArray(result)) setCookies(result as BrowserCookie[]);
       else setState(result as BrowserState);
     } catch {
-      setError(ACTION_FAILED);
+      setError(command.action.startsWith("agent") ? AGENT_ACTION_FAILED : ACTION_FAILED);
     }
+  }
+
+  function sendAgent(command: BrowserCommand) {
+    setAgentBusy(true);
+    void send(command).finally(() => setAgentBusy(false));
   }
 
   useEffect(() => {
@@ -117,8 +148,20 @@ function BrowserApp() {
   );
   const domains = [...new Set(filtered.map((cookie) => cookie.domain))].sort();
   const allDomains = new Set(cookies.map((cookie) => cookie.domain)).size;
-  const statusText = error || active?.error || (active?.loading ? STATUS_LOADING : STATUS_READY);
-  const statusTone = error || active?.error ? "err" : active?.loading ? "busy" : "ok";
+  const agent = state.agent;
+  const agentActive = agent.status !== "idle";
+  const statusText =
+    error ||
+    active?.error ||
+    (agentActive ? STATUS_LINES[agent.status] : active?.loading ? STATUS_LOADING : STATUS_READY);
+  const statusTone =
+    error || active?.error
+      ? "err"
+      : agentActive
+        ? STATUS_TONES[agent.status]
+        : active?.loading
+          ? "busy"
+          : "ok";
 
   return (
     <>
@@ -265,6 +308,13 @@ function BrowserApp() {
               onClick={() => void send({ action: "sites", visible: !state.sitesVisible })}
             />
             <IconButton
+              path={mdiRobotOutline}
+              label={state.agentVisible ? AGENT_CLOSE : AGENT_OPEN}
+              className="toggle"
+              aria-pressed={state.agentVisible}
+              onClick={() => void send({ action: "agent", visible: !state.agentVisible })}
+            />
+            <IconButton
               tooltip="top-right"
               path={mdiCodeTags}
               label={state.devtoolsVisible ? DEVTOOLS_CLOSE : DEVTOOLS_OPEN}
@@ -276,193 +326,201 @@ function BrowserApp() {
         </form>
       </header>
       <main>
-        <ScrollArea orientation="vertical" className="page-area">
-          {state.sitesVisible ? (
-            <section className="sites">
-              <div className="sites-heading">
-                <span className="title-mark">
-                  <Icon path={mdiCookieOutline} size={18} />
-                </span>
-                <div className="sites-heading-text">
-                  <h1>{SITES_TITLE}</h1>
-                  <p>{SITES_HINT}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void send({ action: "sites", visible: false })}
-                >
-                  <Icon path={mdiArrowLeft} size={15} />
-                  Назад
-                </button>
-              </div>
-              <div className="filters">
-                <label className="search">
-                  <Icon path={mdiMagnify} />
-                  <input
-                    aria-label="Поиск куки"
-                    placeholder="Поиск по домену или имени"
-                    value={query}
-                    spellCheck={false}
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
-                </label>
-                <span className="stat">{sitesWord(allDomains)}</span>
-                <span className="stat">{cookiesWord(cookies.length)}</span>
-                <button type="button" onClick={() => void send({ action: "cookies" })}>
-                  <Icon path={mdiRefresh} size={15} />
-                  Обновить
-                </button>
-              </div>
-              {domains.length === 0 && (
-                <div className="empty">
-                  <span className="empty-mark">
-                    <Icon path={mdiCookieOutline} size={22} />
+        <div className="page-column">
+          <ScrollArea orientation="vertical" className="page-area">
+            {state.sitesVisible ? (
+              <section className="sites">
+                <div className="sites-heading">
+                  <span className="title-mark">
+                    <Icon path={mdiCookieOutline} size={18} />
                   </span>
-                  <strong>{cookies.length === 0 ? SITES_EMPTY : SITES_NOTHING_FOUND}</strong>
-                  {cookies.length === 0 ? <p>{SITES_EMPTY_HINT}</p> : null}
+                  <div className="sites-heading-text">
+                    <h1>{SITES_TITLE}</h1>
+                    <p>{SITES_HINT}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void send({ action: "sites", visible: false })}
+                  >
+                    <Icon path={mdiArrowLeft} size={15} />
+                    Назад
+                  </button>
                 </div>
-              )}
-              {domains.map((domain) => {
-                const rows = filtered.filter((cookie) => cookie.domain === domain);
-                return (
-                  <article key={domain}>
-                    <div className="site-heading">
-                      <span className="site-avatar" aria-hidden="true">
-                        {siteInitial(domain)}
-                      </span>
-                      <h2>{domain}</h2>
-                      <span className="count">{cookiesWord(rows.length)}</span>
-                      <button
-                        type="button"
-                        className="danger-soft"
-                        disabled={busy}
-                        onClick={() => setConfirmation({ action: "clearSite", domain })}
-                      >
-                        <Icon path={mdiDeleteSweepOutline} size={15} />
-                        {CLEAR_SITE}
-                      </button>
-                    </div>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Имя / путь</th>
-                          <th>Флаги</th>
-                          <th>Истекает</th>
-                          <th className="actions">
-                            <span className="sr-only">Действия</span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.map((cookie) => (
-                          <tr key={cookie.id}>
-                            <td className="cookie-name">
-                              {cookie.name}
-                              <small>{cookie.path}</small>
-                            </td>
-                            <td>
-                              <span className="flags">
-                                {cookie.secure ? <span className="flag ok">Secure</span> : null}
-                                {cookie.httpOnly ? (
-                                  <span className="flag info">HttpOnly</span>
-                                ) : null}
-                                {!cookie.secure && !cookie.httpOnly ? (
-                                  <span className="muted">—</span>
-                                ) : null}
-                              </span>
-                            </td>
-                            <td className="expiry">
-                              {cookie.session ? (
-                                <span className="flag neutral">{SESSION_COOKIE}</span>
-                              ) : cookie.expirationDate ? (
-                                expiryLabel(cookie.expirationDate)
-                              ) : (
-                                <span className="muted">—</span>
-                              )}
-                            </td>
-                            <td className="actions">
-                              <button
-                                type="button"
-                                className="row-action"
-                                aria-label={REMOVE_COOKIE}
-                                title={REMOVE_COOKIE}
-                                disabled={busy}
-                                onClick={() =>
-                                  setConfirmation({ action: "removeCookie", id: cookie.id })
-                                }
-                              >
-                                <Icon path={mdiTrashCanOutline} size={15} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </article>
-                );
-              })}
-              {confirmation && (
-                <div className="overlay">
-                  <div role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-                    <span className="dialog-mark">
-                      <Icon path={mdiTrashCanOutline} size={18} />
+                <div className="filters">
+                  <label className="search">
+                    <Icon path={mdiMagnify} />
+                    <input
+                      aria-label="Поиск куки"
+                      placeholder="Поиск по домену или имени"
+                      value={query}
+                      spellCheck={false}
+                      onChange={(event) => setQuery(event.target.value)}
+                    />
+                  </label>
+                  <span className="stat">{sitesWord(allDomains)}</span>
+                  <span className="stat">{cookiesWord(cookies.length)}</span>
+                  <button type="button" onClick={() => void send({ action: "cookies" })}>
+                    <Icon path={mdiRefresh} size={15} />
+                    Обновить
+                  </button>
+                </div>
+                {domains.length === 0 && (
+                  <div className="empty">
+                    <span className="empty-mark">
+                      <Icon path={mdiCookieOutline} size={22} />
                     </span>
-                    <h2 id="confirm-title">
-                      {confirmTitle(
-                        confirmation.action === "clearSite" ? confirmation.domain : null,
-                      )}
-                    </h2>
-                    <p>Сеанс на сайте может завершиться; войти можно снова.</p>
-                    <div className="dialog-actions">
-                      <button type="button" disabled={busy} onClick={() => setConfirmation(null)}>
-                        {CANCEL}
-                      </button>
-                      <button
-                        type="button"
-                        className="danger"
-                        disabled={busy}
-                        onClick={() => {
-                          setBusy(true);
-                          void send(confirmation).finally(() => {
-                            setBusy(false);
-                            setConfirmation(null);
-                          });
-                        }}
-                      >
-                        {CONFIRM_REMOVAL}
-                      </button>
+                    <strong>{cookies.length === 0 ? SITES_EMPTY : SITES_NOTHING_FOUND}</strong>
+                    {cookies.length === 0 ? <p>{SITES_EMPTY_HINT}</p> : null}
+                  </div>
+                )}
+                {domains.map((domain) => {
+                  const rows = filtered.filter((cookie) => cookie.domain === domain);
+                  return (
+                    <article key={domain}>
+                      <div className="site-heading">
+                        <span className="site-avatar" aria-hidden="true">
+                          {siteInitial(domain)}
+                        </span>
+                        <h2>{domain}</h2>
+                        <span className="count">{cookiesWord(rows.length)}</span>
+                        <button
+                          type="button"
+                          className="danger-soft"
+                          disabled={busy}
+                          onClick={() => setConfirmation({ action: "clearSite", domain })}
+                        >
+                          <Icon path={mdiDeleteSweepOutline} size={15} />
+                          {CLEAR_SITE}
+                        </button>
+                      </div>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Имя / путь</th>
+                            <th>Флаги</th>
+                            <th>Истекает</th>
+                            <th className="actions">
+                              <span className="sr-only">Действия</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((cookie) => (
+                            <tr key={cookie.id}>
+                              <td className="cookie-name">
+                                {cookie.name}
+                                <small>{cookie.path}</small>
+                              </td>
+                              <td>
+                                <span className="flags">
+                                  {cookie.secure ? <span className="flag ok">Secure</span> : null}
+                                  {cookie.httpOnly ? (
+                                    <span className="flag info">HttpOnly</span>
+                                  ) : null}
+                                  {!cookie.secure && !cookie.httpOnly ? (
+                                    <span className="muted">—</span>
+                                  ) : null}
+                                </span>
+                              </td>
+                              <td className="expiry">
+                                {cookie.session ? (
+                                  <span className="flag neutral">{SESSION_COOKIE}</span>
+                                ) : cookie.expirationDate ? (
+                                  expiryLabel(cookie.expirationDate)
+                                ) : (
+                                  <span className="muted">—</span>
+                                )}
+                              </td>
+                              <td className="actions">
+                                <button
+                                  type="button"
+                                  className="row-action"
+                                  aria-label={REMOVE_COOKIE}
+                                  title={REMOVE_COOKIE}
+                                  disabled={busy}
+                                  onClick={() =>
+                                    setConfirmation({ action: "removeCookie", id: cookie.id })
+                                  }
+                                >
+                                  <Icon path={mdiTrashCanOutline} size={15} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </article>
+                  );
+                })}
+                {confirmation && (
+                  <div className="overlay">
+                    <div role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+                      <span className="dialog-mark">
+                        <Icon path={mdiTrashCanOutline} size={18} />
+                      </span>
+                      <h2 id="confirm-title">
+                        {confirmTitle(
+                          confirmation.action === "clearSite" ? confirmation.domain : null,
+                        )}
+                      </h2>
+                      <p>Сеанс на сайте может завершиться; войти можно снова.</p>
+                      <div className="dialog-actions">
+                        <button type="button" disabled={busy} onClick={() => setConfirmation(null)}>
+                          {CANCEL}
+                        </button>
+                        <button
+                          type="button"
+                          className="danger"
+                          disabled={busy}
+                          onClick={() => {
+                            setBusy(true);
+                            void send(confirmation).finally(() => {
+                              setBusy(false);
+                              setConfirmation(null);
+                            });
+                          }}
+                        >
+                          {CONFIRM_REMOVAL}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </section>
-          ) : (
-            !active?.url && (
-              <section className="welcome">
-                <span className="badge">{PROFILE_LABEL}</span>
-                <div className="welcome-icon">
-                  <Icon path={mdiWeb} size={28} />
-                </div>
-                <h1>Новая вкладка</h1>
-                <p>
-                  Введите адрес в строке выше. Вход на сайтах и куки сохраняются в рабочем профиле.
-                </p>
+                )}
               </section>
-            )
+            ) : (
+              !active?.url && (
+                <section className="welcome">
+                  <span className="badge">{PROFILE_LABEL}</span>
+                  <div className="welcome-icon">
+                    <Icon path={mdiWeb} size={28} />
+                  </div>
+                  <h1>Новая вкладка</h1>
+                  <p>
+                    Введите адрес в строке выше. Вход на сайтах и куки сохраняются в рабочем
+                    профиле.
+                  </p>
+                </section>
+              )
+            )}
+          </ScrollArea>
+          {agent.approval && (
+            <ApprovalBar approval={agent.approval} busy={agentBusy} send={sendAgent} />
           )}
-        </ScrollArea>
-        {state.devtoolsVisible && (
-          <NetworkPanel
-            tabId={state.activeId}
-            onClose={() => void send({ action: "devtools", visible: false })}
-          />
-        )}
+          {state.devtoolsVisible && (
+            <NetworkPanel
+              tabId={state.activeId}
+              onClose={() => void send({ action: "devtools", visible: false })}
+            />
+          )}
+        </div>
+        {state.agentVisible && <AgentPanel agent={agent} busy={agentBusy} send={sendAgent} />}
       </main>
       <footer>
         <span role="status" className={`status ${statusTone}`}>
           <span className="status-dot" aria-hidden="true" />
           {statusText}
         </span>
+        {agentActive && <span className="agent-line">{paceLabel(agent.pace, agent.limit)}</span>}
         <span className="profile-line">
           <Icon path={mdiDownloadOffOutline} size={12} />
           {PROFILE_FOOTER}

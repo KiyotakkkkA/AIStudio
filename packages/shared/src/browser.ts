@@ -27,6 +27,14 @@ export const BrowserCommand = z.discriminatedUnion("action", [
   z.object({ action: z.literal("networkClear") }),
   z.object({ action: z.literal("networkSave") }),
   z.object({ action: z.literal("networkDetail"), id: z.string().min(1).max(256) }),
+  z.object({ action: z.literal("agent"), visible: z.boolean() }),
+  z.object({ action: z.literal("agentApprove"), id: tabId }),
+  z.object({ action: z.literal("agentAlways"), id: tabId }),
+  z.object({ action: z.literal("agentDeny"), id: tabId }),
+  z.object({ action: z.literal("agentControl") }),
+  z.object({ action: z.literal("agentResume") }),
+  z.object({ action: z.literal("agentStop") }),
+  z.object({ action: z.literal("agentRevoke"), id: tabId }),
 ]);
 export type BrowserCommand = z.infer<typeof BrowserCommand>;
 
@@ -41,11 +49,61 @@ export interface BrowserTab {
   error?: string;
 }
 
+export type BrowserAgentStatus =
+  "idle" | "running" | "approval" | "paused" | "control" | "stopped" | "finished";
+
+export type BrowserAuthorisation =
+  { kind: "auto" } | { kind: "granted"; at: number } | { kind: "approved"; at: number };
+
+export type BrowserActionState = "running" | "waiting" | "done" | "failed" | "denied" | "paused";
+
+export interface BrowserAgentAction {
+  id: number;
+  tool: string;
+  target: string;
+  state: BrowserActionState;
+  authorisation?: BrowserAuthorisation;
+  startedAt: number;
+  durationMs?: number;
+  error?: string;
+}
+
+export interface BrowserAgentApproval {
+  id: string;
+  tool: string;
+  origin: string;
+  target: string;
+  text?: string;
+  canAlways: boolean;
+}
+
+export interface BrowserSiteGrant {
+  id: string;
+  tool: string;
+  grantedAt: number;
+}
+
+export interface BrowserAgentState {
+  status: BrowserAgentStatus;
+  runId: string | null;
+  task: string | null;
+  steps: number;
+  pace: number;
+  limit: number;
+  target: string | null;
+  approval: BrowserAgentApproval | null;
+  actions: BrowserAgentAction[];
+  origin: string | null;
+  grants: BrowserSiteGrant[];
+}
+
 export interface BrowserState {
   tabs: BrowserTab[];
   activeId: string | null;
   sitesVisible: boolean;
   devtoolsVisible: boolean;
+  agentVisible: boolean;
+  agent: BrowserAgentState;
 }
 
 export interface BrowserCookie {

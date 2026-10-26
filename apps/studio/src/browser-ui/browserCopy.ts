@@ -23,7 +23,7 @@ export const ACTION_FAILED =
 export const STATUS_LOADING = "Загрузка…";
 export const STATUS_READY = "Готово";
 export const PROFILE_LABEL = "Рабочий профиль";
-export const PROFILE_FOOTER = "Профиль: work · Загрузки заблокированы";
+export const PROFILE_FOOTER = "Профиль: work · Загрузки только с подтверждением";
 
 export const SITES_TITLE = "Сайты и куки";
 export const SITES_HINT =

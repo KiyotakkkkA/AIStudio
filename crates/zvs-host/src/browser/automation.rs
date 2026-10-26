@@ -85,6 +85,10 @@ pub struct ElementTarget {
 pub trait AutomationPort: Send + Sync {
     fn target(&self, handle: &str) -> Option<ElementTarget>;
 
+    fn origin(&self) -> Option<String>;
+
+    async fn highlight(&self, handle: Option<&str>) -> Result<(), AppError>;
+
     async fn navigate(&self, url: &str) -> Result<PageState, AppError>;
 
     async fn read_page(&self) -> Result<PageSnapshot, AppError>;

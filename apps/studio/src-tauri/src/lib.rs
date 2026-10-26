@@ -19,7 +19,8 @@ use zvs_contract::{NOTIFICATION_SCHEME, NotificationTargetDto};
 use zvs_host::agentic::{AgenticService, AgenticServiceOptions, register_agentic_nodes};
 use zvs_host::artifacts::{ArtifactStore, DASHBOARDS};
 use zvs_host::browser::{
-    Browser as BrowserTools, BrowserGrants, BrowserLifecycle, profile_dir, register_browser_nodes,
+    AgentControls, Browser as BrowserTools, BrowserAgent, BrowserGrants, BrowserLifecycle,
+    profile_dir, register_browser_nodes, setting_limit,
 };
 use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::data::Repositories;
@@ -534,12 +535,14 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let profile = profile_dir(&data_dir);
     let tokens = BearerTokens::default();
     let navigator: SharedNavigator = Arc::new(events.clone());
+    let agent = BrowserAgent::new(clock.clone());
     let workspace = BrowserWorkspace::new(
         app.handle().clone(),
         profile.clone(),
         browser_events.clone(),
         tokens.clone(),
         navigator.clone(),
+        agent.clone(),
     );
     let gateway = Arc::new(AccountGateway::with_options(
         Arc::new(WebviewPages::new(app.handle().clone(), profile)),
@@ -881,13 +884,15 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             )
         },
     )?;
+    let grants = BrowserGrants::new(Arc::clone(&database), clock.clone());
+    agent.attach(AgentControls {
+        runs: Arc::new(runs.clone()),
+        grants: grants.clone(),
+        limit: setting_limit(settings.clone()),
+    });
     register_browser_nodes(
         &nodes,
-        &BrowserTools::new(
-            Arc::new(workspace.clone()),
-            BrowserGrants::new(Arc::clone(&database), clock.clone()),
-            runs.approvals(),
-        ),
+        &BrowserTools::new(Arc::new(workspace.clone()), grants, runs.approvals(), agent),
     )?;
     register_kernel_tools(&nodes, &tools)?;
     let agentic = AgenticService::new(AgenticServiceOptions {

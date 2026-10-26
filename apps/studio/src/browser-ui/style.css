@@ -409,8 +409,13 @@ main {
   position: absolute;
   inset: 148px 0 28px;
   display: flex;
-  flex-direction: column;
   overflow: hidden;
+}
+.page-column {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
 }
 .page-area {
   flex: 1;
@@ -1127,4 +1132,284 @@ tbody tr:hover .row-action,
   .security-label {
     display: none;
   }
+}
+
+button.primary {
+  background: var(--color-accent-dark);
+  border-color: transparent;
+  color: var(--color-on-accent);
+  font-weight: 600;
+}
+button.primary:hover:not(:disabled) {
+  background: var(--color-accent-medium);
+}
+button.ghost {
+  background: transparent;
+  color: var(--color-main-300);
+}
+
+.approval-bar {
+  display: flex;
+  flex: 0 0 76px;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 0 16px;
+  border-top: 1px solid var(--color-warn-line);
+  background: var(--color-main-900);
+}
+.approval-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--color-warn);
+}
+.approval-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+.approval-text strong {
+  overflow: hidden;
+  color: var(--color-main-50);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.approval-text code {
+  overflow: hidden;
+  color: var(--color-main-400);
+  font: 11px var(--font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.agent-panel {
+  display: flex;
+  flex: 0 0 344px;
+  min-height: 0;
+  flex-direction: column;
+  border-left: 1px solid var(--color-line);
+  background: var(--color-main-900);
+}
+.agent-head {
+  display: flex;
+  flex: 0 0 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid var(--color-line);
+}
+.agent-title,
+.agent-section {
+  margin: 0;
+  color: var(--color-main-400);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.agent-title {
+  flex: 1;
+}
+.agent-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+.agent-card {
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-main-850);
+}
+.agent-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+.agent-state strong {
+  display: block;
+  color: var(--color-main-50);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.agent-state small {
+  color: var(--color-main-400);
+  font-size: 11.5px;
+}
+.agent-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--color-main-500);
+}
+.agent-dot.ok {
+  background: var(--color-ok);
+}
+.agent-dot.busy {
+  background: var(--color-accent-dark);
+  animation: browser-pulse 1s ease-in-out infinite;
+}
+.agent-dot.warn {
+  background: var(--color-warn);
+}
+.agent-dot.err {
+  background: var(--color-err);
+}
+.agent-task {
+  margin-top: 8px;
+  color: var(--color-main-300);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.agent-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: var(--color-accent-dark);
+  color: var(--color-on-accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+.agent-target code {
+  overflow: hidden;
+  font: 11px var(--font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.agent-log {
+  flex: 1;
+  min-height: 80px;
+}
+.agent-log ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-action {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 0;
+}
+.agent-action > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.agent-action code {
+  overflow: hidden;
+  color: var(--color-main-200);
+  font: 11.5px var(--font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.agent-action small {
+  color: var(--color-main-500);
+  font-size: 10.5px;
+}
+.agent-action-mark {
+  display: inline-flex;
+  flex: 0 0 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-main-700);
+  color: var(--color-main-300);
+}
+.agent-action.done .agent-action-mark {
+  background: var(--color-ok-soft);
+  color: var(--color-ok);
+}
+.agent-action.waiting .agent-action-mark,
+.agent-action.paused .agent-action-mark {
+  background: var(--color-warn-soft);
+  color: var(--color-warn);
+}
+.agent-action.waiting code {
+  color: var(--color-warn);
+}
+.agent-action.failed .agent-action-mark,
+.agent-action.denied .agent-action-mark {
+  background: var(--color-err-soft);
+  color: var(--color-err);
+}
+.agent-empty {
+  margin: 0;
+  color: var(--color-main-500);
+  font-size: 12px;
+}
+.agent-rights {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.agent-site {
+  color: var(--color-main-200);
+  font: 11.5px var(--font-mono);
+}
+.agent-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  font-size: 11.5px;
+}
+.agent-right > span:first-child {
+  flex: 1;
+  color: var(--color-main-400);
+}
+.agent-tier {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 5px;
+  background: var(--color-main-700);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+.agent-tier.auto,
+.agent-tier.granted {
+  color: var(--color-ok);
+}
+.agent-tier.ask {
+  color: var(--color-warn);
+}
+.agent-tier.never {
+  color: var(--color-err);
+}
+.icon-button.agent-revoke {
+  width: 24px;
+  height: 24px;
+}
+.agent-controls {
+  display: flex;
+  gap: 8px;
+}
+.agent-controls button {
+  flex: 1;
+  height: 32px;
+}
+.status.warn .status-dot {
+  background: var(--color-warn);
+}
+.agent-line {
+  overflow: hidden;
+  color: var(--color-main-500);
+  font: 10.5px var(--font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }

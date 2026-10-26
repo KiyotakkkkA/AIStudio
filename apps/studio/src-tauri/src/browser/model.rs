@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use zvs_contract::{BrowserBounds, BrowserSecurity, BrowserState, BrowserTab};
 use zvs_host::browser::{
-    CHROME_HEIGHT, NAVIGATION_BLOCKED, STATUS_HEIGHT, TAB_LIMIT, devtools_height,
+    AGENT_PANEL_WIDTH, APPROVAL_HEIGHT, CHROME_HEIGHT, NAVIGATION_BLOCKED, STATUS_HEIGHT,
+    TAB_LIMIT, devtools_height,
 };
 
 pub const NEW_TAB_TITLE: &str = "Новая вкладка";
@@ -121,6 +122,8 @@ pub struct Model {
     active: Option<String>,
     sites_visible: bool,
     devtools_visible: bool,
+    agent_visible: bool,
+    approval: bool,
     visible: bool,
     bounds: BrowserBounds,
     zoom: Option<f64>,
@@ -224,6 +227,20 @@ impl Model {
         self.devtools_visible = visible;
     }
 
+    pub const fn set_agent_visible(&mut self, visible: bool) {
+        self.agent_visible = visible;
+    }
+
+    pub const fn agent_visible(&self) -> bool {
+        self.agent_visible
+    }
+
+    pub const fn set_approval(&mut self, pending: bool) -> bool {
+        let changed = self.approval != pending;
+        self.approval = pending;
+        changed
+    }
+
     pub fn label_of(&self, id: &str) -> Option<String> {
         self.tabs
             .iter()
@@ -239,6 +256,8 @@ impl Model {
         self.active = None;
         self.sites_visible = false;
         self.devtools_visible = false;
+        self.agent_visible = false;
+        self.approval = false;
         self.visible = false;
         std::mem::take(&mut self.tabs)
     }
@@ -277,6 +296,8 @@ impl Model {
             active_id: self.active.clone(),
             sites_visible: self.sites_visible,
             devtools_visible: self.devtools_visible,
+            agent_visible: self.agent_visible,
+            agent: Box::default(),
         }
     }
 
@@ -302,13 +323,23 @@ impl Model {
                 } else {
                     0.0
                 };
+                let approval = if self.approval {
+                    APPROVAL_HEIGHT * self.zoom()
+                } else {
+                    0.0
+                };
+                let panel = if self.agent_visible {
+                    AGENT_PANEL_WIDTH * self.zoom()
+                } else {
+                    0.0
+                };
                 (
                     tab.label.clone(),
                     Rect {
                         x,
                         y: y + chrome_height,
-                        width,
-                        height: content - devtools,
+                        width: (width - panel).max(0.0),
+                        height: (content - devtools - approval).max(0.0),
                     },
                 )
             });
@@ -619,6 +650,44 @@ mod tests {
         assert_eq!(site(&model).map(|rect| rect.height), Some(209.0));
         assert!(model.set_zoom(f64::NAN));
         assert!((model.zoom() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn the_agent_panel_and_the_approval_bar_are_kept_clear_of_the_page() {
+        let mut model = three();
+        model.mount(BrowserBounds {
+            x: 0.0,
+            y: 0.0,
+            width: 800.0,
+            height: 600.0,
+        });
+        model.apply(
+            "site-c",
+            PageSignal::Snapshot(page("https://c.example/", "C")),
+        );
+        model.set_zoom(1.25);
+        let site = |model: &Model| model.layout(800.0, 600.0).site.map(|(_, rect)| rect);
+        model.set_agent_visible(true);
+        assert!(model.set_approval(true));
+        assert!(!model.set_approval(true));
+        assert_eq!(
+            site(&model),
+            Some(Rect {
+                x: 0.0,
+                y: 185.0,
+                width: 370.0,
+                height: 285.0
+            })
+        );
+        assert!(model.state().agent_visible);
+        model.set_devtools_visible(true);
+        assert_eq!(site(&model).map(|rect| rect.height), Some(114.0));
+        assert!(model.set_approval(false));
+        model.set_agent_visible(false);
+        assert_eq!(site(&model).map(|rect| rect.width), Some(800.0));
+        model.set_agent_visible(true);
+        model.clear();
+        assert!(!model.agent_visible());
     }
 
     #[test]

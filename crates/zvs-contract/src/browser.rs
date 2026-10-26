@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::AppError;
 use crate::ids::is_wire_uuid;
+use crate::primitives::Timestamp;
 use crate::validate::{Validate, check, invalid};
 
 pub const URL_MAX: usize = 8192;
@@ -82,6 +83,24 @@ pub enum BrowserCommand {
     NetworkDetail {
         id: String,
     },
+    Agent {
+        visible: bool,
+    },
+    AgentApprove {
+        id: String,
+    },
+    AgentAlways {
+        id: String,
+    },
+    AgentDeny {
+        id: String,
+    },
+    AgentControl,
+    AgentResume,
+    AgentStop,
+    AgentRevoke {
+        id: String,
+    },
 }
 
 fn tab_id(id: &str) -> Result<(), AppError> {
@@ -103,6 +122,10 @@ impl Validate for BrowserCommand {
                 check::max_len("url", url, URL_MAX)
             }
             Self::Switch { id } | Self::Close { id } => tab_id(id),
+            Self::AgentApprove { id }
+            | Self::AgentAlways { id }
+            | Self::AgentDeny { id }
+            | Self::AgentRevoke { id } => tab_id(id),
             Self::Reorder { id, index } => {
                 tab_id(id)?;
                 check::safe_integer("index", *index)
@@ -129,7 +152,11 @@ impl Validate for BrowserCommand {
             | Self::Network
             | Self::NetworkRecord { .. }
             | Self::NetworkClear
-            | Self::NetworkSave => Ok(()),
+            | Self::NetworkSave
+            | Self::Agent { .. }
+            | Self::AgentControl
+            | Self::AgentResume
+            | Self::AgentStop => Ok(()),
         }
     }
 }
@@ -161,6 +188,111 @@ pub struct BrowserTab {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BrowserAgentStatus {
+    #[default]
+    Idle,
+    Running,
+    Approval,
+    Paused,
+    Control,
+    Stopped,
+    Finished,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum BrowserAuthorisation {
+    Auto,
+    Granted { at: Timestamp },
+    Approved { at: Timestamp },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BrowserActionState {
+    Running,
+    Waiting,
+    Done,
+    Failed,
+    Denied,
+    Paused,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserAgentAction {
+    pub id: u64,
+    pub tool: String,
+    pub target: String,
+    pub state: BrowserActionState,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub authorisation: Option<BrowserAuthorisation>,
+    pub started_at: Timestamp,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub duration_ms: Option<u64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserAgentApproval {
+    pub id: String,
+    pub tool: String,
+    pub origin: String,
+    pub target: String,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub text: Option<String>,
+    pub can_always: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserSiteGrant {
+    pub id: String,
+    pub tool: String,
+    pub granted_at: Timestamp,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserAgentState {
+    pub status: BrowserAgentStatus,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub run_id: Option<String>,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub task: Option<String>,
+    pub steps: u64,
+    pub pace: u64,
+    pub limit: u64,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub target: Option<String>,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub approval: Option<BrowserAgentApproval>,
+    pub actions: Vec<BrowserAgentAction>,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub origin: Option<String>,
+    pub grants: Vec<BrowserSiteGrant>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserState {
@@ -169,6 +301,8 @@ pub struct BrowserState {
     pub active_id: Option<String>,
     pub sites_visible: bool,
     pub devtools_visible: bool,
+    pub agent_visible: bool,
+    pub agent: Box<BrowserAgentState>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -369,10 +503,46 @@ mod tests {
             json!({ "action": "networkDetail", "id": "a".repeat(NETWORK_ENTRY_ID_MAX + 1) }),
             json!({ "action": "networkRecord" }),
             json!({ "action": "devtools" }),
+            json!({ "action": "agentApprove", "id": "not-an-approval" }),
+            json!({ "action": "agentAlways" }),
+            json!({ "action": "agentRevoke", "id": "" }),
+            json!({ "action": "agent" }),
             json!({}),
         ] {
             assert!(parse::<BrowserCommand>(value.clone()).is_err(), "{value}");
         }
+    }
+
+    #[test]
+    fn an_agent_action_carries_its_authorisation() {
+        let action = BrowserAgentAction {
+            id: 3,
+            tool: "browser.click".into(),
+            target: "button «Отправить»".into(),
+            state: BrowserActionState::Done,
+            authorisation: Some(BrowserAuthorisation::Granted {
+                at: 1_800_000_000_000,
+            }),
+            started_at: 1_800_000_000_500,
+            duration_ms: Some(42),
+            error: None,
+        };
+        assert_eq!(
+            serde_json::to_value(&action).expect("serialises"),
+            json!({
+                "id": 3,
+                "tool": "browser.click",
+                "target": "button «Отправить»",
+                "state": "done",
+                "authorisation": { "kind": "granted", "at": 1_800_000_000_000_i64 },
+                "startedAt": 1_800_000_000_500_i64,
+                "durationMs": 42,
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(BrowserAuthorisation::Auto).expect("serialises"),
+            json!({ "kind": "auto" })
+        );
     }
 
     #[test]
@@ -402,6 +572,8 @@ mod tests {
             active_id: None,
             sites_visible: false,
             devtools_visible: true,
+            agent_visible: false,
+            agent: Box::default(),
         };
         assert_eq!(
             serde_json::to_value(BrowserCommandOutput::State(state)).expect("serialises"),
@@ -418,6 +590,20 @@ mod tests {
                 "activeId": null,
                 "sitesVisible": false,
                 "devtoolsVisible": true,
+                "agentVisible": false,
+                "agent": {
+                    "status": "idle",
+                    "runId": null,
+                    "task": null,
+                    "steps": 0,
+                    "pace": 0,
+                    "limit": 0,
+                    "target": null,
+                    "approval": null,
+                    "actions": [],
+                    "origin": null,
+                    "grants": [],
+                },
             })
         );
     }

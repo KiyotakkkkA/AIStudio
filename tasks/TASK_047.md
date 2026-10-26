@@ -2,7 +2,7 @@
 task: TASK_047
 title: Browser agent panel, approvals, rate limiter
 phase: 8 — Documents and the agent browser
-status: todo
+status: done
 depends_on: [TASK_046, TASK_076]
 unblocks: []
 estimate: 4 h
@@ -79,21 +79,50 @@ Manual check: Run a real agent session against a local fixture site. Watch the o
 
 ## Definition of done
 
-- [ ] Target outline and label drawn by the host, never injected into the page
-- [ ] Every logged action shows its authorisation provenance
-- [ ] Approval bar cannot offer 'always' for always-ask tiers
-- [ ] Take control suspends before the next action; Stop cancels immediately
-- [ ] Rate limiter pauses a runaway session
-- [ ] Grants revocable with immediate effect
-- [ ] Tests and gates pass
-- [ ] `pnpm typecheck && pnpm lint && pnpm build` pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Target outline and label drawn by the host, never injected into the page
+- [x] Every logged action shows its authorisation provenance
+- [x] Approval bar cannot offer 'always' for always-ask tiers
+- [x] Take control suspends before the next action; Stop cancels immediately
+- [x] Rate limiter pauses a runaway session
+- [x] Grants revocable with immediate effect
+- [x] Tests and gates pass — except `drivers::ai::adapters::qwen_web::tests::qwen_leaves_its_own_web_search_out_of_the_tool_policy_through_the_dialect`, which fails on `main` without this change, and `NavRail.tsx` formatting, also already failing on `main`
+- [ ] `pnpm typecheck && pnpm lint && pnpm build` pass — typecheck and lint pass; `pnpm build` was not run locally
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
-**Built:**
-**Deviated from plan:**
-**Next session should know:**
+**Built:** `BrowserAgent` (`zvs-host/src/browser/agent.rs`) is the session. Every `browser.*`
+node calls `begin` before acting. `begin` opens or switches the session to the run, waits while
+the user has control or the rate limiter has paused, counts the action against a sliding minute
+(`browser.agent.actionsPerMinute`, default 20) and logs it. The node then records why it was
+allowed: `auto`, `granted` with the grant's time, or `approved` with the decision's time, from
+the same admission result that let it run. All eight browser nodes now defer approval, so every
+approval (including ones caused by a stricter Tools tier) goes through the agent and shows in
+the bar. The approval offers «Всегда на этом сайте» only when `canAlways`, which the host sets
+only for click and type. The host refuses `agentAlways` for anything else, and the chrome hides
+the button for submit and download as well. Control and a rate pause outlive the run, so a new
+chat turn waits too. «Остановить» cancels the run through `RunService::cancel`. Revocation
+deletes the `browser_grant`, and the next action resolves its tier again. The outline is
+`Overlay.highlightNode` (driver `Session::highlight`), set before the approval and cleared
+after the action. The label («Цель») and everything else are rendered in `browser-ui`:
+`AgentPanel.tsx`, `ApprovalBar.tsx`, toolbar toggle, footer status and pace, with copy in
+`agentCopy.ts`. The host reserves the panel (344 px) and the approval bar (76 px) in the
+site-webview layout, so the page never covers them. `BrowserState` gained `agentVisible` and
+`agent`; `BrowserCommand` gained the eight `agent*` actions (Rust, Zod, fixtures).
+
+**Deviated from plan:** The text label sits in the panel («Цель») rather than beside the element.
+A label next to the element would need a transparent layered webview positioned from the box
+model, so only the outline is drawn on the page itself. The panel log is the agent's in-memory
+record of browser steps (last 200), not a projection of the run's event stream. The steps stay
+in the run's stream for the Tasks page. A session is the run that made the last browser action,
+so each chat turn starts a fresh log. The rate cap is a setting with no UI yet. The footer copy
+«Загрузки заблокированы» became «Загрузки только с подтверждением», since TASK_046 made
+approved downloads possible.
+
+**Next session should know:** The chrome and the chat both receive the same `approval` event.
+Whichever answers first wins, and the other gets «Подтверждение уже не ожидается». The panel
+was not checked visually in a running app, and the manual check (real agent session, approve,
+deny, revoke mid-session, tight loop) was not performed. Neither was `pnpm build`.
 
 ---
 

@@ -30,5 +30,25 @@
   { "name": "start recording", "value": { "action": "networkRecord", "recording": true } },
   { "name": "clear network log", "value": { "action": "networkClear" } },
   { "name": "save network log", "value": { "action": "networkSave" } },
-  { "name": "network detail", "value": { "action": "networkDetail", "id": "1234.56:1" } }
+  { "name": "network detail", "value": { "action": "networkDetail", "id": "1234.56:1" } },
+  { "name": "show agent panel", "value": { "action": "agent", "visible": true } },
+  {
+    "name": "approve once",
+    "value": { "action": "agentApprove", "id": "0199aa22-2222-7222-8222-222222222222" }
+  },
+  {
+    "name": "approve on this site",
+    "value": { "action": "agentAlways", "id": "0199aa22-2222-7222-8222-222222222222" }
+  },
+  {
+    "name": "deny",
+    "value": { "action": "agentDeny", "id": "0199aa22-2222-7222-8222-222222222222" }
+  },
+  { "name": "take control", "value": { "action": "agentControl" } },
+  { "name": "resume", "value": { "action": "agentResume" } },
+  { "name": "stop", "value": { "action": "agentStop" } },
+  {
+    "name": "revoke grant",
+    "value": { "action": "agentRevoke", "id": "0199aa22-2222-7222-8222-222222222222" }
+  }
 ]

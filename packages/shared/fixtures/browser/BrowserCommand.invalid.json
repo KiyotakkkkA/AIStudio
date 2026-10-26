@@ -13,5 +13,9 @@
   { "name": "empty cookie id", "value": { "action": "removeCookie", "id": "" } },
   { "name": "devtools without visibility", "value": { "action": "devtools" } },
   { "name": "recording without flag", "value": { "action": "networkRecord" } },
-  { "name": "empty network entry id", "value": { "action": "networkDetail", "id": "" } }
+  { "name": "empty network entry id", "value": { "action": "networkDetail", "id": "" } },
+  { "name": "agent without visibility", "value": { "action": "agent" } },
+  { "name": "approval id not a uuid", "value": { "action": "agentApprove", "id": "approve-all" } },
+  { "name": "always without approval", "value": { "action": "agentAlways" } },
+  { "name": "empty grant id", "value": { "action": "agentRevoke", "id": "" } }
 ]

@@ -23,7 +23,7 @@ use crate::browser::cdp::{CdpClient, CdpError, RemoteObject};
 
 pub const WORLD: &str = "zvs-automation";
 pub const OBJECT_GROUP: &str = "zvs-automation";
-pub const DOMAINS: [&str; 3] = ["Page", "DOM", "Accessibility"];
+pub const DOMAINS: [&str; 4] = ["Page", "DOM", "Accessibility", "Overlay"];
 pub const LOAD_TIMEOUT: Duration = Duration::from_secs(30);
 pub const DOWNLOAD_START: Duration = Duration::from_secs(15);
 pub const DOWNLOAD_FINISH: Duration = Duration::from_secs(600);
@@ -440,6 +440,37 @@ impl Session {
             .await?;
         }
         Ok(())
+    }
+
+    pub async fn highlight(&self, handle: Option<&str>) -> Result<(), AppError> {
+        let Some(handle) = handle else {
+            if *self.enabled.lock().await {
+                self.send("Overlay.hideHighlight", json!({})).await?;
+            }
+            return Ok(());
+        };
+        self.ensure_enabled().await?;
+        let element = lock(&self.handles)
+            .get(handle)
+            .cloned()
+            .ok_or_else(|| conflict(UNKNOWN_HANDLE))?;
+        let page = self.page().await?;
+        if site_origin(&page.url).as_deref() != Some(element.origin.as_str()) {
+            return Err(conflict(STALE_HANDLE));
+        }
+        self.send(
+            "Overlay.highlightNode",
+            json!({
+                "backendNodeId": element.backend_node_id,
+                "highlightConfig": {
+                    "showInfo": false,
+                    "contentColor": { "r": 133, "g": 170, "b": 214, "a": 0.12 },
+                    "borderColor": { "r": 133, "g": 170, "b": 214, "a": 1.0 },
+                },
+            }),
+        )
+        .await
+        .map(drop)
     }
 
     async fn release(&self) {

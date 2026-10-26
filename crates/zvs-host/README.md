@@ -48,6 +48,7 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 | `browser::policy`          | `is_web_url`, `navigation_url`, `profile_dir`, `BROWSER_PARTITION`, the heights, `TAB_LIMIT`                      |
 | `browser::lifecycle`       | `BrowserLifecycle`, `BrowserLifecycleEvent`, `LifecycleSubscription`                                              |
 | `browser::nodes`           | `browser.*` nodes over the `AutomationPort`, `Browser`, `register_browser_nodes`                                  |
+| `browser::agent`           | `BrowserAgent`: the agent session, action log, approvals, take control, rate limiter, stop                        |
 | `browser::grants`          | `BrowserGrants`: per-origin click and type grants; `capability::resolve_tier` decides every browser tier          |
 | `kernel`                   | `NodeDef`, `NodeRegistry`, `Scheduler`, `RunStream`, `StepContext`, the core and job nodes (see below)            |
 | `services::runs`           | `RunService`: start, inspect, list, retry, clear, cancel, recover, subscribe, dispose                             |

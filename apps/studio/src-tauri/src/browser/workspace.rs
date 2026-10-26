@@ -26,8 +26,8 @@ use zvs_host::browser::automation::{
 };
 use zvs_host::browser::network::{NetworkLog, har};
 use zvs_host::browser::{
-    AutomationPort, BrowserLifecycle, BrowserLifecycleEvent, ElementTarget, LifecycleSubscription,
-    NetworkCapture, navigation_url,
+    AgentChange, AutomationPort, BrowserAgent, BrowserLifecycle, BrowserLifecycleEvent,
+    ElementTarget, LifecycleSubscription, NetworkCapture, navigation_url, site_origin,
 };
 use zvs_host::platform::ids::new_id;
 use zvs_host::platform::navigation::{SharedNavigator, WorkspaceRoute};
@@ -58,6 +58,7 @@ enum Work {
     Signal(String, PageSignal),
     Adopt(String),
     Layout,
+    Agent(AgentChange),
     Closed,
 }
 
@@ -67,6 +68,7 @@ struct Inner {
     lifecycle: BrowserLifecycle,
     tokens: BearerTokens,
     navigator: SharedNavigator,
+    agent: BrowserAgent,
     links: Mutex<LinkTabs>,
     subscription: Mutex<Option<LifecycleSubscription>>,
     model: Mutex<Model>,
@@ -94,6 +96,10 @@ fn failed(error: impl ToString) -> String {
     error.to_string()
 }
 
+fn message(error: AppError) -> String {
+    error.message
+}
+
 fn logical(rect: Rect) -> tauri::Rect {
     tauri::Rect {
         position: LogicalPosition::new(rect.x, rect.y).into(),
@@ -112,6 +118,7 @@ impl BrowserWorkspace {
         lifecycle: BrowserLifecycle,
         tokens: BearerTokens,
         navigator: SharedNavigator,
+        agent: BrowserAgent,
     ) -> Self {
         let (sender, receiver) = mpsc::channel();
         let download_dir = app.path().download_dir().unwrap_or_else(|_| {
@@ -126,6 +133,7 @@ impl BrowserWorkspace {
             lifecycle,
             tokens,
             navigator,
+            agent,
             links: Mutex::default(),
             subscription: Mutex::default(),
             model: Mutex::default(),
@@ -150,6 +158,10 @@ impl BrowserWorkspace {
             }
         });
         *lock(&workspace.0.subscription) = Some(subscription);
+        let changes = lock(&workspace.0.work).clone();
+        workspace.0.agent.subscribe(move |change| {
+            let _ = changes.send(Work::Agent(change));
+        });
         let weak = Arc::downgrade(&workspace.0);
         std::thread::Builder::new()
             .name("browser-workspace".to_owned())
@@ -203,7 +215,7 @@ impl BrowserWorkspace {
     }
 
     pub fn subscribe(&self, channel: Channel<BrowserState>) {
-        let state = lock(&self.0.model).state();
+        let state = self.state();
         if channel.send(state).is_ok() {
             lock(&self.0.subscribers).push(channel);
         }
@@ -295,9 +307,47 @@ impl BrowserWorkspace {
                     .network_detail(&tab, &id)
                     .map(|detail| BrowserCommandOutput::NetworkDetail(Box::new(detail)));
             }
+            BrowserCommand::Agent { visible } => lock(&self.0.model).set_agent_visible(visible),
+            BrowserCommand::AgentApprove { id } => self.0.agent.approve(&id).map_err(message)?,
+            BrowserCommand::AgentAlways { id } => self.0.agent.always(&id).map_err(message)?,
+            BrowserCommand::AgentDeny { id } => self.0.agent.deny(&id).map_err(message)?,
+            BrowserCommand::AgentControl => self.0.agent.take_control().map_err(message)?,
+            BrowserCommand::AgentResume => self.0.agent.resume().map_err(message)?,
+            BrowserCommand::AgentRevoke { id } => self.0.agent.revoke(&id).map_err(message)?,
+            BrowserCommand::AgentStop => {
+                let agent = self.0.agent.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = agent.stop().await;
+                });
+            }
         }
         self.publish();
-        Ok(BrowserCommandOutput::State(lock(&self.0.model).state()))
+        Ok(BrowserCommandOutput::State(self.state()))
+    }
+
+    fn active_origin(&self) -> Option<String> {
+        lock(&self.0.model)
+            .active()
+            .and_then(|tab| site_origin(&tab.page.url))
+    }
+
+    fn state(&self) -> BrowserState {
+        let origin = self.active_origin();
+        let mut state = lock(&self.0.model).state();
+        state.agent = Box::new(self.0.agent.snapshot(origin.as_deref()));
+        state
+    }
+
+    fn agent_changed(&self, change: AgentChange) {
+        let pending = self.0.agent.has_approval();
+        {
+            let mut model = lock(&self.0.model);
+            if change == AgentChange::Started {
+                model.set_agent_visible(true);
+            }
+            model.set_approval(pending);
+        }
+        self.publish();
     }
 
     fn studio(&self) -> Result<Window, String> {
@@ -725,7 +775,7 @@ impl BrowserWorkspace {
 
     fn publish(&self) {
         self.layout();
-        let state = lock(&self.0.model).state();
+        let state = self.state();
         lock(&self.0.subscribers).retain(|channel| channel.send(state.clone()).is_ok());
     }
 
@@ -870,6 +920,15 @@ impl AutomationPort for BrowserWorkspace {
         self.0.sessions.get(&label)?.target(handle)
     }
 
+    fn origin(&self) -> Option<String> {
+        self.active_origin()
+    }
+
+    async fn highlight(&self, handle: Option<&str>) -> Result<(), AppError> {
+        let (_, session) = self.session()?;
+        session.highlight(handle).await
+    }
+
     async fn navigate(&self, url: &str) -> Result<PageState, AppError> {
         let (_, session) = self.session()?;
         session.navigate(url).await
@@ -952,6 +1011,7 @@ fn run(inner: &Weak<Inner>, receiver: &Receiver<Work>) {
             Work::Signal(label, signal) => workspace.signal(&label, signal),
             Work::Adopt(label) => workspace.adopt(&label),
             Work::Layout => workspace.layout(),
+            Work::Agent(change) => workspace.agent_changed(change),
             Work::Closed => workspace.closed(),
         }
     }

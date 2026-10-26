@@ -1117,8 +1117,9 @@ exceed what Tools allows, only narrow it.
 > refused. A node's `permission_for` passes the resolved tier as the minimum to
 > `PermissionService::admit_subject`, so the Tools page ceiling, `off` and a disabled tool still
 > win; on the Tools page navigate, click and type default to `auto` and submit and download to
-> `ask`. The four acting nodes defer approval and raise it with scope `site:<origin>` and the
-> target's role and name. The model sees elements only as opaque handles (`e12`) issued from
+> `ask`. Every browser node defers approval and raises it itself, with scope `site:<origin>`
+> and, for an element, the target's role and name (TASK_047 extended this from the four acting
+> nodes so that every approval reaches the agent panel). The model sees elements only as opaque handles (`e12`) issued from
 > the accessibility tree and kept per tab with their origin; the driver maps a handle to a
 > backend node id and refuses it when the page's origin has changed or the node is gone.
 > `credentials.rs` decides a credential or payment field from the input type, autocomplete
@@ -1150,6 +1151,26 @@ Every action lands in the panel log with its authorisation — "auto", "granted 
 "approved 20:58". **Take control** suspends the agent and hands the user the mouse; **Stop**
 kills the run. A rate limiter caps actions per minute and trips a pause when exceeded, so a
 runaway loop stops itself.
+
+> Implementation (TASK_047, 2026-10-27). `zvs-host/src/browser/agent.rs` (`BrowserAgent`) is
+> the session: every `browser.*` step passes `begin` before it acts, which waits while the user
+> has control or the rate limiter has paused the session, and records the action. The session
+> is the run that made the last browser action; its task is the run's title. Each logged action
+> carries `auto`, `granted` (with the grant's time) or `approved` (with the decision's time),
+> set by the node from the same admission result that let it run. The limit is the setting
+> `browser.agent.actionsPerMinute` (default 20) over a sliding minute; exceeding it pauses the
+> session until **Продолжить**, which also clears the window. Control and a rate pause carry
+> over to the next run, so a new chat turn cannot slip past them. **Остановить** cancels the run
+> through `RunService::cancel`. The chrome reaches the agent only through `browser_command`
+> (`agent`, `agentApprove`, `agentAlways`, `agentDeny`, `agentControl`, `agentResume`,
+> `agentStop`, `agentRevoke`); the host acts only on the approval the agent is waiting for, and
+> `agentAlways` writes a `browser_grant` only for click and type. The outline is CDP
+> `Overlay.highlightNode`, drawn by the browser outside the page's DOM, set before the approval
+> and cleared after the action; the label is in the chrome's panel. The 344 px panel and the
+> 76 px approval bar are regions the host keeps the site webview clear of
+> (`AGENT_PANEL_WIDTH`, `APPROVAL_HEIGHT`). The panel log is the agent's own record of the
+> browser steps, kept in memory (200 entries); the steps themselves stay in the run's event
+> stream.
 
 ### Prompt injection
 

@@ -63,9 +63,11 @@ pub use artifacts::{
     InstalledBrowserDto, OpenArtifactInBrowserInput,
 };
 pub use browser::{
-    BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie, BrowserHeader,
-    BrowserNetworkBody, BrowserNetworkDetail, BrowserNetworkEntry, BrowserNetworkLog,
-    BrowserNetworkSaved, BrowserRequestState, BrowserSecurity, BrowserState, BrowserTab,
+    BrowserActionState, BrowserAgentAction, BrowserAgentApproval, BrowserAgentState,
+    BrowserAgentStatus, BrowserAuthorisation, BrowserBounds, BrowserCommand, BrowserCommandOutput,
+    BrowserCookie, BrowserHeader, BrowserNetworkBody, BrowserNetworkDetail, BrowserNetworkEntry,
+    BrowserNetworkLog, BrowserNetworkSaved, BrowserRequestState, BrowserSecurity, BrowserSiteGrant,
+    BrowserState, BrowserTab,
 };
 pub use channels::{CHANNELS, is_channel};
 pub use chat::{

@@ -285,7 +285,12 @@ async fn domains_are_enabled_once_on_the_first_action_and_disabled_at_the_end() 
         .collect();
     assert_eq!(
         disabled,
-        ["Accessibility.disable", "DOM.disable", "Page.disable"]
+        [
+            "Overlay.disable",
+            "Accessibility.disable",
+            "DOM.disable",
+            "Page.disable"
+        ]
     );
     assert!(fixture.session.target("e1").is_none());
     fixture
@@ -522,6 +527,40 @@ async fn submit_requests_the_form_and_refuses_elements_outside_one() {
     assert_eq!(error.message, NO_FORM);
     assert_eq!(fixture.count("Input.dispatchMouseEvent"), 0);
     fixture.only_the_audited_functions_ran();
+}
+
+#[tokio::test]
+async fn the_target_is_outlined_by_the_browser_overlay_not_the_page() {
+    let fixture = fixture();
+    fixture
+        .session
+        .highlight(None)
+        .await
+        .expect("nothing to hide");
+    assert_eq!(fixture.count("Overlay.hideHighlight"), 0);
+    let button = fixture.handle("Нажми меня").await;
+    fixture
+        .session
+        .highlight(Some(&button))
+        .await
+        .expect("outlines");
+    let outlined = fixture.params("Overlay.highlightNode");
+    assert_eq!(outlined[0]["backendNodeId"], json!(15));
+    assert_eq!(outlined[0]["highlightConfig"]["showInfo"], json!(false));
+    fixture.session.highlight(None).await.expect("hides");
+    assert_eq!(fixture.count("Overlay.hideHighlight"), 1);
+    assert_eq!(fixture.count("Runtime.callFunctionOn"), 0);
+    assert_eq!(fixture.count("Runtime.evaluate"), 0);
+    lock(&fixture.page).url = "https://other.example/".to_owned();
+    assert_eq!(
+        fixture
+            .session
+            .highlight(Some(&button))
+            .await
+            .expect_err("stale")
+            .message,
+        STALE_HANDLE
+    );
 }
 
 #[tokio::test]
