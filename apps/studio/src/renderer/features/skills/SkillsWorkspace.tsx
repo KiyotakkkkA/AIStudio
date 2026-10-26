@@ -25,7 +25,6 @@ import SkillFileTree from "./SkillFileTree";
 import SkillFileView from "./SkillFileView";
 import SkillList from "./SkillList";
 import SkillManifestView from "./SkillManifestView";
-import SkillRail from "./SkillRail";
 import { MANIFEST_PATH } from "./SkillStore";
 import {
   headerLine,
@@ -169,7 +168,7 @@ function SkillsWorkspace() {
                   <Dropdown menuWidth={220} menuPlacement="bottom-right">
                     <IconDropdownButton
                       label="Действия с навыком"
-                      tooltip="bottom-center"
+                      tooltip="bottom-right"
                       path={mdiDotsHorizontal}
                     />
                     <ActionMenu label="Действия с навыком">
@@ -217,7 +216,6 @@ function SkillsWorkspace() {
                 </Button>
               </div>
             </div>
-            <SkillRail vm={form} />
           </>
         )}
       </div>

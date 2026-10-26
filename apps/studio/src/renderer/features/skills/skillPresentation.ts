@@ -165,13 +165,6 @@ export function updatedAllNotice(count: number): string {
   return `Обновлено: ${skillsCount(count)}`;
 }
 
-export function versionLine(skill: SkillDto): string | null {
-  const parts: string[] = [];
-  if (skill.version !== null) parts.push(`Версия ${skill.version}`);
-  if (skill.author !== null) parts.push(`Автор: ${skill.author}`);
-  return parts.length > 0 ? parts.join(" · ") : null;
-}
-
 const TRANSLIT: Record<string, string> = {
   а: "a",
   б: "b",

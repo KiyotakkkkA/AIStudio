@@ -1,21 +1,16 @@
-import { mdiPowerPlugOffOutline } from "@mdi/js";
+import { mdiAccountOutline, mdiPowerPlugOffOutline, mdiTagOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import TextArea from "../../ui/atoms/TextArea";
 import TextInput from "../../ui/atoms/TextInput";
 import Field from "../../ui/molecules/Field";
-import type { SkillFormVm } from "./SkillFormVm";
+import { KEY_HINT, type SkillFormVm } from "./SkillFormVm";
 import type SkillStore from "./SkillStore";
 import InstructionEditor from "./InstructionEditor";
-import { issueLine, versionLine } from "./skillPresentation";
+import { issueLine } from "./skillPresentation";
 import Alert from "../../ui/molecules/Alert";
-
-function keyError(error: string | undefined): string | undefined {
-  return error === undefined
-    ? undefined
-    : `Идентификатор: ${error} Измените его в разделе «Дополнительно».`;
-}
 
 function SkillManifestView({
   store,
@@ -48,19 +43,25 @@ function SkillManifestView({
 
       {vm.banner === null ? null : <Alert>{vm.banner}</Alert>}
 
+      {skill === null || (skill.version === null && skill.author === null) ? null : (
+        <div className="flex flex-none flex-wrap items-center gap-1.5">
+          {skill.version === null ? null : (
+            <Chip title="Версия">
+              <Icon path={mdiTagOutline} size={12} />
+              {skill.version}
+            </Chip>
+          )}
+          {skill.author === null ? null : (
+            <Chip title="Автор">
+              <Icon path={mdiAccountOutline} size={12} />
+              {skill.author}
+            </Chip>
+          )}
+        </div>
+      )}
+
       <div className="flex-none">
-        <Field
-          label="Название"
-          htmlFor="skill-name"
-          required
-          help={[
-            `Идентификатор: ${vm.key.length > 0 ? vm.key : "—"}`,
-            skill === null ? null : versionLine(skill),
-          ]
-            .filter((part) => part !== null)
-            .join(" · ")}
-          error={vm.errorOf("name") ?? keyError(vm.errorOf("key"))}
-        >
+        <Field label="Название" htmlFor="skill-name" required error={vm.errorOf("name")}>
           <TextInput
             id="skill-name"
             value={vm.name}
@@ -68,6 +69,26 @@ function SkillManifestView({
             invalid={vm.errorOf("name") !== undefined}
             onChange={(event) => {
               vm.setName(event.target.value);
+            }}
+          />
+        </Field>
+      </div>
+
+      <div className="flex-none">
+        <Field
+          label="Идентификатор"
+          htmlFor="skill-key"
+          required
+          help={KEY_HINT}
+          error={vm.errorOf("key")}
+        >
+          <TextInput
+            id="skill-key"
+            mono
+            value={vm.key}
+            invalid={vm.errorOf("key") !== undefined}
+            onChange={(event) => {
+              vm.setKey(event.target.value);
             }}
           />
         </Field>
