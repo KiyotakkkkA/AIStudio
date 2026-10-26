@@ -733,6 +733,9 @@ async fn auto_mode_cannot_reach_a_tool_the_tools_page_switched_off() {
     });
     rig.driver.round(|request| {
         assert!(last_message(request).contains(TOOL_NOT_OFFERED));
+        assert!(last_message(request).contains(&format!(
+            "There is no tool named \"{WRITE_NAME}\" in this turn. The tools available now are: {READ_NAME}."
+        )));
         vec![finish("Не удалось")]
     });
     let session = rig.start_with(CreateAgenticSessionInput {
@@ -763,6 +766,8 @@ async fn read_only_mode_offers_and_runs_only_reading_tools() {
     assert!(!system.contains(ARTIFACTS_RULES));
     assert!(rig.effects.writes().is_empty());
     assert_eq!(rig.effects.reads(), ["a.md"]);
+    assert!(done.tools.contains(&READ.to_owned()));
+    assert!(!done.tools.contains(&WRITE.to_owned()));
 }
 
 #[tokio::test]

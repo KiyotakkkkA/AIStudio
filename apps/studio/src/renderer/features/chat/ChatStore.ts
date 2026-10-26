@@ -47,7 +47,13 @@ import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
 import ArtifactActions from "./ArtifactActions";
 import ExplorerStore from "./explorer/ExplorerStore";
 import TerminalStore from "../terminal/TerminalStore";
-import { isAutomaticTool, isModelTool, RECOMMENDED_TOOLS, toolBlockReason } from "./toolSets";
+import {
+  automaticOffers,
+  isAutomaticTool,
+  isModelTool,
+  RECOMMENDED_TOOLS,
+  toolBlockReason,
+} from "./toolSets";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
 const LAST_CONVERSATION_KEY = "chat.conversation.last";
@@ -328,6 +334,9 @@ export default class ChatStore {
   }
   get enabledTools() {
     return this.active?.enabledTools ?? this.composer.enabledTools;
+  }
+  get automaticTools() {
+    return automaticOffers(this.active?.messages ?? [], this.enabledTools);
   }
   get selectableTools() {
     return this.tools

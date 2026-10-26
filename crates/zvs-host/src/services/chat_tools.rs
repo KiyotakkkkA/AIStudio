@@ -6,12 +6,19 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use zvs_contract::validate::{check, js_slice, js_trim};
-use zvs_contract::{AppError, ChatCitationDto, ToolDto, ToolTier, Validate};
+use zvs_contract::{
+    AppError, ChatCitationDto, ChatToolCallStatus, MessageDto, OfferedToolDto, OfferedToolSource,
+    ToolDto, ToolTier, Validate,
+};
 
 use super::chat_history::{attribute, defang_sources, source_label, to_fixed_2};
+use crate::commands::SHELL_RUN;
 use crate::drivers::ai::ToolSpec;
 use crate::drivers::ai::adapters::wire::stringify;
-use crate::kernel::knowledge_nodes::{KnowledgeReadOutput, KnowledgeSearchOutput};
+use crate::files::FILE_TOOLS;
+use crate::kernel::knowledge_nodes::{KNOWLEDGE_TOOLS, KnowledgeReadOutput, KnowledgeSearchOutput};
+use crate::skills::{SKILL_LOAD, SKILL_TOOLS};
+use crate::tools::model_tool;
 
 pub const CHAT_TOOL_ROUNDS: usize = 4;
 pub const CHAT_TOOL_CALLS: usize = 15;
@@ -127,6 +134,83 @@ pub fn offered_tools(enabled: &[String], registered: &[ToolDto]) -> Vec<OfferedT
             }
         })
         .collect()
+}
+
+pub struct ToolChoice {
+    pub keys: Vec<String>,
+    pub skill: Vec<&'static str>,
+}
+
+pub fn choose_tools(selected: &[String], knowledge: bool, skills: bool) -> ToolChoice {
+    let mut keys = selected.to_vec();
+    if knowledge {
+        for key in KNOWLEDGE_TOOLS {
+            if !keys.iter().any(|known| known == key) {
+                keys.push(key.to_owned());
+            }
+        }
+    }
+    let mut skill = Vec::new();
+    if skills {
+        for key in SKILL_TOOLS {
+            if !keys.iter().any(|known| known == key) {
+                keys.push(key.to_owned());
+                skill.push(key);
+            }
+        }
+    }
+    keys.retain(|key| model_tool(key));
+    ToolChoice { keys, skill }
+}
+
+pub fn restrict_skill_tools(offered: &mut [OfferedTool], skill: &[&str]) {
+    for tool in offered {
+        tool.roots_only = skill.contains(&tool.key.as_str())
+            && (FILE_TOOLS.contains(&tool.key.as_str()) || tool.key == SHELL_RUN);
+    }
+}
+
+pub fn loaded_skill(messages: &[MessageDto]) -> bool {
+    messages
+        .iter()
+        .flat_map(|message| &message.tool_calls)
+        .any(|call| call.key == SKILL_LOAD && call.status == ChatToolCallStatus::Succeeded)
+}
+
+pub fn offered_record(
+    offered: &[OfferedTool],
+    selected: &[String],
+    skill: &[&str],
+) -> Vec<OfferedToolDto> {
+    offered
+        .iter()
+        .map(|tool| OfferedToolDto {
+            key: tool.key.clone(),
+            source: if selected.contains(&tool.key) {
+                OfferedToolSource::Selected
+            } else if skill.contains(&tool.key.as_str()) {
+                OfferedToolSource::Skill
+            } else if KNOWLEDGE_TOOLS.contains(&tool.key.as_str()) {
+                OfferedToolSource::Knowledge
+            } else {
+                OfferedToolSource::System
+            },
+            roots_only: tool.roots_only,
+        })
+        .collect()
+}
+
+pub fn unoffered_text(name: &str, offered: &[OfferedTool]) -> String {
+    let mut names: Vec<&str> = offered.iter().map(|tool| tool.name.as_str()).collect();
+    names.sort_unstable();
+    if names.is_empty() {
+        format!("There is no tool named \"{name}\" in this turn and no tools are available.")
+    } else {
+        format!(
+            "There is no tool named \"{name}\" in this turn. The tools available now are: {}.",
+            names.join(", ")
+        )
+    }
 }
 
 pub fn tool_specs(tools: &[OfferedTool]) -> Vec<ToolSpec> {

@@ -11,7 +11,7 @@ import { TIER_HINTS, TIER_LABELS } from "../connections/connectionPresentation";
 import { matchesQuery, sourceGroups, sourceKey } from "../tools/toolFilters";
 import type ChatStore from "./ChatStore";
 import { isBuiltinTool, toolTitle } from "./toolCallCopy";
-import { isAutomaticTool, toolBlockReason } from "./toolSets";
+import { isAutomaticTool, offeredHint, toolBlockReason } from "./toolSets";
 
 export const TOOLS_UNSUPPORTED =
   "Эта модель не поддерживает вызов инструментов: они не будут предложены.";
@@ -38,8 +38,14 @@ const ToolRow = observer(function ToolRow({
   const blocked = toolBlockReason(tool);
   const builtin = isBuiltinTool(tool.key);
   const name = builtin ? toolTitle(tool.key) : tool.key;
+  const offered = store.automaticTools.find((item) => item.key === tool.key);
   const description =
-    blocked ?? (automatic ? AUTOMATIC_TOOL_HINT : tool.description || "Описание не задано");
+    blocked ??
+    (automatic
+      ? AUTOMATIC_TOOL_HINT
+      : offered !== undefined
+        ? offeredHint(offered)
+        : tool.description || "Описание не задано");
   return (
     <label
       className={`flex items-center gap-2.5 rounded-control px-2 py-1.5 transition-colors ${

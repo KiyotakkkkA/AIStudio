@@ -74,8 +74,8 @@ pub use chat::{
     ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto, ChatSendInput, ChatSettings, ChatToolCallDto,
     ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationRef,
     CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DocumentSelectionDto, MessageDto,
-    MessageRole, RenameConversationInput, RetrievalMode, TruncateConversationInput,
-    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    MessageRole, OfferedToolDto, OfferedToolSource, RenameConversationInput, RetrievalMode,
+    TruncateConversationInput, UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
     UpdateConversationStoresInput, UpdateConversationToolsInput,
 };
 pub use documents::{

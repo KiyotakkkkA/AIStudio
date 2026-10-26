@@ -109,7 +109,7 @@ impl AgenticService {
     pub fn new(options: AgenticServiceOptions) -> Self {
         Self {
             inner: Arc::new(Inner {
-                store: SessionStore::new(options.database, options.clock),
+                store: SessionStore::new(options.database, options.clock, options.tools.clone()),
                 runs: options.runs,
                 folders: options.folders,
                 tools: options.tools,

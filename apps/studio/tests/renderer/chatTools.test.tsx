@@ -4,6 +4,7 @@ import { createIpcClient } from "@zvs/ipc";
 import {
   ChatToolCallDto,
   ConversationDetailDto,
+  MessageDto,
   RunHandleDto,
   ToolDto,
   contract,
@@ -13,7 +14,15 @@ import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import ChatStore from "../../src/renderer/features/chat/ChatStore.ts";
 import ChatToolCalls from "../../src/renderer/features/chat/ChatToolCalls";
-import { toolBlockReason } from "../../src/renderer/features/chat/toolSets.ts";
+import {
+  OFFERED_BY_KNOWLEDGE,
+  OFFERED_BY_SKILL,
+  OFFERED_BY_SKILL_ROOTS,
+  OFFERED_BY_SYSTEM,
+  automaticOffers,
+  offeredHint,
+  toolBlockReason,
+} from "../../src/renderer/features/chat/toolSets.ts";
 import { durationLabel } from "../../src/renderer/features/chat/processCopy.ts";
 import { provider } from "./providerFixtures.ts";
 
@@ -266,4 +275,40 @@ test("skill tools stay attached and cannot be picked or dropped", async () => {
   );
   store.dispose();
   events.dispose();
+});
+
+test("the tools the host added on the last answer are shown with the reason they were added", () => {
+  const message = (offeredTools: unknown[]) =>
+    MessageDto.parse({
+      id: "0199bb11-4444-7111-8111-000000000010",
+      conversationId: conversation.id,
+      role: "assistant",
+      content: "",
+      citations: [],
+      offeredTools,
+      tokensIn: 0,
+      tokensOut: 0,
+      usageEstimated: true,
+      durationMs: 0,
+      runId: null,
+      partial: false,
+      createdAt: 1,
+    });
+  const older = message([{ key: "knowledge.search", source: "knowledge" }]);
+  const last = message([
+    { key: "fs.read", source: "selected" },
+    { key: "fs.apply", source: "skill", rootsOnly: true },
+    { key: "skill.load", source: "skill" },
+    { key: "chat.ask", source: "system" },
+  ]);
+  const quiet = message([]);
+
+  expect(
+    automaticOffers([older, last, quiet], ["fs.read", "skill.load"]).map((tool) => tool.key),
+  ).toEqual(["fs.apply", "chat.ask"]);
+  expect(automaticOffers([], [])).toEqual([]);
+  expect(offeredHint(last.offeredTools[1]!)).toBe(OFFERED_BY_SKILL_ROOTS);
+  expect(offeredHint(last.offeredTools[2]!)).toBe(OFFERED_BY_SKILL);
+  expect(offeredHint(older.offeredTools[0]!)).toBe(OFFERED_BY_KNOWLEDGE);
+  expect(offeredHint(last.offeredTools[3]!)).toBe(OFFERED_BY_SYSTEM);
 });

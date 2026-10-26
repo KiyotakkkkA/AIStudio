@@ -748,9 +748,15 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   conversation or session. It is the one app folder an agent reaches without a grant: in a
   chat or session a skill script runs with it as the working directory and `ZVS_CHAT_DIR`
   (other callers keep the per-run scratch folder), and the file tools reach it as `chat:`
-  without an approval. When a skill matches a turn, the chat adds `skill.load`, `fs.read`,
-  `fs.list`, `fs.apply` and `shell.run` for that turn; the ones the user did not enable are
-  limited to `chat:` and `skill:` paths (`rootsOnly`). `skill.load` returns the instructions,
+  without an approval. When a skill matches a turn, or a skill was loaded earlier in the
+  conversation, the chat adds `skill.load`, `fs.read`, `fs.list`, `fs.apply` and `shell.run`
+  to the turn; the ones the user did not enable are limited to `chat:` and `skill:` paths
+  (`rootsOnly`), and a call outside them is refused with that reason. Every assistant message
+  records the tools its turn offered and why (`offeredTools`: `selected`, `skill`, `knowledge`
+  or `system`), the composer shows the ones the user did not pick, and a call to a tool that
+  was not offered is answered with the names that were. `chat.context` counts the same set,
+  apart from the skill tools a not-yet-sent message would match. An agentic session reports in
+  `tools` the tools its current mode offers, not the stored selection. `skill.load` returns the instructions,
   each file with a one-line purpose, and the text of the manifest's `metadata.read-first` files
   up to 16 000 characters (the rest are named as required reading); tool keys in its result
   are rewritten to the names offered in that turn, and its result limit is six times the

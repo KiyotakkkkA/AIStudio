@@ -36,9 +36,10 @@ use super::chat_memory::{
 use super::chat_reply::{ReplyBuffers, ReplyChunk, TOOL_CALL_DOMAIN, apply_tool_call};
 use super::chat_tools::{
     CHAT_TOOL_CALLS, HYBRID_INSTRUCTION, KNOWLEDGE_INSTRUCTION, KnowledgeText, OfferedTool,
-    TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result,
-    knowledge_catalogue, offered_tools, parse_tool_arguments, read_result_text, search_result_text,
-    tool_result_budget, tool_result_text, tool_specs, tool_specs_json,
+    TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text, choose_tools,
+    fence_tool_result, knowledge_catalogue, loaded_skill, offered_record, offered_tools,
+    parse_tool_arguments, read_result_text, restrict_skill_tools, search_result_text,
+    tool_result_budget, tool_result_text, tool_specs, tool_specs_json, unoffered_text,
 };
 use super::memory::MemoryService;
 use super::profile::{
@@ -48,13 +49,14 @@ use super::retrieval_merge::{CHAT_FETCH_K, MergeOptions, StoreHits, merge_retrie
 use super::retrieval_query::retrieval_query;
 use super::runs::RunService;
 use super::vector_stores::VectorSearchOptions;
-use crate::commands::{PROCESS_TOOLS, SHELL_RUN};
+use crate::commands::PROCESS_TOOLS;
 use crate::data::repositories::{ConversationPatch, MessagePatch, ProviderFilter, RunPatch};
 use crate::data::schema::{ConversationRow, FolderGrantRow, MessageRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta, ToolCall};
 use crate::files::FILE_TOOLS;
+use crate::files::roots::{ROOTS_ONLY, SKILL_READ_ONLY};
 use crate::kernel::knowledge_nodes::{KNOWLEDGE_SEARCH, KNOWLEDGE_TOOLS, KnowledgeResult};
 use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateOutput, GenerateRole};
 use crate::kernel::{
@@ -66,9 +68,9 @@ use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 use crate::services::mcp::{RESOURCE_READER, tool_key};
 use crate::skills::{
-    SKILL_LOAD, SKILL_TOOLS, SkillCatalogue, SkillTurn, catalogue_text, presented, result_limit,
+    SKILL_LOAD, SkillCatalogue, SkillTurn, catalogue_text, presented, result_limit,
 };
-use crate::tools::{ToolRegistry, model_tool};
+use crate::tools::ToolRegistry;
 use crate::workspace::{FolderAccessService, ForbiddenFolders, folder_access};
 use zvs_contract::mcp::MCP_INSTRUCTIONS_MAX;
 use zvs_contract::{BindFolderInput, BindFolderResultDto};
@@ -279,6 +281,7 @@ fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
         citations: row.citations,
         tool_calls: row.tool_calls,
         selections: row.selections,
+        offered_tools: row.offered_tools,
         tokens_in: count(row.tokens_in),
         tokens_out: count(row.tokens_out),
         usage_estimated: row.usage_estimated,
@@ -1154,34 +1157,19 @@ impl NodeDef for PrepareNode {
             None => Vec::new(),
         };
         let wants_knowledge = !attached.is_empty() && mode != RetrievalMode::Auto && tools_usable;
-        let mut enabled = details.enabled_tools.clone();
-        if wants_knowledge {
-            for key in KNOWLEDGE_TOOLS {
-                if !enabled.iter().any(|known| known == key) {
-                    enabled.push(key.to_owned());
-                }
-            }
-        }
         let skill_entries = match (&inner.skills, tools_usable) {
             (Some(skills), true) => skills.catalogue(&user.content, &context.cancel).await,
             _ => Vec::new(),
         };
-        let mut automatic: Vec<&str> = Vec::new();
-        if !skill_entries.is_empty() {
-            for key in SKILL_TOOLS {
-                if !enabled.iter().any(|known| known == key) {
-                    enabled.push(key.to_owned());
-                    automatic.push(key);
-                }
-            }
-        }
-        enabled.retain(|key| model_tool(key));
+        let skills_on = !skill_entries.is_empty()
+            || (tools_usable
+                && inner.skills.is_some()
+                && loaded_skill(&conversation.messages[..position]));
+        let choice = choose_tools(&details.enabled_tools, wants_knowledge, skills_on);
+        let mut enabled = choice.keys.clone();
         let guidance = inner.mcp_guidance(&mut enabled, &registered)?;
         let mut offered = offered_tools(&enabled, &registered);
-        for tool in &mut offered {
-            tool.roots_only = automatic.contains(&tool.key.as_str())
-                && (FILE_TOOLS.contains(&tool.key.as_str()) || tool.key == SHELL_RUN);
-        }
+        restrict_skill_tools(&mut offered, &choice.skill);
         let skill_note =
             if !skill_entries.is_empty() && offered.iter().any(|tool| tool.key == SKILL_LOAD) {
                 catalogue_text(&skill_entries, &offered)
@@ -1368,6 +1356,7 @@ impl NodeDef for PrepareNode {
             citations: prepared.citations.clone(),
             tool_calls: Vec::new(),
             selections: Vec::new(),
+            offered_tools: offered_record(&offered, &details.enabled_tools, &choice.skill),
             tokens_in: prepared.tokens_in,
             tokens_out: 0,
             usage_estimated: true,
@@ -1604,10 +1593,13 @@ impl GenerateChatNode {
             )));
         }
         let Some(tool) = options.tool else {
+            let name = calls.lock().unwrap_or_else(PoisonError::into_inner)[index]
+                .name
+                .clone();
             return Ok(plain(settle(
                 ChatToolCallStatus::Refused,
                 Some(NOT_OFFERED),
-                None,
+                Some(unoffered_text(&name, options.offered)),
             )));
         };
         if tool.key == ASK_TOOL {
@@ -1823,9 +1815,15 @@ impl GenerateChatNode {
                 Some(CALL_DENIED),
                 None,
             ))),
-            Err(error) if error.code == AppErrorCode::PermissionDenied && !knowledge => Ok(plain(
-                settle(ChatToolCallStatus::Refused, Some(CALL_FORBIDDEN), None),
-            )),
+            Err(error) if error.code == AppErrorCode::PermissionDenied && !knowledge => {
+                Ok(plain(settle(
+                    ChatToolCallStatus::Refused,
+                    Some(CALL_FORBIDDEN),
+                    [ROOTS_ONLY, SKILL_READ_ONLY]
+                        .contains(&error.message.as_str())
+                        .then(|| error.message.clone()),
+                )))
+            }
             Err(error) => Ok(plain(settle(
                 ChatToolCallStatus::Failed,
                 Some(&error.message),
@@ -2445,6 +2443,7 @@ impl ChatService {
             citations: Vec::new(),
             tool_calls: Vec::new(),
             selections: Vec::new(),
+            offered_tools: Vec::new(),
             tokens_in: 0,
             tokens_out: tokens(text),
             usage_estimated: true,
@@ -2630,6 +2629,7 @@ impl ChatService {
             citations: Vec::<ChatCitationDto>::new(),
             tool_calls: Vec::new(),
             selections: input.selections.clone(),
+            offered_tools: Vec::new(),
             tokens_in: tokens(&with_selections(&text, &input.selections)),
             tokens_out: 0,
             usage_estimated: true,
@@ -2699,7 +2699,7 @@ impl ChatService {
             .clone()
             .or_else(|| details.map(|details| details.system_prompt.clone()))
             .unwrap_or_default();
-        let mut enabled = input
+        let selected = input
             .enabled_tools
             .clone()
             .or_else(|| details.map(|details| details.enabled_tools.clone()))
@@ -2708,15 +2708,28 @@ impl ChatService {
             Some(tools) => tools.list(&ToolListFilter::default())?,
             None => Vec::new(),
         };
+        let tools_usable = model.supports_tools != Some(false);
+        let knowledge = tools_usable
+            && details.is_some_and(|details| {
+                !details.attached_store_ids.is_empty()
+                    && details.retrieval_mode != RetrievalMode::Auto
+            });
+        let skills = tools_usable
+            && self.inner.skills.is_some()
+            && conversation
+                .as_ref()
+                .is_some_and(|detail| loaded_skill(&detail.messages));
+        let choice = choose_tools(&selected, knowledge, skills);
+        let mut enabled = choice.keys.clone();
         let guidance = self.inner.mcp_guidance(&mut enabled, &registered)?;
         let mut offered = offered_tools(&enabled, &registered);
+        restrict_skill_tools(&mut offered, &choice.skill);
         let folder = details.and_then(|details| details.working_folder.as_deref());
         let workspace = if offered.is_empty() && folder.is_none() {
             String::new()
         } else {
             working_folder_section(folder, None)
         };
-        let tools_usable = model.supports_tools != Some(false);
         if tools_usable {
             offered.push(ask_tool(&offered));
         }

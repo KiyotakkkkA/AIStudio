@@ -1,12 +1,16 @@
 use std::sync::Arc;
 
 use zvs_contract::{
-    AgenticSessionDto, AgenticSessionId, AppError, AppErrorCode, ProviderId, RunId, StreamId,
+    AgenticPermissionMode, AgenticSessionDto, AgenticSessionId, AppError, AppErrorCode, ProviderId,
+    RunId, StreamId, ToolListFilter,
 };
 
+use super::node::{COMPLETE_TOOL, FINISH_TOOL, PLAN_TOOL};
 use crate::data::schema::AgenticSessionRow;
 use crate::data::{Database, Repositories};
 use crate::platform::clock::SharedClock;
+use crate::services::chat_tools::{OfferedTool, offered_tools};
+use crate::tools::ToolRegistry;
 
 pub const SESSION_NOT_FOUND: &str = "Сессия не найдена";
 
@@ -17,15 +21,38 @@ fn malformed(field: &str) -> AppError {
     )
 }
 
+pub fn session_tools(
+    registry: &ToolRegistry,
+    keys: &[String],
+    mode: AgenticPermissionMode,
+) -> Result<Vec<OfferedTool>, AppError> {
+    let registered = registry.list(&ToolListFilter::default())?;
+    let keys = crate::tools::current_tool_keys(keys);
+    let mut offered = offered_tools(&keys, &registered);
+    offered.retain(|tool| {
+        crate::tools::model_tool(&tool.key)
+            && ![PLAN_TOOL, COMPLETE_TOOL, FINISH_TOOL].contains(&tool.name.as_str())
+    });
+    if mode == AgenticPermissionMode::ReadOnly {
+        offered.retain(|tool| tool.read_only);
+    }
+    Ok(offered)
+}
+
 #[derive(Clone)]
 pub struct SessionStore {
     database: Arc<Database>,
     clock: SharedClock,
+    tools: ToolRegistry,
 }
 
 impl SessionStore {
-    pub fn new(database: Arc<Database>, clock: SharedClock) -> Self {
-        Self { database, clock }
+    pub fn new(database: Arc<Database>, clock: SharedClock, tools: ToolRegistry) -> Self {
+        Self {
+            database,
+            clock,
+            tools,
+        }
     }
 
     pub fn now(&self) -> i64 {
@@ -104,7 +131,10 @@ impl SessionStore {
             provider_id: ProviderId::parse(&row.provider_id)
                 .ok_or_else(|| malformed("providerId"))?,
             model_id: row.model_id.clone(),
-            tools: row.tools.clone(),
+            tools: session_tools(&self.tools, &row.tools, row.mode)?
+                .into_iter()
+                .map(|tool| tool.key)
+                .collect(),
             budget: row.budget,
             usage: row.usage,
             plan: row.plan.clone(),

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "empty key",
+    "value": {
+      "key": "",
+      "source": "selected"
+    }
+  },
+  {
+    "name": "unknown source",
+    "value": {
+      "key": "fs.read",
+      "source": "automatic"
+    }
+  },
+  {
+    "name": "missing source",
+    "value": {
+      "key": "fs.read"
+    }
+  }
+]

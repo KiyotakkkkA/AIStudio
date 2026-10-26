@@ -61,6 +61,15 @@ export const ChatToolCallDto = z.object({
   meta: Json.nullable().default(null),
 });
 export type ChatToolCallDto = z.infer<typeof ChatToolCallDto>;
+export const OFFERED_TOOL_SOURCES = ["selected", "skill", "knowledge", "system"] as const;
+export const OfferedToolSource = z.enum(OFFERED_TOOL_SOURCES);
+export type OfferedToolSource = z.infer<typeof OfferedToolSource>;
+export const OfferedToolDto = z.object({
+  key: z.string().min(1).max(200),
+  source: OfferedToolSource,
+  rootsOnly: z.boolean().default(false),
+});
+export type OfferedToolDto = z.infer<typeof OfferedToolDto>;
 export const ChatEnabledTools = z.array(ToolKey).max(64);
 export const RetrievalMode = z.enum(["auto", "agentic", "hybrid"]);
 export type RetrievalMode = z.infer<typeof RetrievalMode>;
@@ -152,6 +161,7 @@ export const MessageDto = z.object({
   citations: z.array(ChatCitationDto),
   toolCalls: z.array(ChatToolCallDto).default([]),
   selections: Selections.default([]),
+  offeredTools: z.array(OfferedToolDto).default([]),
   tokensIn: z.number().int().nonnegative(),
   tokensOut: z.number().int().nonnegative(),
   usageEstimated: z.boolean(),

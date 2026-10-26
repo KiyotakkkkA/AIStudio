@@ -7,15 +7,15 @@ use serde_json::{Map, Value, json};
 use zvs_contract::validate::check;
 use zvs_contract::{
     AgenticBudgetDto, AgenticChangedFileDto, AgenticPermissionMode, AgenticSessionStatus,
-    AgenticStopReason, AgenticUsageDto, AppError, AppErrorCode, HostEventDraft, ToolListFilter,
-    ToolMode, ToolTier, Validate, log_line, resolve_tool_mode,
+    AgenticStopReason, AgenticUsageDto, AppError, AppErrorCode, HostEventDraft, ToolMode, ToolTier,
+    Validate, log_line, resolve_tool_mode,
 };
 
 use super::plan::{
     LoopGuard, Plan, PlanChange, complete, describe, edit, finish, link, propose, record_changes,
     signature, summary,
 };
-use super::store::SessionStore;
+use super::store::{SessionStore, session_tools};
 use crate::commands::PROCESS_TOOLS;
 use crate::data::schema::{AgenticSessionRow, TranscriptCall, TranscriptEntry};
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, ToolCall, ToolSpec};
@@ -25,7 +25,7 @@ use crate::kernel::{NodeDef, PermissionRequirement, StepContext, ToolStepRequest
 use crate::services::chat::{FILE_TOOLS_RULES, GenerateChatNode, RoundOutput};
 use crate::services::chat_tools::{
     OfferedTool, TOOL_RESULT_MAX_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result,
-    offered_tools, parse_tool_arguments, tool_result_text, tool_specs,
+    parse_tool_arguments, tool_result_text, tool_specs, unoffered_text,
 };
 use crate::services::token_estimate::estimate_tokens;
 use crate::skills::{presented, result_limit};
@@ -312,17 +312,7 @@ impl SessionNode {
         keys: &[String],
         mode: AgenticPermissionMode,
     ) -> Result<Vec<OfferedTool>, AppError> {
-        let registered = self.tools.list(&ToolListFilter::default())?;
-        let keys = crate::tools::current_tool_keys(keys);
-        let mut offered = offered_tools(&keys, &registered);
-        offered.retain(|tool| {
-            crate::tools::model_tool(&tool.key)
-                && ![PLAN_TOOL, COMPLETE_TOOL, FINISH_TOOL].contains(&tool.name.as_str())
-        });
-        if mode == AgenticPermissionMode::ReadOnly {
-            offered.retain(|tool| tool.read_only);
-        }
-        Ok(offered)
+        session_tools(&self.tools, keys, mode)
     }
 
     fn publish(&self, context: &StepContext, row: &AgenticSessionRow) -> Result<(), AppError> {
@@ -652,7 +642,11 @@ impl NodeDef for SessionNode {
                             self.call_tool(context, &id, tool, &by_name, call, &mut progress)
                                 .await?
                         }
-                        None => fence_tool_result(name, "refused", TOOL_NOT_OFFERED),
+                        None => fence_tool_result(
+                            name,
+                            "refused",
+                            &format!("{TOOL_NOT_OFFERED}. {}", unoffered_text(name, &offered)),
+                        ),
                     },
                 };
                 progress

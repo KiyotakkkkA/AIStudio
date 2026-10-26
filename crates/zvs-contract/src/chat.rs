@@ -45,6 +45,13 @@ wire_enum!(ChatToolCallStatus {
     Cancelled => "cancelled",
 });
 
+wire_enum!(OfferedToolSource {
+    Selected => "selected",
+    Skill => "skill",
+    Knowledge => "knowledge",
+    System => "system",
+});
+
 wire_enum!(MessageRole {
     User => "user",
     Assistant => "assistant",
@@ -209,6 +216,23 @@ impl Validate for ChatToolCallDto {
         check::max_len("name", &self.name, 200)?;
         check::safe_integer("round", self.round)?;
         check::safe_integer("durationMs", self.duration_ms)
+    }
+}
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OfferedToolDto {
+    pub key: String,
+    pub source: OfferedToolSource,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub roots_only: bool,
+}
+
+impl Validate for OfferedToolDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("key", &self.key)?;
+        check::max_len("key", &self.key, 200)
     }
 }
 
@@ -443,6 +467,8 @@ pub struct MessageDto {
     pub tool_calls: Vec<ChatToolCallDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub selections: Vec<DocumentSelectionDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub offered_tools: Vec<OfferedToolDto>,
     pub tokens_in: u64,
     pub tokens_out: u64,
     pub usage_estimated: bool,
@@ -457,6 +483,7 @@ impl Validate for MessageDto {
     fn validate(&self) -> Result<(), AppError> {
         nested("citations", self.citations.validate())?;
         nested("toolCalls", self.tool_calls.validate())?;
+        nested("offeredTools", self.offered_tools.validate())?;
         check_selections(&self.selections)?;
         check::safe_integer("tokensIn", self.tokens_in)?;
         check::safe_integer("tokensOut", self.tokens_out)?;

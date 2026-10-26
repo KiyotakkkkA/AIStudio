@@ -232,8 +232,8 @@ impl<'c> ChatRepository<'c> {
     pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
         self.connection
             .prepare_cached(&format!(
-                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, tool_calls, selections, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, created_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) RETURNING {}",
+                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, tool_calls, selections, offered_tools, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16) RETURNING {}",
                 MessageRow::COLUMNS
             ))?
             .query_row(
@@ -246,6 +246,7 @@ impl<'c> ChatRepository<'c> {
                     json_text(&row.citations)?,
                     json_text(&row.tool_calls)?,
                     json_text(&row.selections)?,
+                    json_text(&row.offered_tools)?,
                     row.tokens_in,
                     row.tokens_out,
                     row.usage_estimated,
@@ -363,6 +364,7 @@ mod tests {
             citations: Vec::new(),
             tool_calls: Vec::new(),
             selections: Vec::new(),
+            offered_tools: Vec::new(),
             tokens_in: 1,
             tokens_out: 0,
             usage_estimated: true,

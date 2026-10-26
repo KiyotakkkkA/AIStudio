@@ -1,0 +1,17 @@
+[
+  {
+    "name": "selected",
+    "value": {
+      "key": "fs.read",
+      "source": "selected"
+    }
+  },
+  {
+    "name": "skill paths only",
+    "value": {
+      "key": "shell.run",
+      "source": "skill",
+      "rootsOnly": true
+    }
+  }
+]

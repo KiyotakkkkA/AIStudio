@@ -10,8 +10,8 @@ use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, AppErrorCode, ChatToolCallStatus, ConversationId, CreateConversationInput, DeltaKind,
-    HostEvent, HostEventDraft, ModelCapability, ProviderCapability, RunHandleDto, RunListFilter,
-    RunStatus, ToolDto, ToolMode, ToolSource, ToolTier, Validate,
+    HostEvent, HostEventDraft, ModelCapability, OfferedToolSource, ProviderCapability,
+    RunHandleDto, RunListFilter, RunStatus, ToolDto, ToolMode, ToolSource, ToolTier, Validate,
 };
 
 use super::{Harness, HarnessOptions, OneDriver, eventually, within};
@@ -1182,6 +1182,149 @@ async fn a_turn_lists_the_skills_and_offers_skill_load_even_when_the_conversatio
     assert_eq!(
         assistant.tool_calls[0].result.as_deref(),
         Some("instructions for release-notes")
+    );
+}
+
+struct FirstMessageSkill;
+
+#[async_trait]
+impl crate::skills::SkillCatalogue for FirstMessageSkill {
+    async fn catalogue(
+        &self,
+        query: &str,
+        _cancel: &CancellationToken,
+    ) -> Vec<crate::skills::SkillCatalogueEntry> {
+        if query == "Write the release notes" {
+            vec![crate::skills::SkillCatalogueEntry {
+                key: "release-notes".to_owned(),
+                description: "Writes release notes from a change list".to_owned(),
+            }]
+        } else {
+            Vec::new()
+        }
+    }
+}
+
+#[tokio::test]
+async fn skill_tools_stay_offered_after_a_skill_loaded_and_every_turn_records_why_a_tool_was_offered()
+ {
+    let database = temporary_database();
+    let registry = Arc::new(NodeRegistry::new());
+    register_core_nodes(&registry).expect("registers the core nodes");
+    registry
+        .register(FnNode::new(
+            crate::skills::SKILL_LOAD,
+            PermissionRequirement::tool(crate::skills::SKILL_LOAD),
+            false,
+            |_context: StepContext, _input: Value| async move {
+                Ok(TextOutput {
+                    text: "instructions".to_owned(),
+                })
+            },
+        ))
+        .expect("registers skill.load");
+    registry
+        .register(FnNode::new(
+            crate::files::FS_READ,
+            PermissionRequirement::tool(crate::files::FS_READ),
+            false,
+            |_context: StepContext, _input: Value| async move {
+                Err::<TextOutput, _>(AppError::new(
+                    AppErrorCode::PermissionDenied,
+                    crate::files::roots::ROOTS_ONLY,
+                ))
+            },
+        ))
+        .expect("registers fs.read");
+    let tools = ToolRegistry::new(ToolRegistryOptions::new(database.shared()));
+    for key in crate::skills::SKILL_TOOLS {
+        tools
+            .register(&ToolDescriptor {
+                read_only: true,
+                ..ToolDescriptor::new(key, ToolSource::Builtin)
+            })
+            .expect("registers a skill tool");
+    }
+    let driver = Scripted::new();
+    driver.round(|_| vec![call("skill__load", &json!({ "key": "release-notes" }))]);
+    driver.round(|_| vec![text("Notes.")]);
+    driver.round(|_| {
+        vec![
+            call("mail__send", &json!({ "to": "team" })),
+            call("fs__read", &json!({ "paths": [{ "path": "C:/notes.md" }] })),
+        ]
+    });
+    driver.fallback(|_| vec![text("Sent.")]);
+    let harness = Harness::with(HarnessOptions {
+        database: Some(database.shared()),
+        providers: Some(Arc::new(OneDriver(Arc::clone(&driver) as SharedTextDriver))),
+        tools: Some(tools),
+        skills: Some(Arc::new(FirstMessageSkill)),
+        registry: Some(registry),
+        capabilities: vec![ProviderCapability::Text],
+        context_window: 16384,
+        max_output: 512,
+        ..HarnessOptions::default()
+    });
+    let created = harness.create(harness.input());
+    let first = within(harness.turn(created, "Write the release notes")).await;
+    assert_eq!(harness.status(&first), RunStatus::Succeeded);
+
+    let second = within(harness.turn(created, "Now send them to the team")).await;
+
+    assert_eq!(harness.status(&second), RunStatus::Succeeded);
+    let requests = driver.requests();
+    let mut offered: Vec<&str> = requests[2]
+        .tools
+        .iter()
+        .map(|tool| tool.name.as_str())
+        .collect();
+    offered.sort_unstable();
+    assert_eq!(
+        offered,
+        [
+            "ask_user",
+            "fs__apply",
+            "fs__list",
+            "fs__read",
+            "shell__run",
+            "skill__load"
+        ]
+    );
+    let assistant = harness.last(created);
+    let recorded: Vec<(&str, OfferedToolSource, bool)> = assistant
+        .offered_tools
+        .iter()
+        .map(|tool| (tool.key.as_str(), tool.source, tool.roots_only))
+        .collect();
+    assert_eq!(
+        recorded,
+        [
+            ("fs.apply", OfferedToolSource::Skill, true),
+            ("fs.list", OfferedToolSource::Skill, true),
+            ("fs.read", OfferedToolSource::Skill, true),
+            ("shell.run", OfferedToolSource::Skill, true),
+            ("skill.load", OfferedToolSource::Skill, false),
+            (ASK_TOOL, OfferedToolSource::System, false),
+        ]
+    );
+    let refused = &assistant.tool_calls[0];
+    assert_eq!(refused.status, ChatToolCallStatus::Refused);
+    assert_eq!(
+        refused.error.as_deref(),
+        Some(crate::services::chat::NOT_OFFERED)
+    );
+    assert_eq!(
+        refused.result.as_deref(),
+        Some(
+            "There is no tool named \"mail__send\" in this turn. The tools available now are: ask_user, fs__apply, fs__list, fs__read, shell__run, skill__load."
+        )
+    );
+    let scoped = &assistant.tool_calls[1];
+    assert_eq!(scoped.status, ChatToolCallStatus::Refused);
+    assert_eq!(
+        scoped.result.as_deref(),
+        Some(crate::files::roots::ROOTS_ONLY)
     );
 }
 

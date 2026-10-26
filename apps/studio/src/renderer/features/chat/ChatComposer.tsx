@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import {
+  mdiAutoFix,
   mdiChevronDown,
   mdiClose,
   mdiDatabaseOutline,
@@ -24,6 +25,7 @@ import ChatModelGate from "./ChatModelGate";
 import ChatToolPicker from "./ChatToolPicker";
 import SelectionChips from "./SelectionChips";
 import type ChatStore from "./ChatStore";
+import { offeredHint } from "./toolSets";
 
 function insidePopup(target: HTMLElement, form: HTMLElement): boolean {
   for (
@@ -83,7 +85,9 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               />
             </div>
           ) : null}
-          {(store.attachedStoreIds.length > 0 || store.enabledTools.length > 0) && (
+          {(store.attachedStoreIds.length > 0 ||
+            store.enabledTools.length > 0 ||
+            store.automaticTools.length > 0) && (
             <div className="flex flex-wrap gap-1.5 px-1">
               {store.stores
                 .filter((item) => store.attachedStoreIds.includes(item.id))
@@ -138,6 +142,16 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                   </span>
                 );
               })}
+              {store.automaticTools.map((tool) => (
+                <span
+                  key={tool.key}
+                  title={offeredHint(tool)}
+                  className="inline-flex h-7 items-center gap-1.5 rounded-full border border-transparent bg-main-800 pr-2.5 pl-2.5 text-[12px] font-medium text-main-300"
+                >
+                  <Icon path={mdiAutoFix} size={13} />
+                  <span className="max-w-48 truncate font-mono text-[11.5px]">{tool.key}</span>
+                </span>
+              ))}
             </div>
           )}
           <div className="px-0.5">
