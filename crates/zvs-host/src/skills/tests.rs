@@ -1138,7 +1138,11 @@ fn the_bundled_skills_install_once_as_ready_skills_with_their_scripts() {
         assert!(!skill.description.is_empty());
         assert_eq!(skill.file_count, bundled.files.len() as u64);
         let loaded = library.load(bundled.key).expect("loads");
-        assert!(service::has_scripts(&loaded), "{}", skill.key);
+        assert!(
+            service::has_scripts(&loaded) || service::command_skill(bundled.key),
+            "{}",
+            skill.key
+        );
         assert!(!loaded.instructions.starts_with("---"));
         for file in bundled.files {
             assert!(

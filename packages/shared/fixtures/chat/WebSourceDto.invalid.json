@@ -18,5 +18,13 @@
     "value": {
       "title": "x"
     }
+  },
+  {
+    "name": "javascript icon",
+    "value": {
+      "url": "https://example.com",
+      "title": "x",
+      "icon": "javascript:alert(1)"
+    }
   }
 ]

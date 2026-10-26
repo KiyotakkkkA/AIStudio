@@ -16,9 +16,7 @@ use zvs_contract::{
 use super::commit::{Fault, commit, snapshot};
 use super::ledger::ReadLedger;
 use super::plan::{Change, Edit, Plan, RealDisk, plan};
-use super::roots::{
-    CHAT_ROOT, Located, ROOTS_ONLY, RootKind, SKILL_READ_ONLY, VirtualRoots, is_virtual,
-};
+use super::roots::{Located, RootKind, SKILL_READ_ONLY, VirtualRoots, is_virtual};
 use super::text::{Decoded, content_hash, decode};
 use super::walk::{WalkOptions, walk};
 use crate::chat_files::within_quota;
@@ -101,21 +99,12 @@ fn limit(value: Option<u64>, default: u64, max: u64) -> usize {
     usize::try_from(value.unwrap_or(default).clamp(1, max)).unwrap_or(usize::MAX)
 }
 
-fn outside_roots() -> AppError {
-    AppError::new(AppErrorCode::PermissionDenied, ROOTS_ONLY)
-}
-
 fn read_only_skill() -> AppError {
     AppError::new(AppErrorCode::PermissionDenied, SKILL_READ_ONLY)
 }
 
-fn listed_path(path: Option<&str>, roots_only: bool) -> Option<&str> {
-    path.or_else(|| roots_only.then_some(CHAT_ROOT))
-}
-
 fn listing_permission(tool: &str, input: &Value) -> PermissionRequirement {
-    let only = input.get("rootsOnly").and_then(Value::as_bool) == Some(true);
-    match listed_path(input.get("path").and_then(Value::as_str), only) {
+    match input.get("path").and_then(Value::as_str) {
         Some(path) if is_virtual(path) => PermissionRequirement::app_folder(tool),
         _ => PermissionRequirement::tool(tool),
     }
@@ -167,9 +156,7 @@ impl Tools {
         tool: &str,
         action: &str,
         path: Option<&str>,
-        roots_only: bool,
     ) -> Result<PathBuf, AppError> {
-        let path = listed_path(path, roots_only);
         if let Some(located) = path
             .map(|path| self.located(conversation, path))
             .transpose()?
@@ -182,9 +169,6 @@ impl Tools {
                 Err(_) => Err(AppError::new(AppErrorCode::NotFound, FOLDER_MISSING)
                     .with_detail("path", path_text(&located.path))),
             };
-        }
-        if roots_only {
-            return Err(outside_roots());
         }
         let call = self.folders.call(conversation, tool);
         let target = FolderTarget::folder(path.unwrap_or("."));
@@ -235,9 +219,6 @@ pub struct FsListInput {
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
-    #[serde(default)]
-    #[schemars(skip)]
-    pub roots_only: bool,
 }
 
 impl Validate for FsListInput {
@@ -300,7 +281,6 @@ impl NodeDef for FsListNode {
                 FS_LIST,
                 LIST_ACTION,
                 input.path.as_deref(),
-                input.roots_only,
             )
             .await?;
         let cancel = context.cancel.clone();
@@ -371,9 +351,6 @@ pub struct FsReadInput {
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
-    #[serde(default)]
-    #[schemars(skip)]
-    pub roots_only: bool,
 }
 
 impl Validate for FsReadInput {
@@ -596,9 +573,6 @@ impl NodeDef for FsReadNode {
             .filter(|(_, found)| found.is_none())
             .map(|(target, _)| FolderTarget::file(&target.path))
             .collect();
-        if input.roots_only && !targets.is_empty() {
-            return Err(outside_roots());
-        }
         let granted = if targets.is_empty() {
             Vec::new()
         } else {
@@ -658,9 +632,6 @@ pub struct FsSearchInput {
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
-    #[serde(default)]
-    #[schemars(skip)]
-    pub roots_only: bool,
 }
 
 impl Validate for FsSearchInput {
@@ -803,7 +774,6 @@ impl NodeDef for FsSearchNode {
                 FS_SEARCH,
                 SEARCH_ACTION,
                 input.path.as_deref(),
-                input.roots_only,
             )
             .await?;
         let cancel = context.cancel.clone();
@@ -853,9 +823,6 @@ pub struct FsApplyInput {
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
-    #[serde(default)]
-    #[schemars(skip)]
-    pub roots_only: bool,
 }
 
 impl Validate for FsApplyInput {
@@ -1111,9 +1078,6 @@ impl NodeDef for FsApplyNode {
             .filter(|(_, found)| found.is_none())
             .map(|(path, _)| FolderTarget::file(path))
             .collect();
-        if input.roots_only && !real.is_empty() {
-            return Err(outside_roots());
-        }
         let call = tools.folders.call(&input.conversation_id, FS_APPLY);
         let access = if real.is_empty() {
             AccessPlan::empty()

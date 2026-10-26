@@ -16,6 +16,7 @@ pub mod scenarios;
 pub mod secrets;
 mod server;
 pub mod settings;
+pub mod sites;
 pub mod skills;
 pub mod storage;
 pub mod system;
@@ -42,6 +43,7 @@ pub fn register(server: &mut IpcServer) {
     mcp::register(server);
     notifications::register(server);
     skills::register(server);
+    sites::register(server);
     scenarios::register(server);
     toolchain::register(server);
     chat::register(server);
@@ -109,6 +111,7 @@ mod tests {
                 "chat.attach",
                 "chat.bindFolder",
                 "chat.cancel",
+                "chat.commands",
                 "chat.context",
                 "chat.conversations.create",
                 "chat.conversations.get",
@@ -119,7 +122,6 @@ mod tests {
                 "chat.conversations.updateRelations",
                 "chat.conversations.updateRetrieval",
                 "chat.conversations.updateStores",
-                "chat.conversations.updateTools",
                 "chat.evaluate",
                 "chat.pickFolder",
                 "chat.send",
@@ -216,6 +218,8 @@ mod tests {
                 "secrets.update",
                 "settings.get",
                 "settings.set",
+                "sites.icon",
+                "sites.open",
                 "skills.create",
                 "skills.duplicate",
                 "skills.export",
@@ -283,7 +287,7 @@ mod tests {
                 "workspace.list",
                 "workspace.read",
                 "workspace.unwatch",
-                "workspace.watch"
+                "workspace.watch",
             ]
         );
     }

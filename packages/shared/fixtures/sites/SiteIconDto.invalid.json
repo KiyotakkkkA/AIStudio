@@ -1,0 +1,16 @@
+[
+  {
+    "name": "svg",
+    "value": {
+      "mime": "image/svg+xml",
+      "data": "PHN2Zz4="
+    }
+  },
+  {
+    "name": "empty",
+    "value": {
+      "mime": "image/png",
+      "data": ""
+    }
+  }
+]

@@ -9,7 +9,13 @@
       "toolItems": [
         {
           "key": "mail.send",
-          "tokens": 120
+          "tokens": 120,
+          "source": "base"
+        },
+        {
+          "key": "browser.navigate",
+          "tokens": 60,
+          "source": "command"
         }
       ],
       "history": 600,

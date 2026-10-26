@@ -1,18 +1,22 @@
 [
   {
-    "name": "selected",
-    "value": "selected"
-  },
-  {
-    "name": "skill",
-    "value": "skill"
+    "name": "base",
+    "value": "base"
   },
   {
     "name": "knowledge",
     "value": "knowledge"
   },
   {
-    "name": "system",
-    "value": "system"
+    "name": "memory",
+    "value": "memory"
+  },
+  {
+    "name": "command",
+    "value": "command"
+  },
+  {
+    "name": "loaded",
+    "value": "loaded"
   }
 ]

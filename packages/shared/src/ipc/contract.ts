@@ -11,7 +11,7 @@ import {
 import {
   ChatContextDto,
   ChatContextInput,
-  ChatEnabledTools,
+  ChatCommandDto,
   ChatEvalInput,
   ChatEvalRunDto,
   ChatAttachDto,
@@ -61,6 +61,7 @@ import {
   ArtifactSaveResult,
   OpenArtifactInBrowserInput,
 } from "../artifacts.js";
+import { OpenSiteInput, SiteIconDto, SiteIconInput } from "../sites.js";
 import {
   DocumentDto,
   DocumentHandle,
@@ -252,15 +253,12 @@ export const contract = defineContract({
     input: ConversationRef.extend({ useRelations: z.boolean() }),
     output: ConversationDto,
   },
-  "chat.conversations.updateTools": {
-    input: ConversationRef.extend({ enabledTools: ChatEnabledTools }),
-    output: ConversationDto,
-  },
   "chat.conversations.truncate": {
     input: TruncateConversationInput,
     output: ConversationDetailDto,
   },
   "chat.context": { input: ChatContextInput, output: ChatContextDto },
+  "chat.commands": { input: z.void(), output: z.array(ChatCommandDto) },
   "chat.send": { input: ChatSendInput, output: RunHandleDto },
   "chat.attach": { input: ChatAttachInput, output: ChatAttachDto.nullable() },
   "chat.cancel": { input: RunIdInput, output: z.void() },
@@ -313,6 +311,8 @@ export const contract = defineContract({
   "artifacts.browsers": { input: z.void(), output: ArtifactBrowsersDto },
   "artifacts.openInBrowser": { input: OpenArtifactInBrowserInput, output: z.void() },
   "artifacts.openInApp": { input: ArtifactRef, output: z.void() },
+  "sites.open": { input: OpenSiteInput, output: z.void() },
+  "sites.icon": { input: SiteIconInput, output: SiteIconDto.nullable() },
   "runs.approve": {
     input: RunIdInput.extend({ approvalId: z.string().uuid(), always: z.boolean().default(false) }),
     output: z.void(),

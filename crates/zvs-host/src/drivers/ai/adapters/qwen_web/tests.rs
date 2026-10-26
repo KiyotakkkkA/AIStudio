@@ -489,12 +489,14 @@ async fn qwen_sends_the_chosen_effort_and_search_and_streams_the_found_sources()
                 title: "Курсы валют на 26 октября".into(),
                 snippet: "EUR 90,2429".into(),
                 date: Some("3 days ago".into()),
+                icon: None,
             },
             &WebSourceDto {
                 url: "https://cbr.example/daily".into(),
                 title: "Официальные курсы".into(),
                 snippet: "Евро 90,2429 руб.".into(),
                 date: None,
+                icon: None,
             },
         ]
     );

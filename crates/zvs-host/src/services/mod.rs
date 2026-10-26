@@ -44,7 +44,7 @@ pub use crypto::{
 };
 pub use graph::{GraphService, GraphServiceOptions};
 pub use health_check::{HealthCheckOptions, HealthCheckService};
-pub use mcp::{McpService, McpServiceOptions};
+pub use mcp::{McpServers, McpService, McpServiceOptions};
 pub use memory::MemoryService;
 pub use permissions::{Admission, PermissionContext, PermissionService};
 pub use providers::{
@@ -112,5 +112,6 @@ pub struct Services {
     pub terminals: TerminalService,
     pub documents: DocumentService,
     pub artifacts: crate::artifacts::ArtifactStore,
+    pub sites: crate::sites::SiteService,
     pub picker: Option<SharedPicker>,
 }

@@ -63,6 +63,7 @@ macro_rules! bundled_skill {
 }
 
 pub const BUNDLED_SKILLS: &[BundledSkill] = &[
+    bundled_skill!("browser-use", []),
     bundled_skill!(
         "pdf",
         [

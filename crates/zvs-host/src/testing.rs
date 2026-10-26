@@ -517,6 +517,7 @@ pub fn test_services(system: SystemService) -> TestServices {
     let chat = crate::services::ChatService::new(crate::services::ChatServiceOptions {
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),
+        mcp: Some(Arc::new(mcp.clone())),
         folders: Some(folders.clone()),
         clock: clock.clone(),
         ..crate::services::ChatServiceOptions::new(
@@ -606,6 +607,7 @@ pub fn test_services(system: SystemService) -> TestServices {
                 },
             ),
             artifacts: test_artifacts(workspace.join("conversations")),
+            sites: crate::sites::SiteService::new(crate::sites::SiteServiceOptions::default()),
             documents: crate::documents::DocumentService::new(
                 crate::documents::DocumentServiceOptions {
                     clock: clock.clone(),

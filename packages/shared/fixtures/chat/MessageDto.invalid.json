@@ -138,5 +138,23 @@
       "partial": false,
       "createdAt": 3
     }
+  },
+  {
+    "name": "unknown command",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111114",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "role": "user",
+      "content": "x",
+      "citations": [],
+      "command": "deploy",
+      "tokensIn": 1,
+      "tokensOut": 0,
+      "usageEstimated": true,
+      "durationMs": 0,
+      "runId": null,
+      "partial": false,
+      "createdAt": 3
+    }
   }
 ]

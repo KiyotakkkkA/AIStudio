@@ -107,11 +107,11 @@ implemented.
 the primary response (`response_index` `0`) is followed. Then `choices[0].delta` frames, each
 with a `phase` and a `status` (`typing` or `finished`):
 
-| `phase`                  | Read                                                         | Event                                    |
-| ------------------------ | ------------------------------------------------------------ | ---------------------------------------- |
-| `thinking_summary`       | `extra.summary_thought.content[]` (whole snapshots)          | `Reasoning` (new suffixes only)          |
-| `answer`                 | `content`                                                    | `Text`; `Finished` on `status: finished` |
-| `web_search`, `finished` | `extra.web_search_info[]`: `url`, `title`, `snippet`, `date` | `WebSources`                             |
+| `phase`                  | Read                                                                     | Event                                    |
+| ------------------------ | ------------------------------------------------------------------------ | ---------------------------------------- |
+| `thinking_summary`       | `extra.summary_thought.content[]` (whole snapshots)                      | `Reasoning` (new suffixes only)          |
+| `answer`                 | `content`                                                                | `Text`; `Finished` on `status: finished` |
+| `web_search`, `finished` | `extra.web_search_info[]`: `url`, `title`, `snippet`, `date`, `hostlogo` | `WebSources`                             |
 
 `usage` on any frame becomes `Usage`. Error frames (`success: false`, `error`, `status >= 400`)
 become `Failure`, flagged `auth` for 401, 403 and session-like codes. Vendor messages are never
@@ -123,6 +123,9 @@ not end the stream. Search results arrive only on the `finished` `web_search` fr
 `typing` frames carry the query in `function_call.arguments`). The answer cites them as
 `[[n]]`, 1-based over the results in arrival order. Rows without an `http(s)` URL are
 skipped; an empty title falls back to the URL; empty `snippet` and `date` are dropped.
+`hostlogo` becomes the source's `icon` when it is an `http(s)` URL; rows also carry `hostname`,
+which is not read. Both keys are present in the frames recorded 2026-10-26; `hostlogo` was empty
+in those recordings, so the app falls back to the site's own `/favicon.ico` (2026-10-27).
 `web_extractor` phases (pages the model read) are not decoded.
 
 ## Vendor-side tools

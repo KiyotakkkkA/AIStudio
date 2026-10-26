@@ -4,10 +4,10 @@ import { createIpcClient } from "@zvs/ipc";
 import {
   ChatToolCallDto,
   ConversationDetailDto,
-  MessageDto,
   RunHandleDto,
   ToolDto,
   contract,
+  type ChatContextToolDto,
   type Contract,
 } from "@zvs/shared";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
@@ -15,17 +15,22 @@ import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import ChatStore from "../../src/renderer/features/chat/ChatStore.ts";
 import ChatToolCalls from "../../src/renderer/features/chat/ChatToolCalls";
 import {
+  AUTOMATIC_TOOLS_TITLE,
+  BASE_TOOLS_TITLE,
+  COMMAND_TOOLS_TITLE,
+  LOADED_TOOLS_TITLE,
+  OFFERED_BY_COMMAND,
   OFFERED_BY_KNOWLEDGE,
   OFFERED_BY_MEMORY,
-  OFFERED_BY_SKILL,
-  OFFERED_BY_SKILL_ROOTS,
-  OFFERED_BY_SYSTEM,
-  automaticOffers,
-  isCoreTool,
-  policyTools,
-  offeredHint,
-  toolBlockReason,
+  OFFERED_ON_REQUEST,
+  SOURCE_HINTS,
+  toolSections,
 } from "../../src/renderer/features/chat/toolSets.ts";
+import {
+  commandText,
+  matchCommands,
+  parseCommand,
+} from "../../src/renderer/features/chat/chatCommands.ts";
 import { durationLabel } from "../../src/renderer/features/chat/processCopy.ts";
 import { provider } from "./providerFixtures.ts";
 
@@ -73,86 +78,183 @@ const pendingCall = ChatToolCallDto.parse({
   status: "awaiting-approval",
   approvalId,
 });
+const browserUse = {
+  command: "browser-use",
+  description: "Работа во встроенном браузере: открытие и чтение страниц, действия на сайтах",
+} as const;
+const baseItems: ChatContextToolDto[] = [
+  { key: "fs.read", tokens: 30, source: "base" },
+  { key: "chat.ask", tokens: 20, source: "base" },
+];
 
 function setup() {
-  let detail = structuredClone(conversation);
+  const detail = structuredClone(conversation);
   const bridge = createFakeBridge<Contract>()
     .handle("chat.conversations.list", () => [detail])
     .handle("chat.conversations.get", () => detail)
-    .handle("chat.conversations.create", (input) => {
-      detail = { ...detail, enabledTools: input.enabledTools ?? [] };
-      return detail;
-    })
-    .handle("chat.conversations.updateTools", (input) => {
-      detail = { ...detail, enabledTools: input.enabledTools };
-      return detail;
-    })
+    .handle("chat.conversations.create", () => detail)
+    .handle("chat.commands", () => [browserUse])
     .handle("providers.list", () => [saved])
     .handle("providers.get", () => saved)
     .handle("vectorStores.list", () => [])
-    .handle("tools.list", () => [tool("mcp.docs.search"), tool("mcp.docs.drop", { tier: "off" })])
+    .handle("tools.list", () => [tool("mcp.docs.search"), tool("fs.read", { source: "builtin" })])
     .handle("chat.send", () => handle)
-    .handle("chat.context", (input) => ({
-      contextWindow: 8192,
-      reservedOutput: 1024,
-      system: 12,
-      tools: (input.enabledTools ?? []).length * 40,
-      toolItems: (input.enabledTools ?? []).map((key) => ({ key, tokens: 32 })),
-      history: 0,
-      historyMessages: 0,
-      trimmed: 0,
-      total: 12 + (input.enabledTools ?? []).length * 40,
-    }))
+    .handle("chat.context", (input) => {
+      const toolItems: ChatContextToolDto[] =
+        input.command === "browser-use"
+          ? [...baseItems, { key: "browser.navigate", tokens: 50, source: "command" }]
+          : baseItems;
+      const tools = toolItems.reduce((sum, item) => sum + item.tokens, 0);
+      return {
+        contextWindow: 8192,
+        reservedOutput: 1024,
+        system: 12,
+        tools,
+        toolItems,
+        history: 0,
+        historyMessages: 0,
+        trimmed: 0,
+        total: 12 + tools,
+      };
+    })
     .handle("runs.approve", () => undefined);
   const events = createEventRouter({ logger: { log: vi.fn() } });
   const store = new ChatStore(createIpcClient(contract, bridge), events);
   return { store, bridge, events };
 }
 
-test("the conversation's tool picks travel with create and later with updateTools", async () => {
+test("the tools badge follows the host's breakdown and a command adds its tools", async () => {
   const { store, bridge, events } = setup();
   await store.mount();
-  expect(store.tools.map((entry) => entry.key)).toEqual(["mcp.docs.search", "mcp.docs.drop"]);
-  expect(store.toolMode).toBe("native");
+  expect(store.commands).toEqual([browserUse]);
+  await vi.waitFor(() => expect(store.contextUsed).toBe(62));
+  expect(store.toolSections).toEqual([{ title: BASE_TOOLS_TITLE, items: baseItems }]);
 
-  await store.toggleTool("mcp.docs.search");
-  expect(store.enabledTools).toEqual(["mcp.docs.search"]);
-  expect(store.offeredToolCount).toBe(1);
-  store.composer.setText("Question");
-  await store.send();
+  store.typeText("/br");
+  store.completeCommand();
+  await vi.waitFor(() => expect(store.contextUsed).toBe(112));
   expect(
-    bridge.calls.find((call) => call.channel === "chat.conversations.create")?.payload,
-  ).toMatchObject({ enabledTools: ["mcp.docs.search"] });
+    bridge.calls.filter((call) => call.channel === "chat.context").at(-1)?.payload,
+  ).toMatchObject({ modelId: saved.models[0]!.externalId, command: "browser-use" });
+  expect(store.toolSections.map((section) => section.title)).toEqual([
+    BASE_TOOLS_TITLE,
+    COMMAND_TOOLS_TITLE,
+  ]);
 
-  events.dispatch({ type: "end", ...handle, seq: 1, ts: Date.now(), outcome: { status: "ok" } });
-  await vi.waitFor(() => expect(store.generating).toBe(false));
-  await store.toggleTool("mcp.docs.search");
-  expect(
-    bridge.calls.filter((call) => call.channel === "chat.conversations.updateTools").at(-1),
-  ).toMatchObject({
-    channel: "chat.conversations.updateTools",
-    payload: { id: conversation.id, enabledTools: [] },
-  });
-  expect(store.enabledTools).toEqual([]);
+  store.clearCommand();
+  await vi.waitFor(() => expect(store.contextUsed).toBe(62));
   store.dispose();
   events.dispose();
 });
 
-test("the context breakdown follows the tools picked for the next turn", async () => {
-  const { store, bridge, events } = setup();
+test("a slash opens the command list, the keys move through it and a pick becomes a chip", async () => {
+  const { store, events } = setup();
   await store.mount();
-  await vi.waitFor(() => expect(store.context?.total).toBe(12));
-  await store.toggleTool("mcp.docs.search");
-  await vi.waitFor(() =>
-    expect(store.context?.toolItems).toEqual([{ key: "mcp.docs.search", tokens: 32 }]),
-  );
-  expect(
-    bridge.calls.filter((call) => call.channel === "chat.context").at(-1)?.payload,
-  ).toMatchObject({ modelId: saved.models[0]!.externalId, enabledTools: ["mcp.docs.search"] });
-  expect(store.contextUsed).toBe(52);
-  expect(store.contextWindow).toBe(8192);
+  expect(store.commandMatches).toEqual([]);
+
+  store.typeText("/");
+  expect(store.commandMatches).toEqual([browserUse]);
+  store.moveCommand(1);
+  expect(store.commandIndex).toBe(0);
+  store.typeText("/brx");
+  expect(store.commandMatches).toEqual([]);
+  store.typeText("/browser-use now");
+  expect(store.commandMatches).toEqual([]);
+
+  store.typeText("/b");
+  store.dismissCommands();
+  expect(store.commandMatches).toEqual([]);
+  store.typeText("/br");
+  expect(store.commandMatches).toEqual([browserUse]);
+
+  store.completeCommand();
+  expect(store.composer.command).toBe("browser-use");
+  expect(store.composer.text).toBe("");
+  store.typeText("/");
+  expect(store.commandMatches).toEqual([]);
   store.dispose();
   events.dispose();
+});
+
+test("a turn carries its command once and a typed command is understood on send", async () => {
+  const { store, bridge, events } = setup();
+  await store.mount();
+  store.typeText("/b");
+  store.completeCommand();
+  store.typeText("Открой расписание");
+  await store.send();
+  expect(bridge.calls.find((call) => call.channel === "chat.send")?.payload).toMatchObject({
+    text: "Открой расписание",
+    command: "browser-use",
+  });
+  expect(store.composer.command).toBeNull();
+  expect(
+    bridge.calls.find((call) => call.channel === "chat.conversations.create")?.payload,
+  ).not.toHaveProperty("enabledTools");
+  events.dispatch({ type: "end", ...handle, seq: 1, ts: Date.now(), outcome: { status: "ok" } });
+  await vi.waitFor(() => expect(store.generating).toBe(false));
+
+  store.typeText("/browser-use");
+  await vi.waitFor(() => expect(store.canSend).toBe(true));
+  await store.send();
+  expect(store.composer.command).toBe("browser-use");
+  expect(bridge.calls.filter((call) => call.channel === "chat.send")).toHaveLength(1);
+
+  store.clearCommand();
+  store.typeText("/browser-use   Следующая страница ");
+  await store.send();
+  expect(bridge.calls.filter((call) => call.channel === "chat.send").at(-1)?.payload).toMatchObject(
+    { text: "Следующая страница", command: "browser-use" },
+  );
+  events.dispatch({ type: "end", ...handle, seq: 2, ts: Date.now(), outcome: { status: "ok" } });
+  await vi.waitFor(() => expect(store.generating).toBe(false));
+
+  store.typeText("/unknown привет");
+  await vi.waitFor(() => expect(store.canSend).toBe(true));
+  await store.send();
+  const last = bridge.calls.filter((call) => call.channel === "chat.send").at(-1)?.payload;
+  expect(last).toMatchObject({ text: "/unknown привет" });
+  expect(last?.command).toBeUndefined();
+  store.dispose();
+  events.dispose();
+});
+
+test("commands match by prefix and parse only when known", () => {
+  expect(matchCommands([browserUse], "/BR")).toEqual([browserUse]);
+  expect(matchCommands([browserUse], "br")).toEqual([]);
+  expect(matchCommands([browserUse], "/br x")).toEqual([]);
+  expect(parseCommand([browserUse], "  /Browser-Use  найди\nрасписание ")).toEqual({
+    command: "browser-use",
+    text: "найди\nрасписание",
+  });
+  expect(parseCommand([browserUse], "/browser-use")).toEqual({ command: "browser-use", text: "" });
+  expect(parseCommand([browserUse], "/deploy now")).toBeNull();
+  expect(parseCommand([browserUse], "no slash")).toBeNull();
+  expect(commandText("browser-use")).toBe("/browser-use");
+});
+
+test("tool sections group the offered tools by why they were offered", () => {
+  const items: ChatContextToolDto[] = [
+    { key: "docs.search", tokens: 1, source: "loaded" },
+    { key: "fs.read", tokens: 1, source: "base" },
+    { key: "chat.memory", tokens: 1, source: "memory" },
+    { key: "browser.navigate", tokens: 1, source: "command" },
+    { key: "knowledge.search", tokens: 1, source: "knowledge" },
+  ];
+  expect(toolSections(items)).toEqual([
+    { title: BASE_TOOLS_TITLE, items: [items[1]] },
+    { title: AUTOMATIC_TOOLS_TITLE, items: [items[2], items[4]] },
+    { title: COMMAND_TOOLS_TITLE, items: [items[3]] },
+    { title: LOADED_TOOLS_TITLE, items: [items[0]] },
+  ]);
+  expect(toolSections([])).toEqual([]);
+  expect(SOURCE_HINTS).toEqual({
+    base: null,
+    knowledge: OFFERED_BY_KNOWLEDGE,
+    memory: OFFERED_BY_MEMORY,
+    command: OFFERED_BY_COMMAND,
+    loaded: OFFERED_ON_REQUEST,
+  });
 });
 
 test("live tool-call events drive the cards and keep their approval out of the generic bar", async () => {
@@ -237,102 +339,4 @@ test("a card shows the call, its result and an inline approval prompt", () => {
   expect(screen.getByText("Use the CLI.")).toBeTruthy();
   expect(screen.getByText("Результат · сокращён")).toBeTruthy();
   expect(screen.getByText(durationLabel(1500))).toBeTruthy();
-});
-
-test("a tool that cannot be offered explains why", () => {
-  expect(toolBlockReason(tool("mcp.a.b"))).toBeNull();
-  expect(toolBlockReason(tool("mcp.a.b", { tier: "off" }))).toMatch(/Запрещён/);
-  expect(toolBlockReason(tool("mcp.a.b", { enabled: false }))).toMatch(/Выключен/);
-  expect(toolBlockReason(tool("mcp.a.b", { available: false }))).toMatch(/недоступен/);
-});
-
-test("the recommended set replaces the picks with the offerable file tools only", async () => {
-  const { store, bridge, events } = setup();
-  bridge.handle("tools.list", () => [
-    tool("mcp.docs.search"),
-    tool("fs.list", { source: "builtin" }),
-    tool("fs.read", { source: "builtin" }),
-    tool("fs.search", { source: "builtin" }),
-    tool("fs.apply", { source: "builtin", tier: "off" }),
-    tool("shell.run", { source: "builtin" }),
-  ]);
-  await store.mount();
-  await store.toggleTool("mcp.docs.search");
-  expect(store.usesRecommendedTools).toBe(false);
-
-  await store.useRecommendedTools();
-  expect(store.enabledTools).toEqual(["fs.list", "fs.read", "fs.search"]);
-  expect(store.usesRecommendedTools).toBe(true);
-  store.dispose();
-  events.dispose();
-});
-
-test("skill tools stay attached and cannot be picked or dropped", async () => {
-  const { store, bridge, events } = setup();
-  bridge.handle("tools.list", () => [tool("skill.load", { source: "builtin" })]);
-  await store.mount();
-  await store.toggleTool("skill.load");
-  expect(store.enabledTools).toEqual([]);
-  expect(bridge.calls.some((call) => call.channel === "chat.conversations.updateTools")).toBe(
-    false,
-  );
-  store.dispose();
-  events.dispose();
-});
-
-test("the tools the host added on the last answer are shown with the reason they were added", () => {
-  const message = (offeredTools: unknown[]) =>
-    MessageDto.parse({
-      id: "0199bb11-4444-7111-8111-000000000010",
-      conversationId: conversation.id,
-      role: "assistant",
-      content: "",
-      citations: [],
-      offeredTools,
-      tokensIn: 0,
-      tokensOut: 0,
-      usageEstimated: true,
-      durationMs: 0,
-      runId: null,
-      partial: false,
-      createdAt: 1,
-    });
-  const older = message([{ key: "knowledge.search", source: "knowledge" }]);
-  const last = message([
-    { key: "fs.read", source: "selected" },
-    { key: "fs.apply", source: "skill", rootsOnly: true },
-    { key: "skill.load", source: "skill" },
-    { key: "chat.ask", source: "system" },
-  ]);
-  const quiet = message([]);
-
-  expect(
-    automaticOffers([older, last, quiet], ["fs.read", "skill.load"]).map((tool) => tool.key),
-  ).toEqual(["fs.apply"]);
-  expect(automaticOffers([], [])).toEqual([]);
-  expect(offeredHint(last.offeredTools[1]!)).toBe(OFFERED_BY_SKILL_ROOTS);
-  expect(offeredHint(last.offeredTools[2]!)).toBe(OFFERED_BY_SKILL);
-  expect(offeredHint(older.offeredTools[0]!)).toBe(OFFERED_BY_KNOWLEDGE);
-  expect(offeredHint(last.offeredTools[3]!)).toBe(OFFERED_BY_SYSTEM);
-  expect(isCoreTool("chat.ask") && isCoreTool("skill.load")).toBe(true);
-  expect(isCoreTool("fs.read")).toBe(false);
-});
-
-test("knowledge search and memory show as automatic before the first answer", () => {
-  const knowledge = { key: "knowledge.search", source: "knowledge", rootsOnly: false };
-  const memory = { key: "chat.memory", source: "system", rootsOnly: false };
-  const policy = {
-    attachedStores: 1,
-    retrievalMode: "hybrid",
-    selected: [],
-    memory: false,
-  } as const;
-  expect(policyTools([], policy)).toEqual([knowledge]);
-  expect(policyTools([], { ...policy, retrievalMode: "auto" })).toEqual([]);
-  expect(policyTools([], { ...policy, attachedStores: 0 })).toEqual([]);
-  expect(policyTools([], { ...policy, selected: ["knowledge.search"] })).toEqual([]);
-  expect(policyTools([knowledge], policy)).toEqual([knowledge]);
-  expect(policyTools([], { ...policy, attachedStores: 0, memory: true })).toEqual([memory]);
-  expect(policyTools([memory], { ...policy, attachedStores: 0, memory: true })).toEqual([memory]);
-  expect(offeredHint(memory)).toBe(OFFERED_BY_MEMORY);
 });

@@ -43,7 +43,6 @@ fn fixture() -> Fixture {
                 system_prompt: String::new(),
                 attached_store_ids: Vec::new(),
                 use_relations: false,
-                enabled_tools: Vec::new(),
                 retrieval_mode: RetrievalMode::Hybrid,
                 working_folder: None,
                 turn_folder: None,

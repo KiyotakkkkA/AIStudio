@@ -25,6 +25,7 @@ import { answerCitations, questionSelections } from "./citations";
 import { answerArtifacts } from "./artifacts";
 import ChatArtifacts from "./ChatArtifacts";
 import { shouldPinToBottom } from "./scroll";
+import { commandText } from "./chatCommands";
 import type ChatStore from "./ChatStore";
 import { CONTEXT_PANEL, FILES_PANEL, PANEL_GROUP_LABEL } from "./explorer/explorerCopy";
 import TerminalDock from "../terminal/TerminalDock";
@@ -207,6 +208,11 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                     </div>
                   ) : (
                     <>
+                      {message.command !== undefined && (
+                        <span className="mb-1 font-mono text-[11.5px] text-main-400">
+                          {commandText(message.command)}
+                        </span>
+                      )}
                       <div className="rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
                         {message.content}
                       </div>

@@ -20,6 +20,7 @@ pub mod platform;
 pub mod runtimes;
 pub mod scenarios;
 pub mod services;
+pub mod sites;
 pub mod skills;
 pub mod terminal;
 pub mod toolchain;

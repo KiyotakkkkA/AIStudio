@@ -174,7 +174,8 @@ mod tests {
             parameters: json!({}),
             destructive: false,
             read_only: true,
-            roots_only: false,
+            source: zvs_contract::OfferedToolSource::Base,
+            server: None,
         };
         assert_eq!(
             presented(

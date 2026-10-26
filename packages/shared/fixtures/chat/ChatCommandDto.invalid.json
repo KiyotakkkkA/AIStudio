@@ -1,0 +1,16 @@
+[
+  {
+    "name": "blank description",
+    "value": {
+      "command": "browser-use",
+      "description": "  "
+    }
+  },
+  {
+    "name": "unknown command",
+    "value": {
+      "command": "deploy",
+      "description": "x"
+    }
+  }
+]

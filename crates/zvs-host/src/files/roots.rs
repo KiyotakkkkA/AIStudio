@@ -16,7 +16,6 @@ pub const SKILL_KEY_MISSING: &str =
     "После skill: указывается идентификатор навыка, например skill:dashboard/references/spec.md";
 pub const SKILL_READ_ONLY: &str = "Папка навыка доступна только для чтения";
 pub const ROOTS_UNAVAILABLE: &str = "Пути chat: и skill: недоступны в этом запуске";
-pub const ROOTS_ONLY: &str = "Инструмент предложен для навыка: доступны только пути chat: и skill:";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RootKind {

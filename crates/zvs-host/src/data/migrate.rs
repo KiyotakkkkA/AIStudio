@@ -175,6 +175,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0025_browser_grant",
         sql: include_str!("../../migrations/0025_browser_grant.sql"),
     },
+    Migration {
+        id: 26,
+        name: "0026_chat_commands",
+        sql: include_str!("../../migrations/0026_chat_commands.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -638,6 +643,44 @@ mod tests {
                 "SELECT subject FROM tool_permission ORDER BY subject"
             ),
             ["fs.read", "job.run"]
+        );
+    }
+
+    #[test]
+    fn stored_tool_offers_take_the_new_sources_and_conversations_lose_their_tool_picks() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..25], &options(&backups, &clock)).expect("applies");
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    r#"INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, enabled_tools, created_at, updated_at) VALUES ('c1', 't', 'p', 'm', '{}', '', '[]', '["fs.read"]', 1, 1);
+                    INSERT INTO message (id, conversation_id, role, content, citations, offered_tools, tokens_in, tokens_out, usage_estimated, duration_ms, partial, created_at) VALUES ('m1', 'c1', 'assistant', '', '[]', '[{"key":"fs.read","source":"selected"},{"key":"shell.run","source":"skill","rootsOnly":true},{"key":"knowledge.search","source":"knowledge"},{"key":"chat.memory","source":"system"},{"key":"chat.ask","source":"system"}]', 0, 0, 1, 0, 0, 1), ('m2', 'c1', 'user', '', '[]', '[]', 0, 0, 1, 0, 0, 2);"#,
+                )?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        assert_eq!(
+            query(&database, "SELECT offered_tools FROM message ORDER BY id"),
+            [
+                r#"[{"key":"fs.read","source":"base"},{"key":"shell.run","source":"base"},{"key":"knowledge.search","source":"knowledge"},{"key":"chat.memory","source":"memory"},{"key":"chat.ask","source":"base"}]"#,
+                "[]",
+            ]
+        );
+        assert_eq!(
+            query(
+                &database,
+                "SELECT coalesce(command, 'none') FROM message ORDER BY id"
+            ),
+            ["none", "none"]
+        );
+        assert!(
+            query(
+                &database,
+                "SELECT name FROM pragma_table_info('conversation') WHERE name = 'enabled_tools'"
+            )
+            .is_empty()
         );
     }
 

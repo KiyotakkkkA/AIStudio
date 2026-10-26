@@ -1,0 +1,18 @@
+[
+  {
+    "name": "file",
+    "value": {
+      "url": "file:///C:/Windows/win.ini"
+    }
+  },
+  {
+    "name": "javascript",
+    "value": {
+      "url": "javascript:alert(1)"
+    }
+  },
+  {
+    "name": "missing",
+    "value": {}
+  }
+]

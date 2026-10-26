@@ -188,17 +188,26 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
             .await,
     );
     assert!(stores.attached_store_ids.is_empty());
+    let commands: Vec<zvs_contract::ChatCommandDto> =
+        data(&channels.server.dispatch("chat.commands", json!(null)).await);
     assert_eq!(
+        commands
+            .iter()
+            .map(|command| command.command)
+            .collect::<Vec<_>>(),
+        [zvs_contract::ChatCommand::BrowserUse]
+    );
+    assert!(
         failed(
             &channels
                 .server
                 .dispatch(
                     "chat.conversations.updateTools",
-                    json!({ "id": created.id, "enabledTools": ["demo.missing"] }),
+                    json!({ "id": created.id })
                 )
                 .await
-        ),
-        &json!("NOT_FOUND")
+        )
+        .is_string()
     );
     assert_eq!(
         failed(

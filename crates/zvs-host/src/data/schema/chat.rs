@@ -1,6 +1,6 @@
 use rusqlite::Row;
 use zvs_contract::{
-    ChatCitationDto, ChatSettings, ChatToolCallDto, DocumentSelectionDto, MessageRole,
+    ChatCitationDto, ChatCommand, ChatSettings, ChatToolCallDto, DocumentSelectionDto, MessageRole,
     OfferedToolDto, RetrievalMode, Timestamp, WebSourceDto,
 };
 
@@ -16,7 +16,6 @@ pub struct ConversationRow {
     pub system_prompt: String,
     pub attached_store_ids: Vec<String>,
     pub use_relations: bool,
-    pub enabled_tools: Vec<String>,
     pub retrieval_mode: RetrievalMode,
     pub working_folder: Option<String>,
     pub turn_folder: Option<String>,
@@ -27,7 +26,7 @@ pub struct ConversationRow {
 
 impl ConversationRow {
     pub const COLUMNS: &str = "id, title, provider_id, model_id, settings, system_prompt, \
-        attached_store_ids, use_relations, enabled_tools, retrieval_mode, working_folder, turn_folder, \
+        attached_store_ids, use_relations, retrieval_mode, working_folder, turn_folder, \
         profile, created_at, updated_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
@@ -40,7 +39,6 @@ impl ConversationRow {
             system_prompt: row.get("system_prompt")?,
             attached_store_ids: json_column(row, "attached_store_ids")?,
             use_relations: row.get("use_relations")?,
-            enabled_tools: json_column(row, "enabled_tools")?,
             retrieval_mode: row.get::<_, EnumColumn<RetrievalMode>>("retrieval_mode")?.0,
             working_folder: row.get("working_folder")?,
             turn_folder: row.get("turn_folder")?,
@@ -61,6 +59,7 @@ pub struct MessageRow {
     pub citations: Vec<ChatCitationDto>,
     pub tool_calls: Vec<ChatToolCallDto>,
     pub selections: Vec<DocumentSelectionDto>,
+    pub command: Option<ChatCommand>,
     pub offered_tools: Vec<OfferedToolDto>,
     pub web_sources: Vec<WebSourceDto>,
     pub tokens_in: i64,
@@ -75,7 +74,7 @@ pub struct MessageRow {
 impl MessageRow {
     pub const COLUMNS: &str = "id, conversation_id, role, content, reasoning, citations, \
         (SELECT json_group_array(json(call) ORDER BY idx) FROM message_tool_call \
-        WHERE message_id = message.id) AS tool_calls, selections, offered_tools, web_sources, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, \
+        WHERE message_id = message.id) AS tool_calls, selections, command, offered_tools, web_sources, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, \
         created_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
@@ -88,6 +87,9 @@ impl MessageRow {
             citations: json_column(row, "citations")?,
             tool_calls: json_column(row, "tool_calls")?,
             selections: json_column(row, "selections")?,
+            command: row
+                .get::<_, Option<EnumColumn<ChatCommand>>>("command")?
+                .map(|column| column.0),
             offered_tools: json_column(row, "offered_tools")?,
             web_sources: json_column(row, "web_sources")?,
             tokens_in: row.get("tokens_in")?,

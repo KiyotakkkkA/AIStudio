@@ -4,7 +4,11 @@
     "value": "automatic"
   },
   {
+    "name": "retired",
+    "value": "selected"
+  },
+  {
     "name": "upper case",
-    "value": "SKILL"
+    "value": "BASE"
   }
 ]

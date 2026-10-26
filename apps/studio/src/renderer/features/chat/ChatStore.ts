@@ -20,6 +20,7 @@ import {
   type ApprovalRequestDto,
   type ChatAttachDto,
   type ChatCitationDto,
+  type ChatCommandDto,
   type ChatContextDto,
   type ChatContextInput,
   type Contract,
@@ -48,17 +49,11 @@ import { adapterLabel } from "../providers/accountPresentation";
 import { suggestedBaseUrl } from "../providers/providerPresentation";
 import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
 import ArtifactActions from "./ArtifactActions";
+import SiteIcons from "./SiteIcons";
 import ExplorerStore from "./explorer/ExplorerStore";
 import TerminalStore from "../terminal/TerminalStore";
-import {
-  automaticOffers,
-  CORE_TOOLS,
-  isCoreTool,
-  isModelTool,
-  policyTools,
-  RECOMMENDED_TOOLS,
-  toolBlockReason,
-} from "./toolSets";
+import { matchCommands, parseCommand } from "./chatCommands";
+import { toolSections } from "./toolSets";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
 const LAST_CONVERSATION_KEY = "chat.conversation.last";
@@ -84,6 +79,9 @@ export default class ChatStore {
   accounts: AccountDto[] = [];
   adapters: AdapterDescriptorDto[] = [];
   servers: McpServerDto[] = [];
+  commands: ChatCommandDto[] = [];
+  commandIndex = 0;
+  commandsDismissed = false;
   context: ChatContextDto | null = null;
   connecting = false;
   connectingAccountId: AccountId | null = null;
@@ -122,6 +120,7 @@ export default class ChatStore {
   readonly explorer: ExplorerStore;
   readonly terminal: TerminalStore;
   readonly artifacts: ArtifactActions;
+  readonly siteIcons: SiteIcons;
   outcome: "ok" | "cancelled" | "failed" | null = null;
   revealed = 0;
   private buffer = "";
@@ -149,6 +148,7 @@ export default class ChatStore {
     this.explorer = new ExplorerStore(ipc, events);
     this.terminal = new TerminalStore(ipc, events);
     this.artifacts = new ArtifactActions(ipc);
+    this.siteIcons = new SiteIcons(ipc);
     makeAutoObservable<
       ChatStore,
       | "ipc"
@@ -177,6 +177,7 @@ export default class ChatStore {
         explorer: false,
         terminal: false,
         artifacts: false,
+        siteIcons: false,
         buffer: false,
         timer: false,
         unsubscribe: false,
@@ -351,44 +352,37 @@ export default class ChatStore {
     }
     return null;
   }
-  get enabledTools() {
-    return this.active?.enabledTools ?? this.composer.enabledTools;
-  }
-  get automaticTools() {
-    const offered = automaticOffers(this.active?.messages ?? [], this.enabledTools);
-    if (this.toolMode === "none") return offered;
-    return policyTools(offered, {
-      attachedStores: this.attachedStoreIds.length,
-      retrievalMode: this.retrievalMode,
-      selected: this.enabledTools,
-      memory: this.memoryTool(),
-    });
+  get toolSections() {
+    return toolSections(this.context?.toolItems ?? []);
   }
   useMemorySwitch(source: () => boolean) {
     this.memoryTool = source;
   }
-  get coreTools(): readonly string[] {
-    return this.toolMode === "none" ? [] : CORE_TOOLS;
+  get commandMatches() {
+    if (this.composer.command !== null || this.commandsDismissed) return [];
+    return matchCommands(this.commands, this.composer.text);
   }
-  get selectableTools() {
-    return this.tools
-      .filter(
-        (tool) =>
-          isModelTool(tool.key) &&
-          !isCoreTool(tool.key) &&
-          (tool.available || this.enabledTools.includes(tool.key)),
-      )
-      .slice()
-      .sort((left, right) => left.key.localeCompare(right.key));
+  typeText(value: string) {
+    this.composer.setText(value);
+    this.commandIndex = 0;
+    this.commandsDismissed = false;
   }
-  get offeredToolCount() {
-    return this.tools.filter(
-      (tool) =>
-        this.enabledTools.includes(tool.key) &&
-        tool.available &&
-        tool.enabled &&
-        tool.tier !== "off",
-    ).length;
+  moveCommand(step: number) {
+    const count = this.commandMatches.length;
+    if (count === 0) return;
+    this.commandIndex = (this.commandIndex + step + count) % count;
+  }
+  completeCommand(command = this.commandMatches[this.commandIndex]?.command) {
+    if (command === undefined) return;
+    this.composer.setCommand(command);
+    this.composer.setText("");
+    this.commandIndex = 0;
+  }
+  dismissCommands() {
+    this.commandsDismissed = true;
+  }
+  clearCommand() {
+    this.composer.setCommand(null);
   }
   get standaloneApprovals() {
     const attached = new Set(
@@ -436,18 +430,19 @@ export default class ChatStore {
     const providerId = this.composer.providerId;
     const modelId = this.model?.externalId;
     if (!providerId || !modelId || !this.available) return null;
+    const command = this.composer.command ?? undefined;
     if (this.active)
       return {
         conversationId: this.active.id,
         providerId,
         modelId,
-        enabledTools: [...this.active.enabledTools],
+        command,
       };
     return {
       providerId,
       modelId,
       systemPrompt: this.composer.systemPrompt,
-      enabledTools: [...this.composer.enabledTools],
+      command,
     };
   }
   async refreshContext() {
@@ -530,52 +525,13 @@ export default class ChatStore {
     }
   }
 
-  get recommendedTools() {
-    return RECOMMENDED_TOOLS.filter((key) =>
-      this.tools.some((tool) => tool.key === key && toolBlockReason(tool) === null),
-    );
-  }
-
-  get usesRecommendedTools() {
-    const current = this.enabledTools;
-    return (
-      current.length === this.recommendedTools.length &&
-      this.recommendedTools.every((key) => current.includes(key))
-    );
-  }
-
-  toggleTool(key: ToolDto["key"]) {
-    if (isCoreTool(key)) return Promise.resolve();
-    const current = this.enabledTools;
-    return this.setTools(
-      current.includes(key) ? current.filter((value) => value !== key) : [...current, key],
-    );
-  }
-
-  useRecommendedTools() {
-    return this.setTools(this.recommendedTools);
-  }
-
-  private async setTools(keys: readonly string[]) {
-    if (!this.canConfigure) return;
-    const enabledTools = keys.filter((key) => !isCoreTool(key));
-    if (!this.active) {
-      this.composer.setEnabledTools(enabledTools);
-      return;
-    }
+  async openSite(url: string) {
     try {
-      const updated = await this.ipc.call("chat.conversations.updateTools", {
-        id: this.active.id,
-        enabledTools,
-      });
-      runInAction(() => {
-        this.active = { ...this.active!, ...updated };
-        this.conversations = this.conversations.map((conversation) =>
-          conversation.id === updated.id ? updated : conversation,
-        );
-      });
+      await this.ipc.call("sites.open", { url });
     } catch (error) {
-      this.error = errorCopy(error);
+      runInAction(() => {
+        this.error = errorCopy(error);
+      });
     }
   }
 
@@ -641,7 +597,7 @@ export default class ChatStore {
     this.error = null;
     const revision = ++this.revision;
     try {
-      const [conversations, summaries, stores, tools, accounts, adapters, servers, last] =
+      const [conversations, summaries, stores, tools, accounts, adapters, servers, commands, last] =
         await Promise.all([
           this.ipc.call("chat.conversations.list", undefined),
           this.ipc.call("providers.list", { capability: "text", enabled: true }),
@@ -652,6 +608,7 @@ export default class ChatStore {
           this.ipc.call("accounts.list", undefined).catch((): AccountDto[] => []),
           this.ipc.call("providers.adapters", undefined).catch((): AdapterDescriptorDto[] => []),
           this.ipc.call("mcp.list", undefined).catch((): McpServerDto[] => this.servers),
+          this.ipc.call("chat.commands", undefined).catch((): ChatCommandDto[] => this.commands),
           this.lastConversation(),
         ]);
       const providers = await Promise.all(
@@ -668,6 +625,7 @@ export default class ChatStore {
         this.accounts = accounts;
         this.adapters = adapters;
         this.servers = servers;
+        this.commands = commands;
         this.remembered = last;
         if (!this.composer.providerId && providers[0]) this.composer.selectProvider(providers[0]);
         this.loading = false;
@@ -679,6 +637,7 @@ export default class ChatStore {
             this.contextInput,
             this.active?.messages.length ?? 0,
             this.active?.updatedAt ?? 0,
+            this.memoryTool(),
           ]),
         () => void this.refreshContext(),
         { fireImmediately: true },
@@ -843,7 +802,14 @@ export default class ChatStore {
 
   async send() {
     if (!this.canSend) return;
-    const text = this.composer.text.trim();
+    const typed =
+      this.composer.command === null ? parseCommand(this.commands, this.composer.text) : null;
+    if (typed !== null && typed.text.length === 0) {
+      this.completeCommand(typed.command);
+      return;
+    }
+    const command = this.composer.command ?? typed?.command;
+    const text = typed?.text ?? this.composer.text.trim();
     this.sending = true;
     this.runStartedAt = Date.now();
     this.error = null;
@@ -865,6 +831,7 @@ export default class ChatStore {
         modelId: this.composer.modelId,
         settings: { temperature: this.composer.temperature },
         selections: [...this.composer.selections],
+        command,
         vendor: this.vendorOptions,
       });
       const sentSelections = [...this.composer.selections];
@@ -873,6 +840,7 @@ export default class ChatStore {
         this.lastSeq = -1;
         this.liveSelections = sentSelections;
         this.composer.setText("");
+        this.composer.setCommand(null);
         this.composer.clearSelections();
         this.sending = false;
         if (this.mounted) this.subscribe();
@@ -898,7 +866,6 @@ export default class ChatStore {
       systemPrompt: this.composer.systemPrompt,
       attachedStoreIds: [...this.composer.attachedStoreIds],
       useRelations: this.composer.useRelations,
-      enabledTools: [...this.composer.enabledTools],
       retrievalMode: this.composer.retrievalMode,
     });
     runInAction(() => {

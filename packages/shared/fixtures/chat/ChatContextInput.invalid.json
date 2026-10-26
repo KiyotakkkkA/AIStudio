@@ -11,5 +11,13 @@
       "providerId": "0199aa11-1111-7111-8111-111111111111",
       "modelId": ""
     }
+  },
+  {
+    "name": "unknown command",
+    "value": {
+      "providerId": "0199aa11-1111-7111-8111-111111111111",
+      "modelId": "fake-model",
+      "command": "deploy"
+    }
   }
 ]

@@ -16,5 +16,15 @@
       "snippet": "",
       "date": null
     }
+  },
+  {
+    "name": "with an icon",
+    "value": {
+      "url": "https://example.com/rates",
+      "title": "Курсы валют",
+      "snippet": "",
+      "date": null,
+      "icon": "https://cdn.example.com/logo.png"
+    }
   }
 ]

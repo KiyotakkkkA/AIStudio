@@ -10,7 +10,6 @@
       "systemPrompt": "",
       "attachedStoreIds": [],
       "useRelations": false,
-      "enabledTools": [],
       "retrievalMode": "hybrid",
       "createdAt": 1,
       "updatedAt": 2
@@ -27,7 +26,6 @@
       "systemPrompt": "",
       "attachedStoreIds": [],
       "useRelations": false,
-      "enabledTools": [],
       "retrievalMode": "hybrid",
       "createdAt": 1,
       "updatedAt": 2,

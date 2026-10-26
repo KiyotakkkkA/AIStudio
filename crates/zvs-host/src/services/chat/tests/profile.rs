@@ -106,7 +106,7 @@ async fn the_context_breakdown_counts_the_profile_a_new_dialog_would_carry() {
         model_id: test.harness.model_id.clone(),
         settings: None,
         system_prompt: None,
-        enabled_tools: None,
+        command: None,
     };
     let created = test.harness.conversation();
     let empty = test.harness.chat.context(&input(None)).expect("context");

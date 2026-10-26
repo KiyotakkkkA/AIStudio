@@ -668,9 +668,10 @@ const TABLE: &[(&str, Check)] = &[
         "chat/UpdateConversationRelationsInput",
         round_trip::<zvs_contract::UpdateConversationRelationsInput>,
     ),
+    ("chat/ChatCommand", round_trip::<zvs_contract::ChatCommand>),
     (
-        "chat/UpdateConversationToolsInput",
-        round_trip::<zvs_contract::UpdateConversationToolsInput>,
+        "chat/ChatCommandDto",
+        round_trip::<zvs_contract::ChatCommandDto>,
     ),
     (
         "files/FileChangeKind",
@@ -916,6 +917,15 @@ const TABLE: &[(&str, Check)] = &[
         "terminal/TerminalStatusDto",
         round_trip::<zvs_contract::terminal::TerminalStatusDto>,
     ),
+    (
+        "sites/OpenSiteInput",
+        round_trip::<zvs_contract::OpenSiteInput>,
+    ),
+    (
+        "sites/SiteIconInput",
+        round_trip::<zvs_contract::SiteIconInput>,
+    ),
+    ("sites/SiteIconDto", round_trip::<zvs_contract::SiteIconDto>),
     (
         "artifacts/ArtifactDto",
         round_trip::<zvs_contract::artifacts::ArtifactDto>,

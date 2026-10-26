@@ -18,6 +18,7 @@ struct RawSource {
     title: Option<String>,
     snippet: Option<String>,
     date: Option<String>,
+    hostlogo: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,6 +27,11 @@ pub struct WebSource {
     pub title: String,
     pub snippet: String,
     pub date: Option<String>,
+    pub icon: Option<String>,
+}
+
+fn web_address(value: &str) -> bool {
+    value.starts_with("https://") || value.starts_with("http://")
 }
 
 fn present(value: Option<String>) -> Option<String> {
@@ -37,13 +43,14 @@ fn present(value: Option<String>) -> Option<String> {
 fn web_source(row: &Value) -> Option<WebSource> {
     let raw = RawSource::deserialize(row).ok()?;
     let url = present(raw.url)?;
-    if !(url.starts_with("https://") || url.starts_with("http://")) {
+    if !web_address(&url) {
         return None;
     }
     Some(WebSource {
         title: present(raw.title).unwrap_or_else(|| url.clone()),
         snippet: present(raw.snippet).unwrap_or_default(),
         date: present(raw.date),
+        icon: present(raw.hostlogo).filter(|icon| web_address(icon)),
         url,
     })
 }
@@ -393,7 +400,9 @@ mod tests {
                       "hostname": "", "hostlogo": "", "date": "3 days ago" },
                     { "url": "ftp://b.example", "title": "skip" },
                     { "url": "  ", "title": "skip" },
-                    { "url": "http://c.example", "title": "", "snippet": "", "date": "" },
+                    { "url": "http://c.example", "title": "", "snippet": "", "date": "",
+                      "hostlogo": "https://cdn.example/c.png" },
+                    { "url": "https://d.example", "title": "d", "hostlogo": "javascript:x" },
                     7,
                 ],
             },
@@ -406,12 +415,21 @@ mod tests {
                     title: "Курс".into(),
                     snippet: "EUR 90".into(),
                     date: Some("3 days ago".into()),
+                    icon: None,
                 },
                 WebSource {
                     url: "http://c.example".into(),
                     title: "http://c.example".into(),
                     snippet: String::new(),
                     date: None,
+                    icon: Some("https://cdn.example/c.png".into()),
+                },
+                WebSource {
+                    url: "https://d.example".into(),
+                    title: "d".into(),
+                    snippet: String::new(),
+                    date: None,
+                    icon: None,
                 },
             ])]
         );

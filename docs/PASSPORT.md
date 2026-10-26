@@ -670,6 +670,26 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   or granted by a connected integration) and given `auto | ask | off` on the Tools page. A
   scenario may narrow that, never widen it. The kernel enforces it at step
   admission; the UI only reflects it.
+- **Chat tool set** (`zvs-host/src/services/chat_tools.rs`, 2026-10-27). A chat has no tool
+  picker: the Tools and Connections pages are the only switches. `plan_tools` offers every
+  model tool the registry allows (available, enabled, tier not `off`), with three conditions.
+  An MCP tool is offered only while its server is connected and signed in: `McpServers::usable`
+  is a live client, status `connected`, enabled, and no pending sign-in; a call whose token
+  cannot be refreshed marks the server as needing a sign-in. Knowledge tools need an
+  attached store and a retrieval mode other than `auto`, and memory tools need the memory
+  switches. The `browser.*` tools are offered only after a user message carries the
+  `/browser-use` command (`ChatCommand`, listed by `chat.commands`). The command then holds for
+  the rest of the dialog, and the bundled `browser-use` skill's instructions go into the
+  system prompt. Pages can carry prompt injection, so the browser is never reachable by
+  search. Core tools (`fs.*`, `code.run`, `shell.run`, `skill.load`) always go out with their
+  schemas. When the other tools' schemas exceed `DEFERRED_TOKENS_MAX` (2000 tokens), those
+  tools are **deferred**: the system prompt lists each by name and first line, and
+  `tool.search` (`names` or `query`, at most five matches, refunded against the call budget)
+  loads them from the next round. A deferred tool called by name runs and loads too. Loaded
+  tools are recorded in the search call's `meta.loaded` and stay offered for the rest of the
+  dialog, appended after the core tools so the cached prompt prefix holds. Folder grants,
+  tiers, approvals and browser grants are unchanged; deciding *what is offered* is the only
+  part this replaced.
 - Sidecar runs with the app's privileges but no elevated rights; workspace roots are an
   explicit allow-list checked host-side, not in Rust.
 - **Folder access** (`zvs-host/src/workspace/`, TASK_036_EXTRA_1). A chat may bind one
@@ -752,14 +772,12 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   conversation or session. It is the one app folder an agent reaches without a grant: in a
   chat or session a skill script runs with it as the working directory and `ZVS_CHAT_DIR`
   (other callers keep the per-run scratch folder), and the file tools reach it as `chat:`
-  without an approval. When a skill matches a turn, or a skill was loaded earlier in the
-  conversation, the chat adds `skill.load`, `fs.read`, `fs.list`, `fs.apply` and `shell.run`
-  to the turn; the ones the user did not enable are limited to `chat:` and `skill:` paths
-  (`rootsOnly`), and a call outside them is refused with that reason. Every assistant message
-  records the tools its turn offered and why (`offeredTools`: `selected`, `skill`, `knowledge`
-  or `system`), the composer shows the ones the user did not pick, and a call to a tool that
-  was not offered is answered with the names that were. `chat.context` counts the same set,
-  apart from the skill tools a not-yet-sent message would match. An agentic session reports in
+  without an approval. Skill tools are part of every chat's core set (see *Chat tool set*), so
+  a matching skill only adds its catalogue to the prompt. Every assistant message records the
+  tools its turn offered and why (`offeredTools`: `base`, `knowledge`, `memory`, `command` or
+  `loaded`). A call to a tool that does not exist is answered with the names that were offered.
+  `chat.context` counts the same set, with each tool's source, and the composer's grey tools
+  badge renders it. An agentic session reports in
   `tools` the tools its current mode offers, not the stored selection. `skill.load` returns the instructions,
   each file with a one-line purpose, and the text of the manifest's `metadata.read-first` files
   up to 16 000 characters (the rest are named as required reading); tool keys in its result
@@ -801,7 +819,18 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
 - **Folder access and tool tiers are separate axes.** A grant says *where* a tool may act;
   the tier on the Tools page says *whether* and with what confirmation it may act. Neither
   widens the other.
-- No telemetry, no outbound calls the user did not configure.
+- No telemetry, no outbound calls the user did not configure. One narrow exception: **site
+  icons** for the web sources a provider returned with an answer (`zvs-host/src/sites.rs`,
+  2026-10-27). The renderer never loads a remote image (CSP `img-src 'self' blob:`). It asks
+  `sites.icon`, and the host fetches the vendor's icon URL (Qwen's `hostlogo`) or the site's
+  `/favicon.ico`. Only `http(s)` addresses are fetched, never `localhost`, and every resolved
+  address must be public: loopback, private, link-local, CGNAT, documentation, unique-local
+  and IPv4-mapped forms are refused. The connection is pinned to the checked address, uses no
+  proxy and no cookies, follows at most three redirects (each checked again), times out after
+  4 s and stops at 64 KiB. The bytes must sniff as PNG, JPEG, GIF, WebP or ICO (never SVG), and
+  results, misses included, are cached per site for the session. `sites.open` opens a web
+  source in the agent browser (§21) through the same page opener as `artifacts.openInApp`;
+  only `http(s)` URLs without credentials pass.
 - **Page and document content is untrusted input.** Anything the agent reads from a web page,
   a PDF or an email is data, never instruction. Text from those sources is fenced before it
   reaches a model, and a tool call the model then proposes is authorised by the permission
@@ -1107,7 +1136,8 @@ absent.
 | Credential and payment fields | **never** | The driver refuses, by input type and field heuristics |
 
 Grants are stored per origin, not per session, and are listed and revocable in the agent panel
-and in Settings. The tiers compose with the global tool ceiling (§14): the browser can never
+and in Settings. A chat reaches the `browser.*` tools only through the `/browser-use` command
+(§14, *Chat tool set*). The tiers compose with the global tool ceiling (§14): the browser can never
 exceed what Tools allows, only narrow it.
 
 > Implementation (TASK_046, 2026-10-26). `zvs-host/src/browser/`: `capability.rs` holds the

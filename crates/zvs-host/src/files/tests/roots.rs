@@ -1,6 +1,6 @@
 use super::*;
 use crate::files::nodes::FS_LIST;
-use crate::files::roots::{BAD_ROOT_PATH, ROOTS_ONLY, SKILL_READ_ONLY};
+use crate::files::roots::{BAD_ROOT_PATH, SKILL_READ_ONLY};
 
 const SKILL: &str = "extract";
 
@@ -165,41 +165,6 @@ async fn an_escape_is_refused_on_every_root() {
         assert_eq!(host.finish(&write.id).await, RunStatus::Failed, "{path}");
         assert!(host.approvals(&write.id).is_empty(), "{path}");
     }
-}
-
-#[tokio::test]
-async fn roots_only_calls_reach_no_real_path() {
-    let host = Host::new();
-    let folder = temporary_directory("roots-only-");
-    let root = canonical(folder.path()).expect("a canonical path");
-    let file = root.join("data.csv");
-    std::fs::write(&file, "a,b\n").expect("writes");
-    let conversation = host.bound(&root);
-    let refused = host.start(json!([{
-        "id": "read",
-        "type": FS_READ,
-        "input": {
-            "conversationId": conversation.to_string(),
-            "rootsOnly": true,
-            "paths": [{ "path": file.to_string_lossy() }]
-        }
-    }]));
-    assert_eq!(host.finish(&refused.id).await, RunStatus::Failed);
-    assert_eq!(host.failure(&refused.id).as_deref(), Some(ROOTS_ONLY));
-    let listed = host.start(json!([{
-        "id": "list",
-        "type": FS_LIST,
-        "input": { "conversationId": conversation.to_string(), "rootsOnly": true }
-    }]));
-    assert_eq!(host.finish(&listed.id).await, RunStatus::Succeeded);
-    assert!(host.approvals(&listed.id).is_empty());
-    let listing = host.output(&listed.id, "list");
-    assert!(
-        listing["text"]
-            .as_str()
-            .expect("a listing")
-            .contains(&chat_folder(&host, conversation).display().to_string())
-    );
 }
 
 #[tokio::test]

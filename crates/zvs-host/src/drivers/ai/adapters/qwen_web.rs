@@ -201,6 +201,7 @@ fn web_source(source: WebSource) -> WebSourceDto {
         title: source.title,
         snippet: source.snippet,
         date: source.date,
+        icon: source.icon,
     }
 }
 

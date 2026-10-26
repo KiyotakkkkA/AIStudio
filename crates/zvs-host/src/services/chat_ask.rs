@@ -99,7 +99,8 @@ pub fn ask_tool(offered: &[OfferedTool]) -> OfferedTool {
         parameters: ask_parameters(),
         destructive: false,
         read_only: false,
-        roots_only: false,
+        source: zvs_contract::OfferedToolSource::Base,
+        server: None,
     }
 }
 

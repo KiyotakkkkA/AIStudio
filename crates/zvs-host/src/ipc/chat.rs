@@ -5,7 +5,7 @@ use zvs_contract::{
     ChatEvalInput, ChatSendInput, ChatSkipInput, ConversationRef, CreateConversationInput,
     PickFolderResultDto, RenameConversationInput, RunIdInput, TruncateConversationInput,
     UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
-    UpdateConversationStoresInput, UpdateConversationToolsInput, VectorSourceKind,
+    UpdateConversationStoresInput, VectorSourceKind,
 };
 
 use super::IpcServer;
@@ -76,11 +76,9 @@ pub fn register(server: &mut IpcServer) {
             },
         )
         .handle(
-            "chat.conversations.updateTools",
-            |services: Arc<Services>, input: UpdateConversationToolsInput| async move {
-                services
-                    .chat
-                    .update_tools(&input.id, &input.enabled_tools())
+            "chat.commands",
+            |services: Arc<Services>, _input: ()| async move {
+                Ok::<_, AppError>(services.chat.commands())
             },
         )
         .handle(

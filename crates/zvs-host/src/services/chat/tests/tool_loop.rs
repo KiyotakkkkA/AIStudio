@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, ChatSendInput, ChatToolCallStatus, ConversationId,
-    CreateConversationInput, DeltaKind, HostEvent, HostEventDraft, ModelCapability,
-    OfferedToolSource, ProviderCapability, RunHandleDto, RunListFilter, RunStatus, ThinkingEffort,
-    ToolDto, ToolMode, ToolSource, ToolTier, Validate, VendorTurnOptions, WebSourceDto,
+    AppError, AppErrorCode, ChatSendInput, ChatToolCallStatus, ConversationId, DeltaKind,
+    HostEvent, HostEventDraft, ModelCapability, OfferedToolSource, ProviderCapability,
+    RunHandleDto, RunListFilter, RunStatus, ThinkingEffort, ToolDto, ToolMode, ToolSource,
+    ToolTier, Validate, VendorTurnOptions, WebSourceDto,
 };
 
 use super::{Harness, HarnessOptions, OneDriver, eventually, within};
@@ -339,6 +339,7 @@ impl Loop {
             database: Some(database.shared()),
             providers: Some(Arc::new(OneDriver(shared))),
             tools: Some(tools.clone()),
+            mcp: Some(Arc::new(LiveServers(&[LIVE_SERVER]))),
             registry: Some(registry),
             capabilities: vec![ProviderCapability::Text],
             context_window: 16384,
@@ -357,10 +358,16 @@ impl Loop {
     }
 
     fn conversation(&self, enabled: &[&str]) -> ConversationId {
-        self.harness.create(CreateConversationInput {
-            enabled_tools: Some(enabled.iter().map(|key| (*key).to_owned()).collect()),
-            ..self.harness.input()
-        })
+        for tool in self
+            .tools
+            .list(&zvs_contract::ToolListFilter::default())
+            .expect("lists the tools")
+        {
+            if !enabled.contains(&tool.key.as_str()) && tool.tier != ToolTier::Off {
+                self.set_tier(&tool, ToolTier::Off);
+            }
+        }
+        self.harness.create(self.harness.input())
     }
 
     async fn turn(&self, conversation: ConversationId, message: &str) -> RunHandleDto {
@@ -764,6 +771,7 @@ async fn vendor_options_reach_the_driver_and_web_sources_of_every_round_are_kept
         title: url.to_owned(),
         snippet: String::new(),
         date: None,
+        icon: None,
     };
     let first = source("https://a.example/");
     let second = source("https://b.example/");
@@ -1012,51 +1020,6 @@ async fn a_model_the_provider_reports_as_tool_less_is_not_offered_tools() {
 }
 
 #[tokio::test]
-async fn conversation_tool_selection_is_validated_and_persisted() {
-    let test = Loop::new();
-    let created = test.conversation(&[]);
-    assert_eq!(
-        test.harness
-            .chat
-            .update_tools(
-                &created,
-                &["demo.lookup".to_owned(), "demo.lookup".to_owned()]
-            )
-            .expect("updates")
-            .enabled_tools,
-        ["demo.lookup"]
-    );
-    assert_eq!(
-        test.harness
-            .chat
-            .get(&created)
-            .expect("a conversation")
-            .conversation
-            .enabled_tools,
-        ["demo.lookup"]
-    );
-    assert_eq!(
-        test.harness
-            .chat
-            .update_tools(&created, &["demo.missing".to_owned()])
-            .expect_err("unknown")
-            .code,
-        AppErrorCode::NotFound
-    );
-    assert_eq!(
-        test.harness
-            .chat
-            .create(&CreateConversationInput {
-                enabled_tools: Some(vec!["demo.missing".to_owned()]),
-                ..test.harness.input()
-            })
-            .expect_err("unknown")
-            .code,
-        AppErrorCode::NotFound
-    );
-}
-
-#[tokio::test]
 async fn context_counts_the_offered_tools_one_by_one() {
     let setup = Loop::new();
     let created = setup.conversation(&["demo.lookup"]);
@@ -1069,7 +1032,7 @@ async fn context_counts_the_offered_tools_one_by_one() {
             model_id: setup.harness.model_id.clone(),
             settings: None,
             system_prompt: None,
-            enabled_tools: None,
+            command: None,
         })
         .expect("measures");
     assert_eq!(measured.tool_items.len(), 2);
@@ -1077,32 +1040,23 @@ async fn context_counts_the_offered_tools_one_by_one() {
     assert_eq!(measured.tool_items[1].key, ASK_TOOL);
     assert!(measured.tool_items[0].tokens > 0);
     assert!(measured.tools > measured.tool_items[0].tokens);
+}
 
-    let none = setup
-        .harness
-        .chat
-        .context(&zvs_contract::ChatContextInput {
-            conversation_id: Some(created),
-            provider_id: setup.harness.provider_id,
-            model_id: setup.harness.model_id.clone(),
-            settings: None,
-            system_prompt: None,
-            enabled_tools: Some(Vec::new()),
-        })
-        .expect("measures without tools");
-    assert_eq!(
-        none.tool_items
-            .iter()
-            .map(|item| item.key.as_str())
-            .collect::<Vec<_>>(),
-        [ASK_TOOL]
-    );
+const LIVE_SERVER: &str = "0199dd11-1111-7111-8111-000000000001";
+const OFFLINE_SERVER: &str = "0199dd11-1111-7111-8111-000000000002";
+
+struct LiveServers(&'static [&'static str]);
+
+impl crate::services::McpServers for LiveServers {
+    fn usable(&self) -> std::collections::HashSet<String> {
+        self.0.iter().map(|id| (*id).to_owned()).collect()
+    }
 }
 
 #[tokio::test]
-async fn an_offered_mcp_tool_brings_its_server_instructions_and_resource_reader() {
+async fn only_a_connected_mcp_server_offers_its_tools_and_they_bring_its_instructions() {
     let test = Loop::new();
-    let server_id = "0199dd11-1111-7111-8111-000000000001";
+    let server_id = LIVE_SERVER;
     test.harness
         .database
         .with_connection(|connection| {
@@ -1135,18 +1089,29 @@ async fn an_offered_mcp_tool_brings_its_server_instructions_and_resource_reader(
             Ok(())
         })
         .expect("adds a server");
-    for key in ["testix.importQuestions", "testix.read_resource"] {
+    for (key, server) in [
+        ("testix.importQuestions", server_id),
+        ("testix.read_resource", server_id),
+        ("offline.ping", OFFLINE_SERVER),
+    ] {
         test.tools
             .register(&ToolDescriptor {
-                source_ref: Some(server_id.to_owned()),
+                source_ref: Some(server.to_owned()),
                 read_only: true,
                 ..ToolDescriptor::new(key, ToolSource::Mcp)
             })
             .expect("registers");
     }
     test.driver.fallback(|_| vec![text("Done.")]);
-    test.turn(test.conversation(&["testix.importQuestions"]), "Import")
-        .await;
+    test.turn(
+        test.conversation(&[
+            "testix.importQuestions",
+            "testix.read_resource",
+            "offline.ping",
+        ]),
+        "Import",
+    )
+    .await;
     let request = &test.driver.requests()[0];
     let names: Vec<&str> = request
         .tools
@@ -1290,7 +1255,7 @@ impl crate::skills::SkillCatalogue for FirstMessageSkill {
 }
 
 #[tokio::test]
-async fn skill_tools_stay_offered_after_a_skill_loaded_and_every_turn_records_why_a_tool_was_offered()
+async fn every_turn_records_why_a_tool_was_offered_and_an_unknown_tool_is_answered_with_the_offered_names()
  {
     let database = temporary_database();
     let registry = Arc::new(NodeRegistry::new());
@@ -1315,7 +1280,7 @@ async fn skill_tools_stay_offered_after_a_skill_loaded_and_every_turn_records_wh
             |_context: StepContext, _input: Value| async move {
                 Err::<TextOutput, _>(AppError::new(
                     AppErrorCode::PermissionDenied,
-                    crate::files::roots::ROOTS_ONLY,
+                    crate::files::roots::SKILL_READ_ONLY,
                 ))
             },
         ))
@@ -1376,20 +1341,20 @@ async fn skill_tools_stay_offered_after_a_skill_loaded_and_every_turn_records_wh
         ]
     );
     let assistant = harness.last(created);
-    let recorded: Vec<(&str, OfferedToolSource, bool)> = assistant
+    let recorded: Vec<(&str, OfferedToolSource)> = assistant
         .offered_tools
         .iter()
-        .map(|tool| (tool.key.as_str(), tool.source, tool.roots_only))
+        .map(|tool| (tool.key.as_str(), tool.source))
         .collect();
     assert_eq!(
         recorded,
         [
-            ("fs.apply", OfferedToolSource::Skill, true),
-            ("fs.list", OfferedToolSource::Skill, true),
-            ("fs.read", OfferedToolSource::Skill, true),
-            ("shell.run", OfferedToolSource::Skill, true),
-            ("skill.load", OfferedToolSource::Skill, false),
-            (ASK_TOOL, OfferedToolSource::System, false),
+            ("fs.apply", OfferedToolSource::Base),
+            ("fs.list", OfferedToolSource::Base),
+            ("fs.read", OfferedToolSource::Base),
+            ("shell.run", OfferedToolSource::Base),
+            ("skill.load", OfferedToolSource::Base),
+            (ASK_TOOL, OfferedToolSource::Base),
         ]
     );
     let refused = &assistant.tool_calls[0];
@@ -1408,7 +1373,7 @@ async fn skill_tools_stay_offered_after_a_skill_loaded_and_every_turn_records_wh
     assert_eq!(scoped.status, ChatToolCallStatus::Refused);
     assert_eq!(
         scoped.result.as_deref(),
-        Some(crate::files::roots::ROOTS_ONLY)
+        Some(crate::files::roots::SKILL_READ_ONLY)
     );
 }
 
@@ -1962,5 +1927,197 @@ async fn a_recorded_turn_with_tool_calls_replays_to_the_live_state_from_a_lean_l
     assert!(
         usize::try_from(bytes).expect("bytes") * 2 < live_bytes,
         "{bytes} of {live_bytes}"
+    );
+}
+
+fn bulk_tools(test: &Loop) {
+    for index in 0..12 {
+        test.tools
+            .register(&ToolDescriptor {
+                description: format!("Bulk tool {index}. {}", "Описание. ".repeat(100)),
+                read_only: true,
+                ..ToolDescriptor::new(format!("bulk.tool{index}"), ToolSource::Builtin)
+            })
+            .expect("registers a bulk tool");
+    }
+}
+
+fn names(request: &GenerateRequest) -> Vec<&str> {
+    request
+        .tools
+        .iter()
+        .map(|tool| tool.name.as_str())
+        .collect()
+}
+
+#[tokio::test]
+async fn a_large_catalogue_is_deferred_and_a_searched_tool_is_callable_from_the_next_step_and_stays()
+ {
+    let test = Loop::new();
+    bulk_tools(&test);
+    test.driver
+        .round(|_| vec![call("tool_search", &json!({ "names": ["demo__lookup"] }))]);
+    test.driver
+        .round(|_| vec![call("demo__lookup", &json!({ "query": "x" }))]);
+    test.driver.round(|_| vec![text("It is x.")]);
+    test.driver.fallback(|_| vec![text("Again x.")]);
+    let mut enabled: Vec<String> = (0..12).map(|index| format!("bulk.tool{index}")).collect();
+    enabled.push("demo.lookup".to_owned());
+    let keys: Vec<&str> = enabled.iter().map(String::as_str).collect();
+    let created = test.conversation(&keys);
+
+    let handle = test.turn(created, "Question").await;
+
+    assert_eq!(test.harness.status(&handle), RunStatus::Succeeded);
+    assert_eq!(test.calls.lookups(), ["x"]);
+    let requests = test.driver.requests();
+    assert_eq!(names(&requests[0]), ["ask_user", "tool_search"]);
+    let system = requests[0].system.clone().unwrap_or_default();
+    assert!(system.contains(crate::services::chat_tools::DEFERRED_HEADING));
+    assert!(system.contains("- demo__lookup: "));
+    assert!(system.contains("- bulk__tool7: Bulk tool 7."));
+    assert_eq!(
+        names(&requests[1]),
+        ["ask_user", "tool_search", "demo__lookup"]
+    );
+    let assistant = test.harness.last(created);
+    let search = &assistant.tool_calls[0];
+    assert_eq!(search.key, crate::services::chat_tools::TOOL_SEARCH);
+    assert_eq!(search.status, ChatToolCallStatus::Succeeded);
+    assert_eq!(search.meta, Some(json!({ "loaded": ["demo.lookup"] })));
+    assert!(
+        search
+            .result
+            .as_deref()
+            .is_some_and(|result| result.contains("\"name\":\"demo__lookup\""))
+    );
+    assert_eq!(
+        assistant.tool_calls[1].status,
+        ChatToolCallStatus::Succeeded
+    );
+    assert!(
+        assistant
+            .offered_tools
+            .contains(&zvs_contract::OfferedToolDto {
+                key: "demo.lookup".to_owned(),
+                source: OfferedToolSource::Loaded,
+            })
+    );
+
+    test.turn(created, "Once more").await;
+
+    let requests = test.driver.requests();
+    assert_eq!(
+        names(&requests[3]),
+        ["demo__lookup", "ask_user", "tool_search"]
+    );
+}
+
+#[tokio::test]
+async fn a_deferred_tool_called_by_name_runs_without_a_search() {
+    let test = Loop::new();
+    bulk_tools(&test);
+    test.driver
+        .round(|_| vec![call("demo__lookup", &json!({ "query": "y" }))]);
+    test.driver.fallback(|_| vec![text("It is y.")]);
+    let mut enabled: Vec<String> = (0..12).map(|index| format!("bulk.tool{index}")).collect();
+    enabled.push("demo.lookup".to_owned());
+    let keys: Vec<&str> = enabled.iter().map(String::as_str).collect();
+    let created = test.conversation(&keys);
+
+    let handle = test.turn(created, "Question").await;
+
+    assert_eq!(test.harness.status(&handle), RunStatus::Succeeded);
+    assert_eq!(test.calls.lookups(), ["y"]);
+    assert_eq!(
+        names(&test.driver.requests()[1]),
+        ["ask_user", "tool_search", "demo__lookup"]
+    );
+}
+
+struct BrowserSkill;
+
+#[async_trait]
+impl crate::skills::SkillCatalogue for BrowserSkill {
+    async fn catalogue(
+        &self,
+        _query: &str,
+        _cancel: &CancellationToken,
+    ) -> Vec<crate::skills::SkillCatalogueEntry> {
+        Vec::new()
+    }
+
+    fn command(&self, key: &str) -> Option<String> {
+        (key == "browser-use").then(|| "Open the page with browser.navigate first.".to_owned())
+    }
+}
+
+#[tokio::test]
+async fn the_browser_command_brings_the_browser_tools_and_its_skill_for_the_rest_of_the_dialog() {
+    let database = temporary_database();
+    let tools = ToolRegistry::new(ToolRegistryOptions::new(database.shared()));
+    for key in crate::services::chat_tools::BROWSER_TOOLS {
+        tools
+            .register(&ToolDescriptor {
+                read_only: true,
+                ..ToolDescriptor::new(key, ToolSource::Builtin)
+            })
+            .expect("registers a browser tool");
+    }
+    let driver = Scripted::new();
+    driver.fallback(|_| vec![text("Done.")]);
+    let harness = Harness::with(HarnessOptions {
+        database: Some(database.shared()),
+        providers: Some(Arc::new(OneDriver(Arc::clone(&driver) as SharedTextDriver))),
+        tools: Some(tools),
+        skills: Some(Arc::new(BrowserSkill)),
+        capabilities: vec![ProviderCapability::Text],
+        context_window: 16384,
+        max_output: 512,
+        ..HarnessOptions::default()
+    });
+    assert_eq!(
+        harness
+            .chat
+            .commands()
+            .iter()
+            .map(|command| command.command)
+            .collect::<Vec<_>>(),
+        [zvs_contract::ChatCommand::BrowserUse]
+    );
+    let created = harness.create(harness.input());
+
+    within(harness.turn(created, "Hello")).await;
+    within(harness.command_turn(
+        created,
+        "Open the schedule",
+        zvs_contract::ChatCommand::BrowserUse,
+    ))
+    .await;
+    within(harness.turn(created, "And the next page")).await;
+
+    let requests = driver.requests();
+    assert_eq!(names(&requests[0]), ["ask_user"]);
+    for request in &requests[1..] {
+        assert!(names(request).contains(&"browser__navigate"));
+        assert!(names(request).contains(&"browser__submit"));
+        let system = request.system.clone().unwrap_or_default();
+        assert!(system.contains(
+            "Instructions of the command /browser-use:\nOpen the page with browser__navigate first."
+        ));
+    }
+    let messages = harness.messages(created);
+    assert_eq!(messages[0].command, None);
+    assert_eq!(
+        messages[2].command,
+        Some(zvs_contract::ChatCommand::BrowserUse)
+    );
+    assert!(
+        messages[5]
+            .offered_tools
+            .contains(&zvs_contract::OfferedToolDto {
+                key: "browser.navigate".to_owned(),
+                source: OfferedToolSource::Command,
+            })
     );
 }

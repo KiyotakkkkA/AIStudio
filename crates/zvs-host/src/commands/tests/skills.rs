@@ -3,7 +3,7 @@ use zvs_contract::{CreateSkillInput, SkillFileInput};
 use super::*;
 use crate::artifacts::{ArtifactStore, DASHBOARDS};
 use crate::files::VirtualRoots;
-use crate::files::roots::{ROOTS_ONLY, SKILL_READ_ONLY};
+use crate::files::roots::SKILL_READ_ONLY;
 use crate::skills::library::{SKILL_FILE_NOT_FOUND, SKILL_SCRIPT_OUTSIDE};
 use crate::skills::script::{SCRIPT_NO_TOOLCHAIN, SCRIPT_UNSUPPORTED};
 
@@ -343,9 +343,9 @@ async fn a_script_is_capped_and_stopped_by_the_shared_limits() {
 }
 
 #[tokio::test]
-async fn roots_only_runs_skill_scripts_and_nothing_else() {
+async fn a_skill_folder_is_never_a_cwd_and_a_skill_script_runs_in_the_chat_folder() {
     let host = Host::new().with_skill();
-    let folder = temporary_directory("shell-roots-only-");
+    let folder = temporary_directory("shell-skill-cwd-");
     let root = canonical(folder.path()).expect("a canonical path");
     let conversation = host.bound(&root).to_string();
     let node = host.script_node(
@@ -353,34 +353,6 @@ async fn roots_only_runs_skill_scripts_and_nothing_else() {
         Some(host.store()),
         ProcessLimits::default(),
     );
-    let program = node
-        .run(
-            &context(CancellationToken::new()),
-            ShellRunInput {
-                conversation_id: conversation.clone(),
-                roots_only: true,
-                ..ShellRunInput {
-                    argv: stub_argv(),
-                    ..shell(&[])
-                }
-            },
-        )
-        .await
-        .expect_err("a project program");
-    assert_eq!(program.message, ROOTS_ONLY);
-    let foreign = node
-        .run(
-            &context(CancellationToken::new()),
-            ShellRunInput {
-                conversation_id: conversation.clone(),
-                roots_only: true,
-                cwd: Some(root.to_string_lossy().into_owned()),
-                ..script("scripts/extract.py")
-            },
-        )
-        .await
-        .expect_err("a real cwd");
-    assert_eq!(foreign.message, ROOTS_ONLY);
     let skill_cwd = node
         .run(
             &context(CancellationToken::new()),
@@ -398,7 +370,6 @@ async fn roots_only_runs_skill_scripts_and_nothing_else() {
             &context(CancellationToken::new()),
             ShellRunInput {
                 conversation_id: conversation,
-                roots_only: true,
                 cwd: Some("chat:".to_owned()),
                 ..script("scripts/extract.py")
             },

@@ -11,13 +11,14 @@ use serde_json::{Value, json};
 use zvs_contract::validate::{check, js_slice, nested};
 use zvs_contract::vector_stores::DEFAULT_CHAT_MIN_SCORE;
 use zvs_contract::{
-    AppError, AppErrorCode, ChatAttachDto, ChatCitationDto, ChatContextDto, ChatContextInput,
-    ChatContextToolDto, ChatEvalCaseDto, ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto,
-    ChatSendInput, ChatSettings, ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto,
-    ConversationDto, ConversationId, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
-    DeltaKind, DocumentId, GRAPH_EXPANSION_DEFAULT_MAX, GraphDirection, GraphExpansionDocument,
-    GraphNeighborhood, GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId,
-    MessageRole, ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph,
+    AppError, AppErrorCode, ChatAttachDto, ChatCitationDto, ChatCommand, ChatCommandDto,
+    ChatContextDto, ChatContextInput, ChatContextToolDto, ChatEvalCaseDto, ChatEvalInput,
+    ChatEvalModeDto, ChatEvalRunDto, ChatSendInput, ChatSettings, ChatToolCallDto,
+    ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationId,
+    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DeltaKind, DocumentId,
+    GRAPH_EXPANSION_DEFAULT_MAX, GraphDirection, GraphExpansionDocument, GraphNeighborhood,
+    GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId, MessageRole,
+    OfferedToolSource, ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph,
     RunHandleDto, RunId, RunKind, RunStatus, StartRunInput, StreamId, ToolListFilter, ToolMode,
     ToolTier, Validate, VectorSearchHitDto, VectorStoreId, VendorTurnOptions, WEB_SOURCES_MAX,
     WebSourceDto, log_line, merge_graph_neighbors, model_tool_support, resolve_tool_mode,
@@ -36,11 +37,13 @@ use super::chat_memory::{
 use super::chat_reply::{ReplyBuffers, ReplyChunk, TOOL_CALL_DOMAIN, apply_tool_call};
 use super::chat_tools::{
     CHAT_TOOL_CALLS, HYBRID_INSTRUCTION, KNOWLEDGE_INSTRUCTION, KnowledgeText, OfferedTool,
-    TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text, choose_tools,
-    fence_tool_result, knowledge_catalogue, loaded_skill, offered_record, offered_tools,
-    parse_tool_arguments, read_result_text, restrict_skill_tools, search_result_text,
-    tool_result_budget, tool_result_text, tool_specs, tool_specs_json, unoffered_text,
+    TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS, TOOL_RESULTS_INSTRUCTION, TOOL_SEARCH, ToolInputs,
+    ToolPlan, active_commands, cap_text, command_tools, deferred_section, fence_tool_result,
+    knowledge_catalogue, loaded_keys, loaded_tools_text, offered_record, parse_tool_arguments,
+    plan_tools, read_result_text, search_result_text, search_tool, search_tools,
+    tool_result_budget, tool_result_text, tool_specs, tool_specs_json, unoffered_text, wire_names,
 };
+use super::mcp::McpServers;
 use super::memory::MemoryService;
 use super::profile::{
     self, ProfileSettings, TOOL_CALLS_MAX, TOOL_CALLS_MIN, about_section, style_section,
@@ -56,7 +59,7 @@ use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta, ToolCall};
 use crate::files::FILE_TOOLS;
-use crate::files::roots::{ROOTS_ONLY, SKILL_READ_ONLY};
+use crate::files::roots::SKILL_READ_ONLY;
 use crate::kernel::knowledge_nodes::{KNOWLEDGE_SEARCH, KNOWLEDGE_TOOLS, KnowledgeResult};
 use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateOutput, GenerateRole};
 use crate::kernel::{
@@ -66,17 +69,25 @@ use crate::kernel::{
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
-use crate::services::mcp::{RESOURCE_READER, tool_key};
 use crate::skills::{
     SKILL_LOAD, SkillCatalogue, SkillTurn, catalogue_text, presented, result_limit,
 };
 use crate::tools::ToolRegistry;
 use crate::workspace::{FolderAccessService, ForbiddenFolders, folder_access};
+use zvs_contract::ToolDto;
 use zvs_contract::mcp::MCP_INSTRUCTIONS_MAX;
 use zvs_contract::{BindFolderInput, BindFolderResultDto};
-use zvs_contract::{ToolDto, ToolSource};
 
 pub const CHAT_RELATED_MAX: usize = 3;
+pub const COMMAND_HEADING: &str = "Instructions of the command";
+pub const BROWSER_USE_DESCRIPTION: &str =
+    "Работа во встроенном браузере: открытие и чтение страниц, действия на сайтах";
+
+pub fn command_description(command: ChatCommand) -> &'static str {
+    match command {
+        ChatCommand::BrowserUse => BROWSER_USE_DESCRIPTION,
+    }
+}
 pub const HYBRID_SOURCES_MAX: usize = 3;
 pub const KNOWLEDGE_COMPACTED: &str = "Older knowledge results compacted";
 
@@ -89,7 +100,6 @@ pub const DEFAULT_TOOL_RESULT_CHARS: u64 = 4000;
 pub const CONVERSATION_NOT_FOUND: &str = "Диалог не найден";
 pub const MESSAGE_NOT_FOUND: &str = "Сообщение не найдено";
 pub const STORE_NOT_FOUND: &str = "Векторное хранилище не найдено";
-pub const TOOL_NOT_FOUND: &str = "Инструмент не найден";
 pub const ACTIVE_TURN: &str = "В диалоге уже выполняется ход";
 pub const INVALID_TURN: &str = "Некорректный ход чата";
 pub const NOT_A_CHAT_RUN: &str = "Запуск не относится к чату";
@@ -134,6 +144,7 @@ pub struct ChatServiceOptions {
     pub registry: Arc<NodeRegistry>,
     pub tools: Option<ToolRegistry>,
     pub skills: Option<Arc<dyn SkillCatalogue>>,
+    pub mcp: Option<Arc<dyn McpServers>>,
     pub folders: Option<FolderAccessService>,
     pub logger: SharedLogger,
     pub clock: SharedClock,
@@ -147,6 +158,7 @@ impl ChatServiceOptions {
             registry,
             tools: None,
             skills: None,
+            mcp: None,
             folders: None,
             logger: silent_logger(),
             clock: Arc::new(SystemClock),
@@ -166,6 +178,7 @@ struct Inner {
     database: Arc<Database>,
     tools: Option<ToolRegistry>,
     skills: Option<Arc<dyn SkillCatalogue>>,
+    mcp: Option<Arc<dyn McpServers>>,
     folders: FolderAccessService,
     memory: MemoryService,
     logger: SharedLogger,
@@ -205,7 +218,6 @@ fn conversation_dto(
             .map(|id| VectorStoreId::parse(id).ok_or_else(|| malformed("attachedStoreIds")))
             .collect::<Result<_, _>>()?,
         use_relations: row.use_relations,
-        enabled_tools: row.enabled_tools,
         retrieval_mode: row.retrieval_mode,
         working_folder: row.working_folder,
         working_folder_access,
@@ -234,11 +246,7 @@ pub fn working_folder_section(folder: Option<&str>, previous: Option<Option<&str
 pub fn file_tools_section(offered: &[OfferedTool]) -> String {
     let names: Vec<&str> = FILE_TOOLS
         .iter()
-        .filter_map(|key| {
-            offered
-                .iter()
-                .find(|tool| tool.key == *key && !tool.roots_only)
-        })
+        .filter_map(|key| offered.iter().find(|tool| tool.key == *key))
         .map(|tool| tool.name.as_str())
         .collect();
     if names.is_empty() {
@@ -253,11 +261,7 @@ pub fn file_tools_section(offered: &[OfferedTool]) -> String {
 pub fn process_tools_section(offered: &[OfferedTool]) -> String {
     let names: Vec<&str> = PROCESS_TOOLS
         .iter()
-        .filter_map(|key| {
-            offered
-                .iter()
-                .find(|tool| tool.key == *key && !tool.roots_only)
-        })
+        .filter_map(|key| offered.iter().find(|tool| tool.key == *key))
         .map(|tool| tool.name.as_str())
         .collect();
     if names.is_empty() {
@@ -282,6 +286,7 @@ fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
         citations: row.citations,
         tool_calls: row.tool_calls,
         selections: row.selections,
+        command: row.command,
         offered_tools: row.offered_tools,
         web_sources: row.web_sources,
         tokens_in: count(row.tokens_in),
@@ -479,24 +484,6 @@ impl Inner {
         Ok(())
     }
 
-    fn require_tools(&self, keys: &[String]) -> Result<(), AppError> {
-        if keys.is_empty() {
-            return Ok(());
-        }
-        let known: HashSet<String> = self
-            .read(|repositories| Ok(repositories.tools.list()?))?
-            .into_iter()
-            .map(|tool| tool.key)
-            .collect();
-        for key in keys {
-            if !known.contains(key) {
-                return Err(AppError::new(AppErrorCode::NotFound, TOOL_NOT_FOUND)
-                    .with_detail("key", key.clone()));
-            }
-        }
-        Ok(())
-    }
-
     fn require_turn(
         &self,
         run_id: &RunId,
@@ -605,20 +592,55 @@ impl Inner {
         })
     }
 
-    fn mcp_guidance(
+    fn plan(
         &self,
-        enabled: &mut Vec<String>,
         registered: &[ToolDto],
-    ) -> Result<String, AppError> {
-        let offered: HashSet<String> = offered_tools(enabled, registered)
-            .into_iter()
-            .map(|tool| tool.key)
-            .collect();
+        knowledge: bool,
+        commands: &[ChatCommand],
+        history: &[MessageDto],
+    ) -> ToolPlan {
+        let servers = self
+            .mcp
+            .as_ref()
+            .map(|mcp| mcp.usable())
+            .unwrap_or_default();
+        plan_tools(&ToolInputs {
+            registered,
+            servers: &servers,
+            knowledge,
+            commands,
+            loaded: &loaded_keys(history),
+        })
+    }
+
+    fn command_note(&self, commands: &[ChatCommand], offered: &[OfferedTool]) -> String {
+        let Some(skills) = &self.skills else {
+            return String::new();
+        };
+        commands
+            .iter()
+            .filter(|command| {
+                command_tools(**command)
+                    .iter()
+                    .any(|key| offered.iter().any(|tool| tool.key == *key))
+            })
+            .filter_map(|command| {
+                let text = skills.command(command.as_str())?;
+                Some(format!(
+                    "{COMMAND_HEADING} /{}:\n{}",
+                    command.as_str(),
+                    wire_names(&text, offered)
+                ))
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+
+    fn mcp_guidance(&self, tools: &[OfferedTool]) -> Result<String, AppError> {
         let servers = unique(
-            &registered
+            &tools
                 .iter()
-                .filter(|tool| tool.source == ToolSource::Mcp && offered.contains(&tool.key))
-                .filter_map(|tool| tool.source_ref.clone())
+                .filter_map(|tool| tool.server.clone())
                 .collect::<Vec<_>>(),
         );
         let mut blocks = Vec::new();
@@ -628,10 +650,6 @@ impl Inner {
             else {
                 continue;
             };
-            let reader = tool_key(&row.namespace, RESOURCE_READER);
-            if registered.iter().any(|tool| tool.key == reader) && !enabled.contains(&reader) {
-                enabled.push(reader);
-            }
             if let Some(text) = row
                 .instructions
                 .as_deref()
@@ -765,6 +783,8 @@ pub struct ChatGenerateRequest {
     pub assistant_id: String,
     #[serde(default)]
     pub tools: Vec<OfferedTool>,
+    #[serde(default)]
+    pub deferred: Vec<OfferedTool>,
     #[serde(default)]
     pub model_tools: Option<bool>,
     #[serde(default = "default_tool_result_chars")]
@@ -1165,15 +1185,22 @@ impl NodeDef for PrepareNode {
             (Some(skills), true) => skills.catalogue(&user.content, &context.cancel).await,
             _ => Vec::new(),
         };
-        let skills_on = !skill_entries.is_empty()
-            || (tools_usable
-                && inner.skills.is_some()
-                && loaded_skill(&conversation.messages[..position]));
-        let choice = choose_tools(&details.enabled_tools, wants_knowledge, skills_on);
-        let mut enabled = choice.keys.clone();
-        let guidance = inner.mcp_guidance(&mut enabled, &registered)?;
-        let mut offered = offered_tools(&enabled, &registered);
-        restrict_skill_tools(&mut offered, &choice.skill);
+        let commands = active_commands(&conversation.messages[..=position]);
+        let ToolPlan {
+            mut offered,
+            deferred,
+        } = if tools_usable {
+            inner.plan(
+                &registered,
+                wants_knowledge,
+                &commands,
+                &conversation.messages[..position],
+            )
+        } else {
+            ToolPlan::default()
+        };
+        let guidance = inner.mcp_guidance(&offered)?;
+        let command_note = inner.command_note(&commands, &offered);
         let skill_note =
             if !skill_entries.is_empty() && offered.iter().any(|tool| tool.key == SKILL_LOAD) {
                 catalogue_text(&skill_entries, &offered)
@@ -1271,21 +1298,27 @@ impl NodeDef for PrepareNode {
         }
         let (memory, memory_refs) =
             inner.memory_prompt(&input.conversation_id, tools_usable, &mut offered)?;
+        if !deferred.is_empty() {
+            offered.push(search_tool(&offered, &deferred));
+        }
         let (profile, tool_calls) = inner.profile_prompt(&row.profile)?;
         let files = file_tools_section(&offered);
         let processes = process_tools_section(&offered);
         let asking = ask_section(&offered);
+        let later = deferred_section(&deferred, &offered);
         let prompt = [
             details.system_prompt.clone(),
             profile,
             memory,
             prompt,
             guidance,
+            command_note,
             skill_note,
             workspace,
             files,
             processes,
             asking,
+            later,
         ]
         .into_iter()
         .filter(|part| !part.trim().is_empty())
@@ -1360,7 +1393,8 @@ impl NodeDef for PrepareNode {
             citations: prepared.citations.clone(),
             tool_calls: Vec::new(),
             selections: Vec::new(),
-            offered_tools: offered_record(&offered, &details.enabled_tools, &choice.skill),
+            command: None,
+            offered_tools: offered_record(&offered),
             web_sources: Vec::new(),
             tokens_in: prepared.tokens_in,
             tokens_out: 0,
@@ -1394,6 +1428,7 @@ impl NodeDef for PrepareNode {
             },
             assistant_id: input.assistant_id,
             tools: offered,
+            deferred,
             model_tools: model.supports_tools,
             tool_result_chars: tool_result_budget(
                 model.context_window - model.max_output_tokens - prepared.tokens_in,
@@ -1428,6 +1463,8 @@ struct CallOptions<'a> {
     conversation: &'a str,
     memory: &'a Mutex<MemoryRefs>,
     offered: &'a [OfferedTool],
+    deferred: &'a [OfferedTool],
+    loading: &'a Mutex<Vec<String>>,
     skills: &'a Mutex<SkillTurn>,
 }
 
@@ -1623,6 +1660,43 @@ impl GenerateChatNode {
                 Some(unoffered_text(&name, options.offered)),
             )));
         };
+        if tool.key == TOOL_SEARCH {
+            let arguments = calls.lock().unwrap_or_else(PoisonError::into_inner)[index]
+                .arguments
+                .clone();
+            let found = search_tools(&arguments, options.deferred);
+            let known: HashSet<&str> = options
+                .offered
+                .iter()
+                .filter_map(|tool| tool.server.as_deref())
+                .collect();
+            let fresh: Vec<OfferedTool> = found
+                .iter()
+                .filter(|tool| {
+                    tool.server
+                        .as_deref()
+                        .is_some_and(|server| !known.contains(server))
+                })
+                .map(|tool| (*tool).clone())
+                .collect();
+            let guidance = inner.mcp_guidance(&fresh)?;
+            let keys: Vec<String> = found.iter().map(|tool| tool.key.clone()).collect();
+            options
+                .loading
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .extend(keys.iter().cloned());
+            calls.lock().unwrap_or_else(PoisonError::into_inner)[index].meta =
+                Some(json!({ "loaded": keys }));
+            return Ok(CallOutcome {
+                refund: true,
+                ..plain(settle(
+                    ChatToolCallStatus::Succeeded,
+                    None,
+                    Some(loaded_tools_text(&found, &guidance)),
+                ))
+            });
+        }
         if tool.key == ASK_TOOL {
             let arguments = calls.lock().unwrap_or_else(PoisonError::into_inner)[index]
                 .arguments
@@ -1712,9 +1786,6 @@ impl GenerateChatNode {
         }
         if FILE_TOOLS.contains(&tool.key.as_str()) || PROCESS_TOOLS.contains(&tool.key.as_str()) {
             fields.insert("conversationId".to_owned(), json!(options.conversation));
-        }
-        if tool.roots_only {
-            fields.insert("rootsOnly".to_owned(), json!(true));
         }
         let hint = options
             .skills
@@ -1840,9 +1911,7 @@ impl GenerateChatNode {
                 Ok(plain(settle(
                     ChatToolCallStatus::Refused,
                     Some(CALL_FORBIDDEN),
-                    [ROOTS_ONLY, SKILL_READ_ONLY]
-                        .contains(&error.message.as_str())
-                        .then(|| error.message.clone()),
+                    (error.message == SKILL_READ_ONLY).then(|| error.message.clone()),
                 )))
             }
             Err(error) => Ok(plain(settle(
@@ -1865,6 +1934,7 @@ impl GenerateChatNode {
             base,
             assistant_id,
             tools,
+            deferred,
             model_tools,
             tool_result_chars,
             tool_calls,
@@ -1883,16 +1953,14 @@ impl GenerateChatNode {
         } else {
             resolve_tool_mode(driver.capabilities().tools, model_tools)
         };
-        let offered: Vec<OfferedTool> = if mode == ToolMode::None {
-            Vec::new()
-        } else {
-            tools.clone()
-        };
-        let specs = tool_specs(&offered);
-        let by_name: HashMap<&str, &OfferedTool> = offered
-            .iter()
-            .map(|tool| (tool.name.as_str(), tool))
-            .collect();
+        let (mut offered, deferred): (Vec<OfferedTool>, Vec<OfferedTool>) =
+            if mode == ToolMode::None {
+                (Vec::new(), Vec::new())
+            } else {
+                (tools.clone(), deferred)
+            };
+        let mut specs = tool_specs(&offered);
+        let loading: Mutex<Vec<String>> = Mutex::new(Vec::new());
         if !tools.is_empty() && offered.is_empty() {
             context.emit(HostEventDraft::Log {
                 line: log_line(&[("message", json!(TOOLS_NOT_OFFERED))]),
@@ -1913,7 +1981,7 @@ impl GenerateChatNode {
                 .join("\n\n"),
             )
         };
-        let template = GenerateRequest {
+        let mut template = GenerateRequest {
             system,
             tools: specs.clone(),
             ..base.clone().request()
@@ -1969,10 +2037,23 @@ impl GenerateChatNode {
                     ChatMessage::assistant(output.text.clone())
                         .with_tool_calls(output.tool_calls.clone()),
                 );
+                let mut by_name: HashMap<&str, &OfferedTool> = deferred
+                    .iter()
+                    .map(|tool| (tool.name.as_str(), tool))
+                    .collect();
+                by_name.extend(offered.iter().map(|tool| (tool.name.as_str(), tool)));
                 let mut pending = Vec::with_capacity(output.tool_calls.len());
                 let mut asked = false;
                 for call in output.tool_calls {
                     let tool = by_name.get(call.name.as_str()).copied();
+                    if let Some(tool) = tool
+                        && !offered.iter().any(|known| known.key == tool.key)
+                    {
+                        loading
+                            .lock()
+                            .unwrap_or_else(PoisonError::into_inner)
+                            .push(tool.key.clone());
+                    }
                     let index = {
                         let mut guard = calls.lock().unwrap_or_else(PoisonError::into_inner);
                         guard.push(ChatToolCallDto {
@@ -2042,6 +2123,8 @@ impl GenerateChatNode {
                                 conversation: &conversation_id,
                                 memory: &memory,
                                 offered: &offered,
+                                deferred: &deferred,
+                                loading: &loading,
                                 skills: &skills,
                             },
                         )
@@ -2071,6 +2154,41 @@ impl GenerateChatNode {
                         ));
                     }
                     position = end;
+                }
+                let loaded =
+                    std::mem::take(&mut *loading.lock().unwrap_or_else(PoisonError::into_inner));
+                let mut grew = false;
+                for key in loaded {
+                    if offered.iter().any(|tool| tool.key == key) {
+                        continue;
+                    }
+                    if let Some(tool) = deferred.iter().find(|tool| tool.key == key) {
+                        offered.push(OfferedTool {
+                            source: OfferedToolSource::Loaded,
+                            ..tool.clone()
+                        });
+                        grew = true;
+                    }
+                }
+                if grew {
+                    specs = tool_specs(&offered);
+                    template.tools = specs.clone();
+                    if let Err(error) = self.0.update_message(
+                        &assistant_id,
+                        &MessagePatch {
+                            offered_tools: Some(offered_record(&offered)),
+                            ..MessagePatch::default()
+                        },
+                    ) {
+                        self.0.log(
+                            LogLevel::Warn,
+                            "Could not save the loaded tools",
+                            &[
+                                ("runId", json!(context.run_id.to_string())),
+                                ("error", json!(error.message)),
+                            ],
+                        );
+                    }
                 }
                 if last {
                     break;
@@ -2205,6 +2323,7 @@ impl ChatService {
             database: options.database,
             tools: options.tools,
             skills: options.skills,
+            mcp: options.mcp,
             folders,
             memory,
             logger: options.logger,
@@ -2254,8 +2373,6 @@ impl ChatService {
             .resolve_model(&input.provider_id.to_string(), &input.model_id, &settings)?;
         let stores = input.attached_store_ids();
         self.inner.require_stores(&stores)?;
-        let tools = input.enabled_tools();
-        self.inner.require_tools(&tools)?;
         let profile = self.inner.profile()?;
         let now = self.inner.now();
         let row = ConversationRow {
@@ -2267,7 +2384,6 @@ impl ChatService {
             system_prompt: input.system_prompt(),
             attached_store_ids: unique(&stores).iter().map(ToString::to_string).collect(),
             use_relations: input.use_relations(),
-            enabled_tools: unique(&tools),
             retrieval_mode: input.retrieval_mode(),
             working_folder: None,
             turn_folder: None,
@@ -2368,28 +2484,14 @@ impl ChatService {
         )
     }
 
-    pub fn update_tools(
-        &self,
-        id: &ConversationId,
-        enabled_tools: &[String],
-    ) -> Result<ConversationDto, AppError> {
-        let id = id.to_string();
-        self.inner.conversation(&id)?;
-        zvs_contract::chat::check_enabled_tools("enabledTools", enabled_tools)?;
-        let keys = unique(
-            &enabled_tools
-                .iter()
-                .map(|key| zvs_contract::validate::js_trim(key).to_owned())
-                .collect::<Vec<_>>(),
-        );
-        self.inner.require_tools(&keys)?;
-        self.update(
-            &id,
-            &ConversationPatch {
-                enabled_tools: Some(keys),
-                ..ConversationPatch::touched(self.inner.now())
-            },
-        )
+    pub fn commands(&self) -> Vec<ChatCommandDto> {
+        ChatCommand::ALL
+            .iter()
+            .map(|command| ChatCommandDto {
+                command: *command,
+                description: command_description(*command).to_owned(),
+            })
+            .collect()
     }
 
     pub fn update_retrieval(
@@ -2472,6 +2574,7 @@ impl ChatService {
             citations: Vec::new(),
             tool_calls: Vec::new(),
             selections: Vec::new(),
+            command: None,
             offered_tools: Vec::new(),
             web_sources: Vec::new(),
             tokens_in: 0,
@@ -2660,6 +2763,7 @@ impl ChatService {
             citations: Vec::<ChatCitationDto>::new(),
             tool_calls: Vec::new(),
             selections: input.selections.clone(),
+            command: input.command,
             offered_tools: Vec::new(),
             web_sources: Vec::new(),
             tokens_in: tokens(&with_selections(&text, &input.selections)),
@@ -2731,11 +2835,6 @@ impl ChatService {
             .clone()
             .or_else(|| details.map(|details| details.system_prompt.clone()))
             .unwrap_or_default();
-        let selected = input
-            .enabled_tools
-            .clone()
-            .or_else(|| details.map(|details| details.enabled_tools.clone()))
-            .unwrap_or_default();
         let registered = match &self.inner.tools {
             Some(tools) => tools.list(&ToolListFilter::default())?,
             None => Vec::new(),
@@ -2746,16 +2845,25 @@ impl ChatService {
                 !details.attached_store_ids.is_empty()
                     && details.retrieval_mode != RetrievalMode::Auto
             });
-        let skills = tools_usable
-            && self.inner.skills.is_some()
-            && conversation
-                .as_ref()
-                .is_some_and(|detail| loaded_skill(&detail.messages));
-        let choice = choose_tools(&selected, knowledge, skills);
-        let mut enabled = choice.keys.clone();
-        let guidance = self.inner.mcp_guidance(&mut enabled, &registered)?;
-        let mut offered = offered_tools(&enabled, &registered);
-        restrict_skill_tools(&mut offered, &choice.skill);
+        let history: &[MessageDto] = conversation
+            .as_ref()
+            .map_or(&[], |detail| detail.messages.as_slice());
+        let mut commands = active_commands(history);
+        if let Some(command) = input.command
+            && !commands.contains(&command)
+        {
+            commands.push(command);
+        }
+        let ToolPlan {
+            mut offered,
+            deferred,
+        } = if tools_usable {
+            self.inner.plan(&registered, knowledge, &commands, history)
+        } else {
+            ToolPlan::default()
+        };
+        let guidance = self.inner.mcp_guidance(&offered)?;
+        let command_note = self.inner.command_note(&commands, &offered);
         let folder = details.and_then(|details| details.working_folder.as_deref());
         let workspace = if offered.is_empty() && folder.is_none() {
             String::new()
@@ -2772,6 +2880,9 @@ impl ChatService {
         let (memory, _) = self
             .inner
             .memory_prompt(&conversation_id, tools_usable, &mut offered)?;
+        if !deferred.is_empty() {
+            offered.push(search_tool(&offered, &deferred));
+        }
         let about = match &input.conversation_id {
             Some(id) => self.inner.conversation(&id.to_string())?.profile,
             None => self.inner.profile()?.about,
@@ -2784,10 +2895,12 @@ impl ChatService {
             .join("\n\n");
         let tool_block = [
             guidance,
+            command_note,
             workspace,
             file_tools_section(&offered),
             process_tools_section(&offered),
             ask_section(&offered),
+            deferred_section(&deferred, &offered),
             if offered.is_empty() {
                 String::new()
             } else {
@@ -2820,6 +2933,7 @@ impl ChatService {
                 .map(|tool| ChatContextToolDto {
                     key: tool.key.clone(),
                     tokens: count(tokens(&tool_specs_json(std::slice::from_ref(tool)))),
+                    source: tool.source,
                 })
                 .collect(),
             history: count(usage.history),

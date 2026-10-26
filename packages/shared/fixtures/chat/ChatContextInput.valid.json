@@ -16,7 +16,7 @@
         "maxOutputTokens": 512
       },
       "systemPrompt": "Be brief.",
-      "enabledTools": ["mail.send"]
+      "command": "browser-use"
     }
   }
 ]

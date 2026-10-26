@@ -148,6 +148,10 @@ pub struct McpService {
     inner: Arc<Inner>,
 }
 
+pub trait McpServers: Send + Sync {
+    fn usable(&self) -> HashSet<String>;
+}
+
 pub fn derive_namespace(name: &str) -> String {
     let parts: Vec<String> = name
         .split(|character: char| !character.is_ascii_alphanumeric())
@@ -828,6 +832,16 @@ impl McpService {
                     McpLogLevel::Error,
                     &format!("tools/call {} — {}", target.tool, error.message),
                 );
+                if is_auth_required(&error) {
+                    self.patch(
+                        &target.server_id,
+                        &McpServerPatch {
+                            last_error: Some(Some(AUTH_REQUIRED.to_owned())),
+                            updated_at: Some(self.now()),
+                            ..McpServerPatch::default()
+                        },
+                    )?;
+                }
                 Err(error)
             }
         }
@@ -1769,6 +1783,38 @@ impl McpService {
             },
         )?;
         Ok(())
+    }
+}
+
+impl McpServers for McpService {
+    fn usable(&self) -> HashSet<String> {
+        let live: HashSet<String> = self
+            .supervisors()
+            .iter()
+            .filter(|(_, supervisor)| {
+                supervisor
+                    .client
+                    .as_ref()
+                    .is_some_and(|client| client.connected())
+            })
+            .map(|(id, _)| id.clone())
+            .collect();
+        if live.is_empty() {
+            return HashSet::new();
+        }
+        let rows = self
+            .database()
+            .with_connection(|connection| Ok(Repositories::new(connection).mcp_servers.list()?))
+            .unwrap_or_default();
+        rows.into_iter()
+            .filter(|row| {
+                row.enabled
+                    && row.status == McpServerStatus::Connected
+                    && row.last_error.as_deref() != Some(AUTH_REQUIRED)
+                    && live.contains(&row.id)
+            })
+            .map(|row| row.id)
+            .collect()
     }
 }
 

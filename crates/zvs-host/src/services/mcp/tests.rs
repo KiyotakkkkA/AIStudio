@@ -559,6 +559,25 @@ async fn removing_a_server_withdraws_its_tools_and_its_nodes() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn only_a_live_connected_server_is_usable_for_the_chat() {
+    let host = host();
+    let id = host.stdio_server("qdrant");
+    assert!(host.mcp.usable().is_empty());
+    host.mcp.start(&id).await.expect("starts");
+    assert_eq!(host.mcp.usable(), HashSet::from([id.clone()]));
+    host.mcp.stop(&id).await;
+    assert!(host.mcp.usable().is_empty());
+    host.mcp.start(&id).await.expect("starts again");
+    assert_eq!(host.mcp.usable(), HashSet::from([id.clone()]));
+    let update = UpdateMcpServerInput {
+        enabled: Some(false),
+        ..UpdateMcpServerInput::new(zvs_contract::McpServerId::parse(&id).expect("an id"))
+    };
+    host.mcp.update(&update).await.expect("updates");
+    assert!(host.mcp.usable().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn disabling_a_server_takes_its_tools_out_of_reach() {
     let host = host();
     let id = host.stdio_server("qdrant");
@@ -581,6 +600,7 @@ struct HttpFixture {
     calls: Arc<Mutex<Vec<(Value, HeaderMap)>>>,
     reject: bool,
     bearer: Option<&'static str>,
+    revoked: Arc<std::sync::atomic::AtomicBool>,
 }
 
 async fn http_handler(
@@ -596,7 +616,8 @@ async fn http_handler(
             .get("authorization")
             .and_then(|value| value.to_str().ok())
             .unwrap_or_default();
-        if presented != format!("Bearer {token}") {
+        let revoked = fixture.revoked.load(std::sync::atomic::Ordering::SeqCst);
+        if revoked || presented != format!("Bearer {token}") {
             return (
                 StatusCode::UNAUTHORIZED,
                 [(
@@ -737,6 +758,7 @@ async fn an_oauth_server_asks_for_sign_in_and_then_accepts_the_stored_token() {
     let id = host.create(&http_server(&url, &[]));
     let error = host.mcp.start(&id).await.expect_err("needs a sign-in");
     assert!(is_auth_required(&error));
+    assert!(host.mcp.usable().is_empty());
     let server = host.mcp.server(&id).expect("a server");
     assert_eq!(server.oauth, McpOAuthState::Required);
     assert_eq!(server.last_error.as_deref(), Some(AUTH_REQUIRED));
@@ -762,10 +784,56 @@ async fn an_oauth_server_asks_for_sign_in_and_then_accepts_the_stored_token() {
     assert_eq!(server.status, McpServerStatus::Connected);
     assert_eq!(server.oauth, McpOAuthState::SignedIn);
     assert_eq!(host.available_mcp(), ["github.listIssues"]);
+    assert_eq!(host.mcp.usable(), HashSet::from([id.clone()]));
     assert!(!format!("{:?}", host.logger.entries()).contains("access-1"));
     let signed_out = host.mcp.sign_out(&id).await.expect("signs out");
     assert_eq!(signed_out.oauth, McpOAuthState::None);
     assert!(host.available_mcp().is_empty());
+    assert!(host.mcp.usable().is_empty());
+    host.mcp.dispose().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_token_revoked_mid_session_takes_the_server_out_of_the_chat_until_a_new_sign_in() {
+    let host = host();
+    let fixture = HttpFixture {
+        bearer: Some("access-1"),
+        ..HttpFixture::default()
+    };
+    let url = serve(fixture.clone()).await;
+    let id = host.create(&http_server(&url, &[]));
+    host.mcp
+        .save_grant(
+            &id,
+            &OAuthGrant {
+                issuer: "https://id.example".to_owned(),
+                token_endpoint: "https://id.example/token".to_owned(),
+                client_id: "client-1".to_owned(),
+                client_secret: None,
+                redirect_uri: "http://127.0.0.1:53682/callback".to_owned(),
+                resource: url.clone(),
+                scope: None,
+                access_token: "access-1".to_owned(),
+                refresh_token: None,
+                expires_at: None,
+            },
+        )
+        .expect("saves");
+    host.mcp.start(&id).await.expect("starts");
+    assert_eq!(host.mcp.usable(), HashSet::from([id.clone()]));
+    fixture
+        .revoked
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let error = host
+        .call(&id, "listIssues", json!({}))
+        .await
+        .expect_err("the token is gone");
+    assert!(is_auth_required(&error));
+    assert!(host.mcp.usable().is_empty());
+    assert_eq!(
+        host.mcp.server(&id).expect("a server").oauth,
+        McpOAuthState::Required
+    );
     host.mcp.dispose().await;
 }
 

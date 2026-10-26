@@ -214,7 +214,6 @@ fn shell(argv: &[&str]) -> ShellRunInput {
         cwd: None,
         stdin: None,
         conversation_id: String::new(),
-        roots_only: false,
     }
 }
 

@@ -17,7 +17,7 @@ use crate::artifacts::{Snapshot, library_env, mentioned_paths, produced, snapsho
 use crate::chat_files::{CHAT_DIR_ENV, is_working};
 use crate::conversations::is_owner;
 use crate::files::roots::{
-    PathRoot, ROOTS_ONLY, ROOTS_UNAVAILABLE, RootKind, SKILL_READ_ONLY, VirtualRoots, path_root,
+    PathRoot, ROOTS_UNAVAILABLE, RootKind, SKILL_READ_ONLY, VirtualRoots, path_root,
 };
 use crate::kernel::{
     ApprovalDecision, DeferredApproval, NodeDef, NodeRegistry, PermissionRequirement, StepContext,
@@ -517,9 +517,6 @@ pub struct ShellRunInput {
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
-    #[serde(default)]
-    #[schemars(skip)]
-    pub roots_only: bool,
 }
 
 impl Validate for ShellRunInput {
@@ -555,10 +552,6 @@ pub fn shell_spec(argv: &[String], cwd: &Path, dirs: &[PathBuf]) -> Result<Launc
 pub struct SkillScript {
     pub spec: LaunchSpec,
     pub dir: PathBuf,
-}
-
-fn outside_roots() -> AppError {
-    AppError::new(AppErrorCode::PermissionDenied, ROOTS_ONLY)
 }
 
 pub fn skill_script(
@@ -652,9 +645,6 @@ impl ShellRunNode {
                     .with_detail("path", path_text(&located.path)))
             };
         }
-        if input.roots_only && input.cwd.is_some() {
-            return Err(outside_roots());
-        }
         if script && input.cwd.is_none() {
             return match self.chat_folder(&input.conversation_id) {
                 Some(folder) => Ok(folder),
@@ -724,7 +714,6 @@ impl NodeDef for ShellRunNode {
             PathRoot::Skill { key, rest } => {
                 Some(skill_script(&tools.options, key, rest, &input.argv[1..])?)
             }
-            _ if input.roots_only => return Err(outside_roots()),
             _ => None,
         };
         let cwd = self.cwd(context, &input, skill.is_some()).await?;

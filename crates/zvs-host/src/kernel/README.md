@@ -135,7 +135,9 @@ tokens, the latest tool-call snapshot, the approvals still pending and the quest
 waiting. A renderer that reopens a chat restores from it and subscribes for events after `seq`.
 
 Every turn whose model can call tools is offered `chat.ask` (wire name `ask_user`) with a short
-prompt section, whatever tools the conversation picked. The loop intercepts it before tool
+prompt section, next to the tools `plan_tools` offers (PASSPORT §14, _Chat tool set_).
+`tool.search` is intercepted the same way: it moves deferred tools into the offered set for the
+next round, records them in its `meta.loaded` and refunds its call. The loop intercepts it before tool
 invocation: the host assigns question and option ids, validates the request and returns a
 malformed call to the model as the call result. A second `chat.ask` in a round is refused, and
 the call does not count against the call budget. The call record is `awaiting-answer` with a

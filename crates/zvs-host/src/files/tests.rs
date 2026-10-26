@@ -251,7 +251,6 @@ fn read_input_is_capped_at_sixteen_paths() {
             })
             .collect(),
         conversation_id: String::new(),
-        roots_only: false,
     };
     use zvs_contract::Validate;
     assert!(input(READ_PATHS_MAX).validate().is_ok());

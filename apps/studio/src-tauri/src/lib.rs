@@ -785,6 +785,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         .with_picker(Arc::clone(&picker))
         .with_launcher(platform::file_launcher())
         .with_pages(Arc::new(WorkspacePages(workspace.clone())));
+    let sites = zvs_host::sites::SiteService::new(zvs_host::sites::SiteServiceOptions {
+        pages: Some(Arc::new(WorkspacePages(workspace.clone()))),
+        ..zvs_host::sites::SiteServiceOptions::default()
+    });
     let roots = VirtualRoots::new(Some(artifacts.clone()), Some(skill_library.clone()));
     register_skill_nodes(&nodes, &skill_library)?;
     register_kernel_tools(&nodes, &tools)?;
@@ -908,6 +912,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let chat = ChatService::new(ChatServiceOptions {
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),
+        mcp: Some(Arc::new(mcp.clone())),
         folders: Some(folders.clone()),
         logger: logger.clone(),
         clock: clock.clone(),
@@ -1096,6 +1101,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         terminals,
         documents,
         artifacts,
+        sites,
         folders,
         picker: Some(picker),
     });

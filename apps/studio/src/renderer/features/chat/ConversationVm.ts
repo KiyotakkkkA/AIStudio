@@ -1,6 +1,7 @@
 import { makeAutoObservable } from "mobx";
 import {
   CHAT_SELECTIONS_MAX,
+  type ChatCommand,
   type DocumentSelectionDto,
   type ProviderDto,
   type ProviderId,
@@ -18,7 +19,7 @@ export default class ConversationVm {
   attachedStoreIds: VectorStoreId[] = [];
   useRelations = false;
   retrievalMode: RetrievalMode = "hybrid";
-  enabledTools: string[] = [];
+  command: ChatCommand | null = null;
   selections: DocumentSelectionDto[] = [];
   effort: ThinkingEffort = "auto";
   webSearch = false;
@@ -73,8 +74,8 @@ export default class ConversationVm {
   setWebSearch(value: boolean) {
     this.webSearch = value;
   }
-  setEnabledTools(value: readonly string[]) {
-    this.enabledTools = [...new Set(value)];
+  setCommand(value: ChatCommand | null) {
+    this.command = value;
   }
   selectProvider(provider: ProviderDto) {
     this.providerId = provider.id;

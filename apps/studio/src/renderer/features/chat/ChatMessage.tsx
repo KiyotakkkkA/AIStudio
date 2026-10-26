@@ -12,7 +12,8 @@ import IconButton from "../../ui/atoms/buttons/IconButton";
 import ChatMarkdown from "./ChatMarkdown";
 import ReasoningBlock from "./ReasoningBlock";
 import ChatSources from "./ChatSources";
-import ChatWebSources from "./ChatWebSources";
+import WebSourceCard from "./WebSourceCard";
+import { WEB_SOURCES_TAB } from "./webSources";
 import {
   OPEN_CITATION,
   OPEN_SELECTION,
@@ -63,7 +64,7 @@ export default function ChatMessage({
   readonly onRefresh?: () => void;
   readonly onDelete?: () => void;
 }) {
-  const { viewer } = useStore();
+  const { viewer, chat } = useStore();
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const storeName = (storeId: VectorStoreId) =>
     stores.find((store) => store.id === storeId)?.name ?? "Хранилище";
@@ -75,8 +76,16 @@ export default function ChatMessage({
     setSourcesOpen(false);
     void viewer.openSelection(selection, selectionLocation(selection));
   };
+  const openWeb = (source: WebSourceDto) => {
+    setSourcesOpen(false);
+    void chat.openSite(source.url);
+  };
   const citationStoreIds = [...new Set(citations.map((citation) => citation.storeId))];
-  const tabs: string[] = [...(selections.length > 0 ? [SELECTIONS_KEY] : []), ...citationStoreIds];
+  const tabs: string[] = [
+    ...(selections.length > 0 ? [SELECTIONS_KEY] : []),
+    ...citationStoreIds,
+    ...(webSources.length > 0 ? [WEB_KEY] : []),
+  ];
   const [activeTab, setActiveTab] = useState<string>(tabs[0] ?? "");
   const selectedTab = tabs.find((tab) => tab === activeTab) ?? tabs[0] ?? "";
   const selectedCitations = citations.filter((citation) => citation.storeId === selectedTab);
@@ -96,17 +105,19 @@ export default function ChatMessage({
             citations={citations}
             webSources={webSources}
             onCite={view}
+            onOpenWeb={openWeb}
           />
           {generating && <GenerationStatus label={status} since={since} />}
           <ChatSources
             sources={sources}
             selections={selectionSources(selections)}
-            fragments={citations.length + selections.length}
+            web={webSources}
+            fragments={citations.length + selections.length + webSources.length}
             onOpen={() => setSourcesOpen(true)}
             onView={view}
             onViewSelection={viewSelection}
+            onOpenWeb={openWeb}
           />
-          {!generating && <ChatWebSources sources={webSources} />}
           {artifacts}
           {partial && !generating && (
             <p className="text-[12px] text-warn">Частичный ответ · генерация не завершена</p>
@@ -150,7 +161,9 @@ export default function ChatMessage({
               label:
                 id === SELECTIONS_KEY
                   ? SELECTIONS_TAB
-                  : (stores.find((store) => store.id === id)?.name ?? "Хранилище"),
+                  : id === WEB_KEY
+                    ? WEB_SOURCES_TAB
+                    : (stores.find((store) => store.id === id)?.name ?? "Хранилище"),
             }))}
             label="Группы источников"
             classNames={{
@@ -186,6 +199,16 @@ export default function ChatMessage({
                         {excerptPreview(selection.text, SELECTION_EXCERPT)}
                       </p>
                     </article>
+                  ))
+                : null}
+              {selectedTab === WEB_KEY
+                ? webSources.map((source, index) => (
+                    <WebSourceCard
+                      key={`${String(index)}:${source.url}`}
+                      source={source}
+                      number={index + 1}
+                      onOpen={openWeb}
+                    />
                   ))
                 : null}
               {selectedCitations.map((citation) => (
@@ -234,6 +257,7 @@ export default function ChatMessage({
 }
 
 const SELECTIONS_KEY = "selections";
+const WEB_KEY = "web";
 const SELECTION_EXCERPT = 600;
 
 function citationPlace(citation: ChatCitationDto): string {

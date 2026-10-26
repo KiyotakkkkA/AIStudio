@@ -10,6 +10,7 @@ import {
 import { Json } from "./primitives/json.js";
 import { FolderGrantScope, FolderPath, WorkingFolderAccess } from "./folders.js";
 import { ToolKey } from "./tools/ToolDto.js";
+import { WebUrl } from "./sites.js";
 import { RunHandleDto } from "./runs/RunDto.js";
 import { ApprovalRequestDto, EventSeq } from "./events/HostEvent.js";
 import { QuestionRequestDto } from "./questions.js";
@@ -61,13 +62,12 @@ export const ChatToolCallDto = z.object({
   meta: Json.nullable().default(null),
 });
 export type ChatToolCallDto = z.infer<typeof ChatToolCallDto>;
-export const OFFERED_TOOL_SOURCES = ["selected", "skill", "knowledge", "system"] as const;
+export const OFFERED_TOOL_SOURCES = ["base", "knowledge", "memory", "command", "loaded"] as const;
 export const OfferedToolSource = z.enum(OFFERED_TOOL_SOURCES);
 export type OfferedToolSource = z.infer<typeof OfferedToolSource>;
 export const OfferedToolDto = z.object({
   key: z.string().min(1).max(200),
   source: OfferedToolSource,
-  rootsOnly: z.boolean().default(false),
 });
 export type OfferedToolDto = z.infer<typeof OfferedToolDto>;
 export const THINKING_EFFORTS = ["auto", "thinking", "fast"] as const;
@@ -84,9 +84,17 @@ export const WebSourceDto = z.object({
   title: z.string().min(1).max(4000),
   snippet: z.string().max(4000).default(""),
   date: z.string().max(100).nullable().default(null),
+  icon: WebUrl.optional(),
 });
 export type WebSourceDto = z.infer<typeof WebSourceDto>;
-export const ChatEnabledTools = z.array(ToolKey).max(64);
+export const CHAT_COMMANDS = ["browser-use"] as const;
+export const ChatCommand = z.enum(CHAT_COMMANDS);
+export type ChatCommand = z.infer<typeof ChatCommand>;
+export const ChatCommandDto = z.object({
+  command: ChatCommand,
+  description: z.string().trim().min(1).max(500),
+});
+export type ChatCommandDto = z.infer<typeof ChatCommandDto>;
 export const RetrievalMode = z.enum(["auto", "agentic", "hybrid"]);
 export type RetrievalMode = z.infer<typeof RetrievalMode>;
 export const ChatEvalInput = z.object({
@@ -127,7 +135,6 @@ export const CreateConversationInput = z.object({
   systemPrompt: z.string().max(100000).default(""),
   attachedStoreIds: z.array(VectorStoreId).max(64).default([]),
   useRelations: z.boolean().default(false),
-  enabledTools: ChatEnabledTools.default([]),
   retrievalMode: RetrievalMode.default("hybrid"),
 });
 export type CreateConversationInput = z.infer<typeof CreateConversationInput>;
@@ -177,6 +184,7 @@ export const MessageDto = z.object({
   citations: z.array(ChatCitationDto),
   toolCalls: z.array(ChatToolCallDto).default([]),
   selections: Selections.default([]),
+  command: ChatCommand.optional(),
   offeredTools: z.array(OfferedToolDto).default([]),
   webSources: z.array(WebSourceDto).max(WEB_SOURCES_MAX).default([]),
   tokensIn: z.number().int().nonnegative(),
@@ -199,6 +207,7 @@ export const ChatSendInput = z.object({
   modelId: z.string().min(1).optional(),
   settings: ChatSettings.optional(),
   selections: Selections.default([]),
+  command: ChatCommand.optional(),
   vendor: VendorTurnOptions.optional(),
 });
 export type ChatSendInput = z.infer<typeof ChatSendInput>;
@@ -208,12 +217,13 @@ export const ChatContextInput = z.object({
   modelId: z.string().min(1),
   settings: ChatSettings.optional(),
   systemPrompt: z.string().max(100000).optional(),
-  enabledTools: ChatEnabledTools.optional(),
+  command: ChatCommand.optional(),
 });
 export type ChatContextInput = z.infer<typeof ChatContextInput>;
 export const ChatContextToolDto = z.object({
   key: ToolKey,
   tokens: z.number().int().nonnegative(),
+  source: OfferedToolSource,
 });
 export type ChatContextToolDto = z.infer<typeof ChatContextToolDto>;
 export const ChatContextDto = z.object({

@@ -8,7 +8,7 @@ use serde_json::json;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::validate::js_trim;
 use zvs_contract::{
-    AppError, AppErrorCode, CreateSkillInput, ProviderCapability, SKILL_TRIGGER_KEY,
+    AppError, AppErrorCode, ChatCommand, CreateSkillInput, ProviderCapability, SKILL_TRIGGER_KEY,
     SkillDetailDto, SkillDto, SkillExportInput, SkillExportResultDto, SkillFileContentDto, SkillId,
     SkillImportInput, SkillImportResultDto, SkillModelDto, SkillTriggerSettingsDto,
     UpdateSkillInput, Validate, VectorSourceKind,
@@ -48,6 +48,14 @@ pub struct SkillCatalogueEntry {
 #[async_trait]
 pub trait SkillCatalogue: Send + Sync {
     async fn catalogue(&self, query: &str, cancel: &CancellationToken) -> Vec<SkillCatalogueEntry>;
+
+    fn command(&self, _key: &str) -> Option<String> {
+        None
+    }
+}
+
+pub fn command_skill(key: &str) -> bool {
+    ChatCommand::parse(key).is_some()
 }
 
 pub fn catalogue_text(entries: &[SkillCatalogueEntry], offered: &[OfferedTool]) -> String {
@@ -432,7 +440,8 @@ impl SkillService {
         cancel: &CancellationToken,
     ) -> Result<Vec<SkillDto>, AppError> {
         let settings = self.trigger_settings();
-        let usable = self.inner.library.usable()?;
+        let mut usable = self.inner.library.usable()?;
+        usable.retain(|skill| !command_skill(&skill.key));
         let limit = usize::try_from(settings.catalogue_limit).unwrap_or(usize::MAX);
         if usable.len() <= limit || js_trim(query).is_empty() {
             return Ok(usable.into_iter().take(limit).collect());
@@ -475,5 +484,14 @@ impl SkillCatalogue for SkillService {
                 Vec::new()
             }
         }
+    }
+
+    fn command(&self, key: &str) -> Option<String> {
+        self.inner
+            .library
+            .load(key)
+            .ok()
+            .map(|loaded| loaded.instructions)
+            .filter(|text| !js_trim(text).is_empty())
     }
 }

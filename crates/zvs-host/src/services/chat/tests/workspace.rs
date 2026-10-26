@@ -97,7 +97,8 @@ fn the_file_tools_section_names_the_offered_file_tools_and_the_rules() {
         parameters: serde_json::json!({}),
         destructive: false,
         read_only: true,
-        roots_only: false,
+        source: zvs_contract::OfferedToolSource::Base,
+        server: None,
     };
     assert!(file_tools_section(&[tool("demo.x", "demo__x")]).is_empty());
     assert_eq!(

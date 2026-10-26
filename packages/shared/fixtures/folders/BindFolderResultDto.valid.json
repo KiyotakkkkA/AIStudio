@@ -12,7 +12,6 @@
         "systemPrompt": "",
         "attachedStoreIds": [],
         "useRelations": false,
-        "enabledTools": [],
         "retrievalMode": "hybrid",
         "workingFolder": "D:\\work",
         "workingFolderAccess": "granted",

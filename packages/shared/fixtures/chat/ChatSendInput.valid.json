@@ -46,5 +46,13 @@
         "webSearch": true
       }
     }
+  },
+  {
+    "name": "with a command",
+    "value": {
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "text": "Найди расписание на сайте",
+      "command": "browser-use"
+    }
   }
 ]

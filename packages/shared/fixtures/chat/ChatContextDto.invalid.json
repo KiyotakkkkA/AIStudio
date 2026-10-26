@@ -26,5 +26,24 @@
       "trimmed": 0,
       "total": 0
     }
+  },
+  {
+    "name": "tool without a source",
+    "value": {
+      "contextWindow": 8192,
+      "reservedOutput": 1024,
+      "system": 0,
+      "tools": 10,
+      "toolItems": [
+        {
+          "key": "mail.send",
+          "tokens": 10
+        }
+      ],
+      "history": 0,
+      "historyMessages": 0,
+      "trimmed": 0,
+      "total": 10
+    }
   }
 ]

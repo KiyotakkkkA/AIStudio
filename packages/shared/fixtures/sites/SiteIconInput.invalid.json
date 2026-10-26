@@ -1,0 +1,15 @@
+[
+  {
+    "name": "data icon",
+    "value": {
+      "url": "https://example.com",
+      "icon": "data:image/png;base64,AA=="
+    }
+  },
+  {
+    "name": "not a url",
+    "value": {
+      "url": "example"
+    }
+  }
+]

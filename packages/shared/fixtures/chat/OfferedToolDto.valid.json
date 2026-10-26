@@ -1,17 +1,16 @@
 [
   {
-    "name": "selected",
+    "name": "base",
     "value": {
       "key": "fs.read",
-      "source": "selected"
+      "source": "base"
     }
   },
   {
-    "name": "skill paths only",
+    "name": "loaded",
     "value": {
-      "key": "shell.run",
-      "source": "skill",
-      "rootsOnly": true
+      "key": "docs.search",
+      "source": "loaded"
     }
   }
 ]

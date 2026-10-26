@@ -17,6 +17,7 @@ import * as terminal from "../src/terminal.js";
 import * as notifications from "../src/notifications.js";
 import * as documents from "../src/documents.js";
 import * as artifacts from "../src/artifacts.js";
+import * as sites from "../src/sites.js";
 import * as storage from "../src/storage.js";
 import {
   AccountDto,
@@ -31,6 +32,8 @@ import {
   DocumentSelectionDto,
   MessageDto,
   OfferedToolDto,
+  ChatCommand,
+  ChatCommandDto,
   OfferedToolSource,
   ThinkingEffort,
   VendorTurnOptions,
@@ -252,6 +255,9 @@ const schemas: Record<string, z.ZodType> = {
   "terminal/TerminalRenameInput": terminal.TerminalRenameInput,
   "terminal/TerminalAttachDto": terminal.TerminalAttachDto,
   "terminal/TerminalStatusDto": terminal.TerminalStatusDto,
+  "sites/OpenSiteInput": sites.OpenSiteInput,
+  "sites/SiteIconInput": sites.SiteIconInput,
+  "sites/SiteIconDto": sites.SiteIconDto,
   "artifacts/ArtifactDto": artifacts.ArtifactDto,
   "artifacts/ArtifactRef": artifacts.ArtifactRef,
   "artifacts/ArtifactSaveResult": artifacts.ArtifactSaveResult,
@@ -493,7 +499,8 @@ const schemas: Record<string, z.ZodType> = {
   "chat/RenameConversationInput": contract["chat.conversations.rename"].input,
   "chat/UpdateConversationStoresInput": contract["chat.conversations.updateStores"].input,
   "chat/UpdateConversationRelationsInput": contract["chat.conversations.updateRelations"].input,
-  "chat/UpdateConversationToolsInput": contract["chat.conversations.updateTools"].input,
+  "chat/ChatCommand": ChatCommand,
+  "chat/ChatCommandDto": ChatCommandDto,
 };
 
 const root = fileURLToPath(new URL("../fixtures/", import.meta.url));

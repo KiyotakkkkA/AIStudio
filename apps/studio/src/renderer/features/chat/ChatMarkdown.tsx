@@ -21,6 +21,7 @@ interface MarkdownSource {
   readonly streaming: boolean;
   readonly citations: readonly ChatCitationDto[];
   readonly webSources: readonly WebSourceDto[];
+  readonly onOpenWeb?: (source: WebSourceDto) => void;
   readonly onCite?: (citation: ChatCitationDto) => void;
 }
 
@@ -82,18 +83,20 @@ function CodeBlock({ children, node }: ComponentProps<"pre"> & ExtraProps) {
 }
 
 function Link({ children, href }: ComponentProps<"a"> & ExtraProps) {
-  const { citations, webSources, onCite } = useContext(SourceContext);
+  const { citations, webSources, onCite, onOpenWeb } = useContext(SourceContext);
   const webNumber = webSourceNumber(href);
   const webSource = webNumber === null ? undefined : webSources[webNumber - 1];
   if (webNumber !== null && webSource !== undefined)
     return (
-      <span
+      <button
+        type="button"
         title={`${webSource.title}\n${webSourceDetail(webSource)}`}
         aria-label={`Источник ${String(webNumber)}: ${webSource.title}`}
-        className={MARKER_CHIP}
+        className={`${MARKER_CHIP} hover:bg-accent-dark hover:text-on-accent`}
+        onClick={() => onOpenWeb?.(webSource)}
       >
         {webNumber}
-      </span>
+      </button>
     );
   const number = citationNumber(href);
   const citation = number === null ? undefined : citations[number - 1];
@@ -126,17 +129,19 @@ export default function ChatMarkdown({
   citations = [],
   webSources = [],
   onCite,
+  onOpenWeb,
 }: {
   readonly content: string;
   readonly streaming?: boolean;
   readonly citations?: readonly ChatCitationDto[];
   readonly webSources?: readonly WebSourceDto[];
   readonly onCite?: (citation: ChatCitationDto) => void;
+  readonly onOpenWeb?: (source: WebSourceDto) => void;
 }) {
   const text = linkCitations(linkWebSources(content, webSources.length), citations.length);
   const source = useMemo(
-    () => ({ text, streaming, citations, webSources, onCite }),
-    [text, streaming, citations, webSources, onCite],
+    () => ({ text, streaming, citations, webSources, onCite, onOpenWeb }),
+    [text, streaming, citations, webSources, onCite, onOpenWeb],
   );
   return (
     <div

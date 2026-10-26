@@ -3,6 +3,7 @@ import { observer } from "mobx-react-lite";
 import {
   mdiChevronDown,
   mdiClose,
+  mdiConsoleLine,
   mdiDatabaseOutline,
   mdiPaperclip,
   mdiStop,
@@ -19,10 +20,11 @@ import SegmentedControl from "../../ui/atoms/SegmentedControl";
 import Toggle from "../../ui/atoms/Toggle";
 import { RETRIEVAL_MODES, retrievalHint } from "./retrievalModes";
 import ChatAccountProviderSetup from "./ChatAccountProviderSetup";
+import ChatCommandMenu, { COMMAND_MENU_ID, commandOptionId } from "./ChatCommandMenu";
 import ChatContextMeter from "./ChatContextMeter";
 import ChatModelGate from "./ChatModelGate";
-import ChatToolPicker from "./ChatToolPicker";
 import ChatToolsBadge from "./ChatToolsBadge";
+import { REMOVE_COMMAND, commandText } from "./chatCommands";
 import SelectionChips from "./SelectionChips";
 import type ChatStore from "./ChatStore";
 
@@ -84,10 +86,23 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               />
             </div>
           ) : null}
-          {(store.attachedStoreIds.length > 0 ||
-            store.enabledTools.length > 0 ||
-            store.automaticTools.length > 0) && (
+          <ChatCommandMenu store={store} />
+          {(store.attachedStoreIds.length > 0 || store.composer.command !== null) && (
             <div className="flex flex-wrap gap-1.5 px-1">
+              {store.composer.command !== null && (
+                <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-accent-soft pr-1.5 pl-2.5 text-[12px] font-medium text-accent-medium">
+                  <Icon path={mdiConsoleLine} size={14} />
+                  <span className="font-mono">{commandText(store.composer.command)}</span>
+                  <button
+                    type="button"
+                    aria-label={REMOVE_COMMAND}
+                    className="flex size-4.5 items-center justify-center rounded-full hover:bg-accent-dark hover:text-on-accent"
+                    onClick={store.clearCommand}
+                  >
+                    <Icon path={mdiClose} size={13} />
+                  </button>
+                </span>
+              )}
               {store.stores
                 .filter((item) => store.attachedStoreIds.includes(item.id))
                 .map((item) => (
@@ -107,7 +122,6 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                     </button>
                   </span>
                 ))}
-              <ChatToolsBadge store={store} />
             </div>
           )}
           <div className="px-0.5">
@@ -118,9 +132,40 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               value={store.composer.text}
               maxLength={100000}
               disabled={store.loading || store.generating}
-              onChange={(event) => store.composer.setText(event.target.value)}
+              aria-controls={store.commandMatches.length > 0 ? COMMAND_MENU_ID : undefined}
+              aria-activedescendant={
+                store.commandMatches.length > 0 ? commandOptionId(store.commandIndex) : undefined
+              }
+              onChange={(event) => store.typeText(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                if (event.nativeEvent.isComposing) return;
+                if (store.commandMatches.length > 0) {
+                  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                    event.preventDefault();
+                    store.moveCommand(event.key === "ArrowDown" ? 1 : -1);
+                    return;
+                  }
+                  if (event.key === "Tab" || (event.key === "Enter" && !event.shiftKey)) {
+                    event.preventDefault();
+                    store.completeCommand();
+                    return;
+                  }
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    store.dismissCommands();
+                    return;
+                  }
+                }
+                if (
+                  event.key === "Backspace" &&
+                  store.composer.text.length === 0 &&
+                  store.composer.command !== null
+                ) {
+                  event.preventDefault();
+                  store.clearCommand();
+                  return;
+                }
+                if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
                   void store.send();
                 }
@@ -164,8 +209,8 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               </Dropdown.Menu>
             </Dropdown>
             <ChatAccountProviderSetup store={store} />
-            <ChatToolPicker store={store} />
             <span className="flex-1" />
+            <ChatToolsBadge store={store} />
             <ChatContextMeter store={store} />
             <Dropdown menuWidth={300} menuPlacement="top-right">
               <Dropdown.Trigger
@@ -334,7 +379,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
         </div>
       </Modal>
       <p className="mt-2 text-center text-[11px] text-main-500 [&_kbd]:font-mono">
-        Enter — отправить · Shift+Enter — новая строка
+        Enter — отправить · Shift+Enter — новая строка · / — команды
       </p>
     </div>
   );

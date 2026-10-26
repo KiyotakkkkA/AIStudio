@@ -29,6 +29,7 @@ pub mod runtimes;
 pub mod scenarios;
 pub mod secrets;
 pub mod settings;
+pub mod sites;
 pub mod skills;
 pub mod storage;
 pub mod system;
@@ -71,15 +72,15 @@ pub use browser::{
 };
 pub use channels::{CHANNELS, is_channel};
 pub use chat::{
-    ChatAttachDto, ChatAttachInput, ChatAttachOutput, ChatCitationDto, ChatContextDto,
-    ChatContextInput, ChatContextToolDto, ChatConversationsListOutput, ChatEvalCaseDto,
-    ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto, ChatSendInput, ChatSettings, ChatToolCallDto,
-    ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationRef,
-    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DocumentSelectionDto, MessageDto,
-    MessageRole, OfferedToolDto, OfferedToolSource, RenameConversationInput, RetrievalMode,
-    ThinkingEffort, TruncateConversationInput, UpdateConversationRelationsInput,
-    UpdateConversationRetrievalInput, UpdateConversationStoresInput, UpdateConversationToolsInput,
-    VendorTurnOptions, WEB_SOURCES_MAX, WebSourceDto,
+    ChatAttachDto, ChatAttachInput, ChatAttachOutput, ChatCitationDto, ChatCommand, ChatCommandDto,
+    ChatCommandsOutput, ChatContextDto, ChatContextInput, ChatContextToolDto,
+    ChatConversationsListOutput, ChatEvalCaseDto, ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto,
+    ChatSendInput, ChatSettings, ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto,
+    ConversationDto, ConversationRef, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
+    DocumentSelectionDto, MessageDto, MessageRole, OfferedToolDto, OfferedToolSource,
+    RenameConversationInput, RetrievalMode, ThinkingEffort, TruncateConversationInput,
+    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    UpdateConversationStoresInput, VendorTurnOptions, WEB_SOURCES_MAX, WebSourceDto,
 };
 pub use documents::{
     DOCUMENT_BYTES_DATA_MAX, DOCUMENT_BYTES_PAGE_MAX, DOCUMENT_LIST_MAX, DOCUMENT_PATH_MAX,
@@ -188,6 +189,9 @@ pub use secrets::{
 };
 pub use settings::{
     SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, check_setting_key,
+};
+pub use sites::{
+    OpenSiteInput, SITE_ICON_BYTES_MAX, SITE_ICON_MIMES, SiteIconDto, SiteIconInput, SiteIconOutput,
 };
 pub use skills::{
     CreateSkillInput, SKILL_TRIGGER_KEY, SetSkillEnabledInput, SkillDetailDto, SkillDto,

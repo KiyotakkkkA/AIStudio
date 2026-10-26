@@ -1,0 +1,15 @@
+[
+  {
+    "name": "page only",
+    "value": {
+      "url": "https://example.com/rates"
+    }
+  },
+  {
+    "name": "with a vendor icon",
+    "value": {
+      "url": "https://example.com/rates",
+      "icon": "https://cdn.example.com/logo.png"
+    }
+  }
+]

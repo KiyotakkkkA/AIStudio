@@ -245,6 +245,7 @@ pub(super) struct HarnessOptions {
     pub providers: Option<Arc<dyn TextDrivers>>,
     pub tools: Option<ToolRegistry>,
     pub skills: Option<Arc<dyn SkillCatalogue>>,
+    pub mcp: Option<Arc<dyn McpServers>>,
     pub registry: Option<Arc<NodeRegistry>>,
     pub capabilities: Vec<ProviderCapability>,
     pub context_window: i64,
@@ -262,6 +263,7 @@ impl Default for HarnessOptions {
             providers: None,
             tools: None,
             skills: None,
+            mcp: None,
             registry: None,
             capabilities: vec![ProviderCapability::Text, ProviderCapability::Embedding],
             context_window: 1024,
@@ -329,6 +331,7 @@ impl Harness {
         let chat = ChatService::new(ChatServiceOptions {
             tools: options.tools,
             skills: options.skills,
+            mcp: options.mcp,
             logger: logger.clone(),
             ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), registry)
         })
@@ -407,6 +410,23 @@ impl Harness {
 
     pub async fn turn(&self, conversation: ConversationId, text: &str) -> RunHandleDto {
         let handle = self.send(conversation, text);
+        self.runs.wait(&handle.id).await;
+        handle
+    }
+
+    pub async fn command_turn(
+        &self,
+        conversation: ConversationId,
+        text: &str,
+        command: ChatCommand,
+    ) -> RunHandleDto {
+        let handle = self
+            .chat
+            .send(&ChatSendInput {
+                command: Some(command),
+                ..ChatSendInput::new(conversation, text)
+            })
+            .expect("sends");
         self.runs.wait(&handle.id).await;
         handle
     }
@@ -1433,7 +1453,7 @@ async fn context_breaks_down_the_prompt_and_history_the_next_turn_will_carry() {
             model_id: harness.model_id.clone(),
             settings: None,
             system_prompt: Some("Always be helpful.".to_owned()),
-            enabled_tools: None,
+            command: None,
         })
         .expect("measures a draft");
     assert_eq!(draft.context_window, 1024);
@@ -1463,7 +1483,7 @@ async fn context_breaks_down_the_prompt_and_history_the_next_turn_will_carry() {
             model_id: harness.model_id.clone(),
             settings: None,
             system_prompt: None,
-            enabled_tools: None,
+            command: None,
         })
         .expect("measures a conversation");
     assert_eq!(measured.system, draft.system);

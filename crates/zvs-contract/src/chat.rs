@@ -17,7 +17,6 @@ pub const CONVERSATION_TITLE_MAX: usize = 200;
 pub const SYSTEM_PROMPT_MAX: usize = 100_000;
 pub const CHAT_TEXT_MAX: usize = 100_000;
 pub const ATTACHED_STORES_MAX: usize = 64;
-pub const ENABLED_TOOLS_MAX: usize = 64;
 pub const CHAT_SELECTIONS_MAX: usize = 8;
 pub const SELECTION_TEXT_MAX: usize = 8_000;
 pub const SELECTION_NAME_MAX: usize = 1024;
@@ -50,10 +49,15 @@ wire_enum!(ChatToolCallStatus {
 });
 
 wire_enum!(OfferedToolSource {
-    Selected => "selected",
-    Skill => "skill",
+    Base => "base",
     Knowledge => "knowledge",
-    System => "system",
+    Memory => "memory",
+    Command => "command",
+    Loaded => "loaded",
+});
+
+wire_enum!(ChatCommand {
+    BrowserUse => "browser-use",
 });
 
 wire_enum!(MessageRole {
@@ -72,16 +76,6 @@ fn check_int(field: &str, value: i64) -> Result<(), AppError> {
 
 fn check_title(value: &str) -> Result<(), AppError> {
     check::trimmed_name("title", value, CONVERSATION_TITLE_MAX)
-}
-
-pub fn check_enabled_tools(field: &str, keys: &[String]) -> Result<(), AppError> {
-    if keys.len() > ENABLED_TOOLS_MAX {
-        return Err(invalid(field, "maxItems"));
-    }
-    for (index, key) in keys.iter().enumerate() {
-        check_tool_key(&format!("{field}.{index}"), key)?;
-    }
-    Ok(())
 }
 
 pub fn check_attached_stores(field: &str, ids: &[VectorStoreId]) -> Result<(), AppError> {
@@ -226,11 +220,16 @@ pub struct WebSourceDto {
     pub snippet: String,
     #[serde(default)]
     pub date: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 impl Validate for WebSourceDto {
     fn validate(&self) -> Result<(), AppError> {
         check::url("url", &self.url, WEB_SOURCE_URL_MAX)?;
+        if let Some(icon) = &self.icon {
+            crate::sites::check_web_url("icon", icon)?;
+        }
         check::non_empty("title", &self.title)?;
         check::max_len("title", &self.title, WEB_SOURCE_TEXT_MAX)?;
         check::max_len("snippet", &self.snippet, WEB_SOURCE_TEXT_MAX)?;
@@ -285,8 +284,6 @@ impl Validate for ChatToolCallDto {
 pub struct OfferedToolDto {
     pub key: String,
     pub source: OfferedToolSource,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub roots_only: bool,
 }
 
 impl Validate for OfferedToolDto {
@@ -336,12 +333,6 @@ pub struct CreateConversationInput {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "crate::wire::present"
     )]
-    pub enabled_tools: Option<Vec<String>>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
     pub retrieval_mode: Option<RetrievalMode>,
 }
 
@@ -355,7 +346,6 @@ impl CreateConversationInput {
             system_prompt: None,
             attached_store_ids: None,
             use_relations: None,
-            enabled_tools: None,
             retrieval_mode: None,
         }
     }
@@ -386,14 +376,6 @@ impl CreateConversationInput {
     pub fn retrieval_mode(&self) -> RetrievalMode {
         self.retrieval_mode.unwrap_or(DEFAULT_RETRIEVAL_MODE)
     }
-
-    pub fn enabled_tools(&self) -> Vec<String> {
-        self.enabled_tools
-            .iter()
-            .flatten()
-            .map(|key| js_trim(key).to_owned())
-            .collect()
-    }
 }
 
 impl Validate for CreateConversationInput {
@@ -410,9 +392,6 @@ impl Validate for CreateConversationInput {
         }
         if let Some(ids) = &self.attached_store_ids {
             check_attached_stores("attachedStoreIds", ids)?;
-        }
-        if let Some(keys) = &self.enabled_tools {
-            check_enabled_tools("enabledTools", keys)?;
         }
         Ok(())
     }
@@ -439,8 +418,6 @@ pub struct ConversationDto {
     pub attached_store_ids: Vec<VectorStoreId>,
     #[serde(default)]
     pub use_relations: bool,
-    #[serde(default)]
-    pub enabled_tools: Vec<String>,
     #[serde(default = "default_retrieval_mode")]
     pub retrieval_mode: RetrievalMode,
     #[serde(default)]
@@ -458,7 +435,6 @@ impl Validate for ConversationDto {
         nested("settings", self.settings.validate())?;
         check::max_len("systemPrompt", &self.system_prompt, SYSTEM_PROMPT_MAX)?;
         check_attached_stores("attachedStoreIds", &self.attached_store_ids)?;
-        check_enabled_tools("enabledTools", &self.enabled_tools)?;
         if let Some(folder) = &self.working_folder {
             check_folder_path("workingFolder", folder)?;
         }
@@ -527,6 +503,8 @@ pub struct MessageDto {
     pub tool_calls: Vec<ChatToolCallDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub selections: Vec<DocumentSelectionDto>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<ChatCommand>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub offered_tools: Vec<OfferedToolDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -598,6 +576,12 @@ pub struct ChatSendInput {
     pub settings: Option<ChatSettings>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub selections: Vec<DocumentSelectionDto>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub command: Option<ChatCommand>,
     #[serde(default, skip_serializing_if = "VendorTurnOptions::is_default")]
     pub vendor: VendorTurnOptions,
 }
@@ -611,6 +595,7 @@ impl ChatSendInput {
             model_id: None,
             settings: None,
             selections: Vec::new(),
+            command: None,
             vendor: VendorTurnOptions::default(),
         }
     }
@@ -661,7 +646,7 @@ pub struct ChatContextInput {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "crate::wire::present"
     )]
-    pub enabled_tools: Option<Vec<String>>,
+    pub command: Option<ChatCommand>,
 }
 
 impl Validate for ChatContextInput {
@@ -673,9 +658,6 @@ impl Validate for ChatContextInput {
         if let Some(prompt) = &self.system_prompt {
             check::max_len("systemPrompt", prompt, SYSTEM_PROMPT_MAX)?;
         }
-        if let Some(keys) = &self.enabled_tools {
-            check_enabled_tools("enabledTools", keys)?;
-        }
         Ok(())
     }
 }
@@ -685,6 +667,7 @@ impl Validate for ChatContextInput {
 pub struct ChatContextToolDto {
     pub key: String,
     pub tokens: u64,
+    pub source: OfferedToolSource,
 }
 
 impl Validate for ChatContextToolDto {
@@ -781,25 +764,19 @@ pub struct UpdateConversationRetrievalInput {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct UpdateConversationToolsInput {
-    pub id: ConversationId,
-    pub enabled_tools: Vec<String>,
+pub struct ChatCommandDto {
+    pub command: ChatCommand,
+    pub description: String,
 }
 
-impl UpdateConversationToolsInput {
-    pub fn enabled_tools(&self) -> Vec<String> {
-        self.enabled_tools
-            .iter()
-            .map(|key| js_trim(key).to_owned())
-            .collect()
-    }
-}
-
-impl Validate for UpdateConversationToolsInput {
+impl Validate for ChatCommandDto {
     fn validate(&self) -> Result<(), AppError> {
-        check_enabled_tools("enabledTools", &self.enabled_tools)
+        check::non_empty("description", js_trim(&self.description))?;
+        check::max_len("description", &self.description, 500)
     }
 }
+
+pub type ChatCommandsOutput = Vec<ChatCommandDto>;
 
 pub type ChatConversationsListOutput = Vec<ConversationDto>;
 
@@ -969,12 +946,10 @@ mod tests {
         let input = parse::<CreateConversationInput>(json!({
             "providerId": PROVIDER,
             "modelId": "m",
-            "title": "  Plans  ",
-            "enabledTools": [" mail.send "]
+            "title": "  Plans  "
         }))
         .expect("parses");
         assert_eq!(input.title(), "Plans");
-        assert_eq!(input.enabled_tools(), ["mail.send"]);
         assert_eq!(input.settings(), ChatSettings::default());
         assert!(!input.use_relations());
         let bare =
@@ -987,12 +962,6 @@ mod tests {
             )
             .is_err()
         );
-        assert!(
-            parse::<CreateConversationInput>(
-                json!({ "providerId": PROVIDER, "modelId": "m", "enabledTools": ["mail"] })
-            )
-            .is_err()
-        );
     }
 
     #[test]
@@ -1001,6 +970,22 @@ mod tests {
             parse::<ChatSendInput>(json!({ "conversationId": CONVERSATION, "text": " hi " }))
                 .expect("parses");
         assert_eq!(input.text(), "hi");
+        assert_eq!(input.command, None);
+        let command = parse::<ChatSendInput>(json!({
+            "conversationId": CONVERSATION,
+            "text": "открой сайт",
+            "command": "browser-use"
+        }))
+        .expect("parses");
+        assert_eq!(command.command, Some(ChatCommand::BrowserUse));
+        assert!(
+            parse::<ChatSendInput>(json!({
+                "conversationId": CONVERSATION,
+                "text": "x",
+                "command": "unknown"
+            }))
+            .is_err()
+        );
         assert!(
             parse::<ChatSendInput>(json!({ "conversationId": CONVERSATION, "text": "  " }))
                 .is_err()

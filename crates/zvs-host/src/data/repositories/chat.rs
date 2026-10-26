@@ -1,7 +1,8 @@
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use zvs_contract::{
-    ChatCitationDto, ChatSettings, ChatToolCallDto, RetrievalMode, Timestamp, WebSourceDto,
+    ChatCitationDto, ChatSettings, ChatToolCallDto, OfferedToolDto, RetrievalMode, Timestamp,
+    WebSourceDto,
 };
 
 use crate::data::schema::columns::{EnumColumn, json_text};
@@ -15,7 +16,6 @@ pub struct ConversationPatch {
     pub settings: Option<ChatSettings>,
     pub attached_store_ids: Option<Vec<String>>,
     pub use_relations: Option<bool>,
-    pub enabled_tools: Option<Vec<String>>,
     pub retrieval_mode: Option<RetrievalMode>,
     pub working_folder: Option<Option<String>>,
     pub turn_folder: Option<Option<String>>,
@@ -50,9 +50,6 @@ impl ConversationPatch {
         if let Some(use_relations) = self.use_relations {
             assignments.push(("use_relations", SqlValue::Integer(i64::from(use_relations))));
         }
-        if let Some(keys) = &self.enabled_tools {
-            assignments.push(("enabled_tools", SqlValue::Text(json_text(keys)?)));
-        }
         if let Some(mode) = self.retrieval_mode {
             assignments.push(("retrieval_mode", SqlValue::Text(mode.as_str().to_owned())));
         }
@@ -80,6 +77,7 @@ pub struct MessagePatch {
     pub content: Option<String>,
     pub reasoning: Option<String>,
     pub citations: Option<Vec<ChatCitationDto>>,
+    pub offered_tools: Option<Vec<OfferedToolDto>>,
     pub web_sources: Option<Vec<WebSourceDto>>,
     pub tokens_in: Option<i64>,
     pub tokens_out: Option<i64>,
@@ -100,6 +98,9 @@ impl MessagePatch {
         }
         if let Some(citations) = &self.citations {
             assignments.push(("citations", SqlValue::Text(json_text(citations)?)));
+        }
+        if let Some(offered) = &self.offered_tools {
+            assignments.push(("offered_tools", SqlValue::Text(json_text(offered)?)));
         }
         if let Some(sources) = &self.web_sources {
             assignments.push(("web_sources", SqlValue::Text(json_text(sources)?)));
@@ -161,8 +162,8 @@ impl<'c> ChatRepository<'c> {
     pub fn create(&self, row: &ConversationRow) -> rusqlite::Result<ConversationRow> {
         self.connection
             .prepare_cached(&format!(
-                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, enabled_tools, retrieval_mode, working_folder, turn_folder, profile, created_at, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) RETURNING {}",
+                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, retrieval_mode, working_folder, turn_folder, profile, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14) RETURNING {}",
                 ConversationRow::COLUMNS
             ))?
             .query_row(
@@ -175,7 +176,6 @@ impl<'c> ChatRepository<'c> {
                     row.system_prompt,
                     json_text(&row.attached_store_ids)?,
                     row.use_relations,
-                    json_text(&row.enabled_tools)?,
                     EnumColumn(row.retrieval_mode),
                     row.working_folder,
                     row.turn_folder,
@@ -234,8 +234,8 @@ impl<'c> ChatRepository<'c> {
     pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
         self.connection
             .prepare_cached(
-                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, offered_tools, web_sources, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, created_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, command, offered_tools, web_sources, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
             )?
             .execute(params![
                 row.id,
@@ -245,6 +245,7 @@ impl<'c> ChatRepository<'c> {
                 row.reasoning,
                 json_text(&row.citations)?,
                 json_text(&row.selections)?,
+                row.command.map(EnumColumn),
                 json_text(&row.offered_tools)?,
                 json_text(&row.web_sources)?,
                 row.tokens_in,
@@ -365,7 +366,6 @@ mod tests {
             system_prompt: String::new(),
             attached_store_ids: Vec::new(),
             use_relations: false,
-            enabled_tools: Vec::new(),
             retrieval_mode: RetrievalMode::Hybrid,
             working_folder: None,
             turn_folder: None,
@@ -385,6 +385,7 @@ mod tests {
             citations: Vec::new(),
             tool_calls: Vec::new(),
             selections: Vec::new(),
+            command: None,
             offered_tools: Vec::new(),
             web_sources: Vec::new(),
             tokens_in: 1,
@@ -429,14 +430,12 @@ mod tests {
                         "a",
                         &ConversationPatch {
                             title: Some("Plans".to_owned()),
-                            enabled_tools: Some(vec!["demo.lookup".to_owned()]),
                             use_relations: Some(true),
                             ..ConversationPatch::touched(20)
                         },
                     )?
                     .expect("the row");
                 assert_eq!(patched.title, "Plans");
-                assert_eq!(patched.enabled_tools, ["demo.lookup"]);
                 assert!(patched.use_relations);
                 assert_eq!(patched.updated_at, 20);
                 assert_eq!(

@@ -16,5 +16,6 @@ pub use library::{AuthoredSkill, SKILLS_DIR, SkillLibrary, SkillLibraryOptions};
 pub use nodes::{SKILL_GENERATE, SKILL_LOAD, SKILL_SAVE, SKILL_TOOLS, register_skill_nodes};
 pub use service::{
     SkillCatalogue, SkillCatalogueEntry, SkillService, SkillServiceOptions, catalogue_text,
+    command_skill,
 };
 pub use turn::{SkillTurn, presented, result_limit};
