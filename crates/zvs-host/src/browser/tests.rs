@@ -13,8 +13,8 @@ use zvs_contract::{
 };
 
 use super::agent::{
-    ALWAYS_REFUSED, AgentControls, BrowserAgent, DEFAULT_RATE_LIMIT, NO_SESSION, NOT_PENDING,
-    RATE_PAUSED, RATE_WINDOW_MS,
+    ALWAYS_REFUSED, AgentControls, BrowserAgent, DEFAULT_RATE_LIMIT, GRANT_NOT_FOUND, NO_SESSION,
+    NOT_PENDING, RATE_PAUSED, RATE_WINDOW_MS,
 };
 use super::automation::{
     AutomationPort, BLOCKED_ADDRESS, BROWSER_DENIED, DownloadedFile, ElementTarget, PageMatches,
@@ -1028,6 +1028,31 @@ async fn a_revoked_grant_asks_again_on_the_next_action() {
     assert!(host.snapshot().grants.is_empty());
     host.denied("browser.click", json!({ "handle": "e1" }))
         .await;
+}
+
+#[tokio::test]
+async fn every_site_grant_is_listed_and_a_missing_one_is_not_revoked() {
+    let host = Host::new();
+    let click = host
+        .grants
+        .grant(SHOP, BrowserCapability::Click)
+        .expect("grants clicks");
+    host.grants
+        .grant(OTHER, BrowserCapability::Type)
+        .expect("grants typing elsewhere");
+    let listed = host.agent.site_grants().expect("lists");
+    assert_eq!(listed.len(), 2);
+    let shop = listed
+        .iter()
+        .find(|grant| grant.id == click.id)
+        .expect("lists the shop grant");
+    assert_eq!(shop.origin, SHOP);
+    assert_eq!(shop.tool, "browser.click");
+    host.agent.revoke(&click.id).expect("revokes");
+    assert_eq!(host.agent.site_grants().expect("lists").len(), 1);
+    let missing = host.agent.revoke(&click.id).expect_err("already revoked");
+    assert_eq!(missing.code, AppErrorCode::NotFound);
+    assert_eq!(missing.message, GRANT_NOT_FOUND);
 }
 
 #[tokio::test]

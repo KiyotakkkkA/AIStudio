@@ -113,5 +113,6 @@ pub struct Services {
     pub documents: DocumentService,
     pub artifacts: crate::artifacts::ArtifactStore,
     pub sites: crate::sites::SiteService,
+    pub browser: crate::browser::BrowserAgent,
     pub picker: Option<SharedPicker>,
 }

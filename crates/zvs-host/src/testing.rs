@@ -608,6 +608,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             ),
             artifacts: test_artifacts(workspace.join("conversations")),
             sites: crate::sites::SiteService::new(crate::sites::SiteServiceOptions::default()),
+            browser: crate::browser::BrowserAgent::new(clock.clone()),
             documents: crate::documents::DocumentService::new(
                 crate::documents::DocumentServiceOptions {
                     clock: clock.clone(),

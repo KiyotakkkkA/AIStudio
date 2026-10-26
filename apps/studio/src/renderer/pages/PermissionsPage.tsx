@@ -5,7 +5,10 @@ import { useSearchParams } from "react-router-dom";
 import FolderGrantDetail from "../features/permissions/FolderGrantDetail";
 import FolderGrantList from "../features/permissions/FolderGrantList";
 import ToolDefaultsTable from "../features/permissions/ToolDefaultsTable";
+import SiteGrantsTable from "../features/permissions/SiteGrantsTable";
 import {
+  BROWSER_TAB,
+  BROWSER_TAB_PARAM,
   FOLDERS_TAB,
   NOTHING_SELECTED_DESCRIPTION,
   NOTHING_SELECTED_TITLE,
@@ -13,6 +16,7 @@ import {
   TOOLS_TAB,
   TOOLS_TAB_PARAM,
   grantCountLabel,
+  siteCountLabel,
 } from "../features/permissions/permissionsPresentation";
 import { useStore } from "../stores/useStore";
 import SegmentedControl from "../ui/atoms/SegmentedControl";
@@ -25,6 +29,7 @@ import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../ui/molecules/Load
 const TABS = [
   { value: "folders", label: FOLDERS_TAB },
   { value: TOOLS_TAB_PARAM, label: TOOLS_TAB },
+  { value: BROWSER_TAB_PARAM, label: BROWSER_TAB },
 ] as const;
 
 type TabValue = (typeof TABS)[number]["value"];
@@ -32,7 +37,8 @@ type TabValue = (typeof TABS)[number]["value"];
 function PermissionsPage() {
   const { permissions } = useStore();
   const [params, setParams] = useSearchParams();
-  const tab: TabValue = params.get("tab") === TOOLS_TAB_PARAM ? TOOLS_TAB_PARAM : "folders";
+  const tab: TabValue =
+    TABS.find((option) => option.value === params.get("tab"))?.value ?? "folders";
   const setTab = (value: TabValue) => {
     setParams(value === "folders" ? {} : { tab: value }, { replace: true });
   };
@@ -49,7 +55,13 @@ function PermissionsPage() {
       icon={mdiShieldCheckOutline}
       title={PAGE_TITLE}
       subtitle={
-        awaitingData(permissions) ? (
+        tab === BROWSER_TAB_PARAM ? (
+          permissions.siteGrantsLoaded ? (
+            siteCountLabel(permissions.siteGroups.length)
+          ) : (
+            <InlineSkeleton label={PAGE_LOADING} className="w-28" />
+          )
+        ) : awaitingData(permissions) ? (
           <InlineSkeleton label={PAGE_LOADING} className="w-28" />
         ) : (
           grantCountLabel(permissions.grants.length)
@@ -72,6 +84,8 @@ function PermissionsPage() {
       )}
       {tab === TOOLS_TAB_PARAM ? (
         <ToolDefaultsTable />
+      ) : tab === BROWSER_TAB_PARAM ? (
+        <SiteGrantsTable />
       ) : (
         <div className="flex min-h-0 flex-1">
           <FolderGrantList />

@@ -1,0 +1,11 @@
+[
+  {
+    "name": "click on a site",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "origin": "https://portal.acme.io",
+      "tool": "browser.click",
+      "grantedAt": 1793037480000
+    }
+  }
+]

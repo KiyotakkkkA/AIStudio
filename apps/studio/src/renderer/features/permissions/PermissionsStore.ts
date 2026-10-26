@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import type {
+  BrowserGrantDto,
   Contract,
   FolderGrantDto,
   FolderGrantId,
@@ -9,7 +10,12 @@ import type {
   ToolSource,
 } from "@zvs/shared";
 import { toolErrorCopy } from "../tools/toolPresentation";
-import { LOAD_ERROR, revokeErrorCopy } from "./permissionsPresentation";
+import {
+  LOAD_ERROR,
+  SITES_LOAD_ERROR,
+  groupSiteGrants,
+  revokeErrorCopy,
+} from "./permissionsPresentation";
 
 export interface PermissionsStoreOptions {
   readonly clock?: () => number;
@@ -25,6 +31,9 @@ export default class PermissionsStore {
   revoking = false;
   defaults: ToolDefaultsDto | null = null;
   savingSource: ToolSource | null = null;
+  siteGrants: BrowserGrantDto[] = [];
+  siteGrantsLoaded = false;
+  revokingSiteGrant: string | null = null;
   now: number;
   private readonly clock: () => number;
   private revision = 0;
@@ -64,6 +73,10 @@ export default class PermissionsStore {
 
   get selected(): FolderGrantDto | null {
     return this.grants.find((grant) => grant.id === this.selectedId) ?? null;
+  }
+
+  get siteGroups() {
+    return groupSiteGrants(this.siteGrants);
   }
 
   get isEmpty(): boolean {
@@ -124,6 +137,39 @@ export default class PermissionsStore {
       });
     }
     await this.load();
+  }
+
+  async loadSiteGrants() {
+    try {
+      const grants = await this.ipc.call("browserGrants.list", undefined);
+      runInAction(() => {
+        this.siteGrants = grants;
+        this.siteGrantsLoaded = true;
+        if (this.error === SITES_LOAD_ERROR) this.error = null;
+      });
+    } catch {
+      runInAction(() => {
+        this.error = SITES_LOAD_ERROR;
+      });
+    }
+  }
+
+  async revokeSiteGrant(id: string) {
+    if (this.revokingSiteGrant !== null) return;
+    this.revokingSiteGrant = id;
+    this.error = null;
+    try {
+      await this.ipc.call("browserGrants.revoke", { id });
+    } catch (error) {
+      runInAction(() => {
+        this.error = revokeErrorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.revokingSiteGrant = null;
+      });
+    }
+    await this.loadSiteGrants();
   }
 
   async loadDefaults() {

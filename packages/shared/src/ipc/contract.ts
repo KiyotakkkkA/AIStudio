@@ -28,6 +28,7 @@ import {
   PickFolderResultDto,
 } from "../chat.js";
 import { AnswerFolderRequestInput, FolderGrantDto, FolderGrantRef } from "../folders.js";
+import { BrowserGrantDto, BrowserGrantRef } from "../browser.js";
 import { ChatAnswerInput, ChatSkipInput } from "../questions.js";
 import {
   ClearMemoryInput,
@@ -270,6 +271,8 @@ export const contract = defineContract({
   "folders.list": { input: z.void(), output: z.array(FolderGrantDto) },
   "folders.revoke": { input: FolderGrantRef, output: z.void() },
   "folders.answer": { input: AnswerFolderRequestInput, output: z.void() },
+  "browserGrants.list": { input: z.void(), output: z.array(BrowserGrantDto) },
+  "browserGrants.revoke": { input: BrowserGrantRef, output: z.void() },
   "agentic.list": { input: z.void(), output: z.array(AgenticSessionDto) },
   "agentic.get": { input: AgenticSessionRef, output: AgenticSessionDto },
   "agentic.create": { input: CreateAgenticSessionInput, output: AgenticSessionDto },

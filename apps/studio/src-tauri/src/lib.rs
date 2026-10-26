@@ -896,7 +896,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     });
     register_browser_nodes(
         &nodes,
-        &BrowserTools::new(Arc::new(workspace.clone()), grants, runs.approvals(), agent),
+        &BrowserTools::new(
+            Arc::new(workspace.clone()),
+            grants,
+            runs.approvals(),
+            agent.clone(),
+        ),
     )?;
     register_kernel_tools(&nodes, &tools)?;
     let agentic = AgenticService::new(AgenticServiceOptions {
@@ -1102,6 +1107,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         documents,
         artifacts,
         sites,
+        browser: agent.clone(),
         folders,
         picker: Some(picker),
     });

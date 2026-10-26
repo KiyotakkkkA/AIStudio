@@ -448,6 +448,38 @@ pub enum BrowserCommandOutput {
     NetworkSaved(BrowserNetworkSaved),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserGrantDto {
+    pub id: String,
+    pub origin: String,
+    pub tool: String,
+    pub granted_at: Timestamp,
+}
+
+impl Validate for BrowserGrantDto {
+    fn validate(&self) -> Result<(), AppError> {
+        tab_id(&self.id)?;
+        check::url("origin", &self.origin, URL_MAX)?;
+        check::non_empty("tool", &self.tool)?;
+        check::timestamp("grantedAt", self.granted_at)
+    }
+}
+
+pub type BrowserGrantsListOutput = Vec<BrowserGrantDto>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserGrantRef {
+    pub id: String,
+}
+
+impl Validate for BrowserGrantRef {
+    fn validate(&self) -> Result<(), AppError> {
+        tab_id(&self.id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;

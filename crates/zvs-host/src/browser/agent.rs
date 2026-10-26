@@ -6,7 +6,8 @@ use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, AppErrorCode, BrowserActionState, BrowserAgentAction, BrowserAgentApproval,
-    BrowserAgentState, BrowserAgentStatus, BrowserAuthorisation, BrowserSiteGrant, RunId,
+    BrowserAgentState, BrowserAgentStatus, BrowserAuthorisation, BrowserGrantDto, BrowserSiteGrant,
+    RunId,
 };
 
 use super::capability::BrowserCapability;
@@ -25,6 +26,7 @@ pub const NOT_PENDING: &str = "Подтверждение уже не ожида
 pub const ALWAYS_REFUSED: &str =
     "Это действие подтверждается каждый раз и не разрешается для сайта целиком";
 pub const RATE_PAUSED: &str = "Превышен предел действий в минуту";
+pub const GRANT_NOT_FOUND: &str = "Разрешение не найдено";
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
@@ -526,9 +528,28 @@ impl BrowserAgent {
     }
 
     pub fn revoke(&self, grant_id: &str) -> Result<(), AppError> {
-        self.controls()?.grants.revoke(grant_id)?;
+        if !self.controls()?.grants.revoke(grant_id)? {
+            return Err(AppError::new(AppErrorCode::NotFound, GRANT_NOT_FOUND));
+        }
         self.changed(AgentChange::Updated);
         Ok(())
+    }
+
+    pub fn site_grants(&self) -> Result<Vec<BrowserGrantDto>, AppError> {
+        let Some(controls) = self.0.controls.get() else {
+            return Ok(Vec::new());
+        };
+        Ok(controls
+            .grants
+            .list()?
+            .into_iter()
+            .map(|grant| BrowserGrantDto {
+                id: grant.id,
+                origin: grant.origin,
+                tool: grant.capability.key().to_owned(),
+                granted_at: grant.granted_at,
+            })
+            .collect())
     }
 
     pub fn has_approval(&self) -> bool {

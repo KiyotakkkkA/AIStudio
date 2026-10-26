@@ -77,6 +77,16 @@ export interface BrowserAgentApproval {
   canAlways: boolean;
 }
 
+export const BrowserGrantDto = z.object({
+  id: z.string().uuid(),
+  origin: z.string().url().max(8192),
+  tool: z.string().min(1),
+  grantedAt: z.number().int().nonnegative(),
+});
+export type BrowserGrantDto = z.infer<typeof BrowserGrantDto>;
+export const BrowserGrantRef = z.object({ id: z.string().uuid() });
+export type BrowserGrantRef = z.infer<typeof BrowserGrantRef>;
+
 export interface BrowserSiteGrant {
   id: string;
   tool: string;

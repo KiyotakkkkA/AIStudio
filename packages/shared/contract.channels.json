@@ -20,6 +20,8 @@
   "artifacts.openInBrowser",
   "artifacts.reveal",
   "artifacts.save",
+  "browserGrants.list",
+  "browserGrants.revoke",
   "chat.answer",
   "chat.attach",
   "chat.bindFolder",
