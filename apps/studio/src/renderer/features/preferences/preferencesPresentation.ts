@@ -30,6 +30,7 @@ export const SECTION_LABELS: Record<PreferenceSection, string> = {
   appearance: "Внешний вид",
   notifications: "Уведомления",
   memory: "Память",
+  data: "Данные",
   about: "О системе",
 };
 
@@ -39,6 +40,7 @@ export const SECTION_HINTS: Record<PreferenceSection, string> = {
   appearance: "Тема, шрифт, размер текста и эффекты интерфейса.",
   notifications: "Системные уведомления о событиях приложения.",
   memory: "Факты о пользователе и диалогах, которые модель получает в каждом ходе.",
+  data: "Место на диске, занятое данными приложения, и очистка кэша.",
   about: "Версия приложения и характеристики компьютера.",
 };
 

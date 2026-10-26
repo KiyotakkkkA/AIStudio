@@ -6,6 +6,7 @@ use tokio::runtime::Handle;
 use tokio_util::sync::CancellationToken;
 
 use super::settings::SettingService;
+use crate::conversations::{ConversationFolders, is_owner};
 use crate::data::{Database, Repositories};
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
@@ -25,6 +26,7 @@ pub struct RetentionServiceOptions {
     pub days: i64,
     pub clock: SharedClock,
     pub runtime: Option<Handle>,
+    pub conversations: Option<ConversationFolders>,
 }
 
 impl RetentionServiceOptions {
@@ -38,6 +40,7 @@ impl RetentionServiceOptions {
             days: DEFAULT_RETENTION_DAYS,
             clock: Arc::new(SystemClock),
             runtime: None,
+            conversations: None,
         }
     }
 }
@@ -130,10 +133,21 @@ impl RetentionService {
             let runs = Repositories::new(transaction).runs;
             let ids = runs.prunable(before, options.batch)?;
             runs.drop_payloads(&ids, now)?;
-            Ok(ids.len())
+            let mut owners = Vec::with_capacity(ids.len());
+            for id in ids {
+                let subject = runs.get(&id)?.and_then(|run| run.subject_id);
+                owners.push((subject.filter(|subject| is_owner(subject)), id));
+            }
+            Ok(owners)
         });
         match pruned {
-            Ok(pruned) => {
+            Ok(owners) => {
+                if let Some(folders) = &options.conversations {
+                    for (subject, run) in &owners {
+                        folders.forget_run(subject.as_deref().unwrap_or(run), run);
+                    }
+                }
+                let pruned = owners.len();
                 if pruned > 0 {
                     options.logger.log(
                         LogLevel::Info,

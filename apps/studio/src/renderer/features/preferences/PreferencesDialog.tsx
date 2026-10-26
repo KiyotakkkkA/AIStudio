@@ -7,9 +7,11 @@ import {
   mdiBrain,
   mdiClose,
   mdiCogOutline,
+  mdiHarddisk,
   mdiInformationOutline,
   mdiPaletteOutline,
 } from "@mdi/js";
+import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
@@ -20,6 +22,7 @@ import Toggle from "../../ui/atoms/Toggle";
 import TextComposer from "../../ui/molecules/TextComposer";
 import AppLogo from "../../ui/atoms/AppLogo";
 import Reveal from "../../ui/motion/Reveal";
+import { MeterBar, StackedBar, percent } from "../../ui/molecules/StackedBar";
 import ActivePill from "../../ui/motion/ActivePill";
 import FadeIn from "../../ui/motion/FadeIn";
 import { useStore } from "../../stores/useStore";
@@ -73,6 +76,21 @@ import {
   type ToggleRowCopy,
 } from "./preferencesPresentation";
 import PreferencesSearch from "./PreferencesSearch";
+import {
+  STORAGE_BREAKDOWN,
+  STORAGE_CATEGORY_FILLS,
+  STORAGE_CATEGORY_LABELS,
+  STORAGE_CLEAR,
+  STORAGE_CLEAR_CACHE,
+  STORAGE_CLEAR_CACHE_HINT,
+  STORAGE_CLEAR_CONFIRM,
+  STORAGE_CLEAR_CONSEQUENCE,
+  STORAGE_CLEAR_ID,
+  STORAGE_LOADING,
+  STORAGE_REFRESH,
+  STORAGE_TITLE,
+  storageSize,
+} from "./storageCopy";
 import MemoryFacts from "../memory/MemoryFacts";
 import { DISABLED_NOTE, ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
 import { aboutSettingId, SETTING_ENTRIES, SETTING_IDS } from "./settingsIndex";
@@ -106,6 +124,7 @@ const SECTION_ICONS: Record<PreferenceSection, string> = {
   appearance: mdiPaletteOutline,
   notifications: mdiBellOutline,
   memory: mdiBrain,
+  data: mdiHarddisk,
   about: mdiInformationOutline,
 };
 
@@ -453,6 +472,101 @@ const MemorySection = observer(function MemorySection() {
   );
 });
 
+const DataSection = observer(function DataSection() {
+  const { storage } = useStore();
+  useEffect(() => {
+    void storage.load();
+  }, [storage]);
+  const usage = storage.usage;
+  const total = usage?.totalBytes ?? 0;
+  const parts = storage.categories.map((item) => ({
+    key: item.category,
+    value: item.bytes,
+    fill: STORAGE_CATEGORY_FILLS[item.category],
+  }));
+  return (
+    <div className="flex flex-col gap-4 pt-2">
+      <section className="space-y-3.5 rounded-card border border-line bg-main-900 p-3.5 text-[12px] text-main-300">
+        <div className="space-y-2">
+          <div className="flex items-baseline gap-2">
+            <p className="m-0 flex-1 text-[13px] font-semibold text-main-50">{STORAGE_TITLE}</p>
+            <span className="font-mono text-[12px] font-semibold text-main-100 tabular-nums">
+              {usage === null ? STORAGE_LOADING : storageSize(total)}
+            </span>
+          </div>
+          <StackedBar parts={parts} total={total} className="h-2" />
+        </div>
+        {usage === null ? null : (
+          <div>
+            <div className="flex items-baseline justify-between">
+              <p className="m-0 font-semibold text-main-100">{STORAGE_BREAKDOWN}</p>
+              <Button
+                tone="ghost"
+                size="sm"
+                disabled={storage.loading || storage.clearing}
+                onClick={() => void storage.load(true)}
+              >
+                {STORAGE_REFRESH}
+              </Button>
+            </div>
+            <ul className="m-0 mt-1 list-none divide-y divide-line p-0">
+              {storage.categories.map((item) => (
+                <li key={item.category} className="flex items-center gap-2 py-1.5">
+                  <span
+                    className={`size-2 shrink-0 rounded-full ${STORAGE_CATEGORY_FILLS[item.category]}`}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-main-300">
+                    {STORAGE_CATEGORY_LABELS[item.category]}
+                  </span>
+                  <MeterBar
+                    value={item.bytes}
+                    total={total}
+                    fill={STORAGE_CATEGORY_FILLS[item.category]}
+                    className="w-24"
+                  />
+                  <span className="w-16 shrink-0 text-right font-mono text-[11px] text-main-400 tabular-nums">
+                    {storageSize(item.bytes)}
+                  </span>
+                  <span className="w-9 shrink-0 text-right font-mono text-[11px] text-main-500">
+                    {percent(item.bytes, total)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+      <div className="flex flex-col">
+        <SettingRow
+          id={STORAGE_CLEAR_ID}
+          label={STORAGE_CLEAR_CACHE}
+          hint={STORAGE_CLEAR_CACHE_HINT}
+          error={storage.error ?? undefined}
+        >
+          <Button
+            tone="ghost"
+            disabled={storage.clearing}
+            needConfirm
+            modalSetup={{
+              title: STORAGE_CLEAR_CONFIRM,
+              content: STORAGE_CLEAR_CONSEQUENCE,
+              confirmLabel: STORAGE_CLEAR,
+            }}
+            onClick={() => void storage.clearCache()}
+          >
+            {STORAGE_CLEAR}
+          </Button>
+        </SettingRow>
+        {storage.notice === null ? null : (
+          <p role="status" className="m-0 pt-1 text-[12px] text-main-500">
+            {storage.notice}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+});
+
 const AboutSection = observer(function AboutSection() {
   const { about } = useStore();
   useEffect(() => {
@@ -587,6 +701,7 @@ function PreferencesDialog() {
             {section === "appearance" ? <AppearanceSection /> : null}
             {section === "notifications" ? <NotificationsSection /> : null}
             {section === "memory" ? <MemorySection /> : null}
+            {section === "data" ? <DataSection /> : null}
             {section === "about" ? <AboutSection /> : null}
           </FadeIn>
         </ScrollArea>

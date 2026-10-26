@@ -33,6 +33,7 @@ use super::chat_history::{
 use super::chat_memory::{
     MEMORY_FAILED, MEMORY_TOOL, MemoryRefs, apply_memory_call, memory_section, memory_tool,
 };
+use super::chat_reply::{ReplyBuffers, ReplyChunk, TOOL_CALL_DOMAIN, apply_tool_call};
 use super::chat_tools::{
     CHAT_TOOL_CALLS, HYBRID_INSTRUCTION, KNOWLEDGE_INSTRUCTION, KnowledgeText, OfferedTool,
     TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result,
@@ -167,6 +168,7 @@ struct Inner {
     logger: SharedLogger,
     clock: SharedClock,
     listeners: Mutex<Vec<ChatMessageListener>>,
+    replies: Mutex<ReplyBuffers>,
 }
 
 #[derive(Clone)]
@@ -519,72 +521,83 @@ impl Inner {
         self.logger.log(level, "chat", message, fields);
     }
 
+    fn replies(&self) -> std::sync::MutexGuard<'_, ReplyBuffers> {
+        self.replies.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn append_reply(&self, id: &str, chunk: &ReplyChunk, now: i64) -> Result<(), AppError> {
+        self.read(|repositories| {
+            Ok(repositories.chat.append_message(
+                id,
+                &chunk.content,
+                &chunk.reasoning,
+                chunk.tokens,
+                now,
+            )?)
+        })
+    }
+
     fn record(&self, assistant_id: &str, event: &HostEvent) -> Result<(), AppError> {
+        let now = self.now();
+        if let HostEventDraft::Token { delta, kind } = &event.body {
+            let due = self.replies().push(assistant_id, now, delta, *kind);
+            return due.map_or(Ok(()), |chunk| self.append_reply(assistant_id, &chunk, now));
+        }
+        let pending = self.replies().take(assistant_id);
+        if let Some(chunk) = pending {
+            self.append_reply(assistant_id, &chunk, now)?;
+        }
+        if !matches!(event.body, HostEventDraft::End { .. }) {
+            return Ok(());
+        }
         let Some(message) =
             self.read(|repositories| Ok(repositories.chat.get_message(assistant_id)?))?
         else {
             return Ok(());
         };
-        let duration = (self.now() - message.created_at).max(0);
-        match &event.body {
-            HostEventDraft::Token { delta, kind } => {
-                let reasoning = *kind == Some(DeltaKind::Reasoning);
-                let patch = MessagePatch {
-                    content: (!reasoning).then(|| format!("{}{delta}", message.content)),
-                    reasoning: reasoning.then(|| format!("{}{delta}", message.reasoning)),
-                    tokens_out: Some(message.tokens_out + tokens(delta)),
-                    duration_ms: Some(duration),
-                    ..MessagePatch::default()
-                };
-                self.update_message(assistant_id, &patch)
-            }
-            HostEventDraft::End { .. } => {
-                self.update_message(
-                    assistant_id,
-                    &MessagePatch {
-                        duration_ms: Some(duration),
-                        ..MessagePatch::default()
+        let duration = (now - message.created_at).max(0);
+        self.update_message(
+            assistant_id,
+            &MessagePatch {
+                duration_ms: Some(duration),
+                ..MessagePatch::default()
+            },
+        )?;
+        let conversation = self.get(&message.conversation_id)?;
+        let renamed = conversation
+            .messages
+            .iter()
+            .find(|item| item.role == MessageRole::User)
+            .filter(|_| {
+                conversation.conversation.title == DEFAULT_CONVERSATION_TITLE
+                    && !message.content.is_empty()
+            })
+            .map(|first| {
+                let collapsed = SPACES.replace_all(&first.content, " ");
+                js_slice(&collapsed, TITLE_MAX).to_owned()
+            });
+        let id = message.conversation_id.clone();
+        let run_id = message.run_id.clone();
+        self.database.transaction(|transaction| {
+            let repositories = Repositories::new(transaction);
+            repositories.chat.update(
+                &id,
+                &ConversationPatch {
+                    title: renamed.clone(),
+                    ..ConversationPatch::touched(now)
+                },
+            )?;
+            if let (Some(title), Some(run_id)) = (&renamed, &run_id) {
+                repositories.runs.update(
+                    run_id,
+                    &RunPatch {
+                        title: Some(title.clone()),
+                        ..RunPatch::default()
                     },
                 )?;
-                let conversation = self.get(&message.conversation_id)?;
-                let renamed = conversation
-                    .messages
-                    .iter()
-                    .find(|item| item.role == MessageRole::User)
-                    .filter(|_| {
-                        conversation.conversation.title == DEFAULT_CONVERSATION_TITLE
-                            && !message.content.is_empty()
-                    })
-                    .map(|first| {
-                        let collapsed = SPACES.replace_all(&first.content, " ");
-                        js_slice(&collapsed, TITLE_MAX).to_owned()
-                    });
-                let id = message.conversation_id.clone();
-                let run_id = message.run_id.clone();
-                let now = self.now();
-                self.database.transaction(|transaction| {
-                    let repositories = Repositories::new(transaction);
-                    repositories.chat.update(
-                        &id,
-                        &ConversationPatch {
-                            title: renamed.clone(),
-                            ..ConversationPatch::touched(now)
-                        },
-                    )?;
-                    if let (Some(title), Some(run_id)) = (&renamed, &run_id) {
-                        repositories.runs.update(
-                            run_id,
-                            &RunPatch {
-                                title: Some(title.clone()),
-                                ..RunPatch::default()
-                            },
-                        )?;
-                    }
-                    Ok(())
-                })
             }
-            _ => Ok(()),
-        }
+            Ok(())
+        })
     }
 
     fn mcp_guidance(
@@ -640,6 +653,7 @@ impl Inner {
         context: &StepContext,
         assistant_id: &str,
         calls: &Mutex<Vec<ChatToolCallDto>>,
+        changed: &[usize],
     ) {
         let snapshot = calls.lock().unwrap_or_else(PoisonError::into_inner).clone();
         if snapshot.is_empty() {
@@ -661,10 +675,17 @@ impl Inner {
                 ],
             );
         }
-        let mut step = serde_json::Map::new();
-        step.insert("domain".to_owned(), json!("tool-calls"));
-        step.insert("calls".to_owned(), json!(snapshot));
-        let _ = context.emit(HostEventDraft::Step { step });
+        for index in changed {
+            let Some(call) = snapshot.get(*index) else {
+                continue;
+            };
+            let step = serde_json::Map::from_iter([
+                ("domain".to_owned(), json!(TOOL_CALL_DOMAIN)),
+                ("index".to_owned(), json!(index)),
+                ("call".to_owned(), json!(call)),
+            ]);
+            let _ = context.emit(HostEventDraft::Step { step });
+        }
     }
 }
 
@@ -1557,7 +1578,7 @@ impl GenerateChatNode {
                     record.result = preview.map(|preview| preview.text);
                     record.duration_ms = u64::try_from(inner.now() - started).unwrap_or(0);
                 }
-                inner.save_tool_calls(context, assistant_id, calls);
+                inner.save_tool_calls(context, assistant_id, calls, &[index]);
                 match result {
                     None => format!(
                         "Tool call {}: {}",
@@ -1574,7 +1595,7 @@ impl GenerateChatNode {
                     }
                 }
             };
-        inner.save_tool_calls(context, assistant_id, calls);
+        inner.save_tool_calls(context, assistant_id, calls, &[index]);
         if let Some(reason) = options.refuse {
             return Ok(plain(settle(
                 ChatToolCallStatus::Refused,
@@ -1623,7 +1644,7 @@ impl GenerateChatNode {
                 guard[index].status = ChatToolCallStatus::AwaitingAnswer;
                 guard[index].meta = record(None);
             }
-            inner.save_tool_calls(context, assistant_id, calls);
+            inner.save_tool_calls(context, assistant_id, calls, &[index]);
             return match context.ask_user(request.clone()).await {
                 Ok(outcome) => {
                     calls.lock().unwrap_or_else(PoisonError::into_inner)[index].meta =
@@ -1724,6 +1745,7 @@ impl GenerateChatNode {
                     &observer_context,
                     &observer_assistant,
                     &observer_calls,
+                    &[index],
                 );
             })),
         };
@@ -2038,9 +2060,10 @@ impl GenerateChatNode {
         }
         .await;
         if let Err(error) = outcome {
+            let mut changed = Vec::new();
             {
                 let mut guard = calls.lock().unwrap_or_else(PoisonError::into_inner);
-                for call in guard.iter_mut() {
+                for (index, call) in guard.iter_mut().enumerate() {
                     if matches!(
                         call.status,
                         ChatToolCallStatus::Running
@@ -2053,10 +2076,12 @@ impl GenerateChatNode {
                         } else {
                             error.message.clone()
                         });
+                        changed.push(index);
                     }
                 }
             }
-            self.0.save_tool_calls(context, &assistant_id, &calls);
+            self.0
+                .save_tool_calls(context, &assistant_id, &calls, &changed);
             return Err(error);
         }
         Ok(GenerateOutput { text, reasoning })
@@ -2158,6 +2183,7 @@ impl ChatService {
             logger: options.logger,
             clock: options.clock,
             listeners: Mutex::new(Vec::new()),
+            replies: Mutex::new(ReplyBuffers::default()),
         });
         options.registry.register(PrepareNode(Arc::clone(&inner)))?;
         options
@@ -2911,12 +2937,16 @@ impl ChatService {
                     _ => attached.content.push_str(&delta),
                 },
                 HostEventDraft::Step { step } => {
-                    if step.get("domain").and_then(Value::as_str) == Some("tool-calls")
-                        && let Some(Ok(calls)) = step
-                            .get("calls")
-                            .map(|calls| serde_json::from_value(calls.clone()))
+                    if step.get("domain").and_then(Value::as_str) == Some(TOOL_CALL_DOMAIN)
+                        && let Some(index) = step
+                            .get("index")
+                            .and_then(Value::as_u64)
+                            .and_then(|index| usize::try_from(index).ok())
+                        && let Some(Ok(call)) = step
+                            .get("call")
+                            .map(|call| serde_json::from_value(call.clone()))
                     {
-                        attached.tool_calls = calls;
+                        apply_tool_call(&mut attached.tool_calls, index, call);
                     }
                     if step.get("nodeId").and_then(Value::as_str) == Some("persist")
                         && step.get("status").and_then(Value::as_str) == Some("succeeded")

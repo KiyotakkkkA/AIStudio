@@ -20,6 +20,7 @@ import ScenarioStore from "../features/scenarios/ScenarioStore";
 import AgenticStore from "../features/agentic/AgenticStore";
 import PermissionsStore from "../features/permissions/PermissionsStore";
 import AboutStore from "../features/preferences/AboutStore";
+import StorageStore from "../features/preferences/StorageStore";
 import AppSettingsStore from "../features/preferences/AppSettingsStore";
 import MemoryStore from "../features/memory/MemoryStore";
 import ProfileStore from "../features/preferences/ProfileStore";
@@ -48,6 +49,7 @@ export class RootStore {
   readonly agentic: AgenticStore;
   readonly permissions: PermissionsStore;
   readonly about: AboutStore;
+  readonly storage: StorageStore;
   readonly appSettings: AppSettingsStore;
   readonly memory: MemoryStore;
   readonly profile: ProfileStore;
@@ -73,6 +75,7 @@ export class RootStore {
     this.agentic = new AgenticStore(environment.ipc, environment.events);
     this.permissions = new PermissionsStore(environment.ipc);
     this.about = new AboutStore(environment.ipc);
+    this.storage = new StorageStore(environment.ipc);
     this.appSettings = new AppSettingsStore(environment.ipc);
     this.memory = new MemoryStore(environment.ipc);
     this.profile = new ProfileStore(environment.ipc);

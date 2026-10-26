@@ -154,19 +154,26 @@ test("live tool-call events drive the cards and keep their approval out of the g
     ...handle,
     seq: 1,
     ts: Date.now(),
-    step: { domain: "tool-calls", calls: [pendingCall] },
+    step: { domain: "tool-call", index: 0, call: { ...pendingCall, status: "running" } },
+  });
+  events.dispatch({
+    type: "step",
+    ...handle,
+    seq: 2,
+    ts: Date.now(),
+    step: { domain: "tool-call", index: 0, call: pendingCall },
   });
   events.dispatch({
     type: "approval",
     ...handle,
-    seq: 2,
+    seq: 3,
     ts: Date.now(),
     request: { id: approvalId, runId: handle.id, subject: "mcp.docs.search" },
   });
   events.dispatch({
     type: "approval",
     ...handle,
-    seq: 3,
+    seq: 4,
     ts: Date.now(),
     request: { id: "0199bb11-5555-7111-8111-000000000009", runId: handle.id, subject: "other" },
   });

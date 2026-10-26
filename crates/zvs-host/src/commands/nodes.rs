@@ -15,6 +15,7 @@ use zvs_contract::{
 
 use crate::artifacts::{Snapshot, library_env, mentioned_paths, produced, snapshot};
 use crate::chat_files::{CHAT_DIR_ENV, is_working};
+use crate::conversations::is_owner;
 use crate::files::roots::{
     PathRoot, ROOTS_ONLY, ROOTS_UNAVAILABLE, RootKind, SKILL_READ_ONLY, VirtualRoots, path_root,
 };
@@ -814,7 +815,13 @@ impl NodeDef for ShellRunNode {
                             .map_or(true, |relative| !is_working(relative))
                 })
                 .collect();
-            let mut kept = store.keep(&context.run_id.to_string(), &results);
+            let run = context.run_id.to_string();
+            let owner = if is_owner(&input.conversation_id) {
+                input.conversation_id.as_str()
+            } else {
+                run.as_str()
+            };
+            let mut kept = store.keep(owner, &run, &results);
             for (name, folder, previous) in &libraries {
                 kept.extend(store.adopt(name, &produced(folder, previous, &[], started)));
             }

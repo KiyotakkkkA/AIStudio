@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, ChatToolCallStatus, ConversationId, CreateConversationInput,
-    HostEventDraft, ModelCapability, ProviderCapability, RunHandleDto, RunListFilter, RunStatus,
-    ToolDto, ToolMode, ToolSource, ToolTier, Validate,
+    AppError, AppErrorCode, ChatToolCallStatus, ConversationId, CreateConversationInput, DeltaKind,
+    HostEvent, HostEventDraft, ModelCapability, ProviderCapability, RunHandleDto, RunListFilter,
+    RunStatus, ToolDto, ToolMode, ToolSource, ToolTier, Validate,
 };
 
 use super::{Harness, HarnessOptions, OneDriver, eventually, within};
@@ -32,6 +32,7 @@ use crate::kernel::{
     FnNode, NodeRegistry, PermissionRequirement, StepContext, register_core_nodes,
 };
 use crate::services::chat_ask::{ASK_MALFORMED, ASK_ONCE, ASK_SKIPPED, ASK_TOOL};
+use crate::services::chat_reply::{TOOL_CALL_DOMAIN, apply_tool_call};
 use crate::services::chat_tools::{CHAT_TOOL_CALLS, TOOL_BUDGET_NOTE, TOOL_RESULTS_INSTRUCTION};
 use crate::services::profile::TOOL_CALLS_KEY;
 use crate::testing::{FAKE_CAPABILITIES, TemporaryDatabase, temporary_database};
@@ -462,7 +463,9 @@ async fn a_native_call_is_admitted_run_as_its_own_step_and_fed_back_fenced_befor
     assert_eq!(page.items[0].progress.total, 3);
     assert!(test.harness.events().iter().any(|event| matches!(
         &event.body,
-        HostEventDraft::Step { step } if step.get("domain") == Some(&json!("tool-calls"))
+        HostEventDraft::Step { step } if step.get("domain") == Some(&json!(TOOL_CALL_DOMAIN))
+            && step.get("index") == Some(&json!(0))
+            && step["call"]["id"] == json!(record.id)
     )));
 }
 
@@ -1627,4 +1630,110 @@ async fn attaching_to_a_turn_waiting_on_a_question_returns_the_question() {
         .expect("skips");
     within(test.harness.runs.wait(&handle.id)).await;
     assert_eq!(attached(&test, created), None);
+}
+
+#[derive(Debug, Default, PartialEq)]
+struct Replayed {
+    content: String,
+    reasoning: String,
+    tool_calls: Vec<zvs_contract::ChatToolCallDto>,
+    steps: Vec<serde_json::Map<String, Value>>,
+}
+
+fn replayed(events: &[HostEvent]) -> Replayed {
+    let mut state = Replayed::default();
+    for event in events {
+        match &event.body {
+            HostEventDraft::Token { delta, kind } => match kind {
+                Some(DeltaKind::Reasoning) => state.reasoning.push_str(delta),
+                _ => state.content.push_str(delta),
+            },
+            HostEventDraft::Step { step }
+                if step.get("domain") == Some(&json!(TOOL_CALL_DOMAIN)) =>
+            {
+                let index = step["index"].as_u64().expect("an index") as usize;
+                let call = serde_json::from_value(step["call"].clone()).expect("a call");
+                apply_tool_call(&mut state.tool_calls, index, call);
+            }
+            HostEventDraft::Step { step } if step.contains_key("attempt") => {
+                state.steps.push(step.clone());
+            }
+            _ => {}
+        }
+    }
+    state
+}
+
+#[tokio::test]
+async fn a_recorded_turn_with_tool_calls_replays_to_the_live_state_from_a_lean_log() {
+    let test = Loop::new();
+    test.driver.round(|_| {
+        let mut deltas: Vec<TextDelta> = (0..40)
+            .map(|index| TextDelta::Content {
+                text: format!("мысль{index} "),
+                kind: DeltaKind::Reasoning,
+            })
+            .collect();
+        deltas.push(text("Поиск."));
+        for index in 0..3 {
+            deltas.push(call_with_id(
+                "demo__lookup",
+                &json!({ "query": format!("{index}{}", "x".repeat(1500)) }),
+                &format!("call_{index}"),
+            ));
+        }
+        deltas
+    });
+    test.driver.round(|_| {
+        (0..400)
+            .map(|index| text(&format!("слово{index} ")))
+            .collect()
+    });
+    let created = test.conversation(&["demo.lookup"]);
+
+    let handle = test.turn(created, "Question").await;
+
+    let live: Vec<HostEvent> = test
+        .harness
+        .events()
+        .into_iter()
+        .filter(|event| event.stream_id == handle.stream_id)
+        .collect();
+    let record = test
+        .harness
+        .runs
+        .record(&handle.id.to_string())
+        .expect("events");
+    let (rows, bytes): (i64, i64) = test
+        .harness
+        .database
+        .with_connection(|connection| {
+            Ok(connection.query_row(
+                "SELECT COUNT(*), SUM(LENGTH(event)) FROM run_event WHERE run_id = ?1",
+                [handle.id.to_string()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )?)
+        })
+        .expect("measures");
+    let live_bytes: usize = live
+        .iter()
+        .map(|event| serde_json::to_string(event).expect("serialises").len())
+        .sum();
+    eprintln!(
+        "run_event: {rows} rows, {bytes} bytes; live: {} events, {live_bytes} bytes",
+        live.len()
+    );
+
+    assert_eq!(test.harness.status(&handle), RunStatus::Succeeded);
+    let assistant = test.harness.last(created);
+    let state = replayed(&live);
+    assert_eq!(replayed(&record), state);
+    assert_eq!(state.tool_calls, assistant.tool_calls);
+    assert_eq!(state.content, assistant.content);
+    assert_eq!(state.reasoning, assistant.reasoning);
+    assert!(rows * 10 < live.len() as i64, "{rows} of {}", live.len());
+    assert!(
+        usize::try_from(bytes).expect("bytes") * 2 < live_bytes,
+        "{bytes} of {live_bytes}"
+    );
 }

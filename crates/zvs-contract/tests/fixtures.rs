@@ -516,6 +516,22 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::DownloadReportDto>,
     ),
     (
+        "storage/StorageCategory",
+        round_trip::<zvs_contract::StorageCategory>,
+    ),
+    (
+        "storage/StorageUsageDto",
+        round_trip::<zvs_contract::StorageUsageDto>,
+    ),
+    (
+        "storage/StorageUsageInput",
+        round_trip::<zvs_contract::StorageUsageInput>,
+    ),
+    (
+        "storage/StorageClearCacheOutput",
+        round_trip::<zvs_contract::StorageClearCacheOutput>,
+    ),
+    (
         "runtimes/ModelFormat",
         round_trip::<zvs_contract::ModelFormat>,
     ),

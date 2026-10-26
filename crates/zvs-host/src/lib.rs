@@ -6,6 +6,7 @@ pub mod artifacts;
 pub mod browser;
 pub mod chat_files;
 pub mod commands;
+pub mod conversations;
 pub mod data;
 pub mod documents;
 pub mod downloads;

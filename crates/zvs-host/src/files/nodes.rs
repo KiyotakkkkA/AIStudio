@@ -22,6 +22,7 @@ use super::roots::{
 use super::text::{Decoded, content_hash, decode};
 use super::walk::{WalkOptions, walk};
 use crate::chat_files::within_quota;
+use crate::conversations::{ConversationFolders, is_owner};
 use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext};
 use crate::platform::ids::new_id;
 use crate::platform::long_path::extended;
@@ -131,16 +132,16 @@ fn all_virtual<'a>(paths: impl IntoIterator<Item = Option<&'a str>>) -> bool {
 
 #[derive(Clone)]
 pub struct FileToolOptions {
-    pub runs_dir: PathBuf,
+    pub conversations: ConversationFolders,
     pub ledger: ReadLedger,
     pub fault: Option<Fault>,
     pub roots: VirtualRoots,
 }
 
 impl FileToolOptions {
-    pub fn new(runs_dir: PathBuf) -> Self {
+    pub fn new(conversations: PathBuf) -> Self {
         Self {
-            runs_dir,
+            conversations: ConversationFolders::new(conversations),
             ledger: ReadLedger::new(),
             fault: None,
             roots: VirtualRoots::default(),
@@ -1174,11 +1175,16 @@ impl NodeDef for FsApplyNode {
             )
             .await?;
         context.check_cancelled()?;
+        let owner = if is_owner(&input.conversation_id) {
+            input.conversation_id.as_str()
+        } else {
+            run.as_str()
+        };
         let folder = tools
             .options
-            .runs_dir
-            .join(&run)
-            .join("snapshots")
+            .conversations
+            .snapshots(owner, &run)
+            .ok_or_else(|| AppError::new(AppErrorCode::NativeError, SNAPSHOT_FAILED))?
             .join(new_id().simple().to_string());
         let fault = tools.options.fault.clone();
         let committed = planned.clone();

@@ -147,6 +147,7 @@ import {
 import { AccountDto, AccountLinkInput, AccountLinkResult, AccountRef } from "../accounts.js";
 import { AdapterDescriptorDto } from "../ai.js";
 import { DeviceProfileDto, ResourceSampleDto } from "../system.js";
+import { StorageClearCacheOutput, StorageUsageDto, StorageUsageInput } from "../storage.js";
 import { InstallRuntimeInput, RuntimeOverviewDto, RuntimeRef } from "../runtimes/index.js";
 import {
   ToolchainDto,
@@ -439,6 +440,8 @@ export const contract = defineContract({
     input: z.object({ refresh: z.boolean().default(false) }),
     output: DiskUsageDto,
   },
+  "storage.usage": { input: StorageUsageInput, output: StorageUsageDto },
+  "storage.clearCache": { input: z.void(), output: StorageClearCacheOutput },
   "accounts.list": { input: z.void(), output: z.array(AccountDto) },
   "accounts.link": { input: AccountLinkInput, output: AccountLinkResult },
   "accounts.cancelLink": { input: AccountLinkInput, output: z.object({ cancelled: z.boolean() }) },

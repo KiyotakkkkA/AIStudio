@@ -6,7 +6,6 @@ use zvs_contract::{AppError, AppErrorCode};
 use crate::artifacts::ArtifactStore;
 use crate::platform::long_path::extended;
 
-pub const CHAT_FOLDERS: &str = "chats";
 pub const CHAT_DIR_ENV: &str = "ZVS_CHAT_DIR";
 pub const WORKING_PREFIX: char = '_';
 pub const CHAT_FOLDER_MAX_BYTES: u64 = 200 * 1024 * 1024;
@@ -16,29 +15,17 @@ pub const NO_CHAT: &str = "Рабочая папка доступна тольк
 pub const CHAT_FOLDER_FULL: &str = "Рабочая папка диалога заполнена";
 pub const CHAT_FOLDER_FAILED: &str = "Не удалось открыть рабочую папку диалога";
 
-fn is_owner(owner: &str) -> bool {
-    !owner.is_empty()
-        && owner.len() <= 64
-        && owner
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || character == '-')
-}
-
 pub fn is_working(relative: &Path) -> bool {
     relative.components().any(|component| {
         matches!(component, Component::Normal(name) if name.to_string_lossy().starts_with(WORKING_PREFIX))
     })
 }
 
-pub fn chat_root(store: &ArtifactStore) -> PathBuf {
-    store.root().join(CHAT_FOLDERS)
-}
-
 pub fn chat_dir(store: &ArtifactStore, owner: &str) -> Result<PathBuf, AppError> {
-    if !is_owner(owner) {
-        return Err(AppError::new(AppErrorCode::ValidationFailed, NO_CHAT));
-    }
-    let folder = chat_root(store).join(owner);
+    let folder = store
+        .folders()
+        .work(owner)
+        .ok_or_else(|| AppError::new(AppErrorCode::ValidationFailed, NO_CHAT))?;
     std::fs::create_dir_all(extended(&folder)).map_err(|error| {
         AppError::new(AppErrorCode::Unknown, CHAT_FOLDER_FAILED)
             .with_detail("raw", error.to_string())
@@ -47,9 +34,7 @@ pub fn chat_dir(store: &ArtifactStore, owner: &str) -> Result<PathBuf, AppError>
 }
 
 pub fn remove_chat_dir(store: &ArtifactStore, owner: &str) {
-    if is_owner(owner) {
-        let _ = std::fs::remove_dir_all(extended(&chat_root(store).join(owner)));
-    }
+    store.folders().remove(owner);
 }
 
 fn walk(folder: &Path, base: &Path, out: &mut Vec<(String, u64)>) {

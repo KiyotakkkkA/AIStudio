@@ -4,6 +4,7 @@ import { Dropdown, Tooltip } from "@kiyotakkkka/zvs-uikit-lib";
 import type { ChatContextDto, ToolDto } from "@zvs/shared";
 import { sourceGroups, sourceKey } from "../tools/toolFilters";
 import type ChatStore from "./ChatStore";
+import { MeterBar, StackedBar, percent, share } from "../../ui/molecules/StackedBar";
 
 interface Segment {
   readonly key: string;
@@ -30,17 +31,6 @@ function plural(count: number, forms: readonly [string, string, string]): string
   return forms[2];
 }
 
-function share(tokens: number, total: number): number {
-  return total > 0 ? Math.min(100, (tokens / total) * 100) : 0;
-}
-
-function percent(tokens: number, total: number): string {
-  const value = share(tokens, total);
-  if (value === 0) return "0%";
-  if (value < 1) return "<1%";
-  return `${Math.round(value)}%`;
-}
-
 function segments(context: ChatContextDto): Segment[] {
   return [
     { key: "system", label: "Системный промпт", tokens: context.system, fill: "bg-accent-dark" },
@@ -53,30 +43,6 @@ function segments(context: ChatContextDto): Segment[] {
       fill: "bg-main-500/45",
     },
   ];
-}
-
-function StackedBar({
-  parts,
-  total,
-  className,
-}: {
-  readonly parts: readonly Segment[];
-  readonly total: number;
-  readonly className: string;
-}) {
-  return (
-    <div className={`flex overflow-hidden rounded-full bg-main-700 ${className}`}>
-      {parts.map((part) =>
-        part.tokens > 0 ? (
-          <span
-            key={part.key}
-            className={`h-full min-w-0.5 anim-on:transition-[width] anim-on:duration-300 ${part.fill}`}
-            style={{ width: `${share(part.tokens, total)}%` }}
-          />
-        ) : null,
-      )}
-    </div>
-  );
 }
 
 function ContextRing({
@@ -176,12 +142,7 @@ function ToolUsage({
                 >
                   {isBuiltinTool(tool.key) ? builtinTitle(tool.key) : tool.key}
                 </span>
-                <span className="h-1 w-16 shrink-0 overflow-hidden rounded-full bg-main-700">
-                  <span
-                    className="block h-full rounded-full bg-info anim-on:transition-[width] anim-on:duration-300"
-                    style={{ width: `${Math.max(4, share(cost, context.contextWindow))}%` }}
-                  />
-                </span>
+                <MeterBar value={cost} total={context.contextWindow} fill="bg-info" />
                 <span className="w-9 shrink-0 text-right font-mono text-[11px] text-main-500">
                   {percent(cost, context.contextWindow)}
                 </span>
@@ -242,7 +203,11 @@ export default observer(function ChatContextMeter({ store }: { readonly store: C
                 {percent(store.contextUsed, limit)}
               </span>
             </div>
-            <StackedBar parts={parts} total={limit} className="h-2" />
+            <StackedBar
+              parts={parts.map((part) => ({ key: part.key, value: part.tokens, fill: part.fill }))}
+              total={limit}
+              className="h-2"
+            />
             {context === null ? (
               <p className="text-[11.5px] text-main-500">Разбивка доступна после выбора модели.</p>
             ) : null}

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "total differs from the categories",
+    "value": {
+      "totalBytes": 10,
+      "categories": [{ "category": "cache", "bytes": 3 }],
+      "measuredAt": 1760000000000
+    }
+  },
+  {
+    "name": "unknown category",
+    "value": {
+      "totalBytes": 1,
+      "categories": [{ "category": "models", "bytes": 1 }],
+      "measuredAt": 1760000000000
+    }
+  },
+  {
+    "name": "negative bytes",
+    "value": {
+      "totalBytes": -1,
+      "categories": [{ "category": "logs", "bytes": -1 }],
+      "measuredAt": 1760000000000
+    }
+  }
+]

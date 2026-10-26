@@ -875,10 +875,20 @@ async fn retention_keeps_the_run_summary_and_drops_step_payloads_past_the_window
     let id = history.run("job", "Старое задание", work()).await;
     let settings = SettingService::new(history.database.shared(), history.clock.clone());
     let logger = MemoryLogger::shared();
+    let root = tempfile::tempdir().expect("a conversations folder");
+    let folders = crate::conversations::ConversationFolders::new(root.path().to_path_buf());
+    let run = id.to_string();
+    let snapshot = folders.snapshots(&run, &run).expect("snapshots");
+    std::fs::create_dir_all(&snapshot).expect("creates");
+    std::fs::write(snapshot.join("a.txt"), "before").expect("writes");
+    let output = root.path().join("report.pdf");
+    std::fs::write(&output, "pdf").expect("writes");
+    folders.record_outputs(&run, &run, std::slice::from_ref(&output));
     let retention = RetentionService::new(RetentionServiceOptions {
         settings: Some(settings.clone()),
         clock: history.clock.clone(),
         logger: logger.clone(),
+        conversations: Some(folders.clone()),
         ..RetentionServiceOptions::new(history.database.shared())
     });
     assert_eq!(retention.days(), 30);
@@ -888,9 +898,12 @@ async fn retention_keeps_the_run_summary_and_drops_step_payloads_past_the_window
         Some(json!({ "ok": true }))
     );
 
+    assert!(snapshot.exists());
     history.clock.advance(31 * 24 * 60 * 60 * 1000);
     assert_eq!(retention.sweep(), 1);
     assert_eq!(retention.sweep(), 0);
+    assert!(!root.path().join(&run).exists());
+    assert!(output.is_file());
     assert_eq!(
         logger.matching("Pruned step payloads past retention").len(),
         1

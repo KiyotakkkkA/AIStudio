@@ -588,9 +588,10 @@ async fn a_stale_or_unread_file_refuses_the_batch() {
     let snapshots = host
         .services
         .workspace
-        .join("runs")
-        .join(fresh.id.to_string())
-        .join("snapshots");
+        .join(crate::conversations::CONVERSATIONS_DIR)
+        .join(conversation.to_string())
+        .join(crate::conversations::SNAPSHOTS_DIR)
+        .join(fresh.id.to_string());
     let batch = std::fs::read_dir(&snapshots)
         .expect("a snapshot folder")
         .filter_map(Result::ok)

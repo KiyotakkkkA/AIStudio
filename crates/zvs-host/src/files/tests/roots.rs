@@ -7,9 +7,9 @@ const SKILL: &str = "extract";
 fn chat_folder(host: &Host, conversation: ConversationId) -> PathBuf {
     host.services
         .workspace
-        .join("artifacts")
-        .join(crate::chat_files::CHAT_FOLDERS)
+        .join(crate::conversations::CONVERSATIONS_DIR)
         .join(conversation.to_string())
+        .join(crate::conversations::WORK_DIR)
 }
 
 fn with_skill(host: &Host) {

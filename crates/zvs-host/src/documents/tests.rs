@@ -587,7 +587,9 @@ async fn an_artifact_opens_through_the_store_even_inside_a_forbidden_folder() {
             &[],
             Arc::new(Vec::new),
         ));
-        options.artifacts = Some(crate::artifacts::ArtifactStore::new(root.clone()));
+        let store = crate::artifacts::ArtifactStore::new(root.clone());
+        store.keep("run-1", "r1", std::slice::from_ref(&artifact));
+        options.artifacts = Some(store);
     });
 
     let opened = fixture

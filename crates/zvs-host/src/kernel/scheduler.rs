@@ -190,6 +190,10 @@ impl Scheduler {
         &self.cancel
     }
 
+    pub const fn stream(&self) -> &Arc<RunStream> {
+        &self.stream
+    }
+
     pub fn cancel(&self) {
         self.cancel.cancel();
     }

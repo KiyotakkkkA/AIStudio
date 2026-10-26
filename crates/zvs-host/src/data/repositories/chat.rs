@@ -288,6 +288,23 @@ impl<'c> ChatRepository<'c> {
         Ok(())
     }
 
+    pub fn append_message(
+        &self,
+        id: &str,
+        content: &str,
+        reasoning: &str,
+        tokens_out: i64,
+        now: Timestamp,
+    ) -> rusqlite::Result<()> {
+        self.connection
+            .prepare_cached(
+                "UPDATE message SET content = content || ?2, reasoning = reasoning || ?3, \
+                 tokens_out = tokens_out + ?4, duration_ms = MAX(?5 - created_at, 0) WHERE id = ?1",
+            )?
+            .execute(params![id, content, reasoning, tokens_out, now])?;
+        Ok(())
+    }
+
     pub fn truncate_from(&self, conversation_id: &str, message_id: &str) -> rusqlite::Result<()> {
         let Some(target) = self.get_message(message_id)? else {
             return Ok(());

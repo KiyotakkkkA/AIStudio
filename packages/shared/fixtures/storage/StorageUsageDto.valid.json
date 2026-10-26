@@ -1,0 +1,19 @@
+[
+  {
+    "name": "measured",
+    "value": {
+      "totalBytes": 616,
+      "categories": [
+        { "category": "conversations", "bytes": 30 },
+        { "category": "toolchain", "bytes": 317 },
+        { "category": "browser", "bytes": 254 },
+        { "category": "database", "bytes": 15 }
+      ],
+      "measuredAt": 1760000000000
+    }
+  },
+  {
+    "name": "nothing measured",
+    "value": { "totalBytes": 0, "categories": [], "measuredAt": 1760000000000 }
+  }
+]

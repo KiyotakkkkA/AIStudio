@@ -1,0 +1,4 @@
+[
+  { "name": "negative", "value": { "removedBytes": -1 } },
+  { "name": "missing", "value": {} }
+]

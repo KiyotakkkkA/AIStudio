@@ -1,0 +1,4 @@
+[
+  { "name": "refresh as a string", "value": { "refresh": "true" } },
+  { "name": "null refresh", "value": { "refresh": null } }
+]

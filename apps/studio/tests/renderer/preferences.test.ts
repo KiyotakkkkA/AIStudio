@@ -133,13 +133,14 @@ function appSettings(seed: Record<string, Json> = {}) {
   return { bridge, stored, store: new AppSettingsStore(createIpcClient(contract, bridge)) };
 }
 
-test("the application group lists general, profile, appearance, notifications, memory and about in order", () => {
+test("the application group lists general, profile, appearance, notifications, memory, data and about in order", () => {
   expect(PREFERENCE_SECTIONS.map((section) => SECTION_LABELS[section])).toEqual([
     "Общие",
     "Профиль",
     "Внешний вид",
     "Уведомления",
     "Память",
+    "Данные",
     "О системе",
   ]);
   expect(GENERAL_ROWS.map((row) => row.key)).toEqual(["app.autostart", "app.tray"]);

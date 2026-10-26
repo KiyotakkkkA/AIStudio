@@ -110,6 +110,9 @@ mod tests {
         let root = host.shared().artifacts.root().to_path_buf();
         std::fs::create_dir_all(root.join("run")).expect("a run folder");
         std::fs::write(root.join("run").join("a.pdf"), b"%PDF-1.7").expect("writes");
+        host.shared()
+            .artifacts
+            .keep("run", "r1", &[root.join("run").join("a.pdf")]);
         let mut server =
             IpcServer::new(host.shared(), silent_logger()).with_output_validation(true);
         register(&mut server);

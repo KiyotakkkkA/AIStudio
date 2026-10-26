@@ -47,6 +47,7 @@ export const PREFERENCE_SECTIONS = [
   "appearance",
   "notifications",
   "memory",
+  "data",
   "about",
 ] as const;
 export type PreferenceSection = (typeof PREFERENCE_SECTIONS)[number];

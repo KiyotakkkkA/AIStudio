@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use zvs_contract::{
     EventSeq, HostEvent, HostEventDraft, LogLineDto, RunGraph, RunKind, RunOutcomeDto, RunStatus,
     StepStatus, Timestamp,
@@ -420,17 +422,18 @@ impl<'c> RunRepository<'c> {
     }
 
     pub fn append_event(&self, run_id: &str, event: &HostEvent) -> rusqlite::Result<()> {
+        let stored = lean_event(event);
         self.connection
             .prepare_cached("INSERT INTO run_event (run_id, seq, event) VALUES (?1, ?2, ?3)")?
             .execute(params![
                 run_id,
                 i64::try_from(event.seq).unwrap_or(i64::MAX),
-                json_text(event)?
+                json_text(stored.as_ref().unwrap_or(event))?
             ])?;
         Ok(())
     }
 
-    pub fn events(&self, run_id: &str) -> rusqlite::Result<Vec<HostEvent>> {
+    fn stored_events(&self, run_id: &str) -> rusqlite::Result<Vec<HostEvent>> {
         self.connection
             .prepare_cached("SELECT event FROM run_event WHERE run_id = ?1 ORDER BY seq")?
             .query_map([run_id], |row| {
@@ -439,9 +442,24 @@ impl<'c> RunRepository<'c> {
             .collect()
     }
 
+    pub fn events(&self, run_id: &str) -> rusqlite::Result<Vec<HostEvent>> {
+        let mut events = self.stored_events(run_id)?;
+        if events.iter().any(is_lean) {
+            let steps: HashMap<String, StepRow> = self
+                .steps(run_id)?
+                .into_iter()
+                .map(|step| (step.id.clone(), step))
+                .collect();
+            for event in &mut events {
+                hydrate(event, &steps);
+            }
+        }
+        Ok(events)
+    }
+
     pub fn logs(&self, run_id: &str) -> rusqlite::Result<Vec<LogLineDto>> {
         Ok(self
-            .events(run_id)?
+            .stored_events(run_id)?
             .into_iter()
             .filter_map(|event| match event.body {
                 HostEventDraft::Log { line } => Some(line),
@@ -527,6 +545,59 @@ impl<'c> RunRepository<'c> {
         )?;
         Ok(finished.len())
     }
+}
+
+const STEP_PAYLOAD: [&str; 2] = ["input", "output"];
+
+fn kernel_step(step: &Map<String, Value>) -> bool {
+    ["id", "runId", "nodeId", "attempt"]
+        .iter()
+        .all(|key| step.contains_key(*key))
+}
+
+fn lean_event(event: &HostEvent) -> Option<HostEvent> {
+    let HostEventDraft::Step { step } = &event.body else {
+        return None;
+    };
+    if !kernel_step(step) {
+        return None;
+    }
+    let mut step = step.clone();
+    for key in STEP_PAYLOAD {
+        step.remove(key);
+    }
+    Some(HostEvent::new(
+        event.stream_id,
+        event.seq,
+        event.ts,
+        HostEventDraft::Step { step },
+    ))
+}
+
+fn is_lean(event: &HostEvent) -> bool {
+    matches!(&event.body, HostEventDraft::Step { step } if kernel_step(step) && !step.contains_key("output"))
+}
+
+fn hydrate(event: &mut HostEvent, steps: &HashMap<String, StepRow>) {
+    if !is_lean(event) {
+        return;
+    }
+    let HostEventDraft::Step { step } = &mut event.body else {
+        return;
+    };
+    let row = step
+        .get("id")
+        .and_then(Value::as_str)
+        .and_then(|id| steps.get(id));
+    let settled = row.is_some_and(|row| {
+        serde_json::to_value(row.status).is_ok_and(|status| step.get("status") == Some(&status))
+    });
+    let input = row.map_or(Value::Null, |row| row.input.clone());
+    let output = row
+        .filter(|_| settled)
+        .map_or(Value::Null, |row| row.output.clone());
+    step.insert("input".to_owned(), input);
+    step.insert("output".to_owned(), output);
 }
 
 #[cfg(test)]
@@ -643,6 +714,67 @@ mod tests {
                 }
                 assert_eq!(runs.next_sequence("r1")?, 2);
                 assert_eq!(runs.logs("r1")?.len(), 2);
+                Ok(())
+            })
+            .expect("the repository works");
+    }
+
+    #[test]
+    fn step_events_are_stored_without_payloads_and_read_back_whole() {
+        let database = temporary_database();
+        database
+            .with_connection(|connection| {
+                let runs = Repositories::new(connection).runs;
+                runs.create(&draft("r1", RunStatus::Running, 10))?;
+                let stream = StreamId::parse(STREAM).expect("a stream id");
+                let event = |seq: EventSeq, step: &StepRow| {
+                    let value = json!({
+                        "id": step.id,
+                        "runId": step.run_id,
+                        "nodeId": step.node_id,
+                        "type": step.step_type,
+                        "status": step.status,
+                        "input": step.input,
+                        "output": step.output,
+                        "error": step.error,
+                        "startedAt": step.started_at,
+                        "finishedAt": step.finished_at,
+                        "attempt": step.attempt,
+                    });
+                    let Value::Object(step) = value else {
+                        unreachable!("a step event is an object")
+                    };
+                    HostEvent::new(stream, seq, 1, HostEventDraft::Step { step })
+                };
+                let mut running = step("s1", "r1", StepStatus::Running);
+                running.input = json!({ "request": "x".repeat(4000) });
+                runs.add_step(&running)?;
+                let started = event(0, &running);
+                runs.append_event("r1", &started)?;
+                let mut done = running.clone();
+                done.status = StepStatus::Succeeded;
+                done.output = json!({ "messages": "y".repeat(4000) });
+                done.finished_at = Some(9);
+                runs.update_step(&done)?;
+                let finished = event(1, &done);
+                runs.append_event("r1", &finished)?;
+                let domain = HostEvent::new(
+                    stream,
+                    2,
+                    1,
+                    HostEventDraft::Step {
+                        step: Map::from_iter([("domain".to_owned(), json!("tool-call"))]),
+                    },
+                );
+                runs.append_event("r1", &domain)?;
+
+                let stored: i64 = connection.query_row(
+                    "SELECT SUM(LENGTH(event)) FROM run_event WHERE run_id = 'r1'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert!(stored < 1000, "{stored}");
+                assert_eq!(runs.events("r1")?, [started, finished, domain]);
                 Ok(())
             })
             .expect("the repository works");

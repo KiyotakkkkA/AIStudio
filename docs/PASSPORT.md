@@ -393,6 +393,22 @@ repositories.
   failure. A failed migration blocks boot and shows a recovery window. The app never runs on
   a half-migrated database.
 - Backup the DB file before each migration run; keep the last three.
+- `run_event` is the replay log, kept lean (TASK_045_EXTRA_5). Kernel step events are stored
+  without `input` and `output`; `runs.events` puts them back from the `step` row (the output
+  only when the event's status is the row's). Tokens reach the renderer one by one, but they
+  are stored merged per kind: a merged row is written when another event commits, the kind
+  changes, or 250 ms have passed. The row carries the last token's `seq`, so the log has gaps.
+  `RunService::record` adds the tail that has not been written yet for a live run. The chat
+  appends to the message row at most every 250 ms, using SQL concatenation. Chat tool-call
+  progress is a `step` event `{ domain: "tool-call", index, call }` with one call. The full
+  list stays in `message.tool_calls`.
+- One folder per conversation or agentic session: `<app data>/conversations/<id>/` with
+  `work/` (the chat folder), `outputs/manifest.json` (created files, recorded by reference,
+  never copied) and `snapshots/<runId>/` (`fs.apply` originals). A run without a conversation
+  uses its own id as the folder. Removing the conversation removes the folder. Retention
+  removes a pruned run's snapshots and manifest entries, but not the files they point to.
+  `storage.usage` reports bytes per category, cached until `refresh`. `storage.clearCache`
+  empties `cache/` and is refused while a run is unfinished.
 
 Aggregates (initial): `secret`, `identity`, `provider`, `model`, `vector_store`,
 `vector_document`, `conversation`, `message`, `scenario`, `scenario_version`, `run`, `step`,
@@ -686,7 +702,7 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `move`, `delete`, ≤ 1 MiB of text), plans them in memory over the disk, refuses the whole
   batch on any forbidden or escaping path, on a binary or non-UTF-8 target, or on a file this
   run did not read with `fs.read` or that changed since (a run-scoped read ledger of content
-  hashes). It snapshots the originals to `runs/<runId>/snapshots/<batch>/` with a
+  hashes). It snapshots the originals to `conversations/<id>/snapshots/<runId>/<batch>/` with a
   `manifest.json`, writes each file through a temp file renamed over the target, and restores
   everything already written if any write fails. NTFS has no cross-file transaction: this is
   all-or-nothing by rollback, not atomic. Line endings and a BOM are kept.
@@ -708,8 +724,9 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   fenced output.
 - **Created files** (`zvs-host/src/artifacts.rs`, TASK_043). After a skill script runs, the
   documents it created or changed in its scratch folder (and paths named in its arguments) are
-  copied to `<app data>/artifacts/<runId>/` and reported in the tool call's `meta.artifacts`
-  (`ArtifactDto`, id `<runId>/<name>`). The chat shows each as a card with «Скачать»
+  recorded by reference in `<app data>/conversations/<id>/outputs/manifest.json` and reported in
+  the tool call's `meta.artifacts` (`ArtifactDto`, id `<id>/<name>`, names unique per
+  conversation). An id resolves only through the manifest, so a moved or deleted file is gone. The chat shows each as a card with «Скачать»
   (`artifacts.save`: a save dialog, then a copy) and «Перейти» (`artifacts.reveal`). Ids never
   resolve outside the artifact folder.
 - **Artifact libraries and pages.** A library is a named app folder whose files are reported
@@ -722,12 +739,12 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `artifacts.openInApp` opens HTML, SVG, PDF and images in the agent browser (§21) without
   relaxing its web-only navigation: the host serves them from a loopback page server
   (`zvs-host/src/artifact_pages.rs`) started on first use, bound to `127.0.0.1` on a random
-  port, `GET /<token>/<run>/<name>` only, with a per-launch random token, a `Host` check
+  port, `GET /<token>/<id>/<name>` only, with a per-launch random token, a `Host` check
   against DNS rebinding, and `Content-Security-Policy: default-src 'none'; script-src
   'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'` — a
   page can run its own inline code but cannot load or send anything.
 - **Chat working folder** (`zvs-host/src/chat_files.rs`). Each conversation, and each agentic
-  session, owns `<app data>/artifacts/chats/<id>/`, created on first use and removed with the
+  session, owns `<app data>/conversations/<id>/work/`, created on first use and removed with the
   conversation or session. It is the one app folder an agent reaches without a grant: in a
   chat or session a skill script runs with it as the working directory and `ZVS_CHAT_DIR`
   (other callers keep the per-run scratch folder), and the file tools reach it as `chat:`
@@ -742,8 +759,8 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   same turn. The folder is capped at 200 MB and
   1000 files, and writes go through `fs.apply`'s temporary files. Names whose path has a
   segment starting with `_` are working files: they never become artifact cards. Other
-  documents a script creates there are reported like scratch results (copied to
-  `<app data>/artifacts/<runId>/`). Nothing in the folder is ever opened or run by the host.
+  documents a script creates there are reported like scratch results (recorded in the
+  conversation's `outputs/manifest.json`). Nothing in the folder is ever opened or run by the host.
 - **Working folder explorer** (`zvs-host/src/workspace/explorer.rs`, TASK_036_EXTRA_4). The
   «Файлы» side panel in the chat is the user browsing their own folder, not a tool call:
   `workspace.list` / `workspace.read` raise **no** access request, but they require the chat's

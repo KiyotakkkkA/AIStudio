@@ -30,6 +30,7 @@ pub mod scenarios;
 pub mod secrets;
 pub mod settings;
 pub mod skills;
+pub mod storage;
 pub mod system;
 pub mod terminal;
 pub mod toolchain;
@@ -191,6 +192,10 @@ pub use skills::{
     SkillFileInput, SkillFileRef, SkillImportInput, SkillImportResultDto, SkillIssueDto,
     SkillIssueRule, SkillModelDto, SkillRef, SkillRemoveOutput, SkillSource, SkillStatus,
     SkillTriggerSettingsDto, SkillUpdateDto, UpdateSkillInput, is_skill_key, is_skill_path,
+};
+pub use storage::{
+    StorageCategory, StorageCategoryUsage, StorageClearCacheOutput, StorageUsageDto,
+    StorageUsageInput,
 };
 pub use system::{
     DeviceGpuDto, DeviceProfileDto, DeviceTier, ResourceSampleDto, SystemDemoJobInput,

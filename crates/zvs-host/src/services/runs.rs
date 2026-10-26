@@ -627,10 +627,10 @@ impl RunService {
     pub fn detail(&self, id: &RunId) -> Result<RunDetailDto, AppError> {
         let row = read_run(&self.inner.database, &id.to_string())?;
         let run = run_dto(&row)?;
-        let (logs, events) = self.inner.database.with_connection(|connection| {
-            let runs = Repositories::new(connection).runs;
-            Ok((runs.logs(&row.id)?, runs.events(&row.id)?))
+        let logs = self.inner.database.with_connection(|connection| {
+            Ok(Repositories::new(connection).runs.logs(&row.id)?)
         })?;
+        let events = self.record(&row.id)?;
         let summary = self
             .summaries(std::slice::from_ref(&row))?
             .pop()
@@ -893,9 +893,17 @@ impl RunService {
     }
 
     pub fn record(&self, id: &str) -> Result<Vec<HostEvent>, AppError> {
-        self.inner
-            .database
-            .with_connection(|connection| Ok(Repositories::new(connection).runs.events(id)?))
+        let stream = self
+            .active()
+            .get(id)
+            .map(|active| Arc::clone(active.scheduler.stream()));
+        match stream {
+            Some(stream) => stream.record(),
+            None => self
+                .inner
+                .database
+                .with_connection(|connection| Ok(Repositories::new(connection).runs.events(id)?)),
+        }
     }
 }
 

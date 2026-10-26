@@ -427,7 +427,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         )
     });
     let roots = crate::files::VirtualRoots::new(
-        Some(test_artifacts(workspace.join("artifacts"))),
+        Some(test_artifacts(workspace.join("conversations"))),
         Some(skill_library.clone()),
     );
     crate::skills::register_skill_nodes(&nodes, &skill_library).expect("registers the skill nodes");
@@ -485,7 +485,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         &folders,
         crate::files::FileToolOptions {
             roots: roots.clone(),
-            ..crate::files::FileToolOptions::new(workspace.join("runs"))
+            ..crate::files::FileToolOptions::new(workspace.join("conversations"))
         },
     )
     .expect("registers the file nodes");
@@ -545,9 +545,22 @@ pub fn test_services(system: SystemService) -> TestServices {
         notifications: Some(notifications.clone()),
         files_dir: workspace.join("scenario-files"),
     }));
+    let storage = crate::services::StorageService::new(
+        crate::services::StorageRoots::resolve(&crate::platform::paths::StudioPaths::resolve(
+            &crate::platform::paths::PathEnvironment {
+                data_dir: workspace.join("data"),
+                resource_dir: workspace.join("resources"),
+                executable_dir: workspace.join("bin"),
+                packaged: false,
+            },
+        )),
+        database.shared(),
+        clock.clone(),
+    );
     TestServices {
         services: Arc::new(Services {
             system,
+            storage,
             accounts,
             settings,
             secrets,
@@ -592,12 +605,12 @@ pub fn test_services(system: SystemService) -> TestServices {
                     home: workspace.join("home"),
                 },
             ),
-            artifacts: test_artifacts(workspace.join("artifacts")),
+            artifacts: test_artifacts(workspace.join("conversations")),
             documents: crate::documents::DocumentService::new(
                 crate::documents::DocumentServiceOptions {
                     clock: clock.clone(),
                     reveal: Arc::new(|_: &Path| Ok(())),
-                    artifacts: Some(test_artifacts(workspace.join("artifacts"))),
+                    artifacts: Some(test_artifacts(workspace.join("conversations"))),
                     picker: Some(picker.clone()),
                     ..crate::documents::DocumentServiceOptions::new(
                         database.shared(),

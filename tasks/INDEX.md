@@ -202,7 +202,7 @@ Electron app untouched. TASK_066's CDP client is reused by TASK_046.
 - [x] **TASK_045_EXTRA_2** — Tool dialects in the web adapters: the injected protocol leaves the service layer
 - [x] **TASK_045_EXTRA_3** — Chat turn reattach: a reopened chat shows the live turn, its approvals and its questions
 - [x] **TASK_045_EXTRA_4** — Skill read-first files: required references arrive with `skill.load`, tool names match the wire *(after TASK_045_EXTRA_1)*
-- [ ] **TASK_045_EXTRA_5** — Storage: lean run events, one folder per conversation, disk usage by category *(after TASK_045_EXTRA_3)*
+- [x] **TASK_045_EXTRA_5** — Storage: lean run events, one folder per conversation, disk usage by category *(after TASK_045_EXTRA_3)*
 
 The five `TASK_045_EXTRA_` tasks come from the 2026-10-25 audit of tools, tool-call parsing,
 chat restore, skills and storage. They sit under TASK_045 by numbering only and do not depend
@@ -321,7 +321,7 @@ you can settle the load-bearing ones early rather than being interrupted mid-tas
 | TASK_040 (resolved) | Option (a): 25 steps, 200 000 tokens, 15 minutes; exhaustion pauses the session and `agentic.extend` continues it. The three limits are read from settings (`agentic.budget.maxSteps`, `maxTokens`, `maxMinutes`) for TASK_052 to expose. | yes |
 | TASK_043 (superseded by ADR 0003) | LibreOffice integration removed in TASK_044 after the managed copy crashed on almost every conversion. Office documents render in the renderer (docx-preview, an OOXML sheet reader, slide text). «Компоненты» holds Node.js and uv. | moderate |
 | TASK_045_EXTRA_1 (resolved) | Option (a), all three: `chat.file` → `fs.*` on `chat:`, `skill.read` → `fs.read` on `skill:<key>/`, `skill.script` → `shell.run` with `argv[0] = skill:<key>/scripts/<file>`. The tier of a `chat:` or `skill:` call is decided in the permission resolver (`AppFolder`). | yes |
-| TASK_045_EXTRA_5 | Existing chat folders and artifacts: migrate to `conversations/<id>/…` on first start, new layout for new conversations only, or skip the layout and do events and usage only (fallback)? | **no** — moves user data |
+| TASK_045_EXTRA_5 (resolved) | The user first chose (c), then changed it during the task: the new layout `conversations/<id>/{work,outputs,snapshots}` applies to every conversation, with no migration and no backward compatibility for beta data. Old `artifacts/` and `runs/` folders are not read, and old `<runId>/<name>` artifact ids no longer resolve. | **no** — moves user data |
 | TASK_049 | Does mail send automatically once approved, or per message? | yes |
 | TASK_050 | Telegram: bot account, or your personal account? | **no** |
 | TASK_056 | Code-sign the installer? Auto-update or manual? WebView2 runtime: download, embed bootstrapper, or offline? | moderate |

@@ -2,7 +2,7 @@
 task: TASK_045_EXTRA_5
 title: Storage — lean run events, one folder per conversation, disk usage by category
 phase: 8 — Documents and the agent browser
-status: todo
+status: done
 depends_on: [TASK_045, TASK_045_EXTRA_3]
 unblocks: []
 estimate: 6 h
@@ -135,16 +135,65 @@ conversation and confirm its folder is gone, and open «Хранилище».
 
 ## Definition of done
 
-- [ ] Tool-call deltas, coalesced tokens, no step outputs in events; replay tests pass
-- [ ] Event bytes before / after recorded in Handoff
-- [ ] Decision recorded; part B done or explicitly skipped
-- [ ] No orphaned folders after conversation removal or retention
-- [ ] `storage.usage` and the «Хранилище» section; contract in three places
-- [ ] Gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Tool-call deltas, coalesced tokens, no step outputs in events; replay tests pass
+- [x] Event bytes before / after recorded in Handoff
+- [x] Decision recorded; part B done or explicitly skipped
+- [x] No orphaned folders after conversation removal or retention
+- [x] `storage.usage` and the «Хранилище» section; contract in three places
+- [x] Gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- Part A, events. `run_event` stores kernel step events without `input`/`output`
+  (`RunRepository::append_event`). `events()` puts them back from the `step` row, and adds the
+  output only when the event's status is the row's, so replay is exact. `RunStream` streams
+  every token live but stores them merged per kind (`TokenBuffer`): a merged row is written
+  when another event commits, the kind changes, or 250 ms pass, plus a best-effort flush on
+  drop. `RunService::record` and `runs.detail` add the unwritten tail for a live run, under
+  the stream gate, so reattach sees every token. Chat tool-call progress is
+  `{ domain: "tool-call", index, call }`, one call per event. `ChatStore`, `chat.attach` and
+  the replay tests apply it by index. `ChatService::record` buffers reply text
+  (`chat_reply.rs`, `ReplyBuffers`) and appends with `content = content || ?` at most every
+  250 ms and before any other event. The old read-modify-write per token is gone.
+- Measured on the fixture turn `a_recorded_turn_with_tool_calls_replays_to_the_live_state_from_a_lean_log`
+  (40 reasoning tokens, 3 tool calls with 1.5 k-character arguments, 400 answer tokens):
+  **before** 468 rows / 154 116 bytes in `run_event`; **after** 29 rows / 24 992 bytes
+  (16× fewer rows, 6.2× fewer bytes). Live delivery is still 468 events.
+- Part B, layout (no migration, by the user's decision). `conversations/<id>/` holds `work/`
+  (was `artifacts/chats/<id>`), `outputs/manifest.json` (created files recorded by reference,
+  never copied, names unique per conversation) and `snapshots/<runId>/` (was
+  `runs/<run>/snapshots`). `conversations.rs` (`ConversationFolders`) owns the layout.
+  `ArtifactStore` resolves `<id>/<name>` through the manifest only. A run with no
+  conversation uses its run id as the folder. Removing a conversation or agentic session
+  removes the whole folder. Retention calls `forget_run`, which drops the run's snapshots
+  and manifest entries and removes folders left empty. `StudioPaths::runs_dir` became
+  `conversations_dir`.
+- `storage.usage` and `storage.clearCache`: Rust (`zvs-contract/src/storage.rs`), Zod
+  (`packages/shared/src/storage.ts`), fixtures in `packages/shared/fixtures/storage/`.
+  `StorageService` measures 11 categories in a blocking task and caches the result until a
+  refresh. Clearing the cache empties `cache/`, is refused with `Conflict` while a run is
+  unfinished, and drops the cached result.
+- Preferences: a «Данные» section (renamed from «Хранилище» at the user's request).
+  `StorageStore` drives a card in the chat context-meter style: a stacked bar, rows with a
+  colour dot, a meter, the size and a share, «Пересчитать», and a confirmed «Очистить кэш».
+  `StackedBar` / `MeterBar` / `share` / `percent` moved to `ui/molecules/StackedBar.tsx`, and
+  `ChatContextMeter` uses them too. Sizes go through `toLocaleString("ru-RU")`.
+
 **Deviated from plan:**
+- Step outputs still travel in **live** step events, because the scenario canvas, agentic
+  tool cards and chat retrieval citations read them. Only the stored copy is lean.
+- Part B was first skipped (option c), then done at the user's request without backward
+  compatibility: no migration, and old ids are not kept.
+- `downloads/downloadPresentation.ts` and `tasks/runPresentation.ts` still format bytes
+  with `toFixed`, which gives a dot decimal separator. Left alone; the new section has its
+  own ru-RU formatter.
+
 **Next session should know:**
+- Beta data under `<app data>/artifacts/` and `<app data>/runs/` is now orphaned. Nothing
+  reads it, and «Данные» does not count it.
+- `apps/studio/src/renderer/ui/organisms/NavRail.tsx` fails `prettier --check` on `main`
+  already. It is not part of this change.
+- `run_event` seqs now have gaps (merged tokens carry the last seq). `next_sequence` uses
+  the max, and `chat.attach` returns the max including the live tail.

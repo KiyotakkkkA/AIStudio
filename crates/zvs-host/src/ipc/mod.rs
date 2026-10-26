@@ -17,6 +17,7 @@ pub mod secrets;
 mod server;
 pub mod settings;
 pub mod skills;
+pub mod storage;
 pub mod system;
 pub mod terminal;
 pub mod toolchain;
@@ -51,6 +52,7 @@ pub fn register(server: &mut IpcServer) {
     terminal::register(server);
     documents::register(server);
     artifacts::register(server);
+    storage::register(server);
 }
 
 #[cfg(test)]
@@ -226,6 +228,8 @@ mod tests {
                 "skills.update",
                 "skills.updateAllBundled",
                 "skills.updateBundled",
+                "storage.clearCache",
+                "storage.usage",
                 "system.demoJob",
                 "system.demoStream",
                 "system.device",

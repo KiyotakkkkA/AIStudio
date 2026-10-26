@@ -17,6 +17,7 @@ import * as terminal from "../src/terminal.js";
 import * as notifications from "../src/notifications.js";
 import * as documents from "../src/documents.js";
 import * as artifacts from "../src/artifacts.js";
+import * as storage from "../src/storage.js";
 import {
   AccountDto,
   ChatCitationDto,
@@ -335,6 +336,10 @@ const schemas: Record<string, z.ZodType> = {
   "system/DeviceProfileDto": DeviceProfileDto,
   "system/ResourceSampleDto": ResourceSampleDto,
   "system/SystemPingInput": contract["system.ping"].input,
+  "storage/StorageCategory": storage.StorageCategory,
+  "storage/StorageUsageDto": contract["storage.usage"].output,
+  "storage/StorageUsageInput": contract["storage.usage"].input,
+  "storage/StorageClearCacheOutput": contract["storage.clearCache"].output,
   "system/SystemPingOutput": contract["system.ping"].output,
   "system/SystemDemoStreamInput": contract["system.demoStream"].input,
   "system/SystemDemoStreamOutput": contract["system.demoStream"].output,

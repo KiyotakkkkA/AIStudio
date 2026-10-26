@@ -1,0 +1,4 @@
+[
+  { "name": "cached", "value": {} },
+  { "name": "refresh", "value": { "refresh": true } }
+]

@@ -143,6 +143,8 @@
   "skills.update",
   "skills.updateAllBundled",
   "skills.updateBundled",
+  "storage.clearCache",
+  "storage.usage",
   "system.demoJob",
   "system.demoStream",
   "system.device",

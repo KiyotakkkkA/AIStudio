@@ -13,11 +13,11 @@ fn underscores_mark_working_files() {
 #[test]
 fn a_chat_folder_belongs_to_one_conversation_and_goes_with_it() {
     let root = tempfile::tempdir().expect("the data folder");
-    let store = ArtifactStore::new(root.path().join("artifacts"));
+    let store = ArtifactStore::new(root.path().join("conversations"));
     let folder = chat_dir(&store, CHAT).expect("the chat folder");
     assert_eq!(
         folder,
-        root.path().join("artifacts").join(CHAT_FOLDERS).join(CHAT)
+        root.path().join("conversations").join(CHAT).join("work")
     );
     std::fs::create_dir_all(folder.join("notes")).expect("a nested folder");
     std::fs::write(folder.join("_spec.json"), "{}").expect("writes");
@@ -37,7 +37,7 @@ fn a_chat_folder_belongs_to_one_conversation_and_goes_with_it() {
     remove_chat_dir(&store, CHAT);
     assert!(!folder.exists());
     remove_chat_dir(&store, "../..");
-    assert!(root.path().join("artifacts").exists());
+    assert!(root.path().join("conversations").exists());
 }
 
 #[test]

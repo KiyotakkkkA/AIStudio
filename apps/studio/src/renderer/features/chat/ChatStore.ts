@@ -1219,9 +1219,14 @@ export default class ChatStore {
         this.timer ??= setTimeout(this.flush, 32);
       }
     }
-    if (event.type === "step" && event.step.domain === "tool-calls") {
-      const calls = ChatToolCallDto.array().safeParse(event.step.calls);
-      if (calls.success) this.liveToolCalls = calls.data;
+    if (event.type === "step" && event.step.domain === "tool-call") {
+      const index = event.step.index;
+      const call = ChatToolCallDto.safeParse(event.step.call);
+      if (typeof index === "number" && call.success) {
+        const calls = [...this.liveToolCalls];
+        calls[Math.min(index, calls.length)] = call.data;
+        this.liveToolCalls = calls;
+      }
     }
     if (event.type === "step" && event.step.status === "succeeded") {
       const nodeId = event.step.nodeId;

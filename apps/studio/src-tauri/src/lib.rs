@@ -78,8 +78,9 @@ use zvs_host::services::{
     DriverSource, GraphService, GraphServiceOptions, HealthCheckOptions, HealthCheckService,
     McpService, McpServiceOptions, ProviderService, ProviderServiceOptions, RetentionService,
     RetentionServiceOptions, RunService, RunServiceOptions, SecretService, Services,
-    SettingService, SystemService, VectorEvalService, VectorEvalServiceOptions,
-    VectorSourceService, VectorSourceServiceOptions, VectorStoreService, VectorStoreServiceOptions,
+    SettingService, StorageRoots, StorageService, SystemService, VectorEvalService,
+    VectorEvalServiceOptions, VectorSourceService, VectorSourceServiceOptions, VectorStoreService,
+    VectorStoreServiceOptions,
 };
 use zvs_host::skills::{
     SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillService, SkillServiceOptions,
@@ -774,7 +775,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         clock: clock.clone(),
         ..SkillLibraryOptions::new(Arc::clone(&database), paths.data_dir.join(SKILLS_DIR))
     });
-    let artifacts = ArtifactStore::new(paths.data_dir.join("artifacts"))
+    let artifacts = ArtifactStore::new(paths.conversations_dir.clone())
         .with_library(DASHBOARDS, paths.data_dir.join(DASHBOARDS))
         .with_picker(Arc::clone(&picker))
         .with_launcher(platform::file_launcher())
@@ -863,7 +864,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         &folders,
         FileToolOptions {
             roots: roots.clone(),
-            ..FileToolOptions::new(paths.runs_dir.clone())
+            ..FileToolOptions::new(paths.conversations_dir.clone())
         },
     )?;
     register_command_nodes(
@@ -916,6 +917,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger: logger.clone(),
         clock: clock.clone(),
         runtime: Some(runtime.clone()),
+        conversations: Some(artifacts.folders().clone()),
         ..RetentionServiceOptions::new(Arc::clone(&database))
     });
     let system = SystemService::new(clock.clone(), events.clone(), DEMO_INTERVAL)
@@ -1042,8 +1044,14 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     }
     let hidden = launched.is_none() && shell::launched_by_autostart() && shell_state.tray();
 
+    let storage = StorageService::new(
+        StorageRoots::resolve(&paths),
+        Arc::clone(&database),
+        Arc::clone(&clock),
+    );
     let services = Arc::new(Services {
         system,
+        storage,
         accounts,
         settings,
         secrets,

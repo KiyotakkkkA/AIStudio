@@ -4,6 +4,7 @@ pub mod chat;
 pub mod chat_ask;
 pub mod chat_history;
 pub mod chat_memory;
+pub mod chat_reply;
 pub mod chat_tools;
 pub mod crypto;
 pub mod graph;
@@ -26,6 +27,7 @@ pub mod secret_fields;
 pub mod secret_policy;
 pub mod secrets;
 pub mod settings;
+pub mod storage;
 pub mod stored;
 pub mod system;
 pub mod token_estimate;
@@ -53,6 +55,7 @@ pub use retention::{RetentionService, RetentionServiceOptions};
 pub use runs::{RunService, RunServiceOptions};
 pub use secrets::{SecretCreateInput, SecretService, SecretSummary, SecretUpdateInput};
 pub use settings::{SettingDto, SettingService};
+pub use storage::{StorageRoots, StorageService};
 pub use system::SystemService;
 pub use vector_eval::{EvalSearch, VectorEvalService, VectorEvalServiceOptions};
 pub use vector_sources::{VectorSourceService, VectorSourceServiceOptions};
@@ -78,6 +81,7 @@ use crate::workspace::{ExplorerService, FolderAccessService};
 
 pub struct Services {
     pub system: SystemService,
+    pub storage: StorageService,
     pub accounts: AccountService,
     pub settings: SettingService,
     pub secrets: Arc<SecretService>,
