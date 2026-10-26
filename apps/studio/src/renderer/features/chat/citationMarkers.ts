@@ -1,5 +1,5 @@
 const FENCE = /(```[\s\S]*?(?:```|$))/g;
-const MARKER = /\[(\d{1,3})\](?![(:[])/g;
+const MARKER = /\[(\d{1,3})\](?![(:]|\[(?!\d{1,3}\]))/g;
 export const CITE_PREFIX = "#cite-";
 
 export function linkCitations(content: string, count: number): string {

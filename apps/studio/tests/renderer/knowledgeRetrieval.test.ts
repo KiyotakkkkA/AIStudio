@@ -23,6 +23,10 @@ test("citation markers become links only outside code and within the citation co
     "Leave is 28 days [1](#cite-1), sick leave [2](#cite-2) and [9].\n```\nlist[1]\n```\nSee [x](https://a).",
   );
   expect(linkCitations(text, 0)).toBe(text);
+  expect(linkCitations("Sources [1][22][4][66] and [3][x].", 66)).toBe(
+    "Sources [1](#cite-1)[22](#cite-22)[4](#cite-4)[66](#cite-66) and [3][x].",
+  );
+  expect(linkCitations("Seen in [1][70].", 2)).toBe("Seen in [1](#cite-1)[70].");
   expect(citationNumber("#cite-3")).toBe(3);
   expect(citationNumber("https://example.com")).toBeNull();
   expect(citationNumber(undefined)).toBeNull();
