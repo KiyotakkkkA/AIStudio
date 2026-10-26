@@ -1,9 +1,10 @@
-import { mdiDeleteOutline, mdiLockOutline } from "@mdi/js";
+import { mdiContentCopy, mdiDeleteOutline, mdiDotsHorizontal, mdiLockOutline } from "@mdi/js";
+import { useState } from "react";
 import { observer } from "mobx-react-lite";
-import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import { Dropdown, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import type { SecretTypeKey } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
-import IconButton from "../../ui/atoms/buttons/IconButton";
+import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import SegmentedControl from "../../ui/atoms/SegmentedControl";
@@ -17,6 +18,8 @@ import SecretCredentialField from "./SecretCredentialField";
 import { ROTATION_OPTIONS, type SecretFormVm } from "./SecretFormVm";
 import { maskedHint, SCOPE_OPTIONS } from "./secretPresentation";
 import Alert from "../../ui/molecules/Alert";
+import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
+import { ActionMenu, ActionMenuItem, ActionMenuSeparator } from "../../ui/molecules/ActionMenu";
 
 interface SecretFormProps {
   readonly vm: SecretFormVm;
@@ -24,10 +27,20 @@ interface SecretFormProps {
   readonly saving: boolean;
   readonly onSave: () => void;
   readonly onCancel: () => void;
+  readonly onDuplicate: () => void;
   readonly onDelete: () => void;
 }
 
-function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretFormProps) {
+function SecretForm({
+  vm,
+  hint,
+  saving,
+  onSave,
+  onCancel,
+  onDuplicate,
+  onDelete,
+}: SecretFormProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const secretField = vm.secretField;
   const inputs = vm.credentialFields.filter((field) => field.kind !== "boolean");
   const switches = vm.credentialFields.filter((field) => field.kind === "boolean");
@@ -51,22 +64,23 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
           </p>
         </div>
         {vm.isNew ? null : (
-          <IconButton
-            key={vm.secretId}
-            tone="danger"
-            size="md"
-            path={mdiDeleteOutline}
-            label="Удалить"
-            disabled={saving}
-            needConfirm
-            modalSetup={{
-              title: "Удалить секрет?",
-              content: <>Секрет «{vm.name}» будет удалён. Это действие нельзя отменить.</>,
-              tone: "danger",
-              confirmLabel: "Удалить",
-            }}
-            onClick={onDelete}
-          />
+          <Dropdown menuWidth={220} menuPlacement="bottom-right" disabled={saving}>
+            <IconDropdownButton
+              label="Действия с секретом"
+              tooltip="bottom-right"
+              path={mdiDotsHorizontal}
+              disabled={saving}
+            />
+            <ActionMenu label="Действия с секретом">
+              <ActionMenuItem icon={mdiContentCopy} onClick={onDuplicate}>
+                Дублировать
+              </ActionMenuItem>
+              <ActionMenuSeparator />
+              <ActionMenuItem icon={mdiDeleteOutline} danger onClick={() => setConfirmDelete(true)}>
+                Удалить секрет
+              </ActionMenuItem>
+            </ActionMenu>
+          </Dropdown>
         )}
       </div>
 
@@ -230,6 +244,19 @@ function SecretForm({ vm, hint, saving, onSave, onCancel, onDelete }: SecretForm
           {saving ? "Сохранение…" : "Сохранить секрет"}
         </Button>
       </div>
+      <ConfirmDialog
+        open={confirmDelete && !vm.isNew}
+        title="Удалить секрет?"
+        confirmLabel="Удалить"
+        confirmTone="danger"
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          onDelete();
+        }}
+      >
+        Секрет «{vm.name}» будет удалён. Это действие нельзя отменить.
+      </ConfirmDialog>
     </form>
   );
 }

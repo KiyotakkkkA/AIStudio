@@ -1,49 +1,56 @@
 import {
-  mdiClockOutline,
-  mdiDatabaseCogOutline,
+  mdiContentCopy,
   mdiDatabaseOutline,
   mdiDeleteOutline,
   mdiDeleteSweepOutline,
-  mdiFileDocumentMultipleOutline,
-  mdiFolderOutline,
-  mdiHeartPulse,
-  mdiRuler,
-  mdiSetCenter,
-  mdiSortVariant,
-  mdiTextBoxOutline,
-  mdiTextRecognition,
-  mdiTextShort,
+  mdiDotsHorizontal,
+  mdiPencilOutline,
+  mdiFolderPlusOutline,
+  mdiRefresh,
+  mdiScaleBalance,
+  mdiStop,
+  mdiSync,
 } from "@mdi/js";
 import { observer } from "mobx-react-lite";
-import { ScrollArea, Switcher } from "@kiyotakkkka/zvs-uikit-lib";
-import { VECTOR_SCHEMA_VERSION } from "@zvs/shared";
+import { useState } from "react";
+import { Dropdown, Switcher } from "@kiyotakkkka/zvs-uikit-lib";
+import { VECTOR_SCHEMA_VERSION, type VectorStoreDto } from "@zvs/shared";
 import { useStore } from "../../stores/useStore";
-import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
-import Chip from "../../ui/atoms/Chip";
-import Icon from "../../ui/atoms/Icon";
-import TextInput from "../../ui/atoms/TextInput";
-import Field from "../../ui/molecules/Field";
+import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
+import StatusDot from "../../ui/atoms/StatusDot";
+import Alert from "../../ui/molecules/Alert";
+import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
+import { ActionMenu, ActionMenuItem, ActionMenuSeparator } from "../../ui/molecules/ActionMenu";
+import EmptyState from "../../ui/molecules/EmptyState";
 import VectorSearchPanel from "./VectorSearchPanel";
 import VectorDocumentsPanel from "./VectorDocumentsPanel";
 import VectorRelationsPanel from "./VectorRelationsPanel";
-import { formatBytes } from "../downloads/downloadPresentation";
-import { healthLabels, healthTones } from "./vectorPresentation";
-import InfoTable from "../../ui/molecules/InfoTable";
-import StatusDot from "../../ui/atoms/StatusDot";
-import { plural } from "../connections/connectionPresentation";
-import EmptyState from "../../ui/molecules/EmptyState";
+import VectorEvalSection from "./VectorEvalSection";
+import Disclosure from "./Disclosure";
+import {
+  PRIMARY_ACTION_LABELS,
+  VECTOR_STORE_TABS,
+  healthLabels,
+  healthTones,
+  primaryAction,
+  storeFacts,
+  type PrimaryAction,
+} from "./vectorPresentation";
 
-const VECTOR_STORE_TABS = [
-  { value: "Overview", label: "Обзор" },
-  { value: "Documents", label: "Документы" },
-  { value: "Relations", label: "Связи" },
-  { value: "Test search", label: "Тестовый поиск" },
-  { value: "Settings", label: "Настройки" },
-] as const;
+const PRIMARY_ICON_TONE =
+  "zvs-press border border-transparent bg-accent-dark text-on-accent hover:bg-accent-medium";
+const PRIMARY_ICONS: Record<PrimaryAction, string> = {
+  stop: mdiStop,
+  add: mdiFolderPlusOutline,
+  reconcile: mdiScaleBalance,
+  rebuild: mdiRefresh,
+  update: mdiSync,
+};
 
 function VectorStoreDetail() {
   const { vectorStores: store } = useStore();
+  const [confirm, setConfirm] = useState<"clear" | "remove" | null>(null);
   const detail = store.detail;
   if (!detail)
     return (
@@ -64,314 +71,230 @@ function VectorStoreDetail() {
       </div>
     );
   const outdated = detail.schemaVersion < VECTOR_SCHEMA_VERSION;
-  const stats = [
-    [detail.documents.toLocaleString(), "Документы"],
-    [detail.vectors.toLocaleString(), "Векторы"],
-    [String(detail.dimension), "Размерность"],
-    [
-      detail.indexType,
-      `Индекс · ${detail.metric} · ${detail.searchMode === "hybrid" && !outdated ? "гибридный" : "векторный"}`,
-    ],
-    [formatBytes(detail.bytes), "На диске"],
-    [
-      detail.embeddingModelId,
-      `Embedding · ${store.providers.find((p) => p.id === detail.embeddingProviderId)?.name ?? detail.embeddingProviderId}`,
-    ],
-  ];
   const disabled = store.busy || store.searching;
+  const action = primaryAction({
+    status: detail.status,
+    indexing: store.indexing,
+    sources: store.sources.length,
+    outdated,
+    vectors: detail.vectors,
+  });
+  const runPrimary = () => {
+    if (action === "stop") void store.cancelIndex();
+    else if (action === "reconcile") void store.reconcile();
+    else if (action === "add") {
+      store.set("tab", "Documents");
+      void store.pickSource("folder");
+    } else void store.startIndex(action === "rebuild");
+  };
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5">
-      <div className="flex flex-none flex-col gap-3.5 rounded-card border border-line bg-main-900 px-4.5 py-4">
-        <div className="flex flex-wrap items-start gap-3">
-          <div className="flex size-9.5  flex-none items-center justify-center rounded-card bg-main-700 text-accent-medium">
-            <Icon path={mdiDatabaseOutline} size={19} />
-          </div>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <section className="flex flex-none flex-col gap-3 px-6 pt-5 pb-4">
+        <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="wrap-break-word text-[15px] font-semibold">{detail.name}</h2>
-              <Chip>{healthLabels[detail.status]}</Chip>
-              {outdated && detail.vectors > 0 ? (
-                <Chip tone="raised">Требуется переиндексация</Chip>
-              ) : null}
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h2 className="wrap-break-word text-[17px] font-semibold tracking-[-0.015em] text-main-50">
+                {detail.name}
+              </h2>
+              <span className="flex items-center gap-1.5 text-[12px] text-main-400">
+                <StatusDot tone={healthTones[detail.status]} />
+                {healthLabels[detail.status]}
+              </span>
             </div>
-            <p className="mt-0.75 text-[12px] text-main-400">{detail.description}</p>
+            {detail.description ? (
+              <p className="mt-1 max-w-3xl text-[12.5px] text-main-400">{detail.description}</p>
+            ) : null}
+            <p className="mt-2 flex flex-wrap gap-x-2 text-[12px] text-main-300">
+              {(detail.status === "broken"
+                ? ["статистика не подтверждена"]
+                : storeFacts(detail)
+              ).map((fact, i) => (
+                <span key={fact} className="flex items-center gap-2">
+                  {i === 0 ? null : <span className="text-main-500">·</span>}
+                  {fact}
+                </span>
+              ))}
+            </p>
           </div>
-          <div className="flex gap-1.75">
-            <Button disabled={disabled} onClick={store.edit}>
-              Изменить
-            </Button>
-            <Button
-              disabled={disabled || store.indexing || store.sources.length === 0}
-              title="Переиндексировать все файлы источников"
-              onClick={() => {
-                void store.startIndex(true);
-              }}
-            >
-              Полная переиндексация
-            </Button>
-            <Button
-              disabled={disabled}
-              title="Сверить статистику с таблицей"
-              onClick={() => {
-                void store.reconcile();
-              }}
-            >
-              Сверить
-            </Button>
+          <div className="flex flex-none items-center gap-1.5">
             <IconButton
-              tone="danger"
               size="md"
-              path={mdiDeleteSweepOutline}
-              label="Очистить содержимое, не удаляя хранилище"
-              disabled={disabled || (detail.documents === 0 && detail.vectors === 0)}
-              needConfirm
-              modalSetup={{
-                title: `Очистить «${detail.name}»?`,
-                content: `Из хранилища будут удалены все векторы (${detail.vectors.toLocaleString("ru-RU")}) и документы (${detail.documents.toLocaleString("ru-RU")}). Само хранилище, его источники и настройки сохранятся. Действие нельзя отменить.`,
-                tone: "danger",
-                confirmLabel: "Очистить",
-              }}
-              onClick={() => {
-                void store.clear();
-              }}
+              tooltip="bottom-center"
+              path={PRIMARY_ICONS[action]}
+              iconSize={17}
+              label={PRIMARY_ACTION_LABELS[action]}
+              tone={action === "stop" ? "danger" : "ghost"}
+              {...(action === "stop" ? {} : { toneClassName: PRIMARY_ICON_TONE })}
+              disabled={action === "stop" ? false : disabled}
+              onClick={runPrimary}
             />
-            <IconButton
-              tone="danger"
-              size="md"
-              path={mdiDeleteOutline}
-              label="Удалить"
-              disabled={disabled}
-              needConfirm
-              modalSetup={{
-                title: `Удалить «${detail.name}»?`,
-                content: `Будут удалены хранилище и его документы (${detail.documents}). Действие нельзя отменить.`,
-                tone: "danger",
-                confirmLabel: "Удалить",
-              }}
-              onClick={() => {
-                void store.remove();
-              }}
-            />
-          </div>
-        </div>
-        <div className="flex overflow-hidden rounded-[9px] bg-main-800">
-          {stats.map(([value, label], i) => (
-            <div
-              key={label}
-              className={`min-w-0 flex-1 border-r border-line px-3.25 py-2.75 last:border-r-0 ${i === 5 ? "grow-[1.6]" : ""}`}
-            >
-              <div
-                title={value}
-                className={`truncate text-[17px] font-semibold ${i === 5 ? "text-accent-medium" : ""}`}
-              >
-                {detail.status === "broken" && i !== 2 && i !== 5 ? "—" : value}
-              </div>
-              <div title={label} className="mt-px truncate text-[11px] text-main-500">
-                {label}
-              </div>
-            </div>
-          ))}
-        </div>
-        {detail.status === "broken" ? (
-          <div role="alert" className="flex items-center gap-3 text-[12px] text-err">
-            <span>
-              Таблица недоступна. Статистика не подтверждена. Сверка не восстанавливает удалённые
-              данные.
-            </span>
-            <Button
-              disabled={disabled}
-              onClick={() => {
-                void store.reconcile();
-              }}
-            >
-              Сверить
-            </Button>
-          </div>
-        ) : detail.status === "pending" || detail.vectors === 0 ? (
-          <p className="text-[12px] text-warn">
-            Ожидает индексации. Добавьте источники на вкладке «Документы» и запустите индексацию.
-          </p>
-        ) : outdated ? (
-          <p role="status" className="text-[12px] text-warn">
-            Требуется переиндексация: хранилище создано в старом формате индекса. Поиск работает
-            только по векторам, без ключевых слов, страниц и разделов. «Полная переиндексация»
-            пересоберёт таблицу в новом формате.
-          </p>
-        ) : null}
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col rounded-card border border-line bg-main-900">
-        <div className="flex h-11 flex-none items-center border-b border-line px-3.5">
-          <Switcher
-            value={store.tab}
-            label="Раздел хранилища"
-            options={[...VECTOR_STORE_TABS]}
-            onChange={(tab) => {
-              store.set("tab", tab);
-            }}
-            rounded=""
-            className="gap-1 rounded-control bg-transparent border-transparent"
-            classNames={{ tab: "rounded-pill px-[14px] py-[5px] text-[12px]" }}
-          />
-        </div>
-        {store.tab === "Test search" ? (
-          <VectorSearchPanel />
-        ) : store.tab === "Documents" ? (
-          <VectorDocumentsPanel />
-        ) : store.tab === "Relations" ? (
-          <VectorRelationsPanel />
-        ) : (
-          <ScrollArea role="tabpanel" className="space-y-3 p-4 text-[12px] text-main-300">
-            {store.tab === "Settings" ? (
-              <>
-                <InfoTable
-                  label="Параметры хранилища"
-                  rows={[
-                    {
-                      key: "chunk",
-                      icon: mdiTextBoxOutline,
-                      label: "Размер фрагмента",
-                      value: plural(detail.chunkSize, "символ", "символа", "символов"),
-                    },
-                    {
-                      key: "overlap",
-                      icon: mdiSetCenter,
-                      label: "Перекрытие фрагментов",
-                      value: plural(detail.chunkOverlap, "символ", "символа", "символов"),
-                    },
-                    {
-                      key: "backend",
-                      icon: mdiDatabaseCogOutline,
-                      label: "Движок",
-                      value: detail.backend,
-                      mono: true,
-                    },
-                    {
-                      key: "metric",
-                      icon: mdiRuler,
-                      label: "Метрика",
-                      value: detail.metric,
-                      mono: true,
-                    },
-                    {
-                      key: "rerank",
-                      icon: mdiSortVariant,
-                      label: "Переранжирование",
-                      value: detail.rerank.enabled
-                        ? describeRef(detail.rerank.modelRef)
-                        : "выключено",
-                      hint: detail.rerank.enabled
-                        ? plural(detail.rerank.candidates, "кандидат", "кандидата", "кандидатов")
-                        : undefined,
-                      muted: !detail.rerank.enabled,
-                    },
-                    {
-                      key: "ocr",
-                      icon: mdiTextRecognition,
-                      label: "Распознавание текста",
-                      value: detail.ocr.enabled ? describeRef(detail.ocr.modelRef) : "выключено",
-                      hint: detail.ocr.enabled
-                        ? `язык ${detail.ocr.language} · от ${plural(detail.ocr.minCharsPerPage, "символа", "символов", "символов")} на странице`
-                        : undefined,
-                      muted: !detail.ocr.enabled,
-                    },
-                  ]}
-                />
-                <form
-                  className="flex max-w-md items-end gap-2.5 pt-1"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void store.saveChatMinScore();
-                  }}
+            <Dropdown menuWidth={260} menuPlacement="bottom-right" disabled={disabled}>
+              <IconDropdownButton
+                label="Действия с хранилищем"
+                tooltip="bottom-right"
+                path={mdiDotsHorizontal}
+                disabled={disabled}
+              />
+              <ActionMenu label="Действия с хранилищем">
+                <ActionMenuItem icon={mdiPencilOutline} onClick={store.edit}>
+                  Изменить параметры
+                </ActionMenuItem>
+                <ActionMenuItem icon={mdiContentCopy} onClick={store.duplicate}>
+                  Дублировать
+                </ActionMenuItem>
+                <ActionMenuItem icon={mdiScaleBalance} onClick={() => void store.reconcile()}>
+                  Сверить статистику
+                </ActionMenuItem>
+                <ActionMenuItem
+                  icon={mdiRefresh}
+                  disabled={store.indexing || store.sources.length === 0}
+                  onClick={() => void store.startIndex(true)}
                 >
-                  <div className="min-w-0 flex-1">
-                    <Field
-                      label="Порог релевантности для чата"
-                      htmlFor="vs-settings-chat-min-score"
-                      help="Ниже порога фрагмент не попадает в ответ чата. Тестовый поиск приглушает такие строки."
-                    >
-                      <TextInput
-                        id="vs-settings-chat-min-score"
-                        value={store.chatMinScore}
-                        mono
-                        disabled={disabled}
-                        onChange={(e) => store.set("chatMinScore", e.target.value)}
-                      />
-                    </Field>
-                  </div>
-                  <Button
-                    type="submit"
-                    tone="primary"
-                    disabled={disabled || !store.chatMinScoreChanged}
-                  >
-                    Сохранить
-                  </Button>
-                </form>
-              </>
-            ) : (
-              <>
-                <InfoTable
-                  label="Обзор хранилища"
-                  rows={[
-                    {
-                      key: "description",
-                      icon: mdiTextShort,
-                      label: "Описание",
-                      value: detail.description || "не задано",
-                      muted: !detail.description,
-                    },
-                    {
-                      key: "status",
-                      icon: mdiHeartPulse,
-                      label: "Состояние",
-                      value: (
-                        <span className="flex items-center gap-2">
-                          <StatusDot tone={healthTones[detail.status]} />
-                          {healthLabels[detail.status]}
-                        </span>
-                      ),
-                    },
-                    {
-                      key: "backend",
-                      icon: mdiDatabaseCogOutline,
-                      label: "Движок",
-                      value: detail.backend,
-                      mono: true,
-                    },
-                    {
-                      key: "indexed",
-                      icon: mdiClockOutline,
-                      label: "Последняя индексация",
-                      value:
-                        detail.lastIndexedAt === null
-                          ? "ещё не выполнялась"
-                          : new Date(detail.lastIndexedAt).toLocaleString("ru-RU"),
-                      muted: detail.lastIndexedAt === null,
-                    },
-                    {
-                      key: "sources",
-                      icon: mdiFolderOutline,
-                      label: "Источники",
-                      value: store.sources.length.toLocaleString("ru-RU"),
-                    },
-                    {
-                      key: "documents",
-                      icon: mdiFileDocumentMultipleOutline,
-                      label: "Документы",
-                      value: store.documents.length.toLocaleString("ru-RU"),
-                    },
-                  ]}
-                />
-              </>
-            )}
-          </ScrollArea>
-        )}
+                  Полная переиндексация
+                </ActionMenuItem>
+                <ActionMenuSeparator />
+                <ActionMenuItem
+                  icon={mdiDeleteSweepOutline}
+                  danger
+                  disabled={store.indexing || (detail.documents === 0 && detail.vectors === 0)}
+                  onClick={() => setConfirm("clear")}
+                >
+                  Очистить содержимое
+                </ActionMenuItem>
+                <ActionMenuItem icon={mdiDeleteOutline} danger onClick={() => setConfirm("remove")}>
+                  Удалить хранилище
+                </ActionMenuItem>
+              </ActionMenu>
+            </Dropdown>
+          </div>
+        </div>
+        <StatusNotice detail={detail} outdated={outdated} />
+        <Disclosure summary="Технические сведения">
+          <TechFacts detail={detail} outdated={outdated} />
+        </Disclosure>
+      </section>
+      <div className="flex h-11 flex-none items-center border-b border-line px-5">
+        <Switcher
+          value={store.tab}
+          label="Раздел хранилища"
+          options={[...VECTOR_STORE_TABS]}
+          onChange={(tab) => {
+            store.set("tab", tab);
+          }}
+          rounded=""
+          className="gap-1 rounded-control bg-transparent border-transparent"
+          classNames={{ tab: "rounded-pill px-[14px] py-[5px] text-[12px]" }}
+        />
       </div>
+      {store.tab === "Test search" ? (
+        <VectorSearchPanel />
+      ) : store.tab === "Relations" ? (
+        <VectorRelationsPanel />
+      ) : store.tab === "Quality" ? (
+        <VectorEvalSection />
+      ) : (
+        <VectorDocumentsPanel />
+      )}
+      <ConfirmDialog
+        open={confirm === "clear"}
+        title={`Очистить «${detail.name}»?`}
+        confirmLabel="Очистить"
+        confirmTone="danger"
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          setConfirm(null);
+          void store.clear();
+        }}
+      >
+        Из хранилища будут удалены все фрагменты ({detail.vectors.toLocaleString("ru-RU")}) и
+        документы ({detail.documents.toLocaleString("ru-RU")}). Источники и настройки сохранятся.
+        Действие нельзя отменить.
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={confirm === "remove"}
+        title={`Удалить «${detail.name}»?`}
+        confirmLabel="Удалить"
+        confirmTone="danger"
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          setConfirm(null);
+          void store.remove();
+        }}
+      >
+        Будут удалены хранилище и его документы ({detail.documents.toLocaleString("ru-RU")}). Файлы
+        на диске останутся. Действие нельзя отменить.
+      </ConfirmDialog>
     </div>
   );
 }
-/** A catalogue ref is `<source>:<kind>:<name>`; the name is the part worth showing. */
-function describeRef(ref: string): string {
-  return ref.split(":").slice(2).join(":") || ref || "модель не выбрана";
-}
+
+const StatusNotice = observer(function StatusNotice({
+  detail,
+  outdated,
+}: {
+  readonly detail: VectorStoreDto;
+  readonly outdated: boolean;
+}) {
+  const { vectorStores: store } = useStore();
+  if (detail.status === "broken")
+    return (
+      <Alert title="Таблица хранилища недоступна">
+        Статистика не подтверждена. Сверка обновит сведения, но не восстановит удалённые данные.
+      </Alert>
+    );
+  if (store.indexing) return null;
+  if (detail.status === "pending" || detail.vectors === 0)
+    return (
+      <Alert tone="info" title="Хранилище ещё не проиндексировано">
+        {store.sources.length === 0
+          ? "Добавьте папку или файлы с документами, затем запустите индексацию."
+          : "Источники добавлены. Запустите индексацию, чтобы документы стали доступны для поиска."}
+      </Alert>
+    );
+  if (outdated)
+    return (
+      <Alert tone="warning" title="Требуется переиндексация">
+        Хранилище создано в старом формате индекса: поиск работает только по смыслу, без ключевых
+        слов, страниц и разделов.
+      </Alert>
+    );
+  return null;
+});
+
+const TechFacts = observer(function TechFacts({
+  detail,
+  outdated,
+}: {
+  readonly detail: VectorStoreDto;
+  readonly outdated: boolean;
+}) {
+  const { vectorStores: store } = useStore();
+  const facts: [string, string][] = [
+    ["Модель эмбеддингов", detail.embeddingModelId],
+    [
+      "Провайдер",
+      store.providers.find((p) => p.id === detail.embeddingProviderId)?.name ??
+        detail.embeddingProviderId,
+    ],
+    ["Размерность", String(detail.dimension)],
+    ["Индекс", detail.indexType],
+    ["Метрика", detail.metric],
+    ["Режим поиска", detail.searchMode === "hybrid" && !outdated ? "гибридный" : "векторный"],
+    ["Движок", detail.backend],
+    ["Векторы", detail.vectors.toLocaleString("ru-RU")],
+  ];
+  return (
+    <dl className="m-0 grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-x-6 gap-y-2.5">
+      {facts.map(([label, value]) => (
+        <div key={label} className="min-w-0">
+          <dt className="text-[11px] text-main-500">{label}</dt>
+          <dd className="m-0 truncate font-mono text-[12px] text-main-200" title={value}>
+            {value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+});
 
 export default observer(VectorStoreDetail);

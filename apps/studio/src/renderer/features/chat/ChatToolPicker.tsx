@@ -2,10 +2,11 @@ import { useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Link } from "react-router-dom";
 import { mdiArrowRight, mdiAutoFix, mdiMagnify, mdiWrenchOutline } from "@mdi/js";
-import { Dropdown, InputCheckBox, ScrollArea, Tooltip } from "@kiyotakkkka/zvs-uikit-lib";
+import { Dropdown, InputCheckBox, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import type { ToolDto, ToolTier } from "@zvs/shared";
 import { ROUTES } from "../../app/routes";
 import IconButton from "../../ui/atoms/buttons/IconButton";
+import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import Icon from "../../ui/atoms/Icon";
 import { TIER_HINTS, TIER_LABELS } from "../connections/connectionPresentation";
 import { matchesQuery, sourceGroups, sourceKey } from "../tools/toolFilters";
@@ -100,27 +101,18 @@ export default observer(function ChatToolPicker({ store }: { readonly store: Cha
 
   return (
     <Dropdown menuWidth={380} menuPlacement="top-left" onOpenChange={() => setQuery("")}>
-      <Tooltip
+      <IconDropdownButton
         label="Инструменты для модели"
-        placement="top-center"
-        rounded="rounded-lg"
-        className=""
-      >
-        <Dropdown.Trigger
-          aria-label="Инструменты для модели"
-          rounded="rounded-lg"
-          icon={false}
-          className={`size-8 justify-center gap-0 border-none cursor-auto border-transparent p-0 ${
-            count > 0
-              ? unsupported
+        path={mdiWrenchOutline}
+        iconSize={17}
+        {...(count > 0
+          ? {
+              toneClassName: unsupported
                 ? "bg-main-800 text-main-400 hover:bg-main-700"
-                : "bg-accent-soft text-accent-medium hover:bg-accent-soft hover:brightness-110"
-              : "bg-transparent text-main-400 hover:bg-main-700 hover:text-main-100"
-          }`}
-        >
-          <Icon path={mdiWrenchOutline} size={17} />
-        </Dropdown.Trigger>
-      </Tooltip>
+                : "bg-accent-soft text-accent-medium hover:bg-accent-soft hover:brightness-110",
+            }
+          : {})}
+      />
       <Dropdown.Menu
         aria-label="Инструменты для модели"
         rounded=""

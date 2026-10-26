@@ -3,7 +3,6 @@ import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
 import SelectInput from "../../ui/atoms/SelectInput";
-import Field from "../../ui/molecules/Field";
 import type ChatEvalStore from "./ChatEvalStore";
 import { CHAT_EVAL_MODE_LABELS } from "./ChatEvalStore";
 
@@ -25,28 +24,28 @@ function ChatEvalPanel({
   }, [chat]);
   const run = chat.run;
   return (
-    <div className="flex flex-col gap-2.5 border-t border-line pt-3.25">
+    <section className="flex flex-col gap-3">
       <div>
-        <p className="text-[12px] font-medium text-main-200">Сквозная проверка в чате</p>
-        <p className="mt-0.5 text-[11px] leading-relaxed text-main-500">
+        <h3 className="text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
+          Проверка в чате
+        </h3>
+        <p className="mt-1 text-[12px] leading-relaxed text-main-500">
           Каждый вопрос задаётся модели во временном диалоге с этим хранилищем — сначала с поиском
           перед ответом, затем в режиме, где поиском управляет модель. Проверка считается
           пройденной, если ответ сослался на ожидаемый документ. Временные диалоги удаляются после
           проверки.
         </p>
       </div>
-      <div className="flex flex-wrap items-end gap-2.5">
+      <div className="flex flex-wrap items-center gap-2.5">
         <div className="min-w-60 flex-1">
-          <Field label="Модель">
-            <SelectInput
-              label="Модель для проверки"
-              value={chat.modelKey}
-              options={chat.models.map((model) => ({ value: model.key, label: model.label }))}
-              placeholder={chat.loaded ? "Нет доступных текстовых моделей" : "Загрузка моделей…"}
-              disabled={chat.running || chat.models.length === 0}
-              onChange={chat.setModel}
-            />
-          </Field>
+          <SelectInput
+            label="Модель для проверки"
+            value={chat.modelKey}
+            options={chat.models.map((model) => ({ value: model.key, label: model.label }))}
+            placeholder={chat.loaded ? "Нет доступных текстовых моделей" : "Загрузка моделей…"}
+            disabled={chat.running || chat.models.length === 0}
+            onChange={chat.setModel}
+          />
         </div>
         <Button
           tone="secondary"
@@ -55,7 +54,7 @@ function ChatEvalPanel({
             void chat.evaluate();
           }}
         >
-          {chat.running ? "Спрашиваем модель…" : "Проверить в чате"}
+          {chat.running ? "Проверка в чате…" : "Проверить в чате"}
         </Button>
       </div>
       {chat.error === null ? null : (
@@ -123,7 +122,7 @@ function ChatEvalPanel({
           </table>
         </ScrollArea>
       )}
-    </div>
+    </section>
   );
 }
 

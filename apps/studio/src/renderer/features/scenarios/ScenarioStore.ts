@@ -1,6 +1,6 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
-import type { Contract, ScenarioDto, ScenarioId } from "@zvs/shared";
+import { SCENARIO_NAME_MAX, type Contract, type ScenarioDto, type ScenarioId } from "@zvs/shared";
 import type { EventRouter } from "../../app/EventRouter";
 import ScenarioEditor, { type ScenarioEditorOptions } from "./ScenarioEditor";
 import { scenarioErrorCopy } from "./scenarioCopy";
@@ -14,6 +14,7 @@ export default class ScenarioStore {
   loaded = false;
   creating = false;
   removingId: ScenarioId | null = null;
+  duplicatingId: ScenarioId | null = null;
   error: string | null = null;
   palettePinned = false;
   logHeight: number | undefined = undefined;
@@ -95,6 +96,32 @@ export default class ScenarioStore {
     editor.dispose();
     this.editor = null;
     void this.load();
+  }
+
+  async duplicate(id: ScenarioId): Promise<void> {
+    if (this.duplicatingId !== null) return;
+    this.duplicatingId = id;
+    this.error = null;
+    try {
+      const source = await this.ipc.call("scenarios.get", { id });
+      const copy = await this.ipc.call("scenarios.create", {
+        name: `${source.name} (копия)`.slice(0, SCENARIO_NAME_MAX),
+        tags: [...source.tags],
+        graph: source.graph,
+      });
+      if (copy.overlap !== source.overlap) {
+        await this.ipc.call("scenarios.update", { id: copy.id, overlap: source.overlap });
+      }
+      runInAction(() => {
+        this.duplicatingId = null;
+      });
+      await this.load();
+    } catch (error: unknown) {
+      runInAction(() => {
+        this.error = scenarioErrorCopy(error);
+        this.duplicatingId = null;
+      });
+    }
   }
 
   async remove(id: ScenarioId): Promise<void> {

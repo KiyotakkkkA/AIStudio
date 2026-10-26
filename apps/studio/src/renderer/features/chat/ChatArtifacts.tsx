@@ -11,9 +11,9 @@ import {
 } from "@mdi/js";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
+import { ActionMenu, ActionMenuItem } from "../../ui/molecules/ActionMenu";
 import { useStore } from "../../stores/useStore";
 import { viewerCanShow } from "../../viewer/viewerModel";
-import Icon from "../../ui/atoms/Icon";
 import type ArtifactActions from "./ArtifactActions";
 import ArtifactTile from "./ArtifactTile";
 import {
@@ -28,8 +28,6 @@ import {
   openInApplication,
   opensAsPage,
 } from "./artifacts";
-
-const MENU_ITEM = "text-[13px] text-main-100";
 
 const OpenMenu = observer(function OpenMenu({
   artifact,
@@ -59,72 +57,41 @@ const OpenMenu = observer(function OpenMenu({
         tooltip="top-center"
         path={mdiOpenInNew}
         iconSize={16}
-        rounded="rounded-lg"
         disabled={disabled}
-        className="size-8 justify-center gap-0 border-none cursor-auto bg-main-800 p-0 text-main-400 hover:bg-main-700 hover:text-main-50"
+        toneClassName="bg-main-800 text-main-400 hover:bg-main-700 hover:text-main-50"
       />
-      <Dropdown.Menu
-        role="menu"
-        aria-label={OPEN_ARTIFACT}
-        rounded="rounded-lg"
-        className="rounded-card border-line bg-main-900 p-1 shadow-pop"
-      >
-        <Dropdown.Item
-          role="menuitem"
-          rounded="rounded-lg"
-          className="text-[13px] text-main-100"
-          onClick={() => void actions.open(artifact.id)}
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            <Icon path={mdiOpenInNew} size={17} className="flex-none text-main-400" />
-            <span className="truncate">
-              {openInApplication(actions.applicationOf(artifact.format))}
-            </span>
-          </span>
-        </Dropdown.Item>
+      <ActionMenu label={OPEN_ARTIFACT}>
+        <ActionMenuItem icon={mdiOpenInNew} onClick={() => void actions.open(artifact.id)}>
+          {openInApplication(actions.applicationOf(artifact.format))}
+        </ActionMenuItem>
         {page
           ? actions.browsersFor(artifact.format).map((browser) => (
-              <Dropdown.Item
+              <ActionMenuItem
                 key={browser.id}
-                role="menuitem"
-                rounded="rounded-lg"
-                className={MENU_ITEM}
+                icon={mdiWeb}
                 onClick={() => void actions.openInBrowser(artifact.id, browser.id)}
               >
-                <span className="flex min-w-0 items-center gap-2">
-                  <Icon path={mdiWeb} size={17} className="flex-none text-main-400" />
-                  <span className="truncate">{openInApplication(browser.name)}</span>
-                </span>
-              </Dropdown.Item>
+                {openInApplication(browser.name)}
+              </ActionMenuItem>
             ))
           : null}
         {page ? (
-          <Dropdown.Item
-            role="menuitem"
-            rounded="rounded-lg"
-            className={MENU_ITEM}
+          <ActionMenuItem
+            icon={mdiApplicationOutline}
             onClick={() => void actions.openInApp(artifact.id)}
           >
-            <span className="flex items-center gap-2">
-              <Icon path={mdiApplicationOutline} size={17} className="flex-none text-main-400" />
-              {OPEN_IN_BUILT_IN_BROWSER}
-            </span>
-          </Dropdown.Item>
+            {OPEN_IN_BUILT_IN_BROWSER}
+          </ActionMenuItem>
         ) : null}
-        <Dropdown.Item
-          role="menuitem"
-          rounded="rounded-lg"
+        <ActionMenuItem
+          icon={mdiEyeOutline}
           disabled={!viewable}
-          title={viewable ? undefined : VIEWER_UNAVAILABLE}
-          className="text-[13px] text-main-100 disabled:opacity-45"
+          {...(viewable ? {} : { title: VIEWER_UNAVAILABLE })}
           onClick={() => void viewer.openArtifact(artifact)}
         >
-          <span className="flex items-center gap-2">
-            <Icon path={mdiEyeOutline} size={17} className="flex-none text-main-400" />
-            {OPEN_IN_VIEWER}
-          </span>
-        </Dropdown.Item>
-      </Dropdown.Menu>
+          {OPEN_IN_VIEWER}
+        </ActionMenuItem>
+      </ActionMenu>
     </Dropdown>
   );
 });

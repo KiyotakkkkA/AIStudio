@@ -63,6 +63,7 @@ import {
   TOOL_UNAVAILABLE,
   TOOL_UNREGISTERED,
 } from "../../src/renderer/features/scenarios/scenarioCopy.ts";
+import ScenarioStore from "../../src/renderer/features/scenarios/ScenarioStore";
 import ScenarioEditor, {
   slotHandle,
   type Timers,
@@ -905,4 +906,34 @@ describe("scenario editor", () => {
     expect(editor.dirty).toBe(false);
     expect(bridge.calls.some((call) => call.channel === "scenarios.discardDraft")).toBe(true);
   });
+});
+
+test("duplicating a scenario copies its graph, tags and overlap into an inactive copy", async () => {
+  const COPY = "0199aa11-1111-7111-8111-222222222222" as ScenarioId;
+  const bridge = createFakeBridge<Contract>();
+  const source = { ...detail(MOCKUP), overlap: "queue" as const, active: true };
+  const copy = { ...detail(MOCKUP), id: COPY, name: "Триаж (копия)", active: false };
+  const updates: unknown[] = [];
+  bridge
+    .handle("scenarios.get", () => source)
+    .handle("scenarios.create", () => copy)
+    .handle("scenarios.update", (input) => {
+      updates.push(input);
+      return { ...copy, overlap: "queue" };
+    })
+    .handle("scenarios.list", () => [source, copy]);
+  const store = new ScenarioStore(createIpcClient(contract, bridge));
+
+  await store.duplicate(SCENARIO);
+
+  const created = bridge.calls.find((call) => call.channel === "scenarios.create");
+  expect(created?.payload).toEqual({
+    name: "Триаж (копия)",
+    tags: ["support"],
+    graph: MOCKUP,
+  });
+  expect(updates).toEqual([{ id: COPY, overlap: "queue" }]);
+  expect(store.scenarios.map((scenario) => scenario.id)).toEqual([SCENARIO, COPY]);
+  expect(store.duplicatingId).toBeNull();
+  expect(store.editor).toBeNull();
 });

@@ -16,6 +16,10 @@ import { searchRows } from "../../src/renderer/features/vector-stores/searchRows
 import {
   formatDuration,
   formatThroughput,
+  PRIMARY_ACTION_LABELS,
+  primaryAction,
+  splitPath,
+  storeFacts,
 } from "../../src/renderer/features/vector-stores/vectorPresentation";
 import {
   chunkPlan,
@@ -629,4 +633,81 @@ test("test search marks rows under the chat floor, which the Settings tab edits"
   expect(store.detail?.chatMinScore).toBe(0.5);
   expect(store.minScore).toBe("0.5");
   expect(store.rows.map((row) => row.belowFloor)).toEqual([false, true]);
+});
+
+test("the header offers the one action the store needs next", () => {
+  const base = {
+    status: "healthy",
+    indexing: false,
+    sources: 1,
+    outdated: false,
+    vectors: 3,
+  } as const;
+  expect(primaryAction(base)).toBe("update");
+  expect(primaryAction({ ...base, indexing: true, status: "broken" })).toBe("stop");
+  expect(primaryAction({ ...base, status: "broken" })).toBe("reconcile");
+  expect(primaryAction({ ...base, status: "stale" })).toBe("reconcile");
+  expect(primaryAction({ ...base, sources: 0 })).toBe("add");
+  expect(primaryAction({ ...base, outdated: true })).toBe("rebuild");
+  expect(primaryAction({ ...base, outdated: true, vectors: 0 })).toBe("update");
+  expect(PRIMARY_ACTION_LABELS[primaryAction({ ...base, sources: 0 })]).toBe(
+    PRIMARY_ACTION_LABELS.add,
+  );
+});
+
+test("store facts count in words and say when the store was never indexed", () => {
+  expect(storeFacts({ documents: 1, vectors: 22, bytes: 2048, lastIndexedAt: null })).toEqual([
+    "1 документ",
+    "22 фрагмента",
+    "2.0 KB",
+    "ещё не индексировалось",
+  ]);
+  expect(storeFacts({ documents: 5, vectors: 11, bytes: 0, lastIndexedAt: 0 })[3]).toMatch(
+    /^обновлено /,
+  );
+});
+
+test("a document path splits into its file name and folder on either separator", () => {
+  expect(splitPath("C:\\docs\\handbook\\intro.md")).toEqual({
+    name: "intro.md",
+    folder: "C:\\docs\\handbook",
+  });
+  expect(splitPath("faq/general.md#L96")).toEqual({ name: "general.md#L96", folder: "faq" });
+  expect(splitPath("readme.md")).toEqual({ name: "readme.md", folder: "" });
+});
+
+test("duplicating opens a create form with the configuration and none of the data", async () => {
+  const { store, bridge } = setup();
+  await store.load();
+  store.duplicate();
+  const vm = store.form!;
+  expect(vm.isNew).toBe(true);
+  expect(vm.chunkLocked).toBe(false);
+  expect(vm.name).toBe("Knowledge (копия)");
+  expect(vm.embeddingModelId).toBe("embed");
+  expect(vm.dimension).toBe("3");
+  bridge.handle("vectorStores.create", (input) =>
+    VectorStoreDto.parse({
+      ...detail,
+      ...input,
+      id: "0199bb11-1111-7111-8111-000000000097",
+      documents: 0,
+      vectors: 0,
+    }),
+  );
+  bridge.handle("vectorStores.sources.list", () => []);
+  bridge.handle("vectorStores.documents.list", () => []);
+  expect(await store.save()).toBe(true);
+  const call = bridge.calls.find((entry) => entry.channel === "vectorStores.create");
+  expect(call?.payload).toMatchObject({
+    name: "Knowledge (копия)",
+    embeddingProviderId: EMBEDDER,
+    embeddingModelId: "embed",
+    dimension: 3,
+    chunkSize: 256,
+    chunkOverlap: 32,
+  });
+  expect(store.detail?.id).toBe("0199bb11-1111-7111-8111-000000000097");
+  expect(store.sources).toEqual([]);
+  expect(store.documents).toEqual([]);
 });

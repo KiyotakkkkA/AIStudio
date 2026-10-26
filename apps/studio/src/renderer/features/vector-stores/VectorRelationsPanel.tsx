@@ -27,7 +27,7 @@ function VectorRelationsPanel() {
   const paths = new Map(documents.map((document) => [document.id as string, document.sourcePath]));
   const busy = store.busy || graph.busy;
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+    <div role="tabpanel" className="flex min-h-0 flex-1 flex-col gap-3 px-6 py-5">
       <form
         className="flex flex-wrap items-end gap-2.5"
         onSubmit={(e) => {
@@ -84,7 +84,7 @@ function VectorRelationsPanel() {
         ) : null}
         <span className="text-[12px] text-main-500">
           Связи задаются вручную и действуют внутри одного хранилища. Направление важно для всех
-          типов, кроме «Встречается вместе». Направление важно для всех
+          типов, кроме «Встречается вместе».
         </span>
       </div>
       {graph.error === null ? null : (
@@ -113,12 +113,9 @@ function VectorRelationsPanel() {
           />
         </div>
       ) : (
-        <ScrollArea className="flex min-h-0 flex-1 flex-col gap-2">
+        <ScrollArea className="flex min-h-0 flex-1 flex-col">
           {groups.map((group) => (
-            <article
-              key={group.document.id}
-              className="rounded-card bg-main-900 shadow-card px-3.25 py-3"
-            >
+            <article key={group.document.id} className="border-b border-line py-3">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="break-all font-mono text-[12px] text-main-200">
                   {group.document.sourcePath}

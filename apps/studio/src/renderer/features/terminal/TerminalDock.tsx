@@ -190,9 +190,8 @@ export default observer(function TerminalDock({
                   label={NEW_SESSION_WITH}
                   path={mdiChevronDown}
                   iconSize={14}
-                  rounded="rounded-lg"
+                  size="xs"
                   disabled={store.creating}
-                  className="size-6 justify-center gap-0 border-transparent bg-transparent p-0 text-main-400 hover:bg-main-700 hover:text-main-50"
                 />
                 <Dropdown.Menu
                   role="menu"

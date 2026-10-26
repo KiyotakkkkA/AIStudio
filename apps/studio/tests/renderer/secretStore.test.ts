@@ -221,3 +221,50 @@ test("deleting an unused secret drops it from the list and clears the form", asy
   assert.equal(store.form, null);
   assert.equal(store.selectedId, null);
 });
+
+test("duplicating copies the configuration into a new form that still needs the value", async () => {
+  const rows = [summary({ id: OLLAMA, tags: ["llm", "prod"] })];
+  const { bridge, store } = storeWith(rows);
+  bridge.handle("secrets.create", (input) =>
+    detail(summary({ id: CREATED, name: input.name, type: input.type, scope: input.scope })),
+  );
+  await store.load();
+  await store.select(OLLAMA);
+
+  store.requestDuplicate();
+
+  const form = store.form;
+  assert.notEqual(form, null);
+  assert.equal(form?.isNew, true);
+  assert.equal(form?.dirty, true);
+  assert.equal(form?.name, "Ollama — личный (копия)");
+  assert.deepEqual(form?.tags, ["llm", "prod"]);
+  assert.equal(form?.value, "");
+  assert.equal(store.selectedId, null);
+  assert.equal(await store.submit(), false);
+
+  form?.setValue("osk_live_other");
+  assert.equal(await store.submit(), true);
+  const call = bridge.calls.find((entry) => entry.channel === "secrets.create");
+  assert.deepEqual(call?.payload, {
+    ...form?.toCreateInput(),
+    value: "osk_live_other",
+    name: "Ollama — личный (копия)",
+  });
+  assert.equal(store.selectedId, CREATED);
+});
+
+test("duplicating over unsaved edits waits for the discard to be confirmed", async () => {
+  const { store } = storeWith([summary({ id: OLLAMA })]);
+  await store.load();
+  await store.select(OLLAMA);
+  store.form?.setName("Изменено");
+
+  store.requestDuplicate();
+  assert.deepEqual(store.pending, { kind: "duplicate" });
+  assert.equal(store.form?.isNew, false);
+
+  store.confirmPending();
+  assert.equal(store.form?.isNew, true);
+  assert.equal(store.form?.name, "Ollama — личный (копия)");
+});

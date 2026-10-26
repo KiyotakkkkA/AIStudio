@@ -33,8 +33,8 @@ impl PickerPort for DialogPicker {
             dialog = dialog.set_parent(&studio);
         }
         match kind {
-            VectorSourceKind::Folder => dialog.pick_folder(move |path| {
-                let _ = sender.send(path.into_iter().collect());
+            VectorSourceKind::Folder => dialog.pick_folders(move |paths| {
+                let _ = sender.send(paths.unwrap_or_default());
             }),
             VectorSourceKind::File => dialog.pick_files(move |paths| {
                 let _ = sender.send(paths.unwrap_or_default());

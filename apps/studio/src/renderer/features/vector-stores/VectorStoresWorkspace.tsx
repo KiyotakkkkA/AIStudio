@@ -131,9 +131,13 @@ function VectorStoresWorkspace() {
             <span className="text-[11px] text-main-400">Документы хранятся локально.</span>
           </ListRow>
         </EntityListPanel>
-        <ScrollArea className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 px-4.5 py-4">
-          {store.form ? <VectorStoreForm /> : <VectorStoreDetail />}
-        </ScrollArea>
+        {store.form ? (
+          <ScrollArea className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 px-4.5 py-4">
+            <VectorStoreForm />
+          </ScrollArea>
+        ) : (
+          <VectorStoreDetail />
+        )}
       </div>
     </PageShell>
   );

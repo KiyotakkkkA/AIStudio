@@ -37,7 +37,7 @@ export default class VectorStoreStore {
   selectedId: VectorStoreId | null = null;
   detail: VectorStoreDto | null = null;
   form: VectorStoreFormVm | null = null;
-  tab = "Test search";
+  tab = "Documents";
   filter = "";
   query = "";
   k = "5";
@@ -264,6 +264,19 @@ export default class VectorStoreStore {
       this.formContext,
     );
   }
+  duplicate() {
+    const template = this.detail;
+    if (this.busy || this.form || !template) return;
+    ++this.revision;
+    this.searching = false;
+    this.form = new VectorStoreFormVm(
+      null,
+      this.providers,
+      this.embeddingModelsByProvider,
+      this.formContext,
+      template,
+    );
+  }
   edit() {
     if (this.detail && !this.busy)
       this.form = new VectorStoreFormVm(
@@ -300,6 +313,17 @@ export default class VectorStoreStore {
         this.form = null;
         this.result = null;
       });
+      if (!form.isNew) return;
+      runInAction(() => {
+        this.sources = [];
+        this.documents = [];
+        this.graphExpansions = [];
+        this.graph.reset();
+        this.evaluation.reset();
+      });
+      await this.loadDocuments(detail.id);
+      await this.graph.load(detail.id);
+      await this.evaluation.load(detail.id);
     });
   }
   async reconcile(all = false) {
@@ -437,9 +461,10 @@ export default class VectorStoreStore {
       });
     }
   }
-  async pickSource() {
+  async pickSource(kind: VectorSourceKind = this.sourceKind) {
     const id = this.selectedId;
     if (!id || this.busy) return false;
+    this.sourceKind = kind;
     return this.mutate(async () => {
       const { paths } = await this.ipc.call("vectorStores.sources.pick", {
         kind: this.sourceKind,

@@ -45,6 +45,7 @@ interface Snapshot {
 export class SecretFormVm {
   readonly types: readonly SecretTypeSchema[];
   readonly secretId: SecretId | null;
+  readonly copied: boolean;
 
   private readonly fallback: SecretTypeSchema;
 
@@ -61,15 +62,16 @@ export class SecretFormVm {
 
   private readonly initial: Snapshot;
 
-  constructor(types: readonly SecretTypeSchema[], secret?: SecretDto | null) {
+  constructor(types: readonly SecretTypeSchema[], secret?: SecretDto | null, copy = false) {
     const fallback = types[0];
     if (fallback === undefined) throw new Error("Реестр типов секретов пуст");
     this.types = types;
     this.fallback = fallback;
-    this.secretId = secret?.id ?? null;
+    this.copied = copy && secret !== undefined && secret !== null;
+    this.secretId = this.copied ? null : (secret?.id ?? null);
     this.type = (secret?.type ?? fallback.key) as SecretTypeKey;
     if (secret !== undefined && secret !== null) {
-      this.name = secret.name;
+      this.name = this.copied ? `${secret.name} (копия)` : secret.name;
       this.scope = secret.scope;
       this.tags = [...secret.tags];
       this.note = secret.note ?? "";
@@ -79,7 +81,7 @@ export class SecretFormVm {
     this.initial = this.snapshot();
     makeAutoObservable<SecretFormVm, "initial" | "types" | "fallback">(
       this,
-      { initial: false, types: false, fallback: false },
+      { initial: false, types: false, fallback: false, copied: false },
       { autoBind: true },
     );
   }
@@ -109,6 +111,7 @@ export class SecretFormVm {
   }
 
   get dirty(): boolean {
+    if (this.copied) return true;
     const current = this.snapshot();
     return (
       current.type !== this.initial.type ||

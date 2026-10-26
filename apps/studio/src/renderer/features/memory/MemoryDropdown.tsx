@@ -26,8 +26,6 @@ import {
   SOURCE_USER,
 } from "./memoryCopy";
 
-const TRIGGER =
-  "size-7 justify-center gap-0 rounded-control border-transparent p-0 hover:bg-main-700 hover:text-main-50 border-none cursor-auto";
 const TRIGGER_OPEN =
   "bg-accent-soft text-accent-medium hover:bg-accent-soft hover:text-accent-light";
 
@@ -100,9 +98,11 @@ function MemoryDropdown({ conversationId }: { readonly conversationId: Conversat
         tooltip="bottom-center"
         path={mdiBrain}
         iconSize={16}
+        size="sm"
         rounded=""
         aria-pressed={open}
-        className={`${TRIGGER} ${open ? TRIGGER_OPEN : "bg-transparent text-main-400"}`}
+        className="rounded-control"
+        {...(open ? { toneClassName: TRIGGER_OPEN } : {})}
       />
       <Dropdown.Menu
         aria-label={MEMORY_PANEL}

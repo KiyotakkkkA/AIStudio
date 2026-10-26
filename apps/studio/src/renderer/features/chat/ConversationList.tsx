@@ -16,6 +16,7 @@ import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
+import { ActionMenu, ActionMenuItem, ActionMenuSeparator } from "../../ui/molecules/ActionMenu";
 import TextInput from "../../ui/atoms/TextInput";
 import ConfirmModal from "../../ui/molecules/ConfirmModal";
 import type { ConversationDto } from "@zvs/shared";
@@ -124,51 +125,37 @@ export default observer(function ConversationList({ store }: { readonly store: C
                         </div>
                         <Dropdown menuWidth={160} menuPlacement="bottom-right">
                           <IconDropdownButton
-                            rounded="rounded-lg"
                             aria-label={`Действия для ${conversation.title}`}
                             label="Действия"
                             tooltip="right-center"
                             path={mdiDotsVertical}
-                            className="invisible size-6 justify-center gap-0 border-none cursor-auto bg-transparent p-0 text-main-400 group-focus-within:visible group-hover:visible hover:border-transparent hover:bg-main-700 hover:text-main-100"
-                            iconSize={18}
+                            size="xs"
+                            className="invisible group-focus-within:visible group-hover:visible"
                             onClick={(event) => event.stopPropagation()}
                           />
-                          <Dropdown.Menu
-                            role="menu"
-                            aria-label="Действия диалога"
-                            rounded="rounded-lg"
-                            className="rounded-card border-line bg-main-900 p-1 shadow-pop"
-                          >
-                            <Dropdown.Item
-                              role="menuitem"
-                              rounded="rounded-lg"
-                              className="text-[13px] text-main-100"
+                          <ActionMenu label="Действия диалога">
+                            <ActionMenuItem
+                              icon={mdiPencilOutline}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 setRenameTarget(conversation);
                                 setRenameTitle(conversation.title);
                               }}
                             >
-                              <span className="flex items-center gap-2">
-                                <Icon path={mdiPencilOutline} size={16} className="text-main-400" />
-                                Переименовать
-                              </span>
-                            </Dropdown.Item>
-                            <Dropdown.Item
-                              role="menuitem"
-                              rounded="rounded-lg"
-                              className="text-[13px] text-err hover:bg-err-soft hover:text-err"
+                              Переименовать
+                            </ActionMenuItem>
+                            <ActionMenuSeparator />
+                            <ActionMenuItem
+                              icon={mdiDeleteOutline}
+                              danger
                               onClick={(event) => {
                                 event.stopPropagation();
                                 setDeleteTarget(conversation);
                               }}
                             >
-                              <span className="flex items-center gap-2">
-                                <Icon path={mdiDeleteOutline} size={16} />
-                                Удалить
-                              </span>
-                            </Dropdown.Item>
-                          </Dropdown.Menu>
+                              Удалить
+                            </ActionMenuItem>
+                          </ActionMenu>
                         </Dropdown>
                       </div>
                     </motion.div>

@@ -10,13 +10,14 @@ import {
 } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import Icon from "../../ui/atoms/Icon";
 import Toggle from "../../ui/atoms/Toggle";
 import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
+import { ActionMenu, ActionMenuItem, ActionMenuSeparator } from "../../ui/molecules/ActionMenu";
 import EmptyState from "../../ui/molecules/EmptyState";
 import PageHeader from "../../ui/organisms/PageHeader";
 import { useStore } from "../../stores/useStore";
@@ -38,13 +39,13 @@ import {
 } from "./skillPresentation";
 import Alert from "../../ui/molecules/Alert";
 
-const MENU_ITEM = "text-[13px] text-main-100";
-
 function SkillsWorkspace() {
   const { skills: store } = useStore();
   const form = store.form;
   const selected = store.selectedSkill;
   const update = selected?.update ?? null;
+
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   useEffect(() => {
     void store.mount();
@@ -170,39 +171,24 @@ function SkillsWorkspace() {
                       label="Действия с навыком"
                       tooltip="bottom-center"
                       path={mdiDotsHorizontal}
-                      className="size-8 justify-center gap-0 border-none cursor-auto bg-transparent p-0 text-main-400 hover:bg-main-700 hover:text-main-100"
-                      rounded="rounded-lg"
-                      iconSize={18}
                     />
-                    <Dropdown.Menu
-                      role="menu"
-                      aria-label="Действия с навыком"
-                      rounded="rounded-lg"
-                      className="rounded-card border-line bg-main-900 p-1 shadow-pop"
-                    >
-                      <Dropdown.Item
-                        role="menuitem"
-                        rounded="rounded-lg"
-                        className={MENU_ITEM}
-                        onClick={store.requestDuplicate}
+                    <ActionMenu label="Действия с навыком">
+                      <ActionMenuItem icon={mdiContentCopy} onClick={store.requestDuplicate}>
+                        Дублировать
+                      </ActionMenuItem>
+                      <ActionMenuItem icon={mdiExport} onClick={() => void store.exportSelected()}>
+                        Экспорт в папку
+                      </ActionMenuItem>
+                      <ActionMenuSeparator />
+                      <ActionMenuItem
+                        icon={mdiDeleteOutline}
+                        danger
+                        disabled={store.removing}
+                        onClick={() => setConfirmRemove(true)}
                       >
-                        <span className="flex items-center gap-2">
-                          <Icon path={mdiContentCopy} size={16} />
-                          Дублировать
-                        </span>
-                      </Dropdown.Item>
-                      <Dropdown.Item
-                        role="menuitem"
-                        rounded="rounded-lg"
-                        className={MENU_ITEM}
-                        onClick={() => void store.exportSelected()}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Icon path={mdiExport} size={16} />
-                          Экспорт в папку
-                        </span>
-                      </Dropdown.Item>
-                    </Dropdown.Menu>
+                        Удалить навык
+                      </ActionMenuItem>
+                    </ActionMenu>
                   </Dropdown>
                 )}
               </div>
@@ -214,31 +200,7 @@ function SkillsWorkspace() {
                   <SkillFileView store={store} vm={form} />
                 )}
               </div>
-              <div className="flex flex-none items-center gap-3 border-t border-line bg-main-900 px-4.5 py-3">
-                {form.isNew ? null : (
-                  <IconButton
-                    key={form.skillId}
-                    tone="danger"
-                    size="md"
-                    path={mdiDeleteOutline}
-                    label="Удалить навык"
-                    disabled={store.removing}
-                    needConfirm
-                    modalSetup={{
-                      title: "Удалить навык?",
-                      content: (
-                        <>
-                          Папка навыка «{form.name}» со всеми файлами будет удалена. Действие нельзя
-                          отменить.
-                        </>
-                      ),
-                      tone: "danger",
-                      confirmLabel: "Удалить",
-                    }}
-                    onClick={() => void store.removeSelected()}
-                  />
-                )}
-                <span className="flex-1" />
+              <div className="flex flex-none items-center justify-end gap-3 border-t border-line bg-main-900 px-4.5 py-3">
                 <Button
                   tone="secondary"
                   disabled={(!form.isNew && !form.dirty) || store.saving}
@@ -260,6 +222,19 @@ function SkillsWorkspace() {
         )}
       </div>
 
+      <ConfirmDialog
+        open={confirmRemove && form !== null && !form.isNew}
+        title="Удалить навык?"
+        confirmLabel="Удалить"
+        confirmTone="danger"
+        onCancel={() => setConfirmRemove(false)}
+        onConfirm={() => {
+          setConfirmRemove(false);
+          void store.removeSelected();
+        }}
+      >
+        Папка навыка «{form?.name}» со всеми файлами будет удалена. Действие нельзя отменить.
+      </ConfirmDialog>
       <ConfirmDialog
         open={store.pending !== null}
         title="Есть несохранённые изменения"

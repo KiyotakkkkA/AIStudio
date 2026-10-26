@@ -44,6 +44,7 @@ function SecretsWorkspace() {
               void secrets.submit();
             }}
             onCancel={secrets.resetForm}
+            onDuplicate={secrets.requestDuplicate}
             onDelete={() => {
               void secrets.removeSelected();
             }}

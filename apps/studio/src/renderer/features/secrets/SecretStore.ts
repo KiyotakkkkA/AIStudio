@@ -22,7 +22,9 @@ export interface SecretConflict {
 }
 
 export type PendingIntent =
-  { readonly kind: "create" } | { readonly kind: "select"; readonly id: SecretId };
+  | { readonly kind: "create" }
+  | { readonly kind: "duplicate" }
+  | { readonly kind: "select"; readonly id: SecretId };
 
 export class SecretStore {
   summaries: SecretSummaryDto[] = [];
@@ -142,6 +144,23 @@ export class SecretStore {
     this.startCreate();
   }
 
+  startDuplicate(): void {
+    const source = this.selected;
+    if (!this.ready || source === null) return;
+    this.selectedId = null;
+    this.selected = null;
+    this.form = new SecretFormVm(this.types, source, true);
+  }
+
+  requestDuplicate(): void {
+    if (this.selected === null) return;
+    if (this.form?.dirty === true) {
+      this.pending = { kind: "duplicate" };
+      return;
+    }
+    this.startDuplicate();
+  }
+
   requestSelect(id: SecretId): void {
     if (id === this.selectedId) return;
     if (this.form?.dirty === true) {
@@ -156,6 +175,7 @@ export class SecretStore {
     this.pending = null;
     if (intent === null) return;
     if (intent.kind === "create") this.startCreate();
+    else if (intent.kind === "duplicate") this.startDuplicate();
     else void this.select(intent.id);
   }
 

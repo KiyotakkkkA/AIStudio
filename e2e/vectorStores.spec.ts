@@ -72,7 +72,9 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
     await page.locator("#vs-dimension").fill("3");
     await page.getByRole("button", { name: "Сохранить", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Product knowledge base" })).toBeVisible();
-    await expect(page.getByText("Ожидает индексации.", { exact: false })).toBeVisible();
+    await expect(
+      page.getByText("Хранилище ещё не проиндексировано", { exact: true }),
+    ).toBeVisible();
     const response = (await page.evaluate(() =>
       window.zvs.call("vectorStores.list", undefined),
     )) as { ok: boolean; data: { id: string }[] };
@@ -102,7 +104,9 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
         payload: { chunkCount: 2 },
       },
     ]);
-    await page.getByRole("button", { name: "Сверить", exact: true }).click();
+    await page.getByRole("button", { name: "Действия с хранилищем" }).click();
+    await page.getByRole("menuitem", { name: "Сверить статистику" }).click();
+    await page.getByText("Проверка поиска", { exact: true }).click();
     await page.locator("#vs-query").fill("How do I rotate a token?");
     await page.getByRole("button", { name: "Найти", exact: true }).click();
     await expect(
@@ -112,16 +116,19 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
     await expect(page.locator("article.opacity-50")).toHaveCount(1);
     expect(requests.some((body) => body.includes("How do I rotate a token?"))).toBe(true);
     await page.screenshot({ path: testInfo.outputPath("vector-stores-1440x900.png") });
-    await page.getByRole("button", { name: "Изменить", exact: true }).click();
+    await page.getByRole("button", { name: "Действия с хранилищем" }).click();
+    await page.getByRole("menuitem", { name: "Изменить параметры" }).click();
     await expect(page.locator("#vs-dimension")).toBeDisabled();
     await page.locator("#vs-name").fill("Renamed knowledge base");
     await page.getByRole("button", { name: "Сохранить", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Renamed knowledge base" })).toBeVisible();
     await rm(assertTemporaryPath(path), { recursive: true });
-    await page.getByTitle("Сверить статистику с таблицей", { exact: true }).click();
-    await expect(page.getByRole("alert")).toContainText("Таблица недоступна");
-    await expect(page.getByRole("button", { name: "Сверить", exact: true })).toHaveCount(2);
-    await page.getByRole("button", { name: "Удалить", exact: true }).click();
+    await page.getByRole("button", { name: "Действия с хранилищем" }).click();
+    await page.getByRole("menuitem", { name: "Сверить статистику" }).click();
+    await expect(page.getByRole("alert")).toContainText("Таблица хранилища недоступна");
+    await expect(page.getByRole("button", { name: "Сверить", exact: true })).toHaveCount(1);
+    await page.getByRole("button", { name: "Действия с хранилищем" }).click();
+    await page.getByRole("menuitem", { name: "Удалить хранилище" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Удалить", exact: true }).click();
     await expect(page.getByText("Хранилищ пока нет.", { exact: true })).toBeVisible();
     expect(errors).toEqual([]);

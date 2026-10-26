@@ -60,24 +60,26 @@ export default class VectorStoreFormVm {
     readonly providers: readonly ProviderSummaryDto[],
     readonly modelsByProvider: ReadonlyMap<string, readonly ModelDto[]> = new Map(),
     context: VectorStoreFormContext = {},
+    template: VectorStoreDto | null = null,
   ) {
     this.catalogue = context.catalogue ?? [];
     this.device = context.device ?? null;
-    if (original) {
-      this.name = original.name;
-      this.description = original.description;
-      this.embeddingProviderId = original.embeddingProviderId;
-      this.embeddingModelId = original.embeddingModelId;
-      this.dimension = String(original.dimension);
-      this.metric = original.metric;
-      this.chunkSize = String(original.chunkSize);
-      this.chunkOverlap = String(original.chunkOverlap);
-      this.queryPrefix = original.queryPrefix;
-      this.documentPrefix = original.documentPrefix;
-      this.searchMode = original.searchMode;
-      this.chatMinScore = String(original.chatMinScore);
-      this.applyRerank(original.rerank);
-      this.applyOcr(original.ocr);
+    const source = original ?? template;
+    if (source) {
+      this.name = original ? source.name : `${source.name} (копия)`;
+      this.description = source.description;
+      this.embeddingProviderId = source.embeddingProviderId;
+      this.embeddingModelId = source.embeddingModelId;
+      this.dimension = String(source.dimension);
+      this.metric = source.metric;
+      this.chunkSize = String(source.chunkSize);
+      this.chunkOverlap = String(source.chunkOverlap);
+      this.queryPrefix = source.queryPrefix;
+      this.documentPrefix = source.documentPrefix;
+      this.searchMode = source.searchMode;
+      this.chatMinScore = String(source.chatMinScore);
+      this.applyRerank(source.rerank);
+      this.applyOcr(source.ocr);
     }
     makeAutoObservable(this, {}, { autoBind: true });
   }

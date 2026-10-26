@@ -1,6 +1,6 @@
 import { mdiClose, mdiTrashCan } from "@mdi/js";
 import { observer } from "mobx-react-lite";
-import { Accordion, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useStore } from "../../stores/useStore";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
@@ -8,9 +8,10 @@ import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import SelectInput from "../../ui/atoms/SelectInput";
 import TextInput from "../../ui/atoms/TextInput";
-import Field from "../../ui/molecules/Field";
 import ChatEvalPanel from "./ChatEvalPanel";
 import { EVAL_MODE_LABELS, evalCaseRows, evalMetricRows } from "./evalRows";
+
+const EYEBROW = "text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase";
 
 function VectorEvalSection() {
   const { vectorStores: store } = useStore();
@@ -25,28 +26,23 @@ function VectorEvalSection() {
   const cases = evalCaseRows(evaluation.cases, run, documents);
   const locked = store.busy || store.searching || evaluation.busy || evaluation.running;
   return (
-    <Accordion
-      defaultOpen={false}
-      className="flex-none rounded-[9px] border border-line bg-main-900"
-    >
-      <Accordion.Summary className="min-h-12 px-4 text-left text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase hover:text-main-200">
-        Проверка качества
-        {evaluation.cases.length > 0 ? (
-          <span className="ml-2 font-mono normal-case tracking-normal text-main-400">
-            {evaluation.cases.length} вопр.
-            {run === null
-              ? ""
-              : ` · MRR ${run.modes.map((mode) => mode.metrics.mrr.toFixed(3)).join(" → ")}`}
-          </span>
-        ) : null}
-      </Accordion.Summary>
-      <Accordion.Content className="border-t border-line">
-        <ScrollArea className="flex max-h-[46vh] flex-col gap-3.25 p-4">
-          <p className="text-[11px] leading-relaxed text-main-500">
-            Вопросы с заранее известным ответом. Прогон ищет каждый вопрос и смотрит, на каком месте
-            оказался ожидаемый документ. Если у хранилища включено переранжирование, результаты
-            считаются дважды — без него и с ним.
-          </p>
+    <ScrollArea role="tabpanel" className="min-h-0 flex-1 px-6 py-5">
+      <div className="flex max-w-4xl flex-col gap-8">
+        <section className="flex flex-col gap-3">
+          <div>
+            <h3 className={EYEBROW}>
+              Контрольные вопросы
+              {evaluation.cases.length > 0 ? (
+                <span className="ml-2 font-mono tracking-normal text-main-400">
+                  {evaluation.cases.length.toLocaleString("ru-RU")}
+                </span>
+              ) : null}
+            </h3>
+            <p className="mt-1 text-[12px] leading-relaxed text-main-500">
+              Вопросы с заранее известным ответом: для каждого укажите документы, в которых
+              находится ответ.
+            </p>
+          </div>
           <form
             className="flex flex-col gap-2.5"
             onSubmit={(e) => {
@@ -54,30 +50,28 @@ function VectorEvalSection() {
               void evaluation.add();
             }}
           >
-            <Field label="Вопрос" htmlFor="vs-eval-question">
-              <TextInput
-                id="vs-eval-question"
-                value={evaluation.question}
-                onChange={(e) => evaluation.set("question", e.target.value)}
-                disabled={locked}
-              />
-            </Field>
-            <div className="flex flex-wrap items-end gap-2.5">
+            <TextInput
+              id="vs-eval-question"
+              aria-label="Вопрос"
+              placeholder="Вопрос"
+              value={evaluation.question}
+              onChange={(e) => evaluation.set("question", e.target.value)}
+              disabled={locked}
+            />
+            <div className="flex flex-wrap items-center gap-2.5">
               <div className="min-w-50 flex-1">
-                <Field label="Ожидаемые документы">
-                  <SelectInput
-                    label="Ожидаемый документ"
-                    value=""
-                    options={documentOptions}
-                    placeholder={
-                      documents.length === 0 ? "В хранилище нет документов" : "Добавить документ"
-                    }
-                    disabled={locked || documentOptions.length === 0}
-                    onChange={evaluation.addExpected}
-                  />
-                </Field>
+                <SelectInput
+                  label="Ожидаемый документ"
+                  value=""
+                  options={documentOptions}
+                  placeholder={
+                    documents.length === 0 ? "В хранилище нет документов" : "Ожидаемый документ"
+                  }
+                  disabled={locked || documentOptions.length === 0}
+                  onChange={evaluation.addExpected}
+                />
               </div>
-              <Button type="submit" tone="primary" disabled={!evaluation.canAdd || locked}>
+              <Button type="submit" disabled={!evaluation.canAdd || locked}>
                 Добавить вопрос
               </Button>
             </div>
@@ -97,19 +91,77 @@ function VectorEvalSection() {
               </div>
             ) : null}
           </form>
-          <div className="flex flex-wrap items-end gap-2.5 border-t border-line pt-3.25">
-            <div className="w-30">
-              <Field label="Глубина, фрагментов" htmlFor="vs-eval-k">
-                <TextInput
-                  id="vs-eval-k"
-                  value={evaluation.k}
-                  onChange={(e) => evaluation.set("k", e.target.value)}
-                  disabled={locked}
-                  mono
-                  inputMode="numeric"
-                />
-              </Field>
-            </div>
+          {cases.length === 0 ? (
+            <p className="text-[12px] text-main-500">
+              {evaluation.loading ? "Загрузка вопросов…" : "Вопросов пока нет."}
+            </p>
+          ) : (
+            <ul className="m-0 flex list-none flex-col divide-y divide-line border-y border-line p-0">
+              {cases.map((row) => (
+                <li key={row.id} className="flex items-start gap-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12.5px] text-main-100">{row.question}</p>
+                    <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                      {row.expected.map((path) => (
+                        <span key={path} className="break-all font-mono text-[11px] text-main-500">
+                          {path}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-none flex-wrap items-center justify-end gap-1.5">
+                    {row.ranks.map((rank) => (
+                      <Chip
+                        key={rank.mode}
+                        tone={rank.missed ? "neutral" : "accent"}
+                        title={rank.error ?? EVAL_MODE_LABELS[rank.mode]}
+                      >
+                        {rank.mode === "rerank" ? "rr " : "vec "}
+                        {rank.label}
+                      </Chip>
+                    ))}
+                    <IconButton
+                      size="md"
+                      path={mdiTrashCan}
+                      label="Удалить вопрос"
+                      disabled={locked}
+                      needConfirm
+                      modalSetup={{
+                        title: "Удалить вопрос?",
+                        content: `Вопрос «${row.question}» больше не будет участвовать в проверке.`,
+                        tone: "danger",
+                        confirmLabel: "Удалить",
+                      }}
+                      onClick={() => {
+                        void evaluation.remove(row.id);
+                      }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section className="flex flex-col gap-3">
+          <div>
+            <h3 className={EYEBROW}>Проверка поиска</h3>
+            <p className="mt-1 text-[12px] leading-relaxed text-main-500">
+              Каждый вопрос ищется в хранилище; оценка показывает, на каком месте оказался ожидаемый
+              документ. С переранжированием результаты считаются дважды — без него и с ним.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5 text-[12px] text-main-400">
+            <label htmlFor="vs-eval-k">Глубина, фрагментов</label>
+            <span className="w-16">
+              <TextInput
+                id="vs-eval-k"
+                value={evaluation.k}
+                onChange={(e) => evaluation.set("k", e.target.value)}
+                disabled={locked}
+                mono
+                inputMode="numeric"
+              />
+            </span>
             <Button
               tone="primary"
               disabled={!evaluation.canRun || locked || store.detail?.status === "broken"}
@@ -120,7 +172,7 @@ function VectorEvalSection() {
               {evaluation.running ? "Проверка…" : "Запустить проверку"}
             </Button>
             {run === null ? null : (
-              <span className="pb-1.5 text-[11px] text-main-500">
+              <span className="text-[11px] text-main-500">
                 Последний прогон: {new Date(run.ranAt).toLocaleString("ru-RU")} · top-{run.k} ·{" "}
                 {(run.durationMs / 1000).toFixed(1)} с
               </span>
@@ -174,66 +226,10 @@ function VectorEvalSection() {
               порядок векторного поиска. Подробности в журнале.
             </p>
           ) : null}
-          {cases.length === 0 ? (
-            <p className="text-[12px] text-main-400">
-              {evaluation.loading
-                ? "Загрузка вопросов…"
-                : "Вопросов пока нет. Добавьте вопросы с известными ответами."}
-            </p>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              {cases.map((row) => (
-                <div
-                  key={row.id}
-                  className="flex items-start gap-3 rounded-card border border-line bg-main-900 px-3.25 py-2.5"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12.5px] text-main-200">{row.question}</p>
-                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                      {row.expected.map((path) => (
-                        <span key={path} className="break-all font-mono text-[11px] text-main-500">
-                          {path}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-none flex-wrap items-center justify-end gap-1.5">
-                    {row.ranks.map((rank) => (
-                      <Chip
-                        key={rank.mode}
-                        tone={rank.missed ? "neutral" : "accent"}
-                        title={rank.error ?? EVAL_MODE_LABELS[rank.mode]}
-                      >
-                        {rank.mode === "rerank" ? "rr " : "vec "}
-                        {rank.label}
-                      </Chip>
-                    ))}
-                    <IconButton
-                      tone="danger"
-                      size="md"
-                      path={mdiTrashCan}
-                      label="Удалить вопрос"
-                      disabled={locked}
-                      needConfirm
-                      modalSetup={{
-                        title: "Удалить вопрос?",
-                        content: `Вопрос «${row.question}» больше не будет участвовать в проверке.`,
-                        tone: "danger",
-                        confirmLabel: "Удалить",
-                      }}
-                      onClick={() => {
-                        void evaluation.remove(row.id);
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <ChatEvalPanel chat={evaluation.chat} cases={evaluation.cases.length} locked={locked} />
-        </ScrollArea>
-      </Accordion.Content>
-    </Accordion>
+        </section>
+        <ChatEvalPanel chat={evaluation.chat} cases={evaluation.cases.length} locked={locked} />
+      </div>
+    </ScrollArea>
   );
 }
 

@@ -1,4 +1,4 @@
-import { mdiArrowLeft, mdiDeleteOutline, mdiGraphOutline, mdiPlus } from "@mdi/js";
+import { mdiArrowLeft, mdiGraphOutline, mdiPlus } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { useEffect, useState, type ReactNode } from "react";
 import type { ScenarioDto } from "@zvs/shared";
@@ -8,6 +8,7 @@ import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
 import Toggle from "../../ui/atoms/Toggle";
 import EmptyState from "../../ui/molecules/EmptyState";
+import CardMenu from "../../ui/molecules/CardMenu";
 import PageHeader from "../../ui/organisms/PageHeader";
 import { useStore } from "../../stores/useStore";
 import { formatLastUsed } from "../tools/toolPresentation";
@@ -248,7 +249,7 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
           />
         </div>
       ) : (
-        <ul className="m-0 flex min-h-0 flex-1 list-none flex-col gap-2 overflow-y-auto px-6 pt-1 pb-6">
+        <ul className="m-0 flex min-h-0 flex-1 list-none flex-col gap-2 overflow-y-auto px-6 py-5">
           {store.scenarios.map((scenario) => (
             <li
               onClick={() => void store.open(scenario.id)}
@@ -275,25 +276,21 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
                   {tag}
                 </span>
               ))}
-              <IconButton
-                tone="danger"
-                size="md"
-                path={mdiDeleteOutline}
-                label="Удалить сценарий"
-                disabled={store.removingId === scenario.id}
-                needConfirm
-                modalSetup={{
-                  title: "Удалить сценарий?",
-                  content: (
-                    <>
-                      Сценарий «{scenario.name}» и все его версии будут удалены. Действие нельзя
-                      отменить.
-                    </>
-                  ),
-                  tone: "danger",
-                  confirmLabel: "Удалить",
-                }}
-                onClick={() => void store.remove(scenario.id)}
+              <CardMenu
+                label="Действия со сценарием"
+                removeLabel="Удалить сценарий"
+                removeDisabled={store.removingId === scenario.id}
+                confirmTitle="Удалить сценарий?"
+                confirmContent={
+                  <>
+                    Сценарий «{scenario.name}» и все его версии будут удалены. Действие нельзя
+                    отменить.
+                  </>
+                }
+                onOpen={() => void store.open(scenario.id)}
+                onDuplicate={() => void store.duplicate(scenario.id)}
+                duplicateDisabled={store.duplicatingId !== null}
+                onRemove={() => void store.remove(scenario.id)}
               />
             </li>
           ))}

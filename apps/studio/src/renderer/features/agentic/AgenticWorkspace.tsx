@@ -17,6 +17,7 @@ import StatusDot from "../../ui/atoms/StatusDot";
 import { STATUS_TONE_TEXT } from "../../ui/atoms/statusTone";
 import Alert from "../../ui/molecules/Alert";
 import EmptyState from "../../ui/molecules/EmptyState";
+import CardMenu from "../../ui/molecules/CardMenu";
 import PageHeader from "../../ui/organisms/PageHeader";
 import { useStore } from "../../stores/useStore";
 import { formatLastUsed } from "../tools/toolPresentation";
@@ -38,7 +39,9 @@ import {
   PHASE_LABELS,
   PHASE_TONES,
   progressLabel,
+  REMOVE_RUNNING_HINT,
   REMOVE_SESSION,
+  SESSION_ACTIONS,
   removeLead,
   SESSION_TITLE,
   sessionsWord,
@@ -123,23 +126,16 @@ const SessionList = observer(function SessionList({ store }: { readonly store: A
                     ].join(" · ")}
                   </span>
                 </button>
-                {session.status === "running" ? null : (
-                  <IconButton
-                    tone="danger"
-                    size="md"
-                    path={mdiDeleteOutline}
-                    label={REMOVE_SESSION}
-                    disabled={store.removingId === session.id}
-                    needConfirm
-                    modalSetup={{
-                      title: `${REMOVE_SESSION}?`,
-                      content: removeLead(session.goal),
-                      tone: "danger",
-                      confirmLabel: REMOVE_SESSION,
-                    }}
-                    onClick={() => void store.remove(session.id)}
-                  />
-                )}
+                <CardMenu
+                  label={SESSION_ACTIONS}
+                  removeLabel={REMOVE_SESSION}
+                  removeDisabled={session.status === "running" || store.removingId === session.id}
+                  {...(session.status === "running" ? { removeHint: REMOVE_RUNNING_HINT } : {})}
+                  confirmTitle={`${REMOVE_SESSION}?`}
+                  confirmContent={removeLead(session.goal)}
+                  onOpen={() => void store.open(session.id)}
+                  onRemove={() => void store.remove(session.id)}
+                />
               </li>
             );
           })}

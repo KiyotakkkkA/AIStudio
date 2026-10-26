@@ -49,3 +49,57 @@ export function formatThroughput(perSecond: number): string {
   const rounded = perSecond >= 10 ? Math.round(perSecond) : Math.round(perSecond * 10) / 10;
   return `${rounded.toLocaleString("ru-RU")} фрагм./с`;
 }
+
+export const VECTOR_STORE_TABS = [
+  { value: "Documents", label: "Документы" },
+  { value: "Test search", label: "Проверка поиска" },
+  { value: "Quality", label: "Качество" },
+  { value: "Relations", label: "Связи" },
+] as const;
+
+export type PrimaryAction = "stop" | "add" | "reconcile" | "rebuild" | "update";
+
+export const PRIMARY_ACTION_LABELS: Record<PrimaryAction, string> = {
+  stop: "Остановить индексацию",
+  add: "Добавить папку",
+  reconcile: "Сверить",
+  rebuild: "Переиндексировать",
+  update: "Обновить индекс",
+};
+
+export function primaryAction(input: {
+  readonly status: VectorHealth;
+  readonly indexing: boolean;
+  readonly sources: number;
+  readonly outdated: boolean;
+  readonly vectors: number;
+}): PrimaryAction {
+  if (input.indexing) return "stop";
+  if (input.status === "broken" || input.status === "stale") return "reconcile";
+  if (input.sources === 0) return "add";
+  if (input.outdated && input.vectors > 0) return "rebuild";
+  return "update";
+}
+
+export function storeFacts(input: {
+  readonly documents: number;
+  readonly vectors: number;
+  readonly bytes: number;
+  readonly lastIndexedAt: number | null;
+}): string[] {
+  return [
+    plural(input.documents, "документ", "документа", "документов"),
+    plural(input.vectors, "фрагмент", "фрагмента", "фрагментов"),
+    formatBytes(input.bytes),
+    input.lastIndexedAt === null
+      ? "ещё не индексировалось"
+      : `обновлено ${formatIndexedAt(input.lastIndexedAt)}`,
+  ];
+}
+
+export function splitPath(path: string): { readonly name: string; readonly folder: string } {
+  const cut = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return cut < 0
+    ? { name: path, folder: "" }
+    : { name: path.slice(cut + 1), folder: path.slice(0, cut) };
+}
