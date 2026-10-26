@@ -24,6 +24,7 @@ pub(crate) struct ProbeVectorCore {
     pub fail_remove: AtomicUsize,
     pub remove_calls: AtomicUsize,
     pub hold_remove: Mutex<Option<oneshot::Receiver<()>>>,
+    pub hold_search: Mutex<Option<oneshot::Receiver<()>>>,
     pub on_create: Mutex<Option<Hook>>,
     pub on_remove: Mutex<Option<Hook>>,
     pub schema_version: Mutex<Option<u32>>,
@@ -98,6 +99,10 @@ impl VectorCore for ProbeVectorCore {
         request: VectorSearchRequest,
     ) -> Result<Vec<VectorHit>, AppError> {
         Self::lock(&self.searches).push(request.clone());
+        let held = Self::lock(&self.hold_search).take();
+        if let Some(gate) = held {
+            let _ = gate.await;
+        }
         let scripted = Self::lock(&self.hits).clone();
         match scripted {
             Some(hits) => Ok(hits),
@@ -1165,6 +1170,101 @@ async fn a_slow_query_embedding_does_not_hold_the_store_lock() {
             .hits
             .is_empty()
     );
+}
+
+#[tokio::test]
+async fn parallel_searches_share_the_store_and_only_block_mutations() {
+    let fixture = fixture();
+    let store = fixture.store().await;
+    let id = store.id.to_string();
+    let (release, gate) = oneshot::channel();
+    *ProbeVectorCore::lock(&fixture.core.hold_search) = Some(gate);
+    let first = {
+        let service = fixture.service.clone();
+        let id = id.clone();
+        tokio::spawn(async move {
+            service
+                .search(
+                    &id,
+                    "first",
+                    VectorSearchOptions::default(),
+                    &CancellationToken::new(),
+                )
+                .await
+        })
+    };
+    while fixture.core.searches().is_empty() {
+        tokio::task::yield_now().await;
+    }
+    fixture
+        .service
+        .search(
+            &id,
+            "second",
+            VectorSearchOptions::default(),
+            &CancellationToken::new(),
+        )
+        .await
+        .expect("searches beside the held one");
+    assert_eq!(
+        fixture.service.lease(&id).err().expect("busy").message,
+        STORE_BUSY
+    );
+    assert!(!fixture.service.is_busy(&id));
+    release.send(()).expect("releases");
+    first.await.expect("joins").expect("searches");
+    drop(fixture.service.lease(&id).expect("free"));
+}
+
+#[tokio::test]
+async fn a_search_waits_for_a_running_mutation_instead_of_failing() {
+    let fixture = fixture();
+    let store = fixture.store().await;
+    let id = store.id.to_string();
+    let (_, lease) = fixture.service.lease(&id).expect("free");
+    assert!(fixture.service.is_busy(&id));
+    let searching = {
+        let service = fixture.service.clone();
+        let id = id.clone();
+        tokio::spawn(async move {
+            service
+                .search(
+                    &id,
+                    "query",
+                    VectorSearchOptions::default(),
+                    &CancellationToken::new(),
+                )
+                .await
+        })
+    };
+    for _ in 0..32 {
+        tokio::task::yield_now().await;
+    }
+    assert!(!searching.is_finished());
+    assert!(fixture.core.searches().is_empty());
+    drop(lease);
+    searching.await.expect("joins").expect("searches");
+    assert_eq!(fixture.core.searches().len(), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_search_gives_up_when_a_mutation_outlasts_the_wait() {
+    let fixture = fixture();
+    let store = fixture.store().await;
+    let id = store.id.to_string();
+    let (_, _lease) = fixture.service.lease(&id).expect("free");
+    let error = fixture
+        .service
+        .search(
+            &id,
+            "query",
+            VectorSearchOptions::default(),
+            &CancellationToken::new(),
+        )
+        .await
+        .expect_err("busy");
+    assert_eq!(error.message, STORE_BUSY);
+    assert_eq!(error.code, AppErrorCode::Conflict);
 }
 
 #[tokio::test]

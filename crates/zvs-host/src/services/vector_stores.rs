@@ -1,12 +1,13 @@
 #[cfg(test)]
 pub(crate) mod tests;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError, RwLock};
 use std::time::{Duration, Instant};
 
 use serde_json::json;
+use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock as StoreLock};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::validate::{js_slice, js_trim};
 use zvs_contract::{
@@ -36,6 +37,7 @@ use crate::platform::paths::vector_store_path;
 
 pub const DEFAULT_RERANK_TIMEOUT: Duration = Duration::from_secs(20);
 pub const DEFAULT_EMBEDDING_TIMEOUT_SECONDS: f64 = 30.0;
+pub const STORE_READ_WAIT: Duration = Duration::from_secs(30);
 
 pub const ONLY_LANCEDB: &str = "Поддерживается только LanceDB";
 pub const STORE_NOT_FOUND: &str = "Векторное хранилище не найдено";
@@ -136,7 +138,7 @@ struct Inner {
     stopwatch: Stopwatch,
     rerankers: RwLock<Option<RerankerSource>>,
     rerank_timeout: Duration,
-    busy: Mutex<HashSet<String>>,
+    locks: Mutex<HashMap<String, Arc<StoreLock<()>>>>,
 }
 
 #[derive(Clone)]
@@ -145,18 +147,11 @@ pub struct VectorStoreService {
 }
 
 pub struct StoreLease {
-    inner: Arc<Inner>,
-    id: String,
+    _guard: OwnedRwLockWriteGuard<()>,
 }
 
-impl Drop for StoreLease {
-    fn drop(&mut self) {
-        self.inner
-            .busy
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .remove(&self.id);
-    }
+struct SharedLease {
+    _guard: OwnedRwLockReadGuard<()>,
 }
 
 struct Observed {
@@ -316,7 +311,7 @@ impl VectorStoreService {
                 stopwatch: options.stopwatch,
                 rerankers: RwLock::new(options.rerankers),
                 rerank_timeout: options.rerank_timeout,
-                busy: Mutex::new(HashSet::new()),
+                locks: Mutex::new(HashMap::new()),
             }),
         }
     }
@@ -672,7 +667,7 @@ impl VectorStoreService {
         let embedding_ms = self.elapsed() - embedding_start;
 
         let (row, hits, search_ms, mode, reranking) = {
-            let _lease = self.exclusive(store_id)?;
+            let _lease = self.shared(store_id, cancel).await?;
             Self::check(cancel)?;
             let row = self.require_embedded_with(store_id, &embedded)?;
             let mode = effective_mode(row.search_mode, row.schema_version, input.mode);
@@ -744,7 +739,7 @@ impl VectorStoreService {
         document_id: &str,
         indices: &[u64],
     ) -> Result<Vec<VectorChunkDto>, AppError> {
-        let _lease = self.exclusive(store_id)?;
+        let _lease = self.shared(store_id, &CancellationToken::new()).await?;
         let row = self.require(store_id)?;
         require_backend(&row)?;
         let mut seen = HashSet::new();
@@ -796,7 +791,7 @@ impl VectorStoreService {
             return Ok(Vec::new());
         }
         let vector = self.embed_query(&embedded, query, cancel).await?;
-        let _lease = self.exclusive(store_id)?;
+        let _lease = self.shared(store_id, cancel).await?;
         self.require_embedded_with(store_id, &embedded)?;
         let path = self.path(store_id)?;
         let mut hits = Vec::new();
@@ -1072,27 +1067,37 @@ impl VectorStoreService {
             .ok_or_else(|| AppError::new(AppErrorCode::NotFound, STORE_NOT_FOUND))
     }
 
+    fn store_lock(&self, id: &str) -> Arc<StoreLock<()>> {
+        Arc::clone(
+            self.inner
+                .locks
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .entry(id.to_owned())
+                .or_default(),
+        )
+    }
+
     fn exclusive(&self, id: &str) -> Result<StoreLease, AppError> {
-        let mut busy = self
-            .inner
-            .busy
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        if !busy.insert(id.to_owned()) {
-            return Err(AppError::new(AppErrorCode::Conflict, STORE_BUSY));
+        self.store_lock(id)
+            .try_write_owned()
+            .map(|guard| StoreLease { _guard: guard })
+            .map_err(|_| AppError::new(AppErrorCode::Conflict, STORE_BUSY))
+    }
+
+    async fn shared(&self, id: &str, cancel: &CancellationToken) -> Result<SharedLease, AppError> {
+        let lock = self.store_lock(id);
+        tokio::select! {
+            guard = lock.read_owned() => Ok(SharedLease { _guard: guard }),
+            () = cancel.cancelled() => Err(cancelled_error()),
+            () = tokio::time::sleep(STORE_READ_WAIT) => {
+                Err(AppError::new(AppErrorCode::Conflict, STORE_BUSY))
+            }
         }
-        Ok(StoreLease {
-            inner: Arc::clone(&self.inner),
-            id: id.to_owned(),
-        })
     }
 
     pub fn is_busy(&self, id: &str) -> bool {
-        self.inner
-            .busy
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .contains(id)
+        self.store_lock(id).try_read().is_err()
     }
 
     fn check(cancel: &CancellationToken) -> Result<(), AppError> {

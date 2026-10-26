@@ -111,8 +111,11 @@ tried once and then left alone on a machine without it; a missing reading is `nu
 failed cleanup marks the row `broken` («Store creation and cleanup failed; metadata retained
 for removal»). `list` reports drift without writing (a busy store keeps its stored status),
 `get` and `reconcile` repair the counts from `stats`, `clear` drops and recreates the table
-and deletes the document rows, and a failed reset marks the store `broken`. Mutations take a
-per-store lease (`CONFLICT` «Vector store is busy»); `lease` hands one to other services.
+and deletes the document rows, and a failed reset marks the store `broken`. Mutations take an
+exclusive per-store lease and fail at once while another lease is held (`CONFLICT` «Vector
+store is busy»); `lease` hands one to other services. Searches and chunk reads share the store
+with each other and wait up to `STORE_READ_WAIT` (30 s) for a running mutation before failing
+the same way.
 Chunk size, overlap and both prefixes change only before indexing.
 
 `search_timed` embeds the query (prefix included, the provider's `timeoutSeconds` or 30 s)
