@@ -51,6 +51,7 @@ struct ModelMeta {
     max_generation_length: Option<Number>,
     capabilities: Option<Flags>,
     abilities: Option<Flags>,
+    auto_thinking: Option<Flag>,
 }
 
 #[derive(Deserialize)]
@@ -84,6 +85,7 @@ pub struct QwenModel {
     pub max_output: Option<i64>,
     /// Whether turns on this model run in `Thinking` mode rather than `Fast`.
     pub thinking: bool,
+    pub auto_thinking: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -224,14 +226,16 @@ fn to_model(id: String, entry: &ModelEntry) -> Result<QwenModel, ()> {
             meta.and_then(|meta| meta.abilities.as_ref())
                 .and_then(|flags| flags.thinking.as_ref())
         });
+    let thinking = enabled(thinking);
     Ok(QwenModel {
+        auto_thinking: thinking && enabled(meta.and_then(|meta| meta.auto_thinking.as_ref())),
         display_name: text(entry.name.as_deref())
             .or_else(|| text(entry.info.as_ref().and_then(|info| info.name.as_deref())))
             .unwrap_or_else(|| id.clone()),
         owned_by: text(entry.owned_by.as_deref()),
         context_window,
         max_output,
-        thinking: enabled(thinking),
+        thinking,
         id,
     })
 }
@@ -444,6 +448,41 @@ mod tests {
         assert_eq!(list.models[0].context_window, Some(131_072));
         assert_eq!(list.models[0].max_output, Some(32_768));
         assert_eq!(list.models[0].owned_by.as_deref(), Some("qwen"));
+    }
+
+    #[test]
+    fn auto_thinking_is_offered_only_where_the_meta_names_it_on_a_thinking_model() {
+        let list = parse_models(&json!({ "data": [
+            { "id": "qwen3.7-plus", "info": { "meta": {
+                "capabilities": { "thinking": true }, "abilities": { "thinking": 3 },
+                "auto_thinking": true, "thinking_format": "summary" } } },
+            { "id": "qwen3.7-max", "info": { "meta": {
+                "capabilities": { "document": true, "thinking": true },
+                "abilities": { "document": 1, "mcp": 1, "thinking": 1, "parse_url": 2 },
+                "auto_search": true, "thinking_format": "summary",
+                "max_thinking_generation_length": 81_920 } } },
+            { "id": "qwen3.8-omni-flash", "info": { "meta": {
+                "capabilities": { "vision": true, "audio": true, "thinking": true },
+                "abilities": { "vision": 1, "thinking": 1 },
+                "chat_type": ["t2t", "search"] } } },
+            { "id": "no-thinking", "info": { "meta": {
+                "capabilities": { "thinking": false }, "auto_thinking": true } } },
+        ] }))
+        .expect("decodes");
+        let modes = list
+            .models
+            .iter()
+            .map(|model| (model.id.as_str(), model.thinking, model.auto_thinking))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            modes,
+            [
+                ("qwen3.7-plus", true, true),
+                ("qwen3.7-max", true, false),
+                ("qwen3.8-omni-flash", true, false),
+                ("no-thinking", false, false),
+            ]
+        );
     }
 
     #[test]

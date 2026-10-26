@@ -1,0 +1,22 @@
+[
+  {
+    "name": "not a url",
+    "value": {
+      "url": "example",
+      "title": "x"
+    }
+  },
+  {
+    "name": "empty title",
+    "value": {
+      "url": "https://example.com/",
+      "title": ""
+    }
+  },
+  {
+    "name": "missing url",
+    "value": {
+      "title": "x"
+    }
+  }
+]

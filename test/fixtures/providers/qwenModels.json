@@ -24,6 +24,7 @@
             "profile_image_url": "/static/favicon.png",
             "description": "Flagship Qwen3.7 text model.",
             "short_description": "Qwen3.7 Plus",
+            "auto_thinking": true,
             "capabilities": {
               "vision": true,
               "document": true,

@@ -285,6 +285,7 @@ impl TextGenerationDriver for OllamaAdapter {
                         zvs_contract::DeltaKind::Reasoning => reasoning.push_str(&text),
                         zvs_contract::DeltaKind::Text => result.text.push_str(&text),
                     },
+                    TextDelta::WebSources(_) => {}
                 }
             }
         }

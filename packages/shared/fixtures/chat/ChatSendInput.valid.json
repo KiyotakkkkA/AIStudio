@@ -35,5 +35,16 @@
         }
       ]
     }
+  },
+  {
+    "name": "with vendor options",
+    "value": {
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "text": "Курс евро",
+      "vendor": {
+        "effort": "fast",
+        "webSearch": true
+      }
+    }
   }
 ]

@@ -1,14 +1,14 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::protocol::{API_VERSION, CHAT_MODE, CHAT_TYPE};
+use crate::protocol::{API_VERSION, CHAT_MODE, CHAT_TYPE, SEARCH_CHAT_TYPE};
 
 /// The body of `POST /api/v2/chats/new`; `now_ms` is a Unix time in milliseconds.
-pub fn new_chat_body(model: &str, now_ms: i64) -> Value {
+pub fn new_chat_body(model: &str, chat_type: ChatType, now_ms: i64) -> Value {
     json!({
         "chatId": "",
         "chat_mode": CHAT_MODE,
-        "chat_type": CHAT_TYPE,
+        "chat_type": chat_type.as_str(),
         "models": [model],
         "project_id": "",
         "timestamp": now_ms,
@@ -55,12 +55,29 @@ impl ThinkingMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ChatType {
+    #[default]
+    Text,
+    Search,
+}
+
+impl ChatType {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Text => CHAT_TYPE,
+            Self::Search => SEARCH_CHAT_TYPE,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompletionTurn<'a> {
     pub chat_id: &'a str,
     pub model: &'a str,
     pub prompt: &'a str,
     pub thinking: ThinkingMode,
+    pub chat_type: ChatType,
     pub parent_id: Option<&'a str>,
     pub fid: &'a str,
     pub answer_fid: &'a str,
@@ -71,11 +88,23 @@ impl CompletionTurn<'_> {
     pub fn body(&self) -> Value {
         let timestamp = self.now_ms.div_euclid(1000);
         let parent = self.parent_id.map_or(Value::Null, |id| json!(id));
+        let chat_type = self.chat_type.as_str();
+        let thinking_enabled = self.thinking != ThinkingMode::Fast;
+        let mut feature_config = json!({
+            "thinking_enabled": thinking_enabled,
+            "thinking_mode": self.thinking.as_str(),
+            "auto_thinking": self.thinking == ThinkingMode::Auto,
+            "auto_search": true,
+            "output_schema": "phase",
+            "research_mode": "normal",
+        });
+        if thinking_enabled {
+            feature_config["thinking_format"] = json!("summary");
+        }
         json!({
             "chatId": self.chat_id,
             "chat_id": self.chat_id,
             "chat_mode": CHAT_MODE,
-            "chat_type": CHAT_TYPE,
             "incremental_output": true,
             "messages": [{
                 "id": null,
@@ -90,18 +119,10 @@ impl CompletionTurn<'_> {
                 "timestamp": timestamp,
                 "model": "",
                 "models": [self.model],
-                "chat_type": CHAT_TYPE,
-                "sub_chat_type": CHAT_TYPE,
-                "feature_config": {
-                    "thinking_enabled": self.thinking != ThinkingMode::Fast,
-                    "thinking_format": "summary",
-                    "thinking_mode": self.thinking.as_str(),
-                    "auto_thinking": self.thinking == ThinkingMode::Auto,
-                    "auto_search": false,
-                    "output_schema": "phase",
-                    "research_mode": "normal",
-                },
-                "extra": { "meta": { "subChatType": CHAT_TYPE } },
+                "chat_type": chat_type,
+                "sub_chat_type": chat_type,
+                "feature_config": feature_config,
+                "extra": { "meta": { "subChatType": chat_type } },
             }],
             "model": self.model,
             "parentId": self.parent_id.unwrap_or_default(),
@@ -123,6 +144,7 @@ mod tests {
             model: "qwen3.7-plus",
             prompt: "Привет",
             thinking,
+            chat_type: ChatType::Text,
             parent_id,
             fid: "fid",
             answer_fid: "answer",
@@ -164,13 +186,36 @@ mod tests {
             assert_eq!(config["thinking_mode"], mode.as_str());
             assert_eq!(config["thinking_enabled"], enabled);
             assert_eq!(config["auto_thinking"], auto);
-            assert_eq!(config["auto_search"], false);
+            assert_eq!(config["auto_search"], true);
+            assert_eq!(config.get("thinking_format").is_some(), enabled);
         }
     }
 
     #[test]
+    fn a_search_turn_names_the_search_chat_type_where_the_client_does() {
+        let body = CompletionTurn {
+            chat_type: ChatType::Search,
+            ..turn(ThinkingMode::Fast, None)
+        }
+        .body();
+        assert_eq!(body.get("chat_type"), None);
+        let message = &body["messages"][0];
+        assert_eq!(message["chat_type"], "search");
+        assert_eq!(message["sub_chat_type"], "search");
+        assert_eq!(message["extra"]["meta"]["subChatType"], "search");
+        assert_eq!(
+            turn(ThinkingMode::Fast, None).body()["messages"][0]["chat_type"],
+            "t2t"
+        );
+        assert_eq!(
+            new_chat_body("m", ChatType::Search, 5)["chat_type"],
+            "search"
+        );
+    }
+
+    #[test]
     fn a_created_chat_yields_its_trimmed_id() {
-        let new = new_chat_body("m", 5);
+        let new = new_chat_body("m", ChatType::Text, 5);
         assert_eq!(new["chat_mode"], CHAT_MODE);
         assert_eq!(new["models"], json!(["m"]));
         assert_eq!(

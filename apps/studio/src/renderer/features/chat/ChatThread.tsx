@@ -221,6 +221,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                 content={message.content}
                 reasoning={message.reasoning}
                 citations={answerCitations(message.citations, message.toolCalls)}
+                webSources={message.webSources}
                 selections={answerSelections.get(message.id)}
                 stores={store.stores}
                 partial={message.partial}
@@ -248,6 +249,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                 content={store.liveText}
                 reasoning={store.liveReasoning}
                 citations={answerCitations(store.liveCitations, store.liveToolCalls)}
+                webSources={store.liveWebSources}
                 selections={store.liveSelections}
                 stores={store.stores}
                 generating={store.generating}

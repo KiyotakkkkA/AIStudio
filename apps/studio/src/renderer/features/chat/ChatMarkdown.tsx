@@ -11,14 +11,16 @@ import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown"
 import remarkGfm from "remark-gfm";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { CodeView } from "@kiyotakkkka/zvs-uikit-lib/code-view";
-import type { ChatCitationDto } from "@zvs/shared";
-import { citationNumber, linkCitations } from "./citationMarkers";
+import type { ChatCitationDto, WebSourceDto } from "@zvs/shared";
+import { citationNumber, linkCitations, linkWebSources, webSourceNumber } from "./citationMarkers";
+import { webSourceDetail } from "./webSources";
 import { isFenceOpen } from "./codeFence";
 
 interface MarkdownSource {
   readonly text: string;
   readonly streaming: boolean;
   readonly citations: readonly ChatCitationDto[];
+  readonly webSources: readonly WebSourceDto[];
   readonly onCite?: (citation: ChatCitationDto) => void;
 }
 
@@ -26,7 +28,11 @@ const SourceContext = createContext<MarkdownSource>({
   text: "",
   streaming: false,
   citations: [],
+  webSources: [],
 });
+
+const MARKER_CHIP =
+  "mx-0.5 inline-flex h-4.5 min-w-4.5 -translate-y-px items-center justify-center rounded-full bg-accent-soft px-1 align-middle font-mono text-[10.5px] font-semibold text-accent-medium no-underline tabular-nums";
 
 function PlainCode({ code }: { readonly code: string }) {
   return (
@@ -76,7 +82,19 @@ function CodeBlock({ children, node }: ComponentProps<"pre"> & ExtraProps) {
 }
 
 function Link({ children, href }: ComponentProps<"a"> & ExtraProps) {
-  const { citations, onCite } = useContext(SourceContext);
+  const { citations, webSources, onCite } = useContext(SourceContext);
+  const webNumber = webSourceNumber(href);
+  const webSource = webNumber === null ? undefined : webSources[webNumber - 1];
+  if (webNumber !== null && webSource !== undefined)
+    return (
+      <span
+        title={`${webSource.title}\n${webSourceDetail(webSource)}`}
+        aria-label={`Источник ${String(webNumber)}: ${webSource.title}`}
+        className={MARKER_CHIP}
+      >
+        {webNumber}
+      </span>
+    );
   const number = citationNumber(href);
   const citation = number === null ? undefined : citations[number - 1];
   if (number !== null && citation !== undefined)
@@ -85,7 +103,7 @@ function Link({ children, href }: ComponentProps<"a"> & ExtraProps) {
         type="button"
         title={citation.sourcePath}
         aria-label={`Источник ${String(number)}: ${citation.sourcePath}`}
-        className="mx-0.5 inline-flex h-4.5 min-w-4.5 -translate-y-px items-center justify-center rounded-full bg-accent-soft px-1 align-middle font-mono text-[10.5px] font-semibold text-accent-medium no-underline tabular-nums hover:bg-accent-dark hover:text-on-accent"
+        className={`${MARKER_CHIP} hover:bg-accent-dark hover:text-on-accent`}
         onClick={() => onCite?.(citation)}
       >
         {number}
@@ -106,17 +124,19 @@ export default function ChatMarkdown({
   content,
   streaming = false,
   citations = [],
+  webSources = [],
   onCite,
 }: {
   readonly content: string;
   readonly streaming?: boolean;
   readonly citations?: readonly ChatCitationDto[];
+  readonly webSources?: readonly WebSourceDto[];
   readonly onCite?: (citation: ChatCitationDto) => void;
 }) {
-  const text = linkCitations(content, citations.length);
+  const text = linkCitations(linkWebSources(content, webSources.length), citations.length);
   const source = useMemo(
-    () => ({ text, streaming, citations, onCite }),
-    [text, streaming, citations, onCite],
+    () => ({ text, streaming, citations, webSources, onCite }),
+    [text, streaming, citations, webSources, onCite],
   );
   return (
     <div

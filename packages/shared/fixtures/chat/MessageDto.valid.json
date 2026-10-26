@@ -158,5 +158,32 @@
       "partial": false,
       "createdAt": 3
     }
+  },
+  {
+    "name": "assistant with web sources",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111113",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "role": "assistant",
+      "content": "Курс 90,24 [[1]].",
+      "reasoning": "",
+      "citations": [],
+      "toolCalls": [],
+      "webSources": [
+        {
+          "url": "https://example.com/rates",
+          "title": "Курсы валют",
+          "snippet": "EUR 90,24",
+          "date": "3 days ago"
+        }
+      ],
+      "tokensIn": 12,
+      "tokensOut": 2,
+      "usageEstimated": true,
+      "durationMs": 40,
+      "runId": "0199aa11-4444-7111-8111-111111111111",
+      "partial": false,
+      "createdAt": 3
+    }
   }
 ]

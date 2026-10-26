@@ -19,8 +19,8 @@ use zvs_contract::{
     GraphNeighborhood, GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId,
     MessageRole, ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph,
     RunHandleDto, RunId, RunKind, RunStatus, StartRunInput, StreamId, ToolListFilter, ToolMode,
-    ToolTier, Validate, VectorSearchHitDto, VectorStoreId, log_line, merge_graph_neighbors,
-    model_tool_support, resolve_tool_mode,
+    ToolTier, Validate, VectorSearchHitDto, VectorStoreId, VendorTurnOptions, WEB_SOURCES_MAX,
+    WebSourceDto, log_line, merge_graph_neighbors, model_tool_support, resolve_tool_mode,
 };
 
 use super::chat_ask::{
@@ -282,6 +282,7 @@ fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
         tool_calls: row.tool_calls,
         selections: row.selections,
         offered_tools: row.offered_tools,
+        web_sources: row.web_sources,
         tokens_in: count(row.tokens_in),
         tokens_out: count(row.tokens_out),
         usage_estimated: row.usage_estimated,
@@ -707,6 +708,8 @@ pub struct ChatPrepareInput {
     )]
     pub query: Option<String>,
     pub settings: ChatSettings,
+    #[serde(default, skip_serializing_if = "VendorTurnOptions::is_default")]
+    pub vendor: VendorTurnOptions,
     #[serde(flatten)]
     pub stores: BTreeMap<String, Vec<VectorSearchHitDto>>,
 }
@@ -1357,6 +1360,7 @@ impl NodeDef for PrepareNode {
             tool_calls: Vec::new(),
             selections: Vec::new(),
             offered_tools: offered_record(&offered, &details.enabled_tools, &choice.skill),
+            web_sources: Vec::new(),
             tokens_in: prepared.tokens_in,
             tokens_out: 0,
             usage_estimated: true,
@@ -1385,6 +1389,7 @@ impl NodeDef for PrepareNode {
                 top_k: input.settings.top_k,
                 top_p: input.settings.top_p,
                 max_output_tokens: u64::try_from(model.max_output_tokens).ok(),
+                vendor: input.vendor,
             },
             assistant_id: input.assistant_id,
             tools: offered,
@@ -1409,6 +1414,7 @@ pub(crate) struct RoundOutput {
     pub(crate) text: String,
     pub(crate) reasoning: String,
     pub(crate) tool_calls: Vec<ToolCall>,
+    pub(crate) web_sources: Vec<WebSourceDto>,
 }
 
 struct CallOptions<'a> {
@@ -1488,6 +1494,7 @@ impl GenerateChatNode {
             text: String::new(),
             reasoning: String::new(),
             tool_calls: Vec::new(),
+            web_sources: Vec::new(),
         };
         let mut deltas = driver.stream(request, &context.cancel);
         while let Some(delta) = deltas.next().await {
@@ -1502,6 +1509,7 @@ impl GenerateChatNode {
                     };
                     output.tool_calls.push(ToolCall { id, ..call });
                 }
+                TextDelta::WebSources(sources) => output.web_sources.extend(sources),
                 TextDelta::Content { text, .. } if text.is_empty() => {}
                 TextDelta::Content {
                     text,
@@ -1902,6 +1910,7 @@ impl GenerateChatNode {
         let limit = usize::try_from(tool_result_chars).unwrap_or(usize::MAX);
         let mut text = String::new();
         let mut reasoning = String::new();
+        let mut web_sources: Vec<WebSourceDto> = Vec::new();
         let mut executed = 0;
         let mut round = 0;
         let outcome: Result<(), AppError> = async {
@@ -1939,6 +1948,7 @@ impl GenerateChatNode {
                 .await?;
                 text.push_str(&output.text);
                 reasoning.push_str(&output.reasoning);
+                web_sources.extend(output.web_sources);
                 if output.tool_calls.is_empty() || specs.is_empty() {
                     break;
                 }
@@ -2082,7 +2092,12 @@ impl GenerateChatNode {
                 .save_tool_calls(context, &assistant_id, &calls, &changed);
             return Err(error);
         }
-        Ok(GenerateOutput { text, reasoning })
+        web_sources.truncate(WEB_SOURCES_MAX);
+        Ok(GenerateOutput {
+            text,
+            reasoning,
+            web_sources,
+        })
     }
 }
 
@@ -2148,6 +2163,7 @@ impl NodeDef for PersistNode {
             &MessagePatch {
                 content: Some(input.result.text),
                 reasoning: Some(input.result.reasoning),
+                web_sources: Some(input.result.web_sources),
                 tokens_out: Some(as_i64(tokens_out)),
                 partial: Some(false),
                 duration_ms: Some((inner.now() - message.created_at).max(0)),
@@ -2444,6 +2460,7 @@ impl ChatService {
             tool_calls: Vec::new(),
             selections: Vec::new(),
             offered_tools: Vec::new(),
+            web_sources: Vec::new(),
             tokens_in: 0,
             tokens_out: tokens(text),
             usage_estimated: true,
@@ -2595,6 +2612,7 @@ impl ChatService {
                     "modelId": model_id,
                     "query": query,
                     "settings": settings,
+                    "vendor": input.vendor,
                 },
                 "bindings": bindings,
             }),
@@ -2630,6 +2648,7 @@ impl ChatService {
             tool_calls: Vec::new(),
             selections: input.selections.clone(),
             offered_tools: Vec::new(),
+            web_sources: Vec::new(),
             tokens_in: tokens(&with_selections(&text, &input.selections)),
             tokens_out: 0,
             usage_estimated: true,

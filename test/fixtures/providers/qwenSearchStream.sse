@@ -1,0 +1,14 @@
+data: {"response.created": {"chat_id": "1a77c526-b841-4fef-805c-8096a2b5e4c3", "parent_id": "01619d0b-fb8c-4cb8-92f6-aa72cea9b642", "response_id": "98faef3a-faa0-43f8-b028-350ce286bb7a", "response_index": "0"}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "Нужно проверить курс.\n\n", "phase": "answer", "status": "typing"}}], "response_id": "98faef3a-faa0-43f8-b028-350ce286bb7a", "timestamp": 1793026362, "usage": {"input_tokens": 834, "output_tokens": 1, "characters": 0, "total_tokens": 835}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "answer", "status": "finished"}}], "response_id": "98faef3a-faa0-43f8-b028-350ce286bb7a", "timestamp": 1793026362}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "web_search", "status": "typing", "function_call": {"name": "web_search", "arguments": "{\"queries\": \n[\"курс евро к рублю сегодня\"]\n\n}"}, "function_id": "call_0cb56938fdaa4dd58cb80ba9", "extra": {"display_position": "answer"}}}], "response_id": "98faef3a-faa0-43f8-b028-350ce286bb7a", "timestamp": 1793026363}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "web_search", "status": "finished", "name": "web_search", "function_id": "call_0cb56938fdaa4dd58cb80ba9", "extra": {"display_position": "answer", "function_id": "call_0cb56938fdaa4dd58cb80ba9", "tool_result": {"docs": [], "used_id": 3, "tool_call_metrics": {"success": [1, 1]}, "tool_observation": "[1] https://rates.example/eur"}, "web_search_info": [{"url": "https://rates.example/eur", "title": "Курсы валют на 26 октября", "snippet": "EUR 90,2429", "hostname": "", "hostlogo": "", "date": "3 days ago"}, {"url": "https://cbr.example/daily", "title": "Официальные курсы", "snippet": "Евро 90,2429 руб.", "hostname": "", "hostlogo": "", "date": ""}]}}}], "response_id": "98faef3a-faa0-43f8-b028-350ce286bb7a", "timestamp": 1793026364}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "Курс евро составляет 90,2429 рубля [[2]].", "phase": "answer", "status": "typing"}}], "response_id": "98faef3a-faa0-43f8-b028-350ce286bb7a", "timestamp": 1793026365, "usage": {"input_tokens": 2104, "output_tokens": 40, "characters": 0, "total_tokens": 2144}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "answer", "status": "finished"}}], "response_id": "98faef3a-faa0-43f8-b028-350ce286bb7a", "timestamp": 1793026365}
+

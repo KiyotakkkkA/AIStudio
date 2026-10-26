@@ -165,6 +165,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0023_append_only_history",
         sql: include_str!("../../migrations/0023_append_only_history.sql"),
     },
+    Migration {
+        id: 24,
+        name: "0024_message_web_sources",
+        sql: include_str!("../../migrations/0024_message_web_sources.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

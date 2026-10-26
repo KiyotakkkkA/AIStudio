@@ -18,6 +18,7 @@ import TextArea from "../../ui/atoms/TextArea";
 import SegmentedControl from "../../ui/atoms/SegmentedControl";
 import Toggle from "../../ui/atoms/Toggle";
 import { RETRIEVAL_MODES, retrievalHint } from "./retrievalModes";
+import ChatAccountProviderSetup from "./ChatAccountProviderSetup";
 import ChatContextMeter from "./ChatContextMeter";
 import ChatModelGate from "./ChatModelGate";
 import ChatToolPicker from "./ChatToolPicker";
@@ -162,6 +163,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
+            <ChatAccountProviderSetup store={store} />
             <ChatToolPicker store={store} />
             <span className="flex-1" />
             <ChatContextMeter store={store} />

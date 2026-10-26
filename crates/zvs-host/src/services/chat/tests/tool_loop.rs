@@ -9,9 +9,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, ChatToolCallStatus, ConversationId, CreateConversationInput, DeltaKind,
-    HostEvent, HostEventDraft, ModelCapability, OfferedToolSource, ProviderCapability,
-    RunHandleDto, RunListFilter, RunStatus, ToolDto, ToolMode, ToolSource, ToolTier, Validate,
+    AppError, AppErrorCode, ChatSendInput, ChatToolCallStatus, ConversationId,
+    CreateConversationInput, DeltaKind, HostEvent, HostEventDraft, ModelCapability,
+    OfferedToolSource, ProviderCapability, RunHandleDto, RunListFilter, RunStatus, ThinkingEffort,
+    ToolDto, ToolMode, ToolSource, ToolTier, Validate, VendorTurnOptions, WebSourceDto,
 };
 
 use super::{Harness, HarnessOptions, OneDriver, eventually, within};
@@ -747,6 +748,58 @@ async fn a_call_to_a_tool_that_was_not_offered_is_refused_without_a_step() {
     assert_eq!(record.key, "demo__drop");
     assert_eq!(record.status, ChatToolCallStatus::Refused);
     assert!(test.tool_steps(&handle).is_empty());
+}
+
+#[tokio::test]
+async fn vendor_options_reach_the_driver_and_web_sources_of_every_round_are_kept() {
+    let test = Loop::new();
+    let source = |url: &str| WebSourceDto {
+        url: url.to_owned(),
+        title: url.to_owned(),
+        snippet: String::new(),
+        date: None,
+    };
+    let first = source("https://a.example/");
+    let second = source("https://b.example/");
+    let found = (first.clone(), second.clone());
+    test.driver.round(move |_| {
+        vec![
+            TextDelta::WebSources(vec![found.0]),
+            call("demo__lookup", &json!({ "query": "x" })),
+        ]
+    });
+    test.driver.fallback(move |_| {
+        vec![
+            TextDelta::WebSources(vec![found.1.clone()]),
+            text("Итог [[2]]."),
+        ]
+    });
+    let created = test.conversation(&["demo.lookup"]);
+    let vendor = VendorTurnOptions {
+        effort: Some(ThinkingEffort::Fast),
+        web_search: true,
+    };
+    let handle = test
+        .harness
+        .chat
+        .send(&ChatSendInput {
+            vendor,
+            ..ChatSendInput::new(created, "Курс")
+        })
+        .expect("sends");
+    within(test.harness.runs.wait(&handle.id)).await;
+
+    assert!(
+        test.driver
+            .requests()
+            .iter()
+            .all(|request| request.vendor == vendor)
+    );
+    let last = test.harness.last(created);
+    assert_eq!(last.content, "Итог [[2]].");
+    assert_eq!(last.web_sources, [first, second]);
+    let user = &test.harness.messages(created)[0];
+    assert!(user.web_sources.is_empty());
 }
 
 #[tokio::test]

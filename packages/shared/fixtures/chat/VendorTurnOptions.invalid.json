@@ -1,0 +1,14 @@
+[
+  {
+    "name": "unknown effort",
+    "value": {
+      "effort": "deep"
+    }
+  },
+  {
+    "name": "search as text",
+    "value": {
+      "webSearch": "yes"
+    }
+  }
+]

@@ -19,7 +19,6 @@ import { STATUS_TONE_TEXT, type StatusTone } from "../../ui/atoms/statusTone";
 import VendorMark from "./VendorMark";
 import {
   ACCOUNT_STATUS_SHORT,
-  accountInitials,
   accountStatusLine,
   accountStatusTone,
   accountTitle,
@@ -97,25 +96,25 @@ function AccountCard({
       <header className="flex min-w-0 items-center gap-3 px-4 pt-4 pb-3">
         <span className="relative flex-none">
           {showAvatar ? (
-            <img
-              src={account.avatarUrl ?? ""}
-              alt=""
-              referrerPolicy="no-referrer"
-              className="size-10 rounded-control object-cover"
-              onError={() => {
-                setAvatarBroken(true);
-              }}
-            />
+            <>
+              <img
+                src={account.avatarUrl ?? ""}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="size-10 rounded-control object-cover"
+                onError={() => {
+                  setAvatarBroken(true);
+                }}
+              />
+              <VendorMark
+                family={account.adapter}
+                size="xs"
+                className="absolute -right-1.5 -bottom-1.5 border-2 border-main-900"
+              />
+            </>
           ) : (
-            <span className="flex size-10 items-center justify-center rounded-control bg-main-700 text-[13px] font-semibold text-main-200">
-              {accountInitials(account)}
-            </span>
+            <VendorMark family={account.adapter} size="lg" />
           )}
-          <VendorMark
-            family={account.adapter}
-            size="xs"
-            className="absolute -right-1.5 -bottom-1.5 border-2 border-main-900"
-          />
         </span>
 
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">

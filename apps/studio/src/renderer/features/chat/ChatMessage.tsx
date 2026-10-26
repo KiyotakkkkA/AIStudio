@@ -4,6 +4,7 @@ import type {
   DocumentSelectionDto,
   VectorStoreDto,
   VectorStoreId,
+  WebSourceDto,
 } from "@zvs/shared";
 import { ScrollArea, SlidedPanel, Tabs } from "@kiyotakkkka/zvs-uikit-lib";
 import { mdiFileEyeOutline } from "@mdi/js";
@@ -11,6 +12,7 @@ import IconButton from "../../ui/atoms/buttons/IconButton";
 import ChatMarkdown from "./ChatMarkdown";
 import ReasoningBlock from "./ReasoningBlock";
 import ChatSources from "./ChatSources";
+import ChatWebSources from "./ChatWebSources";
 import {
   OPEN_CITATION,
   OPEN_SELECTION,
@@ -30,6 +32,7 @@ export default function ChatMessage({
   content,
   reasoning = "",
   citations,
+  webSources = [],
   selections = [],
   stores,
   partial = false,
@@ -46,6 +49,7 @@ export default function ChatMessage({
   readonly content: string;
   readonly reasoning?: string;
   readonly citations: readonly ChatCitationDto[];
+  readonly webSources?: readonly WebSourceDto[];
   readonly selections?: readonly DocumentSelectionDto[];
   readonly stores: readonly VectorStoreDto[];
   readonly partial?: boolean;
@@ -90,6 +94,7 @@ export default function ChatMessage({
             content={content}
             streaming={generating}
             citations={citations}
+            webSources={webSources}
             onCite={view}
           />
           {generating && <GenerationStatus label={status} since={since} />}
@@ -101,6 +106,7 @@ export default function ChatMessage({
             onView={view}
             onViewSelection={viewSelection}
           />
+          {!generating && <ChatWebSources sources={webSources} />}
           {artifacts}
           {partial && !generating && (
             <p className="text-[12px] text-warn">Частичный ответ · генерация не завершена</p>

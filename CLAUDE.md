@@ -70,6 +70,9 @@ test that greps for `"active turn"` breaks the moment the message is translated.
 - The renderer maps `AppErrorCode` to copy and never parses error strings (PASSPORT §7).
 - Every DTO change touches three places: the Rust type, the Zod schema and a golden fixture
   in `packages/shared/fixtures/`. `cargo test -p zvs-contract` requires byte-equal JSON.
+- Read `crates/zvs-qwen-web/README.md` before any work with the Qwen web API (the crate, the
+  `qwen_web` adapter, its fixtures). Every change to `zvs-qwen-web` updates that README in the
+  same commit, with the new observation date.
 - Stores take clock and bridge dependencies so they can be tested — use `createFakeBridge()`
   and `createFakeClock()` from `test/helpers/`, not real time or a real Tauri runtime.
 - Tests are mandatory for services, the kernel, repositories, the permission model and the

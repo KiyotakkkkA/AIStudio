@@ -49,6 +49,7 @@ export const MODEL_CAPABILITY_LABELS: Record<ModelCapability, string> = {
   vision: "зрение",
   streaming: "стриминг",
   reasoning: "рассуждения",
+  "adaptive-reasoning": "авторежим рассуждений",
   code: "код",
 };
 

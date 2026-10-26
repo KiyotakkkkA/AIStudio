@@ -21,6 +21,10 @@ pub const ENABLED_TOOLS_MAX: usize = 64;
 pub const CHAT_SELECTIONS_MAX: usize = 8;
 pub const SELECTION_TEXT_MAX: usize = 8_000;
 pub const SELECTION_NAME_MAX: usize = 1024;
+pub const WEB_SOURCE_URL_MAX: usize = 4096;
+pub const WEB_SOURCE_TEXT_MAX: usize = 4000;
+pub const WEB_SOURCE_DATE_MAX: usize = 100;
+pub const WEB_SOURCES_MAX: usize = 200;
 
 wire_enum!(RetrievalMode {
     Auto => "auto",
@@ -177,6 +181,62 @@ impl Validate for ChatCitationDto {
         check::safe_integer("chunkIndex", self.chunk_index)?;
         check::number_range("score", self.score, 0.0, 1.0)?;
         self.page.map_or(Ok(()), |page| positive("page", page))
+    }
+}
+
+wire_enum!(ThinkingEffort {
+    Auto => "auto",
+    Thinking => "thinking",
+    Fast => "fast",
+});
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VendorTurnOptions {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub effort: Option<ThinkingEffort>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub web_search: bool,
+}
+
+impl VendorTurnOptions {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
+impl Validate for VendorTurnOptions {
+    fn validate(&self) -> Result<(), AppError> {
+        Ok(())
+    }
+}
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WebSourceDto {
+    pub url: String,
+    pub title: String,
+    #[serde(default)]
+    pub snippet: String,
+    #[serde(default)]
+    pub date: Option<String>,
+}
+
+impl Validate for WebSourceDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::url("url", &self.url, WEB_SOURCE_URL_MAX)?;
+        check::non_empty("title", &self.title)?;
+        check::max_len("title", &self.title, WEB_SOURCE_TEXT_MAX)?;
+        check::max_len("snippet", &self.snippet, WEB_SOURCE_TEXT_MAX)?;
+        self.date.as_deref().map_or(Ok(()), |date| {
+            check::max_len("date", date, WEB_SOURCE_DATE_MAX)
+        })
     }
 }
 
@@ -469,6 +529,8 @@ pub struct MessageDto {
     pub selections: Vec<DocumentSelectionDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub offered_tools: Vec<OfferedToolDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub web_sources: Vec<WebSourceDto>,
     pub tokens_in: u64,
     pub tokens_out: u64,
     pub usage_estimated: bool,
@@ -484,6 +546,10 @@ impl Validate for MessageDto {
         nested("citations", self.citations.validate())?;
         nested("toolCalls", self.tool_calls.validate())?;
         nested("offeredTools", self.offered_tools.validate())?;
+        if self.web_sources.len() > WEB_SOURCES_MAX {
+            return Err(invalid("webSources", "maxItems"));
+        }
+        nested("webSources", self.web_sources.validate())?;
         check_selections(&self.selections)?;
         check::safe_integer("tokensIn", self.tokens_in)?;
         check::safe_integer("tokensOut", self.tokens_out)?;
@@ -532,6 +598,8 @@ pub struct ChatSendInput {
     pub settings: Option<ChatSettings>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub selections: Vec<DocumentSelectionDto>,
+    #[serde(default, skip_serializing_if = "VendorTurnOptions::is_default")]
+    pub vendor: VendorTurnOptions,
 }
 
 impl ChatSendInput {
@@ -543,6 +611,7 @@ impl ChatSendInput {
             model_id: None,
             settings: None,
             selections: Vec::new(),
+            vendor: VendorTurnOptions::default(),
         }
     }
 

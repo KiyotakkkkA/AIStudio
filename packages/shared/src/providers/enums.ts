@@ -12,6 +12,13 @@ export const PROVIDER_STATUSES = ["unknown", "ok", "degraded", "failed", "needs-
 export const ProviderStatus = z.enum(PROVIDER_STATUSES);
 export type ProviderStatus = z.infer<typeof ProviderStatus>;
 
-export const MODEL_CAPABILITIES = ["tools", "vision", "streaming", "reasoning", "code"] as const;
+export const MODEL_CAPABILITIES = [
+  "tools",
+  "vision",
+  "streaming",
+  "reasoning",
+  "adaptive-reasoning",
+  "code",
+] as const;
 export const ModelCapability = z.enum(MODEL_CAPABILITIES);
 export type ModelCapability = z.infer<typeof ModelCapability>;

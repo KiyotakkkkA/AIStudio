@@ -16,5 +16,5 @@ pub use page::{
     SESSION_REFRESH, SESSION_REFUSALS, SessionRefresh, page_plan,
 };
 pub use protocol::Observation;
-pub use request::{CompletionTurn, ThinkingMode, new_chat_body, parse_chat_created};
-pub use stream::{TurnDecoder, TurnEvent, Usage, VendorFailure};
+pub use request::{ChatType, CompletionTurn, ThinkingMode, new_chat_body, parse_chat_created};
+pub use stream::{TurnDecoder, TurnEvent, Usage, VendorFailure, WebSource};

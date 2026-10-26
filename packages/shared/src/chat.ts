@@ -70,6 +70,22 @@ export const OfferedToolDto = z.object({
   rootsOnly: z.boolean().default(false),
 });
 export type OfferedToolDto = z.infer<typeof OfferedToolDto>;
+export const THINKING_EFFORTS = ["auto", "thinking", "fast"] as const;
+export const ThinkingEffort = z.enum(THINKING_EFFORTS);
+export type ThinkingEffort = z.infer<typeof ThinkingEffort>;
+export const VendorTurnOptions = z.object({
+  effort: ThinkingEffort.optional(),
+  webSearch: z.boolean().default(false),
+});
+export type VendorTurnOptions = z.infer<typeof VendorTurnOptions>;
+export const WEB_SOURCES_MAX = 200;
+export const WebSourceDto = z.object({
+  url: z.url().max(4096),
+  title: z.string().min(1).max(4000),
+  snippet: z.string().max(4000).default(""),
+  date: z.string().max(100).nullable().default(null),
+});
+export type WebSourceDto = z.infer<typeof WebSourceDto>;
 export const ChatEnabledTools = z.array(ToolKey).max(64);
 export const RetrievalMode = z.enum(["auto", "agentic", "hybrid"]);
 export type RetrievalMode = z.infer<typeof RetrievalMode>;
@@ -162,6 +178,7 @@ export const MessageDto = z.object({
   toolCalls: z.array(ChatToolCallDto).default([]),
   selections: Selections.default([]),
   offeredTools: z.array(OfferedToolDto).default([]),
+  webSources: z.array(WebSourceDto).max(WEB_SOURCES_MAX).default([]),
   tokensIn: z.number().int().nonnegative(),
   tokensOut: z.number().int().nonnegative(),
   usageEstimated: z.boolean(),
@@ -182,6 +199,7 @@ export const ChatSendInput = z.object({
   modelId: z.string().min(1).optional(),
   settings: ChatSettings.optional(),
   selections: Selections.default([]),
+  vendor: VendorTurnOptions.optional(),
 });
 export type ChatSendInput = z.infer<typeof ChatSendInput>;
 export const ChatContextInput = z.object({

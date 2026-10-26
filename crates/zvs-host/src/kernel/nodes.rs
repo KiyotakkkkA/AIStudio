@@ -8,7 +8,8 @@ use serde_json::{Value, json};
 use zvs_contract::validate::check;
 use zvs_contract::{
     AppError, AppErrorCode, ChatCitationDto, HostEventDraft, Validate, VectorIndexInput,
-    VectorIndexReportDto, VectorSearchHitDto, VectorSearchInput, VectorStoreId, log_line,
+    VectorIndexReportDto, VectorSearchHitDto, VectorSearchInput, VectorStoreId, VendorTurnOptions,
+    WebSourceDto, log_line,
 };
 
 use super::registry::NodeRegistry;
@@ -84,6 +85,8 @@ pub struct GenerateNodeInput {
         deserialize_with = "zvs_contract::wire::present"
     )]
     pub max_output_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "VendorTurnOptions::is_default")]
+    pub vendor: VendorTurnOptions,
 }
 
 impl GenerateNodeInput {
@@ -96,6 +99,7 @@ impl GenerateNodeInput {
                 .map(|value| u32::try_from(value).unwrap_or(u32::MAX)),
             top_p: self.top_p,
             max_output_tokens: self.max_output_tokens,
+            vendor: self.vendor,
             ..GenerateRequest::new(
                 self.model,
                 self.messages
@@ -163,6 +167,8 @@ impl Validate for GenerateInput {
 pub struct GenerateOutput {
     pub text: String,
     pub reasoning: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub web_sources: Vec<WebSourceDto>,
 }
 
 impl Validate for GenerateOutput {
@@ -219,7 +225,11 @@ impl NodeDef for GenerateNode {
                 kind: Some(kind),
             })?;
         }
-        Ok(GenerateOutput { text, reasoning })
+        Ok(GenerateOutput {
+            text,
+            reasoning,
+            web_sources: Vec::new(),
+        })
     }
 }
 

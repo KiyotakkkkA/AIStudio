@@ -11,7 +11,7 @@ use zvs_contract::skills::{
 use zvs_contract::validate::check;
 use zvs_contract::{
     AppError, AppErrorCode, ChatToolCallStatus, SkillIssueDto, ToolMode, ToolTier, Validate,
-    resolve_tool_mode,
+    VendorTurnOptions, resolve_tool_mode,
 };
 
 use super::library::{AuthoredSkill, SkillLibrary};
@@ -591,6 +591,7 @@ impl NodeDef for SkillGenerateNode {
                 top_k: None,
                 top_p: None,
                 max_output_tokens: input.max_output_tokens,
+                vendor: VendorTurnOptions::default(),
             }
             .request()
         };

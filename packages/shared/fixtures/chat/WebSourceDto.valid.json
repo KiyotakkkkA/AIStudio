@@ -1,0 +1,20 @@
+[
+  {
+    "name": "full",
+    "value": {
+      "url": "https://example.com/rates",
+      "title": "Курсы валют",
+      "snippet": "EUR 90,24",
+      "date": "3 days ago"
+    }
+  },
+  {
+    "name": "bare",
+    "value": {
+      "url": "http://example.org/",
+      "title": "example.org",
+      "snippet": "",
+      "date": null
+    }
+  }
+]

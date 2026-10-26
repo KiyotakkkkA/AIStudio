@@ -9,11 +9,14 @@ use futures::StreamExt;
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use url::Url;
-use zvs_contract::{AdapterFamily, AppError, AppErrorCode, AuthMode, ModelCapability, ToolMode};
+use zvs_contract::{
+    AdapterFamily, AppError, AppErrorCode, AuthMode, ModelCapability, ThinkingEffort, ToolMode,
+    VendorTurnOptions, WebSourceDto,
+};
 use zvs_qwen_web::protocol::{self, chat_referer_path};
 use zvs_qwen_web::{
-    CompletionTurn, ModelsDiagnostics, QwenModel, RowProblem, ThinkingMode, TurnDecoder, TurnEvent,
-    VendorFailure, new_chat_body, parse_chat_created, parse_models,
+    ChatType, CompletionTurn, ModelsDiagnostics, QwenModel, RowProblem, ThinkingMode, TurnDecoder,
+    TurnEvent, VendorFailure, WebSource, new_chat_body, parse_chat_created, parse_models,
 };
 
 use dialect::QwenDialect;
@@ -68,6 +71,9 @@ fn to_discovered_model(model: QwenModel) -> DiscoveredModel {
     let mut capabilities = vec![ModelCapability::Streaming];
     if model.thinking {
         capabilities.push(ModelCapability::Reasoning);
+    }
+    if model.auto_thinking {
+        capabilities.push(ModelCapability::AdaptiveReasoning);
     }
     DiscoveredModel {
         display_name: model.display_name,
@@ -167,6 +173,35 @@ fn malformed_models_response(response: &TransportResponse, logger: &SharedLogger
         .with_detail("modelCount", shape.model_count)
         .with_detail("rowProblems", row_problems(&shape.row_problems))
         .with_detail("vendorCode", json!(shape.vendor_code))
+}
+
+fn thinking_mode(vendor: VendorTurnOptions, capabilities: &[ModelCapability]) -> ThinkingMode {
+    if !capabilities.contains(&ModelCapability::Reasoning) {
+        return ThinkingMode::Fast;
+    }
+    let adaptive = capabilities.contains(&ModelCapability::AdaptiveReasoning);
+    match vendor.effort {
+        None | Some(ThinkingEffort::Auto) if adaptive => ThinkingMode::Auto,
+        None | Some(ThinkingEffort::Auto | ThinkingEffort::Thinking) => ThinkingMode::Thinking,
+        Some(ThinkingEffort::Fast) => ThinkingMode::Fast,
+    }
+}
+
+const fn chat_type(vendor: VendorTurnOptions) -> ChatType {
+    if vendor.web_search {
+        ChatType::Search
+    } else {
+        ChatType::Text
+    }
+}
+
+fn web_source(source: WebSource) -> WebSourceDto {
+    WebSourceDto {
+        url: source.url,
+        title: source.title,
+        snippet: source.snippet,
+        date: source.date,
+    }
 }
 
 fn to_usage(raw: zvs_qwen_web::Usage) -> TokenUsage {
@@ -430,6 +465,7 @@ impl Shared {
     async fn create_chat(
         &self,
         model: &str,
+        chat_type: ChatType,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
         let _one_at_a_time = tokio::select! {
@@ -443,7 +479,7 @@ impl Shared {
                 &self.web_request(
                     RequestSpec::post(
                         QWEN_CHATS_NEW_PATH,
-                        new_chat_body(model, self.core.clock.now()),
+                        new_chat_body(model, chat_type, self.core.clock.now()),
                     ),
                     protocol::NEW_CHAT_REFERER_PATH,
                 )?,
@@ -467,6 +503,7 @@ impl Shared {
         model: &str,
         prompt: &str,
         thinking: ThinkingMode,
+        chat_type: ChatType,
         parent_id: Option<&str>,
     ) -> Result<RequestSpec, AppError> {
         let fid = (self.core.new_id)();
@@ -476,6 +513,7 @@ impl Shared {
             model,
             prompt,
             thinking,
+            chat_type,
             parent_id,
             fid: &fid,
             answer_fid: &answer_fid,
@@ -499,15 +537,13 @@ impl Shared {
     ) -> Result<Opened, AppError> {
         self.core.drop_unsupported(request);
         let models = self.models(cancel).await?;
-        let thinking = if models
+        let capabilities = models
             .iter()
             .find(|model| model.external_id == request.model)
-            .is_some_and(|model| model.capabilities.contains(&ModelCapability::Reasoning))
-        {
-            ThinkingMode::Auto
-        } else {
-            ThinkingMode::Fast
-        };
+            .map(|model| model.capabilities.as_slice())
+            .unwrap_or_default();
+        let thinking = thinking_mode(request.vendor, capabilities);
+        let chat_type = chat_type(request.vendor);
         let continued = if fresh {
             None
         } else {
@@ -516,7 +552,7 @@ impl Shared {
         let (chat_id, prompt, parent_id) = match continued {
             Some((chain, prompt)) => (chain.chat_id, prompt, Some(chain.response_id)),
             None => (
-                self.create_chat(&request.model, cancel).await?,
+                self.create_chat(&request.model, chat_type, cancel).await?,
                 flatten_prompt(request),
                 None,
             ),
@@ -528,6 +564,7 @@ impl Shared {
                 &request.model,
                 &prompt,
                 thinking,
+                chat_type,
                 parent_id.as_deref(),
             )?,
             cancel,
@@ -607,6 +644,12 @@ impl Run {
                 TurnEvent::Text(chunk) => {
                     self.produced = true;
                     self.queue.push_back(Ok(TextDelta::text(chunk)));
+                }
+                TurnEvent::WebSources(sources) => {
+                    self.produced = true;
+                    self.queue.push_back(Ok(TextDelta::WebSources(
+                        sources.into_iter().map(web_source).collect(),
+                    )));
                 }
                 TurnEvent::Finished => self.finished = true,
             }

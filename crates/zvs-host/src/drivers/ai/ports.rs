@@ -4,7 +4,9 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
-use zvs_contract::{AppError, DeltaKind, ModelCapability, TunableParameter};
+use zvs_contract::{
+    AppError, DeltaKind, ModelCapability, TunableParameter, VendorTurnOptions, WebSourceDto,
+};
 
 use super::capabilities::AdapterCapabilities;
 
@@ -111,6 +113,7 @@ pub struct GenerateRequest {
     pub top_k: Option<u32>,
     pub top_p: Option<f64>,
     pub max_output_tokens: Option<u64>,
+    pub vendor: VendorTurnOptions,
 }
 
 impl GenerateRequest {
@@ -180,6 +183,7 @@ pub struct GenerateResult {
 pub enum TextDelta {
     Content { text: String, kind: DeltaKind },
     ToolCall(ToolCall),
+    WebSources(Vec<WebSourceDto>),
 }
 
 impl TextDelta {

@@ -444,6 +444,37 @@ test("a document selection rides along with the next message and then clears", a
   events.dispose();
 });
 
+test("a Qwen account turn carries the chosen effort and search, other providers carry none", async () => {
+  const { store, bridge, events } = setup();
+  const qwen = provider({
+    id: "0199bb11-6666-7111-8111-000000000005" as ProviderId,
+    name: "Qwen",
+    adapter: "qwen-web",
+    authMode: "account",
+    accountId: "0199bb11-6666-7111-8111-000000000001" as AccountDto["id"],
+    models: [model({ id: MODEL, externalId: "qwen3.7-plus" })],
+  });
+  bridge
+    .handle("providers.list", () => [saved, qwen])
+    .handle("providers.get", (input) => (input.id === qwen.id ? qwen : saved));
+  await store.mount();
+  store.composer.selectProvider(qwen);
+  expect(store.accountFamily).toBe("qwen-web");
+  store.composer.setEffort("thinking");
+  store.composer.setWebSearch(true);
+  store.composer.setText("Курс евро");
+  await store.send();
+  const sent = bridge.calls.filter((call) => call.channel === "chat.send");
+  expect(sent.at(-1)?.payload).toMatchObject({
+    vendor: { effort: "thinking", webSearch: true },
+  });
+
+  store.composer.selectProvider(saved);
+  expect(store.vendorOptions).toBeUndefined();
+  store.dispose();
+  events.dispose();
+});
+
 test("attaching past the limit reports it instead of dropping silently", async () => {
   const { store, events } = setup();
   await store.mount();

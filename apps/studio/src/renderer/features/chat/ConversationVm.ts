@@ -5,6 +5,7 @@ import {
   type ProviderDto,
   type ProviderId,
   type RetrievalMode,
+  type ThinkingEffort,
   type VectorStoreId,
 } from "@zvs/shared";
 
@@ -19,6 +20,8 @@ export default class ConversationVm {
   retrievalMode: RetrievalMode = "hybrid";
   enabledTools: string[] = [];
   selections: DocumentSelectionDto[] = [];
+  effort: ThinkingEffort = "auto";
+  webSearch = false;
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true });
@@ -63,6 +66,12 @@ export default class ConversationVm {
   }
   setRetrievalMode(value: RetrievalMode) {
     this.retrievalMode = value;
+  }
+  setEffort(value: ThinkingEffort) {
+    this.effort = value;
+  }
+  setWebSearch(value: boolean) {
+    this.webSearch = value;
   }
   setEnabledTools(value: readonly string[]) {
     this.enabledTools = [...new Set(value)];

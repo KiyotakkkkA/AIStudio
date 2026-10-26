@@ -132,7 +132,11 @@ async fn the_qwen_family_lists_models_from_the_recorded_payload() {
                 family: Some("qwen".to_owned()),
                 context_window: Some(131_072),
                 max_output: Some(32_768),
-                capabilities: vec![ModelCapability::Streaming, ModelCapability::Reasoning],
+                capabilities: vec![
+                    ModelCapability::Streaming,
+                    ModelCapability::Reasoning,
+                    ModelCapability::AdaptiveReasoning,
+                ],
                 ..DiscoveredModel::named("qwen3.7-plus")
             },
             DiscoveredModel {
@@ -340,7 +344,7 @@ async fn the_qwen_family_opens_a_chat_and_streams_reasoning_and_answer_as_distin
         .iter()
         .map(|delta| match delta {
             TextDelta::Content { kind, .. } => *kind,
-            TextDelta::ToolCall(_) => panic!("no tool calls"),
+            TextDelta::ToolCall(_) | TextDelta::WebSources(_) => panic!("no tool calls"),
         })
         .collect::<Vec<_>>();
     assert_eq!(
@@ -434,10 +438,181 @@ async fn the_qwen_family_opens_a_chat_and_streams_reasoning_and_answer_as_distin
             .next()
             .expect("a prefix"),
         format!(
-            r#"{{"chatId":"{QWEN_CHAT_ID}","chat_id":"{QWEN_CHAT_ID}","chat_mode":"normal","chat_type":"t2t","incremental_output":true,"#
+            r#"{{"chatId":"{QWEN_CHAT_ID}","chat_id":"{QWEN_CHAT_ID}","chat_mode":"normal","incremental_output":true,"#
         )
     );
-    assert_eq!(QWEN_GENERATION_OBSERVATION.observed_at, "2026-10-24");
+    assert_eq!(message["chat_type"], json!("t2t"));
+    assert_eq!(QWEN_GENERATION_OBSERVATION.observed_at, "2026-10-26");
+}
+
+#[tokio::test]
+async fn qwen_sends_the_chosen_effort_and_search_and_streams_the_found_sources() {
+    let server = qwen_server(fixture_frames("qwenSearchStream.sse")).await;
+    let request = GenerateRequest {
+        vendor: VendorTurnOptions {
+            effort: Some(ThinkingEffort::Thinking),
+            web_search: true,
+        },
+        ..prompt()
+    };
+    let deltas = drain(adapter(&server).stream(&request, &token()))
+        .await
+        .expect("streams");
+    let calls = server.calls();
+    assert_eq!(calls[1].json()["chat_type"], json!("search"));
+    let message = &server.last_body()["messages"][0];
+    assert_eq!(message["chat_type"], json!("search"));
+    assert_eq!(message["sub_chat_type"], json!("search"));
+    assert_eq!(message["extra"]["meta"]["subChatType"], json!("search"));
+    let config = &message["feature_config"];
+    assert_eq!(config["thinking_mode"], json!("Thinking"));
+    assert_eq!(config["thinking_enabled"], json!(true));
+    assert_eq!(config["auto_thinking"], json!(false));
+    assert_eq!(config["auto_search"], json!(true));
+    assert_eq!(
+        texts(&deltas, DeltaKind::Text).concat(),
+        "Нужно проверить курс.\n\nКурс евро составляет 90,2429 рубля [[2]]."
+    );
+    let sources: Vec<&WebSourceDto> = deltas
+        .iter()
+        .filter_map(|delta| match delta {
+            TextDelta::WebSources(sources) => Some(sources),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    assert_eq!(
+        sources,
+        [
+            &WebSourceDto {
+                url: "https://rates.example/eur".into(),
+                title: "Курсы валют на 26 октября".into(),
+                snippet: "EUR 90,2429".into(),
+                date: Some("3 days ago".into()),
+            },
+            &WebSourceDto {
+                url: "https://cbr.example/daily".into(),
+                title: "Официальные курсы".into(),
+                snippet: "Евро 90,2429 руб.".into(),
+                date: None,
+            },
+        ]
+    );
+}
+
+#[test]
+fn auto_thinking_is_sent_only_to_models_that_offer_it() {
+    use ModelCapability::{AdaptiveReasoning, Reasoning};
+    let vendor = |effort| VendorTurnOptions {
+        effort,
+        web_search: false,
+    };
+    for (capabilities, effort, expected) in [
+        (
+            &[Reasoning, AdaptiveReasoning][..],
+            None,
+            ThinkingMode::Auto,
+        ),
+        (
+            &[Reasoning, AdaptiveReasoning][..],
+            Some(ThinkingEffort::Auto),
+            ThinkingMode::Auto,
+        ),
+        (&[Reasoning][..], None, ThinkingMode::Thinking),
+        (
+            &[Reasoning][..],
+            Some(ThinkingEffort::Auto),
+            ThinkingMode::Thinking,
+        ),
+        (
+            &[Reasoning][..],
+            Some(ThinkingEffort::Thinking),
+            ThinkingMode::Thinking,
+        ),
+        (
+            &[Reasoning][..],
+            Some(ThinkingEffort::Fast),
+            ThinkingMode::Fast,
+        ),
+        (
+            &[AdaptiveReasoning][..],
+            Some(ThinkingEffort::Auto),
+            ThinkingMode::Fast,
+        ),
+        (&[][..], Some(ThinkingEffort::Thinking), ThinkingMode::Fast),
+    ] {
+        assert_eq!(
+            thinking_mode(vendor(effort), capabilities),
+            expected,
+            "{capabilities:?} {effort:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn qwen_maps_each_effort_and_falls_back_to_fast_without_reasoning() {
+    let server = qwen_server(fixture_frames("qwenStream.sse")).await;
+    let qwen = adapter(&server);
+    for (model, effort, mode, enabled, auto) in [
+        ("qwen3.7-plus", None, "Auto", true, true),
+        (
+            "qwen3.7-plus",
+            Some(ThinkingEffort::Auto),
+            "Auto",
+            true,
+            true,
+        ),
+        (
+            "qwen3.7-plus",
+            Some(ThinkingEffort::Thinking),
+            "Thinking",
+            true,
+            false,
+        ),
+        (
+            "qwen3.7-plus",
+            Some(ThinkingEffort::Fast),
+            "Fast",
+            false,
+            false,
+        ),
+        (
+            "qwen3.5-plus",
+            Some(ThinkingEffort::Thinking),
+            "Fast",
+            false,
+            false,
+        ),
+    ] {
+        qwen.generate(
+            &GenerateRequest {
+                model: model.to_owned(),
+                vendor: VendorTurnOptions {
+                    effort,
+                    web_search: false,
+                },
+                ..prompt()
+            },
+            &token(),
+        )
+        .await
+        .expect("generates");
+        let message = &server.last_body()["messages"][0];
+        let config = &message["feature_config"];
+        assert_eq!(config["thinking_mode"], json!(mode), "{model} {effort:?}");
+        assert_eq!(
+            config["thinking_enabled"],
+            json!(enabled),
+            "{model} {effort:?}"
+        );
+        assert_eq!(config["auto_thinking"], json!(auto), "{model} {effort:?}");
+        assert_eq!(
+            config.get("thinking_format").is_some(),
+            enabled,
+            "{model} {effort:?}"
+        );
+        assert_eq!(message["chat_type"], json!("t2t"));
+    }
 }
 
 #[tokio::test]

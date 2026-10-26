@@ -11,6 +11,7 @@ import {
   VectorSearchHitDto,
   modelToolSupport,
   resolveToolMode,
+  isAccountFamily,
   type ToolMode,
   type AccountDto,
   type AccountFamily,
@@ -38,6 +39,8 @@ import {
   type RunOutcomeDto,
   type ToolDto,
   type VectorStoreDto,
+  type VendorTurnOptions,
+  type WebSourceDto,
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import ConversationVm from "./ConversationVm";
@@ -98,6 +101,7 @@ export default class ChatStore {
   liveText = "";
   liveReasoning = "";
   liveCitations: ChatCitationDto[] = [];
+  liveWebSources: WebSourceDto[] = [];
   liveSelections: DocumentSelectionDto[] = [];
   liveToolCalls: ChatToolCallDto[] = [];
   searchedStoreIds: VectorStoreDto["id"][] = [];
@@ -199,6 +203,15 @@ export default class ChatStore {
   }
   get canConfigure() {
     return !this.generating;
+  }
+  get accountFamily(): AccountFamily | null {
+    const provider = this.provider;
+    if (provider?.authMode !== "account" || !isAccountFamily(provider.adapter)) return null;
+    return provider.adapter;
+  }
+  get vendorOptions(): VendorTurnOptions | undefined {
+    if (this.accountFamily !== "qwen-web") return undefined;
+    return { effort: this.composer.effort, webSearch: this.composer.webSearch };
   }
   get provider() {
     return this.providers.find((provider) => provider.id === this.composer.providerId);
@@ -754,6 +767,7 @@ export default class ChatStore {
         this.liveText = "";
         this.liveReasoning = "";
         this.liveCitations = [];
+        this.liveWebSources = [];
         this.liveSelections = [];
         this.liveToolCalls = [];
         this.outcome = null;
@@ -789,6 +803,7 @@ export default class ChatStore {
     this.liveText = "";
     this.liveReasoning = "";
     this.liveCitations = [];
+    this.liveWebSources = [];
     this.liveSelections = [];
     this.liveToolCalls = [];
     this.retryText = "";
@@ -836,6 +851,7 @@ export default class ChatStore {
     this.retryText = text;
     this.liveText = "";
     this.liveCitations = [];
+    this.liveWebSources = [];
     this.liveSelections = [];
     this.liveToolCalls = [];
     this.searchedStoreIds = [];
@@ -849,6 +865,7 @@ export default class ChatStore {
         modelId: this.composer.modelId,
         settings: { temperature: this.composer.temperature },
         selections: [...this.composer.selections],
+        vendor: this.vendorOptions,
       });
       const sentSelections = [...this.composer.selections];
       runInAction(() => {
@@ -1038,6 +1055,7 @@ export default class ChatStore {
         this.liveText = "";
         this.liveReasoning = "";
         this.liveCitations = [];
+        this.liveWebSources = [];
         this.liveSelections = [];
         this.liveToolCalls = [];
         this.pendingTurn = false;
@@ -1288,6 +1306,7 @@ export default class ChatStore {
           this.liveText = message.data.content;
           this.liveReasoning = message.data.reasoning;
           this.liveCitations = message.data.citations;
+          this.liveWebSources = message.data.webSources;
         }
       }
     }
@@ -1334,6 +1353,7 @@ export default class ChatStore {
         this.liveText = "";
         this.liveReasoning = "";
         this.liveCitations = [];
+        this.liveWebSources = [];
         this.liveSelections = [];
         this.liveToolCalls = [];
         this.pendingTurn = false;

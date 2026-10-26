@@ -1,0 +1,21 @@
+[
+  {
+    "name": "search with fast thinking",
+    "value": {
+      "effort": "fast",
+      "webSearch": true
+    }
+  },
+  {
+    "name": "thinking only",
+    "value": {
+      "effort": "thinking"
+    }
+  },
+  {
+    "name": "search only",
+    "value": {
+      "webSearch": true
+    }
+  }
+]

@@ -33,6 +33,7 @@ wire_enum!(ModelCapability {
     Vision => "vision",
     Streaming => "streaming",
     Reasoning => "reasoning",
+    AdaptiveReasoning => "adaptive-reasoning",
     Code => "code",
 });
 

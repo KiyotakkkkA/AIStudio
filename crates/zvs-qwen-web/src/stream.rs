@@ -9,6 +9,43 @@ struct Summary {
 #[derive(Deserialize)]
 struct Extra {
     summary_thought: Option<Summary>,
+    web_search_info: Option<Vec<Value>>,
+}
+
+#[derive(Deserialize)]
+struct RawSource {
+    url: Option<String>,
+    title: Option<String>,
+    snippet: Option<String>,
+    date: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebSource {
+    pub url: String,
+    pub title: String,
+    pub snippet: String,
+    pub date: Option<String>,
+}
+
+fn present(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+}
+
+fn web_source(row: &Value) -> Option<WebSource> {
+    let raw = RawSource::deserialize(row).ok()?;
+    let url = present(raw.url)?;
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return None;
+    }
+    Some(WebSource {
+        title: present(raw.title).unwrap_or_else(|| url.clone()),
+        snippet: present(raw.snippet).unwrap_or_default(),
+        date: present(raw.date),
+        url,
+    })
 }
 
 #[derive(Deserialize)]
@@ -107,6 +144,7 @@ pub enum TurnEvent {
     Started(String),
     Reasoning(String),
     Text(String),
+    WebSources(Vec<WebSource>),
     Usage(Usage),
     /// The answer phase reported `finished`; a stream that ends without it was cut short.
     Finished,
@@ -259,6 +297,18 @@ impl TurnDecoder {
                     events.push(TurnEvent::Finished);
                 }
             }
+            Some("web_search") if delta.status.as_deref() == Some("finished") => {
+                let sources: Vec<WebSource> = delta
+                    .extra
+                    .and_then(|extra| extra.web_search_info)
+                    .unwrap_or_default()
+                    .iter()
+                    .filter_map(web_source)
+                    .collect();
+                if !sources.is_empty() {
+                    events.push(TurnEvent::WebSources(sources));
+                }
+            }
             _ => {}
         }
         events
@@ -322,6 +372,70 @@ mod tests {
             []
         );
         assert_eq!(decoder.push("not json"), []);
+    }
+
+    #[test]
+    fn a_finished_web_search_yields_its_usable_results_in_order() {
+        let mut decoder = TurnDecoder::new();
+        let typing = frame(&json!({
+            "phase": "web_search", "status": "typing", "content": "",
+            "function_call": { "name": "web_search", "arguments": "{\"queries\": " },
+        }));
+        assert_eq!(decoder.push(&typing), []);
+        let finished = frame(&json!({
+            "phase": "web_search", "status": "finished", "content": "", "name": "web_search",
+            "function_id": "call_1",
+            "extra": {
+                "display_position": "answer",
+                "tool_result": { "docs": [], "used_id": 3 },
+                "web_search_info": [
+                    { "url": "https://a.example/x", "title": " Курс ", "snippet": "EUR 90",
+                      "hostname": "", "hostlogo": "", "date": "3 days ago" },
+                    { "url": "ftp://b.example", "title": "skip" },
+                    { "url": "  ", "title": "skip" },
+                    { "url": "http://c.example", "title": "", "snippet": "", "date": "" },
+                    7,
+                ],
+            },
+        }));
+        assert_eq!(
+            decoder.push(&finished),
+            [TurnEvent::WebSources(vec![
+                WebSource {
+                    url: "https://a.example/x".into(),
+                    title: "Курс".into(),
+                    snippet: "EUR 90".into(),
+                    date: Some("3 days ago".into()),
+                },
+                WebSource {
+                    url: "http://c.example".into(),
+                    title: "http://c.example".into(),
+                    snippet: String::new(),
+                    date: None,
+                },
+            ])]
+        );
+        let empty = frame(&json!({
+            "phase": "web_search", "status": "finished", "extra": { "web_search_info": [] },
+        }));
+        assert_eq!(decoder.push(&empty), []);
+    }
+
+    #[test]
+    fn an_answer_finished_before_a_search_does_not_end_the_text() {
+        let mut decoder = TurnDecoder::new();
+        let answer = |content: &str, status: &str| {
+            frame(&json!({ "phase": "answer", "content": content, "status": status }))
+        };
+        assert_eq!(
+            decoder.push(&answer("Проверка.", "typing")),
+            [TurnEvent::Text("Проверка.".into())]
+        );
+        assert_eq!(decoder.push(&answer("", "finished")), [TurnEvent::Finished]);
+        assert_eq!(
+            decoder.push(&answer("Итог [[1]].", "typing")),
+            [TurnEvent::Text("Итог [[1]].".into())]
+        );
     }
 
     #[test]
