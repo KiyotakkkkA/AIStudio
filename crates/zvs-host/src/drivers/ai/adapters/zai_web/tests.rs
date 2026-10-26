@@ -374,3 +374,10 @@ async fn texts_reach_the_stream_as_answer_deltas() {
         })
     )));
 }
+
+#[tokio::test]
+async fn zai_excludes_no_tool_from_the_tool_policy() {
+    let server = MockServer::start().await;
+    let driver = adapter(&server);
+    assert!(driver.excluded_policy_check_tools().is_empty());
+}

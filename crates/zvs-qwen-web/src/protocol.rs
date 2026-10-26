@@ -22,6 +22,7 @@ pub const NEW_CHAT_REFERER_PATH: &str = "/c/new-chat";
 pub const CHAT_MODE: &str = "normal";
 pub const CHAT_TYPE: &str = "t2t";
 pub const SEARCH_CHAT_TYPE: &str = "search";
+pub const EXCLUDED_POLICY_CHECK_TOOLS_NAMES: &[&str] = &["web_search"];
 pub const API_VERSION: &str = "2.1";
 /// The frontend build the client announces in its `Version` header.
 pub const WEB_VERSION: &str = "0.3.22";

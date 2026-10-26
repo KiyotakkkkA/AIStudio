@@ -813,6 +813,10 @@ impl TextGenerationDriver for QwenWebAdapter {
     ) -> Result<Vec<DiscoveredModel>, AppError> {
         self.shared.list_models(cancel).await
     }
+
+    fn excluded_policy_check_tools(&self) -> &'static [&'static str] {
+        zvs_qwen_web::EXCLUDED_POLICY_CHECK_TOOLS_NAMES
+    }
 }
 
 pub fn qwen_web_driver(options: AccountAdapterOptions) -> SharedTextDriver {

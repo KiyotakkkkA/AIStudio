@@ -777,6 +777,10 @@ impl TextGenerationDriver for DialectDriver {
         self.inner.capabilities()
     }
 
+    fn excluded_policy_check_tools(&self) -> &'static [&'static str] {
+        self.inner.excluded_policy_check_tools()
+    }
+
     async fn generate(
         &self,
         request: &GenerateRequest,

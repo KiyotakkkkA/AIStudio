@@ -15,6 +15,6 @@ pub use page::{
     CHALLENGE_PATTERN, FRONTEND_VERSION, FrontendVersion, PAGE_BEARER_KEY, PagePlan, PageTransport,
     SESSION_REFRESH, SESSION_REFUSALS, SessionRefresh, page_plan,
 };
-pub use protocol::Observation;
+pub use protocol::{EXCLUDED_POLICY_CHECK_TOOLS_NAMES, Observation};
 pub use request::{ChatType, CompletionTurn, ThinkingMode, new_chat_body, parse_chat_created};
 pub use stream::{TurnDecoder, TurnEvent, Usage, VendorFailure, WebSource};

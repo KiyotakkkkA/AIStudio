@@ -9,6 +9,7 @@ pub const API_BASE: &str = "https://chat.z.ai/api";
 pub const APP_PAGE: &str = "https://chat.z.ai/";
 
 pub const MODELS_PATH: &str = "/models";
+pub const EXCLUDED_POLICY_CHECK_TOOLS_NAMES: &[&str] = &[];
 pub const CONFIG_PATH: &str = "/config";
 pub const USER_PATH: &str = "/v1/auths/";
 pub const CHATS_NEW_PATH: &str = "/v1/chats/new";

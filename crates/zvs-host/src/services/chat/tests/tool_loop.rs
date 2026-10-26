@@ -47,6 +47,7 @@ pub(super) struct Scripted {
     rounds: Mutex<VecDeque<Round>>,
     fallback: Mutex<Fallback>,
     pub(super) mode: Mutex<ToolMode>,
+    pub(super) excluded: Mutex<&'static [&'static str]>,
 }
 
 impl Scripted {
@@ -56,6 +57,7 @@ impl Scripted {
             rounds: Mutex::new(VecDeque::new()),
             fallback: Mutex::new(Arc::new(|_| vec![text("Done.")])),
             mode: Mutex::new(ToolMode::Native),
+            excluded: Mutex::new(&[]),
         })
     }
 
@@ -135,6 +137,10 @@ impl TextGenerationDriver for Scripted {
         _cancel: &CancellationToken,
     ) -> Result<Vec<DiscoveredModel>, AppError> {
         Ok(Vec::new())
+    }
+
+    fn excluded_policy_check_tools(&self) -> &'static [&'static str] {
+        *self.excluded.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 
@@ -800,6 +806,31 @@ async fn vendor_options_reach_the_driver_and_web_sources_of_every_round_are_kept
     assert_eq!(last.web_sources, [first, second]);
     let user = &test.harness.messages(created)[0];
     assert!(user.web_sources.is_empty());
+}
+
+#[tokio::test]
+async fn a_vendor_side_tool_call_is_left_to_the_vendor_instead_of_refused() {
+    let test = Loop::new();
+    *test
+        .driver
+        .excluded
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner) = &["web_search"];
+    test.driver.round(|_| {
+        vec![
+            text("Курс 90,24."),
+            call("web_search", &json!({ "queries": ["курс евро"] })),
+        ]
+    });
+    let created = test.conversation(&["demo.lookup"]);
+
+    let handle = test.turn(created, "Курс").await;
+
+    let last = test.harness.last(created);
+    assert_eq!(last.content, "Курс 90,24.");
+    assert!(last.tool_calls.is_empty());
+    assert_eq!(test.driver.requests().len(), 1);
+    assert!(test.tool_steps(&handle).is_empty());
 }
 
 #[tokio::test]

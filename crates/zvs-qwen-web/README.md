@@ -125,6 +125,14 @@ not end the stream. Search results arrive only on the `finished` `web_search` fr
 skipped; an empty title falls back to the URL; empty `snippet` and `date` are dropped.
 `web_extractor` phases (pages the model read) are not decoded.
 
+## Vendor-side tools
+
+`EXCLUDED_POLICY_CHECK_TOOLS_NAMES` (`["web_search"]`) lists the tools Qwen runs itself. When
+the model emits a call with one of these names and the app did not offer a tool by that name,
+the chat loop drops the call with a log line instead of refusing it as unoffered: the search
+already ran on the vendor's side and its results arrive as `WebSources`. `zvs-zai-web` exposes
+the same constant, empty for now.
+
 ## Tests
 
 `cargo test -p zvs-qwen-web` covers the bodies, the model list and the decoder. The host's

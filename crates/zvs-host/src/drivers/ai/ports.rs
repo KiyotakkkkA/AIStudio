@@ -250,6 +250,10 @@ pub trait TextGenerationDriver: Send + Sync {
         &self,
         cancel: &CancellationToken,
     ) -> Result<Vec<DiscoveredModel>, AppError>;
+
+    fn excluded_policy_check_tools(&self) -> &'static [&'static str] {
+        &[]
+    }
 }
 
 #[async_trait]

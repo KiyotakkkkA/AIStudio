@@ -102,6 +102,7 @@ pub const TOOLS_NOT_OFFERED: &str =
     "The model does not support tool calling; tools were not offered";
 pub const BUDGET_EXHAUSTED: &str = "Бюджет вызовов инструментов на этот ход исчерпан";
 pub const NOT_OFFERED: &str = "Модель вызвала инструмент, который не был ей предложен";
+pub const VENDOR_TOOL_SKIPPED: &str = "Vendor-side tool call left to the vendor";
 pub const NOT_AN_OBJECT: &str = "Аргументы вызова не являются JSON-объектом";
 pub const NO_TOOL_CALLS: &str = "Вызов инструментов недоступен в этом запуске";
 pub const TOOL_REPORTED_ERROR: &str = "Инструмент вернул ошибку";
@@ -1496,11 +1497,23 @@ impl GenerateChatNode {
             tool_calls: Vec::new(),
             web_sources: Vec::new(),
         };
+        let excluded = driver.excluded_policy_check_tools();
         let mut deltas = driver.stream(request, &context.cancel);
         while let Some(delta) = deltas.next().await {
             let delta = delta?;
             context.check_cancelled()?;
             match delta {
+                TextDelta::ToolCall(call)
+                    if excluded.contains(&call.name.as_str())
+                        && !request.tools.iter().any(|tool| tool.name == call.name) =>
+                {
+                    context.emit(HostEventDraft::Log {
+                        line: log_line(&[
+                            ("message", json!(VENDOR_TOOL_SKIPPED)),
+                            ("tool", json!(call.name)),
+                        ]),
+                    })?;
+                }
                 TextDelta::ToolCall(call) => {
                     let id = if call.id.is_empty() {
                         format!("call_{}", output.tool_calls.len() + 1)
