@@ -127,7 +127,7 @@ skipped; an empty title falls back to the URL; empty `snippet` and `date` are dr
 
 ## Vendor-side tools
 
-`EXCLUDED_POLICY_CHECK_TOOLS_NAMES` (`["web_search"]`) lists the tools Qwen runs itself. When
+`EXCLUDED_POLICY_CHECK_TOOLS_NAMES` When
 the model emits a call with one of these names and the app did not offer a tool by that name,
 the chat loop drops the call with a log line instead of refusing it as unoffered: the search
 already ran on the vendor's side and its results arrive as `WebSources`. `zvs-zai-web` exposes
