@@ -75,9 +75,12 @@ Progress text is a state, not a narration: `Индексация продолж�
 - Numbers: `toLocaleString("ru-RU")` for counts a user reads; units are Russian abbreviations
   (`мс`, `с`, `мин`, `ч`, `Б`, `КБ`, `МБ`, `ГБ`)
 - Plurals go through `plural(count, one, few, many)` from
-  `features/connections/connectionPresentation.ts`. Russian has three forms and an exception
-  for 11–14; hand-rolled branches get it wrong. Add a `…Word(count)` wrapper next to the
-  existing ones rather than inlining the arithmetic.
+  `features/connections/connectionPresentation.ts`, which returns the count with the form
+  (`5 моделей`). Russian has three forms and an exception for 11–14; hand-rolled branches get
+  it wrong. Add a `…Word(count)` wrapper next to the existing ones rather than inlining the
+  arithmetic. `src/browser-ui` is a separate Vite entry that imports nothing from the
+  renderer, so it keeps its own copy in `browserCopy.ts` — the one place a second
+  implementation is allowed, and it stays in step with this one.
 
 ## Where copy lives
 

@@ -1,4 +1,5 @@
 import type { AccountDto, AccountFamily, AccountStatus } from "@zvs/shared";
+import { plural } from "../connections/connectionPresentation";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 
 /** Mirrors the host's rotation window, so an expiring session reads like an expiring secret. */
@@ -72,21 +73,11 @@ export function accountStatusLine(account: AccountDto): string {
 }
 
 export function providersWord(count: number): string {
-  const tail = count % 100;
-  const last = count % 10;
-  if (tail >= 11 && tail <= 14) return `${String(count)} подключений`;
-  if (last === 1) return `${String(count)} подключение`;
-  if (last >= 2 && last <= 4) return `${String(count)} подключения`;
-  return `${String(count)} подключений`;
+  return plural(count, "подключение", "подключения", "подключений");
 }
 
 export function accountsWord(count: number): string {
-  const tail = count % 100;
-  const last = count % 10;
-  if (tail >= 11 && tail <= 14) return `${String(count)} аккаунтов`;
-  if (last === 1) return `${String(count)} аккаунт`;
-  if (last >= 2 && last <= 4) return `${String(count)} аккаунта`;
-  return `${String(count)} аккаунтов`;
+  return plural(count, "аккаунт", "аккаунта", "аккаунтов");
 }
 
 export function secondsLeftLabel(elapsedMs: number, totalMs: number): string | null {
@@ -96,10 +87,5 @@ export function secondsLeftLabel(elapsedMs: number, totalMs: number): string | n
 }
 
 function daysWord(days: number): string {
-  const tail = days % 100;
-  const last = days % 10;
-  if (tail >= 11 && tail <= 14) return `${String(days)} дней`;
-  if (last === 1) return `${String(days)} день`;
-  if (last >= 2 && last <= 4) return `${String(days)} дня`;
-  return `${String(days)} дней`;
+  return plural(days, "день", "дня", "дней");
 }

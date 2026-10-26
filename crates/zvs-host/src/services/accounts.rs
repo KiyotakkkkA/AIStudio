@@ -52,11 +52,11 @@ pub const SERVICE_CLOSED: &str = "Account service is closed";
 pub const ACCOUNT_NOT_FOUND: &str = "Account not found";
 pub const VENDOR_UNCHECKED: &str = "Could not check the vendor session";
 pub const OPERATION_CANCELLED: &str = "Account operation cancelled";
-pub const NO_SIGN_IN: &str = "No sign-in detected";
-pub const IDENTITY_REPLACED: &str = "Previous identity replaced; only one browser session per vendor can be active. Its providers now use the new account.";
-pub const DIFFERENT_ACCOUNT: &str = "Browser is signed in to a different account";
-pub const COOKIES_CLEARED_DETAIL: &str = "Browser cookies cleared — sign in again";
-pub const LINKING_FAILED: &str = "Account linking failed";
+pub const NO_SIGN_IN: &str = "Вход не обнаружен";
+pub const IDENTITY_REPLACED: &str = "Предыдущая учётная запись заменена: для одного вендора активен только один сеанс браузера. Его подключения теперь используют новый аккаунт.";
+pub const DIFFERENT_ACCOUNT: &str = "В браузере выполнен вход в другой аккаунт";
+pub const COOKIES_CLEARED_DETAIL: &str = "Куки браузера очищены — войдите снова";
+pub const LINKING_FAILED: &str = "Не удалось привязать аккаунт";
 
 #[async_trait]
 pub trait AccountBrowser: Send + Sync {

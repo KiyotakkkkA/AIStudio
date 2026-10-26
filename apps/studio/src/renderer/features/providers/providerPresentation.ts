@@ -11,6 +11,7 @@ import type {
   ProviderSummaryDto,
   SecretSummaryDto,
 } from "@zvs/shared";
+import { plural } from "../connections/connectionPresentation";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 
 export const CAPABILITY_LABELS: Record<ProviderCapability, string> = {
@@ -123,12 +124,7 @@ export function summaryLine(summary: ProviderSummaryDto): string {
 }
 
 export function modelsWord(count: number): string {
-  const tail = count % 100;
-  const last = count % 10;
-  if (tail >= 11 && tail <= 14) return `${String(count)} моделей`;
-  if (last === 1) return `${String(count)} модель`;
-  if (last >= 2 && last <= 4) return `${String(count)} модели`;
-  return `${String(count)} моделей`;
+  return plural(count, "модель", "модели", "моделей");
 }
 
 export interface ProbeLine {

@@ -14,7 +14,7 @@ pub const AGENT_PANEL_WIDTH: f64 = 344.0;
 pub const APPROVAL_HEIGHT: f64 = 76.0;
 pub const TAB_LIMIT: usize = 30;
 pub const ONLY_WEB_ADDRESSES: &str = "Only HTTP and HTTPS addresses are allowed";
-pub const NAVIGATION_BLOCKED: &str = "Navigation blocked: only HTTP/HTTPS is allowed";
+pub const NAVIGATION_BLOCKED: &str = "Переход заблокирован: разрешены только адреса HTTP и HTTPS";
 
 static SCHEME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)^[a-z][a-z\d+.-]*:").expect("a static pattern"));

@@ -7,9 +7,10 @@ use zvs_host::browser::{
 };
 
 pub const NEW_TAB_TITLE: &str = "Новая вкладка";
-pub const PROCESS_GONE: &str = "Page process stopped. Reload to retry.";
+pub const PROCESS_GONE: &str = "Процесс страницы остановлен. Обновите страницу.";
+pub const LOAD_FAILED: &str = "Страница не загрузилась";
 pub const FORM_RESUBMISSION: &str =
-    "This page needs a form submission. Go back to the sign-in page and try again.";
+    "Страница открывается только после отправки формы. Вернитесь на страницу входа и повторите.";
 pub const TAB_LIMIT_REACHED: &str = "Close a tab before opening another (limit: 30)";
 pub const UNKNOWN_TAB: &str = "Unknown tab";
 pub const INVALID_ORDER: &str = "Invalid tab order";
@@ -36,7 +37,7 @@ pub fn load_error(failure: LoadFailure) -> Option<String> {
     match failure {
         LoadFailure::Aborted => None,
         LoadFailure::CacheMiss => Some(FORM_RESUBMISSION.to_owned()),
-        LoadFailure::Other(code) => Some(format!("Page could not load ({code})")),
+        LoadFailure::Other(code) => Some(format!("{LOAD_FAILED} ({code})")),
     }
 }
 
@@ -475,7 +476,7 @@ mod tests {
         );
         let tab = &model.state().tabs[0];
         assert_eq!(tab.security, BrowserSecurity::Error);
-        assert_eq!(tab.error.as_deref(), Some("Page could not load (-105)"));
+        assert_eq!(tab.error, Some(format!("{LOAD_FAILED} (-105)")));
     }
 
     #[test]
@@ -486,8 +487,8 @@ mod tests {
             Some(FORM_RESUBMISSION)
         );
         assert_eq!(
-            load_error(LoadFailure::Other(7)).as_deref(),
-            Some("Page could not load (7)")
+            load_error(LoadFailure::Other(7)),
+            Some(format!("{LOAD_FAILED} (7)"))
         );
     }
 
