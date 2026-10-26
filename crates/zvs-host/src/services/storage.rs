@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use zvs_contract::{
     AppError, AppErrorCode, StorageCategory, StorageCategoryUsage, StorageClearCacheOutput,
-    StorageUsageDto,
+    StoragePart, StoragePartUsage, StorageUsageDto,
 };
 
 use crate::artifacts::DASHBOARDS;
@@ -12,43 +12,105 @@ use crate::data::{Database, Repositories};
 use crate::downloads::disk::directory_size;
 use crate::drivers::mcp::TOOLCHAIN_DIR;
 use crate::platform::clock::SharedClock;
-use crate::platform::paths::StudioPaths;
+use crate::platform::paths::{DownloadKind, StudioPaths};
 use crate::skills::SKILLS_DIR;
 
 pub const CACHE_BUSY: &str = "Кэш нельзя очистить, пока выполняются задачи";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StorageRoot {
+    pub category: StorageCategory,
+    pub paths: Vec<PathBuf>,
+    pub parts: Vec<(StoragePart, Vec<PathBuf>)>,
+}
+
+impl StorageRoot {
+    fn new(category: StorageCategory, paths: Vec<PathBuf>) -> Self {
+        Self {
+            category,
+            paths,
+            parts: Vec::new(),
+        }
+    }
+
+    fn with_parts(mut self, parts: Vec<(StoragePart, Vec<PathBuf>)>) -> Self {
+        self.parts = parts;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StorageRoots {
-    pub categories: Vec<(StorageCategory, Vec<PathBuf>)>,
+    pub categories: Vec<StorageRoot>,
     pub cache_dir: PathBuf,
+}
+
+const fn download_part(kind: DownloadKind) -> StoragePart {
+    match kind {
+        DownloadKind::Model => StoragePart::Models,
+        DownloadKind::Embedding => StoragePart::Embeddings,
+        DownloadKind::Runtime => StoragePart::Runtimes,
+        DownloadKind::Mcp => StoragePart::Mcp,
+        DownloadKind::Skill => StoragePart::Skills,
+    }
+}
+
+fn toolchain_parts(root: &Path) -> Vec<(StoragePart, Vec<PathBuf>)> {
+    let uv = root.join("uv");
+    vec![
+        (StoragePart::Node, vec![root.join("node")]),
+        (
+            StoragePart::Npm,
+            vec![root.join("npm-cache"), root.join("npm-global")],
+        ),
+        (StoragePart::Uv, vec![uv.clone()]),
+        (StoragePart::Python, vec![uv.join("python")]),
+        (
+            StoragePart::PythonPackages,
+            vec![
+                uv.join("tools"),
+                uv.join("bin"),
+                uv.join("cache"),
+                root.join("pip-cache"),
+            ],
+        ),
+    ]
 }
 
 impl StorageRoots {
     pub fn resolve(paths: &StudioPaths) -> Self {
         let data = &paths.data_dir;
         let database = paths.db_path.to_string_lossy().into_owned();
+        let toolchain = data.join(TOOLCHAIN_DIR);
         Self {
             categories: vec![
-                (
+                StorageRoot::new(
                     StorageCategory::Conversations,
                     vec![paths.conversations_dir.clone()],
                 ),
-                (StorageCategory::Dashboards, vec![data.join(DASHBOARDS)]),
-                (StorageCategory::Skills, vec![data.join(SKILLS_DIR)]),
-                (
+                StorageRoot::new(StorageCategory::Dashboards, vec![data.join(DASHBOARDS)]),
+                StorageRoot::new(StorageCategory::Skills, vec![data.join(SKILLS_DIR)]),
+                StorageRoot::new(
                     StorageCategory::Vectors,
                     vec![paths.vector_stores_dir.clone()],
                 ),
-                (
+                StorageRoot::new(
                     StorageCategory::Downloads,
                     vec![paths.downloads_dir.clone()],
+                )
+                .with_parts(
+                    DownloadKind::ALL
+                        .iter()
+                        .map(|kind| (download_part(*kind), vec![paths.download_dir(*kind)]))
+                        .collect(),
                 ),
-                (StorageCategory::Toolchain, vec![data.join(TOOLCHAIN_DIR)]),
-                (StorageCategory::Browser, vec![data.join(PROFILE_DIR[0])]),
-                (StorageCategory::Cache, vec![paths.cache_dir.clone()]),
-                (StorageCategory::Logs, vec![paths.logs_dir.clone()]),
-                (StorageCategory::Backups, vec![paths.backups_dir.clone()]),
-                (
+                StorageRoot::new(StorageCategory::Toolchain, vec![toolchain.clone()])
+                    .with_parts(toolchain_parts(&toolchain)),
+                StorageRoot::new(StorageCategory::Browser, vec![data.join(PROFILE_DIR[0])]),
+                StorageRoot::new(StorageCategory::Cache, vec![paths.cache_dir.clone()]),
+                StorageRoot::new(StorageCategory::Logs, vec![paths.logs_dir.clone()]),
+                StorageRoot::new(StorageCategory::Backups, vec![paths.backups_dir.clone()]),
+                StorageRoot::new(
                     StorageCategory::Database,
                     ["", "-wal", "-shm"]
                         .iter()
@@ -69,13 +131,49 @@ fn path_size(path: &Path) -> u64 {
     }
 }
 
+fn measure_parts(root: &StorageRoot, bytes: u64) -> Vec<StoragePartUsage> {
+    let nested: Vec<&PathBuf> = root.parts.iter().flat_map(|(_, paths)| paths).collect();
+    let own_size = |path: &PathBuf| {
+        let inner: u64 = nested
+            .iter()
+            .filter(|other| **other != path && other.starts_with(path))
+            .map(|other| path_size(other))
+            .sum();
+        path_size(path).saturating_sub(inner)
+    };
+    let mut parts: Vec<StoragePartUsage> = root
+        .parts
+        .iter()
+        .map(|(part, paths)| StoragePartUsage {
+            part: *part,
+            bytes: paths.iter().map(own_size).sum(),
+        })
+        .collect();
+    let accounted: u64 = parts.iter().map(|usage| usage.bytes).sum();
+    parts.push(StoragePartUsage {
+        part: StoragePart::Other,
+        bytes: bytes.saturating_sub(accounted),
+    });
+    parts.retain(|usage| usage.bytes > 0);
+    parts
+}
+
 fn measure(roots: &StorageRoots, measured_at: i64) -> StorageUsageDto {
     let categories: Vec<StorageCategoryUsage> = roots
         .categories
         .iter()
-        .map(|(category, paths)| StorageCategoryUsage {
-            category: *category,
-            bytes: paths.iter().map(|path| path_size(path)).sum(),
+        .map(|root| {
+            let bytes = root.paths.iter().map(|path| path_size(path)).sum();
+            let parts = if root.parts.is_empty() {
+                Vec::new()
+            } else {
+                measure_parts(root, bytes)
+            };
+            StorageCategoryUsage {
+                category: root.category,
+                bytes,
+                parts,
+            }
         })
         .collect();
     StorageUsageDto {
@@ -263,6 +361,15 @@ mod tests {
         assert_eq!(bytes(&usage, StorageCategory::Database), 40);
         assert_eq!(usage.total_bytes, 315);
         assert_eq!(usage.measured_at, 1_760_000_000_000);
+        assert_eq!(
+            parts(&usage, StorageCategory::Downloads),
+            vec![(StoragePart::Models, 13)]
+        );
+        assert_eq!(
+            parts(&usage, StorageCategory::Toolchain),
+            vec![(StoragePart::Node, 17)]
+        );
+        assert!(parts(&usage, StorageCategory::Cache).is_empty());
 
         write(&data.join("dashboards/more.html"), 1000);
         test.clock.advance(5);
@@ -270,6 +377,64 @@ mod tests {
         let refreshed = test.service.usage(true).await.expect("measures");
         assert_eq!(bytes(&refreshed, StorageCategory::Dashboards), 1007);
         assert_eq!(refreshed.measured_at, 1_760_000_000_005);
+    }
+
+    fn parts(usage: &StorageUsageDto, category: StorageCategory) -> Vec<(StoragePart, u64)> {
+        usage
+            .categories
+            .iter()
+            .find(|item| item.category == category)
+            .map(|item| {
+                item.parts
+                    .iter()
+                    .map(|part| (part.part, part.bytes))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    #[tokio::test]
+    async fn downloads_and_components_are_split_into_parts_that_add_up() {
+        let test = fixture();
+        let downloads = &test.paths.downloads_dir;
+        let toolchain = test.paths.data_dir.join(TOOLCHAIN_DIR);
+        write(&downloads.join("models/m.gguf"), 13);
+        write(&downloads.join("embeddings/e.gguf"), 5);
+        write(&downloads.join("runtimes/node.zip"), 7);
+        write(&downloads.join("stray.part"), 2);
+        write(&toolchain.join("node/22.0.0/node.exe"), 40);
+        write(&toolchain.join("npm-cache/a"), 3);
+        write(&toolchain.join("npm-global/b"), 4);
+        write(&toolchain.join("uv/0.8.0/uv.exe"), 9);
+        write(&toolchain.join("uv/python/3.13/python.exe"), 30);
+        write(&toolchain.join("uv/tools/ruff/r"), 6);
+        write(&toolchain.join("uv/cache/c"), 1);
+        write(&toolchain.join("pip-cache/p"), 2);
+        write(&toolchain.join("state.json"), 1);
+
+        let usage = test.service.usage(false).await.expect("measures");
+
+        usage.validate().expect("parts add up to their category");
+        assert_eq!(
+            parts(&usage, StorageCategory::Downloads),
+            vec![
+                (StoragePart::Models, 13),
+                (StoragePart::Embeddings, 5),
+                (StoragePart::Runtimes, 7),
+                (StoragePart::Other, 2),
+            ]
+        );
+        assert_eq!(
+            parts(&usage, StorageCategory::Toolchain),
+            vec![
+                (StoragePart::Node, 40),
+                (StoragePart::Npm, 7),
+                (StoragePart::Uv, 9),
+                (StoragePart::Python, 30),
+                (StoragePart::PythonPackages, 9),
+                (StoragePart::Other, 1),
+            ]
+        );
     }
 
     #[tokio::test]

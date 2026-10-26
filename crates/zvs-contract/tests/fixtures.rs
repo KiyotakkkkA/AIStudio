@@ -520,6 +520,10 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::StorageCategory>,
     ),
     (
+        "storage/StoragePart",
+        round_trip::<zvs_contract::StoragePart>,
+    ),
+    (
         "storage/StorageUsageDto",
         round_trip::<zvs_contract::StorageUsageDto>,
     ),

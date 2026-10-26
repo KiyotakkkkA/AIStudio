@@ -5,6 +5,7 @@ import {
   mdiAccountCircleOutline,
   mdiBellOutline,
   mdiBrain,
+  mdiChevronDown,
   mdiClose,
   mdiCogOutline,
   mdiHarddisk,
@@ -87,6 +88,8 @@ import {
   STORAGE_CLEAR_CONSEQUENCE,
   STORAGE_CLEAR_ID,
   STORAGE_LOADING,
+  STORAGE_PART_FILLS,
+  STORAGE_PART_LABELS,
   STORAGE_REFRESH,
   STORAGE_TITLE,
   storageSize,
@@ -510,28 +513,81 @@ const DataSection = observer(function DataSection() {
               </Button>
             </div>
             <ul className="m-0 mt-1 list-none divide-y divide-line p-0">
-              {storage.categories.map((item) => (
-                <li key={item.category} className="flex items-center gap-2 py-1.5">
-                  <span
-                    className={`size-2 shrink-0 rounded-full ${STORAGE_CATEGORY_FILLS[item.category]}`}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-main-300">
-                    {STORAGE_CATEGORY_LABELS[item.category]}
-                  </span>
-                  <MeterBar
-                    value={item.bytes}
-                    total={total}
-                    fill={STORAGE_CATEGORY_FILLS[item.category]}
-                    className="w-24"
-                  />
-                  <span className="w-16 shrink-0 text-right font-mono text-[11px] text-main-400 tabular-nums">
-                    {storageSize(item.bytes)}
-                  </span>
-                  <span className="w-9 shrink-0 text-right font-mono text-[11px] text-main-500">
-                    {percent(item.bytes, total)}
-                  </span>
-                </li>
-              ))}
+              {storage.categories.map((item) => {
+                const expandable = item.parts.length > 0;
+                const open = expandable && storage.isExpanded(item.category);
+                const row = (
+                  <>
+                    <span
+                      className={`size-2 shrink-0 rounded-full ${STORAGE_CATEGORY_FILLS[item.category]}`}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-main-300">
+                      {STORAGE_CATEGORY_LABELS[item.category]}
+                    </span>
+                    {expandable ? (
+                      <Icon
+                        path={mdiChevronDown}
+                        size={14}
+                        className={`shrink-0 text-main-500 group-hover/row:text-main-200 anim-on:transition-transform ${open ? "rotate-180" : ""}`}
+                      />
+                    ) : null}
+                    <MeterBar
+                      value={item.bytes}
+                      total={total}
+                      fill={STORAGE_CATEGORY_FILLS[item.category]}
+                      className="w-24"
+                    />
+                    <span className="w-16 shrink-0 text-right font-mono text-[11px] text-main-400 tabular-nums">
+                      {storageSize(item.bytes)}
+                    </span>
+                    <span className="w-9 shrink-0 text-right font-mono text-[11px] text-main-500">
+                      {percent(item.bytes, total)}
+                    </span>
+                  </>
+                );
+                return (
+                  <li key={item.category}>
+                    {expandable ? (
+                      <button
+                        type="button"
+                        aria-expanded={open}
+                        onClick={() => storage.toggle(item.category)}
+                        className="group/row flex w-full cursor-pointer items-center gap-2 py-1.5 text-left text-[12px]"
+                      >
+                        {row}
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2 py-1.5">{row}</div>
+                    )}
+                    <Reveal show={open}>
+                      <ul className="m-0 mb-1.5 ml-4 list-none border-l border-line p-0 pl-3">
+                        {item.parts.map((part) => (
+                          <li key={part.part} className="flex items-center gap-2 py-1">
+                            <span
+                              className={`size-1.5 shrink-0 rounded-full ${STORAGE_PART_FILLS[part.part]}`}
+                            />
+                            <span className="min-w-0 flex-1 truncate text-[11.5px] text-main-400">
+                              {STORAGE_PART_LABELS[part.part]}
+                            </span>
+                            <MeterBar
+                              value={part.bytes}
+                              total={item.bytes}
+                              fill={STORAGE_PART_FILLS[part.part]}
+                              className="w-24"
+                            />
+                            <span className="w-16 shrink-0 text-right font-mono text-[11px] text-main-400 tabular-nums">
+                              {storageSize(part.bytes)}
+                            </span>
+                            <span className="w-9 shrink-0 text-right font-mono text-[11px] text-main-500">
+                              {percent(part.bytes, item.bytes)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </Reveal>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}

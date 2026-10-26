@@ -339,6 +339,7 @@ const schemas: Record<string, z.ZodType> = {
   "system/ResourceSampleDto": ResourceSampleDto,
   "system/SystemPingInput": contract["system.ping"].input,
   "storage/StorageCategory": storage.StorageCategory,
+  "storage/StoragePart": storage.StoragePart,
   "storage/StorageUsageDto": contract["storage.usage"].output,
   "storage/StorageUsageInput": contract["storage.usage"].input,
   "storage/StorageClearCacheOutput": contract["storage.clearCache"].output,

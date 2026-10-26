@@ -194,8 +194,8 @@ pub use skills::{
     SkillTriggerSettingsDto, SkillUpdateDto, UpdateSkillInput, is_skill_key, is_skill_path,
 };
 pub use storage::{
-    StorageCategory, StorageCategoryUsage, StorageClearCacheOutput, StorageUsageDto,
-    StorageUsageInput,
+    StorageCategory, StorageCategoryUsage, StorageClearCacheOutput, StoragePart, StoragePartUsage,
+    StorageUsageDto, StorageUsageInput,
 };
 pub use system::{
     DeviceGpuDto, DeviceProfileDto, DeviceTier, ResourceSampleDto, SystemDemoJobInput,

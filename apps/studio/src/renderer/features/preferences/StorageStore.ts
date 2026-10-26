@@ -1,6 +1,6 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
-import type { Contract, StorageUsageDto } from "@zvs/shared";
+import type { Contract, StorageCategory, StorageUsageDto } from "@zvs/shared";
 import { STORAGE_UNAVAILABLE, clearErrorCopy, clearedCopy } from "./storageCopy";
 
 export default class StorageStore {
@@ -9,13 +9,28 @@ export default class StorageStore {
   clearing = false;
   error: string | null = null;
   notice: string | null = null;
+  expanded = new Set<StorageCategory>();
 
   constructor(private readonly ipc: IpcClient<Contract>) {
     makeAutoObservable<StorageStore, "ipc">(this, { ipc: false }, { autoBind: true });
   }
 
   get categories() {
-    return [...(this.usage?.categories ?? [])].sort((a, b) => b.bytes - a.bytes);
+    return [...(this.usage?.categories ?? [])]
+      .sort((a, b) => b.bytes - a.bytes)
+      .map((item) => ({
+        ...item,
+        parts: [...(item.parts ?? [])].sort((a, b) => b.bytes - a.bytes),
+      }));
+  }
+
+  isExpanded(category: StorageCategory) {
+    return this.expanded.has(category);
+  }
+
+  toggle(category: StorageCategory) {
+    if (this.expanded.has(category)) this.expanded.delete(category);
+    else this.expanded.add(category);
   }
 
   async load(refresh = false) {

@@ -3,7 +3,31 @@
     "name": "total differs from the categories",
     "value": {
       "totalBytes": 10,
-      "categories": [{ "category": "cache", "bytes": 3 }],
+      "categories": [
+        {
+          "category": "cache",
+          "bytes": 3
+        }
+      ],
+      "measuredAt": 1760000000000
+    }
+  },
+  {
+    "name": "parts differ from the category",
+    "value": {
+      "totalBytes": 10,
+      "categories": [
+        {
+          "category": "downloads",
+          "bytes": 10,
+          "parts": [
+            {
+              "part": "models",
+              "bytes": 4
+            }
+          ]
+        }
+      ],
       "measuredAt": 1760000000000
     }
   },
@@ -11,7 +35,12 @@
     "name": "unknown category",
     "value": {
       "totalBytes": 1,
-      "categories": [{ "category": "models", "bytes": 1 }],
+      "categories": [
+        {
+          "category": "models",
+          "bytes": 1
+        }
+      ],
       "measuredAt": 1760000000000
     }
   },
@@ -19,7 +48,31 @@
     "name": "negative bytes",
     "value": {
       "totalBytes": -1,
-      "categories": [{ "category": "logs", "bytes": -1 }],
+      "categories": [
+        {
+          "category": "logs",
+          "bytes": -1
+        }
+      ],
+      "measuredAt": 1760000000000
+    }
+  },
+  {
+    "name": "unknown part",
+    "value": {
+      "totalBytes": 1,
+      "categories": [
+        {
+          "category": "toolchain",
+          "bytes": 1,
+          "parts": [
+            {
+              "part": "java",
+              "bytes": 1
+            }
+          ]
+        }
+      ],
       "measuredAt": 1760000000000
     }
   }

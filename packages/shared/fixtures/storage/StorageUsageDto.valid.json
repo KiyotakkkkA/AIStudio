@@ -2,18 +2,66 @@
   {
     "name": "measured",
     "value": {
-      "totalBytes": 616,
+      "totalBytes": 636,
       "categories": [
-        { "category": "conversations", "bytes": 30 },
-        { "category": "toolchain", "bytes": 317 },
-        { "category": "browser", "bytes": 254 },
-        { "category": "database", "bytes": 15 }
+        {
+          "category": "conversations",
+          "bytes": 30
+        },
+        {
+          "category": "downloads",
+          "bytes": 20,
+          "parts": [
+            {
+              "part": "models",
+              "bytes": 12
+            },
+            {
+              "part": "mcp",
+              "bytes": 5
+            },
+            {
+              "part": "other",
+              "bytes": 3
+            }
+          ]
+        },
+        {
+          "category": "toolchain",
+          "bytes": 317,
+          "parts": [
+            {
+              "part": "node",
+              "bytes": 200
+            },
+            {
+              "part": "npm",
+              "bytes": 17
+            },
+            {
+              "part": "python",
+              "bytes": 100
+            }
+          ]
+        },
+        {
+          "category": "browser",
+          "bytes": 254
+        },
+        {
+          "category": "database",
+          "bytes": 15
+        }
       ],
       "measuredAt": 1760000000000
     }
   },
   {
     "name": "nothing measured",
-    "value": { "totalBytes": 0, "categories": [], "measuredAt": 1760000000000 }
+    "value": {
+      "totalBytes": 0,
+      "categories": [],
+      "measuredAt": 1760000000000
+    }
   }
 ]

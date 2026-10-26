@@ -19,16 +19,57 @@ wire_enum!(StorageCategory {
     Database => "database",
 });
 
+wire_enum!(StoragePart {
+    Models => "models",
+    Embeddings => "embeddings",
+    Runtimes => "runtimes",
+    Mcp => "mcp",
+    Skills => "skills",
+    Node => "node",
+    Npm => "npm",
+    Uv => "uv",
+    Python => "python",
+    PythonPackages => "python-packages",
+    Other => "other",
+});
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoragePartUsage {
+    pub part: StoragePart,
+    pub bytes: u64,
+}
+
+impl Validate for StoragePartUsage {
+    fn validate(&self) -> Result<(), AppError> {
+        check::safe_integer("bytes", self.bytes)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageCategoryUsage {
     pub category: StorageCategory,
     pub bytes: u64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parts: Vec<StoragePartUsage>,
 }
 
 impl Validate for StorageCategoryUsage {
     fn validate(&self) -> Result<(), AppError> {
-        check::safe_integer("bytes", self.bytes)
+        check::safe_integer("bytes", self.bytes)?;
+        nested("parts", self.parts.validate())?;
+        if self.parts.is_empty() {
+            return Ok(());
+        }
+        let sum = self
+            .parts
+            .iter()
+            .try_fold(0_u64, |sum, usage| sum.checked_add(usage.bytes));
+        if sum != Some(self.bytes) {
+            return Err(invalid("bytes", "sum"));
+        }
+        Ok(())
     }
 }
 
@@ -108,5 +149,25 @@ mod tests {
         };
         assert!(usage(7).is_ok());
         assert!(usage(8).is_err());
+    }
+
+    #[test]
+    fn category_parts_must_match_the_category() {
+        let usage = |part: u64| {
+            parse::<StorageUsageDto>(json!({
+                "totalBytes": 10,
+                "categories": [{
+                    "category": "downloads",
+                    "bytes": 10,
+                    "parts": [
+                        { "part": "models", "bytes": 6 },
+                        { "part": "other", "bytes": part },
+                    ],
+                }],
+                "measuredAt": 1_760_000_000_000_i64,
+            }))
+        };
+        assert!(usage(4).is_ok());
+        assert!(usage(5).is_err());
     }
 }

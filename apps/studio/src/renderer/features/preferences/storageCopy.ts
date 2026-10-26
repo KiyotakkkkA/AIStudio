@@ -1,4 +1,4 @@
-import { AppErrorCode, type StorageCategory } from "@zvs/shared";
+import { AppErrorCode, type StorageCategory, type StoragePart } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 
 export const STORAGE_TITLE = "Занято на диске";
@@ -42,6 +42,34 @@ export const STORAGE_CATEGORY_FILLS: Record<StorageCategory, string> = {
   logs: "bg-warn/50",
   backups: "bg-main-400",
   database: "bg-main-500/45",
+};
+
+export const STORAGE_PART_LABELS: Record<StoragePart, string> = {
+  models: "Модели",
+  embeddings: "Модели эмбеддингов",
+  runtimes: "Движки и среды выполнения",
+  mcp: "MCP-серверы",
+  skills: "Наборы навыков",
+  node: "Node.js",
+  npm: "Пакеты npm",
+  uv: "uv",
+  python: "Python",
+  "python-packages": "Пакеты Python",
+  other: "Прочее",
+};
+
+export const STORAGE_PART_FILLS: Record<StoragePart, string> = {
+  models: "bg-accent-dark",
+  embeddings: "bg-accent-medium",
+  runtimes: "bg-accent-light",
+  mcp: "bg-info",
+  skills: "bg-info/50",
+  node: "bg-ok",
+  npm: "bg-ok/60",
+  uv: "bg-info",
+  python: "bg-info/60",
+  "python-packages": "bg-info/35",
+  other: "bg-main-500/45",
 };
 
 const BYTE_UNITS = ["Б", "КБ", "МБ", "ГБ", "ТБ"] as const;

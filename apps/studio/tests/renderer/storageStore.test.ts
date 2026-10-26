@@ -39,6 +39,36 @@ test("usage loads cached, refreshes on demand and lists the largest category fir
   expect(store.error).toBeNull();
 });
 
+test("category parts are listed largest first and expand per category", async () => {
+  const bridge = createFakeBridge<Contract>().handle("storage.usage", () => ({
+    totalBytes: 30,
+    categories: [
+      {
+        category: "downloads" as const,
+        bytes: 20,
+        parts: [
+          { part: "mcp" as const, bytes: 4 },
+          { part: "models" as const, bytes: 16 },
+        ],
+      },
+      { category: "logs" as const, bytes: 10 },
+    ],
+    measuredAt: 1_760_000_000_000,
+  }));
+  const store = new StorageStore(createIpcClient(contract, bridge));
+  await store.load();
+
+  expect(store.categories.map((item) => item.parts.map((part) => part.part))).toEqual([
+    ["models", "mcp"],
+    [],
+  ]);
+  expect(store.isExpanded("downloads")).toBe(false);
+  store.toggle("downloads");
+  expect(store.isExpanded("downloads")).toBe(true);
+  store.toggle("downloads");
+  expect(store.isExpanded("downloads")).toBe(false);
+});
+
 test("clearing the cache reports the freed space and re-measures", async () => {
   let cache = 2_621_440;
   const bridge = createFakeBridge<Contract>()
