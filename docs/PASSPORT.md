@@ -401,7 +401,11 @@ repositories.
   `RunService::record` adds the tail that has not been written yet for a live run. The chat
   appends to the message row at most every 250 ms, using SQL concatenation. Chat tool-call
   progress is a `step` event `{ domain: "tool-call", index, call }` with one call. The full
-  list stays in `message.tool_calls`.
+  list is stored one row per call in `message_tool_call (message_id, idx)`: a change rewrites
+  only that call, and reading a message assembles the list in order. An agentic session's
+  model transcript is stored the same way in `agentic_transcript (session_id, seq)`: a save
+  appends only the new entries, and the session row no longer carries it, so updates, plan
+  edits and listings do not read or rewrite the history.
 - One folder per conversation or agentic session: `<app data>/conversations/<id>/` with
   `work/` (the chat folder), `outputs/manifest.json` (created files, recorded by reference,
   never copied) and `snapshots/<runId>/` (`fs.apply` originals). A run without a conversation

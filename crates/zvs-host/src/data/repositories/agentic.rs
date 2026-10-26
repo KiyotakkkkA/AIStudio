@@ -1,7 +1,7 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::data::schema::AgenticSessionRow;
-use crate::data::schema::columns::{EnumColumn, json_text};
+use crate::data::schema::columns::{EnumColumn, json_column, json_text};
+use crate::data::schema::{AgenticSessionRow, TranscriptEntry};
 
 pub struct AgenticSessionRepository<'c> {
     connection: &'c Connection,
@@ -43,7 +43,7 @@ impl<'c> AgenticSessionRepository<'c> {
         self.connection
             .prepare_cached(&format!(
                 "INSERT INTO agentic_session ({}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, \
-                 ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+                 ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
                 AgenticSessionRow::COLUMNS
             ))?
             .execute(params![
@@ -65,7 +65,6 @@ impl<'c> AgenticSessionRepository<'c> {
                 row.pending_plan.as_ref().map(json_text).transpose()?,
                 json_text(&row.pending_instructions)?,
                 json_text(&row.changed_files)?,
-                json_text(&row.transcript)?,
                 row.run_id,
                 row.created_at,
                 row.updated_at,
@@ -80,7 +79,7 @@ impl<'c> AgenticSessionRepository<'c> {
                 "UPDATE agentic_session SET status = ?2, stop_reason = ?3, error = ?4, \
                  summary = ?5, mode = ?6, pending_mode = ?7, tools = ?8, budget = ?9, \
                  usage = ?10, plan = ?11, pending_plan = ?12, pending_instructions = ?13, \
-                 changed_files = ?14, transcript = ?15, run_id = ?16, updated_at = ?17 \
+                 changed_files = ?14, run_id = ?15, updated_at = ?16 \
                  WHERE id = ?1",
             )?
             .execute(params![
@@ -98,11 +97,38 @@ impl<'c> AgenticSessionRepository<'c> {
                 row.pending_plan.as_ref().map(json_text).transpose()?,
                 json_text(&row.pending_instructions)?,
                 json_text(&row.changed_files)?,
-                json_text(&row.transcript)?,
                 row.run_id,
                 row.updated_at,
             ])?
             > 0)
+    }
+
+    pub fn transcript(&self, id: &str) -> rusqlite::Result<Vec<TranscriptEntry>> {
+        self.connection
+            .prepare_cached(
+                "SELECT entry FROM agentic_transcript WHERE session_id = ?1 ORDER BY seq",
+            )?
+            .query_map([id], |row| json_column(row, "entry"))?
+            .collect()
+    }
+
+    pub fn append_transcript(
+        &self,
+        id: &str,
+        seq: usize,
+        entries: &[TranscriptEntry],
+    ) -> rusqlite::Result<()> {
+        let mut statement = self.connection.prepare_cached(
+            "INSERT INTO agentic_transcript (session_id, seq, entry) VALUES (?1, ?2, ?3)",
+        )?;
+        for (offset, entry) in entries.iter().enumerate() {
+            statement.execute(params![
+                id,
+                i64::try_from(seq + offset).unwrap_or(i64::MAX),
+                json_text(entry)?
+            ])?;
+        }
+        Ok(())
     }
 
     pub fn remove(&self, id: &str) -> rusqlite::Result<bool> {
@@ -145,7 +171,6 @@ mod tests {
             pending_plan: None,
             pending_instructions: Vec::new(),
             changed_files: Vec::new(),
-            transcript: Vec::new(),
             run_id: None,
             created_at: 1,
             updated_at,
@@ -175,19 +200,32 @@ mod tests {
                     id: None,
                     title: "Проверить".to_owned(),
                 }]);
-                changed.transcript = vec![TranscriptEntry {
+                let entry = |content: &str| TranscriptEntry {
                     role: "user".to_owned(),
-                    content: "Цель".to_owned(),
+                    content: content.to_owned(),
                     tool_call_id: None,
                     tool_calls: Vec::new(),
-                }];
+                };
                 assert!(repository.save(&changed)?);
                 assert_eq!(repository.get("a")?, Some(changed));
+                repository.append_transcript("a", 0, &[entry("Цель")])?;
+                repository.append_transcript("a", 1, &[entry("Шаг"), entry("Итог")])?;
+                assert_eq!(
+                    repository.transcript("a")?,
+                    [entry("Цель"), entry("Шаг"), entry("Итог")]
+                );
+                assert!(
+                    repository
+                        .append_transcript("a", 1, &[entry("Повтор")])
+                        .is_err()
+                );
+                repository.append_transcript("b", 0, &[entry("Другая")])?;
                 let order: Vec<String> = repository.list()?.into_iter().map(|row| row.id).collect();
                 assert_eq!(order, ["a", "b"]);
                 assert_eq!(repository.workspace("b")?.as_deref(), Some("C:\\work"));
                 assert!(repository.remove("b")?);
                 assert_eq!(repository.workspace("b")?, None);
+                assert!(repository.transcript("b")?.is_empty());
                 Ok(())
             })
             .expect("the repository works");

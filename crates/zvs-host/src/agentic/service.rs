@@ -236,7 +236,6 @@ impl AgenticService {
             pending_plan: None,
             pending_instructions: Vec::new(),
             changed_files: Vec::new(),
-            transcript: Vec::new(),
             run_id: None,
             created_at: now,
             updated_at: now,

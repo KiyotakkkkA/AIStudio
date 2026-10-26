@@ -46,7 +46,6 @@ pub struct AgenticSessionRow {
     pub pending_plan: Option<Vec<AgenticPlanEditDto>>,
     pub pending_instructions: Vec<String>,
     pub changed_files: Vec<AgenticChangedFileDto>,
-    pub transcript: Vec<TranscriptEntry>,
     pub run_id: Option<String>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
@@ -55,7 +54,7 @@ pub struct AgenticSessionRow {
 impl AgenticSessionRow {
     pub const COLUMNS: &str = "id, goal, status, stop_reason, error, summary, mode, pending_mode, \
                                workspace, provider_id, model_id, tools, budget, usage, plan, \
-                               pending_plan, pending_instructions, changed_files, transcript, \
+                               pending_plan, pending_instructions, changed_files, \
                                run_id, created_at, updated_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
@@ -82,7 +81,6 @@ impl AgenticSessionRow {
             pending_plan: optional_json_column(row, "pending_plan")?,
             pending_instructions: json_column(row, "pending_instructions")?,
             changed_files: json_column(row, "changed_files")?,
-            transcript: json_column(row, "transcript")?,
             run_id: row.get("run_id")?,
             created_at: row.get("created_at")?,
             updated_at: row.get("updated_at")?,

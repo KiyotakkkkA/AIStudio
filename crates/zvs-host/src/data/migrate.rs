@@ -160,6 +160,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0022_message_offered_tools",
         sql: include_str!("../../migrations/0022_message_offered_tools.sql"),
     },
+    Migration {
+        id: 23,
+        name: "0023_append_only_history",
+        sql: include_str!("../../migrations/0023_append_only_history.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -529,6 +534,48 @@ mod tests {
                 r#"["mail.send","fs.read","fs.list","fs.search","fs.apply","code.run","shell.run"]"#,
                 r#"["fs.list","fs.read","fs.search","fs.apply","code.run","shell.run"]"#,
             ]
+        );
+    }
+
+    #[test]
+    fn stored_tool_calls_and_transcripts_move_into_their_own_rows_in_order() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..22], &options(&backups, &clock)).expect("applies");
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    r#"INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, enabled_tools, created_at, updated_at) VALUES ('c1', 't', 'p', 'm', '{}', '', '[]', '[]', 1, 1);
+                    INSERT INTO message (id, conversation_id, role, content, citations, tool_calls, tokens_in, tokens_out, usage_estimated, duration_ms, partial, created_at) VALUES ('m1', 'c1', 'assistant', '', '[]', '[{"id":"a"},{"id":"b"}]', 0, 0, 1, 0, 0, 1), ('m2', 'c1', 'user', '', '[]', '[]', 0, 0, 1, 0, 0, 2);
+                    INSERT INTO agentic_session (id, goal, status, mode, workspace, provider_id, model_id, tools, budget, usage, transcript, created_at, updated_at) VALUES ('s1', 'g', 'done', 'ask', 'C:/w', 'p', 'm', '[]', '{}', '{}', '[{"role":"user","content":"x"},{"role":"assistant","content":"y"}]', 1, 1);"#,
+                )?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        assert_eq!(
+            query(
+                &database,
+                "SELECT message_id || ':' || idx || ':' || call FROM message_tool_call ORDER BY message_id, idx"
+            ),
+            [r#"m1:0:{"id":"a"}"#, r#"m1:1:{"id":"b"}"#]
+        );
+        assert_eq!(
+            query(
+                &database,
+                "SELECT session_id || ':' || seq || ':' || entry FROM agentic_transcript ORDER BY seq"
+            ),
+            [
+                r#"s1:0:{"role":"user","content":"x"}"#,
+                r#"s1:1:{"role":"assistant","content":"y"}"#
+            ]
+        );
+        assert!(
+            query(
+                &database,
+                "SELECT name FROM pragma_table_info('message') WHERE name = 'tool_calls' UNION ALL SELECT name FROM pragma_table_info('agentic_session') WHERE name = 'transcript'"
+            )
+            .is_empty()
         );
     }
 

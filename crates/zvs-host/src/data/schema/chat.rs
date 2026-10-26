@@ -73,7 +73,8 @@ pub struct MessageRow {
 
 impl MessageRow {
     pub const COLUMNS: &str = "id, conversation_id, role, content, reasoning, citations, \
-        tool_calls, selections, offered_tools, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, \
+        (SELECT json_group_array(json(call) ORDER BY idx) FROM message_tool_call \
+        WHERE message_id = message.id) AS tool_calls, selections, offered_tools, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, \
         created_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {

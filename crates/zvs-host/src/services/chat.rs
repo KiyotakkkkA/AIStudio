@@ -659,16 +659,16 @@ impl Inner {
         changed: &[usize],
     ) {
         let snapshot = calls.lock().unwrap_or_else(PoisonError::into_inner).clone();
-        if snapshot.is_empty() {
+        let saved: Vec<(usize, &ChatToolCallDto)> = changed
+            .iter()
+            .filter_map(|index| snapshot.get(*index).map(|call| (*index, call)))
+            .collect();
+        if saved.is_empty() {
             return;
         }
-        if let Err(error) = self.update_message(
-            assistant_id,
-            &MessagePatch {
-                tool_calls: Some(snapshot.clone()),
-                ..MessagePatch::default()
-            },
-        ) {
+        if let Err(error) =
+            self.read(|repositories| Ok(repositories.chat.put_tool_calls(assistant_id, &saved)?))
+        {
             self.log(
                 LogLevel::Warn,
                 "Could not save tool calls",

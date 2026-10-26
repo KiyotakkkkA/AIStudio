@@ -6,7 +6,7 @@ use zvs_contract::{
 };
 
 use super::node::{COMPLETE_TOOL, FINISH_TOOL, PLAN_TOOL};
-use crate::data::schema::AgenticSessionRow;
+use crate::data::schema::{AgenticSessionRow, TranscriptEntry};
 use crate::data::{Database, Repositories};
 use crate::platform::clock::SharedClock;
 use crate::services::chat_tools::{OfferedTool, offered_tools};
@@ -77,9 +77,27 @@ impl SessionStore {
         })
     }
 
+    pub fn transcript(&self, id: &str) -> Result<Vec<TranscriptEntry>, AppError> {
+        self.database.with_connection(|connection| {
+            Ok(Repositories::new(connection)
+                .agentic_sessions
+                .transcript(id)?)
+        })
+    }
+
     pub fn update<T>(
         &self,
         id: &str,
+        change: impl FnOnce(&mut AgenticSessionRow) -> Result<T, AppError>,
+    ) -> Result<(AgenticSessionRow, T), AppError> {
+        self.update_appending(id, 0, &[], change)
+    }
+
+    pub fn update_appending<T>(
+        &self,
+        id: &str,
+        seq: usize,
+        entries: &[TranscriptEntry],
         change: impl FnOnce(&mut AgenticSessionRow) -> Result<T, AppError>,
     ) -> Result<(AgenticSessionRow, T), AppError> {
         let now = self.clock.now();
@@ -93,6 +111,9 @@ impl SessionStore {
                 Ok(value) => {
                     row.updated_at = now;
                     repositories.agentic_sessions.save(&row)?;
+                    repositories
+                        .agentic_sessions
+                        .append_transcript(id, seq, entries)?;
                     outcome = Some(Ok(value));
                     Ok(Some(row))
                 }

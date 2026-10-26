@@ -78,7 +78,6 @@ pub struct MessagePatch {
     pub content: Option<String>,
     pub reasoning: Option<String>,
     pub citations: Option<Vec<ChatCitationDto>>,
-    pub tool_calls: Option<Vec<ChatToolCallDto>>,
     pub tokens_in: Option<i64>,
     pub tokens_out: Option<i64>,
     pub usage_estimated: Option<bool>,
@@ -98,9 +97,6 @@ impl MessagePatch {
         }
         if let Some(citations) = &self.citations {
             assignments.push(("citations", SqlValue::Text(json_text(citations)?)));
-        }
-        if let Some(calls) = &self.tool_calls {
-            assignments.push(("tool_calls", SqlValue::Text(json_text(calls)?)));
         }
         if let Some(tokens) = self.tokens_in {
             assignments.push(("tokens_in", SqlValue::Integer(tokens)));
@@ -231,32 +227,50 @@ impl<'c> ChatRepository<'c> {
 
     pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
         self.connection
-            .prepare_cached(&format!(
-                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, tool_calls, selections, offered_tools, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, created_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16) RETURNING {}",
-                MessageRow::COLUMNS
-            ))?
-            .query_row(
-                params![
-                    row.id,
-                    row.conversation_id,
-                    row.role.as_str(),
-                    row.content,
-                    row.reasoning,
-                    json_text(&row.citations)?,
-                    json_text(&row.tool_calls)?,
-                    json_text(&row.selections)?,
-                    json_text(&row.offered_tools)?,
-                    row.tokens_in,
-                    row.tokens_out,
-                    row.usage_estimated,
-                    row.duration_ms,
-                    row.run_id,
-                    row.partial,
-                    row.created_at,
-                ],
-                MessageRow::from_row,
-            )
+            .prepare_cached(
+                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, offered_tools, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            )?
+            .execute(params![
+                row.id,
+                row.conversation_id,
+                row.role.as_str(),
+                row.content,
+                row.reasoning,
+                json_text(&row.citations)?,
+                json_text(&row.selections)?,
+                json_text(&row.offered_tools)?,
+                row.tokens_in,
+                row.tokens_out,
+                row.usage_estimated,
+                row.duration_ms,
+                row.run_id,
+                row.partial,
+                row.created_at,
+            ])?;
+        let calls: Vec<(usize, &ChatToolCallDto)> = row.tool_calls.iter().enumerate().collect();
+        self.put_tool_calls(&row.id, &calls)?;
+        self.get_message(&row.id)?
+            .ok_or(rusqlite::Error::QueryReturnedNoRows)
+    }
+
+    pub fn put_tool_calls(
+        &self,
+        message_id: &str,
+        calls: &[(usize, &ChatToolCallDto)],
+    ) -> rusqlite::Result<()> {
+        let mut statement = self.connection.prepare_cached(
+            "INSERT INTO message_tool_call (message_id, idx, call) VALUES (?1, ?2, ?3) \
+             ON CONFLICT (message_id, idx) DO UPDATE SET call = excluded.call",
+        )?;
+        for (index, call) in calls {
+            statement.execute(params![
+                message_id,
+                i64::try_from(*index).unwrap_or(i64::MAX),
+                json_text(call)?
+            ])?;
+        }
+        Ok(())
     }
 
     pub fn get_message(&self, id: &str) -> rusqlite::Result<Option<MessageRow>> {
@@ -329,7 +343,7 @@ mod tests {
     use crate::data::Repositories;
     use crate::data::repositories::ProviderDraft;
     use crate::testing::temporary_database;
-    use zvs_contract::{MessageRole, ProviderCapability, ProviderKind};
+    use zvs_contract::{ChatToolCallStatus, MessageRole, ProviderCapability, ProviderKind};
 
     fn conversation(id: &str, provider_id: &str, updated_at: Timestamp) -> ConversationRow {
         ConversationRow {
@@ -480,6 +494,63 @@ mod tests {
                 chat.remove("c")?;
                 assert!(chat.messages("c")?.is_empty());
                 assert_eq!(chat.messages("other")?.len(), 1);
+                Ok(())
+            })
+            .expect("the repository works");
+    }
+
+    #[test]
+    fn tool_calls_are_written_one_at_a_time_and_read_back_in_order() {
+        let database = temporary_database();
+        database
+            .with_connection(|connection| {
+                let repositories = Repositories::new(connection);
+                let provider = repositories
+                    .providers
+                    .create(&ProviderDraft::new(
+                        ProviderKind::Ollama,
+                        "Fake",
+                        "http://localhost:11434",
+                        vec![ProviderCapability::Text],
+                        1,
+                    ))?
+                    .id;
+                let chat = repositories.chat;
+                chat.create(&conversation("c", &provider, 1))?;
+                let call = |id: &str, status: ChatToolCallStatus| ChatToolCallDto {
+                    id: id.to_owned(),
+                    key: "fs.read".to_owned(),
+                    name: "fs__read".to_owned(),
+                    round: 0,
+                    arguments: serde_json::json!({}),
+                    status,
+                    result: None,
+                    truncated: false,
+                    error: None,
+                    approval_id: None,
+                    step_id: None,
+                    duration_ms: 0,
+                    meta: None,
+                };
+                let added = chat.add_message(&MessageRow {
+                    tool_calls: vec![call("a", ChatToolCallStatus::Running)],
+                    ..message("m", "c", 1)
+                })?;
+                assert_eq!(added.tool_calls, [call("a", ChatToolCallStatus::Running)]);
+                let second = call("b", ChatToolCallStatus::Running);
+                chat.put_tool_calls("m", &[(1, &second)])?;
+                let settled = call("a", ChatToolCallStatus::Succeeded);
+                chat.put_tool_calls("m", &[(0, &settled)])?;
+                assert_eq!(
+                    chat.get_message("m")?.expect("the message").tool_calls,
+                    [settled, second]
+                );
+                chat.remove("c")?;
+                let left: i64 =
+                    connection.query_row("SELECT COUNT(*) FROM message_tool_call", [], |row| {
+                        row.get(0)
+                    })?;
+                assert_eq!(left, 0);
                 Ok(())
             })
             .expect("the repository works");

@@ -124,6 +124,8 @@ struct Progress {
     usage: AgenticUsageDto,
     changed: Vec<AgenticChangedFileDto>,
     messages: Vec<ChatMessage>,
+    saved: usize,
+    stored: usize,
     mode: AgenticPermissionMode,
 }
 
@@ -330,22 +332,29 @@ impl SessionNode {
         &self,
         context: &StepContext,
         id: &str,
-        progress: &Progress,
+        progress: &mut Progress,
         ending: Option<&Ending>,
     ) -> Result<(), AppError> {
-        let (row, ()) = self.store.update(id, |row| {
-            row.plan = progress.plan.clone();
-            row.usage = progress.usage;
-            row.changed_files = progress.changed.clone();
-            row.transcript = progress.messages.iter().map(to_entry).collect();
-            row.mode = progress.mode;
-            if let Some(ending) = ending {
-                row.status = ending.status;
-                row.stop_reason = Some(ending.reason);
-                row.summary = ending.summary.clone();
-            }
-            Ok(())
-        })?;
+        let entries: Vec<TranscriptEntry> = progress.messages[progress.saved..]
+            .iter()
+            .map(to_entry)
+            .collect();
+        let (row, ()) = self
+            .store
+            .update_appending(id, progress.stored, &entries, |row| {
+                row.plan = progress.plan.clone();
+                row.usage = progress.usage;
+                row.changed_files = progress.changed.clone();
+                row.mode = progress.mode;
+                if let Some(ending) = ending {
+                    row.status = ending.status;
+                    row.stop_reason = Some(ending.reason);
+                    row.summary = ending.summary.clone();
+                }
+                Ok(())
+            })?;
+        progress.stored += entries.len();
+        progress.saved = progress.messages.len();
         self.publish(context, &row)
     }
 
@@ -562,11 +571,15 @@ impl NodeDef for SessionNode {
         }
         let started = self.store.now();
         let base_elapsed = row.usage.elapsed_ms;
+        let transcript = self.store.transcript(&id)?;
+        let messages: Vec<ChatMessage> = transcript.iter().filter_map(from_entry).collect();
         let mut progress = Progress {
             plan: row.plan.clone(),
             usage: row.usage,
             changed: row.changed_files.clone(),
-            messages: row.transcript.iter().filter_map(from_entry).collect(),
+            saved: messages.len(),
+            stored: transcript.len(),
+            messages,
             mode: row.mode,
         };
         if progress.messages.is_empty() {
@@ -582,7 +595,7 @@ impl NodeDef for SessionNode {
             progress.usage.elapsed_ms = base_elapsed + u64::try_from(elapsed).unwrap_or(0);
             if let Some(reason) = budget_exceeded(&row.budget, &progress.usage) {
                 let ending = Ending::new(AgenticSessionStatus::Paused, reason, None);
-                self.save(context, &id, &progress, Some(&ending))?;
+                self.save(context, &id, &mut progress, Some(&ending))?;
                 return Ok(output(&ending));
             }
             let offered = self.offered(&row.tools, progress.mode)?;
@@ -612,7 +625,7 @@ impl NodeDef for SessionNode {
                     AgenticStopReason::Goal,
                     summary(&round.text),
                 );
-                self.save(context, &id, &progress, Some(&ending))?;
+                self.save(context, &id, &mut progress, Some(&ending))?;
                 return Ok(output(&ending));
             }
             let watched: Vec<(String, String)> = round
@@ -660,16 +673,16 @@ impl NodeDef for SessionNode {
                     AgenticStopReason::Goal,
                     summary,
                 );
-                self.save(context, &id, &progress, Some(&ending))?;
+                self.save(context, &id, &mut progress, Some(&ending))?;
                 return Ok(output(&ending));
             }
             if tripped {
                 let ending =
                     Ending::new(AgenticSessionStatus::Stopped, AgenticStopReason::Loop, None);
-                self.save(context, &id, &progress, Some(&ending))?;
+                self.save(context, &id, &mut progress, Some(&ending))?;
                 return Ok(output(&ending));
             }
-            self.save(context, &id, &progress, None)?;
+            self.save(context, &id, &mut progress, None)?;
         }
     }
 }
