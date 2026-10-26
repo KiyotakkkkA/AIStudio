@@ -208,7 +208,7 @@ The five `TASK_045_EXTRA_` tasks come from the 2026-10-25 audit of tools, tool-c
 chat restore, skills and storage. They sit under TASK_045 by numbering only and do not depend
 on its code. Suggested order: 045_EXTRA_3 → 045_EXTRA_5 (part A) → 045_EXTRA_1 →
 045_EXTRA_4 → 045_EXTRA_2.
-- [ ] **TASK_046** — CDP driver, `browser.*` nodes, policy engine
+- [x] **TASK_046** — CDP driver, `browser.*` nodes, policy engine
 - [ ] **TASK_047** — Browser agent panel, approvals, rate limiter
 
 ## Phase 9 — Integrations

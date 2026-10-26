@@ -1110,6 +1110,27 @@ Grants are stored per origin, not per session, and are listed and revocable in t
 and in Settings. The tiers compose with the global tool ceiling (§14): the browser can never
 exceed what Tools allows, only narrow it.
 
+> Implementation (TASK_046, 2026-10-26). `zvs-host/src/browser/`: `capability.rs` holds the
+> table and `resolve_tier`, the one place a tier is decided; submit and download resolve to
+> `ask` without looking at grants. `grants.rs` stores `browser_grant` rows (origin ×
+> `browser.click` | `browser.type`, enforced by a `CHECK`); granting any other capability is
+> refused. A node's `permission_for` passes the resolved tier as the minimum to
+> `PermissionService::admit_subject`, so the Tools page ceiling, `off` and a disabled tool still
+> win; on the Tools page navigate, click and type default to `auto` and submit and download to
+> `ask`. The four acting nodes defer approval and raise it with scope `site:<origin>` and the
+> target's role and name. The model sees elements only as opaque handles (`e12`) issued from
+> the accessibility tree and kept per tab with their origin; the driver maps a handle to a
+> backend node id and refuses it when the page's origin has changed or the node is gone.
+> `credentials.rs` decides a credential or payment field from the input type, autocomplete
+> tokens and the words in its name, id, placeholder, aria-label and labels; the driver checks
+> it before focusing and again after. A click is refused when the element, or whatever is
+> under its centre point, submits a form, or when another element covers it. Downloads are
+> cancelled by the profile unless `browser.download` armed one for that tab; the file goes to
+> the user's Downloads folder. The driver (`src-tauri/src/browser/automation.rs`) enables
+> `Page`, `DOM` and `Accessibility` on a tab's first action and drops the session with the tab.
+> It runs only four fixed functions in an isolated world (element facts, hit test, focus check,
+> form submit) and never sends `Runtime.evaluate`.
+
 ### Network recording
 
 The chrome's developer tools have one panel, Network. Recording is per tab: the host enables

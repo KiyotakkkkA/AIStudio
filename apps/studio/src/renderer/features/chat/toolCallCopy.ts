@@ -2,10 +2,12 @@ import {
   mdiAlertCircleOutline,
   mdiBookOpenPageVariantOutline,
   mdiBrain,
+  mdiCameraOutline,
   mdiCodeBraces,
   mdiCogPlayOutline,
   mdiCommentQuestionOutline,
   mdiConsoleLine,
+  mdiCursorDefaultClickOutline,
   mdiDatabaseArrowDownOutline,
   mdiDatabaseOutline,
   mdiDatabaseSearchOutline,
@@ -13,11 +15,16 @@ import {
   mdiFileDocumentEditOutline,
   mdiFileDocumentMultipleOutline,
   mdiFileFind,
+  mdiFileTreeOutline,
   mdiFolderOpenOutline,
+  mdiFormTextbox,
+  mdiMagnify,
   mdiPuzzleEditOutline,
   mdiPuzzleOutline,
   mdiScriptTextPlayOutline,
+  mdiSendOutline,
   mdiTextBoxSearchOutline,
+  mdiWeb,
   mdiWrenchOutline,
 } from "@mdi/js";
 import type { ChatToolCallDto } from "@zvs/shared";
@@ -78,6 +85,18 @@ export const TOOL_PRESENTATION: Readonly<Record<string, ToolPresentation>> = {
     category: "other",
   },
   "chat.memory": { title: "Память", icon: mdiBrain, category: "dialog" },
+  "browser.navigate": { title: "Переход по адресу", icon: mdiWeb, category: "other" },
+  "browser.read_page": { title: "Чтение страницы", icon: mdiFileTreeOutline, category: "other" },
+  "browser.screenshot": { title: "Снимок страницы", icon: mdiCameraOutline, category: "other" },
+  "browser.find": { title: "Поиск на странице", icon: mdiMagnify, category: "other" },
+  "browser.click": {
+    title: "Нажатие на элемент",
+    icon: mdiCursorDefaultClickOutline,
+    category: "other",
+  },
+  "browser.type": { title: "Ввод текста", icon: mdiFormTextbox, category: "other" },
+  "browser.submit": { title: "Отправка формы", icon: mdiSendOutline, category: "other" },
+  "browser.download": { title: "Загрузка файла", icon: mdiDownloadOutline, category: "other" },
 };
 
 const OTHER: Omit<ToolPresentation, "title"> = { icon: mdiWrenchOutline, category: "other" };

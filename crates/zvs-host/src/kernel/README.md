@@ -8,7 +8,7 @@ what they must do.
 graph with one `CancellationToken` and a per-run concurrency cap. Register node definitions in
 `NodeRegistry` before calling `recover()`. Production registers `llm.generate`,
 `vector.search`, `flow.branch`, `flow.map`, `chat.prepare`, `chat.generate` and
-`chat.persist`, plus the job, download and MCP nodes.
+`chat.persist`, plus the job, download, MCP and `browser.*` nodes.
 
 ## Graphs
 

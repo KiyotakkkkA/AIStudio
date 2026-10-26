@@ -1,4 +1,5 @@
 pub mod accounts;
+pub mod automation;
 pub mod bearer;
 pub mod cdp;
 pub mod cookies;

@@ -3,6 +3,14 @@ use std::collections::BTreeMap;
 use zvs_contract::{AppError, ToolDto, ToolSource, ToolTier};
 
 use super::registry::{ToolDescriptor, ToolRegistry};
+use crate::browser::capability::{
+    BROWSER_CLICK, BROWSER_DOWNLOAD, BROWSER_FIND, BROWSER_NAVIGATE, BROWSER_READ_PAGE,
+    BROWSER_SCREENSHOT, BROWSER_SUBMIT, BROWSER_TYPE,
+};
+use crate::browser::nodes::{
+    CLICK_DESCRIPTION, DOWNLOAD_DESCRIPTION, FIND_DESCRIPTION, NAVIGATE_DESCRIPTION,
+    READ_PAGE_DESCRIPTION, SCREENSHOT_DESCRIPTION, SUBMIT_DESCRIPTION, TYPE_DESCRIPTION,
+};
 use crate::commands::nodes::{CODE_DESCRIPTION, CODE_RUN, SHELL_DESCRIPTION, SHELL_RUN};
 use crate::files::nodes::{
     APPLY_DESCRIPTION as FS_APPLY_DESCRIPTION, FS_APPLY, FS_LIST, FS_READ, FS_SEARCH,
@@ -18,6 +26,7 @@ use crate::skills::nodes::{
 
 pub const NOT_TOOLS: &[&str] = &["llm.generate", "vector.index", "job.run", "download.fetch"];
 const ASK_BY_DEFAULT: &[&str] = &[FS_APPLY];
+const AUTO_BY_DEFAULT: &[&str] = &[BROWSER_NAVIGATE, BROWSER_CLICK, BROWSER_TYPE];
 
 struct BuiltinToolMeta {
     display_name: &'static str,
@@ -114,6 +123,70 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
             destructive: true,
         },
     ),
+    (
+        BROWSER_NAVIGATE,
+        BuiltinToolMeta {
+            display_name: "browser.navigate",
+            description: NAVIGATE_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        BROWSER_READ_PAGE,
+        BuiltinToolMeta {
+            display_name: "browser.read_page",
+            description: READ_PAGE_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        BROWSER_SCREENSHOT,
+        BuiltinToolMeta {
+            display_name: "browser.screenshot",
+            description: SCREENSHOT_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        BROWSER_FIND,
+        BuiltinToolMeta {
+            display_name: "browser.find",
+            description: FIND_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        BROWSER_CLICK,
+        BuiltinToolMeta {
+            display_name: "browser.click",
+            description: CLICK_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        BROWSER_TYPE,
+        BuiltinToolMeta {
+            display_name: "browser.type",
+            description: TYPE_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        BROWSER_SUBMIT,
+        BuiltinToolMeta {
+            display_name: "browser.submit",
+            description: SUBMIT_DESCRIPTION,
+            destructive: true,
+        },
+    ),
+    (
+        BROWSER_DOWNLOAD,
+        BuiltinToolMeta {
+            display_name: "browser.download",
+            description: DOWNLOAD_DESCRIPTION,
+            destructive: true,
+        },
+    ),
 ];
 
 pub const GRAPH_ONLY_TOOLS: &[&str] = &["vector.search", "vector.list"];
@@ -183,9 +256,15 @@ pub fn register_kernel_tools(
             input_schema: node.input_schema().clone(),
             read_only: node.side_effect_free() && previous,
             destructive: meta.is_some_and(|meta| meta.destructive),
-            tier: (meta.is_some_and(|meta| meta.destructive)
-                || ASK_BY_DEFAULT.contains(&key.as_str()))
-            .then_some(ToolTier::Ask),
+            tier: if meta.is_some_and(|meta| meta.destructive)
+                || ASK_BY_DEFAULT.contains(&key.as_str())
+            {
+                Some(ToolTier::Ask)
+            } else {
+                AUTO_BY_DEFAULT
+                    .contains(&key.as_str())
+                    .then_some(ToolTier::Auto)
+            },
             ..ToolDescriptor::new(key.clone(), ToolSource::Builtin)
         })?;
         if !order.contains(key) {

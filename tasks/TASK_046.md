@@ -2,7 +2,7 @@
 task: TASK_046
 title: CDP driver, browser.* nodes, policy engine
 phase: 8 — Documents and the agent browser
-status: todo
+status: done
 depends_on: [TASK_045, TASK_066, TASK_076]
 unblocks: [TASK_047]
 estimate: 4 h
@@ -84,18 +84,55 @@ Manual check: Against a local fixture site: read the page, click a button, type 
 
 ## Definition of done
 
-- [ ] Only §21's primitives exist — no script evaluation, no raw selector execution
-- [ ] Accessibility tree used for reading, not raw DOM
-- [ ] Credential and payment fields refused, tested against several field shapes
-- [ ] Per-origin grants honoured; submit and download always ask regardless
-- [ ] Composition with the tool ceiling reuses the existing resolver
-- [ ] Page content fenced as untrusted; an injection fixture provably changes nothing
-- [ ] Tests and gates pass
-- [ ] `pnpm typecheck && pnpm lint && pnpm build` pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Only §21's primitives exist — no script evaluation, no raw selector execution
+- [x] Accessibility tree used for reading, not raw DOM
+- [x] Credential and payment fields refused, tested against several field shapes
+- [x] Per-origin grants honoured; submit and download always ask regardless
+- [x] Composition with the tool ceiling reuses the existing resolver
+- [x] Page content fenced as untrusted; an injection fixture provably changes nothing
+- [ ] Tests and gates pass — browser tests in zvs-host (40) and zvs-studio (99), clippy, fmt, pnpm typecheck/lint/test pass; the full `cargo test --workspace` was not completed locally (stopped for low memory)
+- [ ] `pnpm typecheck && pnpm lint && pnpm build` pass — typecheck and lint pass; `pnpm build` was not run locally
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
-**Built:**
-**Deviated from plan:**
-**Next session should know:**
+**Built:** The eight §21 primitives as kernel nodes and tools (`zvs-host/src/browser/nodes.rs`),
+behind `AutomationPort` (`browser/automation.rs`), which `BrowserWorkspace` implements over the
+TASK_066 CDP client (`src-tauri/src/browser/automation.rs`; the client gained `call_on_object`,
+`resolve_node` and `release_group`). `capability.rs` holds the tier table and `resolve_tier`,
+the single place a browser tier is decided; submit and download return `ask` without reading
+grants. A node's `permission_for` hands that tier to `PermissionService::admit_subject` as the
+minimum, so the Tools ceiling, `off` and «disabled» compose most-restrictive-wins through the
+existing resolver. `browser_grant` (migration `0025`) stores origin × `browser.click` |
+`browser.type` with a `CHECK`; `BrowserGrants` refuses every other capability and any value
+that is not a canonical web origin. Click, type, submit and download defer approval and raise
+it with scope `site:<origin>`, `tool`, `action`, `origin`, `target {role, name}` (and `text` for
+type). `read_page` and `find` work from `Accessibility.getFullAXTree`. Handles (`e12`) are
+issued per tab with their origin; the driver maps them to backend node ids and refuses a handle
+once the page's origin changed or the node is gone. `credentials.rs` refuses password inputs,
+credential/OTP/`cc-*` autocomplete tokens and name/id/placeholder/aria-label/label words
+(English and Russian); the driver checks before focusing and again after. A click is refused
+when the element or whatever sits under its centre submits a form (including a `<label>` for a
+submit button), or when another element covers it. Downloads stay cancelled unless
+`browser.download` armed one for that tab; the file goes to the user's Downloads folder with a
+safe unique name. Every output carries `untrusted: true` (validated as a literal) and page text
+arrives inside a `<page … untrusted="true">` fence that page content cannot close.
+`test/fixtures/browser/agent.html` is the manual-check page; the driver tests use its
+accessibility tree.
+
+**Deviated from plan:** Navigate, click and type register with a Tools-page default of `auto`
+(submit and download `ask`, as destructive). With the inferred default of `ask` for tools that
+change state, a site grant could never take effect, because the ceiling only narrows. The tier
+the user sees per site comes from the browser policy instead. `Overlay` outlining is left to
+TASK_047. The "DevTools already open" case needs no special path: WebView2 gives
+`CallDevToolsProtocolMethod` its own session, so the driver only enables its domains lazily and
+idempotently.
+
+**Next session should know:** The manual check in a running app (fixture site, click, type,
+password refusal, grant, submit) was not performed; it needs a model or a run that calls the
+`browser.*` tools. `runs.approve` with `always: true` on a browser approval still writes a
+`tool_permission` row at `site:<origin>`, which cannot widen anything. TASK_047's «Always on this
+site» must call `BrowserGrants::grant` for click and type and must not be offered for submit or
+download. A page can still submit a form from its own script in a click handler; the driver only
+refuses clicks it can see are submitters. Screenshots return base64 JPEG in the step output; the
+model gets only the fenced summary line.

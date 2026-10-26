@@ -8,26 +8,34 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use serde_json::Value;
 use tauri::ipc::Channel;
-use tauri::webview::{NewWindowFeatures, NewWindowResponse, PermissionResponse, WebviewBuilder};
+use tauri::webview::{
+    DownloadEvent, NewWindowFeatures, NewWindowResponse, PermissionResponse, WebviewBuilder,
+};
 use tauri::window::WindowBuilder;
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Url, Webview, WebviewUrl, Window, WindowEvent,
 };
 use tauri_plugin_dialog::DialogExt;
+use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie, BrowserNetworkDetail,
-    BrowserNetworkLog, BrowserNetworkSaved, BrowserState,
+    AppError, BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie,
+    BrowserNetworkDetail, BrowserNetworkLog, BrowserNetworkSaved, BrowserState,
+};
+use zvs_host::browser::automation::{
+    DownloadedFile, NO_BROWSER_TAB, PageMatches, PageScreenshot, PageSnapshot, PageState, conflict,
 };
 use zvs_host::browser::network::{NetworkLog, har};
 use zvs_host::browser::{
-    BrowserLifecycle, BrowserLifecycleEvent, LifecycleSubscription, NetworkCapture, navigation_url,
+    AutomationPort, BrowserLifecycle, BrowserLifecycleEvent, ElementTarget, LifecycleSubscription,
+    NetworkCapture, navigation_url,
 };
 use zvs_host::platform::ids::new_id;
 use zvs_host::platform::navigation::{SharedNavigator, WorkspaceRoute};
 use zvs_host::platform::paths::utc_stamp;
 
+use crate::browser::automation::{Downloads, Session, Sessions};
 use crate::browser::bearer::{BearerTokens, request_filters};
-use crate::browser::cdp::WebviewCdp;
+use crate::browser::cdp::{DEFAULT_CALL_TIMEOUT, WebviewCdp};
 use crate::browser::cookies::{CookieMeta, cleared_domains};
 use crate::browser::model::{
     LinkTabs, Model, NO_ACTIVE_TAB, PageSignal, Rect, TAB_LIMIT_REACHED, Tab, UNKNOWN_TAB,
@@ -66,6 +74,8 @@ struct Inner {
     creating: Mutex<()>,
     sites: Mutex<HashMap<String, Webview>>,
     recorders: Mutex<HashMap<String, Arc<NetworkRecorder>>>,
+    sessions: Sessions,
+    downloads: Arc<Downloads>,
     shown: Mutex<Option<String>>,
     subscribers: Mutex<Vec<Channel<BrowserState>>>,
     work: Mutex<Sender<Work>>,
@@ -104,6 +114,12 @@ impl BrowserWorkspace {
         navigator: SharedNavigator,
     ) -> Self {
         let (sender, receiver) = mpsc::channel();
+        let download_dir = app.path().download_dir().unwrap_or_else(|_| {
+            profile.parent().map_or_else(
+                || profile.join("downloads"),
+                |browser| browser.join("downloads"),
+            )
+        });
         let workspace = Self(Arc::new(Inner {
             app,
             profile,
@@ -117,6 +133,8 @@ impl BrowserWorkspace {
             creating: Mutex::default(),
             sites: Mutex::default(),
             recorders: Mutex::default(),
+            sessions: Sessions::default(),
+            downloads: Arc::new(Downloads::new(download_dir)),
             shown: Mutex::default(),
             subscribers: Mutex::default(),
             work: Mutex::new(sender),
@@ -482,11 +500,22 @@ impl BrowserWorkspace {
 
     fn site_builder(&self, label: &str) -> WebviewBuilder<tauri::Wry> {
         let opener = Arc::downgrade(&self.0);
+        let downloads = Arc::clone(&self.0.downloads);
+        let owner = label.to_owned();
         WebviewBuilder::new(label, blank())
             .data_directory(self.0.profile.clone())
             .devtools(cfg!(debug_assertions))
             .on_navigation(|url| site::allowed_main(url.as_str()))
-            .on_download(|_, _| false)
+            .on_download(move |_, event| match event {
+                DownloadEvent::Requested { url, destination } => {
+                    downloads.requested(&owner, url.as_str(), destination)
+                }
+                DownloadEvent::Finished { path, success, .. } => {
+                    downloads.finished(&owner, path.as_deref(), success);
+                    false
+                }
+                _ => false,
+            })
             .on_permission_request(|_, _| PermissionResponse::Deny)
             .on_new_window(move |url, features| {
                 opener
@@ -616,6 +645,8 @@ impl BrowserWorkspace {
             *lock(&self.0.shown) = None;
         }
         lock(&self.0.recorders).remove(label);
+        self.0.sessions.detach(label);
+        self.0.downloads.disarm(label);
         let removed = lock(&self.0.sites).remove(label);
         if let Some(webview) = removed {
             let _ = webview.close();
@@ -705,6 +736,7 @@ impl BrowserWorkspace {
         lock(&self.0.links).clear();
         lock(&self.0.model).clear();
         lock(&self.0.recorders).clear();
+        self.0.sessions.clear();
         lock(&self.0.sites).clear();
         lock(&self.0.subscribers).clear();
         *lock(&self.0.chrome) = None;
@@ -807,6 +839,86 @@ impl NetworkCapture for BrowserWorkspace {
     async fn har(&self, tab_id: String) -> Result<Value, String> {
         let workspace = self.clone();
         off_thread(move || workspace.network_har(&tab_id)).await
+    }
+}
+
+impl BrowserWorkspace {
+    fn active_label(&self) -> Option<String> {
+        lock(&self.0.model).active().map(|tab| tab.label.clone())
+    }
+
+    fn session(&self) -> Result<(String, Arc<Session>), AppError> {
+        let label = self
+            .active_label()
+            .ok_or_else(|| conflict(NO_BROWSER_TAB))?;
+        let webview = lock(&self.0.sites)
+            .get(&label)
+            .cloned()
+            .ok_or_else(|| conflict(NO_BROWSER_TAB))?;
+        let session = self
+            .0
+            .sessions
+            .open(&label, || WebviewCdp::client(webview, DEFAULT_CALL_TIMEOUT));
+        Ok((label, session))
+    }
+}
+
+#[async_trait]
+impl AutomationPort for BrowserWorkspace {
+    fn target(&self, handle: &str) -> Option<ElementTarget> {
+        let label = self.active_label()?;
+        self.0.sessions.get(&label)?.target(handle)
+    }
+
+    async fn navigate(&self, url: &str) -> Result<PageState, AppError> {
+        let (_, session) = self.session()?;
+        session.navigate(url).await
+    }
+
+    async fn read_page(&self) -> Result<PageSnapshot, AppError> {
+        let (_, session) = self.session()?;
+        session.read_page().await
+    }
+
+    async fn screenshot(&self) -> Result<PageScreenshot, AppError> {
+        let (_, session) = self.session()?;
+        session.screenshot().await
+    }
+
+    async fn find(&self, query: &str, role: Option<&str>) -> Result<PageMatches, AppError> {
+        let (_, session) = self.session()?;
+        session.find(query, role).await
+    }
+
+    async fn click(&self, handle: &str) -> Result<PageState, AppError> {
+        let (_, session) = self.session()?;
+        session.click(handle).await
+    }
+
+    async fn type_text(
+        &self,
+        handle: &str,
+        text: &str,
+        replace: bool,
+    ) -> Result<PageState, AppError> {
+        let (_, session) = self.session()?;
+        session.type_text(handle, text, replace).await
+    }
+
+    async fn submit(&self, handle: &str) -> Result<PageState, AppError> {
+        let (_, session) = self.session()?;
+        session.submit(handle).await
+    }
+
+    async fn download(
+        &self,
+        handle: &str,
+        cancel: &CancellationToken,
+    ) -> Result<DownloadedFile, AppError> {
+        let (label, session) = self.session()?;
+        session
+            .download(handle, &self.0.downloads, &label, cancel)
+            .await
     }
 }
 

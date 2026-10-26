@@ -245,6 +245,11 @@ struct IsolatedWorld {
     execution_context_id: i64,
 }
 
+#[derive(Debug, Deserialize)]
+struct ResolvedNode {
+    object: RemoteObject,
+}
+
 #[derive(Clone)]
 pub struct CdpClient {
     transport: Arc<dyn CdpTransport>,
@@ -399,6 +404,57 @@ impl CdpClient {
             "returnByValue": true,
         });
         evaluation(self.send("Runtime.callFunctionOn", params).await?)
+    }
+
+    pub async fn call_on_object(
+        &self,
+        object_id: &str,
+        declaration: &'static str,
+        arguments: Vec<Value>,
+    ) -> Result<RemoteObject, CdpError> {
+        let arguments = arguments
+            .into_iter()
+            .map(|value| json!({ "value": value }))
+            .collect::<Vec<_>>();
+        let params = json!({
+            "functionDeclaration": declaration,
+            "objectId": object_id,
+            "arguments": arguments,
+            "returnByValue": true,
+        });
+        evaluation(self.send("Runtime.callFunctionOn", params).await?)
+    }
+
+    pub async fn resolve_node(
+        &self,
+        backend_node_id: i64,
+        context_id: i64,
+        group: &str,
+    ) -> Result<String, CdpError> {
+        let reply: ResolvedNode = decode(
+            self.send(
+                "DOM.resolveNode",
+                json!({
+                    "backendNodeId": backend_node_id,
+                    "executionContextId": context_id,
+                    "objectGroup": group,
+                }),
+            )
+            .await?,
+        )?;
+        reply
+            .object
+            .object_id
+            .ok_or_else(|| CdpError::Decode("the node has no object id".to_owned()))
+    }
+
+    pub async fn release_group(&self, group: &str) {
+        let _ = self
+            .send(
+                "Runtime.releaseObjectGroup",
+                json!({ "objectGroup": group }),
+            )
+            .await;
     }
 
     pub async fn main_frame(&self) -> Result<String, CdpError> {

@@ -18,7 +18,9 @@ use tauri_plugin_deep_link::DeepLinkExt;
 use zvs_contract::{NOTIFICATION_SCHEME, NotificationTargetDto};
 use zvs_host::agentic::{AgenticService, AgenticServiceOptions, register_agentic_nodes};
 use zvs_host::artifacts::{ArtifactStore, DASHBOARDS};
-use zvs_host::browser::{BrowserLifecycle, profile_dir};
+use zvs_host::browser::{
+    Browser as BrowserTools, BrowserGrants, BrowserLifecycle, profile_dir, register_browser_nodes,
+};
 use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::data::Repositories;
 use zvs_host::data::repositories::{ProviderFilter, SecretFilter};
@@ -878,6 +880,14 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
                 paths.cache_dir.join("code-runs"),
             )
         },
+    )?;
+    register_browser_nodes(
+        &nodes,
+        &BrowserTools::new(
+            Arc::new(workspace.clone()),
+            BrowserGrants::new(Arc::clone(&database), clock.clone()),
+            runs.approvals(),
+        ),
     )?;
     register_kernel_tools(&nodes, &tools)?;
     let agentic = AgenticService::new(AgenticServiceOptions {

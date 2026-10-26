@@ -47,6 +47,8 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 | `testing`                  | `temporary_directory`, `temporary_database`, `test_services`, `FakeCrypto`, `FakeDriver`, `FakeSessionGateway`, … |
 | `browser::policy`          | `is_web_url`, `navigation_url`, `profile_dir`, `BROWSER_PARTITION`, the heights, `TAB_LIMIT`                      |
 | `browser::lifecycle`       | `BrowserLifecycle`, `BrowserLifecycleEvent`, `LifecycleSubscription`                                              |
+| `browser::nodes`           | `browser.*` nodes over the `AutomationPort`, `Browser`, `register_browser_nodes`                                  |
+| `browser::grants`          | `BrowserGrants`: per-origin click and type grants; `capability::resolve_tier` decides every browser tier          |
 | `kernel`                   | `NodeDef`, `NodeRegistry`, `Scheduler`, `RunStream`, `StepContext`, the core and job nodes (see below)            |
 | `services::runs`           | `RunService`: start, inspect, list, retry, clear, cancel, recover, subscribe, dispose                             |
 | `services::permissions`    | `PermissionService`: grants, revocation, `admit` / `admit_subject` with `off > ask > auto`                        |
@@ -514,3 +516,9 @@ into one (`example.com` and `localhost:8123` get `https://`). The work profile i
 user-data directory `<app data>/browser/work`. `BrowserLifecycle` delivers `link-finished`,
 `link-tab-closed`, `workspace-closed` and `cookies-cleared` to subscribers; dropping the
 `LifecycleSubscription` unsubscribes.
+
+Agent automation (TASK_046) is in `browser::{capability, grants, credentials, page, automation,
+nodes}`. The `browser.*` nodes depend only on `AutomationPort`, which `BrowserWorkspace`
+implements over CDP; `page` turns an accessibility tree into the outline and the per-tab handle
+table, and `credentials::secret_field` is the field refusal the driver applies. The tiers, the
+`browser_grant` table and the approval shape are in PASSPORT §21.
