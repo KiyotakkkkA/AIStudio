@@ -3,7 +3,7 @@ name: dashboard
 description: "Создание дашборда — интерактивной HTML-страницы с показателями, графиками, таблицами и фильтрами по данным из файлов CSV, Excel, JSON, Parquet, баз SQLite, документов PDF и Word, хранилищ знаний, коннекторов и ответов API. Страница одна, работает без интернета, поддерживает светлую и тёмную тему. Используется, когда пользователь просит дашборд, панель показателей, сводку или отчёт с графиками, визуализацию данных или HTML-отчёт."
 metadata:
   display-name: Дашборды
-  version: "1.6.0"
+  version: "1.7.0"
   read-first: [references/spec.md, references/exploration.md]
   requires: { scripts/build_dashboard.py: [references/spec.md] }
   author: ZVS AI Studio

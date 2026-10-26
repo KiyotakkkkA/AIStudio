@@ -8,19 +8,19 @@
   const BAR_MAX = 24;
   const GAP = 2;
   const SEQUENTIAL = [
-    "#cde2fb",
-    "#b7d3f6",
-    "#9ec5f4",
-    "#86b6ef",
-    "#6da7ec",
-    "#5598e7",
-    "#3987e5",
-    "#2a78d6",
-    "#256abf",
-    "#1c5cab",
-    "#184f95",
-    "#104281",
-    "#0d366b",
+    "#fbf1e8",
+    "#f8e3d2",
+    "#f4d3ba",
+    "#efc2a1",
+    "#e9b088",
+    "#e29d70",
+    "#d98958",
+    "#cd7341",
+    "#c2571c",
+    "#a44818",
+    "#863b14",
+    "#692e10",
+    "#4d220c",
   ];
   const ORDINAL = SEQUENTIAL.slice(3, 11);
   const DARK_LABEL_FROM = 7;
@@ -39,7 +39,14 @@
       empty: "Нет данных для выбранных фильтров",
       from: "с",
       to: "по",
-      theme: { auto: "Тема: как в системе", light: "Тема: светлая", dark: "Тема: тёмная" },
+      theme: "Тема",
+      themes: { auto: "Авто", light: "Светлая", dark: "Тёмная" },
+      view: "Вид",
+      pickDate: "Выбрать дату",
+      prevMonth: "Предыдущий месяц",
+      nextMonth: "Следующий месяц",
+      clear: "Сбросить",
+      nothing: "Ничего не найдено",
       generated: "Сформировано",
       sources: "Источники",
       reset: "Сбросить фильтры",
@@ -62,7 +69,14 @@
       empty: "No data for the selected filters",
       from: "from",
       to: "to",
-      theme: { auto: "Theme: system", light: "Theme: light", dark: "Theme: dark" },
+      theme: "Theme",
+      themes: { auto: "Auto", light: "Light", dark: "Dark" },
+      view: "View",
+      pickDate: "Pick a date",
+      prevMonth: "Previous month",
+      nextMonth: "Next month",
+      clear: "Clear",
+      nothing: "Nothing found",
       generated: "Generated",
       sources: "Sources",
       reset: "Reset filters",
@@ -99,6 +113,466 @@
     }
     if (parent) parent.appendChild(node);
     return node;
+  }
+
+  const ICON_PATHS = {
+    chevron: "M6 9l6 6 6-6",
+    check: "M5 12.5l4.5 4.5L19 7.5",
+    search: "M11 4.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM20 20l-4.2-4.2",
+    calendar:
+      "M8 3v3M16 3v3M4 9.5h16M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z",
+    left: "M15 18l-6-6 6-6",
+    right: "M9 18l6-6-6-6",
+  };
+
+  function icon(name, size) {
+    const node = svg("svg", {
+      class: "zd-icon",
+      width: size || 14,
+      height: size || 14,
+      viewBox: "0 0 24 24",
+      "aria-hidden": "true",
+    });
+    svg("path", { d: ICON_PATHS[name] }, node);
+    return node;
+  }
+
+  function button(content, tone, size) {
+    const node = el(
+      "button",
+      `zd-btn zd-btn-${tone || "secondary"}${size === "sm" ? " zd-btn-sm" : ""}`,
+    );
+    node.type = "button";
+    if (content !== undefined && content !== null) node.append(content);
+    return node;
+  }
+
+  function segmented(options, value, label, onChange, small) {
+    const group = el("div", `zd-seg${small ? " zd-seg-sm" : ""}`);
+    group.setAttribute("role", "radiogroup");
+    group.setAttribute("aria-label", label);
+    let current = value;
+    const items = options.map((option) => {
+      const item = el("button", "zd-seg-item", option.label);
+      item.type = "button";
+      item.setAttribute("role", "radio");
+      item.addEventListener("click", () => {
+        if (option.value === current) return;
+        set(option.value);
+        onChange(option.value);
+      });
+      group.appendChild(item);
+      return item;
+    });
+    function set(next) {
+      current = next;
+      items.forEach((item, index) => {
+        const checked = options[index].value === next;
+        item.setAttribute("aria-checked", String(checked));
+        item.tabIndex = checked ? 0 : -1;
+      });
+    }
+    group.addEventListener("keydown", (event) => {
+      const index = Math.max(
+        0,
+        options.findIndex((option) => option.value === current),
+      );
+      const steps = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 };
+      let next = null;
+      if (event.key in steps) next = (index + steps[event.key] + options.length) % options.length;
+      else if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = options.length - 1;
+      if (next === null) return;
+      event.preventDefault();
+      items[next].focus();
+      items[next].click();
+    });
+    set(value);
+    return { node: group, set };
+  }
+
+  function searchField(placeholder, value, onInput, small) {
+    const field = el("div", "zd-field");
+    const input = el("input", `zd-input${small ? " zd-input-sm" : ""}`);
+    input.type = "search";
+    input.placeholder = placeholder;
+    input.value = value || "";
+    input.setAttribute("aria-label", placeholder);
+    input.addEventListener("input", () => onInput(input.value));
+    field.append(icon("search", small ? 13 : 14), input);
+    return { node: field, input };
+  }
+
+  const popover = { owner: null, close: null };
+
+  function closePopover() {
+    const close = popover.close;
+    popover.owner = null;
+    popover.close = null;
+    if (close) close();
+  }
+
+  function openPopover(owner, trigger, menu) {
+    closePopover();
+    menu.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+    delete menu.dataset.placement;
+    delete menu.dataset.align;
+    const rect = trigger.getBoundingClientRect();
+    const height = menu.offsetHeight;
+    const width = menu.offsetWidth;
+    if (rect.bottom + height + 12 > window.innerHeight && rect.top - height - 12 > 0)
+      menu.dataset.placement = "top";
+    if (rect.left + width + 8 > window.innerWidth) menu.dataset.align = "end";
+    popover.owner = owner;
+    popover.close = () => {
+      menu.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+    };
+  }
+
+  document.addEventListener("pointerdown", (event) => {
+    if (popover.owner && !popover.owner.contains(event.target)) closePopover();
+  });
+
+  let uid = 0;
+
+  function select(config) {
+    uid += 1;
+    const id = `zd-select-${uid}`;
+    const root = el("div", "zd-select");
+    const trigger = el("button", "zd-select-trigger");
+    trigger.type = "button";
+    trigger.setAttribute("aria-haspopup", "listbox");
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.setAttribute("aria-controls", id);
+    trigger.setAttribute("aria-label", config.label);
+    const shown = el("span", "zd-select-value");
+    trigger.append(shown, icon("chevron"));
+    const menu = el("div", "zd-menu");
+    menu.hidden = true;
+    const list = el("div", "zd-options");
+    list.id = id;
+    list.setAttribute("role", "listbox");
+    list.setAttribute("aria-label", config.label);
+    let value = config.value;
+    let needle = "";
+    let active = 0;
+    let visible = [];
+    let query = null;
+    if (config.options.length > 10) {
+      const box = el("div", "zd-menu-search");
+      const field = searchField(
+        state.copy.search,
+        "",
+        (text) => {
+          needle = text;
+          active = 0;
+          draw();
+        },
+        true,
+      );
+      box.appendChild(field.node);
+      menu.appendChild(box);
+      query = field.input;
+    }
+    menu.appendChild(list);
+    root.append(trigger, menu);
+
+    function labelOf(current) {
+      const found = config.options.find((option) => option.value === current);
+      return found ? found.label : "";
+    }
+
+    function sync() {
+      const text = labelOf(value);
+      shown.textContent = text || config.placeholder || "";
+      shown.dataset.empty = String(!text);
+    }
+
+    function highlight(index) {
+      active = index;
+      [...list.children].forEach((item, position) => {
+        item.dataset.active = String(position === index);
+      });
+      const node = list.children[index];
+      if (node && node.scrollIntoView) node.scrollIntoView({ block: "nearest" });
+      (query || trigger).setAttribute("aria-activedescendant", `${id}-${index}`);
+    }
+
+    function draw() {
+      const text = needle.trim().toLowerCase();
+      visible = config.options.filter(
+        (option) => !text || option.label.toLowerCase().includes(text),
+      );
+      list.replaceChildren();
+      if (visible.length === 0) {
+        list.appendChild(el("p", "zd-menu-empty", state.copy.nothing));
+        return;
+      }
+      active = Math.max(0, Math.min(active, visible.length - 1));
+      visible.forEach((option, index) => {
+        const item = el("div", "zd-option");
+        item.id = `${id}-${index}`;
+        item.setAttribute("role", "option");
+        item.setAttribute("aria-selected", String(option.value === value));
+        item.dataset.active = String(index === active);
+        item.append(el("span", "", option.label), icon("check"));
+        item.addEventListener("pointermove", () => {
+          if (active !== index) highlight(index);
+        });
+        item.addEventListener("click", () => choose(option));
+        list.appendChild(item);
+      });
+    }
+
+    function choose(option) {
+      value = option.value;
+      sync();
+      closePopover();
+      trigger.focus();
+      config.onChange(value);
+    }
+
+    function open() {
+      needle = "";
+      if (query) query.value = "";
+      active = Math.max(
+        0,
+        config.options.findIndex((option) => option.value === value),
+      );
+      draw();
+      openPopover(root, trigger, menu);
+      if (query) query.focus();
+      highlight(active);
+    }
+
+    function keys(event) {
+      if (menu.hidden) {
+        if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) {
+          event.preventDefault();
+          open();
+        }
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        highlight(Math.min(visible.length - 1, active + 1));
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        highlight(Math.max(0, active - 1));
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        if (visible[active]) choose(visible[active]);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        closePopover();
+        trigger.focus();
+      } else if (event.key === "Tab") {
+        closePopover();
+      } else if (!query && event.key.length === 1) {
+        const key = event.key.toLowerCase();
+        const count = visible.length;
+        for (let step = 1; step <= count; step += 1) {
+          const index = (active + step) % count;
+          if (visible[index].label.toLowerCase().startsWith(key)) {
+            highlight(index);
+            break;
+          }
+        }
+      }
+    }
+
+    trigger.addEventListener("click", () => {
+      if (menu.hidden) open();
+      else closePopover();
+    });
+    trigger.addEventListener("keydown", keys);
+    if (query) query.addEventListener("keydown", keys);
+    sync();
+    return {
+      node: root,
+      set(next) {
+        value = next;
+        sync();
+      },
+    };
+  }
+
+  function isoOf(date) {
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${date.getFullYear()}-${month}-${day}`;
+  }
+
+  function parseDay(text) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(text || ""));
+    return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : null;
+  }
+
+  function datePicker(config) {
+    const root = el("div", "zd-select zd-date");
+    const trigger = el("button", "zd-select-trigger");
+    trigger.type = "button";
+    trigger.setAttribute("aria-haspopup", "dialog");
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.setAttribute("aria-label", config.label);
+    const shown = el("span", "zd-select-value");
+    trigger.append(shown, icon("calendar"));
+    const menu = el("div", "zd-menu zd-calendar");
+    menu.hidden = true;
+    menu.setAttribute("role", "dialog");
+    menu.setAttribute("aria-label", config.label);
+    root.append(trigger, menu);
+    const locale = state.copy.locale;
+    const first = locale.startsWith("en") ? 0 : 1;
+    const dayFormat = new Intl.DateTimeFormat(locale, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    const monthFormat = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" });
+    const weekdayFormat = new Intl.DateTimeFormat(locale, { weekday: "short" });
+    let value = config.value || "";
+    let view = new Date();
+    let focus = isoOf(view);
+
+    function sync() {
+      const day = parseDay(value);
+      shown.textContent = day ? dayFormat.format(day) : config.placeholder || state.copy.pickDate;
+      shown.dataset.empty = String(!day);
+    }
+
+    function allowed(iso) {
+      return (!config.min || iso >= config.min) && (!config.max || iso <= config.max);
+    }
+
+    function shift(months) {
+      view = new Date(view.getFullYear(), view.getMonth() + months, 1);
+      const day = parseDay(focus);
+      const last = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+      focus = isoOf(new Date(view.getFullYear(), view.getMonth(), Math.min(day.getDate(), last)));
+      draw();
+    }
+
+    function draw() {
+      menu.replaceChildren();
+      const head = el("div", "zd-calendar-head");
+      const previous = button(icon("left"), "ghost", "sm");
+      previous.classList.add("zd-btn-icon");
+      previous.setAttribute("aria-label", state.copy.prevMonth);
+      previous.addEventListener("click", () => shift(-1));
+      const next = button(icon("right"), "ghost", "sm");
+      next.classList.add("zd-btn-icon");
+      next.setAttribute("aria-label", state.copy.nextMonth);
+      next.addEventListener("click", () => shift(1));
+      const month = monthFormat.format(view).replace(/\s*г\.$/, "");
+      head.append(
+        previous,
+        el("span", "zd-calendar-month", month.charAt(0).toUpperCase() + month.slice(1)),
+        next,
+      );
+      const grid = el("div", "zd-calendar-grid");
+      grid.setAttribute("role", "grid");
+      for (let index = 0; index < 7; index += 1) {
+        grid.appendChild(
+          el(
+            "span",
+            "zd-weekday",
+            weekdayFormat.format(new Date(2024, 0, 7 + ((first + index) % 7))),
+          ),
+        );
+      }
+      const start = new Date(view.getFullYear(), view.getMonth(), 1);
+      const offset = (start.getDay() - first + 7) % 7;
+      const today = isoOf(new Date());
+      for (let index = 0; index < 42; index += 1) {
+        const date = new Date(view.getFullYear(), view.getMonth(), 1 - offset + index);
+        const iso = isoOf(date);
+        const day = el("button", "zd-day", date.getDate());
+        day.type = "button";
+        day.dataset.iso = iso;
+        day.dataset.outside = String(date.getMonth() !== view.getMonth());
+        if (iso === today) day.dataset.today = "true";
+        day.setAttribute("aria-selected", String(iso === value));
+        day.setAttribute("aria-label", dayFormat.format(date));
+        day.disabled = !allowed(iso);
+        day.tabIndex = iso === focus ? 0 : -1;
+        day.addEventListener("click", () => pick(iso));
+        grid.appendChild(day);
+      }
+      grid.addEventListener("keydown", (event) => {
+        const steps = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+        if (!(event.key in steps)) return;
+        event.preventDefault();
+        const current = parseDay(focus);
+        const target = new Date(
+          current.getFullYear(),
+          current.getMonth(),
+          current.getDate() + steps[event.key],
+        );
+        focus = isoOf(target);
+        if (target.getMonth() !== view.getMonth() || target.getFullYear() !== view.getFullYear())
+          view = new Date(target.getFullYear(), target.getMonth(), 1);
+        draw();
+        const node = menu.querySelector(`[data-iso="${focus}"]`);
+        if (node) node.focus();
+      });
+      const foot = el("div", "zd-calendar-foot");
+      const clear = button(state.copy.clear, "ghost", "sm");
+      clear.addEventListener("click", () => pick(""));
+      foot.appendChild(clear);
+      menu.append(head, grid, foot);
+    }
+
+    function pick(iso) {
+      value = iso;
+      sync();
+      closePopover();
+      trigger.focus();
+      config.onChange(value);
+    }
+
+    function open() {
+      const today = isoOf(new Date());
+      const base =
+        parseDay(value) ||
+        parseDay(config.max && today > config.max ? config.max : "") ||
+        parseDay(config.min && today < config.min ? config.min : "") ||
+        new Date();
+      view = new Date(base.getFullYear(), base.getMonth(), 1);
+      focus = isoOf(base);
+      draw();
+      openPopover(root, trigger, menu);
+      const node = menu.querySelector(`[data-iso="${focus}"]`);
+      if (node && !node.disabled) node.focus();
+    }
+
+    trigger.addEventListener("click", () => {
+      if (menu.hidden) open();
+      else closePopover();
+    });
+    trigger.addEventListener("keydown", (event) => {
+      if (menu.hidden && event.key === "ArrowDown") {
+        event.preventDefault();
+        open();
+      }
+    });
+    menu.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closePopover();
+        trigger.focus();
+      }
+    });
+    sync();
+    return {
+      node: root,
+      set(next) {
+        value = next || "";
+        sync();
+      },
+    };
   }
 
   function color(slot) {
@@ -1678,14 +2152,16 @@
           "div",
           `zd-delta ${good === null ? "zd-flat" : good ? "zd-good" : "zd-bad"}`,
         );
-        delta.appendChild(
+        const chip = el("span", "zd-delta-chip");
+        chip.appendChild(
           el("span", "zd-delta-icon", direction === "up" ? "▲" : direction === "down" ? "▼" : "●"),
         );
         const shown =
           c.deltaMode === "absolute" || relative === null
             ? `${change > 0 ? "+" : ""}${format(change)}`
             : `${relative > 0 ? "+" : ""}${formatter("percent")(relative)}`;
-        delta.appendChild(el("span", "", shown));
+        chip.appendChild(el("span", "", shown));
+        delta.appendChild(chip);
         if (c.compareLabel) delta.appendChild(el("span", "zd-muted", c.compareLabel));
         entry.body.appendChild(delta);
       }
@@ -1782,16 +2258,12 @@
     const c = entry.c;
     entry.table = entry.table || { sort: c.sort || null, query: "", expanded: false };
     if (c.search !== false && rowsOf(c.dataset).length > 10) {
-      const search = el("input", "zd-search");
-      search.type = "search";
-      search.placeholder = state.copy.search;
-      search.value = entry.table.query;
-      search.setAttribute("aria-label", state.copy.search);
-      search.addEventListener("input", () => {
-        entry.table.query = search.value;
+      const search = searchField(state.copy.search, entry.table.query, (text) => {
+        entry.table.query = text;
         drawTable(entry, host);
       });
-      entry.body.appendChild(search);
+      search.node.classList.add("zd-search");
+      entry.body.appendChild(search.node);
     }
     const host = el("div", "zd-table-host");
     entry.body.appendChild(host);
@@ -1839,20 +2311,20 @@
     const head = table.createTHead().insertRow();
     for (const column of columns) {
       const cell = el("th", column.type === "number" ? "zd-num" : "");
-      const button = el("button", "zd-sort", column.label);
-      button.type = "button";
+      const sorter = el("button", "zd-sort", column.label);
+      sorter.type = "button";
       const active = view.sort && view.sort.field === column.field;
+      sorter.dataset.active = String(Boolean(active));
       if (active)
         cell.setAttribute("aria-sort", view.sort.dir === "asc" ? "ascending" : "descending");
-      button.appendChild(
-        el("span", "zd-sort-mark", active ? (view.sort.dir === "asc" ? " ↑" : " ↓") : ""),
-      );
-      button.addEventListener("click", () => {
+      if (active)
+        sorter.appendChild(el("span", "zd-sort-mark", view.sort.dir === "asc" ? "↑" : "↓"));
+      sorter.addEventListener("click", () => {
         const dir = active && view.sort.dir === "desc" ? "asc" : "desc";
         view.sort = { field: column.field, dir };
         drawTable(entry, host);
       });
-      cell.appendChild(button);
+      cell.appendChild(sorter);
       head.appendChild(cell);
     }
     const body = table.createTBody();
@@ -1878,8 +2350,7 @@
     if (rows.length === 0) footer.appendChild(el("span", "zd-muted", state.copy.empty));
     else footer.appendChild(el("span", "zd-muted", state.copy.shown(shown.length, rows.length)));
     if (shown.length < rows.length) {
-      const more = el("button", "zd-link", state.copy.showAll);
-      more.type = "button";
+      const more = button(state.copy.showAll, "ghost", "sm");
       more.addEventListener("click", () => {
         view.expanded = true;
         drawTable(entry, host);
@@ -1939,8 +2410,7 @@
       entry.body.replaceChildren(el("p", "zd-error", `${state.copy.failed}: ${error.message}`));
       if (window.console) console.error(error);
     }
-    if (entry.toggle)
-      entry.toggle.textContent = entry.showTable ? state.copy.chart : state.copy.table;
+    if (entry.toggle) entry.toggle.set(entry.showTable ? "table" : "chart");
   }
 
   function buildCard(c, columns) {
@@ -1961,14 +2431,22 @@
     if (c.subtitle) titles.appendChild(el("p", "zd-card-subtitle", c.subtitle));
     header.appendChild(titles);
     if (CHART_TYPES.includes(c.type)) {
-      entry.toggle = el("button", "zd-toggle", state.copy.table);
-      entry.toggle.type = "button";
-      entry.toggle.addEventListener("click", () => {
-        entry.showTable = !entry.showTable;
-        hideTip();
-        renderCard(entry);
-      });
-      header.appendChild(entry.toggle);
+      entry.toggle = segmented(
+        [
+          { value: "chart", label: state.copy.chart },
+          { value: "table", label: state.copy.table },
+        ],
+        "chart",
+        state.copy.view,
+        (mode) => {
+          entry.showTable = mode === "table";
+          hideTip();
+          renderCard(entry);
+        },
+        true,
+      );
+      entry.toggle.node.classList.add("zd-toggle");
+      header.appendChild(entry.toggle.node);
     }
     node.appendChild(header);
     entry.legend = el("div", "zd-legend");
@@ -1998,77 +2476,81 @@
     if (filters.length === 0) return;
     const bar = el("div", "zd-filters");
     bar.setAttribute("role", "group");
-    const reset = el("button", "zd-link", state.copy.reset);
-    reset.type = "button";
+    const reset = button(state.copy.reset, "ghost", "sm");
+    reset.classList.add("zd-filter-reset");
     const sync = () => {
       reset.hidden = !filters.some(filterActive);
     };
+    const changed = () => {
+      sync();
+      renderAll();
+    };
     filters.forEach((filter, index) => {
       filter.id = filter.id || `f${index}`;
-      const field = el("label", "zd-filter");
-      field.appendChild(el("span", "zd-filter-label", filter.label || filter.field));
+      const name = filter.label || filter.field;
+      const field = el("div", "zd-filter");
+      field.appendChild(el("span", "zd-filter-label", name));
+      const controls = el("div", "zd-filter-controls");
       const { list, type } = filterOptions(filter);
       if (filter.type === "dateRange") {
         const days = list
           .map(dayOf)
           .filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day))
           .sort();
-        const from = el("input", "zd-input");
-        const to = el("input", "zd-input");
-        from.type = "date";
-        to.type = "date";
-        from.setAttribute("aria-label", `${filter.label || filter.field}: ${state.copy.from}`);
-        to.setAttribute("aria-label", `${filter.label || filter.field}: ${state.copy.to}`);
-        if (days.length) {
-          for (const input of [from, to]) {
-            input.min = days[0];
-            input.max = days[days.length - 1];
-          }
-        }
+        const bounds = days.length ? { min: days[0], max: days[days.length - 1] } : {};
         const value = state.filters[filter.id] || { from: filter.from || "", to: filter.to || "" };
         state.filters[filter.id] = value;
-        from.value = value.from;
-        to.value = value.to;
-        const update = () => {
-          state.filters[filter.id] = { from: from.value, to: to.value };
-          sync();
-          renderAll();
-        };
-        from.addEventListener("change", update);
-        to.addEventListener("change", update);
-        field.append(
-          el("span", "zd-muted", state.copy.from),
-          from,
-          el("span", "zd-muted", state.copy.to),
-          to,
-        );
-        filter.inputs = [from, to];
+        const from = datePicker({
+          ...bounds,
+          value: value.from,
+          label: `${name}: ${state.copy.from}`,
+          placeholder: state.copy.from,
+          onChange: (day) => {
+            state.filters[filter.id] = { ...state.filters[filter.id], from: day };
+            changed();
+          },
+        });
+        const to = datePicker({
+          ...bounds,
+          value: value.to,
+          label: `${name}: ${state.copy.to}`,
+          placeholder: state.copy.to,
+          onChange: (day) => {
+            state.filters[filter.id] = { ...state.filters[filter.id], to: day };
+            changed();
+          },
+        });
+        controls.append(from.node, el("span", "zd-muted", "—"), to.node);
+        filter.controls = [from, to];
       } else {
-        const select = el("select", "zd-input");
-        select.appendChild(new Option(state.copy.all, ""));
         const format = formatter(
           filter.format || (type === "date" ? "date" : type === "number" ? "auto" : "text"),
         );
-        for (const value of list) select.appendChild(new Option(format(value), String(value)));
         if (!isBlank(filter.default)) state.filters[filter.id] = String(filter.default);
-        select.value = state.filters[filter.id] || "";
-        select.addEventListener("change", () => {
-          state.filters[filter.id] = select.value;
-          sync();
-          renderAll();
+        const choice = select({
+          label: name,
+          value: state.filters[filter.id] || "",
+          options: [
+            { value: "", label: state.copy.all },
+            ...list.map((value) => ({ value: String(value), label: format(value) })),
+          ],
+          onChange: (value) => {
+            state.filters[filter.id] = value;
+            changed();
+          },
         });
-        field.appendChild(select);
-        filter.inputs = [select];
+        controls.appendChild(choice.node);
+        filter.controls = [choice];
       }
+      field.appendChild(controls);
       bar.appendChild(field);
     });
     reset.addEventListener("click", () => {
       for (const filter of filters) {
         state.filters[filter.id] = filter.type === "dateRange" ? { from: "", to: "" } : "";
-        for (const input of filter.inputs) input.value = "";
+        for (const control of filter.controls) control.set("");
       }
-      sync();
-      renderAll();
+      changed();
     });
     bar.appendChild(reset);
     sync();
@@ -2103,19 +2585,22 @@
     }
     if (!THEMES.includes(mode)) mode = "auto";
     applyTheme(mode);
-    const toggle = el("button", "zd-theme", state.copy.theme[mode]);
-    toggle.type = "button";
-    toggle.addEventListener("click", () => {
-      mode = THEMES[(THEMES.indexOf(mode) + 1) % THEMES.length];
-      applyTheme(mode);
-      toggle.textContent = state.copy.theme[mode];
-      try {
-        window.localStorage.setItem("zvs-dashboard-theme", mode);
-      } catch {
-        return;
-      }
-    });
-    header.appendChild(toggle);
+    const toggle = segmented(
+      THEMES.map((theme) => ({ value: theme, label: state.copy.themes[theme] })),
+      mode,
+      state.copy.theme,
+      (next) => {
+        mode = next;
+        applyTheme(mode);
+        try {
+          window.localStorage.setItem("zvs-dashboard-theme", mode);
+        } catch {
+          return;
+        }
+      },
+    );
+    toggle.node.classList.add("zd-theme");
+    header.appendChild(toggle.node);
     root.appendChild(header);
   }
 
