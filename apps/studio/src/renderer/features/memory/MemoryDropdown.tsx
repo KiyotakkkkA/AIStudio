@@ -25,6 +25,7 @@ import {
   SOURCE_MODEL,
   SOURCE_USER,
 } from "./memoryCopy";
+import { LoadingStatus, SkeletonLines } from "../../ui/molecules/LoadingSkeleton";
 
 const TRIGGER_OPEN =
   "bg-accent-soft text-accent-medium hover:bg-accent-soft hover:text-accent-light";
@@ -122,7 +123,9 @@ function MemoryDropdown({ conversationId }: { readonly conversationId: Conversat
         )}
         <ScrollArea className="max-h-90">
           {!memory.loaded && memory.loading ? (
-            <p className="m-0 px-3 py-4 text-[12px] text-main-500">{LOADING}</p>
+            <LoadingStatus label={LOADING} className="px-3 py-4">
+              <SkeletonLines count={4} />
+            </LoadingStatus>
           ) : (
             <div className="flex flex-col pb-1.5">
               <FactSection

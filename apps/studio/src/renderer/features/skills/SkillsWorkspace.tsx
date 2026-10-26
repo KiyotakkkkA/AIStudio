@@ -37,6 +37,8 @@ import {
   updateLabel,
 } from "./skillPresentation";
 import Alert from "../../ui/molecules/Alert";
+import { PaneSkeleton } from "../../ui/organisms/PageSkeletons";
+import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function SkillsWorkspace() {
   const { skills: store } = useStore();
@@ -56,7 +58,13 @@ function SkillsWorkspace() {
       <PageHeader
         icon={mdiBookOpenOutline}
         title="Навыки"
-        subtitle={headerLine(store.skills)}
+        subtitle={
+          awaitingData(store) ? (
+            <InlineSkeleton label={PAGE_LOADING} className="w-32" />
+          ) : (
+            headerLine(store.skills)
+          )
+        }
         actions={
           <>
             {store.updatable.length === 0 ? null : (
@@ -110,7 +118,9 @@ function SkillsWorkspace() {
       <div className="flex min-h-0 flex-1">
         <SkillList store={store} />
 
-        {form === null ? (
+        {form === null && awaitingData(store) ? (
+          <PaneSkeleton />
+        ) : form === null ? (
           <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
             <EmptyState
               icon={mdiBookOpenOutline}

@@ -37,6 +37,8 @@ import { toolTitle } from "./toolCallCopy";
 import { SHOW_CONVERSATIONS } from "./conversationListCopy";
 import Alert from "../../ui/molecules/Alert";
 import PanelButton from "./PanelButton";
+import Skeleton from "../../ui/atoms/Skeleton";
+import { LoadingStatus, SkeletonLines } from "../../ui/molecules/LoadingSkeleton";
 
 export default observer(function ChatThread({ store }: { readonly store: ChatStore }) {
   const viewport = useRef<HTMLDivElement>(null);
@@ -149,9 +151,18 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
       >
         <div ref={content} className="mx-auto w-full max-w-4xl space-y-7 pb-6">
           {store.loading && (
-            <p role="status" className="text-[12px] text-main-500">
-              Загрузка диалога…
-            </p>
+            <LoadingStatus label="Загрузка диалога…" className="space-y-7">
+              <div className="flex justify-end">
+                <Skeleton rounded="xl" className="h-10 w-[46%]" />
+              </div>
+              <div className="flex gap-3">
+                <Skeleton rounded="full" className="size-7 flex-none" />
+                <SkeletonLines count={4} className="flex-1 pt-1" />
+              </div>
+              <div className="flex justify-end">
+                <Skeleton rounded="xl" className="h-10 w-[32%]" />
+              </div>
+            </LoadingStatus>
           )}
           {!store.loading && !store.active?.messages.length && !store.generating && (
             <div className="flex flex-col items-center py-20 text-center">

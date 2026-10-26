@@ -445,6 +445,19 @@ select:focus-visible,
   background: linear-gradient(90deg, transparent, var(--zvs-shimmer), transparent);
 }
 
+:root[data-motion="reduced"] .zvs-shimmer::after {
+  animation-duration: 2.8s;
+}
+
+:root[data-effects="reduced"] .zvs-shimmer::after {
+  opacity: 0.55;
+}
+
+:root[data-effects="none"] .zvs-shimmer::after {
+  animation: none;
+  opacity: 0;
+}
+
 :where(:root:not([data-motion="none"]) :is(button, a, [role="tab"])) {
   transition-property: color, background-color, border-color, box-shadow, opacity, transform;
   transition-duration: 120ms;

@@ -50,6 +50,8 @@ import {
   memoryDate,
 } from "./memoryCopy";
 import Alert from "../../ui/molecules/Alert";
+import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
+import { LoadingStatus } from "../../ui/molecules/LoadingSkeleton";
 
 type Scope = "account" | "dialog";
 
@@ -261,7 +263,13 @@ function MemoryFacts() {
     void memory.load();
   }, [memory]);
   if (!memory.loaded && memory.loading)
-    return <p className="m-0 py-6 text-[12px] text-main-500">{LOADING}</p>;
+    return (
+      <LoadingStatus label={LOADING} className="flex flex-col gap-2.5 py-6">
+        <ListRowSkeleton />
+        <ListRowSkeleton />
+        <ListRowSkeleton />
+      </LoadingStatus>
+    );
   const dialogCount = memory.dialogs.reduce((sum, group) => sum + group.memories.length, 0);
   const options = [
     {

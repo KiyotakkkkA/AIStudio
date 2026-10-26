@@ -49,6 +49,8 @@ import {
   TREE_LABEL,
 } from "./explorerCopy";
 import Alert from "../../../ui/molecules/Alert";
+import Skeleton from "../../../ui/atoms/Skeleton";
+import { InlineSkeleton, LoadingStatus } from "../../../ui/molecules/LoadingSkeleton";
 
 const MARK_STYLES = {
   created: { className: "bg-ok", label: MARK_CREATED },
@@ -102,7 +104,7 @@ const ExplorerRowView = observer(function ExplorerRowView({
         />
       </span>
       <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-      {loading ? <span className="text-[11px] text-main-500">{LOADING}</span> : null}
+      {loading ? <InlineSkeleton label={LOADING} className="w-10" /> : null}
       {markStyle === null ? null : (
         <span
           role="img"
@@ -196,9 +198,14 @@ export default observer(function ChatExplorer({ store }: { readonly store: Explo
           />
         </div>
       ) : !explorer.rootLoaded ? (
-        <p role="status" className="px-4 pt-1 text-[12px] text-main-500">
-          {LOADING}
-        </p>
+        <LoadingStatus label={LOADING} className="flex flex-col gap-2.5 px-4 pt-1">
+          {["w-[58%]", "w-[44%]", "w-[66%]", "w-[38%]", "w-[52%]"].map((width, index) => (
+            <div key={width} className={`flex items-center gap-2 ${index % 2 === 1 ? "pl-4" : ""}`}>
+              <Skeleton rounded="sm" className="size-3.5 flex-none" />
+              <Skeleton rounded="sm" className={`h-2.5 ${width}`} />
+            </div>
+          ))}
+        </LoadingStatus>
       ) : rows.length === 0 ? (
         <div className="flex flex-1 items-center justify-center px-4 pb-10">
           <EmptyState

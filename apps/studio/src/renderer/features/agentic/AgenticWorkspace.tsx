@@ -54,6 +54,8 @@ import NewSessionModal from "./NewSessionModal";
 import PlanColumn from "./PlanColumn";
 import SessionStream from "./SessionStream";
 import { planProgress, planRows, sessionPhase } from "./sessionModel";
+import { DetailSkeleton, InlineSkeleton, awaitingData } from "../../ui/molecules/LoadingSkeleton";
+import { CardListSkeleton } from "../../ui/organisms/PageSkeletons";
 
 const NewSessionButton = observer(function NewSessionButton({
   store,
@@ -85,11 +87,21 @@ const SessionList = observer(function SessionList({ store }: { readonly store: A
       <PageHeader
         icon={mdiCreationOutline}
         title={PAGE_TITLE}
-        subtitle={store.loaded ? sessionsWord(sessions.length) : LOADING}
+        subtitle={
+          !awaitingData(store) ? (
+            sessionsWord(sessions.length)
+          ) : (
+            <InlineSkeleton label={LOADING} className="w-20" />
+          )
+        }
         actions={<NewSessionButton store={store} />}
       />
       <ErrorBar store={store} />
-      {store.loaded && sessions.length === 0 ? (
+      {awaitingData(store) ? (
+        <div className="min-h-0 flex-1 px-6 py-5">
+          <CardListSkeleton label={LOADING} />
+        </div>
+      ) : store.loaded && sessions.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
             icon={mdiCreationOutline}
@@ -249,9 +261,7 @@ const SessionView = observer(function SessionView({ store }: { readonly store: A
       <SessionHeader store={store} />
       <ErrorBar store={store} />
       {store.session === null ? (
-        <div className="flex flex-1 items-center justify-center text-[12.5px] text-main-500">
-          {LOADING}
-        </div>
+        <DetailSkeleton label={LOADING} sections={3} className="flex-1 p-6" />
       ) : (
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <PlanColumn store={store} />

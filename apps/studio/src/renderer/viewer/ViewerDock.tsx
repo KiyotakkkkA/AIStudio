@@ -39,6 +39,7 @@ import {
   selectionLabel,
 } from "./viewerCopy";
 import { THREAD_MIN_WIDTH } from "./viewerModel";
+import { DocumentSkeleton } from "../ui/molecules/LoadingSkeleton";
 
 const NARROW = "(max-width: 1250px)";
 
@@ -128,11 +129,7 @@ const ViewerBody = observer(function ViewerBody({ viewer }: { readonly viewer: V
   const content = viewer.content;
   const document = viewer.document;
   if (content === null || document === null) {
-    return (
-      <p role="status" className="px-6 pt-6 text-center text-[12.5px] text-main-500">
-        {LOADING}
-      </p>
-    );
+    return <DocumentSkeleton label={LOADING} paragraphs={4} className="px-6 pt-6" />;
   }
   switch (content.type) {
     case "pdf":

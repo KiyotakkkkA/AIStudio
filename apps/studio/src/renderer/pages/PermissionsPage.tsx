@@ -19,6 +19,8 @@ import SegmentedControl from "../ui/atoms/SegmentedControl";
 import EmptyState from "../ui/molecules/EmptyState";
 import PageShell from "../ui/templates/PageShell";
 import Alert from "../ui/molecules/Alert";
+import { PaneSkeleton } from "../ui/organisms/PageSkeletons";
+import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../ui/molecules/LoadingSkeleton";
 
 const TABS = [
   { value: "folders", label: FOLDERS_TAB },
@@ -46,7 +48,13 @@ function PermissionsPage() {
       bleed={true}
       icon={mdiShieldCheckOutline}
       title={PAGE_TITLE}
-      subtitle={grantCountLabel(permissions.grants.length)}
+      subtitle={
+        awaitingData(permissions) ? (
+          <InlineSkeleton label={PAGE_LOADING} className="w-28" />
+        ) : (
+          grantCountLabel(permissions.grants.length)
+        )
+      }
       toolbar={
         <SegmentedControl
           label="Вид разрешений"
@@ -67,7 +75,9 @@ function PermissionsPage() {
       ) : (
         <div className="flex min-h-0 flex-1">
           <FolderGrantList />
-          {selected === null ? (
+          {selected === null && awaitingData(permissions) ? (
+            <PaneSkeleton />
+          ) : selected === null ? (
             <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
               <EmptyState
                 icon={mdiShieldOutline}

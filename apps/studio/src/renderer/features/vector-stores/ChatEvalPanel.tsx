@@ -5,6 +5,8 @@ import Button from "../../ui/atoms/buttons/Button";
 import SelectInput from "../../ui/atoms/SelectInput";
 import type ChatEvalStore from "./ChatEvalStore";
 import { CHAT_EVAL_MODE_LABELS } from "./ChatEvalStore";
+import Skeleton from "../../ui/atoms/Skeleton";
+import { LoadingStatus } from "../../ui/molecules/LoadingSkeleton";
 
 function percent(value: number): string {
   return `${(value * 100).toFixed(0)}%`;
@@ -38,14 +40,20 @@ function ChatEvalPanel({
       </div>
       <div className="flex flex-wrap items-center gap-2.5">
         <div className="min-w-60 flex-1">
-          <SelectInput
-            label="Модель для проверки"
-            value={chat.modelKey}
-            options={chat.models.map((model) => ({ value: model.key, label: model.label }))}
-            placeholder={chat.loaded ? "Нет доступных текстовых моделей" : "Загрузка моделей…"}
-            disabled={chat.running || chat.models.length === 0}
-            onChange={chat.setModel}
-          />
+          {chat.loaded ? (
+            <SelectInput
+              label="Модель для проверки"
+              value={chat.modelKey}
+              options={chat.models.map((model) => ({ value: model.key, label: model.label }))}
+              placeholder="Нет доступных текстовых моделей"
+              disabled={chat.running || chat.models.length === 0}
+              onChange={chat.setModel}
+            />
+          ) : (
+            <LoadingStatus label="Загрузка моделей…">
+              <Skeleton rounded="lg" className="h-9 w-full" />
+            </LoadingStatus>
+          )}
         </div>
         <Button
           tone="secondary"

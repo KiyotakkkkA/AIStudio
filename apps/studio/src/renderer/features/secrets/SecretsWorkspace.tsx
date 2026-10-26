@@ -8,6 +8,8 @@ import SecretConflictDialog from "./SecretConflictDialog";
 import SecretForm from "./SecretForm";
 import SecretList from "./SecretList";
 import Alert from "../../ui/molecules/Alert";
+import { PaneSkeleton } from "../../ui/organisms/PageSkeletons";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function SecretsWorkspace() {
   const { secrets } = useStore();
@@ -27,7 +29,9 @@ function SecretsWorkspace() {
       <div className="flex min-h-0 flex-1">
         <SecretList onSelect={secrets.requestSelect} onCreate={secrets.requestCreate} />
 
-        {secrets.form === null ? (
+        {secrets.form === null && awaitingData(secrets) ? (
+          <PaneSkeleton />
+        ) : secrets.form === null ? (
           <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
             <EmptyState
               icon={mdiKeyOutline}

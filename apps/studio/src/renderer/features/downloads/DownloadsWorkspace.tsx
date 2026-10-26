@@ -18,6 +18,8 @@ import DownloadProgressRow from "./DownloadProgressRow";
 import DownloadQueueRow from "./DownloadQueueRow";
 import { formatBytes, formatRate, SECTION_LABELS } from "./downloadPresentation";
 import Alert from "../../ui/molecules/Alert";
+import { TableSkeleton } from "../../ui/organisms/PageSkeletons";
+import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 const CatalogueEntry = observer(function CatalogueEntry({
   item,
@@ -56,12 +58,16 @@ export default observer(function DownloadsWorkspace() {
         icon={mdiTrayArrowDown}
         title="Загрузки"
         subtitle={
-          <>
-            {store.runningCount} загружается · {store.queued.length} в очереди
-            {disk === null
-              ? ""
-              : ` · занято ${formatBytes(disk.usedBytes)} из ${formatBytes(disk.totalBytes)}`}
-          </>
+          awaitingData(store) ? (
+            <InlineSkeleton label={PAGE_LOADING} className="w-56" />
+          ) : (
+            <>
+              {store.runningCount} загружается · {store.queued.length} в очереди
+              {disk === null
+                ? ""
+                : ` · занято ${formatBytes(disk.usedBytes)} из ${formatBytes(disk.totalBytes)}`}
+            </>
+          )
         }
         actions={
           <>
@@ -216,6 +222,8 @@ export default observer(function DownloadsWorkspace() {
                   }
                 />
               </div>
+            ) : awaitingData(store) ? (
+              <TableSkeleton grouped rows={9} />
             ) : store.loaded && store.visible.length === 0 ? (
               <div className="flex flex-1 items-center justify-center p-6">
                 <EmptyState

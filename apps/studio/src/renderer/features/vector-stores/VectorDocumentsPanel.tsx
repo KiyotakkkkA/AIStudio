@@ -27,6 +27,8 @@ import {
   formatThroughput,
   splitPath,
 } from "./vectorPresentation";
+import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
+import { LoadingStatus } from "../../ui/molecules/LoadingSkeleton";
 
 const DOCUMENT_ROW_HEIGHT = 52;
 const DOCUMENT_OVERSCAN = 8;
@@ -239,18 +241,20 @@ const DocumentList = observer(function DocumentList() {
   }, [viewport]);
   const busy = store.busy || store.indexing;
   const documents = store.documents;
+  if (documents.length === 0 && store.indexRun === null && store.documentsLoading)
+    return (
+      <LoadingStatus label="Загрузка документов…" className="flex flex-col gap-2.5 py-1">
+        <ListRowSkeleton />
+        <ListRowSkeleton />
+        <ListRowSkeleton />
+      </LoadingStatus>
+    );
   if (documents.length === 0)
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center">
         <EmptyState
           icon={mdiFileDocumentOutline}
-          title={
-            store.indexRun !== null
-              ? "Первый документ ещё не готов"
-              : store.documentsLoading
-                ? "Загрузка документов…"
-                : "Документов пока нет"
-          }
+          title={store.indexRun !== null ? "Первый документ ещё не готов" : "Документов пока нет"}
           description={
             store.indexRun !== null
               ? "Файл появляется в списке, когда обработаны все его фрагменты."

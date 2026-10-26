@@ -15,6 +15,8 @@ import ModelSettingsCard from "./ModelSettingsCard";
 import ProviderList from "./ProviderList";
 import { modelsWord } from "./providerPresentation";
 import Alert from "../../ui/molecules/Alert";
+import { PaneSkeleton } from "../../ui/organisms/PageSkeletons";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function ProvidersWorkspace() {
   const { providers } = useStore();
@@ -48,7 +50,9 @@ function ProvidersWorkspace() {
       <div className="flex min-h-0 flex-1">
         <ProviderList onSelect={providers.requestSelect} onCreate={providers.requestCreate} />
 
-        {form === null ? (
+        {form === null && awaitingData(providers) ? (
+          <PaneSkeleton cards={3} />
+        ) : form === null ? (
           <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
             <EmptyState
               icon={mdiLayersOutline}

@@ -5,7 +5,6 @@ import StatusDot from "../../ui/atoms/StatusDot";
 import EmptyState from "../../ui/molecules/EmptyState";
 import EntityListPanel from "../../ui/molecules/EntityListPanel";
 import ListRow from "../../ui/molecules/ListRow";
-import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import { useStore } from "../../stores/useStore";
 import {
   ALWAYS_SECTION,
@@ -18,6 +17,8 @@ import {
   boundLabel,
   lastUsedLabel,
 } from "./permissionsPresentation";
+import { ListSkeleton } from "../../ui/organisms/PageSkeletons";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function FolderGrantList() {
   const { permissions } = useStore();
@@ -67,12 +68,7 @@ function FolderGrantList() {
         onChange: permissions.setQuery,
       }}
     >
-      {permissions.loading && !permissions.loaded ? (
-        <>
-          <ListRowSkeleton />
-          <ListRowSkeleton />
-        </>
-      ) : null}
+      {awaitingData(permissions) ? <ListSkeleton /> : null}
 
       {permissions.isEmpty ? (
         <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">

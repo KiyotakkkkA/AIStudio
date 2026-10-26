@@ -5,7 +5,7 @@ import PageHeader from "../organisms/PageHeader";
 export interface PageShellProps {
   readonly icon: string;
   readonly title: string;
-  readonly subtitle?: string;
+  readonly subtitle?: ReactNode;
   readonly actions?: ReactNode;
   readonly toolbar?: ReactNode;
   readonly bleed?: boolean;

@@ -10,6 +10,8 @@ import Icon from "../../ui/atoms/Icon";
 import SelectInput from "../../ui/atoms/SelectInput";
 import EmptyState from "../../ui/molecules/EmptyState";
 import Field from "../../ui/molecules/Field";
+import Skeleton from "../../ui/atoms/Skeleton";
+import { LoadingStatus, SkeletonLines } from "../../ui/molecules/LoadingSkeleton";
 
 function VectorRelationsPanel() {
   const { vectorStores: store } = useStore();
@@ -100,16 +102,21 @@ function VectorRelationsPanel() {
             description="В хранилище меньше двух документов. Проиндексируйте источники на вкладке «Документы»."
           />
         </div>
+      ) : groups.length === 0 && graph.loading ? (
+        <LoadingStatus label="Загрузка связей…" className="flex flex-col gap-4 py-3">
+          {[0, 1, 2].map((index) => (
+            <div key={index} className="flex flex-col gap-2 border-b border-line pb-3">
+              <Skeleton rounded="sm" className="h-3 w-[48%]" />
+              <SkeletonLines count={2} />
+            </div>
+          ))}
+        </LoadingStatus>
       ) : groups.length === 0 ? (
         <div className="flex min-h-0 flex-1 items-center justify-center">
           <EmptyState
             icon={mdiGraphOutline}
-            title={graph.loading ? "Загрузка связей…" : "Связей пока нет"}
-            description={
-              graph.loading
-                ? "Загрузка таблицы связей хранилища…"
-                : "Связей нет. Добавьте связь вручную или запустите индексацию."
-            }
+            title="Связей пока нет"
+            description="Связей нет. Добавьте связь вручную или запустите индексацию."
           />
         </div>
       ) : (

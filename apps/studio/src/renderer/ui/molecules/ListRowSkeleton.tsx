@@ -1,4 +1,4 @@
-import { Skeleton } from "@kiyotakkkka/zvs-uikit-lib";
+import Skeleton from "../atoms/Skeleton";
 
 export default function ListRowSkeleton() {
   return (

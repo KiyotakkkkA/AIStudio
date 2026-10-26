@@ -12,6 +12,7 @@ import { modelsWord } from "../features/providers/providerPresentation";
 import { ACCOUNTS_TAB, PROVIDERS_TABS, TAB_LABELS } from "../features/providers/providerTabs";
 import { useStore } from "../stores/useStore";
 import PageShell from "../ui/templates/PageShell";
+import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../ui/molecules/LoadingSkeleton";
 
 function ProvidersPage() {
   const { providers, accounts } = useStore();
@@ -27,9 +28,13 @@ function ProvidersPage() {
       icon={mdiLayersOutline}
       title="AI-провайдеры"
       subtitle={
-        onAccounts
-          ? `${accountsWord(accounts.accounts.length)} привязано`
-          : `${String(providers.summaries.length)} подключений · ${modelsWord(providers.discoveredModelCount)} найдено`
+        awaitingData(onAccounts ? accounts : providers) ? (
+          <InlineSkeleton label={PAGE_LOADING} className="w-48" />
+        ) : onAccounts ? (
+          `${accountsWord(accounts.accounts.length)} привязано`
+        ) : (
+          `${String(providers.summaries.length)} подключений · ${modelsWord(providers.discoveredModelCount)} найдено`
+        )
       }
       actions={
         onAccounts ? (
@@ -71,7 +76,11 @@ function ProvidersPage() {
                 }}
               >
                 {TAB_LABELS[tab]}
-                <Chip tone={active ? "raised" : "neutral"}>{String(count)}</Chip>
+                {awaitingData(tab === ACCOUNTS_TAB ? accounts : providers) ? (
+                  <InlineSkeleton label={PAGE_LOADING} className="w-5" />
+                ) : (
+                  <Chip tone={active ? "raised" : "neutral"}>{String(count)}</Chip>
+                )}
               </button>
             );
           })}

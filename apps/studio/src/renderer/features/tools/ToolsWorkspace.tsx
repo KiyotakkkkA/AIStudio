@@ -14,6 +14,7 @@ import ToolFilterRail from "./ToolFilterRail";
 import { headerLine } from "./toolPresentation";
 import ToolTable from "./ToolTable";
 import Alert from "../../ui/molecules/Alert";
+import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function ToolsWorkspace() {
   const { tools: store } = useStore();
@@ -29,7 +30,13 @@ function ToolsWorkspace() {
       <PageHeader
         icon={mdiWrenchOutline}
         title="Инструменты"
-        subtitle={headerLine(store.tools.length, store.groups.length)}
+        subtitle={
+          awaitingData(store) ? (
+            <InlineSkeleton label={PAGE_LOADING} className="w-40" />
+          ) : (
+            headerLine(store.tools.length, store.groups.length)
+          )
+        }
         actions={
           <>
             <div className="w-57.5">

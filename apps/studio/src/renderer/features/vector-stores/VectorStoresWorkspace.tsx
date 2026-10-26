@@ -14,8 +14,9 @@ import StatusDot from "../../ui/atoms/StatusDot";
 import ListRow from "../../ui/molecules/ListRow";
 import Icon from "../../ui/atoms/Icon";
 import EmptyState from "../../ui/molecules/EmptyState";
-import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import Alert from "../../ui/molecules/Alert";
+import { ListSkeleton, PaneSkeleton } from "../../ui/organisms/PageSkeletons";
+import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function VectorStoresWorkspace() {
   const { vectorStores: store } = useStore();
@@ -27,7 +28,13 @@ function VectorStoresWorkspace() {
       bleed
       icon={mdiDatabaseOutline}
       title="Векторные хранилища"
-      subtitle={`${store.stores.length} хранилищ`}
+      subtitle={
+        awaitingData(store) ? (
+          <InlineSkeleton label={PAGE_LOADING} className="w-24" />
+        ) : (
+          `${store.stores.length} хранилищ`
+        )
+      }
       actions={
         <div className="flex flex-none items-center gap-3">
           <Button
@@ -76,12 +83,7 @@ function VectorStoresWorkspace() {
             },
           }}
         >
-          {store.loading && !store.loaded ? (
-            <>
-              <ListRowSkeleton />
-              <ListRowSkeleton />
-            </>
-          ) : null}
+          {awaitingData(store) ? <ListSkeleton /> : null}
           {store.visibleStores.map((item) => (
             <ListRow
               key={item.id}
@@ -131,7 +133,9 @@ function VectorStoresWorkspace() {
             <span className="text-[11px] text-main-400">Документы хранятся локально.</span>
           </ListRow>
         </EntityListPanel>
-        {store.form ? (
+        {!store.form && awaitingData(store) ? (
+          <PaneSkeleton cards={3} />
+        ) : store.form ? (
           <ScrollArea className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 px-4.5 py-4">
             <VectorStoreForm />
           </ScrollArea>

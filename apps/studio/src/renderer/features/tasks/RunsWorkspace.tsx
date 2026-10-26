@@ -15,6 +15,8 @@ import FilterRailButton from "../../ui/molecules/FilterRailButton";
 import { KIND_FILTER_LABELS, STATUS_LABELS, STATUS_TONES } from "./runPresentation";
 import type { RunRangeKey } from "./RunHistoryStore";
 import Alert from "../../ui/molecules/Alert";
+import { TableSkeleton } from "../../ui/organisms/PageSkeletons";
+import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 const RANGES: readonly { key: RunRangeKey; label: string }[] = [
   { key: "all", label: "За всё время" },
@@ -44,9 +46,11 @@ export default observer(function RunsWorkspace() {
         icon={mdiHistory}
         title="Запуски и логи"
         subtitle={
-          <>
-              {store.counts.total} запусков в истории
-          </>
+          awaitingData(store) ? (
+            <InlineSkeleton label={PAGE_LOADING} className="w-36" />
+          ) : (
+            <>{store.counts.total} запусков в истории</>
+          )
         }
         actions={
           <>
@@ -130,6 +134,7 @@ export default observer(function RunsWorkspace() {
 </Alert>
           )}
           <ScrollArea className="flex min-h-0 flex-1 flex-col">
+            {awaitingData(store) ? <TableSkeleton rows={10} /> : null}
             {store.runs.map((run) => (
               <RunHistoryRow
                 key={run.id}

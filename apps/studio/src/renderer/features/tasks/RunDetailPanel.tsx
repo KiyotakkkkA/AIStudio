@@ -14,9 +14,19 @@ import {
   STATUS_LABELS,
 } from "./runPresentation";
 import type RunHistoryStore from "./RunHistoryStore";
+import { DetailSkeleton, awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 export default observer(function RunDetailPanel({ store }: { readonly store: RunHistoryStore }) {
   const detail = store.detail;
+  if (detail === null && (store.loadingDetail || awaitingData(store)))
+    return (
+      <section
+        aria-label="Детали запуска"
+        className="flex w-105 flex-none flex-col border-l border-line bg-main-800 p-4"
+      >
+        <DetailSkeleton label="Загрузка запуска…" sections={3} />
+      </section>
+    );
   if (detail === null)
     return (
       <section
@@ -25,7 +35,7 @@ export default observer(function RunDetailPanel({ store }: { readonly store: Run
       >
         <EmptyState
           icon={mdiHistory}
-          title={store.loadingDetail ? "Загрузка запуска…" : "Запуск не выбран"}
+          title="Запуск не выбран"
           description="Выберите запуск, чтобы увидеть его шаги с входом, выходом и ошибками, а также журнал."
         />
       </section>

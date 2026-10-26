@@ -6,9 +6,10 @@ import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
 import EmptyState from "../../ui/molecules/EmptyState";
 import ListRow from "../../ui/molecules/ListRow";
-import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import type SkillStore from "./SkillStore";
 import { skillLine, skillTone, SOURCE_LABELS, updateLabel } from "./skillPresentation";
+import { ListSkeleton } from "../../ui/organisms/PageSkeletons";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function SkillList({ store }: { readonly store: SkillStore }) {
   const draft = store.form?.isNew === true ? store.form : null;
@@ -23,12 +24,7 @@ function SkillList({ store }: { readonly store: SkillStore }) {
         onChange: store.setQuery,
       }}
     >
-      {store.loading && store.skills.length === 0 ? (
-        <>
-          <ListRowSkeleton />
-          <ListRowSkeleton />
-        </>
-      ) : null}
+      {awaitingData(store) ? <ListSkeleton /> : null}
 
       {store.isEmpty && draft === null ? (
         <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">

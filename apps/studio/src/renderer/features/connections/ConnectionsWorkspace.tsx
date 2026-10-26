@@ -16,6 +16,8 @@ import RegistryDialog from "./RegistryDialog";
 import ServerList from "./ServerList";
 import ServerSetupCard from "./ServerSetupCard";
 import Alert from "../../ui/molecules/Alert";
+import { PaneSkeleton } from "../../ui/organisms/PageSkeletons";
+import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function ConnectionsWorkspace() {
   const { connections: store } = useStore();
@@ -31,7 +33,13 @@ function ConnectionsWorkspace() {
       <PageHeader
         icon={mdiPowerPlugOutline}
         title="Коннекторы"
-        subtitle={`MCP-серверы · ${serversWord(store.servers.length)} · ${toolsWord(store.exposedToolCount)} доступно`}
+        subtitle={
+          awaitingData(store) ? (
+            <InlineSkeleton label={PAGE_LOADING} className="w-48" />
+          ) : (
+            `MCP-серверы · ${serversWord(store.servers.length)} · ${toolsWord(store.exposedToolCount)} доступно`
+          )
+        }
         actions={
           <>
             <Button tone="secondary" onClick={store.openRegistry}>
@@ -60,7 +68,9 @@ function ConnectionsWorkspace() {
       <div className="flex min-h-0 flex-1">
         <ServerList store={store} />
 
-        {form === null ? (
+        {form === null && awaitingData(store) ? (
+          <PaneSkeleton />
+        ) : form === null ? (
           <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
             <EmptyState
               icon={mdiPowerPlugOutline}

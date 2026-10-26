@@ -28,6 +28,7 @@ import {
   modifiedLabel,
 } from "./explorerCopy";
 import Alert from "../../../ui/molecules/Alert";
+import { DocumentSkeleton } from "../../../ui/molecules/LoadingSkeleton";
 
 type Mode = "preview" | "text";
 
@@ -156,9 +157,7 @@ export default observer(function ExplorerFileView({
       >
         {file === null ? (
           explorer.fileLoading ? (
-            <p role="status" className="px-4 pt-3 text-[12px] text-main-500">
-              {FILE_LOADING}
-            </p>
+            <DocumentSkeleton label={FILE_LOADING} className="px-4 pt-3" />
           ) : explorer.fileError !== null ? (
             <div className="flex flex-1 items-center justify-center">
               <EmptyState

@@ -11,6 +11,8 @@ import TaskDetailRail from "./TaskDetailRail";
 import TaskFilterRail from "./TaskFilterRail";
 import TaskRow from "./TaskRow";
 import Alert from "../../ui/molecules/Alert";
+import { TableSkeleton } from "../../ui/organisms/PageSkeletons";
+import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 const GROUP_TITLES = {
   running: "Выполняется",
@@ -38,10 +40,14 @@ export default observer(function TasksWorkspace() {
         icon={mdiClockOutline}
         title="Задачи"
         subtitle={
+          awaitingData(store) ? (
+            <InlineSkeleton label={PAGE_LOADING} className="w-56" />
+          ) : (
           <>
               {byStatus.running} выполняется · {byStatus.queued} в очереди · {byStatus.blocked} ждут
               решения
           </>
+          )
         }
         actions={
           <>
@@ -96,6 +102,7 @@ export default observer(function TasksWorkspace() {
 </Alert>
           )}
           <ScrollArea className="flex min-h-0 flex-1 flex-col">
+            {awaitingData(store) ? <TableSkeleton grouped rows={7} /> : null}
             {sections.map((group) => (
               <section key={group}>
                 <div className="flex items-center gap-2.5 border-b border-line bg-main-850 px-5 py-2">

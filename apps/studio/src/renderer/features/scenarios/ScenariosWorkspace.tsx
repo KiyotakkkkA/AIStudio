@@ -18,6 +18,13 @@ import ScenarioCanvas from "./ScenarioCanvas";
 import type ScenarioEditor from "./ScenarioEditor";
 import type ScenarioStore from "./ScenarioStore";
 import { issuesWord, savedAtLabel, scenariosWord } from "./scenarioCopy";
+import {
+  DetailSkeleton,
+  InlineSkeleton,
+  PAGE_LOADING,
+  awaitingData,
+} from "../../ui/molecules/LoadingSkeleton";
+import { CardListSkeleton } from "../../ui/organisms/PageSkeletons";
 
 function Banner({
   tone,
@@ -182,9 +189,7 @@ const EditorView = observer(function EditorView({
         </Banner>
       )}
       {!editor.loaded ? (
-        <div className="flex flex-1 items-center justify-center text-[12.5px] text-main-500">
-          Загрузка сценария…
-        </div>
+        <DetailSkeleton label="Загрузка сценария…" className="flex-1 p-6" />
       ) : editor.scenario === null ? null : (
         <div className="mt-3 flex min-h-0 flex-1 flex-col border-t border-line">
           <div className="flex min-h-0 flex-1">
@@ -214,7 +219,13 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
       <PageHeader
         icon={mdiGraphOutline}
         title="Сценарии"
-        subtitle={store.loaded ? scenariosWord(store.scenarios.length) : "Загрузка…"}
+        subtitle={
+          awaitingData(store) ? (
+            <InlineSkeleton label={PAGE_LOADING} className="w-24" />
+          ) : (
+            scenariosWord(store.scenarios.length)
+          )
+        }
         actions={
           <Button tone="primary" disabled={store.creating} onClick={() => void store.create()}>
             <Icon path={mdiPlus} size={15} />
@@ -234,7 +245,11 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
           {store.error}
         </Banner>
       )}
-      {store.isEmpty ? (
+      {awaitingData(store) ? (
+        <div className="min-h-0 flex-1 px-6 py-5">
+          <CardListSkeleton />
+        </div>
+      ) : store.isEmpty ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
             icon={mdiGraphOutline}

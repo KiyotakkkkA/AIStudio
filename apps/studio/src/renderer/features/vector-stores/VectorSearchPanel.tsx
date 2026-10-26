@@ -9,6 +9,7 @@ import Toggle from "../../ui/atoms/Toggle";
 import SelectInput from "../../ui/atoms/SelectInput";
 import { IconFloatingButton } from "../../ui/atoms/buttons/IconFloatingButton";
 import EmptyState from "../../ui/molecules/EmptyState";
+import { InlineSkeleton } from "../../ui/molecules/LoadingSkeleton";
 
 function VectorSearchPanel() {
   const { vectorStores: store } = useStore();
@@ -213,11 +214,13 @@ function VectorSearchPanel() {
                     }
                     onClick={() => void store.toggleNeighbours(row.id)}
                   >
-                    {store.neighbours.has(row.id)
-                      ? "Скрыть соседние"
-                      : store.neighboursLoading === row.id
-                        ? "Загрузка…"
-                        : "Соседние фрагменты"}
+                    {store.neighbours.has(row.id) ? (
+                      "Скрыть соседние"
+                    ) : store.neighboursLoading === row.id ? (
+                      <InlineSkeleton label="Загрузка…" className="w-24" />
+                    ) : (
+                      "Соседние фрагменты"
+                    )}
                   </button>
                 </div>
                 {store

@@ -6,7 +6,6 @@ import type { AccountFamily } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import EmptyState from "../../ui/molecules/EmptyState";
-import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import { useAppNavigation } from "../../hooks/useAppNavigation";
 import { ROUTES } from "../../app/routes";
 import { useStore } from "../../stores/useStore";
@@ -14,6 +13,8 @@ import AccountCard from "./AccountCard";
 import AccountLoginMenu from "./AccountLoginMenu";
 import { adapterLabel, secondsLeftLabel } from "./accountPresentation";
 import Alert from "../../ui/molecules/Alert";
+import { ListSkeleton } from "../../ui/organisms/PageSkeletons";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function AccountsTab() {
   const { accounts } = useStore();
@@ -104,12 +105,7 @@ function AccountsTab() {
       )}
 
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 pr-0.5">
-        {accounts.loading && accounts.accounts.length === 0 ? (
-          <>
-            <ListRowSkeleton />
-            <ListRowSkeleton />
-          </>
-        ) : null}
+        {awaitingData(accounts) ? <ListSkeleton rows={3} /> : null}
 
         {accounts.isEmpty ? (
           <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">

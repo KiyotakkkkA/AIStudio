@@ -18,6 +18,8 @@ import {
   STATUS_LABELS,
 } from "./runPresentation";
 import type TaskStore from "./TaskStore";
+import { RailSkeleton } from "../../ui/organisms/PageSkeletons";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 export default observer(function TaskDetailRail({ store }: { readonly store: TaskStore }) {
   const navigate = useNavigate();
@@ -27,7 +29,9 @@ export default observer(function TaskDetailRail({ store }: { readonly store: Tas
       aria-label="Детали запуска"
       className="flex w-80 flex-none flex-col border-l border-line bg-main-800"
     >
-      {run === null ? (
+      {run === null && awaitingData(store) ? (
+        <RailSkeleton />
+      ) : run === null ? (
         <div className="flex flex-1 items-center justify-center p-4">
           <EmptyState
             icon={mdiHistory}

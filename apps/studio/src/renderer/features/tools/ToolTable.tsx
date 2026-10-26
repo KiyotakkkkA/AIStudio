@@ -3,7 +3,6 @@ import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Chip from "../../ui/atoms/Chip";
 import EmptyState from "../../ui/molecules/EmptyState";
-import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import { effectiveTier } from "./toolFilters";
 import type ToolStore from "./ToolStore";
 import {
@@ -13,6 +12,8 @@ import {
   TIER_LABELS,
   TIER_TEXT,
 } from "./toolPresentation";
+import { TableSkeleton } from "../../ui/organisms/PageSkeletons";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 const HEAD = "text-[10px] font-semibold tracking-[0.07em] text-main-500 uppercase";
 
@@ -29,12 +30,8 @@ function ToolTable({ store }: { readonly store: ToolStore }) {
         <span className={`w-19 flex-none text-right ${HEAD}`}>Вызывался</span>
       </div>
 
-      {store.loading && store.tools.length === 0 ? (
-        <div className="flex flex-col gap-2 p-3">
-          <ListRowSkeleton />
-          <ListRowSkeleton />
-          <ListRowSkeleton />
-        </div>
+      {awaitingData(store) ? (
+        <TableSkeleton rows={10} columns={3} />
       ) : store.isEmpty ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState

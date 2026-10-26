@@ -6,10 +6,11 @@ import Icon from "../../ui/atoms/Icon";
 import EmptyState from "../../ui/molecules/EmptyState";
 import EntityListPanel from "../../ui/molecules/EntityListPanel";
 import ListRow from "../../ui/molecules/ListRow";
-import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import { useStore } from "../../stores/useStore";
 import SecretListItem from "./SecretListItem";
 import { SCOPE_FILTERS, type ScopeFilter } from "./SecretStore";
+import { ListSkeleton } from "../../ui/organisms/PageSkeletons";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 const FILTER_LABELS: Record<ScopeFilter, string> = {
   all: "Все",
@@ -48,13 +49,7 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
         </Chip>
       ))}
     >
-      {secrets.loading && secrets.summaries.length === 0 ? (
-        <>
-          <ListRowSkeleton />
-          <ListRowSkeleton />
-          <ListRowSkeleton />
-        </>
-      ) : null}
+      {awaitingData(secrets) ? <ListSkeleton /> : null}
 
       {secrets.isEmpty ? (
         <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">

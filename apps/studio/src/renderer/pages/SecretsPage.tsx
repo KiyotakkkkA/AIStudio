@@ -7,6 +7,7 @@ import { useStore } from "../stores/useStore";
 import EmptyState from "../ui/molecules/EmptyState";
 import PageShell from "../ui/templates/PageShell";
 import SegmentedControl from "../ui/atoms/SegmentedControl";
+import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../ui/molecules/LoadingSkeleton";
 
 const TABS = [
   { value: "secrets", label: "Секреты" },
@@ -24,7 +25,13 @@ function SecretsPage() {
       bleed={tab === "secrets"}
       icon={mdiKeyOutline}
       title="Секреты"
-      subtitle={`${String(secrets.total)} секретов`}
+      subtitle={
+        awaitingData(secrets) ? (
+          <InlineSkeleton label={PAGE_LOADING} className="w-24" />
+        ) : (
+          `${String(secrets.total)} секретов`
+        )
+      }
       actions={<SecretsHeaderActions />}
       toolbar={
         <SegmentedControl

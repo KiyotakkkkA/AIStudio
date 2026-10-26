@@ -37,6 +37,7 @@ import type AgenticStore from "./AgenticStore";
 import SessionArtifacts from "./SessionArtifacts";
 import { splitArtifacts, streamBlocks, type SessionApproval } from "./sessionModel";
 import { callOf } from "./toolCardModel";
+import { LoadingStatus, SkeletonLines } from "../../ui/molecules/LoadingSkeleton";
 
 function Eyebrow({ children }: { readonly children: string }) {
   return (
@@ -275,9 +276,9 @@ export default observer(function SessionStream({ store }: { readonly store: Agen
             </p>
           </div>
           {!store.streamLoaded ? (
-            <p role="status" className="m-0 text-[12px] text-main-500">
-              {LOADING}
-            </p>
+            <LoadingStatus label={LOADING}>
+              <SkeletonLines count={3} />
+            </LoadingStatus>
           ) : null}
           {streamBlocks(entries).map((entry) =>
             entry.kind === "instruction" ? (

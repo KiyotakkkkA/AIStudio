@@ -6,7 +6,6 @@ import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
 import EmptyState from "../../ui/molecules/EmptyState";
 import ListRow from "../../ui/molecules/ListRow";
-import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import { useStore } from "../../stores/useStore";
 import {
   CAPABILITY_LIST_HEADINGS,
@@ -14,6 +13,8 @@ import {
   statusTone,
   summaryLine,
 } from "./providerPresentation";
+import { ListSkeleton } from "../../ui/organisms/PageSkeletons";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 interface ProviderListProps {
   readonly onSelect: (id: ProviderId) => void;
@@ -33,12 +34,7 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
         onChange: providers.setListQuery,
       }}
     >
-      {providers.loading && providers.summaries.length === 0 ? (
-        <>
-          <ListRowSkeleton />
-          <ListRowSkeleton />
-        </>
-      ) : null}
+      {awaitingData(providers) ? <ListSkeleton /> : null}
 
       {providers.isEmpty ? (
         <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">

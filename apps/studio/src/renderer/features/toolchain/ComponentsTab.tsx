@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import { useStore } from "../../stores/useStore";
 import ToolchainCard from "./ToolchainCard";
 import type { ToolchainAction } from "./toolchainPresentation";
+import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
+import { LoadingStatus } from "../../ui/molecules/LoadingSkeleton";
 
 function ComponentsTab() {
   const { toolchain } = useStore();
@@ -19,7 +21,12 @@ function ComponentsTab() {
           {toolchain.error}
         </p>
       )}
-      {toolchain.loading ? <p className="m-0 text-[12px] text-main-400">Загрузка…</p> : null}
+      {toolchain.loading && toolchain.ordered.length === 0 ? (
+        <LoadingStatus label="Загрузка…" className="grid gap-3 lg:grid-cols-2">
+          <ListRowSkeleton />
+          <ListRowSkeleton />
+        </LoadingStatus>
+      ) : null}
       <div className="grid gap-3 lg:grid-cols-2">
         {toolchain.ordered.map((dto) => (
           <ToolchainCard

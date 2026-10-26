@@ -9,6 +9,7 @@ import type { SkillFormVm } from "./SkillFormVm";
 import type SkillStore from "./SkillStore";
 import { formatSize } from "./skillPresentation";
 import Alert from "../../ui/molecules/Alert";
+import { DocumentSkeleton } from "../../ui/molecules/LoadingSkeleton";
 
 const LANGUAGES: Record<string, string> = {
   py: "python",
@@ -65,7 +66,7 @@ function SkillFileView({ store, vm }: { readonly store: SkillStore; readonly vm:
             />
           </div>
         ) : store.fileLoading || file === null ? (
-          <span className="text-[12px] text-main-500">Загрузка файла…</span>
+          <DocumentSkeleton label="Загрузка файла…" className="pt-1" />
         ) : file.text === null ? (
           <div className="flex flex-1 items-center justify-center">
             <EmptyState

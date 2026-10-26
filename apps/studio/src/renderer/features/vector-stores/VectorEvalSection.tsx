@@ -10,6 +10,7 @@ import SelectInput from "../../ui/atoms/SelectInput";
 import TextInput from "../../ui/atoms/TextInput";
 import ChatEvalPanel from "./ChatEvalPanel";
 import { EVAL_MODE_LABELS, evalCaseRows, evalMetricRows } from "./evalRows";
+import { LoadingStatus, SkeletonLines } from "../../ui/molecules/LoadingSkeleton";
 
 const EYEBROW = "text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase";
 
@@ -91,10 +92,12 @@ function VectorEvalSection() {
               </div>
             ) : null}
           </form>
-          {cases.length === 0 ? (
-            <p className="text-[12px] text-main-500">
-              {evaluation.loading ? "Загрузка вопросов…" : "Вопросов пока нет."}
-            </p>
+          {cases.length === 0 && evaluation.loading ? (
+            <LoadingStatus label="Загрузка вопросов…">
+              <SkeletonLines count={3} />
+            </LoadingStatus>
+          ) : cases.length === 0 ? (
+            <p className="text-[12px] text-main-500">Вопросов пока нет.</p>
           ) : (
             <ul className="m-0 flex list-none flex-col divide-y divide-line border-y border-line p-0">
               {cases.map((row) => (

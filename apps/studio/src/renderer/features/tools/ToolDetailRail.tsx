@@ -11,6 +11,8 @@ import EmptyState from "../../ui/molecules/EmptyState";
 import SchemaView from "./SchemaView";
 import type ToolStore from "./ToolStore";
 import { sourceLabel } from "./toolPresentation";
+import { LoadingStatus, SkeletonLines, awaitingData } from "../../ui/molecules/LoadingSkeleton";
+import { RailSkeleton } from "../../ui/organisms/PageSkeletons";
 
 const TIER_OPTIONS: readonly { value: ToolTier; label: string }[] = [
   { value: "auto", label: "auto" },
@@ -32,7 +34,9 @@ function ToolDetailRail({ store }: { readonly store: ToolStore }) {
       aria-label="Инструмент"
       className="flex min-h-0 w-85 flex-none flex-col border-l border-line bg-main-800"
     >
-      {tool === null || tier === null ? (
+      {(tool === null || tier === null) && awaitingData(store) ? (
+        <RailSkeleton />
+      ) : tool === null || tier === null ? (
         <div className="flex flex-1 items-center justify-center p-4">
           <EmptyState
             icon={mdiWrenchOutline}
@@ -107,7 +111,9 @@ function ToolDetailRail({ store }: { readonly store: ToolStore }) {
 
           <h3 className={`m-0 mt-0.5 ${SECTION}`}>Используется в</h3>
           {references === null ? (
-            <span className="text-[12px] text-main-500">Загрузка…</span>
+            <LoadingStatus label="Загрузка…">
+              <SkeletonLines count={2} />
+            </LoadingStatus>
           ) : references.length === 0 ? (
             <span className="text-[12px] text-main-500">
               Ни один сценарий не ссылается на инструмент.

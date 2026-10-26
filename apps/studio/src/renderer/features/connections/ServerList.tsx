@@ -7,9 +7,10 @@ import StatusDot from "../../ui/atoms/StatusDot";
 import { STATUS_TONE_TEXT } from "../../ui/atoms/statusTone";
 import EmptyState from "../../ui/molecules/EmptyState";
 import ListRow from "../../ui/molecules/ListRow";
-import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import type ConnectionStore from "./ConnectionStore";
 import { serverLine, STATE_LABELS, STATE_TONES } from "./connectionPresentation";
+import { ListSkeleton } from "../../ui/organisms/PageSkeletons";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function ServerList({ store }: { readonly store: ConnectionStore }) {
   return (
@@ -22,12 +23,7 @@ function ServerList({ store }: { readonly store: ConnectionStore }) {
         onChange: store.setQuery,
       }}
     >
-      {store.loading && store.servers.length === 0 ? (
-        <>
-          <ListRowSkeleton />
-          <ListRowSkeleton />
-        </>
-      ) : null}
+      {awaitingData(store) ? <ListSkeleton /> : null}
 
       {store.isEmpty && store.form === null ? (
         <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">

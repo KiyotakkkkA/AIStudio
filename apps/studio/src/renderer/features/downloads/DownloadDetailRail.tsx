@@ -20,6 +20,8 @@ import {
 } from "./downloadPresentation";
 import { isToolchainRef } from "../toolchain/toolchainPresentation";
 import Alert from "../../ui/molecules/Alert";
+import { RailSkeleton } from "../../ui/organisms/PageSkeletons";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 export default observer(function DownloadDetailRail({ store }: { readonly store: DownloadStore }) {
   const item = store.selectedItem;
@@ -31,13 +33,17 @@ export default observer(function DownloadDetailRail({ store }: { readonly store:
         aria-label="Детали загрузки"
         className="flex w-78.5 flex-none flex-col border-l border-line bg-main-800"
       >
-        <div className="flex flex-1 items-center justify-center p-4">
-          <EmptyState
-            icon={mdiTrayArrowDown}
-            title="Ничего не выбрано"
-            description="Выберите строку, чтобы увидеть описание, путь назначения, контрольную сумму и действия после загрузки."
-          />
-        </div>
+        {awaitingData(store) ? (
+          <RailSkeleton />
+        ) : (
+          <div className="flex flex-1 items-center justify-center p-4">
+            <EmptyState
+              icon={mdiTrayArrowDown}
+              title="Ничего не выбрано"
+              description="Выберите строку, чтобы увидеть описание, путь назначения, контрольную сумму и действия после загрузки."
+            />
+          </div>
+        )}
       </aside>
     );
   }

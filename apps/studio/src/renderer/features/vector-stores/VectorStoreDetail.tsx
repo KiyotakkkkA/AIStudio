@@ -37,6 +37,7 @@ import {
   storeFacts,
   type PrimaryAction,
 } from "./vectorPresentation";
+import { DetailSkeleton } from "../../ui/molecules/LoadingSkeleton";
 
 const PRIMARY_ICON_TONE =
   "zvs-press border border-transparent bg-accent-dark text-on-accent hover:bg-accent-medium";
@@ -52,21 +53,19 @@ function VectorStoreDetail() {
   const { vectorStores: store } = useStore();
   const [confirm, setConfirm] = useState<"clear" | "remove" | null>(null);
   const detail = store.detail;
+  if (!detail && (store.loading || (store.selectedId && !store.error)))
+    return (
+      <div className="flex min-w-0 flex-1 flex-col p-4.5">
+        <DetailSkeleton label="Загрузка хранилища…" sections={3} />
+      </div>
+    );
   if (!detail)
     return (
       <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
         <EmptyState
           icon={mdiDatabaseOutline}
-          title={
-            store.loading || (store.selectedId && !store.error)
-              ? "Загрузка хранилища…"
-              : "Хранилище не выбрано"
-          }
-          description={
-            store.loading || (store.selectedId && !store.error)
-              ? "Загрузка настроек и статистики хранилища…"
-              : "Выберите хранилище слева или добавьте новое, чтобы настроить поиск по документам."
-          }
+          title="Хранилище не выбрано"
+          description="Выберите хранилище слева или добавьте новое, чтобы настроить поиск по документам."
         />
       </div>
     );

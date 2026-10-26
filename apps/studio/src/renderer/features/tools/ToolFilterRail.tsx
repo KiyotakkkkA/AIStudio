@@ -5,6 +5,8 @@ import FilterRailButton from "../../ui/molecules/FilterRailButton";
 import { ALL_SOURCES } from "./toolFilters";
 import type ToolStore from "./ToolStore";
 import { groupTone, TIER_FILTER_LABELS, TIER_TONES } from "./toolPresentation";
+import { FilterRowsSkeleton } from "../../ui/organisms/PageSkeletons";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 const TIERS: readonly ToolTier[] = ["auto", "ask", "off"];
 
@@ -29,6 +31,7 @@ function ToolFilterRail({ store }: { readonly store: ToolStore }) {
             store.setSource(ALL_SOURCES);
           }}
         />
+        {awaitingData(store) ? <FilterRowsSkeleton /> : null}
         {store.groups.map((group) => (
           <FilterRailButton
             key={group.key}
