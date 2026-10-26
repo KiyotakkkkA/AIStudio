@@ -11,14 +11,13 @@ import { TIER_HINTS, TIER_LABELS } from "../connections/connectionPresentation";
 import { matchesQuery, sourceGroups, sourceKey } from "../tools/toolFilters";
 import type ChatStore from "./ChatStore";
 import { isBuiltinTool, toolTitle } from "./toolCallCopy";
-import { isAutomaticTool, offeredHint, toolBlockReason } from "./toolSets";
+import { offeredHint, toolBlockReason } from "./toolSets";
 
 export const TOOLS_UNSUPPORTED =
   "Эта модель не поддерживает вызов инструментов: они не будут предложены.";
 export const USE_RECOMMENDED = "Установить рекомендуемое";
-export const AUTOMATIC_TOOL_HINT = "Подключается автоматически, когда к запросу подходит навык";
 
-const TIER_PILL: Record<ToolTier, string> = {
+export const TIER_PILL: Record<ToolTier, string> = {
   auto: "bg-ok-soft text-ok",
   ask: "bg-warn-soft text-warn",
   off: "bg-main-800 text-main-400",
@@ -33,29 +32,24 @@ const ToolRow = observer(function ToolRow({
   readonly store: ChatStore;
   readonly tool: ToolDto;
 }) {
-  const automatic = isAutomaticTool(tool.key);
-  const selected = automatic || store.enabledTools.includes(tool.key);
+  const selected = store.enabledTools.includes(tool.key);
   const blocked = toolBlockReason(tool);
   const builtin = isBuiltinTool(tool.key);
   const name = builtin ? toolTitle(tool.key) : tool.key;
   const offered = store.automaticTools.find((item) => item.key === tool.key);
   const description =
     blocked ??
-    (automatic
-      ? AUTOMATIC_TOOL_HINT
-      : offered !== undefined
-        ? offeredHint(offered)
-        : tool.description || "Описание не задано");
+    (offered !== undefined ? offeredHint(offered) : tool.description || "Описание не задано");
   return (
     <label
       className={`flex items-center gap-2.5 rounded-control px-2 py-1.5 transition-colors ${
         selected ? "bg-accent-soft" : ""
-      } ${blocked && !selected ? "opacity-55" : automatic ? "" : "cursor-pointer hover:bg-main-850"}`}
+      } ${blocked && !selected ? "opacity-55" : "cursor-pointer hover:bg-main-850"}`}
     >
       <InputCheckBox
         aria-label={`Предлагать модели: ${name}`}
         checked={selected}
-        disabled={automatic || !store.canConfigure || (blocked !== null && !selected)}
+        disabled={!store.canConfigure || (blocked !== null && !selected)}
         onChange={() => void store.toggleTool(tool.key)}
       />
       <span className="min-w-0 flex-1">
@@ -116,7 +110,7 @@ export default observer(function ChatToolPicker({ store }: { readonly store: Cha
           aria-label="Инструменты для модели"
           rounded="rounded-lg"
           icon={false}
-          className={`h-8 w-auto min-w-8 justify-center gap-0 border-none cursor-auto border-transparent px-2 text-[12px] font-medium ${
+          className={`size-8 justify-center gap-0 border-none cursor-auto border-transparent p-0 ${
             count > 0
               ? unsupported
                 ? "bg-main-800 text-main-400 hover:bg-main-700"
@@ -124,10 +118,7 @@ export default observer(function ChatToolPicker({ store }: { readonly store: Cha
               : "bg-transparent text-main-400 hover:bg-main-700 hover:text-main-100"
           }`}
         >
-          <span className="flex items-center gap-1.5">
-            <Icon path={mdiWrenchOutline} size={17} />
-            {count > 0 && <span className="font-mono text-[11.5px] tabular-nums">{count}</span>}
-          </span>
+          <Icon path={mdiWrenchOutline} size={17} />
         </Dropdown.Trigger>
       </Tooltip>
       <Dropdown.Menu
@@ -173,12 +164,8 @@ export default observer(function ChatToolPicker({ store }: { readonly store: Cha
               <p className="flex items-center gap-2 px-2 pt-1.5 pb-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
                 <span className="min-w-0 flex-1 truncate">{group.label}</span>
                 <span className="font-mono tracking-normal tabular-nums">
-                  {
-                    items.filter(
-                      (tool) => isAutomaticTool(tool.key) || store.enabledTools.includes(tool.key),
-                    ).length
-                  }
-                  /{items.length}
+                  {items.filter((tool) => store.enabledTools.includes(tool.key)).length}/
+                  {items.length}
                 </span>
               </p>
               <div className="space-y-0.5">

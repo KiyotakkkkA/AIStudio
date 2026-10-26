@@ -77,6 +77,9 @@ export class RootStore {
     this.about = new AboutStore(environment.ipc);
     this.storage = new StorageStore(environment.ipc);
     this.appSettings = new AppSettingsStore(environment.ipc);
+    this.chat.useMemorySwitch(
+      () => this.appSettings.values["memory.enabled"] && this.appSettings.values["memory.model"],
+    );
     this.memory = new MemoryStore(environment.ipc);
     this.profile = new ProfileStore(environment.ipc);
     makeAutoObservable<RootStore, "environment">(

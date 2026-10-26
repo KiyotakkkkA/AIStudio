@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import {
-  mdiAutoFix,
   mdiChevronDown,
   mdiClose,
   mdiDatabaseOutline,
   mdiPaperclip,
   mdiStop,
   mdiUpload,
-  mdiWrenchOutline,
 } from "@mdi/js";
 import { Dropdown, InputCheckBox, Modal } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
@@ -23,9 +21,9 @@ import { RETRIEVAL_MODES, retrievalHint } from "./retrievalModes";
 import ChatContextMeter from "./ChatContextMeter";
 import ChatModelGate from "./ChatModelGate";
 import ChatToolPicker from "./ChatToolPicker";
+import ChatToolsBadge from "./ChatToolsBadge";
 import SelectionChips from "./SelectionChips";
 import type ChatStore from "./ChatStore";
-import { offeredHint } from "./toolSets";
 
 function insidePopup(target: HTMLElement, form: HTMLElement): boolean {
   for (
@@ -108,50 +106,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                     </button>
                   </span>
                 ))}
-              {store.enabledTools.map((key) => {
-                const tool = store.tools.find((item) => item.key === key);
-                const blocked =
-                  tool === undefined || !tool.available || !tool.enabled || tool.tier === "off";
-                return (
-                  <span
-                    key={key}
-                    title={
-                      blocked
-                        ? "Инструмент сейчас недоступен и не будет предложен модели"
-                        : store.toolMode === "none"
-                          ? "Модель не поддерживает вызов инструментов"
-                          : undefined
-                    }
-                    className={`inline-flex h-7 items-center gap-1.5 rounded-full border pr-1.5 pl-2.5 text-[12px] font-medium ${
-                      blocked || store.toolMode === "none"
-                        ? "border-dashed border-line-strong bg-transparent text-main-400"
-                        : "border-transparent bg-accent-soft text-accent-medium"
-                    }`}
-                  >
-                    <Icon path={mdiWrenchOutline} size={13} />
-                    <span className="max-w-48 truncate font-mono text-[11.5px]">{key}</span>
-                    <button
-                      type="button"
-                      aria-label={`Не предлагать инструмент ${key}`}
-                      disabled={!store.canConfigure}
-                      className="flex size-4.5 items-center justify-center rounded-full hover:bg-accent-dark hover:text-on-accent disabled:opacity-50"
-                      onClick={() => void store.toggleTool(key)}
-                    >
-                      <Icon path={mdiClose} size={13} />
-                    </button>
-                  </span>
-                );
-              })}
-              {store.automaticTools.map((tool) => (
-                <span
-                  key={tool.key}
-                  title={offeredHint(tool)}
-                  className="inline-flex h-7 items-center gap-1.5 rounded-full border border-transparent bg-main-800 pr-2.5 pl-2.5 text-[12px] font-medium text-main-300"
-                >
-                  <Icon path={mdiAutoFix} size={13} />
-                  <span className="max-w-48 truncate font-mono text-[11.5px]">{tool.key}</span>
-                </span>
-              ))}
+              <ChatToolsBadge store={store} />
             </div>
           )}
           <div className="px-0.5">

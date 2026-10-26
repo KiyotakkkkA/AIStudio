@@ -16,10 +16,13 @@ import ChatStore from "../../src/renderer/features/chat/ChatStore.ts";
 import ChatToolCalls from "../../src/renderer/features/chat/ChatToolCalls";
 import {
   OFFERED_BY_KNOWLEDGE,
+  OFFERED_BY_MEMORY,
   OFFERED_BY_SKILL,
   OFFERED_BY_SKILL_ROOTS,
   OFFERED_BY_SYSTEM,
   automaticOffers,
+  isCoreTool,
+  policyTools,
   offeredHint,
   toolBlockReason,
 } from "../../src/renderer/features/chat/toolSets.ts";
@@ -305,10 +308,31 @@ test("the tools the host added on the last answer are shown with the reason they
 
   expect(
     automaticOffers([older, last, quiet], ["fs.read", "skill.load"]).map((tool) => tool.key),
-  ).toEqual(["fs.apply", "chat.ask"]);
+  ).toEqual(["fs.apply"]);
   expect(automaticOffers([], [])).toEqual([]);
   expect(offeredHint(last.offeredTools[1]!)).toBe(OFFERED_BY_SKILL_ROOTS);
   expect(offeredHint(last.offeredTools[2]!)).toBe(OFFERED_BY_SKILL);
   expect(offeredHint(older.offeredTools[0]!)).toBe(OFFERED_BY_KNOWLEDGE);
   expect(offeredHint(last.offeredTools[3]!)).toBe(OFFERED_BY_SYSTEM);
+  expect(isCoreTool("chat.ask") && isCoreTool("skill.load")).toBe(true);
+  expect(isCoreTool("fs.read")).toBe(false);
+});
+
+test("knowledge search and memory show as automatic before the first answer", () => {
+  const knowledge = { key: "knowledge.search", source: "knowledge", rootsOnly: false };
+  const memory = { key: "chat.memory", source: "system", rootsOnly: false };
+  const policy = {
+    attachedStores: 1,
+    retrievalMode: "hybrid",
+    selected: [],
+    memory: false,
+  } as const;
+  expect(policyTools([], policy)).toEqual([knowledge]);
+  expect(policyTools([], { ...policy, retrievalMode: "auto" })).toEqual([]);
+  expect(policyTools([], { ...policy, attachedStores: 0 })).toEqual([]);
+  expect(policyTools([], { ...policy, selected: ["knowledge.search"] })).toEqual([]);
+  expect(policyTools([knowledge], policy)).toEqual([knowledge]);
+  expect(policyTools([], { ...policy, attachedStores: 0, memory: true })).toEqual([memory]);
+  expect(policyTools([memory], { ...policy, attachedStores: 0, memory: true })).toEqual([memory]);
+  expect(offeredHint(memory)).toBe(OFFERED_BY_MEMORY);
 });

@@ -49,8 +49,10 @@ import ExplorerStore from "./explorer/ExplorerStore";
 import TerminalStore from "../terminal/TerminalStore";
 import {
   automaticOffers,
-  isAutomaticTool,
+  CORE_TOOLS,
+  isCoreTool,
   isModelTool,
+  policyTools,
   RECOMMENDED_TOOLS,
   toolBlockReason,
 } from "./toolSets";
@@ -134,6 +136,8 @@ export default class ChatStore {
   private contiguous = false;
   private held: RoutedEvent[] = [];
 
+  private memoryTool: () => boolean = () => false;
+
   constructor(
     private readonly ipc: IpcClient<Contract>,
     private readonly events: EventRouter,
@@ -160,6 +164,7 @@ export default class ChatStore {
       | "attaching"
       | "contiguous"
       | "held"
+      | "memoryTool"
     >(
       this,
       {
@@ -171,6 +176,7 @@ export default class ChatStore {
         buffer: false,
         timer: false,
         unsubscribe: false,
+        memoryTool: false,
         lastSeq: false,
         revision: false,
         mounted: false,
@@ -336,12 +342,28 @@ export default class ChatStore {
     return this.active?.enabledTools ?? this.composer.enabledTools;
   }
   get automaticTools() {
-    return automaticOffers(this.active?.messages ?? [], this.enabledTools);
+    const offered = automaticOffers(this.active?.messages ?? [], this.enabledTools);
+    if (this.toolMode === "none") return offered;
+    return policyTools(offered, {
+      attachedStores: this.attachedStoreIds.length,
+      retrievalMode: this.retrievalMode,
+      selected: this.enabledTools,
+      memory: this.memoryTool(),
+    });
+  }
+  useMemorySwitch(source: () => boolean) {
+    this.memoryTool = source;
+  }
+  get coreTools(): readonly string[] {
+    return this.toolMode === "none" ? [] : CORE_TOOLS;
   }
   get selectableTools() {
     return this.tools
       .filter(
-        (tool) => isModelTool(tool.key) && (tool.available || this.enabledTools.includes(tool.key)),
+        (tool) =>
+          isModelTool(tool.key) &&
+          !isCoreTool(tool.key) &&
+          (tool.available || this.enabledTools.includes(tool.key)),
       )
       .slice()
       .sort((left, right) => left.key.localeCompare(right.key));
@@ -510,7 +532,7 @@ export default class ChatStore {
   }
 
   toggleTool(key: ToolDto["key"]) {
-    if (isAutomaticTool(key)) return Promise.resolve();
+    if (isCoreTool(key)) return Promise.resolve();
     const current = this.enabledTools;
     return this.setTools(
       current.includes(key) ? current.filter((value) => value !== key) : [...current, key],
@@ -523,7 +545,7 @@ export default class ChatStore {
 
   private async setTools(keys: readonly string[]) {
     if (!this.canConfigure) return;
-    const enabledTools = keys.filter((key) => !isAutomaticTool(key));
+    const enabledTools = keys.filter((key) => !isCoreTool(key));
     if (!this.active) {
       this.composer.setEnabledTools(enabledTools);
       return;

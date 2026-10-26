@@ -53,6 +53,7 @@ function AppFrame() {
     if (!ui.restored || restoredOnce.current) return;
     restoredOnce.current = true;
     navigation.replace(ui.activeRoute);
+    void appSettings.load();
     void appSettings.takePendingTarget().then((target) => {
       if (target?.kind === "conversation") follow(ROUTES.chat, target.conversationId);
       if (target?.kind === "downloads") follow(ROUTES.downloads);
