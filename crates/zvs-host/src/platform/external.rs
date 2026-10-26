@@ -88,12 +88,25 @@ pub fn system_url_opener() -> UrlOpener {
     Arc::new(open_in_system_browser)
 }
 
+#[cfg(any(windows, test))]
+fn select_argument(path: &Path) -> std::ffi::OsString {
+    let mut argument = std::ffi::OsString::from("/select,\"");
+    argument.push(path.as_os_str());
+    argument.push("\"");
+    argument
+}
+
+#[cfg(windows)]
 fn reveal_command(path: &Path) -> Command {
-    if cfg!(windows) {
-        let mut command = Command::new("explorer");
-        command.arg("/select,").arg(path);
-        command
-    } else if cfg!(target_os = "macos") {
+    use std::os::windows::process::CommandExt;
+    let mut command = Command::new("explorer");
+    command.raw_arg(select_argument(path));
+    command
+}
+
+#[cfg(not(windows))]
+fn reveal_command(path: &Path) -> Command {
+    if cfg!(target_os = "macos") {
         let mut command = Command::new("open");
         command.arg("-R").arg(path);
         command
@@ -160,4 +173,17 @@ impl FileLauncher for SystemFileLauncher {
 
 pub fn system_file_launcher() -> SharedFileLauncher {
     Arc::new(SystemFileLauncher)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_selected_path_is_quoted_whole_so_commas_and_spaces_stay_in_the_name() {
+        assert_eq!(
+            select_argument(Path::new("C:/Отчёты/Итоги, сентябрь — декабрь.html")),
+            std::ffi::OsString::from("/select,\"C:/Отчёты/Итоги, сентябрь — декабрь.html\"")
+        );
+    }
 }

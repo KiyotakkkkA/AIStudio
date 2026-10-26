@@ -18,6 +18,7 @@ use crate::platform::external::{
 };
 use crate::platform::long_path::extended;
 use crate::platform::picker::{SAVE_DIALOG_UNAVAILABLE, SharedPicker};
+use crate::workspace::canonical;
 
 pub const ARTIFACT_EXTENSIONS: &[&str] = &[
     "pdf", "docx", "doc", "xlsx", "xlsm", "xls", "pptx", "ppt", "odt", "ods", "odp", "rtf", "csv",
@@ -267,11 +268,12 @@ impl ArtifactStore {
                 .output(owner, name)
                 .ok_or_else(|| not_found(id))?
         };
-        if std::fs::metadata(extended(&path)).is_ok_and(|metadata| metadata.is_file()) {
-            Ok(path)
-        } else {
-            Err(not_found(id))
-        }
+        canonical(&path)
+            .ok()
+            .filter(|path| {
+                std::fs::metadata(extended(path)).is_ok_and(|metadata| metadata.is_file())
+            })
+            .ok_or_else(|| not_found(id))
     }
 
     pub fn reveal(&self, id: &str) -> Result<(), AppError> {
@@ -486,7 +488,7 @@ mod tests {
         assert_eq!(kept[1].size_bytes, 3);
         assert_eq!(
             store.resolve("c1/report (2).docx").expect("resolves"),
-            second
+            canonical(&second).expect("a canonical path")
         );
         assert!(!root.path().join("r1").exists());
         drop(scratch);
@@ -494,6 +496,34 @@ mod tests {
             store.resolve("c1/report (2).docx").expect_err("gone").code,
             AppErrorCode::NotFound
         );
+    }
+
+    #[test]
+    fn an_output_recorded_with_a_relative_spelling_resolves_to_its_canonical_path() {
+        let scratch = tempfile::tempdir().expect("a folder");
+        let root = tempfile::tempdir().expect("the store");
+        let store = ArtifactStore::new(root.path().to_path_buf());
+        let file = scratch.path().join("out").join("Итоги, 2024.pdf");
+        write(&file, "pdf");
+        let spelled = scratch
+            .path()
+            .join("work")
+            .join("..")
+            .join(".")
+            .join("out/Итоги, 2024.pdf");
+        std::fs::create_dir_all(scratch.path().join("work")).expect("creates");
+        store.folders().record_outputs("c1", "r1", &[spelled]);
+        let resolved = store.resolve("c1/Итоги, 2024.pdf").expect("resolves");
+        assert_eq!(resolved, canonical(&file).expect("a canonical path"));
+        assert!(
+            !resolved
+                .to_string_lossy()
+                .starts_with(crate::platform::long_path::EXTENDED)
+        );
+        assert!(resolved.components().all(|component| !matches!(
+            component,
+            std::path::Component::CurDir | std::path::Component::ParentDir
+        )));
     }
 
     #[test]
@@ -663,7 +693,7 @@ mod tests {
         assert_eq!(adopted[0].size_bytes, 9);
         assert_eq!(
             store.resolve("dashboards/Продажи.html").expect("resolves"),
-            dashboards.join("Продажи.html")
+            canonical(&dashboards.join("Продажи.html")).expect("a canonical path")
         );
         assert!(store.resolve("dashboards/..").is_err());
         assert!(store.resolve("dashboards/missing.html").is_err());
