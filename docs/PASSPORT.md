@@ -789,6 +789,15 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   segment starting with `_` are working files: they never become artifact cards. Other
   documents a script creates there are reported like scratch results (recorded in the
   conversation's `outputs/manifest.json`). Nothing in the folder is ever opened or run by the host.
+- **Dialog branches** (`chat.conversations.branch`, `ChatService::branch`). «Создать ветку в
+  новом диалоге» on an answer creates a new conversation with the parent's settings, model,
+  stores, working folder and profile, titled `<parent> (ветка)` and unpinned. It copies the
+  messages up to and including that answer (new ids, same pins and run ids), the
+  conversation-scoped memory and the conversation-scoped folder grants, in one transaction.
+  The host then copies `work/` and `snapshots/` and rewrites `outputs/manifest.json` and the
+  artifact ids in the copied tool calls (`<parent>/<name>` becomes `<branch>/<name>`), so the
+  branch never reads the parent's folder. A failed copy removes the branch. Branching is refused
+  while a turn runs in the parent. After that the two dialogs are independent.
 - **Working folder explorer** (`zvs-host/src/workspace/explorer.rs`, TASK_036_EXTRA_4). The
   «Файлы» side panel in the chat is the user browsing their own folder, not a tool call:
   `workspace.list` / `workspace.read` raise **no** access request, but they require the chat's

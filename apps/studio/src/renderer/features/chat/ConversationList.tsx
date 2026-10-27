@@ -9,8 +9,8 @@ import {
   mdiPinOutline,
   mdiSquareEditOutline,
 } from "@mdi/js";
-import { Dropdown, Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
-import { useState } from "react";
+import { ContextMenu, Dropdown, Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import { Fragment, useState, type MouseEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import ActivePill from "../../ui/motion/ActivePill";
 import { useFx, useTransition } from "../../ui/motion/fx";
@@ -25,6 +25,23 @@ import type { ConversationDto } from "@zvs/shared";
 import type ChatStore from "./ChatStore";
 import { HIDE_CONVERSATIONS } from "./conversationListCopy";
 import { PINNED_GROUP, PIN_CONVERSATION, UNPIN_CONVERSATION } from "./pinnedMessages";
+
+interface ConversationAction {
+  readonly key: string;
+  readonly icon: string;
+  readonly label: string;
+  readonly danger?: boolean;
+  readonly run: () => void;
+}
+
+const CONTEXT_MENU = "w-48 rounded-card border-line bg-main-900 p-1 shadow-pop backdrop-blur-none";
+
+function select(action: ConversationAction) {
+  return (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    action.run();
+  };
+}
 
 export default observer(function ConversationList({ store }: { readonly store: ChatStore }) {
   const [renameTarget, setRenameTarget] = useState<ConversationDto | null>(null);
@@ -45,6 +62,30 @@ export default observer(function ConversationList({ store }: { readonly store: C
       rows: unpinned.filter((item) => item.updatedAt < +today && item.updatedAt >= +week),
     },
     { name: "Ранее", rows: unpinned.filter((item) => item.updatedAt < +week) },
+  ];
+  const actions = (conversation: ConversationDto): ConversationAction[] => [
+    {
+      key: "rename",
+      icon: mdiPencilOutline,
+      label: "Переименовать",
+      run: () => {
+        setRenameTarget(conversation);
+        setRenameTitle(conversation.title);
+      },
+    },
+    {
+      key: "pin",
+      icon: conversation.pinned ? mdiPinOffOutline : mdiPinOutline,
+      label: conversation.pinned ? UNPIN_CONVERSATION : PIN_CONVERSATION,
+      run: () => void store.pinConversation(conversation.id, !conversation.pinned),
+    },
+    {
+      key: "remove",
+      icon: mdiDeleteOutline,
+      label: "Удалить",
+      danger: true,
+      run: () => setDeleteTarget(conversation),
+    },
   ];
   if (!store.listOpen) return null;
   return (
@@ -104,69 +145,79 @@ export default observer(function ConversationList({ store }: { readonly store: C
                       transition={settle}
                       className="overflow-hidden"
                     >
-                      <div
-                        className={`group relative mb-0.5 flex h-8.5 w-full cursor-pointer items-center rounded-control pr-1 pl-2.5 ${
-                          store.active?.id === conversation.id
-                            ? "text-main-50"
-                            : "text-main-300 hover:bg-main-700 hover:text-main-100"
-                        }`}
-                      >
-                        {store.active?.id === conversation.id ? (
-                          <ActivePill
-                            layoutId="conversation-active"
-                            className="rounded-control bg-main-900 fx-on:shadow-[0_1px_3px_rgb(40_25_10/0.08)]"
-                          />
-                        ) : null}
-                        <div className="relative flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                          <span
-                            className={`size-1.5 shrink-0 rounded-full ${store.active?.id === conversation.id ? "bg-accent-dark" : "bg-main-600"}`}
-                          />
-                          <span className="truncate text-[13px]">{conversation.title}</span>
-                        </div>
-                        <Dropdown menuWidth={160} menuPlacement="bottom-right">
-                          <IconDropdownButton
-                            aria-label={`Действия для ${conversation.title}`}
-                            label="Действия"
-                            tooltip="right-center"
-                            path={mdiDotsVertical}
-                            size="xs"
-                            className="invisible group-focus-within:visible group-hover:visible"
-                            onClick={(event) => event.stopPropagation()}
-                          />
-                          <ActionMenu label="Действия диалога">
-                            <ActionMenuItem
-                              icon={mdiPencilOutline}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setRenameTarget(conversation);
-                                setRenameTitle(conversation.title);
-                              }}
-                            >
-                              Переименовать
-                            </ActionMenuItem>
-                            <ActionMenuItem
-                              icon={conversation.pinned ? mdiPinOffOutline : mdiPinOutline}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                void store.pinConversation(conversation.id, !conversation.pinned);
-                              }}
-                            >
-                              {conversation.pinned ? UNPIN_CONVERSATION : PIN_CONVERSATION}
-                            </ActionMenuItem>
-                            <ActionMenuSeparator />
-                            <ActionMenuItem
-                              icon={mdiDeleteOutline}
-                              danger
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setDeleteTarget(conversation);
-                              }}
-                            >
-                              Удалить
-                            </ActionMenuItem>
-                          </ActionMenu>
-                        </Dropdown>
-                      </div>
+                      <ContextMenu>
+                        <ContextMenu.Trigger
+                          className={`group relative mb-0.5 flex h-8.5 w-full cursor-pointer items-center rounded-control pr-1 pl-2.5 ${
+                            store.active?.id === conversation.id
+                              ? "text-main-50"
+                              : "text-main-300 hover:bg-main-700 hover:text-main-100"
+                          }`}
+                        >
+                          {store.active?.id === conversation.id ? (
+                            <ActivePill
+                              layoutId="conversation-active"
+                              className="rounded-control bg-main-900 fx-on:shadow-[0_1px_3px_rgb(40_25_10/0.08)]"
+                            />
+                          ) : null}
+                          <div className="relative flex min-w-0 flex-1 items-center gap-2.5 text-left">
+                            <span
+                              className={`size-1.5 shrink-0 rounded-full ${store.active?.id === conversation.id ? "bg-accent-dark" : "bg-main-600"}`}
+                            />
+                            <span className="truncate text-[13px]">{conversation.title}</span>
+                          </div>
+                          <Dropdown menuWidth={160} menuPlacement="bottom-right">
+                            <IconDropdownButton
+                              aria-label={`Действия для ${conversation.title}`}
+                              label="Действия"
+                              tooltip="right-center"
+                              path={mdiDotsVertical}
+                              size="xs"
+                              className="invisible group-focus-within:visible group-hover:visible"
+                              onClick={(event) => event.stopPropagation()}
+                            />
+                            <ActionMenu label="Действия диалога">
+                              {actions(conversation).map((action) => (
+                                <Fragment key={action.key}>
+                                  {action.danger && <ActionMenuSeparator />}
+                                  <ActionMenuItem
+                                    icon={action.icon}
+                                    danger={action.danger ?? false}
+                                    onClick={select(action)}
+                                  >
+                                    {action.label}
+                                  </ActionMenuItem>
+                                </Fragment>
+                              ))}
+                            </ActionMenu>
+                          </Dropdown>
+                        </ContextMenu.Trigger>
+                        <ContextMenu.Content aria-label="Действия диалога" className={CONTEXT_MENU}>
+                          {actions(conversation).map((action) => (
+                            <Fragment key={action.key}>
+                              {action.danger && (
+                                <ContextMenu.Separator className="mx-2 my-1 h-px bg-line" />
+                              )}
+                              {action.danger ? (
+                                <ContextMenu.ItemDanger
+                                  className="text-[13px] text-err hover:bg-err-soft hover:text-err"
+                                  leftSlot={<Icon path={action.icon} size={16} />}
+                                  onClick={select(action)}
+                                >
+                                  {action.label}
+                                </ContextMenu.ItemDanger>
+                              ) : (
+                                <ContextMenu.Item
+                                  className="text-[13px] text-main-100"
+                                  leftSlot={<Icon path={action.icon} size={16} />}
+                                  onClick={select(action)}
+                                >
+                                  {action.label}
+                                </ContextMenu.Item>
+                              )}
+                            </Fragment>
+                          ))}
+                        </ContextMenu.Content>
+                      </ContextMenu>
                     </motion.div>
                   ))}
                 </AnimatePresence>

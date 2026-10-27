@@ -47,6 +47,27 @@ fn unique_name(name: &str, taken: &mut HashSet<String>) -> String {
     candidate
 }
 
+fn copy_tree(source: &Path, target: &Path) -> std::io::Result<()> {
+    let entries = match std::fs::read_dir(extended(source)) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    std::fs::create_dir_all(extended(target))?;
+    for entry in entries {
+        let entry = entry?;
+        let kind = entry.file_type()?;
+        let from = source.join(entry.file_name());
+        let to = target.join(entry.file_name());
+        if kind.is_dir() {
+            copy_tree(&from, &to)?;
+        } else if kind.is_file() {
+            std::fs::copy(extended(&from), extended(&to))?;
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub struct ConversationFolders {
     root: PathBuf,
@@ -87,6 +108,38 @@ impl ConversationFolders {
     pub fn remove(&self, owner: &str) {
         if let Some(folder) = self.folder(owner) {
             let _ = std::fs::remove_dir_all(extended(&folder));
+        }
+    }
+
+    pub fn copy(&self, from: &str, to: &str) -> std::io::Result<()> {
+        let (Some(source), Some(target)) = (self.folder(from), self.folder(to)) else {
+            return Err(std::io::ErrorKind::InvalidInput.into());
+        };
+        if !extended(&source).is_dir() {
+            return Ok(());
+        }
+        for name in [WORK_DIR, SNAPSHOTS_DIR] {
+            copy_tree(&source.join(name), &target.join(name))?;
+        }
+        let _guard = self
+            .manifests
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let entries: Vec<OutputEntry> = self
+            .outputs(from)
+            .into_iter()
+            .map(|entry| OutputEntry {
+                path: entry
+                    .path
+                    .strip_prefix(&source)
+                    .map_or_else(|_| entry.path.clone(), |inner| target.join(inner)),
+                ..entry
+            })
+            .collect();
+        if entries.is_empty() || self.write_outputs(to, &entries) {
+            Ok(())
+        } else {
+            Err(std::io::ErrorKind::Other.into())
         }
     }
 
@@ -246,6 +299,36 @@ mod tests {
             .collect();
         assert_eq!(stored, [MANIFEST_FILE]);
         assert!(folders.record_outputs("..", "r1", &[first]).is_empty());
+    }
+
+    #[test]
+    fn copying_a_folder_moves_outputs_inside_it_to_the_copy() {
+        let root = tempfile::tempdir().expect("a root");
+        let folders = ConversationFolders::new(root.path().to_path_buf());
+        let inside = folders.work("c1").expect("work").join("report.docx");
+        let outside = root.path().join("elsewhere").join("deck.pptx");
+        write(&inside, "report");
+        write(&outside, "deck");
+        write(
+            &folders
+                .snapshots("c1", "r1")
+                .expect("snapshots")
+                .join("a.txt"),
+            "before",
+        );
+        folders.record_outputs("c1", "r1", &[inside.clone(), outside.clone()]);
+
+        folders.copy("c1", "c2").expect("copies");
+
+        let copied = folders.work("c2").expect("work").join("report.docx");
+        assert_eq!(std::fs::read_to_string(&copied).expect("reads"), "report");
+        assert!(root.path().join("c2/snapshots/r1/a.txt").is_file());
+        assert_eq!(folders.output("c2", "report.docx"), Some(copied));
+        assert_eq!(folders.output("c2", "deck.pptx"), Some(outside));
+        assert_eq!(folders.output("c1", "report.docx"), Some(inside));
+        folders.copy("empty", "c3").expect("nothing to copy");
+        assert!(!root.path().join("c3").exists());
+        assert!(folders.copy("..", "c4").is_err());
     }
 
     #[test]

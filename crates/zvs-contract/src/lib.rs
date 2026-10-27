@@ -73,14 +73,15 @@ pub use browser::{
 };
 pub use channels::{CHANNELS, is_channel};
 pub use chat::{
-    ChatAttachDto, ChatAttachInput, ChatAttachOutput, ChatCitationDto, ChatCommand, ChatCommandDto,
-    ChatCommandsOutput, ChatContextDto, ChatContextInput, ChatContextToolDto,
-    ChatConversationsListOutput, ChatEvalCaseDto, ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto,
-    ChatSendInput, ChatSettings, ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto,
-    ConversationDto, ConversationRef, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
-    DocumentSelectionDto, MessageDto, MessageRole, OfferedToolDto, OfferedToolSource,
-    PinConversationInput, PinMessageInput, RenameConversationInput, RetrievalMode, ThinkingEffort,
-    TruncateConversationInput, UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    BranchConversationInput, ChatAttachDto, ChatAttachInput, ChatAttachOutput, ChatCitationDto,
+    ChatCommand, ChatCommandDto, ChatCommandsOutput, ChatContextDto, ChatContextInput,
+    ChatContextToolDto, ChatConversationsListOutput, ChatEvalCaseDto, ChatEvalInput,
+    ChatEvalModeDto, ChatEvalRunDto, ChatSendInput, ChatSettings, ChatToolCallDto,
+    ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationRef,
+    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DocumentSelectionDto, MessageDto,
+    MessageRole, OfferedToolDto, OfferedToolSource, PinConversationInput, PinMessageInput,
+    RenameConversationInput, RetrievalMode, ThinkingEffort, TruncateConversationInput,
+    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
     UpdateConversationStoresInput, VendorTurnOptions, WEB_SOURCES_MAX, WebSourceDto,
 };
 pub use documents::{

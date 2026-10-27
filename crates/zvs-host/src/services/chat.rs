@@ -15,7 +15,7 @@ use zvs_contract::{
     ChatContextDto, ChatContextInput, ChatContextToolDto, ChatEvalCaseDto, ChatEvalInput,
     ChatEvalModeDto, ChatEvalRunDto, ChatSendInput, ChatSettings, ChatToolCallDto,
     ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationId,
-    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DeltaKind, DocumentId,
+    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DeltaKind, DocumentId, FolderGrantScope,
     GRAPH_EXPANSION_DEFAULT_MAX, GraphDirection, GraphExpansionDocument, GraphNeighborhood,
     GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId, MessageRole,
     OfferedToolSource, ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph,
@@ -54,7 +54,7 @@ use super::runs::RunService;
 use super::vector_stores::VectorSearchOptions;
 use crate::commands::PROCESS_TOOLS;
 use crate::data::repositories::{ConversationPatch, MessagePatch, ProviderFilter, RunPatch};
-use crate::data::schema::{ConversationRow, FolderGrantRow, MessageRow};
+use crate::data::schema::{ConversationRow, FolderGrantRow, MemoryRow, MessageRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta, ToolCall};
@@ -99,6 +99,7 @@ pub const TITLE_MAX: usize = 80;
 pub const DEFAULT_TOOL_RESULT_CHARS: u64 = 4000;
 pub const CONVERSATION_NOT_FOUND: &str = "Диалог не найден";
 pub const MESSAGE_NOT_FOUND: &str = "Сообщение не найдено";
+pub const BRANCH_TITLE_SUFFIX: &str = " (ветка)";
 pub const STORE_NOT_FOUND: &str = "Векторное хранилище не найдено";
 pub const ACTIVE_TURN: &str = "В диалоге уже выполняется ход";
 pub const INVALID_TURN: &str = "Некорректный ход чата";
@@ -273,6 +274,26 @@ pub fn process_tools_section(offered: &[OfferedTool]) -> String {
 {PROCESS_TOOLS_RULES}",
         names.join(", ")
     )
+}
+
+fn rehome_artifacts(call: &ChatToolCallDto, from: &str, to: &str) -> ChatToolCallDto {
+    let mut call = call.clone();
+    let prefix = format!("{from}/");
+    if let Some(Value::Array(artifacts)) = call
+        .meta
+        .as_mut()
+        .and_then(|meta| meta.as_object_mut())
+        .and_then(|meta| meta.get_mut("artifacts"))
+    {
+        for artifact in artifacts {
+            if let Some(Value::String(id)) = artifact.get_mut("id")
+                && let Some(name) = id.strip_prefix(&prefix)
+            {
+                *id = format!("{to}/{name}");
+            }
+        }
+    }
+    call
 }
 
 fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
@@ -2599,6 +2620,72 @@ impl ChatService {
             Ok(())
         })?;
         self.get(conversation_id)
+    }
+
+    pub fn branch(
+        &self,
+        conversation_id: &ConversationId,
+        message_id: &MessageId,
+    ) -> Result<ConversationDto, AppError> {
+        let id = conversation_id.to_string();
+        let parent = self.inner.conversation(&id)?;
+        self.inner.require_idle(&id)?;
+        let message = message_id.to_string();
+        let now = self.inner.now();
+        let branch_id = new_id().hyphenated().to_string();
+        let title_room = zvs_contract::chat::CONVERSATION_TITLE_MAX
+            .saturating_sub(BRANCH_TITLE_SUFFIX.encode_utf16().count());
+        let row = ConversationRow {
+            id: branch_id.clone(),
+            title: format!(
+                "{}{BRANCH_TITLE_SUFFIX}",
+                js_slice(&parent.title, title_room)
+            ),
+            pinned: false,
+            created_at: now,
+            updated_at: now,
+            ..parent
+        };
+        let created = self.inner.database.transaction(|transaction| {
+            let repositories = Repositories::new(transaction);
+            let messages = repositories.chat.messages(&id)?;
+            let Some(end) = messages.iter().position(|row| row.id == message) else {
+                return Ok(None);
+            };
+            let created = repositories.chat.create(&row)?;
+            for source in &messages[..=end] {
+                repositories.chat.add_message(&MessageRow {
+                    id: new_id().hyphenated().to_string(),
+                    conversation_id: branch_id.clone(),
+                    tool_calls: source
+                        .tool_calls
+                        .iter()
+                        .map(|call| rehome_artifacts(call, &id, &branch_id))
+                        .collect(),
+                    ..source.clone()
+                })?;
+            }
+            for memory in repositories.memory.list_conversation(&id)? {
+                repositories.memory.create(&MemoryRow {
+                    id: new_id().hyphenated().to_string(),
+                    conversation_id: Some(branch_id.clone()),
+                    ..memory
+                })?;
+            }
+            for grant in repositories.folder_grants.applicable(&id)? {
+                if grant.scope == FolderGrantScope::Conversation {
+                    repositories.folder_grants.create(&FolderGrantRow {
+                        id: new_id().hyphenated().to_string(),
+                        conversation_id: Some(branch_id.clone()),
+                        ..grant
+                    })?;
+                }
+            }
+            Ok(Some(created))
+        })?;
+        created
+            .ok_or_else(|| AppError::new(AppErrorCode::NotFound, MESSAGE_NOT_FOUND))
+            .and_then(|row| self.inner.dto(row))
     }
 
     pub fn on_message(&self, listener: ChatMessageListener) {

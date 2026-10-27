@@ -29,7 +29,7 @@ import {
 } from "./citations";
 import { excerptPreview } from "./selectionCopy";
 import { useStore } from "../../stores/useStore";
-import MessageActions from "../../ui/molecules/MessageActions";
+import MessageActions, { type MessageBranchAction } from "../../ui/molecules/MessageActions";
 import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
 import GenerationStatus from "../../ui/molecules/GenerationStatus";
 
@@ -53,6 +53,7 @@ export default function ChatMessage({
   onDelete,
   pinned = false,
   onPin,
+  branch,
 }: {
   readonly messageId?: MessageId;
   readonly content: string;
@@ -73,6 +74,7 @@ export default function ChatMessage({
   readonly onDelete?: () => void;
   readonly pinned?: boolean;
   readonly onPin?: () => void;
+  readonly branch?: MessageBranchAction;
 }) {
   const { viewer, chat } = useStore();
   const selections = documentSelections(attached);
@@ -150,6 +152,7 @@ export default function ChatMessage({
             onDelete={onDelete}
             pinned={pinned}
             onPin={onPin}
+            branch={branch}
           />
         </div>
       </div>

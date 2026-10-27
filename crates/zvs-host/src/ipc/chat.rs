@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use zvs_contract::{
-    AppError, AppErrorCode, BindFolderInput, ChatAnswerInput, ChatAttachInput, ChatContextInput,
-    ChatEvalInput, ChatSendInput, ChatSkipInput, ConversationRef, CreateConversationInput,
-    PickFolderResultDto, PinConversationInput, PinMessageInput, RenameConversationInput,
-    RunIdInput, TruncateConversationInput, UpdateConversationRelationsInput,
-    UpdateConversationRetrievalInput, UpdateConversationStoresInput, VectorSourceKind,
+    AppError, AppErrorCode, BindFolderInput, BranchConversationInput, ChatAnswerInput,
+    ChatAttachInput, ChatContextInput, ChatEvalInput, ChatSendInput, ChatSkipInput,
+    ConversationRef, CreateConversationInput, PickFolderResultDto, PinConversationInput,
+    PinMessageInput, RenameConversationInput, RunIdInput, TruncateConversationInput,
+    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    UpdateConversationStoresInput, VectorSourceKind,
 };
 
 use super::IpcServer;
@@ -28,6 +29,21 @@ pub fn register(server: &mut IpcServer) {
             "chat.conversations.create",
             |services: Arc<Services>, input: CreateConversationInput| async move {
                 services.chat.create(&input)
+            },
+        )
+        .handle(
+            "chat.conversations.branch",
+            |services: Arc<Services>, input: BranchConversationInput| async move {
+                let branch = services.chat.branch(&input.id, &input.message_id)?;
+                if let Err(error) = crate::chat_files::copy_chat_dir(
+                    &services.artifacts,
+                    &input.id.to_string(),
+                    &branch.id.to_string(),
+                ) {
+                    services.chat.remove(&branch.id)?;
+                    return Err(error);
+                }
+                Ok(branch)
             },
         )
         .handle(

@@ -14,6 +14,7 @@ pub const CHAT_FOLDER_MAX_FILES: usize = 1000;
 pub const NO_CHAT: &str = "Рабочая папка доступна только в диалоге или агентной сессии";
 pub const CHAT_FOLDER_FULL: &str = "Рабочая папка диалога заполнена";
 pub const CHAT_FOLDER_FAILED: &str = "Не удалось открыть рабочую папку диалога";
+pub const BRANCH_FILES_FAILED: &str = "Не удалось скопировать файлы диалога в ветку";
 
 pub fn is_working(relative: &Path) -> bool {
     relative.components().any(|component| {
@@ -31,6 +32,14 @@ pub fn chat_dir(store: &ArtifactStore, owner: &str) -> Result<PathBuf, AppError>
             .with_detail("raw", error.to_string())
     })?;
     Ok(folder)
+}
+
+pub fn copy_chat_dir(store: &ArtifactStore, from: &str, to: &str) -> Result<(), AppError> {
+    store.folders().copy(from, to).map_err(|error| {
+        store.folders().remove(to);
+        AppError::new(AppErrorCode::Unknown, BRANCH_FILES_FAILED)
+            .with_detail("raw", error.to_string())
+    })
 }
 
 pub fn remove_chat_dir(store: &ArtifactStore, owner: &str) {

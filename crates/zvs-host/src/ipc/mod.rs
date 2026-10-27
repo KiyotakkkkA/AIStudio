@@ -117,6 +117,7 @@ mod tests {
                 "chat.cancel",
                 "chat.commands",
                 "chat.context",
+                "chat.conversations.branch",
                 "chat.conversations.create",
                 "chat.conversations.get",
                 "chat.conversations.list",

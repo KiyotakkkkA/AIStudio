@@ -660,6 +660,10 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::TruncateConversationInput>,
     ),
     (
+        "chat/BranchConversationInput",
+        round_trip::<zvs_contract::BranchConversationInput>,
+    ),
+    (
         "chat/RenameConversationInput",
         round_trip::<zvs_contract::RenameConversationInput>,
     ),

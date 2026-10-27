@@ -98,6 +98,7 @@ export default class ChatStore {
   artifactTarget: { messageId: MessageId; artifactId: string; nonce: number } | null = null;
   loading = false;
   sending = false;
+  branching = false;
   stopping = false;
   error: string | null = null;
   run: RunHandleDto | null = null;
@@ -845,6 +846,27 @@ export default class ChatStore {
     } catch (error) {
       runInAction(() => {
         this.error = errorCopy(error);
+      });
+    }
+  }
+
+  async branchConversation(messageId: MessageId) {
+    const id = this.active?.id;
+    if (!id || this.generating || this.branching) return;
+    this.branching = true;
+    try {
+      const branch = await this.ipc.call("chat.conversations.branch", { id, messageId });
+      runInAction(() => {
+        this.conversations.unshift(branch);
+      });
+      await this.select(branch.id);
+    } catch (error) {
+      runInAction(() => {
+        this.error = errorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.branching = false;
       });
     }
   }

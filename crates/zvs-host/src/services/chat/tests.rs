@@ -1456,6 +1456,136 @@ async fn truncating_drops_the_message_and_everything_after_it() {
 }
 
 #[tokio::test]
+async fn branching_copies_the_dialog_up_to_the_message_into_a_new_conversation() {
+    let harness = Harness::new();
+    let parent = harness.conversation();
+    within(harness.turn(parent, "One")).await;
+    within(harness.turn(parent, "Two")).await;
+    let messages = harness.messages(parent);
+    let key = parent.to_string();
+    let call = ChatToolCallDto {
+        id: "call-1".to_owned(),
+        key: "skill.run".to_owned(),
+        name: "skill_run".to_owned(),
+        round: 0,
+        arguments: json!({}),
+        status: ChatToolCallStatus::Succeeded,
+        result: None,
+        truncated: false,
+        error: None,
+        approval_id: None,
+        step_id: None,
+        duration_ms: 0,
+        meta: Some(json!({ "artifacts": [
+            { "id": format!("{key}/report.docx"), "name": "report.docx" },
+            { "id": "library/deck.pptx", "name": "deck.pptx" },
+        ] })),
+    };
+    harness
+        .database
+        .with_connection(|connection| {
+            let repositories = Repositories::new(connection);
+            repositories
+                .chat
+                .put_tool_calls(&messages[1].id.to_string(), &[(0, &call)])?;
+            repositories.memory.create(&MemoryRow {
+                id: "memory-1".to_owned(),
+                scope: zvs_contract::MemoryScope::Conversation,
+                conversation_id: Some(key.clone()),
+                content: "Prefers short answers".to_owned(),
+                source: zvs_contract::MemorySource::User,
+                created_at: 1,
+                updated_at: 1,
+            })?;
+            for (id, scope, owner) in [
+                ("grant-1", FolderGrantScope::Conversation, Some(key.clone())),
+                ("grant-2", FolderGrantScope::Always, None),
+            ] {
+                repositories.folder_grants.create(&FolderGrantRow {
+                    id: id.to_owned(),
+                    path: format!("C:\\work\\{id}"),
+                    scope,
+                    conversation_id: owner,
+                    granted_at: 1,
+                    last_used_at: None,
+                })?;
+            }
+            Ok(())
+        })
+        .expect("seeds");
+    harness
+        .chat
+        .pin_message(&parent, &messages[1].id, true)
+        .expect("pins");
+    harness.chat.pin(&parent, true).expect("pins the dialog");
+
+    let branch = harness
+        .chat
+        .branch(&parent, &messages[1].id)
+        .expect("branches");
+
+    assert_ne!(branch.id, parent);
+    assert!(!branch.pinned);
+    assert!(branch.title.ends_with(BRANCH_TITLE_SUFFIX));
+    let copied = harness.messages(branch.id);
+    assert_eq!(
+        copied
+            .iter()
+            .map(|message| message.content.as_str())
+            .collect::<Vec<_>>(),
+        ["One", "Hello world"]
+    );
+    assert!(
+        copied
+            .iter()
+            .all(|message| messages.iter().all(|original| original.id != message.id))
+    );
+    assert!(copied[1].pinned);
+    let ids: Vec<&str> = copied[1].tool_calls[0]
+        .meta
+        .as_ref()
+        .and_then(|meta| meta["artifacts"].as_array())
+        .expect("artifacts")
+        .iter()
+        .filter_map(|artifact| artifact["id"].as_str())
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            format!("{}/report.docx", branch.id).as_str(),
+            "library/deck.pptx"
+        ]
+    );
+    let (memories, grants) = harness
+        .database
+        .with_connection(|connection| {
+            let repositories = Repositories::new(connection);
+            Ok((
+                repositories
+                    .memory
+                    .list_conversation(&branch.id.to_string())?,
+                repositories.folder_grants.list()?,
+            ))
+        })
+        .expect("reads");
+    assert_eq!(memories.len(), 1);
+    assert_eq!(memories[0].content, "Prefers short answers");
+    assert_eq!(grants.len(), 3);
+    assert!(grants.iter().any(|grant| grant.path == "C:\\work\\grant-1"
+        && grant.conversation_id.as_deref() == Some(branch.id.to_string().as_str())));
+    assert_eq!(harness.messages(parent).len(), 4);
+    assert_eq!(
+        harness
+            .chat
+            .branch(&parent, &copied[0].id)
+            .expect_err("another conversation")
+            .message,
+        MESSAGE_NOT_FOUND
+    );
+    assert_eq!(harness.chat.list().expect("lists").len(), 2);
+}
+
+#[tokio::test]
 async fn cancel_refuses_a_run_that_is_not_a_chat_turn() {
     let harness = Harness::new();
     let handle = harness

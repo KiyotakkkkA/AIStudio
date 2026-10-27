@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
 import {
   mdiCheck,
   mdiContentCopy,
@@ -7,8 +8,19 @@ import {
   mdiPin,
   mdiPinOutline,
   mdiRefresh,
+  mdiSourceBranch,
+  mdiSourceBranchPlus,
 } from "@mdi/js";
 import IconButton from "../atoms/buttons/IconButton";
+import IconDropdownButton from "../atoms/buttons/IconDropdownButton";
+import { ActionMenu, ActionMenuItem } from "./ActionMenu";
+
+export interface MessageBranchAction {
+  readonly label: string;
+  readonly newDialogLabel: string;
+  readonly disabled?: boolean;
+  readonly onNewDialog: () => void;
+}
 
 export default function MessageActions({
   content,
@@ -18,6 +30,7 @@ export default function MessageActions({
   onDelete,
   pinned = false,
   onPin,
+  branch,
 }: {
   readonly content: string;
   readonly isUser?: boolean;
@@ -26,6 +39,7 @@ export default function MessageActions({
   readonly onDelete?: () => void;
   readonly pinned?: boolean;
   readonly onPin?: () => void;
+  readonly branch?: MessageBranchAction;
 }) {
   const [copied, setCopied] = useState(false);
   const tooltip = isUser ? "bottom-left" : "top-right";
@@ -81,6 +95,26 @@ export default function MessageActions({
             : {})}
           onClick={onPin}
         />
+      )}
+      {branch && (
+        <Dropdown menuWidth={260} menuPlacement="bottom-left" disabled={branch.disabled}>
+          <IconDropdownButton
+            label={branch.label}
+            tooltip={tooltip}
+            path={mdiSourceBranch}
+            iconSize={15}
+            size="sm"
+            rounded=""
+            className="rounded-control"
+            disabled={branch.disabled}
+            toneClassName="text-main-400 hover:bg-main-700 hover:text-main-50"
+          />
+          <ActionMenu label={branch.label}>
+            <ActionMenuItem icon={mdiSourceBranchPlus} onClick={branch.onNewDialog}>
+              {branch.newDialogLabel}
+            </ActionMenuItem>
+          </ActionMenu>
+        </Dropdown>
       )}
       {onEdit && (
         <IconButton

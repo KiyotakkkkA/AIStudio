@@ -725,6 +725,13 @@ pub struct TruncateConversationInput {
     pub message_id: MessageId,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchConversationInput {
+    pub id: ConversationId,
+    pub message_id: MessageId,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RenameConversationInput {
@@ -928,6 +935,7 @@ impl Validate for ChatAttachDto {
 pub type ChatAttachOutput = Option<ChatAttachDto>;
 
 crate::validate::no_refinements!(
+    BranchConversationInput,
     ChatAttachInput,
     ConversationRef,
     PinConversationInput,

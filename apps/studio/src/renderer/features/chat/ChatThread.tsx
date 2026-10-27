@@ -45,6 +45,7 @@ import Skeleton from "../../ui/atoms/Skeleton";
 import { LoadingStatus, SkeletonLines } from "../../ui/molecules/LoadingSkeleton";
 import PinnedNavigator from "./PinnedNavigator";
 import { PINS_PANEL, currentPin, pinPreview } from "./pinnedMessages";
+import { BRANCH_IN_NEW_DIALOG, CREATE_BRANCH } from "./branching";
 
 export default observer(function ChatThread({ store }: { readonly store: ChatStore }) {
   const viewport = useRef<HTMLDivElement>(null);
@@ -318,6 +319,12 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
                     usage={`${message.usageEstimated ? "~" : ""}${message.tokensIn} вход. · ${message.tokensOut} выход. · ${(message.durationMs / 1000).toFixed(1)} с`}
                     pinned={message.pinned}
                     onPin={() => void store.pinMessage(message.id, !message.pinned)}
+                    branch={{
+                      label: CREATE_BRANCH,
+                      newDialogLabel: BRANCH_IN_NEW_DIALOG,
+                      disabled: store.generating || store.branching,
+                      onNewDialog: () => void store.branchConversation(message.id),
+                    }}
                   />
                 </div>
               ),
