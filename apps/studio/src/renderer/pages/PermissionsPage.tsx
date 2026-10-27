@@ -19,7 +19,7 @@ import {
   siteCountLabel,
 } from "../features/permissions/permissionsPresentation";
 import { useStore } from "../stores/useStore";
-import SegmentedControl from "../ui/atoms/SegmentedControl";
+import PageTabs from "../ui/molecules/PageTabs";
 import EmptyState from "../ui/molecules/EmptyState";
 import PageShell from "../ui/templates/PageShell";
 import Alert from "../ui/molecules/Alert";
@@ -67,15 +67,7 @@ function PermissionsPage() {
           grantCountLabel(permissions.grants.length)
         )
       }
-      toolbar={
-        <SegmentedControl
-          label="Вид разрешений"
-          value={tab}
-          options={TABS}
-          onChange={setTab}
-          ghost={true}
-        />
-      }
+      toolbar={<PageTabs label="Вид разрешений" value={tab} tabs={TABS} onChange={setTab} />}
     >
       {permissions.error === null ? null : (
         <Alert className="mx-6 mt-3" onDismiss={permissions.dismissError}>

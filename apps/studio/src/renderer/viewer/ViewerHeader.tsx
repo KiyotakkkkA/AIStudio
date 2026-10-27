@@ -117,7 +117,6 @@ const ZoomControl = observer(function ZoomControl({ viewer }: { readonly viewer:
     <Dropdown menuWidth={168} menuPlacement="bottom-right">
       <Dropdown.Trigger
         aria-label={ZOOM_LABEL}
-        rounded="rounded-lg"
         icon={<Icon path={mdiChevronDown} size={14} className="text-main-500" />}
         className="h-7 flex-none gap-1 border-line bg-transparent px-2 font-mono text-[11.5px] text-main-300 hover:bg-main-700"
       >

@@ -42,7 +42,7 @@ function renderTab(accounts: readonly AccountDto[] = []) {
 }
 
 async function openAccountsTab(bridge: ReturnType<typeof createFakeBridge<Contract>>) {
-  fireEvent.click(await screen.findByRole("button", { name: /Аккаунты/u }));
+  fireEvent.click(await screen.findByRole("radio", { name: /Аккаунты/u }));
   return bridge;
 }
 
@@ -59,10 +59,7 @@ test("the tab sits beside the capability filters and counts linked accounts", as
   const bridge = renderTab([account()]);
   await openAccountsTab(bridge);
 
-  const tab = screen
-    .getAllByRole("button", { name: /Аккаунты/u })
-    .find((button) => button.getAttribute("aria-current") === "page");
-  assert.ok(tab !== undefined, "the accounts tab is the active one");
+  const tab = screen.getByRole("radio", { name: /Аккаунты/u, checked: true });
   assert.equal(within(tab).getByText("1").textContent, "1");
   assert.ok(screen.getByText("k***@example.com"));
 });

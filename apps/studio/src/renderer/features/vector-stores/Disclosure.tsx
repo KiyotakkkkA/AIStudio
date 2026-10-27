@@ -11,7 +11,7 @@ export default function Disclosure({
   readonly children: ReactNode;
 }) {
   return (
-    <Accordion defaultOpen={defaultOpen} className="flex-none border-none bg-transparent">
+    <Accordion preset="ghost" defaultOpen={defaultOpen} className="flex-none">
       <Accordion.Summary className="min-h-8 w-fit gap-1.5 px-0 text-left text-[12px] font-medium text-main-400 transition-colors hover:text-main-100">
         {summary}
       </Accordion.Summary>

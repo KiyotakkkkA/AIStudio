@@ -2,7 +2,6 @@ import { mdiLayersOutline, mdiPlus, mdiRefresh } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
 import Button from "../ui/atoms/buttons/Button";
-import Chip from "../ui/atoms/Chip";
 import Icon from "../ui/atoms/Icon";
 import AccountLoginMenu from "../features/providers/AccountLoginMenu";
 import AccountsTab from "../features/providers/AccountsTab";
@@ -12,6 +11,7 @@ import { modelsWord } from "../features/providers/providerPresentation";
 import { ACCOUNTS_TAB, PROVIDERS_TABS, TAB_LABELS } from "../features/providers/providerTabs";
 import { useStore } from "../stores/useStore";
 import PageShell from "../ui/templates/PageShell";
+import PageTabs from "../ui/molecules/PageTabs";
 import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../ui/molecules/LoadingSkeleton";
 
 function ProvidersPage() {
@@ -59,32 +59,25 @@ function ProvidersPage() {
         )
       }
       toolbar={
-        <>
-          {PROVIDERS_TABS.map((tab) => {
-            const active = providers.tab === tab;
-            const count = tab === ACCOUNTS_TAB ? accounts.accounts.length : providers.counts[tab];
-            return (
-              <button
-                key={tab}
-                type="button"
-                aria-current={active ? "page" : undefined}
-                className={`inline-flex h-7.5 items-center gap-1.75 rounded-control px-3 text-[13px] font-medium ${
-                  active ? "bg-main-700 text-main-50" : "text-main-400 hover:text-main-100"
-                }`}
-                onClick={() => {
-                  providers.requestTab(tab);
-                }}
-              >
-                {TAB_LABELS[tab]}
-                {awaitingData(tab === ACCOUNTS_TAB ? accounts : providers) ? (
-                  <InlineSkeleton label={PAGE_LOADING} className="w-5" />
-                ) : (
-                  <Chip tone={active ? "raised" : "neutral"}>{String(count)}</Chip>
-                )}
-              </button>
-            );
+        <PageTabs
+          label="Раздел провайдеров"
+          value={providers.tab}
+          onChange={(tab) => {
+            providers.requestTab(tab);
+          }}
+          tabs={PROVIDERS_TABS.map((tab) => {
+            const source = tab === ACCOUNTS_TAB ? accounts : providers;
+            return {
+              value: tab,
+              label: TAB_LABELS[tab],
+              count: awaitingData(source)
+                ? null
+                : tab === ACCOUNTS_TAB
+                  ? accounts.accounts.length
+                  : providers.counts[tab],
+            };
           })}
-        </>
+        />
       }
     >
       {onAccounts ? <AccountsTab /> : <ProvidersWorkspace />}

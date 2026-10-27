@@ -30,6 +30,7 @@ import TextArea from "../../ui/atoms/TextArea";
 import TextInput from "../../ui/atoms/TextInput";
 import Toggle from "../../ui/atoms/Toggle";
 import Field from "../../ui/molecules/Field";
+import PageTabs from "../../ui/molecules/PageTabs";
 import {
   ENTITY_PLACEHOLDERS,
   entityKindOf,
@@ -815,21 +816,13 @@ const NodeForm = observer(function NodeForm({
   return (
     <>
       <div className="flex h-10.5 flex-none items-center gap-1.25 border-b border-line px-3">
-        {tabs.map((entry) => (
-          <button
-            key={entry}
-            type="button"
-            aria-pressed={active === entry}
-            className={`inline-flex h-7 items-center rounded-[6px] px-3 text-[12.5px] font-medium ${
-              active === entry ? "bg-main-700 text-main-50" : "text-main-400 hover:text-main-100"
-            }`}
-            onClick={() => {
-              setTab(entry);
-            }}
-          >
-            {TAB_LABELS[entry]}
-          </button>
-        ))}
+        <PageTabs
+          compact
+          label="Раздел узла"
+          value={active}
+          tabs={tabs.map((entry) => ({ value: entry, label: TAB_LABELS[entry] }))}
+          onChange={setTab}
+        />
       </div>
       <ScrollArea className="min-h-0 flex-1">
         {active === "params" ? <ParamsTab editor={editor} node={node} /> : null}

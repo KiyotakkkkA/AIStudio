@@ -13,7 +13,8 @@ import {
 } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { useState } from "react";
-import { Dropdown, Switcher } from "@kiyotakkkka/zvs-uikit-lib";
+import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
+import PageTabs from "../../ui/molecules/PageTabs";
 import { VECTOR_SCHEMA_VERSION, type VectorStoreDto } from "@zvs/shared";
 import { useStore } from "../../stores/useStore";
 import IconButton from "../../ui/atoms/buttons/IconButton";
@@ -173,16 +174,14 @@ function VectorStoreDetail() {
         </Disclosure>
       </section>
       <div className="flex h-11 flex-none items-center border-b border-line px-5">
-        <Switcher
+        <PageTabs
+          compact
           value={store.tab}
           label="Раздел хранилища"
-          options={[...VECTOR_STORE_TABS]}
+          tabs={VECTOR_STORE_TABS}
           onChange={(tab) => {
             store.set("tab", tab);
           }}
-          rounded=""
-          className="gap-1 rounded-control bg-transparent border-transparent"
-          classNames={{ tab: "rounded-pill px-[14px] py-[5px] text-[12px]" }}
         />
       </div>
       {store.tab === "Test search" ? (

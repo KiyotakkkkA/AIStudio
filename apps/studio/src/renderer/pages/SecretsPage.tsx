@@ -6,7 +6,7 @@ import SecretsWorkspace from "../features/secrets/SecretsWorkspace";
 import { useStore } from "../stores/useStore";
 import EmptyState from "../ui/molecules/EmptyState";
 import PageShell from "../ui/templates/PageShell";
-import SegmentedControl from "../ui/atoms/SegmentedControl";
+import PageTabs from "../ui/molecules/PageTabs";
 import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../ui/molecules/LoadingSkeleton";
 
 const TABS = [
@@ -33,15 +33,7 @@ function SecretsPage() {
         )
       }
       actions={<SecretsHeaderActions />}
-      toolbar={
-        <SegmentedControl
-          label="Область видимости"
-          value={tab}
-          options={TABS}
-          onChange={setTab}
-          ghost={true}
-        />
-      }
+      toolbar={<PageTabs label="Область видимости" value={tab} tabs={TABS} onChange={setTab} />}
     >
       {tab === "secrets" ? <SecretsWorkspace /> : null}
 

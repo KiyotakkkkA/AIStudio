@@ -75,10 +75,7 @@ test("the page mounts one form and one list, with the token as a picker over sec
 
   assert.ok(await screen.findByText("Настройка подключения"));
 
-  const tab = screen
-    .getAllByRole("button", { name: /Генерация текста/u })
-    .find((button) => button.getAttribute("aria-current") === "page");
-  assert.ok(tab !== undefined, "the active capability tab is marked");
+  const tab = screen.getByRole("radio", { name: /Генерация текста/u, checked: true });
   assert.equal(within(tab).getByText("1").textContent, "1");
 
   // The credential never appears as a typed field: no password input anywhere on the page.

@@ -49,7 +49,7 @@ export default function IconButton({
 
   return (
     <>
-      <Tooltip label={label} placement={tooltip} rounded="rounded-lg" className="">
+      <Tooltip label={label} placement={tooltip} className="">
         <button
           type="button"
           aria-label={ariaLabel ?? label}

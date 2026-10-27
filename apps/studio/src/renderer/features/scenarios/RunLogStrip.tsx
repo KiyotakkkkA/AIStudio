@@ -8,6 +8,7 @@ import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
 import type { StatusTone } from "../../ui/atoms/statusTone";
+import PageTabs from "../../ui/molecules/PageTabs";
 import JsonView from "./JsonView";
 import type ScenarioEditor from "./ScenarioEditor";
 import { STRIP_HEIGHT_COLLAPSED } from "./ScenarioRunState";
@@ -261,22 +262,16 @@ function RunLogStrip({ editor }: { readonly editor: ScenarioEditor }) {
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex h-9.5 flex-none items-center gap-1.5 border-b border-line px-3.5">
-          {TABS.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              aria-pressed={run.tab === tab}
-              className={`inline-flex h-7 items-center rounded-[6px] px-3 text-[12.5px] font-medium ${
-                run.tab === tab ? "bg-main-700 text-main-50" : "text-main-400 hover:text-main-100"
-              }`}
-              onClick={() => {
-                run.setTab(tab);
-                if (!run.stripOpen) run.toggleStrip();
-              }}
-            >
-              {RUN_TAB_LABELS[tab]}
-            </button>
-          ))}
+          <PageTabs
+            compact
+            label="Данные шага"
+            value={run.tab}
+            tabs={TABS.map((tab) => ({ value: tab, label: RUN_TAB_LABELS[tab] }))}
+            onChange={(tab) => {
+              run.setTab(tab);
+              if (!run.stripOpen) run.toggleStrip();
+            }}
+          />
           <span className="flex-1" />
           <StepActions editor={editor} />
           {step === null ? null : (

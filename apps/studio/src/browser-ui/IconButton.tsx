@@ -24,7 +24,7 @@ export default function IconButton({
   ...props
 }: IconButtonProps) {
   return (
-    <Tooltip label={label} placement={tooltip} rounded="rounded-lg" className="">
+    <Tooltip label={label} placement={tooltip} className="">
       <button
         type="button"
         aria-label={ariaLabel ?? label}

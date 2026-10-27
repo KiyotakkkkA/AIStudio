@@ -5,5 +5,5 @@ allowBuilds:
   esbuild: true
   unrs-resolver: true
 minimumReleaseAgeExclude:
-  - '@kiyotakkkka/zvs-uikit-lib@8.5.0'
+  - "@kiyotakkkka/zvs-uikit-lib@8.5.0 || 8.6.1"
 saveExact: true

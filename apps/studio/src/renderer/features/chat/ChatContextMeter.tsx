@@ -169,10 +169,9 @@ export default observer(function ChatContextMeter({ store }: { readonly store: C
 
   return (
     <Dropdown menuWidth={340} menuPlacement="top-right">
-      <Tooltip label="Контекстное окно" placement="top-center" rounded="rounded-lg" className="">
+      <Tooltip label="Контекстное окно" placement="top-center" className="">
         <Dropdown.Trigger
           aria-label={`Контекстное окно: ${summary}`}
-          rounded="rounded-lg"
           icon={false}
           className={`h-8 w-auto justify-center gap-0 border-none cursor-auto bg-transparent px-2 hover:bg-main-800 ${
             pressured ? "text-warn" : "text-main-500 hover:text-main-200"

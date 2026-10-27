@@ -2,7 +2,7 @@ import { mdiPuzzleOutline } from "@mdi/js";
 import { useState } from "react";
 import HostCheck from "../features/diagnostics/HostCheck";
 import ComponentsTab from "../features/toolchain/ComponentsTab";
-import SegmentedControl from "../ui/atoms/SegmentedControl";
+import PageTabs from "../ui/molecules/PageTabs";
 import PageShell from "../ui/templates/PageShell";
 
 const TABS = [{ value: "components", label: "Компоненты" }] as const;
@@ -17,15 +17,7 @@ export default function SettingsPage() {
       icon={mdiPuzzleOutline}
       title="Расширения"
       subtitle="Компоненты и среды выполнения"
-      toolbar={
-        <SegmentedControl
-          label="Раздел расширений"
-          value={tab}
-          options={TABS}
-          onChange={setTab}
-          ghost={true}
-        />
-      }
+      toolbar={<PageTabs label="Раздел расширений" value={tab} tabs={TABS} onChange={setTab} />}
     >
       {tab === "components" ? <ComponentsTab /> : null}
       <HostCheck />

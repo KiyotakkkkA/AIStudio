@@ -40,7 +40,7 @@ export default function IconDropdownButton({
   ...props
 }: IconDropdownButtonProps) {
   return (
-    <Tooltip label={label} placement={tooltip} rounded="rounded-lg" className="">
+    <Tooltip label={label} placement={tooltip} className="">
       <Dropdown.Trigger
         {...props}
         rounded={rounded}

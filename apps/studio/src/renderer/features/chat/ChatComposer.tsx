@@ -215,7 +215,6 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
             <Dropdown menuWidth={300} menuPlacement="top-right">
               <Dropdown.Trigger
                 title="Провайдер и модель"
-                rounded="rounded-lg"
                 icon={<Icon path={mdiChevronDown} size={15} className="shrink-0 text-main-500" />}
                 className="h-8 w-auto max-w-64 min-w-0 gap-1 border-none cursor-auto bg-transparent px-2 text-[12.5px] text-main-200 hover:bg-main-700 hover:text-main-50"
               >
