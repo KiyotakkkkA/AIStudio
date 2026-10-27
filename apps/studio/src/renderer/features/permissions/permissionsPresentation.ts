@@ -10,11 +10,9 @@ export const TOOLS_TAB_PARAM = "tools";
 export const BROWSER_TAB = "Браузер";
 export const BROWSER_TAB_PARAM = "browser";
 export const SITES_TITLE = "Разрешения на сайтах";
-export const SITES_DESCRIPTION =
-  "Действия, которые агент в браузере выполняет на сайте без подтверждения. После отзыва агент снова запрашивает подтверждение.";
+export const SITES_DESCRIPTION = "Действия, которые агент выполняет на сайте без подтверждения.";
 export const SITES_EMPTY_TITLE = "Разрешений для сайтов нет";
-export const SITES_EMPTY_DESCRIPTION =
-  "Разрешение появляется после ответа «Всегда на этом сайте» на запрос агента в браузере.";
+export const SITES_EMPTY_DESCRIPTION = "Разрешение появляется после ответа «Всегда на этом сайте».";
 export const SITE_GRANTED_COLUMN = "Выдано";
 export const SITES_LOAD_ERROR = "Не удалось загрузить разрешения сайтов. Попробуйте ещё раз.";
 
@@ -24,7 +22,7 @@ const SITE_ACTIONS: Readonly<Record<string, string>> = {
 };
 export const DEFAULTS_TITLE = "Разрешения по умолчанию";
 export const DEFAULTS_DESCRIPTION =
-  "Уровень, который получает инструмент при первой регистрации. Уже известные инструменты сохраняют своё разрешение: изменение здесь не включит то, что было выключено. Разрушающие инструменты всегда начинают с «off».";
+  "Уровень, который получает инструмент при первой регистрации. Разрешения известных инструментов не меняются, разрушающие всегда начинают с «off».";
 export const DEFAULTS_SOURCE_COLUMN = "Источник";
 export const DEFAULTS_TIER_COLUMN = "Разрешение для новых инструментов";
 export const ALWAYS_SECTION = "Постоянные";
@@ -36,12 +34,12 @@ export const EMPTY_DESCRIPTION =
   "Разрешение на папку появляется после ответа «Разрешить всегда» или «Разрешить для этого диалога».";
 export const NOTHING_SELECTED_TITLE = "Разрешение не выбрано";
 export const NOTHING_SELECTED_DESCRIPTION = "Выберите папку в списке.";
-export const NOTHING_FOUND = "Ничего не найдено по текущему запросу.";
+export const NOTHING_FOUND = "Ничего не найдено.";
 export const LOAD_ERROR = "Не удалось загрузить разрешения. Попробуйте ещё раз.";
 export const REVOKE_ERROR = "Не удалось отозвать разрешение. Попробуйте ещё раз.";
 export const ALREADY_REVOKED = "Разрешение уже отозвано.";
 export const PROCESS_TOOLS_NOTE =
-  "Разрешения на папки не ограничивают «code.run» и «shell.run»: процессы работают с правами пользователя, каждый запуск подтверждается отдельно.";
+  "«code.run» и «shell.run» не ограничены разрешениями на папки: каждый запуск подтверждается отдельно.";
 
 export function grantCountLabel(count: number): string {
   return plural(count, "папка", "папки", "папок");

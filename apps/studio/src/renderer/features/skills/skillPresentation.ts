@@ -48,7 +48,7 @@ const RULE_COPY: Record<SkillIssueRule, string> = {
   pattern: "Строчная латиница, цифры и одиночные дефисы, начиная с буквы.",
   tooLong: "Слишком длинное значение.",
   duplicate: "Навык с таким идентификатором уже есть.",
-  path: "Недопустимый путь: файлы лежат в references/, scripts/ или assets/.",
+  path: "Недопустимый путь: допустимы references/, scripts/ и assets/.",
   fileTooLarge: "Файл больше 1 МБ.",
   skillTooLarge: "Файлы навыка вместе больше 10 МБ.",
   tooManyFiles: "Больше 200 файлов.",
@@ -140,7 +140,7 @@ export const UPDATE_CONFIRM_LABEL = "Обновить";
 export const UPDATE_SKILL_TITLE = "Обновить навык?";
 export const UPDATE_ALL_TITLE = "Обновить встроенные навыки?";
 export const UPDATE_MODIFIED_WARNING =
-  "Файлы навыка будут заменены версией из приложения. Изменения, внесённые в навык, будут потеряны.";
+  "Файлы навыка будут заменены версией из приложения. Изменения будут потеряны.";
 export const UPDATE_GUARD = "Сохраните или отмените изменения перед обновлением.";
 
 export function updateLabel(update: SkillUpdateDto): string {

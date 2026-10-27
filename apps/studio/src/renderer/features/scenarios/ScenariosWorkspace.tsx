@@ -254,7 +254,7 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
           <EmptyState
             icon={mdiGraphOutline}
             title="Сценариев нет"
-            description="Сценарий связывает триггер, ИИ-агента и действия в граф, который запускается сам."
+            description="Создайте сценарий из триггера, агента и действий."
             action={
               <Button tone="primary" onClick={() => void store.create()}>
                 <Icon path={mdiPlus} size={15} />

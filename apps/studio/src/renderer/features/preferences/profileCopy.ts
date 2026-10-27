@@ -9,7 +9,7 @@ import {
 export const STYLE_ROW = {
   key: PROFILE_KEYS.style,
   label: "Стиль общения",
-  hint: "Как модель формулирует ответы. Изменение действует во всех диалогах со следующего ответа.",
+  hint: "Как модель формулирует ответы.",
 } as const;
 
 export const STYLE_OPTIONS: readonly { value: ReplyStyle; label: string }[] = [
@@ -31,7 +31,7 @@ export const STYLE_DESCRIPTIONS: Record<ReplyStyle, string> = {
 export const CUSTOM_STYLE_LABEL = "Описание стиля";
 export const CUSTOM_STYLE_PLACEHOLDER =
   "Например: отвечать по пунктам, без вступлений, примеры кода — на TypeScript";
-export const CUSTOM_STYLE_EMPTY = "Пока описание не сохранено, используется стандартный стиль.";
+export const CUSTOM_STYLE_EMPTY = "Без описания используется стандартный стиль.";
 
 export const ABOUT_ROW = {
   key: PROFILE_KEYS.about,
@@ -41,8 +41,7 @@ export const ABOUT_ROW = {
 
 export const ABOUT_PLACEHOLDER =
   "Например: backend-разработчик, работаю с Rust и PostgreSQL, использую Linux";
-export const ABOUT_NEW_DIALOGS =
-  "Дополнительная информация о вас будет доступна только в новых диалогах";
+export const ABOUT_NEW_DIALOGS = "Сведения о вас применяются в новых диалогах";
 
 export const TOOL_CALLS_ROW = {
   key: PROFILE_KEYS.toolCalls,

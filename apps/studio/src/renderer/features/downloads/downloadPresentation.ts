@@ -69,8 +69,8 @@ export function removalPrompt(
 ): string {
   if (isToolchainRef(item.ref)) return removalCopy(item.displayName);
   if (item.kind === "runtime")
-    return "Распакованная сборка движка будет удалена с диска. Хранилища, настроенные на этот движок, не смогут вычислять локальные эмбеддинги до установки другого движка.";
-  return "Файл будет удалён с диска. Повторная загрузка доступна в каталоге.";
+    return "Распакованная сборка движка будет удалена с диска. Хранилища на этом движке останутся без локальных эмбеддингов.";
+  return "Файл будет удалён с диска.";
 }
 
 export const STATE_LABELS: Record<CatalogueItemState, string> = {

@@ -166,7 +166,7 @@ function VectorSearchPanel() {
           <EmptyState
             icon={mdiTextSearch}
             title="Проверьте, что найдёт хранилище"
-            description="Введите вопрос: появятся фрагменты, которые получит чат, с оценкой совпадения."
+            description="Введите вопрос: появятся фрагменты с оценкой совпадения."
           />
         </div>
       ) : null}

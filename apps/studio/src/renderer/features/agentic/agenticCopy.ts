@@ -29,14 +29,13 @@ export const FOLDER_FAILED = "Не удалось выбрать папку.";
 
 export const EMPTY_TITLE = "Сессий нет";
 export const EMPTY_DESCRIPTION =
-  "Агентная сессия составляет план, выполняет его инструментами в рабочей папке и показывает каждый вызов.";
+  "Сессия составляет план и выполняет его инструментами в рабочей папке.";
 export const LOADING = "Загрузка…";
 
 export const PLAN_TITLE = "План";
 export const PLAN_EMPTY = "План ещё не составлен";
 export const PLAN_PENDING = "Изменения плана применятся на границе шага";
-export const PLAN_HINT =
-  "Шаги в очереди можно переименовать, удалить и перетащить. Агент получит изменения на границе шага.";
+export const PLAN_HINT = "Агент получит изменения плана на границе шага.";
 export const EDIT_STEP = "Переименовать шаг";
 export const DELETE_STEP = "Удалить шаг";
 export const STEP_TITLE_LABEL = "Название шага";

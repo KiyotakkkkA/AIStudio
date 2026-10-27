@@ -22,8 +22,7 @@ export const ALWAYS = "Всегда на этом сайте";
 export const APPROVE_ONCE = "Разрешить один раз";
 export const IRREVERSIBLE = "действие необратимо";
 export const TARGET_LABEL = "Цель";
-export const AGENT_ACTION_FAILED =
-  "Действие не выполнено: состояние сеанса агента изменилось. Повторите действие.";
+export const AGENT_ACTION_FAILED = "Состояние сеанса изменилось. Повторите действие.";
 
 export const ALWAYS_ASK_TOOLS: ReadonlySet<string> = new Set([
   "browser.submit",

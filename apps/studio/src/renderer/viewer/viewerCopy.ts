@@ -33,12 +33,11 @@ export const RENDERING = "Подготовка страниц…";
 
 export const CHIP_APPROXIMATE = "приближённое отображение";
 export const CHIP_APPROXIMATE_HINT =
-  "Документ отрисован в приложении: вёрстка, шрифты и разрывы страниц могут отличаться от оригинала.";
+  "Вёрстка, шрифты и разрывы страниц могут отличаться от оригинала.";
 export const PPTX_NOTE = "Для презентации показан только текст слайдов.";
 
 export const MISSING_TITLE = "Файл не найден";
-export const MISSING_HINT =
-  "Файл перемещён или удалён после того, как на него сослались. Проверьте исходную папку.";
+export const MISSING_HINT = "Файл перемещён или удалён. Проверьте исходную папку.";
 export const UNSUPPORTED_TITLE = "Формат не поддерживается";
 export const UNSUPPORTED_HINT = "Этот файл нельзя показать в просмотрщике.";
 export const FORBIDDEN_TITLE = "Доступ к файлу закрыт";
