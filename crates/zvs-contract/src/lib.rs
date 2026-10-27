@@ -79,8 +79,8 @@ pub use chat::{
     ChatSendInput, ChatSettings, ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto,
     ConversationDto, ConversationRef, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
     DocumentSelectionDto, MessageDto, MessageRole, OfferedToolDto, OfferedToolSource,
-    RenameConversationInput, RetrievalMode, ThinkingEffort, TruncateConversationInput,
-    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    PinConversationInput, PinMessageInput, RenameConversationInput, RetrievalMode, ThinkingEffort,
+    TruncateConversationInput, UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
     UpdateConversationStoresInput, VendorTurnOptions, WEB_SOURCES_MAX, WebSourceDto,
 };
 pub use documents::{

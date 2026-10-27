@@ -178,6 +178,17 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
             .await,
     );
     assert!(related.use_relations);
+    let pinned: ConversationDto = data(
+        &channels
+            .server
+            .dispatch(
+                "chat.conversations.pin",
+                json!({ "id": created.id, "pinned": true }),
+            )
+            .await,
+    );
+    assert!(pinned.pinned);
+    assert_eq!(pinned.updated_at, related.updated_at);
     let stores: ConversationDto = data(
         &channels
             .server

@@ -5,6 +5,8 @@ import {
   mdiDockLeft,
   mdiDotsVertical,
   mdiPencilOutline,
+  mdiPinOffOutline,
+  mdiPinOutline,
   mdiSquareEditOutline,
 } from "@mdi/js";
 import { Dropdown, Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
@@ -22,6 +24,7 @@ import ConfirmModal from "../../ui/molecules/ConfirmModal";
 import type { ConversationDto } from "@zvs/shared";
 import type ChatStore from "./ChatStore";
 import { HIDE_CONVERSATIONS } from "./conversationListCopy";
+import { PINNED_GROUP, PIN_CONVERSATION, UNPIN_CONVERSATION } from "./pinnedMessages";
 
 export default observer(function ConversationList({ store }: { readonly store: ChatStore }) {
   const [renameTarget, setRenameTarget] = useState<ConversationDto | null>(null);
@@ -33,18 +36,15 @@ export default observer(function ConversationList({ store }: { readonly store: C
   today.setHours(0, 0, 0, 0);
   const week = new Date(today);
   week.setDate(week.getDate() - ((week.getDay() + 6) % 7));
+  const unpinned = store.visibleConversations.filter((item) => !item.pinned);
   const groups = [
-    {
-      name: "Сегодня",
-      rows: store.visibleConversations.filter((item) => item.updatedAt >= +today),
-    },
+    { name: PINNED_GROUP, rows: store.visibleConversations.filter((item) => item.pinned) },
+    { name: "Сегодня", rows: unpinned.filter((item) => item.updatedAt >= +today) },
     {
       name: "Ранее на этой неделе",
-      rows: store.visibleConversations.filter(
-        (item) => item.updatedAt < +today && item.updatedAt >= +week,
-      ),
+      rows: unpinned.filter((item) => item.updatedAt < +today && item.updatedAt >= +week),
     },
-    { name: "Ранее", rows: store.visibleConversations.filter((item) => item.updatedAt < +week) },
+    { name: "Ранее", rows: unpinned.filter((item) => item.updatedAt < +week) },
   ];
   if (!store.listOpen) return null;
   return (
@@ -143,6 +143,15 @@ export default observer(function ConversationList({ store }: { readonly store: C
                               }}
                             >
                               Переименовать
+                            </ActionMenuItem>
+                            <ActionMenuItem
+                              icon={conversation.pinned ? mdiPinOffOutline : mdiPinOutline}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void store.pinConversation(conversation.id, !conversation.pinned);
+                              }}
+                            >
+                              {conversation.pinned ? UNPIN_CONVERSATION : PIN_CONVERSATION}
                             </ActionMenuItem>
                             <ActionMenuSeparator />
                             <ActionMenuItem

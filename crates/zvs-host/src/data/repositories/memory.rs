@@ -135,6 +135,7 @@ mod tests {
             working_folder: None,
             turn_folder: None,
             profile: String::new(),
+            pinned: false,
             created_at: 1,
             updated_at: 1,
         }

@@ -19,6 +19,7 @@ pub struct ConversationPatch {
     pub retrieval_mode: Option<RetrievalMode>,
     pub working_folder: Option<Option<String>>,
     pub turn_folder: Option<Option<String>>,
+    pub pinned: Option<bool>,
     pub updated_at: Option<Timestamp>,
 }
 
@@ -65,6 +66,9 @@ impl ConversationPatch {
                 folder.clone().map_or(SqlValue::Null, SqlValue::Text),
             ));
         }
+        if let Some(pinned) = self.pinned {
+            assignments.push(("pinned", SqlValue::Integer(i64::from(pinned))));
+        }
         if let Some(updated_at) = self.updated_at {
             assignments.push(("updated_at", SqlValue::Integer(updated_at)));
         }
@@ -85,6 +89,7 @@ pub struct MessagePatch {
     pub duration_ms: Option<i64>,
     pub run_id: Option<Option<String>>,
     pub partial: Option<bool>,
+    pub pinned: Option<bool>,
 }
 
 impl MessagePatch {
@@ -126,6 +131,9 @@ impl MessagePatch {
         if let Some(partial) = self.partial {
             assignments.push(("partial", SqlValue::Integer(i64::from(partial))));
         }
+        if let Some(pinned) = self.pinned {
+            assignments.push(("pinned", SqlValue::Integer(i64::from(pinned))));
+        }
         Ok(assignments)
     }
 }
@@ -162,8 +170,8 @@ impl<'c> ChatRepository<'c> {
     pub fn create(&self, row: &ConversationRow) -> rusqlite::Result<ConversationRow> {
         self.connection
             .prepare_cached(&format!(
-                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, retrieval_mode, working_folder, turn_folder, profile, created_at, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14) RETURNING {}",
+                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, retrieval_mode, working_folder, turn_folder, profile, pinned, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) RETURNING {}",
                 ConversationRow::COLUMNS
             ))?
             .query_row(
@@ -180,6 +188,7 @@ impl<'c> ChatRepository<'c> {
                     row.working_folder,
                     row.turn_folder,
                     row.profile,
+                    row.pinned,
                     row.created_at,
                     row.updated_at,
                 ],
@@ -234,8 +243,8 @@ impl<'c> ChatRepository<'c> {
     pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
         self.connection
             .prepare_cached(
-                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, command, offered_tools, web_sources, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, created_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, command, offered_tools, web_sources, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, pinned, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
             )?
             .execute(params![
                 row.id,
@@ -254,6 +263,7 @@ impl<'c> ChatRepository<'c> {
                 row.duration_ms,
                 row.run_id,
                 row.partial,
+                row.pinned,
                 row.created_at,
             ])?;
         let calls: Vec<(usize, &ChatToolCallDto)> = row.tool_calls.iter().enumerate().collect();
@@ -370,6 +380,7 @@ mod tests {
             working_folder: None,
             turn_folder: None,
             profile: String::new(),
+            pinned: false,
             created_at: 1,
             updated_at,
         }
@@ -394,6 +405,7 @@ mod tests {
             duration_ms: 0,
             run_id: None,
             partial: false,
+            pinned: false,
             created_at,
         }
     }
@@ -431,12 +443,14 @@ mod tests {
                         &ConversationPatch {
                             title: Some("Plans".to_owned()),
                             use_relations: Some(true),
+                            pinned: Some(true),
                             ..ConversationPatch::touched(20)
                         },
                     )?
                     .expect("the row");
                 assert_eq!(patched.title, "Plans");
                 assert!(patched.use_relations);
+                assert!(patched.pinned);
                 assert_eq!(patched.updated_at, 20);
                 assert_eq!(
                     chat.update("missing", &ConversationPatch::touched(1))?,
@@ -482,12 +496,14 @@ mod tests {
                     &MessagePatch {
                         content: Some("edited".to_owned()),
                         partial: Some(true),
+                        pinned: Some(true),
                         ..MessagePatch::default()
                     },
                 )?;
                 let edited = chat.get_message("m1")?.expect("the message");
                 assert_eq!(edited.content, "edited");
                 assert!(edited.partial);
+                assert!(edited.pinned);
                 chat.truncate_from("other", "m2b")?;
                 assert_eq!(chat.messages("c")?.len(), 4);
                 chat.truncate_from("c", "m2b")?;

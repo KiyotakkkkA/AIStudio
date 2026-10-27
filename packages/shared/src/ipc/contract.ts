@@ -19,6 +19,9 @@ import {
   ChatSendInput,
   ConversationDetailDto,
   TruncateConversationInput,
+  PinConversationInput,
+  PinMessageInput,
+  MessageDto,
   ConversationDto,
   ConversationRef,
   RetrievalMode,
@@ -254,6 +257,8 @@ export const contract = defineContract({
     input: ConversationRef.extend({ useRelations: z.boolean() }),
     output: ConversationDto,
   },
+  "chat.conversations.pin": { input: PinConversationInput, output: ConversationDto },
+  "chat.messages.pin": { input: PinMessageInput, output: MessageDto },
   "chat.conversations.truncate": {
     input: TruncateConversationInput,
     output: ConversationDetailDto,

@@ -3,9 +3,9 @@ use std::sync::Arc;
 use zvs_contract::{
     AppError, AppErrorCode, BindFolderInput, ChatAnswerInput, ChatAttachInput, ChatContextInput,
     ChatEvalInput, ChatSendInput, ChatSkipInput, ConversationRef, CreateConversationInput,
-    PickFolderResultDto, RenameConversationInput, RunIdInput, TruncateConversationInput,
-    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
-    UpdateConversationStoresInput, VectorSourceKind,
+    PickFolderResultDto, PinConversationInput, PinMessageInput, RenameConversationInput,
+    RunIdInput, TruncateConversationInput, UpdateConversationRelationsInput,
+    UpdateConversationRetrievalInput, UpdateConversationStoresInput, VectorSourceKind,
 };
 
 use super::IpcServer;
@@ -43,6 +43,20 @@ pub fn register(server: &mut IpcServer) {
             "chat.conversations.rename",
             |services: Arc<Services>, input: RenameConversationInput| async move {
                 services.chat.rename(&input.id, input.title())
+            },
+        )
+        .handle(
+            "chat.conversations.pin",
+            |services: Arc<Services>, input: PinConversationInput| async move {
+                services.chat.pin(&input.id, input.pinned)
+            },
+        )
+        .handle(
+            "chat.messages.pin",
+            |services: Arc<Services>, input: PinMessageInput| async move {
+                services
+                    .chat
+                    .pin_message(&input.id, &input.message_id, input.pinned)
             },
         )
         .handle(

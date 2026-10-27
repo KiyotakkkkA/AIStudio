@@ -812,6 +812,40 @@ async fn conversations_rename_list_and_cascade_messages_while_keeping_run_histor
 }
 
 #[tokio::test]
+async fn pins_mark_a_conversation_and_its_messages_without_reordering_the_list() {
+    let harness = Harness::new();
+    let created = harness.conversation();
+    let other = harness.conversation();
+    within(harness.turn(created, "Question")).await;
+    let before = harness.chat.get(&created).expect("reads").conversation;
+    let pinned = harness.chat.pin(&created, true).expect("pins");
+    assert!(pinned.pinned);
+    assert_eq!(pinned.updated_at, before.updated_at);
+    let answer = harness.messages(created)[1].id;
+    let marked = harness
+        .chat
+        .pin_message(&created, &answer, true)
+        .expect("pins the message");
+    assert!(marked.pinned);
+    assert!(harness.messages(created)[1].pinned);
+    assert!(!harness.messages(created)[0].pinned);
+    assert_eq!(
+        harness
+            .chat
+            .pin_message(&other, &answer, true)
+            .expect_err("another conversation")
+            .code,
+        AppErrorCode::NotFound
+    );
+    harness
+        .chat
+        .pin_message(&created, &answer, false)
+        .expect("unpins the message");
+    assert!(!harness.messages(created)[1].pinned);
+    assert!(!harness.chat.pin(&created, false).expect("unpins").pinned);
+}
+
+#[tokio::test]
 async fn chat_generation_needs_no_tool_approval_and_completes() {
     let harness = Harness::new();
     harness

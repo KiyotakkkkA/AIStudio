@@ -671,6 +671,14 @@ const TABLE: &[(&str, Check)] = &[
         "chat/UpdateConversationRelationsInput",
         round_trip::<zvs_contract::UpdateConversationRelationsInput>,
     ),
+    (
+        "chat/PinConversationInput",
+        round_trip::<zvs_contract::PinConversationInput>,
+    ),
+    (
+        "chat/PinMessageInput",
+        round_trip::<zvs_contract::PinMessageInput>,
+    ),
     ("chat/ChatCommand", round_trip::<zvs_contract::ChatCommand>),
     (
         "chat/ChatCommandDto",

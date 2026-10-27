@@ -46,6 +46,8 @@ export default function ChatMessage({
   onEdit,
   onRefresh,
   onDelete,
+  pinned = false,
+  onPin,
 }: {
   readonly content: string;
   readonly reasoning?: string;
@@ -63,6 +65,8 @@ export default function ChatMessage({
   readonly onEdit?: () => void;
   readonly onRefresh?: () => void;
   readonly onDelete?: () => void;
+  readonly pinned?: boolean;
+  readonly onPin?: () => void;
 }) {
   const { viewer, chat } = useStore();
   const [sourcesOpen, setSourcesOpen] = useState(false);
@@ -130,6 +134,8 @@ export default function ChatMessage({
             onEdit={onEdit}
             onRefresh={onRefresh}
             onDelete={onDelete}
+            pinned={pinned}
+            onPin={onPin}
           />
         </div>
       </div>

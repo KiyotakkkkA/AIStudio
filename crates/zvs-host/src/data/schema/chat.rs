@@ -20,6 +20,7 @@ pub struct ConversationRow {
     pub working_folder: Option<String>,
     pub turn_folder: Option<String>,
     pub profile: String,
+    pub pinned: bool,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
@@ -27,7 +28,7 @@ pub struct ConversationRow {
 impl ConversationRow {
     pub const COLUMNS: &str = "id, title, provider_id, model_id, settings, system_prompt, \
         attached_store_ids, use_relations, retrieval_mode, working_folder, turn_folder, \
-        profile, created_at, updated_at";
+        profile, pinned, created_at, updated_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -43,6 +44,7 @@ impl ConversationRow {
             working_folder: row.get("working_folder")?,
             turn_folder: row.get("turn_folder")?,
             profile: row.get("profile")?,
+            pinned: row.get("pinned")?,
             created_at: row.get("created_at")?,
             updated_at: row.get("updated_at")?,
         })
@@ -68,6 +70,7 @@ pub struct MessageRow {
     pub duration_ms: i64,
     pub run_id: Option<String>,
     pub partial: bool,
+    pub pinned: bool,
     pub created_at: Timestamp,
 }
 
@@ -75,7 +78,7 @@ impl MessageRow {
     pub const COLUMNS: &str = "id, conversation_id, role, content, reasoning, citations, \
         (SELECT json_group_array(json(call) ORDER BY idx) FROM message_tool_call \
         WHERE message_id = message.id) AS tool_calls, selections, command, offered_tools, web_sources, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, \
-        created_at";
+        pinned, created_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -98,6 +101,7 @@ impl MessageRow {
             duration_ms: row.get("duration_ms")?,
             run_id: row.get("run_id")?,
             partial: row.get("partial")?,
+            pinned: row.get("pinned")?,
             created_at: row.get("created_at")?,
         })
     }

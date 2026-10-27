@@ -212,5 +212,25 @@
       "partial": false,
       "createdAt": 3
     }
+  },
+  {
+    "name": "pinned assistant",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111111",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "role": "assistant",
+      "content": "Hello",
+      "reasoning": "",
+      "citations": [],
+      "toolCalls": [],
+      "tokensIn": 12,
+      "tokensOut": 2,
+      "usageEstimated": true,
+      "durationMs": 40,
+      "runId": null,
+      "partial": false,
+      "pinned": true,
+      "createdAt": 3
+    }
   }
 ]

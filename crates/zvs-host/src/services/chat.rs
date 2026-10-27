@@ -221,6 +221,7 @@ fn conversation_dto(
         retrieval_mode: row.retrieval_mode,
         working_folder: row.working_folder,
         working_folder_access,
+        pinned: row.pinned,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -295,6 +296,7 @@ fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
         duration_ms: count(row.duration_ms),
         run_id: row.run_id.as_deref().and_then(RunId::parse),
         partial: row.partial,
+        pinned: row.pinned,
         created_at: row.created_at,
     })
 }
@@ -1402,6 +1404,7 @@ impl NodeDef for PrepareNode {
             duration_ms: 0,
             run_id: Some(run_id),
             partial: true,
+            pinned: false,
             created_at: now,
         };
         inner.read(|repositories| Ok(repositories.chat.add_message(&row)?))?;
@@ -2388,6 +2391,7 @@ impl ChatService {
             working_folder: None,
             turn_folder: None,
             profile: profile.about,
+            pinned: false,
             created_at: now,
             updated_at: now,
         };
@@ -2526,6 +2530,49 @@ impl ChatService {
         )
     }
 
+    pub fn pin(&self, id: &ConversationId, pinned: bool) -> Result<ConversationDto, AppError> {
+        let id = id.to_string();
+        self.inner.conversation(&id)?;
+        self.update(
+            &id,
+            &ConversationPatch {
+                pinned: Some(pinned),
+                ..ConversationPatch::default()
+            },
+        )
+    }
+
+    pub fn pin_message(
+        &self,
+        conversation_id: &ConversationId,
+        message_id: &MessageId,
+        pinned: bool,
+    ) -> Result<MessageDto, AppError> {
+        let id = conversation_id.to_string();
+        self.inner.conversation(&id)?;
+        let message = message_id.to_string();
+        let saved = self.inner.read(|repositories| {
+            let found = repositories
+                .chat
+                .get_message(&message)?
+                .filter(|row| row.conversation_id == id);
+            if found.is_none() {
+                return Ok(None);
+            }
+            repositories.chat.update_message(
+                &message,
+                &MessagePatch {
+                    pinned: Some(pinned),
+                    ..MessagePatch::default()
+                },
+            )?;
+            Ok(repositories.chat.get_message(&message)?)
+        })?;
+        saved
+            .ok_or_else(|| AppError::new(AppErrorCode::NotFound, MESSAGE_NOT_FOUND))
+            .and_then(message_dto)
+    }
+
     pub fn truncate(
         &self,
         conversation_id: &ConversationId,
@@ -2583,6 +2630,7 @@ impl ChatService {
             duration_ms: 0,
             run_id: None,
             partial: false,
+            pinned: false,
             created_at: now,
         };
         let saved = self.inner.read(|repositories| {
@@ -2772,6 +2820,7 @@ impl ChatService {
             duration_ms: 0,
             run_id: None,
             partial: false,
+            pinned: false,
             created_at: now,
         };
         let announced = (user.id.clone(), user.content.clone());

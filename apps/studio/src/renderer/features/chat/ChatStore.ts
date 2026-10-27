@@ -93,6 +93,7 @@ export default class ChatStore {
   panelOpen = true;
   browserWidth = BROWSER_DOCK_DEFAULT_WIDTH;
   listOpen = true;
+  pinsOpen = true;
   loading = false;
   sending = false;
   stopping = false;
@@ -480,6 +481,15 @@ export default class ChatStore {
   toggleList() {
     this.listOpen = !this.listOpen;
   }
+  get pinnedMessages(): MessageDto[] {
+    return this.active?.messages.filter((message) => message.pinned) ?? [];
+  }
+  get pinsShown() {
+    return this.pinsOpen && this.pinnedMessages.length > 0;
+  }
+  togglePins() {
+    this.pinsOpen = !this.pinsOpen;
+  }
   get activePanel(): SidePanel {
     if (this.sidePanel === "files") return this.workingFolder === null ? "context" : "files";
     return this.sidePanel;
@@ -794,6 +804,41 @@ export default class ChatStore {
       this.conversations = this.conversations.map((item) => (item.id === id ? updated : item));
       if (this.active?.id === id) this.active = { ...this.active, ...updated };
     });
+  }
+
+  async pinConversation(id: ConversationId, pinned: boolean) {
+    try {
+      const updated = await this.ipc.call("chat.conversations.pin", { id, pinned });
+      runInAction(() => {
+        this.conversations = this.conversations.map((item) => (item.id === id ? updated : item));
+        if (this.active?.id === id) this.active = { ...this.active, ...updated };
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.error = errorCopy(error);
+      });
+    }
+  }
+
+  async pinMessage(messageId: MessageId, pinned: boolean) {
+    const id = this.active?.id;
+    if (!id) return;
+    try {
+      const updated = await this.ipc.call("chat.messages.pin", { id, messageId, pinned });
+      runInAction(() => {
+        if (this.active?.id !== id) return;
+        this.active = {
+          ...this.active,
+          messages: this.active.messages.map((message) =>
+            message.id === messageId ? { ...message, pinned: updated.pinned } : message,
+          ),
+        };
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.error = errorCopy(error);
+      });
+    }
   }
 
   async removeConversation(id: ConversationId) {

@@ -424,6 +424,8 @@ pub struct ConversationDto {
     pub working_folder: Option<String>,
     #[serde(default)]
     pub working_folder_access: Option<WorkingFolderAccess>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub pinned: bool,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
@@ -516,6 +518,8 @@ pub struct MessageDto {
     #[serde(deserialize_with = "crate::wire::nullable")]
     pub run_id: Option<RunId>,
     pub partial: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub pinned: bool,
     pub created_at: Timestamp,
 }
 
@@ -757,6 +761,21 @@ pub struct UpdateConversationRelationsInput {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PinConversationInput {
+    pub id: ConversationId,
+    pub pinned: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PinMessageInput {
+    pub id: ConversationId,
+    pub message_id: MessageId,
+    pub pinned: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateConversationRetrievalInput {
     pub id: ConversationId,
     pub retrieval_mode: RetrievalMode,
@@ -906,6 +925,8 @@ pub type ChatAttachOutput = Option<ChatAttachDto>;
 crate::validate::no_refinements!(
     ChatAttachInput,
     ConversationRef,
+    PinConversationInput,
+    PinMessageInput,
     TruncateConversationInput,
     UpdateConversationRelationsInput,
     UpdateConversationRetrievalInput

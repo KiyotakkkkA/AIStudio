@@ -143,6 +143,7 @@ const ConversationFields = CreateConversationInput.extend({
   id: ConversationId,
   workingFolder: FolderPath.nullable().default(null),
   workingFolderAccess: WorkingFolderAccess.nullable().default(null),
+  pinned: z.boolean().default(false),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
 });
@@ -193,6 +194,7 @@ export const MessageDto = z.object({
   durationMs: z.number().int().nonnegative(),
   runId: RunId.nullable(),
   partial: z.boolean(),
+  pinned: z.boolean().default(false),
   createdAt: z.number().int(),
 });
 export type MessageDto = z.infer<typeof MessageDto>;
@@ -240,6 +242,10 @@ export const ChatContextDto = z.object({
 export type ChatContextDto = z.infer<typeof ChatContextDto>;
 export const TruncateConversationInput = ConversationRef.extend({ messageId: MessageId });
 export type TruncateConversationInput = z.infer<typeof TruncateConversationInput>;
+export const PinConversationInput = ConversationRef.extend({ pinned: z.boolean() });
+export type PinConversationInput = z.infer<typeof PinConversationInput>;
+export const PinMessageInput = TruncateConversationInput.extend({ pinned: z.boolean() });
+export type PinMessageInput = z.infer<typeof PinMessageInput>;
 
 export const BindFolderInput = z.object({
   id: ConversationId,

@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { mdiCheck, mdiContentCopy, mdiDeleteOutline, mdiPencilOutline, mdiRefresh } from "@mdi/js";
+import {
+  mdiCheck,
+  mdiContentCopy,
+  mdiDeleteOutline,
+  mdiPencilOutline,
+  mdiPin,
+  mdiPinOutline,
+  mdiRefresh,
+} from "@mdi/js";
 import IconButton from "../atoms/buttons/IconButton";
 
 export default function MessageActions({
@@ -8,12 +16,16 @@ export default function MessageActions({
   onEdit,
   onRefresh,
   onDelete,
+  pinned = false,
+  onPin,
 }: {
   readonly content: string;
   readonly isUser?: boolean;
   readonly onEdit?: () => void;
   readonly onRefresh?: () => void;
   readonly onDelete?: () => void;
+  readonly pinned?: boolean;
+  readonly onPin?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const tooltip = isUser ? "bottom-left" : "top-right";
@@ -56,6 +68,19 @@ export default function MessageActions({
             onClick={onRefresh}
           />{" "}
         </>
+      )}
+      {onPin && (
+        <IconButton
+          aria-label={pinned ? "Открепить сообщение" : "Закрепить сообщение"}
+          aria-pressed={pinned}
+          label={pinned ? "Открепить" : "Закрепить"}
+          tooltip={tooltip}
+          path={pinned ? mdiPin : mdiPinOutline}
+          {...(pinned
+            ? { toneClassName: "text-accent-medium hover:bg-main-700 hover:text-accent-light" }
+            : {})}
+          onClick={onPin}
+        />
       )}
       {onEdit && (
         <IconButton
