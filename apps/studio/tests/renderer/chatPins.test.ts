@@ -100,3 +100,12 @@ test("pinning a conversation updates the list and the open dialog", async () => 
   expect(store.active?.pinned).toBe(true);
   expect(store.active?.messages).toHaveLength(1);
 });
+
+test("showing an artifact asks the feed to scroll again even for the same file", () => {
+  const { store } = setup();
+  store.showArtifact(answer.id, "run/a.pdf");
+  const first = store.artifactTarget;
+  store.showArtifact(answer.id, "run/a.pdf");
+  expect(store.artifactTarget).toMatchObject({ messageId: answer.id, artifactId: "run/a.pdf" });
+  expect(store.artifactTarget?.nonce).toBe((first?.nonce ?? 0) + 1);
+});

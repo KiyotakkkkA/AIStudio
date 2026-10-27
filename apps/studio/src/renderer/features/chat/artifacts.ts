@@ -1,4 +1,10 @@
-import { ArtifactDto, AppErrorCode, type ChatToolCallDto } from "@zvs/shared";
+import {
+  ArtifactDto,
+  AppErrorCode,
+  type ChatToolCallDto,
+  type MessageDto,
+  type MessageId,
+} from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 import { formatBytes } from "../downloads/downloadPresentation";
@@ -14,6 +20,9 @@ export const OPEN_IN_DEFAULT_APP = "Открыть в приложении по 
 export const VIEWER_UNAVAILABLE = "Формат не поддерживается просмотрщиком";
 export const OPEN_IN_BUILT_IN_BROWSER = "Открыть во встроенном браузере";
 export const DASHBOARD_KIND = "Дашборд";
+export const ARTIFACTS_SECTION = "Артефакты";
+export const NO_DIALOG_ARTIFACTS = "В диалоге нет созданных файлов";
+export const SHOW_IN_CHAT = "Показать в диалоге";
 
 const PAGE_FORMATS = new Set(["html", "htm", "svg", "pdf", "png", "jpg", "jpeg"]);
 const DASHBOARDS_PREFIX = "dashboards/";
@@ -117,6 +126,23 @@ export function answerArtifacts(calls: readonly ChatToolCallDto[]): ArtifactDto[
     for (const artifact of parsed.data) {
       byId.delete(artifact.id);
       byId.set(artifact.id, artifact);
+    }
+  }
+  return [...byId.values()];
+}
+
+export interface DialogArtifact {
+  readonly messageId: MessageId;
+  readonly artifact: ArtifactDto;
+}
+
+export function dialogArtifacts(messages: readonly MessageDto[]): DialogArtifact[] {
+  const byId = new Map<string, DialogArtifact>();
+  for (const message of messages) {
+    if (message.role !== "assistant") continue;
+    for (const artifact of answerArtifacts(message.toolCalls)) {
+      byId.delete(artifact.id);
+      byId.set(artifact.id, { messageId: message.id, artifact });
     }
   }
   return [...byId.values()];

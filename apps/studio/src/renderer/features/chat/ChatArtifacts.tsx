@@ -113,6 +113,7 @@ function ChatArtifacts({
         return (
           <ArtifactTile
             key={artifact.id}
+            anchor={artifact.id}
             name={artifact.name}
             format={artifact.format}
             subtitle={artifactSubtitle(artifact)}

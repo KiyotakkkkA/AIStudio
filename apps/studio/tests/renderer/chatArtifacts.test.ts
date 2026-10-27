@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { createIpcClient } from "@zvs/ipc";
-import { AppErrorCode, ChatToolCallDto, contract, type Contract } from "@zvs/shared";
+import { AppErrorCode, ChatToolCallDto, MessageDto, contract, type Contract } from "@zvs/shared";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import ArtifactActions from "../../src/renderer/features/chat/ArtifactActions.ts";
 import { formatBytes } from "../../src/renderer/features/downloads/downloadPresentation.ts";
@@ -11,6 +11,7 @@ import {
   answerArtifacts,
   artifactKind,
   artifactSubtitle,
+  dialogArtifacts,
   opensAsPage,
   stepArtifacts,
 } from "../../src/renderer/features/chat/artifacts.ts";
@@ -137,4 +138,38 @@ test("a page opens in a listed browser or the built-in one, never offering the d
     ["artifacts.openInBrowser", { id: dashboard.id, browser: "Microsoft Edge" }],
     ["artifacts.openInApp", { id: dashboard.id }],
   ]);
+});
+
+const message = (id: string, role: string, calls: unknown[]) =>
+  MessageDto.parse({
+    id,
+    conversationId: "0199aa11-2222-7111-8111-111111111111",
+    role,
+    content: "",
+    citations: [],
+    toolCalls: calls,
+    tokensIn: 0,
+    tokensOut: 0,
+    usageEstimated: false,
+    durationMs: 0,
+    runId: null,
+    partial: false,
+    createdAt: 1,
+  });
+
+test("the dialog lists each artifact once, pointing at the answer that last produced it", () => {
+  const first = "0199aa11-3333-7111-8111-000000000001";
+  const second = "0199aa11-3333-7111-8111-000000000002";
+  const listed = dialogArtifacts([
+    message(first, "assistant", [
+      call("succeeded", { artifacts: [artifact("Отчёт.docx"), artifact("data.xlsx")] }),
+    ]),
+    message("0199aa11-3333-7111-8111-000000000003", "user", []),
+    message(second, "assistant", [call("succeeded", { artifacts: [artifact("Отчёт.docx", 30)] })]),
+  ]);
+  expect(listed.map((row) => [row.artifact.name, row.messageId, row.artifact.sizeBytes])).toEqual([
+    ["data.xlsx", first, 2048],
+    ["Отчёт.docx", second, 30],
+  ]);
+  expect(dialogArtifacts([])).toEqual([]);
 });

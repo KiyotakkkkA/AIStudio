@@ -93,6 +93,27 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
       ?.scrollIntoView({ block: "start", behavior: level === "full" ? "smooth" : "auto" });
     setPinAt(id);
   };
+  const artifactTarget = store.artifactTarget;
+  useEffect(() => {
+    const element = viewport.current;
+    if (!artifactTarget || !element) return;
+    const message = Array.from(element.querySelectorAll<HTMLElement>("[data-message-id]")).find(
+      (node) => node.dataset.messageId === artifactTarget.messageId,
+    );
+    const tile =
+      Array.from(message?.querySelectorAll<HTMLElement>("[data-artifact-id]") ?? []).find(
+        (node) => node.dataset.artifactId === artifactTarget.artifactId,
+      ) ?? message;
+    if (!tile) return;
+    pinned.current = false;
+    tile.scrollIntoView({ block: "center", behavior: level === "full" ? "smooth" : "auto" });
+    if (level !== "none" && typeof tile.animate === "function")
+      tile.animate([{ backgroundColor: "var(--color-accent-soft)", offset: 0 }], {
+        duration: 1600,
+        easing: "ease-out",
+      });
+    if (window.matchMedia?.("(max-width: 1100px)").matches) store.closePanel();
+  }, [artifactTarget, level, store]);
   useEffect(() => {
     if (!content.current || typeof ResizeObserver === "undefined") return;
     const resize = new ResizeObserver(() => {

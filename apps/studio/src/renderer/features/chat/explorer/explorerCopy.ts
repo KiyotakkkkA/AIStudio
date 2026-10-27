@@ -2,7 +2,7 @@ import { AppErrorCode, EXPLORER_LIST_MAX } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 
 export const PANEL_GROUP_LABEL = "Боковая панель";
-export const CONTEXT_PANEL = "Контекст запуска";
+export const CONTEXT_PANEL = "Контекст";
 export const FILES_PANEL = "Файлы";
 export const TREE_LABEL = "Файлы рабочей папки";
 export const COLLAPSE_ALL = "Свернуть всё";

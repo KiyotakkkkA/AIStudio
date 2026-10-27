@@ -55,6 +55,7 @@ export default function ArtifactTile({
   actions,
   error,
   notice,
+  anchor,
 }: {
   readonly name: string;
   readonly format: string;
@@ -62,10 +63,14 @@ export default function ArtifactTile({
   readonly actions: ReactNode;
   readonly error?: string | undefined;
   readonly notice?: string | undefined;
+  readonly anchor?: string;
 }) {
   const tone = artifactKind(format).tone;
   return (
-    <li className="flex max-w-120 flex-col gap-1.5 rounded-card border border-line bg-main-900 px-3 py-2.5">
+    <li
+      data-artifact-id={anchor}
+      className="flex max-w-120 flex-col gap-1.5 rounded-card border border-line bg-main-900 px-3 py-2.5"
+    >
       <div className="flex items-center gap-3">
         <span
           aria-hidden="true"

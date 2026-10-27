@@ -49,6 +49,7 @@ import { adapterLabel } from "../providers/accountPresentation";
 import { suggestedBaseUrl } from "../providers/providerPresentation";
 import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
 import ArtifactActions from "./ArtifactActions";
+import { dialogArtifacts, type DialogArtifact } from "./artifacts";
 import SiteIcons from "./SiteIcons";
 import ExplorerStore from "./explorer/ExplorerStore";
 import TerminalStore from "../terminal/TerminalStore";
@@ -94,6 +95,7 @@ export default class ChatStore {
   browserWidth = BROWSER_DOCK_DEFAULT_WIDTH;
   listOpen = true;
   pinsOpen = true;
+  artifactTarget: { messageId: MessageId; artifactId: string; nonce: number } | null = null;
   loading = false;
   sending = false;
   stopping = false;
@@ -489,6 +491,12 @@ export default class ChatStore {
   }
   togglePins() {
     this.pinsOpen = !this.pinsOpen;
+  }
+  get dialogArtifacts(): DialogArtifact[] {
+    return dialogArtifacts(this.active?.messages ?? []);
+  }
+  showArtifact(messageId: MessageId, artifactId: string) {
+    this.artifactTarget = { messageId, artifactId, nonce: (this.artifactTarget?.nonce ?? 0) + 1 };
   }
   get activePanel(): SidePanel {
     if (this.sidePanel === "files") return this.workingFolder === null ? "context" : "files";
