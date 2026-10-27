@@ -452,7 +452,9 @@ impl Validate for ConversationDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DocumentSelectionDto {
-    pub document_id: DocumentId,
+    pub document_id: Option<DocumentId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_id: Option<MessageId>,
     pub name: String,
     #[serde(default)]
     pub page: Option<u64>,
@@ -464,6 +466,9 @@ pub struct DocumentSelectionDto {
 
 impl Validate for DocumentSelectionDto {
     fn validate(&self) -> Result<(), AppError> {
+        if self.document_id.is_some() == self.message_id.is_some() {
+            return Err(invalid("messageId", "documentId"));
+        }
         check::non_empty("name", &self.name)?;
         check::max_len("name", &self.name, SELECTION_NAME_MAX)?;
         self.page.map_or(Ok(()), |page| positive("page", page))?;

@@ -300,6 +300,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
               ) : (
                 <div key={message.id} data-message-id={message.id} className="scroll-mt-6">
                   <ChatMessage
+                    messageId={message.id}
                     content={message.content}
                     reasoning={message.reasoning}
                     citations={answerCitations(message.citations, message.toolCalls)}

@@ -58,7 +58,7 @@ import { toolSections } from "./toolSets";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
 const LAST_CONVERSATION_KEY = "chat.conversation.last";
-export const SELECTIONS_FULL = "К сообщению можно приложить не больше 8 фрагментов документов.";
+export const SELECTIONS_FULL = "К сообщению можно приложить не больше 8 фрагментов.";
 export const GENERATION_FAILED = "Не удалось получить ответ. Повторите запрос.";
 
 export type SidePanel = "context" | "files" | "browser";

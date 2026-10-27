@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import type {
   ChatCitationDto,
   DocumentSelectionDto,
+  MessageId,
   VectorStoreDto,
   VectorStoreId,
   WebSourceDto,
@@ -10,6 +11,7 @@ import { ScrollArea, SlidedPanel, Tabs } from "@kiyotakkkka/zvs-uikit-lib";
 import { mdiFileEyeOutline } from "@mdi/js";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import ChatMarkdown from "./ChatMarkdown";
+import AnswerQuote from "./AnswerQuote";
 import ReasoningBlock from "./ReasoningBlock";
 import ChatSources from "./ChatSources";
 import WebSourceCard from "./WebSourceCard";
@@ -20,7 +22,9 @@ import {
   SELECTIONS_TAB,
   citationLocation,
   citationSources,
+  documentSelections,
   selectionLocation,
+  type DocumentQuote,
   selectionSources,
 } from "./citations";
 import { excerptPreview } from "./selectionCopy";
@@ -30,11 +34,12 @@ import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
 import GenerationStatus from "../../ui/molecules/GenerationStatus";
 
 export default function ChatMessage({
+  messageId,
   content,
   reasoning = "",
   citations,
   webSources = [],
-  selections = [],
+  selections: attached = [],
   stores,
   partial = false,
   generating = false,
@@ -49,6 +54,7 @@ export default function ChatMessage({
   pinned = false,
   onPin,
 }: {
+  readonly messageId?: MessageId;
   readonly content: string;
   readonly reasoning?: string;
   readonly citations: readonly ChatCitationDto[];
@@ -69,6 +75,7 @@ export default function ChatMessage({
   readonly onPin?: () => void;
 }) {
   const { viewer, chat } = useStore();
+  const selections = documentSelections(attached);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const storeName = (storeId: VectorStoreId) =>
     stores.find((store) => store.id === storeId)?.name ?? "Хранилище";
@@ -76,7 +83,7 @@ export default function ChatMessage({
     setSourcesOpen(false);
     void viewer.openCitation(citation, citationLocation(citation, storeName(citation.storeId)));
   };
-  const viewSelection = (selection: DocumentSelectionDto) => {
+  const viewSelection = (selection: DocumentQuote) => {
     setSourcesOpen(false);
     void viewer.openSelection(selection, selectionLocation(selection));
   };
@@ -94,6 +101,16 @@ export default function ChatMessage({
   const selectedTab = tabs.find((tab) => tab === activeTab) ?? tabs[0] ?? "";
   const selectedCitations = citations.filter((citation) => citation.storeId === selectedTab);
   const thinking = generating && content === "";
+  const markdown = (
+    <ChatMarkdown
+      content={content}
+      streaming={generating}
+      citations={citations}
+      webSources={webSources}
+      onCite={view}
+      onOpenWeb={openWeb}
+    />
+  );
   const sources = citationSources(citations, storeName);
 
   return (
@@ -103,14 +120,11 @@ export default function ChatMessage({
         <div className="space-y-3">
           {reasoning && <ReasoningBlock reasoning={reasoning} thinking={thinking} />}
           {tools}
-          <ChatMarkdown
-            content={content}
-            streaming={generating}
-            citations={citations}
-            webSources={webSources}
-            onCite={view}
-            onOpenWeb={openWeb}
-          />
+          {messageId === undefined || generating ? (
+            markdown
+          ) : (
+            <AnswerQuote messageId={messageId}>{markdown}</AnswerQuote>
+          )}
           {generating && <GenerationStatus label={status} since={since} />}
           <ChatSources
             sources={sources}

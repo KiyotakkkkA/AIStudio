@@ -160,7 +160,8 @@ export const SELECTION_TEXT_MAX = 8000;
 
 export const DocumentSelectionDto = z
   .object({
-    documentId: DocumentId,
+    documentId: DocumentId.nullable(),
+    messageId: MessageId.optional(),
     name: z.string().min(1).max(1024),
     page: z.number().int().positive().nullable().default(null),
     start: z.number().int().nonnegative(),
@@ -171,7 +172,10 @@ export const DocumentSelectionDto = z
       .refine((text) => text.trim().length > 0),
     untrusted: z.literal(true),
   })
-  .refine((selection) => selection.end > selection.start, { path: ["end"] });
+  .refine((selection) => selection.end > selection.start, { path: ["end"] })
+  .refine((selection) => (selection.documentId === null) !== (selection.messageId === undefined), {
+    path: ["messageId"],
+  });
 export type DocumentSelectionDto = z.infer<typeof DocumentSelectionDto>;
 
 const Selections = z.array(DocumentSelectionDto).max(CHAT_SELECTIONS_MAX);

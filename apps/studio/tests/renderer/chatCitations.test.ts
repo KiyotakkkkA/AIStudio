@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { ChatCitationDto, ChatToolCallDto, DocumentSelectionDto } from "@zvs/shared";
+import { ChatCitationDto, ChatToolCallDto, DocumentSelectionDto, MessageId } from "@zvs/shared";
 import {
   ALL_FRAGMENTS,
   answerCitations,
@@ -11,6 +11,8 @@ import {
   sourceDetail,
   sourceName,
 } from "../../src/renderer/features/chat/citations.ts";
+import { answerQuote } from "../../src/renderer/features/chat/answerQuoteModel.ts";
+import { ANSWER_QUOTE_NAME } from "../../src/renderer/features/chat/selectionCopy.ts";
 
 const store = "0199aa11-2222-7111-8111-111111111111";
 
@@ -115,4 +117,45 @@ test("an answer takes the fragments attached to the question before it", () => {
   ]);
   expect(byAnswer.get("a1")).toBe(first);
   expect(byAnswer.get("a2")).toEqual([]);
+});
+
+const ANSWER = MessageId.parse("0199aa11-3333-7333-8333-333333333333");
+
+test("a selection inside an answer becomes a quote of that answer", () => {
+  const root = document.createElement("div");
+  root.innerHTML = "<p>Выручка <b>11,12</b> млрд руб.</p>";
+  const range = document.createRange();
+  range.setStart(root.firstChild!.firstChild!, 3);
+  range.setEnd(root.firstChild!.lastChild!, 5);
+  const quote = answerQuote(root, range, ANSWER);
+  expect(quote).toEqual({
+    documentId: null,
+    messageId: ANSWER,
+    name: ANSWER_QUOTE_NAME,
+    page: null,
+    start: 3,
+    end: 18,
+    text: "учка 11,12 млрд",
+    untrusted: true,
+  });
+  expect(DocumentSelectionDto.safeParse(quote).success).toBe(true);
+
+  const elsewhere = document.createElement("p");
+  elsewhere.textContent = "чужой текст";
+  const across = document.createRange();
+  across.setStart(root.firstChild!.firstChild!, 0);
+  across.setEnd(elsewhere.firstChild!, 3);
+  expect(answerQuote(root, across, ANSWER)).toBeNull();
+  range.collapse(true);
+  expect(answerQuote(root, range, ANSWER)).toBeNull();
+});
+
+test("quotes of answers are not listed as document sources", () => {
+  const root = document.createElement("div");
+  root.textContent = "Вывод ответа";
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  const quote = answerQuote(root, range, ANSWER)!;
+  const sources = selectionSources([quote, picked(DOC_A, 1, 0)]);
+  expect(sources.map((source) => source.name)).toEqual(["Отчёт.pdf"]);
 });

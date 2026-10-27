@@ -1252,8 +1252,10 @@ async fn a_document_selection_travels_with_the_message_fenced_as_untrusted() {
     let harness = Harness::new();
     let created = harness.conversation();
     let selection = zvs_contract::DocumentSelectionDto {
-        document_id: zvs_contract::DocumentId::parse("0199aa11-2222-7222-8222-222222222222")
-            .expect("an id"),
+        document_id: Some(
+            zvs_contract::DocumentId::parse("0199aa11-2222-7222-8222-222222222222").expect("an id"),
+        ),
+        message_id: None,
         name: "Отчёт.docx".to_owned(),
         page: Some(2),
         start: 10,
@@ -1291,8 +1293,10 @@ async fn too_many_selections_are_refused_before_a_run_starts() {
     let harness = Harness::new();
     let created = harness.conversation();
     let selection = zvs_contract::DocumentSelectionDto {
-        document_id: zvs_contract::DocumentId::parse("0199aa11-2222-7222-8222-222222222222")
-            .expect("an id"),
+        document_id: Some(
+            zvs_contract::DocumentId::parse("0199aa11-2222-7222-8222-222222222222").expect("an id"),
+        ),
+        message_id: None,
         name: "a.pdf".to_owned(),
         page: None,
         start: 0,

@@ -5,6 +5,7 @@ import type {
   ChatCitationDto,
   Contract,
   DocumentDto,
+  DocumentId,
   DocumentRef,
   DocumentSelectionDto,
 } from "@zvs/shared";
@@ -173,7 +174,10 @@ export default class ViewerStore {
     );
   }
 
-  openSelection(selection: DocumentSelectionDto, location: string | null = null): Promise<void> {
+  openSelection(
+    selection: DocumentSelectionDto & { readonly documentId: DocumentId },
+    location: string | null = null,
+  ): Promise<void> {
     return this.open(
       { source: "document", documentId: selection.documentId },
       {

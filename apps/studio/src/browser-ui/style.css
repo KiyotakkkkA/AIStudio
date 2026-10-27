@@ -1191,8 +1191,10 @@ button.ghost {
 .agent-panel {
   display: flex;
   flex: 0 0 344px;
+  min-width: 0;
   min-height: 0;
   flex-direction: column;
+  overflow: hidden;
   background: var(--color-main-850);
 }
 .agent-head {
@@ -1282,6 +1284,7 @@ button.ghost {
   font-weight: 600;
 }
 .agent-target code {
+  min-width: 0;
   overflow: hidden;
   color: var(--color-main-100);
   font: 11px var(--font-mono);

@@ -1,5 +1,5 @@
 import type { DocumentSelectionDto } from "@zvs/shared";
-import { mdiClose, mdiTextBoxOutline } from "@mdi/js";
+import { mdiClose, mdiCommentQuoteOutline, mdiTextBoxOutline } from "@mdi/js";
 import Icon from "../../ui/atoms/Icon";
 import {
   SELECTIONS_LABEL,
@@ -25,11 +25,14 @@ export default function SelectionChips({
     >
       {selections.map((selection, index) => (
         <li
-          key={`${selection.documentId}:${String(selection.page)}:${String(selection.start)}`}
+          key={`${selection.documentId ?? selection.messageId ?? ""}:${String(selection.page)}:${String(selection.start)}`}
           title={selection.text}
           className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-full bg-accent-soft pr-1.5 pl-2.5 text-[12px] font-medium text-accent-medium"
         >
-          <Icon path={mdiTextBoxOutline} size={14} />
+          <Icon
+            path={selection.documentId === null ? mdiCommentQuoteOutline : mdiTextBoxOutline}
+            size={14}
+          />
           <span className="max-w-48 truncate">{selectionTitle(selection)}</span>
           <span className="max-w-56 truncate font-normal text-main-400">
             «{excerptPreview(selection.text)}»

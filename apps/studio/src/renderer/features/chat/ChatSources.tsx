@@ -1,4 +1,4 @@
-import type { ChatCitationDto, DocumentSelectionDto, WebSourceDto } from "@zvs/shared";
+import type { ChatCitationDto, WebSourceDto } from "@zvs/shared";
 import {
   SOURCES_SHOWN,
   SOURCES_TITLE,
@@ -6,6 +6,7 @@ import {
   selectionDetail,
   sourceDetail,
   type CitationSource,
+  type DocumentQuote,
   type SelectionSource,
 } from "./citations";
 import SiteIcon from "./SiteIcon";
@@ -35,7 +36,7 @@ export default function ChatSources({
   readonly fragments: number;
   readonly onOpen: () => void;
   readonly onView: (citation: ChatCitationDto) => void;
-  readonly onViewSelection: (selection: DocumentSelectionDto) => void;
+  readonly onViewSelection: (selection: DocumentQuote) => void;
   readonly onOpenWeb: (source: WebSourceDto) => void;
 }) {
   const rows: SourceRow[] = [

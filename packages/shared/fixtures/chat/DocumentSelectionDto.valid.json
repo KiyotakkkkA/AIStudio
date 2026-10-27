@@ -22,5 +22,18 @@
       "text": "Выручка составила 11,12 млрд руб.",
       "untrusted": true
     }
+  },
+  {
+    "name": "answer quote",
+    "value": {
+      "documentId": null,
+      "messageId": "0199aa11-3333-7333-8333-333333333333",
+      "name": "Ответ ассистента",
+      "page": null,
+      "start": 12,
+      "end": 46,
+      "text": "Выручка составила 11,12 млрд руб.",
+      "untrusted": true
+    }
   }
 ]

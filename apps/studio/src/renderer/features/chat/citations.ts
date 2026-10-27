@@ -1,4 +1,9 @@
-import { ChatCitationDto, type ChatToolCallDto, type DocumentSelectionDto } from "@zvs/shared";
+import {
+  ChatCitationDto,
+  type ChatToolCallDto,
+  type DocumentId,
+  type DocumentSelectionDto,
+} from "@zvs/shared";
 import { plural } from "../connections/connectionPresentation";
 
 const ToolCitations = ChatCitationDto.array();
@@ -109,20 +114,28 @@ export const SELECTIONS_TAB = "Выделенные фрагменты";
 export const SELECTION_ORIGIN = "выделено в документе";
 export const OPEN_SELECTION = "Открыть фрагмент в документе";
 
+export type DocumentQuote = DocumentSelectionDto & { readonly documentId: DocumentId };
+
+export function documentSelections(selections: readonly DocumentSelectionDto[]): DocumentQuote[] {
+  return selections.filter(
+    (selection): selection is DocumentQuote => selection.documentId !== null,
+  );
+}
+
 export interface SelectionSource {
   readonly key: string;
   readonly name: string;
   readonly pages: readonly number[];
   readonly fragments: number;
-  readonly selection: DocumentSelectionDto;
+  readonly selection: DocumentQuote;
 }
 
 export function selectionSources(selections: readonly DocumentSelectionDto[]): SelectionSource[] {
   const grouped = new Map<
     string,
-    { selection: DocumentSelectionDto; pages: Set<number>; count: number }
+    { selection: DocumentQuote; pages: Set<number>; count: number }
   >();
-  for (const selection of selections) {
+  for (const selection of documentSelections(selections)) {
     const entry = grouped.get(selection.documentId) ?? {
       selection,
       pages: new Set<number>(),
