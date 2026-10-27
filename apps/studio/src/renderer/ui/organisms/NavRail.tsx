@@ -158,7 +158,7 @@ export default function NavRail({
                 iconSize={16}
                 onClick={onOpenIdentity}
                 className={RAIL_ICON_BUTTON}
-                />
+              />
             </>
           )}
         </div>

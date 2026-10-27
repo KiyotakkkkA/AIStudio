@@ -28,7 +28,7 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
           <EmptyState
             icon={mdiHeartPulse}
             title="Нет данных"
-            description="Время работы, вызовы, задержки и журнал появятся после первого подключения."
+            description="Данные появятся после первого подключения."
           />
         </div>
       </aside>

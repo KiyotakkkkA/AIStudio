@@ -45,8 +45,7 @@ export const OVERLAP_LABELS: Record<ScenarioOverlap, string> = {
   queue: "Ставить в очередь",
 };
 
-export const OVERLAP_HINT =
-  "Что делать, если триггер срабатывает, пока предыдущий запуск сценария ещё выполняется.";
+export const OVERLAP_HINT = "Что делать, если триггер срабатывает во время предыдущего запуска.";
 
 export const TOOL_CALL_LABEL = "Вызов инструмента";
 

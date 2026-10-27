@@ -117,7 +117,7 @@ export const FONT_SIZE_HINT = "Масштаб текста и элементов
 
 export const FX_LABEL = "Эффекты";
 export const FX_HINT = "Анимации переходов и состояний.";
-export const FX_OS_NOTE = "Сейчас уровень выбран по настройке анимаций Windows.";
+export const FX_OS_NOTE = "Уровень выбран по настройке анимаций Windows.";
 export const FX_OPTIONS: readonly { value: FxPreset; label: string }[] = [
   { value: "none", label: "Нет" },
   { value: "reduced", label: "Меньше" },

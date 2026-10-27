@@ -34,7 +34,7 @@ use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 pub const SKILLS_DIR: &str = "skills";
 pub const SKILL_NOT_FOUND: &str = "Навык не найден";
 pub const SKILL_INVALID: &str = "Навык не прошёл проверку";
-pub const SKILL_NOT_READY: &str = "Навык содержит ошибки и не может быть использован";
+pub const SKILL_NOT_READY: &str = "Навык содержит ошибки, его нельзя использовать";
 pub const SKILL_DISABLED: &str = "Навык выключен";
 pub const SKILL_FILE_NOT_FOUND: &str = "Файл навыка не найден";
 pub const SKILL_SCRIPT_OUTSIDE: &str = "Запускать можно только файлы из папки scripts/";

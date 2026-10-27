@@ -15,10 +15,10 @@ export const SECURITY_LABELS = {
 } as const;
 
 export const SECURITY_HINT =
-  "HTTPS означает, что основная страница загружена по HTTPS без принятого исключения для сертификата. Надёжность сайта это не подтверждает.";
+  "Основная страница загружена по HTTPS. Надёжность сайта это не подтверждает.";
 
 export const ACTION_FAILED =
-  "Действие не выполнено. Допустимы только адреса HTTP и HTTPS; одновременно открыто не более 30 вкладок.";
+  "Действие не выполнено. Допустимы адреса HTTP и HTTPS, не более 30 вкладок.";
 
 export const STATUS_LOADING = "Загрузка…";
 export const STATUS_READY = "Готово";
@@ -26,10 +26,9 @@ export const PROFILE_LABEL = "Рабочий профиль";
 export const PROFILE_FOOTER = "Загрузки только с подтверждением";
 
 export const SITES_TITLE = "Сайты и куки";
-export const SITES_HINT =
-  "Куки рабочего профиля. Удаление куки может завершить сеанс на сайте — войти можно снова.";
+export const SITES_HINT = "Куки рабочего профиля. Удаление куки может завершить сеанс на сайте.";
 export const SITES_EMPTY = "Куки нет.";
-export const SITES_EMPTY_HINT = "Они появятся после посещения сайтов в рабочем профиле.";
+export const SITES_EMPTY_HINT = "Куки появляются после посещения сайтов.";
 export const SITES_NOTHING_FOUND = "Ничего не найдено.";
 export const CLEAR_SITE = "Очистить куки";
 export const REMOVE_COOKIE = "Удалить";

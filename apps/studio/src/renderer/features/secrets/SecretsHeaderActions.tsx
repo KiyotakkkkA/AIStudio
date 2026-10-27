@@ -4,7 +4,7 @@ import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import { useStore } from "../../stores/useStore";
 
-const IMPORT_HINT = "Импорт .env появится в отдельной задаче — канал ещё не существует.";
+const IMPORT_HINT = "Импорт .env пока недоступен.";
 
 function SecretsHeaderActions() {
   const { secrets } = useStore();

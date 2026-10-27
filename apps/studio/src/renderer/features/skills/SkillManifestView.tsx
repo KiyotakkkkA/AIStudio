@@ -25,7 +25,7 @@ function SkillManifestView({
   return (
     <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3.5 px-4.5 py-4">
       {storedIssues.length > 0 ? (
-        <Alert title="Навык не может быть использован, пока ошибки не исправлены.">
+        <Alert title="Навык нельзя использовать, пока ошибки не исправлены.">
           {storedIssues.map((issue) => (
             <p key={`${issue.field}:${issue.rule}`} className="m-0">
               {issueLine(issue)}

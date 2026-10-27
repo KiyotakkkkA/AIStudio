@@ -12,7 +12,7 @@ export default function IntegrationsPage() {
       <PagePlaceholder
         icon={mdiEmailOutline}
         title="Аккаунтов пока нет"
-        description="Учётные записи, форма подключения и лента автоматизаций появятся здесь."
+        description="Раздел пока недоступен."
         task="TASK_051"
       />
     </PageShell>

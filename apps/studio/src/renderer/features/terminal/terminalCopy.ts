@@ -18,7 +18,7 @@ export const DISMISS_ERROR = "Скрыть сообщение";
 export const NO_DIALOG = "Терминал доступен в сохранённом диалоге";
 export const STARTING = "Запуск оболочки…";
 export const EMPTY = "Нет открытых сеансов";
-export const EMPTY_HINT = "Сеанс запускается в рабочей папке диалога или в папке пользователя.";
+export const EMPTY_HINT = "Сеанс запускается в рабочей папке диалога.";
 export const STATUS_RUNNING = "Работает";
 
 export const SHELL_LABELS: Record<TerminalShell, string> = {

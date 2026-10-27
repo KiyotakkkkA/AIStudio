@@ -229,7 +229,7 @@ export default observer(function DownloadsWorkspace() {
                 <EmptyState
                   icon={mdiTrayArrowDown}
                   title="Ничего не найдено"
-                  description="Под выбранные фильтры не подходит ни один артефакт. Сбросьте фильтры или обновите каталог."
+                  description="Ничего не найдено. Сбросьте фильтры или обновите каталог."
                 />
               </div>
             ) : store.kind === "all" ? (

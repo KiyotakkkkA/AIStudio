@@ -2,6 +2,7 @@ import { observer } from "mobx-react-lite";
 import { isBuiltinTool, toolTitle as builtinTitle } from "./toolCallCopy";
 import { Dropdown, Tooltip } from "@kiyotakkkka/zvs-uikit-lib";
 import type { ChatContextDto, ToolDto } from "@zvs/shared";
+import { plural } from "../connections/connectionPresentation";
 import { sourceGroups, sourceKey } from "../tools/toolFilters";
 import type ChatStore from "./ChatStore";
 import { MeterBar, StackedBar, percent, share } from "../../ui/molecules/StackedBar";
@@ -15,20 +16,15 @@ interface Segment {
 
 const MESSAGE_FORMS = ["сообщение", "сообщения", "сообщений"] as const;
 
+function messagesWord(count: number): string {
+  return plural(count, ...MESSAGE_FORMS);
+}
+
 export function compactTokens(value: number): string {
   if (value < 1000) return String(value);
   const [divisor, suffix] = value < 1_000_000 ? [1000, "k"] : [1_000_000, "M"];
   const scaled = value / divisor;
   return `${scaled >= 100 ? Math.round(scaled) : scaled.toFixed(1).replace(/\.0$/, "")}${suffix}`;
-}
-
-function plural(count: number, forms: readonly [string, string, string]): string {
-  const tens = count % 100;
-  const units = count % 10;
-  if (tens >= 11 && tens <= 14) return forms[2];
-  if (units === 1) return forms[0];
-  if (units >= 2 && units <= 4) return forms[1];
-  return forms[2];
 }
 
 function segments(context: ChatContextDto): Segment[] {
@@ -231,7 +227,7 @@ export default observer(function ChatContextMeter({ store }: { readonly store: C
                       part.key === "tools" && context.toolItems.length > 0
                         ? String(context.toolItems.length)
                         : part.key === "history" && context.historyMessages > 0
-                          ? `${context.historyMessages} ${plural(context.historyMessages, MESSAGE_FORMS)}`
+                          ? messagesWord(context.historyMessages)
                           : undefined
                     }
                     value={compactTokens(part.tokens)}
@@ -241,8 +237,7 @@ export default observer(function ChatContextMeter({ store }: { readonly store: C
               </div>
               {context.trimmed > 0 ? (
                 <p className="mt-2 rounded-lg bg-warn-soft px-2.5 py-1.5 text-[11.5px] text-warn">
-                  {context.trimmed} {plural(context.trimmed, MESSAGE_FORMS)} не помещаются и не
-                  попадут в следующий запрос.
+                  {messagesWord(context.trimmed)} не помещаются и не попадут в следующий запрос.
                 </p>
               ) : null}
             </section>
