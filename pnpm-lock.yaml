@@ -167,8 +167,8 @@ importers:
         specifier: 5.3.1
         version: 5.3.1
       '@kiyotakkkka/zvs-uikit-lib':
-        specifier: 8.4.0
-        version: 8.4.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@17.0.2)(react@19.2.8)(redux@5.0.1)
+        specifier: 8.5.0
+        version: 8.5.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@17.0.2)(react@19.2.8)(redux@5.0.1)
       '@mdi/js':
         specifier: 7.4.47
         version: 7.4.47
@@ -657,8 +657,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@kiyotakkkka/zvs-uikit-lib@8.4.0':
-    resolution: {integrity: sha512-z5nuHMVp64T2mnx/uW9gFnbFqrrmBt4O/3cgll7sTBvI3gy3PfcjFBcj46WazDuefEDXBhP0iz2TXBwEWRvpIg==}
+  '@kiyotakkkka/zvs-uikit-lib@8.5.0':
+    resolution: {integrity: sha512-C7MPi/VwWl3Zb4274eU3bG7RbEz/Fpo0J+iUyG5p+JyqDEN8GO9FAkEPQoJtJYxXuyGj1YKt03Fz6+FCKenQKQ==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -4047,7 +4047,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@kiyotakkkka/zvs-uikit-lib@8.4.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@17.0.2)(react@19.2.8)(redux@5.0.1)':
+  '@kiyotakkkka/zvs-uikit-lib@8.5.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@17.0.2)(react@19.2.8)(redux@5.0.1)':
     dependencies:
       '@tanstack/react-virtual': 3.14.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       clsx: 2.1.1

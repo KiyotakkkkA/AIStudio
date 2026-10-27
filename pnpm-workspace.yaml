@@ -4,4 +4,6 @@ packages:
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - '@kiyotakkkka/zvs-uikit-lib@8.5.0'
 saveExact: true
