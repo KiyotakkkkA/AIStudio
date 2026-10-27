@@ -2,13 +2,18 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use serde_json::{Map, Value, json};
 use zvs_contract::{
-    AppError, AppErrorCode, GraphBinding, GraphNode, RetryPolicy, RunGraph, ScenarioGraphDto,
-    ScenarioIssueDto, ScenarioNodeDto, ScenarioOnError, ScenarioSlot,
+    AppError, AppErrorCode, GraphBinding, GraphCondition, GraphNode, RetryPolicy, RunGraph,
+    SCENARIO_FALSE_PORT, SCENARIO_TRUE_PORT, ScenarioGraphDto, ScenarioIssueDto, ScenarioNodeDto,
+    ScenarioOnError, ScenarioSlot, blocking_issues,
 };
 
-use super::catalogue::{NodeSpec, ScenarioCatalogue, TOOL_SET, TOOL_SET_PARAM};
+use super::catalogue::{
+    CONDITION_PARAM, FLOW_BRANCH, KNOWLEDGE_STORES, MEMORY_FACTS, NodeSpec, ScenarioCatalogue,
+    TOOL_SET, TOOL_SET_PARAM,
+};
 use super::service::SCENARIO_INVALID;
 use super::validation::validate_graph;
+use crate::kernel::knowledge_nodes::KNOWLEDGE_SEARCH;
 use crate::kernel::project;
 
 pub const NODE_NOT_IN_GRAPH: &str = "Шаг не найден в сценарии";
@@ -22,6 +27,8 @@ pub const PARAMS_KEY: &str = "params";
 pub const TOOLS_KEY: &str = "tools";
 
 const RESULT_TEMPLATE: &str = "result";
+const WHOLE_RESULT: &str = "{{result}}";
+const BRANCH_VALUES: [&str; 2] = ["then", "else"];
 
 fn invalid(issues: &[ScenarioIssueDto]) -> AppError {
     AppError::new(AppErrorCode::ValidationFailed, SCENARIO_INVALID)
@@ -42,6 +49,14 @@ pub fn slot_key(slot: ScenarioSlot) -> &'static str {
         ScenarioSlot::Memory => "memory",
         ScenarioSlot::Tool => TOOLS_KEY,
         ScenarioSlot::Embedding => "embedding",
+    }
+}
+
+pub fn attachment_key(slot: ScenarioSlot, child_type: &str) -> &'static str {
+    match child_type {
+        MEMORY_FACTS => "facts",
+        KNOWLEDGE_STORES => "knowledge",
+        _ => slot_key(slot),
     }
 }
 
@@ -79,8 +94,9 @@ impl<'g> Scope<'g> {
                 .chain([id])
                 .collect()
         });
-        let issues: Vec<ScenarioIssueDto> = validate_graph(graph, catalogue)
+        let issues: Vec<ScenarioIssueDto> = blocking_issues(&validate_graph(graph, catalogue))
             .into_iter()
+            .cloned()
             .filter(|issue| {
                 relevant.as_ref().is_none_or(|relevant| {
                     issue
@@ -155,6 +171,32 @@ impl<'g> Scope<'g> {
         found
     }
 
+    fn condition(&self, id: &str) -> Option<GraphCondition> {
+        let [edge] = self
+            .graph
+            .edges
+            .iter()
+            .filter(|edge| edge.to == id)
+            .collect::<Vec<_>>()[..]
+        else {
+            return None;
+        };
+        let branch = self.nodes.get(edge.from.as_str())?;
+        if branch.node_type != FLOW_BRANCH || branch.is_disabled() {
+            return None;
+        }
+        let equals = match edge.from_port.as_str() {
+            SCENARIO_TRUE_PORT => true,
+            SCENARIO_FALSE_PORT => false,
+            _ => return None,
+        };
+        Some(GraphCondition {
+            node_id: branch.id.clone(),
+            field: CONDITION_PARAM.to_owned(),
+            equals,
+        })
+    }
+
     fn incoming(&self, id: &str) -> Vec<&'g str> {
         self.graph
             .edges
@@ -195,6 +237,11 @@ impl<'g> Scope<'g> {
         let mut config = Map::new();
         let mut keys: Vec<String> = Vec::new();
         for (slot, child) in self.children(id) {
+            if child.node_type == KNOWLEDGE_STORES
+                && !keys.iter().any(|key| key == KNOWLEDGE_SEARCH)
+            {
+                keys.push(KNOWLEDGE_SEARCH.to_owned());
+            }
             if slot == ScenarioSlot::Tool {
                 for key in self.tool_keys(child)? {
                     if !keys.contains(&key) {
@@ -204,7 +251,7 @@ impl<'g> Scope<'g> {
                 continue;
             }
             config.insert(
-                slot_key(slot).to_owned(),
+                attachment_key(slot, &child.node_type).to_owned(),
                 json!({
                     "nodeId": child.id,
                     "type": child.node_type,
@@ -261,8 +308,9 @@ impl<'g> Scope<'g> {
             }
             input
         } else {
-            let mut input = node.params.clone();
-            for (key, value) in &node.params {
+            let params = step_params(node);
+            let mut input = params.clone();
+            for (key, value) in &params {
                 let Some(path) = result_reference(value) else {
                     continue;
                 };
@@ -281,15 +329,42 @@ impl<'g> Scope<'g> {
             }
             input
         };
+        let when = match upstream {
+            Upstream::Steps(_) => self.condition(&node.id),
+            Upstream::Pinned(_) => None,
+        };
         let mut step = GraphNode {
             dependencies: Some(dependencies),
             input: Some(Value::Object(input)),
             bindings: (!bindings.is_empty()).then_some(bindings),
+            when,
             ..GraphNode::new(node.id.clone(), node.node_type.clone())
         };
         self.settings(node, &mut step);
         Ok((step, keys))
     }
+}
+
+fn step_params(node: &ScenarioNodeDto) -> Map<String, Value> {
+    let mut params = node.params.clone();
+    if node.node_type != FLOW_BRANCH {
+        return params;
+    }
+    for key in BRANCH_VALUES {
+        params.insert(key.to_owned(), json!(WHOLE_RESULT));
+    }
+    if let Some(Value::String(text)) = params.get(CONDITION_PARAM) {
+        match text.trim() {
+            "true" => {
+                params.insert(CONDITION_PARAM.to_owned(), json!(true));
+            }
+            "false" => {
+                params.insert(CONDITION_PARAM.to_owned(), json!(false));
+            }
+            _ => {}
+        }
+    }
+    params
 }
 
 #[derive(Clone, Copy)]

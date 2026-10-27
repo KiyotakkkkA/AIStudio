@@ -40,7 +40,20 @@ import {
   slotUnder,
   tidy,
 } from "../../src/renderer/features/scenarios/layout.ts";
-import { paletteGroups, toolReason } from "../../src/renderer/features/scenarios/palette.ts";
+import {
+  fitsAnchor,
+  paletteGroups,
+  toolReason,
+} from "../../src/renderer/features/scenarios/palette.ts";
+import {
+  blockingIssues,
+  defaultParams,
+  dialogNeed,
+  grantedTools,
+  isRestrictedTool,
+  KNOWLEDGE_TOOL,
+  MEMORY_TOOL,
+} from "../../src/renderer/features/scenarios/nodeRules.ts";
 import {
   toggleToolKey,
   toolSetKeys,
@@ -74,11 +87,13 @@ const SCENARIO = "0199aa11-1111-7111-8111-111111111111" as ScenarioId;
 const VERSION = "0199aa11-2222-7111-8111-111111111111" as ScenarioVersionId;
 
 function type(overrides: Partial<ScenarioNodeTypeDto> & { type: string }): ScenarioNodeTypeDto {
+  const ends = overrides.role === "subNode" || overrides.type.startsWith("output.");
   return {
     role: "action",
     trigger: null,
     fills: [],
     slots: [],
+    ports: ends ? [] : ["main"],
     requiredParams: [],
     toolKey: null,
     paramsSchema: { type: "object", properties: {} },
@@ -93,12 +108,20 @@ const TYPES: ScenarioNodeTypeDto[] = [
     type: "agent.tools",
     slots: [
       { slot: "model", required: true, multiple: false },
-      { slot: "memory", required: false, multiple: false },
+      { slot: "memory", required: false, multiple: true },
       { slot: "tool", required: false, multiple: true },
     ],
   }),
   type({ type: "model.chat", role: "subNode", fills: ["model"], requiredParams: ["modelId"] }),
   type({ type: "memory.window", role: "subNode", fills: ["memory"] }),
+  type({ type: "memory.facts", role: "subNode", fills: ["memory"] }),
+  type({
+    type: "knowledge.stores",
+    role: "subNode",
+    fills: ["memory"],
+    requiredParams: ["stores"],
+  }),
+  type({ type: "flow.branch", ports: ["true", "false"], requiredParams: ["condition"] }),
   type({ type: "embedding.model", role: "subNode", fills: ["embedding"] }),
   type({ type: "tool.set", role: "subNode", fills: ["tool"], requiredParams: ["tools"] }),
   type({ type: "output.notify", requiredParams: ["title"] }),
@@ -473,7 +496,16 @@ describe("tidy", () => {
 describe("palette", () => {
   test("steps group into triggers, agents and core actions, and single tools are left out", () => {
     const groups = paletteGroups(TYPES, TOOLS, "");
-    expect(groups.map((group) => group.key)).toEqual(["triggers", "agents", "outputs"]);
+    expect(groups.map((group) => group.key)).toEqual([
+      "triggers",
+      "agents",
+      "memory",
+      "outputs",
+      "core",
+    ]);
+    expect(
+      groups.find((group) => group.key === "memory")?.entries.map((entry) => entry.type),
+    ).toEqual(["knowledge.stores", "memory.window", "memory.facts"]);
     expect(
       groups.find((group) => group.key === "outputs")?.entries.map((entry) => entry.type),
     ).toEqual(["output.chatMessage", "output.notify"]);
@@ -494,6 +526,104 @@ describe("palette", () => {
     expect(toolReason("web.fetch", TOOLS)).toBe(TOOL_UNAVAILABLE);
     expect(toolReason("ghost.tool", TOOLS)).toBe(TOOL_UNREGISTERED);
     expect(toolReason("vector.search", TOOLS)).toBeNull();
+  });
+});
+
+describe("next step anchors", () => {
+  test("a slot offers only the sub-nodes that fill it and a port only steps", () => {
+    const forSlot = paletteGroups(TYPES, TOOLS, "", {
+      nodeId: "agent",
+      kind: "slot",
+      slot: "memory",
+    }).flatMap((group) => group.entries.map((entry) => entry.type));
+    expect(forSlot).toEqual(["knowledge.stores", "memory.window", "memory.facts"]);
+    const remaining = paletteGroups(
+      TYPES,
+      TOOLS,
+      "",
+      { nodeId: "agent", kind: "slot", slot: "memory" },
+      new Set(["memory.window"]),
+    ).flatMap((group) => group.entries.map((entry) => entry.type));
+    expect(remaining).toEqual(["knowledge.stores", "memory.facts"]);
+    const forPort = paletteGroups(TYPES, TOOLS, "", {
+      nodeId: "branch",
+      kind: "port",
+      port: "true",
+    }).flatMap((group) => group.entries.map((entry) => entry.type));
+    expect(forPort).toContain("agent.tools");
+    expect(forPort).toContain("output.notify");
+    expect(forPort).not.toContain("trigger.chat");
+    expect(forPort).not.toContain("model.chat");
+    const facts = CATALOGUE.get("memory.facts");
+    expect(facts !== undefined && fitsAnchor(facts, null)).toBe(true);
+  });
+});
+
+describe("node rules", () => {
+  test("history and chat replies need a dialog, memory only for its dialog areas", () => {
+    expect(dialogNeed(node("h", "memory.window"))).toBe("required");
+    expect(dialogNeed(node("r", "output.chatReply"))).toBe("required");
+    const facts = (area: string): ScenarioNodeDto => ({
+      ...node("f", "memory.facts"),
+      params: { policy: "read", area },
+    });
+    expect(dialogNeed(facts("global"))).toBeNull();
+    expect(dialogNeed(facts("dialog"))).toBe("required");
+    expect(dialogNeed(facts("both"))).toBe("partial");
+    expect(dialogNeed(node("n", "output.notify"))).toBeNull();
+  });
+
+  test("browser, vector and knowledge tools are restricted to their own nodes", () => {
+    expect(isRestrictedTool("browser.click")).toBe(true);
+    expect(isRestrictedTool("vector.search")).toBe(true);
+    expect(isRestrictedTool("knowledge.search")).toBe(true);
+    expect(isRestrictedTool("fs.read")).toBe(false);
+  });
+
+  test("a tool set lists what the agent's store and writable memory nodes grant", () => {
+    const graph = graphOf(
+      [
+        node("agent", "agent.tools"),
+        node("set", "tool.set"),
+        { ...node("stores", "knowledge.stores"), params: { stores: ["s1"] } },
+        { ...node("facts", "memory.facts"), params: { policy: "readWrite", area: "global" } },
+      ],
+      {
+        attachments: [
+          { parentNodeId: "agent", childNodeId: "set", slot: "tool" },
+          { parentNodeId: "agent", childNodeId: "stores", slot: "memory" },
+          { parentNodeId: "agent", childNodeId: "facts", slot: "memory" },
+        ],
+      },
+    );
+    expect(grantedTools(graph, "set")).toEqual([
+      { key: KNOWLEDGE_TOOL, nodeId: "stores" },
+      { key: MEMORY_TOOL, nodeId: "facts" },
+    ]);
+    const readOnly = {
+      ...graph,
+      nodes: graph.nodes.map((entry) =>
+        entry.id === "facts" ? { ...entry, params: { policy: "read", area: "global" } } : entry,
+      ),
+    };
+    expect(grantedTools(readOnly, "set")).toEqual([{ key: KNOWLEDGE_TOOL, nodeId: "stores" }]);
+    expect(grantedTools(graph, "agent")).toEqual([]);
+  });
+
+  test("new memory and store nodes start with safe defaults", () => {
+    expect(defaultParams("memory.facts")).toEqual({ policy: "read", area: "global" });
+    expect(defaultParams("knowledge.stores")).toEqual({ stores: [] });
+    expect(defaultParams("tool.set")).toEqual({ tools: [] });
+    expect(defaultParams("agent.tools")).toEqual({});
+  });
+
+  test("warnings do not block a run", () => {
+    expect(
+      blockingIssues([
+        { rule: "limitedDialog", nodeId: "facts" },
+        { rule: "missingDialog", nodeId: "memory" },
+      ]),
+    ).toEqual([{ rule: "missingDialog", nodeId: "memory" }]);
   });
 });
 
@@ -837,6 +967,60 @@ describe("scenario editor", () => {
     });
     editor.updateNode("set-1", { params: { tools: ["fs.delete"] } });
     expect(editor.ceilingOf("set-1")).toBe(`«fs.delete»: ${TOOL_OFF}`);
+  });
+
+  test("a plus on a branch port adds a step on that port and on a slot attaches a fitting sub-node", async () => {
+    const { editor } = setup({
+      saved: graphOf([
+        node("trigger", "trigger.chat", 40, 40),
+        node("branch", "flow.branch", 300, 40),
+      ]),
+    });
+    await editor.load();
+    editor.openNext({ nodeId: "branch", kind: "port", port: "false" });
+    expect(editor.selection.nodes).toEqual(["branch"]);
+    expect(
+      editor.palette.flatMap((group) => group.entries.map((entry) => entry.type)),
+    ).not.toContain("model.chat");
+    expect(editor.addStep("model.chat", { x: 0, y: 0 })).toBe(false);
+    expect(editor.addStep("agent.tools", { x: 0, y: 0 })).toBe(true);
+    expect(editor.graph.edges).toEqual([
+      { from: "branch", to: "tools-1", fromPort: "false", toPort: "main" },
+    ]);
+    const agent = editor.graph.nodes.find((entry) => entry.id === "tools-1");
+    expect(agent?.position.y).toBeGreaterThan(40);
+    editor.openNext({ nodeId: "tools-1", kind: "slot", slot: "memory" });
+    expect(editor.addStep("memory.facts", { x: 0, y: 0 })).toBe(true);
+    expect(editor.graph.attachments).toEqual([
+      { parentNodeId: "tools-1", childNodeId: "facts-1", slot: "memory" },
+    ]);
+    expect(editor.paletteAnchor).toBeNull();
+    editor.openNext({ nodeId: "tools-1", kind: "slot", slot: "memory" });
+    expect(editor.palette.flatMap((group) => group.entries.map((entry) => entry.type))).toEqual([
+      "knowledge.stores",
+      "memory.window",
+    ]);
+    expect(editor.addStep("memory.facts", { x: 0, y: 0 })).toBe(false);
+    expect(editor.graph.nodes.map((entry) => entry.id)).not.toContain("facts-2");
+    expect(editor.graph.nodes.find((entry) => entry.id === "facts-1")?.params).toEqual({
+      policy: "read",
+      area: "global",
+    });
+  });
+
+  test("dragging from a branch port draws an edge on that port", async () => {
+    const { editor } = setup({
+      saved: graphOf([
+        node("trigger", "trigger.chat"),
+        node("branch", "flow.branch"),
+        node("notify", "output.notify"),
+      ]),
+    });
+    await editor.load();
+    expect(editor.connect("branch", "out:true", "notify", "in")).toBe(true);
+    expect(editor.graph.edges).toEqual([
+      { from: "branch", to: "notify", fromPort: "true", toPort: "main" },
+    ]);
   });
 
   test("the context actions act on the clicked node, or on the selection it belongs to", async () => {

@@ -2,5 +2,9 @@
   {
     "name": "unknown",
     "value": "brain"
+  },
+  {
+    "name": "removed facts slot",
+    "value": "facts"
   }
 ]

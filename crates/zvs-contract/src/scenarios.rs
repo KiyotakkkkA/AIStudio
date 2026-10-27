@@ -54,7 +54,20 @@ wire_enum!(ScenarioIssueRule {
     NoTrigger => "noTrigger",
     MultipleTriggers => "multipleTriggers",
     Unreachable => "unreachable",
+    RestrictedTool => "restrictedTool",
+    InvalidPort => "invalidPort",
+    MissingDialog => "missingDialog",
+    LimitedDialog => "limitedDialog",
+    DuplicateKind => "duplicateKind",
 });
+
+impl ScenarioIssueRule {
+    pub const WARNINGS: &[Self] = &[Self::LimitedDialog];
+
+    pub fn is_warning(self) -> bool {
+        Self::WARNINGS.contains(&self)
+    }
+}
 
 pub const SCENARIO_NAME_MAX: usize = 120;
 pub const SCENARIO_TAG_MAX: usize = 32;
@@ -70,6 +83,8 @@ pub const SCENARIO_EDGES_MAX: usize = 1000;
 pub const SCENARIO_ATTACHMENTS_MAX: usize = 1000;
 pub const SCENARIO_ISSUES_MAX: usize = 1000;
 pub const SCENARIO_MAIN_PORT: &str = "main";
+pub const SCENARIO_TRUE_PORT: &str = "true";
+pub const SCENARIO_FALSE_PORT: &str = "false";
 pub const SCENARIO_NOTES_MAX: usize = 2000;
 pub const SCENARIO_ATTEMPTS_MAX: u64 = 10;
 pub const SCENARIO_BACKOFF_MAX_MS: u64 = 60_000;
@@ -350,6 +365,24 @@ impl ScenarioIssueDto {
         }
     }
 
+    pub fn port(node_id: &str, port: &str) -> Self {
+        Self {
+            param: Some(port.to_owned()),
+            ..Self::node(ScenarioIssueRule::InvalidPort, node_id)
+        }
+    }
+
+    pub fn tool(node_id: &str, key: &str) -> Self {
+        Self {
+            param: Some(key.to_owned()),
+            ..Self::node(ScenarioIssueRule::RestrictedTool, node_id)
+        }
+    }
+
+    pub fn is_warning(&self) -> bool {
+        self.rule.is_warning()
+    }
+
     pub fn param(node_id: &str, param: &str) -> Self {
         Self {
             param: Some(param.to_owned()),
@@ -369,6 +402,10 @@ impl Validate for ScenarioIssueDto {
         }
         Ok(())
     }
+}
+
+pub fn blocking_issues(issues: &[ScenarioIssueDto]) -> Vec<&ScenarioIssueDto> {
+    issues.iter().filter(|issue| !issue.is_warning()).collect()
 }
 
 fn check_issues(issues: &[ScenarioIssueDto]) -> Result<(), AppError> {
@@ -613,7 +650,7 @@ pub struct ScenarioValidationDto {
 impl Validate for ScenarioValidationDto {
     fn validate(&self) -> Result<(), AppError> {
         check_issues(&self.issues)?;
-        if self.valid == self.issues.is_empty() {
+        if self.valid == blocking_issues(&self.issues).is_empty() {
             Ok(())
         } else {
             Err(invalid("valid", "consistency"))
@@ -659,6 +696,7 @@ pub struct ScenarioNodeTypeDto {
     pub trigger: Option<ScenarioTriggerKind>,
     pub fills: Vec<ScenarioSlot>,
     pub slots: Vec<ScenarioSlotSpecDto>,
+    pub ports: Vec<String>,
     pub required_params: Vec<String>,
     #[serde(deserialize_with = "crate::wire::nullable")]
     pub tool_key: Option<String>,
@@ -670,6 +708,14 @@ impl Validate for ScenarioNodeTypeDto {
     fn validate(&self) -> Result<(), AppError> {
         check::non_empty("type", &self.node_type)?;
         check::max_len("type", &self.node_type, SCENARIO_NODE_TYPE_MAX)?;
+        self.ports
+            .iter()
+            .enumerate()
+            .try_for_each(|(index, port)| {
+                let field = format!("ports.{index}");
+                check::non_empty(&field, port)?;
+                check::max_len(&field, port, SCENARIO_PORT_MAX)
+            })?;
         self.required_params
             .iter()
             .enumerate()

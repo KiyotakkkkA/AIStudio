@@ -2,11 +2,38 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use serde_json::Value;
 use zvs_contract::{
-    ScenarioAttachmentDto, ScenarioGraphDto, ScenarioIssueDto, ScenarioIssueRule, ScenarioNodeDto,
-    ScenarioSlot, ScenarioTriggerDto, validate::js_trim,
+    SCENARIO_MAIN_PORT, ScenarioAttachmentDto, ScenarioGraphDto, ScenarioIssueDto,
+    ScenarioIssueRule, ScenarioNodeDto, ScenarioSlot, ScenarioTriggerDto, validate::js_trim,
 };
 
-use super::catalogue::{NodeSpec, ScenarioCatalogue};
+use super::catalogue::{
+    AREA_BOTH, AREA_DIALOG, AREA_PARAM, MEMORY_FACTS, MEMORY_WINDOW, NodeSpec, OUTPUT_CHAT_REPLY,
+    RESTRICTED_TOOL_PREFIXES, ScenarioCatalogue, TOOL_SET, TOOL_SET_PARAM, TRIGGER_CHAT,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DialogNeed {
+    Required,
+    Partial,
+}
+
+pub fn dialog_need(node: &ScenarioNodeDto) -> Option<DialogNeed> {
+    match node.node_type.as_str() {
+        MEMORY_WINDOW | OUTPUT_CHAT_REPLY => Some(DialogNeed::Required),
+        MEMORY_FACTS => match node.params.get(AREA_PARAM).and_then(Value::as_str) {
+            Some(AREA_DIALOG) => Some(DialogNeed::Required),
+            Some(AREA_BOTH) => Some(DialogNeed::Partial),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+pub fn is_restricted_tool(key: &str) -> bool {
+    RESTRICTED_TOOL_PREFIXES
+        .iter()
+        .any(|prefix| key.starts_with(prefix))
+}
 
 #[derive(Default)]
 struct Issues(Vec<ScenarioIssueDto>);
@@ -102,7 +129,10 @@ pub fn validate_graph(
     check_slots(&nodes, &attachments, &mut issues);
     check_cycles(&nodes, &main, &mut issues);
     check_params(&nodes, &attachments, &mut issues);
+    check_ports(graph, &nodes, &mut issues);
+    check_tools(&nodes, &mut issues);
     let triggers = check_triggers(&nodes, &mut issues);
+    check_dialog(&nodes, &triggers, &mut issues);
     check_reachability(&nodes, &main, &attachments, &triggers, &mut issues);
     issues.0
 }
@@ -264,6 +294,25 @@ fn check_slots(nodes: &Graph<'_>, attachments: &[&ScenarioAttachmentDto], issues
                     slot.slot,
                 ));
             }
+            if slot.slot == ScenarioSlot::Memory {
+                let mut kinds = HashSet::new();
+                let repeated = attachments
+                    .iter()
+                    .filter(|attachment| {
+                        attachment.parent_node_id == node.id
+                            && attachment.slot == ScenarioSlot::Memory
+                            && nodes.is_enabled(&attachment.child_node_id)
+                    })
+                    .filter_map(|attachment| nodes.nodes.get(attachment.child_node_id.as_str()))
+                    .any(|child| !kinds.insert(child.node_type.as_str()));
+                if repeated {
+                    issues.push(ScenarioIssueDto::slot(
+                        ScenarioIssueRule::DuplicateKind,
+                        &node.id,
+                        slot.slot,
+                    ));
+                }
+            }
         }
     }
 }
@@ -367,6 +416,61 @@ fn check_params(nodes: &Graph<'_>, attachments: &[&ScenarioAttachmentDto], issue
             if is_missing(node.params.get(param)) {
                 issues.push(ScenarioIssueDto::param(&node.id, param));
             }
+        }
+    }
+}
+
+fn check_ports(graph: &ScenarioGraphDto, nodes: &Graph<'_>, issues: &mut Issues) {
+    for edge in &graph.edges {
+        if let Some(spec) = nodes.spec(&edge.from)
+            && !spec.ports.contains(&edge.from_port)
+        {
+            issues.push(ScenarioIssueDto::port(&edge.from, &edge.from_port));
+        }
+        if nodes.has(&edge.to) && edge.to_port != SCENARIO_MAIN_PORT {
+            issues.push(ScenarioIssueDto::port(&edge.to, &edge.to_port));
+        }
+    }
+}
+
+fn check_tools(nodes: &Graph<'_>, issues: &mut Issues) {
+    for node in &nodes.order {
+        if node.node_type != TOOL_SET {
+            continue;
+        }
+        let keys = node
+            .params
+            .get(TOOL_SET_PARAM)
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str);
+        for key in keys {
+            if is_restricted_tool(key) {
+                issues.push(ScenarioIssueDto::tool(&node.id, key));
+            }
+        }
+    }
+}
+
+fn check_dialog(nodes: &Graph<'_>, triggers: &[&str], issues: &mut Issues) {
+    let chat = triggers.first().is_some_and(|id| {
+        nodes
+            .nodes
+            .get(id)
+            .is_some_and(|node| node.node_type == TRIGGER_CHAT)
+    });
+    if chat {
+        return;
+    }
+    for node in &nodes.order {
+        if node.is_disabled() {
+            continue;
+        }
+        match dialog_need(node) {
+            Some(DialogNeed::Required) => issues.node(ScenarioIssueRule::MissingDialog, &node.id),
+            Some(DialogNeed::Partial) => issues.node(ScenarioIssueRule::LimitedDialog, &node.id),
+            None => {}
         }
     }
 }

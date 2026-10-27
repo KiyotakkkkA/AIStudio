@@ -1,10 +1,12 @@
 import {
+  mdiAlert,
   mdiAlertCircle,
   mdiCancel,
   mdiCheckCircle,
   mdiContentCopy,
   mdiDeleteOutline,
   mdiPlayCircle,
+  mdiPlus,
 } from "@mdi/js";
 import { ContextMenu } from "@kiyotakkkka/zvs-uikit-lib";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
@@ -14,11 +16,12 @@ import { useCanvasActions } from "./canvasActions";
 import { STEP_STATUS_LABELS } from "./runCopy";
 import {
   IN_HANDLE,
-  OUT_HANDLE,
   UP_HANDLE,
+  type NextAnchor,
   type ScenarioFlowNode,
   type SlotPort,
 } from "./flowModel";
+import { NEXT_STEP } from "./scenarioCopy";
 
 const PORT =
   "!size-2.25 !min-h-0 !min-w-0 !rounded-full !border-[1.5px] !border-main-800 !bg-main-600 transition-colors hover:!bg-accent-dark";
@@ -51,6 +54,54 @@ function Badge({
     >
       <Icon path={path} size={16} />
     </span>
+  );
+}
+
+const STUB = 26;
+
+function NextButton({
+  entry,
+  width,
+  height,
+  slotted,
+}: {
+  readonly entry: NextAnchor;
+  readonly width: number;
+  readonly height: number;
+  readonly slotted: boolean;
+}) {
+  const actions = useCanvasActions();
+  const right = entry.side === "right";
+  const reach = right ? STUB : STUB + (slotted ? 18 : 0);
+  return (
+    <>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute bg-main-500"
+        style={
+          right
+            ? { left: width + 5, top: entry.offset, width: reach - 5, height: 1 }
+            : { left: entry.offset, top: height + 5, width: 1, height: reach - 5 }
+        }
+      />
+      <button
+        type="button"
+        aria-label={NEXT_STEP}
+        title={NEXT_STEP}
+        className="nodrag nopan absolute flex size-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[5px] border border-main-400 bg-main-800 text-main-200 hover:border-accent-dark hover:text-accent-medium"
+        style={
+          right
+            ? { left: width + reach + 10, top: entry.offset }
+            : { left: entry.offset, top: height + reach + 10 }
+        }
+        onClick={(event) => {
+          event.stopPropagation();
+          actions.next(entry.anchor);
+        }}
+      >
+        <Icon path={mdiPlus} size={14} />
+      </button>
+    </>
   );
 }
 
@@ -116,6 +167,8 @@ function ScenarioNodeView({ id, data, selected }: NodeProps<ScenarioFlowNode>) {
 
           {problem ? (
             <Badge path={mdiAlertCircle} tone="text-err" title={data.issues.join("\n")} />
+          ) : data.warnings.length > 0 ? (
+            <Badge path={mdiAlert} tone="text-warn" title={data.warnings.join("\n")} />
           ) : data.run === "failed" ? (
             <Badge
               path={mdiAlertCircle}
@@ -138,9 +191,38 @@ function ScenarioNodeView({ id, data, selected }: NodeProps<ScenarioFlowNode>) {
           {data.hasIn ? (
             <Handle id={IN_HANDLE} type="target" position={Position.Left} className={PORT} />
           ) : null}
-          {data.hasOut ? (
-            <Handle id={OUT_HANDLE} type="source" position={Position.Right} className={PORT} />
-          ) : null}
+          {data.outs.map((out) => (
+            <Handle
+              key={out.handle}
+              id={out.handle}
+              type="source"
+              position={Position.Right}
+              className={PORT}
+              style={{ top: out.top }}
+            />
+          ))}
+          {data.outs.map((out) =>
+            out.label === null ? null : (
+              <span
+                key={`${out.handle}-label`}
+                className="pointer-events-none absolute left-full ml-2 -translate-y-full pb-0.5 text-[9.5px] whitespace-nowrap text-main-400"
+                style={{ top: out.top }}
+              >
+                {out.label}
+              </span>
+            ),
+          )}
+          {selected
+            ? data.next.map((entry) => (
+                <NextButton
+                  key={entry.key}
+                  entry={entry}
+                  width={data.width}
+                  height={data.height}
+                  slotted={entry.side === "bottom"}
+                />
+              ))
+            : null}
           {data.hasUp ? (
             <Handle id={UP_HANDLE} type="target" position={Position.Top} className={PORT} />
           ) : null}

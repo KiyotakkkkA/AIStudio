@@ -416,6 +416,10 @@ pub fn test_services(system: SystemService) -> TestServices {
         &crate::scenarios::ScenarioNodeOptions {
             effects: scenario_effects.clone(),
             tools: Some(tools.clone()),
+            memory: Some(std::sync::Arc::new(crate::services::MemoryService::new(
+                database.shared(),
+                clock.clone(),
+            ))),
         },
     )
     .expect("registers the scenario nodes");

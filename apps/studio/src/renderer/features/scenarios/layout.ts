@@ -16,6 +16,7 @@ export const TRUNK_SIZE: NodeSize = { width: 188, height: 62 };
 export const PARENT_SIZE: NodeSize = { width: 212, height: 82 };
 export const SUB_SIZE: NodeSize = { width: 144, height: 58 };
 export const SNAP_RADIUS = 44;
+export const SLOT_SPACING = 78;
 
 const COLUMN = 300;
 const ROW_GAP = 64;
@@ -25,7 +26,12 @@ const ORIGIN = 40;
 
 export function nodeSize(spec: ScenarioNodeTypeDto | undefined): NodeSize {
   if (spec === undefined) return TRUNK_SIZE;
-  if (spec.slots.length > 0) return PARENT_SIZE;
+  if (spec.slots.length > 0) {
+    return {
+      width: Math.max(PARENT_SIZE.width, spec.slots.length * SLOT_SPACING),
+      height: PARENT_SIZE.height,
+    };
+  }
   return spec.role === "subNode" ? SUB_SIZE : TRUNK_SIZE;
 }
 

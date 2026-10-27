@@ -102,6 +102,7 @@ impl Finish {
 struct State {
     pending_gates: usize,
     completed: HashMap<String, StepRow>,
+    skipped: HashSet<String>,
     attempts: HashMap<String, i64>,
     latest: HashMap<String, StepRow>,
     ready_at: HashMap<String, Timestamp>,
@@ -177,6 +178,7 @@ impl Scheduler {
             state: Mutex::new(State {
                 pending_gates: 0,
                 completed: HashMap::new(),
+                skipped: HashSet::new(),
                 attempts: HashMap::new(),
                 latest: HashMap::new(),
                 ready_at: HashMap::new(),
@@ -419,6 +421,7 @@ impl Scheduler {
         let concurrency = usize::try_from(self.run.concurrency).unwrap_or(1).max(1);
         while !self.cancel.is_cancelled() && self.state().completed.len() < total {
             let mut next: Option<Timestamp> = None;
+            let mut progressed = false;
             for node in &nodes {
                 let mut state = self.state();
                 if state.pending_gates > 0 || running.len() >= concurrency {
@@ -447,6 +450,13 @@ impl Scheduler {
                     self.cancel.cancel();
                     break;
                 }
+                if skips(node, &state) {
+                    let step = self.skipped_step(node);
+                    state.skipped.insert(node.id.clone());
+                    state.completed.insert(node.id.clone(), step);
+                    progressed = true;
+                    continue;
+                }
                 let due = state.ready_at.get(&node.id).copied().unwrap_or(0);
                 drop(state);
                 if due > self.now() {
@@ -471,7 +481,7 @@ impl Scheduler {
                 }
             } else if let Some(due) = next {
                 self.pause(due).await;
-            } else if self.state().completed.len() < total {
+            } else if !progressed && self.state().completed.len() < total {
                 return Err(AppError::new(AppErrorCode::Unknown, NO_READY_NODES));
             }
         }
@@ -509,6 +519,23 @@ impl Scheduler {
             (id, result)
         }
         .boxed()
+    }
+
+    fn skipped_step(&self, node: &GraphNode) -> StepRow {
+        let now = self.now();
+        StepRow {
+            id: new_id().hyphenated().to_string(),
+            run_id: self.run.id.clone(),
+            node_id: node.id.clone(),
+            step_type: node.node_type.clone(),
+            status: StepStatus::Succeeded,
+            input: Value::Null,
+            output: Value::Null,
+            error: None,
+            started_at: now,
+            finished_at: Some(now),
+            attempt: 0,
+        }
     }
 
     fn bind(&self, node: &GraphNode, state: &State) -> Value {
@@ -830,6 +857,24 @@ fn settle(
     };
     running.remove(&id);
     result
+}
+
+fn skips(node: &GraphNode, state: &State) -> bool {
+    if let Some(when) = &node.when {
+        if state.skipped.contains(&when.node_id) {
+            return true;
+        }
+        let taken = state
+            .completed
+            .get(&when.node_id)
+            .and_then(|step| step.input.get(&when.field))
+            .and_then(Value::as_bool);
+        if taken != Some(when.equals) {
+            return true;
+        }
+    }
+    let dependencies = node.dependencies();
+    !dependencies.is_empty() && dependencies.iter().all(|id| state.skipped.contains(id))
 }
 
 fn failure_output(message: Option<&str>) -> Value {

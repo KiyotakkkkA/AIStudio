@@ -1,4 +1,4 @@
-import type { ScenarioNodeTypeDto, ToolDto } from "@zvs/shared";
+import type { ScenarioNodeTypeDto, ScenarioSlot, ToolDto } from "@zvs/shared";
 import { effectiveTier } from "../tools/toolFilters";
 import {
   NODE_TYPE_LABELS,
@@ -8,6 +8,7 @@ import {
   TOOL_UNREGISTERED,
 } from "./scenarioCopy";
 import { isOutputType } from "./nodeForms";
+import { MEMORY_TYPES } from "./nodeRules";
 
 export interface PaletteEntry {
   readonly type: string;
@@ -15,13 +16,17 @@ export interface PaletteEntry {
   readonly spec: ScenarioNodeTypeDto;
 }
 
+export type PaletteAnchor =
+  | { readonly nodeId: string; readonly kind: "port"; readonly port: string }
+  | { readonly nodeId: string; readonly kind: "slot"; readonly slot: ScenarioSlot };
+
 export interface PaletteGroup {
   readonly key: keyof typeof PALETTE_GROUP_LABELS;
   readonly label: string;
   readonly entries: readonly PaletteEntry[];
 }
 
-const ORDER: readonly PaletteGroup["key"][] = ["triggers", "agents", "outputs", "core"];
+const ORDER: readonly PaletteGroup["key"][] = ["triggers", "agents", "memory", "outputs", "core"];
 
 export function toolFor(spec: ScenarioNodeTypeDto, tools: readonly ToolDto[]): ToolDto | undefined {
   return spec.toolKey === null ? undefined : tools.find((tool) => tool.key === spec.toolKey);
@@ -50,6 +55,7 @@ export function ceilingReason(spec: ScenarioNodeTypeDto, tools: readonly ToolDto
 
 function groupOf(spec: ScenarioNodeTypeDto): PaletteGroup["key"] {
   if (spec.role === "trigger") return "triggers";
+  if (MEMORY_TYPES.has(spec.type)) return "memory";
   if (isOutputType(spec.type)) return "outputs";
   return spec.role === "subNode" || spec.slots.length > 0 ? "agents" : "core";
 }
@@ -60,14 +66,22 @@ function matches(entry: PaletteEntry, query: string): boolean {
   return entry.label.toLowerCase().includes(needle) || entry.type.toLowerCase().includes(needle);
 }
 
+export function fitsAnchor(spec: ScenarioNodeTypeDto, anchor: PaletteAnchor | null): boolean {
+  if (anchor === null) return true;
+  if (anchor.kind === "slot") return spec.fills.includes(anchor.slot);
+  return spec.role === "action";
+}
+
 export function paletteGroups(
   types: readonly ScenarioNodeTypeDto[],
   tools: readonly ToolDto[],
   query: string,
+  anchor: PaletteAnchor | null = null,
+  taken: ReadonlySet<string> = new Set(),
 ): PaletteGroup[] {
   const groups = new Map<PaletteGroup["key"], PaletteEntry[]>();
   for (const spec of types) {
-    if (spec.toolKey !== null) continue;
+    if (spec.toolKey !== null || !fitsAnchor(spec, anchor) || taken.has(spec.type)) continue;
     const entry: PaletteEntry = { type: spec.type, label: typeLabel(spec.type, spec, tools), spec };
     if (!matches(entry, query)) continue;
     const key = groupOf(spec);

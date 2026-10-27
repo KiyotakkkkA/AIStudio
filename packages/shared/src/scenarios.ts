@@ -17,6 +17,8 @@ export const SCENARIO_EDGES_MAX = 1000;
 export const SCENARIO_ATTACHMENTS_MAX = 1000;
 export const SCENARIO_ISSUES_MAX = 1000;
 export const SCENARIO_MAIN_PORT = "main";
+export const SCENARIO_TRUE_PORT = "true";
+export const SCENARIO_FALSE_PORT = "false";
 export const SCENARIO_NOTES_MAX = 2000;
 export const SCENARIO_ATTEMPTS_MAX = 10;
 export const SCENARIO_BACKOFF_MAX_MS = 60_000;
@@ -68,8 +70,19 @@ export const ScenarioIssueRule = z.enum([
   "noTrigger",
   "multipleTriggers",
   "unreachable",
+  "restrictedTool",
+  "invalidPort",
+  "missingDialog",
+  "limitedDialog",
+  "duplicateKind",
 ]);
 export type ScenarioIssueRule = z.infer<typeof ScenarioIssueRule>;
+
+export const SCENARIO_WARNING_RULES: readonly ScenarioIssueRule[] = ["limitedDialog"];
+
+export function isWarningRule(rule: ScenarioIssueRule): boolean {
+  return SCENARIO_WARNING_RULES.includes(rule);
+}
 
 export const ScenarioPositionDto = z.object({ x: z.number(), y: z.number() });
 export type ScenarioPositionDto = z.infer<typeof ScenarioPositionDto>;
@@ -204,7 +217,9 @@ export type ScenarioValidateInput = z.infer<typeof ScenarioValidateInput>;
 
 export const ScenarioValidationDto = z
   .object({ valid: z.boolean(), issues: Issues })
-  .refine((result) => result.valid === (result.issues.length === 0), { path: ["valid"] });
+  .refine((result) => result.valid === result.issues.every((issue) => isWarningRule(issue.rule)), {
+    path: ["valid"],
+  });
 export type ScenarioValidationDto = z.infer<typeof ScenarioValidationDto>;
 
 export const SetScenarioActiveInput = z.object({ id: ScenarioId, active: z.boolean() });
@@ -226,6 +241,7 @@ export const ScenarioNodeTypeDto = z.object({
   trigger: ScenarioTriggerKind.nullable(),
   fills: z.array(ScenarioSlot),
   slots: z.array(ScenarioSlotSpecDto),
+  ports: z.array(Port),
   requiredParams: z.array(z.string().min(1).max(SCENARIO_PARAM_KEY_MAX)),
   toolKey: z.string().min(1).max(SCENARIO_NODE_TYPE_MAX).nullable(),
   paramsSchema: z.json(),

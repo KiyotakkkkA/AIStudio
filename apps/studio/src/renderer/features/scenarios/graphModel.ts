@@ -22,7 +22,7 @@ export const DUPLICATE_OFFSET = 32;
 export type ConnectRefusal = "selfLoop" | "notTrunk" | "intoTrigger" | "duplicate" | "cycle";
 
 export type AttachRefusal =
-  "self" | "unknownType" | "noSlot" | "wrongKind" | "occupied" | "hasEdges" | "cycle";
+  "self" | "unknownType" | "noSlot" | "wrongKind" | "occupied" | "sameKind" | "hasEdges" | "cycle";
 
 export type Refusal =
   | { readonly kind: "connect"; readonly reason: ConnectRefusal }
@@ -58,12 +58,18 @@ export type GraphAction =
       readonly nodeIds: readonly string[];
       readonly linkIds: readonly string[];
     }
-  | { readonly type: "connect"; readonly from: string; readonly to: string }
+  | {
+      readonly type: "connect";
+      readonly from: string;
+      readonly to: string;
+      readonly port?: string;
+    }
   | {
       readonly type: "reroute";
       readonly linkId: string;
       readonly from: string;
       readonly to: string;
+      readonly port?: string;
     }
   | {
       readonly type: "attach";
@@ -204,6 +210,12 @@ export function attachRefusal(
     (attachment) => attachment.childNodeId !== childId,
   );
   if (!slotSpec.multiple && occupants.length > 0) return "occupied";
+  if (
+    slot === "memory" &&
+    occupants.some((attachment) => findNode(graph, attachment.childNodeId)?.type === child?.type)
+  ) {
+    return "sameKind";
+  }
   return null;
 }
 
@@ -290,8 +302,8 @@ function duplicate(graph: ScenarioGraphDto, ids: readonly string[]): GraphResult
   );
 }
 
-function mainEdge(from: string, to: string): ScenarioEdgeDto {
-  return { from, to, fromPort: SCENARIO_MAIN_PORT, toPort: SCENARIO_MAIN_PORT };
+function mainEdge(from: string, to: string, port: string = SCENARIO_MAIN_PORT): ScenarioEdgeDto {
+  return { from, to, fromPort: port, toPort: SCENARIO_MAIN_PORT };
 }
 
 function attach(
@@ -322,15 +334,21 @@ function reroute(
   linkId: string,
   from: string,
   to: string,
+  port: string | undefined,
 ): GraphResult {
   const existing = graph.edges.find((edge) => edgeLinkId(edge) === linkId);
   if (existing === undefined) return ok(graph);
-  if (existing.from === from && existing.to === to) return ok(graph);
+  const fromPort = port ?? existing.fromPort;
+  if (existing.from === from && existing.to === to && existing.fromPort === fromPort) {
+    return ok(graph);
+  }
   const reason = connectRefusal(graph, catalogue, from, to, linkId);
   if (reason !== null) return { ok: false, refusal: { kind: "connect", reason } };
   return ok({
     ...graph,
-    edges: graph.edges.map((edge) => (edgeLinkId(edge) === linkId ? { ...edge, from, to } : edge)),
+    edges: graph.edges.map((edge) =>
+      edgeLinkId(edge) === linkId ? { ...edge, from, to, fromPort } : edge,
+    ),
   });
 }
 
@@ -389,10 +407,13 @@ export function applyAction(
     case "connect": {
       const reason = connectRefusal(graph, catalogue, action.from, action.to);
       if (reason !== null) return { ok: false, refusal: { kind: "connect", reason } };
-      return ok({ ...graph, edges: [...graph.edges, mainEdge(action.from, action.to)] });
+      return ok({
+        ...graph,
+        edges: [...graph.edges, mainEdge(action.from, action.to, action.port)],
+      });
     }
     case "reroute":
-      return reroute(graph, catalogue, action.linkId, action.from, action.to);
+      return reroute(graph, catalogue, action.linkId, action.from, action.to, action.port);
     case "attach":
       return attach(graph, catalogue, action.parentId, action.childId, action.slot);
     case "duplicate":

@@ -12,7 +12,8 @@ use zvs_contract::{
 };
 
 use super::catalogue::{
-    AGENT_TOOLS, MEMORY_WINDOW, MODEL_CHAT, OUTPUT_CHAT_REPLY, TOOL_SET, TRIGGER_CHAT,
+    AGENT_TOOLS, FLOW_BRANCH, KNOWLEDGE_STORES, MEMORY_FACTS, MEMORY_WINDOW, MODEL_CHAT,
+    OUTPUT_CHAT_REPLY, TOOL_SET, TRIGGER_CHAT,
 };
 use super::compile::{EVENT_KEY, PINNED_SOURCE, compile, compile_node, from_key};
 use super::nodes::{EffectsSlot, ScenarioEffects, ScenarioNodeOptions, register_scenario_nodes};
@@ -83,9 +84,13 @@ fn rig() -> Rig {
         &ScenarioNodeOptions {
             effects: slot.clone(),
             tools: None,
+            memory: None,
         },
     )
     .expect("registers the scenario nodes");
+    nodes
+        .register(crate::kernel::nodes::BranchNode)
+        .expect("registers the branch");
     nodes
         .register(FnNode::new(
             UPPER,
@@ -139,10 +144,11 @@ fn rig() -> Rig {
         ..RunServiceOptions::new(database.shared(), bus, Arc::clone(&nodes))
     })
     .expect("a run service");
-    let scenarios = ScenarioService::new(ScenarioServiceOptions::new(
-        database.shared(),
-        Arc::clone(&nodes),
-    ));
+    let mut options = ScenarioServiceOptions::new(database.shared(), Arc::clone(&nodes));
+    options
+        .actions
+        .extend([UPPER, FAIL, WAIT, SEARCH].map(str::to_owned));
+    let scenarios = ScenarioService::new(options);
     let runner = ScenarioRunner::new(ScenarioRunnerOptions::new(scenarios.clone(), runs.clone()));
     let effects = Arc::new(Effects::default());
     slot.attach(effects.clone());
@@ -249,6 +255,36 @@ fn edge(from: &str, to: &str) -> ScenarioEdgeDto {
         to: to.to_owned(),
         from_port: "main".to_owned(),
         to_port: "main".to_owned(),
+    }
+}
+
+fn port_edge(from: &str, port: &str, to: &str) -> ScenarioEdgeDto {
+    ScenarioEdgeDto {
+        from_port: port.to_owned(),
+        ..edge(from, to)
+    }
+}
+
+fn branch_graph(condition: Value) -> ScenarioGraphDto {
+    ScenarioGraphDto {
+        nodes: vec![
+            node("trigger", TRIGGER_CHAT, json!({})),
+            node("branch", FLOW_BRANCH, json!({ "condition": condition })),
+            node("shout", UPPER, json!({ "text": "{{result.text}}" })),
+            node("broken", FAIL, json!({})),
+            node(
+                "reply",
+                OUTPUT_CHAT_REPLY,
+                json!({ "template": "{{result.text}}" }),
+            ),
+        ],
+        edges: vec![
+            edge("trigger", "branch"),
+            port_edge("branch", "true", "shout"),
+            port_edge("branch", "false", "broken"),
+            edge("shout", "reply"),
+        ],
+        attachments: Vec::new(),
     }
 }
 
@@ -705,5 +741,131 @@ async fn a_step_that_overruns_its_timeout_fails_with_a_timeout() {
     assert_eq!(
         shout.error.as_deref(),
         Some(crate::kernel::scheduler::STEP_TIMED_OUT)
+    );
+}
+
+#[tokio::test]
+async fn a_knowledge_node_grants_only_the_scoped_search_and_memory_grants_no_tool() {
+    let rig = rig();
+    let mut graph = agent_graph();
+    graph.nodes.push(node(
+        "stores",
+        KNOWLEDGE_STORES,
+        json!({ "stores": ["0199aa11-2222-7111-8111-111111111111"] }),
+    ));
+    graph.nodes.push(node(
+        "facts",
+        MEMORY_FACTS,
+        json!({ "policy": "readWrite", "area": "both" }),
+    ));
+    graph
+        .attachments
+        .push(attach("agent", "stores", ScenarioSlot::Memory));
+    graph
+        .attachments
+        .push(attach("agent", "facts", ScenarioSlot::Memory));
+    let compiled = compile(&graph, &rig.scenarios.catalogue()).expect("compiles");
+    assert_eq!(
+        compiled.allowed_tools,
+        Some(vec![
+            UPPER.to_owned(),
+            SEARCH.to_owned(),
+            "knowledge.search".to_owned()
+        ])
+    );
+    let agent = &compiled.nodes[1];
+    assert_eq!(
+        agent.input()["knowledge"]["params"]["stores"],
+        json!(["0199aa11-2222-7111-8111-111111111111"])
+    );
+    assert_eq!(agent.input()["facts"]["params"]["area"], "both");
+    assert_eq!(
+        agent.input()["tools"],
+        json!([UPPER, SEARCH, "knowledge.search"])
+    );
+}
+
+#[tokio::test]
+async fn an_agent_without_tool_nodes_is_allowed_no_tool() {
+    let rig = rig();
+    let mut graph = agent_graph();
+    graph
+        .nodes
+        .retain(|node| node.id != "set" && node.id != "search");
+    graph
+        .attachments
+        .retain(|attachment| attachment.slot != ScenarioSlot::Tool);
+    let compiled = compile(&graph, &rig.scenarios.catalogue()).expect("compiles");
+    assert_eq!(compiled.allowed_tools, Some(Vec::new()));
+    assert!(compiled.nodes[1].input().get("tools").is_none());
+}
+
+#[tokio::test]
+async fn branch_ports_compile_into_conditions_on_the_steps_they_lead_to() {
+    let rig = rig();
+    let compiled = compile(
+        &branch_graph(json!("{{result.flag}}")),
+        &rig.scenarios.catalogue(),
+    )
+    .expect("compiles");
+    let step = |id: &str| {
+        compiled
+            .nodes
+            .iter()
+            .find(|node| node.id == id)
+            .unwrap_or_else(|| panic!("{id} compiled"))
+    };
+    let shout = step("shout").when.clone().expect("a condition");
+    assert_eq!(
+        (shout.node_id.as_str(), shout.field.as_str(), shout.equals),
+        ("branch", "condition", true)
+    );
+    assert!(!step("broken").when.clone().expect("a condition").equals);
+    assert_eq!(step("reply").when, None);
+    let branch = step("branch");
+    assert_eq!(
+        branch
+            .bindings()
+            .map(|(key, _)| key.as_str())
+            .collect::<Vec<_>>(),
+        ["condition", "else", "then"]
+    );
+}
+
+#[tokio::test]
+async fn a_branch_runs_only_the_taken_port_and_skips_what_follows_the_other() {
+    let rig = rig();
+    let scenario = rig.create(branch_graph(json!("true")));
+    let handle = rig
+        .runner
+        .test(&ScenarioRunInput {
+            id: scenario.scenario.id,
+            graph: None,
+            input: Some(event()),
+        })
+        .expect("starts");
+    assert_eq!(rig.finish(&handle.id).await, RunStatus::Succeeded);
+    assert_eq!(
+        rig.started_order(&handle.id),
+        ["trigger", "branch", "shout", "reply"]
+    );
+    assert_eq!(
+        rig.effects.posted(),
+        [("c1".to_owned(), "ПРИВЕТ".to_owned())]
+    );
+
+    let scenario = rig.create(branch_graph(json!(false)));
+    let handle = rig
+        .runner
+        .test(&ScenarioRunInput {
+            id: scenario.scenario.id,
+            graph: None,
+            input: Some(event()),
+        })
+        .expect("starts");
+    assert_eq!(rig.finish(&handle.id).await, RunStatus::Failed);
+    assert_eq!(
+        rig.started_order(&handle.id),
+        ["trigger", "branch", "broken"]
     );
 }

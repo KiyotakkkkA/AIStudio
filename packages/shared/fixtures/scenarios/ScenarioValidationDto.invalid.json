@@ -18,5 +18,17 @@
       "valid": false,
       "issues": []
     }
+  },
+  {
+    "name": "invalid with warnings only",
+    "value": {
+      "valid": false,
+      "issues": [
+        {
+          "rule": "limitedDialog",
+          "nodeId": "memory"
+        }
+      ]
+    }
   }
 ]

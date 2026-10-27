@@ -1,6 +1,8 @@
 import { isIpcError } from "@zvs/ipc";
 import {
   AppErrorCode,
+  SCENARIO_FALSE_PORT,
+  SCENARIO_TRUE_PORT,
   ScenarioIssueDto,
   type ScenarioIssueRule,
   type ScenarioNodeRole,
@@ -16,7 +18,9 @@ export const NODE_TYPE_LABELS: Readonly<Record<string, string>> = {
   "trigger.webhook": "Вебхук",
   "agent.tools": "ИИ-агент",
   "model.chat": "Чат-модель",
-  "memory.window": "Память диалога",
+  "memory.window": "История диалога",
+  "memory.facts": "Память",
+  "knowledge.stores": "Векторные хранилища",
   "embedding.model": "Модель эмбеддингов",
   "tool.set": "Набор инструментов",
   "output.chatReply": "Ответ в чат",
@@ -24,11 +28,8 @@ export const NODE_TYPE_LABELS: Readonly<Record<string, string>> = {
   "output.newChat": "Новый диалог",
   "output.notify": "Уведомление",
   "output.file": "Сохранение в файл",
-  "llm.generate": "Генерация текста",
   "flow.branch": "Ветвление",
   "flow.map": "Обработка списка",
-  "job.run": "Фоновая задача",
-  "download.fetch": "Загрузка файла",
 };
 
 export const ROLE_LABELS: Record<ScenarioNodeRole, string> = {
@@ -44,9 +45,15 @@ export const SLOT_LABELS: Record<ScenarioSlot, string> = {
   embedding: "Эмбеддинги",
 };
 
+export const PORT_LABELS: Readonly<Record<string, string>> = {
+  [SCENARIO_TRUE_PORT]: "да",
+  [SCENARIO_FALSE_PORT]: "нет",
+};
+
 export const PALETTE_GROUP_LABELS = {
   triggers: "Триггеры",
   agents: "Агенты и подузлы",
+  memory: "Память",
   outputs: "Результат",
   core: "Действия ядра",
 } as const;
@@ -54,7 +61,30 @@ export const PALETTE_GROUP_LABELS = {
 export const TOOL_OFF = "Инструмент выключен: разрешение «off»";
 export const TOOL_UNAVAILABLE = "Инструмент недоступен";
 export const TOOL_UNREGISTERED = "Инструмент не зарегистрирован";
+export const TOOL_RESTRICTED = "Недоступен в наборе инструментов";
 export const TOOL_SET_EMPTY = "Инструменты не выбраны";
+export const STORES_EMPTY = "Хранилища не выбраны";
+export const NEXT_STEP = "Добавить следующий узел";
+
+export function nextForSlot(name: string, slot: ScenarioSlot): string {
+  return `Подузлы для слота «${SLOT_LABELS[slot]}» узла «${name}»`;
+}
+
+export function nextForPort(name: string, port: string): string {
+  const label = PORT_LABELS[port];
+  return label === undefined
+    ? `Шаги после узла «${name}»`
+    : `Шаги для выхода «${label}» узла «${name}»`;
+}
+export const DIALOG_LABEL = "Диалог";
+export const DIALOG_FROM_TRIGGER = "Диалог, из которого пришло сообщение";
+export const STORES_NONE = "Векторных хранилищ нет";
+export const DIALOG_MISSING = "Не определён: нет триггера «Сообщение в чате»";
+export const GRANTED_SECTION = "Подключено другими узлами";
+
+export function grantedBy(name: string): string {
+  return `Подключено узлом «${name}»`;
+}
 
 export const SCENARIO_LOAD_FAILED = "Не удалось загрузить сценарий.";
 export const SCENARIO_ACTION_FAILED = "Не удалось выполнить операцию со сценарием.";
@@ -94,6 +124,7 @@ export function attachRefusalText(
     occupied: `Слот ${slot} узла ${parent} уже занят`,
     hasEdges: `Узел ${child} соединён основными связями — удалите их перед подключением к слоту`,
     cycle: `Узел ${child} уже содержит ${parent} среди своих подузлов`,
+    sameKind: `В слоте ${slot} узла ${parent} уже есть узел этого вида`,
   };
   return reasons[refusal.reason];
 }
@@ -127,6 +158,11 @@ export function issueText(issue: ScenarioIssueDto, nameOf: (id: string) => strin
     noTrigger: "В сценарии нет триггера",
     multipleTriggers: "В сценарии может быть только один триггер",
     unreachable: `Узел ${node} не достижим от триггера`,
+    restrictedTool: `Инструмент «${issue.param ?? ""}» недоступен в наборе ${node}`,
+    invalidPort: `У узла ${node} нет выхода «${issue.param ?? ""}»`,
+    missingDialog: `Узлу ${node} нужен диалог: сценарий должен запускаться триггером «Сообщение в чате»`,
+    limitedDialog: `Без триггера «Сообщение в чате» узел ${node} работает только с глобальной памятью`,
+    duplicateKind: `Слот ${slot} узла ${node} принимает не больше одного узла каждого вида`,
   };
   return texts[issue.rule];
 }
@@ -141,6 +177,10 @@ export function stepsWord(count: number): string {
 
 export function issuesWord(count: number): string {
   return plural(count, "ошибка", "ошибки", "ошибок");
+}
+
+export function storesWord(count: number): string {
+  return plural(count, "хранилище", "хранилища", "хранилищ");
 }
 
 export function toolCountLabel(count: number): string {

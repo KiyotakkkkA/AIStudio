@@ -3,38 +3,63 @@ import {
   mdiBrain,
   mdiClockOutline,
   mdiCogOutline,
-  mdiDatabaseOutline,
-  mdiDownloadOutline,
+  mdiDatabaseSearchOutline,
   mdiEmailOutline,
   mdiFileDocumentOutline,
   mdiFormatListBulleted,
+  mdiHistory,
   mdiMessageArrowRightOutline,
   mdiMessageOutline,
   mdiMessagePlusOutline,
+  mdiNotebookOutline,
   mdiReply,
   mdiRobotOutline,
   mdiSourceBranch,
-  mdiTextBoxOutline,
-  mdiTimerSandEmpty,
   mdiToolboxOutline,
   mdiVectorPoint,
   mdiWebhook,
   mdiWrenchOutline,
 } from "@mdi/js";
 import type { Edge, Node } from "@xyflow/react";
-import type { ScenarioNodeDto, ScenarioNodeRole, ScenarioSlot } from "@zvs/shared";
+import {
+  SCENARIO_MAIN_PORT,
+  type ScenarioNodeDto,
+  type ScenarioNodeRole,
+  type ScenarioSlot,
+} from "@zvs/shared";
 import { attachmentLinkId, childrenIn, edgeLinkId } from "./graphModel";
 import { nodeSize, slotOffset } from "./layout";
 import type ScenarioEditor from "./ScenarioEditor";
 import { slotHandle } from "./ScenarioEditor";
-import { ROLE_LABELS, slotLabel, TOOL_SET_EMPTY, toolCountLabel } from "./scenarioCopy";
-import { isOutputType } from "./nodeForms";
+import {
+  issueText,
+  PORT_LABELS,
+  ROLE_LABELS,
+  slotLabel,
+  STORES_EMPTY,
+  storesWord,
+  TOOL_SET_EMPTY,
+  toolCountLabel,
+} from "./scenarioCopy";
+import { isWarning, STORES_TYPE, storeIds } from "./nodeRules";
+import type { PaletteAnchor } from "./palette";
 import type { NodeRunStatus } from "./runModel";
 import { TOOL_SET_TYPE, toolSetKeys } from "./toolSet";
 
 export const IN_HANDLE = "in";
 export const OUT_HANDLE = "out";
 export const UP_HANDLE = "up";
+export const PORT_HANDLE_PREFIX = "out:";
+
+export function portHandle(port: string): string {
+  return port === SCENARIO_MAIN_PORT ? OUT_HANDLE : `${PORT_HANDLE_PREFIX}${port}`;
+}
+
+export function portOfHandle(handle: string | null | undefined): string | null {
+  if (handle === OUT_HANDLE) return SCENARIO_MAIN_PORT;
+  if (handle?.startsWith(PORT_HANDLE_PREFIX) !== true) return null;
+  return handle.slice(PORT_HANDLE_PREFIX.length);
+}
 
 export type DropState = "accept" | "refuse" | null;
 
@@ -47,6 +72,20 @@ export interface SlotPort {
   readonly drop: DropState;
 }
 
+export interface OutPort {
+  readonly port: string;
+  readonly handle: string;
+  readonly label: string | null;
+  readonly top: number;
+}
+
+export interface NextAnchor {
+  readonly key: string;
+  readonly anchor: PaletteAnchor;
+  readonly side: "right" | "bottom";
+  readonly offset: number;
+}
+
 export interface ScenarioNodeData extends Record<string, unknown> {
   readonly label: string;
   readonly subLabel: string;
@@ -55,11 +94,13 @@ export interface ScenarioNodeData extends Record<string, unknown> {
   readonly width: number;
   readonly height: number;
   readonly hasIn: boolean;
-  readonly hasOut: boolean;
+  readonly outs: readonly OutPort[];
   readonly hasUp: boolean;
   readonly slots: readonly SlotPort[];
+  readonly next: readonly NextAnchor[];
   readonly chips: readonly string[];
   readonly issues: readonly string[];
+  readonly warnings: readonly string[];
   readonly ceiling: string | null;
   readonly disabled: boolean;
   readonly run: NodeRunStatus | null;
@@ -82,7 +123,9 @@ const TYPE_ICONS: Readonly<Record<string, string>> = {
   "trigger.webhook": mdiWebhook,
   "agent.tools": mdiRobotOutline,
   "model.chat": mdiBrain,
-  "memory.window": mdiDatabaseOutline,
+  "memory.window": mdiHistory,
+  "memory.facts": mdiNotebookOutline,
+  "knowledge.stores": mdiDatabaseSearchOutline,
   "embedding.model": mdiVectorPoint,
   "tool.set": mdiToolboxOutline,
   "output.chatReply": mdiReply,
@@ -90,11 +133,8 @@ const TYPE_ICONS: Readonly<Record<string, string>> = {
   "output.newChat": mdiMessagePlusOutline,
   "output.notify": mdiBellOutline,
   "output.file": mdiFileDocumentOutline,
-  "llm.generate": mdiTextBoxOutline,
   "flow.branch": mdiSourceBranch,
   "flow.map": mdiFormatListBulleted,
-  "job.run": mdiTimerSandEmpty,
-  "download.fetch": mdiDownloadOutline,
 };
 
 const SLOT_CHIPS: Record<Exclude<ScenarioSlot, "tool">, string> = {
@@ -115,6 +155,10 @@ function subLabelOf(node: ScenarioNodeDto, base: string, modelId: unknown): stri
   if (node.type === TOOL_SET_TYPE) {
     const count = toolSetKeys(node.params).length;
     return count === 0 ? TOOL_SET_EMPTY : toolCountLabel(count);
+  }
+  if (node.type === STORES_TYPE) {
+    const count = storeIds(node.params).length;
+    return count === 0 ? STORES_EMPTY : storesWord(count);
   }
   return typeof modelId === "string" && modelId.length > 0 ? `${base} · ${modelId}` : base;
 }
@@ -145,6 +189,42 @@ export function flowNodes(editor: ScenarioEditor): ScenarioFlowNode[] {
             : "refuse"
           : null,
     }));
+    const ports = spec?.ports ?? [SCENARIO_MAIN_PORT];
+    const outs: OutPort[] = ports.map((port, index) => ({
+      port,
+      handle: portHandle(port),
+      label: PORT_LABELS[port] ?? null,
+      top: Math.round(((index + 1) * size.height) / (ports.length + 1)),
+    }));
+    const editable = selected.has(node.id) && editor.selection.nodes.length === 1;
+    const next: NextAnchor[] = editable
+      ? [
+          ...outs
+            .filter(
+              (out) =>
+                !graph.edges.some((edge) => edge.from === node.id && edge.fromPort === out.port),
+            )
+            .map((out) => ({
+              key: out.handle,
+              anchor: { nodeId: node.id, kind: "port" as const, port: out.port },
+              side: "right" as const,
+              offset: out.top,
+            })),
+          ...slots
+            .filter(
+              (port) =>
+                !port.filled ||
+                spec?.slots.find((entry) => entry.slot === port.slot)?.multiple === true,
+            )
+            .map((port) => ({
+              key: port.handle,
+              anchor: { nodeId: node.id, kind: "slot" as const, slot: port.slot },
+              side: "bottom" as const,
+              offset: port.offset,
+            })),
+        ]
+      : [];
+    const issues = editor.issuesByNode.get(node.id) ?? [];
     const chips = (spec?.slots ?? []).flatMap((entry) => {
       const count = childrenIn(graph, node.id, entry.slot).reduce((sum, attachment) => {
         const child = graph.nodes.find((candidate) => candidate.id === attachment.childNodeId);
@@ -167,12 +247,15 @@ export function flowNodes(editor: ScenarioEditor): ScenarioFlowNode[] {
         width: size.width,
         height: size.height,
         hasIn: role === "action" || role === null,
-        hasOut:
-          (role === "action" || role === "trigger" || role === null) && !isOutputType(node.type),
+        outs,
         hasUp: (spec?.fills.length ?? 0) > 0,
         slots,
+        next,
         chips,
-        issues: editor.issueLines(node.id),
+        issues: issues
+          .filter((issue) => !isWarning(issue))
+          .map((issue) => issueText(issue, editor.nameOf)),
+        warnings: issues.filter(isWarning).map((issue) => issueText(issue, editor.nameOf)),
         ceiling: editor.ceilingOf(node.id),
         disabled: node.disabled === true,
         run: run?.status ?? null,
@@ -194,7 +277,7 @@ export function flowEdges(editor: ScenarioEditor): ScenarioFlowEdge[] {
       type: "scenario",
       source: edge.from,
       target: edge.to,
-      sourceHandle: OUT_HANDLE,
+      sourceHandle: portHandle(edge.fromPort),
       targetHandle: IN_HANDLE,
       selected: selected.has(id),
       reconnectable: true,

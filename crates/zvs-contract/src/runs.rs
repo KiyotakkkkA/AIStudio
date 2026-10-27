@@ -119,6 +119,23 @@ impl Validate for RetryPolicy {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphCondition {
+    pub node_id: String,
+    pub field: String,
+    pub equals: bool,
+}
+
+impl Validate for GraphCondition {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("nodeId", &self.node_id)?;
+        check::max_len("nodeId", &self.node_id, 128)?;
+        check::non_empty("field", &self.field)?;
+        check::max_len("field", &self.field, 128)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GraphNode {
@@ -161,6 +178,12 @@ pub struct GraphNode {
         deserialize_with = "crate::wire::present"
     )]
     pub continue_on_error: Option<bool>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub when: Option<GraphCondition>,
 }
 
 impl GraphNode {
@@ -174,6 +197,7 @@ impl GraphNode {
             retry: None,
             timeout_ms: None,
             continue_on_error: None,
+            when: None,
         }
     }
 
@@ -222,6 +246,9 @@ impl Validate for GraphNode {
         check::max_len("type", &self.node_type, 128)?;
         if let Some(timeout) = self.timeout_ms {
             check::int_range("timeoutMs", timeout, 1, GRAPH_TIMEOUT_MAX_MS)?;
+        }
+        if let Some(when) = &self.when {
+            nested("when", when.validate())?;
         }
         nested("retry", self.retry.validate())
     }

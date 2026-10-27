@@ -5,11 +5,11 @@ use zvs_contract::{
     AppError, AppErrorCode, CreateScenarioInput, SaveScenarioDraftInput, ScenarioDetailDto,
     ScenarioDraftDto, ScenarioDto, ScenarioGraphDto, ScenarioId, ScenarioIssueDto,
     ScenarioNodeTypeDto, ScenarioOverlap, ScenarioTriggerKind, ScenarioValidationDto,
-    ScenarioVersionDto, ScenarioVersionId, ToolReferenceKind, UpdateScenarioInput, normalise_tags,
-    validate::js_trim,
+    ScenarioVersionDto, ScenarioVersionId, ToolReferenceKind, UpdateScenarioInput, blocking_issues,
+    normalise_tags, validate::js_trim,
 };
 
-use super::catalogue::{NodeSpec, ScenarioCatalogue, TOOL_SET, TOOL_SET_PARAM};
+use super::catalogue::{NodeSpec, SCENARIO_ACTIONS, ScenarioCatalogue, TOOL_SET, TOOL_SET_PARAM};
 use super::diff::diff_graphs;
 use super::validation::{trigger_binding, validate_graph};
 use crate::data::schema::{ScenarioRow, ScenarioVersionRow};
@@ -31,6 +31,7 @@ pub struct ScenarioServiceOptions {
     pub tools: Option<ToolRegistry>,
     pub clock: SharedClock,
     pub ids: IdGenerator,
+    pub actions: Vec<String>,
 }
 
 impl ScenarioServiceOptions {
@@ -38,6 +39,10 @@ impl ScenarioServiceOptions {
         Self {
             database,
             nodes,
+            actions: SCENARIO_ACTIONS
+                .iter()
+                .map(|action| (*action).to_owned())
+                .collect(),
             tools: None,
             clock: Arc::new(SystemClock),
             ids: system_ids(),
@@ -111,7 +116,7 @@ impl ScenarioService {
     }
 
     pub fn catalogue(&self) -> ScenarioCatalogue {
-        ScenarioCatalogue::from_registry(&self.inner.nodes)
+        ScenarioCatalogue::from_registry(&self.inner.nodes, &self.inner.actions)
     }
 
     pub fn node_types(&self) -> Vec<ScenarioNodeTypeDto> {
@@ -121,7 +126,7 @@ impl ScenarioService {
     pub fn validate(&self, graph: &ScenarioGraphDto) -> ScenarioValidationDto {
         let issues = validate_graph(graph, &self.catalogue());
         ScenarioValidationDto {
-            valid: issues.is_empty(),
+            valid: blocking_issues(&issues).is_empty(),
             issues,
         }
     }
@@ -149,7 +154,7 @@ impl ScenarioService {
     fn detail(&self, loaded: &Loaded) -> Result<ScenarioDetailDto, AppError> {
         let issues = validate_graph(&loaded.graph, &self.catalogue());
         Ok(ScenarioDetailDto {
-            scenario: self.dto(loaded, issues.len())?,
+            scenario: self.dto(loaded, blocking_issues(&issues).len())?,
             graph: loaded.graph.clone(),
             issues,
         })
@@ -160,7 +165,10 @@ impl ScenarioService {
         loaded: &Loaded,
         catalogue: &ScenarioCatalogue,
     ) -> Result<ScenarioDto, AppError> {
-        self.dto(loaded, validate_graph(&loaded.graph, catalogue).len())
+        self.dto(
+            loaded,
+            blocking_issues(&validate_graph(&loaded.graph, catalogue)).len(),
+        )
     }
 
     fn loaded(&self, id: &str) -> Result<Loaded, AppError> {
@@ -253,7 +261,7 @@ impl ScenarioService {
             }
             if let Some(graph) = input.graph.as_ref().filter(|graph| **graph != loaded.graph) {
                 let issues = validate_graph(graph, &catalogue);
-                if loaded.row.active && !issues.is_empty() {
+                if loaded.row.active && !blocking_issues(&issues).is_empty() {
                     return Err(refused(ACTIVE_SCENARIO_INVALID, &input.id, &issues).into());
                 }
                 let number = repositories.scenarios.next_version(&loaded.row.id)?;
@@ -303,7 +311,7 @@ impl ScenarioService {
             let repositories = Repositories::new(transaction);
             let mut loaded = load(&repositories, &id.to_string())?;
             let issues = validate_graph(&loaded.graph, &catalogue);
-            if active && !issues.is_empty() {
+            if active && !blocking_issues(&issues).is_empty() {
                 return Err(refused(SCENARIO_INVALID, id, &issues).into());
             }
             if loaded.row.active != active {
@@ -313,7 +321,7 @@ impl ScenarioService {
             }
             Ok((loaded, issues))
         })?;
-        self.dto(&loaded, issues.len())
+        self.dto(&loaded, blocking_issues(&issues).len())
     }
 
     pub fn versions(&self, id: &ScenarioId) -> Result<Vec<ScenarioVersionDto>, AppError> {

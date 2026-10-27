@@ -7,7 +7,7 @@ import TextInput from "../../ui/atoms/TextInput";
 import { iconFor } from "./flowModel";
 import { descriptionOf } from "./nodeForms";
 import type ScenarioEditor from "./ScenarioEditor";
-import { ROLE_LABELS } from "./scenarioCopy";
+import { nextForPort, nextForSlot, ROLE_LABELS } from "./scenarioCopy";
 
 export interface NodePaletteProps {
   readonly editor: ScenarioEditor;
@@ -16,6 +16,7 @@ export interface NodePaletteProps {
 
 function NodePalette({ editor, onPick }: NodePaletteProps) {
   const groups = editor.palette;
+  const anchor = editor.paletteAnchor;
   return (
     <div
       role="dialog"
@@ -48,6 +49,13 @@ function NodePalette({ editor, onPick }: NodePaletteProps) {
           className={`size-8 ${editor.palettePinned ? "bg-accent-soft text-accent-medium hover:bg-accent-soft hover:text-accent-medium" : ""}`}
         />
       </div>
+      {anchor === null ? null : (
+        <p className="m-0 border-b border-line px-3 py-2 text-[11.5px] text-main-400">
+          {anchor.kind === "slot"
+            ? nextForSlot(editor.nameOf(anchor.nodeId), anchor.slot)
+            : nextForPort(editor.nameOf(anchor.nodeId), anchor.port)}
+        </p>
+      )}
       <ScrollArea className="min-h-0 flex-1 p-1.5">
         {groups.length === 0 ? (
           <div className="flex items-center gap-2 px-2.5 py-3 text-[12px] text-main-500">

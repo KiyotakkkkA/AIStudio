@@ -53,5 +53,18 @@
       "timeoutMs": 30000,
       "continueOnError": true
     }
+  },
+  {
+    "name": "conditional step",
+    "value": {
+      "id": "reply",
+      "type": "output.chatReply",
+      "dependencies": ["branch"],
+      "when": {
+        "nodeId": "branch",
+        "field": "condition",
+        "equals": true
+      }
+    }
   }
 ]

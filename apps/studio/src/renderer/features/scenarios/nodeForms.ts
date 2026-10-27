@@ -1,5 +1,6 @@
 import type { Json, ScenarioNodeTypeDto, ScenarioParams } from "@zvs/shared";
 import { entityKindOf } from "./entityParams";
+import { STORES_PARAM, STORES_TYPE } from "./nodeRules";
 
 export type FieldKind = "text" | "multiline" | "number" | "boolean" | "json" | "select";
 
@@ -10,6 +11,7 @@ export interface ParamField {
   readonly hint?: string;
   readonly placeholder?: string;
   readonly options?: readonly string[];
+  readonly optionLabels?: Readonly<Record<string, string>>;
 }
 
 export interface NodeForm {
@@ -70,7 +72,7 @@ export const NODE_FORMS: Readonly<Record<string, NodeForm>> = {
   },
   "agent.tools": {
     description:
-      "Обрабатывает входные данные чат-моделью и вызывает инструменты из подключённых наборов. Чат-модель обязательна, память — по желанию.",
+      "Обрабатывает входные данные чат-моделью и вызывает инструменты из подключённых наборов. Чат-модель обязательна; история диалога, память и векторные хранилища подключаются к слоту «Память» по необходимости.",
     fields: [
       { key: "systemMessage", label: "Системное сообщение", kind: "multiline" },
       { key: "maxIterations", label: "Максимум шагов", kind: "number", placeholder: "8" },
@@ -85,8 +87,34 @@ export const NODE_FORMS: Readonly<Record<string, NodeForm>> = {
   },
   "memory.window": {
     description:
-      "Хранит последние сообщения, чтобы агент учитывал контекст. Подключается к слоту «Память».",
-    fields: [{ key: "size", label: "Сообщений в памяти", kind: "number", placeholder: "10" }],
+      "Передаёт агенту последние сообщения диалога как контекст. Подключается к слоту «Память».",
+    fields: [{ key: "size", label: "Сообщений в истории", kind: "number", placeholder: "10" }],
+  },
+  "memory.facts": {
+    description:
+      "Добавляет агенту сохранённые факты памяти. В режиме «Чтение и запись» агент получает инструмент памяти. Подключается к слоту «Память».",
+    fields: [
+      {
+        key: "policy",
+        label: "Доступ",
+        kind: "select",
+        options: ["read", "readWrite"],
+        optionLabels: { read: "Только чтение", readWrite: "Чтение и запись" },
+      },
+      {
+        key: "area",
+        label: "Область памяти",
+        kind: "select",
+        options: ["global", "dialog", "both"],
+        optionLabels: { global: "Глобальная", dialog: "Диалог", both: "Глобальная и диалог" },
+        hint: "Память диалога требует триггера «Сообщение в чате».",
+      },
+    ],
+  },
+  "knowledge.stores": {
+    description:
+      "Даёт агенту поиск по выбранным векторным хранилищам. Подключается к слоту «Память».",
+    fields: [],
   },
   "embedding.model": {
     description: "Модель, которая превращает текст в векторы для поиска по хранилищу.",
@@ -122,14 +150,21 @@ export const NODE_FORMS: Readonly<Record<string, NodeForm>> = {
     fields: [{ key: "path", label: "Путь к файлу", placeholder: "reports/support.md" }, TEMPLATE],
   },
   "flow.branch": {
-    description: "Направляет выполнение по одной из ветвей в зависимости от условия.",
-    fields: [],
+    description:
+      "Направляет выполнение по выходу «да» или «нет» в зависимости от условия. Шаги другой ветви пропускаются.",
+    fields: [
+      {
+        key: "condition",
+        label: "Условие",
+        placeholder: "{{result.ok}}",
+        hint: "Ссылка на логическое поле результата предыдущего шага или значение true / false.",
+      },
+    ],
   },
   "flow.map": {
     description: "Выполняет следующие шаги для каждого элемента списка.",
     fields: [],
   },
-  "job.run": { description: "Запускает фоновую задачу.", fields: [] },
 };
 
 export function isOutputType(type: string): boolean {
@@ -194,12 +229,13 @@ export function schemaFields(schema: Json | undefined): ParamField[] {
 export function formFields(spec: ScenarioNodeTypeDto | undefined, type: string): FormField[] {
   const required = new Set(spec?.requiredParams ?? []);
   const declared = NODE_FORMS[type]?.fields ?? [];
+  const hidden = new Set(type === STORES_TYPE ? [STORES_PARAM] : []);
   const fields: FormField[] = declared.map((field) => ({
     ...field,
     required: required.has(field.key),
     entity: entityKindOf(field.key) !== null,
   }));
-  const known = new Set(declared.map((field) => field.key));
+  const known = new Set([...declared.map((field) => field.key), ...hidden]);
   for (const field of schemaFields(spec?.paramsSchema)) {
     if (known.has(field.key)) continue;
     known.add(field.key);
@@ -214,6 +250,10 @@ export function formFields(spec: ScenarioNodeTypeDto | undefined, type: string):
     fields.push({ key, label: key, required: true, entity: entityKindOf(key) !== null });
   }
   return fields;
+}
+
+export function optionLabel(field: ParamField, option: string): string {
+  return field.optionLabels?.[option] ?? option;
 }
 
 export function fieldValue(field: ParamField, text: string): Json | undefined {

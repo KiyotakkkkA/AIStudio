@@ -1,5 +1,6 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
+import { SCENARIO_MAIN_PORT, ScenarioSlot as SlotSchema } from "@zvs/shared";
 import type {
   Contract,
   Json,
@@ -37,8 +38,17 @@ import type { EventRouter } from "../../app/EventRouter";
 import ScenarioRunState from "./ScenarioRunState";
 import { nodeSize, slotOffset, slotUnder, tidy, type SlotTarget } from "./layout";
 import EntityOptions from "./entityParams";
-import { ceilingReason, paletteGroups, typeLabel, type PaletteGroup } from "./palette";
-import { TOOL_SET_PARAM, TOOL_SET_TYPE, toolSetProblem } from "./toolSet";
+import {
+  ceilingReason,
+  fitsAnchor,
+  paletteGroups,
+  typeLabel,
+  type PaletteAnchor,
+  type PaletteGroup,
+} from "./palette";
+import { TOOL_SET_TYPE, toolSetProblem } from "./toolSet";
+import { blockingIssues, defaultParams, memoryKinds } from "./nodeRules";
+import { portOfHandle } from "./flowModel";
 import {
   DRAFT_SAVE_FAILED,
   SCENARIO_LOAD_FAILED,
@@ -104,6 +114,7 @@ export default class ScenarioEditor {
   switching = false;
   paletteOpen = false;
   paletteQuery = "";
+  paletteAnchor: PaletteAnchor | null = null;
   palettePinned: boolean;
   overlapSaving = false;
   readonly entities: EntityOptions;
@@ -184,7 +195,16 @@ export default class ScenarioEditor {
   }
 
   get palette(): PaletteGroup[] {
-    return paletteGroups(this.types, this.tools, this.paletteQuery);
+    const anchor = this.paletteAnchor;
+    const taken =
+      anchor?.kind === "slot" && anchor.slot === "memory"
+        ? memoryKinds(this.graph, anchor.nodeId)
+        : new Set<string>();
+    return paletteGroups(this.types, this.tools, this.paletteQuery, anchor, taken);
+  }
+
+  get blocking(): ScenarioIssueDto[] {
+    return blockingIssues(this.issues);
   }
 
   get selectedNode(): ScenarioNodeDto | null {
@@ -349,6 +369,10 @@ export default class ScenarioEditor {
 
   setSelection(selection: Selection): void {
     this.selection = selection;
+    const anchor = this.paletteAnchor;
+    if (anchor !== null && (selection.nodes.length !== 1 || selection.nodes[0] !== anchor.nodeId)) {
+      this.paletteAnchor = null;
+    }
   }
 
   select(id: string, additive = false): void {
@@ -463,11 +487,24 @@ export default class ScenarioEditor {
     if (targetSlot !== null) {
       return this.dispatch({ type: "attach", parentId: target, childId: source, slot: targetSlot });
     }
-    return this.dispatch({ type: "connect", from: source, to: target });
+    const port = portOfHandle(sourceHandle);
+    return this.dispatch({
+      type: "connect",
+      from: source,
+      to: target,
+      ...(port === null ? {} : { port }),
+    });
   }
 
-  reroute(linkId: string, source: string, target: string): boolean {
-    return this.dispatch({ type: "reroute", linkId, from: source, to: target });
+  reroute(linkId: string, source: string, target: string, sourceHandle?: string | null): boolean {
+    const port = portOfHandle(sourceHandle);
+    return this.dispatch({
+      type: "reroute",
+      linkId,
+      from: source,
+      to: target,
+      ...(port === null ? {} : { port }),
+    });
   }
 
   updateNode(nodeId: string, patch: NodePatch): void {
@@ -557,9 +594,18 @@ export default class ScenarioEditor {
   openPalette(): void {
     this.paletteOpen = true;
     this.paletteQuery = "";
+    this.paletteAnchor = null;
+  }
+
+  openNext(anchor: PaletteAnchor): void {
+    this.selection = { nodes: [anchor.nodeId], links: [] };
+    this.paletteOpen = true;
+    this.paletteQuery = "";
+    this.paletteAnchor = anchor;
   }
 
   closePalette(force = false): void {
+    this.paletteAnchor = null;
     if (this.palettePinned && !force) return;
     this.paletteOpen = false;
   }
@@ -586,20 +632,28 @@ export default class ScenarioEditor {
       this.refusal = blocked;
       return false;
     }
+    const target = this.paletteAnchor;
+    if (target !== null && !fitsAnchor(spec, target)) return false;
     const id = freshNodeId(this.graph, type, new Set());
-    const anchor = this.selectedNode;
+    const anchor =
+      target === null ? this.selectedNode : (findNode(this.graph, target.nodeId) ?? null);
     const actions: GraphAction[] = [];
     let position = fallback;
     const anchorSpec = anchor === null ? undefined : this.catalogue.get(anchor.type);
-    const params: ScenarioParams = type === TOOL_SET_TYPE ? { [TOOL_SET_PARAM]: [] } : {};
+    const params: ScenarioParams = defaultParams(type);
     const node: ScenarioNodeDto = { id, type, position, params };
     const probe: ScenarioGraphDto = { ...this.graph, nodes: [...this.graph.nodes, node] };
     const slot =
-      anchor === null || anchorSpec === undefined
+      anchor === null || anchorSpec === undefined || target?.kind === "port"
         ? undefined
         : anchorSpec.slots.find(
-            (entry) => attachRefusal(probe, this.catalogue, anchor.id, id, entry.slot) === null,
+            (entry) =>
+              (target === null || entry.slot === target.slot) &&
+              attachRefusal(probe, this.catalogue, anchor.id, id, entry.slot) === null,
           );
+    if (target?.kind === "slot" && slot === undefined) return false;
+    const port = target?.kind === "port" ? target.port : undefined;
+    const portIndex = port === undefined ? -1 : (anchorSpec?.ports.indexOf(port) ?? -1);
     if (anchor !== null && anchorSpec !== undefined && slot !== undefined) {
       const offset = slotOffset(anchorSpec, slot.slot) ?? 0;
       position = {
@@ -613,16 +667,24 @@ export default class ScenarioEditor {
     } else if (
       anchor !== null &&
       spec.role !== "subNode" &&
+      target?.kind !== "slot" &&
+      (anchorSpec?.ports.length ?? 1) > 0 &&
       isTrunk(this.catalogue, anchor) &&
       connectRefusal(probe, this.catalogue, anchor.id, id) === null
     ) {
+      const fan = (anchorSpec?.ports.length ?? 1) > 1 ? Math.max(portIndex, 0) * 2 - 1 : 0;
       position = {
         x: anchor.position.x + nodeSize(anchorSpec).width + STEP_GAP,
-        y: anchor.position.y,
+        y: anchor.position.y + fan * (nodeSize(spec).height / 2 + STEP_GAP / 3),
       };
       actions.push(
         { type: "addNode", node: { ...node, position } },
-        { type: "connect", from: anchor.id, to: id },
+        {
+          type: "connect",
+          from: anchor.id,
+          to: id,
+          ...(port === undefined ? { port: anchorSpec?.ports[0] ?? SCENARIO_MAIN_PORT } : { port }),
+        },
       );
     } else {
       actions.push({ type: "addNode", node });
@@ -784,8 +846,6 @@ export function slotHandle(slot: ScenarioSlot): string {
 
 export function slotOfHandle(handle: string | null | undefined): ScenarioSlot | null {
   if (handle?.startsWith(SLOT_HANDLE_PREFIX) !== true) return null;
-  const slot = handle.slice(SLOT_HANDLE_PREFIX.length);
-  return slot === "model" || slot === "memory" || slot === "tool" || slot === "embedding"
-    ? slot
-    : null;
+  const parsed = SlotSchema.safeParse(handle.slice(SLOT_HANDLE_PREFIX.length));
+  return parsed.success ? parsed.data : null;
 }

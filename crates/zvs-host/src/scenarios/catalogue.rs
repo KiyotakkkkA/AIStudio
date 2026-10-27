@@ -1,6 +1,7 @@
 use serde_json::{Map, Value, json};
 use zvs_contract::{
-    ScenarioNodeRole, ScenarioNodeTypeDto, ScenarioSlot, ScenarioSlotSpecDto, ScenarioTriggerKind,
+    SCENARIO_FALSE_PORT, SCENARIO_MAIN_PORT, SCENARIO_TRUE_PORT, ScenarioNodeRole,
+    ScenarioNodeTypeDto, ScenarioSlot, ScenarioSlotSpecDto, ScenarioTriggerKind,
 };
 
 use crate::kernel::NodeRegistry;
@@ -12,6 +13,21 @@ pub const TRIGGER_WEBHOOK: &str = "trigger.webhook";
 pub const AGENT_TOOLS: &str = "agent.tools";
 pub const MODEL_CHAT: &str = "model.chat";
 pub const MEMORY_WINDOW: &str = "memory.window";
+pub const MEMORY_FACTS: &str = "memory.facts";
+pub const KNOWLEDGE_STORES: &str = "knowledge.stores";
+pub const STORES_PARAM: &str = "stores";
+pub const POLICY_PARAM: &str = "policy";
+pub const AREA_PARAM: &str = "area";
+pub const POLICY_READ: &str = "read";
+pub const POLICY_READ_WRITE: &str = "readWrite";
+pub const AREA_GLOBAL: &str = "global";
+pub const AREA_DIALOG: &str = "dialog";
+pub const AREA_BOTH: &str = "both";
+pub const FLOW_BRANCH: &str = "flow.branch";
+pub const FLOW_MAP: &str = "flow.map";
+pub const CONDITION_PARAM: &str = "condition";
+pub const SCENARIO_ACTIONS: &[&str] = &[FLOW_BRANCH, FLOW_MAP];
+pub const RESTRICTED_TOOL_PREFIXES: &[&str] = &["browser.", "vector.", "knowledge."];
 pub const EMBEDDING_MODEL: &str = "embedding.model";
 pub const TOOL_SET: &str = "tool.set";
 pub const TOOL_SET_PARAM: &str = "tools";
@@ -21,7 +37,6 @@ pub const OUTPUT_NEW_CHAT: &str = "output.newChat";
 pub const OUTPUT_NOTIFY: &str = "output.notify";
 pub const OUTPUT_FILE: &str = "output.file";
 pub const TEMPLATE_PARAM: &str = "template";
-pub const INTERNAL_PREFIXES: &[&str] = &["chat."];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SlotSpec {
@@ -63,6 +78,7 @@ pub struct NodeSpec {
     pub trigger: Option<ScenarioTriggerKind>,
     pub fills: Vec<ScenarioSlot>,
     pub slots: Vec<SlotSpec>,
+    pub ports: Vec<String>,
     pub required_params: Vec<String>,
     pub tool_key: Option<String>,
     pub params_schema: Value,
@@ -78,6 +94,7 @@ impl NodeSpec {
             trigger: None,
             fills: Vec::new(),
             slots: Vec::new(),
+            ports: vec![SCENARIO_MAIN_PORT.to_owned()],
             required_params: Vec::new(),
             tool_key: None,
             params_schema: object_schema(&[], &[]),
@@ -98,6 +115,7 @@ impl NodeSpec {
         Self {
             trunk: false,
             fills: vec![slot],
+            ports: Vec::new(),
             idempotent: true,
             ..Self::action(node_type)
         }
@@ -106,6 +124,12 @@ impl NodeSpec {
     #[must_use]
     pub fn with_slots(mut self, slots: &[SlotSpec]) -> Self {
         self.slots = slots.to_vec();
+        self
+    }
+
+    #[must_use]
+    pub fn with_ports(mut self, ports: &[&str]) -> Self {
+        self.ports = ports.iter().map(|port| (*port).to_owned()).collect();
         self
     }
 
@@ -157,6 +181,7 @@ impl NodeSpec {
                     multiple: spec.multiple,
                 })
                 .collect(),
+            ports: self.ports.clone(),
             required_params: self.required_params.clone(),
             tool_key: self.tool_key.clone(),
             params_schema: self.params_schema.clone(),
@@ -192,6 +217,10 @@ fn model_schema() -> Value {
     )
 }
 
+fn choice(options: &[&str]) -> Value {
+    json!({ "type": "string", "enum": options })
+}
+
 fn output_schema(fields: &[(&str, Value)], required: &[&str]) -> Value {
     let mut all = fields.to_vec();
     all.push((TEMPLATE_PARAM, text()));
@@ -212,7 +241,7 @@ impl ScenarioCatalogue {
             NodeSpec::action(AGENT_TOOLS)
                 .with_slots(&[
                     SlotSpec::required(ScenarioSlot::Model),
-                    SlotSpec::optional(ScenarioSlot::Memory),
+                    SlotSpec::many(ScenarioSlot::Memory),
                     SlotSpec::many(ScenarioSlot::Tool),
                 ])
                 .with_schema(object_schema(
@@ -225,6 +254,20 @@ impl ScenarioCatalogue {
             NodeSpec::sub_node(MODEL_CHAT, ScenarioSlot::Model).with_schema(model_schema()),
             NodeSpec::sub_node(MEMORY_WINDOW, ScenarioSlot::Memory)
                 .with_schema(object_schema(&[("size", bounded_integer(100))], &[])),
+            NodeSpec::sub_node(MEMORY_FACTS, ScenarioSlot::Memory).with_schema(object_schema(
+                &[
+                    (POLICY_PARAM, choice(&[POLICY_READ, POLICY_READ_WRITE])),
+                    (AREA_PARAM, choice(&[AREA_GLOBAL, AREA_DIALOG, AREA_BOTH])),
+                ],
+                &[],
+            )),
+            NodeSpec::sub_node(KNOWLEDGE_STORES, ScenarioSlot::Memory).with_schema(object_schema(
+                &[(
+                    STORES_PARAM,
+                    json!({ "type": "array", "items": { "type": "string" } }),
+                )],
+                &[STORES_PARAM],
+            )),
             NodeSpec::sub_node(TOOL_SET, ScenarioSlot::Tool).with_schema(object_schema(
                 &[(
                     TOOL_SET_PARAM,
@@ -234,31 +277,46 @@ impl ScenarioCatalogue {
             )),
             NodeSpec::sub_node(EMBEDDING_MODEL, ScenarioSlot::Embedding)
                 .with_schema(model_schema()),
-            NodeSpec::action(OUTPUT_CHAT_REPLY).with_schema(output_schema(&[], &[])),
-            NodeSpec::action(OUTPUT_CHAT_MESSAGE).with_schema(output_schema(
-                &[("conversationId", text())],
-                &["conversationId"],
-            )),
-            NodeSpec::action(OUTPUT_NEW_CHAT).with_schema(output_schema(&[("title", text())], &[])),
+            NodeSpec::action(OUTPUT_CHAT_REPLY)
+                .with_ports(&[])
+                .with_schema(output_schema(&[], &[])),
+            NodeSpec::action(OUTPUT_CHAT_MESSAGE)
+                .with_ports(&[])
+                .with_schema(output_schema(
+                    &[("conversationId", text())],
+                    &["conversationId"],
+                )),
+            NodeSpec::action(OUTPUT_NEW_CHAT)
+                .with_ports(&[])
+                .with_schema(output_schema(&[("title", text())], &[])),
             NodeSpec::action(OUTPUT_NOTIFY)
+                .with_ports(&[])
                 .with_schema(output_schema(&[("title", text())], &["title"])),
             NodeSpec::action(OUTPUT_FILE)
+                .with_ports(&[])
                 .with_schema(output_schema(&[("path", text())], &["path"])),
         ];
-        specs.into_iter().fold(Self::default(), |catalogue, spec| {
-            catalogue.with(spec.built_in())
-        })
+        specs
+            .into_iter()
+            .fold(Self::default(), |catalogue, spec| {
+                catalogue.with(spec.built_in())
+            })
+            .with(NodeSpec {
+                idempotent: true,
+                ..NodeSpec::action(FLOW_BRANCH)
+                    .with_ports(&[SCENARIO_TRUE_PORT, SCENARIO_FALSE_PORT])
+                    .with_schema(object_schema(
+                        &[(CONDITION_PARAM, json!({ "type": ["boolean", "string"] }))],
+                        &[CONDITION_PARAM],
+                    ))
+            })
     }
 
-    pub fn from_registry(registry: &NodeRegistry) -> Self {
+    pub fn from_registry(registry: &NodeRegistry, actions: &[String]) -> Self {
         registry
             .list()
             .iter()
-            .filter(|node| {
-                !INTERNAL_PREFIXES
-                    .iter()
-                    .any(|prefix| node.node_type().starts_with(prefix))
-            })
+            .filter(|node| actions.iter().any(|action| action == node.node_type()))
             .fold(Self::builtin(), |catalogue, node| {
                 let tool_key = node
                     .permission()

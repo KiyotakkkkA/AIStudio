@@ -80,5 +80,17 @@
       "type": "w",
       "timeoutMs": 0
     }
+  },
+  {
+    "name": "condition without field",
+    "value": {
+      "id": "a",
+      "type": "w",
+      "when": {
+        "nodeId": "b",
+        "field": "",
+        "equals": true
+      }
+    }
   }
 ]

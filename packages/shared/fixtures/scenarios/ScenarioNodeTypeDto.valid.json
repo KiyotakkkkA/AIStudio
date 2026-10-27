@@ -15,7 +15,7 @@
         {
           "slot": "memory",
           "required": false,
-          "multiple": false
+          "multiple": true
         },
         {
           "slot": "tool",
@@ -23,6 +23,7 @@
           "multiple": true
         }
       ],
+      "ports": ["main"],
       "requiredParams": [],
       "toolKey": null,
       "paramsSchema": {
@@ -48,6 +49,7 @@
       "trigger": "schedule",
       "fills": [],
       "slots": [],
+      "ports": ["main"],
       "requiredParams": ["cron"],
       "toolKey": null,
       "paramsSchema": {
@@ -70,6 +72,7 @@
       "trigger": null,
       "fills": ["tool"],
       "slots": [],
+      "ports": ["main"],
       "requiredParams": ["query"],
       "toolKey": "vector.search",
       "paramsSchema": {
@@ -80,6 +83,23 @@
           }
         },
         "required": ["query"]
+      },
+      "idempotent": true
+    }
+  },
+  {
+    "name": "branch",
+    "value": {
+      "type": "flow.branch",
+      "role": "action",
+      "trigger": null,
+      "fills": [],
+      "slots": [],
+      "ports": ["true", "false"],
+      "requiredParams": ["condition"],
+      "toolKey": null,
+      "paramsSchema": {
+        "type": "object"
       },
       "idempotent": true
     }

@@ -30,7 +30,7 @@ import {
   flowEdges,
   flowNodes,
   IN_HANDLE,
-  OUT_HANDLE,
+  portOfHandle,
   type ScenarioFlowEdge,
   type ScenarioFlowNode,
 } from "./flowModel";
@@ -123,7 +123,7 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
   const flow = useReactFlow();
   const frame = useRef<HTMLDivElement | null>(null);
   const actions = useMemo(
-    () => ({ duplicate: editor.duplicateNode, remove: editor.deleteNode }),
+    () => ({ duplicate: editor.duplicateNode, remove: editor.deleteNode, next: editor.openNext }),
     [editor],
   );
   const [measured, setMeasured] = useState<Record<string, Size>>({});
@@ -191,8 +191,10 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
   const onReconnect = useCallback(
     (edge: ScenarioFlowEdge, connection: Connection) => {
       if (edge.data?.kind !== "main") return;
-      if (connection.sourceHandle !== OUT_HANDLE || connection.targetHandle !== IN_HANDLE) return;
-      editor.reroute(edge.id, connection.source, connection.target);
+      if (portOfHandle(connection.sourceHandle) === null || connection.targetHandle !== IN_HANDLE) {
+        return;
+      }
+      editor.reroute(edge.id, connection.source, connection.target, connection.sourceHandle);
     },
     [editor],
   );
@@ -338,8 +340,8 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
             ) : (
               <Button
                 tone="primary"
-                disabled={editor.issues.length > 0}
-                title={editor.issues.length > 0 ? TEST_BLOCKED : undefined}
+                disabled={editor.blocking.length > 0}
+                title={editor.blocking.length > 0 ? TEST_BLOCKED : undefined}
                 onClick={() => void editor.testRun()}
               >
                 <Icon path={mdiPlay} size={15} />

@@ -5,6 +5,7 @@ import {
   mdiClose,
   mdiContentCopy,
   mdiDeleteOutline,
+  mdiLinkVariant,
   mdiLinkVariantOff,
   mdiPlay,
   mdiPlayOutline,
@@ -39,9 +40,14 @@ import {
 } from "./entityParams";
 import { attachmentLinkId, childrenIn, findNode } from "./graphModel";
 import { iconFor } from "./flowModel";
-import { descriptionOf, formFields, withField, type FormField } from "./nodeForms";
+import { descriptionOf, formFields, optionLabel, withField, type FormField } from "./nodeForms";
+import { chatTrigger, dialogNeed, isWarning, STORES_PARAM, STORES_TYPE } from "./nodeRules";
+import StoresPicker from "./StoresPicker";
 import type ScenarioEditor from "./ScenarioEditor";
 import {
+  DIALOG_FROM_TRIGGER,
+  DIALOG_LABEL,
+  DIALOG_MISSING,
   issueText,
   ROLE_LABELS,
   slotLabel,
@@ -239,7 +245,7 @@ function ParamField({
           value={paramText(value)}
           invalid={invalid}
           options={withCurrent(
-            field.options.map((option) => ({ value: option, label: option })),
+            field.options.map((option) => ({ value: option, label: optionLabel(field, option) })),
             paramText(value),
           )}
           onChange={(next) => {
@@ -352,7 +358,9 @@ const SubNodes = observer(function SubNodes({
             ) : (
               children.map((attachment) => {
                 const child = findNode(editor.graph, attachment.childNodeId);
-                const broken = (editor.issuesByNode.get(attachment.childNodeId) ?? []).length > 0;
+                const broken = (editor.issuesByNode.get(attachment.childNodeId) ?? []).some(
+                  (issue) => !isWarning(issue),
+                );
                 const tone = child?.disabled === true ? "idle" : broken ? "err" : ("ok" as const);
                 return (
                   <div
@@ -399,6 +407,43 @@ const SubNodes = observer(function SubNodes({
   );
 });
 
+const DialogSource = observer(function DialogSource({
+  editor,
+  node,
+}: {
+  readonly editor: ScenarioEditor;
+  readonly node: ScenarioNodeDto;
+}) {
+  if (dialogNeed(node) === null) return null;
+  const trigger = chatTrigger(editor.graph);
+  return (
+    <div className="rounded-card border border-line bg-main-850 px-2.75 py-2.5">
+      <div className="flex items-center gap-2">
+        <span className="flex-1 text-[11px] font-medium text-main-400">{DIALOG_LABEL}</span>
+        {trigger === undefined ? null : (
+          <button
+            type="button"
+            className="inline-flex min-w-0 items-center gap-1 text-[11.5px] text-accent-medium hover:underline"
+            onClick={() => {
+              editor.select(trigger.id);
+            }}
+          >
+            <Icon path={mdiLinkVariant} size={13} />
+            <span className="truncate">{editor.nameOf(trigger.id)}</span>
+          </button>
+        )}
+      </div>
+      <p
+        className={`m-0 mt-1 text-[12px] leading-snug ${
+          trigger === undefined ? "text-err" : "text-main-200"
+        }`}
+      >
+        {trigger === undefined ? DIALOG_MISSING : DIALOG_FROM_TRIGGER}
+      </p>
+    </div>
+  );
+});
+
 const ParamsTab = observer(function ParamsTab({
   editor,
   node,
@@ -412,18 +457,28 @@ const ParamsTab = observer(function ParamsTab({
   const description = descriptionOf(node.type);
   const [showJson, setShowJson] = useState(false);
   const toolSet = node.type === TOOL_SET_TYPE;
+  const stores = node.type === STORES_TYPE;
   const ceiling = editor.ceilingOf(node.id);
   const missing = (key: string) => issues.some((issue) => issue.param === key);
   const run = editor.execution.nodes.get(node.id);
 
   return (
     <div className="flex flex-col gap-3.5 p-3.5">
-      {description === null ? null : (
-        <p className="m-0 text-[12px] leading-relaxed text-main-400">{description}</p>
-      )}
+      {issues.map((issue) => (
+        <Alert
+          key={`${issue.rule}-${issue.slot ?? ""}-${issue.param ?? ""}`}
+          tone={isWarning(issue) ? "warning" : "error"}
+        >
+          {issueText(issue, editor.nameOf)}
+        </Alert>
+      ))}
       {run?.status === "failed" && run.error !== null ? (
         <Alert>{`${STEP_STATUS_LABELS.failed}: ${run.error}`}</Alert>
       ) : null}
+      <DialogSource editor={editor} node={node} />
+      {description === null ? null : (
+        <p className="m-0 text-[12px] leading-relaxed text-main-400">{description}</p>
+      )}
       <Field label="Название" htmlFor="scenario-node-name">
         <CommitInput
           id="scenario-node-name"
@@ -466,6 +521,7 @@ const ParamsTab = observer(function ParamsTab({
       {toolSet ? (
         <ToolSetPicker editor={editor} node={node} invalid={missing(TOOL_SET_PARAM)} />
       ) : null}
+      {stores ? <StoresPicker editor={editor} node={node} invalid={missing(STORES_PARAM)} /> : null}
 
       <button
         type="button"
@@ -487,23 +543,6 @@ const ParamsTab = observer(function ParamsTab({
       )}
 
       <SubNodes editor={editor} node={node} />
-
-      {issues.length === 0 ? null : (
-        <>
-          <div className="h-px flex-none bg-line" />
-          <h3 className={SECTION}>Ошибки</h3>
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-            {issues.map((issue) => (
-              <li
-                key={`${issue.rule}-${issue.slot ?? ""}-${issue.param ?? ""}`}
-                className="text-[12px] leading-snug text-err"
-              >
-                {issueText(issue, editor.nameOf)}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
     </div>
   );
 });
@@ -829,7 +868,11 @@ const Overview = observer(function Overview({ editor }: { readonly editor: Scena
                 <button
                   type="button"
                   disabled={issue.nodeId === undefined}
-                  className="w-full rounded-control px-2 py-1.5 text-left text-[12px] leading-snug text-err enabled:hover:bg-err-soft"
+                  className={`w-full rounded-control px-2 py-1.5 text-left text-[12px] leading-snug ${
+                    isWarning(issue)
+                      ? "text-warn enabled:hover:bg-warn-soft"
+                      : "text-err enabled:hover:bg-err-soft"
+                  }`}
                   onClick={() => {
                     if (issue.nodeId !== undefined) editor.select(issue.nodeId);
                   }}

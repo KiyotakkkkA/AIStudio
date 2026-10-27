@@ -20,5 +20,20 @@
       "nodeId": "model",
       "param": "modelId"
     }
+  },
+  {
+    "name": "warning",
+    "value": {
+      "rule": "limitedDialog",
+      "nodeId": "memory"
+    }
+  },
+  {
+    "name": "restricted tool",
+    "value": {
+      "rule": "restrictedTool",
+      "nodeId": "tools",
+      "param": "browser.click"
+    }
   }
 ]

@@ -12,19 +12,26 @@ use zvs_contract::{
 };
 
 use super::catalogue::{
-    AGENT_TOOLS, OUTPUT_CHAT_MESSAGE, OUTPUT_CHAT_REPLY, OUTPUT_FILE, OUTPUT_NEW_CHAT,
-    OUTPUT_NOTIFY, TEMPLATE_PARAM, TRIGGER_CHAT, TRIGGER_MAIL, TRIGGER_SCHEDULE, TRIGGER_WEBHOOK,
+    AGENT_TOOLS, AREA_BOTH, AREA_DIALOG, AREA_GLOBAL, AREA_PARAM, OUTPUT_CHAT_MESSAGE,
+    OUTPUT_CHAT_REPLY, OUTPUT_FILE, OUTPUT_NEW_CHAT, OUTPUT_NOTIFY, POLICY_PARAM,
+    POLICY_READ_WRITE, STORES_PARAM, TEMPLATE_PARAM, TRIGGER_CHAT, TRIGGER_MAIL, TRIGGER_SCHEDULE,
+    TRIGGER_WEBHOOK,
 };
 use super::compile::FROM_PREFIX;
 use super::template::{TemplateScope, civil_date, render, text_of};
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, ToolCall};
+use crate::kernel::knowledge_nodes::KNOWLEDGE_SEARCH;
 use crate::kernel::nodes::PROVIDERS_UNAVAILABLE;
 use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext, ToolStepRequest};
+use crate::services::MemoryService;
 use crate::services::chat::GenerateChatNode;
+use crate::services::chat_memory::{
+    MEMORY_TOOL, MemoryRefs, apply_memory_call, memory_section, memory_tool,
+};
 use crate::services::chat_tools::{
-    OfferedTool, TOOL_BUDGET_NOTE, TOOL_RESULT_MAX_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text,
-    fence_tool_result, offered_tools, parse_tool_arguments, tool_parameters, tool_result_text,
-    tool_specs, wire_tool_name,
+    KNOWLEDGE_INSTRUCTION, OfferedTool, TOOL_BUDGET_NOTE, TOOL_RESULT_MAX_CHARS,
+    TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result, offered_tools, parse_tool_arguments,
+    tool_parameters, tool_result_text, tool_specs, wire_tool_name,
 };
 use crate::skills::{presented, result_limit};
 use crate::tools::ToolRegistry;
@@ -67,6 +74,7 @@ impl EffectsSlot {
 pub struct ScenarioNodeOptions {
     pub effects: EffectsSlot,
     pub tools: Option<ToolRegistry>,
+    pub memory: Option<Arc<MemoryService>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -82,6 +90,10 @@ pub struct StepInput {
     pub memory: Option<Value>,
     #[serde(default)]
     pub embedding: Option<Value>,
+    #[serde(default)]
+    pub knowledge: Option<Value>,
+    #[serde(default)]
+    pub facts: Option<Value>,
     #[serde(default)]
     pub tools: Vec<String>,
     #[serde(flatten)]
@@ -286,6 +298,59 @@ impl NodeDef for OutputNode {
 struct AgentNode {
     nodes: Weak<NodeRegistry>,
     tools: Option<ToolRegistry>,
+    memory: Option<Arc<MemoryService>>,
+}
+
+struct Recall {
+    service: Arc<MemoryService>,
+    area: String,
+    conversation: String,
+    writes: bool,
+    refs: MemoryRefs,
+}
+
+impl Recall {
+    fn section(&mut self, tool: Option<&str>) -> Result<String, AppError> {
+        let mut snapshot = self.service.snapshot(&self.conversation)?;
+        if self.area == AREA_DIALOG {
+            snapshot.account.clear();
+        }
+        if self.area == AREA_GLOBAL || self.conversation.is_empty() {
+            snapshot.conversation.clear();
+        }
+        let (section, refs) = memory_section(&snapshot, tool);
+        self.refs = refs;
+        Ok(section)
+    }
+
+    fn apply(&mut self, arguments: &Value) -> Result<String, String> {
+        let mut arguments = arguments.clone();
+        if let Value::Object(fields) = &mut arguments
+            && fields.get("action").and_then(Value::as_str) == Some("save")
+        {
+            match self.area.as_str() {
+                AREA_GLOBAL => {
+                    fields.insert("scope".to_owned(), json!("account"));
+                }
+                AREA_DIALOG => {
+                    fields.insert("scope".to_owned(), json!("conversation"));
+                }
+                _ => {}
+            }
+        }
+        apply_memory_call(
+            &self.service,
+            &arguments,
+            &self.conversation,
+            &mut self.refs,
+        )
+    }
+}
+
+struct Session<'a> {
+    by_name: HashMap<&'a str, &'a OfferedTool>,
+    stores: Vec<String>,
+    recall: Option<Recall>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
@@ -330,7 +395,47 @@ fn history(event: &Value, size: u64) -> Vec<ChatMessage> {
     entries[entries.len().saturating_sub(keep)..].to_vec()
 }
 
+fn store_ids(slot: Option<&Value>) -> Vec<String> {
+    slot_params(slot)
+        .get(STORES_PARAM)
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect()
+}
+
 impl AgentNode {
+    fn recall(&self, input: &StepInput) -> Result<Option<Recall>, AppError> {
+        let (Some(service), Some(_)) = (&self.memory, &input.facts) else {
+            return Ok(None);
+        };
+        let switches = service.switches()?;
+        if !switches.enabled {
+            return Ok(None);
+        }
+        let params = slot_params(input.facts.as_ref());
+        let area = params
+            .get(AREA_PARAM)
+            .and_then(Value::as_str)
+            .filter(|area| [AREA_GLOBAL, AREA_DIALOG, AREA_BOTH].contains(area))
+            .unwrap_or(AREA_GLOBAL);
+        Ok(Some(Recall {
+            service: Arc::clone(service),
+            area: area.to_owned(),
+            conversation: input
+                .event
+                .get("conversationId")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned(),
+            writes: switches.model
+                && params.get(POLICY_PARAM).and_then(Value::as_str) == Some(POLICY_READ_WRITE),
+            refs: MemoryRefs::default(),
+        }))
+    }
+
     fn offered(&self, keys: &[String]) -> Result<Vec<OfferedTool>, AppError> {
         if keys.is_empty() {
             return Ok(Vec::new());
@@ -397,24 +502,47 @@ impl NodeDef for AgentNode {
             return Err(AppError::new(AppErrorCode::Conflict, PROVIDERS_UNAVAILABLE));
         };
         let driver = providers.text(provider_id)?;
-        let offered = self.offered(&input.tools)?;
-        let mode = if offered.is_empty() {
+        let mut offered = self.offered(&input.tools)?;
+        let mut recall = self.recall(&input)?;
+        let writes = recall.as_ref().is_some_and(|recall| recall.writes);
+        let mode = if offered.is_empty() && !writes {
             ToolMode::None
         } else {
             resolve_tool_mode(driver.capabilities().tools, None)
         };
-        let offered = if mode == ToolMode::None {
-            Vec::new()
-        } else {
-            offered
+        if mode == ToolMode::None {
+            offered.clear();
+        } else if writes {
+            offered.push(memory_tool(&offered));
+        }
+        let memory = match recall.as_mut() {
+            Some(recall) => recall.section(
+                offered
+                    .iter()
+                    .find(|tool| tool.key == MEMORY_TOOL)
+                    .map(|tool| tool.name.as_str()),
+            )?,
+            None => String::new(),
         };
-        let by_name: HashMap<&str, &OfferedTool> = offered
-            .iter()
-            .map(|tool| (tool.name.as_str(), tool))
-            .collect();
+        let stores = store_ids(input.knowledge.as_ref());
+        let searches = offered.iter().any(|tool| tool.key == KNOWLEDGE_SEARCH);
         let specs = tool_specs(&offered);
+        let mut session = Session {
+            by_name: offered
+                .iter()
+                .map(|tool| (tool.name.as_str(), tool))
+                .collect(),
+            stores,
+            recall,
+        };
         let system = [
             input.param_text("systemMessage").unwrap_or_default(),
+            memory,
+            if searches && !session.stores.is_empty() {
+                KNOWLEDGE_INSTRUCTION.to_owned()
+            } else {
+                String::new()
+            },
             if specs.is_empty() {
                 String::new()
             } else {
@@ -475,7 +603,7 @@ impl NodeDef for AgentNode {
             );
             for call in output.tool_calls {
                 calls += 1;
-                let content = self.call(context, &by_name, &call, calls).await?;
+                let content = self.call(context, &mut session, &call, calls).await?;
                 messages.push(ChatMessage::tool(call.id.clone(), content));
             }
         }
@@ -492,15 +620,27 @@ impl AgentNode {
     async fn call(
         &self,
         context: &StepContext,
-        by_name: &HashMap<&str, &OfferedTool>,
+        session: &mut Session<'_>,
         call: &ToolCall,
         index: u64,
     ) -> Result<String, AppError> {
         let shape = |status: &str, text: String| fence_tool_result(&call.name, status, &text);
-        let Some(tool) = by_name.get(call.name.as_str()) else {
+        let Some(tool) = session.by_name.get(call.name.as_str()).copied() else {
             return Ok(shape("refused", UNKNOWN_TOOL.to_owned()));
         };
-        let arguments = parse_tool_arguments(&call.arguments).unwrap_or_default();
+        let mut arguments = parse_tool_arguments(&call.arguments).unwrap_or_default();
+        if tool.key == MEMORY_TOOL {
+            let Some(recall) = session.recall.as_mut() else {
+                return Ok(shape("refused", UNKNOWN_TOOL.to_owned()));
+            };
+            return Ok(match recall.apply(&Value::Object(arguments)) {
+                Ok(text) => shape("succeeded", text),
+                Err(text) => shape("failed", text),
+            });
+        }
+        if tool.key == KNOWLEDGE_SEARCH {
+            arguments.insert("scope".to_owned(), json!(session.stores));
+        }
         let Some(invocation) = context.invoke_tool(ToolStepRequest {
             key: tool.key.clone(),
             input: Value::Object(arguments),
@@ -513,7 +653,7 @@ impl AgentNode {
         match invocation.await {
             Ok(result) => {
                 let rendered = tool_result_text(&result.output);
-                let shown = presented(&tool.key, rendered.text, by_name.values().copied());
+                let shown = presented(&tool.key, rendered.text, session.by_name.values().copied());
                 let capped = cap_text(&shown, result_limit(&tool.key, TOOL_RESULT_MAX_CHARS));
                 Ok(shape(
                     if rendered.is_error {
@@ -554,6 +694,7 @@ pub fn register_scenario_nodes(
     registry.register(AgentNode {
         nodes: Arc::downgrade(registry),
         tools: options.tools.clone(),
+        memory: options.memory.clone(),
     })?;
     for (node_type, output) in [
         (OUTPUT_CHAT_REPLY, Output::ChatReply),

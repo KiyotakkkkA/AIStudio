@@ -773,6 +773,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         &ScenarioNodeOptions {
             effects: scenario_effects.clone(),
             tools: Some(tools.clone()),
+            memory: Some(Arc::new(zvs_host::services::MemoryService::new(
+                Arc::clone(&database),
+                clock.clone(),
+            ))),
         },
     )?;
     let skill_library = SkillLibrary::new(SkillLibraryOptions {

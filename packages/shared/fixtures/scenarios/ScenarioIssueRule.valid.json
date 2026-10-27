@@ -58,5 +58,25 @@
   {
     "name": "unreachable",
     "value": "unreachable"
+  },
+  {
+    "name": "restrictedTool",
+    "value": "restrictedTool"
+  },
+  {
+    "name": "invalidPort",
+    "value": "invalidPort"
+  },
+  {
+    "name": "missingDialog",
+    "value": "missingDialog"
+  },
+  {
+    "name": "limitedDialog",
+    "value": "limitedDialog"
+  },
+  {
+    "name": "duplicateKind",
+    "value": "duplicateKind"
   }
 ]

@@ -18,5 +18,17 @@
         }
       ]
     }
+  },
+  {
+    "name": "warnings only",
+    "value": {
+      "valid": true,
+      "issues": [
+        {
+          "rule": "limitedDialog",
+          "nodeId": "memory"
+        }
+      ]
+    }
   }
 ]

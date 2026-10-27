@@ -45,6 +45,13 @@ export const GraphNode = z.object({
     .default({ maxAttempts: 1, backoffMs: 0 }),
   timeoutMs: z.number().int().min(1).max(GRAPH_TIMEOUT_MAX_MS).optional(),
   continueOnError: z.boolean().optional(),
+  when: z
+    .object({
+      nodeId: z.string().min(1).max(128),
+      field: z.string().min(1).max(128),
+      equals: z.boolean(),
+    })
+    .optional(),
 });
 export type GraphNode = z.infer<typeof GraphNode>;
 export const RunGraph = z.object({

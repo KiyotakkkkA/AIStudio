@@ -166,6 +166,7 @@ describe("inspector fields", () => {
     trigger: null,
     fills: [],
     slots: [],
+    ports: ["main"],
     requiredParams: ["query"],
     toolKey: null,
     paramsSchema: {

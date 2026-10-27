@@ -9,8 +9,8 @@ use zvs_contract::{
 };
 
 use super::catalogue::{
-    AGENT_TOOLS, EMBEDDING_MODEL, MEMORY_WINDOW, MODEL_CHAT, TOOL_SET, TRIGGER_CHAT, TRIGGER_MAIL,
-    TRIGGER_SCHEDULE,
+    AGENT_TOOLS, EMBEDDING_MODEL, FLOW_BRANCH, KNOWLEDGE_STORES, MEMORY_FACTS, MEMORY_WINDOW,
+    MODEL_CHAT, TOOL_SET, TRIGGER_CHAT, TRIGGER_MAIL, TRIGGER_SCHEDULE,
 };
 use super::*;
 use crate::ipc::IpcServer;
@@ -339,7 +339,11 @@ fn a_missing_or_blank_required_parameter_is_named() {
     );
 
     let mut graph = valid_graph();
-    graph.nodes[0] = node("trigger", TRIGGER_SCHEDULE);
+    graph.nodes[0] = with_params(node("trigger", TRIGGER_SCHEDULE), json!({ "cron": " " }));
+    graph.nodes.retain(|node| node.id != "memory");
+    graph
+        .attachments
+        .retain(|attachment| attachment.child_node_id != "memory");
     assert_eq!(issues(&graph), [ScenarioIssueDto::param("trigger", "cron")]);
 }
 
@@ -360,7 +364,10 @@ fn a_scenario_needs_exactly_one_trigger() {
     graph.edges.clear();
     assert_eq!(
         issues(&graph),
-        [ScenarioIssueDto::graph(ScenarioIssueRule::NoTrigger)]
+        [
+            ScenarioIssueDto::graph(ScenarioIssueRule::NoTrigger),
+            rule(ScenarioIssueRule::MissingDialog, "memory"),
+        ]
     );
 
     let mut graph = valid_graph();
@@ -437,6 +444,17 @@ fn host() -> Host {
         clock,
         service,
     }
+}
+
+fn offered_tool(services: &crate::services::Services) -> String {
+    services
+        .tools
+        .list(&ToolListFilter::default())
+        .expect("lists tools")
+        .into_iter()
+        .map(|row| row.key)
+        .find(|key| !validation::is_restricted_tool(key))
+        .expect("a tool a scenario may offer")
 }
 
 fn builtin_graph() -> ScenarioGraphDto {
@@ -669,12 +687,7 @@ async fn the_channels_create_validate_activate_and_list_versions_in_the_contract
         EventBus::default(),
         Duration::ZERO,
     ));
-    let tool = services
-        .scenarios
-        .node_types()
-        .into_iter()
-        .find_map(|entry| entry.tool_key.filter(|key| key == &entry.node_type))
-        .expect("a registered tool node");
+    let tool = offered_tool(&services);
     let mut server =
         IpcServer::new(services.shared(), silent_logger()).with_output_validation(true);
     crate::ipc::scenarios::register(&mut server);
@@ -682,7 +695,7 @@ async fn the_channels_create_validate_activate_and_list_versions_in_the_contract
         "nodes": [
             { "id": "trigger", "type": TRIGGER_CHAT, "position": { "x": 0.5, "y": 0.5 }, "params": {} },
             { "id": "agent", "type": AGENT_TOOLS, "position": { "x": 200.5, "y": 0.5 }, "params": {} },
-            { "id": "tool", "type": tool, "position": { "x": 200.5, "y": 200.5 }, "params": {} }
+            { "id": "tool", "type": TOOL_SET, "position": { "x": 200.5, "y": 200.5 }, "params": { "tools": [tool] } }
         ],
         "edges": [{ "from": "trigger", "to": "agent", "fromPort": "main", "toPort": "main" }],
         "attachments": [{ "parentNodeId": "agent", "childNodeId": "tool", "slot": "tool" }]
@@ -829,10 +842,32 @@ fn the_catalogue_describes_roles_slots_and_what_each_node_fills() {
             .collect::<Vec<_>>(),
         [
             (ScenarioSlot::Model, true, false),
-            (ScenarioSlot::Memory, false, false),
+            (ScenarioSlot::Memory, false, true),
             (ScenarioSlot::Tool, false, true),
         ]
     );
+    assert_eq!(agent.ports, ["main"]);
+    assert_eq!(find(MEMORY_FACTS).fills, [ScenarioSlot::Memory]);
+    assert_eq!(find(KNOWLEDGE_STORES).fills, [ScenarioSlot::Memory]);
+    assert_eq!(find(KNOWLEDGE_STORES).required_params, ["stores"]);
+    assert_eq!(find(FLOW_BRANCH).ports, ["true", "false"]);
+    assert_eq!(
+        find(super::catalogue::OUTPUT_CHAT_REPLY).ports,
+        Vec::<String>::new()
+    );
+    assert!(
+        types
+            .iter()
+            .all(|entry| entry.role != zvs_contract::ScenarioNodeRole::Action
+                || entry.tool_key.is_none()),
+        "{types:?}"
+    );
+    for removed in ["llm.generate", "job.run", "download.fetch", "vector.search"] {
+        assert!(
+            types.iter().all(|entry| entry.node_type != removed),
+            "{removed} is not a scenario step"
+        );
+    }
     let model = find(MODEL_CHAT);
     assert_eq!(model.role, zvs_contract::ScenarioNodeRole::SubNode);
     assert_eq!(model.fills, [ScenarioSlot::Model]);
@@ -856,7 +891,8 @@ async fn the_catalogue_and_draft_channels_answer_in_the_contract_shape() {
     assert!(
         entries
             .iter()
-            .any(|entry| entry["toolKey"].is_string() && entry["fills"] == json!(["tool"])),
+            .any(|entry| entry["type"] == json!(FLOW_BRANCH)
+                && entry["ports"] == json!(["true", "false"])),
         "{catalogue}"
     );
     let created = server
@@ -913,12 +949,7 @@ async fn a_tool_set_records_its_chosen_tools_as_references() {
         EventBus::default(),
         Duration::ZERO,
     ));
-    let tool = services
-        .scenarios
-        .node_types()
-        .into_iter()
-        .find_map(|entry| entry.tool_key.filter(|key| key == &entry.node_type))
-        .expect("a registered tool node");
+    let tool = offered_tool(&services);
     let mut graph = builtin_graph();
     graph.nodes.push(with_params(
         node("set", TOOL_SET),
@@ -982,5 +1013,208 @@ fn internal_chat_turn_nodes_stay_out_of_scenarios_and_outputs_are_offered() {
     assert_eq!(
         validate_graph(&graph, &ScenarioCatalogue::builtin()),
         [ScenarioIssueDto::param("send", "conversationId")]
+    );
+}
+
+#[test]
+fn browser_vector_and_knowledge_tools_are_refused_in_a_tool_set() {
+    let mut graph = valid_graph();
+    graph.nodes.push(with_params(
+        node("set", TOOL_SET),
+        json!({ "tools": ["fs.read", "browser.click", "vector.search", "knowledge.search"] }),
+    ));
+    graph
+        .attachments
+        .push(attach("agent", "set", ScenarioSlot::Tool));
+    assert_eq!(
+        issues(&graph),
+        [
+            ScenarioIssueDto::tool("set", "browser.click"),
+            ScenarioIssueDto::tool("set", "vector.search"),
+            ScenarioIssueDto::tool("set", "knowledge.search"),
+        ]
+    );
+}
+
+fn without_chat_trigger(mut graph: ScenarioGraphDto) -> ScenarioGraphDto {
+    graph.nodes[0] = with_params(
+        node("trigger", TRIGGER_SCHEDULE),
+        json!({ "cron": "0 9 * * *" }),
+    );
+    graph
+}
+
+fn with_facts(mut graph: ScenarioGraphDto, area: &str) -> ScenarioGraphDto {
+    graph.nodes.retain(|node| node.id != "memory");
+    graph
+        .attachments
+        .retain(|attachment| attachment.child_node_id != "memory");
+    graph.nodes.push(with_params(
+        node("facts", MEMORY_FACTS),
+        json!({ "policy": "read", "area": area }),
+    ));
+    graph
+        .attachments
+        .push(attach("agent", "facts", ScenarioSlot::Memory));
+    graph
+}
+
+#[test]
+fn a_node_that_needs_a_dialog_is_an_error_without_a_chat_trigger_and_partial_use_a_warning() {
+    let graph = without_chat_trigger(valid_graph());
+    assert_eq!(
+        issues(&graph),
+        [rule(ScenarioIssueRule::MissingDialog, "memory")]
+    );
+    assert_eq!(issues(&with_facts(valid_graph(), "both")), []);
+    assert_eq!(
+        issues(&without_chat_trigger(with_facts(valid_graph(), "global"))),
+        []
+    );
+    assert_eq!(
+        issues(&without_chat_trigger(with_facts(valid_graph(), "dialog"))),
+        [rule(ScenarioIssueRule::MissingDialog, "facts")]
+    );
+    let partial = issues(&without_chat_trigger(with_facts(valid_graph(), "both")));
+    assert_eq!(partial, [rule(ScenarioIssueRule::LimitedDialog, "facts")]);
+    assert!(partial.iter().all(ScenarioIssueDto::is_warning));
+    assert!(zvs_contract::blocking_issues(&partial).is_empty());
+}
+
+#[test]
+fn a_warning_leaves_the_scenario_valid_and_out_of_the_issue_count() {
+    let host = host();
+    let graph = without_chat_trigger(with_facts(builtin_graph(), "both"));
+    let validation = host.service.validate(&graph);
+    assert!(validation.valid);
+    assert_eq!(
+        validation.issues,
+        [rule(ScenarioIssueRule::LimitedDialog, "facts")]
+    );
+    let created = create(&host, graph);
+    assert_eq!(created.scenario.issue_count, 0);
+    host.service
+        .set_active(&created.scenario.id, true)
+        .expect("a warning does not block activation");
+}
+
+#[test]
+fn a_branch_leaves_by_its_true_and_false_ports_only() {
+    let mut graph = builtin_graph();
+    graph.nodes.push(with_params(
+        node("branch", FLOW_BRANCH),
+        json!({ "condition": true }),
+    ));
+    graph.edges.push(edge("agent", "branch"));
+    let catalogue = catalogue();
+    let mut taken = graph.clone();
+    taken.edges.push(ScenarioEdgeDto {
+        from_port: "true".to_owned(),
+        ..edge("branch", "agent2")
+    });
+    taken.nodes.push(node("agent2", AGENT_TOOLS));
+    taken.nodes.push(with_params(
+        node("model2", MODEL_CHAT),
+        json!({ "providerId": "p", "modelId": "m" }),
+    ));
+    taken
+        .attachments
+        .push(attach("agent2", "model2", ScenarioSlot::Model));
+    assert_eq!(validate_graph(&taken, &catalogue), []);
+    let mut wrong = taken;
+    wrong.edges.last_mut().expect("the branch edge").from_port = "main".to_owned();
+    assert_eq!(
+        validate_graph(&wrong, &catalogue),
+        [ScenarioIssueDto::port("branch", "main")]
+    );
+}
+
+async fn agent_system_prompt(area: &str) -> String {
+    let services = test_services(SystemService::new(
+        Arc::new(FakeClock::default()),
+        EventBus::default(),
+        Duration::ZERO,
+    ));
+    let driver = crate::testing::FakeDriver::shared(crate::testing::FakeScript {
+        deltas: Some(vec!["Готово".to_owned()]),
+        ..crate::testing::FakeScript::default()
+    });
+    services.drivers.set(Arc::clone(&driver));
+    services
+        .memory
+        .save(
+            zvs_contract::MemoryScope::Account,
+            None,
+            "Пользователь пишет на Rust",
+            zvs_contract::MemorySource::User,
+        )
+        .expect("saves a fact");
+    let graph = with_facts(builtin_graph(), area);
+    let created = services
+        .scenarios
+        .create(&CreateScenarioInput {
+            name: "Память".to_owned(),
+            tags: None,
+            graph: Some(graph),
+            note: None,
+        })
+        .expect("creates");
+    let handle = services
+        .scenario_runs
+        .test(&zvs_contract::ScenarioRunInput {
+            id: created.scenario.id,
+            graph: None,
+            input: Some(json!({ "conversationId": "c1", "text": "привет" })),
+        })
+        .expect("starts");
+    tokio::time::timeout(Duration::from_secs(5), services.runs.wait(&handle.id))
+        .await
+        .expect("the run ends");
+    let requests = driver.requests();
+    let request = requests.first().expect("the agent asked the model");
+    request.system.clone().unwrap_or_default()
+}
+
+#[tokio::test]
+async fn the_agent_reads_memory_only_from_the_chosen_area() {
+    let global = agent_system_prompt("global").await;
+    assert!(global.contains("Пользователь пишет на Rust"), "{global}");
+    assert!(!global.contains("The memory tool is"), "{global}");
+    let dialog = agent_system_prompt("dialog").await;
+    assert!(!dialog.contains("Пользователь пишет на Rust"), "{dialog}");
+}
+
+#[test]
+fn the_memory_slot_takes_history_facts_and_stores_once_each() {
+    let mut graph = with_facts(valid_graph(), "global");
+    graph.nodes.push(with_params(
+        node("history", MEMORY_WINDOW),
+        json!({ "size": 4 }),
+    ));
+    graph.nodes.push(with_params(
+        node("stores", KNOWLEDGE_STORES),
+        json!({ "stores": ["0199aa11-2222-7111-8111-111111111111"] }),
+    ));
+    graph
+        .attachments
+        .push(attach("agent", "history", ScenarioSlot::Memory));
+    graph
+        .attachments
+        .push(attach("agent", "stores", ScenarioSlot::Memory));
+    assert_eq!(issues(&graph), []);
+    graph.nodes.push(with_params(
+        node("more", KNOWLEDGE_STORES),
+        json!({ "stores": ["0199aa11-2222-7111-8111-111111111111"] }),
+    ));
+    graph
+        .attachments
+        .push(attach("agent", "more", ScenarioSlot::Memory));
+    assert_eq!(
+        issues(&graph),
+        [ScenarioIssueDto::slot(
+            ScenarioIssueRule::DuplicateKind,
+            "agent",
+            ScenarioSlot::Memory
+        )]
     );
 }
