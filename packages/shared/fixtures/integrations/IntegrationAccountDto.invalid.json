@@ -1,0 +1,105 @@
+[
+  {
+    "name": "missing counters",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "kind": "telegram",
+      "name": "Бот поддержки",
+      "enabled": true,
+      "config": {
+        "token": {
+          "secretId": "0199aa11-1111-7111-8111-111111111111"
+        },
+        "pollSeconds": 30,
+        "allowGroups": false
+      },
+      "status": "running",
+      "statusDetail": null,
+      "lastActivityAt": 1700000005000,
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000001000
+    }
+  },
+  {
+    "name": "credential typed into the config",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "kind": "telegram",
+      "name": "Бот поддержки",
+      "enabled": true,
+      "config": {
+        "token": {
+          "password": "x"
+        }
+      },
+      "status": "running",
+      "statusDetail": null,
+      "lastActivityAt": 1700000005000,
+      "counters": {
+        "events": 12,
+        "duplicates": 1,
+        "runs": 11,
+        "toolCalls": 4,
+        "errors": 0
+      },
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000001000
+    }
+  },
+  {
+    "name": "blank name",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "kind": "telegram",
+      "name": "  ",
+      "enabled": true,
+      "config": {
+        "token": {
+          "secretId": "0199aa11-1111-7111-8111-111111111111"
+        },
+        "pollSeconds": 30,
+        "allowGroups": false
+      },
+      "status": "running",
+      "statusDetail": null,
+      "lastActivityAt": 1700000005000,
+      "counters": {
+        "events": 12,
+        "duplicates": 1,
+        "runs": 11,
+        "toolCalls": 4,
+        "errors": 0
+      },
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000001000
+    }
+  },
+  {
+    "name": "unknown status",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "kind": "telegram",
+      "name": "Бот поддержки",
+      "enabled": true,
+      "config": {
+        "token": {
+          "secretId": "0199aa11-1111-7111-8111-111111111111"
+        },
+        "pollSeconds": 30,
+        "allowGroups": false
+      },
+      "status": "connected",
+      "statusDetail": null,
+      "lastActivityAt": 1700000005000,
+      "counters": {
+        "events": 12,
+        "duplicates": 1,
+        "runs": 11,
+        "toolCalls": 4,
+        "errors": 0
+      },
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000001000
+    }
+  }
+]

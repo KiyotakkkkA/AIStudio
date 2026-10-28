@@ -1,0 +1,11 @@
+[
+  {
+    "name": "negative latency",
+    "value": {
+      "ok": true,
+      "latencyMs": -1,
+      "checks": [],
+      "error": null
+    }
+  }
+]

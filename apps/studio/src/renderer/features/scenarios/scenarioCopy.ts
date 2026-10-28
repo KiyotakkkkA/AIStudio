@@ -16,6 +16,7 @@ export const NODE_TYPE_LABELS: Readonly<Record<string, string>> = {
   "trigger.mail": "Новое письмо",
   "trigger.schedule": "Расписание",
   "trigger.webhook": "Вебхук",
+  "trigger.integration": "Событие интеграции",
   "agent.tools": "ИИ-агент",
   "model.chat": "Чат-модель",
   "memory.window": "История диалога",

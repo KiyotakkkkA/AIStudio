@@ -1,0 +1,29 @@
+[
+  {
+    "name": "bad key",
+    "value": {
+      "key": "Integration",
+      "label": "Бот поддержки",
+      "status": "retrying",
+      "restarts": 2,
+      "detail": null,
+      "lastError": "Сервер недоступен",
+      "startedAt": 1700000000000,
+      "heartbeatAt": 1700000002000,
+      "retryAt": 1700000004000
+    }
+  },
+  {
+    "name": "missing restarts",
+    "value": {
+      "key": "integration:0199aa22-2222-7222-8222-222222222222",
+      "label": "Бот поддержки",
+      "status": "retrying",
+      "detail": null,
+      "lastError": "Сервер недоступен",
+      "startedAt": 1700000000000,
+      "heartbeatAt": 1700000002000,
+      "retryAt": 1700000004000
+    }
+  }
+]

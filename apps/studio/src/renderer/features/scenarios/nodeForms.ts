@@ -70,6 +70,19 @@ export const NODE_FORMS: Readonly<Record<string, NodeForm>> = {
     description: "Запускает сценарий HTTP-запросом POST на указанный путь.",
     fields: [{ key: "path", label: "Путь", placeholder: "support/incoming" }],
   },
+  "trigger.integration": {
+    description:
+      "Запускает сценарий, когда подключённая интеграция сообщает о событии. Повтор события с тем же идентификатором сценарий не запускает.",
+    fields: [
+      { key: "accountId", label: "Интеграция" },
+      {
+        key: "trigger",
+        label: "Событие",
+        placeholder: "telegram.message",
+        hint: "Ключ события из панели автоматизации интеграции.",
+      },
+    ],
+  },
   "agent.tools": {
     description:
       "Обрабатывает входные данные чат-моделью и вызывает инструменты из подключённых наборов. Чат-модель обязательна; история диалога, память и векторные хранилища подключаются к слоту «Память» по необходимости.",

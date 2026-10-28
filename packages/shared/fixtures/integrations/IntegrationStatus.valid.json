@@ -1,0 +1,26 @@
+[
+  {
+    "name": "disabled",
+    "value": "disabled"
+  },
+  {
+    "name": "stopped",
+    "value": "stopped"
+  },
+  {
+    "name": "starting",
+    "value": "starting"
+  },
+  {
+    "name": "running",
+    "value": "running"
+  },
+  {
+    "name": "retrying",
+    "value": "retrying"
+  },
+  {
+    "name": "failed",
+    "value": "failed"
+  }
+]

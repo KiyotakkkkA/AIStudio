@@ -50,7 +50,7 @@ Integrations that can only be configured through the database are not a feature.
 - Enable/disable per account
 
 **Out of scope** (do not do these, even if tempting)
-- Webhooks tab unless TASK_048 implemented it — render it as a stub naming its task
+- A Webhooks tab — dropped by ADR 0004; the page has Mail, Telegram and Git hosting only
 - Per-tool tier editing — that lives on the Tools page
 
 ## Steps

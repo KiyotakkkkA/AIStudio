@@ -98,6 +98,10 @@ pub fn trigger_matches(scenario: &ScenarioDto, event: &Value) -> bool {
             event.get("path").and_then(Value::as_str).map(str::trim) == Some(path)
         }),
         ScenarioTriggerKind::Schedule => true,
+        ScenarioTriggerKind::Integration => ["accountId", "trigger"].iter().all(|key| {
+            text_param(params, key)
+                .is_some_and(|wanted| event.get(*key).and_then(Value::as_str) == Some(wanted))
+        }),
     }
 }
 
@@ -318,6 +322,18 @@ impl ScenarioRunner {
             }
         }
         Ok(outcomes)
+    }
+
+    pub fn integration_sink(&self) -> crate::integrations::TriggerSink {
+        let runner = self.clone();
+        Arc::new(move |event: &Value| {
+            Ok(runner
+                .fire(ScenarioTriggerKind::Integration, event)?
+                .into_iter()
+                .filter(|(_, fired)| !matches!(fired, Fired::Skipped))
+                .map(|(scenario, _)| scenario.name)
+                .collect())
+        })
     }
 
     pub fn chat_listener(&self) -> crate::services::chat::ChatMessageListener {

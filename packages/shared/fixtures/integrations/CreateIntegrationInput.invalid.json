@@ -1,0 +1,19 @@
+[
+  {
+    "name": "unknown kind",
+    "value": {
+      "kind": "webhook",
+      "name": "Бот"
+    }
+  },
+  {
+    "name": "bad config key",
+    "value": {
+      "kind": "telegram",
+      "name": "Бот",
+      "config": {
+        "Token": "x"
+      }
+    }
+  }
+]

@@ -1,0 +1,10 @@
+[
+  {
+    "name": "missing side effect",
+    "value": {
+      "name": "telegram.send",
+      "label": "Отправить сообщение",
+      "description": "Отправляет сообщение в чат."
+    }
+  }
+]

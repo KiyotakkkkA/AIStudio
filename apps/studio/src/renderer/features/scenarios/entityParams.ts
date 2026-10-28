@@ -2,7 +2,8 @@ import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import type { Contract, ProviderId, ScenarioParams } from "@zvs/shared";
 
-export type EntityKind = "provider" | "model" | "vectorStore" | "conversation" | "mcpServer";
+export type EntityKind =
+  "provider" | "model" | "vectorStore" | "conversation" | "mcpServer" | "integration";
 
 export const ENTITY_PARAMS: Readonly<Record<string, EntityKind>> = {
   providerId: "provider",
@@ -12,6 +13,7 @@ export const ENTITY_PARAMS: Readonly<Record<string, EntityKind>> = {
   vectorStoreId: "vectorStore",
   conversationId: "conversation",
   serverId: "mcpServer",
+  accountId: "integration",
 };
 
 export const ENTITY_LABELS: Record<EntityKind, string> = {
@@ -20,6 +22,7 @@ export const ENTITY_LABELS: Record<EntityKind, string> = {
   vectorStore: "Хранилище",
   conversation: "Диалог",
   mcpServer: "MCP-сервер",
+  integration: "Интеграция",
 };
 
 export const ENTITY_PLACEHOLDERS: Record<EntityKind, string> = {
@@ -28,6 +31,7 @@ export const ENTITY_PLACEHOLDERS: Record<EntityKind, string> = {
   vectorStore: "Выберите хранилище",
   conversation: "Выберите диалог",
   mcpServer: "Выберите сервер",
+  integration: "Выберите интеграцию",
 };
 
 export const MODEL_NEEDS_PROVIDER = "Сначала выберите провайдера";
@@ -111,6 +115,11 @@ export default class EntityOptions {
         }));
       case "mcpServer":
         return (await this.ipc.call("mcp.list", undefined)).map((entry) => ({
+          value: entry.id,
+          label: entry.name,
+        }));
+      case "integration":
+        return (await this.ipc.call("integrations.list", undefined)).map((entry) => ({
           value: entry.id,
           label: entry.name,
         }));

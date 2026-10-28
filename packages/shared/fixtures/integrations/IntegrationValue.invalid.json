@@ -1,0 +1,19 @@
+[
+  {
+    "name": "secret with a value",
+    "value": {
+      "secretId": "0199aa11-1111-7111-8111-111111111111",
+      "value": "hunter2"
+    }
+  },
+  {
+    "name": "password object",
+    "value": {
+      "password": "hunter2"
+    }
+  },
+  {
+    "name": "null",
+    "value": null
+  }
+]

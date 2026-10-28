@@ -42,7 +42,7 @@ export type ScenarioParams = z.infer<typeof ScenarioParams>;
 export const ScenarioSlot = z.enum(["model", "memory", "tool", "embedding"]);
 export type ScenarioSlot = z.infer<typeof ScenarioSlot>;
 
-export const ScenarioTriggerKind = z.enum(["chat", "mail", "schedule", "webhook"]);
+export const ScenarioTriggerKind = z.enum(["chat", "mail", "schedule", "webhook", "integration"]);
 export type ScenarioTriggerKind = z.infer<typeof ScenarioTriggerKind>;
 
 export const ScenarioOnError = z.enum(["stop", "continue"]);

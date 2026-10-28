@@ -1,0 +1,20 @@
+[
+  {
+    "name": "secret reference",
+    "value": {
+      "secretId": "0199aa11-1111-7111-8111-111111111111"
+    }
+  },
+  {
+    "name": "text",
+    "value": "imap.example.com"
+  },
+  {
+    "name": "number",
+    "value": 30
+  },
+  {
+    "name": "flag",
+    "value": true
+  }
+]

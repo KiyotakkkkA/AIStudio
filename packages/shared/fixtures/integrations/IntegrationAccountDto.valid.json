@@ -1,0 +1,52 @@
+[
+  {
+    "name": "running",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "kind": "telegram",
+      "name": "Бот поддержки",
+      "enabled": true,
+      "config": {
+        "token": {
+          "secretId": "0199aa11-1111-7111-8111-111111111111"
+        },
+        "pollSeconds": 30,
+        "allowGroups": false
+      },
+      "status": "running",
+      "statusDetail": null,
+      "lastActivityAt": 1700000005000,
+      "counters": {
+        "events": 12,
+        "duplicates": 1,
+        "runs": 11,
+        "toolCalls": 4,
+        "errors": 0
+      },
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000001000
+    }
+  },
+  {
+    "name": "failed",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "kind": "telegram",
+      "name": "Бот поддержки",
+      "enabled": true,
+      "config": {},
+      "status": "failed",
+      "statusDetail": "Секрет не найден",
+      "lastActivityAt": null,
+      "counters": {
+        "events": 12,
+        "duplicates": 1,
+        "runs": 11,
+        "toolCalls": 4,
+        "errors": 0
+      },
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000001000
+    }
+  }
+]

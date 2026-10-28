@@ -545,6 +545,21 @@ pub fn test_services(system: SystemService) -> TestServices {
         crate::scenarios::ScenarioRunnerOptions::new(scenarios.clone(), runs.clone()),
     );
     chat.on_message(scenario_runs.chat_listener());
+    let workers = crate::workers::WorkerSupervisor::new(clock.clone(), silent_logger());
+    let integrations = crate::integrations::IntegrationService::new(
+        crate::integrations::IntegrationServiceOptions {
+            clock: clock.clone(),
+            ..crate::integrations::IntegrationServiceOptions::new(
+                database.shared(),
+                tools.clone(),
+                Arc::clone(&nodes),
+                Arc::clone(&secrets),
+                workers.clone(),
+            )
+        },
+    )
+    .expect("an integration service");
+    integrations.attach_sink(scenario_runs.integration_sink());
     scenario_effects.attach(Arc::new(crate::scenarios::HostScenarioEffects {
         chat: chat.clone(),
         notifications: Some(notifications.clone()),
@@ -585,6 +600,8 @@ pub fn test_services(system: SystemService) -> TestServices {
             toolchain,
             tools,
             mcp,
+            integrations,
+            workers,
             skills,
             scenarios,
             scenario_runs,

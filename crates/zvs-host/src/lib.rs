@@ -13,6 +13,7 @@ pub mod downloads;
 pub mod drivers;
 pub mod files;
 pub mod indexing;
+pub mod integrations;
 pub mod ipc;
 pub mod kernel;
 pub mod notifications;
@@ -25,6 +26,7 @@ pub mod skills;
 pub mod terminal;
 pub mod toolchain;
 pub mod tools;
+pub mod workers;
 pub mod workspace;
 
 #[cfg(any(test, feature = "testing"))]

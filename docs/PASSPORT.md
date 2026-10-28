@@ -56,6 +56,7 @@ are Rust.
 | D9 | Agent browser | **Child webviews attached to the studio window, in their own WebView2 profile, driven over WebView2's CDP; tiered approval** *(rev. 2.0; was `BrowserWindow` + `WebContentsView`)* | No second browser to ship, every action visible live, instant takeover; the user logs into sites once | We own the automation primitives, a logged-in profile raises the stakes on prompt injection, and CDP access is WebView2-only, so automation is Windows-only |
 | D10 | Shell and host | **Tauri 2 (WebView2 on Windows); the whole host in Rust; no Node runtime in the shipped app** *(decided 2026-10-10; complete 2026-10-19, TASK_076)* | One language for host and core, so no FFI layer, no Node ABI rebuilds and no JSON hop to reach `zvs-core`. A much smaller install and memory footprint than a bundled Chromium. Capability-scoped IPC instead of a preload convention | A rewrite of ~22k lines of host TypeScript (Phase M). Multi-webview needs Tauri's `unstable` feature. Only WebView2 is verified. Electron APIs are replaced one by one, as listed below |
 | D11 | Account-mode providers | **Qwen only; no vendor whose web API demands a proof of work or other anti-automation challenge** *(decided 2026-10-19, ADR 0001)* | Account mode sends the requests the user's own signed-in page sends and nothing more; solving a vendor's anti-bot challenge would mean shipping code that defeats its abuse protection | DeepSeek is offered only through its official API (`openai-compatible`) or OpenRouter; existing `deepseek-web` rows are deleted by migration 0002 |
+| D12 | Inbound events | **No webhooks; integrations pull through supervised background workers (long polling, IDLE, interval polling)** *(decided 2026-10-28, ADR 0004)* | A desktop app has no public endpoint, and a listener open to the internet is a server product with its own attack surface | Event latency is the poll interval; events arrive only while the app runs |
 
 **D10, what replaced what.** `BrowserWindow` became a Tauri window with a `studio` webview.
 The preloads became capabilities: the studio webview may call only `ipc_call` and
@@ -884,6 +885,38 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   one target and a later activation replaces it; repeats of one target within 2 s are
   dropped. The URL is parsed by `NotificationTargetDto::from_url` alone, and it only navigates
   (§14).
+- **Background workers** (`zvs-host/src/workers/`, TASK_048). `WorkerSupervisor` is the one
+  way the host runs a long-lived loop: long polling, IDLE, interval polling. `spawn(spec, body)`
+  starts a named tokio task (`key` is `^[a-z][a-z0-9.:_-]*$`). The body gets a `WorkerContext`
+  with the cancellation token, `ready()` (status `running`), `heartbeat()`, `detail()` and a
+  cancellable `sleep()`. Each attempt runs in its own task, so a panic counts as a failure,
+  not a crash. A failure is retried with exponential backoff (`Backoff`: 1 s doubling to
+  5 min, reset once the worker has been `running` for 30 s). `WorkerFault::permanent` stops it as
+  `failed`. `stop`/`remove` cancel and wait; a body that ignores cancellation is aborted after
+  5 s. `spawn` on an existing key replaces that worker. `watch` observes every state change.
+  `workers.list` and `workers.restart` expose the state, and the composition root disposes
+  every worker at the `Stop` shutdown stage. There is no inbound HTTP (D12, ADR 0004).
+- **Integrations** (`zvs-host/src/integrations/`, TASK_048). An `IntegrationProvider` per
+  `IntegrationKind` (`mail | telegram | git`) provides `describe()` (a `FieldDescriptor`
+  list), `triggers()`, `tools()`, `test()`, `start()`, `stop()` and `call_tool()`. Accounts
+  live in `integration_account` with a non-secret config map. **A credential is a secret
+  reference by construction:** a config value is a `{ secretId }` reference or a plain
+  text/number/boolean. A `secret` field accepts only a reference, and any other value is
+  refused with `CREDENTIAL_NOT_A_SECRET`. `FieldKind` has no `password`. A provider is refused
+  at registration when a non-secret field key looks like a credential (`password`, `token`,
+  `secret`, `apiKey`, `privateKey`, `credential`). The plaintext is resolved only through
+  `IntegrationConfigView::secret` at point of use, and secret usage is recorded as
+  `integration` consumers. An enabled account runs as the worker `integration:<id>`. Its
+  `start` emits `IntegrationEvent { trigger, eventId, payload }`. The dispatcher records
+  `(account, trigger, eventId)` in `integration_event` (kept 30 days) before anything starts, so
+  a replayed event is counted as a duplicate and starts nothing. A new event fires
+  `trigger.integration` scenarios whose `accountId` and `trigger` params match, with
+  `{ accountId, kind, trigger, eventId, payload }` as the run input. Tools register per
+  account as `<head>.<last 8 of the account id>.<rest>` (`telegram.a1b2c3d4.send`), with source
+  `integration` and the account as `sourceRef`. A side-effecting tool defaults to `ask` and
+  stays under the tool ceiling (§14). Disable or remove withdraws them. Counters, `last_error`
+  and the last 200 activity lines per account feed the automation rail. Channels:
+  `integrations.kinds|list|get|create|update|remove|test|enable|disable|activity`.
 - **Tray and autostart** — with `app.tray` on, closing the studio window hides it. Runs,
   streams and downloads keep going, and only «Выход» in the tray menu goes through the shutdown
   coordinator. `app.autostart` is mirrored from the OS registration, which is the source of

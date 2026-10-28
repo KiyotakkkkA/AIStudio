@@ -101,6 +101,8 @@ pub struct Services {
     pub toolchain: ToolchainService,
     pub tools: ToolRegistry,
     pub mcp: McpService,
+    pub integrations: crate::integrations::IntegrationService,
+    pub workers: crate::workers::WorkerSupervisor,
     pub skills: SkillService,
     pub scenarios: ScenarioService,
     pub scenario_runs: ScenarioRunner,

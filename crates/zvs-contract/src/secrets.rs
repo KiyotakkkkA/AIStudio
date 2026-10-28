@@ -195,7 +195,7 @@ pub struct FieldDescriptor {
     pub default: Option<FieldDefault>,
 }
 
-fn field_key_shape(key: &str) -> bool {
+pub fn is_field_key(key: &str) -> bool {
     let mut bytes = key.bytes();
     bytes.next().is_some_and(|first| first.is_ascii_lowercase())
         && bytes.all(|byte| byte.is_ascii_alphanumeric())
@@ -228,7 +228,7 @@ fn check_key(field: &str, key: &str, shape: fn(&str) -> bool) -> Result<(), AppE
 
 impl Validate for FieldDescriptor {
     fn validate(&self) -> Result<(), AppError> {
-        check_key("key", &self.key, field_key_shape)?;
+        check_key("key", &self.key, is_field_key)?;
         check::non_empty("label", &self.label)?;
         if let Some(options) = &self.options {
             if options.is_empty() {
@@ -701,10 +701,10 @@ mod tests {
     #[test]
     fn key_shapes_follow_the_zod_patterns() {
         for good in ["apiKey", "a", "baseUrl2"] {
-            assert!(field_key_shape(good), "{good}");
+            assert!(is_field_key(good), "{good}");
         }
         for bad in ["", "ApiKey", "api_key", "1a", "api-key"] {
-            assert!(!field_key_shape(bad), "{bad}");
+            assert!(!is_field_key(bad), "{bad}");
         }
         for good in ["ollama", "account-token", "a1-b2"] {
             assert!(type_key_shape(good), "{good}");

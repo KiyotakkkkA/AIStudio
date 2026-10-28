@@ -213,7 +213,7 @@ on its code. Suggested order: 045_EXTRA_3 → 045_EXTRA_5 (part A) → 045_EXTRA
 
 ## Phase 9 — Integrations
 
-- [ ] **TASK_048** — Integration framework: accounts, triggers, tool exposure
+- [x] **TASK_048** — Integration framework: accounts, triggers, tool exposure
 - [ ] **TASK_049** — Mail integration (IMAP/SMTP)
 - [ ] **TASK_050** — Telegram and Git hosting integrations
 - [ ] **TASK_051** — Integrations page

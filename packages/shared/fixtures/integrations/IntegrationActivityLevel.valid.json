@@ -1,0 +1,14 @@
+[
+  {
+    "name": "info",
+    "value": "info"
+  },
+  {
+    "name": "warn",
+    "value": "warn"
+  },
+  {
+    "name": "error",
+    "value": "error"
+  }
+]

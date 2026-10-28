@@ -1,0 +1,10 @@
+[
+  {
+    "name": "empty message",
+    "value": {
+      "at": 1700000005000,
+      "level": "info",
+      "message": ""
+    }
+  }
+]

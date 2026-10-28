@@ -17,6 +17,7 @@ pub mod folders;
 pub mod graph;
 pub mod graph_expansion;
 pub mod ids;
+pub mod integrations;
 pub mod mcp;
 pub mod memory;
 pub mod notifications;
@@ -131,6 +132,15 @@ pub use graph_expansion::{
     merge_graph_neighbors,
 };
 pub use ids::*;
+pub use integrations::{
+    CreateIntegrationInput, IntegrationAccountDetailDto, IntegrationAccountDto,
+    IntegrationAccountToolDto, IntegrationActivityDto, IntegrationActivityInput,
+    IntegrationActivityLevel, IntegrationCheckDto, IntegrationConfig, IntegrationCountersDto,
+    IntegrationKind, IntegrationKindDto, IntegrationRef, IntegrationRemoveOutput,
+    IntegrationSecretRef, IntegrationStatus, IntegrationTestResultDto, IntegrationToolDto,
+    IntegrationTriggerDto, IntegrationValue, UpdateIntegrationInput, WorkerDto, WorkerRef,
+    WorkerStatus,
+};
 pub use mcp::{
     CreateMcpServerInput, McpCallResultDto, McpCapabilityDto, McpCapabilityKind, McpContentDto,
     McpEnv, McpHeaders, McpHealthDto, McpLogLevel, McpLogLineDto, McpOAuthState, McpRemoveOutput,

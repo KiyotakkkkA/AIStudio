@@ -1,0 +1,32 @@
+[
+  {
+    "name": "telegram",
+    "value": {
+      "kind": "telegram",
+      "label": "Telegram",
+      "fields": [
+        {
+          "key": "token",
+          "label": "Токен бота",
+          "kind": "secret",
+          "required": true
+        }
+      ],
+      "triggers": [
+        {
+          "name": "telegram.message",
+          "label": "Входящее сообщение",
+          "description": "Сообщение, отправленное боту."
+        }
+      ],
+      "tools": [
+        {
+          "name": "telegram.send",
+          "label": "Отправить сообщение",
+          "description": "Отправляет сообщение в чат.",
+          "sideEffect": true
+        }
+      ]
+    }
+  }
+]

@@ -14,5 +14,9 @@
   {
     "name": "webhook",
     "value": "webhook"
+  },
+  {
+    "name": "integration",
+    "value": "integration"
   }
 ]

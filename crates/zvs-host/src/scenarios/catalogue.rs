@@ -10,6 +10,7 @@ pub const TRIGGER_CHAT: &str = "trigger.chat";
 pub const TRIGGER_MAIL: &str = "trigger.mail";
 pub const TRIGGER_SCHEDULE: &str = "trigger.schedule";
 pub const TRIGGER_WEBHOOK: &str = "trigger.webhook";
+pub const TRIGGER_INTEGRATION: &str = "trigger.integration";
 pub const AGENT_TOOLS: &str = "agent.tools";
 pub const MODEL_CHAT: &str = "model.chat";
 pub const MEMORY_WINDOW: &str = "memory.window";
@@ -238,6 +239,12 @@ impl ScenarioCatalogue {
                 .with_schema(object_schema(&[("cron", text())], &["cron"])),
             NodeSpec::trigger(TRIGGER_WEBHOOK, ScenarioTriggerKind::Webhook)
                 .with_schema(object_schema(&[("path", text())], &["path"])),
+            NodeSpec::trigger(TRIGGER_INTEGRATION, ScenarioTriggerKind::Integration).with_schema(
+                object_schema(
+                    &[("accountId", text()), ("trigger", text())],
+                    &["accountId", "trigger"],
+                ),
+            ),
             NodeSpec::action(AGENT_TOOLS)
                 .with_slots(&[
                     SlotSpec::required(ScenarioSlot::Model),

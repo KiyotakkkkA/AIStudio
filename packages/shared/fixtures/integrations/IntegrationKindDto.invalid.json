@@ -1,0 +1,19 @@
+[
+  {
+    "name": "password field",
+    "value": {
+      "kind": "telegram",
+      "label": "Telegram",
+      "fields": [
+        {
+          "key": "token",
+          "label": "Токен бота",
+          "kind": "password",
+          "required": true
+        }
+      ],
+      "triggers": [],
+      "tools": []
+    }
+  }
+]

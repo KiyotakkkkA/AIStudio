@@ -44,6 +44,7 @@ use zvs_host::indexing::{
     DocumentExtractorOptions, ImageExtractor, IndexingService, IndexingServiceOptions,
     PdfExtractor, image_extensions,
 };
+use zvs_host::integrations::{IntegrationService, IntegrationServiceOptions};
 use zvs_host::kernel::{
     KernelServices, NodeRegistry, register_core_nodes, register_download_nodes, register_job_nodes,
 };
@@ -94,6 +95,7 @@ use zvs_host::toolchain::{
     ToolchainResolver, ToolchainResolverOptions, ToolchainService, ToolchainServiceOptions,
 };
 use zvs_host::tools::{ToolRegistry, ToolRegistryOptions, register_kernel_tools};
+use zvs_host::workers::WorkerSupervisor;
 use zvs_host::workspace::{ExplorerService, FolderAccessService, ForbiddenFolders};
 use zvs_host::{IpcServer, ipc};
 
@@ -1061,6 +1063,31 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         ..ScenarioRunnerOptions::new(scenarios.clone(), runs.clone())
     });
     chat.on_message(scenario_runs.chat_listener());
+    let workers = WorkerSupervisor::new(clock.clone(), logger.clone());
+    let integrations = IntegrationService::new(IntegrationServiceOptions {
+        clock: clock.clone(),
+        logger: logger.clone(),
+        ..IntegrationServiceOptions::new(
+            Arc::clone(&database),
+            tools.clone(),
+            Arc::clone(&nodes),
+            Arc::clone(&secrets),
+            workers.clone(),
+        )
+    })?;
+    integrations.attach_sink(scenario_runs.integration_sink());
+    {
+        let integrations = integrations.clone();
+        shutdown.register(ShutdownStage::Stop, "integrations", move || async move {
+            integrations.dispose().await;
+        });
+    }
+    {
+        let workers = workers.clone();
+        shutdown.register(ShutdownStage::Stop, "workers", move || async move {
+            workers.dispose().await;
+        });
+    }
     scenario_effects.attach(Arc::new(HostScenarioEffects {
         chat: chat.clone(),
         notifications: Some(notifications.clone()),
@@ -1100,6 +1127,8 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         toolchain,
         tools,
         mcp,
+        integrations,
+        workers,
         skills,
         scenarios,
         scenario_runs,
@@ -1136,6 +1165,20 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         let mcp = services.mcp.clone();
         tauri::async_runtime::spawn(async move {
             let _ = mcp.start_auto_start().await;
+        });
+    }
+    {
+        let integrations = services.integrations.clone();
+        let logger = logger.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(error) = integrations.start_enabled().await {
+                logger.log(
+                    LogLevel::Warn,
+                    "integrations",
+                    "Could not start the integration accounts",
+                    &[("error", json!(error.message))],
+                );
+            }
         });
     }
     warm_sidecar(sidecar, logger.clone());

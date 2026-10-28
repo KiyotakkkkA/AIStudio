@@ -1,0 +1,10 @@
+[
+  {
+    "name": "bad name",
+    "value": {
+      "name": "Message",
+      "label": "Входящее сообщение",
+      "description": "Сообщение, отправленное боту."
+    }
+  }
+]

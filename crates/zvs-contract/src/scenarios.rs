@@ -20,6 +20,7 @@ wire_enum!(ScenarioTriggerKind {
     Mail => "mail",
     Schedule => "schedule",
     Webhook => "webhook",
+    Integration => "integration",
 });
 
 wire_enum!(ScenarioOnError {

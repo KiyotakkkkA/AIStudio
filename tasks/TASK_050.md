@@ -43,7 +43,7 @@ Telegram is the natural notification and command channel for a local automation 
 
 **In scope**
 - Telegram provider with triggers and tools per the decision
-- GitHub and GitLab providers: repo read, issue and PR tools, webhook or polling triggers
+- GitHub and GitLab providers: repo read, issue and PR tools, polling triggers (no webhooks, ADR 0004)
 - Credentials from Secrets in both cases
 - Registration of all tools with correct side-effect flags
 - Tests against fixtures, no live-service dependency in CI
@@ -57,7 +57,7 @@ Telegram is the natural notification and command channel for a local automation 
 
 1. Telegram: implement per the decision below. Triggers on incoming messages with per-update deduplication; tools to send a message and send a file. Message content is untrusted input and must be marked as such.
 2. Git hosting: one provider with GitHub and GitLab adapters behind it, since the shapes are close enough to share a surface. Base URL configurable so self-hosted GitLab works.
-3. Git triggers: issue opened or commented, PR opened or updated, push. Prefer webhooks where a public endpoint exists; otherwise poll with an ETag or since-cursor so the app is not rate-limited into uselessness.
+3. Git triggers: issue opened or commented, PR opened or updated, push. Poll with an ETag or since-cursor from the provider's background worker (TASK_048 `WorkerSupervisor`; no webhooks, ADR 0004) so the app is not rate-limited into uselessness.
 4. Git tools: `git.readFile`, `git.listIssues`, `git.createIssue`, `git.comment`, `git.createPullRequest`. The last three are side-effecting and default to `ask`; wire them so an agentic session can use them under approval.
 5. Rate limiting: respect the service's limits and surface remaining quota in the health rail rather than failing opaquely when it runs out.
 6. Both providers mark all fetched content as untrusted — an issue body is exactly the kind of text that could be aimed at an agent.

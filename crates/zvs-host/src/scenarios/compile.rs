@@ -96,7 +96,6 @@ impl<'g> Scope<'g> {
         });
         let issues: Vec<ScenarioIssueDto> = blocking_issues(&validate_graph(graph, catalogue))
             .into_iter()
-            .cloned()
             .filter(|issue| {
                 relevant.as_ref().is_none_or(|relevant| {
                     issue
@@ -105,6 +104,7 @@ impl<'g> Scope<'g> {
                         .is_some_and(|node| relevant.contains(node))
                 })
             })
+            .cloned()
             .collect();
         if !issues.is_empty() {
             return Err(invalid(&issues));

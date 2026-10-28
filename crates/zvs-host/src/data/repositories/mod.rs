@@ -7,6 +7,7 @@ pub mod download;
 pub mod folder_grant;
 pub mod graph_edge;
 pub mod graph_relation;
+pub mod integration;
 pub mod mcp_server;
 pub mod memory;
 pub mod model;
@@ -36,6 +37,7 @@ pub use download::{DownloadPatch, DownloadRepository};
 pub use folder_grant::FolderGrantRepository;
 pub use graph_edge::{GraphEdgeDraft, GraphEdgeLookup, GraphEdgeRepository};
 pub use graph_relation::GraphRelationRepository;
+pub use integration::{IntegrationCounter, IntegrationPatch, IntegrationRepository};
 pub use mcp_server::{CapabilityCounts, McpServerPatch, McpServerRepository};
 pub use memory::MemoryRepository;
 pub use model::{ModelDraft, ModelRepository};
@@ -82,6 +84,7 @@ pub struct Repositories<'c> {
     pub memory: MemoryRepository<'c>,
     pub agentic_sessions: AgenticSessionRepository<'c>,
     pub browser_grants: BrowserGrantRepository<'c>,
+    pub integrations: IntegrationRepository<'c>,
 }
 
 impl<'c> Repositories<'c> {
@@ -111,6 +114,7 @@ impl<'c> Repositories<'c> {
             memory: MemoryRepository::new(connection),
             agentic_sessions: AgenticSessionRepository::new(connection),
             browser_grants: BrowserGrantRepository::new(connection),
+            integrations: IntegrationRepository::new(connection),
         }
     }
 }

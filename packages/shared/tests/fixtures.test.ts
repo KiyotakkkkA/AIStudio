@@ -19,6 +19,7 @@ import * as documents from "../src/documents.js";
 import * as artifacts from "../src/artifacts.js";
 import * as sites from "../src/sites.js";
 import * as storage from "../src/storage.js";
+import * as integrations from "../src/integrations.js";
 import {
   AccountDto,
   ChatCitationDto,
@@ -196,6 +197,26 @@ const schemas: Record<string, z.ZodType> = {
   "mcp/McpContentDto": McpContentDto,
   "mcp/McpCallResultDto": McpCallResultDto,
   "mcp/McpRemoveOutput": contract["mcp.remove"].output,
+  "integrations/CreateIntegrationInput": integrations.CreateIntegrationInput,
+  "integrations/IntegrationAccountDetailDto": integrations.IntegrationAccountDetailDto,
+  "integrations/IntegrationAccountDto": integrations.IntegrationAccountDto,
+  "integrations/IntegrationActivityDto": integrations.IntegrationActivityDto,
+  "integrations/IntegrationActivityInput": integrations.IntegrationActivityInput,
+  "integrations/IntegrationActivityLevel": integrations.IntegrationActivityLevel,
+  "integrations/IntegrationCheckDto": integrations.IntegrationCheckDto,
+  "integrations/IntegrationKind": integrations.IntegrationKind,
+  "integrations/IntegrationKindDto": integrations.IntegrationKindDto,
+  "integrations/IntegrationRef": integrations.IntegrationRef,
+  "integrations/IntegrationRemoveOutput": integrations.IntegrationRemoveOutput,
+  "integrations/IntegrationStatus": integrations.IntegrationStatus,
+  "integrations/IntegrationTestResultDto": integrations.IntegrationTestResultDto,
+  "integrations/IntegrationToolDto": integrations.IntegrationToolDto,
+  "integrations/IntegrationTriggerDto": integrations.IntegrationTriggerDto,
+  "integrations/IntegrationValue": integrations.IntegrationValue,
+  "integrations/UpdateIntegrationInput": integrations.UpdateIntegrationInput,
+  "integrations/WorkerDto": integrations.WorkerDto,
+  "integrations/WorkerRef": integrations.WorkerRef,
+  "integrations/WorkerStatus": integrations.WorkerStatus,
   "files/FileChangeKind": files.FileChangeKind,
   "files/FileDiffDto": files.FileDiffDto,
   "files/FileChangesDto": files.FileChangesDto,

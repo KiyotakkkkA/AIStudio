@@ -7,6 +7,7 @@ pub mod documents;
 pub mod downloads;
 pub mod folders;
 pub mod graph_relations;
+pub mod integrations;
 pub mod mcp;
 pub mod memory;
 pub mod notifications;
@@ -42,6 +43,7 @@ pub fn register(server: &mut IpcServer) {
     runtimes::register(server);
     tools::register(server);
     mcp::register(server);
+    integrations::register(server);
     notifications::register(server);
     skills::register(server);
     sites::register(server);
@@ -160,6 +162,16 @@ mod tests {
                 "graphRelations.reconcile",
                 "graphRelations.removeEdge",
                 "graphRelations.shortestPath",
+                "integrations.activity",
+                "integrations.create",
+                "integrations.disable",
+                "integrations.enable",
+                "integrations.get",
+                "integrations.kinds",
+                "integrations.list",
+                "integrations.remove",
+                "integrations.test",
+                "integrations.update",
                 "mcp.cancelSignIn",
                 "mcp.create",
                 "mcp.get",
@@ -291,6 +303,8 @@ mod tests {
                 "vectorStores.sources.pick",
                 "vectorStores.sources.remove",
                 "vectorStores.update",
+                "workers.list",
+                "workers.restart",
                 "workspace.list",
                 "workspace.read",
                 "workspace.unwatch",

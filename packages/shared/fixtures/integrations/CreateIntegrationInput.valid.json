@@ -1,0 +1,22 @@
+[
+  {
+    "name": "minimal",
+    "value": {
+      "kind": "telegram",
+      "name": "Бот"
+    }
+  },
+  {
+    "name": "full",
+    "value": {
+      "kind": "mail",
+      "name": "Почта",
+      "config": {
+        "password": {
+          "secretId": "0199aa11-1111-7111-8111-111111111111"
+        }
+      },
+      "enabled": false
+    }
+  }
+]

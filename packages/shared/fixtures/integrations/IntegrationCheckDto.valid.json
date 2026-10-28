@@ -1,0 +1,10 @@
+[
+  {
+    "name": "imap",
+    "value": {
+      "label": "IMAP",
+      "ok": true,
+      "detail": null
+    }
+  }
+]

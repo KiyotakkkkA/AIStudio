@@ -1,0 +1,22 @@
+[
+  {
+    "name": "starting",
+    "value": "starting"
+  },
+  {
+    "name": "running",
+    "value": "running"
+  },
+  {
+    "name": "retrying",
+    "value": "retrying"
+  },
+  {
+    "name": "stopped",
+    "value": "stopped"
+  },
+  {
+    "name": "failed",
+    "value": "failed"
+  }
+]

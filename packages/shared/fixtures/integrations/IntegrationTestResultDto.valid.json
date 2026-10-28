@@ -1,0 +1,22 @@
+[
+  {
+    "name": "both directions",
+    "value": {
+      "ok": false,
+      "latencyMs": 214,
+      "checks": [
+        {
+          "label": "IMAP",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "label": "SMTP",
+          "ok": false,
+          "detail": "Неверный пароль"
+        }
+      ],
+      "error": null
+    }
+  }
+]
