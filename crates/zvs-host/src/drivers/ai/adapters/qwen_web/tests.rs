@@ -1361,8 +1361,8 @@ async fn the_model_list_is_refreshed_after_its_lifetime_and_a_failed_refresh_kee
 }
 
 #[tokio::test]
-async fn qwen_leaves_its_own_web_search_out_of_the_tool_policy_through_the_dialect() {
+async fn qwen_excludes_no_tools_from_the_policy_through_the_dialect() {
     let server = MockServer::start().await;
     let driver = qwen_web_driver(options(&server));
-    assert_eq!(driver.excluded_policy_check_tools(), ["web_search"]);
+    assert!(driver.excluded_policy_check_tools().is_empty());
 }

@@ -146,7 +146,3 @@ disposes integrations and then workers.
 - `trigger.webhook` is still in the scenario catalogue with nothing firing it, and
   `trigger.schedule` has no worker yet either. Both are candidates for a follow-up; a cron
   worker would use `WorkerSupervisor`.
-- Pre-existing failure, not touched:
-  `drivers::ai::adapters::qwen_web::tests::qwen_leaves_its_own_web_search_out_of_the_tool_policy_through_the_dialect`
-  fails on `main`: commit `546f9ec` emptied `zvs_qwen_web::EXCLUDED_POLICY_CHECK_TOOLS_NAMES`,
-  but the test still expects `["web_search"]`.
