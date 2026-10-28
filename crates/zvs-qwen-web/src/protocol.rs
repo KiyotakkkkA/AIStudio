@@ -42,6 +42,11 @@ pub const GENERATION_OBSERVATION: Observation = Observation {
     observed_at: "2026-10-26",
 };
 
+pub const NATIVE_CALL_OBSERVATION: Observation = Observation {
+    source: "POST /api/v2/chat/completions (SSE, FE Version 0.3.22): answer-phase function_call snapshots, then the vendor's reply to each call with delta.name",
+    observed_at: "2026-10-29",
+};
+
 pub fn chat_referer_path(chat_id: &str) -> String {
     format!("/c/{chat_id}")
 }

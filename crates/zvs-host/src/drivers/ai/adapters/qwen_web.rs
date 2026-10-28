@@ -15,8 +15,9 @@ use zvs_contract::{
 };
 use zvs_qwen_web::protocol::{self, chat_referer_path};
 use zvs_qwen_web::{
-    ChatType, CompletionTurn, ModelsDiagnostics, QwenModel, RowProblem, ThinkingMode, TurnDecoder,
-    TurnEvent, VendorFailure, WebSource, new_chat_body, parse_chat_created, parse_models,
+    ChatType, CompletionTurn, ModelCall, ModelsDiagnostics, QwenModel, RowProblem, ThinkingMode,
+    TurnDecoder, TurnEvent, VendorFailure, WebSource, new_chat_body, parse_chat_created,
+    parse_models,
 };
 
 use dialect::QwenDialect;
@@ -31,7 +32,7 @@ use crate::drivers::ai::errors::{
 };
 use crate::drivers::ai::ports::{
     ChatMessage, ChatRole, DeltaStream, DiscoveredModel, FinishReason, GenerateRequest,
-    GenerateResult, SharedTextDriver, TextDelta, TextGenerationDriver, TokenUsage,
+    GenerateResult, SharedTextDriver, TextDelta, TextGenerationDriver, TokenUsage, ToolCall,
 };
 use crate::drivers::ai::sse::FrameStream;
 use crate::drivers::ai::tool_dialect::with_tool_dialect;
@@ -624,8 +625,38 @@ impl Run {
         self.fail(error);
     }
 
+    fn hand_over(&mut self) {
+        self.finished = true;
+        self.chat_id = None;
+        self.response_id = None;
+        if let Some(summary) = &self.summary {
+            with_summary(summary, |summary| {
+                summary.finish_reason = Some(FinishReason::ToolCalls);
+            });
+        }
+        self.phase = Phase::Done;
+    }
+
+    fn model_call(&self, call: ModelCall) -> TextDelta {
+        let arguments = if call.arguments.trim().is_empty() {
+            "{}".to_owned()
+        } else {
+            call.arguments
+        };
+        TextDelta::ToolCall(ToolCall::new(
+            format!("call_{}", (self.shared.core.new_id)()),
+            call.name,
+            arguments,
+        ))
+    }
+
     fn frame(&mut self, payload: &str) {
-        for event in self.decoder.push(payload) {
+        let events = self.decoder.push(payload);
+        self.events(events);
+    }
+
+    fn events(&mut self, events: Vec<TurnEvent>) {
+        for event in events {
             match event {
                 TurnEvent::Failure(failure) => {
                     let failure = self.shared.core.normalise(vendor_failure(failure));
@@ -651,6 +682,15 @@ impl Run {
                     self.queue.push_back(Ok(TextDelta::WebSources(
                         sources.into_iter().map(web_source).collect(),
                     )));
+                }
+                TurnEvent::ToolCall(call) => {
+                    self.produced = true;
+                    let delta = self.model_call(call);
+                    self.queue.push_back(Ok(delta));
+                }
+                TurnEvent::CallsEnded => {
+                    self.hand_over();
+                    return;
                 }
                 TurnEvent::Finished => self.finished = true,
             }
@@ -685,6 +725,11 @@ impl Run {
             },
             Phase::Frames(mut frames) => match frames.next().await {
                 None => {
+                    let handed = self.decoder.end();
+                    if !handed.is_empty() {
+                        self.events(handed);
+                        return;
+                    }
                     if !self.finished {
                         self.fail(truncated_stream(FAMILY, QWEN_COMPLETIONS_PATH));
                         return;
@@ -785,12 +830,15 @@ impl TextGenerationDriver for QwenWebAdapter {
         let mut deltas = self.run(request, cancel, Some(Arc::clone(&summary)));
         let mut text = String::new();
         let mut reasoning = String::new();
+        let mut tool_calls = Vec::new();
         while let Some(delta) = deltas.next().await {
-            if let TextDelta::Content { text: chunk, kind } = delta? {
-                match kind {
+            match delta? {
+                TextDelta::Content { text: chunk, kind } => match kind {
                     zvs_contract::DeltaKind::Reasoning => reasoning.push_str(&chunk),
                     zvs_contract::DeltaKind::Text => text.push_str(&chunk),
-                }
+                },
+                TextDelta::ToolCall(call) => tool_calls.push(call),
+                TextDelta::WebSources(_) => {}
             }
         }
         let summary = mem::take(&mut *summary.lock().unwrap_or_else(PoisonError::into_inner));
@@ -800,7 +848,7 @@ impl TextGenerationDriver for QwenWebAdapter {
             reasoning: (!reasoning.is_empty()).then_some(reasoning),
             finish_reason: summary.finish_reason.unwrap_or(FinishReason::Unknown),
             usage: summary.usage,
-            tool_calls: Vec::new(),
+            tool_calls,
         })
     }
 

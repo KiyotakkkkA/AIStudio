@@ -128,9 +128,34 @@ which is not read. Both keys are present in the frames recorded 2026-10-26; `hos
 in those recordings, so the app falls back to the site's own `/favicon.ico` (2026-10-27).
 `web_extractor` phases (pages the model read) are not decoded.
 
+## Calls in the vendor's format (`TurnEvent::ToolCall`)
+
+Observed 2026-10-29 (`protocol::NATIVE_CALL_OBSERVATION`, FE `0.3.22`). The app offers its tools
+in the prompt (the host's injected dialect). The model usually answers with a
+`{"zvs_call_tool": …}` object in `content`, but it may instead call a tool in its own format,
+and the vendor then tries to run that tool on its side:
+
+| Frame (all `phase: answer`)                                 | Meaning                                     |
+| ----------------------------------------------------------- | ------------------------------------------- |
+| `content: ""`, `function_call: { name, arguments }`         | the call; `arguments` is a growing snapshot |
+| `content: "Tool <name> does not exists."`, `name: "<name>"` | the vendor's reply to a call it cannot run  |
+| `status: finished`, then more `content`                     | the model's reply to that refusal           |
+
+`arguments` is a string. It starts at `""` and each frame repeats the whole value so far,
+sometimes twice. A frame with another `name`, or with arguments that do not extend the current
+snapshot, starts the next call. The first frame of a call may carry
+`extra.display_position: think`. There is no `function_id` on these frames, unlike
+`web_search`.
+
+The decoder emits each finished call as `ToolCall`, then `CallsEnded` on the first answer frame
+that is not a call (the vendor's reply). After that it decodes nothing more: the vendor's reply
+is vendor text, and the rest is the model answering a refusal the app never made. A stream that
+ends during a call is handed over by `TurnDecoder::end`. The host passes the calls to the chat
+loop, stops reading the response, and does not chain the next turn onto it.
+
 ## Vendor-side tools
 
-`EXCLUDED_POLICY_CHECK_TOOLS_NAMES` When
+`EXCLUDED_POLICY_CHECK_TOOLS_NAMES` (now empty) lists tools that Qwen runs itself. When
 the model emits a call with one of these names and the app did not offer a tool by that name,
 the chat loop drops the call with a log line instead of refusing it as unoffered: the search
 already ran on the vendor's side and its results arrive as `WebSources`. `zvs-zai-web` exposes

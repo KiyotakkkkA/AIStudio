@@ -56,11 +56,40 @@ fn web_source(row: &Value) -> Option<WebSource> {
 }
 
 #[derive(Deserialize)]
+struct RawCall {
+    name: Option<String>,
+    arguments: Option<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelCall {
+    pub name: String,
+    pub arguments: String,
+}
+
+impl ModelCall {
+    fn from_raw(raw: RawCall) -> Option<Self> {
+        let name = present(raw.name)?;
+        let arguments = match raw.arguments {
+            None | Some(Value::Null) => String::new(),
+            Some(Value::String(text)) => text,
+            Some(other) => other.to_string(),
+        };
+        Some(Self { name, arguments })
+    }
+
+    fn continued_by(&self, next: &Self) -> bool {
+        self.name == next.name && next.arguments.starts_with(&self.arguments)
+    }
+}
+
+#[derive(Deserialize)]
 struct Delta {
     content: Option<String>,
     phase: Option<String>,
     status: Option<String>,
     extra: Option<Extra>,
+    function_call: Option<RawCall>,
 }
 
 #[derive(Deserialize)]
@@ -152,6 +181,8 @@ pub enum TurnEvent {
     Reasoning(String),
     Text(String),
     WebSources(Vec<WebSource>),
+    ToolCall(ModelCall),
+    CallsEnded,
     Usage(Usage),
     /// The answer phase reported `finished`; a stream that ends without it was cut short.
     Finished,
@@ -208,6 +239,8 @@ fn failure(frame: &StreamFrame) -> Option<VendorFailure> {
 pub struct TurnDecoder {
     emitted: Vec<String>,
     response_id: Option<String>,
+    call: Option<ModelCall>,
+    ended: bool,
 }
 
 impl TurnDecoder {
@@ -235,8 +268,74 @@ impl TurnDecoder {
         chunks
     }
 
+    fn thinking(&mut self, delta: Delta) -> Vec<TurnEvent> {
+        let thought = delta
+            .extra
+            .and_then(|extra| extra.summary_thought)
+            .and_then(|summary| summary.content)
+            .unwrap_or_default();
+        self.summary_deltas(&thought)
+            .into_iter()
+            .map(TurnEvent::Reasoning)
+            .collect()
+    }
+
+    fn answer(&mut self, delta: Delta) -> Vec<TurnEvent> {
+        if let Some(call) = delta.function_call.and_then(ModelCall::from_raw) {
+            return self.calling(call);
+        }
+        if self.call.is_some() {
+            return self.hand_over();
+        }
+        let mut events = Vec::new();
+        let content = delta.content.unwrap_or_default();
+        if !content.is_empty() {
+            events.push(TurnEvent::Text(content));
+        }
+        if delta.status.as_deref() == Some("finished") {
+            events.push(TurnEvent::Finished);
+        }
+        events
+    }
+
+    fn calling(&mut self, next: ModelCall) -> Vec<TurnEvent> {
+        if self
+            .call
+            .as_ref()
+            .is_some_and(|current| current.continued_by(&next))
+        {
+            self.call = Some(next);
+            return Vec::new();
+        }
+        self.call
+            .replace(next)
+            .map(TurnEvent::ToolCall)
+            .into_iter()
+            .collect()
+    }
+
+    fn hand_over(&mut self) -> Vec<TurnEvent> {
+        self.ended = true;
+        self.call
+            .take()
+            .map(TurnEvent::ToolCall)
+            .into_iter()
+            .chain([TurnEvent::CallsEnded])
+            .collect()
+    }
+
+    pub fn end(&mut self) -> Vec<TurnEvent> {
+        if self.ended || self.call.is_none() {
+            return Vec::new();
+        }
+        self.hand_over()
+    }
+
     /// Decode one payload. Payloads that are not frames (keep-alives, unknown JSON) yield nothing.
     pub fn push(&mut self, payload: &str) -> Vec<TurnEvent> {
+        if self.ended {
+            return Vec::new();
+        }
         let Ok(value) = serde_json::from_str::<Value>(payload) else {
             return Vec::new();
         };
@@ -282,44 +381,31 @@ impl TurnDecoder {
         else {
             return events;
         };
-        match delta.phase.as_deref() {
-            Some("thinking_summary") => {
-                let thought = delta
-                    .extra
-                    .and_then(|extra| extra.summary_thought)
-                    .and_then(|summary| summary.content)
-                    .unwrap_or_default();
-                events.extend(
-                    self.summary_deltas(&thought)
-                        .into_iter()
-                        .map(TurnEvent::Reasoning),
-                );
-            }
-            Some("answer") => {
-                let content = delta.content.unwrap_or_default();
-                if !content.is_empty() {
-                    events.push(TurnEvent::Text(content));
-                }
-                if delta.status.as_deref() == Some("finished") {
-                    events.push(TurnEvent::Finished);
-                }
-            }
-            Some("web_search") if delta.status.as_deref() == Some("finished") => {
-                let sources: Vec<WebSource> = delta
-                    .extra
-                    .and_then(|extra| extra.web_search_info)
-                    .unwrap_or_default()
-                    .iter()
-                    .filter_map(web_source)
-                    .collect();
-                if !sources.is_empty() {
-                    events.push(TurnEvent::WebSources(sources));
-                }
-            }
-            _ => {}
-        }
+        events.extend(match delta.phase.as_deref() {
+            Some("thinking_summary") => self.thinking(delta),
+            Some("answer") => self.answer(delta),
+            Some("web_search") => web_search(delta),
+            _ => Vec::new(),
+        });
         events
     }
+}
+
+fn web_search(delta: Delta) -> Vec<TurnEvent> {
+    if delta.status.as_deref() != Some("finished") {
+        return Vec::new();
+    }
+    let sources: Vec<WebSource> = delta
+        .extra
+        .and_then(|extra| extra.web_search_info)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(web_source)
+        .collect();
+    if sources.is_empty() {
+        return Vec::new();
+    }
+    vec![TurnEvent::WebSources(sources)]
 }
 
 #[cfg(test)]
@@ -523,6 +609,96 @@ mod tests {
         );
         assert_eq!(failed(json!({ "status": 200, "choices": [] })), None);
         assert_eq!(decoder.push(&json!({ "error": 5 }).to_string()), []);
+    }
+
+    fn call_frame(name: &str, arguments: &str) -> String {
+        frame(
+            &json!({ "phase": "answer", "status": "typing", "content": "",
+                       "function_call": { "name": name, "arguments": arguments },
+                       "extra": { "display_position": "answer" } }),
+        )
+    }
+
+    fn vendor_reply(name: &str) -> String {
+        frame(
+            &json!({ "phase": "answer", "status": "typing", "name": name,
+                       "content": format!("Tool {name} does not exists.") }),
+        )
+    }
+
+    fn model_call(name: &str, arguments: &str) -> TurnEvent {
+        TurnEvent::ToolCall(ModelCall {
+            name: name.into(),
+            arguments: arguments.into(),
+        })
+    }
+
+    #[test]
+    fn native_calls_are_assembled_from_argument_snapshots_and_handed_over() {
+        let mut decoder = TurnDecoder::new();
+        let mut events = Vec::new();
+        for payload in [
+            call_frame("browser__click", ""),
+            call_frame("browser__click", r#"{"ref": "e4"#),
+            call_frame("browser__click", r#"{"ref": "e42"}"#),
+            call_frame("skill__load", ""),
+            call_frame("skill__load", r#"{"name": "pdf"}"#),
+            call_frame("skill__load", r#"{"name": "pdf"}"#),
+            vendor_reply("browser__click"),
+            vendor_reply("skill__load"),
+            frame(&json!({ "phase": "answer", "status": "finished", "content": "" })),
+            frame(&json!({ "phase": "answer", "status": "typing", "content": "I'm sorry" })),
+        ] {
+            events.extend(decoder.push(&payload));
+        }
+        assert_eq!(
+            events,
+            [
+                model_call("browser__click", r#"{"ref": "e42"}"#),
+                model_call("skill__load", r#"{"name": "pdf"}"#),
+                TurnEvent::CallsEnded,
+            ]
+        );
+        assert_eq!(decoder.end(), []);
+    }
+
+    #[test]
+    fn a_repeated_tool_starts_a_new_call_when_its_arguments_restart() {
+        let mut decoder = TurnDecoder::new();
+        let mut events = Vec::new();
+        for payload in [
+            call_frame("fs__read", r#"{"path": "a.md"}"#),
+            call_frame("fs__read", ""),
+            call_frame("fs__read", r#"{"path": "b.md"}"#),
+        ] {
+            events.extend(decoder.push(&payload));
+        }
+        events.extend(decoder.end());
+        assert_eq!(
+            events,
+            [
+                model_call("fs__read", r#"{"path": "a.md"}"#),
+                model_call("fs__read", r#"{"path": "b.md"}"#),
+                TurnEvent::CallsEnded,
+            ]
+        );
+    }
+
+    #[test]
+    fn text_before_a_native_call_is_kept_and_a_call_without_a_name_is_ignored() {
+        let mut decoder = TurnDecoder::new();
+        assert_eq!(
+            decoder.push(&frame(
+                &json!({ "phase": "answer", "content": "Открываю." })
+            )),
+            [TurnEvent::Text("Открываю.".into())]
+        );
+        assert_eq!(decoder.push(&call_frame(" ", "{}")), []);
+        assert_eq!(decoder.end(), []);
+        assert_eq!(
+            decoder.push(&frame(&json!({ "phase": "answer", "content": "!" }))),
+            [TurnEvent::Text("!".into())]
+        );
     }
 
     #[test]

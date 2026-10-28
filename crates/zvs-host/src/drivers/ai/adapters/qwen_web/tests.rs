@@ -1019,6 +1019,53 @@ async fn the_qwen_driver_emits_a_native_tool_call_from_a_recorded_injected_strea
     assert!(sent.contains(INJECTED_CALL_KEY));
 }
 
+fn browser_tools() -> Vec<crate::drivers::ai::ports::ToolSpec> {
+    ["browser__click", "skill__load"]
+        .into_iter()
+        .map(|name| crate::drivers::ai::ports::ToolSpec {
+            name: name.to_owned(),
+            ..search_tool()
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn calls_in_the_vendor_format_reach_the_app_and_the_vendor_reply_is_dropped() {
+    let server = qwen_server(fixture_frames("qwenNativeToolCall.sse")).await;
+    let qwen = adapter(&server);
+    let driver = qwen_web_driver(options(&server));
+    let request = GenerateRequest {
+        tools: browser_tools(),
+        ..GenerateRequest::new("qwen3.7-plus", vec![ChatMessage::user("Нажми e42")])
+    };
+    let deltas = drain(driver.stream(&request, &token()))
+        .await
+        .expect("streams");
+    let calls: Vec<(&str, &str)> = deltas
+        .iter()
+        .filter_map(|delta| match delta {
+            TextDelta::ToolCall(call) => Some((call.name.as_str(), call.arguments.as_str())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        calls,
+        [
+            ("browser__click", r#"{"ref": "e42"}"#),
+            ("skill__load", r#"{"name": "pdf"}"#),
+        ]
+    );
+    assert!(texts(&deltas, DeltaKind::Text).is_empty(), "{deltas:?}");
+    assert_eq!(texts(&deltas, DeltaKind::Reasoning).len(), 1);
+
+    let result = qwen.generate(&request, &token()).await.expect("generates");
+    assert_eq!(result.finish_reason, FinishReason::ToolCalls);
+    assert_eq!(result.tool_calls.len(), 2);
+    assert!(result.tool_calls[0].id.starts_with("call_"));
+    assert!(result.text.is_empty());
+    assert_eq!(qwen.chained_chats(), 0);
+}
+
 struct DirectSession {
     http: crate::drivers::ai::http::HttpClient,
 }

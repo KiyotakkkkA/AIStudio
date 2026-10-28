@@ -17,4 +17,4 @@ pub use page::{
 };
 pub use protocol::{EXCLUDED_POLICY_CHECK_TOOLS_NAMES, Observation};
 pub use request::{ChatType, CompletionTurn, ThinkingMode, new_chat_body, parse_chat_created};
-pub use stream::{TurnDecoder, TurnEvent, Usage, VendorFailure, WebSource};
+pub use stream::{ModelCall, TurnDecoder, TurnEvent, Usage, VendorFailure, WebSource};

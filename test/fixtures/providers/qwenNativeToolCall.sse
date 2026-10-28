@@ -1,0 +1,26 @@
+data: {"response.created":{"chat_id": "8c907682-866b-4d67-bdc4-ac180a5b92fe", "parent_id": "c6c11306-2186-4879-b6a1-d72c6d0c04c1", "response_id":"c5616a69-e104-4a92-9c56-07da8e8ce891", "response_index": "0"}}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "thinking_summary", "extra": {"summary_title": {"content": ["Clicking the element"]}, "summary_thought": {"content": ["The user wants element e42 clicked, then the pdf skill loaded."]}}, "status": "typing"}}], "response_id": "c5616a69-e104-4a92-9c56-07da8e8ce891"}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "answer", "status": "typing", "function_call": {"name": "browser__click", "arguments": ""}, "extra": {"display_position": "think"}}}], "response_id": "c5616a69-e104-4a92-9c56-07da8e8ce891"}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "answer", "status": "typing", "function_call": {"name": "browser__click", "arguments": "{\"ref\": \"e4"}, "extra": {"display_position": "answer"}}}], "response_id": "c5616a69-e104-4a92-9c56-07da8e8ce891"}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "answer", "status": "typing", "function_call": {"name": "browser__click", "arguments": "{\"ref\": \"e42\"}"}, "extra": {"display_position": "answer"}}}], "response_id": "c5616a69-e104-4a92-9c56-07da8e8ce891"}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "answer", "status": "typing", "function_call": {"name": "skill__load", "arguments": ""}, "extra": {"display_position": "answer"}}}], "response_id": "c5616a69-e104-4a92-9c56-07da8e8ce891"}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "answer", "status": "typing", "function_call": {"name": "skill__load", "arguments": "{\"name\": \"pdf\"}"}, "extra": {"display_position": "answer"}}}], "response_id": "c5616a69-e104-4a92-9c56-07da8e8ce891"}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "answer", "status": "typing", "function_call": {"name": "skill__load", "arguments": "{\"name\": \"pdf\"}"}, "extra": {"display_position": "answer"}}}], "response_id": "c5616a69-e104-4a92-9c56-07da8e8ce891"}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "Tool browser__click does not exists.", "phase": "answer", "status": "typing", "name": "browser__click"}}], "response_id": "c5616a69-e104-4a92-9c56-07da8e8ce891"}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "Tool skill__load does not exists.", "phase": "answer", "status": "typing", "name": "skill__load"}}], "response_id": "c5616a69-e104-4a92-9c56-07da8e8ce891"}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "", "phase": "answer", "status": "finished"}}], "response_id": "c5616a69-e104-4a92-9c56-07da8e8ce891"}
+
+data: {"choices": [{"delta": {"role": "assistant", "content": "I'm sorry, but I don't have access to the tools `browser__click` or `skill__load` in my current environment.", "phase": "answer", "status": "typing"}}], "response_id": "c5616a69-e104-4a92-9c56-07da8e8ce891", "usage": {"input_tokens": 160, "output_tokens": 160, "characters": 0, "total_tokens": 320}}
+
+data: {"choices": [{"delta": {"content": "", "role": "assistant", "status": "finished", "phase": "answer"}}], "response_id": "c5616a69-e104-4a92-9c56-07da8e8ce891"}
+
