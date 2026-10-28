@@ -22,12 +22,12 @@ function ComponentsTab() {
         </p>
       )}
       {toolchain.loading && toolchain.ordered.length === 0 ? (
-        <LoadingStatus label="Загрузка…" className="grid gap-3 lg:grid-cols-2">
+        <LoadingStatus label="Загрузка…" className="flex flex-col gap-3">
           <ListRowSkeleton />
           <ListRowSkeleton />
         </LoadingStatus>
       ) : null}
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="flex flex-col gap-3">
         {toolchain.ordered.map((dto) => (
           <ToolchainCard
             key={dto.runtime}

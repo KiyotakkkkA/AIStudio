@@ -1,4 +1,12 @@
-import { mdiLanguagePython, mdiNodejs } from "@mdi/js";
+import {
+  mdiDeleteOutline,
+  mdiDownload,
+  mdiFolderOpenOutline,
+  mdiLanguagePython,
+  mdiMagnify,
+  mdiNodejs,
+  mdiUpdate,
+} from "@mdi/js";
 import {
   AppErrorCode,
   ToolchainRuntime,
@@ -49,6 +57,14 @@ export const ACTION_LABELS: Record<ToolchainAction, string> = {
   scan: "Найти в PATH",
   select: "Указать файл",
   remove: "Удалить",
+};
+
+export const ACTION_ICONS: Record<ToolchainAction, string> = {
+  install: mdiDownload,
+  update: mdiUpdate,
+  scan: mdiMagnify,
+  select: mdiFolderOpenOutline,
+  remove: mdiDeleteOutline,
 };
 
 export const DISCONNECT_LABEL = "Отключить";

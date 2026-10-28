@@ -15,6 +15,7 @@ import {
   NOTIFICATIONS_ROW,
   PALETTES_LABEL,
   RAIL_PICKER_LABEL,
+  SECTION_LABELS,
   THEME_LABEL,
 } from "./preferencesPresentation";
 
@@ -40,6 +41,7 @@ export const SETTING_IDS = {
   fx: "appearance.fx",
   fxMotion: "appearance.fxMotion",
   fxEffects: "appearance.fxEffects",
+  components: "components.runtimes",
 } as const;
 
 const SEARCH_LIMIT = 8;
@@ -86,6 +88,7 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: ENABLED_ROW.key, section: "memory", label: ENABLED_ROW.label },
   { id: MODEL_ROW.key, section: "memory", label: MODEL_ROW.label, fallback: ENABLED_ROW.key },
   { id: STORAGE_CLEAR_ID, section: "data", label: STORAGE_CLEAR_CACHE },
+  { id: SETTING_IDS.components, section: "components", label: SECTION_LABELS.components },
   ...[...Object.values(APP_ROW_LABELS), ...Object.values(DEVICE_ROW_LABELS)].map((label) => ({
     id: aboutSettingId(label),
     section: "about" as const,

@@ -1,12 +1,11 @@
-import { mdiDeleteOutline } from "@mdi/js";
 import type { ToolchainDto } from "@zvs/shared";
-import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
 import { STATUS_TONE_TEXT } from "../../ui/atoms/statusTone";
 import {
+  ACTION_ICONS,
   ACTION_LABELS,
   INSTALLING_HINT,
   RUNTIME_HINTS,
@@ -21,6 +20,11 @@ import {
   versionLine,
   type ToolchainAction,
 } from "./toolchainPresentation";
+
+const PRIMARY_TONE =
+  "zvs-press border border-transparent bg-accent-dark text-on-accent hover:bg-accent-medium";
+const SECONDARY_TONE =
+  "zvs-press border border-line text-main-300 hover:border-line-strong hover:bg-main-850 hover:text-main-100";
 
 export interface ToolchainCardProps {
   readonly dto: ToolchainDto;
@@ -37,7 +41,7 @@ export default function ToolchainCard({ dto, busy, error, onAction }: ToolchainC
   return (
     <section
       aria-label={dto.displayName}
-      className="flex flex-col gap-3 rounded-card bg-main-900 px-4 py-3.5 shadow-card"
+      className="flex flex-col gap-3 rounded-card border border-line bg-main-900 px-4 py-3.5"
     >
       <header className="flex items-center gap-3">
         <span className="flex size-9 flex-none items-center justify-center rounded-control bg-main-700 text-main-300">
@@ -88,7 +92,7 @@ export default function ToolchainCard({ dto, busy, error, onAction }: ToolchainC
                 key={action}
                 tone="danger"
                 size="md"
-                path={mdiDeleteOutline}
+                path={ACTION_ICONS[action]}
                 label={removalLabel(dto)}
                 disabled={busy !== undefined}
                 needConfirm
@@ -100,14 +104,17 @@ export default function ToolchainCard({ dto, busy, error, onAction }: ToolchainC
                 onClick={() => onAction(action)}
               />
             ) : (
-              <Button
+              <IconButton
                 key={action}
-                tone={action === "install" || action === "update" ? "primary" : "secondary"}
+                size="md"
+                path={ACTION_ICONS[action]}
+                label={busy === action ? `${ACTION_LABELS[action]}…` : ACTION_LABELS[action]}
+                toneClassName={
+                  action === "install" || action === "update" ? PRIMARY_TONE : SECONDARY_TONE
+                }
                 disabled={busy !== undefined}
                 onClick={() => onAction(action)}
-              >
-                {busy === action ? `${ACTION_LABELS[action]}…` : ACTION_LABELS[action]}
-              </Button>
+              />
             ),
           )}
         </div>

@@ -33,7 +33,21 @@ export const SECTION_LABELS: Record<PreferenceSection, string> = {
   memory: "Память",
   data: "Данные",
   about: "О системе",
+  components: "Компоненты",
 };
+
+export const EXTENSIONS_GROUP = "Расширения";
+
+export const PREFERENCE_GROUPS: readonly {
+  readonly label: string;
+  readonly sections: readonly PreferenceSection[];
+}[] = [
+  {
+    label: PREFERENCES_GROUP,
+    sections: ["general", "profile", "appearance", "notifications", "memory", "data", "about"],
+  },
+  { label: EXTENSIONS_GROUP, sections: ["components"] },
+];
 
 export const SECTION_HINTS: Record<PreferenceSection, string> = {
   general: "Запуск, работа в фоне и ограничения генерации.",
@@ -43,6 +57,7 @@ export const SECTION_HINTS: Record<PreferenceSection, string> = {
   memory: "Факты о пользователе и диалогах, которые модель получает в каждом ходе.",
   data: "Место на диске, занятое данными приложения, и очистка кэша.",
   about: "Версия приложения и характеристики компьютера.",
+  components: "Среды выполнения, которые нужны MCP-серверам.",
 };
 
 export const TOGGLE_ON = "Включено";

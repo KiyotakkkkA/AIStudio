@@ -10,6 +10,7 @@ import {
   mdiCogOutline,
   mdiHarddisk,
   mdiInformationOutline,
+  mdiPackageVariantClosed,
   mdiPaletteOutline,
 } from "@mdi/js";
 import Button from "../../ui/atoms/buttons/Button";
@@ -32,7 +33,6 @@ import {
   FONT_SIZES,
   FX_LEVELS,
   FX_PRESETS,
-  PREFERENCE_SECTIONS,
   type PreferenceSection,
 } from "../../stores/UiStore";
 import {
@@ -59,7 +59,7 @@ import {
   GENERAL_ROWS,
   NOTIFICATION_KIND_ROWS,
   NOTIFICATIONS_ROW,
-  PREFERENCES_GROUP,
+  PREFERENCE_GROUPS,
   PREFERENCES_TITLE,
   RAIL_PICKER_HINT,
   RAIL_PICKER_LABEL,
@@ -78,6 +78,7 @@ import {
 } from "./preferencesPresentation";
 import PreferencesSearch from "./PreferencesSearch";
 import ThemePalettes from "./ThemePalettes";
+import ComponentsTab from "../toolchain/ComponentsTab";
 import {
   STORAGE_BREAKDOWN,
   STORAGE_CATEGORY_FILLS,
@@ -130,6 +131,7 @@ const SECTION_ICONS: Record<PreferenceSection, string> = {
   memory: mdiBrain,
   data: mdiHarddisk,
   about: mdiInformationOutline,
+  components: mdiPackageVariantClosed,
 };
 
 const SettingRow = observer(function SettingRow({
@@ -721,25 +723,36 @@ function PreferencesDialog() {
         className="flex w-56 flex-none flex-col gap-0.5 border-r border-line bg-main-950 px-3 py-4"
       >
         <PreferencesSearch />
-        <span className="px-2.5 pb-1.5 text-[12px] text-main-500">{PREFERENCES_GROUP}</span>
-        {PREFERENCE_SECTIONS.map((item) => (
-          <button
-            key={item}
-            type="button"
-            aria-current={section === item ? "page" : undefined}
-            onClick={() => ui.openPreferences(item)}
-            className={`relative flex h-8.5 items-center gap-2.5 rounded-control px-2.5 text-left text-[13px] ${
-              section === item
-                ? "font-medium text-main-50"
-                : "text-main-300 hover:bg-main-900 hover:text-main-100"
-            }`}
-          >
-            {section === item ? (
-              <ActivePill layoutId="preferences-section" className="rounded-control bg-main-800" />
-            ) : null}
-            <Icon path={SECTION_ICONS[item]} size={16} className="relative flex-none" />
-            <span className="relative">{SECTION_LABELS[item]}</span>
-          </button>
+        {PREFERENCE_GROUPS.map((group, index) => (
+          <div key={group.label} className="flex flex-col gap-0.5">
+            <span
+              className={`px-2.5 pb-1.5 text-[12px] text-main-500 ${index === 0 ? "" : "pt-4"}`}
+            >
+              {group.label}
+            </span>
+            {group.sections.map((item) => (
+              <button
+                key={item}
+                type="button"
+                aria-current={section === item ? "page" : undefined}
+                onClick={() => ui.openPreferences(item)}
+                className={`relative flex h-8.5 items-center gap-2.5 rounded-control px-2.5 text-left text-[13px] ${
+                  section === item
+                    ? "font-medium text-main-50"
+                    : "text-main-300 hover:bg-main-900 hover:text-main-100"
+                }`}
+              >
+                {section === item ? (
+                  <ActivePill
+                    layoutId="preferences-section"
+                    className="rounded-control bg-main-800"
+                  />
+                ) : null}
+                <Icon path={SECTION_ICONS[item]} size={16} className="relative flex-none" />
+                <span className="relative">{SECTION_LABELS[item]}</span>
+              </button>
+            ))}
+          </div>
         ))}
       </nav>
       <div ref={content} className="flex min-w-0 flex-1 flex-col">
@@ -768,6 +781,11 @@ function PreferencesDialog() {
             {section === "memory" ? <MemorySection /> : null}
             {section === "data" ? <DataSection /> : null}
             {section === "about" ? <AboutSection /> : null}
+            {section === "components" ? (
+              <div data-setting={SETTING_IDS.components} className="pt-2">
+                <ComponentsTab />
+              </div>
+            ) : null}
           </FadeIn>
         </ScrollArea>
       </div>
