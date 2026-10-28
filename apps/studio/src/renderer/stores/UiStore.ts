@@ -3,6 +3,13 @@ import type { IpcClient } from "@zvs/ipc";
 import type { Contract } from "@zvs/shared";
 import { DEFAULT_ROUTE, isRoutePath, type RoutePath } from "../app/routes";
 import { FX_LEVELS, type FxLevel } from "../ui/motion/levels";
+import {
+  DEFAULT_PALETTES,
+  defaultPalette,
+  findPalette,
+  type Palette,
+  type PaletteMode,
+} from "../app/palettes";
 
 const RAIL_COLLAPSED_KEY = "ui.rail.collapsed";
 const LAST_ROUTE_KEY = "ui.route.last";
@@ -13,6 +20,10 @@ const FONT_SIZE_KEY = "ui.font.size";
 const FX_PRESET_KEY = "ui.fx.preset";
 const FX_MOTION_KEY = "ui.fx.motion";
 const FX_EFFECTS_KEY = "ui.fx.effects";
+const PALETTE_KEYS: Readonly<Record<PaletteMode, string>> = {
+  dark: "ui.palette.dark",
+  light: "ui.palette.light",
+};
 
 export const THEME_MODES = ["system", "light", "dark"] as const;
 export type ThemeMode = (typeof THEME_MODES)[number];
@@ -71,6 +82,8 @@ export class UiStore {
   customMotion: FxLevel = "full";
   customEffects: FxLevel = "full";
   osReducedMotion = false;
+  osDark = false;
+  palettes: Record<PaletteMode, string> = { ...DEFAULT_PALETTES };
   private customChosen = false;
   preferences: PreferenceSection | null = null;
   preferenceTarget: string | null = null;
@@ -102,21 +115,48 @@ export class UiStore {
     return this.fxPreset === "custom" ? this.customEffects : this.fxPreset;
   }
 
+  get themeShown(): PaletteMode {
+    if (this.theme === "system") return this.osDark ? "dark" : "light";
+    return this.theme;
+  }
+
+  get palette(): Palette {
+    const mode = this.themeShown;
+    return findPalette(this.palettes[mode], mode) ?? defaultPalette(mode);
+  }
+
   async restore(): Promise<void> {
-    const [collapsed, route, theme, picker, family, size, preset, motion, effects] =
-      await Promise.all([
-        this.read(RAIL_COLLAPSED_KEY),
-        this.read(LAST_ROUTE_KEY),
-        this.read(THEME_KEY),
-        this.read(RAIL_THEME_PICKER_KEY),
-        this.read(FONT_FAMILY_KEY),
-        this.read(FONT_SIZE_KEY),
-        this.read(FX_PRESET_KEY),
-        this.read(FX_MOTION_KEY),
-        this.read(FX_EFFECTS_KEY),
-      ]);
+    const [
+      collapsed,
+      route,
+      theme,
+      picker,
+      family,
+      size,
+      preset,
+      motion,
+      effects,
+      darkPalette,
+      lightPalette,
+    ] = await Promise.all([
+      this.read(RAIL_COLLAPSED_KEY),
+      this.read(LAST_ROUTE_KEY),
+      this.read(THEME_KEY),
+      this.read(RAIL_THEME_PICKER_KEY),
+      this.read(FONT_FAMILY_KEY),
+      this.read(FONT_SIZE_KEY),
+      this.read(FX_PRESET_KEY),
+      this.read(FX_MOTION_KEY),
+      this.read(FX_EFFECTS_KEY),
+      this.read(PALETTE_KEYS.dark),
+      this.read(PALETTE_KEYS.light),
+    ]);
     runInAction(() => {
       if (isThemeMode(theme)) this.theme = theme;
+      const dark = findPalette(darkPalette, "dark");
+      if (dark !== undefined) this.palettes.dark = dark.id;
+      const light = findPalette(lightPalette, "light");
+      if (light !== undefined) this.palettes.light = light.id;
       if (typeof picker === "boolean") this.railThemePicker = picker;
       if (isFontFamily(family)) this.fontFamily = family;
       if (isFontSize(size)) this.fontSize = size;
@@ -144,6 +184,17 @@ export class UiStore {
     if (this.theme === theme) return;
     this.theme = theme;
     void this.write(THEME_KEY, theme);
+  }
+
+  setPalette(mode: PaletteMode, id: string): void {
+    const palette = findPalette(id, mode);
+    if (palette === undefined || this.palettes[mode] === palette.id) return;
+    this.palettes[mode] = palette.id;
+    void this.write(PALETTE_KEYS[mode], palette.id);
+  }
+
+  setOsDark(dark: boolean): void {
+    this.osDark = dark;
   }
 
   setRailThemePicker(visible: boolean): void {

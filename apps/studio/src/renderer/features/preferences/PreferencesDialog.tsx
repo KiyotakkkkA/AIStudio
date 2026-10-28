@@ -77,6 +77,7 @@ import {
   type ToggleRowCopy,
 } from "./preferencesPresentation";
 import PreferencesSearch from "./PreferencesSearch";
+import ThemePalettes from "./ThemePalettes";
 import {
   STORAGE_BREAKDOWN,
   STORAGE_CATEGORY_FILLS,
@@ -137,6 +138,7 @@ const SettingRow = observer(function SettingRow({
   hint,
   error,
   stacked = false,
+  footer,
   children,
 }: {
   readonly id: string;
@@ -144,6 +146,7 @@ const SettingRow = observer(function SettingRow({
   readonly hint: string;
   readonly error?: string | undefined;
   readonly stacked?: boolean;
+  readonly footer?: ReactNode;
   readonly children: ReactNode;
 }) {
   const { ui } = useStore();
@@ -166,6 +169,7 @@ const SettingRow = observer(function SettingRow({
       <div className={stacked ? "flex flex-col gap-2.5" : "flex flex-none items-center"}>
         {children}
       </div>
+      {footer === undefined ? null : <div className="basis-full">{footer}</div>}
     </div>
   );
 });
@@ -205,7 +209,12 @@ const AppearanceSection = observer(function AppearanceSection() {
   const { ui } = useStore();
   return (
     <div className="flex flex-col">
-      <SettingRow id={SETTING_IDS.theme} label={THEME_LABEL} hint={THEME_HINT}>
+      <SettingRow
+        id={SETTING_IDS.theme}
+        label={THEME_LABEL}
+        hint={THEME_HINT}
+        footer={<ThemePalettes />}
+      >
         <SegmentedControl
           label={THEME_LABEL}
           value={ui.theme}

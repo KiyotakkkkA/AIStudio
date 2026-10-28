@@ -13,6 +13,7 @@ import {
   GENERAL_ROWS,
   NOTIFICATION_KIND_ROWS,
   NOTIFICATIONS_ROW,
+  PALETTES_LABEL,
   RAIL_PICKER_LABEL,
   THEME_LABEL,
 } from "./preferencesPresentation";
@@ -32,6 +33,7 @@ export interface SettingMatch {
 
 export const SETTING_IDS = {
   theme: "appearance.theme",
+  palettes: "appearance.palettes",
   railPicker: "appearance.railPicker",
   fontFamily: "appearance.fontFamily",
   fontSize: "appearance.fontSize",
@@ -52,6 +54,12 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: STYLE_ROW.key, section: "profile", label: STYLE_ROW.label },
   { id: ABOUT_ROW.key, section: "profile", label: ABOUT_ROW.label },
   { id: SETTING_IDS.theme, section: "appearance", label: THEME_LABEL },
+  {
+    id: SETTING_IDS.palettes,
+    section: "appearance",
+    label: PALETTES_LABEL,
+    fallback: SETTING_IDS.theme,
+  },
   { id: SETTING_IDS.railPicker, section: "appearance", label: RAIL_PICKER_LABEL },
   { id: SETTING_IDS.fontFamily, section: "appearance", label: FONT_FAMILY_LABEL },
   { id: SETTING_IDS.fontSize, section: "appearance", label: FONT_SIZE_LABEL },

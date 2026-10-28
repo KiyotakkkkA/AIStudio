@@ -41,7 +41,7 @@ test("the store restores rail and route from the host through the real bridge co
   assert.equal(ui.railWidth, 64);
   assert.deepEqual(
     bridge.calls.map((call) => call.channel),
-    Array.from({ length: 9 }, () => "settings.get"),
+    Array.from({ length: 11 }, () => "settings.get"),
   );
 });
 
@@ -98,6 +98,52 @@ test("the theme mode restores, rejects unknown values and writes through once", 
   const fallback = new UiStore(client(settingsBridge({ "ui.theme": "sepia" }).bridge));
   await fallback.restore();
   assert.equal(fallback.theme, "system");
+});
+
+test("each theme restores its own palette and ignores one stored for the other mode", async () => {
+  const { bridge } = settingsBridge({
+    "ui.theme": "dark",
+    "ui.palette.dark": "dracula",
+    "ui.palette.light": "nord",
+  });
+  const ui = new UiStore(client(bridge));
+  await ui.restore();
+
+  assert.equal(ui.palettes.dark, "dracula");
+  assert.equal(ui.palettes.light, "zvs-light");
+  assert.equal(ui.palette.id, "dracula");
+  ui.setTheme("light");
+  assert.equal(ui.palette.id, "zvs-light");
+});
+
+test("the system theme shows the palette of the mode the OS reports", () => {
+  const ui = new UiStore(client(settingsBridge().bridge));
+  ui.setPalette("dark", "nord");
+  ui.setPalette("light", "github-light");
+
+  assert.equal(ui.theme, "system");
+  assert.equal(ui.themeShown, "light");
+  assert.equal(ui.palette.id, "github-light");
+  ui.setOsDark(true);
+  assert.equal(ui.themeShown, "dark");
+  assert.equal(ui.palette.id, "nord");
+});
+
+test("choosing a palette writes it once and refuses a palette of the other mode", async () => {
+  const { bridge, stored } = settingsBridge();
+  const ui = new UiStore(client(bridge));
+  await ui.restore();
+
+  ui.setPalette("dark", "tokyo-night");
+  ui.setPalette("dark", "tokyo-night");
+  ui.setPalette("light", "dracula");
+  ui.setPalette("light", "missing");
+  await Promise.resolve();
+
+  assert.equal(stored.get("ui.palette.dark"), "tokyo-night");
+  assert.equal(stored.has("ui.palette.light"), false);
+  assert.equal(ui.palettes.light, "zvs-light");
+  assert.equal(bridge.calls.filter((call) => call.channel === "settings.set").length, 1);
 });
 
 test("effects follow the OS until a preset is picked, then the preset decides", async () => {

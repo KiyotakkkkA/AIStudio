@@ -1,5 +1,6 @@
 import type { DeviceProfileDto } from "@zvs/shared";
 import { APP_CHANNEL, APP_VERSION } from "../../app/appEnv";
+import type { PaletteMode } from "../../app/palettes";
 import {
   DEFAULT_FONT_SIZE,
   FONT_SIZES,
@@ -99,6 +100,14 @@ export const THEME_OPTIONS: readonly { value: ThemeMode; label: string }[] = [
   { value: "light", label: "Светлая" },
   { value: "dark", label: "Тёмная" },
   { value: "system", label: "Как в системе" },
+];
+
+export const PALETTES_LABEL = "Расширенные настройки темы";
+export const PALETTES_HINT =
+  "Палитра для каждой темы. Выбранная палитра применяется, когда включена её тема.";
+export const PALETTE_GROUPS: readonly { mode: PaletteMode; label: string }[] = [
+  { mode: "dark", label: "Тёмная" },
+  { mode: "light", label: "Светлая" },
 ];
 
 export const RAIL_PICKER_LABEL = "Переключатель темы в панели навигации";
