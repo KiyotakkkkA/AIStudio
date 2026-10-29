@@ -1,0 +1,289 @@
+use serde_json::{Value, json};
+
+use super::transcript::Entry;
+use super::*;
+
+const PROVIDERS: &str =
+    include_str!("../../../../packages/shared/fixtures/providers/ProviderDto.valid.json");
+const CONVERSATIONS: &str =
+    include_str!("../../../../packages/shared/fixtures/chat/ConversationDto.valid.json");
+const RUN: &str = "0199aa11-5555-7111-8111-111111111111";
+const STREAM: &str = "0199aa11-6666-7111-8111-111111111111";
+const APPROVAL: &str = "0199aa11-7777-7111-8111-111111111111";
+const FOLDER: &str = r"D:\work";
+
+fn first<T: serde::de::DeserializeOwned>(fixture: &str) -> T {
+    let cases: Vec<Value> = serde_json::from_str(fixture).expect("fixture");
+    serde_json::from_value(cases[0]["value"].clone()).expect("parses")
+}
+
+fn provider() -> ProviderDto {
+    first(PROVIDERS)
+}
+
+fn conversation() -> ConversationDto {
+    first(CONVERSATIONS)
+}
+
+fn handle() -> RunHandleDto {
+    serde_json::from_value(json!({ "id": RUN, "streamId": STREAM })).expect("handle")
+}
+
+fn event(seq: u64, body: Value) -> Msg {
+    let mut value = json!({ "streamId": STREAM, "seq": seq, "ts": 1 });
+    if let (Value::Object(target), Value::Object(fields)) = (&mut value, body) {
+        target.extend(fields);
+    }
+    Msg::Event(Box::new(serde_json::from_value(value).expect("event")))
+}
+
+fn end(status: &str) -> Msg {
+    event(
+        99,
+        json!({ "type": "end", "outcome": { "status": status } }),
+    )
+}
+
+fn typed(app: &mut App, text: &str) {
+    for value in text.chars() {
+        app.update(Msg::Key(Key::Char(value)));
+    }
+}
+
+fn ready() -> App {
+    let mut app = App::new(FOLDER);
+    app.update(Msg::Opened(Ok(CliSessionDto {
+        folder: FOLDER.to_owned(),
+        access: WorkingFolderAccess::Granted,
+    })));
+    app.update(Msg::Providers(Ok(vec![provider()])));
+    app
+}
+
+fn running() -> App {
+    let mut app = ready();
+    app.conversation = Some(conversation());
+    typed(&mut app, "привет");
+    app.update(Msg::Key(Key::Enter));
+    app.update(Msg::Sent(Ok(handle())));
+    app
+}
+
+#[test]
+fn connecting_asks_for_the_session_providers_and_policy() {
+    let mut app = App::new(FOLDER);
+    assert_eq!(
+        app.update(Msg::Connected),
+        [Request::Open, Request::Providers, Request::Policy]
+    );
+}
+
+#[test]
+fn a_folder_without_access_asks_before_the_welcome_screen() {
+    let mut app = App::new(FOLDER);
+    app.update(Msg::Opened(Ok(CliSessionDto {
+        folder: FOLDER.to_owned(),
+        access: WorkingFolderAccess::Missing,
+    })));
+    assert_eq!(app.phase, Phase::Access);
+    app.update(Msg::Key(Key::Down));
+    app.update(Msg::Key(Key::Enter));
+    assert_eq!(app.phase, Phase::Chat);
+    assert_eq!(app.grant, Some(FolderGrantScope::Always));
+    assert!(app.exit.is_none());
+}
+
+#[test]
+fn refusing_folder_access_ends_the_session() {
+    let mut app = App::new(FOLDER);
+    app.update(Msg::Opened(Ok(CliSessionDto {
+        folder: FOLDER.to_owned(),
+        access: WorkingFolderAccess::Missing,
+    })));
+    app.update(Msg::Key(Key::Esc));
+    assert_eq!(
+        app.exit,
+        Some(Exit::Message(copy::ACCESS_DENIED.to_owned()))
+    );
+}
+
+#[test]
+fn the_default_model_follows_the_provider_default() {
+    let app = ready();
+    let model = app.model.expect("a model");
+    assert_eq!(model.model, "openai/gpt-4o-mini");
+    assert_eq!(model.provider_name, "OpenRouter");
+    assert_eq!(model.context_window, Some(128_000));
+}
+
+#[test]
+fn the_first_message_creates_binds_and_then_sends() {
+    let mut app = ready();
+    app.grant = Some(FolderGrantScope::Conversation);
+    typed(&mut app, "привет");
+    let requests = app.update(Msg::Key(Key::Enter));
+    let Some(Request::Create { model, .. }) = requests.first() else {
+        panic!("creates: {requests:?}");
+    };
+    assert_eq!(model, "openai/gpt-4o-mini");
+    assert_eq!(app.transcript.entries, [Entry::User("привет".to_owned())]);
+
+    let created = conversation();
+    let id = created.id;
+    assert_eq!(
+        app.update(Msg::Created(Ok(created.clone()))),
+        [Request::Bind {
+            id,
+            grant: Some(FolderGrantScope::Conversation)
+        }]
+    );
+    let sent = app.update(Msg::Bound(Ok(BindFolderResultDto::Bound {
+        conversation: Box::new(created),
+    })));
+    let [Request::Send(input)] = sent.as_slice() else {
+        panic!("sends: {sent:?}");
+    };
+    assert_eq!(input.text, "привет");
+    assert_eq!(input.conversation_id, id);
+    assert!(app.grant.is_none());
+    assert!(app.busy());
+}
+
+#[test]
+fn events_that_arrive_before_the_handle_are_replayed() {
+    let mut app = ready();
+    app.conversation = Some(conversation());
+    typed(&mut app, "привет");
+    app.update(Msg::Key(Key::Enter));
+    app.update(event(0, json!({ "type": "token", "delta": "Здрав" })));
+    app.update(Msg::Sent(Ok(handle())));
+    app.update(event(1, json!({ "type": "token", "delta": "ствуйте" })));
+    app.update(end("ok"));
+    assert!(!app.busy());
+    assert_eq!(
+        app.transcript.entries.last(),
+        Some(&Entry::Assistant {
+            text: "Здравствуйте".to_owned(),
+            reasoning: String::new()
+        })
+    );
+}
+
+#[test]
+fn a_failed_run_shows_its_message_and_a_cancel_is_sent_once() {
+    let mut app = running();
+    assert_eq!(
+        app.update(Msg::Key(Key::Esc)),
+        [Request::Cancel(handle().id)]
+    );
+    assert!(app.update(Msg::Key(Key::Esc)).is_empty());
+    app.update(event(
+        5,
+        json!({ "type": "end", "outcome": { "status": "failed", "message": "Лимит" } }),
+    ));
+    assert!(!app.cancelling);
+    assert!(matches!(
+        app.transcript.entries.last(),
+        Some(Entry::Notice { tone: Tone::Error, text }) if text == "Лимит"
+    ));
+}
+
+#[test]
+fn always_allow_writes_a_workspace_rule_and_approves() {
+    let mut app = running();
+    app.mode = ExecMode::AutoBypass;
+    app.update(event(
+        2,
+        json!({
+            "type": "approval",
+            "request": {
+                "id": APPROVAL, "runId": RUN, "kind": "process", "subject": "commands.run",
+                "scope": "global", "expiresAt": 1,
+                "conversationId": "0199aa11-3333-7111-8111-111111111111",
+                "tool": "run_command", "action": "Run",
+                "process": { "program": "run_command", "argv": ["deploytool", "sync"], "cwd": FOLDER, "packages": [] }
+            }
+        }),
+    ));
+    assert_eq!(app.prompts.len(), 1);
+    app.update(Msg::Key(Key::Down));
+    let requests = app.update(Msg::Key(Key::Enter));
+    assert_eq!(
+        requests,
+        [
+            Request::AllowRule(AllowRuleInput::Process {
+                argv: vec!["deploytool".to_owned(), "sync".to_owned()],
+                cwd: FOLDER.to_owned(),
+                folder: Some(FOLDER.to_owned()),
+            }),
+            Request::Approve {
+                run: handle().id,
+                approval: APPROVAL.to_owned()
+            }
+        ]
+    );
+    assert!(app.prompts.is_empty());
+}
+
+#[test]
+fn a_prompt_left_open_is_dropped_when_the_run_ends() {
+    let mut app = running();
+    app.update(event(
+        2,
+        json!({ "type": "approval", "request": { "id": APPROVAL, "runId": RUN, "subject": "web.fetch" } }),
+    ));
+    assert_eq!(app.prompts.len(), 1);
+    app.update(end("cancelled"));
+    assert!(app.prompts.is_empty());
+}
+
+#[test]
+fn a_message_while_busy_is_kept_in_the_input() {
+    let mut app = running();
+    typed(&mut app, "ещё");
+    assert!(app.update(Msg::Key(Key::Enter)).is_empty());
+    assert_eq!(app.input.text(), "ещё");
+    assert_eq!(app.status, Some((Tone::Info, copy::BUSY.to_owned())));
+}
+
+#[test]
+fn the_palette_completes_and_runs_commands() {
+    let mut app = ready();
+    typed(&mut app, "/ex");
+    assert!(app.palette_open());
+    app.update(Msg::Key(Key::Tab));
+    assert_eq!(app.input.text(), "/exit");
+    app.update(Msg::Key(Key::Enter));
+    assert_eq!(app.exit, Some(Exit::Quiet));
+}
+
+#[test]
+fn an_unknown_command_is_reported_and_double_escape_exits() {
+    let mut app = ready();
+    typed(&mut app, "/nope now");
+    app.update(Msg::Key(Key::Enter));
+    assert!(matches!(&app.status, Some((Tone::Error, text)) if text.contains("/nope")));
+    app.update(Msg::Key(Key::Esc));
+    assert!(app.exit.is_none());
+    app.update(Msg::Key(Key::Esc));
+    assert_eq!(app.exit, Some(Exit::Quiet));
+}
+
+#[test]
+fn new_starts_a_fresh_conversation_in_the_same_folder() {
+    let mut app = ready();
+    app.conversation = Some(conversation());
+    app.transcript.push_user("старое");
+    typed(&mut app, "/new");
+    app.update(Msg::Key(Key::Enter));
+    assert!(app.conversation.is_none());
+    assert!(app.show_welcome());
+    assert_eq!(app.folder, FOLDER);
+}
+
+#[test]
+fn a_lost_connection_exits_with_a_message() {
+    let mut app = running();
+    app.update(Msg::Closed);
+    assert_eq!(app.exit, Some(Exit::Message(copy::DISCONNECTED.to_owned())));
+}

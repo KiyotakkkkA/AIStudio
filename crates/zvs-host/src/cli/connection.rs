@@ -33,6 +33,7 @@ pub const CLI_CHANNELS: &[&str] = &[
     "mcp.list",
     "mcp.start",
     "mcp.stop",
+    "providers.get",
     "providers.list",
     "runs.approve",
     "runs.deny",

@@ -1,0 +1,110 @@
+use ratatui::Terminal;
+use ratatui::backend::TestBackend;
+use serde_json::{Value, json};
+use zvs_contract::{CliSessionDto, ProviderDto, WorkingFolderAccess};
+
+use super::*;
+use crate::state::{Key, Msg};
+
+const PROVIDERS: &str =
+    include_str!("../../../../packages/shared/fixtures/providers/ProviderDto.valid.json");
+
+fn ready(access: WorkingFolderAccess) -> App {
+    let mut app = App::new(r"D:\work\project");
+    app.update(Msg::Opened(Ok(CliSessionDto {
+        folder: r"D:\work\project".to_owned(),
+        access,
+    })));
+    let cases: Vec<Value> = serde_json::from_str(PROVIDERS).expect("fixture");
+    let provider: ProviderDto =
+        serde_json::from_value(cases[0]["value"].clone()).expect("provider");
+    app.update(Msg::Providers(Ok(vec![provider])));
+    app
+}
+
+fn render(app: &App, width: u16, height: u16) -> String {
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
+    terminal.draw(|frame| draw(frame, app)).expect("draws");
+    let buffer = terminal.backend().buffer().clone();
+    (0..height)
+        .map(|row| {
+            (0..width)
+                .map(|column| buffer[(column, row)].symbol().to_owned())
+                .collect::<String>()
+                .trim_end()
+                .to_owned()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn conversation_app() -> App {
+    let mut app = ready(WorkingFolderAccess::Granted);
+    app.transcript
+        .push_user("Прочитай README и кратко перескажи");
+    app.transcript
+        .entries
+        .push(crate::state::transcript::Entry::Tool(Box::new(
+            serde_json::from_value(json!({
+                "id": "c1", "key": "files.read", "name": "read_file", "round": 0,
+                "arguments": { "path": "README.md" }, "status": "succeeded",
+                "result": "# ZVS AI Studio\nЛокальная студия", "durationMs": 84
+            }))
+            .expect("call"),
+        )));
+    app.transcript
+        .entries
+        .push(crate::state::transcript::Entry::Assistant {
+            text: "## Кратко\n- Локальная студия\n- Запуск через `pnpm dev`".to_owned(),
+            reasoning: String::new(),
+        });
+    app
+}
+
+#[test]
+fn the_welcome_screen_shows_the_art_folder_and_model() {
+    let screen = render(&ready(WorkingFolderAccess::Granted), 100, 30);
+    println!("{screen}");
+    assert!(screen.contains("█████"));
+    assert!(screen.contains(r"D:\work\project"));
+    assert!(screen.contains("OpenRouter / GPT-4o mini"));
+    assert!(screen.contains(copy::MODE_ALWAYS_ASK));
+}
+
+#[test]
+fn the_access_prompt_lists_its_three_answers() {
+    let screen = render(&ready(WorkingFolderAccess::Missing), 100, 30);
+    println!("{screen}");
+    assert!(screen.contains(copy::ACCESS_TITLE));
+    assert!(screen.contains(copy::ACCESS_CONVERSATION));
+    assert!(screen.contains(copy::ACCESS_DENY));
+}
+
+#[test]
+fn a_conversation_renders_user_tool_and_answer_blocks() {
+    let screen = render(&conversation_app(), 90, 24);
+    println!("{screen}");
+    assert!(screen.contains("  Прочитай README"));
+    assert!(screen.contains(" ✓ read_file "));
+    assert!(screen.contains("• Запуск через pnpm dev"));
+}
+
+#[test]
+fn the_palette_opens_above_the_input() {
+    let mut app = ready(WorkingFolderAccess::Granted);
+    app.update(Msg::Key(Key::Char('/')));
+    let screen = render(&app, 90, 24);
+    println!("{screen}");
+    assert!(screen.contains(copy::COMMANDS_TITLE));
+    assert!(screen.contains("/models"));
+}
+
+#[test]
+fn help_and_tiny_terminals_do_not_panic() {
+    let mut app = conversation_app();
+    app.help = true;
+    for (width, height) in [(90, 30), (20, 6), (1, 1), (200, 60)] {
+        render(&app, width, height);
+    }
+    render(&App::new("D:/x"), 10, 3);
+}

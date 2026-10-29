@@ -1,0 +1,29 @@
+[package]
+name = "zvs-cli"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "zvs_cli"
+
+[[bin]]
+name = "aistudio"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "=0.30.2"
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "io-util"] }
+unicode-width = "=0.2.3"
+zvs-contract = { path = "../zvs-contract" }
+
+[target.'cfg(windows)'.dependencies]
+zvs-pipe = { path = "../zvs-pipe" }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "test-util"] }
+
+[lints]
+workspace = true

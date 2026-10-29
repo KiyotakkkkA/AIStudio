@@ -357,9 +357,9 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
   message drops the connection.
 - **An allow-list, not the contract.** The pipe dispatches through the same `IpcServer`, but
   only the channels in `zvs_host::cli::CLI_CHANNELS` — chat, folder and run answers, the
-  execution policy, model, skill and MCP listings. Secrets, settings, accounts, providers'
-  configuration and `cli.install`/`cli.uninstall` stay studio-only. Widening the list is a
-  security decision, as above.
+  execution policy, provider and model listings, skills and MCP servers. Secrets, settings,
+  accounts, provider editing and `cli.install`/`cli.uninstall` stay studio-only. Widening the
+  list is a security decision, as above.
 - **Same events, same answers.** CLI connections are extra event-bus subscribers beside the
   window. An approval or a question reaches both; the first answer wins and the other side
   sees `Conflict`.
