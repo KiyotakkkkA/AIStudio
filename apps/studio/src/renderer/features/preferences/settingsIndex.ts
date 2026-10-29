@@ -2,6 +2,7 @@ import type { PreferenceSection } from "../../stores/UiStore";
 import { JUDGE_ROW } from "../execPolicy/execPolicyCopy";
 import { ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
 import { ABOUT_ROW, STYLE_ROW, TOOL_CALLS_ROW } from "./profileCopy";
+import { CLI_SETTING_ID, CLI_TITLE } from "./cliCopy";
 import { STORAGE_CLEAR_CACHE, STORAGE_CLEAR_ID } from "./storageCopy";
 import {
   APP_ROW_LABELS,
@@ -91,6 +92,7 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: MODEL_ROW.key, section: "memory", label: MODEL_ROW.label, fallback: ENABLED_ROW.key },
   { id: STORAGE_CLEAR_ID, section: "data", label: STORAGE_CLEAR_CACHE },
   { id: SETTING_IDS.components, section: "components", label: SECTION_LABELS.components },
+  { id: CLI_SETTING_ID, section: "cli", label: CLI_TITLE },
   ...[...Object.values(APP_ROW_LABELS), ...Object.values(DEVICE_ROW_LABELS)].map((label) => ({
     id: aboutSettingId(label),
     section: "about" as const,

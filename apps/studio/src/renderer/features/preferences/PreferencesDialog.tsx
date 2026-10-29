@@ -8,6 +8,7 @@ import {
   mdiChevronDown,
   mdiClose,
   mdiCogOutline,
+  mdiConsole,
   mdiHarddisk,
   mdiInformationOutline,
   mdiPackageVariantClosed,
@@ -28,6 +29,19 @@ import { MeterBar, StackedBar, percent } from "../../ui/molecules/StackedBar";
 import ActivePill from "../../ui/motion/ActivePill";
 import FadeIn from "../../ui/motion/FadeIn";
 import { useStore } from "../../stores/useStore";
+import {
+  CLI_CHECKING,
+  CLI_DESCRIPTION,
+  CLI_INSTALL,
+  CLI_INSTALLED,
+  CLI_NOT_BUNDLED,
+  CLI_NOT_INSTALLED,
+  CLI_SETTING_ID,
+  CLI_TITLE,
+  CLI_TRAY_NOTE,
+  CLI_UNINSTALL,
+  CLI_USAGE,
+} from "./cliCopy";
 import {
   FONT_FAMILIES,
   FONT_SIZES,
@@ -143,6 +157,7 @@ const SECTION_ICONS: Record<PreferenceSection, string> = {
   data: mdiHarddisk,
   about: mdiInformationOutline,
   components: mdiPackageVariantClosed,
+  cli: mdiConsole,
 };
 
 const SettingRow = observer(function SettingRow({
@@ -545,6 +560,61 @@ const MemorySection = observer(function MemorySection() {
   );
 });
 
+const CliSection = observer(function CliSection() {
+  const { cli } = useStore();
+  useEffect(() => {
+    void cli.load();
+  }, [cli]);
+  const status = cli.status;
+  const state =
+    status === null
+      ? CLI_CHECKING
+      : !status.available
+        ? CLI_NOT_BUNDLED
+        : status.installed
+          ? CLI_INSTALLED
+          : CLI_NOT_INSTALLED;
+  return (
+    <div className="flex flex-col pt-2">
+      <SettingRow
+        id={CLI_SETTING_ID}
+        label={CLI_TITLE}
+        hint={CLI_DESCRIPTION}
+        error={cli.error ?? undefined}
+        footer={
+          <div className="flex flex-col gap-2 text-[12px] text-main-500">
+            <div className="flex items-center gap-2">
+              <span>{CLI_USAGE}</span>
+              <code className="rounded-control bg-main-900 px-2 py-0.5 font-mono text-[12px] text-accent-medium">
+                {status?.command ?? "aistudio"}
+              </code>
+            </div>
+            <p className="m-0">{CLI_TRAY_NOTE}</p>
+            {cli.notice === null ? null : (
+              <p role="status" className="m-0 text-main-300">
+                {cli.notice}
+              </p>
+            )}
+          </div>
+        }
+      >
+        <div className="flex items-center gap-3">
+          <Chip tone={status?.installed ? "accent" : "neutral"}>{state}</Chip>
+          {status?.installed ? (
+            <Button tone="ghost" disabled={cli.busy} onClick={() => void cli.uninstall()}>
+              {CLI_UNINSTALL}
+            </Button>
+          ) : (
+            <Button disabled={cli.busy || !cli.available} onClick={() => void cli.install()}>
+              {CLI_INSTALL}
+            </Button>
+          )}
+        </div>
+      </SettingRow>
+    </div>
+  );
+});
+
 const DataSection = observer(function DataSection() {
   const { storage } = useStore();
   useEffect(() => {
@@ -840,6 +910,7 @@ function PreferencesDialog() {
             {section === "memory" ? <MemorySection /> : null}
             {section === "data" ? <DataSection /> : null}
             {section === "about" ? <AboutSection /> : null}
+            {section === "cli" ? <CliSection /> : null}
             {section === "components" ? (
               <div data-setting={SETTING_IDS.components} className="pt-2">
                 <ComponentsTab />

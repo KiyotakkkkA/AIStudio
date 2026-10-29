@@ -134,7 +134,7 @@ function appSettings(seed: Record<string, Json> = {}) {
   return { bridge, stored, store: new AppSettingsStore(createIpcClient(contract, bridge)) };
 }
 
-test("the application group lists its sections in order and the extensions group holds components", () => {
+test("the application group lists its sections in order and the extensions group holds components and the CLI", () => {
   expect(
     PREFERENCE_GROUPS.map((group) => [
       group.label,
@@ -145,7 +145,7 @@ test("the application group lists its sections in order and the extensions group
       "Приложение",
       ["Общие", "Профиль", "Внешний вид", "Уведомления", "Память", "Данные", "О системе"],
     ],
-    ["Расширения", ["Компоненты"]],
+    ["Расширения", ["Компоненты", "CLI"]],
   ]);
   expect(PREFERENCE_GROUPS.flatMap((group) => group.sections).sort()).toEqual(
     [...PREFERENCE_SECTIONS].sort(),

@@ -61,6 +61,7 @@ export const PREFERENCE_SECTIONS = [
   "data",
   "about",
   "components",
+  "cli",
 ] as const;
 export type PreferenceSection = (typeof PREFERENCE_SECTIONS)[number];
 

@@ -1015,9 +1015,10 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   per-user NSIS installer; the sidecar ships as a bundle resource that lands next to the
   executable. Release builds on Windows link the C runtime statically (`crt-static`, set by
   `scripts/tauri.mjs`), so the installer needs no Visual C++ Redistributable.
-- One executable holds the shell, the host, `zvs-core` and SQLite. The only other artefact is
-  the `zvs-jobd` sidecar, placed next to the executable. No native module is rebuilt and no
-  Node runtime ships.
+- One executable holds the shell, the host, `zvs-core` and SQLite. The other artefacts are
+  the `zvs-jobd` sidecar, placed next to the executable, and the `aistudio` console client in
+  its own `cli\` folder, so that putting it on the user `Path` exposes nothing else (§7). No
+  native module is rebuilt and no Node runtime ships.
 - WebView2 is a runtime dependency. The installer's `webviewInstallMode` is decided in
   TASK_056.
 - **Windows first** (the development target); macOS and Linux are structurally supported but

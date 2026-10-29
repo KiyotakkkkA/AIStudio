@@ -27,10 +27,14 @@ const profile = release ? ["--release"] : [];
 if (release && process.platform === "win32") {
   process.env.CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS = "-C target-feature=+crt-static";
 }
-execFileSync("cargo", ["build", "--locked", "--package", "zvs-jobd", ...profile], {
-  cwd: root,
-  stdio: "inherit",
-});
+execFileSync(
+  "cargo",
+  ["build", "--locked", "--package", "zvs-jobd", "--package", "zvs-cli", ...profile],
+  {
+    cwd: root,
+    stdio: "inherit",
+  },
+);
 if (features.includes("e2e")) {
   execFileSync(
     "cargo",
@@ -45,12 +49,19 @@ const sidecar = join(
   "target/release",
   process.platform === "win32" ? "zvs-jobd.exe" : "zvs-jobd",
 );
+const cli = join(
+  root,
+  "target/release",
+  process.platform === "win32" ? "aistudio.exe" : "aistudio",
+);
 const overlay = join(root, "target/tauri.overlay.json");
 writeFileSync(
   overlay,
   JSON.stringify({
     version: readAppEnv().ZVS_APP_VERSION,
-    ...(bundling ? { bundle: { resources: { [sidecar]: basename(sidecar) } } } : {}),
+    ...(bundling
+      ? { bundle: { resources: { [sidecar]: basename(sidecar), [cli]: `cli/${basename(cli)}` } } }
+      : {}),
   }),
 );
 const tauri = spawnSync("pnpm", ["exec", "tauri", command, ...rest, "--config", overlay], {

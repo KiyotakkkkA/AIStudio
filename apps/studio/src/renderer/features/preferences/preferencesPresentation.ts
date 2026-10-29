@@ -34,6 +34,7 @@ export const SECTION_LABELS: Record<PreferenceSection, string> = {
   data: "Данные",
   about: "О системе",
   components: "Компоненты",
+  cli: "CLI",
 };
 
 export const EXTENSIONS_GROUP = "Расширения";
@@ -46,7 +47,7 @@ export const PREFERENCE_GROUPS: readonly {
     label: PREFERENCES_GROUP,
     sections: ["general", "profile", "appearance", "notifications", "memory", "data", "about"],
   },
-  { label: EXTENSIONS_GROUP, sections: ["components"] },
+  { label: EXTENSIONS_GROUP, sections: ["components", "cli"] },
 ];
 
 export const SECTION_HINTS: Record<PreferenceSection, string> = {
@@ -58,6 +59,7 @@ export const SECTION_HINTS: Record<PreferenceSection, string> = {
   data: "Место на диске, занятое данными приложения, и очистка кэша.",
   about: "Версия приложения и характеристики компьютера.",
   components: "Среды выполнения, которые нужны MCP-серверам.",
+  cli: "Команда aistudio для работы с диалогами из терминала.",
 };
 
 export const TOGGLE_ON = "Включено";

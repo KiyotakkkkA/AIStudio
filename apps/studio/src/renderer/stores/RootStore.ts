@@ -21,6 +21,7 @@ import AgenticStore from "../features/agentic/AgenticStore";
 import PermissionsStore from "../features/permissions/PermissionsStore";
 import AboutStore from "../features/preferences/AboutStore";
 import StorageStore from "../features/preferences/StorageStore";
+import CliStore from "../features/preferences/CliStore";
 import AppSettingsStore from "../features/preferences/AppSettingsStore";
 import MemoryStore from "../features/memory/MemoryStore";
 import ProfileStore from "../features/preferences/ProfileStore";
@@ -51,6 +52,7 @@ export class RootStore {
   readonly permissions: PermissionsStore;
   readonly about: AboutStore;
   readonly storage: StorageStore;
+  readonly cli: CliStore;
   readonly appSettings: AppSettingsStore;
   readonly memory: MemoryStore;
   readonly profile: ProfileStore;
@@ -79,6 +81,7 @@ export class RootStore {
     this.about = new AboutStore(environment.ipc);
     this.storage = new StorageStore(environment.ipc);
     this.appSettings = new AppSettingsStore(environment.ipc);
+    this.cli = new CliStore(environment.ipc, () => this.appSettings.load());
     this.chat.useMemorySwitch(
       () => this.appSettings.values["memory.enabled"] && this.appSettings.values["memory.model"],
     );
@@ -108,6 +111,7 @@ export class RootStore {
         permissions: false,
         about: false,
         appSettings: false,
+        cli: false,
         memory: false,
         profile: false,
         execPolicy: false,
