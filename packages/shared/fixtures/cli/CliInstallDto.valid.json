@@ -1,0 +1,18 @@
+[
+  {
+    "name": "installed",
+    "value": {
+      "available": true,
+      "installed": true,
+      "command": "aistudio"
+    }
+  },
+  {
+    "name": "not bundled",
+    "value": {
+      "available": false,
+      "installed": false,
+      "command": "aistudio"
+    }
+  }
+]

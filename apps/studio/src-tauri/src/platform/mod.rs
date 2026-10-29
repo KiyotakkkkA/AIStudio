@@ -21,6 +21,16 @@ pub use windows::webview2 as site;
 pub use site_stub as site;
 
 #[cfg(windows)]
+pub fn cli_installer(binary: std::path::PathBuf) -> zvs_host::cli::SharedCliInstaller {
+    Arc::new(windows::cli_path::UserPathInstaller::new(binary))
+}
+
+#[cfg(not(windows))]
+pub fn cli_installer(_binary: std::path::PathBuf) -> zvs_host::cli::SharedCliInstaller {
+    Arc::new(zvs_host::cli::NoCliInstaller)
+}
+
+#[cfg(windows)]
 pub fn crypto_backend() -> SharedCryptoBackend {
     Arc::new(windows::dpapi::DpapiBackend::probe())
 }

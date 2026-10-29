@@ -184,6 +184,7 @@ zvs-ai-studio/
 │  │     ├─ indexing/ downloads/ runtimes/ tools/ documents/
 │  │     ├─ browser/             # pure browser policy, lifecycle, automation policy
 │  │     └─ platform/            # paths, logger, ids, clock, events, archive, metrics
+│  ├─ zvs-pipe/                  # the CLI pipe: per-user named pipe, owner checks
 │  └─ zvs-jobd/                  # sidecar binary, thin wrapper over zvs-core
 ├─ e2e/                          # Playwright over WebView2 CDP
 ├─ design/                       # the maket (source of truth for UI)
@@ -340,6 +341,32 @@ exactly `ipc_call` and `events_subscribe`, with no core plugin permissions: no f
 shell, no HTTP. Every command re-checks the caller's webview label. Tauri's isolation pattern
 filters messages before they reach the core. Adding a third command is a security decision,
 not a convenience.
+
+### The CLI pipe
+
+The `aistudio` console client is the only caller that is not a webview. It reaches the host
+over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the running app
+(`crates/zvs-pipe`, `zvs-studio/src/cli.rs`). Four rules hold:
+
+- **Owner only.** The pipe is created as the first instance with a protected DACL that grants
+  access to the current user's SID alone, and it rejects remote clients. The client reads the
+  server's process token through `GetNamedPipeServerProcessId` and refuses a pipe served by
+  another user, so a squatted name is never trusted.
+- **Greeting first.** Nothing is sent before the client says `hello` with the protocol
+  version; only then is it subscribed to the event channel. A line over 8 MiB or a malformed
+  message drops the connection.
+- **An allow-list, not the contract.** The pipe dispatches through the same `IpcServer`, but
+  only the channels in `zvs_host::cli::CLI_CHANNELS` — chat, folder and run answers, the
+  execution policy, model, skill and MCP listings. Secrets, settings, accounts, providers'
+  configuration and `cli.install`/`cli.uninstall` stay studio-only. Widening the list is a
+  security decision, as above.
+- **Same events, same answers.** CLI connections are extra event-bus subscribers beside the
+  window. An approval or a question reaches both; the first answer wins and the other side
+  sees `Conflict`.
+
+`cli.install` puts the folder holding `aistudio.exe` on the **user** `Path` (HKCU, no
+elevation) and turns the tray on, so the app keeps serving the pipe with its window closed.
+A CLI launch starts the app with `--cli`, hidden in the tray when the tray is on.
 
 ---
 

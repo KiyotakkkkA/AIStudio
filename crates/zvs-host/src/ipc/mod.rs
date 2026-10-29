@@ -3,6 +3,7 @@ pub mod agentic;
 pub mod artifacts;
 pub mod browser_grants;
 pub mod chat;
+pub mod cli;
 pub mod documents;
 pub mod downloads;
 pub mod exec_policy;
@@ -52,6 +53,7 @@ pub fn register(server: &mut IpcServer) {
     scenarios::register(server);
     toolchain::register(server);
     chat::register(server);
+    cli::register(server);
     folders::register(server);
     memory::register(server);
     agentic::register(server);
@@ -138,6 +140,10 @@ mod tests {
                 "chat.send",
                 "chat.skip",
                 "chat.unbindFolder",
+                "cli.install",
+                "cli.open",
+                "cli.status",
+                "cli.uninstall",
                 "documents.close",
                 "documents.list",
                 "documents.open",
@@ -153,6 +159,7 @@ mod tests {
                 "downloads.remove",
                 "downloads.resume",
                 "downloads.start",
+                "execPolicy.allowRule",
                 "execPolicy.get",
                 "execPolicy.set",
                 "folders.answer",

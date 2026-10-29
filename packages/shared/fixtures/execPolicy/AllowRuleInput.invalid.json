@@ -1,0 +1,47 @@
+[
+  {
+    "name": "no changes",
+    "value": {
+      "kind": "files",
+      "changes": [],
+      "folder": null
+    }
+  },
+  {
+    "name": "folder omitted",
+    "value": {
+      "kind": "files",
+      "changes": [
+        {
+          "path": "D:\\work\\a.txt",
+          "kind": "delete"
+        }
+      ]
+    }
+  },
+  {
+    "name": "no program",
+    "value": {
+      "kind": "process",
+      "argv": [],
+      "cwd": "D:\\work",
+      "folder": null
+    }
+  },
+  {
+    "name": "unknown kind",
+    "value": {
+      "kind": "browser",
+      "folder": null
+    }
+  },
+  {
+    "name": "empty program",
+    "value": {
+      "kind": "process",
+      "argv": [""],
+      "cwd": "D:\\work",
+      "folder": null
+    }
+  }
+]

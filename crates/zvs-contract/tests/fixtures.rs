@@ -1039,6 +1039,27 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ToolAuthorisationDto>,
     ),
     (
+        "execPolicy/AllowRuleChangeDto",
+        round_trip::<zvs_contract::AllowRuleChangeDto>,
+    ),
+    (
+        "execPolicy/AllowRuleInput",
+        round_trip::<zvs_contract::AllowRuleInput>,
+    ),
+    (
+        "execPolicy/PolicyRuleDto",
+        round_trip::<zvs_contract::PolicyRuleDto>,
+    ),
+    ("cli/CliOpenInput", round_trip::<zvs_contract::CliOpenInput>),
+    (
+        "cli/CliSessionDto",
+        round_trip::<zvs_contract::CliSessionDto>,
+    ),
+    (
+        "cli/CliInstallDto",
+        round_trip::<zvs_contract::CliInstallDto>,
+    ),
+    (
         "artifacts/ArtifactDto",
         round_trip::<zvs_contract::artifacts::ArtifactDto>,
     ),

@@ -6,9 +6,9 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde_json::json;
 use zvs_contract::{
-    AppError, AppErrorCode, ExecJudgeDto, ExecMode, ExecPolicyDto, ProviderCapability,
-    TOOL_AUTHORISATION_REASON_MAX, TOOL_AUTHORISATION_SOURCE_MAX, ToolAuthorisationDto,
-    ToolAuthorisationKind,
+    AllowRuleInput, AppError, AppErrorCode, ExecJudgeDto, ExecMode, ExecPolicyDto, PolicyRuleDto,
+    ProviderCapability, TOOL_AUTHORISATION_REASON_MAX, TOOL_AUTHORISATION_SOURCE_MAX,
+    ToolAuthorisationDto, ToolAuthorisationKind,
 };
 
 use super::action::{ReviewVerdict, ReviewedAction};
@@ -29,6 +29,7 @@ pub const JUDGE_UNAVAILABLE: &str =
     "Модель-арбитр недоступна: выберите включённого провайдера и доступную модель";
 pub const JUDGE_REQUIRED: &str = "Для режима «Автопроверка» нужна модель-арбитр";
 pub const RULE_DENIED: &str = "Действие запрещено правилом политики выполнения";
+pub const RULES_UNAVAILABLE: &str = "Пользовательские правила недоступны";
 const LOG_SOURCE: &str = "policy";
 
 pub struct ExecPolicyOptions {
@@ -64,6 +65,7 @@ struct Inner {
     timeout: Duration,
     judge_calls: u32,
     spent: Mutex<HashMap<String, u32>>,
+    writing: Mutex<()>,
 }
 
 #[derive(Clone)]
@@ -83,6 +85,7 @@ impl ExecPolicyService {
                 timeout: options.timeout,
                 judge_calls: options.judge_calls,
                 spent: Mutex::new(HashMap::new()),
+                writing: Mutex::new(()),
             }),
         }
     }
@@ -175,6 +178,29 @@ impl ExecPolicyService {
         }
         self.store(input)?;
         Ok(input.clone())
+    }
+
+    pub fn allow_rule(&self, input: &AllowRuleInput) -> Result<PolicyRuleDto, AppError> {
+        let folder = self
+            .inner
+            .packs
+            .as_deref()
+            .ok_or_else(|| AppError::new(AppErrorCode::Conflict, RULES_UNAVAILABLE))?;
+        let _writing = self
+            .inner
+            .writing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let written = super::user_rules::allow(folder, input)?;
+        self.log(
+            LogLevel::Info,
+            "A user allow rule was added",
+            &[("rule", json!(written.id))],
+        );
+        Ok(PolicyRuleDto {
+            id: written.id,
+            text: written.text,
+        })
     }
 
     pub fn rules(&self) -> RuleSet {

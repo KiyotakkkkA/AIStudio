@@ -50,6 +50,7 @@ zvs-host = { path = "../../../crates/zvs-host", features = ["testing"] }
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "=0.39.1"
+zvs-pipe = { path = "../../../crates/zvs-pipe" }
 windows = { version = "=0.62.2", features = [
     "Data_Xml_Dom",
     "Foundation",

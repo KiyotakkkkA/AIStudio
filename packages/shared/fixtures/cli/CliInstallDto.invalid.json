@@ -1,0 +1,18 @@
+[
+  {
+    "name": "installed without a binary",
+    "value": {
+      "available": false,
+      "installed": true,
+      "command": "aistudio"
+    }
+  },
+  {
+    "name": "empty command",
+    "value": {
+      "available": true,
+      "installed": false,
+      "command": ""
+    }
+  }
+]

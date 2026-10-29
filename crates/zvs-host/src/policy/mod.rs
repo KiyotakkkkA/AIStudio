@@ -3,6 +3,7 @@ pub mod judge;
 pub mod rules;
 pub mod service;
 pub mod table;
+pub mod user_rules;
 
 #[cfg(test)]
 mod tests;
@@ -15,3 +16,4 @@ pub use service::{
     JUDGE_TIMEOUT, JUDGE_UNAVAILABLE, POLICY_DIR, RULE_DENIED, rule_denied,
 };
 pub use table::{Decision, Family, decide};
+pub use user_rules::{CLI_PACK_FILE, CLI_PACK_ID};

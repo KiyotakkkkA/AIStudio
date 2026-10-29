@@ -5,6 +5,7 @@ pub mod artifact_pages;
 pub mod artifacts;
 pub mod browser;
 pub mod chat_files;
+pub mod cli;
 pub mod commands;
 pub mod conversations;
 pub mod data;

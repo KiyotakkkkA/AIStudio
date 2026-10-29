@@ -19,6 +19,7 @@ import * as documents from "../src/documents.js";
 import * as artifacts from "../src/artifacts.js";
 import * as sites from "../src/sites.js";
 import * as execPolicy from "../src/execPolicy.js";
+import * as cli from "../src/cli.js";
 import * as storage from "../src/storage.js";
 import * as integrations from "../src/integrations.js";
 import {
@@ -287,6 +288,12 @@ const schemas: Record<string, z.ZodType> = {
   "execPolicy/ExecPolicyDto": execPolicy.ExecPolicyDto,
   "execPolicy/ToolAuthorisationKind": execPolicy.ToolAuthorisationKind,
   "execPolicy/ToolAuthorisationDto": execPolicy.ToolAuthorisationDto,
+  "execPolicy/AllowRuleChangeDto": execPolicy.AllowRuleChangeDto,
+  "execPolicy/AllowRuleInput": execPolicy.AllowRuleInput,
+  "execPolicy/PolicyRuleDto": execPolicy.PolicyRuleDto,
+  "cli/CliOpenInput": cli.CliOpenInput,
+  "cli/CliSessionDto": cli.CliSessionDto,
+  "cli/CliInstallDto": cli.CliInstallDto,
   "artifacts/ArtifactDto": artifacts.ArtifactDto,
   "artifacts/ArtifactRef": artifacts.ArtifactRef,
   "artifacts/ArtifactSaveResult": artifacts.ArtifactSaveResult,

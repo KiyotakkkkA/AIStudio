@@ -118,4 +118,5 @@ pub struct Services {
     pub exec_policy: crate::policy::ExecPolicyService,
     pub browser: crate::browser::BrowserAgent,
     pub picker: Option<SharedPicker>,
+    pub cli: crate::cli::SharedCliInstaller,
 }

@@ -1,4 +1,5 @@
 pub mod browser;
+mod cli;
 mod commands;
 mod e2e;
 mod picker;
@@ -311,6 +312,9 @@ fn warm_account_pages(
 }
 
 fn open_launch_link(app: &AppHandle, args: &[String]) {
+    if cli::is_cli_launch(args) {
+        return;
+    }
     let Some(url) = toast::launch_url(args) else {
         window::focus_studio(app);
         return;
@@ -1105,7 +1109,9 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     if let Some(target) = launched {
         notifications.activated(target);
     }
-    let hidden = launched.is_none() && shell::launched_by_autostart() && shell_state.tray();
+    let hidden = launched.is_none()
+        && (shell::launched_by_autostart() || cli::launched_by_cli())
+        && shell_state.tray();
 
     let storage = StorageService::new(
         StorageRoots::resolve(&paths),
@@ -1151,6 +1157,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         browser: agent.clone(),
         folders,
         picker: Some(picker),
+        cli: platform::cli_installer(paths.cli_path.clone()),
     });
     {
         let services = Arc::clone(&services);
@@ -1163,6 +1170,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let mut server = IpcServer::new(Arc::clone(&services), logger.clone());
     ipc::register(&mut server);
     server.finish();
+    let server = Arc::new(server);
+    if e2e::data_dir().is_none() {
+        cli::listen(Arc::clone(&server), events.clone(), logger.clone());
+    }
     services.accounts.start_auto_refresh()?;
     warm_account_pages(&services.accounts, Arc::clone(&gateway), logger.clone());
     services.health.start();

@@ -67,7 +67,8 @@ import {
   OpenArtifactInBrowserInput,
 } from "../artifacts.js";
 import { OpenSiteInput, SiteIconDto, SiteIconInput } from "../sites.js";
-import { ExecPolicyDto } from "../execPolicy.js";
+import { AllowRuleInput, ExecPolicyDto, PolicyRuleDto } from "../execPolicy.js";
+import { CliInstallDto, CliOpenInput, CliSessionDto } from "../cli.js";
 import {
   DocumentDto,
   DocumentHandle,
@@ -543,6 +544,11 @@ export const contract = defineContract({
   "notifications.pending": { input: z.void(), output: NotificationTargetDto.nullable() },
   "execPolicy.get": { input: z.void(), output: ExecPolicyDto },
   "execPolicy.set": { input: ExecPolicyDto, output: ExecPolicyDto },
+  "execPolicy.allowRule": { input: AllowRuleInput, output: PolicyRuleDto },
+  "cli.open": { input: CliOpenInput, output: CliSessionDto },
+  "cli.status": { input: z.void(), output: CliInstallDto },
+  "cli.install": { input: z.void(), output: CliInstallDto },
+  "cli.uninstall": { input: z.void(), output: CliInstallDto },
   "settings.set": {
     input: z.object({ key: SettingKey, value: Json }),
     output: z.object({ key: SettingKey, value: Json, updatedAt: Timestamp }),

@@ -5,6 +5,7 @@ pub mod artifacts;
 pub mod browser;
 pub mod channels;
 pub mod chat;
+pub mod cli;
 pub mod documents;
 pub mod downloads;
 pub mod enums;
@@ -86,6 +87,10 @@ pub use chat::{
     UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
     UpdateConversationStoresInput, VendorTurnOptions, WEB_SOURCES_MAX, WebSourceDto,
 };
+pub use cli::{
+    CLI_COMMAND, CLI_LAUNCH_ARG, CLI_LINE_MAX, CLI_PIPE_PREFIX, CLI_PROTOCOL_VERSION,
+    CliClientMessage, CliInstallDto, CliOpenInput, CliServerMessage, CliSessionDto, cli_pipe_name,
+};
 pub use documents::{
     DOCUMENT_BYTES_DATA_MAX, DOCUMENT_BYTES_PAGE_MAX, DOCUMENT_LIST_MAX, DOCUMENT_PATH_MAX,
     DOCUMENT_TEXT_PAGE_MAX, DocumentDto, DocumentHandle, DocumentKind, DocumentOfficeFormat,
@@ -106,8 +111,10 @@ pub use events::{
     RunOutcomeDto, RunOutcomeStatus, StepEventDto,
 };
 pub use exec_policy::{
-    EXEC_JUDGE_ID_MAX, ExecJudgeDto, ExecMode, ExecPolicyDto, TOOL_AUTHORISATION_REASON_MAX,
-    TOOL_AUTHORISATION_SOURCE_MAX, ToolAuthorisationDto, ToolAuthorisationKind,
+    ALLOW_RULE_CHANGES_MAX, AllowRuleChangeDto, AllowRuleInput, EXEC_JUDGE_ID_MAX, ExecJudgeDto,
+    ExecMode, ExecPolicyDto, POLICY_RULE_ID_MAX, POLICY_RULE_TEXT_MAX, PolicyRuleDto,
+    TOOL_AUTHORISATION_REASON_MAX, TOOL_AUTHORISATION_SOURCE_MAX, ToolAuthorisationDto,
+    ToolAuthorisationKind,
 };
 pub use explorer::{
     EXPLORER_CHANGES_MAX, EXPLORER_LIST_MAX, EXPLORER_STEP_DOMAIN, EXPLORER_TEXT_MAX,

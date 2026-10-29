@@ -1,0 +1,37 @@
+[
+  {
+    "name": "files in a workspace",
+    "value": {
+      "kind": "files",
+      "changes": [
+        {
+          "path": "D:\\work\\a.txt",
+          "kind": "modify"
+        }
+      ],
+      "folder": "D:\\work"
+    }
+  },
+  {
+    "name": "exact files",
+    "value": {
+      "kind": "files",
+      "changes": [
+        {
+          "path": "D:\\work\\a.txt",
+          "kind": "delete"
+        }
+      ],
+      "folder": null
+    }
+  },
+  {
+    "name": "process anywhere",
+    "value": {
+      "kind": "process",
+      "argv": ["cargo", "test", "--workspace"],
+      "cwd": "D:\\work",
+      "folder": null
+    }
+  }
+]

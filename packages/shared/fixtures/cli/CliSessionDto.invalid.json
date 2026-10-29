@@ -1,0 +1,16 @@
+[
+  {
+    "name": "unknown access",
+    "value": {
+      "folder": "D:\\work",
+      "access": "once"
+    }
+  },
+  {
+    "name": "empty folder",
+    "value": {
+      "folder": "",
+      "access": "granted"
+    }
+  }
+]

@@ -1,0 +1,12 @@
+[
+  {
+    "name": "empty",
+    "value": {
+      "cwd": ""
+    }
+  },
+  {
+    "name": "missing",
+    "value": {}
+  }
+]

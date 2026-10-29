@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use serde_json::json;
@@ -67,6 +67,8 @@ struct BusInner {
     ids: IdGenerator,
     recorder: Option<Box<dyn EventRecorder>>,
     sink: RwLock<Option<Arc<dyn EventSink>>>,
+    subscribers: RwLock<Vec<(u64, Arc<dyn EventSink>)>>,
+    next_subscriber: AtomicU64,
     live: Mutex<HashSet<StreamId>>,
     disposed: AtomicBool,
 }
@@ -76,6 +78,7 @@ impl BusInner {
         if let Some(recorder) = &self.recorder {
             recorder.append(event);
         }
+        self.deliver_to_subscribers(event);
         let sink = self.sink.read().ok().and_then(|slot| slot.clone());
         let Some(sink) = sink else {
             self.logger.log(
@@ -100,6 +103,31 @@ impl BusInner {
                     ("error", json!(error)),
                 ],
             );
+        }
+    }
+
+    fn deliver_to_subscribers(&self, event: &HostEvent) {
+        let subscribers = self
+            .subscribers
+            .read()
+            .map(|list| list.clone())
+            .unwrap_or_default();
+        let failed: Vec<u64> = subscribers
+            .iter()
+            .filter(|(_, sink)| sink.deliver(event).is_err())
+            .map(|(id, _)| *id)
+            .collect();
+        if failed.is_empty() {
+            return;
+        }
+        self.logger.log(
+            LogLevel::Warn,
+            "events",
+            "Dropped subscribers that could not take an event",
+            &[("count", json!(failed.len()))],
+        );
+        if let Ok(mut list) = self.subscribers.write() {
+            list.retain(|(id, _)| !failed.contains(id));
         }
     }
 
@@ -130,6 +158,8 @@ impl EventBus {
                 ids: options.ids,
                 recorder: options.recorder,
                 sink: RwLock::new(None),
+                subscribers: RwLock::new(Vec::new()),
+                next_subscriber: AtomicU64::new(1),
                 live: Mutex::new(HashSet::new()),
                 disposed: AtomicBool::new(false),
             }),
@@ -146,6 +176,24 @@ impl EventBus {
         if let Ok(mut slot) = self.inner.sink.write() {
             *slot = None;
         }
+    }
+
+    pub fn subscribe(&self, sink: Arc<dyn EventSink>) -> u64 {
+        let id = self.inner.next_subscriber.fetch_add(1, Ordering::SeqCst);
+        if let Ok(mut list) = self.inner.subscribers.write() {
+            list.push((id, sink));
+        }
+        id
+    }
+
+    pub fn unsubscribe(&self, id: u64) {
+        if let Ok(mut list) = self.inner.subscribers.write() {
+            list.retain(|(known, _)| *known != id);
+        }
+    }
+
+    pub fn subscribers(&self) -> usize {
+        self.inner.subscribers.read().map_or(0, |list| list.len())
     }
 
     pub fn open(&self) -> usize {
@@ -403,6 +451,28 @@ mod tests {
             assert_eq!(&parsed, event);
             assert_eq!(event.ts, crate::platform::clock::CLOCK_ORIGIN);
         }
+    }
+
+    #[test]
+    fn subscribers_see_every_event_beside_the_window_and_a_failing_one_is_dropped() {
+        let window = Arc::new(MemorySink::default());
+        let terminal = Arc::new(MemorySink::default());
+        let bus = bus_with(silent_logger(), None);
+        bus.attach(window.clone());
+        let kept = bus.subscribe(terminal.clone());
+        bus.subscribe(Arc::new(FailingSink));
+        let stream = bus.open_stream().expect("opens");
+        stream.emit(token("a"));
+
+        assert_eq!(window.events().len(), 1);
+        assert_eq!(terminal.events(), window.events());
+        assert_eq!(bus.subscribers(), 1);
+
+        bus.unsubscribe(kept);
+        stream.end(outcome(RunOutcomeStatus::Ok));
+        assert_eq!(terminal.events().len(), 1);
+        assert_eq!(window.events().len(), 2);
+        assert_eq!(bus.subscribers(), 0);
     }
 
     #[test]

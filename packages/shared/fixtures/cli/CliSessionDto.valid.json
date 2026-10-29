@@ -1,0 +1,16 @@
+[
+  {
+    "name": "granted",
+    "value": {
+      "folder": "D:\\work",
+      "access": "granted"
+    }
+  },
+  {
+    "name": "missing",
+    "value": {
+      "folder": "D:\\work\\app",
+      "access": "missing"
+    }
+  }
+]

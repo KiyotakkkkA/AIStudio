@@ -206,6 +206,7 @@ pub struct TestServices {
     pub jobs: Arc<FakeJobs>,
     pub download_jobs: Arc<FakeDownloadJobs>,
     pub disk_probe: Arc<FixedDiskProbe>,
+    pub cli: Arc<FakeCliInstaller>,
     pub workspace: TemporaryDirectory,
     pub database: TemporaryDatabase,
 }
@@ -229,6 +230,7 @@ impl Deref for TestServices {
 }
 
 pub fn test_services(system: SystemService) -> TestServices {
+    let cli = FakeCliInstaller::shared();
     let database = temporary_database();
     let clock = Arc::new(FakeClock::default());
     let theme = RecordingTheme::shared();
@@ -651,6 +653,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             ),
             folders,
             picker: Some(picker.clone()),
+            cli: cli.clone(),
         }),
         nodes,
         run_events,
@@ -658,6 +661,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         jobs,
         download_jobs,
         disk_probe,
+        cli,
         workspace,
         theme,
         shell,
@@ -1141,5 +1145,42 @@ mod tests {
         assert_eq!(tables, 1);
         drop(database);
         assert!(!directory.exists());
+    }
+}
+
+#[derive(Default)]
+pub struct FakeCliInstaller {
+    pub available: AtomicBool,
+    pub installed: AtomicBool,
+    pub failing: AtomicBool,
+}
+
+impl FakeCliInstaller {
+    pub fn shared() -> Arc<Self> {
+        let installer = Self::default();
+        installer.available.store(true, Ordering::SeqCst);
+        Arc::new(installer)
+    }
+}
+
+impl crate::cli::CliInstaller for FakeCliInstaller {
+    fn state(&self) -> crate::cli::CliInstallState {
+        crate::cli::CliInstallState {
+            available: self.available.load(Ordering::SeqCst),
+            installed: self.installed.load(Ordering::SeqCst),
+        }
+    }
+
+    fn install(&self) -> Result<(), String> {
+        if self.failing.load(Ordering::SeqCst) {
+            return Err("access denied".to_owned());
+        }
+        self.installed.store(true, Ordering::SeqCst);
+        Ok(())
+    }
+
+    fn uninstall(&self) -> Result<(), String> {
+        self.installed.store(false, Ordering::SeqCst);
+        Ok(())
     }
 }

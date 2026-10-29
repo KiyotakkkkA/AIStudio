@@ -9691,6 +9691,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "zvs-pipe"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "windows",
+ "zvs-contract",
+]
+
+[[package]]
 name = "zvs-qwen-web"
 version = "0.1.0"
 dependencies = [
@@ -9722,6 +9731,7 @@ dependencies = [
  "zeroize",
  "zvs-contract",
  "zvs-host",
+ "zvs-pipe",
  "zvs-qwen-web",
  "zvs-zai-web",
 ]

@@ -1,0 +1,9 @@
+[
+  {
+    "name": "delete",
+    "value": {
+      "path": "D:\\work\\a.txt",
+      "kind": "delete"
+    }
+  }
+]

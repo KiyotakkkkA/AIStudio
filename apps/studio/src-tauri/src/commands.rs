@@ -17,7 +17,7 @@ const INVALID_COMMAND: &str = "Invalid browser command";
 const NO_WORKSPACE: &str = "The browser workspace is unavailable";
 
 pub struct Host {
-    pub server: IpcServer,
+    pub server: Arc<IpcServer>,
     pub events: EventBus,
     pub services: Arc<Services>,
 }

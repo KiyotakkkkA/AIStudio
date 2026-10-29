@@ -23,10 +23,21 @@ pub struct StudioPaths {
     pub conversations_dir: PathBuf,
     pub resources_dir: PathBuf,
     pub sidecar_path: PathBuf,
+    pub cli_path: PathBuf,
     pub packaged: bool,
 }
 
 pub const SIDECAR_NAME: &str = "zvs-jobd";
+pub const CLI_FOLDER: &str = "cli";
+
+pub fn cli_path(executable_dir: &Path, packaged: bool) -> PathBuf {
+    let name = format!("{}.exe", zvs_contract::CLI_COMMAND);
+    if packaged {
+        executable_dir.join(CLI_FOLDER).join(name)
+    } else {
+        executable_dir.join(name)
+    }
+}
 
 pub fn sidecar_file_name(windows: bool) -> String {
     if windows {
@@ -56,6 +67,7 @@ impl StudioPaths {
             conversations_dir: data.join(crate::conversations::CONVERSATIONS_DIR),
             resources_dir: env.resource_dir.clone(),
             sidecar_path: sidecar_path(&env.executable_dir, cfg!(windows)),
+            cli_path: cli_path(&env.executable_dir, env.packaged),
             packaged: env.packaged,
         }
     }
@@ -268,6 +280,16 @@ mod tests {
             env.executable_dir.join(sidecar_file_name(cfg!(windows)))
         );
         assert!(!paths.packaged);
+    }
+
+    #[test]
+    fn the_cli_has_its_own_folder_once_installed() {
+        let installed = std::env::temp_dir().join("ZVS AI Studio");
+        assert_eq!(
+            cli_path(&installed, true),
+            installed.join("cli").join("aistudio.exe")
+        );
+        assert_eq!(cli_path(&installed, false), installed.join("aistudio.exe"));
     }
 
     #[test]
