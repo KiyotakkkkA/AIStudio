@@ -903,10 +903,17 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `ExecReview` port in `KernelServices` at every point an approval would be raised: the gate
   in `RunService` for tools that do not defer, and the deferred approvals of `fs.apply`, the
   process tools and the browser acting nodes. A tool declared destructive whose effect the
-  host cannot see asks in every mode but `no-restrictions`; `code.run` never meets argv rules
-  and goes straight to the judge. Rule packs are JSON (`{ id, allows, rules[] }`, each rule
-  `files: { paths, operations }` or `process: { argv, cwd }`, `**` matching any run of
-  arguments, `{a,b}` alternation, case-insensitive): the vendor pack ships in
+  host cannot see asks in every mode but `no-restrictions`. Rule packs are JSON
+  (`{ id, allows, rules[] }`, each rule `files: { paths, operations }`, `process: { argv, cwd }`
+  or `code: { languages, avoid }`, `**` matching any run of arguments, `{a,b}` alternation,
+  case-insensitive). A `code` rule matches a `code.run` script in one of its languages whose
+  source matches none of the `avoid` regexes. Since 2026-10-29 the vendor pack ends in two
+  catch-alls so routine work stops asking: `allow-unflagged` allows any command no `ask` or
+  `deny` rule names (vendor `ask` outranks vendor `allow`), and `allow-plain-scripts` allows a
+  script without network use, process launches, generated code, deleting or moving files,
+  registry or credential access, decoded payloads or installs; a script that trips a pattern
+  goes to the judge. Among rules of equal effect the first in the pack is reported. The vendor
+  pack ships in
   `policy/vendor.json`, user packs are read from `<app data>/policy/*.json` on every review,
   and a pack that holds an `allow` it did not declare, or does not parse, is skipped with a
   warning. In a batch the destructive changes are matched one by one: any `deny` refuses the

@@ -303,10 +303,11 @@ mod tests {
     use zvs_contract::{FileDiffDto, ProcessPlanDto};
 
     use super::super::action::ReviewedAction;
-    use super::super::rules::{RuleOutcome, RuleSet, VENDOR_PACK};
+    use super::super::rules::{RuleOutcome, RuleSet};
     use super::*;
 
     const WORK: &str = "C:/work";
+    const NO_VENDOR: &str = r#"{ "id": "none", "allows": false, "rules": [] }"#;
 
     fn process(argv: &[&str], cwd: &str) -> ReviewedAction {
         ReviewedAction::Process {
@@ -353,7 +354,7 @@ mod tests {
     }
 
     fn evaluate(packs: &Path, action: &ReviewedAction) -> RuleOutcome {
-        let (rules, problems) = RuleSet::load(VENDOR_PACK, Some(packs));
+        let (rules, problems) = RuleSet::load(NO_VENDOR, Some(packs));
         assert!(problems.is_empty(), "{problems:?}");
         rules.evaluate(action)
     }

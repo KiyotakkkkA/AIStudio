@@ -1,7 +1,8 @@
 use std::path::Path;
 
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
+use zvs_contract::CodeLanguage;
 
 use super::action::{FileAction, FileOperation, ReviewedAction};
 
@@ -40,6 +41,14 @@ struct ProcessRuleSpec {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CodeRuleSpec {
+    languages: Vec<CodeLanguage>,
+    #[serde(default)]
+    avoid: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct RuleSpec {
     id: String,
     effect: RuleEffect,
@@ -48,6 +57,8 @@ struct RuleSpec {
     files: Option<FileRuleSpec>,
     #[serde(default)]
     process: Option<ProcessRuleSpec>,
+    #[serde(default)]
+    code: Option<CodeRuleSpec>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -67,6 +78,10 @@ enum Matcher {
     Process {
         argv: Vec<ArgPattern>,
         cwd: Option<Regex>,
+    },
+    Code {
+        languages: Vec<CodeLanguage>,
+        avoid: Vec<Regex>,
     },
 }
 
@@ -184,8 +199,27 @@ impl Rule {
             return Err("a rule needs an id and a text".to_owned());
         }
         let invalid = |pattern: &str| format!("rule {}: invalid pattern {pattern}", spec.id);
-        let matcher = match (spec.files, spec.process) {
-            (Some(files), None) => {
+        let matcher = match (spec.files, spec.process, spec.code) {
+            (None, None, Some(code)) => {
+                if code.languages.is_empty() {
+                    return Err(format!("rule {}: no languages", spec.id));
+                }
+                let avoid = code
+                    .avoid
+                    .iter()
+                    .map(|pattern| {
+                        RegexBuilder::new(pattern)
+                            .case_insensitive(true)
+                            .build()
+                            .map_err(|_| invalid(pattern))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                Matcher::Code {
+                    languages: code.languages,
+                    avoid,
+                }
+            }
+            (Some(files), None, None) => {
                 if files.paths.is_empty() {
                     return Err(format!("rule {}: no paths", spec.id));
                 }
@@ -199,7 +233,7 @@ impl Rule {
                     operations: files.operations,
                 }
             }
-            (None, Some(process)) => {
+            (None, Some(process), None) => {
                 if process
                     .argv
                     .first()
@@ -229,7 +263,7 @@ impl Rule {
             }
             _ => {
                 return Err(format!(
-                    "rule {}: exactly one of files or process is required",
+                    "rule {}: exactly one of files, process or code is required",
                     spec.id
                 ));
             }
@@ -273,6 +307,13 @@ impl Rule {
                 .is_none_or(|folder| folder.is_match(&normalised(cwd)))
     }
 
+    fn matches_code(&self, language: CodeLanguage, source: &str) -> bool {
+        let Matcher::Code { languages, avoid } = &self.matcher else {
+            return false;
+        };
+        languages.contains(&language) && !avoid.iter().any(|pattern| pattern.is_match(source))
+    }
+
     const fn is_files(&self) -> bool {
         matches!(self.matcher, Matcher::Files { .. })
     }
@@ -308,7 +349,7 @@ pub fn compile_pack(text: &str, origin: PackOrigin) -> Result<Vec<Rule>, String>
 }
 
 fn strongest<'a>(rules: impl Iterator<Item = &'a Rule>) -> Option<&'a Rule> {
-    rules.max_by_key(|rule| rule.effect)
+    rules.min_by_key(|rule| std::cmp::Reverse(rule.effect))
 }
 
 fn resolve<'a>(matched: &[&'a Rule]) -> Option<&'a Rule> {
@@ -430,6 +471,18 @@ impl RuleSet {
                     return RuleOutcome::Unmatched;
                 }
                 self.resolve_items(items)
+            }
+            ReviewedAction::Process { process, .. }
+                if process.language.is_some() && process.source.is_some() =>
+            {
+                let language = process.language.unwrap_or(CodeLanguage::Python);
+                let source = process.source.as_deref().unwrap_or_default();
+                let matched = self
+                    .rules
+                    .iter()
+                    .filter(|rule| rule.matches_code(language, source))
+                    .collect();
+                self.resolve_items(vec![matched])
             }
             ReviewedAction::Process { process, .. }
                 if process.language.is_none() && !process.argv.is_empty() =>

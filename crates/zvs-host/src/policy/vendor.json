@@ -42,7 +42,9 @@
       "id": "vendor.files.deny-autostart",
       "effect": "deny",
       "text": "Windows autostart folders are never written by an agent: a file there runs at every sign-in.",
-      "files": { "paths": ["**/Microsoft/Windows/Start Menu/Programs/Startup/**"] }
+      "files": {
+        "paths": ["**/Microsoft/Windows/Start Menu/Programs/Startup/**"]
+      }
     },
     {
       "id": "vendor.files.ask-env-and-secrets",
@@ -180,13 +182,17 @@
       "id": "vendor.process.deny-repository-deletion",
       "effect": "deny",
       "text": "Deleting a hosted repository never runs automatically.",
-      "process": { "argv": ["gh", "repo", "delete", "**"] }
+      "process": {
+        "argv": ["gh", "repo", "delete", "**"]
+      }
     },
     {
       "id": "vendor.process.ask-system-configuration",
       "effect": "ask",
       "text": "Network, user, environment and system file configuration tools (net, netsh, setx, attrib, wmic, sfc, dism, powercfg, bitsadmin) change the machine; they need the user.",
-      "process": { "argv": ["{net,netsh,setx,attrib,wmic,sfc,dism,powercfg,bitsadmin}", "**"] }
+      "process": {
+        "argv": ["{net,netsh,setx,attrib,wmic,sfc,dism,powercfg,bitsadmin}", "**"]
+      }
     },
     {
       "id": "vendor.process.ask-script-strings",
@@ -225,7 +231,9 @@
       "id": "vendor.process.ask-git-amend",
       "effect": "ask",
       "text": "git commit --amend rewrites the last commit; it needs the user.",
-      "process": { "argv": ["git", "commit", "**", "--amend", "**"] }
+      "process": {
+        "argv": ["git", "commit", "**", "--amend", "**"]
+      }
     },
     {
       "id": "vendor.process.ask-publishing",
@@ -238,6 +246,14 @@
           "{publish,upload,push,release,login,yank,owner,unpublish,deprecate}",
           "**"
         ]
+      }
+    },
+    {
+      "id": "vendor.process.ask-release-verbs",
+      "effect": "ask",
+      "text": "Any tool asked to deploy, publish, release or upload reaches other people or servers; it needs the user.",
+      "process": {
+        "argv": ["*", "**", "{deploy,publish,release,upload,unpublish}", "**"]
       }
     },
     {
@@ -265,13 +281,47 @@
       "id": "vendor.process.ask-process-control",
       "effect": "ask",
       "text": "Stopping other processes can lose unsaved work; it needs the user.",
-      "process": { "argv": ["{taskkill,kill,pkill,killall,tskill}", "**"] }
+      "process": {
+        "argv": ["{taskkill,kill,pkill,killall,tskill}", "**"]
+      }
     },
     {
       "id": "vendor.process.ask-delete-commands",
       "effect": "ask",
       "text": "Delete commands (rm, rmdir, del, rimraf, Remove-Item) bypass the file snapshot that fs.apply keeps; they need the user.",
-      "process": { "argv": ["{rm,rmdir,rd,del,erase,rimraf,trash,remove-item}", "**"] }
+      "process": {
+        "argv": ["{rm,rmdir,rd,del,erase,rimraf,trash,remove-item}", "**"]
+      }
+    },
+    {
+      "id": "vendor.process.ask-file-moves",
+      "effect": "ask",
+      "text": "Copy, move, rename, link and permission commands can overwrite or expose files outside the reviewed changes; they need the user.",
+      "process": {
+        "argv": [
+          "{move,mv,copy,cp,xcopy,robocopy,ren,rename,mklink,ln,chmod,chown,truncate,dd,shred,sdelete,move-item,copy-item,rename-item,set-content,out-file,clear-content}",
+          "**"
+        ]
+      }
+    },
+    {
+      "id": "vendor.process.ask-powershell-actions",
+      "effect": "ask",
+      "text": "PowerShell downloads, process launches, dynamic code and execution policy changes reach outside the project; they need the user.",
+      "process": {
+        "argv": [
+          "{invoke-webrequest,iwr,invoke-restmethod,irm,start-bitstransfer,start-process,saps,invoke-expression,iex,set-executionpolicy,set-itemproperty,new-itemproperty}",
+          "**"
+        ]
+      }
+    },
+    {
+      "id": "vendor.process.ask-elevation",
+      "effect": "ask",
+      "text": "Commands that raise privileges (sudo, gsudo, doas, su) run with more rights than the user; they need the user.",
+      "process": {
+        "argv": ["{sudo,gsudo,doas,su}", "**"]
+      }
     },
     {
       "id": "vendor.process.allow-git-read",
@@ -289,19 +339,25 @@
       "id": "vendor.process.allow-git-listing",
       "effect": "allow",
       "text": "Listing git branches, tags and remotes changes nothing.",
-      "process": { "argv": ["git", "{branch,tag,remote}", "**"] }
+      "process": {
+        "argv": ["git", "{branch,tag,remote}", "**"]
+      }
     },
     {
       "id": "vendor.process.allow-git-local-commit",
       "effect": "allow",
       "text": "Staging and committing locally (git add, git commit without --amend) is recorded in history and can be undone.",
-      "process": { "argv": ["git", "{add,commit}", "**"] }
+      "process": {
+        "argv": ["git", "{add,commit}", "**"]
+      }
     },
     {
       "id": "vendor.process.allow-version-and-help",
       "effect": "allow",
       "text": "Asking a program for its version or help text changes nothing.",
-      "process": { "argv": ["*", "{--version,-v,-V,version,--help,-h,help}"] }
+      "process": {
+        "argv": ["*", "{--version,-v,-V,version,--help,-h,help}"]
+      }
     },
     {
       "id": "vendor.process.allow-rust-checks",
@@ -336,19 +392,25 @@
       "id": "vendor.process.allow-js-tools",
       "effect": "allow",
       "text": "JavaScript type checkers, linters and test runners stay inside the project.",
-      "process": { "argv": ["{tsc,eslint,vitest,jest,mocha,biome,oxlint}", "**"] }
+      "process": {
+        "argv": ["{tsc,eslint,vitest,jest,mocha,biome,oxlint}", "**"]
+      }
     },
     {
       "id": "vendor.process.allow-prettier-check",
       "effect": "allow",
       "text": "prettier --check only reads files.",
-      "process": { "argv": ["prettier", "**", "{--check,-c,--list-different,-l}", "**"] }
+      "process": {
+        "argv": ["prettier", "**", "{--check,-c,--list-different,-l}", "**"]
+      }
     },
     {
       "id": "vendor.process.allow-python-checks",
       "effect": "allow",
       "text": "Python tests, type checks and linters stay inside the project.",
-      "process": { "argv": ["{pytest,mypy,pyright,ruff,flake8,pylint,tox,nox}", "**"] }
+      "process": {
+        "argv": ["{pytest,mypy,pyright,ruff,flake8,pylint,tox,nox}", "**"]
+      }
     },
     {
       "id": "vendor.process.allow-python-module-checks",
@@ -367,13 +429,17 @@
       "id": "vendor.process.allow-uv-run-checks",
       "effect": "allow",
       "text": "uv run with a test or lint tool stays inside the project.",
-      "process": { "argv": ["uv", "run", "{pytest,mypy,ruff,pyright}", "**"] }
+      "process": {
+        "argv": ["uv", "run", "{pytest,mypy,ruff,pyright}", "**"]
+      }
     },
     {
       "id": "vendor.process.allow-go-dotnet-checks",
       "effect": "allow",
       "text": "Go and .NET builds, tests and vet checks stay inside the project.",
-      "process": { "argv": ["{go,dotnet}", "{build,test,vet,list,format}", "**"] }
+      "process": {
+        "argv": ["{go,dotnet}", "{build,test,vet,list,format}", "**"]
+      }
     },
     {
       "id": "vendor.process.allow-read-only-utilities",
@@ -383,6 +449,37 @@
         "argv": [
           "{dir,ls,tree,where,which,rg,grep,findstr,cat,type,head,tail,wc,pwd,whoami,hostname}",
           "**"
+        ]
+      }
+    },
+    {
+      "id": "vendor.process.allow-unflagged",
+      "effect": "allow",
+      "text": "A command no other rule flags: it does not delete, move or overwrite files, download, install, publish, rewrite history, raise privileges or change the system.",
+      "process": {
+        "argv": ["*", "**"]
+      }
+    },
+    {
+      "id": "vendor.code.allow-plain-scripts",
+      "effect": "allow",
+      "text": "A script that does not use the network, launch programs, run generated code, delete or move files, touch the registry or credentials, decode hidden data or install packages.",
+      "code": {
+        "languages": ["python", "javascript", "powershell"],
+        "avoid": [
+          "\\b(requests|urllib\\d?|httpx|aiohttp|socket|http\\.client|ftplib|smtplib|paramiko|websockets?)\\b",
+          "\\bfetch\\s*\\(",
+          "\\b(axios|node-fetch|XMLHttpRequest|WebSocket|EventSource)\\b",
+          "(require\\s*\\(|from\\s+|import\\s*\\()\\s*['\"](node:)?(https?|net|dgram|tls|child_process|cluster|worker_threads)['\"]",
+          "\\b(Invoke-WebRequest|Invoke-RestMethod|iwr|irm|Start-BitsTransfer|Net\\.WebClient|DownloadString|DownloadFile|Test-NetConnection)\\b",
+          "\\b(subprocess|os\\.system|os\\.popen|os\\.exec\\w*|os\\.spawn\\w*|pty\\.spawn|execSync|execFile\\w*|spawnSync|Start-Process|Invoke-Expression|Invoke-Command|iex)\\b",
+          "\\b(exec|eval)\\s*\\(|__import__|new\\s+Function\\s*\\(",
+          "\\b(os\\.remove|os\\.unlink|os\\.rmdir|os\\.removedirs|shutil\\.rmtree|shutil\\.move|send2trash|unlinkSync|rmSync|rmdirSync|Remove-Item|Clear-Content|Move-Item)\\b",
+          "\\.(unlink|rmdir|rm)\\s*\\(",
+          "\\b(winreg|_winreg|HKLM|HKCU|HKEY_\\w+|Registry::|ctypes|win32api|win32con|Set-ItemProperty|New-ItemProperty|Set-ExecutionPolicy|schtasks|bcdedit)\\b",
+          "\\.ssh\\b|\\.aws\\b|\\.gnupg\\b|\\.kube\\b|id_rsa|id_ed25519|\\.git-credentials|\\.netrc|\\bkeyring\\b|Get-Credential|ConvertFrom-SecureString|Login Data|Cookies",
+          "\\b(b64decode|base64\\.b64decode|atob|FromBase64String|EncodedCommand|marshal\\.loads|pickle\\.loads|codecs\\.decode|zlib\\.decompress)\\b",
+          "\\b(pip3?\\s+install|npm\\s+(install|i)\\b|Install-Module|Install-Package)"
         ]
       }
     }

@@ -280,6 +280,20 @@ fn delete(path: &str) -> ReviewedAction {
     files(vec![change(FileChangeKind::Delete, path)])
 }
 
+fn script(source: &str) -> ReviewedAction {
+    ReviewedAction::Process {
+        tool: "code.run".to_owned(),
+        process: ProcessPlanDto {
+            program: "python".to_owned(),
+            language: Some(zvs_contract::CodeLanguage::Python),
+            argv: Vec::new(),
+            cwd: "C:/work".to_owned(),
+            source: Some(source.to_owned()),
+            packages: Vec::new(),
+        },
+    }
+}
+
 fn shell(argv: &[&str]) -> ReviewedAction {
     ReviewedAction::Process {
         tool: "shell.run".to_owned(),
@@ -370,7 +384,7 @@ fn file_actions_are_classified_by_effect_not_by_name() {
 #[test]
 fn the_vendor_pack_guards_the_obvious_cases() {
     let rules = vendor();
-    let cases: [(ReviewedAction, &str, Option<&str>); 14] = [
+    let cases: [(ReviewedAction, &str, Option<&str>); 20] = [
         (
             delete("C:/work/.git/config"),
             "deny",
@@ -432,7 +446,37 @@ fn the_vendor_pack_guards_the_obvious_cases() {
             "ask",
             Some("vendor.process.ask-script-strings"),
         ),
-        (shell(&["make", "deploy"]), "unmatched", None),
+        (
+            shell(&["make", "deploy"]),
+            "ask",
+            Some("vendor.process.ask-release-verbs"),
+        ),
+        (
+            shell(&["make", "all"]),
+            "allow",
+            Some("vendor.process.allow-unflagged"),
+        ),
+        (
+            shell(&["robocopy", "a", "b", "/MIR"]),
+            "ask",
+            Some("vendor.process.ask-file-moves"),
+        ),
+        (
+            script("print(sum(range(10)))"),
+            "allow",
+            Some("vendor.code.allow-plain-scripts"),
+        ),
+        (
+            script("import requests\nrequests.get('https://x')"),
+            "unmatched",
+            None,
+        ),
+        (
+            script("import shutil\nshutil.rmtree('C:/work')"),
+            "unmatched",
+            None,
+        ),
+        (script("exec(open('a.py').read())"), "unmatched", None),
     ];
     for (action, effect, rule) in cases {
         let outcome = rules.evaluate(&action);
@@ -722,7 +766,11 @@ async fn the_judge_decides_an_unmatched_action_and_its_reason_is_kept() {
         r#"{"decision":"ask","reason":"Команда публикует пакет."}"#,
     ));
     assert_eq!(
-        host.review(&context, shell(&["make", "deploy"])).await,
+        host.review(
+            &context,
+            script("import requests\nrequests.post('https://x')")
+        )
+        .await,
         ReviewVerdict::Ask {
             reason: Some("Команда публикует пакет.".to_owned())
         }
