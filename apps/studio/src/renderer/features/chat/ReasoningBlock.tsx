@@ -16,8 +16,8 @@ export default function ReasoningBlock({
   readonly thinking: boolean;
 }) {
   return (
-    <Accordion className="rounded-card bg-main-800">
-      <Accordion.Summary className="min-h-9.5 gap-2.5 rounded-card px-3 py-1.5 text-[12px] font-medium text-main-300 transition-colors hover:text-main-50">
+    <Accordion preset="ghost">
+      <Accordion.Summary className="min-h-9.5 w-auto justify-start gap-2.5 px-0 py-1.5 text-[12px] font-medium text-main-300 transition-colors hover:text-main-50">
         <span className="flex min-w-0 items-center gap-2.5">
           <span
             aria-hidden="true"
@@ -33,7 +33,7 @@ export default function ReasoningBlock({
           </span>
         </span>
       </Accordion.Summary>
-      <Accordion.Content className="border-transparent px-3 pt-1 pb-3">
+      <Accordion.Content className="px-0 pt-1 pb-1">
         <ScrollArea className="max-h-80 border-l-2 border-accent-line pr-1 pl-3 text-[12.5px]/relaxed whitespace-pre-wrap text-main-400">
           {reasoning}
         </ScrollArea>

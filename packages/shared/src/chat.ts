@@ -47,6 +47,11 @@ export const CHAT_TOOL_CALL_STATUSES = [
 ] as const;
 export const ChatToolCallStatus = z.enum(CHAT_TOOL_CALL_STATUSES);
 export type ChatToolCallStatus = z.infer<typeof ChatToolCallStatus>;
+export const ChatRoundDto = z.object({
+  text: z.string(),
+  reasoning: z.string(),
+});
+export type ChatRoundDto = z.infer<typeof ChatRoundDto>;
 export const ChatToolCallDto = z.object({
   id: z.string().min(1).max(128),
   key: z.string().min(1).max(200),
@@ -194,6 +199,7 @@ export const MessageDto = z.object({
   command: ChatCommand.optional(),
   offeredTools: z.array(OfferedToolDto).default([]),
   webSources: z.array(WebSourceDto).max(WEB_SOURCES_MAX).default([]),
+  rounds: z.array(ChatRoundDto).default([]),
   tokensIn: z.number().int().nonnegative(),
   tokensOut: z.number().int().nonnegative(),
   usageEstimated: z.boolean(),
@@ -276,6 +282,7 @@ export const ChatAttachDto = z.object({
   startedAt: Timestamp,
   content: z.string(),
   reasoning: z.string(),
+  rounds: z.array(ChatRoundDto).default([]),
   toolCalls: z.array(ChatToolCallDto),
   approvals: z.array(ApprovalRequestDto),
   questions: z.array(QuestionRequestDto),

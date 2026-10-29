@@ -257,6 +257,42 @@ test("tool sections group the offered tools by why they were offered", () => {
   });
 });
 
+test("live text and reasoning are split into rounds at each tool call", async () => {
+  const { store, events } = setup();
+  await store.mount();
+  store.composer.setText("Question");
+  await store.send();
+  const at = { ...handle, ts: Date.now() };
+  events.dispatch({ type: "token", ...at, seq: 1, delta: "Мысль.", kind: "reasoning" });
+  events.dispatch({ type: "token", ...at, seq: 2, delta: "Поиск." });
+  events.dispatch({
+    type: "step",
+    ...at,
+    seq: 3,
+    step: { domain: "tool-call", index: 0, call: { ...pendingCall, status: "running" } },
+  });
+  events.dispatch({ type: "token", ...at, seq: 4, delta: "Ещё.", kind: "reasoning" });
+  events.dispatch({ type: "token", ...at, seq: 5, delta: "\n\nИтог." });
+  events.dispatch({
+    type: "step",
+    ...at,
+    seq: 6,
+    step: {
+      domain: "tool-call",
+      index: 1,
+      call: { ...pendingCall, id: "call_2", round: 1, status: "running" },
+    },
+  });
+
+  expect(store.liveRounds).toEqual([
+    { text: "Поиск.", reasoning: "Мысль." },
+    { text: "\n\nИтог.", reasoning: "Ещё." },
+  ]);
+  expect(store.liveText).toBe("Поиск.\n\nИтог.");
+  store.dispose();
+  events.dispose();
+});
+
 test("live tool-call events drive the cards and keep their approval out of the generic bar", async () => {
   const { store, events, bridge } = setup();
   await store.mount();

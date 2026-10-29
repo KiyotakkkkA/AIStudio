@@ -10,6 +10,12 @@
       "startedAt": 1767225600000,
       "content": "Проверка файла.",
       "reasoning": "",
+      "rounds": [
+        {
+          "text": "Проверка файла.",
+          "reasoning": ""
+        }
+      ],
       "toolCalls": [
         {
           "id": "call_1",

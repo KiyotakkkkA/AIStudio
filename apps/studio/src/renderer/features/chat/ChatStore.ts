@@ -2,6 +2,7 @@ import { makeAutoObservable, reaction, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
   ChatToolCallDto,
+  type ChatRoundDto,
   FilesApprovalDto,
   FolderApprovalDto,
   ProcessApprovalDto,
@@ -55,6 +56,7 @@ import ExplorerStore from "./explorer/ExplorerStore";
 import TerminalStore from "../terminal/TerminalStore";
 import { matchCommands, parseCommand } from "./chatCommands";
 import { toolSections } from "./toolSets";
+import { appendRound } from "./answerRounds";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
 const LAST_CONVERSATION_KEY = "chat.conversation.last";
@@ -105,6 +107,7 @@ export default class ChatStore {
   runStartedAt: number | null = null;
   liveText = "";
   liveReasoning = "";
+  liveRounds: ChatRoundDto[] = [];
   liveCitations: ChatCitationDto[] = [];
   liveWebSources: WebSourceDto[] = [];
   liveSelections: DocumentSelectionDto[] = [];
@@ -755,6 +758,7 @@ export default class ChatStore {
         this.liveWebSources = [];
         this.liveSelections = [];
         this.liveToolCalls = [];
+        this.liveRounds = [];
         this.outcome = null;
         this.retryText = "";
         this.pendingTurn = false;
@@ -791,6 +795,7 @@ export default class ChatStore {
     this.liveWebSources = [];
     this.liveSelections = [];
     this.liveToolCalls = [];
+    this.liveRounds = [];
     this.retryText = "";
     this.pendingTurn = false;
     this.composer.setText("");
@@ -902,6 +907,7 @@ export default class ChatStore {
     this.liveWebSources = [];
     this.liveSelections = [];
     this.liveToolCalls = [];
+    this.liveRounds = [];
     this.searchedStoreIds = [];
     this.pendingTurn = true;
     try {
@@ -1107,6 +1113,7 @@ export default class ChatStore {
         this.liveWebSources = [];
         this.liveSelections = [];
         this.liveToolCalls = [];
+        this.liveRounds = [];
         this.pendingTurn = false;
         this.retryText = "";
       });
@@ -1227,6 +1234,7 @@ export default class ChatStore {
     this.contiguous = live.seq !== null;
     this.liveText = live.content;
     this.liveReasoning = live.reasoning;
+    this.liveRounds = live.rounds;
     this.liveToolCalls = live.toolCalls;
     this.approvals = [];
     this.folderRequests = [];
@@ -1311,8 +1319,15 @@ export default class ChatStore {
     )
       this.questions.push({ request: event.request, busy: false });
     if (event.type === "token") {
-      if (event.kind === "reasoning") this.liveReasoning += event.delta;
-      else {
+      if (event.kind === "reasoning") {
+        this.liveReasoning += event.delta;
+        this.liveRounds = appendRound(
+          this.liveRounds,
+          this.liveToolCalls,
+          "reasoning",
+          event.delta,
+        );
+      } else {
         this.buffer += event.delta;
         this.timer ??= setTimeout(this.flush, 32);
       }
@@ -1321,6 +1336,7 @@ export default class ChatStore {
       const index = event.step.index;
       const call = ChatToolCallDto.safeParse(event.step.call);
       if (typeof index === "number" && call.success) {
+        this.flush();
         const calls = [...this.liveToolCalls];
         calls[Math.min(index, calls.length)] = call.data;
         this.liveToolCalls = calls;
@@ -1354,6 +1370,7 @@ export default class ChatStore {
           this.flush();
           this.liveText = message.data.content;
           this.liveReasoning = message.data.reasoning;
+          this.liveRounds = message.data.rounds;
           this.liveCitations = message.data.citations;
           this.liveWebSources = message.data.webSources;
         }
@@ -1382,6 +1399,7 @@ export default class ChatStore {
     this.timer = undefined;
     if (this.buffer) {
       this.liveText += this.buffer;
+      this.liveRounds = appendRound(this.liveRounds, this.liveToolCalls, "text", this.buffer);
       this.buffer = "";
     }
   }
@@ -1405,6 +1423,7 @@ export default class ChatStore {
         this.liveWebSources = [];
         this.liveSelections = [];
         this.liveToolCalls = [];
+        this.liveRounds = [];
         this.pendingTurn = false;
       });
     } catch (error) {

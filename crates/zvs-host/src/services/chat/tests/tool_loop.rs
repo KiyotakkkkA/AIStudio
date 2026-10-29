@@ -33,7 +33,7 @@ use crate::kernel::{
     FnNode, NodeRegistry, PermissionRequirement, StepContext, register_core_nodes,
 };
 use crate::services::chat_ask::{ASK_MALFORMED, ASK_ONCE, ASK_SKIPPED, ASK_TOOL};
-use crate::services::chat_reply::{TOOL_CALL_DOMAIN, apply_tool_call};
+use crate::services::chat_reply::{TOOL_CALL_DOMAIN, append_round, apply_tool_call};
 use crate::services::chat_tools::{CHAT_TOOL_CALLS, TOOL_BUDGET_NOTE, TOOL_RESULTS_INSTRUCTION};
 use crate::services::profile::TOOL_CALLS_KEY;
 use crate::testing::{FAKE_CAPABILITIES, TemporaryDatabase, temporary_database};
@@ -1768,6 +1768,13 @@ async fn attaching_to_a_turn_waiting_on_an_approval_returns_the_text_the_calls_a
 
     assert_eq!(live.run, handle);
     assert_eq!(live.content, "Сначала удаление.");
+    assert_eq!(
+        live.rounds,
+        [zvs_contract::ChatRoundDto {
+            text: "Сначала удаление.".to_owned(),
+            reasoning: String::new(),
+        }]
+    );
     assert_eq!(live.approvals[0].get("id"), Some(&json!(approval)));
     assert_eq!(live.tool_calls.len(), 1);
     assert_eq!(
@@ -1828,6 +1835,7 @@ async fn attaching_to_a_turn_waiting_on_a_question_returns_the_question() {
 struct Replayed {
     content: String,
     reasoning: String,
+    rounds: Vec<zvs_contract::ChatRoundDto>,
     tool_calls: Vec<zvs_contract::ChatToolCallDto>,
     steps: Vec<serde_json::Map<String, Value>>,
 }
@@ -1836,10 +1844,13 @@ fn replayed(events: &[HostEvent]) -> Replayed {
     let mut state = Replayed::default();
     for event in events {
         match &event.body {
-            HostEventDraft::Token { delta, kind } => match kind {
-                Some(DeltaKind::Reasoning) => state.reasoning.push_str(delta),
-                _ => state.content.push_str(delta),
-            },
+            HostEventDraft::Token { delta, kind } => {
+                match kind {
+                    Some(DeltaKind::Reasoning) => state.reasoning.push_str(delta),
+                    _ => state.content.push_str(delta),
+                }
+                append_round(&mut state.rounds, &state.tool_calls, *kind, delta);
+            }
             HostEventDraft::Step { step }
                 if step.get("domain") == Some(&json!(TOOL_CALL_DOMAIN)) =>
             {
@@ -1923,6 +1934,19 @@ async fn a_recorded_turn_with_tool_calls_replays_to_the_live_state_from_a_lean_l
     assert_eq!(state.tool_calls, assistant.tool_calls);
     assert_eq!(state.content, assistant.content);
     assert_eq!(state.reasoning, assistant.reasoning);
+    assert_eq!(state.rounds, assistant.rounds);
+    assert_eq!(assistant.rounds.len(), 2);
+    assert_eq!(assistant.rounds[0].text, "Поиск.");
+    assert!(assistant.rounds[0].reasoning.starts_with("мысль0 "));
+    assert!(assistant.rounds[1].reasoning.is_empty());
+    assert_eq!(
+        assistant
+            .rounds
+            .iter()
+            .map(|round| round.text.as_str())
+            .collect::<String>(),
+        assistant.content
+    );
     assert!(rows * 10 < live.len() as i64, "{rows} of {}", live.len());
     assert!(
         usize::try_from(bytes).expect("bytes") * 2 < live_bytes,

@@ -13,7 +13,7 @@ use zvs_contract::vector_stores::DEFAULT_CHAT_MIN_SCORE;
 use zvs_contract::{
     AppError, AppErrorCode, ChatAttachDto, ChatCitationDto, ChatCommand, ChatCommandDto,
     ChatContextDto, ChatContextInput, ChatContextToolDto, ChatEvalCaseDto, ChatEvalInput,
-    ChatEvalModeDto, ChatEvalRunDto, ChatSendInput, ChatSettings, ChatToolCallDto,
+    ChatEvalModeDto, ChatEvalRunDto, ChatRoundDto, ChatSendInput, ChatSettings, ChatToolCallDto,
     ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationId,
     CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DeltaKind, DocumentId, FolderGrantScope,
     GRAPH_EXPANSION_DEFAULT_MAX, GraphDirection, GraphExpansionDocument, GraphNeighborhood,
@@ -34,7 +34,9 @@ use super::chat_history::{
 use super::chat_memory::{
     MEMORY_FAILED, MEMORY_TOOL, MemoryRefs, apply_memory_call, memory_section, memory_tool,
 };
-use super::chat_reply::{ReplyBuffers, ReplyChunk, TOOL_CALL_DOMAIN, apply_tool_call};
+use super::chat_reply::{
+    ReplyBuffers, ReplyChunk, TOOL_CALL_DOMAIN, append_round, apply_tool_call,
+};
 use super::chat_tools::{
     CHAT_TOOL_CALLS, HYBRID_INSTRUCTION, KNOWLEDGE_INSTRUCTION, KnowledgeText, OfferedTool,
     TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS, TOOL_RESULTS_INSTRUCTION, TOOL_SEARCH, ToolInputs,
@@ -311,6 +313,7 @@ fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
         command: row.command,
         offered_tools: row.offered_tools,
         web_sources: row.web_sources,
+        rounds: row.rounds,
         tokens_in: count(row.tokens_in),
         tokens_out: count(row.tokens_out),
         usage_estimated: row.usage_estimated,
@@ -1419,6 +1422,7 @@ impl NodeDef for PrepareNode {
             command: None,
             offered_tools: offered_record(&offered),
             web_sources: Vec::new(),
+            rounds: Vec::new(),
             tokens_in: prepared.tokens_in,
             tokens_out: 0,
             usage_estimated: true,
@@ -2016,6 +2020,7 @@ impl GenerateChatNode {
         let limit = usize::try_from(tool_result_chars).unwrap_or(usize::MAX);
         let mut text = String::new();
         let mut reasoning = String::new();
+        let mut rounds: Vec<ChatRoundDto> = Vec::new();
         let mut web_sources: Vec<WebSourceDto> = Vec::new();
         let mut executed = 0;
         let mut round = 0;
@@ -2055,6 +2060,26 @@ impl GenerateChatNode {
                 text.push_str(&output.text);
                 reasoning.push_str(&output.reasoning);
                 web_sources.extend(output.web_sources);
+                rounds.push(ChatRoundDto {
+                    text: output.text.clone(),
+                    reasoning: output.reasoning.clone(),
+                });
+                if let Err(error) = self.0.update_message(
+                    &assistant_id,
+                    &MessagePatch {
+                        rounds: Some(rounds.clone()),
+                        ..MessagePatch::default()
+                    },
+                ) {
+                    self.0.log(
+                        LogLevel::Warn,
+                        "Could not save the answer rounds",
+                        &[
+                            ("runId", json!(context.run_id.to_string())),
+                            ("error", json!(error.message)),
+                        ],
+                    );
+                }
                 if output.tool_calls.is_empty() || specs.is_empty() {
                     break;
                 }
@@ -2713,6 +2738,7 @@ impl ChatService {
             command: None,
             offered_tools: Vec::new(),
             web_sources: Vec::new(),
+            rounds: Vec::new(),
             tokens_in: 0,
             tokens_out: tokens(text),
             usage_estimated: true,
@@ -2903,6 +2929,7 @@ impl ChatService {
             command: input.command,
             offered_tools: Vec::new(),
             web_sources: Vec::new(),
+            rounds: Vec::new(),
             tokens_in: tokens(&with_selections(&text, &input.selections)),
             tokens_out: 0,
             usage_estimated: true,
@@ -3222,6 +3249,7 @@ impl ChatService {
             started_at: row.started_at.unwrap_or(row.created_at),
             content: String::new(),
             reasoning: String::new(),
+            rounds: Vec::new(),
             tool_calls: Vec::new(),
             approvals: Vec::new(),
             questions: self.runs.questions().pending(&row.id),
@@ -3229,10 +3257,14 @@ impl ChatService {
         for event in self.runs.record(&row.id)? {
             attached.seq = Some(attached.seq.map_or(event.seq, |seq| seq.max(event.seq)));
             match event.body {
-                HostEventDraft::Token { delta, kind } => match kind {
-                    Some(DeltaKind::Reasoning) => attached.reasoning.push_str(&delta),
-                    _ => attached.content.push_str(&delta),
-                },
+                HostEventDraft::Token { delta, kind } => {
+                    if kind == Some(DeltaKind::Reasoning) {
+                        attached.reasoning.push_str(&delta);
+                    } else {
+                        attached.content.push_str(&delta);
+                    }
+                    append_round(&mut attached.rounds, &attached.tool_calls, kind, &delta);
+                }
                 HostEventDraft::Step { step } => {
                     if step.get("domain").and_then(Value::as_str) == Some(TOOL_CALL_DOMAIN)
                         && let Some(index) = step

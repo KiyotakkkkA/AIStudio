@@ -1,0 +1,16 @@
+[
+  {
+    "name": "text and reasoning",
+    "value": {
+      "text": "Ответ",
+      "reasoning": "Размышления"
+    }
+  },
+  {
+    "name": "empty",
+    "value": {
+      "text": "",
+      "reasoning": ""
+    }
+  }
+]

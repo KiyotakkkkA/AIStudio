@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use zvs_contract::{ChatToolCallDto, DeltaKind, Timestamp};
+use zvs_contract::{ChatRoundDto, ChatToolCallDto, DeltaKind, Timestamp};
 
 use super::chat_history::tokens;
 
@@ -53,6 +53,28 @@ pub fn apply_tool_call(calls: &mut Vec<ChatToolCallDto>, index: usize, call: Cha
     match calls.get_mut(index) {
         Some(slot) => *slot = call,
         None => calls.push(call),
+    }
+}
+
+pub fn append_round(
+    rounds: &mut Vec<ChatRoundDto>,
+    calls: &[ChatToolCallDto],
+    kind: Option<DeltaKind>,
+    delta: &str,
+) {
+    let index = calls
+        .iter()
+        .map(|call| usize::try_from(call.round).map_or(0, |round| round + 1))
+        .max()
+        .unwrap_or(0);
+    if rounds.len() <= index {
+        rounds.resize_with(index + 1, ChatRoundDto::default);
+    }
+    let round = &mut rounds[index];
+    if kind == Some(DeltaKind::Reasoning) {
+        round.reasoning.push_str(delta);
+    } else {
+        round.text.push_str(delta);
     }
 }
 

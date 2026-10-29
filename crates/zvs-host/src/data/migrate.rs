@@ -190,6 +190,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0028_integration",
         sql: include_str!("../../migrations/0028_integration.sql"),
     },
+    Migration {
+        id: 29,
+        name: "0029_message_rounds",
+        sql: include_str!("../../migrations/0029_message_rounds.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

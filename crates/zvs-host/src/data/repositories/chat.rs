@@ -1,8 +1,8 @@
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use zvs_contract::{
-    ChatCitationDto, ChatSettings, ChatToolCallDto, OfferedToolDto, RetrievalMode, Timestamp,
-    WebSourceDto,
+    ChatCitationDto, ChatRoundDto, ChatSettings, ChatToolCallDto, OfferedToolDto, RetrievalMode,
+    Timestamp, WebSourceDto,
 };
 
 use crate::data::schema::columns::{EnumColumn, json_text};
@@ -83,6 +83,7 @@ pub struct MessagePatch {
     pub citations: Option<Vec<ChatCitationDto>>,
     pub offered_tools: Option<Vec<OfferedToolDto>>,
     pub web_sources: Option<Vec<WebSourceDto>>,
+    pub rounds: Option<Vec<ChatRoundDto>>,
     pub tokens_in: Option<i64>,
     pub tokens_out: Option<i64>,
     pub usage_estimated: Option<bool>,
@@ -109,6 +110,9 @@ impl MessagePatch {
         }
         if let Some(sources) = &self.web_sources {
             assignments.push(("web_sources", SqlValue::Text(json_text(sources)?)));
+        }
+        if let Some(rounds) = &self.rounds {
+            assignments.push(("rounds", SqlValue::Text(json_text(rounds)?)));
         }
         if let Some(tokens) = self.tokens_in {
             assignments.push(("tokens_in", SqlValue::Integer(tokens)));
@@ -243,8 +247,8 @@ impl<'c> ChatRepository<'c> {
     pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
         self.connection
             .prepare_cached(
-                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, command, offered_tools, web_sources, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, pinned, created_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, command, offered_tools, web_sources, rounds, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, pinned, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
             )?
             .execute(params![
                 row.id,
@@ -257,6 +261,7 @@ impl<'c> ChatRepository<'c> {
                 row.command.map(EnumColumn),
                 json_text(&row.offered_tools)?,
                 json_text(&row.web_sources)?,
+                json_text(&row.rounds)?,
                 row.tokens_in,
                 row.tokens_out,
                 row.usage_estimated,
@@ -399,6 +404,7 @@ mod tests {
             command: None,
             offered_tools: Vec::new(),
             web_sources: Vec::new(),
+            rounds: Vec::new(),
             tokens_in: 1,
             tokens_out: 0,
             usage_estimated: true,

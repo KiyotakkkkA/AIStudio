@@ -79,7 +79,7 @@ pub use chat::{
     BranchConversationInput, ChatAttachDto, ChatAttachInput, ChatAttachOutput, ChatCitationDto,
     ChatCommand, ChatCommandDto, ChatCommandsOutput, ChatContextDto, ChatContextInput,
     ChatContextToolDto, ChatConversationsListOutput, ChatEvalCaseDto, ChatEvalInput,
-    ChatEvalModeDto, ChatEvalRunDto, ChatSendInput, ChatSettings, ChatToolCallDto,
+    ChatEvalModeDto, ChatEvalRunDto, ChatRoundDto, ChatSendInput, ChatSettings, ChatToolCallDto,
     ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationRef,
     CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DocumentSelectionDto, MessageDto,
     MessageRole, OfferedToolDto, OfferedToolSource, PinConversationInput, PinMessageInput,

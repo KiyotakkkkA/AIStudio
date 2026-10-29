@@ -311,12 +311,14 @@ export default observer(function ChatThread({
                     messageId={message.id}
                     content={message.content}
                     reasoning={message.reasoning}
+                    rounds={message.rounds}
                     citations={answerCitations(message.citations, message.toolCalls)}
                     webSources={message.webSources}
                     selections={answerSelections.get(message.id)}
                     stores={store.stores}
                     partial={message.partial}
-                    tools={<ChatToolCalls calls={message.toolCalls} />}
+                    toolCalls={message.toolCalls}
+                    renderTools={(calls) => <ChatToolCalls calls={calls} />}
                     artifacts={
                       <ChatArtifacts
                         artifacts={answerArtifacts(message.toolCalls)}
@@ -348,6 +350,7 @@ export default observer(function ChatThread({
                 <ChatMessage
                   content={store.liveText}
                   reasoning={store.liveReasoning}
+                  rounds={store.liveRounds}
                   citations={answerCitations(store.liveCitations, store.liveToolCalls)}
                   webSources={store.liveWebSources}
                   selections={store.liveSelections}
@@ -362,16 +365,17 @@ export default observer(function ChatThread({
                     />
                   }
                   partial={store.outcome !== "ok"}
-                  tools={
+                  toolCalls={store.liveToolCalls}
+                  renderTools={(calls) => (
                     <ChatToolCalls
-                      calls={store.liveToolCalls}
+                      calls={calls}
                       approvalFor={store.approvalFor}
                       onDecide={(id, approve) => void store.decideApproval(id, approve)}
                       questionFor={store.questionFor}
                       onAnswer={(id, answers) => void store.answerQuestion(id, answers)}
                       onSkip={(id) => void store.skipQuestion(id)}
                     />
-                  }
+                  )}
                 />
               </FadeIn>
             )}

@@ -47,7 +47,7 @@ export default observer(function ChatWorkingFolder({ store }: { readonly store: 
         ) : (
           <>
             <span
-              className="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-control bg-main-800 px-2 text-main-200"
+              className="inline-flex z-0 h-7 min-w-0 items-center gap-1.5 rounded-control bg-main-800 px-2 text-main-200"
               title={folder}
             >
               <Icon path={mdiFolderOutline} size={14} />

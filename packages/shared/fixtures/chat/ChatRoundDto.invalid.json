@@ -1,0 +1,15 @@
+[
+  {
+    "name": "missing reasoning",
+    "value": {
+      "text": "Ответ"
+    }
+  },
+  {
+    "name": "text is not a string",
+    "value": {
+      "text": 1,
+      "reasoning": ""
+    }
+  }
+]

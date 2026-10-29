@@ -1,6 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import type {
   ChatCitationDto,
+  ChatRoundDto,
+  ChatToolCallDto,
   DocumentSelectionDto,
   MessageId,
   VectorStoreDto,
@@ -13,6 +15,7 @@ import IconButton from "../../ui/atoms/buttons/IconButton";
 import ChatMarkdown from "./ChatMarkdown";
 import AnswerQuote from "./AnswerQuote";
 import ReasoningBlock from "./ReasoningBlock";
+import { answerBlocks } from "./answerRounds";
 import ChatSources from "./ChatSources";
 import WebSourceCard from "./WebSourceCard";
 import { WEB_SOURCES_TAB } from "./webSources";
@@ -37,6 +40,7 @@ export default function ChatMessage({
   messageId,
   content,
   reasoning = "",
+  rounds = [],
   citations,
   webSources = [],
   selections: attached = [],
@@ -46,7 +50,8 @@ export default function ChatMessage({
   status = "Обработка запроса",
   since = null,
   usage,
-  tools,
+  toolCalls = [],
+  renderTools,
   artifacts,
   onEdit,
   onRefresh,
@@ -58,6 +63,7 @@ export default function ChatMessage({
   readonly messageId?: MessageId;
   readonly content: string;
   readonly reasoning?: string;
+  readonly rounds?: readonly ChatRoundDto[];
   readonly citations: readonly ChatCitationDto[];
   readonly webSources?: readonly WebSourceDto[];
   readonly selections?: readonly DocumentSelectionDto[];
@@ -67,7 +73,8 @@ export default function ChatMessage({
   readonly status?: string;
   readonly since?: number | null;
   readonly usage?: string;
-  readonly tools?: ReactNode;
+  readonly toolCalls?: readonly ChatToolCallDto[];
+  readonly renderTools: (calls: readonly ChatToolCallDto[]) => ReactNode;
   readonly artifacts?: ReactNode;
   readonly onEdit?: () => void;
   readonly onRefresh?: () => void;
@@ -102,11 +109,11 @@ export default function ChatMessage({
   const [activeTab, setActiveTab] = useState<string>(tabs[0] ?? "");
   const selectedTab = tabs.find((tab) => tab === activeTab) ?? tabs[0] ?? "";
   const selectedCitations = citations.filter((citation) => citation.storeId === selectedTab);
-  const thinking = generating && content === "";
-  const markdown = (
+  const blocks = answerBlocks(content, reasoning, rounds, toolCalls);
+  const markdown = (text: string, streaming: boolean) => (
     <ChatMarkdown
-      content={content}
-      streaming={generating}
+      content={text}
+      streaming={streaming}
       citations={citations}
       webSources={webSources}
       onCite={view}
@@ -120,13 +127,26 @@ export default function ChatMessage({
       <AssistantAvatar size={28} live={generating} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <div className="space-y-3">
-          {reasoning && <ReasoningBlock reasoning={reasoning} thinking={thinking} />}
-          {tools}
-          {messageId === undefined || generating ? (
-            markdown
-          ) : (
-            <AnswerQuote messageId={messageId}>{markdown}</AnswerQuote>
-          )}
+          {blocks.map((block, index) => {
+            if (block.kind === "tools")
+              return <Fragment key={block.key}>{renderTools(block.calls)}</Fragment>;
+            const last = generating && index === blocks.length - 1;
+            return (
+              <Fragment key={block.key}>
+                {block.reasoning.trim().length > 0 && (
+                  <ReasoningBlock
+                    reasoning={block.reasoning}
+                    thinking={last && block.text === ""}
+                  />
+                )}
+                {block.text.trim().length === 0 ? null : messageId === undefined || generating ? (
+                  markdown(block.text, last)
+                ) : (
+                  <AnswerQuote messageId={messageId}>{markdown(block.text, false)}</AnswerQuote>
+                )}
+              </Fragment>
+            );
+          })}
           {generating && <GenerationStatus label={status} since={since} />}
           <ChatSources
             sources={sources}

@@ -241,6 +241,14 @@ impl Validate for WebSourceDto {
 }
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatRoundDto {
+    pub text: String,
+    pub reasoning: String,
+}
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatToolCallDto {
@@ -526,6 +534,8 @@ pub struct MessageDto {
     pub offered_tools: Vec<OfferedToolDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub web_sources: Vec<WebSourceDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rounds: Vec<ChatRoundDto>,
     pub tokens_in: u64,
     pub tokens_out: u64,
     pub usage_estimated: bool,
@@ -926,6 +936,8 @@ pub struct ChatAttachDto {
     pub started_at: Timestamp,
     pub content: String,
     pub reasoning: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rounds: Vec<ChatRoundDto>,
     pub tool_calls: Vec<ChatToolCallDto>,
     pub approvals: Vec<ApprovalRequestDto>,
     pub questions: Vec<QuestionRequestDto>,
@@ -947,6 +959,7 @@ pub type ChatAttachOutput = Option<ChatAttachDto>;
 crate::validate::no_refinements!(
     BranchConversationInput,
     ChatAttachInput,
+    ChatRoundDto,
     ConversationRef,
     PinConversationInput,
     PinMessageInput,

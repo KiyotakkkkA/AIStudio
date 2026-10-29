@@ -232,5 +232,63 @@
       "pinned": true,
       "createdAt": 3
     }
+  },
+  {
+    "name": "assistant with rounds",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111111",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "role": "assistant",
+      "content": "Поиск.\n\nНайдено.",
+      "reasoning": "Нужен поиск.Готово.",
+      "citations": [
+        {
+          "storeId": "0199aa11-5555-7111-8111-111111111111",
+          "documentId": "doc",
+          "sourcePath": "docs/a.md",
+          "chunkIndex": 3,
+          "score": 0.9,
+          "section": "",
+          "page": null,
+          "related": null
+        }
+      ],
+      "toolCalls": [
+        {
+          "id": "call_1",
+          "key": "demo.lookup",
+          "name": "demo__lookup",
+          "round": 0,
+          "arguments": {
+            "query": "x"
+          },
+          "status": "succeeded",
+          "result": "found x",
+          "truncated": false,
+          "error": null,
+          "approvalId": null,
+          "stepId": null,
+          "durationMs": 4,
+          "meta": null
+        }
+      ],
+      "rounds": [
+        {
+          "text": "Поиск.",
+          "reasoning": "Нужен поиск."
+        },
+        {
+          "text": "\n\nНайдено.",
+          "reasoning": "Готово."
+        }
+      ],
+      "tokensIn": 12,
+      "tokensOut": 2,
+      "usageEstimated": true,
+      "durationMs": 40,
+      "runId": "0199aa11-4444-7111-8111-111111111111",
+      "partial": false,
+      "createdAt": 3
+    }
   }
 ]
