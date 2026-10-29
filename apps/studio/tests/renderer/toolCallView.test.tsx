@@ -3,7 +3,9 @@ import { expect, test } from "vitest";
 import { ChatToolCallDto, type Json } from "@zvs/shared";
 import ChatToolCalls from "../../src/renderer/features/chat/ChatToolCalls";
 import {
+  AUTHORISATION_TITLE,
   TOOL_PRESENTATION,
+  authorisationView,
   isBuiltinTool,
   lineRange,
   toolPresentation,
@@ -11,6 +13,7 @@ import {
 } from "../../src/renderer/features/chat/toolCallCopy.ts";
 import { resultLines, toolCallView } from "../../src/renderer/features/chat/toolCallView.ts";
 import { toolCallSummary } from "../../src/renderer/features/chat/toolCallSummary.ts";
+import { EXEC_MODE_COPY } from "../../src/renderer/features/execPolicy/execPolicyCopy.ts";
 
 const call = (key: string, args: Json, extra: Partial<ChatToolCallDto> = {}) =>
   ChatToolCallDto.parse({
@@ -164,4 +167,40 @@ test("collapsed summaries describe file, skill and search calls instead of raw J
     "pdf · SKILL.md",
   );
   expect(toolCallSummary(call("vector.search", { query: "q", storeId: "s" }))).toBe("«q»");
+});
+
+test("an authorisation names the mode, or keeps the judge source and its reason", () => {
+  const policy = authorisationView({ kind: "policy", source: "safety-ask" });
+  expect(policy.label).toContain(EXEC_MODE_COPY["safety-ask"].label);
+  expect(policy.source).toBeNull();
+  expect(policy.reason).toBeNull();
+  const judged = authorisationView({
+    kind: "judge",
+    source: "gpt-oss:120b",
+    reason: "Удаляется временный файл.",
+  });
+  expect(judged.source).toBe("gpt-oss:120b");
+  expect(judged.reason).toBe("Удаляется временный файл.");
+  expect(authorisationView({ kind: "approved" }).source).toBeNull();
+});
+
+test("the expanded call shows why it ran", () => {
+  render(
+    <ChatToolCalls
+      calls={[
+        call(
+          "fs.apply",
+          { changes: [] },
+          {
+            status: "succeeded",
+            authorisation: { kind: "judge", source: "judge-model", reason: "Причина решения." },
+          },
+        ),
+      ]}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { expanded: false }));
+  expect(screen.getByText(AUTHORISATION_TITLE)).toBeTruthy();
+  expect(screen.getByText("Причина решения.")).toBeTruthy();
+  expect(screen.getByText("judge-model")).toBeTruthy();
 });

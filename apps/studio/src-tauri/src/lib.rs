@@ -68,6 +68,7 @@ use zvs_host::platform::theme::{
     apply_theme_source,
 };
 use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_window_state};
+use zvs_host::policy::{ExecPolicyOptions, ExecPolicyService, POLICY_DIR};
 use zvs_host::runtimes::{
     ReleaseResolver, ReleaseResolverOptions, RuntimeService, RuntimeServiceOptions,
 };
@@ -822,6 +823,11 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             mcp_http,
         )
     });
+    let exec_policy = ExecPolicyService::new(ExecPolicyOptions {
+        logger: logger.clone(),
+        packs: Some(paths.data_dir.join(POLICY_DIR)),
+        ..ExecPolicyOptions::new(Arc::clone(&database), clock.clone())
+    });
     let runs = RunService::new(RunServiceOptions {
         services: KernelServices {
             providers: Some(registry.clone()),
@@ -830,6 +836,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             downloads: Some(Arc::new(downloads.clone())),
             indexing: Some(Arc::new(indexing.clone())),
             graph: Some(Arc::new(graph.clone())),
+            policy: Some(Arc::new(exec_policy.clone())),
         },
         clock: clock.clone(),
         logger: logger.clone(),
@@ -1140,6 +1147,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         documents,
         artifacts,
         sites,
+        exec_policy,
         browser: agent.clone(),
         folders,
         picker: Some(picker),

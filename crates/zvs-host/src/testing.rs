@@ -436,11 +436,16 @@ pub fn test_services(system: SystemService) -> TestServices {
     );
     crate::skills::register_skill_nodes(&nodes, &skill_library).expect("registers the skill nodes");
     crate::tools::register_kernel_tools(&nodes, &tools).expect("registers the kernel tools");
+    let exec_policy = crate::policy::ExecPolicyService::new(crate::policy::ExecPolicyOptions::new(
+        database.shared(),
+        clock.clone(),
+    ));
     let runs = RunService::new(RunServiceOptions {
         clock: clock.clone(),
         tools: Some(tools.clone()),
         services: crate::kernel::KernelServices {
             providers: Some(Arc::new(FakeTexts(drivers.clone()))),
+            policy: Some(Arc::new(exec_policy.clone())),
             jobs: Some(jobs.clone()),
             downloads: Some(Arc::new(downloads.clone())),
             indexing: Some(Arc::new(indexing.clone())),
@@ -629,6 +634,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             ),
             artifacts: test_artifacts(workspace.join("conversations")),
             sites: crate::sites::SiteService::new(crate::sites::SiteServiceOptions::default()),
+            exec_policy,
             browser: crate::browser::BrowserAgent::new(clock.clone()),
             documents: crate::documents::DocumentService::new(
                 crate::documents::DocumentServiceOptions {

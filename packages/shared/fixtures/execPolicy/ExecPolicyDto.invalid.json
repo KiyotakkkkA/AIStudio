@@ -1,0 +1,25 @@
+[
+  {
+    "name": "unknown mode",
+    "value": {
+      "mode": "never",
+      "judge": null
+    }
+  },
+  {
+    "name": "missing judge",
+    "value": {
+      "mode": "safety-ask"
+    }
+  },
+  {
+    "name": "empty judge provider",
+    "value": {
+      "mode": "auto-bypass",
+      "judge": {
+        "providerId": "",
+        "modelId": "gpt-oss:120b"
+      }
+    }
+  }
+]

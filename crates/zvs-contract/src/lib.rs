@@ -11,6 +11,7 @@ pub mod enums;
 pub mod envelope;
 pub mod errors;
 pub mod events;
+pub mod exec_policy;
 pub mod explorer;
 pub mod files;
 pub mod folders;
@@ -103,6 +104,10 @@ pub use errors::{AppError, AppErrorCode, ErrorDetails};
 pub use events::{
     ApprovalRequestDto, DeltaKind, EVENT_CHANNEL, EventSeq, HostEvent, HostEventDraft, LogLineDto,
     RunOutcomeDto, RunOutcomeStatus, StepEventDto,
+};
+pub use exec_policy::{
+    EXEC_JUDGE_ID_MAX, ExecJudgeDto, ExecMode, ExecPolicyDto, TOOL_AUTHORISATION_REASON_MAX,
+    TOOL_AUTHORISATION_SOURCE_MAX, ToolAuthorisationDto, ToolAuthorisationKind,
 };
 pub use explorer::{
     EXPLORER_CHANGES_MAX, EXPLORER_LIST_MAX, EXPLORER_STEP_DOMAIN, EXPLORER_TEXT_MAX,

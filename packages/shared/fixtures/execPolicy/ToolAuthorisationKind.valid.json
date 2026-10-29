@@ -1,0 +1,22 @@
+[
+  {
+    "name": "auto",
+    "value": "auto"
+  },
+  {
+    "name": "granted",
+    "value": "granted"
+  },
+  {
+    "name": "approved",
+    "value": "approved"
+  },
+  {
+    "name": "policy",
+    "value": "policy"
+  },
+  {
+    "name": "judge",
+    "value": "judge"
+  }
+]

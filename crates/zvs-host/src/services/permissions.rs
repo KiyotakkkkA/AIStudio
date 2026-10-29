@@ -150,6 +150,20 @@ impl PermissionService {
         })
     }
 
+    pub fn granted(&self, subject: &str, context: &PermissionContext) -> Result<bool, AppError> {
+        self.database.with_connection(|connection| {
+            Ok(Repositories::new(connection)
+                .permissions
+                .list(subject)?
+                .iter()
+                .any(|row| {
+                    row.tier == ToolTier::Auto
+                        && row.scope != GLOBAL_SCOPE
+                        && context.scopes.contains(&row.scope)
+                }))
+        })
+    }
+
     pub fn admit_subject(
         &self,
         subject: &str,

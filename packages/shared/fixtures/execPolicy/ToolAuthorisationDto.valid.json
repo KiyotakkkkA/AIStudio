@@ -1,0 +1,23 @@
+[
+  {
+    "name": "auto",
+    "value": {
+      "kind": "auto"
+    }
+  },
+  {
+    "name": "policy",
+    "value": {
+      "kind": "policy",
+      "source": "no-restrictions"
+    }
+  },
+  {
+    "name": "rule",
+    "value": {
+      "kind": "judge",
+      "source": "vendor.allow-build-output",
+      "reason": "Удаление в папке сборки разрешено правилом."
+    }
+  }
+]

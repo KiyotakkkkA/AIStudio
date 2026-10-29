@@ -554,6 +554,7 @@ mod tests {
                     step_id: None,
                     duration_ms: 0,
                     meta: None,
+                    authorisation: None,
                 };
                 let added = chat.add_message(&MessageRow {
                     tool_calls: vec![call("a", ChatToolCallStatus::Running)],

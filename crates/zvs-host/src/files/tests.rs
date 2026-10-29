@@ -6,9 +6,9 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 use zvs_contract::{
-    AppError, AppErrorCode, BindFolderInput, ConversationId, CreateConversationInput,
-    FileChangeKind, FolderAccessAnswer, FolderGrantScope, HostEventDraft, ProviderCapability,
-    ProviderId, ProviderKind, RunHandleDto, RunId, RunStatus, ToolTier,
+    AppError, AppErrorCode, BindFolderInput, ConversationId, CreateConversationInput, ExecMode,
+    ExecPolicyDto, FileChangeKind, FolderAccessAnswer, FolderGrantScope, HostEventDraft,
+    ProviderCapability, ProviderId, ProviderKind, RunHandleDto, RunId, RunStatus, ToolTier,
 };
 
 use super::commit::{Fault, MANIFEST, commit};
@@ -25,7 +25,7 @@ use super::text::BOM;
 use super::walk::IgnoreRules;
 use crate::data::Repositories;
 use crate::data::repositories::{ModelDraft, ProviderDraft};
-use crate::kernel::{FnNode, PermissionRequirement, StepContext};
+use crate::kernel::{FnNode, PermissionRequirement, StepContext, TOOL_AUTHORISED};
 use crate::platform::clock::FakeClock;
 use crate::platform::events::EventBus;
 use crate::services::SystemService;
@@ -456,6 +456,25 @@ impl Host {
         panic!("no approval was requested");
     }
 
+    fn authorisations(&self, handle: &RunHandleDto) -> Vec<String> {
+        self.services
+            .run_events
+            .events()
+            .into_iter()
+            .filter(|event| event.stream_id == handle.stream_id)
+            .filter_map(|event| match event.body {
+                HostEventDraft::Log { line }
+                    if line.get("message") == Some(&json!(TOOL_AUTHORISED)) =>
+                {
+                    line.get("authorisation")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned)
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
     async fn finish(&self, run: &RunId) -> RunStatus {
         tokio::time::timeout(Duration::from_secs(120), self.services.runs.wait(run))
             .await
@@ -656,6 +675,100 @@ async fn a_delete_asks_even_at_auto_and_off_still_denies() {
     assert_eq!(host.finish(&off.id).await, RunStatus::Failed);
     assert!(host.approvals(&off.id).is_empty());
     assert!(file.exists());
+}
+
+#[tokio::test]
+async fn the_execution_mode_answers_the_diff_approval_and_records_why() {
+    let host = Host::new();
+    let folder = temporary_directory("policy-");
+    let root = canonical(folder.path()).expect("a canonical path");
+    let file = root.join("a.txt");
+    std::fs::write(
+        &file, "a
+",
+    )
+    .expect("writes");
+    let conversation = host.bound(&root);
+    host.services
+        .exec_policy
+        .set(&ExecPolicyDto {
+            mode: ExecMode::SafetyAsk,
+            judge: None,
+        })
+        .expect("stores the mode");
+
+    let created = host.start(json!([apply_node(
+        conversation,
+        &[],
+        json!([{ "op": "write", "path": "new.txt", "content": "n
+" }])
+    )]));
+    assert_eq!(host.finish(&created.id).await, RunStatus::Succeeded);
+    assert!(host.approvals(&created.id).is_empty());
+    assert_eq!(
+        text(&root.join("new.txt")),
+        "n
+"
+    );
+    assert_eq!(
+        host.authorisations(&created),
+        ["policy:safety-ask".to_owned()]
+    );
+
+    let deleted = host.start(json!([
+        read_node(conversation, &[&file]),
+        apply_node(
+            conversation,
+            &["read"],
+            json!([{ "op": "delete", "path": "a.txt" }])
+        )
+    ]));
+    let request = host.approval(&deleted.id).await;
+    assert_eq!(request["kind"], json!("files"));
+    host.services
+        .runs
+        .approve(&deleted.id, request["id"].as_str().expect("an id"), false)
+        .expect("approves");
+    assert_eq!(host.finish(&deleted.id).await, RunStatus::Succeeded);
+    assert!(!file.exists());
+    assert!(
+        host.authorisations(&deleted)
+            .contains(&"approved".to_owned())
+    );
+
+    host.services
+        .exec_policy
+        .set(&ExecPolicyDto {
+            mode: ExecMode::NoRestrictions,
+            judge: None,
+        })
+        .expect("stores the mode");
+    std::fs::write(
+        &file, "again
+",
+    )
+    .expect("writes");
+    let free = host.start(json!([
+        read_node(conversation, &[&file]),
+        apply_node(
+            conversation,
+            &["read"],
+            json!([{ "op": "delete", "path": "a.txt" }])
+        )
+    ]));
+    assert_eq!(host.finish(&free.id).await, RunStatus::Succeeded);
+    assert!(host.approvals(&free.id).is_empty());
+    assert!(!file.exists());
+
+    let forbidden = host.services.workspace.join("inside.txt");
+    let refused = host.start(json!([apply_node(
+        conversation,
+        &[],
+        json!([{ "op": "write", "path": forbidden.to_string_lossy(), "content": "y" }])
+    )]));
+    assert_eq!(host.finish(&refused.id).await, RunStatus::Failed);
+    assert!(host.approvals(&refused.id).is_empty());
+    assert!(!forbidden.exists());
 }
 
 #[tokio::test]

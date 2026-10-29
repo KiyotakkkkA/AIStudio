@@ -1,0 +1,15 @@
+[
+  {
+    "name": "empty model",
+    "value": {
+      "providerId": "0199aa11-2222-7111-8111-111111111111",
+      "modelId": ""
+    }
+  },
+  {
+    "name": "missing provider",
+    "value": {
+      "modelId": "gpt-oss:120b"
+    }
+  }
+]

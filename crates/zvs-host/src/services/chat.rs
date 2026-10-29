@@ -1870,6 +1870,7 @@ impl GenerateChatNode {
                     let mut guard = calls.lock().unwrap_or_else(PoisonError::into_inner);
                     guard[index].step_id = Some(result.step_id);
                     guard[index].meta = result.meta;
+                    guard[index].authorisation = result.authorisation;
                 }
                 if knowledge {
                     let formatted = {
@@ -2097,6 +2098,7 @@ impl GenerateChatNode {
                             step_id: None,
                             duration_ms: 0,
                             meta: None,
+                            authorisation: None,
                         });
                         guard.len() - 1
                     };

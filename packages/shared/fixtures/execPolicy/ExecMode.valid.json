@@ -1,0 +1,18 @@
+[
+  {
+    "name": "always-ask",
+    "value": "always-ask"
+  },
+  {
+    "name": "safety-ask",
+    "value": "safety-ask"
+  },
+  {
+    "name": "auto-bypass",
+    "value": "auto-bypass"
+  },
+  {
+    "name": "no-restrictions",
+    "value": "no-restrictions"
+  }
+]

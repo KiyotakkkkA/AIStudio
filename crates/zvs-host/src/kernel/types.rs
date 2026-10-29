@@ -7,13 +7,13 @@ use futures::future::BoxFuture;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use serde_json::Value;
+use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, AppErrorCode, ApprovalRequestDto, GraphNeighborDto, GraphNeighborsInput,
-    HostEventDraft, QuestionAnswerDto, QuestionRequestDto, RunId, ToolTier, Validate,
-    VectorChunkDto, VectorDocumentDto, VectorIndexInput, VectorIndexReportDto, VectorSearchHitDto,
-    VectorStoreDto,
+    HostEventDraft, QuestionAnswerDto, QuestionRequestDto, RunId, ToolAuthorisationDto, ToolTier,
+    Validate, VectorChunkDto, VectorDocumentDto, VectorIndexInput, VectorIndexReportDto,
+    VectorSearchHitDto, VectorStoreDto, log_line,
 };
 
 pub use crate::data::schema::ApprovalDecision;
@@ -22,11 +22,13 @@ use crate::drivers::ai::ProviderRegistry;
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::sidecar::SharedSidecarJobs;
 use crate::indexing::{IndexContext, IndexingService};
+use crate::policy::{ReviewVerdict, ReviewedAction};
 use crate::services::graph::GraphService;
 use crate::services::vector_stores::{VectorSearchOptions, VectorStoreService};
 
 pub const CANCELLED_MESSAGE: &str = "Выполнение отменено";
 pub const NO_QUESTION_SERVICE: &str = "Вопросы пользователю недоступны в этом запуске";
+pub const TOOL_AUTHORISED: &str = "Tool call authorised";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QuestionOutcome {
@@ -245,6 +247,26 @@ pub struct KernelServices {
     pub downloads: Option<SharedDownloadExecutor>,
     pub indexing: Option<Arc<dyn VectorIndexer>>,
     pub graph: Option<Arc<dyn GraphNeighbors>>,
+    pub policy: Option<Arc<dyn ExecReview>>,
+}
+
+#[async_trait]
+pub trait ExecReview: Send + Sync {
+    async fn review(
+        &self,
+        context: &StepContext,
+        action: &ReviewedAction,
+    ) -> Result<ReviewVerdict, AppError>;
+}
+
+pub async fn review_action(
+    context: &StepContext,
+    action: ReviewedAction,
+) -> Result<ReviewVerdict, AppError> {
+    match &context.services.policy {
+        Some(policy) => policy.review(context, &action).await,
+        None => Ok(ReviewVerdict::Ask { reason: None }),
+    }
 }
 
 pub type ApprovalObserver =
@@ -264,6 +286,7 @@ pub struct ToolStepResult {
     pub step_id: String,
     pub output: Value,
     pub meta: Option<Value>,
+    pub authorisation: Option<ToolAuthorisationDto>,
 }
 
 pub type ToolStepFuture = BoxFuture<'static, Result<ToolStepResult, AppError>>;
@@ -301,6 +324,7 @@ pub struct StepContext {
     pub services: KernelServices,
     link: Arc<dyn StepLink>,
     deferred: Option<Arc<Mutex<Option<DeferredApproval>>>>,
+    authorisation: Option<Arc<Mutex<Option<ToolAuthorisationDto>>>>,
 }
 
 impl StepContext {
@@ -316,6 +340,7 @@ impl StepContext {
             services,
             link,
             deferred: None,
+            authorisation: None,
         }
     }
 
@@ -345,6 +370,36 @@ impl StepContext {
         self.deferred
             .as_ref()
             .and_then(|slot| slot.lock().unwrap_or_else(PoisonError::into_inner).take())
+    }
+
+    pub fn recording(self) -> Self {
+        Self {
+            authorisation: Some(Arc::new(Mutex::new(None))),
+            ..self
+        }
+    }
+
+    pub fn authorise(&self, authorisation: ToolAuthorisationDto) -> Result<(), AppError> {
+        let Some(slot) = &self.authorisation else {
+            return Ok(());
+        };
+        let mut fields = vec![
+            ("message", json!(TOOL_AUTHORISED)),
+            ("authorisation", json!(authorisation.label())),
+        ];
+        if let Some(reason) = &authorisation.reason {
+            fields.push(("reason", json!(reason)));
+        }
+        *slot.lock().unwrap_or_else(PoisonError::into_inner) = Some(authorisation);
+        self.link.emit(HostEventDraft::Log {
+            line: log_line(&fields),
+        })
+    }
+
+    pub fn authorisation(&self) -> Option<ToolAuthorisationDto> {
+        self.authorisation
+            .as_ref()
+            .and_then(|slot| slot.lock().unwrap_or_else(PoisonError::into_inner).clone())
     }
 
     pub fn is_cancelled(&self) -> bool {

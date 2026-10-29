@@ -5,6 +5,7 @@ pub mod browser_grants;
 pub mod chat;
 pub mod documents;
 pub mod downloads;
+pub mod exec_policy;
 pub mod folders;
 pub mod graph_relations;
 pub mod integrations;
@@ -47,6 +48,7 @@ pub fn register(server: &mut IpcServer) {
     notifications::register(server);
     skills::register(server);
     sites::register(server);
+    exec_policy::register(server);
     scenarios::register(server);
     toolchain::register(server);
     chat::register(server);
@@ -151,6 +153,8 @@ mod tests {
                 "downloads.remove",
                 "downloads.resume",
                 "downloads.start",
+                "execPolicy.get",
+                "execPolicy.set",
                 "folders.answer",
                 "folders.list",
                 "folders.revoke",

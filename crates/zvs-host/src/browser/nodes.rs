@@ -7,7 +7,10 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use zvs_contract::validate::{check, invalid, js_slice};
-use zvs_contract::{AppError, AppErrorCode, BrowserAgentApproval, BrowserAuthorisation, Validate};
+use zvs_contract::{
+    AppError, AppErrorCode, BrowserAgentApproval, BrowserAuthorisation, ToolAuthorisationDto,
+    ToolAuthorisationKind, Validate,
+};
 
 use super::agent::BrowserAgent;
 use super::automation::{
@@ -18,7 +21,10 @@ use super::capability::{BrowserCapability, site_origin, site_scope};
 use super::grants::BrowserGrants;
 use super::page::{PageElement, fence_page};
 use super::policy::navigation_url;
-use crate::kernel::{ApprovalDecision, NodeDef, NodeRegistry, PermissionRequirement, StepContext};
+use crate::kernel::{
+    ApprovalDecision, NodeDef, NodeRegistry, PermissionRequirement, StepContext, review_action,
+};
+use crate::policy::{ReviewVerdict, ReviewedAction, rule_denied};
 use crate::services::approvals::ApprovalService;
 use crate::services::permissions::GLOBAL_SCOPE;
 
@@ -341,6 +347,23 @@ impl Browser {
             );
             return Ok(());
         };
+        let reviewed = if matches!(
+            capability,
+            BrowserCapability::Submit | BrowserCapability::Download
+        ) {
+            ReviewedAction::Browser
+        } else {
+            ReviewedAction::Plain
+        };
+        let reason = match review_action(act.context, reviewed).await? {
+            ReviewVerdict::Run(authorisation) => {
+                self.agent
+                    .authorised(act.action, BrowserAuthorisation::Auto);
+                return act.context.authorise(authorisation);
+            }
+            ReviewVerdict::Deny { rule } => return Err(rule_denied(&rule)),
+            ReviewVerdict::Ask { reason } => reason,
+        };
         let scope = origin
             .as_deref()
             .map_or_else(|| GLOBAL_SCOPE.to_owned(), site_scope);
@@ -387,7 +410,9 @@ impl Browser {
             matches!(decision, Ok(ApprovalDecision::Approved)),
         );
         match decision? {
-            ApprovalDecision::Approved => Ok(()),
+            ApprovalDecision::Approved => act.context.authorise(
+                ToolAuthorisationDto::of(ToolAuthorisationKind::Approved).because(reason),
+            ),
             ApprovalDecision::Denied => {
                 Err(AppError::new(AppErrorCode::ApprovalDenied, BROWSER_DENIED))
             }

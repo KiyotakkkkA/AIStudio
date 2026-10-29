@@ -12,7 +12,7 @@ use zvs_contract::{
     AppError, AppErrorCode, HostEvent, HostEventDraft, RunApprovalDto, RunCountsDto, RunDetailDto,
     RunDto, RunHandleDto, RunId, RunKind, RunListFilter, RunPageDto, RunProgressDto, RunStatus,
     RunSummaryDto, RunsClearFinishedOutput, StartRunInput, StepDto, StepId, StepStatus, StreamId,
-    ToolTier, Validate, log_line,
+    ToolAuthorisationDto, ToolAuthorisationKind, ToolTier, Validate, log_line,
 };
 
 use super::approvals::{ApprovalService, DEFAULT_APPROVAL_TIMEOUT};
@@ -25,12 +25,13 @@ use crate::kernel::scheduler::step_event;
 use crate::kernel::{
     AdmissionOrigin, AdmitHook, ApprovalDecision, ApprovalHook, DeferredApproval, Finish,
     KernelServices, NodeRegistry, Observers, PermissionRequirement, QuestionHook, RunObserver,
-    RunStream, RunWatcher, Scheduler, SchedulerOptions, StepContext, Subscription,
+    RunStream, RunWatcher, Scheduler, SchedulerOptions, StepContext, Subscription, review_action,
 };
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::events::{EventBus, StreamOptions};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
+use crate::policy::{ReviewVerdict, ReviewedAction, rule_denied};
 use crate::tools::ToolRegistry;
 
 pub const DEFAULT_GRACE: Duration = Duration::from_millis(500);
@@ -137,7 +138,9 @@ impl Gate {
                 AppErrorCode::PermissionDenied,
                 "Permission denied",
             )),
-            Admission::Allow | Admission::Ask => Ok(()),
+            Admission::Allow | Admission::Ask => {
+                context.authorise(ToolAuthorisationDto::of(ToolAuthorisationKind::Auto))
+            }
         }
     }
 
@@ -176,7 +179,14 @@ impl Gate {
             .permissions
             .admit_subject(&tool, &permission, minimum)?
         {
-            Admission::Allow => Ok(()),
+            Admission::Allow => {
+                let kind = if self.permissions.granted(&tool, &permission)? {
+                    ToolAuthorisationKind::Granted
+                } else {
+                    ToolAuthorisationKind::Auto
+                };
+                context.authorise(ToolAuthorisationDto::of(kind))
+            }
             Admission::Deny => Err(AppError::new(
                 AppErrorCode::PermissionDenied,
                 "Permission denied",
@@ -189,6 +199,16 @@ impl Gate {
                 }) {
                     return Ok(());
                 }
+                let action = if minimum == ToolTier::Ask {
+                    ReviewedAction::Declared
+                } else {
+                    ReviewedAction::Plain
+                };
+                let reason = match review_action(&context, action).await? {
+                    ReviewVerdict::Run(authorisation) => return context.authorise(authorisation),
+                    ReviewVerdict::Deny { rule } => return Err(rule_denied(&rule)),
+                    ReviewVerdict::Ask { reason } => reason,
+                };
                 let request = self.approvals.create(&run.id, &tool, scope)?;
                 let decision = context.request_approval(request).await?;
                 if decision != ApprovalDecision::Approved {
@@ -207,7 +227,9 @@ impl Gate {
                         "Permission revoked",
                     ));
                 }
-                Ok(())
+                context.authorise(
+                    ToolAuthorisationDto::of(ToolAuthorisationKind::Approved).because(reason),
+                )
             }
         }
     }

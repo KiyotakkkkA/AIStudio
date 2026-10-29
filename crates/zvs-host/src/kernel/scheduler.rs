@@ -618,7 +618,8 @@ impl Scheduler {
                 context.deferring()
             } else {
                 context
-            };
+            }
+            .recording();
             let requirement = definition.permission_for(&input);
             if let Some(admit) = admit {
                 admit(requirement, context.clone(), AdmissionOrigin::Graph).await?;
@@ -793,7 +794,8 @@ impl Scheduler {
             context.deferring()
         } else {
             context
-        };
+        }
+        .recording();
         let outcome = async {
             match self.options.admit.clone() {
                 Some(admit) => admit(requirement, context.clone(), AdmissionOrigin::Model).await?,
@@ -832,6 +834,7 @@ impl Scheduler {
             step_id: step.id,
             output,
             meta,
+            authorisation: context.authorisation(),
         })
     }
 

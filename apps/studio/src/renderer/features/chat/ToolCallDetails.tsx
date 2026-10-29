@@ -10,7 +10,7 @@ import {
   mdiMagnify,
   mdiPuzzleOutline,
 } from "@mdi/js";
-import type { ChatCitationDto } from "@zvs/shared";
+import type { ChatCitationDto, ToolAuthorisationDto } from "@zvs/shared";
 import Icon from "../../ui/atoms/Icon";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import Collapse from "../../ui/motion/Collapse";
@@ -20,6 +20,7 @@ import { sourceName } from "./citations";
 import { commandLine } from "./processCopy";
 import {
   ALL_STORES,
+  AUTHORISATION_TITLE,
   COPY_RESULT,
   DOCUMENT_FIELD,
   FILES_TITLE,
@@ -41,6 +42,7 @@ import {
   STDIN_FIELD,
   STORE_FIELD,
   WORKING_FOLDER,
+  authorisationView,
   lineRange,
   scorePercent,
 } from "./toolCallCopy";
@@ -443,6 +445,27 @@ export function ResultBlock({
           {result}
         </pre>
       </ScrollArea>
+    </div>
+  );
+}
+
+export function AuthorisationNote({
+  authorisation,
+}: {
+  readonly authorisation: ToolAuthorisationDto;
+}) {
+  const view = authorisationView(authorisation);
+  return (
+    <div>
+      <Eyebrow>{AUTHORISATION_TITLE}</Eyebrow>
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[12px] text-main-200">
+        <Icon path={view.icon} size={14} className="shrink-0 text-main-400" />
+        <span>{view.label}</span>
+        {view.source === null ? null : <Tag mono>{view.source}</Tag>}
+      </div>
+      {view.reason === null ? null : (
+        <p className="m-0 mt-1 text-[12px] leading-[18px] text-main-300">{view.reason}</p>
+      )}
     </div>
   );
 }

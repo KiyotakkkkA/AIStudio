@@ -18,6 +18,7 @@ import * as notifications from "../src/notifications.js";
 import * as documents from "../src/documents.js";
 import * as artifacts from "../src/artifacts.js";
 import * as sites from "../src/sites.js";
+import * as execPolicy from "../src/execPolicy.js";
 import * as storage from "../src/storage.js";
 import * as integrations from "../src/integrations.js";
 import {
@@ -281,6 +282,11 @@ const schemas: Record<string, z.ZodType> = {
   "sites/OpenSiteInput": sites.OpenSiteInput,
   "sites/SiteIconInput": sites.SiteIconInput,
   "sites/SiteIconDto": sites.SiteIconDto,
+  "execPolicy/ExecMode": execPolicy.ExecMode,
+  "execPolicy/ExecJudgeDto": execPolicy.ExecJudgeDto,
+  "execPolicy/ExecPolicyDto": execPolicy.ExecPolicyDto,
+  "execPolicy/ToolAuthorisationKind": execPolicy.ToolAuthorisationKind,
+  "execPolicy/ToolAuthorisationDto": execPolicy.ToolAuthorisationDto,
   "artifacts/ArtifactDto": artifacts.ArtifactDto,
   "artifacts/ArtifactRef": artifacts.ArtifactRef,
   "artifacts/ArtifactSaveResult": artifacts.ArtifactSaveResult,

@@ -67,6 +67,7 @@ import {
   OpenArtifactInBrowserInput,
 } from "../artifacts.js";
 import { OpenSiteInput, SiteIconDto, SiteIconInput } from "../sites.js";
+import { ExecPolicyDto } from "../execPolicy.js";
 import {
   DocumentDto,
   DocumentHandle,
@@ -540,6 +541,8 @@ export const contract = defineContract({
   },
   "notifications.clear": { input: NotificationTargetDto, output: z.void() },
   "notifications.pending": { input: z.void(), output: NotificationTargetDto.nullable() },
+  "execPolicy.get": { input: z.void(), output: ExecPolicyDto },
+  "execPolicy.set": { input: ExecPolicyDto, output: ExecPolicyDto },
   "settings.set": {
     input: z.object({ key: SettingKey, value: Json }),
     output: z.object({ key: SettingKey, value: Json, updatedAt: Timestamp }),

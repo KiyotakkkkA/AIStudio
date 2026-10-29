@@ -829,7 +829,7 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
 - **Folder access and tool tiers are separate axes.** A grant says *where* a tool may act;
   the tier on the Tools page says *whether* and with what confirmation it may act. Neither
   widens the other.
-- **Execution policy** (design, 2026-10-29). A third axis, above the two: it decides how a call
+- **Execution policy** (2026-10-29). A third axis, above the two: it decides how a call
   that would *ask* is answered, and nothing else. One global mode, shown and switched from the
   composer (the shield button beside the provider control):
 
@@ -862,10 +862,29 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
 - **Audit.** Every admitted call records why it ran: `auto`, `granted`, `approved`,
   `policy:<mode>` or `judge:<rule id | model>` with the judge's reason, in the run log and on
   the tool call's details.
-- **Status (2026-10-29): renderer preview only.** The composer control and the judge model
-  setting exist and hold their values in memory for the session; the host ignores the mode and
-  every call is admitted as under `always-ask`. Rules, packs, the judge and the audit field are
-  not built.
+- **Implementation (`zvs-host/src/policy/`, TASK_048_EXTRA_1, 2026-10-29).** The mode and the
+  judge are stored under the `exec.policy` setting and reached only through `execPolicy.get` /
+  `execPolicy.set` (`settings.set` refuses the key). `set` refuses a judge whose provider is
+  disabled or whose model is unavailable, and `auto-bypass` without a judge; `get` clears a
+  judge that disappeared since, drops `auto-bypass` to `safety-ask` and stores the result.
+  `decide(mode, family)` is the table above as a pure function. It is consulted through the
+  `ExecReview` port in `KernelServices` at every point an approval would be raised: the gate
+  in `RunService` for tools that do not defer, and the deferred approvals of `fs.apply`, the
+  process tools and the browser acting nodes. A tool declared destructive whose effect the
+  host cannot see asks in every mode but `no-restrictions`; `code.run` never meets argv rules
+  and goes straight to the judge. Rule packs are JSON (`{ id, allows, rules[] }`, each rule
+  `files: { paths, operations }` or `process: { argv, cwd }`, `**` matching any run of
+  arguments, `{a,b}` alternation, case-insensitive): the vendor pack ships in
+  `policy/vendor.json`, user packs are read from `<app data>/policy/*.json` on every review,
+  and a pack that holds an `allow` it did not declare, or does not parse, is skipped with a
+  warning. In a batch the destructive changes are matched one by one: any `deny` refuses the
+  batch, any `ask` asks, and the batch runs on rules only when every change is allowed;
+  otherwise the judge sees it. The judge is one `generate` call through the provider's own
+  driver with a single `verdict` tool (`decision: allow | ask`, `reason` required, written in
+  Russian), a 30 s timeout and its own cap of 50 calls per run, after which every call asks.
+  `ChatToolCallDto.authorisation` (`ToolAuthorisationDto`: `kind`, `source`, `reason`) carries
+  the audit to the tool call details, and each admission writes a `Tool call authorised` line
+  to the run log. A folder grant raised with the diff in every mode is unchanged.
 - No telemetry, no outbound calls the user did not configure. One narrow exception: **site
   icons** for the web sources a provider returned with an answer (`zvs-host/src/sites.rs`,
   2026-10-27). The renderer never loads a remote image (CSP `img-src 'self' blob:`). It asks

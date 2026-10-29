@@ -1,4 +1,5 @@
 import {
+  mdiAccountCheckOutline,
   mdiAlertCircleOutline,
   mdiBookOpenPageVariantOutline,
   mdiBrain,
@@ -21,13 +22,22 @@ import {
   mdiMagnify,
   mdiPuzzleEditOutline,
   mdiPuzzleOutline,
+  mdiScaleBalance,
   mdiScriptTextPlayOutline,
   mdiSendOutline,
+  mdiShieldCheckOutline,
+  mdiShieldKeyOutline,
   mdiTextBoxSearchOutline,
   mdiWeb,
   mdiWrenchOutline,
 } from "@mdi/js";
-import type { ChatToolCallDto } from "@zvs/shared";
+import {
+  EXEC_MODES,
+  type ChatToolCallDto,
+  type ExecMode,
+  type ToolAuthorisationDto,
+} from "@zvs/shared";
+import { EXEC_MODE_COPY } from "../execPolicy/execPolicyCopy";
 
 export type ToolCategory =
   "knowledge" | "files" | "process" | "skills" | "dialog" | "data" | "other";
@@ -178,4 +188,46 @@ export function scorePercent(score: number): string {
 
 export function runningPhase(call: Pick<ChatToolCallDto, "key">): string {
   return toolTitle(call.key);
+}
+
+export const AUTHORISATION_TITLE = "Основание запуска";
+
+const AUTHORISATION_LABEL: Record<ToolAuthorisationDto["kind"], string> = {
+  auto: "Разрешено уровнем инструмента",
+  granted: "Разрешено выданным разрешением",
+  approved: "Подтверждено пользователем",
+  policy: "Разрешено режимом подтверждения",
+  judge: "Разрешено автопроверкой",
+};
+
+const AUTHORISATION_ICON: Record<ToolAuthorisationDto["kind"], string> = {
+  auto: mdiShieldCheckOutline,
+  granted: mdiShieldKeyOutline,
+  approved: mdiAccountCheckOutline,
+  policy: mdiShieldCheckOutline,
+  judge: mdiScaleBalance,
+};
+
+function isExecMode(value: string): value is ExecMode {
+  return (EXEC_MODES as readonly string[]).includes(value);
+}
+
+export interface AuthorisationView {
+  readonly label: string;
+  readonly icon: string;
+  readonly source: string | null;
+  readonly reason: string | null;
+}
+
+export function authorisationView(authorisation: ToolAuthorisationDto): AuthorisationView {
+  const source = authorisation.source ?? null;
+  const mode = authorisation.kind === "policy" && source !== null && isExecMode(source);
+  return {
+    label: mode
+      ? `${AUTHORISATION_LABEL.policy} «${EXEC_MODE_COPY[source].label}»`
+      : AUTHORISATION_LABEL[authorisation.kind],
+    icon: AUTHORISATION_ICON[authorisation.kind],
+    source: mode ? null : source,
+    reason: authorisation.reason ?? null,
+  };
 }

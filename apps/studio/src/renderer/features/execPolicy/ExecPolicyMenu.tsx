@@ -110,7 +110,7 @@ function ExecPolicyMenu({ store: execPolicy, setup }: ExecPolicyBinding) {
                       setConfirming(true);
                       return;
                     }
-                    execPolicy.setMode(mode);
+                    void execPolicy.setMode(mode);
                   }}
                 >
                   <span className="flex items-start gap-2.5 text-left">
@@ -140,7 +140,7 @@ function ExecPolicyMenu({ store: execPolicy, setup }: ExecPolicyBinding) {
         content={NO_RESTRICTIONS_CONSEQUENCE}
         confirmLabel={NO_RESTRICTIONS_ACCEPT}
         onConfirm={() => {
-          execPolicy.setMode("no-restrictions");
+          void execPolicy.setMode("no-restrictions");
           setConfirming(false);
         }}
         onCancel={() => setConfirming(false)}

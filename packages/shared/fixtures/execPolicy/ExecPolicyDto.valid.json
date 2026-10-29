@@ -1,0 +1,19 @@
+[
+  {
+    "name": "always ask without a judge",
+    "value": {
+      "mode": "always-ask",
+      "judge": null
+    }
+  },
+  {
+    "name": "auto bypass with a judge",
+    "value": {
+      "mode": "auto-bypass",
+      "judge": {
+        "providerId": "0199aa11-2222-7111-8111-111111111111",
+        "modelId": "gpt-oss:120b"
+      }
+    }
+  }
+]

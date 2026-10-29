@@ -389,20 +389,20 @@ const JudgeModelRow = observer(function JudgeModelRow() {
               label: provider.name,
             }))}
             providerDisabled={execPolicy.providers.length === 0}
-            onProviderChange={execPolicy.selectJudgeProvider}
+            onProviderChange={(id) => void execPolicy.selectJudgeProvider(id)}
             modelTitle={JUDGE_MODEL}
             modelLabel={JUDGE_MODEL_LABEL}
             modelValue={execPolicy.judgeModelId ?? ""}
             modelOptions={availableModelOptions(execPolicy.judgeProvider)}
             modelDisabled={execPolicy.judgeProvider === undefined}
-            onModelChange={execPolicy.setJudgeModel}
+            onModelChange={(id) => void execPolicy.setJudgeModel(id)}
             placeholder={JUDGE_NONE}
           />
         </div>
         <Button
           tone="ghost"
           disabled={execPolicy.judgeProviderId === null}
-          onClick={execPolicy.clearJudge}
+          onClick={() => void execPolicy.clearJudge()}
         >
           {JUDGE_CLEAR}
         </Button>

@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 use zvs_contract::validate::{check, invalid, js_slice};
 use zvs_contract::{
     AppError, AppErrorCode, FILE_CHANGES_MAX, FileChangeKind, FileChangesDto, FileDiffDto,
-    ToolTier, Validate,
+    ToolAuthorisationDto, ToolAuthorisationKind, ToolTier, Validate,
 };
 
 use super::commit::{Fault, commit, snapshot};
@@ -21,9 +21,10 @@ use super::text::{Decoded, content_hash, decode};
 use super::walk::{WalkOptions, walk};
 use crate::chat_files::within_quota;
 use crate::conversations::{ConversationFolders, is_owner};
-use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext};
+use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext, review_action};
 use crate::platform::ids::new_id;
 use crate::platform::long_path::extended;
+use crate::policy::{ReviewVerdict, ReviewedAction, rule_denied};
 use crate::workspace::{AccessPlan, FolderAccessService, FolderTarget, Review};
 
 pub const FS_LIST: &str = "fs.list";
@@ -1125,6 +1126,26 @@ impl NodeDef for FsApplyNode {
                 paths: Vec::new(),
             });
         }
+        let (approval, reason) = match approval {
+            Some(ticket) => {
+                let action = ReviewedAction::files(planned.changes.clone(), |path| {
+                    planned
+                        .files
+                        .iter()
+                        .any(|file| path_text(&file.path) == path && file.before.is_some())
+                });
+                match review_action(context, action).await? {
+                    ReviewVerdict::Run(authorisation) => {
+                        context.authorise(authorisation)?;
+                        (None, None)
+                    }
+                    ReviewVerdict::Deny { rule } => return Err(rule_denied(&rule)),
+                    ReviewVerdict::Ask { reason } => (Some(ticket), reason),
+                }
+            }
+            None => (None, None),
+        };
+        let asked = approval.is_some();
         tools
             .folders
             .confirm(
@@ -1138,6 +1159,11 @@ impl NodeDef for FsApplyNode {
                 }),
             )
             .await?;
+        if asked {
+            context.authorise(
+                ToolAuthorisationDto::of(ToolAuthorisationKind::Approved).because(reason),
+            )?;
+        }
         context.check_cancelled()?;
         let owner = if is_owner(&input.conversation_id) {
             input.conversation_id.as_str()

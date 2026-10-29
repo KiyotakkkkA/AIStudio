@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::enums::wire_enum;
 use crate::errors::AppError;
 use crate::events::{ApprovalRequestDto, EventSeq};
+use crate::exec_policy::ToolAuthorisationDto;
 use crate::folders::{WorkingFolderAccess, check_folder_path};
 use crate::ids::{ConversationId, DocumentId, MessageId, ProviderId, RunId, VectorStoreId};
 use crate::primitives::{Json, Timestamp};
@@ -263,6 +264,12 @@ pub struct ChatToolCallDto {
     pub duration_ms: u64,
     #[serde(default)]
     pub meta: Option<Json>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub authorisation: Option<ToolAuthorisationDto>,
 }
 
 impl Validate for ChatToolCallDto {
@@ -274,7 +281,10 @@ impl Validate for ChatToolCallDto {
         check::non_empty("name", &self.name)?;
         check::max_len("name", &self.name, 200)?;
         check::safe_integer("round", self.round)?;
-        check::safe_integer("durationMs", self.duration_ms)
+        check::safe_integer("durationMs", self.duration_ms)?;
+        self.authorisation
+            .as_ref()
+            .map_or(Ok(()), Validate::validate)
     }
 }
 

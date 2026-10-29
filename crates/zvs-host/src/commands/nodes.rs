@@ -10,7 +10,8 @@ use zvs_contract::validate::{check, invalid};
 use zvs_contract::{
     AppError, AppErrorCode, ArtifactDto, CodeLanguage, PROCESS_APPROVAL_KIND, PROCESS_ARG_MAX,
     PROCESS_ARGV_MAX, PROCESS_PACKAGE_MAX, PROCESS_PACKAGES_MAX, PROCESS_SOURCE_MAX,
-    ProcessPlanDto, ProcessResultDto, ToolTier, Validate,
+    ProcessPlanDto, ProcessResultDto, ToolAuthorisationDto, ToolAuthorisationKind, ToolTier,
+    Validate,
 };
 
 use crate::artifacts::{Snapshot, library_env, mentioned_paths, produced, snapshot};
@@ -21,8 +22,10 @@ use crate::files::roots::{
 };
 use crate::kernel::{
     ApprovalDecision, DeferredApproval, NodeDef, NodeRegistry, PermissionRequirement, StepContext,
+    review_action,
 };
 use crate::platform::ids::new_id;
+use crate::policy::{ReviewVerdict, ReviewedAction, rule_denied};
 use crate::services::approvals::ApprovalService;
 use crate::skills::script::{
     SCRIPT_NO_TOOLCHAIN, SCRIPT_NOT_STARTED, SCRIPT_UNSUPPORTED, SKILL_DIR_ENV, ScriptRuntime,
@@ -228,6 +231,15 @@ impl Tools {
         let Some(approval) = approval else {
             return Ok(());
         };
+        let reviewed = ReviewedAction::Process {
+            tool: tool.to_owned(),
+            process: process.clone(),
+        };
+        let reason = match review_action(context, reviewed).await? {
+            ReviewVerdict::Run(authorisation) => return context.authorise(authorisation),
+            ReviewVerdict::Deny { rule } => return Err(rule_denied(&rule)),
+            ReviewVerdict::Ask { reason } => reason,
+        };
         let mut request = self.approvals.create(
             &context.run_id.to_string(),
             &approval.subject,
@@ -241,7 +253,9 @@ impl Tools {
         request.insert("action".to_owned(), json!(action));
         request.insert("process".to_owned(), json!(process));
         match context.request_approval(request).await? {
-            ApprovalDecision::Approved => Ok(()),
+            ApprovalDecision::Approved => context.authorise(
+                ToolAuthorisationDto::of(ToolAuthorisationKind::Approved).because(reason),
+            ),
             ApprovalDecision::Denied => {
                 Err(AppError::new(AppErrorCode::ApprovalDenied, PROCESS_DENIED))
             }

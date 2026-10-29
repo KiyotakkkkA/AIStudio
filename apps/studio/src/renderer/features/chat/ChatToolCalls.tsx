@@ -52,7 +52,13 @@ import {
   toolPresentation,
 } from "./toolCallCopy";
 import { toolCallView } from "./toolCallView";
-import { Eyebrow, RawArguments, ResultBlock, ToolCallViewBody } from "./ToolCallDetails";
+import {
+  AuthorisationNote,
+  Eyebrow,
+  RawArguments,
+  ResultBlock,
+  ToolCallViewBody,
+} from "./ToolCallDetails";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 
 export const TOOL_CALL_STATUS: Record<
@@ -284,6 +290,9 @@ function ToolCallCard({
             <ResultBlock result={call.result} truncated={call.truncated} />
           )}
           {call.error !== null && <p className="text-[12px] text-err">{call.error}</p>}
+          {call.authorisation !== undefined && (
+            <AuthorisationNote authorisation={call.authorisation} />
+          )}
           {approval && proposed.length > 0 && (
             <div role="status" className="space-y-2 rounded-control bg-warn-soft px-3 py-2.5">
               <p className="m-0 text-[12.5px] text-main-100">{CHANGES_LEAD}</p>

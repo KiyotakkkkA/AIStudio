@@ -18,6 +18,7 @@ pub mod ipc;
 pub mod kernel;
 pub mod notifications;
 pub mod platform;
+pub mod policy;
 pub mod runtimes;
 pub mod scenarios;
 pub mod services;

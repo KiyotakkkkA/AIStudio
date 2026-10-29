@@ -1480,6 +1480,7 @@ async fn branching_copies_the_dialog_up_to_the_message_into_a_new_conversation()
             { "id": format!("{key}/report.docx"), "name": "report.docx" },
             { "id": "library/deck.pptx", "name": "deck.pptx" },
         ] })),
+        authorisation: None,
     };
     harness
         .database

@@ -11,6 +11,7 @@ import { Json } from "./primitives/json.js";
 import { FolderGrantScope, FolderPath, WorkingFolderAccess } from "./folders.js";
 import { ToolKey } from "./tools/ToolDto.js";
 import { WebUrl } from "./sites.js";
+import { ToolAuthorisationDto } from "./execPolicy.js";
 import { RunHandleDto } from "./runs/RunDto.js";
 import { ApprovalRequestDto, EventSeq } from "./events/HostEvent.js";
 import { QuestionRequestDto } from "./questions.js";
@@ -60,6 +61,7 @@ export const ChatToolCallDto = z.object({
   stepId: z.string().nullable().default(null),
   durationMs: z.number().int().nonnegative().default(0),
   meta: Json.nullable().default(null),
+  authorisation: ToolAuthorisationDto.optional(),
 });
 export type ChatToolCallDto = z.infer<typeof ChatToolCallDto>;
 export const OFFERED_TOOL_SOURCES = ["base", "knowledge", "memory", "command", "loaded"] as const;

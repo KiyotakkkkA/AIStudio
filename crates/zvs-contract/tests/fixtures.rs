@@ -1021,6 +1021,23 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::SiteIconInput>,
     ),
     ("sites/SiteIconDto", round_trip::<zvs_contract::SiteIconDto>),
+    ("execPolicy/ExecMode", round_trip::<zvs_contract::ExecMode>),
+    (
+        "execPolicy/ExecJudgeDto",
+        round_trip::<zvs_contract::ExecJudgeDto>,
+    ),
+    (
+        "execPolicy/ExecPolicyDto",
+        round_trip::<zvs_contract::ExecPolicyDto>,
+    ),
+    (
+        "execPolicy/ToolAuthorisationKind",
+        round_trip::<zvs_contract::ToolAuthorisationKind>,
+    ),
+    (
+        "execPolicy/ToolAuthorisationDto",
+        round_trip::<zvs_contract::ToolAuthorisationDto>,
+    ),
     (
         "artifacts/ArtifactDto",
         round_trip::<zvs_contract::artifacts::ArtifactDto>,

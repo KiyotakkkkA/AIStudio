@@ -16,6 +16,9 @@ export default observer(function ChatWorkspace() {
     void chat.mount();
     return chat.unmount;
   }, [chat]);
+  useEffect(() => {
+    void execPolicy.load();
+  }, [execPolicy]);
   const activeId = chat.active?.id ?? null;
   useEffect(() => {
     void chat.terminal.show(activeId);

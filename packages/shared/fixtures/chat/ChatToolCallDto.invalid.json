@@ -55,5 +55,52 @@
       "stepId": null,
       "durationMs": 4
     }
+  },
+  {
+    "name": "unknown authorisation kind",
+    "value": {
+      "id": "call_3",
+      "key": "fs.apply",
+      "name": "fs__apply",
+      "round": 2,
+      "arguments": {
+        "changes": []
+      },
+      "status": "succeeded",
+      "result": "Applied 1 file changes",
+      "truncated": false,
+      "error": null,
+      "approvalId": null,
+      "stepId": "0199aa11-5555-7111-8111-111111111111",
+      "durationMs": 30,
+      "meta": null,
+      "authorisation": {
+        "kind": "trusted"
+      }
+    }
+  },
+  {
+    "name": "empty authorisation source",
+    "value": {
+      "id": "call_3",
+      "key": "fs.apply",
+      "name": "fs__apply",
+      "round": 2,
+      "arguments": {
+        "changes": []
+      },
+      "status": "succeeded",
+      "result": "Applied 1 file changes",
+      "truncated": false,
+      "error": null,
+      "approvalId": null,
+      "stepId": "0199aa11-5555-7111-8111-111111111111",
+      "durationMs": 30,
+      "meta": null,
+      "authorisation": {
+        "kind": "policy",
+        "source": ""
+      }
+    }
   }
 ]

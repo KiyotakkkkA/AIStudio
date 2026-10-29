@@ -22,6 +22,7 @@ export * from "./notifications.js";
 export * from "./documents.js";
 export * from "./artifacts.js";
 export * from "./sites.js";
+export * from "./execPolicy.js";
 export * from "./process.js";
 export * from "./questions.js";
 export * from "./folders.js";

@@ -22,7 +22,8 @@ pub use scheduler::{
 };
 pub use stream::{Observers, RunObserver, RunStream, RunWatcher, Subscription};
 pub use types::{
-    AdmissionOrigin, ApprovalDecision, ApprovalObserver, DeferredApproval, FnNode, GraphNeighbors,
-    KernelServices, NodeDef, PermissionRequirement, QuestionOutcome, StepContext, StepLink,
-    TextDrivers, ToolStepFuture, ToolStepRequest, ToolStepResult, VectorIndexer, VectorSearch,
+    AdmissionOrigin, ApprovalDecision, ApprovalObserver, DeferredApproval, ExecReview, FnNode,
+    GraphNeighbors, KernelServices, NodeDef, PermissionRequirement, QuestionOutcome, StepContext,
+    StepLink, TOOL_AUTHORISED, TextDrivers, ToolStepFuture, ToolStepRequest, ToolStepResult,
+    VectorIndexer, VectorSearch, review_action,
 };

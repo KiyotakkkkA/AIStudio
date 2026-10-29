@@ -70,5 +70,54 @@
         ]
       }
     }
+  },
+  {
+    "name": "authorised by the judge",
+    "value": {
+      "id": "call_3",
+      "key": "fs.apply",
+      "name": "fs__apply",
+      "round": 2,
+      "arguments": {
+        "changes": []
+      },
+      "status": "succeeded",
+      "result": "Applied 1 file changes",
+      "truncated": false,
+      "error": null,
+      "approvalId": null,
+      "stepId": "0199aa11-5555-7111-8111-111111111111",
+      "durationMs": 30,
+      "meta": null,
+      "authorisation": {
+        "kind": "judge",
+        "source": "gpt-oss:120b",
+        "reason": "Удаляется временный файл сборки внутри рабочей папки."
+      }
+    }
+  },
+  {
+    "name": "authorised by the policy",
+    "value": {
+      "id": "call_4",
+      "key": "fs.apply",
+      "name": "fs__apply",
+      "round": 2,
+      "arguments": {
+        "changes": []
+      },
+      "status": "succeeded",
+      "result": "Applied 1 file changes",
+      "truncated": false,
+      "error": null,
+      "approvalId": null,
+      "stepId": "0199aa11-5555-7111-8111-111111111111",
+      "durationMs": 30,
+      "meta": null,
+      "authorisation": {
+        "kind": "policy",
+        "source": "safety-ask"
+      }
+    }
   }
 ]

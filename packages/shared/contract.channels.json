@@ -60,6 +60,8 @@
   "downloads.remove",
   "downloads.resume",
   "downloads.start",
+  "execPolicy.get",
+  "execPolicy.set",
   "folders.answer",
   "folders.list",
   "folders.revoke",

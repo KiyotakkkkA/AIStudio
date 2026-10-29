@@ -1,11 +1,13 @@
 use std::sync::Arc;
 
+use zvs_contract::validate::invalid;
 use zvs_contract::{SettingsGetInput, SettingsGetOutput, SettingsSetInput};
 
 use super::IpcServer;
 use crate::platform::theme::{
     FONT_SIZE_SETTING_KEY, THEME_SETTING_KEY, apply_interface_zoom, apply_theme_source,
 };
+use crate::policy::EXEC_POLICY_KEY;
 use crate::services::Services;
 use crate::services::health_check::is_health_check_key;
 use crate::services::profile::check_setting;
@@ -28,6 +30,9 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "settings.set",
             |services: Arc<Services>, input: SettingsSetInput| async move {
+                if input.key == EXEC_POLICY_KEY {
+                    return Err(invalid("key", "reserved"));
+                }
                 check_setting(&input.key, &input.value)?;
                 services.notifications.apply(&input.key, &input.value)?;
                 let result = services.settings.set(&input.key, &input.value)?;
