@@ -867,6 +867,16 @@ async fn a_verification_dialog_shows_the_page_until_the_vendor_answers() {
         vec![b"ok".to_vec()],
     ))));
     let gateway = Arc::new(gateway(&pages));
+    let watched = Arc::new(Mutex::new(Vec::new()));
+    {
+        let watched = Arc::clone(&watched);
+        gateway.watch_verification(Arc::new(move |origin: &str, shown| {
+            watched
+                .lock()
+                .expect("watch")
+                .push((origin.to_owned(), shown));
+        }));
+    }
     let pending = tokio::spawn({
         let gateway = Arc::clone(&gateway);
         async move {
@@ -880,10 +890,19 @@ async fn a_verification_dialog_shows_the_page_until_the_vendor_answers() {
     let page = pages.page(0);
     assert_eq!(page.revealed.load(Ordering::SeqCst), 1);
     assert_eq!(page.concealed.load(Ordering::SeqCst), 0);
+    gateway.focus_verification();
+    assert_eq!(page.revealed.load(Ordering::SeqCst), 2);
     page.passed.notify_waiters();
     let response = pending.await.expect("joins").expect("responds");
     assert_eq!(response.status, 200);
     assert_eq!(page.concealed.load(Ordering::SeqCst), 1);
+    gateway.focus_verification();
+    assert_eq!(page.revealed.load(Ordering::SeqCst), 2);
+    let origin = "https://chat.qwen.ai".to_owned();
+    assert_eq!(
+        *watched.lock().expect("watch"),
+        [(origin.clone(), true), (origin, false)]
+    );
 }
 
 #[tokio::test(start_paused = true)]

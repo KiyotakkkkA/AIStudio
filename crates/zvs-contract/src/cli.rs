@@ -32,6 +32,17 @@ pub enum CliClientMessage {
         #[serde(default)]
         payload: Value,
     },
+    FocusVerification,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum CliNotice {
+    AccountVerification { origin: String, shown: bool },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -44,6 +55,7 @@ pub enum CliServerMessage {
     Welcome { version: u32 },
     Result { id: u64, envelope: Value },
     Event { event: HostEvent },
+    Notice { notice: CliNotice },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -120,6 +132,28 @@ mod tests {
         assert_eq!(
             serde_json::to_value(CliServerMessage::Welcome { version: 1 }).expect("serialises"),
             json!({ "type": "welcome", "version": 1 })
+        );
+    }
+
+    #[test]
+    fn a_verification_notice_names_the_origin() {
+        let notice = CliServerMessage::Notice {
+            notice: CliNotice::AccountVerification {
+                origin: "https://chat.qwen.ai".to_owned(),
+                shown: true,
+            },
+        };
+        assert_eq!(
+            serde_json::to_value(notice).expect("serialises"),
+            json!({
+                "type": "notice",
+                "notice": { "kind": "accountVerification", "origin": "https://chat.qwen.ai", "shown": true }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<CliClientMessage>(json!({ "type": "focusVerification" }))
+                .expect("parses"),
+            CliClientMessage::FocusVerification
         );
     }
 

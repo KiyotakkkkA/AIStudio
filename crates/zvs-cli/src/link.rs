@@ -8,7 +8,8 @@ use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::sync::{mpsc, oneshot};
 use zvs_contract::{
-    AppError, AppErrorCode, CLI_PROTOCOL_VERSION, CliClientMessage, CliServerMessage, HostEvent,
+    AppError, AppErrorCode, CLI_PROTOCOL_VERSION, CliClientMessage, CliNotice, CliServerMessage,
+    HostEvent,
 };
 
 use crate::copy;
@@ -24,6 +25,7 @@ type Pending = Arc<Mutex<Waiters>>;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Incoming {
     Event(HostEvent),
+    Notice(CliNotice),
     Closed,
 }
 
@@ -126,6 +128,11 @@ impl Link {
                             break;
                         }
                     }
+                    Ok(CliServerMessage::Notice { notice }) => {
+                        if incoming.send(Incoming::Notice(notice)).is_err() {
+                            break;
+                        }
+                    }
                     Ok(CliServerMessage::Welcome { .. }) | Err(_) => {}
                 }
             }
@@ -168,6 +175,10 @@ impl Link {
             .map_err(|_| disconnected())?;
         let envelope = receiver.await.map_err(|_| disconnected())?;
         unwrap_envelope(envelope)
+    }
+
+    pub fn focus_verification(&self) {
+        let _ = self.outgoing.send(CliClientMessage::FocusVerification);
     }
 
     pub fn is_closed(&self) -> bool {

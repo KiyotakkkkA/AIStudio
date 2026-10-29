@@ -232,6 +232,12 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             Msg::ServerChanged(link.call("mcp.stop", &json!({ "id": id })).await)
         }
         Request::SetPolicy(policy) => Msg::PolicySet(link.call("execPolicy.set", &policy).await),
+        Request::FocusVerification => {
+            #[cfg(windows)]
+            zvs_pipe::allow_foreground();
+            link.focus_verification();
+            Msg::Tick
+        }
     }
 }
 
@@ -263,6 +269,7 @@ fn forward(
         while let Some(message) = incoming.recv().await {
             let message = match message {
                 Incoming::Event(event) => Msg::Event(Box::new(event)),
+                Incoming::Notice(notice) => Msg::Notice(notice),
                 Incoming::Closed => Msg::Closed,
             };
             if signals.send(Signal::App(Box::new(message))).is_err() {

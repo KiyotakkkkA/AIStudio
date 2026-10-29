@@ -48,7 +48,9 @@ if a matching element appears; the host then shows the gateway window (`reveal`)
 can pass the check, waits up to `challenge_timeout` (5 min) instead of the head timeout, and
 hides it again (`conceal`). A watched request with no head is shown too: after `reveal_after`
 (10 s) for XHR requests, and after `stream_reveal_after` (30 s) for streamed fetches, which a
-slow network delays without any dialog. Closing the shown window only hides it.
+slow network delays without any dialog. Closing the shown window only hides it. Every reveal and
+conceal is reported to `watch_verification`, which the shell forwards to `aistudio` clients as a
+pipe notice; `focus_verification` reveals a still-shown page again when the console asks.
 
 `start` also carries `version` and `timezone` from the plan. `version` names a header and a
 pattern over the page's own script URLs (`/qwen-chat-fe/<build>/`); when the request carries that

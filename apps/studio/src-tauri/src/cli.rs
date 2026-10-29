@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use serde_json::json;
 use zvs_host::IpcServer;
+use zvs_host::cli::CliNotices;
 use zvs_host::platform::events::EventBus;
 use zvs_host::platform::logger::{LogLevel, SharedLogger};
 
@@ -16,9 +17,9 @@ pub fn is_cli_launch(args: &[String]) -> bool {
 }
 
 #[cfg(windows)]
-pub fn listen(server: Arc<IpcServer>, events: EventBus, logger: SharedLogger) {
+pub fn listen(server: Arc<IpcServer>, events: EventBus, notices: CliNotices, logger: SharedLogger) {
     tauri::async_runtime::spawn(async move {
-        if let Err(error) = accept(server, events, logger.clone()).await {
+        if let Err(error) = accept(server, events, notices, logger.clone()).await {
             logger.log(
                 LogLevel::Warn,
                 "cli",
@@ -33,6 +34,7 @@ pub fn listen(server: Arc<IpcServer>, events: EventBus, logger: SharedLogger) {
 async fn accept(
     server: Arc<IpcServer>,
     events: EventBus,
+    notices: CliNotices,
     logger: SharedLogger,
 ) -> std::io::Result<()> {
     let name = zvs_pipe::pipe_name()?;
@@ -47,13 +49,19 @@ async fn accept(
             connected,
             dispatch,
             events.clone(),
+            notices.clone(),
             logger.clone(),
         ));
     }
 }
 
 #[cfg(not(windows))]
-pub fn listen(_server: Arc<IpcServer>, _events: EventBus, logger: SharedLogger) {
+pub fn listen(
+    _server: Arc<IpcServer>,
+    _events: EventBus,
+    _notices: CliNotices,
+    logger: SharedLogger,
+) {
     logger.log(LogLevel::Info, "cli", "The CLI pipe is Windows-only", &[]);
 }
 

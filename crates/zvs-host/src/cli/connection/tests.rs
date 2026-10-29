@@ -44,7 +44,13 @@ impl Client {
 
 fn connect(dispatch: Arc<Recorded>, events: EventBus) -> (Client, tokio::task::JoinHandle<()>) {
     let (client, server) = tokio::io::duplex(64 * 1024);
-    let serving = tokio::spawn(serve(server, dispatch, events, silent_logger()));
+    let serving = tokio::spawn(serve(
+        server,
+        dispatch,
+        events,
+        CliNotices::default(),
+        silent_logger(),
+    ));
     let (reader, writer) = tokio::io::split(client);
     (
         Client {
@@ -184,4 +190,54 @@ fn every_allowed_channel_is_a_contract_channel() {
     ] {
         assert!(!CLI_CHANNELS.contains(&studio_only), "{studio_only}");
     }
+}
+
+#[tokio::test]
+async fn a_shown_verification_reaches_a_new_client_and_focus_is_forwarded() {
+    let notices = CliNotices::default();
+    notices.verification("https://chat.qwen.ai", true);
+    let focused = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let seen = Arc::clone(&focused);
+    notices.on_focus(move || seen.store(true, std::sync::atomic::Ordering::SeqCst));
+
+    let (client, server) = tokio::io::duplex(64 * 1024);
+    tokio::spawn(serve(
+        server,
+        Arc::new(Recorded::default()),
+        EventBus::default(),
+        notices.clone(),
+        silent_logger(),
+    ));
+    let (reader, writer) = tokio::io::split(client);
+    let mut client = Client {
+        lines: BufReader::new(reader).lines(),
+        writer,
+    };
+    client.send(hello()).await;
+    assert!(matches!(
+        client.next().await,
+        Some(CliServerMessage::Welcome { .. })
+    ));
+    assert!(matches!(
+        client.next().await,
+        Some(CliServerMessage::Notice {
+            notice: zvs_contract::CliNotice::AccountVerification { shown: true, .. }
+        })
+    ));
+    notices.verification("https://chat.qwen.ai", false);
+    assert!(matches!(
+        client.next().await,
+        Some(CliServerMessage::Notice {
+            notice: zvs_contract::CliNotice::AccountVerification { shown: false, .. }
+        })
+    ));
+    client.send(json!({ "type": "focusVerification" })).await;
+    client
+        .send(json!({ "type": "call", "id": 1, "channel": "system.ping" }))
+        .await;
+    assert!(matches!(
+        client.next().await,
+        Some(CliServerMessage::Result { id: 1, .. })
+    ));
+    assert!(focused.load(std::sync::atomic::Ordering::SeqCst));
 }

@@ -148,6 +148,20 @@ fn question(state: &QuestionState, selected: usize, width: usize) -> Panel {
     }
 }
 
+pub fn verification(origin: &str, width: usize) -> Panel {
+    let mut lines: Vec<Line<'static>> = wrap(copy::VERIFY_BODY, width.saturating_sub(4))
+        .into_iter()
+        .map(|piece| Line::from(Span::styled(piece, theme::text())))
+        .collect();
+    lines.push(Line::default());
+    lines.extend(labelled(copy::VERIFY_SITE, origin, width));
+    Panel {
+        title: copy::VERIFY_TITLE.to_owned(),
+        lines,
+        cursor: None,
+    }
+}
+
 pub fn panel(prompt: &Prompt, width: usize) -> Panel {
     let mut lines = Vec::new();
     let title = match &prompt.kind {

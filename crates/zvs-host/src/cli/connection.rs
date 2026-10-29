@@ -10,6 +10,7 @@ use zvs_contract::{
     HostEvent, ResultEnvelope,
 };
 
+use super::notices::CliNotices;
 use crate::ipc::IpcServer;
 use crate::platform::events::{EventBus, EventSink};
 use crate::platform::logger::{LogLevel, SharedLogger};
@@ -125,6 +126,7 @@ pub async fn serve<S>(
     stream: S,
     dispatch: Arc<dyn CliDispatch>,
     events: EventBus,
+    notices: CliNotices,
     logger: SharedLogger,
 ) where
     S: AsyncRead + AsyncWrite + Send + 'static,
@@ -173,6 +175,35 @@ pub async fn serve<S>(
         closed: closed.clone(),
     }));
     logger.log(LogLevel::Info, LOG_SOURCE, "A CLI client connected", &[]);
+    for notice in notices.current() {
+        let _ = outgoing.send(CliServerMessage::Notice { notice }).await;
+    }
+    {
+        let mut updates = notices.subscribe();
+        let outgoing = outgoing.clone();
+        let closed = closed.clone();
+        tokio::spawn(async move {
+            loop {
+                let notice = tokio::select! {
+                    notice = updates.recv() => notice,
+                    () = closed.cancelled() => break,
+                };
+                match notice {
+                    Ok(notice) => {
+                        if outgoing
+                            .send(CliServerMessage::Notice { notice })
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        });
+    }
 
     loop {
         let message = tokio::select! {
@@ -191,6 +222,7 @@ pub async fn serve<S>(
                 break;
             }
             Some(Ok(CliClientMessage::Hello { .. })) => {}
+            Some(Ok(CliClientMessage::FocusVerification)) => notices.focus(),
             Some(Ok(CliClientMessage::Call {
                 id,
                 channel,

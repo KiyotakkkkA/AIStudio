@@ -364,3 +364,22 @@ fn typing_in_a_panel_filters_and_escape_clears_then_closes() {
     app.update(Msg::Key(Key::Esc));
     assert!(app.overlay.is_none());
 }
+
+#[test]
+fn a_browser_check_is_shown_brought_forward_and_cleared() {
+    let mut app = running();
+    let notice = |shown| {
+        Msg::Notice(zvs_contract::CliNotice::AccountVerification {
+            origin: "https://chat.qwen.ai".to_owned(),
+            shown,
+        })
+    };
+    assert_eq!(app.update(notice(true)), [Request::FocusVerification]);
+    assert_eq!(app.verification.as_deref(), Some("https://chat.qwen.ai"));
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::FocusVerification]
+    );
+    assert!(app.update(notice(false)).is_empty());
+    assert!(app.verification.is_none());
+}

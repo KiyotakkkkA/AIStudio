@@ -116,6 +116,7 @@ pub enum Request {
     StartServer(McpServerId),
     StopServer(McpServerId),
     SetPolicy(ExecPolicyDto),
+    FocusVerification,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -146,6 +147,7 @@ pub enum Msg {
     SkillChanged(Result<SkillDto, AppError>),
     ServerChanged(Result<McpServerDto, AppError>),
     PolicySet(Result<ExecPolicyDto, AppError>),
+    Notice(zvs_contract::CliNotice),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -159,6 +161,7 @@ pub struct App {
     pub mode: ExecMode,
     pub policy: Option<ExecPolicyDto>,
     pub overlay: Option<Overlay>,
+    pub verification: Option<String>,
     pub transcript: Transcript,
     pub input: Input,
     pub palette: Palette,
@@ -209,6 +212,7 @@ impl App {
             mode: ExecMode::AlwaysAsk,
             policy: None,
             overlay: None,
+            verification: None,
             transcript: Transcript::default(),
             input: Input::default(),
             palette: Palette::default(),
@@ -278,6 +282,16 @@ impl App {
                 Vec::new()
             }
             Msg::Connected => vec![Request::Open, Request::Providers, Request::Policy],
+            Msg::Notice(zvs_contract::CliNotice::AccountVerification { origin, shown }) => {
+                if shown {
+                    self.verification = Some(origin);
+                    return vec![Request::FocusVerification];
+                }
+                if self.verification.as_deref() == Some(origin.as_str()) {
+                    self.verification = None;
+                }
+                Vec::new()
+            }
             Msg::Unreachable(message) => {
                 self.quit(Some(message));
                 Vec::new()
@@ -939,6 +953,9 @@ impl App {
                 }
                 _ => {}
             }
+        }
+        if self.verification.is_some() && key == Key::Enter && self.input.is_empty() {
+            return vec![Request::FocusVerification];
         }
         match key {
             Key::Enter => return self.submit(),

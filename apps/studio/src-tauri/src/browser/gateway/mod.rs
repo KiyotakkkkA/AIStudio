@@ -149,6 +149,7 @@ impl Drop for Turn {
     }
 }
 type Renewal = Arc<tokio::sync::Mutex<Option<(tokio::time::Instant, Result<bool, AppError>)>>>;
+pub type VerificationWatch = Arc<dyn Fn(&str, bool) + Send + Sync>;
 
 pub struct AccountGateway {
     factory: Arc<dyn PageFactory>,
@@ -158,6 +159,8 @@ pub struct AccountGateway {
     slots: Mutex<HashMap<String, Slot>>,
     renewals: Mutex<HashMap<String, Renewal>>,
     paces: Mutex<HashMap<String, Pace>>,
+    watch: Mutex<Option<VerificationWatch>>,
+    shown: Mutex<HashMap<String, SharedPage>>,
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -443,6 +446,34 @@ impl AccountGateway {
             slots: Mutex::default(),
             renewals: Mutex::default(),
             paces: Mutex::default(),
+            watch: Mutex::default(),
+            shown: Mutex::default(),
+        }
+    }
+
+    pub fn watch_verification(&self, watch: VerificationWatch) {
+        *lock(&self.watch) = Some(watch);
+    }
+
+    pub fn focus_verification(&self) {
+        let pages: Vec<SharedPage> = lock(&self.shown).values().cloned().collect();
+        for page in pages {
+            page.reveal();
+        }
+    }
+
+    fn verification(&self, origin: &str, page: Option<&SharedPage>) {
+        match page {
+            Some(page) => {
+                lock(&self.shown).insert(origin.to_owned(), Arc::clone(page));
+            }
+            None => {
+                lock(&self.shown).remove(origin);
+            }
+        }
+        let watch = lock(&self.watch).clone();
+        if let Some(watch) = watch {
+            watch(origin, page.is_some());
         }
     }
 
@@ -693,6 +724,7 @@ impl AccountGateway {
                         revealed = true;
                         deadline = tokio::time::Instant::now() + self.options.challenge_timeout;
                         exchange.page.reveal();
+                        self.verification(origin, Some(&exchange.page));
                         self.logger.log(
                             LogLevel::Warn,
                             "browser",
@@ -721,6 +753,7 @@ impl AccountGateway {
         };
         if revealed {
             exchange.page.conceal();
+            self.verification(origin, None);
         }
         outcome
     }

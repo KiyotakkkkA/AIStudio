@@ -1,5 +1,6 @@
 pub mod connection;
 pub mod installer;
+pub mod notices;
 pub mod path_list;
 
 use std::path::Path;
@@ -12,6 +13,7 @@ use zvs_contract::{
 
 pub use connection::{CLI_CHANNELS, CliDispatch, serve};
 pub use installer::{CliInstallState, CliInstaller, NoCliInstaller, SharedCliInstaller};
+pub use notices::CliNotices;
 pub use path_list::{path_contains, path_with, path_without};
 
 use crate::platform::shell::TRAY_SETTING_KEY;

@@ -20,6 +20,7 @@ use windows::Win32::System::Pipes::GetNamedPipeServerProcessId;
 use windows::Win32::System::Threading::{
     GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
 };
+use windows::Win32::UI::WindowsAndMessaging::{ASFW_ANY, AllowSetForegroundWindow};
 use windows::core::{HSTRING, PWSTR};
 
 use crate::sddl_for;
@@ -65,6 +66,10 @@ fn token_sid(process: HANDLE) -> io::Result<String> {
     let sid = unsafe { text.to_string() }.map_err(|_| io::Error::other("the SID is not UTF-16"));
     let _ = unsafe { LocalFree(Some(HLOCAL(text.0.cast()))) };
     sid
+}
+
+pub fn allow_foreground() {
+    let _ = unsafe { AllowSetForegroundWindow(ASFW_ANY) };
 }
 
 pub fn current_user_sid() -> io::Result<String> {

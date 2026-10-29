@@ -267,6 +267,8 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
     } else {
         let hint = if !app.prompts.is_empty() {
             copy::HINT_PROMPT
+        } else if app.verification.is_some() {
+            copy::HINT_VERIFY
         } else if app.overlay.is_some() {
             copy::HINT_PANEL
         } else if app.palette_open() {
@@ -342,10 +344,16 @@ pub fn draw(frame: &mut Frame<'_>, app: &App) {
         Phase::Connecting(message) => splash(frame, area, message, app),
         Phase::Access => access(frame, area, app),
         Phase::Chat => {
+            let width = usize::from(area.width.saturating_sub(2));
             let panel = app
                 .prompts
                 .front()
-                .map(|current| prompt::panel(current, usize::from(area.width.saturating_sub(2))));
+                .map(|current| prompt::panel(current, width))
+                .or_else(|| {
+                    app.verification
+                        .as_deref()
+                        .map(|origin| prompt::verification(origin, width))
+                });
             let bottom_height = panel
                 .as_ref()
                 .map_or_else(|| input_height(app), |panel| rows(panel.lines.len() + 2))

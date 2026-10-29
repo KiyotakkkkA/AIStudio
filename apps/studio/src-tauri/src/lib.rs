@@ -558,6 +558,17 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger.clone(),
     ));
     let sessions = gateway_sessions(Arc::clone(&gateway));
+    let notices = zvs_host::cli::CliNotices::default();
+    {
+        let notices = notices.clone();
+        gateway.watch_verification(Arc::new(move |origin, shown| {
+            notices.verification(origin, shown);
+        }));
+    }
+    {
+        let gateway = Arc::clone(&gateway);
+        notices.on_focus(move || gateway.focus_verification());
+    }
 
     let http = HttpClient::new()?;
     let mcp_http = http.client().clone();
@@ -1172,7 +1183,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     server.finish();
     let server = Arc::new(server);
     if e2e::data_dir().is_none() {
-        cli::listen(Arc::clone(&server), events.clone(), logger.clone());
+        cli::listen(
+            Arc::clone(&server),
+            events.clone(),
+            notices.clone(),
+            logger.clone(),
+        );
     }
     services.accounts.start_auto_refresh()?;
     warm_account_pages(&services.accounts, Arc::clone(&gateway), logger.clone());

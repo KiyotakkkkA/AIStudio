@@ -363,6 +363,11 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
 - **Same events, same answers.** CLI connections are extra event-bus subscribers beside the
   window. An approval or a question reaches both; the first answer wins and the other side
   sees `Conflict`.
+- **Account checks are announced.** When the account gateway shows a vendor's browser check
+  (§12), every CLI connection gets a pipe-only `notice`, also on connect while the check is
+  still shown. The client lets the app take the foreground (`AllowSetForegroundWindow`) and
+  sends `focusVerification`, which reveals the check window again. Nothing is solved for the
+  person; the check is still passed in the vendor's own page.
 
 `cli.install` puts the folder holding `aistudio.exe` on the **user** `Path` (HKCU, no
 elevation) and turns the tray on, so the app keeps serving the pipe with its window closed.

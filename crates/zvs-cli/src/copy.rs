@@ -60,6 +60,11 @@ pub const FOLDER_ONCE: &str = "Разрешить один раз";
 pub const FOLDER_CONVERSATION: &str = "Разрешить для этого диалога";
 pub const FOLDER_ALWAYS: &str = "Разрешить всегда";
 
+pub const VERIFY_TITLE: &str = "Проверка браузера";
+pub const VERIFY_BODY: &str = "Провайдер запросил проверку браузера. Окно проверки открыто: пройдите проверку, и ответ продолжится.";
+pub const VERIFY_SITE: &str = "Сайт";
+pub const HINT_VERIFY: &str = "Enter — показать окно проверки · Esc — остановить ответ";
+
 pub const QUESTION_TITLE: &str = "Вопрос";
 pub const QUESTION_OTHER: &str = "Другой вариант";
 pub const QUESTION_TEXT_HINT: &str = "Введите ответ и нажмите Enter";
