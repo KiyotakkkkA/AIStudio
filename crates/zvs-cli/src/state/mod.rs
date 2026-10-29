@@ -1,4 +1,5 @@
 pub mod input;
+pub mod overlay;
 pub mod palette;
 pub mod prompt;
 pub mod transcript;
@@ -7,12 +8,15 @@ use std::collections::VecDeque;
 
 use zvs_contract::{
     AllowRuleChangeDto, AllowRuleInput, AppError, BindFolderResultDto, ChatAnswerInput,
-    ChatSendInput, ChatSkipInput, CliSessionDto, ConversationDto, ConversationId, ExecMode,
-    ExecPolicyDto, FolderAccessAnswer, FolderGrantScope, HostEvent, HostEventDraft, PolicyRuleDto,
-    ProviderDto, ProviderId, RunHandleDto, RunId, RunOutcomeStatus, WorkingFolderAccess,
+    ChatAttachDto, ChatContextDto, ChatSendInput, ChatSkipInput, CliSessionDto,
+    ConversationDetailDto, ConversationDto, ConversationId, ExecMode, ExecPolicyDto,
+    FolderAccessAnswer, FolderGrantScope, HostEvent, HostEventDraft, McpServerDto, McpServerId,
+    McpServerStatus, PolicyRuleDto, ProviderDto, ProviderId, RunHandleDto, RunId, RunOutcomeStatus,
+    SkillDto, SkillId, WorkingFolderAccess,
 };
 
 use self::input::Input;
+use self::overlay::{Action, Overlay, Panel, View};
 use self::palette::{Command, Palette, is_command_text};
 use self::prompt::{ApprovalDetail, Choice, Prompt, PromptKind};
 use self::transcript::{Tone, Transcript};
@@ -95,6 +99,23 @@ pub enum Request {
     },
     Answer(ChatAnswerInput),
     Skip(ChatSkipInput),
+    Conversations,
+    Load(ConversationId),
+    Attach(ConversationId),
+    Context {
+        conversation: Option<ConversationId>,
+        provider: ProviderId,
+        model: String,
+    },
+    Skills,
+    Servers,
+    SetSkill {
+        id: SkillId,
+        enabled: bool,
+    },
+    StartServer(McpServerId),
+    StopServer(McpServerId),
+    SetPolicy(ExecPolicyDto),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -116,6 +137,15 @@ pub enum Msg {
     Sent(Result<RunHandleDto, AppError>),
     Answered(Result<(), AppError>),
     RuleAdded(Result<PolicyRuleDto, AppError>),
+    Conversations(Result<Vec<ConversationDto>, AppError>),
+    Loaded(Result<ConversationDetailDto, AppError>),
+    Attached(Result<Option<ChatAttachDto>, AppError>),
+    Context(Result<ChatContextDto, AppError>),
+    Skills(Result<Vec<SkillDto>, AppError>),
+    Servers(Result<Vec<McpServerDto>, AppError>),
+    SkillChanged(Result<SkillDto, AppError>),
+    ServerChanged(Result<McpServerDto, AppError>),
+    PolicySet(Result<ExecPolicyDto, AppError>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -127,6 +157,8 @@ pub struct App {
     pub providers: Vec<ProviderDto>,
     pub model: Option<ModelChoice>,
     pub mode: ExecMode,
+    pub policy: Option<ExecPolicyDto>,
+    pub overlay: Option<Overlay>,
     pub transcript: Transcript,
     pub input: Input,
     pub palette: Palette,
@@ -175,6 +207,8 @@ impl App {
             providers: Vec::new(),
             model: None,
             mode: ExecMode::AlwaysAsk,
+            policy: None,
+            overlay: None,
             transcript: Transcript::default(),
             input: Input::default(),
             palette: Palette::default(),
@@ -200,7 +234,10 @@ impl App {
     }
 
     pub fn palette_open(&self) -> bool {
-        self.prompts.is_empty() && !self.help && is_command_text(self.input.text())
+        self.prompts.is_empty()
+            && !self.help
+            && self.overlay.is_none()
+            && is_command_text(self.input.text())
     }
 
     pub fn show_welcome(&self) -> bool {
@@ -275,8 +312,158 @@ impl App {
                 Vec::new()
             }
             Msg::Policy(result) => {
-                if let Ok(policy) = result {
-                    self.mode = policy.mode;
+                match result {
+                    Ok(policy) => self.adopt_policy(policy),
+                    Err(error) => self.panel_failed(&error),
+                }
+                Vec::new()
+            }
+            Msg::PolicySet(result) => {
+                match result {
+                    Ok(policy) => {
+                        let judge_changed = self
+                            .policy
+                            .as_ref()
+                            .is_some_and(|known| known.judge != policy.judge);
+                        self.adopt_policy(policy);
+                        let text = if judge_changed {
+                            copy::JUDGE_SET
+                        } else {
+                            copy::MODE_SET
+                        };
+                        self.status = Some((Tone::Success, text.to_owned()));
+                    }
+                    Err(error) => self.status = Some((Tone::Error, error.message)),
+                }
+                Vec::new()
+            }
+            Msg::Conversations(result) => {
+                match result {
+                    Ok(list) => {
+                        if let Some(overlay) = self.overlay_for(Panel::Resume) {
+                            overlay.conversations = list;
+                            overlay.loading = false;
+                        }
+                    }
+                    Err(error) => self.panel_failed(&error),
+                }
+                Vec::new()
+            }
+            Msg::Context(result) => {
+                match result {
+                    Ok(context) => {
+                        if let Some(overlay) = self.overlay_for(Panel::Context) {
+                            overlay.context = Some(context);
+                            overlay.loading = false;
+                        }
+                    }
+                    Err(error) => self.panel_failed(&error),
+                }
+                Vec::new()
+            }
+            Msg::Skills(result) => {
+                match result {
+                    Ok(list) => {
+                        if let Some(overlay) = self.overlay_for(Panel::Skills) {
+                            overlay.skills = list;
+                            overlay.loading = false;
+                        }
+                    }
+                    Err(error) => self.panel_failed(&error),
+                }
+                Vec::new()
+            }
+            Msg::Servers(result) => {
+                match result {
+                    Ok(list) => {
+                        if let Some(overlay) = self.overlay_for(Panel::Mcp) {
+                            overlay.servers = list;
+                            overlay.loading = false;
+                        }
+                    }
+                    Err(error) => self.panel_failed(&error),
+                }
+                Vec::new()
+            }
+            Msg::SkillChanged(result) => {
+                match result {
+                    Ok(skill) => {
+                        let text = if skill.enabled {
+                            copy::SKILL_ENABLED
+                        } else {
+                            copy::SKILL_DISABLED
+                        };
+                        self.status = Some((Tone::Success, text.to_owned()));
+                        if let Some(overlay) = self.overlay_for(Panel::Skills)
+                            && let Some(known) =
+                                overlay.skills.iter_mut().find(|known| known.id == skill.id)
+                        {
+                            *known = skill;
+                        }
+                    }
+                    Err(error) => self.status = Some((Tone::Error, error.message)),
+                }
+                Vec::new()
+            }
+            Msg::ServerChanged(result) => {
+                match result {
+                    Ok(server) => {
+                        let running = matches!(
+                            server.status,
+                            McpServerStatus::Connected | McpServerStatus::Starting
+                        );
+                        let text = if running {
+                            copy::MCP_STARTED
+                        } else {
+                            copy::MCP_HALTED
+                        };
+                        self.status = Some((Tone::Success, text.to_owned()));
+                        if let Some(overlay) = self.overlay_for(Panel::Mcp)
+                            && let Some(known) = overlay
+                                .servers
+                                .iter_mut()
+                                .find(|known| known.id == server.id)
+                        {
+                            *known = server;
+                        }
+                    }
+                    Err(error) => self.status = Some((Tone::Error, error.message)),
+                }
+                Vec::new()
+            }
+            Msg::Loaded(result) => match result {
+                Ok(detail) => {
+                    let id = detail.conversation.id;
+                    self.transcript = Transcript::from_messages(
+                        &detail
+                            .messages
+                            .into_iter()
+                            .filter(|message| !message.partial)
+                            .collect::<Vec<_>>(),
+                    );
+                    self.conversation = Some(detail.conversation);
+                    self.scroll = 0;
+                    self.overlay = None;
+                    self.status = Some((Tone::Success, copy::RESUMED.to_owned()));
+                    let mut requests = vec![Request::Attach(id)];
+                    if self.grant.is_some() {
+                        requests.push(Request::Bind {
+                            id,
+                            grant: self.grant,
+                        });
+                    }
+                    requests
+                }
+                Err(error) => {
+                    self.panel_failed(&error);
+                    Vec::new()
+                }
+            },
+            Msg::Attached(result) => {
+                match result {
+                    Ok(Some(live)) => self.adopt_live(live),
+                    Ok(None) => {}
+                    Err(error) => self.fail(&error),
                 }
                 Vec::new()
             }
@@ -462,14 +649,196 @@ impl App {
                     self.status = Some((Tone::Success, copy::NEW_CHAT.to_owned()));
                 }
             }
-            Command::Resume
-            | Command::Models
-            | Command::Context
-            | Command::Skills
-            | Command::Mcp
-            | Command::Permissions => {
-                self.status = Some((Tone::Info, copy::NOT_YET.to_owned()));
+            Command::Resume => return self.open_panel(Panel::Resume),
+            Command::Models => return self.open_panel(Panel::Models),
+            Command::Context => return self.open_panel(Panel::Context),
+            Command::Skills => return self.open_panel(Panel::Skills),
+            Command::Mcp => return self.open_panel(Panel::Mcp),
+            Command::Permissions => return self.open_panel(Panel::Permissions),
+        }
+        Vec::new()
+    }
+
+    pub fn view(&self) -> View<'_> {
+        View {
+            providers: &self.providers,
+            model: self.model.as_ref(),
+            folder: &self.folder,
+            policy: self.policy.as_ref(),
+            mode: self.mode,
+        }
+    }
+
+    fn overlay_for(&mut self, panel: Panel) -> Option<&mut Overlay> {
+        self.overlay
+            .as_mut()
+            .filter(|overlay| overlay.panel == panel)
+    }
+
+    fn panel_failed(&mut self, error: &AppError) {
+        if let Some(overlay) = self.overlay.as_mut() {
+            overlay.loading = false;
+        }
+        self.status = Some((Tone::Error, error.message.clone()));
+    }
+
+    fn adopt_policy(&mut self, policy: ExecPolicyDto) {
+        self.mode = policy.mode;
+        self.policy = Some(policy);
+        if let Some(mut overlay) = self.overlay.take() {
+            if overlay.panel == Panel::Permissions && overlay.loading {
+                overlay.loading = false;
+                overlay.select_current(&self.view());
             }
+            self.overlay = Some(overlay);
+        }
+    }
+
+    fn adopt_live(&mut self, live: ChatAttachDto) {
+        let run = live.run.id;
+        self.transcript.live = Some(transcript::Live {
+            text: live.content,
+            reasoning: live.reasoning,
+            tools: live.tool_calls,
+        });
+        for request in &live.approvals {
+            if let Some(prompt) = prompt::from_request(request, self.mode) {
+                self.prompts.push_back(prompt);
+            }
+        }
+        for request in live
+            .questions
+            .into_iter()
+            .filter(|request| request.run_id == run)
+        {
+            self.prompts.push_back(prompt::question(request));
+        }
+        self.started = self.frame;
+        self.run = Some(live.run);
+    }
+
+    fn open_panel(&mut self, panel: Panel) -> Vec<Request> {
+        if panel == Panel::Resume && self.busy() {
+            self.status = Some((Tone::Info, copy::BUSY.to_owned()));
+            return Vec::new();
+        }
+        let requests = match panel {
+            Panel::Models => Vec::new(),
+            Panel::Resume => vec![Request::Conversations],
+            Panel::Skills => vec![Request::Skills],
+            Panel::Mcp => vec![Request::Servers],
+            Panel::Permissions => vec![Request::Policy],
+            Panel::Context => match &self.model {
+                Some(model) => vec![Request::Context {
+                    conversation: self
+                        .conversation
+                        .as_ref()
+                        .map(|conversation| conversation.id),
+                    provider: model.provider,
+                    model: model.model.clone(),
+                }],
+                None => {
+                    self.status = Some((Tone::Info, copy::CONTEXT_NEEDS_MODEL.to_owned()));
+                    return Vec::new();
+                }
+            },
+        };
+        let mut overlay = Overlay::new(panel);
+        overlay.select_current(&self.view());
+        self.overlay = Some(overlay);
+        requests
+    }
+
+    fn act(&mut self, action: Action) -> Vec<Request> {
+        match action {
+            Action::SelectModel(choice) => {
+                self.status = Some((
+                    Tone::Success,
+                    format!(
+                        "{}: {} · {}",
+                        copy::MODEL_SELECTED,
+                        choice.provider_name,
+                        choice.model_name
+                    ),
+                ));
+                self.model = Some(choice);
+                self.overlay = None;
+                Vec::new()
+            }
+            Action::Resume(id) => vec![Request::Load(id)],
+            Action::ToggleSkill { id, enabled } => vec![Request::SetSkill { id, enabled }],
+            Action::ToggleServer { id, start } => vec![if start {
+                Request::StartServer(id)
+            } else {
+                Request::StopServer(id)
+            }],
+            Action::SetMode(mode) => {
+                if mode == ExecMode::NoRestrictions
+                    && self.mode != mode
+                    && let Some(overlay) = self.overlay.as_mut()
+                    && !overlay.armed
+                {
+                    overlay.armed = true;
+                    self.status = Some((Tone::Error, copy::NO_RESTRICTIONS_CONFIRM.to_owned()));
+                    return Vec::new();
+                }
+                let judge = self.policy.as_ref().and_then(|policy| policy.judge.clone());
+                vec![Request::SetPolicy(ExecPolicyDto { mode, judge })]
+            }
+            Action::SetJudge(judge) => vec![Request::SetPolicy(ExecPolicyDto {
+                mode: self.mode,
+                judge,
+            })],
+        }
+    }
+
+    fn overlay_key(&mut self, key: Key) -> Vec<Request> {
+        let Some(overlay) = self.overlay.as_ref() else {
+            return Vec::new();
+        };
+        let view = self.view();
+        let rows = overlay.rows(&view);
+        let tabs = overlay.tabs(&view).len();
+        let Some(overlay) = self.overlay.as_mut() else {
+            return Vec::new();
+        };
+        overlay.clamp(rows.len());
+        match key {
+            Key::Esc => {
+                if overlay.filter.is_empty() {
+                    self.overlay = None;
+                } else {
+                    overlay.filter.clear();
+                    overlay.selected = 0;
+                }
+            }
+            Key::Up => overlay.up(rows.len()),
+            Key::Down => overlay.down(rows.len()),
+            Key::Tab | Key::Right => overlay.next_tab(tabs, true),
+            Key::Left => overlay.next_tab(tabs, false),
+            Key::Char(' ') => {
+                if let Some(row) = rows.get(overlay.selected) {
+                    overlay.toggle(&row.key);
+                }
+            }
+            Key::Char(value) => {
+                overlay.filter.insert(&value.to_string());
+                overlay.selected = 0;
+            }
+            Key::Backspace => {
+                overlay.filter.backspace();
+                overlay.selected = 0;
+            }
+            Key::ClearLine => overlay.filter.clear(),
+            Key::Enter => {
+                if let Some(action) = rows
+                    .get(overlay.selected)
+                    .and_then(|row| row.action.clone())
+                {
+                    return self.act(action);
+                }
+            }
+            _ => {}
         }
         Vec::new()
     }
@@ -536,6 +905,9 @@ impl App {
         }
         if !self.prompts.is_empty() {
             return self.prompt_key(key);
+        }
+        if self.overlay.is_some() {
+            return self.overlay_key(key);
         }
         if self.help {
             if matches!(key, Key::Esc | Key::Enter) {

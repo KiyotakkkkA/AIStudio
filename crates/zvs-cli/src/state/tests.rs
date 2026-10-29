@@ -287,3 +287,80 @@ fn a_lost_connection_exits_with_a_message() {
     app.update(Msg::Closed);
     assert_eq!(app.exit, Some(Exit::Message(copy::DISCONNECTED.to_owned())));
 }
+
+fn command(app: &mut App, text: &str) -> Vec<Request> {
+    typed(app, text);
+    app.update(Msg::Key(Key::Enter))
+}
+
+#[test]
+fn models_opens_a_panel_and_enter_picks_the_model() {
+    let mut app = ready();
+    app.model = None;
+    assert!(command(&mut app, "/models").is_empty());
+    assert!(app.overlay.is_some());
+    app.update(Msg::Key(Key::Enter));
+    assert!(app.overlay.is_none());
+    assert_eq!(
+        app.model.map(|model| model.model),
+        Some("openai/gpt-4o-mini".to_owned())
+    );
+}
+
+#[test]
+fn disabling_confirmations_needs_a_second_enter() {
+    let mut app = ready();
+    assert_eq!(command(&mut app, "/permissions"), [Request::Policy]);
+    app.update(Msg::Policy(Ok(ExecPolicyDto {
+        mode: ExecMode::SafetyAsk,
+        judge: None,
+    })));
+    app.update(Msg::Key(Key::Down));
+    app.update(Msg::Key(Key::Down));
+    assert!(app.update(Msg::Key(Key::Enter)).is_empty());
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::SetPolicy(ExecPolicyDto {
+            mode: ExecMode::NoRestrictions,
+            judge: None
+        })]
+    );
+}
+
+#[test]
+fn resuming_loads_the_conversation_and_reattaches() {
+    let mut app = ready();
+    assert_eq!(command(&mut app, "/resume"), [Request::Conversations]);
+    let mut own = conversation();
+    own.working_folder = Some(FOLDER.to_owned());
+    let id = own.id;
+    app.update(Msg::Conversations(Ok(vec![own.clone()])));
+    assert_eq!(app.update(Msg::Key(Key::Enter)), [Request::Load(id)]);
+    let detail = ConversationDetailDto {
+        conversation: own,
+        messages: Vec::new(),
+    };
+    assert_eq!(app.update(Msg::Loaded(Ok(detail))), [Request::Attach(id)]);
+    assert!(app.overlay.is_none());
+    assert_eq!(
+        app.conversation.map(|conversation| conversation.id),
+        Some(id)
+    );
+}
+
+#[test]
+fn typing_in_a_panel_filters_and_escape_clears_then_closes() {
+    let mut app = ready();
+    command(&mut app, "/models");
+    typed(&mut app, "zzz");
+    let overlay = app.overlay.clone().expect("open");
+    assert!(overlay.rows(&app.view()).is_empty());
+    app.update(Msg::Key(Key::Esc));
+    assert!(
+        app.overlay
+            .as_ref()
+            .is_some_and(|overlay| overlay.filter.is_empty())
+    );
+    app.update(Msg::Key(Key::Esc));
+    assert!(app.overlay.is_none());
+}

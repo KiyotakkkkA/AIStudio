@@ -82,7 +82,6 @@ pub const MORE_LINES: &str = "ещё строк:";
 pub const COMMANDS_TITLE: &str = "Команды";
 pub const HELP_TITLE: &str = "Справка";
 pub const UNKNOWN_COMMAND: &str = "Неизвестная команда";
-pub const NOT_YET: &str = "Команда станет доступна в следующей версии";
 pub const BUSY: &str = "Дождитесь окончания ответа или остановите его клавишей Esc";
 
 pub const CMD_HELP: &str = "Список команд и клавиш";
@@ -116,3 +115,74 @@ pub const MODE_NO_RESTRICTIONS: &str = "Без ограничений";
 pub const CONTEXT: &str = "Контекст";
 pub const RECOMMENDED: &str = "рекомендуется";
 pub const QUESTION_PROGRESS: &str = "из";
+
+pub const SEARCH_PLACEHOLDER: &str = "Поиск…";
+pub const LOADING: &str = "Загрузка…";
+pub const NOTHING_FOUND: &str = "Ничего не найдено";
+pub const HINT_PANEL: &str =
+    "↑/↓ — выбор · ←/→, Tab — вкладки · Пробел — подробности · Enter — выбрать · Esc — закрыть";
+pub const TAB_ALL: &str = "Все";
+
+pub const MODELS_TITLE: &str = "Модели";
+pub const MODEL_SELECTED: &str = "Выбрана модель";
+pub const MODEL_CURRENT: &str = "текущая";
+pub const CONTEXT_WINDOW: &str = "Окно контекста";
+pub const UNAVAILABLE: &str = "недоступна";
+
+pub const RESUME_TITLE: &str = "Диалоги этой папки";
+pub const TAB_RECENT: &str = "Недавние";
+pub const TAB_PINNED: &str = "Закреплённые";
+pub const RESUMED: &str = "Диалог продолжен";
+pub const UPDATED: &str = "Изменён";
+pub const NO_CONVERSATIONS: &str = "В этой папке ещё нет диалогов";
+
+pub const CONTEXT_TITLE: &str = "Контекст";
+pub const TAB_SUMMARY: &str = "Сводка";
+pub const TAB_TOOLS: &str = "Инструменты";
+pub const CONTEXT_USED: &str = "Занято";
+pub const CONTEXT_OF: &str = "из";
+pub const CONTEXT_SYSTEM: &str = "Системный промпт";
+pub const CONTEXT_TOOLS: &str = "Описания инструментов";
+pub const CONTEXT_HISTORY: &str = "История";
+pub const CONTEXT_RESERVED: &str = "Резерв для ответа";
+pub const CONTEXT_FREE: &str = "Свободно";
+pub const CONTEXT_TRIMMED: &str = "Сокращено сообщений";
+pub const CONTEXT_NEEDS_MODEL: &str = "Выберите модель через /models";
+
+pub const SKILLS_TITLE: &str = "Навыки";
+pub const TAB_ENABLED: &str = "Включённые";
+pub const TAB_DISABLED: &str = "Выключенные";
+pub const SKILL_ON: &str = "включён";
+pub const SKILL_OFF: &str = "выключен";
+pub const SKILL_INVALID: &str = "содержит ошибки";
+pub const SKILL_ENABLED: &str = "Навык включён";
+pub const SKILL_DISABLED: &str = "Навык выключен";
+pub const SOURCE_LOCAL: &str = "локальный";
+pub const SOURCE_IMPORTED: &str = "импортированный";
+pub const SOURCE_BUNDLED: &str = "встроенный";
+
+pub const MCP_TITLE: &str = "MCP-серверы";
+pub const TAB_CONNECTED: &str = "Подключённые";
+pub const TAB_STOPPED: &str = "Остановленные";
+pub const MCP_DISABLED: &str = "выключен";
+pub const MCP_STOPPED: &str = "остановлен";
+pub const MCP_STARTING: &str = "запуск";
+pub const MCP_CONNECTED: &str = "подключён";
+pub const MCP_FAILED: &str = "ошибка";
+pub const MCP_STARTED: &str = "Сервер запущен";
+pub const MCP_HALTED: &str = "Сервер остановлен";
+
+pub const PERMISSIONS_TITLE: &str = "Подтверждение действий";
+pub const TAB_MODE: &str = "Режим";
+pub const TAB_JUDGE: &str = "Модель-арбитр";
+pub const JUDGE_NONE: &str = "Не выбрана";
+pub const MODE_SET: &str = "Режим подтверждения изменён";
+pub const JUDGE_SET: &str = "Модель-арбитр изменена";
+pub const MODE_CURRENT: &str = "текущий";
+pub const NO_RESTRICTIONS_CONFIRM: &str = "Модель сможет удалять и перезаписывать файлы, отправлять формы и запускать программы без подтверждения. Нажмите Enter ещё раз, чтобы отключить подтверждения.";
+pub const MODE_HINT_ALWAYS_ASK: &str =
+    "Инструменты с уровнем ask запрашивают подтверждение перед каждым вызовом.";
+pub const MODE_HINT_SAFETY_ASK: &str = "Подтверждение требуется для удаления и перезаписи файлов, отправки форм, загрузок и запуска кода.";
+pub const MODE_HINT_AUTO_BYPASS: &str = "Опасные действия с файлами и запуск кода оценивают правила и модель-арбитр. Если решение не принято, запрашивается подтверждение.";
+pub const MODE_HINT_NO_RESTRICTIONS: &str = "Подтверждения не запрашиваются. Отключённые инструменты, запрещённые папки и поля оплаты остаются недоступны.";
+pub const JUDGE_HINT: &str = "Оценивает опасные действия в режиме «Автопроверка». Получает только описание действия и правила, без истории диалога.";

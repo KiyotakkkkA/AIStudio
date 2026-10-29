@@ -23,7 +23,7 @@ const TICK: Duration = Duration::from_millis(100);
 const WHEEL_STEP: isize = 3;
 
 enum Signal {
-    App(Msg),
+    App(Box<Msg>),
     Linked(Connection),
 }
 
@@ -79,7 +79,7 @@ fn read_terminal(signals: &mpsc::UnboundedSender<Signal>) {
             _ => None,
         };
         if let Some(message) = message
-            && signals.send(Signal::App(message)).is_err()
+            && signals.send(Signal::App(Box::new(message))).is_err()
         {
             return;
         }
@@ -166,6 +166,44 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
         ),
         Request::Answer(input) => void(link.call("chat.answer", &input).await),
         Request::Skip(input) => void(link.call("chat.skip", &input).await),
+        Request::Conversations => {
+            Msg::Conversations(link.call("chat.conversations.list", &()).await)
+        }
+        Request::Load(id) => Msg::Loaded(
+            link.call("chat.conversations.get", &json!({ "id": id }))
+                .await,
+        ),
+        Request::Attach(id) => Msg::Attached(
+            link.call("chat.attach", &json!({ "conversationId": id }))
+                .await,
+        ),
+        Request::Context {
+            conversation,
+            provider,
+            model,
+        } => {
+            let mut input = json!({ "providerId": provider, "modelId": model });
+            if let Some(id) = conversation {
+                input["conversationId"] = json!(id);
+            }
+            Msg::Context(link.call("chat.context", &input).await)
+        }
+        Request::Skills => Msg::Skills(link.call("skills.list", &()).await),
+        Request::Servers => Msg::Servers(link.call("mcp.list", &()).await),
+        Request::SetSkill { id, enabled } => Msg::SkillChanged(
+            link.call(
+                "skills.setEnabled",
+                &json!({ "id": id, "enabled": enabled }),
+            )
+            .await,
+        ),
+        Request::StartServer(id) => {
+            Msg::ServerChanged(link.call("mcp.start", &json!({ "id": id })).await)
+        }
+        Request::StopServer(id) => {
+            Msg::ServerChanged(link.call("mcp.stop", &json!({ "id": id })).await)
+        }
+        Request::SetPolicy(policy) => Msg::PolicySet(link.call("execPolicy.set", &policy).await),
     }
 }
 
@@ -184,7 +222,7 @@ fn dispatch(
         let signals = signals.clone();
         tokio::spawn(async move {
             let message = execute(link, request, folder).await;
-            let _ = signals.send(Signal::App(message));
+            let _ = signals.send(Signal::App(Box::new(message)));
         });
     }
 }
@@ -199,7 +237,7 @@ fn forward(
                 Incoming::Event(event) => Msg::Event(Box::new(event)),
                 Incoming::Closed => Msg::Closed,
             };
-            if signals.send(Signal::App(message)).is_err() {
+            if signals.send(Signal::App(Box::new(message))).is_err() {
                 break;
             }
         }
@@ -221,7 +259,7 @@ async fn session(
             let mut ticks = tokio::time::interval(TICK);
             loop {
                 ticks.tick().await;
-                if signals.send(Signal::App(Msg::Tick)).is_err() {
+                if signals.send(Signal::App(Box::new(Msg::Tick))).is_err() {
                     break;
                 }
             }
@@ -232,11 +270,11 @@ async fn session(
         tokio::spawn(async move {
             let status = signals.clone();
             let report = move |message: &'static str| {
-                let _ = status.send(Signal::App(Msg::Connecting(message)));
+                let _ = status.send(Signal::App(Box::new(Msg::Connecting(message))));
             };
             let signal = match launch::connect(report).await {
                 Ok(connection) => Signal::Linked(connection),
-                Err(message) => Signal::App(Msg::Unreachable(message)),
+                Err(message) => Signal::App(Box::new(Msg::Unreachable(message))),
             };
             let _ = signals.send(signal);
         });
@@ -260,7 +298,7 @@ async fn session(
                     link = Some(connected);
                     app.update(Msg::Connected)
                 }
-                Signal::App(message) => app.update(message),
+                Signal::App(message) => app.update(*message),
             };
             dispatch(link.as_ref(), requests, &app.folder, &signals);
             if app.exit.is_some() {

@@ -1,4 +1,5 @@
 pub mod banner;
+pub mod overlay;
 pub mod prompt;
 pub mod text;
 pub mod theme;
@@ -20,14 +21,7 @@ use crate::state::{App, Phase};
 const INPUT_MAX_LINES: usize = 8;
 const PALETTE_ROWS: usize = 8;
 
-pub const fn mode_label(mode: ExecMode) -> &'static str {
-    match mode {
-        ExecMode::AlwaysAsk => copy::MODE_ALWAYS_ASK,
-        ExecMode::SafetyAsk => copy::MODE_SAFETY_ASK,
-        ExecMode::AutoBypass => copy::MODE_AUTO_BYPASS,
-        ExecMode::NoRestrictions => copy::MODE_NO_RESTRICTIONS,
-    }
-}
+pub use crate::state::overlay::mode_label;
 
 fn panel(
     title: &str,
@@ -158,7 +152,7 @@ fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
             .collect()
     };
     frame.render_widget(Paragraph::new(lines), inner);
-    if app.prompts.is_empty() && !app.help {
+    if app.prompts.is_empty() && !app.help && app.overlay.is_none() {
         let x = inner.x + rows(column + 2).min(inner.width.saturating_sub(1));
         let y = inner.y + rows(row - first);
         frame.set_cursor_position((x, y));
@@ -273,6 +267,8 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
     } else {
         let hint = if !app.prompts.is_empty() {
             copy::HINT_PROMPT
+        } else if app.overlay.is_some() {
+            copy::HINT_PANEL
         } else if app.palette_open() {
             copy::HINT_PALETTE
         } else if app.busy() {
@@ -360,7 +356,10 @@ pub fn draw(frame: &mut Frame<'_>, app: &App) {
                 Constraint::Length(2),
             ])
             .areas(area);
-            transcript_view(frame, body, app);
+            match &app.overlay {
+                Some(current) => overlay::draw(frame, body, app, current),
+                None => transcript_view(frame, body, app),
+            }
             match panel {
                 Some(panel) => prompt_view(frame, bottom, panel),
                 None => input_view(frame, bottom, app),
