@@ -27,7 +27,21 @@ enum Signal {
     Linked(Connection),
 }
 
-pub fn key(event: KeyEvent, more_pending: bool) -> Option<Key> {
+const BATCH_MAX: usize = 4096;
+
+pub fn typed_later(rest: &[Event]) -> bool {
+    rest.iter().any(|event| {
+        matches!(
+            event,
+            Event::Key(later)
+                if later.kind != KeyEventKind::Release
+                    && !later.modifiers.contains(KeyModifiers::CONTROL)
+                    && matches!(later.code, KeyCode::Char(value) if !value.is_control())
+        )
+    })
+}
+
+pub fn key(event: KeyEvent, pasting: bool) -> Option<Key> {
     let control = event.modifiers.contains(KeyModifiers::CONTROL);
     let shifted = event
         .modifiers
@@ -36,13 +50,14 @@ pub fn key(event: KeyEvent, more_pending: bool) -> Option<Key> {
         KeyCode::Char(value) if control => match value.to_ascii_lowercase() {
             'c' | 'd' => Key::Interrupt,
             'o' => Key::Details,
-            'j' => Key::Newline,
+            'j' | 'm' if pasting => Key::Newline,
+            'j' | 'm' => Key::Enter,
             'u' => Key::ClearLine,
             _ => return None,
         },
+        KeyCode::Enter | KeyCode::Char('\r' | '\n') if shifted || pasting => Key::Newline,
+        KeyCode::Enter | KeyCode::Char('\r' | '\n') => Key::Enter,
         KeyCode::Char(value) => Key::Char(value),
-        KeyCode::Enter if shifted || more_pending => Key::Newline,
-        KeyCode::Enter => Key::Enter,
         KeyCode::Backspace => Key::Backspace,
         KeyCode::Delete => Key::Delete,
         KeyCode::Left => Key::Left,
@@ -59,17 +74,15 @@ pub fn key(event: KeyEvent, more_pending: bool) -> Option<Key> {
     })
 }
 
-fn read_terminal(signals: &mpsc::UnboundedSender<Signal>) {
-    loop {
-        let Ok(next) = event::read() else {
-            return;
-        };
-        let message = match next {
+pub fn translate(batch: &[Event]) -> Vec<Msg> {
+    batch
+        .iter()
+        .enumerate()
+        .filter_map(|(index, next)| match next {
             Event::Key(pressed) if pressed.kind != KeyEventKind::Release => {
-                let more = event::poll(Duration::ZERO).unwrap_or(false);
-                key(pressed, more).map(Msg::Key)
+                key(*pressed, typed_later(&batch[index + 1..])).map(Msg::Key)
             }
-            Event::Paste(text) => Some(Msg::Paste(text)),
+            Event::Paste(text) => Some(Msg::Paste(text.clone())),
             Event::Mouse(mouse) => match mouse.kind {
                 MouseEventKind::ScrollUp => Some(Msg::Scroll(WHEEL_STEP)),
                 MouseEventKind::ScrollDown => Some(Msg::Scroll(-WHEEL_STEP)),
@@ -77,11 +90,26 @@ fn read_terminal(signals: &mpsc::UnboundedSender<Signal>) {
             },
             Event::Resize(..) => Some(Msg::Tick),
             _ => None,
-        };
-        if let Some(message) = message
-            && signals.send(Signal::App(Box::new(message))).is_err()
-        {
+        })
+        .collect()
+}
+
+fn read_terminal(signals: &mpsc::UnboundedSender<Signal>) {
+    loop {
+        let Ok(first) = event::read() else {
             return;
+        };
+        let mut batch = vec![first];
+        while batch.len() < BATCH_MAX && event::poll(Duration::ZERO).unwrap_or(false) {
+            match event::read() {
+                Ok(next) => batch.push(next),
+                Err(_) => break,
+            }
+        }
+        for message in translate(&batch) {
+            if signals.send(Signal::App(Box::new(message))).is_err() {
+                return;
+            }
         }
     }
 }
@@ -345,6 +373,53 @@ mod tests {
 
     fn pressed(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
         KeyEvent::new(code, modifiers)
+    }
+
+    fn press(code: KeyCode) -> Event {
+        Event::Key(KeyEvent::new(code, KeyModifiers::NONE))
+    }
+
+    fn release(code: KeyCode) -> Event {
+        Event::Key(KeyEvent::new_with_kind(
+            code,
+            KeyModifiers::NONE,
+            KeyEventKind::Release,
+        ))
+    }
+
+    #[test]
+    fn an_enter_delivered_with_its_release_still_submits() {
+        let batch = [press(KeyCode::Enter), release(KeyCode::Enter)];
+        assert_eq!(translate(&batch), [Msg::Key(Key::Enter)]);
+        let lf = [Event::Key(KeyEvent::new(
+            KeyCode::Char('j'),
+            KeyModifiers::CONTROL,
+        ))];
+        assert_eq!(translate(&lf), [Msg::Key(Key::Enter)]);
+        assert_eq!(
+            translate(&[press(KeyCode::Char('\r'))]),
+            [Msg::Key(Key::Enter)]
+        );
+    }
+
+    #[test]
+    fn an_enter_followed_by_typed_text_in_one_batch_is_a_pasted_newline() {
+        let batch = [
+            press(KeyCode::Char('a')),
+            press(KeyCode::Enter),
+            release(KeyCode::Enter),
+            press(KeyCode::Char('b')),
+            press(KeyCode::Enter),
+        ];
+        assert_eq!(
+            translate(&batch),
+            [
+                Msg::Key(Key::Char('a')),
+                Msg::Key(Key::Newline),
+                Msg::Key(Key::Char('b')),
+                Msg::Key(Key::Enter),
+            ]
+        );
     }
 
     #[test]

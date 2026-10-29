@@ -19,7 +19,7 @@ pub const ACCESS_DENY: &str = "Отказать и выйти";
 pub const ACCESS_DENIED: &str = "Доступ к папке не предоставлен. Сессия завершена.";
 
 pub const WELCOME_HINT: &str = "Введите сообщение или / для списка команд";
-pub const INPUT_PLACEHOLDER: &str = "Сообщение…  (/ — команды, Shift+Enter — новая строка)";
+pub const INPUT_PLACEHOLDER: &str = "Сообщение…  (/ — команды, Alt+Enter — новая строка)";
 pub const WORKSPACE: &str = "Рабочая папка";
 pub const MODEL: &str = "Модель";
 pub const NO_MODEL: &str = "не выбрана";
@@ -98,7 +98,7 @@ pub const CMD_PERMISSIONS: &str = "Режим выполнения и модел
 pub const KEYS_TITLE: &str = "Клавиши";
 pub const KEYS: &[(&str, &str)] = &[
     ("Enter", "отправить сообщение"),
-    ("Shift+Enter, Ctrl+J", "новая строка"),
+    ("Alt+Enter, Shift+Enter", "новая строка"),
     ("↑ / ↓", "история ввода"),
     ("Esc", "остановить ответ"),
     ("Esc Esc", "выйти"),
