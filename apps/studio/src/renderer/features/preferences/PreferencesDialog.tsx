@@ -9,6 +9,8 @@ import {
   mdiClose,
   mdiCogOutline,
   mdiConsole,
+  mdiDeleteOutline,
+  mdiDownload,
   mdiHarddisk,
   mdiInformationOutline,
   mdiPackageVariantClosed,
@@ -588,13 +590,20 @@ const CliSection = observer(function CliSection() {
       >
         <div className="flex items-center gap-3">
           {status?.installed ? (
-            <Button tone="ghost" disabled={cli.busy} onClick={() => void cli.uninstall()}>
-              {CLI_UNINSTALL}
-            </Button>
+            <IconButton
+              path={mdiDeleteOutline}
+              label={CLI_UNINSTALL}
+              tone="danger"
+              disabled={cli.busy}
+              onClick={() => void cli.uninstall()}
+            />
           ) : (
-            <Button disabled={cli.busy || !cli.available} onClick={() => void cli.install()}>
-              {CLI_INSTALL}
-            </Button>
+            <IconButton
+              path={mdiDownload}
+              label={CLI_INSTALL}
+              disabled={cli.busy || !cli.available}
+              onClick={() => void cli.install()}
+            />
           )}
         </div>
       </SettingRow>

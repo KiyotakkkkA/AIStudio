@@ -41,6 +41,8 @@ pub const HINT_IDLE: &str =
 pub const HINT_RUNNING: &str = "Esc — остановить · Ctrl+O — подробности · PgUp/PgDn — прокрутка";
 pub const HINT_PROMPT: &str = "↑/↓ — выбор · Enter — подтвердить · Esc — отклонить";
 pub const HINT_PALETTE: &str = "↑/↓ — выбор · Tab — дополнить · Enter — выполнить · Esc — закрыть";
+pub const COPIED: &str = "Скопировано в буфер обмена";
+pub const COPY_FAILED: &str = "Не удалось скопировать текст";
 pub const EXIT_AGAIN: &str = "Нажмите Esc ещё раз для выхода";
 
 pub const APPROVAL_TITLE: &str = "Требуется подтверждение";
@@ -119,7 +121,8 @@ pub const KEYS: &[(&str, &str)] = &[
     ("Esc", "остановить ответ"),
     ("Esc Esc", "выйти"),
     ("Ctrl+O", "показать или скрыть подробности инструментов"),
-    ("PgUp / PgDn", "прокрутка"),
+    ("Колесо, PgUp / PgDn", "прокрутка"),
+    ("Выделение мышью", "скопировать текст"),
     ("! в начале строки", "выполнить команду в рабочей папке"),
     ("Ctrl+C", "выйти"),
 ];

@@ -47,6 +47,35 @@ pub enum Key {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pointer {
+    Press(u16, u16),
+    Drag(u16, u16),
+    Release(u16, u16),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Selection {
+    pub anchor: (u16, u16),
+    pub cursor: (u16, u16),
+}
+
+impl Selection {
+    pub fn ordered(&self) -> ((u16, u16), (u16, u16)) {
+        let key = |(x, y): (u16, u16)| (y, x);
+        if key(self.anchor) <= key(self.cursor) {
+            (self.anchor, self.cursor)
+        } else {
+            (self.cursor, self.anchor)
+        }
+    }
+
+    pub fn contains(&self, x: u16, y: u16) -> bool {
+        let ((start_x, start_y), (end_x, end_y)) = self.ordered();
+        (y > start_y || (y == start_y && x >= start_x)) && (y < end_y || (y == end_y && x <= end_x))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
     Connecting(&'static str),
     Access,
@@ -119,6 +148,7 @@ pub enum Request {
     FocusVerification,
     Shell(String),
     StopShell,
+    Copy(Selection),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -152,6 +182,8 @@ pub enum Msg {
     Notice(zvs_contract::CliNotice),
     ShellOutput(String),
     ShellEnded(ShellEnd),
+    Pointer(Pointer),
+    Copied(bool),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -167,6 +199,7 @@ pub struct App {
     pub overlay: Option<Overlay>,
     pub verification: Option<String>,
     pub shell: Option<ShellRun>,
+    pub selection: Option<Selection>,
     pub transcript: Transcript,
     pub input: Input,
     pub palette: Palette,
@@ -219,6 +252,7 @@ impl App {
             overlay: None,
             verification: None,
             shell: None,
+            selection: None,
             transcript: Transcript::default(),
             input: Input::default(),
             palette: Palette::default(),
@@ -308,6 +342,15 @@ impl App {
                 Vec::new()
             }
             Msg::Connected => vec![Request::Open, Request::Providers, Request::Policy],
+            Msg::Pointer(pointer) => self.pointer(pointer),
+            Msg::Copied(copied) => {
+                self.status = Some(if copied {
+                    (Tone::Success, copy::COPIED.to_owned())
+                } else {
+                    (Tone::Error, copy::COPY_FAILED.to_owned())
+                });
+                Vec::new()
+            }
             Msg::ShellOutput(line) => {
                 if let Some(shell) = self.shell.as_mut() {
                     shell.push(line);
@@ -931,7 +974,38 @@ impl App {
         }
     }
 
+    fn pointer(&mut self, pointer: Pointer) -> Vec<Request> {
+        match pointer {
+            Pointer::Press(x, y) => {
+                self.selection = Some(Selection {
+                    anchor: (x, y),
+                    cursor: (x, y),
+                });
+                Vec::new()
+            }
+            Pointer::Drag(x, y) => {
+                if let Some(selection) = self.selection.as_mut() {
+                    selection.cursor = (x, y);
+                }
+                Vec::new()
+            }
+            Pointer::Release(x, y) => {
+                let Some(mut selection) = self.selection else {
+                    return Vec::new();
+                };
+                selection.cursor = (x, y);
+                if selection.anchor == selection.cursor {
+                    self.selection = None;
+                    return Vec::new();
+                }
+                self.selection = Some(selection);
+                vec![Request::Copy(selection)]
+            }
+        }
+    }
+
     fn key(&mut self, key: Key) -> Vec<Request> {
+        self.selection = None;
         if key != Key::Esc {
             self.escape_armed = false;
         }

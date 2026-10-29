@@ -8,7 +8,9 @@ use std::time::Duration;
 use tokio::net::windows::named_pipe::{
     ClientOptions, NamedPipeClient, NamedPipeServer, PipeMode, ServerOptions,
 };
-use windows::Win32::Foundation::{CloseHandle, ERROR_PIPE_BUSY, HANDLE, HLOCAL, LocalFree};
+use windows::Win32::Foundation::{
+    CloseHandle, ERROR_PIPE_BUSY, GlobalFree, HANDLE, HLOCAL, LocalFree,
+};
 use windows::Win32::Globalization::{CP_OEMCP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS, MultiByteToWideChar};
 use windows::Win32::Security::Authorization::{
     ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
@@ -17,6 +19,10 @@ use windows::Win32::Security::{
     GetTokenInformation, PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER,
     TokenUser,
 };
+use windows::Win32::System::DataExchange::{
+    CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+};
+use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
 use windows::Win32::System::Pipes::GetNamedPipeServerProcessId;
 use windows::Win32::System::Threading::{
     GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
@@ -85,6 +91,32 @@ pub fn oem_text(bytes: &[u8]) -> String {
     let written = unsafe { MultiByteToWideChar(CP_OEMCP, flags, bytes, Some(&mut wide)) };
     let written = usize::try_from(written).unwrap_or(0).min(wide.len());
     String::from_utf16_lossy(&wide[..written])
+}
+
+const CF_UNICODETEXT: u32 = 13;
+
+pub fn copy_text(text: &str) -> io::Result<()> {
+    let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    let bytes = wide.len() * size_of::<u16>();
+    unsafe { OpenClipboard(None) }.map_err(|e| native(&e))?;
+    let result = (|| {
+        unsafe { EmptyClipboard() }.map_err(|e| native(&e))?;
+        let memory = unsafe { GlobalAlloc(GMEM_MOVEABLE, bytes) }.map_err(|e| native(&e))?;
+        let target = unsafe { GlobalLock(memory) }.cast::<u16>();
+        if target.is_null() {
+            let _ = unsafe { GlobalFree(Some(memory)) };
+            return Err(io::Error::other("the clipboard memory could not be locked"));
+        }
+        unsafe { std::ptr::copy_nonoverlapping(wide.as_ptr(), target, wide.len()) };
+        let _ = unsafe { GlobalUnlock(memory) };
+        if let Err(error) = unsafe { SetClipboardData(CF_UNICODETEXT, Some(HANDLE(memory.0))) } {
+            let _ = unsafe { GlobalFree(Some(memory)) };
+            return Err(native(&error));
+        }
+        Ok(())
+    })();
+    let _ = unsafe { CloseClipboard() };
+    result
 }
 
 pub fn allow_foreground() {

@@ -25,6 +25,7 @@ pub const PROMPT_BG: Color = Color::Rgb(0x2e, 0x24, 0x14);
 pub const EMBER_SOFT: Color = Color::Rgb(0xf0, 0xc9, 0xad);
 pub const SHELL_BG: Color = Color::Rgb(0x2a, 0x24, 0x12);
 pub const ON_WARN: Color = Color::Rgb(0x1a, 0x14, 0x08);
+pub const SELECTION_BG: Color = Color::Rgb(0x5a, 0x3a, 0x22);
 pub const CODE_BG: Color = Color::Rgb(0x1c, 0x18, 0x14);
 
 pub fn ember(position: f64) -> Color {

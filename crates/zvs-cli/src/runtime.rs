@@ -2,8 +2,8 @@ use std::io::IsTerminal;
 use std::time::Duration;
 
 use ratatui::crossterm::event::{
-    self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEvent, KeyEventKind,
-    KeyModifiers,
+    self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind,
 };
 use ratatui::crossterm::execute;
 use serde_json::{Value, json};
@@ -17,10 +17,11 @@ use crate::copy;
 use crate::launch::{self, Connection};
 use crate::link::{Incoming, Link};
 use crate::shell::{self, ShellControl};
-use crate::state::{App, Exit, Key, Msg, Request};
+use crate::state::{App, Exit, Key, Msg, Pointer, Request, Selection};
 use crate::ui;
 
 const TICK: Duration = Duration::from_millis(100);
+const WHEEL_STEP: isize = 3;
 
 enum Signal {
     App(Box<Msg>),
@@ -83,6 +84,23 @@ pub fn translate(batch: &[Event]) -> Vec<Msg> {
                 key(*pressed, typed_later(&batch[index + 1..])).map(Msg::Key)
             }
             Event::Paste(text) => Some(Msg::Paste(text.clone())),
+            Event::Mouse(mouse) => {
+                let at = (mouse.column, mouse.row);
+                match mouse.kind {
+                    MouseEventKind::ScrollUp => Some(Msg::Scroll(WHEEL_STEP)),
+                    MouseEventKind::ScrollDown => Some(Msg::Scroll(-WHEEL_STEP)),
+                    MouseEventKind::Down(MouseButton::Left) => {
+                        Some(Msg::Pointer(Pointer::Press(at.0, at.1)))
+                    }
+                    MouseEventKind::Drag(MouseButton::Left) => {
+                        Some(Msg::Pointer(Pointer::Drag(at.0, at.1)))
+                    }
+                    MouseEventKind::Up(MouseButton::Left) => {
+                        Some(Msg::Pointer(Pointer::Release(at.0, at.1)))
+                    }
+                    _ => None,
+                }
+            }
             Event::Resize(..) => Some(Msg::Tick),
             _ => None,
         })
@@ -227,7 +245,7 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             Msg::ServerChanged(link.call("mcp.stop", &json!({ "id": id })).await)
         }
         Request::SetPolicy(policy) => Msg::PolicySet(link.call("execPolicy.set", &policy).await),
-        Request::Shell(_) | Request::StopShell => Msg::Tick,
+        Request::Shell(_) | Request::StopShell | Request::Copy(_) => Msg::Tick,
         Request::FocusVerification => {
             #[cfg(windows)]
             zvs_pipe::allow_foreground();
@@ -254,11 +272,63 @@ fn run_shell(
     });
 }
 
+pub fn selected_text(screen: &[String], selection: &Selection) -> String {
+    let ((start_x, start_y), (end_x, end_y)) = selection.ordered();
+    let mut lines = Vec::new();
+    for row in start_y..=end_y {
+        let Some(line) = screen.get(usize::from(row)) else {
+            break;
+        };
+        let cells: Vec<char> = line.chars().collect();
+        let from = if row == start_y {
+            usize::from(start_x)
+        } else {
+            0
+        };
+        let to = if row == end_y {
+            (usize::from(end_x) + 1).min(cells.len())
+        } else {
+            cells.len()
+        };
+        let piece: String = cells
+            .get(from.min(to)..to)
+            .unwrap_or_default()
+            .iter()
+            .collect();
+        lines.push(piece.trim_end().to_owned());
+    }
+    lines.join("\n")
+}
+
+fn copy_to_clipboard(text: &str) -> bool {
+    #[cfg(windows)]
+    {
+        zvs_pipe::copy_text(text).is_ok()
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = text;
+        false
+    }
+}
+
+fn screen_rows(buffer: &ratatui::buffer::Buffer) -> Vec<String> {
+    let area = buffer.area;
+    (area.top()..area.bottom())
+        .map(|y| {
+            (area.left()..area.right())
+                .map(|x| buffer[(x, y)].symbol().chars().next().unwrap_or(' '))
+                .collect()
+        })
+        .collect()
+}
+
 fn dispatch(
     link: Option<&Link>,
     requests: Vec<Request>,
     folder: &str,
     shell: &ShellControl,
+    screen: &[String],
     signals: &mpsc::UnboundedSender<Signal>,
 ) {
     let mut remote = Vec::new();
@@ -266,6 +336,10 @@ fn dispatch(
         match request {
             Request::Shell(line) => run_shell(line, folder.to_owned(), shell.clone(), signals),
             Request::StopShell => shell.stop(),
+            Request::Copy(selection) => {
+                let copied = copy_to_clipboard(&selected_text(screen, &selection));
+                let _ = signals.send(Signal::App(Box::new(Msg::Copied(copied))));
+            }
             other => remote.push(other),
         }
     }
@@ -341,7 +415,8 @@ async fn session(
     let mut link: Option<Link> = None;
     let shell = ShellControl::default();
     loop {
-        terminal.draw(|frame| ui::draw(frame, &app))?;
+        let drawn = terminal.draw(|frame| ui::draw(frame, &app))?;
+        let screen = screen_rows(drawn.buffer);
         let Some(first) = received.recv().await else {
             break;
         };
@@ -358,7 +433,14 @@ async fn session(
                 }
                 Signal::App(message) => app.update(*message),
             };
-            dispatch(link.as_ref(), requests, &app.folder, &shell, &signals);
+            dispatch(
+                link.as_ref(),
+                requests,
+                &app.folder,
+                &shell,
+                &screen,
+                &signals,
+            );
             if app.exit.is_some() {
                 return Ok(app.exit.take());
             }
@@ -376,9 +458,13 @@ pub async fn run() -> i32 {
         .map(|path| path.to_string_lossy().into_owned())
         .unwrap_or_default();
     let mut terminal = ratatui::init();
-    let _ = execute!(std::io::stdout(), EnableBracketedPaste);
+    let _ = execute!(std::io::stdout(), EnableMouseCapture, EnableBracketedPaste);
     let outcome = session(&mut terminal, folder).await;
-    let _ = execute!(std::io::stdout(), DisableBracketedPaste);
+    let _ = execute!(
+        std::io::stdout(),
+        DisableMouseCapture,
+        DisableBracketedPaste
+    );
     ratatui::restore();
     match outcome {
         Ok(Some(Exit::Message(message))) => {
@@ -411,6 +497,30 @@ mod tests {
             KeyModifiers::NONE,
             KeyEventKind::Release,
         ))
+    }
+
+    #[test]
+    fn a_selection_copies_the_covered_cells_across_rows() {
+        let screen = vec![
+            "  hello world".to_owned(),
+            "second line   ".to_owned(),
+            "third".to_owned(),
+        ];
+        let across = Selection {
+            anchor: (8, 0),
+            cursor: (5, 1),
+        };
+        assert_eq!(selected_text(&screen, &across), "world\nsecond");
+        let backwards = Selection {
+            anchor: (5, 1),
+            cursor: (8, 0),
+        };
+        assert_eq!(selected_text(&screen, &backwards), "world\nsecond");
+        let tail = Selection {
+            anchor: (0, 2),
+            cursor: (40, 2),
+        };
+        assert_eq!(selected_text(&screen, &tail), "third");
     }
 
     #[test]

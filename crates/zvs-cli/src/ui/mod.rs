@@ -372,7 +372,27 @@ fn access(frame: &mut Frame<'_>, area: Rect, app: &App) {
     prompt_view(frame, target, panel);
 }
 
+fn highlight(frame: &mut Frame<'_>, app: &App) {
+    let Some(selection) = app.selection else {
+        return;
+    };
+    let area = frame.area();
+    let buffer = frame.buffer_mut();
+    for y in area.top()..area.bottom() {
+        for x in area.left()..area.right() {
+            if selection.contains(x, y) {
+                buffer[(x, y)].set_bg(theme::SELECTION_BG);
+            }
+        }
+    }
+}
+
 pub fn draw(frame: &mut Frame<'_>, app: &App) {
+    draw_screen(frame, app);
+    highlight(frame, app);
+}
+
+fn draw_screen(frame: &mut Frame<'_>, app: &App) {
     let area = frame.area();
     match app.phase {
         Phase::Connecting(message) => splash(frame, area, message, app),
