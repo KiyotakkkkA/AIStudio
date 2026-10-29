@@ -56,7 +56,7 @@ test("OpenRouter filters intersect with search without dropping hidden selection
   );
 });
 
-test("Ollama free filter uses the fixed allowlist, including cloud and latest suffixes", async () => {
+test("Ollama free filter matches no model while the allowlist is empty", async () => {
   const saved = provider();
   const ids = [
     "gemma4:31b",
@@ -75,7 +75,7 @@ test("Ollama free filter uses the fixed allowlist, including cloud and latest su
   store.setNoTrainingOnly(true);
   assert.deepEqual(
     store.visibleRows.map((row) => row.externalId),
-    ids.slice(0, 6),
+    [],
   );
   store.form?.setKind("mistral");
   assert.equal(store.visibleRows.length, ids.length);

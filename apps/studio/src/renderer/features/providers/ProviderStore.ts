@@ -492,14 +492,7 @@ export class ProviderStore {
   }
 }
 
-const FREE_OLLAMA_MODELS = new Set([
-  "gemma4:31b",
-  "gpt-oss:120b",
-  "gpt-oss:20b",
-  "nemotron-3-nano:30b",
-  "nemotron-3-super",
-  "nemotron-3-ultra",
-]);
+const FREE_OLLAMA_MODELS = new Set<string>();
 
 function isFreeOllamaModel(externalId: string): boolean {
   const id = externalId.replace(/(?::cloud|-cloud)$/, "").replace(/:latest$/, "");

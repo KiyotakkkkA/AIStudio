@@ -829,6 +829,43 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
 - **Folder access and tool tiers are separate axes.** A grant says *where* a tool may act;
   the tier on the Tools page says *whether* and with what confirmation it may act. Neither
   widens the other.
+- **Execution policy** (design, 2026-10-29). A third axis, above the two: it decides how a call
+  that would *ask* is answered, and nothing else. One global mode, shown and switched from the
+  composer (the shield button beside the provider control):
+
+  | Call | `always-ask` | `safety-ask` | `auto-bypass` | `no-restrictions` |
+  | --- | --- | --- | --- | --- |
+  | tier `auto` | runs | runs | runs | runs |
+  | tier `ask`, not destructive | asks | runs | runs | runs |
+  | `fs.apply` delete, overwrite, move onto a path | asks | asks | rules → judge → asks | runs |
+  | `browser.submit`, `browser.download` | asks | asks | asks | runs |
+  | `shell.run`, `code.run` | asks | asks | rules → judge → asks | runs |
+  | tier `off`, disabled tool, forbidden folder, outside a grant or the session workspace, credential and payment fields | refused | refused | refused | refused |
+
+  The last row is the floor: no mode reaches it. `always-ask` is today's behaviour. Destructive
+  is decided by effect, not by the operation's name: a `write` or `edit` that replaces an
+  existing file is an overwrite. A file grant is still raised as a `kind: "folder"` approval in
+  every mode; the policy answers tier approvals only. `no-restrictions` is chosen through a
+  confirmation that names process tools: they run with the user's rights and no sandbox.
+- **Judge** (`auto-bypass`). The mode is available only once a judge model is chosen
+  («Общие» → «Модель-арбитр»); without one the composer shows it inactive with a link to that
+  setting. A destructive call first meets **policy rules**, matched in code: path globs ×
+  operation for files, `argv` patterns × cwd for processes, each rule `allow | ask | deny`.
+  Precedence is vendor `deny` > user rules > vendor `allow`; rules ship in packs, vendor and
+  user, the way skills do, and a pack declares whether it contains any `allow`. A call no rule
+  matches goes to the judge with only the structured action (the `fs.apply` batch as one diff,
+  or program, cwd, argv and source) and the rule texts — never the conversation, which may carry
+  injected content. The judge answers `allow` or `ask` with a reason; anything else, an error,
+  a timeout or an unavailable model is `ask`. For processes it can only lower friction for
+  commands a rule could not classify: there is no snapshot to roll back, so the judge prompt is
+  biased toward `ask`. `deny` from a rule fails the call with `PermissionDenied`.
+- **Audit.** Every admitted call records why it ran: `auto`, `granted`, `approved`,
+  `policy:<mode>` or `judge:<rule id | model>` with the judge's reason, in the run log and on
+  the tool call's details.
+- **Status (2026-10-29): renderer preview only.** The composer control and the judge model
+  setting exist and hold their values in memory for the session; the host ignores the mode and
+  every call is admitted as under `always-ask`. Rules, packs, the judge and the audit field are
+  not built.
 - No telemetry, no outbound calls the user did not configure. One narrow exception: **site
   icons** for the web sources a provider returned with an answer (`zvs-host/src/sites.rs`,
   2026-10-27). The renderer never loads a remote image (CSP `img-src 'self' blob:`). It asks

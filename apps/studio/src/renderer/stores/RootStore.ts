@@ -24,6 +24,7 @@ import StorageStore from "../features/preferences/StorageStore";
 import AppSettingsStore from "../features/preferences/AppSettingsStore";
 import MemoryStore from "../features/memory/MemoryStore";
 import ProfileStore from "../features/preferences/ProfileStore";
+import ExecPolicyStore from "../features/execPolicy/ExecPolicyStore";
 
 export interface RootStoreEnvironment {
   readonly ipc: IpcClient<Contract>;
@@ -53,6 +54,7 @@ export class RootStore {
   readonly appSettings: AppSettingsStore;
   readonly memory: MemoryStore;
   readonly profile: ProfileStore;
+  readonly execPolicy: ExecPolicyStore;
 
   constructor(private readonly environment: RootStoreEnvironment) {
     this.ui = new UiStore(environment.ipc);
@@ -82,6 +84,7 @@ export class RootStore {
     );
     this.memory = new MemoryStore(environment.ipc);
     this.profile = new ProfileStore(environment.ipc);
+    this.execPolicy = new ExecPolicyStore(environment.ipc);
     makeAutoObservable<RootStore, "environment">(
       this,
       {
@@ -107,6 +110,7 @@ export class RootStore {
         appSettings: false,
         memory: false,
         profile: false,
+        execPolicy: false,
       },
       { autoBind: true },
     );

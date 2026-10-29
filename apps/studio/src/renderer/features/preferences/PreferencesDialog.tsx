@@ -79,6 +79,17 @@ import {
 import PreferencesSearch from "./PreferencesSearch";
 import ThemePalettes from "./ThemePalettes";
 import ComponentsTab from "../toolchain/ComponentsTab";
+import ModelFields, { availableModelOptions } from "../chat/ModelFields";
+import {
+  JUDGE_CLEAR,
+  JUDGE_MODEL,
+  JUDGE_MODEL_LABEL,
+  JUDGE_NO_PROVIDERS,
+  JUDGE_NONE,
+  JUDGE_PROVIDER,
+  JUDGE_PROVIDER_LABEL,
+  JUDGE_ROW,
+} from "../execPolicy/execPolicyCopy";
 import {
   STORAGE_BREAKDOWN,
   STORAGE_CATEGORY_FILLS,
@@ -354,18 +365,66 @@ const ToolCallsRow = observer(function ToolCallsRow() {
   );
 });
 
+const JudgeModelRow = observer(function JudgeModelRow() {
+  const { execPolicy } = useStore();
+  const empty = execPolicy.loaded && execPolicy.providers.length === 0;
+  return (
+    <SettingRow
+      id={JUDGE_ROW.key}
+      label={JUDGE_ROW.label}
+      hint={JUDGE_ROW.hint}
+      stacked
+      footer={
+        empty ? <p className="m-0 text-[12px] text-main-500">{JUDGE_NO_PROVIDERS}</p> : undefined
+      }
+    >
+      <div className="flex items-end gap-3">
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-3">
+          <ModelFields
+            providerTitle={JUDGE_PROVIDER}
+            providerLabel={JUDGE_PROVIDER_LABEL}
+            providerValue={execPolicy.judgeProviderId ?? ""}
+            providerOptions={execPolicy.providers.map((provider) => ({
+              value: provider.id,
+              label: provider.name,
+            }))}
+            providerDisabled={execPolicy.providers.length === 0}
+            onProviderChange={execPolicy.selectJudgeProvider}
+            modelTitle={JUDGE_MODEL}
+            modelLabel={JUDGE_MODEL_LABEL}
+            modelValue={execPolicy.judgeModelId ?? ""}
+            modelOptions={availableModelOptions(execPolicy.judgeProvider)}
+            modelDisabled={execPolicy.judgeProvider === undefined}
+            onModelChange={execPolicy.setJudgeModel}
+            placeholder={JUDGE_NONE}
+          />
+        </div>
+        <Button
+          tone="ghost"
+          disabled={execPolicy.judgeProviderId === null}
+          onClick={execPolicy.clearJudge}
+        >
+          {JUDGE_CLEAR}
+        </Button>
+      </div>
+    </SettingRow>
+  );
+});
+
 const GeneralSection = observer(function GeneralSection() {
-  const { appSettings, profile } = useStore();
+  const { appSettings, profile, execPolicy } = useStore();
   useEffect(() => {
     void appSettings.load();
     void profile.load();
-  }, [appSettings, profile]);
+    void execPolicy.load();
+  }, [appSettings, profile, execPolicy]);
   return (
     <div className="flex flex-col">
       {GENERAL_ROWS.map((row) => (
         <ToggleSettingRow key={row.key} row={row} />
       ))}
       <ToolCallsRow />
+      <JudgeModelRow />
     </div>
   );
 });

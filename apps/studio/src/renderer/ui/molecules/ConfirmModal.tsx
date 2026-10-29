@@ -42,7 +42,7 @@ export default function ConfirmModal({
       open={open}
       onClose={onCancel}
       label={title}
-      className={`${actions === undefined ? "w-110" : "w-150"} max-w-[92vw] overflow-hidden rounded-card border bg-main-900 p-0 shadow-pop ${tone === "danger" ? "border-err-border" : "border-line"}`}
+      className={`${actions === undefined ? "w-110" : actions.length > 2 ? "w-190" : "w-150"} max-w-[92vw] overflow-hidden rounded-card border bg-main-900 p-0 shadow-pop ${tone === "danger" ? "border-err-border" : "border-line"}`}
     >
       <div className="px-5 pt-5">
         <h2
@@ -53,7 +53,13 @@ export default function ConfirmModal({
         <div className="mt-2 text-[13px] leading-relaxed text-main-400">{content}</div>
       </div>
       <div className="mt-5 flex flex-wrap justify-end gap-2 bg-main-850 px-5 py-3">
-        <ButtonBase onClick={onCancel}>{cancelLabel}</ButtonBase>
+        {actions === undefined ? (
+          <ButtonBase onClick={onCancel}>{cancelLabel}</ButtonBase>
+        ) : (
+          <span className="mr-auto flex">
+            <ButtonBase onClick={onCancel}>{cancelLabel}</ButtonBase>
+          </span>
+        )}
         {buttons.map((action) => (
           <ButtonBase
             key={action.label}

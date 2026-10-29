@@ -50,7 +50,7 @@ export const PREFERENCE_GROUPS: readonly {
 ];
 
 export const SECTION_HINTS: Record<PreferenceSection, string> = {
-  general: "Запуск, работа в фоне и ограничения генерации.",
+  general: "Запуск, работа в фоне, ограничения генерации и проверка действий.",
   profile: "Стиль ответов модели и сведения о вас.",
   appearance: "Тема, шрифт, размер текста и эффекты интерфейса.",
   notifications: "Системные уведомления о событиях приложения.",

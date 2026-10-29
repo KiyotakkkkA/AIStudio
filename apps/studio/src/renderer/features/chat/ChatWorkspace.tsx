@@ -8,9 +8,10 @@ import ChatExplorer from "./explorer/ChatExplorer";
 import ExplorerFileView from "./explorer/ExplorerFileView";
 import ViewerDock from "../../viewer/ViewerDock";
 import ChatBrowserDock from "./ChatBrowserDock";
+import { JUDGE_ROW } from "../execPolicy/execPolicyCopy";
 
 export default observer(function ChatWorkspace() {
-  const { chat, viewer } = useStore();
+  const { chat, viewer, execPolicy, ui } = useStore();
   useEffect(() => {
     void chat.mount();
     return chat.unmount;
@@ -22,7 +23,13 @@ export default observer(function ChatWorkspace() {
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
       <ConversationList store={chat} />
-      <ChatThread store={chat} />
+      <ChatThread
+        store={chat}
+        policy={{
+          store: execPolicy,
+          setup: () => ui.revealPreference("general", JUDGE_ROW.key),
+        }}
+      />
       {chat.activePanel === "browser" && !viewer.isOpen ? (
         chat.panelOpen ? (
           <ChatBrowserDock store={chat} />

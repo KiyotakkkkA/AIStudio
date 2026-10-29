@@ -19,6 +19,7 @@ import TextArea from "../../ui/atoms/TextArea";
 import ChatMessage from "./ChatMessage";
 import MessageActions from "../../ui/molecules/MessageActions";
 import ChatComposer from "./ChatComposer";
+import type { ExecPolicyBinding } from "../execPolicy/ExecPolicyMenu";
 import ChatApprovals from "./ChatApprovals";
 import ChatWorkingFolder from "./ChatWorkingFolder";
 import FolderAccessModal from "./FolderAccessModal";
@@ -47,7 +48,13 @@ import PinnedNavigator from "./PinnedNavigator";
 import { PINS_PANEL, currentPin, pinPreview } from "./pinnedMessages";
 import { BRANCH_IN_NEW_DIALOG, CREATE_BRANCH } from "./branching";
 
-export default observer(function ChatThread({ store }: { readonly store: ChatStore }) {
+export default observer(function ChatThread({
+  store,
+  policy,
+}: {
+  readonly store: ChatStore;
+  readonly policy?: ExecPolicyBinding;
+}) {
   const viewport = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
@@ -447,7 +454,7 @@ export default observer(function ChatThread({ store }: { readonly store: ChatSto
         <ChatWorkingFolder store={store} />
       </div>
       <FolderAccessModal store={store} />
-      <ChatComposer store={store} />
+      <ChatComposer store={store} {...(policy === undefined ? {} : { policy })} />
       <TerminalDock store={store.terminal} available={store.active !== null} />
     </section>
   );

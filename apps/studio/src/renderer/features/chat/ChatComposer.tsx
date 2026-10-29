@@ -14,7 +14,6 @@ import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
-import SelectInput from "../../ui/atoms/SelectInput";
 import TextArea from "../../ui/atoms/TextArea";
 import SegmentedControl from "../../ui/atoms/SegmentedControl";
 import Toggle from "../../ui/atoms/Toggle";
@@ -24,6 +23,8 @@ import ChatCommandMenu, { COMMAND_MENU_ID, commandOptionId } from "./ChatCommand
 import ChatContextMeter from "./ChatContextMeter";
 import ChatModelGate from "./ChatModelGate";
 import ChatToolsBadge from "./ChatToolsBadge";
+import ModelFields, { availableModelOptions } from "./ModelFields";
+import ExecPolicyMenu, { type ExecPolicyBinding } from "../execPolicy/ExecPolicyMenu";
 import { REMOVE_COMMAND, commandText } from "./chatCommands";
 import SelectionChips from "./SelectionChips";
 import type ChatStore from "./ChatStore";
@@ -39,7 +40,13 @@ function insidePopup(target: HTMLElement, form: HTMLElement): boolean {
   return false;
 }
 
-export default observer(function ChatComposer({ store }: { readonly store: ChatStore }) {
+export default observer(function ChatComposer({
+  store,
+  policy,
+}: {
+  readonly store: ChatStore;
+  readonly policy?: ExecPolicyBinding;
+}) {
   const formRef = useRef<HTMLFormElement>(null);
   const [storesOpen, setStoresOpen] = useState(false);
   const wasGenerating = useRef(store.generating);
@@ -209,6 +216,7 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
               </Dropdown.Menu>
             </Dropdown>
             <ChatAccountProviderSetup store={store} />
+            {policy === undefined ? null : <ExecPolicyMenu {...policy} />}
             <span className="flex-1" />
             <ChatToolsBadge store={store} />
             <ChatContextMeter store={store} />
@@ -235,52 +243,37 @@ export default observer(function ChatComposer({ store }: { readonly store: ChatS
                 rounded=""
                 className="space-y-3.5 rounded-card border-line bg-main-900 p-3.5 shadow-pop"
               >
-                <div>
-                  <p className="mb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-                    Провайдер
-                  </p>
-                  <SelectInput
-                    label="Провайдер чата"
-                    value={store.provider?.id ?? ""}
-                    options={[
-                      ...store.providers.map((provider) => ({
-                        value: provider.id,
-                        label: provider.name,
-                      })),
-                      ...store.accountChoices.map((choice) => ({
-                        value: choice.value,
-                        label: choice.label,
-                      })),
-                    ]}
-                    disabled={!store.canConfigure || store.connecting}
-                    onChange={(id) => {
-                      const choice = store.accountChoices.find((item) => item.value === id);
-                      if (choice) {
-                        void store.connectAccount(choice.accountId);
-                        return;
-                      }
-                      const provider = store.providers.find((item) => item.id === id);
-                      if (provider) store.composer.selectProvider(provider);
-                    }}
-                  />
-                </div>
-                <div>
-                  <p className="mb-1.5 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-                    Модель
-                  </p>
-                  <SelectInput
-                    label="Модель чата"
-                    value={store.model?.externalId ?? store.modelId}
-                    options={(store.provider?.models ?? [])
-                      .filter((model) => model.available)
-                      .map((model) => ({
-                        value: model.externalId,
-                        label: model.displayName || model.externalId,
-                      }))}
-                    disabled={!store.canConfigure}
-                    onChange={store.composer.setModel}
-                  />
-                </div>
+                <ModelFields
+                  providerTitle="Провайдер"
+                  providerLabel="Провайдер чата"
+                  providerValue={store.provider?.id ?? ""}
+                  providerOptions={[
+                    ...store.providers.map((provider) => ({
+                      value: provider.id,
+                      label: provider.name,
+                    })),
+                    ...store.accountChoices.map((choice) => ({
+                      value: choice.value,
+                      label: choice.label,
+                    })),
+                  ]}
+                  providerDisabled={!store.canConfigure || store.connecting}
+                  onProviderChange={(id) => {
+                    const choice = store.accountChoices.find((item) => item.value === id);
+                    if (choice) {
+                      void store.connectAccount(choice.accountId);
+                      return;
+                    }
+                    const provider = store.providers.find((item) => item.id === id);
+                    if (provider) store.composer.selectProvider(provider);
+                  }}
+                  modelTitle="Модель"
+                  modelLabel="Модель чата"
+                  modelValue={store.model?.externalId ?? store.modelId}
+                  modelOptions={availableModelOptions(store.provider)}
+                  modelDisabled={!store.canConfigure}
+                  onModelChange={store.composer.setModel}
+                />
               </Dropdown.Menu>
             </Dropdown>
             {store.generating ? (
