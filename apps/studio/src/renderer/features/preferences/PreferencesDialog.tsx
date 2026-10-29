@@ -31,16 +31,13 @@ import FadeIn from "../../ui/motion/FadeIn";
 import { useStore } from "../../stores/useStore";
 import {
   CLI_CHECKING,
-  CLI_DESCRIPTION,
+  CLI_COMMAND,
   CLI_INSTALL,
   CLI_INSTALLED,
   CLI_NOT_BUNDLED,
   CLI_NOT_INSTALLED,
   CLI_SETTING_ID,
-  CLI_TITLE,
-  CLI_TRAY_NOTE,
   CLI_UNINSTALL,
-  CLI_USAGE,
 } from "./cliCopy";
 import {
   FONT_FAMILIES,
@@ -578,28 +575,18 @@ const CliSection = observer(function CliSection() {
     <div className="flex flex-col pt-2">
       <SettingRow
         id={CLI_SETTING_ID}
-        label={CLI_TITLE}
-        hint={CLI_DESCRIPTION}
+        label={status?.command ?? CLI_COMMAND}
+        hint={state}
         error={cli.error ?? undefined}
         footer={
-          <div className="flex flex-col gap-2 text-[12px] text-main-500">
-            <div className="flex items-center gap-2">
-              <span>{CLI_USAGE}</span>
-              <code className="rounded-control bg-main-900 px-2 py-0.5 font-mono text-[12px] text-accent-medium">
-                {status?.command ?? "aistudio"}
-              </code>
-            </div>
-            <p className="m-0">{CLI_TRAY_NOTE}</p>
-            {cli.notice === null ? null : (
-              <p role="status" className="m-0 text-main-300">
-                {cli.notice}
-              </p>
-            )}
-          </div>
+          cli.notice === null ? undefined : (
+            <p role="status" className="m-0 text-[12px] text-main-500">
+              {cli.notice}
+            </p>
+          )
         }
       >
         <div className="flex items-center gap-3">
-          <Chip tone={status?.installed ? "accent" : "neutral"}>{state}</Chip>
           {status?.installed ? (
             <Button tone="ghost" disabled={cli.busy} onClick={() => void cli.uninstall()}>
               {CLI_UNINSTALL}

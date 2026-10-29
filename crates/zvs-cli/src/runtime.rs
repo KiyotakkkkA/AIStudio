@@ -2,8 +2,8 @@ use std::io::IsTerminal;
 use std::time::Duration;
 
 use ratatui::crossterm::event::{
-    self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEventKind,
+    self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEvent, KeyEventKind,
+    KeyModifiers,
 };
 use ratatui::crossterm::execute;
 use serde_json::{Value, json};
@@ -16,11 +16,11 @@ use zvs_contract::{
 use crate::copy;
 use crate::launch::{self, Connection};
 use crate::link::{Incoming, Link};
+use crate::shell::{self, ShellControl};
 use crate::state::{App, Exit, Key, Msg, Request};
 use crate::ui;
 
 const TICK: Duration = Duration::from_millis(100);
-const WHEEL_STEP: isize = 3;
 
 enum Signal {
     App(Box<Msg>),
@@ -83,11 +83,6 @@ pub fn translate(batch: &[Event]) -> Vec<Msg> {
                 key(*pressed, typed_later(&batch[index + 1..])).map(Msg::Key)
             }
             Event::Paste(text) => Some(Msg::Paste(text.clone())),
-            Event::Mouse(mouse) => match mouse.kind {
-                MouseEventKind::ScrollUp => Some(Msg::Scroll(WHEEL_STEP)),
-                MouseEventKind::ScrollDown => Some(Msg::Scroll(-WHEEL_STEP)),
-                _ => None,
-            },
             Event::Resize(..) => Some(Msg::Tick),
             _ => None,
         })
@@ -232,6 +227,7 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             Msg::ServerChanged(link.call("mcp.stop", &json!({ "id": id })).await)
         }
         Request::SetPolicy(policy) => Msg::PolicySet(link.call("execPolicy.set", &policy).await),
+        Request::Shell(_) | Request::StopShell => Msg::Tick,
         Request::FocusVerification => {
             #[cfg(windows)]
             zvs_pipe::allow_foreground();
@@ -241,16 +237,42 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
     }
 }
 
+fn run_shell(
+    line: String,
+    folder: String,
+    control: ShellControl,
+    signals: &mpsc::UnboundedSender<Signal>,
+) {
+    let output = signals.clone();
+    let ended = signals.clone();
+    tokio::spawn(async move {
+        let end = shell::run(line, folder, control, move |text| {
+            let _ = output.send(Signal::App(Box::new(Msg::ShellOutput(text))));
+        })
+        .await;
+        let _ = ended.send(Signal::App(Box::new(Msg::ShellEnded(end))));
+    });
+}
+
 fn dispatch(
     link: Option<&Link>,
     requests: Vec<Request>,
     folder: &str,
+    shell: &ShellControl,
     signals: &mpsc::UnboundedSender<Signal>,
 ) {
+    let mut remote = Vec::new();
+    for request in requests {
+        match request {
+            Request::Shell(line) => run_shell(line, folder.to_owned(), shell.clone(), signals),
+            Request::StopShell => shell.stop(),
+            other => remote.push(other),
+        }
+    }
     let Some(link) = link else {
         return;
     };
-    for request in requests {
+    for request in remote {
         let link = link.clone();
         let folder = folder.to_owned();
         let signals = signals.clone();
@@ -317,6 +339,7 @@ async fn session(
 
     let mut app = App::new(&folder);
     let mut link: Option<Link> = None;
+    let shell = ShellControl::default();
     loop {
         terminal.draw(|frame| ui::draw(frame, &app))?;
         let Some(first) = received.recv().await else {
@@ -335,7 +358,7 @@ async fn session(
                 }
                 Signal::App(message) => app.update(*message),
             };
-            dispatch(link.as_ref(), requests, &app.folder, &signals);
+            dispatch(link.as_ref(), requests, &app.folder, &shell, &signals);
             if app.exit.is_some() {
                 return Ok(app.exit.take());
             }
@@ -353,13 +376,9 @@ pub async fn run() -> i32 {
         .map(|path| path.to_string_lossy().into_owned())
         .unwrap_or_default();
     let mut terminal = ratatui::init();
-    let _ = execute!(std::io::stdout(), EnableMouseCapture, EnableBracketedPaste);
+    let _ = execute!(std::io::stdout(), EnableBracketedPaste);
     let outcome = session(&mut terminal, folder).await;
-    let _ = execute!(
-        std::io::stdout(),
-        DisableMouseCapture,
-        DisableBracketedPaste
-    );
+    let _ = execute!(std::io::stdout(), DisableBracketedPaste);
     ratatui::restore();
     match outcome {
         Ok(Some(Exit::Message(message))) => {

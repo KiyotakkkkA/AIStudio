@@ -8,7 +8,7 @@ use super::text::{markdown, truncate, wrap};
 use super::theme;
 use crate::copy;
 use crate::state::App;
-use crate::state::transcript::{Entry, Tone};
+use crate::state::transcript::{Entry, Segment, ShellEnd, ShellRun, Tone};
 
 pub const SPINNER: [&str; 8] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"];
 pub const TICKS_PER_SECOND: u64 = 10;
@@ -174,6 +174,58 @@ fn tool(call: &ChatToolCallDto, expanded: bool, frame: u64, width: usize) -> Vec
     lines
 }
 
+const SHELL_TAIL: usize = 12;
+const SHELL_EXPANDED: usize = 400;
+
+fn shell_block(run: &ShellRun, expanded: bool, frame: u64, width: usize) -> Vec<Line<'static>> {
+    let (icon, color, label) = match run.end {
+        None => (
+            spinner(frame).to_owned(),
+            theme::ACCENT,
+            copy::SHELL_RUNNING.to_owned(),
+        ),
+        Some(ShellEnd::Exited(0)) => ("✓".to_owned(), theme::OK, copy::SHELL_DONE.to_owned()),
+        Some(ShellEnd::Exited(code)) => (
+            "✗".to_owned(),
+            theme::ERR,
+            format!("{} {code}", copy::SHELL_EXIT),
+        ),
+        Some(ShellEnd::Stopped) => ("○".to_owned(), theme::MUTED, copy::SHELL_STOPPED.to_owned()),
+        Some(ShellEnd::Failed) => ("✗".to_owned(), theme::ERR, copy::SHELL_FAILED.to_owned()),
+    };
+    let chip = Style::new().bg(theme::SHELL_BG);
+    let room = width.saturating_sub(8).max(10);
+    let mut lines = vec![Line::from(vec![
+        Span::raw("  "),
+        Span::styled(" $ ", chip.fg(theme::WARN).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{} ", truncate(&run.command, room)),
+            chip.fg(theme::INK).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(format!("  {icon} {label}"), Style::new().fg(color)),
+    ])];
+    let wrapped: Vec<String> = run
+        .output
+        .iter()
+        .flat_map(|line| wrap(line, room))
+        .collect();
+    let shown = if expanded { SHELL_EXPANDED } else { SHELL_TAIL };
+    let hidden = wrapped.len().saturating_sub(shown);
+    if hidden > 0 {
+        lines.push(Line::from(vec![
+            indent(),
+            Span::styled(format!("… {} {hidden}", copy::MORE_LINES), theme::faint()),
+        ]));
+    }
+    for piece in wrapped.into_iter().skip(hidden) {
+        lines.push(Line::from(vec![
+            indent(),
+            Span::styled(piece, theme::muted()),
+        ]));
+    }
+    lines
+}
+
 fn user(text: &str, width: usize) -> Vec<Line<'static>> {
     let room = width.saturating_sub(6).max(8);
     let style = Style::new().fg(theme::INK).bg(theme::USER_BG);
@@ -283,16 +335,24 @@ pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
             Entry::Assistant { text, reasoning } => assistant(text, reasoning, expanded, width),
             Entry::Tool(call) => tool(call, expanded, app.frame, width),
             Entry::Notice { tone, text } => notice(*tone, text, width),
+            Entry::Shell(run) => shell_block(run, expanded, app.frame, width),
         });
     }
+    if let Some(run) = &app.shell {
+        lines.push(Line::default());
+        lines.extend(shell_block(run, expanded, app.frame, width));
+    }
     if let Some(live) = &app.transcript.live {
-        for call in &live.tools {
+        let last = live.segments.len().saturating_sub(1);
+        for (index, segment) in live.segments.iter().enumerate() {
             lines.push(Line::default());
-            lines.extend(tool(call, expanded, app.frame, width));
-        }
-        if !live.text.is_empty() || !live.reasoning.is_empty() {
-            lines.push(Line::default());
-            lines.extend(assistant(&live.text, &live.reasoning, expanded, width));
+            match segment {
+                Segment::Tool(call) => lines.extend(tool(call, expanded, app.frame, width)),
+                Segment::Text { text, reasoning } => {
+                    let thinking = index == last && text.is_empty();
+                    lines.extend(assistant(text, reasoning, expanded || thinking, width));
+                }
+            }
         }
         let seconds = app.frame.saturating_sub(app.started) / TICKS_PER_SECOND;
         let label = if app.cancelling {

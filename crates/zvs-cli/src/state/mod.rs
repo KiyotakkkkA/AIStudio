@@ -19,7 +19,7 @@ use self::input::Input;
 use self::overlay::{Action, Overlay, Panel, View};
 use self::palette::{Command, Palette, is_command_text};
 use self::prompt::{ApprovalDetail, Choice, Prompt, PromptKind};
-use self::transcript::{Tone, Transcript};
+use self::transcript::{ShellEnd, ShellRun, Tone, Transcript};
 use crate::copy;
 
 pub const SCROLL_STEP: usize = 10;
@@ -117,6 +117,8 @@ pub enum Request {
     StopServer(McpServerId),
     SetPolicy(ExecPolicyDto),
     FocusVerification,
+    Shell(String),
+    StopShell,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -148,6 +150,8 @@ pub enum Msg {
     ServerChanged(Result<McpServerDto, AppError>),
     PolicySet(Result<ExecPolicyDto, AppError>),
     Notice(zvs_contract::CliNotice),
+    ShellOutput(String),
+    ShellEnded(ShellEnd),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -162,6 +166,7 @@ pub struct App {
     pub policy: Option<ExecPolicyDto>,
     pub overlay: Option<Overlay>,
     pub verification: Option<String>,
+    pub shell: Option<ShellRun>,
     pub transcript: Transcript,
     pub input: Input,
     pub palette: Palette,
@@ -213,6 +218,7 @@ impl App {
             policy: None,
             overlay: None,
             verification: None,
+            shell: None,
             transcript: Transcript::default(),
             input: Input::default(),
             palette: Palette::default(),
@@ -245,7 +251,27 @@ impl App {
     }
 
     pub fn show_welcome(&self) -> bool {
-        self.transcript.entries.is_empty() && self.transcript.live.is_none()
+        self.transcript.entries.is_empty() && self.transcript.live.is_none() && self.shell.is_none()
+    }
+
+    pub fn shell_mode(&self) -> bool {
+        self.prompts.is_empty() && self.overlay.is_none() && self.input.text().starts_with('!')
+    }
+
+    fn submit_shell(&mut self, text: &str) -> Vec<Request> {
+        let command = text.trim_start_matches('!').trim();
+        if command.is_empty() {
+            return Vec::new();
+        }
+        if self.shell.is_some() {
+            self.input.set(text);
+            self.status = Some((Tone::Info, copy::SHELL_BUSY.to_owned()));
+            return Vec::new();
+        }
+        self.shell = Some(ShellRun::new(command));
+        self.started = self.frame;
+        self.scroll = 0;
+        vec![Request::Shell(command.to_owned())]
     }
 
     fn fail(&mut self, error: &AppError) {
@@ -282,6 +308,21 @@ impl App {
                 Vec::new()
             }
             Msg::Connected => vec![Request::Open, Request::Providers, Request::Policy],
+            Msg::ShellOutput(line) => {
+                if let Some(shell) = self.shell.as_mut() {
+                    shell.push(line);
+                }
+                Vec::new()
+            }
+            Msg::ShellEnded(end) => {
+                if let Some(mut shell) = self.shell.take() {
+                    shell.end = Some(end);
+                    self.transcript
+                        .entries
+                        .push(transcript::Entry::Shell(Box::new(shell)));
+                }
+                Vec::new()
+            }
             Msg::Notice(zvs_contract::CliNotice::AccountVerification { origin, shown }) => {
                 if shown {
                     self.verification = Some(origin);
@@ -710,11 +751,11 @@ impl App {
 
     fn adopt_live(&mut self, live: ChatAttachDto) {
         let run = live.run.id;
-        self.transcript.live = Some(transcript::Live {
-            text: live.content,
-            reasoning: live.reasoning,
-            tools: live.tool_calls,
-        });
+        self.transcript.live = Some(transcript::Live::attached(
+            live.content,
+            live.reasoning,
+            live.tool_calls,
+        ));
         for request in &live.approvals {
             if let Some(prompt) = prompt::from_request(request, self.mode) {
                 self.prompts.push_back(prompt);
@@ -868,6 +909,9 @@ impl App {
         if text.is_empty() {
             return Vec::new();
         }
+        if text.starts_with('!') {
+            return self.submit_shell(&text);
+        }
         if text.starts_with('/') && !text.starts_with("//") {
             return match Command::parse(&text) {
                 Some(command) => self.command(command),
@@ -991,6 +1035,13 @@ impl App {
     }
 
     fn escape(&mut self) -> Vec<Request> {
+        if self.shell_mode() {
+            self.input.clear();
+            return Vec::new();
+        }
+        if self.shell.is_some() {
+            return vec![Request::StopShell];
+        }
         if let Some(run) = &self.run {
             if self.cancelling {
                 return Vec::new();

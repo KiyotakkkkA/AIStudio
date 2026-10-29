@@ -9,6 +9,7 @@ use tokio::net::windows::named_pipe::{
     ClientOptions, NamedPipeClient, NamedPipeServer, PipeMode, ServerOptions,
 };
 use windows::Win32::Foundation::{CloseHandle, ERROR_PIPE_BUSY, HANDLE, HLOCAL, LocalFree};
+use windows::Win32::Globalization::{CP_OEMCP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS, MultiByteToWideChar};
 use windows::Win32::Security::Authorization::{
     ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
 };
@@ -66,6 +67,24 @@ fn token_sid(process: HANDLE) -> io::Result<String> {
     let sid = unsafe { text.to_string() }.map_err(|_| io::Error::other("the SID is not UTF-16"));
     let _ = unsafe { LocalFree(Some(HLOCAL(text.0.cast()))) };
     sid
+}
+
+pub fn oem_text(bytes: &[u8]) -> String {
+    if bytes.is_empty() {
+        return String::new();
+    }
+    let flags = MULTI_BYTE_TO_WIDE_CHAR_FLAGS(0);
+    let needed = unsafe { MultiByteToWideChar(CP_OEMCP, flags, bytes, None) };
+    let Ok(size) = usize::try_from(needed) else {
+        return String::from_utf8_lossy(bytes).into_owned();
+    };
+    if size == 0 {
+        return String::from_utf8_lossy(bytes).into_owned();
+    }
+    let mut wide = vec![0_u16; size];
+    let written = unsafe { MultiByteToWideChar(CP_OEMCP, flags, bytes, Some(&mut wide)) };
+    let written = usize::try_from(written).unwrap_or(0).min(wide.len());
+    String::from_utf16_lossy(&wide[..written])
 }
 
 pub fn allow_foreground() {

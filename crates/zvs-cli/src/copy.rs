@@ -65,6 +65,17 @@ pub const VERIFY_BODY: &str = "Провайдер запросил провер�
 pub const VERIFY_SITE: &str = "Сайт";
 pub const HINT_VERIFY: &str = "Enter — показать окно проверки · Esc — остановить ответ";
 
+pub const SHELL_MODE: &str = "Командная строка";
+pub const SHELL_PLACEHOLDER: &str = "Команда для cmd в рабочей папке";
+pub const HINT_SHELL: &str = "Enter — выполнить в рабочей папке · Esc — очистить";
+pub const HINT_SHELL_RUNNING: &str = "Esc — остановить команду";
+pub const SHELL_RUNNING: &str = "выполняется";
+pub const SHELL_DONE: &str = "готово";
+pub const SHELL_EXIT: &str = "код выхода";
+pub const SHELL_STOPPED: &str = "остановлено";
+pub const SHELL_FAILED: &str = "Не удалось запустить команду";
+pub const SHELL_BUSY: &str = "Дождитесь окончания команды или остановите её клавишей Esc";
+
 pub const QUESTION_TITLE: &str = "Вопрос";
 pub const QUESTION_OTHER: &str = "Другой вариант";
 pub const QUESTION_TEXT_HINT: &str = "Введите ответ и нажмите Enter";
@@ -108,7 +119,8 @@ pub const KEYS: &[(&str, &str)] = &[
     ("Esc", "остановить ответ"),
     ("Esc Esc", "выйти"),
     ("Ctrl+O", "показать или скрыть подробности инструментов"),
-    ("PgUp / PgDn, колесо", "прокрутка"),
+    ("PgUp / PgDn", "прокрутка"),
+    ("! в начале строки", "выполнить команду в рабочей папке"),
     ("Ctrl+C", "выйти"),
 ];
 

@@ -383,3 +383,24 @@ fn a_browser_check_is_shown_brought_forward_and_cleared() {
     assert!(app.update(notice(false)).is_empty());
     assert!(app.verification.is_none());
 }
+
+#[test]
+fn a_bang_runs_a_shell_command_that_esc_can_stop() {
+    let mut app = ready();
+    typed(&mut app, "!dir /b");
+    assert!(app.shell_mode());
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::Shell("dir /b".to_owned())]
+    );
+    assert!(!app.shell_mode());
+    app.update(Msg::ShellOutput("a.txt".to_owned()));
+    assert_eq!(app.update(Msg::Key(Key::Esc)), [Request::StopShell]);
+    app.update(Msg::ShellEnded(transcript::ShellEnd::Stopped));
+    assert!(app.shell.is_none());
+    let Some(Entry::Shell(run)) = app.transcript.entries.last() else {
+        panic!("a shell entry");
+    };
+    assert_eq!(run.output, ["a.txt"]);
+    assert_eq!(run.end, Some(transcript::ShellEnd::Stopped));
+}

@@ -120,14 +120,33 @@ fn input_height(app: &App) -> u16 {
 }
 
 fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let lead = if app.busy() {
+    let shell = app.shell_mode();
+    let lead = if shell {
+        Style::new().fg(theme::WARN).add_modifier(Modifier::BOLD)
+    } else if app.busy() {
         theme::faint()
     } else {
         theme::accent().add_modifier(Modifier::BOLD)
     };
-    let block = Block::new()
-        .style(Style::new().bg(theme::PANEL_BG))
-        .padding(Padding::new(1, 1, 1, 1));
+    let block = if shell {
+        Block::new()
+            .style(Style::new().bg(theme::SHELL_BG))
+            .padding(Padding::new(1, 1, 0, 1))
+            .title(Line::from(vec![
+                Span::styled(
+                    format!(" {} ", copy::SHELL_MODE),
+                    Style::new()
+                        .fg(theme::ON_WARN)
+                        .bg(theme::WARN)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(format!("  {}", app.folder), theme::faint()),
+            ]))
+    } else {
+        Block::new()
+            .style(Style::new().bg(theme::PANEL_BG))
+            .padding(Padding::new(1, 1, 1, 1))
+    };
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let text = app.input.text();
@@ -144,16 +163,27 @@ fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
             .enumerate()
             .skip(first)
             .map(|(index, line)| {
+                let prompt = match (index, shell) {
+                    (0, true) => "$ ",
+                    (0, false) => "› ",
+                    _ => "  ",
+                };
+                let body = if index == 0 && shell {
+                    line.strip_prefix('!').unwrap_or(line)
+                } else {
+                    line
+                };
                 Line::from(vec![
-                    Span::styled(if index == 0 { "› " } else { "  " }, lead),
-                    Span::styled(line.to_owned(), theme::text()),
+                    Span::styled(prompt, lead),
+                    Span::styled(body.to_owned(), theme::text()),
                 ])
             })
             .collect()
     };
     frame.render_widget(Paragraph::new(lines), inner);
     if app.prompts.is_empty() && !app.help && app.overlay.is_none() {
-        let x = inner.x + rows(column + 2).min(inner.width.saturating_sub(1));
+        let shift = usize::from(shell && row == 0);
+        let x = inner.x + rows(column + 2 - shift).min(inner.width.saturating_sub(1));
         let y = inner.y + rows(row - first);
         frame.set_cursor_position((x, y));
     }
@@ -267,6 +297,10 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
     } else {
         let hint = if !app.prompts.is_empty() {
             copy::HINT_PROMPT
+        } else if app.shell_mode() {
+            copy::HINT_SHELL
+        } else if app.shell.is_some() {
+            copy::HINT_SHELL_RUNNING
         } else if app.verification.is_some() {
             copy::HINT_VERIFY
         } else if app.overlay.is_some() {

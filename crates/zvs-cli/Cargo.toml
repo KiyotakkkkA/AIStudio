@@ -15,7 +15,7 @@ path = "src/main.rs"
 ratatui = "=0.30.2"
 serde.workspace = true
 serde_json.workspace = true
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "io-util"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "process"] }
 unicode-width = "=0.2.3"
 zvs-contract = { path = "../zvs-contract" }
 

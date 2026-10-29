@@ -2,7 +2,7 @@
 mod windows;
 
 #[cfg(windows)]
-pub use windows::{allow_foreground, connect, create_server, current_user_sid};
+pub use windows::{allow_foreground, connect, create_server, current_user_sid, oem_text};
 
 #[cfg(windows)]
 pub use tokio::net::windows::named_pipe::{NamedPipeClient, NamedPipeServer};
