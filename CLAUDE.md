@@ -72,7 +72,8 @@ test that greps for `"active turn"` breaks the moment the message is translated.
   in `packages/shared/fixtures/`. `cargo test -p zvs-contract` requires byte-equal JSON.
 - Read `crates/zvs-qwen-web/README.md` before any work with the Qwen web API (the crate, the
   `qwen_web` adapter, its fixtures). Every change to `zvs-qwen-web` updates that README in the
-  same commit, with the new observation date.
+  same commit, with the new observation date. The same holds for `crates/zvs-zai-web/README.md`
+  and the Z.ai web API (`zvs-zai-web`, the `zai_web` adapter, its fixtures).
 - Stores take clock and bridge dependencies so they can be tested — use `createFakeBridge()`
   and `createFakeClock()` from `test/helpers/`, not real time or a real Tauri runtime.
 - Tests are mandatory for services, the kernel, repositories, the permission model and the

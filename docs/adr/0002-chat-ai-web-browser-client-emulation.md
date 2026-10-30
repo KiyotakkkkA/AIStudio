@@ -54,7 +54,7 @@ carry the tokens the vendor's own SDK produces in the user's own browser profile
    No solver, no automated slider interaction.
 4. **Traffic stays client-like.** One gateway page per profile, protected calls serialized per
    account, no parallel `chats/new` bursts, no retries in a loop after a challenge.
-5. **The Qwen protocol lives in its own crate** (see `docs/QWEN_WEB.md`): wire types, request
+5. **The Qwen protocol lives in its own crate** (see `crates/zvs-qwen-web/README.md`): wire types, request
    builders, SSE parsing and the page request plan (page API, dialog pattern, bearer key),
    versioned with the date of the capture it reflects, so it can be updated without touching
    the host.

@@ -1,7 +1,7 @@
 # ADR 0001 — Account-mode providers: Qwen only, no DeepSeek web account
 
 - **Status:** accepted, 2026-10-19; decisions 4–5 and the Qwen clarification superseded for
-  `qwen-web` by [ADR 0002](0002-qwen-web-browser-client-emulation.md)
+  `qwen-web` by [ADR 0002](0002-chat-ai-web-browser-client-emulation.md)
 - **Task:** TASK_074_EXTRA_1
 - **Supersedes:** the `deepseek-web` adapter family declared in TASK_014_EXTRA_2
 
@@ -15,7 +15,7 @@ or bypassed. The request is exactly what the vendor's page sends.
 Qwen works partly. Its identity and model-list endpoints answer any signed-in session. Its
 chat endpoints (`POST /api/v2/chats/new`, `POST /api/v2/chat/completions?chat_id=…`) are
 behind Alibaba's browser verification: they can answer with an HTML verification page
-instead of JSON (recorded in `docs/QWEN_WEB.md` on 2026-09-10 and seen again on 2026-10-19).
+instead of JSON (observed on 2026-09-10 and again on 2026-10-19).
 When that happens no account-mode generation is possible.
 
 DeepSeek is different. Every `POST /api/v0/chat/completion` on `chat.deepseek.com` must carry
@@ -68,4 +68,4 @@ a challenge solver. A user may complete a browser check manually and retry.
 HTML alone is not evidence of verification: login pages, verification pages and
 unrecognized HTML now have distinct diagnostics. The earlier statement that any
 such response makes account generation unavailable is not a permanent capability
-decision. See `docs/QWEN_WEB.md` for the revised behavior and validation limits.
+decision. See `crates/zvs-qwen-web/README.md` for the revised behavior and validation limits.
