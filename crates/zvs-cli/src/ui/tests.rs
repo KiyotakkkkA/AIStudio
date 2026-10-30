@@ -108,3 +108,23 @@ fn help_and_tiny_terminals_do_not_panic() {
     }
     render(&App::new("D:/x"), 10, 3);
 }
+
+#[test]
+fn the_shortcut_list_and_the_rebinding_panel_render() {
+    let mut app = ready(WorkingFolderAccess::Granted);
+    app.update(Msg::Key(Key::Char('?')));
+    let screen = render(&app, 100, 40);
+    assert!(screen.contains(copy::SHORTCUTS_TITLE), "{screen}");
+    assert!(screen.contains("Ctrl+O"), "{screen}");
+    assert!(screen.contains(copy::SHORTCUT_DETAILS), "{screen}");
+
+    for value in "/shortcuts".chars() {
+        app.update(Msg::Key(Key::Char(value)));
+    }
+    app.update(Msg::Key(Key::Enter));
+    app.update(Msg::Key(Key::Enter));
+    let screen = render(&app, 100, 30);
+    assert!(screen.contains(copy::SHORTCUT_PRESS), "{screen}");
+    assert!(screen.contains(copy::HINT_CAPTURE), "{screen}");
+    let _ = render(&app, 20, 6);
+}

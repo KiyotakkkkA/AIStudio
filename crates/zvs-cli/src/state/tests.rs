@@ -404,3 +404,124 @@ fn a_bang_runs_a_shell_command_that_esc_can_stop() {
     assert_eq!(run.output, ["a.txt"]);
     assert_eq!(run.end, Some(transcript::ShellEnd::Stopped));
 }
+
+fn chord(app: &mut App, chord: shortcuts::Chord) -> Vec<Request> {
+    app.update(Msg::Key(Key::Chord(chord)))
+}
+
+#[test]
+fn a_question_mark_in_an_empty_line_lists_every_shortcut_in_the_chat() {
+    let mut app = ready();
+    app.update(Msg::Key(Key::Char('?')));
+    assert!(app.input.is_empty());
+    let Some(Entry::Keys(sections)) = app.transcript.entries.last() else {
+        panic!("a shortcuts entry");
+    };
+    let (title, bound) = &sections[0];
+    assert_eq!(*title, copy::SHORTCUTS_TITLE);
+    assert_eq!(bound.len(), shortcuts::SHORTCUTS.len());
+    assert!(bound.contains(&("Ctrl+O".to_owned(), copy::SHORTCUT_DETAILS.to_owned())));
+    assert_eq!(sections[1].1.len(), copy::KEYS.len());
+
+    typed(&mut app, "why?");
+    assert_eq!(app.input.text(), "why?");
+}
+
+#[test]
+fn chords_run_their_commands_and_unbound_ones_do_nothing() {
+    let mut app = ready();
+    assert!(chord(&mut app, shortcuts::Chord::ctrl('p')).is_empty());
+    assert_eq!(
+        app.overlay.as_ref().map(|overlay| overlay.panel),
+        Some(Panel::Models)
+    );
+    assert_eq!(
+        chord(&mut app, shortcuts::Chord::alt('s')),
+        [Request::Skills]
+    );
+    assert_eq!(
+        app.overlay.as_ref().map(|overlay| overlay.panel),
+        Some(Panel::Skills)
+    );
+    chord(&mut app, shortcuts::Chord::function(1));
+    assert!(app.help && app.overlay.is_none());
+    assert!(chord(&mut app, shortcuts::Chord::ctrl('x')).is_empty());
+
+    app.help = false;
+    chord(&mut app, shortcuts::Chord::ctrl('o'));
+    assert!(app.expanded);
+    typed(&mut app, "draft");
+    chord(&mut app, shortcuts::Chord::ctrl('u'));
+    assert!(app.input.is_empty());
+}
+
+#[test]
+fn the_shortcuts_panel_rebinds_moves_unbinds_and_restores_and_saves_each_change() {
+    let mut app = ready();
+    typed(&mut app, "/shortcuts");
+    app.update(Msg::Key(Key::Enter));
+    assert_eq!(
+        app.overlay.as_ref().map(|overlay| overlay.panel),
+        Some(Panel::Shortcuts)
+    );
+
+    app.update(Msg::Key(Key::Enter));
+    assert!(app.capturing());
+    app.update(Msg::Key(Key::Char('x')));
+    assert!(app.capturing());
+    assert_eq!(
+        app.status.as_ref().map(|(_, text)| text.as_str()),
+        Some(copy::SHORTCUT_INVALID)
+    );
+
+    let saved = chord(&mut app, shortcuts::Chord::ctrl('p'));
+    assert!(!app.capturing());
+    assert!(matches!(saved.as_slice(), [Request::SaveShortcuts(_)]));
+    assert_eq!(
+        app.keymap.action(shortcuts::Chord::ctrl('p')),
+        Some(shortcuts::Shortcut::Details)
+    );
+    assert_eq!(app.keymap.chord(shortcuts::Shortcut::Models), None);
+    let status = app.status.clone().map(|(_, text)| text).unwrap_or_default();
+    assert!(status.contains(copy::SHORTCUT_MOVED), "{status}");
+
+    app.update(Msg::Key(Key::Enter));
+    assert!(matches!(
+        app.update(Msg::Key(Key::Backspace)).as_slice(),
+        [Request::SaveShortcuts(_)]
+    ));
+    assert_eq!(app.keymap.chord(shortcuts::Shortcut::Details), None);
+
+    app.update(Msg::Key(Key::Enter));
+    app.update(Msg::Key(Key::Esc));
+    assert!(!app.capturing());
+    assert!(app.overlay.is_some());
+
+    app.update(Msg::Key(Key::Up));
+    let reset = app.update(Msg::Key(Key::Enter));
+    let [Request::SaveShortcuts(value)] = reset.as_slice() else {
+        panic!("a save after the reset");
+    };
+    assert_eq!(app.keymap, shortcuts::Keymap::default());
+    assert_eq!(
+        shortcuts::Keymap::from_json(value),
+        shortcuts::Keymap::default()
+    );
+
+    app.update(Msg::ShortcutsSaved(false));
+    assert_eq!(
+        app.status.as_ref().map(|(_, text)| text.as_str()),
+        Some(copy::SHORTCUTS_SAVE_FAILED)
+    );
+}
+
+#[test]
+fn chords_are_ignored_while_a_prompt_waits() {
+    let mut app = App::new(FOLDER);
+    app.update(Msg::Opened(Ok(CliSessionDto {
+        folder: FOLDER.to_owned(),
+        access: WorkingFolderAccess::Missing,
+    })));
+    assert!(chord(&mut app, shortcuts::Chord::ctrl('p')).is_empty());
+    assert!(app.overlay.is_none());
+}

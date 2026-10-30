@@ -237,7 +237,7 @@ fn palette_view(frame: &mut Frame<'_>, above: Rect, app: &App) {
     );
 }
 
-fn help_view(frame: &mut Frame<'_>, area: Rect) {
+fn help_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let mut lines = vec![Line::from(Span::styled(
         copy::COMMANDS_TITLE,
         theme::eyebrow(),
@@ -249,13 +249,7 @@ fn help_view(frame: &mut Frame<'_>, area: Rect) {
         ]));
     }
     lines.push(Line::default());
-    lines.push(Line::from(Span::styled(copy::KEYS_TITLE, theme::eyebrow())));
-    for (keys, meaning) in copy::KEYS {
-        lines.push(Line::from(vec![
-            Span::styled(format!("  {keys:<22}"), theme::strong()),
-            Span::styled(*meaning, theme::muted()),
-        ]));
-    }
+    lines.extend(transcript::key_lines(&app.key_sections(), 70, 0));
     let target = centered(area, 72, rows(lines.len() + 2));
     frame.render_widget(Clear, target);
     frame.render_widget(
@@ -303,6 +297,8 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
             copy::HINT_SHELL_RUNNING
         } else if app.verification.is_some() {
             copy::HINT_VERIFY
+        } else if app.capturing() {
+            copy::HINT_CAPTURE
         } else if app.overlay.is_some() {
             copy::HINT_PANEL
         } else if app.palette_open() {
@@ -431,7 +427,7 @@ fn draw_screen(frame: &mut Frame<'_>, app: &App) {
             }
             footer(frame, status, app);
             if app.help {
-                help_view(frame, area);
+                help_view(frame, area, app);
             }
         }
     }

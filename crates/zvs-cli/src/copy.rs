@@ -18,8 +18,9 @@ pub const ACCESS_ALWAYS: &str = "Разрешить всегда";
 pub const ACCESS_DENY: &str = "Отказать и выйти";
 pub const ACCESS_DENIED: &str = "Доступ к папке не предоставлен. Сессия завершена.";
 
-pub const WELCOME_HINT: &str = "Введите сообщение или / для списка команд";
-pub const INPUT_PLACEHOLDER: &str = "Сообщение…  (/ — команды, Alt+Enter — новая строка)";
+pub const WELCOME_HINT: &str = "Введите сообщение, / для списка команд или ? для сочетаний клавиш";
+pub const INPUT_PLACEHOLDER: &str =
+    "Сообщение…  (/ — команды, ? — сочетания клавиш, Alt+Enter — новая строка)";
 pub const WORKSPACE: &str = "Рабочая папка";
 pub const MODEL: &str = "Модель";
 pub const NO_MODEL: &str = "не выбрана";
@@ -37,8 +38,8 @@ pub const NEW_CHAT: &str = "Новый диалог в этой папке";
 pub const CHAT_CLEARED: &str = "Экран очищен";
 
 pub const HINT_IDLE: &str =
-    "Enter — отправить · Esc Esc — выход · Ctrl+O — подробности · PgUp/PgDn — прокрутка";
-pub const HINT_RUNNING: &str = "Esc — остановить · Ctrl+O — подробности · PgUp/PgDn — прокрутка";
+    "Enter — отправить · ? — сочетания клавиш · Esc Esc — выход · PgUp/PgDn — прокрутка";
+pub const HINT_RUNNING: &str = "Esc — остановить · PgUp/PgDn — прокрутка";
 pub const HINT_PROMPT: &str = "↑/↓ — выбор · Enter — подтвердить · Esc — отклонить";
 pub const HINT_PALETTE: &str = "↑/↓ — выбор · Tab — дополнить · Enter — выполнить · Esc — закрыть";
 pub const COPIED: &str = "Скопировано в буфер обмена";
@@ -112,6 +113,7 @@ pub const CMD_CONTEXT: &str = "Заполнение контекста";
 pub const CMD_SKILLS: &str = "Навыки";
 pub const CMD_MCP: &str = "MCP-серверы";
 pub const CMD_PERMISSIONS: &str = "Режим выполнения и модель-арбитр";
+pub const CMD_SHORTCUTS: &str = "Сочетания клавиш и их переназначение";
 
 pub const KEYS_TITLE: &str = "Клавиши";
 pub const KEYS: &[(&str, &str)] = &[
@@ -120,12 +122,28 @@ pub const KEYS: &[(&str, &str)] = &[
     ("↑ / ↓", "история ввода"),
     ("Esc", "остановить ответ"),
     ("Esc Esc", "выйти"),
-    ("Ctrl+O", "показать или скрыть подробности инструментов"),
     ("Колесо, PgUp / PgDn", "прокрутка"),
     ("Выделение мышью", "скопировать текст"),
     ("! в начале строки", "выполнить команду в рабочей папке"),
     ("Ctrl+C", "выйти"),
+    ("? в пустой строке", "показать сочетания клавиш"),
 ];
+
+pub const SHORTCUTS_TITLE: &str = "Сочетания клавиш";
+pub const SHORTCUT_DETAILS: &str = "Показать или скрыть подробности инструментов";
+pub const SHORTCUT_CLEAR_INPUT: &str = "Очистить строку ввода";
+pub const SHORTCUT_NONE: &str = "не назначено";
+pub const SHORTCUT_PRESS: &str = "нажмите сочетание…";
+pub const SHORTCUTS_RESET: &str = "Восстановить сочетания по умолчанию";
+pub const SHORTCUT_SET: &str = "Назначено";
+pub const SHORTCUT_MOVED: &str = "снято с действия";
+pub const SHORTCUT_REMOVED: &str = "Сочетание убрано";
+pub const SHORTCUT_INVALID: &str = "Используйте Ctrl или Alt с буквой либо клавиши F1–F12";
+pub const SHORTCUT_RESERVED: &str =
+    "Это сочетание используется терминалом и не может быть назначено";
+pub const SHORTCUTS_RESTORED: &str = "Восстановлены сочетания по умолчанию";
+pub const SHORTCUTS_SAVE_FAILED: &str = "Не удалось сохранить сочетания клавиш";
+pub const HINT_CAPTURE: &str = "Нажмите новое сочетание · Backspace — убрать · Esc — отмена";
 
 pub const MODE: &str = "Подтверждение действий";
 pub const MODE_ALWAYS_ASK: &str = "Всегда спрашивать";

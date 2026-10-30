@@ -6,6 +6,7 @@ use zvs_contract::{
 
 use super::ModelChoice;
 use super::input::Input;
+use super::shortcuts::{Keymap, SHORTCUTS, Shortcut};
 use crate::copy;
 use crate::format;
 
@@ -17,6 +18,7 @@ pub enum Panel {
     Skills,
     Mcp,
     Permissions,
+    Shortcuts,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,6 +39,8 @@ pub enum Action {
     ToggleServer { id: McpServerId, start: bool },
     SetMode(ExecMode),
     SetJudge(Option<ExecJudgeDto>),
+    Rebind(Shortcut),
+    ResetShortcuts,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -114,6 +118,7 @@ pub struct Overlay {
     pub expanded: Vec<String>,
     pub loading: bool,
     pub armed: bool,
+    pub capturing: Option<Shortcut>,
     pub conversations: Vec<ConversationDto>,
     pub context: Option<ChatContextDto>,
     pub skills: Vec<SkillDto>,
@@ -126,6 +131,7 @@ pub struct View<'a> {
     pub folder: &'a str,
     pub policy: Option<&'a ExecPolicyDto>,
     pub mode: ExecMode,
+    pub keymap: &'a Keymap,
 }
 
 pub const MODES: [ExecMode; 4] = [
@@ -486,6 +492,36 @@ fn permission_rows(overlay: &Overlay, view: &View<'_>) -> Vec<Row> {
     rows
 }
 
+fn shortcut_rows(overlay: &Overlay, view: &View<'_>) -> Vec<Row> {
+    SHORTCUTS
+        .iter()
+        .map(|shortcut| {
+            let capturing = overlay.capturing == Some(*shortcut);
+            let bound = view.keymap.chord(*shortcut).is_some();
+            Row::new(shortcut.id(), "⌨", shortcut.description())
+                .meta(if capturing {
+                    copy::SHORTCUT_PRESS.to_owned()
+                } else {
+                    view.keymap.label(*shortcut)
+                })
+                .tone(if capturing {
+                    Tone::Warn
+                } else if bound {
+                    Tone::Plain
+                } else {
+                    Tone::Faint
+                })
+                .current(capturing)
+                .action(Action::Rebind(*shortcut))
+        })
+        .chain(std::iter::once(
+            Row::new("reset", "↺", copy::SHORTCUTS_RESET)
+                .tone(Tone::Accent)
+                .action(Action::ResetShortcuts),
+        ))
+        .collect()
+}
+
 impl Overlay {
     pub fn new(panel: Panel) -> Self {
         Self {
@@ -494,8 +530,9 @@ impl Overlay {
             tab: 0,
             selected: 0,
             expanded: Vec::new(),
-            loading: !matches!(panel, Panel::Models),
+            loading: !matches!(panel, Panel::Models | Panel::Shortcuts),
             armed: false,
+            capturing: None,
             conversations: Vec::new(),
             context: None,
             skills: Vec::new(),
@@ -511,6 +548,7 @@ impl Overlay {
             Panel::Skills => copy::SKILLS_TITLE,
             Panel::Mcp => copy::MCP_TITLE,
             Panel::Permissions => copy::PERMISSIONS_TITLE,
+            Panel::Shortcuts => copy::SHORTCUTS_TITLE,
         }
     }
 
@@ -522,6 +560,7 @@ impl Overlay {
             Panel::Skills => "✦",
             Panel::Mcp => "⧉",
             Panel::Permissions => "◉",
+            Panel::Shortcuts => "⌨",
         }
     }
 
@@ -540,6 +579,7 @@ impl Overlay {
             Panel::Skills => fixed(&[copy::TAB_ALL, copy::TAB_ENABLED, copy::TAB_DISABLED]),
             Panel::Mcp => fixed(&[copy::TAB_ALL, copy::TAB_CONNECTED, copy::TAB_STOPPED]),
             Panel::Permissions => fixed(&[copy::TAB_MODE, copy::TAB_JUDGE]),
+            Panel::Shortcuts => Vec::new(),
         }
     }
 
@@ -551,6 +591,7 @@ impl Overlay {
             Panel::Skills => skill_rows(self),
             Panel::Mcp => server_rows(self),
             Panel::Permissions => permission_rows(self, view),
+            Panel::Shortcuts => shortcut_rows(self, view),
         };
         let query = self.filter.text().trim().to_lowercase();
         rows.into_iter().filter(|row| row.matches(&query)).collect()
@@ -634,6 +675,8 @@ mod tests {
         serde_json::from_value(value).expect("conversation")
     }
 
+    static KEYMAP: std::sync::LazyLock<Keymap> = std::sync::LazyLock::new(Keymap::default);
+
     fn view(providers: &[ProviderDto]) -> View<'_> {
         View {
             providers,
@@ -641,6 +684,7 @@ mod tests {
             folder: r"D:\work",
             policy: None,
             mode: ExecMode::SafetyAsk,
+            keymap: &KEYMAP,
         }
     }
 

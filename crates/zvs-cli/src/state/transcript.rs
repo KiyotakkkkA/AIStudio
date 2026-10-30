@@ -15,6 +15,7 @@ pub enum Entry {
     Tool(Box<ChatToolCallDto>),
     Notice { tone: Tone, text: String },
     Shell(Box<ShellRun>),
+    Keys(Vec<(&'static str, Vec<(String, String)>)>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

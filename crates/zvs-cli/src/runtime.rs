@@ -14,9 +14,11 @@ use zvs_contract::{
 };
 
 use crate::copy;
+use crate::keymap_file;
 use crate::launch::{self, Connection};
 use crate::link::{Incoming, Link};
 use crate::shell::{self, ShellControl};
+use crate::state::shortcuts::Chord;
 use crate::state::{App, Exit, Key, Msg, Pointer, Request, Selection};
 use crate::ui;
 
@@ -44,18 +46,20 @@ pub fn typed_later(rest: &[Event]) -> bool {
 
 pub fn key(event: KeyEvent, pasting: bool) -> Option<Key> {
     let control = event.modifiers.contains(KeyModifiers::CONTROL);
-    let shifted = event
-        .modifiers
-        .intersects(KeyModifiers::SHIFT | KeyModifiers::ALT);
+    let alt = event.modifiers.contains(KeyModifiers::ALT);
+    let shift = event.modifiers.contains(KeyModifiers::SHIFT);
+    let shifted = shift || alt;
     Some(match event.code {
-        KeyCode::Char(value) if control => match value.to_ascii_lowercase() {
+        KeyCode::Char(value) if control && !alt => match value.to_ascii_lowercase() {
             'c' | 'd' => Key::Interrupt,
-            'o' => Key::Details,
             'j' | 'm' if pasting => Key::Newline,
             'j' | 'm' => Key::Enter,
-            'u' => Key::ClearLine,
-            _ => return None,
+            _ => Key::Chord(Chord::character(value, true, false, shift)?),
         },
+        KeyCode::Char(value) if alt && !control && !pasting && !value.is_control() => {
+            Key::Chord(Chord::character(value, false, true, shift)?)
+        }
+        KeyCode::F(number) => Key::Chord(Chord::function_key(number, control, alt, shift)?),
         KeyCode::Enter | KeyCode::Char('\r' | '\n') if shifted || pasting => Key::Newline,
         KeyCode::Enter | KeyCode::Char('\r' | '\n') => Key::Enter,
         KeyCode::Char(value) => Key::Char(value),
@@ -245,7 +249,9 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             Msg::ServerChanged(link.call("mcp.stop", &json!({ "id": id })).await)
         }
         Request::SetPolicy(policy) => Msg::PolicySet(link.call("execPolicy.set", &policy).await),
-        Request::Shell(_) | Request::StopShell | Request::Copy(_) => Msg::Tick,
+        Request::Shell(_) | Request::StopShell | Request::Copy(_) | Request::SaveShortcuts(_) => {
+            Msg::Tick
+        }
         Request::FocusVerification => {
             #[cfg(windows)]
             zvs_pipe::allow_foreground();
@@ -340,6 +346,10 @@ fn dispatch(
                 let copied = copy_to_clipboard(&selected_text(screen, &selection));
                 let _ = signals.send(Signal::App(Box::new(Msg::Copied(copied))));
             }
+            Request::SaveShortcuts(value) => {
+                let saved = keymap_file::save(&value);
+                let _ = signals.send(Signal::App(Box::new(Msg::ShortcutsSaved(saved))));
+            }
             other => remote.push(other),
         }
     }
@@ -412,6 +422,7 @@ async fn session(
     }
 
     let mut app = App::new(&folder);
+    app.keymap = keymap_file::load();
     let mut link: Option<Link> = None;
     let shell = ShellControl::default();
     loop {
@@ -575,18 +586,36 @@ mod tests {
     }
 
     #[test]
-    fn control_shortcuts_map_to_actions() {
+    fn control_alt_and_function_keys_become_chords() {
         assert_eq!(
             key(pressed(KeyCode::Char('c'), KeyModifiers::CONTROL), false),
             Some(Key::Interrupt)
         );
         assert_eq!(
             key(pressed(KeyCode::Char('O'), KeyModifiers::CONTROL), false),
-            Some(Key::Details)
+            Some(Key::Chord(Chord::ctrl('o')))
         );
         assert_eq!(
-            key(pressed(KeyCode::Char('x'), KeyModifiers::CONTROL), false),
-            None
+            key(pressed(KeyCode::Char('ы'), KeyModifiers::ALT), false),
+            Some(Key::Chord(Chord::alt('s')))
+        );
+        assert_eq!(
+            key(pressed(KeyCode::F(1), KeyModifiers::NONE), false),
+            Some(Key::Chord(Chord::function(1)))
+        );
+        assert_eq!(
+            key(
+                pressed(
+                    KeyCode::Char('@'),
+                    KeyModifiers::CONTROL | KeyModifiers::ALT
+                ),
+                false
+            ),
+            Some(Key::Char('@'))
+        );
+        assert_eq!(
+            key(pressed(KeyCode::Enter, KeyModifiers::ALT), false),
+            Some(Key::Newline)
         );
         assert_eq!(
             key(pressed(KeyCode::Char('ж'), KeyModifiers::NONE), false),

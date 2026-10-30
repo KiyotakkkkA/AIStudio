@@ -10,6 +10,7 @@ pub enum Command {
     Skills,
     Mcp,
     Permissions,
+    Shortcuts,
     Clear,
     Exit,
 }
@@ -23,6 +24,7 @@ pub const COMMANDS: &[Command] = &[
     Command::Skills,
     Command::Mcp,
     Command::Permissions,
+    Command::Shortcuts,
     Command::Clear,
     Command::Exit,
 ];
@@ -38,6 +40,7 @@ impl Command {
             Self::Skills => "skills",
             Self::Mcp => "mcp",
             Self::Permissions => "permissions",
+            Self::Shortcuts => "shortcuts",
             Self::Clear => "clear",
             Self::Exit => "exit",
         }
@@ -53,6 +56,7 @@ impl Command {
             Self::Skills => copy::CMD_SKILLS,
             Self::Mcp => copy::CMD_MCP,
             Self::Permissions => copy::CMD_PERMISSIONS,
+            Self::Shortcuts => copy::CMD_SHORTCUTS,
             Self::Clear => copy::CMD_CLEAR,
             Self::Exit => copy::CMD_EXIT,
         }

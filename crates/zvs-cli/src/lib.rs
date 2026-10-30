@@ -1,5 +1,6 @@
 pub mod copy;
 pub mod format;
+pub mod keymap_file;
 pub mod launch;
 pub mod link;
 pub mod runtime;

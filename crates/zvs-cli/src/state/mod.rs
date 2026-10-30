@@ -2,6 +2,7 @@ pub mod input;
 pub mod overlay;
 pub mod palette;
 pub mod prompt;
+pub mod shortcuts;
 pub mod transcript;
 
 use std::collections::VecDeque;
@@ -19,6 +20,7 @@ use self::input::Input;
 use self::overlay::{Action, Overlay, Panel, View};
 use self::palette::{Command, Palette, is_command_text};
 use self::prompt::{ApprovalDetail, Choice, Prompt, PromptKind};
+use self::shortcuts::{Chord, Keymap, SHORTCUTS, Shortcut};
 use self::transcript::{ShellEnd, ShellRun, Tone, Transcript};
 use crate::copy;
 
@@ -42,8 +44,7 @@ pub enum Key {
     PageUp,
     PageDown,
     Interrupt,
-    Details,
-    ClearLine,
+    Chord(Chord),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,6 +150,7 @@ pub enum Request {
     Shell(String),
     StopShell,
     Copy(Selection),
+    SaveShortcuts(serde_json::Value),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -184,6 +186,7 @@ pub enum Msg {
     ShellEnded(ShellEnd),
     Pointer(Pointer),
     Copied(bool),
+    ShortcutsSaved(bool),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -213,6 +216,7 @@ pub struct App {
     pub scroll: usize,
     pub escape_armed: bool,
     pub help: bool,
+    pub keymap: Keymap,
     pub status: Option<(Tone, String)>,
     pub frame: u64,
     pub started: u64,
@@ -266,6 +270,7 @@ impl App {
             scroll: 0,
             escape_armed: false,
             help: false,
+            keymap: Keymap::default(),
             status: None,
             frame: 0,
             started: 0,
@@ -282,6 +287,36 @@ impl App {
             && !self.help
             && self.overlay.is_none()
             && is_command_text(self.input.text())
+    }
+
+    pub fn capturing(&self) -> bool {
+        self.overlay
+            .as_ref()
+            .is_some_and(|overlay| overlay.capturing.is_some())
+    }
+
+    pub fn key_sections(&self) -> Vec<(&'static str, Vec<(String, String)>)> {
+        vec![
+            (
+                copy::SHORTCUTS_TITLE,
+                SHORTCUTS
+                    .iter()
+                    .map(|shortcut| {
+                        (
+                            self.keymap.label(*shortcut),
+                            shortcut.description().to_owned(),
+                        )
+                    })
+                    .collect(),
+            ),
+            (
+                copy::KEYS_TITLE,
+                copy::KEYS
+                    .iter()
+                    .map(|(keys, meaning)| ((*keys).to_owned(), (*meaning).to_owned()))
+                    .collect(),
+            ),
+        ]
     }
 
     pub fn show_welcome(&self) -> bool {
@@ -343,6 +378,12 @@ impl App {
             }
             Msg::Connected => vec![Request::Open, Request::Providers, Request::Policy],
             Msg::Pointer(pointer) => self.pointer(pointer),
+            Msg::ShortcutsSaved(saved) => {
+                if !saved {
+                    self.status = Some((Tone::Error, copy::SHORTCUTS_SAVE_FAILED.to_owned()));
+                }
+                Vec::new()
+            }
             Msg::Copied(copied) => {
                 self.status = Some(if copied {
                     (Tone::Success, copy::COPIED.to_owned())
@@ -753,6 +794,7 @@ impl App {
             Command::Skills => return self.open_panel(Panel::Skills),
             Command::Mcp => return self.open_panel(Panel::Mcp),
             Command::Permissions => return self.open_panel(Panel::Permissions),
+            Command::Shortcuts => return self.open_panel(Panel::Shortcuts),
         }
         Vec::new()
     }
@@ -764,6 +806,7 @@ impl App {
             folder: &self.folder,
             policy: self.policy.as_ref(),
             mode: self.mode,
+            keymap: &self.keymap,
         }
     }
 
@@ -821,7 +864,7 @@ impl App {
             return Vec::new();
         }
         let requests = match panel {
-            Panel::Models => Vec::new(),
+            Panel::Models | Panel::Shortcuts => Vec::new(),
             Panel::Resume => vec![Request::Conversations],
             Panel::Skills => vec![Request::Skills],
             Panel::Mcp => vec![Request::Servers],
@@ -887,10 +930,105 @@ impl App {
                 mode: self.mode,
                 judge,
             })],
+            Action::Rebind(shortcut) => {
+                if let Some(overlay) = self.overlay.as_mut() {
+                    overlay.capturing = Some(shortcut);
+                }
+                Vec::new()
+            }
+            Action::ResetShortcuts => {
+                self.keymap.reset();
+                self.status = Some((Tone::Success, copy::SHORTCUTS_RESTORED.to_owned()));
+                vec![self.save_shortcuts()]
+            }
         }
     }
 
+    fn save_shortcuts(&self) -> Request {
+        Request::SaveShortcuts(self.keymap.to_json())
+    }
+
+    fn stop_capture(&mut self) {
+        if let Some(overlay) = self.overlay.as_mut() {
+            overlay.capturing = None;
+        }
+    }
+
+    fn capture(&mut self, target: Shortcut, key: Key) -> Vec<Request> {
+        match key {
+            Key::Esc => {
+                self.stop_capture();
+                Vec::new()
+            }
+            Key::Backspace | Key::Delete => {
+                self.keymap.unbind(target);
+                self.stop_capture();
+                self.status = Some((Tone::Success, copy::SHORTCUT_REMOVED.to_owned()));
+                vec![self.save_shortcuts()]
+            }
+            Key::Chord(chord) if chord.reserved() => {
+                self.status = Some((Tone::Error, copy::SHORTCUT_RESERVED.to_owned()));
+                Vec::new()
+            }
+            Key::Chord(chord) => {
+                let moved = self.keymap.bind(target, chord);
+                self.stop_capture();
+                let label = chord.label();
+                let mut text =
+                    format!("{}: {label} — {}", copy::SHORTCUT_SET, target.description());
+                if let Some(other) = moved {
+                    text.push_str(&format!(
+                        ". {label} {} «{}»",
+                        copy::SHORTCUT_MOVED,
+                        other.description()
+                    ));
+                }
+                self.status = Some((Tone::Success, text));
+                vec![self.save_shortcuts()]
+            }
+            _ => {
+                self.status = Some((Tone::Info, copy::SHORTCUT_INVALID.to_owned()));
+                Vec::new()
+            }
+        }
+    }
+
+    fn shortcut(&mut self, chord: Chord) -> Vec<Request> {
+        let Some(shortcut) = self.keymap.action(chord) else {
+            return Vec::new();
+        };
+        match shortcut {
+            Shortcut::Details => self.expanded = !self.expanded,
+            Shortcut::ClearInput => {
+                if let Some(overlay) = self.overlay.as_mut() {
+                    overlay.filter.clear();
+                    overlay.selected = 0;
+                } else if let Some(other) = self.question_input() {
+                    other.clear();
+                } else if self.prompts.is_empty() {
+                    self.input.clear();
+                    self.palette.reset();
+                }
+            }
+            other => {
+                if self.phase != Phase::Chat || !self.prompts.is_empty() {
+                    return Vec::new();
+                }
+                let Some(command) = other.command() else {
+                    return Vec::new();
+                };
+                self.help = false;
+                self.overlay = None;
+                return self.command(command);
+            }
+        }
+        Vec::new()
+    }
+
     fn overlay_key(&mut self, key: Key) -> Vec<Request> {
+        if let Some(target) = self.overlay.as_ref().and_then(|overlay| overlay.capturing) {
+            return self.capture(target, key);
+        }
         let Some(overlay) = self.overlay.as_ref() else {
             return Vec::new();
         };
@@ -927,7 +1065,6 @@ impl App {
                 overlay.filter.backspace();
                 overlay.selected = 0;
             }
-            Key::ClearLine => overlay.filter.clear(),
             Key::Enter => {
                 if let Some(action) = rows
                     .get(overlay.selected)
@@ -1010,13 +1147,14 @@ impl App {
             self.escape_armed = false;
         }
         self.status = None;
+        if let Key::Chord(chord) = key
+            && !self.capturing()
+        {
+            return self.shortcut(chord);
+        }
         match key {
             Key::Interrupt => {
                 self.quit(None);
-                return Vec::new();
-            }
-            Key::Details => {
-                self.expanded = !self.expanded;
                 return Vec::new();
             }
             Key::PageUp => {
@@ -1075,6 +1213,14 @@ impl App {
         if self.verification.is_some() && key == Key::Enter && self.input.is_empty() {
             return vec![Request::FocusVerification];
         }
+        if key == Key::Char('?') && self.input.is_empty() {
+            let sections = self.key_sections();
+            self.transcript
+                .entries
+                .push(transcript::Entry::Keys(sections));
+            self.scroll = 0;
+            return Vec::new();
+        }
         match key {
             Key::Enter => return self.submit(),
             Key::Esc => return self.escape(),
@@ -1092,7 +1238,6 @@ impl App {
             Key::Right => self.input.right(),
             Key::Home => self.input.home(),
             Key::End => self.input.end(),
-            Key::ClearLine => self.input.clear(),
             Key::Up => {
                 if !self.input.up() {
                     self.input.history_back();
@@ -1103,7 +1248,7 @@ impl App {
                     self.input.history_forward();
                 }
             }
-            Key::Tab | Key::PageUp | Key::PageDown | Key::Interrupt | Key::Details => {}
+            Key::Tab | Key::PageUp | Key::PageDown | Key::Interrupt | Key::Chord(_) => {}
         }
         Vec::new()
     }

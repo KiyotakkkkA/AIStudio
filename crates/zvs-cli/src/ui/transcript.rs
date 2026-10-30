@@ -325,6 +325,39 @@ fn notice(tone: Tone, text: &str, width: usize) -> Vec<Line<'static>> {
         .collect()
 }
 
+pub fn key_lines(
+    sections: &[(&str, Vec<(String, String)>)],
+    width: usize,
+    indent: usize,
+) -> Vec<Line<'static>> {
+    let lead = " ".repeat(indent);
+    let column = sections
+        .iter()
+        .flat_map(|(_, rows)| rows.iter().map(|(keys, _)| keys.width()))
+        .max()
+        .unwrap_or(0)
+        + 2;
+    let room = width.saturating_sub(column + indent + 2).max(8);
+    let mut lines = Vec::new();
+    for (index, (title, rows)) in sections.iter().enumerate() {
+        if index > 0 {
+            lines.push(Line::default());
+        }
+        lines.push(Line::from(Span::styled(
+            format!("{lead}{title}"),
+            theme::eyebrow(),
+        )));
+        for (keys, meaning) in rows {
+            let pad = " ".repeat(column.saturating_sub(keys.width()));
+            lines.push(Line::from(vec![
+                Span::styled(format!("{lead}  {keys}{pad}"), theme::strong()),
+                Span::styled(truncate(meaning, room), theme::muted()),
+            ]));
+        }
+    }
+    lines
+}
+
 pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = Vec::new();
     let expanded = app.expanded;
@@ -336,6 +369,7 @@ pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
             Entry::Tool(call) => tool(call, expanded, app.frame, width),
             Entry::Notice { tone, text } => notice(*tone, text, width),
             Entry::Shell(run) => shell_block(run, expanded, app.frame, width),
+            Entry::Keys(sections) => key_lines(sections, width, 2),
         });
     }
     if let Some(run) = &app.shell {
