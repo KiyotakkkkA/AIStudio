@@ -4,6 +4,7 @@ use serde_json::{Value, json};
 use zvs_contract::{CliSessionDto, ProviderDto, WorkingFolderAccess};
 
 use super::*;
+use crate::state::shortcuts;
 use crate::state::{Key, Msg};
 
 const PROVIDERS: &str =
@@ -109,10 +110,24 @@ fn help_and_tiny_terminals_do_not_panic() {
     render(&App::new("D:/x"), 10, 3);
 }
 
+fn column_of(screen: &str, text: &str) -> usize {
+    let line = screen
+        .lines()
+        .find(|line| line.contains(text))
+        .unwrap_or_else(|| {
+            panic!(
+                "a row for {text}
+{screen}"
+            )
+        });
+    line[..line.find(text).expect("found")].chars().count()
+}
+
 #[test]
 fn the_shortcut_list_and_the_rebinding_panel_render() {
     let mut app = ready(WorkingFolderAccess::Granted);
     app.update(Msg::Key(Key::Char('?')));
+    app.update(Msg::Key(Key::Enter));
     let screen = render(&app, 100, 40);
     assert!(screen.contains(copy::SHORTCUTS_TITLE), "{screen}");
     assert!(screen.contains("Ctrl+O"), "{screen}");
@@ -122,9 +137,25 @@ fn the_shortcut_list_and_the_rebinding_panel_render() {
         app.update(Msg::Key(Key::Char(value)));
     }
     app.update(Msg::Key(Key::Enter));
-    app.update(Msg::Key(Key::Enter));
     let screen = render(&app, 100, 30);
-    assert!(screen.contains(copy::SHORTCUT_PRESS), "{screen}");
-    assert!(screen.contains(copy::HINT_CAPTURE), "{screen}");
+    assert!(screen.contains(copy::SHORTCUT_COLUMN_KEYS), "{screen}");
+    let starts: Vec<usize> = shortcuts::SHORTCUTS
+        .iter()
+        .map(|shortcut| column_of(&screen, shortcut.description()))
+        .collect();
+    assert!(
+        starts.windows(2).all(|pair| pair[0] == pair[1]),
+        "{starts:?}
+{screen}"
+    );
+
+    app.update(Msg::Key(Key::Enter));
+    let capturing = render(&app, 100, 30);
+    assert!(capturing.contains(copy::SHORTCUT_PRESS), "{capturing}");
+    assert!(capturing.contains(copy::HINT_CAPTURE), "{capturing}");
+    assert_eq!(
+        column_of(&capturing, shortcuts::SHORTCUTS[0].description()),
+        starts[0]
+    );
     let _ = render(&app, 20, 6);
 }

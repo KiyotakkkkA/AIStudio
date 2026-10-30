@@ -53,6 +53,69 @@ fn gauge(value: f64, color: Color) -> Vec<Span<'static>> {
     ]
 }
 
+pub fn key_column(rows: &[Row]) -> usize {
+    rows.iter()
+        .map(|row| row.meta.width())
+        .chain([
+            copy::SHORTCUT_PRESS.width(),
+            copy::SHORTCUT_COLUMN_KEYS.width(),
+        ])
+        .max()
+        .unwrap_or(0)
+        + 3
+}
+
+fn table_header(column: usize) -> Line<'static> {
+    let keys = copy::SHORTCUT_COLUMN_KEYS;
+    Line::from(vec![
+        Span::raw("     "),
+        Span::styled(
+            format!("{keys}{}", " ".repeat(column.saturating_sub(keys.width()))),
+            theme::eyebrow(),
+        ),
+        Span::styled(copy::SHORTCUT_COLUMN_ACTION, theme::eyebrow()),
+    ])
+}
+
+fn table_row(row: &Row, selected: bool, column: usize, width: usize) -> Line<'static> {
+    let color = tone_color(row.tone);
+    let base = if selected {
+        Style::new().bg(theme::ACCENT_SOFT)
+    } else {
+        Style::new()
+    };
+    let marker = if selected { " › " } else { "   " };
+    let keys_style = match row.tone {
+        Tone::Faint => theme::faint(),
+        Tone::Warn => Style::new().fg(theme::WARN).add_modifier(Modifier::BOLD),
+        _ => theme::strong(),
+    };
+    let keys = truncate(&row.meta, column.saturating_sub(1));
+    let pad = column.saturating_sub(keys.width());
+    let mut spans = vec![
+        Span::styled(marker, base.fg(theme::ACCENT).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{} ", row.icon), base.fg(color)),
+        Span::styled(keys, base.patch(keys_style)),
+        Span::styled(" ".repeat(pad), base),
+    ];
+    let used: usize = spans.iter().map(|span| span.content.width()).sum();
+    let title = truncate(&row.title, width.saturating_sub(used + 1));
+    let title_width = title.width();
+    let title_style = if row.tone == Tone::Accent {
+        Style::new().fg(theme::ACCENT)
+    } else {
+        theme::text()
+    };
+    spans.push(Span::styled(title, base.patch(title_style)));
+    if selected {
+        spans.push(Span::styled(
+            " ".repeat(width.saturating_sub(used + title_width)),
+            base,
+        ));
+    }
+    Line::from(spans)
+}
+
 fn row_lines(row: &Row, selected: bool, expanded: bool, width: usize) -> Vec<Line<'static>> {
     let color = tone_color(row.tone);
     let base = if selected {
@@ -190,14 +253,21 @@ pub fn draw(frame: &mut Frame<'_>, area: Rect, app: &App, overlay: &Overlay) {
     let selected = overlay.selected.min(rows.len() - 1);
     let mut lines = Vec::new();
     let mut selected_span = (0, 0);
+    let table = (overlay.panel == Panel::Shortcuts).then(|| key_column(&rows));
+    if let Some(column) = table {
+        lines.push(table_header(column));
+    }
     for (index, row) in rows.iter().enumerate() {
         let start = lines.len();
-        lines.extend(row_lines(
-            row,
-            index == selected,
-            overlay.is_expanded(&row.key),
-            width,
-        ));
+        match table {
+            Some(column) => lines.push(table_row(row, index == selected, column, width)),
+            None => lines.extend(row_lines(
+                row,
+                index == selected,
+                overlay.is_expanded(&row.key),
+                width,
+            )),
+        }
         if index == selected {
             selected_span = (start, lines.len());
         }

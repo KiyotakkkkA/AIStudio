@@ -410,9 +410,12 @@ fn chord(app: &mut App, chord: shortcuts::Chord) -> Vec<Request> {
 }
 
 #[test]
-fn a_question_mark_in_an_empty_line_lists_every_shortcut_in_the_chat() {
+fn a_line_holding_only_a_question_mark_lists_every_shortcut_in_the_chat() {
     let mut app = ready();
-    app.update(Msg::Key(Key::Char('?')));
+    typed(&mut app, "?");
+    assert_eq!(app.input.text(), "?");
+    assert!(app.transcript.entries.is_empty());
+    assert!(app.update(Msg::Key(Key::Enter)).is_empty());
     assert!(app.input.is_empty());
     let Some(Entry::Keys(sections)) = app.transcript.entries.last() else {
         panic!("a shortcuts entry");
@@ -423,8 +426,12 @@ fn a_question_mark_in_an_empty_line_lists_every_shortcut_in_the_chat() {
     assert!(bound.contains(&("Ctrl+O".to_owned(), copy::SHORTCUT_DETAILS.to_owned())));
     assert_eq!(sections[1].1.len(), copy::KEYS.len());
 
-    typed(&mut app, "why?");
-    assert_eq!(app.input.text(), "why?");
+    let shown = app.transcript.entries.len();
+    typed(&mut app, "?why");
+    assert_eq!(app.input.text(), "?why");
+    app.update(Msg::Key(Key::Enter));
+    assert_eq!(app.transcript.entries.len(), shown + 1);
+    assert!(matches!(app.transcript.entries.last(), Some(Entry::User(text)) if text == "?why"));
 }
 
 #[test]

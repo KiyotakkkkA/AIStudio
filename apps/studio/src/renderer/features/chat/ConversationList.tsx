@@ -1,6 +1,7 @@
 import { observer } from "mobx-react-lite";
 import {
   mdiChatOutline,
+  mdiChevronDown,
   mdiCodeJson,
   mdiDeleteOutline,
   mdiDockLeft,
@@ -51,6 +52,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
   const [renameTarget, setRenameTarget] = useState<ConversationDto | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ConversationDto | null>(null);
+  const [exportOpen, setExportOpen] = useState<ConversationDto["id"] | null>(null);
   const { motion: level } = useFx();
   const settle = useTransition("layout");
   const today = new Date();
@@ -169,7 +171,13 @@ export default observer(function ConversationList({ store }: { readonly store: C
                             />
                             <span className="truncate text-[13px]">{conversation.title}</span>
                           </div>
-                          <Dropdown menuWidth={160} menuPlacement="bottom-right">
+                          <Dropdown
+                            menuWidth={220}
+                            menuPlacement="bottom-right"
+                            onOpenChange={(open) => {
+                              if (!open) setExportOpen(null);
+                            }}
+                          >
                             <IconDropdownButton
                               aria-label={`Действия для ${conversation.title}`}
                               label="Действия"
@@ -182,7 +190,57 @@ export default observer(function ConversationList({ store }: { readonly store: C
                             <ActionMenu label="Действия диалога">
                               {actions(conversation).map((action) => (
                                 <Fragment key={action.key}>
-                                  {action.danger && <ActionMenuSeparator />}
+                                  {action.danger && (
+                                    <>
+                                      <ActionMenuItem
+                                        icon={mdiExportVariant}
+                                        closeOnClick={false}
+                                        expanded={exportOpen === conversation.id}
+                                        disabled={store.exports.busy}
+                                        trailing={
+                                          <Icon
+                                            path={mdiChevronDown}
+                                            size={15}
+                                            className={`flex-none text-main-500 anim-on:transition-transform ${
+                                              exportOpen === conversation.id ? "rotate-180" : ""
+                                            }`}
+                                          />
+                                        }
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setExportOpen(
+                                            exportOpen === conversation.id ? null : conversation.id,
+                                          );
+                                        }}
+                                      >
+                                        {EXPORT}
+                                      </ActionMenuItem>
+                                      {exportOpen === conversation.id
+                                        ? EXPORT_FORMATS.map((option) => (
+                                            <ActionMenuItem
+                                              key={option.format}
+                                              inset
+                                              icon={
+                                                option.format === "json"
+                                                  ? mdiCodeJson
+                                                  : mdiLanguageMarkdownOutline
+                                              }
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                setExportOpen(null);
+                                                void store.exports.export(
+                                                  conversation.id,
+                                                  option.format,
+                                                );
+                                              }}
+                                            >
+                                              {option.label}
+                                            </ActionMenuItem>
+                                          ))
+                                        : null}
+                                      <ActionMenuSeparator />
+                                    </>
+                                  )}
                                   <ActionMenuItem
                                     icon={action.icon}
                                     danger={action.danger ?? false}

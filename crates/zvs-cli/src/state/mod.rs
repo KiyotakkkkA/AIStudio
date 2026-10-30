@@ -1089,6 +1089,14 @@ impl App {
         if text.is_empty() {
             return Vec::new();
         }
+        if text.trim() == "?" {
+            let sections = self.key_sections();
+            self.transcript
+                .entries
+                .push(transcript::Entry::Keys(sections));
+            self.scroll = 0;
+            return Vec::new();
+        }
         if text.starts_with('!') {
             return self.submit_shell(&text);
         }
@@ -1212,14 +1220,6 @@ impl App {
         }
         if self.verification.is_some() && key == Key::Enter && self.input.is_empty() {
             return vec![Request::FocusVerification];
-        }
-        if key == Key::Char('?') && self.input.is_empty() {
-            let sections = self.key_sections();
-            self.transcript
-                .entries
-                .push(transcript::Entry::Keys(sections));
-            self.scroll = 0;
-            return Vec::new();
         }
         match key {
             Key::Enter => return self.submit(),

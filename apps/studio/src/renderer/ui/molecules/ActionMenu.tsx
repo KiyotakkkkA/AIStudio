@@ -30,6 +30,10 @@ export function ActionMenuItem({
   danger = false,
   disabled = false,
   title,
+  closeOnClick = true,
+  inset = false,
+  expanded,
+  trailing,
   onClick,
 }: {
   readonly icon: string;
@@ -37,6 +41,10 @@ export function ActionMenuItem({
   readonly danger?: boolean;
   readonly disabled?: boolean;
   readonly title?: string;
+  readonly closeOnClick?: boolean;
+  readonly inset?: boolean;
+  readonly expanded?: boolean;
+  readonly trailing?: ReactNode;
   readonly onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
@@ -46,11 +54,14 @@ export function ActionMenuItem({
       className={danger ? DANGER : ITEM}
       disabled={disabled}
       title={title}
+      closeOnClick={closeOnClick}
+      aria-expanded={expanded}
       onClick={onClick}
     >
-      <span className="flex min-w-0 items-center gap-2">
+      <span className={`flex min-w-0 items-center gap-2 ${inset ? "pl-6" : ""}`}>
         <Icon path={icon} size={16} className={`flex-none ${danger ? "" : "text-main-400"}`} />
-        <span className="truncate">{children}</span>
+        <span className="min-w-0 flex-1 truncate">{children}</span>
+        {trailing}
       </span>
     </Dropdown.Item>
   );

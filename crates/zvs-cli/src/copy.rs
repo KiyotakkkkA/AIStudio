@@ -126,10 +126,12 @@ pub const KEYS: &[(&str, &str)] = &[
     ("Выделение мышью", "скопировать текст"),
     ("! в начале строки", "выполнить команду в рабочей папке"),
     ("Ctrl+C", "выйти"),
-    ("? в пустой строке", "показать сочетания клавиш"),
+    ("? и Enter", "показать сочетания клавиш"),
 ];
 
 pub const SHORTCUTS_TITLE: &str = "Сочетания клавиш";
+pub const SHORTCUT_COLUMN_KEYS: &str = "Сочетание";
+pub const SHORTCUT_COLUMN_ACTION: &str = "Действие";
 pub const SHORTCUT_DETAILS: &str = "Показать или скрыть подробности инструментов";
 pub const SHORTCUT_CLEAR_INPUT: &str = "Очистить строку ввода";
 pub const SHORTCUT_NONE: &str = "не назначено";
