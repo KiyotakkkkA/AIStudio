@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { observer } from "mobx-react-lite";
 import { mdiChevronUp, mdiLoading, mdiMicrophone, mdiMicrophoneOutline } from "@mdi/js";
-import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
+import { Dropdown, Tooltip } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
-import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
+import Icon from "../../ui/atoms/Icon";
 import {
   VOICE_CANCEL_HINT,
   VOICE_DEVICE_ROW,
@@ -68,13 +68,19 @@ function VoiceMenu({ store: voice, setup, disabled, onText }: VoiceMenuProps) {
         void voice.loadModels();
       }}
     >
-      <div className="flex items-center">
+      <div
+        className={`flex h-8 items-center rounded-control ${
+          recording
+            ? "zvs-press bg-danger-medium text-white hover:bg-danger-dark"
+            : "text-main-400 hover:bg-main-700"
+        }`}
+      >
         <Dropdown.Render>
           {({ openMenu }) => (
             <IconButton
               size="md"
-              iconSize={recording ? 18 : 17}
-              tone={recording ? "danger" : "ghost"}
+              iconSize={17}
+              toneClassName={recording ? "" : "hover:text-main-50"}
               path={recognizing ? mdiLoading : recording ? mdiMicrophone : mdiMicrophoneOutline}
               className={recognizing ? "[&>svg]:animate-spin" : ""}
               label={recognizing ? VOICE_RECOGNIZING : recording ? VOICE_STOP : VOICE_RECORD}
@@ -96,13 +102,18 @@ function VoiceMenu({ store: voice, setup, disabled, onText }: VoiceMenuProps) {
             />
           )}
         </Dropdown.Render>
-        <IconDropdownButton
-          label={VOICE_OPTIONS}
-          tooltip="top-center"
-          size="xs"
-          iconSize={15}
-          path={mdiChevronUp}
-        />
+        <span aria-hidden="true" className="h-4 w-px bg-current opacity-25" />
+        <Tooltip label={VOICE_OPTIONS} placement="top-center" className="">
+          <Dropdown.Trigger
+            rounded=""
+            className={`h-8 w-5 flex-none cursor-auto justify-center gap-0 border-none bg-transparent p-0 ${
+              recording ? "text-white" : "text-main-400 hover:text-main-50"
+            }`}
+            icon={<Icon path={mdiChevronUp} size={15} />}
+          >
+            <span className="sr-only">{VOICE_OPTIONS}</span>
+          </Dropdown.Trigger>
+        </Tooltip>
       </div>
       <Dropdown.Menu
         role="menu"
