@@ -13,8 +13,10 @@ import {
   mdiDownload,
   mdiHarddisk,
   mdiInformationOutline,
+  mdiMicrophoneOutline,
   mdiPackageVariantClosed,
   mdiPaletteOutline,
+  mdiRefresh,
 } from "@mdi/js";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
@@ -121,6 +123,19 @@ import {
   storageSize,
 } from "./storageCopy";
 import MemoryFacts from "../memory/MemoryFacts";
+import {
+  VOICE_CHOOSE,
+  VOICE_DEVICE_MISSING,
+  VOICE_DEVICE_ROW,
+  VOICE_DOWNLOADING,
+  VOICE_INSTALL,
+  VOICE_MODEL_ROW,
+  VOICE_NO_MODEL,
+  VOICE_NO_MODELS,
+  VOICE_RECOMMENDED,
+  VOICE_REFRESH,
+} from "../voice/voiceCopy";
+import { formatBytes } from "../downloads/downloadPresentation";
 import { DISABLED_NOTE, ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
 import { aboutSettingId, SETTING_ENTRIES, SETTING_IDS } from "./settingsIndex";
 import {
@@ -157,6 +172,7 @@ const SECTION_ICONS: Record<PreferenceSection, string> = {
   about: mdiInformationOutline,
   components: mdiPackageVariantClosed,
   cli: mdiConsole,
+  voice: mdiMicrophoneOutline,
 };
 
 const SettingRow = observer(function SettingRow({
@@ -611,6 +627,126 @@ const CliSection = observer(function CliSection() {
   );
 });
 
+const VoiceModelAdvice = observer(function VoiceModelAdvice() {
+  const { voice } = useStore();
+  const model = voice.recommended;
+  if (model === undefined || voice.selectedModelRef === model.ref) return null;
+  const pending =
+    model.state === "downloading" ||
+    model.state === "queued" ||
+    (model.state === "installed" && voice.installPending);
+  return (
+    <div className="flex items-center gap-4 rounded-card bg-main-850 px-3.5 py-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-[12px] text-main-500">{VOICE_RECOMMENDED}</span>
+        <span className="text-[13px] font-medium text-main-100">
+          {model.displayName} · {formatBytes(model.sizeBytes)}
+        </span>
+        <span className="text-[12px] text-main-500">{voice.reason}</span>
+      </div>
+      {pending ? (
+        <span role="status" className="flex-none text-[12px] text-main-400">
+          {VOICE_DOWNLOADING}
+        </span>
+      ) : model.state === "installed" ? (
+        <Button
+          tone="secondary"
+          size="sm"
+          disabled={voice.modelBusy}
+          onClick={() => void voice.selectModel(model.ref)}
+        >
+          {VOICE_CHOOSE}
+        </Button>
+      ) : (
+        <Button
+          tone="primary"
+          size="sm"
+          disabled={voice.modelBusy}
+          onClick={() => void voice.installModel(model.ref)}
+        >
+          {VOICE_INSTALL}
+        </Button>
+      )}
+    </div>
+  );
+});
+
+const VoiceModelRow = observer(function VoiceModelRow() {
+  const { voice } = useStore();
+  const installed = voice.installedModels;
+  const options = [
+    { value: "", label: installed.length > 0 ? VOICE_NO_MODEL : VOICE_NO_MODELS },
+    ...installed.map((model) => ({ value: model.ref, label: model.displayName })),
+  ];
+  return (
+    <SettingRow
+      id={VOICE_MODEL_ROW.key}
+      label={VOICE_MODEL_ROW.label}
+      hint={VOICE_MODEL_ROW.hint}
+      error={voice.modelError ?? undefined}
+      footer={<VoiceModelAdvice />}
+    >
+      <div className="w-64">
+        <SelectInput
+          label={VOICE_MODEL_ROW.label}
+          value={voice.selectedModel?.ref ?? ""}
+          options={options}
+          disabled={installed.length === 0 || voice.modelBusy}
+          onChange={(value) => void voice.selectModel(value.length > 0 ? value : null)}
+          menuPlacement="bottom-right"
+        />
+      </div>
+    </SettingRow>
+  );
+});
+
+const VoiceSection = observer(function VoiceSection() {
+  const { voice } = useStore();
+  useEffect(() => {
+    void voice.refresh();
+    void voice.loadModels();
+  }, [voice]);
+  const options = [
+    { value: "", label: voice.systemLabel },
+    ...voice.devices.map((device) => ({ value: device.id, label: device.name })),
+    ...(voice.deviceId !== null && voice.selected === undefined
+      ? [{ value: voice.deviceId, label: VOICE_DEVICE_MISSING }]
+      : []),
+  ];
+  return (
+    <div className="flex flex-col pt-2">
+      <SettingRow
+        id={VOICE_DEVICE_ROW.key}
+        label={VOICE_DEVICE_ROW.label}
+        hint={VOICE_DEVICE_ROW.hint}
+        error={voice.error ?? undefined}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-64">
+            <SelectInput
+              label={VOICE_DEVICE_ROW.label}
+              value={voice.deviceId ?? ""}
+              options={options}
+              disabled={!voice.loaded || voice.saving}
+              onChange={(value) => void voice.select(value.length > 0 ? value : null)}
+              menuPlacement="bottom-right"
+            />
+          </div>
+          <IconButton
+            path={mdiRefresh}
+            label={VOICE_REFRESH}
+            size="md"
+            iconSize={17}
+            disabled={voice.loading}
+            onClick={() => void voice.refresh()}
+          />
+        </div>
+      </SettingRow>
+      <VoiceModelRow />
+    </div>
+  );
+});
+
 const DataSection = observer(function DataSection() {
   const { storage } = useStore();
   useEffect(() => {
@@ -907,6 +1043,7 @@ function PreferencesDialog() {
             {section === "data" ? <DataSection /> : null}
             {section === "about" ? <AboutSection /> : null}
             {section === "cli" ? <CliSection /> : null}
+            {section === "voice" ? <VoiceSection /> : null}
             {section === "components" ? (
               <div data-setting={SETTING_IDS.components} className="pt-2">
                 <ComponentsTab />

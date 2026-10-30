@@ -7,6 +7,7 @@ import { UiStore } from "../../src/renderer/stores/UiStore.ts";
 import AboutStore from "../../src/renderer/features/preferences/AboutStore.ts";
 import AppSettingsStore from "../../src/renderer/features/preferences/AppSettingsStore.ts";
 import { PREFERENCE_SECTIONS } from "../../src/renderer/stores/UiStore.ts";
+import { VOICE_INPUT } from "../../src/renderer/features/voice/voiceCopy.ts";
 import {
   AUTOSTART_FAILED,
   DEVICE_UNAVAILABLE,
@@ -145,7 +146,7 @@ test("the application group lists its sections in order and the extensions group
       "Приложение",
       ["Общие", "Профиль", "Внешний вид", "Уведомления", "Память", "Данные", "О системе"],
     ],
-    ["Расширения", ["Компоненты", "CLI"]],
+    ["Расширения", ["Компоненты", VOICE_INPUT, "CLI"]],
   ]);
   expect(PREFERENCE_GROUPS.flatMap((group) => group.sections).sort()).toEqual(
     [...PREFERENCE_SECTIONS].sort(),

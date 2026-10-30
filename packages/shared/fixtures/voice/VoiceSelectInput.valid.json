@@ -1,0 +1,10 @@
+[
+  {
+    "name": "a device",
+    "value": { "deviceId": "{0.0.1.00000000}.{a}" }
+  },
+  {
+    "name": "system default",
+    "value": { "deviceId": null }
+  }
+]

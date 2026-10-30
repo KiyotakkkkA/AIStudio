@@ -97,6 +97,8 @@ use zvs_host::toolchain::{
     ToolchainResolver, ToolchainResolverOptions, ToolchainService, ToolchainServiceOptions,
 };
 use zvs_host::tools::{ToolRegistry, ToolRegistryOptions, register_kernel_tools};
+use zvs_host::voice::whisper::WhisperCli;
+use zvs_host::voice::{VoiceService, VoiceServiceOptions};
 use zvs_host::workers::WorkerSupervisor;
 use zvs_host::workspace::{ExplorerService, FolderAccessService, ForbiddenFolders};
 use zvs_host::{IpcServer, ipc};
@@ -760,6 +762,19 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     });
     downloads.attach_installer(Arc::new(toolchain.clone()));
     catalogue.add_provider(toolchain.catalogue_provider());
+    let voice = VoiceService::new(VoiceServiceOptions {
+        settings: settings.clone(),
+        downloads: downloads.clone(),
+        audio: platform::audio_input(),
+        device: Some(device.clone()),
+        recognizer: Arc::new(WhisperCli),
+        downloads_dir: paths.downloads_dir.clone(),
+        cache_dir: paths.cache_dir.clone(),
+        platform: zvs_host::runtimes::Platform::current(),
+        logger: logger.clone(),
+    });
+    downloads.attach_installer(Arc::new(voice.clone()));
+    catalogue.add_provider(voice.catalogue_provider());
     registry.attach_local_engine(Arc::new(runtimes.clone()));
     vector_stores.attach_rerankers(local_rerankers(Arc::new(runtimes.clone())));
     let documents = DocumentExtractorOptions {
@@ -1169,6 +1184,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         folders,
         picker: Some(picker),
         cli: platform::cli_installer(paths.cli_path.clone()),
+        voice,
     });
     {
         let services = Arc::clone(&services);

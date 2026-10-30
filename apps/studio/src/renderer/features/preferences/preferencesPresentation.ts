@@ -12,6 +12,7 @@ import {
   type ThemeMode,
 } from "../../stores/UiStore";
 import { formatBytes } from "../downloads/downloadPresentation";
+import { VOICE_INPUT } from "../voice/voiceCopy";
 import type { AppSettingKey } from "./AppSettingsStore";
 
 export const APP_NAME = "ZVS AI Studio";
@@ -34,6 +35,7 @@ export const SECTION_LABELS: Record<PreferenceSection, string> = {
   data: "Данные",
   about: "О системе",
   components: "Компоненты",
+  voice: VOICE_INPUT,
   cli: "CLI",
 };
 
@@ -47,7 +49,7 @@ export const PREFERENCE_GROUPS: readonly {
     label: PREFERENCES_GROUP,
     sections: ["general", "profile", "appearance", "notifications", "memory", "data", "about"],
   },
-  { label: EXTENSIONS_GROUP, sections: ["components", "cli"] },
+  { label: EXTENSIONS_GROUP, sections: ["components", "voice", "cli"] },
 ];
 
 export const SECTION_HINTS: Record<PreferenceSection, string> = {
@@ -59,7 +61,8 @@ export const SECTION_HINTS: Record<PreferenceSection, string> = {
   data: "Место на диске, занятое данными приложения, и очистка кэша.",
   about: "Версия приложения и характеристики компьютера.",
   components: "Среды выполнения, которые нужны MCP-серверам.",
-  cli: "Команда aistudio для работы с диалогами из терминала.",
+  cli: "Настройка утилиты командной строки.",
+  voice: "Настройка распознавания голоса и управление голосовым вводом.",
 };
 
 export const TOGGLE_ON = "Включено";

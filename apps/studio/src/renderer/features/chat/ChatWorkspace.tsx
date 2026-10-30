@@ -9,9 +9,10 @@ import ExplorerFileView from "./explorer/ExplorerFileView";
 import ViewerDock from "../../viewer/ViewerDock";
 import ChatBrowserDock from "./ChatBrowserDock";
 import { JUDGE_ROW } from "../execPolicy/execPolicyCopy";
+import { VOICE_DEVICE_ROW } from "../voice/voiceCopy";
 
 export default observer(function ChatWorkspace() {
-  const { chat, viewer, execPolicy, ui } = useStore();
+  const { chat, viewer, execPolicy, ui, voice } = useStore();
   useEffect(() => {
     void chat.mount();
     return chat.unmount;
@@ -31,6 +32,10 @@ export default observer(function ChatWorkspace() {
         policy={{
           store: execPolicy,
           setup: () => ui.revealPreference("general", JUDGE_ROW.key),
+        }}
+        voice={{
+          store: voice,
+          setup: () => ui.revealPreference("voice", VOICE_DEVICE_ROW.key),
         }}
       />
       {chat.activePanel === "browser" && !viewer.isOpen ? (

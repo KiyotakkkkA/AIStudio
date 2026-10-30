@@ -1,0 +1,39 @@
+[
+  {
+    "name": "a selected model",
+    "value": {
+      "models": [
+        {
+          "ref": "curated:speech:whisper-small-q8_0",
+          "displayName": "Whisper Small",
+          "description": "Сбалансированная модель.",
+          "sizeBytes": 264464607,
+          "state": "installed",
+          "recommended": true
+        },
+        {
+          "ref": "curated:speech:whisper-large-v3-turbo-q5_0",
+          "displayName": "Whisper Large v3 Turbo",
+          "description": "",
+          "sizeBytes": 574041195,
+          "state": "downloading",
+          "recommended": false
+        }
+      ],
+      "selectedRef": "curated:speech:whisper-small-q8_0",
+      "engineState": "installed",
+      "recommendedRef": "curated:speech:whisper-small-q8_0",
+      "reason": "16 ГБ памяти и 8 ядер."
+    }
+  },
+  {
+    "name": "nothing installed",
+    "value": {
+      "models": [],
+      "selectedRef": null,
+      "engineState": "available",
+      "recommendedRef": "curated:speech:whisper-small-q8_0",
+      "reason": ""
+    }
+  }
+]

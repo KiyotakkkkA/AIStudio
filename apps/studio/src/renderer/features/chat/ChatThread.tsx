@@ -20,6 +20,7 @@ import ChatMessage from "./ChatMessage";
 import MessageActions from "../../ui/molecules/MessageActions";
 import ChatComposer from "./ChatComposer";
 import type { ExecPolicyBinding } from "../execPolicy/ExecPolicyMenu";
+import type { VoiceBinding } from "../voice/VoiceMenu";
 import ChatApprovals from "./ChatApprovals";
 import ChatWorkingFolder from "./ChatWorkingFolder";
 import FolderAccessModal from "./FolderAccessModal";
@@ -51,9 +52,11 @@ import { BRANCH_IN_NEW_DIALOG, CREATE_BRANCH } from "./branching";
 export default observer(function ChatThread({
   store,
   policy,
+  voice,
 }: {
   readonly store: ChatStore;
   readonly policy?: ExecPolicyBinding;
+  readonly voice?: VoiceBinding;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
@@ -458,7 +461,11 @@ export default observer(function ChatThread({
         <ChatWorkingFolder store={store} />
       </div>
       <FolderAccessModal store={store} />
-      <ChatComposer store={store} {...(policy === undefined ? {} : { policy })} />
+      <ChatComposer
+        store={store}
+        {...(policy === undefined ? {} : { policy })}
+        {...(voice === undefined ? {} : { voice })}
+      />
       <TerminalDock store={store.terminal} available={store.active !== null} />
     </section>
   );

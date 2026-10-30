@@ -20,6 +20,7 @@ import * as artifacts from "../src/artifacts.js";
 import * as sites from "../src/sites.js";
 import * as execPolicy from "../src/execPolicy.js";
 import * as cli from "../src/cli.js";
+import * as voice from "../src/voice.js";
 import * as storage from "../src/storage.js";
 import * as integrations from "../src/integrations.js";
 import {
@@ -295,6 +296,14 @@ const schemas: Record<string, z.ZodType> = {
   "cli/CliOpenInput": cli.CliOpenInput,
   "cli/CliSessionDto": cli.CliSessionDto,
   "cli/CliInstallDto": cli.CliInstallDto,
+  "voice/RecordingDeviceDto": voice.RecordingDeviceDto,
+  "voice/VoiceDevicesDto": voice.VoiceDevicesDto,
+  "voice/VoiceSelectInput": voice.VoiceSelectInput,
+  "voice/SpeechModelDto": voice.SpeechModelDto,
+  "voice/VoiceModelsDto": voice.VoiceModelsDto,
+  "voice/VoiceModelInput": voice.VoiceModelInput,
+  "voice/VoiceSelectModelInput": voice.VoiceSelectModelInput,
+  "voice/VoiceTranscriptDto": voice.VoiceTranscriptDto,
   "artifacts/ArtifactDto": artifacts.ArtifactDto,
   "artifacts/ArtifactRef": artifacts.ArtifactRef,
   "artifacts/ArtifactSaveResult": artifacts.ArtifactSaveResult,

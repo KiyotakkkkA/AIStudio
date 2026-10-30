@@ -207,6 +207,8 @@ pub struct TestServices {
     pub download_jobs: Arc<FakeDownloadJobs>,
     pub disk_probe: Arc<FixedDiskProbe>,
     pub cli: Arc<FakeCliInstaller>,
+    pub audio: Arc<FakeAudioInput>,
+    pub recognizer: Arc<FakeRecognizer>,
     pub workspace: TemporaryDirectory,
     pub database: TemporaryDatabase,
 }
@@ -231,6 +233,8 @@ impl Deref for TestServices {
 
 pub fn test_services(system: SystemService) -> TestServices {
     let cli = FakeCliInstaller::shared();
+    let audio = Arc::new(FakeAudioInput::default());
+    let recognizer = Arc::new(FakeRecognizer::default());
     let database = temporary_database();
     let clock = Arc::new(FakeClock::default());
     let theme = RecordingTheme::shared();
@@ -361,7 +365,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         downloads: Arc::new(downloads.clone()),
         catalogue: Arc::new(catalogue.clone()),
         settings: settings.clone(),
-        downloads_dir,
+        downloads_dir: downloads_dir.clone(),
         device: None,
         resolver: ReleaseResolver::new(ReleaseResolverOptions {
             url: "http://127.0.0.1:9/releases".to_owned(),
@@ -374,6 +378,19 @@ pub fn test_services(system: SystemService) -> TestServices {
     });
     downloads.attach_installer(Arc::new(runtimes.clone()));
     catalogue.add_provider(runtimes.catalogue_provider());
+    let voice = crate::voice::VoiceService::new(crate::voice::VoiceServiceOptions {
+        settings: settings.clone(),
+        downloads: downloads.clone(),
+        audio: audio.clone(),
+        device: None,
+        recognizer: recognizer.clone(),
+        downloads_dir: downloads_dir.clone(),
+        cache_dir: workspace.join("cache"),
+        platform: crate::runtimes::Platform::new("win32", "x64"),
+        logger: silent_logger(),
+    });
+    downloads.attach_installer(Arc::new(voice.clone()));
+    catalogue.add_provider(voice.catalogue_provider());
     let picker = FakePicker::shared();
     let toolchain_probe = FakeProbe::shared();
     let toolchain =
@@ -654,6 +671,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             folders,
             picker: Some(picker.clone()),
             cli: cli.clone(),
+            voice,
         }),
         nodes,
         run_events,
@@ -662,6 +680,8 @@ pub fn test_services(system: SystemService) -> TestServices {
         download_jobs,
         disk_probe,
         cli,
+        audio,
+        recognizer,
         workspace,
         theme,
         shell,
@@ -1182,5 +1202,112 @@ impl crate::cli::CliInstaller for FakeCliInstaller {
     fn uninstall(&self) -> Result<(), String> {
         self.installed.store(false, Ordering::SeqCst);
         Ok(())
+    }
+}
+
+#[derive(Default)]
+pub struct FakeAudioInput {
+    devices: Mutex<Vec<crate::platform::audio::CaptureDevice>>,
+    samples: Mutex<Vec<i16>>,
+    recorded: Mutex<Vec<Option<String>>>,
+    pub failing: AtomicBool,
+    pub record_failing: AtomicBool,
+}
+
+impl FakeAudioInput {
+    pub fn set(&self, devices: Vec<crate::platform::audio::CaptureDevice>) {
+        *self.devices.lock().unwrap_or_else(PoisonError::into_inner) = devices;
+    }
+
+    pub fn speak(&self, samples: Vec<i16>) {
+        *self.samples.lock().unwrap_or_else(PoisonError::into_inner) = samples;
+    }
+
+    pub fn recorded(&self) -> Vec<Option<String>> {
+        self.recorded
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
+
+struct FakeRecording(Vec<i16>);
+
+impl crate::platform::audio::Recording for FakeRecording {
+    fn finish(self: Box<Self>) -> Result<Vec<i16>, String> {
+        Ok(self.0)
+    }
+}
+
+impl crate::platform::audio::AudioInput for FakeAudioInput {
+    fn capture_devices(&self) -> Result<Vec<crate::platform::audio::CaptureDevice>, String> {
+        if self.failing.load(Ordering::SeqCst) {
+            return Err("endpoint enumeration failed".to_owned());
+        }
+        Ok(self
+            .devices
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone())
+    }
+
+    fn record(
+        &self,
+        device_id: Option<&str>,
+    ) -> Result<Box<dyn crate::platform::audio::Recording>, String> {
+        if self.record_failing.load(Ordering::SeqCst) {
+            return Err("capture client failed".to_owned());
+        }
+        self.recorded
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(device_id.map(str::to_owned));
+        Ok(Box::new(FakeRecording(
+            self.samples
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .clone(),
+        )))
+    }
+}
+
+#[derive(Default)]
+pub struct FakeRecognizer {
+    text: Mutex<String>,
+    requests: Mutex<Vec<crate::voice::whisper::TranscribeRequest>>,
+}
+
+impl FakeRecognizer {
+    pub fn answer(&self, text: &str) {
+        *self.text.lock().unwrap_or_else(PoisonError::into_inner) = text.to_owned();
+    }
+
+    pub fn requests(&self) -> Vec<crate::voice::whisper::TranscribeRequest> {
+        self.requests
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::voice::whisper::SpeechRecognizer for FakeRecognizer {
+    async fn transcribe(
+        &self,
+        request: &crate::voice::whisper::TranscribeRequest,
+    ) -> Result<String, zvs_contract::AppError> {
+        assert!(
+            request.audio.is_file(),
+            "the clip is written before recognition"
+        );
+        self.requests
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(request.clone());
+        Ok(self
+            .text
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone())
     }
 }

@@ -7,6 +7,7 @@ mod site_stub;
 use std::path::Path;
 use std::sync::Arc;
 
+use zvs_host::platform::audio::SharedAudioInput;
 use zvs_host::platform::external::SharedFileLauncher;
 use zvs_host::platform::gpu::SharedGpuProbe;
 use zvs_host::platform::logger::SharedLogger;
@@ -48,6 +49,16 @@ pub fn gpu_probe() -> SharedGpuProbe {
 #[cfg(not(windows))]
 pub fn gpu_probe() -> SharedGpuProbe {
     Arc::new(zvs_host::platform::gpu::NoGpu)
+}
+
+#[cfg(windows)]
+pub fn audio_input() -> SharedAudioInput {
+    Arc::new(windows::audio::WasapiInput)
+}
+
+#[cfg(not(windows))]
+pub fn audio_input() -> SharedAudioInput {
+    Arc::new(zvs_host::platform::audio::NoAudioInput)
 }
 
 #[cfg(windows)]

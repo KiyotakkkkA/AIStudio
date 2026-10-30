@@ -6,6 +6,7 @@ import {
   mdiConsoleLine,
   mdiDatabaseOutline,
   mdiPaperclip,
+  mdiSend,
   mdiStop,
   mdiUpload,
 } from "@mdi/js";
@@ -28,6 +29,10 @@ import ExecPolicyMenu, { type ExecPolicyBinding } from "../execPolicy/ExecPolicy
 import { REMOVE_COMMAND, commandText } from "./chatCommands";
 import SelectionChips from "./SelectionChips";
 import type ChatStore from "./ChatStore";
+import VoiceMenu, { type VoiceBinding } from "../voice/VoiceMenu";
+import { appendDictation } from "../voice/dictation";
+
+const MESSAGE_MAX = 100000;
 
 function insidePopup(target: HTMLElement, form: HTMLElement): boolean {
   for (
@@ -43,9 +48,11 @@ function insidePopup(target: HTMLElement, form: HTMLElement): boolean {
 export default observer(function ChatComposer({
   store,
   policy,
+  voice,
 }: {
   readonly store: ChatStore;
   readonly policy?: ExecPolicyBinding;
+  readonly voice?: VoiceBinding;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [storesOpen, setStoresOpen] = useState(false);
@@ -137,7 +144,7 @@ export default observer(function ChatComposer({
               noBorder
               placeholder="Задайте вопрос…"
               value={store.composer.text}
-              maxLength={100000}
+              maxLength={MESSAGE_MAX}
               disabled={store.loading || store.generating}
               aria-controls={store.commandMatches.length > 0 ? COMMAND_MENU_ID : undefined}
               aria-activedescendant={
@@ -276,6 +283,17 @@ export default observer(function ChatComposer({
                 />
               </Dropdown.Menu>
             </Dropdown>
+            {voice === undefined ? null : (
+              <VoiceMenu
+                {...voice}
+                disabled={store.loading || store.generating}
+                onText={(text) => {
+                  if (text.trim().length === 0) return;
+                  store.typeText(appendDictation(store.composer.text, text, MESSAGE_MAX));
+                  formRef.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
+                }}
+              />
+            )}
             {store.generating ? (
               <IconButton
                 tone="danger"
@@ -286,9 +304,15 @@ export default observer(function ChatComposer({
                 onClick={() => void store.stop()}
               />
             ) : (
-              <Button type="submit" tone="primary" disabled={!store.canSend}>
-                Отправить
-              </Button>
+              <IconButton
+                type="submit"
+                tone="primary"
+                size="md"
+                path={mdiSend}
+                iconSize={16}
+                label="Отправить"
+                disabled={!store.canSend}
+              />
             )}
           </div>
         </form>

@@ -1064,6 +1064,38 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::CliInstallDto>,
     ),
     (
+        "voice/RecordingDeviceDto",
+        round_trip::<zvs_contract::RecordingDeviceDto>,
+    ),
+    (
+        "voice/VoiceDevicesDto",
+        round_trip::<zvs_contract::VoiceDevicesDto>,
+    ),
+    (
+        "voice/VoiceSelectInput",
+        round_trip::<zvs_contract::VoiceSelectInput>,
+    ),
+    (
+        "voice/SpeechModelDto",
+        round_trip::<zvs_contract::SpeechModelDto>,
+    ),
+    (
+        "voice/VoiceModelsDto",
+        round_trip::<zvs_contract::VoiceModelsDto>,
+    ),
+    (
+        "voice/VoiceModelInput",
+        round_trip::<zvs_contract::VoiceModelInput>,
+    ),
+    (
+        "voice/VoiceSelectModelInput",
+        round_trip::<zvs_contract::VoiceSelectModelInput>,
+    ),
+    (
+        "voice/VoiceTranscriptDto",
+        round_trip::<zvs_contract::VoiceTranscriptDto>,
+    ),
+    (
         "artifacts/ArtifactDto",
         round_trip::<zvs_contract::artifacts::ArtifactDto>,
     ),

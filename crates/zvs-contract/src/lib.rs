@@ -41,6 +41,7 @@ pub mod toolchain;
 pub mod tools;
 pub mod validate;
 pub mod vector_stores;
+pub mod voice;
 pub mod wire;
 
 pub use accounts::{
@@ -264,4 +265,10 @@ pub use vector_stores::{
     VectorSourceRef, VectorSourcesListOutput, VectorSourcesRemoveOutput, VectorStoreDto,
     VectorStoreRef, VectorStoresChunksOutput, VectorStoresListOutput, VectorStoresRemoveOutput,
     VectorStoresSearchOutput, below_relevance_floor,
+};
+pub use voice::{
+    RECORDING_DEVICE_ID_MAX, RECORDING_DEVICE_NAME_MAX, RecordingDeviceDto,
+    SPEECH_MODEL_DESCRIPTION_MAX, SPEECH_MODEL_NAME_MAX, SPEECH_REASON_MAX, SpeechModelDto,
+    VOICE_TRANSCRIPT_MAX, VoiceDevicesDto, VoiceModelInput, VoiceModelsDto, VoiceSelectInput,
+    VoiceSelectModelInput, VoiceTranscriptDto,
 };

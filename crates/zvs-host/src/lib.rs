@@ -28,6 +28,7 @@ pub mod skills;
 pub mod terminal;
 pub mod toolchain;
 pub mod tools;
+pub mod voice;
 pub mod workers;
 pub mod workspace;
 

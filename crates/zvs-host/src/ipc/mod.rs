@@ -28,6 +28,7 @@ pub mod terminal;
 pub mod toolchain;
 pub mod tools;
 pub mod vector_stores;
+pub mod voice;
 pub mod workspace;
 
 pub use server::{Coverage, INTERNAL_MESSAGE, IpcServer};
@@ -63,6 +64,7 @@ pub fn register(server: &mut IpcServer) {
     artifacts::register(server);
     browser_grants::register(server);
     storage::register(server);
+    voice::register(server);
 }
 
 #[cfg(test)]
@@ -314,6 +316,14 @@ mod tests {
                 "vectorStores.sources.pick",
                 "vectorStores.sources.remove",
                 "vectorStores.update",
+                "voice.cancelRecording",
+                "voice.devices",
+                "voice.installModel",
+                "voice.models",
+                "voice.select",
+                "voice.selectModel",
+                "voice.startRecording",
+                "voice.stopRecording",
                 "workers.list",
                 "workers.restart",
                 "workspace.list",

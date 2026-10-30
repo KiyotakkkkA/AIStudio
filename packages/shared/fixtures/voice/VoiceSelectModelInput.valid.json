@@ -1,0 +1,14 @@
+[
+  {
+    "name": "a model",
+    "value": {
+      "modelRef": "curated:speech:whisper-small-q8_0"
+    }
+  },
+  {
+    "name": "none",
+    "value": {
+      "modelRef": null
+    }
+  }
+]

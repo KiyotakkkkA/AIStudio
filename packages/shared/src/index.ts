@@ -24,6 +24,7 @@ export * from "./artifacts.js";
 export * from "./sites.js";
 export * from "./execPolicy.js";
 export * from "./cli.js";
+export * from "./voice.js";
 export * from "./process.js";
 export * from "./questions.js";
 export * from "./folders.js";

@@ -70,6 +70,14 @@ import { OpenSiteInput, SiteIconDto, SiteIconInput } from "../sites.js";
 import { AllowRuleInput, ExecPolicyDto, PolicyRuleDto } from "../execPolicy.js";
 import { CliInstallDto, CliOpenInput, CliSessionDto } from "../cli.js";
 import {
+  VoiceDevicesDto,
+  VoiceModelInput,
+  VoiceModelsDto,
+  VoiceSelectInput,
+  VoiceSelectModelInput,
+  VoiceTranscriptDto,
+} from "../voice.js";
+import {
   DocumentDto,
   DocumentHandle,
   DocumentPageDto,
@@ -549,6 +557,14 @@ export const contract = defineContract({
   "cli.status": { input: z.void(), output: CliInstallDto },
   "cli.install": { input: z.void(), output: CliInstallDto },
   "cli.uninstall": { input: z.void(), output: CliInstallDto },
+  "voice.devices": { input: z.void(), output: VoiceDevicesDto },
+  "voice.select": { input: VoiceSelectInput, output: VoiceDevicesDto },
+  "voice.models": { input: z.void(), output: VoiceModelsDto },
+  "voice.installModel": { input: VoiceModelInput, output: VoiceModelsDto },
+  "voice.selectModel": { input: VoiceSelectModelInput, output: VoiceModelsDto },
+  "voice.startRecording": { input: z.void(), output: z.void() },
+  "voice.stopRecording": { input: z.void(), output: VoiceTranscriptDto },
+  "voice.cancelRecording": { input: z.void(), output: z.void() },
   "settings.set": {
     input: z.object({ key: SettingKey, value: Json }),
     output: z.object({ key: SettingKey, value: Json, updatedAt: Timestamp }),

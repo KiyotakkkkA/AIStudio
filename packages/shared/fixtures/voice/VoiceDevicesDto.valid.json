@@ -1,0 +1,16 @@
+[
+  {
+    "name": "a chosen device",
+    "value": {
+      "devices": [
+        { "id": "{0.0.1.00000000}.{a}", "name": "Микрофон (Realtek(R) Audio)", "isDefault": true },
+        { "id": "{0.0.1.00000000}.{b}", "name": "USB Microphone", "isDefault": false }
+      ],
+      "selectedId": "{0.0.1.00000000}.{b}"
+    }
+  },
+  {
+    "name": "system default with no devices",
+    "value": { "devices": [], "selectedId": null }
+  }
+]

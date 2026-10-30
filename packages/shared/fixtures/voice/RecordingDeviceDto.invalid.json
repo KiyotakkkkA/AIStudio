@@ -1,0 +1,10 @@
+[
+  {
+    "name": "empty id",
+    "value": { "id": "", "name": "Микрофон", "isDefault": false }
+  },
+  {
+    "name": "empty name",
+    "value": { "id": "{0.0.1.00000000}.{a}", "name": "", "isDefault": false }
+  }
+]

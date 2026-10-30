@@ -1,0 +1,24 @@
+[
+  {
+    "name": "empty name",
+    "value": {
+      "ref": "curated:speech:whisper-small-q8_0",
+      "displayName": "",
+      "description": "Сбалансированная модель.",
+      "sizeBytes": 264464607,
+      "state": "installed",
+      "recommended": true
+    }
+  },
+  {
+    "name": "short ref",
+    "value": {
+      "ref": "ab",
+      "displayName": "Whisper Small",
+      "description": "Сбалансированная модель.",
+      "sizeBytes": 264464607,
+      "state": "installed",
+      "recommended": true
+    }
+  }
+]

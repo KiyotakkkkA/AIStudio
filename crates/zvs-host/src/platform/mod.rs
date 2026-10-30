@@ -1,4 +1,5 @@
 pub mod archive;
+pub mod audio;
 pub mod clock;
 pub mod device;
 pub mod disk;

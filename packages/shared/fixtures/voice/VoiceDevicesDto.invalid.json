@@ -1,0 +1,16 @@
+[
+  {
+    "name": "two defaults",
+    "value": {
+      "devices": [
+        { "id": "{0.0.1.00000000}.{a}", "name": "A", "isDefault": true },
+        { "id": "{0.0.1.00000000}.{b}", "name": "B", "isDefault": true }
+      ],
+      "selectedId": null
+    }
+  },
+  {
+    "name": "empty selection",
+    "value": { "devices": [], "selectedId": "" }
+  }
+]

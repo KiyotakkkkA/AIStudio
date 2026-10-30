@@ -1,4 +1,5 @@
 pub mod assoc;
+pub mod audio;
 pub mod browsers;
 pub mod cli_path;
 pub mod dpapi;

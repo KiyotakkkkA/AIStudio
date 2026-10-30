@@ -6,7 +6,7 @@ import useConfirmedClick, { type ConfirmProps } from "./useConfirmedClick";
 
 export type TooltipPlacement = NonNullable<ComponentProps<typeof Tooltip>["placement"]>;
 
-export type IconButtonTone = "ghost" | "danger";
+export type IconButtonTone = "ghost" | "primary" | "danger";
 
 export type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "title"> &
   ConfirmProps & {
@@ -21,6 +21,8 @@ export type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "chi
 
 const TONES: Record<IconButtonTone, string> = {
   ghost: "text-main-400 hover:bg-main-700 hover:text-main-50",
+  primary:
+    "zvs-press border border-transparent bg-accent-dark text-on-accent shadow-[0_1px_2px_rgb(40_25_10/0.12)] hover:bg-accent-medium",
   danger: "zvs-press border border-transparent bg-danger-medium text-white hover:bg-danger-dark",
 };
 
