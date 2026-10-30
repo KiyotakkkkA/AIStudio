@@ -7,7 +7,7 @@ import { STORAGE_CLEAR_CACHE, STORAGE_CLEAR_ID } from "./storageCopy";
 import { VOICE_DEVICE_ROW, VOICE_MODEL_ROW } from "../voice/voiceCopy";
 import {
   APP_ROW_LABELS,
-  DEVICE_ROW_LABELS,
+  CLI_ROW_LABELS,
   FONT_FAMILY_LABEL,
   FONT_SIZE_LABEL,
   FX_EFFECTS_LABEL,
@@ -96,7 +96,7 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: CLI_SETTING_ID, section: "cli", label: CLI_TITLE },
   { id: VOICE_DEVICE_ROW.key, section: "voice", label: VOICE_DEVICE_ROW.label },
   { id: VOICE_MODEL_ROW.key, section: "voice", label: VOICE_MODEL_ROW.label },
-  ...[...Object.values(APP_ROW_LABELS), ...Object.values(DEVICE_ROW_LABELS)].map((label) => ({
+  ...[...Object.values(APP_ROW_LABELS), ...Object.values(CLI_ROW_LABELS)].map((label) => ({
     id: aboutSettingId(label),
     section: "about" as const,
     label,

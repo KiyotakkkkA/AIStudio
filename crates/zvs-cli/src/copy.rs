@@ -9,6 +9,11 @@ pub const PROTOCOL_MISMATCH: &str =
     "Версия консольного клиента не совпадает с приложением. Обновите ZVS AI Studio.";
 pub const DISCONNECTED: &str = "Соединение с приложением потеряно";
 pub const NO_TERMINAL: &str = "Консольная версия работает только в интерактивном терминале";
+pub const USAGE_COMMANDS: &str = "Использование";
+pub const USAGE_UNKNOWN: &str = "Неизвестный аргумент";
+pub const USAGE_RESUME_MISSING: &str = "После --resume укажите идентификатор диалога";
+pub const USAGE_RESUME_INVALID: &str = "Недопустимый идентификатор диалога";
+pub const RESUME_HINT: &str = "Продолжить этот диалог";
 
 pub const ACCESS_TITLE: &str = "Доступ к папке";
 pub const ACCESS_BODY: &str =
@@ -114,6 +119,18 @@ pub const CMD_SKILLS: &str = "Навыки";
 pub const CMD_MCP: &str = "MCP-серверы";
 pub const CMD_PERMISSIONS: &str = "Режим выполнения и модель-арбитр";
 pub const CMD_SHORTCUTS: &str = "Сочетания клавиш и их переназначение";
+pub const CMD_EFFORT: &str = "Сила размышления модели";
+
+pub const EFFORT_TITLE: &str = "Размышление";
+pub const EFFORT_FAST: &str = "Быстрый";
+pub const EFFORT_AUTO: &str = "Авто";
+pub const EFFORT_THINKING: &str = "Глубокое";
+pub const EFFORT_HINT_FAST: &str = "Отвечает без этапа размышления.";
+pub const EFFORT_HINT_AUTO: &str = "Модель сама решает, нужно ли размышление.";
+pub const EFFORT_HINT_THINKING: &str = "Всегда размышляет перед ответом.";
+pub const EFFORT_SET: &str = "Режим размышления изменён";
+pub const EFFORT_CURRENT: &str = "текущий";
+pub const EFFORT_UNSUPPORTED: &str = "Модель не поддерживает регулирование размышления";
 
 pub const KEYS_TITLE: &str = "Клавиши";
 pub const KEYS: &[(&str, &str)] = &[

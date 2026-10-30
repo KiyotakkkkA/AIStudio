@@ -1,5 +1,4 @@
-import type { DeviceProfileDto } from "@zvs/shared";
-import { APP_CHANNEL, APP_VERSION } from "../../app/appEnv";
+import { APP_CHANNEL, APP_VERSION, CLI_CHANNEL, CLI_VERSION } from "../../app/appEnv";
 import type { PaletteMode } from "../../app/palettes";
 import {
   DEFAULT_FONT_SIZE,
@@ -11,13 +10,14 @@ import {
   type PreferenceSection,
   type ThemeMode,
 } from "../../stores/UiStore";
-import { formatBytes } from "../downloads/downloadPresentation";
 import { VOICE_INPUT } from "../voice/voiceCopy";
 import type { AppSettingKey } from "./AppSettingsStore";
 
 export const APP_NAME = "ZVS AI Studio";
 export const APP_VERSION_LABEL = `${APP_CHANNEL} v${APP_VERSION}`;
 export const APP_EDITION = "Локальная установка";
+
+export const CLI_VERSION_LABEL = `${CLI_CHANNEL} v${CLI_VERSION}`;
 
 export const PREFERENCES_TITLE = "Параметры";
 export const SEARCH_LABEL = "Поиск параметров";
@@ -59,7 +59,7 @@ export const SECTION_HINTS: Record<PreferenceSection, string> = {
   notifications: "Системные уведомления о событиях приложения.",
   memory: "Факты о пользователе и диалогах, которые модель получает в каждом ходе.",
   data: "Место на диске, занятое данными приложения, и очистка кэша.",
-  about: "Версия приложения и характеристики компьютера.",
+  about: "Версия приложения и сведения о консольной версии.",
   components: "Среды выполнения, которые нужны MCP-серверам.",
   cli: "Настройка утилиты командной строки.",
   voice: "Настройка распознавания голоса и управление голосовым вводом.",
@@ -190,12 +190,6 @@ export const FONT_SIZE_OPTIONS = FONT_SIZES.map((size) => ({
   label: String(size),
 }));
 
-const PLATFORMS: Record<string, string> = {
-  win32: "Windows",
-  darwin: "macOS",
-  linux: "Linux",
-};
-
 export interface InfoRow {
   readonly label: string;
   readonly value: string;
@@ -207,50 +201,18 @@ export const APP_ROW_LABELS = {
   edition: "Сборка",
 } as const;
 
-export const DEVICE_ROW_LABELS = {
-  os: "Операционная система",
-  cpu: "Процессор",
-  memory: "Оперативная память",
-  gpu: "Видеокарта",
-  disk: "Свободно на диске",
-} as const;
-
 export function appRows(): InfoRow[] {
   return [
-    { label: APP_ROW_LABELS.name, value: APP_NAME },
     { label: APP_ROW_LABELS.version, value: APP_VERSION_LABEL },
-    { label: APP_ROW_LABELS.edition, value: APP_EDITION },
   ];
 }
 
-export function deviceRows(device: DeviceProfileDto): InfoRow[] {
-  const gpu =
-    device.gpu === null
-      ? "Не обнаружена"
-      : [
-          device.gpu.model,
-          ...(device.gpu.vramBytes === null ? [] : [formatBytes(device.gpu.vramBytes)]),
-        ].join(" · ");
+export const CLI_ROW_LABELS = {
+  version: "Версия",
+} as const;
+
+export function cliRows(): InfoRow[] {
   return [
-    {
-      label: DEVICE_ROW_LABELS.os,
-      value: `${PLATFORMS[device.platform] ?? device.platform} · ${device.arch}`,
-    },
-    {
-      label: DEVICE_ROW_LABELS.cpu,
-      value: `${device.cpuModel} · ядер: ${device.cpuCores.toLocaleString("ru-RU")}`,
-    },
-    {
-      label: DEVICE_ROW_LABELS.memory,
-      value: `${formatBytes(device.totalMemoryBytes)} · свободно ${formatBytes(device.freeMemoryBytes)}`,
-    },
-    { label: DEVICE_ROW_LABELS.gpu, value: gpu },
-    {
-      label: DEVICE_ROW_LABELS.disk,
-      value: device.freeDiskBytes === 0 ? "Не измерено" : formatBytes(device.freeDiskBytes),
-    },
+    { label: CLI_ROW_LABELS.version, value: CLI_VERSION_LABEL },
   ];
 }
-
-export const DEVICE_LOADING = "Получение сведений о компьютере…";
-export const DEVICE_UNAVAILABLE = "Не удалось получить сведения о компьютере.";

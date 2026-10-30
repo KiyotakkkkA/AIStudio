@@ -1,3 +1,4 @@
+pub mod args;
 pub mod copy;
 pub mod format;
 pub mod keymap_file;
@@ -7,3 +8,4 @@ pub mod runtime;
 pub mod shell;
 pub mod state;
 pub mod ui;
+pub mod version;

@@ -55,7 +55,6 @@ import {
   APP_NAME,
   APP_VERSION_LABEL,
   CLOSE_PREFERENCES,
-  DEVICE_LOADING,
   FONT_FAMILY_HINT,
   FONT_FAMILY_LABEL,
   FONT_FAMILY_OPTIONS,
@@ -86,7 +85,7 @@ import {
   TOGGLE_OFF,
   TOGGLE_ON,
   appRows,
-  deviceRows,
+  cliRows,
   fontSizeLabel,
   type InfoRow,
   type ToggleRowCopy,
@@ -896,10 +895,6 @@ const DataSection = observer(function DataSection() {
 });
 
 const AboutSection = observer(function AboutSection() {
-  const { about } = useStore();
-  useEffect(() => {
-    void about.load();
-  }, [about]);
   return (
     <div className="flex flex-col gap-6 pt-2">
       <div className="flex items-center gap-3.5 rounded-card bg-main-850 px-4 py-3.5">
@@ -921,17 +916,9 @@ const AboutSection = observer(function AboutSection() {
       </section>
       <section className="flex flex-col gap-3">
         <h3 className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-          Компьютер
+          {SECTION_LABELS.cli}
         </h3>
-        {about.device !== null ? (
-          <InfoTableRows rows={deviceRows(about.device)} />
-        ) : about.error !== null ? (
-          <p role="alert" className="m-0 text-[12px] text-err">
-            {about.error}
-          </p>
-        ) : (
-          <p className="m-0 text-[12px] text-main-500">{DEVICE_LOADING}</p>
-        )}
+        <InfoTableRows rows={cliRows()} />
       </section>
     </div>
   );

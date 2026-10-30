@@ -66,6 +66,7 @@ fn welcome(frame: &mut Frame<'_>, area: Rect, app: &App) {
     lines.push(Line::from(vec![
         Span::styled(copy::TITLE, theme::strong()),
         Span::styled(format!("  ·  {}", copy::SUBTITLE), theme::muted()),
+        Span::styled(format!("  ·  {}", crate::version::label()), theme::faint()),
     ]));
     lines.push(Line::default());
     let card = [
@@ -271,6 +272,11 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
         Span::styled(mode_label(app.mode), Style::new().fg(mode_color)),
         Span::styled("  ·  ", theme::faint()),
         Span::styled(model_line(app), theme::muted()),
+        Span::styled("  ·  ", theme::faint()),
+        Span::styled(
+            crate::state::overlay::effort_label(app.effort),
+            theme::muted(),
+        ),
     ];
     let used: usize = left.iter().map(|span| span.content.width()).sum();
     let room = usize::from(top.width).saturating_sub(used + 2);

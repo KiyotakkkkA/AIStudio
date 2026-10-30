@@ -285,7 +285,12 @@ impl TextGenerationDriver for OpenaiAdapter {
                 display_name: model.display_name,
                 context_window: model.context_window,
                 family: Some("openai".to_owned()),
-                capabilities: vec![ModelCapability::Streaming, ModelCapability::Tools],
+                capabilities: vec![
+                    ModelCapability::Streaming,
+                    ModelCapability::Tools,
+                    ModelCapability::Reasoning,
+                    ModelCapability::AdaptiveReasoning,
+                ],
                 ..DiscoveredModel::named(model.slug)
             })
             .collect())

@@ -52,7 +52,7 @@ pub const BROWSER_TOOLS: [&str; 8] = [
 
 pub const TOOL_SEARCH: &str = "tool.search";
 pub const TOOL_SEARCH_NAME: &str = "tool_search";
-pub const TOOL_SEARCH_DESCRIPTION: &str = "Загрузить параметры отложенных инструментов из списка в системной подсказке. names — точные имена инструментов, query — слова для поиска по имени и описанию. Загруженные инструменты можно вызывать со следующего шага, и они остаются доступны до конца диалога.";
+pub const TOOL_SEARCH_DESCRIPTION: &str = "Load parameter schemas of deferred tools listed in the system prompt. names — exact tool names; query — words matched against tool names and descriptions. Loaded tools can be called from the next step and stay available for the rest of the conversation.";
 pub const TOOL_SEARCH_MATCHES: usize = 5;
 pub const DEFERRED_TOKENS_MAX: i64 = 2000;
 pub const DEFERRED_LINE_CHARS: usize = 160;

@@ -43,8 +43,8 @@ pub const CODE_RUN: &str = "code.run";
 pub const SHELL_RUN: &str = "shell.run";
 pub const PROCESS_TOOLS: [&str; 2] = [CODE_RUN, SHELL_RUN];
 
-pub const CODE_DESCRIPTION: &str = "Запуск короткой программы, написанной моделью. language: python — выполняется через uv run; зависимости объявляются в начале source заголовком PEP 723 (# /// script, dependencies = [\"…\"], # ///), uv устанавливает их в собственный кэш приложения, глобальная установка не выполняется. javascript — выполняется через Node.js как ES-модуль (import, не require); пакеты из packages устанавливаются во временную папку через npm install с отключёнными скриптами установки. powershell — выполняется через powershell.exe без профиля. Рабочая папка процесса — временная папка запуска; рабочая папка диалога, если она выбрана, передаётся в переменной окружения ZVS_WORKSPACE_DIR. Разрешения на папки этот инструмент не ограничивают: процесс работает с правами пользователя, и пользователь подтверждает каждый запуск по полному тексту программы. Время выполнения ограничено, интерактивный ввод не поддерживается. Возвращает код завершения, stdout и stderr.";
-pub const SHELL_DESCRIPTION: &str = "Запуск программы проекта, например npm test или cargo check, или скрипта навыка. argv — массив: argv[0] — программа, остальные элементы — аргументы. Строка командной оболочки не разбирается, поэтому конвейеры, перенаправления и подстановки недоступны. Программа ищется сначала в папках подключённых сред, затем в PATH. Скрипт навыка указывается как argv[0] = skill:<ключ>/scripts/<файл>: .py выполняется через uv, .js, .mjs и .cjs — через Node.js, папка навыка передаётся в ZVS_SKILL_DIR. Рабочая папка процесса — cwd (путь или chat:); без cwd — рабочая папка диалога, а для скрипта навыка — chat:. Доступ к cwd вне выданных разрешений подтверждает пользователь, но сам процесс работает с правами пользователя. Пользователь подтверждает каждый запуск по полной команде. Время выполнения ограничено; серверы, фоновые и интерактивные процессы не поддерживаются, стандартный ввод передаётся только из stdin. Возвращает код завершения, stdout и stderr.";
+pub const CODE_DESCRIPTION: &str = "Runs a short program written by the model. language: python — executed via uv run; dependencies are declared at the top of source as a PEP 723 header (# /// script, dependencies = [\"…\"], # ///); uv installs them into the app's own cache, nothing is installed globally. javascript — executed via Node.js as an ES module (import, not require); packages from packages are installed into a temporary folder via npm install with install scripts disabled. powershell — executed via powershell.exe without a profile. The process working directory is a temporary run folder; the conversation working folder, when set, is passed as the ZVS_WORKSPACE_DIR environment variable. Folder permissions do not sandbox this tool: the process runs with the user's rights, and the user confirms every run from the full program text. Execution time is limited; interactive input is not supported. Returns exit code, stdout, and stderr.";
+pub const SHELL_DESCRIPTION: &str = "Runs a project program, e.g. npm test or cargo check, or a skill script. argv is an array: argv[0] is the program, the rest are arguments. No shell command line is parsed, so pipes, redirections, and substitutions are unavailable. The program is looked up first in the folders of connected environments, then in PATH. A skill script is referenced as argv[0] = skill:<key>/scripts/<file>: .py runs via uv; .js, .mjs, and .cjs run via Node.js; the skill folder is passed as ZVS_SKILL_DIR. The process working directory is cwd (a path or chat:); without cwd it is the conversation working folder, or chat: for a skill script. Access to a cwd outside granted permissions is confirmed by the user, but the process itself runs with the user's rights. The user confirms every run from the full command. Execution time is limited; servers, background, and interactive processes are not supported; standard input comes only from stdin. Returns exit code, stdout, and stderr.";
 
 pub const CODE_ACTION: &str = "запуск кода";
 pub const SHELL_ACTION: &str = "запуск команды";
@@ -270,17 +270,17 @@ impl Tools {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CodeRunInput {
-    #[schemars(description = "Язык программы: python, javascript или powershell")]
+    #[schemars(description = "Program language: python, javascript, or powershell")]
     pub language: CodeLanguage,
     #[schemars(
         description = "Полный текст программы; для python зависимости указываются в заголовке PEP 723"
     )]
     pub source: String,
     #[serde(default)]
-    #[schemars(description = "Аргументы командной строки программы")]
+    #[schemars(description = "Command-line arguments of the program")]
     pub args: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schemars(description = "Текст, передаваемый программе на стандартный ввод")]
+    #[schemars(description = "Text passed to the program on standard input")]
     pub stdin: Option<String>,
     #[serde(default)]
     #[schemars(
@@ -526,7 +526,7 @@ pub struct ShellRunInput {
     )]
     pub cwd: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schemars(description = "Текст, передаваемый процессу на стандартный ввод")]
+    #[schemars(description = "Text passed to the process on standard input")]
     pub stdin: Option<String>,
     #[serde(default)]
     #[schemars(skip)]

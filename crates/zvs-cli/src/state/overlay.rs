@@ -1,7 +1,7 @@
 use zvs_contract::{
     ChatContextDto, ConversationDto, ConversationId, ExecJudgeDto, ExecMode, ExecPolicyDto,
-    McpServerDto, McpServerId, McpServerStatus, ProviderDto, SkillDto, SkillId, SkillSource,
-    SkillStatus,
+    McpServerDto, McpServerId, McpServerStatus, ModelCapability, ProviderDto, SkillDto, SkillId,
+    SkillSource, SkillStatus, ThinkingEffort,
 };
 
 use super::ModelChoice;
@@ -13,6 +13,7 @@ use crate::format;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Panel {
     Models,
+    Effort,
     Resume,
     Context,
     Skills,
@@ -34,6 +35,7 @@ pub enum Tone {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
     SelectModel(ModelChoice),
+    SetEffort(ThinkingEffort),
     Resume(ConversationId),
     ToggleSkill { id: SkillId, enabled: bool },
     ToggleServer { id: McpServerId, start: bool },
@@ -131,6 +133,7 @@ pub struct View<'a> {
     pub folder: &'a str,
     pub policy: Option<&'a ExecPolicyDto>,
     pub mode: ExecMode,
+    pub effort: ThinkingEffort,
     pub keymap: &'a Keymap,
 }
 
@@ -234,6 +237,70 @@ fn model_rows(view: &View<'_>, tab: usize) -> Vec<Row> {
         }
     }
     rows
+}
+
+pub const EFFORT_STEPS: [ThinkingEffort; 3] = [
+    ThinkingEffort::Fast,
+    ThinkingEffort::Auto,
+    ThinkingEffort::Thinking,
+];
+pub const EFFORT_FIXED_STEPS: [ThinkingEffort; 2] =
+    [ThinkingEffort::Fast, ThinkingEffort::Thinking];
+
+pub const fn effort_label(effort: ThinkingEffort) -> &'static str {
+    match effort {
+        ThinkingEffort::Fast => copy::EFFORT_FAST,
+        ThinkingEffort::Auto => copy::EFFORT_AUTO,
+        ThinkingEffort::Thinking => copy::EFFORT_THINKING,
+    }
+}
+
+const fn effort_hint(effort: ThinkingEffort) -> &'static str {
+    match effort {
+        ThinkingEffort::Fast => copy::EFFORT_HINT_FAST,
+        ThinkingEffort::Auto => copy::EFFORT_HINT_AUTO,
+        ThinkingEffort::Thinking => copy::EFFORT_HINT_THINKING,
+    }
+}
+
+fn effort_steps(view: &View<'_>) -> Option<&'static [ThinkingEffort]> {
+    let model = view.model?;
+    let capabilities = &view
+        .providers
+        .iter()
+        .find(|provider| provider.summary.id == model.provider)?
+        .models
+        .iter()
+        .find(|known| known.external_id == model.model)?
+        .capabilities;
+    if capabilities.contains(&ModelCapability::AdaptiveReasoning) {
+        Some(&EFFORT_STEPS)
+    } else if capabilities.contains(&ModelCapability::Reasoning) {
+        Some(&EFFORT_FIXED_STEPS)
+    } else {
+        None
+    }
+}
+
+fn effort_rows(view: &View<'_>) -> Vec<Row> {
+    if view.model.is_none() {
+        return vec![Row::new("none", "◐", copy::CONTEXT_NEEDS_MODEL).tone(Tone::Faint)];
+    }
+    let Some(steps) = effort_steps(view) else {
+        return vec![Row::new("unsupported", "◐", copy::EFFORT_UNSUPPORTED).tone(Tone::Faint)];
+    };
+    steps
+        .iter()
+        .map(|effort| {
+            let current = *effort == view.effort;
+            Row::new(effort.as_str(), "◐", effort_label(*effort))
+                .meta(if current { copy::EFFORT_CURRENT } else { "" })
+                .tone(if current { Tone::Accent } else { Tone::Plain })
+                .current(current)
+                .detail([effort_hint(*effort).to_owned()])
+                .action(Action::SetEffort(*effort))
+        })
+        .collect()
 }
 
 fn resume_rows(overlay: &Overlay, view: &View<'_>) -> Vec<Row> {
@@ -530,7 +597,7 @@ impl Overlay {
             tab: 0,
             selected: 0,
             expanded: Vec::new(),
-            loading: !matches!(panel, Panel::Models | Panel::Shortcuts),
+            loading: !matches!(panel, Panel::Models | Panel::Effort | Panel::Shortcuts),
             armed: false,
             capturing: None,
             conversations: Vec::new(),
@@ -543,6 +610,7 @@ impl Overlay {
     pub const fn title(&self) -> &'static str {
         match self.panel {
             Panel::Models => copy::MODELS_TITLE,
+            Panel::Effort => copy::EFFORT_TITLE,
             Panel::Resume => copy::RESUME_TITLE,
             Panel::Context => copy::CONTEXT_TITLE,
             Panel::Skills => copy::SKILLS_TITLE,
@@ -555,6 +623,7 @@ impl Overlay {
     pub const fn icon(&self) -> &'static str {
         match self.panel {
             Panel::Models => "◆",
+            Panel::Effort => "◐",
             Panel::Resume => "↺",
             Panel::Context => "▤",
             Panel::Skills => "✦",
@@ -579,13 +648,14 @@ impl Overlay {
             Panel::Skills => fixed(&[copy::TAB_ALL, copy::TAB_ENABLED, copy::TAB_DISABLED]),
             Panel::Mcp => fixed(&[copy::TAB_ALL, copy::TAB_CONNECTED, copy::TAB_STOPPED]),
             Panel::Permissions => fixed(&[copy::TAB_MODE, copy::TAB_JUDGE]),
-            Panel::Shortcuts => Vec::new(),
+            Panel::Effort | Panel::Shortcuts => Vec::new(),
         }
     }
 
     pub fn rows(&self, view: &View<'_>) -> Vec<Row> {
         let rows = match self.panel {
             Panel::Models => model_rows(view, self.tab),
+            Panel::Effort => effort_rows(view),
             Panel::Resume => resume_rows(self, view),
             Panel::Context => context_rows(self),
             Panel::Skills => skill_rows(self),
@@ -684,6 +754,7 @@ mod tests {
             folder: r"D:\work",
             policy: None,
             mode: ExecMode::SafetyAsk,
+            effort: ThinkingEffort::Auto,
             keymap: &KEYMAP,
         }
     }

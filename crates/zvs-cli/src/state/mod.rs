@@ -13,7 +13,7 @@ use zvs_contract::{
     ConversationDetailDto, ConversationDto, ConversationId, ExecMode, ExecPolicyDto,
     FolderAccessAnswer, FolderGrantScope, HostEvent, HostEventDraft, McpServerDto, McpServerId,
     McpServerStatus, PolicyRuleDto, ProviderDto, ProviderId, RunHandleDto, RunId, RunOutcomeStatus,
-    SkillDto, SkillId, WorkingFolderAccess,
+    SkillDto, SkillId, ThinkingEffort, WorkingFolderAccess,
 };
 
 use self::input::Input;
@@ -197,6 +197,8 @@ pub struct App {
     pub conversation: Option<ConversationDto>,
     pub providers: Vec<ProviderDto>,
     pub model: Option<ModelChoice>,
+    pub effort: ThinkingEffort,
+    pub resume: Option<ConversationId>,
     pub mode: ExecMode,
     pub policy: Option<ExecPolicyDto>,
     pub overlay: Option<Overlay>,
@@ -251,6 +253,8 @@ impl App {
             conversation: None,
             providers: Vec::new(),
             model: None,
+            effort: ThinkingEffort::Auto,
+            resume: None,
             mode: ExecMode::AlwaysAsk,
             policy: None,
             overlay: None,
@@ -431,10 +435,10 @@ impl App {
                         self.folder = session.folder;
                         if session.access == WorkingFolderAccess::Granted {
                             self.phase = Phase::Chat;
-                        } else {
-                            self.phase = Phase::Access;
-                            self.prompts.push_back(Prompt::access(&self.folder));
+                            return self.pending_resume();
                         }
+                        self.phase = Phase::Access;
+                        self.prompts.push_back(Prompt::access(&self.folder));
                     }
                     Err(error) => self.quit(Some(&error.message)),
                 }
@@ -594,7 +598,11 @@ impl App {
                     requests
                 }
                 Err(error) => {
-                    self.panel_failed(&error);
+                    if self.overlay.is_none() {
+                        self.quit(Some(&error.message.clone()));
+                    } else {
+                        self.panel_failed(&error);
+                    }
                     Vec::new()
                 }
             },
@@ -678,6 +686,13 @@ impl App {
         }
     }
 
+    fn pending_resume(&mut self) -> Vec<Request> {
+        self.resume
+            .take()
+            .map(|id| vec![Request::Load(id)])
+            .unwrap_or_default()
+    }
+
     fn abandon(&mut self, error: &AppError) -> Vec<Request> {
         self.awaiting = false;
         self.pending = None;
@@ -732,6 +747,7 @@ impl App {
         self.awaiting = true;
         self.transcript.start();
         let mut input = ChatSendInput::new(id, text);
+        input.vendor.effort = Some(self.effort);
         if let Some(model) = &self.model {
             input.provider_id = Some(model.provider);
             input.model_id = Some(model.model.clone());
@@ -790,6 +806,7 @@ impl App {
             }
             Command::Resume => return self.open_panel(Panel::Resume),
             Command::Models => return self.open_panel(Panel::Models),
+            Command::Effort => return self.open_panel(Panel::Effort),
             Command::Context => return self.open_panel(Panel::Context),
             Command::Skills => return self.open_panel(Panel::Skills),
             Command::Mcp => return self.open_panel(Panel::Mcp),
@@ -806,6 +823,7 @@ impl App {
             folder: &self.folder,
             policy: self.policy.as_ref(),
             mode: self.mode,
+            effort: self.effort,
             keymap: &self.keymap,
         }
     }
@@ -864,7 +882,7 @@ impl App {
             return Vec::new();
         }
         let requests = match panel {
-            Panel::Models | Panel::Shortcuts => Vec::new(),
+            Panel::Models | Panel::Effort | Panel::Shortcuts => Vec::new(),
             Panel::Resume => vec![Request::Conversations],
             Panel::Skills => vec![Request::Skills],
             Panel::Mcp => vec![Request::Servers],
@@ -903,6 +921,15 @@ impl App {
                     ),
                 ));
                 self.model = Some(choice);
+                self.overlay = None;
+                Vec::new()
+            }
+            Action::SetEffort(effort) => {
+                self.effort = effort;
+                self.status = Some((
+                    Tone::Success,
+                    format!("{}: {}", copy::EFFORT_SET, overlay::effort_label(effort)),
+                ));
                 self.overlay = None;
                 Vec::new()
             }
@@ -1361,10 +1388,13 @@ impl App {
                 match choice {
                     Choice::AccessConversation => self.grant = Some(FolderGrantScope::Conversation),
                     Choice::AccessAlways => self.grant = Some(FolderGrantScope::Always),
-                    _ => self.quit(Some(copy::ACCESS_DENIED)),
+                    _ => {
+                        self.quit(Some(copy::ACCESS_DENIED));
+                        return Vec::new();
+                    }
                 }
                 self.phase = Phase::Chat;
-                Vec::new()
+                self.pending_resume()
             }
             PromptKind::Approval {
                 run, id, detail, ..

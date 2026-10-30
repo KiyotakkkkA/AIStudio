@@ -63,13 +63,14 @@ fn conversation_app() -> App {
 }
 
 #[test]
-fn the_welcome_screen_shows_the_art_folder_and_model() {
+fn the_welcome_screen_shows_the_art_folder_model_and_version() {
     let screen = render(&ready(WorkingFolderAccess::Granted), 100, 30);
     println!("{screen}");
     assert!(screen.contains("█████"));
     assert!(screen.contains(r"D:\work\project"));
     assert!(screen.contains("OpenRouter / GPT-4o mini"));
     assert!(screen.contains(copy::MODE_ALWAYS_ASK));
+    assert!(screen.contains(&crate::version::label()));
 }
 
 #[test]

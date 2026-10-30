@@ -33,8 +33,8 @@ pub const SKILL_GENERATE: &str = "skill.generate";
 pub const SKILL_SAVE: &str = "skill.save";
 pub const SKILL_TOOLS: [&str; 5] = [SKILL_LOAD, FS_READ, FS_LIST, FS_APPLY, SHELL_RUN];
 
-pub const LOAD_DESCRIPTION: &str = "Загрузка навыка по идентификатору из списка навыков в системном сообщении. Возвращает инструкции навыка, его папку skill:<ключ>/, перечень файлов с назначением каждого и содержимое файлов, обязательных для чтения; остальные файлы читаются через fs.read, скрипты из scripts/ запускаются через shell.run. При выполнении запроса следуйте инструкциям навыка. Вызывайте только для навыка, который соответствует запросу.";
-pub const SAVE_DESCRIPTION: &str = "Сохранение навыка в библиотеку навыков пользователя: идентификатор, название, описание, по которому навык выбирается, инструкции в Markdown и текстовые файлы в папках references/, scripts/ и assets/. Навык с тем же идентификатором перезаписывается только при replace: true, встроенные навыки не перезаписываются. Каждый вызов подтверждает пользователь. Возвращает состояние навыка и найденные ошибки.";
+pub const LOAD_DESCRIPTION: &str = "Loads a skill by identifier from the skill list in the system message. Returns the skill instructions, its skill:<key>/ folder, the file list with each file's purpose, and the contents of the files that must be read; other files are read via fs.read, scripts from scripts/ are run via shell.run. Follow the skill instructions while fulfilling the request. Call only for a skill that matches the request.";
+pub const SAVE_DESCRIPTION: &str = "Saves a skill into the user's skill library: identifier, name, description used for skill selection, Markdown instructions, and text files under references/, scripts/, and assets/. A skill with the same identifier is overwritten only with replace: true; built-in skills cannot be overwritten. Every call is confirmed by the user. Returns the skill state and any errors found.";
 
 pub const NO_PROVIDERS: &str = "Сервис провайдеров недоступен";
 pub const NOT_OFFERED: &str = "Модель вызвала инструмент, который не был ей предложен";
@@ -48,7 +48,7 @@ pub const TOOL_REPORTED_ERROR: &str = "Инструмент вернул оши�
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillLoadInput {
-    #[schemars(description = "Идентификатор навыка из списка навыков, например release-notes")]
+    #[schemars(description = "Skill identifier from the skill list, e.g. release-notes")]
     pub key: String,
 }
 
@@ -93,9 +93,9 @@ impl Validate for SkillLoadOutput {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillSaveFile {
-    #[schemars(description = "Путь внутри навыка: references/…, scripts/… или assets/…")]
+    #[schemars(description = "Path inside the skill: references/…, scripts/…, or assets/…")]
     pub path: String,
-    #[schemars(description = "Текстовое содержимое файла")]
+    #[schemars(description = "Text content of the file")]
     pub content: String,
 }
 
@@ -106,19 +106,19 @@ pub struct SkillSaveInput {
         description = "Идентификатор: строчные латинские буквы, цифры и дефисы, например release-notes"
     )]
     pub key: String,
-    #[schemars(description = "Название навыка, которое видит пользователь")]
+    #[schemars(description = "Skill name shown to the user")]
     pub name: String,
     #[schemars(
         description = "Что делает навык и в каких запросах он нужен; по этому тексту навык выбирается"
     )]
     pub description: String,
-    #[schemars(description = "Инструкции навыка в Markdown без блока frontmatter")]
+    #[schemars(description = "Skill instructions in Markdown, without the frontmatter block")]
     pub instructions: String,
     #[serde(default)]
-    #[schemars(description = "Файлы навыка")]
+    #[schemars(description = "Skill files")]
     pub files: Vec<SkillSaveFile>,
     #[serde(default)]
-    #[schemars(description = "Версия навыка, по умолчанию 1.0.0")]
+    #[schemars(description = "Skill version, defaults to 1.0.0")]
     pub version: Option<String>,
     #[serde(default)]
     #[schemars(

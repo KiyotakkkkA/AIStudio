@@ -33,10 +33,10 @@ pub const FS_SEARCH: &str = "fs.search";
 pub const FS_APPLY: &str = "fs.apply";
 pub const FILE_TOOLS: [&str; 4] = [FS_LIST, FS_READ, FS_SEARCH, FS_APPLY];
 
-pub const LIST_DESCRIPTION: &str = "Список файлов и папок. Путь — абсолютный, относительный от рабочей папки диалога, chat: (папка файлов диалога) или skill:<ключ>/ (папка навыка, только для чтения). Файлы из .gitignore пропускаются. recursive обходит вложенные папки, glob отбирает файлы по шаблону, например **/*.rs. Доступ к папке вне выданных разрешений подтверждает пользователь.";
-pub const READ_DESCRIPTION: &str = "Чтение до 16 текстовых файлов за вызов; для каждого можно указать диапазон строк startLine–endLine. Пути — как в fs.list, например chat:_spec.json или skill:dashboard/references/spec.md. Объём содержимого ограничен, для двоичных файлов сообщается только размер. Существующий файл вне chat: нужно прочитать в текущем ходе, прежде чем изменять его через fs.apply.";
-pub const SEARCH_DESCRIPTION: &str = "Поиск текста по файлам папки с учётом .gitignore; путь — как в fs.list. По умолчанию query ищется как обычная строка, regex: true включает регулярные выражения, ignoreCase отключает учёт регистра, glob ограничивает набор файлов. Возвращает путь, номер строки и саму строку для каждого совпадения.";
-pub const APPLY_DESCRIPTION: &str = "Набор изменений файлов за один вызов: write записывает файл целиком, edit заменяет фрагменты old на new (каждый old встречается в файле ровно один раз), move перемещает файл, delete удаляет файл. Изменения выполняются по порядку, каждое видит результат предыдущих. Пути — как в fs.list; папки skill: только для чтения. Существующий файл вне chat: перед изменением читается через fs.read в текущем ходе и не должен измениться после чтения. Пользователь подтверждает набор целиком по общему диффу; изменения только в chat: подтверждения не требуют. Набор применяется полностью или не применяется вовсе. Окончания строк и BOM сохраняются, двоичные файлы не изменяются.";
+pub const LIST_DESCRIPTION: &str = "Lists files and folders. The path is absolute, relative to the conversation working folder, chat: (the conversation files folder), or skill:<key>/ (a skill folder, read-only). Files matched by .gitignore are skipped. recursive walks nested folders; glob filters files by pattern, e.g. **/*.rs. Access to a folder outside granted permissions is confirmed by the user.";
+pub const READ_DESCRIPTION: &str = "Reads up to 16 text files per call; each may specify a startLine–endLine range. Paths work as in fs.list, e.g. chat:_spec.json or skill:dashboard/references/spec.md. Content size is limited; for binary files only the size is reported. An existing file outside chat: must be read in the current turn before it is changed via fs.apply.";
+pub const SEARCH_DESCRIPTION: &str = "Searches text across the files of a folder, honoring .gitignore; paths work as in fs.list. By default query is a plain string; regex: true enables regular expressions; ignoreCase disables case sensitivity; glob limits the file set. Returns path, line number, and the line itself for each match.";
+pub const APPLY_DESCRIPTION: &str = "A batch of file changes in one call: write writes a whole file, edit replaces fragments old with new (each old must occur in the file exactly once), move renames a file, delete removes a file. Changes run in order; each sees the result of the previous ones. Paths work as in fs.list; skill: folders are read-only. An existing file outside chat: must be read via fs.read in the current turn before changing it and must not change afterwards. The user confirms the whole batch from a combined diff; changes only inside chat: need no confirmation. The batch applies in full or not at all. Line endings and BOM are preserved; binary files are not modified.";
 
 pub const LIST_ACTION: &str = "просмотр папки";
 pub const READ_ACTION: &str = "чтение файлов";
@@ -205,17 +205,17 @@ async fn blocking<T: Send + 'static>(
 pub struct FsListInput {
     #[serde(default)]
     #[schemars(
-        description = "Папка: абсолютный путь, путь относительно рабочей папки, chat: или skill:<ключ>/; по умолчанию рабочая папка"
+        description = "Folder: absolute path, path relative to the working folder, chat: or skill:<key>/; defaults to the working folder"
     )]
     pub path: Option<String>,
     #[serde(default)]
-    #[schemars(description = "Обходить вложенные папки")]
+    #[schemars(description = "Recurse into nested folders")]
     pub recursive: bool,
     #[serde(default)]
-    #[schemars(description = "Шаблон для отбора файлов, например **/*.ts")]
+    #[schemars(description = "Glob to select files, e.g. **/*.ts")]
     pub glob: Option<String>,
     #[serde(default)]
-    #[schemars(description = "Наибольшее число записей, по умолчанию 200, не более 2000")]
+    #[schemars(description = "Maximum number of entries, 200 by default, at most 2000")]
     pub limit: Option<u64>,
     #[serde(default)]
     #[schemars(skip)]
@@ -333,21 +333,21 @@ impl NodeDef for FsListNode {
 #[serde(rename_all = "camelCase")]
 pub struct FsReadTarget {
     #[schemars(
-        description = "Файл: абсолютный путь, путь относительно рабочей папки, chat:<путь> или skill:<ключ>/<путь>"
+        description = "File: absolute path, path relative to the working folder, chat:<path> or skill:<key>/<path>"
     )]
     pub path: String,
     #[serde(default)]
-    #[schemars(description = "Первая строка, начиная с 1")]
+    #[schemars(description = "First line, starting at 1")]
     pub start_line: Option<u64>,
     #[serde(default)]
-    #[schemars(description = "Последняя строка включительно")]
+    #[schemars(description = "Last line, inclusive")]
     pub end_line: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FsReadInput {
-    #[schemars(description = "Файлы для чтения, не более 16")]
+    #[schemars(description = "Files to read, at most 16")]
     pub paths: Vec<FsReadTarget>,
     #[serde(default)]
     #[schemars(skip)]
@@ -613,22 +613,22 @@ impl NodeDef for FsReadNode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FsSearchInput {
-    #[schemars(description = "Искомая строка или регулярное выражение")]
+    #[schemars(description = "String or regular expression to search for")]
     pub query: String,
     #[serde(default)]
-    #[schemars(description = "Папка поиска; по умолчанию рабочая папка")]
+    #[schemars(description = "Folder to search; defaults to the working folder")]
     pub path: Option<String>,
     #[serde(default)]
-    #[schemars(description = "Считать query регулярным выражением")]
+    #[schemars(description = "Treat query as a regular expression")]
     pub regex: bool,
     #[serde(default)]
-    #[schemars(description = "Не учитывать регистр")]
+    #[schemars(description = "Case-insensitive matching")]
     pub ignore_case: bool,
     #[serde(default)]
-    #[schemars(description = "Шаблон для отбора файлов, например **/*.md")]
+    #[schemars(description = "Glob to select files, e.g. **/*.md")]
     pub glob: Option<String>,
     #[serde(default)]
-    #[schemars(description = "Наибольшее число совпадений, по умолчанию 100, не более 500")]
+    #[schemars(description = "Maximum number of matches, 100 by default, at most 500")]
     pub limit: Option<u64>,
     #[serde(default)]
     #[schemars(skip)]
@@ -790,7 +790,7 @@ pub struct FsEdit {
         description = "Точный фрагмент текущего содержимого файла; должен встречаться ровно один раз"
     )]
     pub old: String,
-    #[schemars(description = "Текст, которым заменяется фрагмент")]
+    #[schemars(description = "Text that replaces the fragment")]
     pub new: String,
 }
 
@@ -819,7 +819,7 @@ impl FsChange {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FsApplyInput {
-    #[schemars(description = "Изменения по порядку, от 1 до 32, не более 1 МиБ текста в сумме")]
+    #[schemars(description = "Changes in order, 1 to 32, at most 1 MiB of text in total")]
     pub changes: Vec<FsChange>,
     #[serde(default)]
     #[schemars(skip)]

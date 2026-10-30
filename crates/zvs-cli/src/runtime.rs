@@ -13,6 +13,7 @@ use zvs_contract::{
     ProviderSummaryDto,
 };
 
+use crate::args::{self, Args};
 use crate::copy;
 use crate::keymap_file;
 use crate::launch::{self, Connection};
@@ -21,6 +22,7 @@ use crate::shell::{self, ShellControl};
 use crate::state::shortcuts::Chord;
 use crate::state::{App, Exit, Key, Msg, Pointer, Request, Selection};
 use crate::ui;
+use crate::version;
 
 const TICK: Duration = Duration::from_millis(100);
 const WHEEL_STEP: isize = 3;
@@ -388,7 +390,8 @@ fn forward(
 async fn session(
     terminal: &mut ratatui::DefaultTerminal,
     folder: String,
-) -> std::io::Result<Option<Exit>> {
+    resume: Option<zvs_contract::ConversationId>,
+) -> std::io::Result<(Option<Exit>, Option<zvs_contract::ConversationId>)> {
     let (signals, mut received) = mpsc::unbounded_channel::<Signal>();
     {
         let signals = signals.clone();
@@ -423,6 +426,7 @@ async fn session(
 
     let mut app = App::new(&folder);
     app.keymap = keymap_file::load();
+    app.resume = resume;
     let mut link: Option<Link> = None;
     let shell = ShellControl::default();
     loop {
@@ -453,14 +457,30 @@ async fn session(
                 &signals,
             );
             if app.exit.is_some() {
-                return Ok(app.exit.take());
+                let conversation = app.conversation.as_ref().map(|known| known.id);
+                return Ok((app.exit.take(), conversation));
             }
         }
     }
-    Ok(None)
+    Ok((None, app.conversation.as_ref().map(|known| known.id)))
 }
 
 pub async fn run() -> i32 {
+    let resume = match args::parse(std::env::args().skip(1)) {
+        Ok(Args::Run { resume }) => resume,
+        Ok(Args::Version) => {
+            println!("{}", version::version_line());
+            return 0;
+        }
+        Ok(Args::Help) => {
+            println!("{}", args::usage());
+            return 0;
+        }
+        Err(error) => {
+            eprintln!("{}", args::report(&error));
+            return 2;
+        }
+    };
     if !std::io::stdout().is_terminal() || !std::io::stdin().is_terminal() {
         eprintln!("{}", copy::NO_TERMINAL);
         return 2;
@@ -470,23 +490,29 @@ pub async fn run() -> i32 {
         .unwrap_or_default();
     let mut terminal = ratatui::init();
     let _ = execute!(std::io::stdout(), EnableMouseCapture, EnableBracketedPaste);
-    let outcome = session(&mut terminal, folder).await;
+    let outcome = session(&mut terminal, folder, resume).await;
     let _ = execute!(
         std::io::stdout(),
         DisableMouseCapture,
         DisableBracketedPaste
     );
     ratatui::restore();
-    match outcome {
-        Ok(Some(Exit::Message(message))) => {
+    let (exit, conversation) = match outcome {
+        Ok(parts) => parts,
+        Err(error) => {
+            eprintln!("{error}");
+            return 1;
+        }
+    };
+    if let Some(id) = conversation {
+        println!("{}: aistudio --resume {id}", copy::RESUME_HINT);
+    }
+    match exit {
+        Some(Exit::Message(message)) => {
             eprintln!("{message}");
             1
         }
-        Ok(_) => 0,
-        Err(error) => {
-            eprintln!("{error}");
-            1
-        }
+        _ => 0,
     }
 }
 

@@ -532,3 +532,119 @@ fn chords_are_ignored_while_a_prompt_waits() {
     assert!(chord(&mut app, shortcuts::Chord::ctrl('p')).is_empty());
     assert!(app.overlay.is_none());
 }
+
+fn reasoning_app() -> App {
+    let mut provider = provider();
+    provider.models[0]
+        .capabilities
+        .push(zvs_contract::ModelCapability::AdaptiveReasoning);
+    let mut app = App::new(FOLDER);
+    app.update(Msg::Opened(Ok(CliSessionDto {
+        folder: FOLDER.to_owned(),
+        access: WorkingFolderAccess::Granted,
+    })));
+    app.update(Msg::Providers(Ok(vec![provider])));
+    app
+}
+
+#[test]
+fn a_resume_argument_loads_the_conversation_once_the_folder_is_open() {
+    let id = ConversationId::parse("0199aa11-2222-7111-8111-0000000000aa").expect("id");
+    let mut app = App::new(FOLDER);
+    app.resume = Some(id);
+    assert_eq!(
+        app.update(Msg::Opened(Ok(CliSessionDto {
+            folder: FOLDER.to_owned(),
+            access: WorkingFolderAccess::Granted,
+        }))),
+        [Request::Load(id)]
+    );
+    assert!(app.resume.is_none());
+}
+
+#[test]
+fn a_resume_argument_waits_for_the_folder_grant() {
+    let id = ConversationId::parse("0199aa11-2222-7111-8111-0000000000aa").expect("id");
+    let mut app = App::new(FOLDER);
+    app.resume = Some(id);
+    assert!(
+        app.update(Msg::Opened(Ok(CliSessionDto {
+            folder: FOLDER.to_owned(),
+            access: WorkingFolderAccess::Missing,
+        })))
+        .is_empty()
+    );
+    app.update(Msg::Key(Key::Down));
+    assert_eq!(app.update(Msg::Key(Key::Enter)), [Request::Load(id)]);
+}
+
+#[test]
+fn a_failed_resume_argument_exits_with_the_error() {
+    let mut app = App::new(FOLDER);
+    app.update(Msg::Opened(Ok(CliSessionDto {
+        folder: FOLDER.to_owned(),
+        access: WorkingFolderAccess::Granted,
+    })));
+    app.update(Msg::Loaded(Err(AppError::new(
+        zvs_contract::AppErrorCode::NotFound,
+        "Диалог не найден",
+    ))));
+    assert_eq!(app.exit, Some(Exit::Message("Диалог не найден".to_owned())));
+}
+
+#[test]
+fn the_effort_panel_offers_the_steps_the_model_supports() {
+    let mut app = reasoning_app();
+    assert!(command(&mut app, "/effort").is_empty());
+    let overlay = app.overlay.clone().expect("overlay");
+    assert_eq!(overlay.panel, Panel::Effort);
+    let rows = overlay.rows(&app.view());
+    assert_eq!(rows.len(), 3);
+    assert_eq!(
+        rows.iter()
+            .map(|row| row.action.clone())
+            .collect::<Vec<_>>(),
+        [
+            Some(Action::SetEffort(ThinkingEffort::Fast)),
+            Some(Action::SetEffort(ThinkingEffort::Auto)),
+            Some(Action::SetEffort(ThinkingEffort::Thinking)),
+        ]
+    );
+    assert!(rows[1].current);
+    assert_eq!(overlay.selected, 1);
+    app.update(Msg::Key(Key::Down));
+    app.update(Msg::Key(Key::Enter));
+    assert_eq!(app.effort, ThinkingEffort::Thinking);
+    assert!(app.overlay.is_none());
+}
+
+#[test]
+fn a_model_without_reasoning_gets_no_effort_steps() {
+    let mut app = ready();
+    assert!(command(&mut app, "/effort").is_empty());
+    let overlay = app.overlay.clone().expect("overlay");
+    let rows = overlay.rows(&app.view());
+    assert_eq!(rows.len(), 1);
+    assert!(rows[0].action.is_none());
+    assert_eq!(rows[0].title, copy::EFFORT_UNSUPPORTED);
+}
+
+#[test]
+fn the_chosen_effort_is_sent_with_the_message() {
+    let mut app = reasoning_app();
+    app.effort = ThinkingEffort::Fast;
+    let Request::Send(input) = app.send(conversation().id, "привет".to_owned()) else {
+        panic!("a send request");
+    };
+    assert_eq!(input.vendor.effort, Some(ThinkingEffort::Fast));
+}
+
+#[test]
+fn the_effort_shortcut_opens_the_panel() {
+    let mut app = reasoning_app();
+    assert!(chord(&mut app, shortcuts::Chord::alt('e')).is_empty());
+    assert_eq!(
+        app.overlay.as_ref().map(|overlay| overlay.panel),
+        Some(Panel::Effort)
+    );
+}

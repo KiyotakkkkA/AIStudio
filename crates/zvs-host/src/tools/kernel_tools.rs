@@ -39,7 +39,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
         "vector.search",
         BuiltinToolMeta {
             display_name: "vector.search",
-            description: "Семантический поиск по векторному хранилищу; возвращает фрагменты с оценками. storeId — UUID из vector.list.",
+            description: "Semantic search over a vector store; returns chunks with relevance scores. storeId — the UUID from vector.list.",
             destructive: false,
         },
     ),
@@ -47,7 +47,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
         "vector.list",
         BuiltinToolMeta {
             display_name: "vector.list",
-            description: "Список векторных хранилищ: UUID, название, описание и число документов. UUID передаётся в vector.search как storeId.",
+            description: "List vector stores: UUID, name, description, and document count. Pass the UUID to vector.search as storeId.",
             destructive: false,
         },
     ),

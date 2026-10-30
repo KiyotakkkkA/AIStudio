@@ -14,7 +14,7 @@ use crate::platform::ids::new_id;
 
 pub const ASK_TOOL: &str = "chat.ask";
 pub const ASK_TOOL_NAME: &str = "ask_user";
-pub const ASK_DESCRIPTION: &str = "Задать пользователю от 1 до 6 вопросов и дождаться ответа. Вопрос — свободный текст (text), выбор одного варианта (single) или нескольких (multiple); у вопроса с выбором от 2 до 8 вариантов, не больше одного с recommended: true. allowOther разрешает свой вариант. Ответы возвращаются результатом вызова.";
+pub const ASK_DESCRIPTION: &str = "Ask the user 1 to 6 questions and wait for the answers. A question is free text (text), single choice (single), or multiple choice (multiple); a choice question has 2 to 8 options, at most one with recommended: true. allowOther permits a custom answer. Answers come back as the call result.";
 pub const ASK_HEADING: &str = "Questions to the user";
 pub const ASK_RULES: &str = "When the request is ambiguous and the answer changes what you do, call the ask tool instead of guessing. Ask few, short questions, offer concrete options where you can, and mark the option you would choose as recommended. The turn pauses until the user answers, and the answers come back as the call result. Do not ask what the other tools can tell you, and do not ask again what the user has already answered.";
 pub const ASK_ONCE: &str = "В одном раунде допускается один вызов chat.ask";

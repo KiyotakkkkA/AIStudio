@@ -41,10 +41,10 @@ pub const NO_TOOL_SUPPORT: &str =
     "Модель не поддерживает вызов инструментов: агентная сессия невозможна";
 pub const TOOL_NOT_OFFERED: &str = "Инструмент не предоставлен сессии";
 pub const NOT_THIS_RUN: &str = "Сессия не выполняется в этом запуске";
-pub const PLAN_DESCRIPTION: &str = "Задать или пересмотреть план: упорядоченный список ещё не выполненных шагов. Выполненные шаги сохраняются, остальные заменяются этим списком, первый шаг становится текущим.";
-pub const COMPLETE_DESCRIPTION: &str = "Отметить текущий шаг плана выполненным и перейти к следующему. В summary — одна строка о результате шага.";
+pub const PLAN_DESCRIPTION: &str = "Set or revise the plan: an ordered list of steps not yet done. Completed steps are kept, the rest are replaced by this list, and the first step becomes the current one.";
+pub const COMPLETE_DESCRIPTION: &str = "Mark the current plan step as done and move to the next one. summary — one line about the step's outcome.";
 pub const FINISH_DESCRIPTION: &str =
-    "Завершить сессию, когда цель достигнута. В summary — итог для пользователя.";
+    "Finish the session once the goal is reached. summary — the outcome for the user.";
 pub const AGENT_RULES: &str = "You are an agent working toward the user's goal in a workspace folder. Work in steps. First call update_plan with a short ordered plan. Then carry out the steps one at a time with the tools offered. When a step is done, call complete_step with a one-line summary of what it produced. When what you learn changes the remaining work, revise it with update_plan. When the goal is reached, call finish with a summary for the user. Messages that start with \"Plan changed by the user\" or \"Instruction from the user\" come from the user: follow them, and never add back a step the user removed. Every tool call is checked by the host against the permission model; a refused or denied call is final, so choose another way or finish.";
 pub const READ_ONLY_RULES: &str = "This session is read-only: only tools that read are offered. Do not attempt to change files or run programs.";
 pub const ARTIFACTS_RULES: &str = "Declare every file you created for the user in an <artifacts> section of your final summary: the opening tag <artifacts> on its own line, then one workspace-relative path per line, then the closing tag </artifacts> on its own line. List only files that exist in the workspace when you finish; leave the section out when you created none. Do not describe the files inside the section.";
