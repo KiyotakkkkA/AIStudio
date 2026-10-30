@@ -3,6 +3,7 @@ name = "zvs-zai-web"
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 description = "The chat.z.ai web-client protocol: request signing, request bodies, model lists and the SSE turn decoder, without I/O."
 
 [dependencies]

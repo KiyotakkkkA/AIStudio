@@ -5,6 +5,7 @@ members = ["apps/studio/src-tauri", "crates/zvs-cli", "crates/zvs-contract", "cr
 [workspace.package]
 edition = "2024"
 publish = false
+license = "MIT"
 
 [workspace.dependencies]
 arrow-array = "=58.4.0"

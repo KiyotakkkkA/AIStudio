@@ -3,6 +3,7 @@ name = "zvs-qwen-web"
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 description = "The chat.qwen.ai web-client protocol: request bodies, model lists and the SSE turn decoder, without I/O."
 
 [dependencies]
