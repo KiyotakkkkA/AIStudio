@@ -12,6 +12,7 @@ import { ContextMenu } from "@kiyotakkkka/zvs-uikit-lib";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { memo } from "react";
 import Icon from "../../ui/atoms/Icon";
+import { MENU_DANGER, MENU_ITEM, MENU_PANEL } from "../../ui/molecules/ActionMenu";
 import { useCanvasActions } from "./canvasActions";
 import { STEP_STATUS_LABELS } from "./runCopy";
 import {
@@ -253,10 +254,10 @@ function ScenarioNodeView({ id, data, selected }: NodeProps<ScenarioFlowNode>) {
           ))}
         </div>
       </ContextMenu.Trigger>
-      <ContextMenu.Content className="min-w-44 rounded-card border-line bg-main-900 shadow-pop">
+      <ContextMenu.Content className={`min-w-44 ${MENU_PANEL} backdrop-blur-none`}>
         <ContextMenu.Item
-          leftSlot={<Icon path={mdiContentCopy} size={15} />}
-          className="text-[13px]"
+          leftSlot={<Icon path={mdiContentCopy} size={16} />}
+          className={MENU_ITEM}
           onClick={() => {
             actions.duplicate(id);
           }}
@@ -264,8 +265,8 @@ function ScenarioNodeView({ id, data, selected }: NodeProps<ScenarioFlowNode>) {
           Дублировать
         </ContextMenu.Item>
         <ContextMenu.ItemDanger
-          leftSlot={<Icon path={mdiDeleteOutline} size={15} />}
-          className="text-[13px]"
+          leftSlot={<Icon path={mdiDeleteOutline} size={16} />}
+          className={MENU_DANGER}
           onClick={() => {
             actions.remove(id);
           }}

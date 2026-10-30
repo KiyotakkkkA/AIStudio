@@ -1,7 +1,6 @@
 import { observer } from "mobx-react-lite";
 import {
   mdiChatOutline,
-  mdiChevronDown,
   mdiCodeJson,
   mdiDeleteOutline,
   mdiDockLeft,
@@ -22,7 +21,16 @@ import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
-import { ActionMenu, ActionMenuItem, ActionMenuSeparator } from "../../ui/molecules/ActionMenu";
+import {
+  ActionMenu,
+  ActionMenuItem,
+  ActionMenuSeparator,
+  ActionSubmenu,
+  MENU_DANGER,
+  MENU_ITEM,
+  MENU_PANEL,
+  MENU_WIDTH,
+} from "../../ui/molecules/ActionMenu";
 import TextInput from "../../ui/atoms/TextInput";
 import ConfirmModal from "../../ui/molecules/ConfirmModal";
 import type { ConversationDto } from "@zvs/shared";
@@ -39,7 +47,7 @@ interface ConversationAction {
   readonly run: () => void;
 }
 
-const CONTEXT_MENU = "w-48 rounded-card border-line bg-main-900 p-1 shadow-pop backdrop-blur-none";
+const CONTEXT_MENU = `w-48 ${MENU_PANEL} backdrop-blur-none`;
 
 function select(action: ConversationAction) {
   return (event: MouseEvent<HTMLButtonElement>) => {
@@ -52,7 +60,6 @@ export default observer(function ConversationList({ store }: { readonly store: C
   const [renameTarget, setRenameTarget] = useState<ConversationDto | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ConversationDto | null>(null);
-  const [exportOpen, setExportOpen] = useState<ConversationDto["id"] | null>(null);
   const { motion: level } = useFx();
   const settle = useTransition("layout");
   const today = new Date();
@@ -171,13 +178,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
                             />
                             <span className="truncate text-[13px]">{conversation.title}</span>
                           </div>
-                          <Dropdown
-                            menuWidth={220}
-                            menuPlacement="bottom-right"
-                            onOpenChange={(open) => {
-                              if (!open) setExportOpen(null);
-                            }}
-                          >
+                          <Dropdown menuWidth={MENU_WIDTH} menuPlacement="bottom-right">
                             <IconDropdownButton
                               aria-label={`Действия для ${conversation.title}`}
                               label="Действия"
@@ -192,52 +193,31 @@ export default observer(function ConversationList({ store }: { readonly store: C
                                 <Fragment key={action.key}>
                                   {action.danger && (
                                     <>
-                                      <ActionMenuItem
+                                      <ActionSubmenu
                                         icon={mdiExportVariant}
-                                        closeOnClick={false}
-                                        expanded={exportOpen === conversation.id}
+                                        label={EXPORT}
                                         disabled={store.exports.busy}
-                                        trailing={
-                                          <Icon
-                                            path={mdiChevronDown}
-                                            size={15}
-                                            className={`flex-none text-main-500 anim-on:transition-transform ${
-                                              exportOpen === conversation.id ? "rotate-180" : ""
-                                            }`}
-                                          />
-                                        }
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          setExportOpen(
-                                            exportOpen === conversation.id ? null : conversation.id,
-                                          );
-                                        }}
                                       >
-                                        {EXPORT}
-                                      </ActionMenuItem>
-                                      {exportOpen === conversation.id
-                                        ? EXPORT_FORMATS.map((option) => (
-                                            <ActionMenuItem
-                                              key={option.format}
-                                              inset
-                                              icon={
-                                                option.format === "json"
-                                                  ? mdiCodeJson
-                                                  : mdiLanguageMarkdownOutline
-                                              }
-                                              onClick={(event) => {
-                                                event.stopPropagation();
-                                                setExportOpen(null);
-                                                void store.exports.export(
-                                                  conversation.id,
-                                                  option.format,
-                                                );
-                                              }}
-                                            >
-                                              {option.label}
-                                            </ActionMenuItem>
-                                          ))
-                                        : null}
+                                        {EXPORT_FORMATS.map((option) => (
+                                          <ActionMenuItem
+                                            key={option.format}
+                                            icon={
+                                              option.format === "json"
+                                                ? mdiCodeJson
+                                                : mdiLanguageMarkdownOutline
+                                            }
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              void store.exports.export(
+                                                conversation.id,
+                                                option.format,
+                                              );
+                                            }}
+                                          >
+                                            {option.label}
+                                          </ActionMenuItem>
+                                        ))}
+                                      </ActionSubmenu>
                                       <ActionMenuSeparator />
                                     </>
                                   )}
@@ -260,7 +240,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
                                 <>
                                   <ContextMenu.Sub>
                                     <ContextMenu.SubTrigger
-                                      className="text-[13px] text-main-100"
+                                      className={MENU_ITEM}
                                       leftSlot={<Icon path={mdiExportVariant} size={16} />}
                                       disabled={store.exports.busy}
                                     >
@@ -273,7 +253,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
                                       {EXPORT_FORMATS.map((option) => (
                                         <ContextMenu.Item
                                           key={option.format}
-                                          className="text-[13px] text-main-100"
+                                          className={MENU_ITEM}
                                           leftSlot={
                                             <Icon
                                               path={
@@ -302,7 +282,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
                               )}
                               {action.danger ? (
                                 <ContextMenu.ItemDanger
-                                  className="text-[13px] text-err hover:bg-err-soft hover:text-err"
+                                  className={MENU_DANGER}
                                   leftSlot={<Icon path={action.icon} size={16} />}
                                   onClick={select(action)}
                                 >
@@ -310,7 +290,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
                                 </ContextMenu.ItemDanger>
                               ) : (
                                 <ContextMenu.Item
-                                  className="text-[13px] text-main-100"
+                                  className={MENU_ITEM}
                                   leftSlot={<Icon path={action.icon} size={16} />}
                                   onClick={select(action)}
                                 >
