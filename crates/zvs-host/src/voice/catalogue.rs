@@ -66,7 +66,7 @@ pub const SPEECH_MODELS: &[SpeechModel] = &[
 ];
 
 pub const ENGINE_DISPLAY_NAME: &str = "whisper.cpp · CPU";
-const ENGINE_DESCRIPTION: &str = "Движок локального распознавания речи для моделей Whisper. Считает на процессоре с ускорением OpenBLAS и не отправляет звук в сеть.";
+const ENGINE_DESCRIPTION: &str = "Движок локального распознавания речи для моделей Whisper. Считает на процессоре с ускорением OpenBLAS.";
 const SPEECH_TAG: &str = "распознавание речи";
 
 pub fn speech_supported(platform: Platform) -> bool {

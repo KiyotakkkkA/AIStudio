@@ -11,7 +11,7 @@ export const VOICE_DEVICE_ROW = {
 export const VOICE_MODEL_ROW = {
   key: "voice.model",
   label: "Модель распознавания речи",
-  hint: "Распознавание выполняется на этом компьютере, звук не отправляется в сеть. Другие модели доступны в «Загрузках».",
+  hint: "Распознавание выполняется на этом компьютере. Другие модели доступны в «Загрузках».",
 } as const;
 export const VOICE_DEFAULT_DEVICE = "Как в системе";
 export const VOICE_DEVICE_MISSING = "Устройство не подключено";
