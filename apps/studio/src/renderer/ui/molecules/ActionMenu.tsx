@@ -3,7 +3,8 @@ import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
 import Icon from "../atoms/Icon";
 
 export const MENU_WIDTH = 192;
-export const MENU_PANEL = "rounded-card border-line bg-main-900 p-1 shadow-pop";
+const MENU_SURFACE = "rounded-card border-line bg-main-900 p-1";
+export const MENU_PANEL = `${MENU_SURFACE} shadow-pop`;
 export const MENU_ITEM = "text-[13px] text-main-100";
 export const MENU_DANGER = "text-[13px] text-err hover:bg-err-soft hover:text-err";
 
@@ -22,7 +23,7 @@ export function ActionMenu({
       role="menu"
       aria-label={label}
       rounded=""
-      className={`overflow-visible ${MENU_PANEL}`}
+      className={`overflow-visible! ${MENU_PANEL}`}
     >
       {children}
     </Dropdown.Menu>
@@ -132,7 +133,7 @@ function Submenu({
           <div
             role="menu"
             aria-label={label}
-            className={`absolute top-0 left-[calc(100%+4px)] z-50 flex w-48 flex-col gap-0.5 border ${MENU_PANEL}`}
+            className={`absolute top-0 left-[calc(100%+4px)] z-50 flex w-48 flex-col gap-0.5 border ${MENU_SURFACE}`}
           >
             {children}
           </div>
