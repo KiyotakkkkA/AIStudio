@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::documents::DOCUMENT_PATH_MAX;
 use crate::enums::wire_enum;
 use crate::errors::AppError;
 use crate::events::{ApprovalRequestDto, EventSeq};
@@ -956,11 +957,41 @@ impl Validate for ChatAttachDto {
 
 pub type ChatAttachOutput = Option<ChatAttachDto>;
 
+wire_enum!(ConversationExportFormat {
+    Json => "json",
+    Markdown => "markdown",
+});
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportConversationInput {
+    pub id: ConversationId,
+    pub format: ConversationExportFormat,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationExportDto {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
+impl Validate for ConversationExportDto {
+    fn validate(&self) -> Result<(), AppError> {
+        if let Some(path) = &self.path {
+            check::non_empty("path", path)?;
+            check::max_len("path", path, DOCUMENT_PATH_MAX)?;
+        }
+        Ok(())
+    }
+}
+
 crate::validate::no_refinements!(
     BranchConversationInput,
     ChatAttachInput,
     ChatRoundDto,
     ConversationRef,
+    ExportConversationInput,
     PinConversationInput,
     PinMessageInput,
     TruncateConversationInput,

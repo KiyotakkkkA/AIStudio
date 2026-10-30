@@ -1,9 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
-import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import { Dropdown, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
 import {
+  mdiCodeJson,
   mdiConsole,
+  mdiExportVariant,
+  mdiLanguageMarkdownOutline,
   mdiDatabaseOutline,
   mdiDockLeft,
   mdiFolderOutline,
@@ -43,6 +46,9 @@ import { toolTitle } from "./toolCallCopy";
 import { SHOW_CONVERSATIONS } from "./conversationListCopy";
 import Alert from "../../ui/molecules/Alert";
 import PanelButton from "./PanelButton";
+import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
+import { ActionMenu, ActionMenuItem } from "../../ui/molecules/ActionMenu";
+import { EXPORT, EXPORT_FORMATS } from "./ConversationExport";
 import Skeleton from "../../ui/atoms/Skeleton";
 import { LoadingStatus, SkeletonLines } from "../../ui/molecules/LoadingSkeleton";
 import PinnedNavigator from "./PinnedNavigator";
@@ -209,7 +215,54 @@ export default observer(function ChatThread({
             />
           )}
         </div>
+        <div
+          role="group"
+          aria-label={EXPORT}
+          className="flex flex-none items-center gap-0.5 rounded-control bg-main-800 p-0.5"
+        >
+          <Dropdown menuWidth={210} menuPlacement="bottom-right">
+            <IconDropdownButton
+              label={EXPORT}
+              tooltip="bottom-center"
+              path={mdiExportVariant}
+              size="sm"
+              iconSize={16}
+              rounded=""
+              className="rounded-control"
+              toneClassName="bg-transparent text-main-400 hover:bg-main-700 hover:text-main-50"
+              disabled={store.active === null || store.exports.busy}
+            />
+            <ActionMenu label={EXPORT}>
+              {EXPORT_FORMATS.map((option) => (
+                <ActionMenuItem
+                  key={option.format}
+                  icon={option.format === "json" ? mdiCodeJson : mdiLanguageMarkdownOutline}
+                  onClick={() => {
+                    if (store.active !== null)
+                      void store.exports.export(store.active.id, option.format);
+                  }}
+                >
+                  {option.label}
+                </ActionMenuItem>
+              ))}
+            </ActionMenu>
+          </Dropdown>
+        </div>
       </header>
+      {store.exports.notice === null ? null : (
+        <div className="shrink-0 px-6 pb-2">
+          <Alert
+            bar
+            tone={store.exports.notice.tone}
+            title={store.exports.notice.title}
+            onDismiss={store.exports.dismiss}
+          >
+            {store.exports.notice.detail === undefined ? null : (
+              <span className="break-all">{store.exports.notice.detail}</span>
+            )}
+          </Alert>
+        </div>
+      )}
       <div className="relative flex min-h-0 flex-1 flex-col">
         <ScrollArea
           ref={viewport}

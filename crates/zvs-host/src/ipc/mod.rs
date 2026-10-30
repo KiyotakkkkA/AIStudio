@@ -127,6 +127,7 @@ mod tests {
                 "chat.context",
                 "chat.conversations.branch",
                 "chat.conversations.create",
+                "chat.conversations.export",
                 "chat.conversations.get",
                 "chat.conversations.list",
                 "chat.conversations.pin",

@@ -711,6 +711,18 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ConversationRef>,
     ),
     (
+        "chat/ConversationExportFormat",
+        round_trip::<zvs_contract::ConversationExportFormat>,
+    ),
+    (
+        "chat/ExportConversationInput",
+        round_trip::<zvs_contract::ExportConversationInput>,
+    ),
+    (
+        "chat/ConversationExportDto",
+        round_trip::<zvs_contract::ConversationExportDto>,
+    ),
+    (
         "chat/ConversationDto",
         round_trip::<zvs_contract::ConversationDto>,
     ),

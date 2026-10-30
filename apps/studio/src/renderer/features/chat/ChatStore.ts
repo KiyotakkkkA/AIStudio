@@ -50,6 +50,7 @@ import { adapterLabel } from "../providers/accountPresentation";
 import { suggestedBaseUrl } from "../providers/providerPresentation";
 import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
 import ArtifactActions from "./ArtifactActions";
+import ConversationExport from "./ConversationExport";
 import { dialogArtifacts, type DialogArtifact } from "./artifacts";
 import SiteIcons from "./SiteIcons";
 import ExplorerStore from "./explorer/ExplorerStore";
@@ -130,6 +131,7 @@ export default class ChatStore {
   readonly explorer: ExplorerStore;
   readonly terminal: TerminalStore;
   readonly artifacts: ArtifactActions;
+  readonly exports: ConversationExport;
   readonly siteIcons: SiteIcons;
   outcome: "ok" | "cancelled" | "failed" | null = null;
   revealed = 0;
@@ -158,6 +160,7 @@ export default class ChatStore {
     this.explorer = new ExplorerStore(ipc, events);
     this.terminal = new TerminalStore(ipc, events);
     this.artifacts = new ArtifactActions(ipc);
+    this.exports = new ConversationExport(ipc);
     this.siteIcons = new SiteIcons(ipc);
     makeAutoObservable<
       ChatStore,
@@ -187,6 +190,7 @@ export default class ChatStore {
         explorer: false,
         terminal: false,
         artifacts: false,
+        exports: false,
         siteIcons: false,
         buffer: false,
         timer: false,

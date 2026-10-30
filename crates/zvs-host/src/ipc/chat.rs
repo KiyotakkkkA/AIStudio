@@ -26,6 +26,12 @@ pub fn register(server: &mut IpcServer) {
             },
         )
         .handle(
+            "chat.conversations.export",
+            |services: Arc<Services>, input: zvs_contract::ExportConversationInput| async move {
+                crate::chat_export::export(&services, &input).await
+            },
+        )
+        .handle(
             "chat.conversations.create",
             |services: Arc<Services>, input: CreateConversationInput| async move {
                 services.chat.create(&input)

@@ -146,6 +146,19 @@ export const CreateConversationInput = z.object({
 });
 export type CreateConversationInput = z.infer<typeof CreateConversationInput>;
 export const ConversationRef = z.object({ id: ConversationId });
+
+export const EXPORT_PATH_MAX = 32767;
+
+export const ConversationExportFormat = z.enum(["json", "markdown"]);
+export type ConversationExportFormat = z.infer<typeof ConversationExportFormat>;
+
+export const ExportConversationInput = ConversationRef.extend({ format: ConversationExportFormat });
+export type ExportConversationInput = z.infer<typeof ExportConversationInput>;
+
+export const ConversationExportDto = z.object({
+  path: z.string().min(1).max(EXPORT_PATH_MAX).optional(),
+});
+export type ConversationExportDto = z.infer<typeof ConversationExportDto>;
 const ConversationFields = CreateConversationInput.extend({
   id: ConversationId,
   workingFolder: FolderPath.nullable().default(null),

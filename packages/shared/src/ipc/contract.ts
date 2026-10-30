@@ -24,7 +24,9 @@ import {
   PinMessageInput,
   MessageDto,
   ConversationDto,
+  ConversationExportDto,
   ConversationRef,
+  ExportConversationInput,
   RetrievalMode,
   CreateConversationInput,
   BindFolderInput,
@@ -263,6 +265,7 @@ export type SettingKey = z.infer<typeof SettingKey>;
 export const contract = defineContract({
   "chat.conversations.list": { input: z.void(), output: z.array(ConversationDto) },
   "chat.conversations.get": { input: ConversationRef, output: ConversationDetailDto },
+  "chat.conversations.export": { input: ExportConversationInput, output: ConversationExportDto },
   "chat.conversations.create": { input: CreateConversationInput, output: ConversationDto },
   "chat.conversations.remove": { input: ConversationRef, output: z.void() },
   "chat.conversations.rename": {

@@ -1,9 +1,12 @@
 import { observer } from "mobx-react-lite";
 import {
   mdiChatOutline,
+  mdiCodeJson,
   mdiDeleteOutline,
   mdiDockLeft,
   mdiDotsVertical,
+  mdiExportVariant,
+  mdiLanguageMarkdownOutline,
   mdiPencilOutline,
   mdiPinOffOutline,
   mdiPinOutline,
@@ -25,6 +28,7 @@ import type { ConversationDto } from "@zvs/shared";
 import type ChatStore from "./ChatStore";
 import { HIDE_CONVERSATIONS } from "./conversationListCopy";
 import { PINNED_GROUP, PIN_CONVERSATION, UNPIN_CONVERSATION } from "./pinnedMessages";
+import { EXPORT, EXPORT_FORMATS } from "./ConversationExport";
 
 interface ConversationAction {
   readonly key: string;
@@ -195,7 +199,48 @@ export default observer(function ConversationList({ store }: { readonly store: C
                           {actions(conversation).map((action) => (
                             <Fragment key={action.key}>
                               {action.danger && (
-                                <ContextMenu.Separator className="mx-2 my-1 h-px bg-line" />
+                                <>
+                                  <ContextMenu.Sub>
+                                    <ContextMenu.SubTrigger
+                                      className="text-[13px] text-main-100"
+                                      leftSlot={<Icon path={mdiExportVariant} size={16} />}
+                                      disabled={store.exports.busy}
+                                    >
+                                      {EXPORT}
+                                    </ContextMenu.SubTrigger>
+                                    <ContextMenu.SubContent
+                                      aria-label={EXPORT}
+                                      className={CONTEXT_MENU}
+                                    >
+                                      {EXPORT_FORMATS.map((option) => (
+                                        <ContextMenu.Item
+                                          key={option.format}
+                                          className="text-[13px] text-main-100"
+                                          leftSlot={
+                                            <Icon
+                                              path={
+                                                option.format === "json"
+                                                  ? mdiCodeJson
+                                                  : mdiLanguageMarkdownOutline
+                                              }
+                                              size={16}
+                                            />
+                                          }
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            void store.exports.export(
+                                              conversation.id,
+                                              option.format,
+                                            );
+                                          }}
+                                        >
+                                          {option.label}
+                                        </ContextMenu.Item>
+                                      ))}
+                                    </ContextMenu.SubContent>
+                                  </ContextMenu.Sub>
+                                  <ContextMenu.Separator className="mx-2 my-1 h-px bg-line" />
+                                </>
                               )}
                               {action.danger ? (
                                 <ContextMenu.ItemDanger

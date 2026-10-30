@@ -331,3 +331,101 @@ async fn answers_and_skips_for_a_question_that_is_not_pending_conflict() {
         &json!("VALIDATION_FAILED")
     );
 }
+
+#[tokio::test]
+async fn a_dialog_exports_to_the_picked_file_as_json_or_markdown() {
+    let channels = registered();
+    let created: ConversationDto = data(
+        &channels
+            .server
+            .dispatch(
+                "chat.conversations.create",
+                json!({ "providerId": channels.provider_id, "modelId": "fake-model" }),
+            )
+            .await,
+    );
+    let handle: RunHandleDto = data(
+        &channels
+            .server
+            .dispatch(
+                "chat.send",
+                json!({ "conversationId": created.id, "text": "Plan: the release?" }),
+            )
+            .await,
+    );
+    tokio::time::timeout(Duration::from_secs(10), channels.host.runs.wait(&handle.id))
+        .await
+        .expect("finishes");
+
+    let cancelled: zvs_contract::ConversationExportDto = data(
+        &channels
+            .server
+            .dispatch(
+                "chat.conversations.export",
+                json!({ "id": created.id, "format": "markdown" }),
+            )
+            .await,
+    );
+    assert_eq!(cancelled.path, None);
+
+    let folder = tempfile::tempdir().expect("dir");
+    let markdown = folder.path().join("dialog.md");
+    channels
+        .host
+        .picker
+        .answer(&[markdown.to_string_lossy().as_ref()]);
+    let saved: zvs_contract::ConversationExportDto = data(
+        &channels
+            .server
+            .dispatch(
+                "chat.conversations.export",
+                json!({ "id": created.id, "format": "markdown" }),
+            )
+            .await,
+    );
+    assert_eq!(
+        saved.path.as_deref(),
+        Some(markdown.to_string_lossy().as_ref())
+    );
+    let text = std::fs::read_to_string(&markdown).expect("written");
+    assert!(text.starts_with("# Plan: the release?\n"), "{text}");
+    assert!(text.contains("- Модель: fake-model"), "{text}");
+    let asked = text
+        .find("## Вы\n\nPlan: the release?")
+        .expect("the question");
+    let answered = text
+        .find("## Ассистент\n\nHello world")
+        .expect("the answer");
+    assert!(asked < answered);
+
+    let json_path = folder.path().join("dialog.json");
+    channels
+        .host
+        .picker
+        .answer(&[json_path.to_string_lossy().as_ref()]);
+    channels
+        .server
+        .dispatch(
+            "chat.conversations.export",
+            json!({ "id": created.id, "format": "json" }),
+        )
+        .await;
+    let document: Value =
+        serde_json::from_str(&std::fs::read_to_string(&json_path).expect("written"))
+            .expect("valid json");
+    assert_eq!(
+        document["format"],
+        json!(crate::chat_export::EXPORT_FORMAT_ID)
+    );
+    assert_eq!(document["conversation"]["id"], json!(created.id));
+    assert_eq!(document["messages"].as_array().map(Vec::len), Some(2));
+
+    let missing = channels
+        .server
+        .dispatch(
+            "chat.conversations.export",
+            json!({ "id": "0199aa11-9999-7111-8111-111111111111", "format": "json" }),
+        )
+        .await;
+    assert_eq!(failed(&missing), &json!("NOT_FOUND"));
+}

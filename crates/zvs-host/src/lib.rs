@@ -4,6 +4,7 @@ pub mod agentic;
 pub mod artifact_pages;
 pub mod artifacts;
 pub mod browser;
+pub mod chat_export;
 pub mod chat_files;
 pub mod cli;
 pub mod commands;
