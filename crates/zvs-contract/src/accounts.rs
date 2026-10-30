@@ -36,6 +36,12 @@ impl Validate for AccountDto {
 #[serde(rename_all = "camelCase")]
 pub struct AccountLinkInput {
     pub adapter: AccountFamily,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub account_id: Option<AccountId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

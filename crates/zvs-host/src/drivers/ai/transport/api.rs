@@ -28,11 +28,26 @@ const FAR_FUTURE: Duration = Duration::from_secs(60 * 60 * 24 * 365 * 30);
 
 pub trait SecretResolver: Send + Sync {
     fn resolve(&self, id: &str) -> Result<Plaintext, AppError>;
+
+    fn replace(&self, _id: &str, _value: Plaintext) -> Result<(), AppError> {
+        Err(crate::drivers::ai::openai::auth_error())
+    }
 }
 
 impl SecretResolver for SecretService {
     fn resolve(&self, id: &str) -> Result<Plaintext, AppError> {
         Self::resolve(self, id)
+    }
+
+    fn replace(&self, id: &str, value: Plaintext) -> Result<(), AppError> {
+        self.update(
+            id,
+            crate::services::secrets::SecretUpdateInput {
+                value: Some(value),
+                ..Default::default()
+            },
+        )
+        .map(|_| ())
     }
 }
 

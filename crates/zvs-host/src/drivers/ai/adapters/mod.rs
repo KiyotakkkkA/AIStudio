@@ -1,6 +1,7 @@
 pub mod account_family;
 pub mod local;
 pub mod ollama;
+pub mod openai;
 pub mod openai_compatible;
 pub mod qwen_web;
 pub mod wire;
@@ -35,6 +36,7 @@ use crate::platform::logger::{SharedLogger, silent_logger};
 
 #[derive(Clone)]
 pub struct AdapterContext {
+    pub openai_codex: bool,
     pub transport: Option<SharedTransport>,
     pub logger: SharedLogger,
     pub local_models: Option<SharedModelStore>,
@@ -44,6 +46,7 @@ pub struct AdapterContext {
 impl Default for AdapterContext {
     fn default() -> Self {
         Self {
+            openai_codex: false,
             transport: None,
             logger: silent_logger(),
             local_models: None,
@@ -92,6 +95,14 @@ impl AdapterFamilyEntry {
     pub fn build(&self, context: &AdapterContext) -> Result<AiDriver, AppError> {
         let family = self.capabilities.family;
         match family {
+            AdapterFamily::Openai => Ok(AiDriver {
+                text: Some(Arc::new(openai::OpenaiAdapter::new(
+                    context.require_transport()?,
+                    context.openai_codex,
+                ))),
+                embedding: None,
+                image: None,
+            }),
             AdapterFamily::OpenaiCompatible => {
                 let adapter = Arc::new(OpenAiCompatibleAdapter::new(
                     context.require_transport()?,
@@ -136,6 +147,10 @@ impl AdapterFamilyEntry {
 
 pub const fn adapter_entry(family: AdapterFamily) -> AdapterFamilyEntry {
     match family {
+        AdapterFamily::Openai => AdapterFamilyEntry {
+            capabilities: openai::OPENAI_CAPABILITIES,
+            implemented: true,
+        },
         AdapterFamily::OpenaiCompatible => AdapterFamilyEntry {
             capabilities: OPENAI_COMPATIBLE_CAPABILITIES,
             implemented: true,

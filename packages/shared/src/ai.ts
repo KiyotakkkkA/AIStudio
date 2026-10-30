@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-export const ADAPTER_FAMILIES = ["openai-compatible", "qwen-web", "zai-web", "local"] as const;
+export const ADAPTER_FAMILIES = [
+  "openai-compatible",
+  "openai",
+  "qwen-web",
+  "zai-web",
+  "local",
+] as const;
 export const AdapterFamily = z.enum(ADAPTER_FAMILIES);
 export type AdapterFamily = z.infer<typeof AdapterFamily>;
 
@@ -8,7 +14,7 @@ export const AUTH_MODES = ["api", "account"] as const;
 export const AuthMode = z.enum(AUTH_MODES);
 export type AuthMode = z.infer<typeof AuthMode>;
 
-export const ACCOUNT_FAMILIES = ["qwen-web", "zai-web"] as const;
+export const ACCOUNT_FAMILIES = ["openai", "qwen-web", "zai-web"] as const;
 export const AccountFamily = z.enum(ACCOUNT_FAMILIES);
 export type AccountFamily = z.infer<typeof AccountFamily>;
 

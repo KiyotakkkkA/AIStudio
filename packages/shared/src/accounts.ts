@@ -17,7 +17,10 @@ export const AccountDto = z.object({
 });
 export type AccountDto = z.infer<typeof AccountDto>;
 
-export const AccountLinkInput = z.object({ adapter: AccountFamily });
+export const AccountLinkInput = z.object({
+  adapter: AccountFamily,
+  accountId: AccountId.optional(),
+});
 export const AccountRef = z.object({ id: AccountId });
 export const AccountLinkResult = z.discriminatedUnion("status", [
   z.object({

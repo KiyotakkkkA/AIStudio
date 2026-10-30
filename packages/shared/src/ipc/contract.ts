@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ProviderUsageDto } from "../providers/ProviderDto.js";
 import {
   AgenticInstructInput,
   AgenticSessionDto,
@@ -494,6 +495,7 @@ export const contract = defineContract({
   },
   "storage.usage": { input: StorageUsageInput, output: StorageUsageDto },
   "storage.clearCache": { input: z.void(), output: StorageClearCacheOutput },
+  "providers.usage": { input: ProviderRef, output: ProviderUsageDto.nullable() },
   "accounts.list": { input: z.void(), output: z.array(AccountDto) },
   "accounts.link": { input: AccountLinkInput, output: AccountLinkResult },
   "accounts.cancelLink": { input: AccountLinkInput, output: z.object({ cancelled: z.boolean() }) },
@@ -505,6 +507,7 @@ export const contract = defineContract({
     }),
   },
   "accounts.refresh": { input: AccountRef, output: AccountDto },
+  "accounts.openUsage": { input: AccountRef, output: z.void() },
   "system.ping": {
     input: z.object({ sentAt: Timestamp }),
     output: z.object({

@@ -238,6 +238,13 @@ pub type DeltaStream = BoxStream<'static, Result<TextDelta, AppError>>;
 pub trait TextGenerationDriver: Send + Sync {
     fn capabilities(&self) -> AdapterCapabilities;
 
+    async fn usage(
+        &self,
+        _cancel: &CancellationToken,
+    ) -> Result<Option<zvs_contract::ProviderUsageDto>, AppError> {
+        Ok(None)
+    }
+
     async fn generate(
         &self,
         request: &GenerateRequest,

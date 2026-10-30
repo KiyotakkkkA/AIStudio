@@ -1,4 +1,6 @@
 [
+  { "name": "direct ChatGPT-plan route", "value": { "openaiMode": "direct" } },
+  { "name": "Codex app-server route", "value": { "openaiMode": "codex" } },
   {
     "name": "empty",
     "value": {}

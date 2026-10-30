@@ -1,0 +1,7 @@
+[
+  {
+    "name": "known reset",
+    "value": { "label": "Лимит", "usedPercent": 42.5, "resetsAt": 2000000000000 }
+  },
+  { "name": "no reset", "value": { "label": "Лимит", "usedPercent": 0.5, "resetsAt": null } }
+]

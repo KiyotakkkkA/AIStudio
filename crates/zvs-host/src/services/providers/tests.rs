@@ -694,6 +694,7 @@ fn adapter_descriptors_list_every_family_with_its_wiring_state() {
             .collect::<Vec<_>>(),
         [
             (AdapterFamily::OpenaiCompatible, true),
+            (AdapterFamily::Openai, true),
             (AdapterFamily::QwenWeb, true),
             (AdapterFamily::ZaiWeb, true),
             (AdapterFamily::Local, true),

@@ -64,12 +64,14 @@ export default function EffortSlider({
   label,
   value,
   steps = EFFORT_STEPS,
+  labels = EFFORT_LABELS,
   disabled = false,
   onChange,
 }: {
   readonly label: string;
   readonly value: ThinkingEffort;
   readonly steps?: readonly ThinkingEffort[];
+  readonly labels?: Readonly<Record<ThinkingEffort, string>>;
   readonly disabled?: boolean;
   readonly onChange: (value: ThinkingEffort) => void;
 }) {
@@ -131,7 +133,7 @@ export default function EffortSlider({
                 className={`inline-flex h-6 items-center gap-1 rounded-pill px-2.5 text-[11.5px] font-semibold ${stage.chip}`}
               >
                 <Icon path={stage.icon} size={13} />
-                {EFFORT_LABELS[value]}
+                {labels[value]}
               </span>
             </motion.span>
           </AnimatePresence>
@@ -144,7 +146,7 @@ export default function EffortSlider({
         aria-valuemin={0}
         aria-valuemax={last}
         aria-valuenow={step}
-        aria-valuetext={EFFORT_LABELS[value]}
+        aria-valuetext={labels[value]}
         aria-disabled={disabled}
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
@@ -230,7 +232,7 @@ export default function EffortSlider({
                   : "cursor-pointer text-main-500 hover:text-main-300"
               }`}
             >
-              {EFFORT_LABELS[stop]}
+              {labels[stop]}
             </button>
           );
         })}

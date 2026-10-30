@@ -13,6 +13,12 @@ use crate::services::{ProbeInput, Services};
 pub fn register(server: &mut IpcServer) {
     server
         .handle(
+            "providers.usage",
+            |services: Arc<Services>, input: ProviderRef| async move {
+                services.providers.usage(&input.id.to_string()).await
+            },
+        )
+        .handle(
             "providers.adapters",
             |_services: Arc<Services>, _input: ()| async move {
                 Ok::<ProvidersAdaptersOutput, AppError>(adapter_descriptors())
@@ -243,6 +249,7 @@ mod tests {
             families,
             [
                 json!(["openai-compatible", true]),
+                json!(["openai", true]),
                 json!(["qwen-web", true]),
                 json!(["zai-web", true]),
                 json!(["local", true]),

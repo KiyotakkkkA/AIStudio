@@ -5,6 +5,7 @@ use crate::validate::no_refinements;
 
 wire_enum!(AdapterFamily {
     OpenaiCompatible => "openai-compatible",
+    Openai => "openai",
     QwenWeb => "qwen-web",
     ZaiWeb => "zai-web",
     Local => "local",
@@ -15,7 +16,16 @@ wire_enum!(AuthMode {
     Account => "account",
 });
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum OpenaiMode {
+    Direct,
+    Codex,
+}
+
 wire_enum!(AccountFamily {
+    Openai => "openai",
     QwenWeb => "qwen-web",
     ZaiWeb => "zai-web",
 });
@@ -84,6 +94,7 @@ impl AdapterFamily {
         match self {
             Self::QwenWeb => Some(AccountFamily::QwenWeb),
             Self::ZaiWeb => Some(AccountFamily::ZaiWeb),
+            Self::Openai => Some(AccountFamily::Openai),
             Self::OpenaiCompatible | Self::Local => None,
         }
     }
@@ -123,7 +134,13 @@ mod tests {
                 .iter()
                 .map(|family| family.as_str())
                 .collect::<Vec<_>>(),
-            ["openai-compatible", "qwen-web", "zai-web", "local"]
+            [
+                "openai-compatible",
+                "openai",
+                "qwen-web",
+                "zai-web",
+                "local"
+            ]
         );
         assert_eq!(
             serde_json::to_value(TunableParameter::MaxOutputTokens).expect("serialises"),

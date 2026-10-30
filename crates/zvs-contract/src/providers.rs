@@ -1,5 +1,39 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderUsageWindowDto {
+    pub label: String,
+    pub used_percent: f64,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub resets_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderUsageDto {
+    pub source: String,
+    pub windows: Vec<ProviderUsageWindowDto>,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub detail: Option<String>,
+    pub checked_at: i64,
+}
+
+impl crate::validate::Validate for ProviderUsageWindowDto {
+    fn validate(&self) -> Result<(), crate::AppError> {
+        crate::validate::check::number_range("usedPercent", self.used_percent, 0.0, 100.0)
+    }
+}
+
+impl crate::validate::Validate for ProviderUsageDto {
+    fn validate(&self) -> Result<(), crate::AppError> {
+        for window in &self.windows {
+            crate::validate::Validate::validate(window)?;
+        }
+        Ok(())
+    }
+}
+
 use crate::ai::{AdapterCapabilitiesDto, AdapterFamily, AuthMode};
 use crate::enums::wire_enum;
 use crate::errors::{AppError, AppErrorCode};
@@ -63,6 +97,12 @@ fn check_optional_count(field: &str, value: Option<u64>) -> Result<(), AppError>
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderSettingsDto {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub openai_mode: Option<crate::ai::OpenaiMode>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",

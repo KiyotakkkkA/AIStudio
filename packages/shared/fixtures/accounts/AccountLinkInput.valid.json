@@ -1,4 +1,9 @@
 [
+  { "name": "OpenAI registration", "value": { "adapter": "openai" } },
+  {
+    "name": "OpenAI reauthorization",
+    "value": { "adapter": "openai", "accountId": "0199aa11-1111-7111-8111-111111111111" }
+  },
   {
     "name": "qwen",
     "value": {

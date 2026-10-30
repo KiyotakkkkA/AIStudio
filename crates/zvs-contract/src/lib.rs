@@ -60,8 +60,8 @@ pub use agentic::{
 };
 pub use ai::{
     AccountFamily, AccountStatus, AdapterCapabilitiesDto, AdapterDescriptorDto, AdapterFamily,
-    AuthMode, HonoursDto, LOCAL_BASE_URL, ProvidersAdaptersOutput, ToolMode, TunableParameter,
-    model_tool_support, resolve_tool_mode,
+    AuthMode, HonoursDto, LOCAL_BASE_URL, OpenaiMode, ProvidersAdaptersOutput, ToolMode,
+    TunableParameter, model_tool_support, resolve_tool_mode,
 };
 pub use artifacts::{
     ArtifactApplicationDto, ArtifactBrowsersDto, ArtifactDto, ArtifactRef, ArtifactSaveResult,
@@ -179,8 +179,8 @@ pub use providers::{
     CreateProviderInput, DiscoveredModelDto, ModelCapability, ModelDto, ProbeOutcomeDto,
     ProbeRequest, ProbeResultDto, ProviderCapability, ProviderConnectionInput, ProviderDto,
     ProviderKind, ProviderListFilter, ProviderRef, ProviderSettingsDto, ProviderStatus,
-    ProviderSummaryDto, ProvidersGetInput, ProvidersListOutput, ProvidersRemoveOutput,
-    SetDefaultModelInput, UpdateProviderInput,
+    ProviderSummaryDto, ProviderUsageDto, ProviderUsageWindowDto, ProvidersGetInput,
+    ProvidersListOutput, ProvidersRemoveOutput, SetDefaultModelInput, UpdateProviderInput,
 };
 pub use questions::{
     ChatAnswerInput, ChatSkipInput, QUESTIONS_MAX, QuestionAnswerDto, QuestionDto, QuestionKind,

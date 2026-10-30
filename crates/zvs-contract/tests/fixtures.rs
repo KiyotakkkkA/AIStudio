@@ -35,6 +35,14 @@ type Check = fn(Value) -> Result<Value, String>;
 
 const TABLE: &[(&str, Check)] = &[
     ("primitives/ProviderId", round_trip::<ProviderId>),
+    (
+        "providers/ProviderUsageDto",
+        round_trip::<zvs_contract::ProviderUsageDto>,
+    ),
+    (
+        "providers/ProviderUsageWindowDto",
+        round_trip::<zvs_contract::ProviderUsageWindowDto>,
+    ),
     ("primitives/StreamId", round_trip::<StreamId>),
     ("primitives/PageRequest", round_trip::<PageRequest>),
     ("primitives/Page", round_trip::<Page<Json>>),

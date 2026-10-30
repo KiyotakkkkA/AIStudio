@@ -112,7 +112,7 @@ function AccountsTab() {
             <EmptyState
               icon={mdiAccountCircleOutline}
               title="Аккаунтов пока нет"
-              description={`В режиме аккаунта ключ не нужен: вы входите на сайт вендора в интегрированном браузере, и приложение обращается к вендору с той же сессией. Поддерживаются ${vendorList(accounts.families)}. Не все способы входа поддерживаются, поэтому иногда придётся отказаться от входа через соцсети или Google.`}
+              description={`Привяжите аккаунт для работы без API-ключа. OpenAI запрашивает разрешение на использование подписки ChatGPT в системном браузере. Остальные аккаунты используют встроенный браузер. Поддерживаются ${vendorList(accounts.families)}.`}
               action={<AccountLoginMenu />}
             />
           </div>
@@ -127,7 +127,7 @@ function AccountsTab() {
               checking={accounts.refreshingId === account.id}
               unlinking={accounts.unlinkingId === account.id}
               onRelink={() => {
-                void accounts.link(account.adapter);
+                void accounts.link(account.adapter, account.id);
               }}
               onRecheck={() => {
                 void accounts.refresh(account.id);

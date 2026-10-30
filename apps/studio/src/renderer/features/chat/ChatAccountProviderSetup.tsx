@@ -4,6 +4,7 @@ import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import Icon from "../../ui/atoms/Icon";
 import Toggle from "../../ui/atoms/Toggle";
+import SegmentedControl from "../../ui/atoms/SegmentedControl";
 import { ACCOUNT_VENDOR_MARKS, adapterLabel } from "../providers/accountPresentation";
 import {
   ACCOUNT_SETUP_UNAVAILABLE,
@@ -86,7 +87,34 @@ export default observer(function ChatAccountProviderSetup({
         rounded=""
         className="rounded-card border-line bg-main-900 p-4 shadow-pop"
       >
-        {family === "qwen-web" ? (
+        {family === "openai" ? (
+          <div className="space-y-4">
+            <div>
+              <EffortSlider
+                label="Усилие рассуждения"
+                value={store.composer.effort}
+                labels={{ fast: "Низкое", auto: "Авто", thinking: "Высокое" }}
+                disabled={!store.canConfigure || store.changingOpenaiMode}
+                onChange={store.composer.setEffort}
+              />
+            </div>
+            <p className="text-[12.5px] font-medium text-main-100">Подключение OpenAI</p>
+            <fieldset disabled={!store.canConfigure || store.changingOpenaiMode}>
+              <SegmentedControl
+                label="Способ подключения OpenAI"
+                value={store.openaiMode}
+                options={[
+                  { value: "direct", label: "Веб-аккаунт" },
+                  { value: "codex", label: "Codex" },
+                ]}
+                onChange={(mode) => void store.setOpenaiMode(mode)}
+              />
+            </fieldset>
+            <p className="text-[11.5px] leading-snug text-main-500">
+              Для режима Codex требуется установленный Codex CLI.
+            </p>
+          </div>
+        ) : family === "qwen-web" ? (
           <QwenSetup store={store} />
         ) : (
           <p className="text-[12.5px] text-main-500">{ACCOUNT_SETUP_UNAVAILABLE}</p>

@@ -12,6 +12,7 @@ use super::errors::{Headers, request_failed};
 
 pub mod account;
 pub mod api;
+pub mod openai;
 pub mod session;
 
 pub use account::{
@@ -121,6 +122,10 @@ pub type ByteStream = BoxStream<'static, Result<Vec<u8>, AppError>>;
 #[async_trait]
 pub trait Transport: Send + Sync {
     fn base_url(&self) -> &str;
+
+    async fn oauth_token(&self, _cancel: &CancellationToken) -> Result<String, AppError> {
+        Err(crate::drivers::ai::openai::auth_error())
+    }
 
     async fn request(
         &self,

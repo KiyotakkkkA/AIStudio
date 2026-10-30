@@ -40,6 +40,8 @@ use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 use crate::platform::navigation::{SharedNavigator, WorkspaceRoute};
 
+mod openai;
+
 pub const LINK_TIMEOUT: Duration = Duration::from_secs(180);
 pub const POLL_INTERVAL: Duration = Duration::from_secs(2);
 pub const AUTO_REFRESH_TICK: Duration = Duration::from_secs(60);
@@ -62,6 +64,10 @@ pub const LINKING_FAILED: &str = "Не удалось привязать акк�
 #[async_trait]
 pub trait AccountBrowser: Send + Sync {
     async fn open_tab(&self, url: &str) -> Result<(), AppError>;
+
+    async fn open_external(&self, url: &str) -> Result<(), AppError> {
+        self.open_tab(url).await
+    }
 }
 
 pub type SharedAccountBrowser = Arc<dyn AccountBrowser>;
@@ -297,6 +303,20 @@ impl AccountService {
             .collect()
     }
 
+    pub async fn open_usage(&self, id: &str) -> Result<(), AppError> {
+        let row = self.inner.require(id)?;
+        if row.family() != Some(AccountFamily::Openai) {
+            return Err(AppError::new(
+                AppErrorCode::NotImplemented,
+                "Страница расхода подписки недоступна для этого аккаунта",
+            ));
+        }
+        self.inner
+            .browser
+            .open_external("https://chatgpt.com/#settings/Usage")
+            .await
+    }
+
     pub fn start_auto_refresh(&self) -> Result<(), AppError> {
         self.inner.require_active()?;
         let mut auto = lock(&self.inner.auto);
@@ -385,6 +405,14 @@ impl AccountService {
         &self,
         adapter: AccountFamily,
     ) -> BoxFuture<'static, Result<AccountLinkResult, AppError>> {
+        self.link_account(adapter, None)
+    }
+
+    pub fn link_account(
+        &self,
+        adapter: AccountFamily,
+        account_id: Option<String>,
+    ) -> BoxFuture<'static, Result<AccountLinkResult, AppError>> {
         if let Err(error) = self.inner.require_active() {
             return ready(Err(error)).boxed();
         }
@@ -413,7 +441,11 @@ impl AccountService {
         let inner = Arc::clone(&self.inner);
         let token = cancel.clone();
         let task = runtime.spawn(async move {
-            let result = inner.poll(adapter, &token).await;
+            let result = if adapter == AccountFamily::Openai {
+                inner.link_openai(account_id.as_deref(), &token).await
+            } else {
+                inner.poll(adapter, &token).await
+            };
             let mut links = lock(&inner.links);
             if links.get(&adapter).is_some_and(|pending| pending.id == id) {
                 links.remove(&adapter);
@@ -469,6 +501,20 @@ impl AccountService {
             removed: true,
             browser_session_preserved: true,
         })
+    }
+
+    pub async fn disconnect(&self, id: &str) -> Result<AccountsUnlinkOutput, AppError> {
+        let row = self.inner.require(id)?;
+        if row.family() == Some(AccountFamily::Openai) {
+            self.cancel_link(AccountFamily::Openai);
+            if let Some(pending) = lock(&self.inner.refreshes).get(id) {
+                pending.cancel.cancel();
+            }
+            if let Some(secret_id) = &row.token_secret_id {
+                crate::drivers::ai::openai::revoke(self.inner.secrets.as_ref(), secret_id).await?;
+            }
+        }
+        self.unlink(id)
     }
 
     pub fn refresh(&self, id: &str) -> BoxFuture<'static, Result<AccountDto, AppError>> {
@@ -554,12 +600,17 @@ impl AccountService {
     fn browser_event(&self, event: &BrowserLifecycleEvent) {
         match event {
             BrowserLifecycleEvent::WorkspaceClosed => {
-                for pending in lock(&self.inner.links).values() {
-                    pending.cancel.cancel();
+                for (family, pending) in lock(&self.inner.links).iter() {
+                    if *family != AccountFamily::Openai {
+                        pending.cancel.cancel();
+                    }
                 }
             }
             BrowserLifecycleEvent::LinkTabClosed { url } => {
                 for family in AccountFamily::ALL {
+                    if *family == AccountFamily::Openai {
+                        continue;
+                    }
                     if self.inner.probe(*family).login_url() == url {
                         self.cancel_link(*family);
                     }
@@ -573,6 +624,9 @@ impl AccountService {
     fn cookies_cleared(&self, domain: &str) {
         let domain = domain.strip_prefix('.').unwrap_or(domain).to_lowercase();
         for family in AccountFamily::ALL {
+            if *family == AccountFamily::Openai {
+                continue;
+            }
             let Some(host) = host_of(self.inner.probe(*family).login_url()) else {
                 continue;
             };
@@ -822,6 +876,9 @@ impl Inner {
         row: AccountRow,
         cancel: &CancellationToken,
     ) -> Result<AccountDto, AppError> {
+        if row.family() == Some(AccountFamily::Openai) {
+            return self.refresh_openai(row, cancel).await;
+        }
         let deadline = Deadline {
             at: Instant::now() + self.timeout,
             cancel,
@@ -881,10 +938,14 @@ impl Inner {
             let matching = repositories
                 .accounts
                 .find_by_adapter_and_external_id(adapter, &identity.external_id)?;
-            let replaced = previous
-                .iter()
-                .any(|row| row.external_id != identity.external_id);
+            let replaced = adapter != AccountFamily::Openai
+                && previous
+                    .iter()
+                    .any(|row| row.external_id != identity.external_id);
             for row in &previous {
+                if adapter == AccountFamily::Openai {
+                    continue;
+                }
                 if matching.as_ref().is_some_and(|kept| kept.id == row.id) {
                     continue;
                 }
@@ -914,7 +975,11 @@ impl Inner {
                     None => {
                         let mut input = SecretCreateInput::new(
                             ACCOUNT_TOKEN_SECRET_TYPE,
-                            format!("{adapter} account token"),
+                            if adapter == AccountFamily::Openai {
+                                format!("OpenAI · {}", new_id())
+                            } else {
+                                format!("{adapter} account token")
+                            },
                             SecretScope::Personal,
                         );
                         input.value = Some(Plaintext::new(credential.token.clone()));
@@ -953,7 +1018,11 @@ impl Inner {
                     last_checked_at: Some(now),
                     ..AccountDraft::new(
                         adapter,
-                        BROWSER_PARTITION,
+                        if adapter == AccountFamily::Openai {
+                            "oauth:openai"
+                        } else {
+                            BROWSER_PARTITION
+                        },
                         identity.external_id.clone(),
                         now,
                     )
@@ -964,10 +1033,13 @@ impl Inner {
             {
                 self.secrets.remove_in(&repositories, secret_id)?;
             }
-            // Providers left without an account (by a replaced identity or earlier) follow it.
-            let attached = repositories
-                .accounts
-                .attach_orphans(adapter, &row.id, now)?;
+            let attached = if adapter == AccountFamily::Openai {
+                Vec::new()
+            } else {
+                repositories
+                    .accounts
+                    .attach_orphans(adapter, &row.id, now)?
+            };
             if !attached.is_empty() {
                 self.logger.log(
                     LogLevel::Info,

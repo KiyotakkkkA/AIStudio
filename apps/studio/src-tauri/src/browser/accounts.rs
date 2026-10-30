@@ -18,6 +18,10 @@ fn unavailable(reason: &str) -> AppError {
 
 #[async_trait]
 impl AccountBrowser for WorkspaceOpener {
+    async fn open_external(&self, url: &str) -> Result<(), AppError> {
+        zvs_host::platform::external::open_in_system_browser(url)
+    }
+
     async fn open_tab(&self, url: &str) -> Result<(), AppError> {
         let workspace = self.0.clone();
         let url = url.to_owned();

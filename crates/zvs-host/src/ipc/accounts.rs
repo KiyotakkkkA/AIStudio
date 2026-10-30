@@ -8,13 +8,22 @@ use crate::services::Services;
 pub fn register(server: &mut IpcServer) {
     server
         .handle(
+            "accounts.openUsage",
+            |services: Arc<Services>, input: AccountRef| async move {
+                services.accounts.open_usage(&input.id.to_string()).await
+            },
+        )
+        .handle(
             "accounts.list",
             |services: Arc<Services>, _input: ()| async move { services.accounts.list() },
         )
         .handle(
             "accounts.link",
             |services: Arc<Services>, input: AccountLinkInput| async move {
-                services.accounts.link(input.adapter).await
+                services
+                    .accounts
+                    .link_account(input.adapter, input.account_id.map(|id| id.to_string()))
+                    .await
             },
         )
         .handle(
@@ -28,7 +37,7 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "accounts.unlink",
             |services: Arc<Services>, input: AccountRef| async move {
-                services.accounts.unlink(&input.id.to_string())
+                services.accounts.disconnect(&input.id.to_string()).await
             },
         )
         .handle(

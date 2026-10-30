@@ -1,0 +1,20 @@
+[
+  {
+    "name": "reported windows",
+    "value": {
+      "source": "codex",
+      "windows": [{ "label": "Основной лимит", "usedPercent": 42.5, "resetsAt": 2000000000000 }],
+      "detail": null,
+      "checkedAt": 1700000000000
+    }
+  },
+  {
+    "name": "no published metrics",
+    "value": {
+      "source": "direct",
+      "windows": [],
+      "detail": "Данные недоступны",
+      "checkedAt": 1700000000000
+    }
+  }
+]

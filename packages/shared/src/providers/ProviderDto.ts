@@ -11,6 +11,7 @@ export const BaseUrl = z.url().max(2048);
 export type BaseUrl = z.infer<typeof BaseUrl>;
 
 export const ProviderSettingsDto = z.object({
+  openaiMode: z.enum(["direct", "codex"]).optional(),
   // External vendor IDs also identify models selected from an unsaved draft probe.
   selectedModelIds: z.array(z.string().min(1)).optional(),
   temperature: z.number().min(0).max(2).optional(),
@@ -20,6 +21,21 @@ export const ProviderSettingsDto = z.object({
   timeoutSeconds: z.number().int().min(1).max(600).optional(),
 });
 export type ProviderSettingsDto = z.infer<typeof ProviderSettingsDto>;
+
+export const ProviderUsageWindowDto = z.object({
+  label: z.string(),
+  usedPercent: z.number().min(0).max(100),
+  resetsAt: Timestamp.nullable(),
+});
+export type ProviderUsageWindowDto = z.infer<typeof ProviderUsageWindowDto>;
+
+export const ProviderUsageDto = z.object({
+  source: z.string(),
+  windows: z.array(ProviderUsageWindowDto),
+  detail: z.string().nullable(),
+  checkedAt: Timestamp,
+});
+export type ProviderUsageDto = z.infer<typeof ProviderUsageDto>;
 
 export const ModelDto = z.object({
   isFree: z.boolean().nullable().optional(),

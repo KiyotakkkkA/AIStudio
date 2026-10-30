@@ -173,6 +173,24 @@ impl Drop for Settle {
 }
 
 impl ProviderService {
+    pub async fn usage(
+        &self,
+        id: &str,
+    ) -> Result<Option<zvs_contract::ProviderUsageDto>, AppError> {
+        let row = self
+            .inner
+            .database
+            .with_connection(|connection| {
+                Ok(Repositories::new(connection).providers.find_by_id(id)?)
+            })?
+            .ok_or_else(|| AppError::new(AppErrorCode::NotFound, "Провайдер не найден"))?;
+        let driver = self.inner.drivers.ephemeral_driver(&row).await?;
+        match driver.text {
+            Some(text) => text.usage(&self.inner.shutdown).await,
+            None => Ok(None),
+        }
+    }
+
     pub fn new(options: ProviderServiceOptions) -> Self {
         Self {
             inner: Arc::new(Inner {

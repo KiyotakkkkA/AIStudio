@@ -1,0 +1,4 @@
+[
+  { "name": "negative usage", "value": { "label": "Лимит", "usedPercent": -1, "resetsAt": null } },
+  { "name": "usage above 100", "value": { "label": "Лимит", "usedPercent": 101, "resetsAt": null } }
+]

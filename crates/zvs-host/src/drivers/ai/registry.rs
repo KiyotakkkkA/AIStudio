@@ -113,12 +113,13 @@ impl DatabaseAccounts {
         })
     }
 
-    /// An account-mode provider without an account uses the family's only linked account,
-    /// and is bound to it, so a relink never leaves the user to reattach providers by hand.
     fn adopt(&self, provider: &ProviderRow) -> Result<Option<AccountRow>, AppError> {
         let Some(family) = zvs_contract::AccountFamily::parse(&provider.adapter) else {
             return Ok(None);
         };
+        if family == zvs_contract::AccountFamily::Openai {
+            return Ok(None);
+        }
         let now = crate::platform::clock::Clock::now(&crate::platform::clock::SystemClock);
         let adopted = self.database.transaction(|transaction| {
             let repositories = Repositories::new(transaction);
@@ -186,6 +187,21 @@ impl AccountPort for DatabaseAccounts {
 
     fn transport(&self, provider: &ProviderRow) -> Result<SharedTransport, AppError> {
         let account = self.linked(provider)?;
+        if provider.adapter == "openai" {
+            if account.adapter != "openai"
+                || provider.base_url.trim_end_matches('/') != zvs_openai::API_BASE
+            {
+                return Err(account_not_linked(provider));
+            }
+            return Ok(Arc::new(super::transport::openai::OpenaiTransport {
+                secret_id: account
+                    .token_secret_id
+                    .ok_or_else(super::openai::auth_error)?,
+                secrets: self.secrets.clone(),
+                http: HttpClient::new()?,
+                timeout_seconds: provider.settings.timeout_seconds(),
+            }));
+        }
         let Some(sessions) = &self.sessions else {
             return Err(
                 AppError::new(AppErrorCode::ValidationFailed, BROWSER_SESSION_UNAVAILABLE)
@@ -363,6 +379,12 @@ impl ProviderRegistry {
             Self::require_auth_mode(&entry.capabilities, row)?;
         }
         let context = AdapterContext {
+            openai_codex: row
+                .settings
+                .0
+                .get("openaiMode")
+                .and_then(serde_json::Value::as_str)
+                == Some("codex"),
             transport: if local {
                 None
             } else {

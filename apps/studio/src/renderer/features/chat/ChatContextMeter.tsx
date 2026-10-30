@@ -1,4 +1,5 @@
 import { observer } from "mobx-react-lite";
+import { useEffect } from "react";
 import { isBuiltinTool, toolTitle as builtinTitle } from "./toolCallCopy";
 import { Dropdown, Tooltip } from "@kiyotakkkka/zvs-uikit-lib";
 import type { ChatContextDto, ToolDto } from "@zvs/shared";
@@ -158,6 +159,12 @@ function toolHint(tool: ToolDto): string {
 }
 
 export default observer(function ChatContextMeter({ store }: { readonly store: ChatStore }) {
+  const providerId = store.provider?.id;
+  const openaiMode = store.openaiMode;
+  const generating = store.generating;
+  useEffect(() => {
+    if (!generating) void store.refreshProviderUsage();
+  }, [store, providerId, openaiMode, generating]);
   const context = store.context;
   const limit = store.contextWindow;
   const parts = context ? segments(context) : [];
@@ -171,6 +178,9 @@ export default observer(function ChatContextMeter({ store }: { readonly store: C
     <Dropdown menuWidth={340} menuPlacement="top-right">
       <Tooltip label="Контекстное окно" placement="top-center" className="">
         <Dropdown.Trigger
+          onClick={() => {
+            if (!store.usageLoading) void store.refreshProviderUsage();
+          }}
           aria-label={`Контекстное окно: ${summary}`}
           icon={false}
           className={`h-8 w-auto justify-center gap-0 border-none cursor-auto bg-transparent px-2 hover:bg-main-800 ${
@@ -243,6 +253,53 @@ export default observer(function ChatContextMeter({ store }: { readonly store: C
           ) : null}
 
           {context !== null ? <ToolUsage store={store} context={context} /> : null}
+
+          {store.providerUsage !== null || store.accountFamily === "openai" ? (
+            <section className="space-y-2">
+              <p className="font-semibold text-main-100">Лимиты провайдера</p>
+              {store.usageLoading ? (
+                <p className="text-[11.5px] text-main-500">Загрузка лимитов…</p>
+              ) : null}
+              {store.providerUsage?.windows.map((window) => (
+                <div key={window.label} className="space-y-1">
+                  <Row
+                    label={window.label}
+                    value={`${window.usedPercent.toLocaleString("ru-RU")}%`}
+                  />
+                  <StackedBar
+                    parts={[
+                      {
+                        key: "used",
+                        value: window.usedPercent,
+                        fill: window.usedPercent >= 85 ? "bg-warn" : "bg-accent-dark",
+                      },
+                    ]}
+                    total={100}
+                    className="h-1.5"
+                  />
+                  {window.resetsAt !== null ? (
+                    <p className="text-[11px] text-main-500">
+                      Обновление: {new Date(window.resetsAt).toLocaleString("ru-RU")}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+              {store.providerUsage?.detail || store.providerUsageError ? (
+                <p className="text-[11.5px] leading-snug text-main-500">
+                  {store.providerUsageError ?? store.providerUsage?.detail}
+                </p>
+              ) : null}
+              {store.accountFamily === "openai" ? (
+                <button
+                  type="button"
+                  onClick={() => void store.openProviderUsage()}
+                  className="text-[11.5px] text-accent-medium"
+                >
+                  Расход подписки в ChatGPT
+                </button>
+              ) : null}
+            </section>
+          ) : null}
 
           {last !== undefined ? (
             <section>

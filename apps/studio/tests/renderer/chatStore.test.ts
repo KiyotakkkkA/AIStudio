@@ -18,6 +18,7 @@ import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import ChatStore, { SELECTIONS_FULL } from "../../src/renderer/features/chat/ChatStore.ts";
 import { shouldPinToBottom } from "../../src/renderer/features/chat/scroll.ts";
 import { ADAPTERS, MODEL, model, provider } from "./providerFixtures.ts";
+import { account as accountFixture } from "./accountFixtures.ts";
 
 const id = "0199bb11-4444-7111-8111-000000000001";
 const handle = RunHandleDto.parse({
@@ -68,6 +69,87 @@ function setup() {
 }
 
 afterEach(() => vi.useRealTimers());
+
+test("OpenAI registrations have distinct labels in the provider picker", () => {
+  const { store } = setup();
+  const first = accountFixture({ adapter: "openai", displayName: "Person · first" });
+  const second = accountFixture({
+    adapter: "openai",
+    displayName: "Person · second",
+    id: "0199bb11-4444-7111-8111-000000000002" as AccountDto["id"],
+  });
+  store.accounts = [first, second];
+  store.adapters = [{ ...ADAPTERS[1]!, family: "openai" }];
+  expect(store.accountChoices).toHaveLength(2);
+  expect(new Set(store.accountChoices.map((choice) => choice.label)).size).toBe(2);
+  expect(store.accountChoices[0]?.label).toContain(first.displayName);
+});
+
+test("OpenAI mode is persisted without dropping provider settings or the selected model", async () => {
+  const { store, bridge } = setup();
+  const openai = provider({
+    adapter: "openai",
+    authMode: "account",
+    settings: { selectedModelIds: ["selected"], timeoutSeconds: 120 },
+  });
+  store.providers = [openai];
+  store.composer.selectProvider(openai);
+  const selected = store.modelId;
+  bridge.handle("providers.update", (input) => ({
+    ...openai,
+    settings: input.settings ?? openai.settings,
+  }));
+  await store.setOpenaiMode("codex");
+  expect(store.openaiMode).toBe("codex");
+  expect(store.provider?.settings).toEqual({
+    selectedModelIds: ["selected"],
+    timeoutSeconds: 120,
+    openaiMode: "codex",
+  });
+  expect(store.modelId).toBe(selected);
+  store.sending = true;
+  await store.setOpenaiMode("direct");
+  expect(store.openaiMode).toBe("codex");
+});
+
+test("provider usage from an old selection cannot replace the current provider's limits", async () => {
+  const { store, bridge } = setup();
+  const first = provider({ adapter: "openai", authMode: "account" });
+  const second = provider({
+    id: "0199bb11-1111-7111-8111-000000000002" as ProviderId,
+    adapter: "openai",
+    authMode: "account",
+  });
+  store.providers = [first, second];
+  store.composer.selectProvider(first);
+  let complete: (value: {
+    source: string;
+    windows: [];
+    detail: null;
+    checkedAt: number;
+  }) => void = () => undefined;
+  bridge.handle(
+    "providers.usage",
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+  );
+  const pending = store.refreshProviderUsage();
+  await Promise.resolve();
+  store.composer.selectProvider(second);
+  bridge.handle("providers.usage", () => ({
+    source: "second",
+    windows: [],
+    detail: null,
+    checkedAt: 123,
+  }));
+  await store.refreshProviderUsage();
+  complete({ source: "first", windows: [], detail: null, checkedAt: 100 });
+  await pending;
+  expect(store.providerUsage?.source).toBe("second");
+  expect(store.usageLoading).toBe(false);
+});
 
 test("retrieval cards use real step results including zero hits, and approvals are explicit", async () => {
   const { store, events, bridge, setDetail } = setup();
@@ -474,6 +556,31 @@ test("a Qwen account turn carries the chosen effort and search, other providers 
   store.dispose();
   events.dispose();
 });
+
+test.each(["direct", "codex"] as const)(
+  "OpenAI %s turns send effort without Qwen web search",
+  async (openaiMode) => {
+    const { store, bridge, events } = setup();
+    const openai = provider({
+      adapter: "openai",
+      authMode: "account",
+      settings: { openaiMode },
+      models: [model({ id: MODEL, externalId: "selected" })],
+    });
+    bridge.handle("providers.list", () => [openai]).handle("providers.get", () => openai);
+    await store.mount();
+    store.composer.selectProvider(openai);
+    store.composer.setEffort("thinking");
+    store.composer.setWebSearch(true);
+    store.composer.setText("Задача");
+    await store.send();
+    const sent = bridge.calls.filter((call) => call.channel === "chat.send");
+    expect(sent.at(-1)?.payload).toMatchObject({ vendor: { effort: "thinking" } });
+    expect(store.vendorOptions).toEqual({ effort: "thinking", webSearch: false });
+    store.dispose();
+    events.dispose();
+  },
+);
 
 test("attaching past the limit reports it instead of dropping silently", async () => {
   const { store, events } = setup();

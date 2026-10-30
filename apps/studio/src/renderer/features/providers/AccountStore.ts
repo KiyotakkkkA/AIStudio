@@ -89,14 +89,17 @@ export class AccountStore {
     }
   }
 
-  async link(adapter: AccountFamily): Promise<void> {
+  async link(adapter: AccountFamily, accountId?: AccountId): Promise<void> {
     if (this.busy) return;
     this.error = null;
     this.linkStream = null;
     this.linking = { adapter, phase: "waiting", detail: null, elapsedMs: 0, totalMs: 0 };
     this.watch();
     try {
-      const result = await this.ipc.call("accounts.link", { adapter });
+      const result = await this.ipc.call("accounts.link", {
+        adapter,
+        ...(accountId ? { accountId } : {}),
+      });
       const linked = result.status === "linked";
       runInAction(() => {
         this.unwatch();

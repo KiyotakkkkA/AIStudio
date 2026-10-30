@@ -25,6 +25,204 @@ use crate::testing::{
 
 const QWEN: AccountFamily = AccountFamily::QwenWeb;
 
+fn openai_credentials(client: &str, subject: &str) -> zvs_openai::Credentials {
+    zvs_openai::Credentials {
+        client_id: client.to_owned(),
+        host_id: "urn:uuid:host".to_owned(),
+        subject: subject.to_owned(),
+        email: Some("person@example.com".to_owned()),
+        name: Some("Person".to_owned()),
+        access_token: "private-openai-access".to_owned(),
+        refresh_token: "private-openai-refresh".to_owned(),
+        id_token: "private-openai-id-token".to_owned(),
+        scope: zvs_openai::SCOPES.to_owned(),
+        expires_at: 2_000_000_000,
+        earliest_refresh_at: None,
+    }
+}
+
+#[tokio::test]
+async fn openai_registrations_are_separate_and_cookies_do_not_revoke_oauth() {
+    let harness = harness();
+    harness
+        .service
+        .inner
+        .save_openai(openai_credentials("client-a", "subject"))
+        .expect("first");
+    harness
+        .service
+        .inner
+        .save_openai(openai_credentials("client-b", "subject"))
+        .expect("second");
+    let accounts = harness.list();
+    assert_eq!(accounts.len(), 2);
+    assert_eq!(harness.secret_count(), 2);
+    let printed = serde_json::to_string(&accounts).expect("DTOs");
+    assert!(!printed.contains("private-openai"));
+    assert!(!printed.contains("person@example.com"));
+    harness
+        .service
+        .refresh(&accounts[0].id.to_string())
+        .await
+        .expect("saved OAuth session");
+    harness
+        .lifecycle
+        .emit(&BrowserLifecycleEvent::CookiesCleared {
+            domain: "openai.com".to_owned(),
+        });
+    assert!(
+        harness
+            .list()
+            .iter()
+            .all(|account| account.status == AccountStatus::Linked)
+    );
+    harness
+        .service
+        .inner
+        .save_openai(openai_credentials("client-a", "subject"))
+        .expect("same registration");
+    assert_eq!(harness.list().len(), 2);
+    assert_eq!(harness.secret_count(), 2);
+}
+
+#[tokio::test]
+async fn openai_without_plan_permission_is_saved_without_enabling_inference() {
+    let harness = harness();
+    let mut credentials = openai_credentials("client", "subject");
+    credentials.scope = "openid profile email".to_owned();
+    harness
+        .service
+        .inner
+        .save_openai(credentials)
+        .expect("identity saved");
+    assert_eq!(harness.first().status, AccountStatus::NeedsRelink);
+    assert_eq!(harness.secret_count(), 1);
+}
+
+#[tokio::test]
+async fn account_usage_opens_only_the_fixed_openai_page() {
+    let harness = harness();
+    harness
+        .service
+        .inner
+        .save_openai(openai_credentials("client", "subject"))
+        .expect("saved");
+    let id = harness.first().id.to_string();
+    harness.service.open_usage(&id).await.expect("opened");
+    assert_eq!(
+        harness.browser.opened(),
+        ["https://chatgpt.com/#settings/Usage"]
+    );
+    assert!(harness.service.open_usage("missing").await.is_err());
+}
+
+#[tokio::test]
+async fn an_openai_provider_without_an_account_never_adopts_a_new_registration() {
+    let harness = harness();
+    harness
+        .service
+        .inner
+        .save_openai(openai_credentials("old-client", "subject"))
+        .expect("original registration");
+    let original_id = harness.first().id.to_string();
+    let orphan = harness
+        .database
+        .with_connection(|connection| {
+            Repositories::new(connection)
+                .providers
+                .create(&ProviderDraft {
+                    adapter: AdapterFamily::Openai,
+                    auth_mode: AuthMode::Account,
+                    account_id: Some(original_id.clone()),
+                    ..ProviderDraft::new(
+                        ProviderKind::OpenaiCompatible,
+                        "OpenAI orphan",
+                        zvs_openai::API_BASE,
+                        vec![ProviderCapability::Text],
+                        harness.clock.now(),
+                    )
+                })
+        })
+        .expect("orphan provider");
+    harness
+        .database
+        .with_connection(|connection| {
+            Ok(Repositories::new(connection)
+                .accounts
+                .remove(&original_id, harness.clock.now())?)
+        })
+        .expect("detach original registration");
+    let orphan = harness.provider(&orphan.id);
+    harness
+        .service
+        .inner
+        .save_openai(openai_credentials("new-client", "subject"))
+        .expect("new registration");
+    assert!(harness.provider(&orphan.id).account_id.is_none());
+    let accounts = crate::drivers::ai::registry::DatabaseAccounts::new(
+        harness.database.shared(),
+        None,
+        harness.secrets.clone(),
+        silent_logger(),
+    );
+    let error = crate::drivers::ai::registry::AccountPort::transport(&accounts, &orphan)
+        .err()
+        .expect("explicit binding required");
+    assert_eq!(error.code, AppErrorCode::ProviderSessionExpired);
+    assert!(harness.provider(&orphan.id).account_id.is_none());
+}
+
+#[tokio::test]
+async fn openai_link_uses_a_stable_host_and_reuses_the_selected_registration() {
+    let harness = harness();
+    let first = harness.service.link(AccountFamily::Openai);
+    settle().await;
+    let opened = harness.browser.opened();
+    assert_eq!(opened.len(), 1);
+    let url = Url::parse(&opened[0]).expect("authorization URL");
+    let first_query = url.query_pairs().into_owned().collect::<HashMap<_, _>>();
+    assert_eq!(first_query["client_id"], "dynamic_agent_client");
+    assert_eq!(first_query["code_challenge_method"], "S256");
+    let host = first_query["ext_agent_host_id"].clone();
+    let id =
+        uuid::Uuid::parse_str(host.strip_prefix("urn:uuid:").expect("UUID URI")).expect("UUID");
+    assert_eq!(id.get_version_num(), 4);
+    assert!(harness.service.cancel_link(AccountFamily::Openai).cancelled);
+    assert!(matches!(
+        first.await.expect("cancelled"),
+        AccountLinkResult::Cancelled { .. }
+    ));
+    assert!(matches!(&harness.sink.events().last().expect("end").body,
+        HostEventDraft::End { outcome } if outcome.status == RunOutcomeStatus::Cancelled));
+
+    let mut saved_registration = openai_credentials("saved-client", "subject");
+    saved_registration.scope = "openid profile email".to_owned();
+    harness
+        .service
+        .inner
+        .save_openai(saved_registration)
+        .expect("registration");
+    let account = harness.first();
+    let second = harness
+        .service
+        .link_account(AccountFamily::Openai, Some(account.id.to_string()));
+    settle().await;
+    let opened = harness.browser.opened();
+    let url = Url::parse(&opened[1]).expect("reauthorization URL");
+    let second_query = url.query_pairs().into_owned().collect::<HashMap<_, _>>();
+    assert_eq!(second_query["client_id"], "saved-client");
+    assert_eq!(second_query["prompt"], "consent");
+    assert_eq!(second_query["ext_agent_host_id"], host);
+    assert_ne!(second_query["state"], first_query["state"]);
+    assert!(!second_query.contains_key("agent_name_hint"));
+    harness.service.cancel_link(AccountFamily::Openai);
+    assert!(matches!(
+        second.await.expect("cancelled"),
+        AccountLinkResult::Cancelled { .. }
+    ));
+    assert_eq!(harness.list().len(), 1);
+}
+
 struct Harness {
     database: TemporaryDatabase,
     secrets: Arc<SecretService>,

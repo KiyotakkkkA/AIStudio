@@ -633,6 +633,12 @@ known dialect must be a row, not a file.**
 
 ### Accounts
 
+OpenAI's `openai` account family uses the public ChatGPT-plan OAuth flow instead of browser
+cookies. Credentials remain in encrypted secrets; multiple issued-client/subject registrations
+are independent. Its provider setting selects direct Responses or Codex app-server with the
+same OAuth grant. The context meter reads `providers.usage`, showing reported windows or an
+explicit unavailable state. See [ADR 0005](adr/0005-openai-chatgpt-plan-oauth.md).
+
 An `account` row is an identity linked from the browser session: external id, masked email,
 display name, avatar, optional bearer-token secret ref, expiry, status, profile (the column
 keeps its Electron-era name, `partition`). Its

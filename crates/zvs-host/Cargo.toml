@@ -6,7 +6,7 @@ publish.workspace = true
 license.workspace = true
 
 [features]
-testing = ["dep:tempfile"]
+testing = []
 debug-panic = []
 
 [dependencies]
@@ -15,10 +15,11 @@ base64.workspace = true
 encoding_rs.workspace = true
 flate2.workspace = true
 futures.workspace = true
+jsonwebtoken = { version = "=11.1.0", default-features = false, features = ["rust_crypto"] }
 notify.workspace = true
 portable-pty.workspace = true
 regex.workspace = true
-reqwest = { workspace = true, features = ["system-proxy"] }
+reqwest = { workspace = true, features = ["system-proxy", "json"] }
 rmcp.workspace = true
 rusqlite.workspace = true
 schemars.workspace = true
@@ -28,7 +29,7 @@ sha2.workspace = true
 sse-stream.workspace = true
 sysinfo.workspace = true
 tar.workspace = true
-tempfile = { workspace = true, optional = true }
+tempfile.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["rt", "time", "macros", "sync", "process", "io-util", "net"] }
 tokio-util.workspace = true
@@ -37,6 +38,7 @@ uuid = { workspace = true, features = ["v4", "v7"] }
 zeroize.workspace = true
 zvs-contract = { path = "../zvs-contract", features = ["schema"] }
 zvs-core = { path = "../zvs-core" }
+zvs-openai = { path = "../zvs-openai" }
 zvs-qwen-web = { path = "../zvs-qwen-web" }
 zvs-zai-web = { path = "../zvs-zai-web" }
 axum.workspace = true

@@ -1,4 +1,5 @@
 [
+  { "name": "unknown OpenAI route", "value": { "openaiMode": "web" } },
   {
     "name": "temperature above two",
     "value": {

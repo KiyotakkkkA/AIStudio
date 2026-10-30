@@ -34,3 +34,4 @@ pub use transport::{
     SecretResolver, SessionGateway, SessionRequest, SessionResponse, SharedSecretResolver,
     SharedSessionGateway, SharedTransport, Transport, TransportResponse,
 };
+pub mod openai;

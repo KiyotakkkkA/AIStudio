@@ -34,6 +34,7 @@ import {
   type McpServerDto,
   type MessageId,
   type ProviderDto,
+  type ProviderUsageDto,
   type QuestionAnswerDto,
   type QuestionRequestDto,
   type RetrievalMode,
@@ -46,7 +47,7 @@ import {
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import ConversationVm from "./ConversationVm";
-import { adapterLabel } from "../providers/accountPresentation";
+import { accountProviderLabel } from "../providers/accountPresentation";
 import { suggestedBaseUrl } from "../providers/providerPresentation";
 import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
 import ArtifactActions from "./ArtifactActions";
@@ -89,6 +90,10 @@ export default class ChatStore {
   commandIndex = 0;
   commandsDismissed = false;
   context: ChatContextDto | null = null;
+  providerUsage: ProviderUsageDto | null = null;
+  providerUsageError: string | null = null;
+  usageLoading = false;
+  changingOpenaiMode = false;
   connecting = false;
   connectingAccountId: AccountId | null = null;
   composer = new ConversationVm();
@@ -146,6 +151,7 @@ export default class ChatStore {
   private ready = false;
   private retryText = "";
   private contextRevision = 0;
+  private usageRevision = 0;
   private stopContext: (() => void) | undefined;
   private attaching = false;
   private contiguous = false;
@@ -177,6 +183,7 @@ export default class ChatStore {
       | "ready"
       | "retryText"
       | "contextRevision"
+      | "usageRevision"
       | "stopContext"
       | "attaching"
       | "contiguous"
@@ -204,6 +211,7 @@ export default class ChatStore {
         ready: false,
         retryText: false,
         contextRevision: false,
+        usageRevision: false,
         stopContext: false,
         attaching: false,
         contiguous: false,
@@ -216,6 +224,88 @@ export default class ChatStore {
   get generating() {
     return this.sending || this.run !== null;
   }
+  get openaiMode(): "direct" | "codex" {
+    return this.provider?.settings.openaiMode ?? "direct";
+  }
+
+  async setOpenaiMode(mode: "direct" | "codex") {
+    const provider = this.provider;
+    if (
+      !provider ||
+      this.accountFamily !== "openai" ||
+      !this.canConfigure ||
+      this.changingOpenaiMode
+    )
+      return;
+    this.changingOpenaiMode = true;
+    try {
+      const updated = await this.ipc.call("providers.update", {
+        id: provider.id,
+        settings: { ...provider.settings, openaiMode: mode },
+      });
+      runInAction(() => {
+        this.providers = this.providers.map((item) => (item.id === updated.id ? updated : item));
+        this.providerUsage = null;
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.error = errorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.changingOpenaiMode = false;
+      });
+    }
+  }
+
+  async refreshProviderUsage() {
+    const revision = ++this.usageRevision;
+    const provider = this.provider;
+    this.providerUsage = null;
+    this.providerUsageError = null;
+    if (!provider) {
+      this.usageLoading = false;
+      return;
+    }
+    const mode = provider.settings.openaiMode;
+    this.usageLoading = true;
+    try {
+      const usage = await this.ipc.call("providers.usage", { id: provider.id });
+      runInAction(() => {
+        if (
+          revision === this.usageRevision &&
+          this.provider?.id === provider.id &&
+          this.provider.settings.openaiMode === mode
+        )
+          this.providerUsage = usage;
+      });
+    } catch {
+      runInAction(() => {
+        if (
+          revision === this.usageRevision &&
+          this.provider?.id === provider.id &&
+          this.accountFamily === "openai"
+        )
+          this.providerUsageError = "Не удалось получить данные о лимитах OpenAI.";
+      });
+    } finally {
+      runInAction(() => {
+        if (revision === this.usageRevision) this.usageLoading = false;
+      });
+    }
+  }
+
+  async openProviderUsage() {
+    const accountId = this.provider?.accountId;
+    if (!accountId || this.accountFamily !== "openai") return;
+    try {
+      await this.ipc.call("accounts.openUsage", { id: accountId });
+    } catch {
+      runInAction(() => {
+        this.providerUsageError = "Не удалось открыть страницу расхода подписки.";
+      });
+    }
+  }
   get canConfigure() {
     return !this.generating;
   }
@@ -225,6 +315,7 @@ export default class ChatStore {
     return provider.adapter;
   }
   get vendorOptions(): VendorTurnOptions | undefined {
+    if (this.accountFamily === "openai") return { effort: this.composer.effort, webSearch: false };
     if (this.accountFamily !== "qwen-web") return undefined;
     return { effort: this.composer.effort, webSearch: this.composer.webSearch };
   }
@@ -293,7 +384,7 @@ export default class ChatStore {
       )
       .map((account) => ({
         value: `${ACCOUNT_OPTION_PREFIX}${account.id}`,
-        label: `${adapterLabel(account.adapter)} · аккаунт`,
+        label: `${accountProviderLabel(account)} · аккаунт`,
         accountId: account.id,
         adapter: account.adapter,
         detail: account.emailMasked ?? account.displayName,
@@ -309,7 +400,7 @@ export default class ChatStore {
       const created =
         (await this.accountProvider(account)) ??
         (await this.ipc.call("providers.create", {
-          name: adapterLabel(account.adapter),
+          name: accountProviderLabel(account),
           kind: "openai-compatible",
           adapter: account.adapter,
           authMode: "account",
@@ -415,7 +506,11 @@ export default class ChatStore {
   }
   get canSend() {
     return (
-      this.available && !this.loading && !this.generating && this.composer.text.trim().length > 0
+      this.available &&
+      !this.loading &&
+      !this.generating &&
+      !this.changingOpenaiMode &&
+      this.composer.text.trim().length > 0
     );
   }
   get canRetry() {

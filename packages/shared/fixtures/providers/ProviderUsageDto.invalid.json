@@ -1,0 +1,15 @@
+[
+  {
+    "name": "invalid percentage",
+    "value": {
+      "source": "codex",
+      "windows": [{ "label": "Лимит", "usedPercent": 101, "resetsAt": null }],
+      "detail": null,
+      "checkedAt": 1700000000000
+    }
+  },
+  {
+    "name": "missing source",
+    "value": { "windows": [], "detail": null, "checkedAt": 1700000000000 }
+  }
+]
