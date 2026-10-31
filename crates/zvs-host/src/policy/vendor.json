@@ -195,9 +195,9 @@
       }
     },
     {
-      "id": "vendor.process.ask-script-strings",
-      "effect": "ask",
-      "text": "An interpreter given a script string (cmd /c, powershell -Command, bash -c, python -c, node -e) hides what runs from the rules; it needs the user.",
+      "id": "vendor.process.review-script-strings",
+      "effect": "review",
+      "text": "An interpreter given a script string (cmd /c, powershell -Command, bash -c, python -c, node -e) hides what runs from the argv rules; the judge reads the script itself.",
       "process": {
         "argv": [
           "{cmd,powershell,pwsh,bash,sh,zsh,wsl,python,python3,py,node,deno,bun,ruby,perl}",

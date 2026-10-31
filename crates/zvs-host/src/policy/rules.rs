@@ -13,6 +13,7 @@ pub const ANY_REST: &str = "**";
 #[serde(rename_all = "camelCase")]
 pub enum RuleEffect {
     Allow,
+    Review,
     Ask,
     Deny,
 }
@@ -123,6 +124,7 @@ pub struct RuleText {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleOutcome {
     Allow { rule: String, text: String },
+    Review { rule: String, text: String },
     Ask { rule: String, text: String },
     Deny { rule: String },
     Unmatched,
@@ -441,6 +443,16 @@ impl RuleSet {
             .find(|rule| rule.effect == RuleEffect::Ask)
         {
             return RuleOutcome::Ask {
+                rule: rule.id.clone(),
+                text: rule.text.clone(),
+            };
+        }
+        if let Some(rule) = decided
+            .iter()
+            .flatten()
+            .find(|rule| rule.effect == RuleEffect::Review)
+        {
+            return RuleOutcome::Review {
                 rule: rule.id.clone(),
                 text: rule.text.clone(),
             };

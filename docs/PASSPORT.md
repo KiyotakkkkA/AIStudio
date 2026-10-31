@@ -924,15 +924,24 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
 - **Judge** (`auto-bypass`). The mode is available only once a judge model is chosen
   («Общие» → «Модель-арбитр»); without one the composer shows it inactive with a link to that
   setting. A destructive call first meets **policy rules**, matched in code: path globs ×
-  operation for files, `argv` patterns × cwd for processes, each rule `allow | ask | deny`.
-  Precedence is vendor `deny` > user rules > vendor `allow`; rules ship in packs, vendor and
+  operation for files, `argv` patterns × cwd for processes, each rule
+  `allow | review | ask | deny`. Precedence is vendor `deny` > user rules > vendor `allow`;
+  across a batch, `deny` > `ask` > `review` > `allow`. Rules ship in packs, vendor and
   user, the way skills do, and a pack declares whether it contains any `allow`. A call no rule
-  matches goes to the judge with only the structured action (the `fs.apply` batch as one diff,
-  or program, cwd, argv and source) and the rule texts — never the conversation, which may carry
-  injected content. The judge answers `allow` or `ask` with a reason; anything else, an error,
-  a timeout or an unavailable model is `ask`. For processes it can only lower friction for
-  commands a rule could not classify: there is no snapshot to roll back, so the judge prompt is
-  biased toward `ask`. `deny` from a rule fails the call with `PermissionDenied`.
+  matches, or one a `review` rule flags, goes to the judge with only the structured action (the
+  `fs.apply` batch as one diff, or program, cwd, argv and source), the rule texts and the
+  flagged rule — never the conversation, which may carry injected content. `review` marks calls
+  argv patterns cannot read, such as an interpreter given a script string (`cmd /c`,
+  `powershell -Command`, `python -c`): the judge reads the script itself, and if it fails the
+  user is asked with the rule text as the reason. The judge answers `allow` or `ask` with a
+  reason; anything else, an error, a timeout or an unavailable model is `ask`. Its prompt judges
+  effect, not tool use (2026-11-01, was "biased toward `ask`", which asked for every script that
+  used the network or a subprocess): reading, computing, HTTP GET, scraping, inspection and
+  build/test commands, and writes the agent is producing inside the project or scratch folder
+  run; it asks when it can name a concrete harm — losing data that is not regenerated, sending
+  local data or publishing, credentials, system changes, process control, running downloaded or
+  decoded code, or an action it cannot read. `deny` from a rule fails the call with
+  `PermissionDenied`.
 - **Audit.** Every admitted call records why it ran: `auto`, `granted`, `approved`,
   `policy:<mode>` or `judge:<rule id | model>` with the judge's reason, in the run log and on
   the tool call's details.

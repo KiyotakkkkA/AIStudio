@@ -13,7 +13,7 @@ use zvs_contract::{
 
 use super::action::{ReviewVerdict, ReviewedAction};
 use super::judge::{JudgeOutcome, ask_judge, judge_prompt};
-use super::rules::{RuleOutcome, RuleSet, VENDOR_PACK};
+use super::rules::{RuleEffect, RuleOutcome, RuleSet, RuleText, VENDOR_PACK};
 use super::table::{Decision, decide};
 use crate::data::{Database, Repositories};
 use crate::kernel::{ExecReview, StepContext};
@@ -235,8 +235,11 @@ impl ExecPolicyService {
         policy: &ExecPolicyDto,
         action: &ReviewedAction,
         rules: &RuleSet,
+        flagged: Option<&RuleText>,
     ) -> Result<ReviewVerdict, AppError> {
-        let ask = Ok(ReviewVerdict::Ask { reason: None });
+        let ask = Ok(ReviewVerdict::Ask {
+            reason: flagged.map(|rule| limited(&rule.text, TOOL_AUTHORISATION_REASON_MAX)),
+        });
         let Some(judge) = &policy.judge else {
             return ask;
         };
@@ -264,7 +267,7 @@ impl ExecPolicyService {
             return ask;
         }
         let files = matches!(action, ReviewedAction::Files { .. });
-        let prompt = judge_prompt(action, &rules.texts(files));
+        let prompt = judge_prompt(action, &rules.texts(files), flagged);
         match ask_judge(&driver, &model, prompt, self.inner.timeout, &context.cancel).await {
             JudgeOutcome::Allow(reason) => Ok(ReviewVerdict::Run(
                 ToolAuthorisationDto::of(ToolAuthorisationKind::Judge)
@@ -316,7 +319,18 @@ impl ExecReview for ExecPolicyService {
                             .from_source(limited(&rule, TOOL_AUTHORISATION_SOURCE_MAX))
                             .because(Some(limited(&text, TOOL_AUTHORISATION_REASON_MAX))),
                     )),
-                    RuleOutcome::Unmatched => self.judge(context, &policy, action, &rules).await,
+                    RuleOutcome::Review { rule, text } => {
+                        let flagged = RuleText {
+                            id: rule,
+                            effect: RuleEffect::Review,
+                            text,
+                        };
+                        self.judge(context, &policy, action, &rules, Some(&flagged))
+                            .await
+                    }
+                    RuleOutcome::Unmatched => {
+                        self.judge(context, &policy, action, &rules, None).await
+                    }
                 }
             }
         }
