@@ -4,6 +4,9 @@ use serde_json::{Value, json};
 
 pub const BASE_URL: &str = "https://api.githubcopilot.com";
 pub const MAX_FRAME: usize = 8 * 1024 * 1024;
+/// Copilot's auto model selection. Plans that route every turn (Free, Student) may list no
+/// models at all; the CLI resolves the sentinel to a concrete model per turn.
+pub const AUTO_MODEL: &str = "auto";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -85,6 +88,39 @@ impl Model {
             .map(|effort| Some(effort.as_str()))
             .ok_or("unsupported-effort")
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Choice<'a> {
+    Auto,
+    Listed(&'a Model),
+}
+
+impl<'a> Choice<'a> {
+    pub fn effort(self, requested: Option<&str>) -> Result<Option<&'a str>, &'static str> {
+        match self {
+            Self::Auto => requested.map_or(Ok(None), |_| Err("unsupported-effort")),
+            Self::Listed(model) => model.effort(requested),
+        }
+    }
+}
+
+pub fn choose<'a>(models: &'a [Model], id: &str) -> Option<Choice<'a>> {
+    if id == AUTO_MODEL {
+        return Some(Choice::Auto);
+    }
+    models
+        .iter()
+        .find(|model| model.id == id && model.enabled())
+        .map(Choice::Listed)
+}
+
+/// Enabled catalog models; the auto sentinel is offered separately and never listed twice.
+pub fn selectable(models: Vec<Model>) -> Vec<Model> {
+    models
+        .into_iter()
+        .filter(|model| model.enabled() && model.id != AUTO_MODEL)
+        .collect()
 }
 
 /// No built-in tools, hooks, extensions, MCP, repository instructions or autonomous agents.
@@ -178,6 +214,41 @@ mod tests {
         assert_eq!(model.effort(Some("high")), Ok(Some("high")));
         assert_eq!(model.effort(None), Ok(None));
         assert!(model.effort(Some("max")).is_err());
+    }
+
+    fn model(id: &str, policy: Option<&str>) -> Model {
+        let mut value = json!({"id":id, "name":id, "capabilities":{"supports":{},"limits":{}}});
+        if let Some(state) = policy {
+            value["policy"] = json!({"state": state});
+        }
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn auto_is_always_selectable_and_disabled_models_are_not() {
+        let models = vec![
+            model("gpt", None),
+            model("off", Some("disabled")),
+            model("later", Some("unconfigured")),
+            model(AUTO_MODEL, None),
+        ];
+        assert!(matches!(choose(&[], AUTO_MODEL), Some(Choice::Auto)));
+        assert!(matches!(choose(&models, "gpt"), Some(Choice::Listed(found)) if found.id == "gpt"));
+        assert!(choose(&models, "off").is_none());
+        assert!(choose(&models, "later").is_none());
+        assert_eq!(
+            selectable(models)
+                .iter()
+                .map(|model| model.id.as_str())
+                .collect::<Vec<_>>(),
+            ["gpt"]
+        );
+    }
+
+    #[test]
+    fn auto_keeps_the_model_default_effort_only() {
+        assert_eq!(Choice::Auto.effort(None), Ok(None));
+        assert!(Choice::Auto.effort(Some("high")).is_err());
     }
 
     #[test]

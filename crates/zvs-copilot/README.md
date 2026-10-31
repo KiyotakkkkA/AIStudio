@@ -16,6 +16,12 @@ reasoning efforts. The existing low / auto / high control maps to `low` / omitte
 The explicit control is available when the model advertises both low and high; otherwise
 the model default is used. The host revalidates effort against the live catalog.
 
+Auto model selection is always offered as the model id `auto` («Автовыбор модели»), after the
+enabled catalog models. Plans that route every turn (Copilot Free, Student) may list no models or
+only non-`enabled` policies; `auto` still works for them because the CLI resolves the sentinel to a
+concrete model per turn. An `auto` turn skips the catalog check and keeps the model default effort.
+A catalog entry named `auto` is not listed twice. Disabled and unconfigured models stay hidden.
+
 Each model step runs in a fresh session with an empty working directory, built-in tools
 disabled, configuration discovery disabled, no skills, plugins, custom instructions or
 repository hooks, and remote mode off. ZVS tool calls use the existing injected dialect
@@ -29,6 +35,8 @@ composer. CLI: `/copilot` signs in and discovers models; `/models` selects a mod
 Copilot-specific login/cancel channels, not general account or provider editing.
 
 Protocol observations checked 2026-10-31 against Copilot CLI 1.0.105 (protocol 3).
+The `auto` sentinel and the Free/Student routing were taken from the copilot-sdk generated RPC
+types and GitHub's auto model selection docs on 2026-10-31; a real Free-plan turn was not run.
 Unauthenticated status and isolated session creation were verified with the real executable;
 authentication, cancellation, stream framing and permission refusal are covered by fakes.
 The installed CLI must support protocol >= 3
@@ -38,3 +46,4 @@ and the account login RPCs; unsupported versions fail with an update message.
 - https://github.com/github/copilot-sdk/blob/main/nodejs/src/client.ts
 - https://github.com/github/copilot-sdk/blob/main/nodejs/src/generated/rpc.ts
 - https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli
+- https://docs.github.com/en/copilot/concepts/auto-model-selection

@@ -28,6 +28,8 @@ pub const COPILOT_CAPABILITIES: AdapterCapabilities = AdapterCapabilities {
     honours: Honours::NONE,
     tools: ToolMode::Injected,
 };
+pub const AUTO_MODEL_NAME: &str = "Автовыбор модели";
+pub const MODEL_UNAVAILABLE: &str = "Выбранная модель Copilot недоступна";
 pub const EFFORT_UNSUPPORTED: &str =
     "Выбранная модель Copilot не поддерживает этот режим рассуждения. Выберите «Авто»";
 
@@ -74,6 +76,35 @@ fn discovered(model: zvs_copilot::Model) -> DiscoveredModel {
     }
 }
 
+fn auto_model() -> DiscoveredModel {
+    DiscoveredModel {
+        display_name: AUTO_MODEL_NAME.to_owned(),
+        capabilities: vec![ModelCapability::Streaming],
+        ..DiscoveredModel::named(zvs_copilot::AUTO_MODEL)
+    }
+}
+
+fn catalog(models: Vec<zvs_copilot::Model>) -> Vec<DiscoveredModel> {
+    zvs_copilot::selectable(models)
+        .into_iter()
+        .map(discovered)
+        .chain(std::iter::once(auto_model()))
+        .collect()
+}
+
+fn session_effort(
+    models: &[zvs_copilot::Model],
+    request: &GenerateRequest,
+) -> Result<Option<&'static str>, AppError> {
+    let choice = zvs_copilot::choose(models, &request.model)
+        .ok_or_else(|| AppError::new(AppErrorCode::Conflict, MODEL_UNAVAILABLE))?;
+    let requested = requested_effort(request);
+    choice
+        .effort(requested)
+        .map(|effort| effort.and(requested))
+        .map_err(|_| AppError::new(AppErrorCode::ValidationFailed, EFFORT_UNSUPPORTED))
+}
+
 enum TurnEvent {
     Delta(TextDelta),
     Done,
@@ -112,13 +143,7 @@ impl TextGenerationDriver for CopilotAdapter {
     ) -> Result<Vec<DiscoveredModel>, AppError> {
         let mut client = Client::start(cancel).await?;
         client.auth(Some(&self.identity)).await?;
-        Ok(client
-            .models()
-            .await?
-            .into_iter()
-            .filter(zvs_copilot::Model::enabled)
-            .map(discovered)
-            .collect())
+        Ok(catalog(client.models().await?))
     }
 
     fn stream(&self, request: &GenerateRequest, cancel: &CancellationToken) -> DeltaStream {
@@ -128,19 +153,12 @@ impl TextGenerationDriver for CopilotAdapter {
         let start = async move {
             let mut client = Client::start(&cancel).await?;
             client.auth(Some(&identity)).await?;
-            let models = client.models().await?;
-            let model = models
-                .iter()
-                .find(|model| model.id == request.model && model.enabled())
-                .ok_or_else(|| {
-                    AppError::new(
-                        AppErrorCode::Conflict,
-                        "Выбранная модель Copilot недоступна",
-                    )
-                })?;
-            let effort = model
-                .effort(requested_effort(&request))
-                .map_err(|_| AppError::new(AppErrorCode::ValidationFailed, EFFORT_UNSUPPORTED))?;
+            let models = if request.model == zvs_copilot::AUTO_MODEL {
+                Vec::new()
+            } else {
+                client.models().await?
+            };
+            let effort = session_effort(&models, &request)?;
             let session = client.session(Some(&request.model), effort).await?;
             client
                 .call(
@@ -211,6 +229,80 @@ impl TextGenerationDriver for CopilotAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn listed(id: &str, policy: &str) -> zvs_copilot::Model {
+        serde_json::from_value(json!({
+            "id": id,
+            "name": id,
+            "capabilities": {"supports": {"reasoningEffort": true}, "limits": {}},
+            "supportedReasoningEfforts": ["low", "high"],
+            "policy": {"state": policy}
+        }))
+        .expect("model")
+    }
+
+    #[test]
+    fn an_account_without_listed_models_still_offers_auto_selection() {
+        let models = catalog(Vec::new());
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].external_id, zvs_copilot::AUTO_MODEL);
+        assert_eq!(models[0].display_name, AUTO_MODEL_NAME);
+        assert!(!models[0].capabilities.contains(&ModelCapability::Reasoning));
+
+        let models = catalog(vec![
+            listed("gpt", "enabled"),
+            listed("off", "disabled"),
+            listed(zvs_copilot::AUTO_MODEL, "enabled"),
+        ]);
+        assert_eq!(
+            models
+                .iter()
+                .map(|model| model.external_id.as_str())
+                .collect::<Vec<_>>(),
+            ["gpt", zvs_copilot::AUTO_MODEL]
+        );
+    }
+
+    fn turn(model: &str, effort: Option<ThinkingEffort>) -> GenerateRequest {
+        let mut request = GenerateRequest::new(model, Vec::new());
+        request.vendor.effort = effort;
+        request
+    }
+
+    #[test]
+    fn auto_needs_no_catalog_entry_and_keeps_the_default_effort() {
+        assert_eq!(
+            session_effort(&[], &turn(zvs_copilot::AUTO_MODEL, None)),
+            Ok(None)
+        );
+        assert_eq!(
+            session_effort(
+                &[],
+                &turn(zvs_copilot::AUTO_MODEL, Some(ThinkingEffort::Auto))
+            ),
+            Ok(None)
+        );
+        assert_eq!(
+            session_effort(
+                &[],
+                &turn(zvs_copilot::AUTO_MODEL, Some(ThinkingEffort::Thinking))
+            )
+            .unwrap_err()
+            .message,
+            EFFORT_UNSUPPORTED
+        );
+        let models = [listed("gpt", "enabled"), listed("off", "disabled")];
+        assert_eq!(
+            session_effort(&models, &turn("gpt", Some(ThinkingEffort::Fast))),
+            Ok(Some("low"))
+        );
+        assert_eq!(
+            session_effort(&models, &turn("off", None))
+                .unwrap_err()
+                .message,
+            MODEL_UNAVAILABLE
+        );
+    }
 
     #[test]
     fn delta_and_terminal_events_are_distinct_and_errors_are_not_success() {
