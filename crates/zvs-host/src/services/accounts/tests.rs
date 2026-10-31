@@ -25,6 +25,34 @@ use crate::testing::{
 
 const QWEN: AccountFamily = AccountFamily::QwenWeb;
 
+#[tokio::test]
+async fn copilot_links_only_identity_and_is_independent_of_browser_cookies() {
+    let harness = harness();
+    let status = serde_json::from_value(
+        json!({"isAuthenticated":true,"host":"github.com","login":"octocat"}),
+    )
+    .unwrap();
+    harness.service.inner.save_copilot(status).unwrap();
+    let account = harness.first();
+    assert_eq!(account.adapter, AccountFamily::Copilot);
+    assert_eq!(harness.secret_count(), 0);
+    assert_eq!(
+        harness.row(&account.id.to_string()).unwrap().partition,
+        "cli:copilot"
+    );
+    harness
+        .lifecycle
+        .emit(&BrowserLifecycleEvent::CookiesCleared {
+            domain: "github.com".to_owned(),
+        });
+    harness
+        .lifecycle
+        .emit(&BrowserLifecycleEvent::WorkspaceClosed);
+    assert_eq!(harness.first().status, AccountStatus::Linked);
+    harness.service.unlink(&account.id.to_string()).unwrap();
+    assert!(harness.list().is_empty());
+}
+
 fn openai_credentials(client: &str, subject: &str) -> zvs_openai::Credentials {
     zvs_openai::Credentials {
         client_id: client.to_owned(),

@@ -1,4 +1,5 @@
 pub mod account_family;
+pub mod copilot;
 pub mod local;
 pub mod ollama;
 pub mod openai;
@@ -95,6 +96,10 @@ impl AdapterFamilyEntry {
     pub fn build(&self, context: &AdapterContext) -> Result<AiDriver, AppError> {
         let family = self.capabilities.family;
         match family {
+            AdapterFamily::Copilot => Err(AppError::new(
+                AppErrorCode::Conflict,
+                "Адаптеру нужен аккаунт GitHub Copilot",
+            )),
             AdapterFamily::Openai => Ok(AiDriver {
                 text: Some(Arc::new(openai::OpenaiAdapter::new(
                     context.require_transport()?,
@@ -147,6 +152,10 @@ impl AdapterFamilyEntry {
 
 pub const fn adapter_entry(family: AdapterFamily) -> AdapterFamilyEntry {
     match family {
+        AdapterFamily::Copilot => AdapterFamilyEntry {
+            capabilities: copilot::COPILOT_CAPABILITIES,
+            implemented: true,
+        },
         AdapterFamily::Openai => AdapterFamilyEntry {
             capabilities: openai::OPENAI_CAPABILITIES,
             implemented: true,

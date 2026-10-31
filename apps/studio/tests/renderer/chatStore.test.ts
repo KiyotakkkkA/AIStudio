@@ -85,6 +85,31 @@ test("OpenAI registrations have distinct labels in the provider picker", () => {
   expect(store.accountChoices[0]?.label).toContain(first.displayName);
 });
 
+test.each([true, false])("Copilot sends effort only for a configurable model (%s)", (reasoning) => {
+  const { store, events } = setup();
+  const copilot = provider({
+    adapter: "copilot",
+    authMode: "account",
+    models: [
+      model({
+        id: MODEL,
+        capabilities: reasoning ? ["streaming", "reasoning", "adaptive-reasoning"] : ["streaming"],
+      }),
+    ],
+  });
+  store.providers = [copilot];
+  store.composer.selectProvider(copilot);
+  store.composer.setEffort("thinking");
+  store.composer.setWebSearch(true);
+  expect(store.accountFamily).toBe("copilot");
+  expect(store.vendorOptions).toEqual({
+    effort: reasoning ? "thinking" : "auto",
+    webSearch: false,
+  });
+  store.dispose();
+  events.dispose();
+});
+
 test("OpenAI mode is persisted without dropping provider settings or the selected model", async () => {
   const { store, bridge } = setup();
   const openai = provider({

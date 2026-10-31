@@ -39,6 +39,7 @@ zeroize.workspace = true
 zvs-contract = { path = "../zvs-contract", features = ["schema"] }
 zvs-core = { path = "../zvs-core" }
 zvs-openai = { path = "../zvs-openai" }
+zvs-copilot = { path = "../zvs-copilot" }
 zvs-qwen-web = { path = "../zvs-qwen-web" }
 zvs-zai-web = { path = "../zvs-zai-web" }
 axum.workspace = true

@@ -161,6 +161,26 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
     match request {
         Request::Open => Msg::Opened(link.call("cli.open", &CliOpenInput { cwd: folder }).await),
         Request::Providers => Msg::Providers(providers(&link).await),
+        Request::LinkCopilot => {
+            let result: Result<zvs_contract::AccountLinkResult, AppError> =
+                link.call("cli.copilot.login", &()).await;
+            Msg::CopilotLinked(match result {
+                Ok(zvs_contract::AccountLinkResult::Linked { .. }) => providers(&link).await,
+                Ok(
+                    zvs_contract::AccountLinkResult::Cancelled { detail }
+                    | zvs_contract::AccountLinkResult::Timeout { detail },
+                ) => Err(AppError::new(
+                    zvs_contract::AppErrorCode::RunCancelled,
+                    detail,
+                )),
+                Err(error) => Err(error),
+            })
+        }
+        Request::CancelCopilotLink => {
+            let result: Result<zvs_contract::AccountsCancelLinkOutput, AppError> =
+                link.call("cli.copilot.cancelLogin", &()).await;
+            Msg::Answered(result.map(|_| ()))
+        }
         Request::Policy => Msg::Policy(link.call("execPolicy.get", &()).await),
         Request::Create { provider, model } => Msg::Created(
             link.call(

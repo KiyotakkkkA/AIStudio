@@ -5,6 +5,26 @@ use super::*;
 
 const PROVIDERS: &str =
     include_str!("../../../../packages/shared/fixtures/providers/ProviderDto.valid.json");
+
+#[test]
+fn copilot_login_can_be_cancelled_and_adopts_its_models_after_completion() {
+    let mut app = ready();
+    typed(&mut app, "/copilot");
+    assert_eq!(app.update(Msg::Key(Key::Enter)), vec![Request::LinkCopilot]);
+    assert!(app.copilot_linking);
+    assert_eq!(app.status.as_ref().unwrap().1, copy::COPILOT_LINKING);
+    assert_eq!(
+        app.update(Msg::Key(Key::Esc)),
+        vec![Request::CancelCopilotLink]
+    );
+    let mut copilot = provider();
+    copilot.summary.adapter = zvs_contract::AdapterFamily::Copilot;
+    app.update(Msg::CopilotLinked(Ok(vec![copilot.clone()])));
+    assert!(!app.copilot_linking);
+    assert_eq!(app.model.as_ref().unwrap().provider, copilot.summary.id);
+    assert_eq!(app.effort, ThinkingEffort::Auto);
+    assert_eq!(app.status.as_ref().unwrap().1, copy::COPILOT_LINKED);
+}
 const CONVERSATIONS: &str =
     include_str!("../../../../packages/shared/fixtures/chat/ConversationDto.valid.json");
 const RUN: &str = "0199aa11-5555-7111-8111-111111111111";

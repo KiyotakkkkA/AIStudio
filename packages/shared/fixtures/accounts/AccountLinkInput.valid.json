@@ -1,4 +1,5 @@
 [
+  { "name": "GitHub Copilot login", "value": { "adapter": "copilot" } },
   { "name": "OpenAI registration", "value": { "adapter": "openai" } },
   {
     "name": "OpenAI reauthorization",

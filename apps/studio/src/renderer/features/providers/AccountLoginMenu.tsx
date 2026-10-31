@@ -66,11 +66,13 @@ function AccountLoginMenu() {
                     {family === "openai" ? "Продолжить с ChatGPT" : adapterLabel(family)}
                   </span>
                   <span className="text-[11px] text-main-400">
-                    {family === "openai"
-                      ? "Вход в системном браузере"
-                      : accounts.accountFor(family) === null
-                        ? "Откроется сайт вендора"
-                        : "Уже привязан"}
+                    {family === "copilot"
+                      ? "Требуется GitHub Copilot CLI"
+                      : family === "openai"
+                        ? "Вход в системном браузере"
+                        : accounts.accountFor(family) === null
+                          ? "Откроется сайт вендора"
+                          : "Уже привязан"}
                   </span>
                 </span>
               </span>

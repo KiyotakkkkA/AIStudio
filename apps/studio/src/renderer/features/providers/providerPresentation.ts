@@ -35,6 +35,7 @@ export const KIND_LABELS: Record<ProviderKind, string> = {
 
 export const ADAPTER_LABELS: Record<AdapterFamily, string> = {
   openai: "OpenAI (подписка ChatGPT)",
+  copilot: "GitHub Copilot (подписка)",
   "openai-compatible": "Совместимый с OpenAI (API)",
   "qwen-web": "Qwen (веб)",
   "zai-web": "Z.ai (веб)",
@@ -71,6 +72,7 @@ const KIND_BASE_URLS: Record<ProviderKind, string> = {
 
 const ADAPTER_BASE_URLS: Partial<Record<AdapterFamily, string>> = {
   openai: "https://api.openai.com/v1",
+  copilot: "https://api.githubcopilot.com",
   "qwen-web": "https://chat.qwen.ai/api/v2",
   "zai-web": "https://chat.z.ai/api",
   local: LOCAL_BASE_URL,

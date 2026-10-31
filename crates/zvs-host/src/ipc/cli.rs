@@ -8,6 +8,12 @@ use crate::services::Services;
 
 pub fn register(server: &mut IpcServer) {
     server
+        .handle("cli.copilot.login", |services: Arc<Services>, (): ()| async move {
+            cli::link_copilot(&services).await
+        })
+        .handle("cli.copilot.cancelLogin", |services: Arc<Services>, (): ()| async move {
+            Ok::<_, AppError>(services.accounts.cancel_link(zvs_contract::AccountFamily::Copilot))
+        })
         .handle(
             "cli.open",
             |services: Arc<Services>, input: CliOpenInput| async move {

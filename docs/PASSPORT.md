@@ -360,6 +360,10 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
   execution policy, provider and model listings, skills and MCP servers. Secrets, settings,
   accounts, provider editing and `cli.install`/`cli.uninstall` stay studio-only. Widening the
   list is a security decision, as above.
+  Copilot exception (2026-10-31): `cli.copilot.login` and `cli.copilot.cancelLogin` are
+  allowed. Login links only the active GitHub Copilot identity, creates its account-mode
+  text provider if needed, and discovers models through the existing services. No caller
+  supplied URL, credential, account family or provider patch is accepted.
 - **Same events, same answers.** CLI connections are extra event-bus subscribers beside the
   window. An approval or a question reaches both; the first answer wins and the other side
   sees `Conflict`.
@@ -564,9 +568,25 @@ retry/cancel/progress are written once.
 
 ## 12. AI layer
 
+### Copilot CLI account provider (2026-10-31)
+
+`copilot` is an account-only adapter. `zvs-copilot` contains credential-free protocol types;
+the host owns a framed JSON-RPC stdio client to the installed Copilot CLI. GitHub OAuth is
+performed in the system browser by the CLI's own account flow; credentials stay in its
+credential store. ZVS stores the account identity and checks it before model discovery and
+every turn. Browser cookie clearing does not revoke CLI credentials. Unlinking preserves
+the CLI login. No vendor SDK or Node runtime is bundled in the app.
+
+Copilot sessions have no built-in tools, hooks, skills, plugins, configuration discovery,
+custom instructions or remote steering. Only the host transcript is supplied. Model tool
+calls use the existing injected dialect and kernel permission gates. Children are terminated
+on completion, stream drop, cancellation or failure. Model/effort availability comes from
+the live CLI catalog. See `crates/zvs-copilot/README.md` for protocol observations.
+
 The AI layer lives in the **host** only (`zvs-host/src/drivers/ai/`). The renderer has no
-vendor code, no API keys and no session cookies. There is no vendor SDK. Every adapter family
-is hand-written over one `Transport` seam. API traffic shares one `reqwest` client that uses
+vendor code, no API keys and no session cookies. There is no vendor SDK. HTTP adapters are
+hand-written over one `Transport` seam; CLI adapters use host-owned stdio clients. API traffic
+shares one `reqwest` client that uses
 the OS root store (`rustls-tls-native-roots`) and the system proxy, which is what `net.fetch`
 gave us under Electron.
 

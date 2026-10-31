@@ -10791,6 +10791,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "zvs-copilot"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "zvs-core"
 version = "0.1.0"
 dependencies = [
@@ -10842,6 +10850,7 @@ dependencies = [
  "uuid",
  "zeroize",
  "zvs-contract",
+ "zvs-copilot",
  "zvs-core",
  "zvs-openai",
  "zvs-qwen-web",

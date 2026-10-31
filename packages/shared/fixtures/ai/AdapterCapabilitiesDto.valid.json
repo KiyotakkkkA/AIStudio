@@ -1,5 +1,18 @@
 [
   {
+    "name": "Copilot account uses host tool execution",
+    "value": {
+      "family": "copilot",
+      "authModes": ["account"],
+      "streaming": true,
+      "liveModelList": true,
+      "embedding": false,
+      "image": false,
+      "honours": { "temperature": false, "topK": false, "topP": false, "maxOutputTokens": false },
+      "tools": "injected"
+    }
+  },
+  {
     "name": "OpenAI subscription account",
     "value": {
       "family": "openai",

@@ -289,15 +289,34 @@ fn effort_rows(view: &View<'_>) -> Vec<Row> {
     let Some(steps) = effort_steps(view) else {
         return vec![Row::new("unsupported", "◐", copy::EFFORT_UNSUPPORTED).tone(Tone::Faint)];
     };
+    let copilot = view.model.is_some_and(|model| {
+        view.providers.iter().any(|provider| {
+            provider.summary.id == model.provider
+                && provider.summary.adapter == zvs_contract::AdapterFamily::Copilot
+        })
+    });
     steps
         .iter()
         .map(|effort| {
             let current = *effort == view.effort;
-            Row::new(effort.as_str(), "◐", effort_label(*effort))
+            let (label, hint) = if copilot {
+                match effort {
+                    ThinkingEffort::Fast => {
+                        (copy::COPILOT_EFFORT_LOW, copy::COPILOT_EFFORT_LOW_HINT)
+                    }
+                    ThinkingEffort::Auto => (copy::EFFORT_AUTO, copy::COPILOT_EFFORT_AUTO_HINT),
+                    ThinkingEffort::Thinking => {
+                        (copy::COPILOT_EFFORT_HIGH, copy::COPILOT_EFFORT_HIGH_HINT)
+                    }
+                }
+            } else {
+                (effort_label(*effort), effort_hint(*effort))
+            };
+            Row::new(effort.as_str(), "◐", label)
                 .meta(if current { copy::EFFORT_CURRENT } else { "" })
                 .tone(if current { Tone::Accent } else { Tone::Plain })
                 .current(current)
-                .detail([effort_hint(*effort).to_owned()])
+                .detail([hint.to_owned()])
                 .action(Action::SetEffort(*effort))
         })
         .collect()

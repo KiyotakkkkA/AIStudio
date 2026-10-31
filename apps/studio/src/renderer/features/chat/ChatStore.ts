@@ -315,7 +315,14 @@ export default class ChatStore {
     return provider.adapter;
   }
   get vendorOptions(): VendorTurnOptions | undefined {
-    if (this.accountFamily === "openai") return { effort: this.composer.effort, webSearch: false };
+    if (this.accountFamily === "openai" || this.accountFamily === "copilot")
+      return {
+        effort:
+          this.accountFamily === "copilot" && !this.model?.capabilities.includes("reasoning")
+            ? "auto"
+            : this.composer.effort,
+        webSearch: false,
+      };
     if (this.accountFamily !== "qwen-web") return undefined;
     return { effort: this.composer.effort, webSearch: this.composer.webSearch };
   }

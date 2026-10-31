@@ -250,6 +250,7 @@ mod tests {
             [
                 json!(["openai-compatible", true]),
                 json!(["openai", true]),
+                json!(["copilot", true]),
                 json!(["qwen-web", true]),
                 json!(["zai-web", true]),
                 json!(["local", true]),

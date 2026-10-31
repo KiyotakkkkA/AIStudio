@@ -100,6 +100,8 @@ pub struct ModelChoice {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Request {
+    LinkCopilot,
+    CancelCopilotLink,
     Open,
     Providers,
     Policy,
@@ -155,6 +157,7 @@ pub enum Request {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Msg {
+    CopilotLinked(Result<Vec<ProviderDto>, AppError>),
     Key(Key),
     Paste(String),
     Scroll(isize),
@@ -198,6 +201,7 @@ pub struct App {
     pub providers: Vec<ProviderDto>,
     pub model: Option<ModelChoice>,
     pub effort: ThinkingEffort,
+    pub copilot_linking: bool,
     pub resume: Option<ConversationId>,
     pub mode: ExecMode,
     pub policy: Option<ExecPolicyDto>,
@@ -254,6 +258,7 @@ impl App {
             providers: Vec::new(),
             model: None,
             effort: ThinkingEffort::Auto,
+            copilot_linking: false,
             resume: None,
             mode: ExecMode::AlwaysAsk,
             policy: None,
@@ -381,6 +386,27 @@ impl App {
                 Vec::new()
             }
             Msg::Connected => vec![Request::Open, Request::Providers, Request::Policy],
+            Msg::CopilotLinked(result) => {
+                self.copilot_linking = false;
+                match result {
+                    Ok(providers) => {
+                        let copilot: Vec<_> = providers
+                            .iter()
+                            .filter(|provider| {
+                                provider.summary.adapter == zvs_contract::AdapterFamily::Copilot
+                                    && provider.summary.enabled
+                            })
+                            .cloned()
+                            .collect();
+                        self.model = default_model(&copilot).or_else(|| self.model.clone());
+                        self.providers = providers;
+                        self.effort = ThinkingEffort::Auto;
+                        self.status = Some((Tone::Success, copy::COPILOT_LINKED.to_owned()));
+                    }
+                    Err(error) => self.fail(&error),
+                }
+                Vec::new()
+            }
             Msg::Pointer(pointer) => self.pointer(pointer),
             Msg::ShortcutsSaved(saved) => {
                 if !saved {
@@ -748,6 +774,23 @@ impl App {
         self.transcript.start();
         let mut input = ChatSendInput::new(id, text);
         input.vendor.effort = Some(self.effort);
+        if let Some(model) = &self.model
+            && self
+                .providers
+                .iter()
+                .find(|provider| provider.summary.id == model.provider)
+                .is_some_and(|provider| {
+                    provider.summary.adapter == zvs_contract::AdapterFamily::Copilot
+                        && !provider.models.iter().any(|known| {
+                            known.external_id == model.model
+                                && known
+                                    .capabilities
+                                    .contains(&zvs_contract::ModelCapability::Reasoning)
+                        })
+                })
+        {
+            input.vendor.effort = Some(ThinkingEffort::Auto);
+        }
         if let Some(model) = &self.model {
             input.provider_id = Some(model.provider);
             input.model_id = Some(model.model.clone());
@@ -807,6 +850,15 @@ impl App {
             Command::Resume => return self.open_panel(Panel::Resume),
             Command::Models => return self.open_panel(Panel::Models),
             Command::Effort => return self.open_panel(Panel::Effort),
+            Command::Copilot => {
+                if self.busy() || self.copilot_linking {
+                    self.status = Some((Tone::Info, copy::BUSY.to_owned()));
+                } else {
+                    self.copilot_linking = true;
+                    self.status = Some((Tone::Info, copy::COPILOT_LINKING.to_owned()));
+                    return vec![Request::LinkCopilot];
+                }
+            }
             Command::Context => return self.open_panel(Panel::Context),
             Command::Skills => return self.open_panel(Panel::Skills),
             Command::Mcp => return self.open_panel(Panel::Mcp),
@@ -1177,6 +1229,12 @@ impl App {
     }
 
     fn key(&mut self, key: Key) -> Vec<Request> {
+        if self.copilot_linking && matches!(key, Key::Esc | Key::Interrupt) {
+            return vec![Request::CancelCopilotLink];
+        }
+        if self.copilot_linking && !matches!(key, Key::PageUp | Key::PageDown) {
+            return Vec::new();
+        }
         self.selection = None;
         if key != Key::Esc {
             self.escape_armed = false;

@@ -138,6 +138,23 @@ export default observer(function ChatAccountProviderSetup({
               Для режима Codex требуется установленный Codex CLI.
             </p>
           </div>
+        ) : family === "copilot" ? (
+          <div className="space-y-4">
+            <EffortSlider
+              label={EFFORT_LABEL}
+              value={
+                store.model?.capabilities.includes("reasoning") ? store.composer.effort : "auto"
+              }
+              labels={{ fast: "Низкое", auto: "Авто", thinking: "Высокое" }}
+              disabled={!store.canConfigure || !store.model?.capabilities.includes("reasoning")}
+              onChange={store.composer.setEffort}
+            />
+            <p className="text-[11.5px] leading-snug text-main-500">
+              {store.model?.capabilities.includes("reasoning")
+                ? "В режиме «Авто» используется уровень рассуждения по умолчанию для выбранной модели."
+                : "Для выбранной модели используется уровень рассуждения по умолчанию."}
+            </p>
+          </div>
         ) : family === "qwen-web" ? (
           <QwenSetup store={store} />
         ) : (

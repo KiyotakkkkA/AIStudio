@@ -26,6 +26,8 @@ pub const CLI_CHANNELS: &[&str] = &[
     "chat.conversations.list",
     "chat.send",
     "chat.skip",
+    "cli.copilot.cancelLogin",
+    "cli.copilot.login",
     "cli.open",
     "execPolicy.allowRule",
     "execPolicy.get",

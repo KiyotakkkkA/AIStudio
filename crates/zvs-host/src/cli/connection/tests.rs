@@ -187,6 +187,10 @@ fn every_allowed_channel_is_a_contract_channel() {
         "cli.uninstall",
         "secrets.get",
         "settings.set",
+        "accounts.link",
+        "accounts.unlink",
+        "providers.create",
+        "providers.update",
     ] {
         assert!(!CLI_CHANNELS.contains(&studio_only), "{studio_only}");
     }

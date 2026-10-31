@@ -53,6 +53,10 @@ pub trait AccountPort: Send + Sync {
     fn snapshot(&self, account_id: &str) -> Option<AccountSnapshot>;
 
     fn transport(&self, provider: &ProviderRow) -> Result<SharedTransport, AppError>;
+
+    fn copilot_identity(&self, provider: &ProviderRow) -> Result<String, AppError> {
+        Err(account_not_linked(provider))
+    }
 }
 
 pub const ACCOUNT_NOT_LINKED: &str = "account-not-linked";
@@ -175,6 +179,16 @@ impl DatabaseAccounts {
 }
 
 impl AccountPort for DatabaseAccounts {
+    fn copilot_identity(&self, provider: &ProviderRow) -> Result<String, AppError> {
+        let account = self.linked(provider)?;
+        if account.adapter != "copilot"
+            || provider.base_url.trim_end_matches('/') != zvs_copilot::BASE_URL
+        {
+            return Err(account_not_linked(provider));
+        }
+        Ok(account.external_id)
+    }
+
     fn snapshot(&self, account_id: &str) -> Option<AccountSnapshot> {
         self.find(account_id)
             .ok()
@@ -365,6 +379,16 @@ impl ProviderRegistry {
     }
 
     pub fn ephemeral_driver(&self, row: &ProviderRow) -> Result<AiDriver, AppError> {
+        if row.adapter == "copilot" {
+            Self::require_auth_mode(&super::adapters::copilot::COPILOT_CAPABILITIES, row)?;
+            return Ok(AiDriver {
+                text: Some(super::adapters::copilot::copilot_driver(
+                    self.accounts.copilot_identity(row)?,
+                )),
+                embedding: None,
+                image: None,
+            });
+        }
         let local = row.is_local();
         if row.kind == ProviderKind::Ollama && !local {
             let transport = self.transport(row)?;
@@ -860,6 +884,66 @@ mod tests {
             Some(json!("missing"))
         );
         assert_eq!(providers.size(), 0);
+    }
+
+    #[test]
+    fn copilot_requires_a_matching_linked_identity_and_fixed_endpoint_without_browser_or_secrets() {
+        use crate::data::repositories::AccountDraft;
+        use zvs_contract::{AccountFamily, AccountStatus};
+        let fixture = Fixture::new();
+        let account = fixture
+            .database
+            .transaction(|transaction| {
+                Ok(Repositories::new(transaction)
+                    .accounts
+                    .create(&AccountDraft::new(
+                        AccountFamily::Copilot,
+                        "cli:copilot",
+                        "github.com/octocat",
+                        100,
+                    ))?)
+            })
+            .unwrap();
+        let row = fixture.create(&ProviderDraft {
+            kind: ProviderKind::OpenaiCompatible,
+            adapter: AdapterFamily::Copilot,
+            auth_mode: AuthMode::Account,
+            account_id: Some(account.id.clone()),
+            base_url: zvs_copilot::BASE_URL.to_owned(),
+            ..draft()
+        });
+        let accounts = DatabaseAccounts::new(
+            fixture.database.shared(),
+            None,
+            fixture.key.clone(),
+            silent_logger(),
+        );
+        assert_eq!(
+            accounts.copilot_identity(&row).unwrap(),
+            "github.com/octocat"
+        );
+        let mut different = row.clone();
+        different.base_url = "https://example.com".to_owned();
+        assert_eq!(
+            accounts.copilot_identity(&different).unwrap_err().code,
+            AppErrorCode::ProviderSessionExpired
+        );
+        fixture
+            .database
+            .transaction(|transaction| {
+                Ok(Repositories::new(transaction).accounts.update_status(
+                    &account.id,
+                    AccountStatus::Revoked,
+                    None,
+                    200,
+                )?)
+            })
+            .unwrap();
+        assert_eq!(
+            accounts.copilot_identity(&row).unwrap_err().code,
+            AppErrorCode::ProviderSessionExpired
+        );
+        assert_eq!(fixture.key.calls(), 0);
     }
 
     #[test]

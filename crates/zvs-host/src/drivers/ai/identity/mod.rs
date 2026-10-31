@@ -79,6 +79,7 @@ static ZAI: LazyLock<SharedIdentityProbe> = LazyLock::new(|| Arc::new(ZaiIdentit
 
 pub fn identity_probe(family: AccountFamily) -> SharedIdentityProbe {
     match family {
+        AccountFamily::Copilot => Arc::new(CopilotIdentityProbe),
         AccountFamily::Openai => Arc::new(OpenaiIdentityProbe),
         AccountFamily::QwenWeb => Arc::clone(&QWEN),
         AccountFamily::ZaiWeb => Arc::clone(&ZAI),
@@ -86,6 +87,28 @@ pub fn identity_probe(family: AccountFamily) -> SharedIdentityProbe {
 }
 
 struct OpenaiIdentityProbe;
+
+struct CopilotIdentityProbe;
+
+#[async_trait]
+impl IdentityProbe for CopilotIdentityProbe {
+    fn family(&self) -> AccountFamily {
+        AccountFamily::Copilot
+    }
+    fn endpoint(&self) -> &str {
+        zvs_copilot::BASE_URL
+    }
+    fn login_url(&self) -> &str {
+        "https://github.com/login"
+    }
+    async fn probe(
+        &self,
+        _session: &dyn SessionGateway,
+        _cancel: &CancellationToken,
+    ) -> Result<ProbeResult, AppError> {
+        Err(super::copilot::auth_error())
+    }
+}
 
 #[async_trait]
 impl IdentityProbe for OpenaiIdentityProbe {

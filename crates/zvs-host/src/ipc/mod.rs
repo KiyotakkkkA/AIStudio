@@ -144,6 +144,8 @@ mod tests {
                 "chat.send",
                 "chat.skip",
                 "chat.unbindFolder",
+                "cli.copilot.cancelLogin",
+                "cli.copilot.login",
                 "cli.install",
                 "cli.open",
                 "cli.status",

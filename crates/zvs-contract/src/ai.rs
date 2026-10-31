@@ -6,6 +6,7 @@ use crate::validate::no_refinements;
 wire_enum!(AdapterFamily {
     OpenaiCompatible => "openai-compatible",
     Openai => "openai",
+    Copilot => "copilot",
     QwenWeb => "qwen-web",
     ZaiWeb => "zai-web",
     Local => "local",
@@ -26,6 +27,7 @@ pub enum OpenaiMode {
 
 wire_enum!(AccountFamily {
     Openai => "openai",
+    Copilot => "copilot",
     QwenWeb => "qwen-web",
     ZaiWeb => "zai-web",
 });
@@ -95,6 +97,7 @@ impl AdapterFamily {
             Self::QwenWeb => Some(AccountFamily::QwenWeb),
             Self::ZaiWeb => Some(AccountFamily::ZaiWeb),
             Self::Openai => Some(AccountFamily::Openai),
+            Self::Copilot => Some(AccountFamily::Copilot),
             Self::OpenaiCompatible | Self::Local => None,
         }
     }
@@ -137,6 +140,7 @@ mod tests {
             [
                 "openai-compatible",
                 "openai",
+                "copilot",
                 "qwen-web",
                 "zai-web",
                 "local"

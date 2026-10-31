@@ -560,6 +560,8 @@ export const contract = defineContract({
   "execPolicy.set": { input: ExecPolicyDto, output: ExecPolicyDto },
   "execPolicy.allowRule": { input: AllowRuleInput, output: PolicyRuleDto },
   "cli.open": { input: CliOpenInput, output: CliSessionDto },
+  "cli.copilot.login": { input: z.void(), output: AccountLinkResult },
+  "cli.copilot.cancelLogin": { input: z.void(), output: z.object({ cancelled: z.boolean() }) },
   "cli.status": { input: z.void(), output: CliInstallDto },
   "cli.install": { input: z.void(), output: CliInstallDto },
   "cli.uninstall": { input: z.void(), output: CliInstallDto },

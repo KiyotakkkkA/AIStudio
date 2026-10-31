@@ -137,6 +137,7 @@ impl IdentityProbe for FakeProbe {
 
     fn login_url(&self) -> &str {
         match self.family {
+            AccountFamily::Copilot => "https://github.com/login",
             AccountFamily::Openai => zvs_openai::AUTHORIZE_URL,
             AccountFamily::QwenWeb => FAKE_QWEN_LOGIN,
             AccountFamily::ZaiWeb => FAKE_ZAI_LOGIN,

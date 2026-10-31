@@ -1,5 +1,6 @@
 pub mod adapters;
 pub mod capabilities;
+pub mod copilot;
 pub mod errors;
 pub mod http;
 pub mod identity;

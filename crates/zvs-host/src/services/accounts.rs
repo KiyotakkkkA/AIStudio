@@ -40,6 +40,7 @@ use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 use crate::platform::navigation::{SharedNavigator, WorkspaceRoute};
 
+mod copilot;
 mod openai;
 
 pub const LINK_TIMEOUT: Duration = Duration::from_secs(180);
@@ -443,6 +444,8 @@ impl AccountService {
         let task = runtime.spawn(async move {
             let result = if adapter == AccountFamily::Openai {
                 inner.link_openai(account_id.as_deref(), &token).await
+            } else if adapter == AccountFamily::Copilot {
+                inner.link_copilot(account_id.as_deref(), &token).await
             } else {
                 inner.poll(adapter, &token).await
             };
@@ -601,14 +604,14 @@ impl AccountService {
         match event {
             BrowserLifecycleEvent::WorkspaceClosed => {
                 for (family, pending) in lock(&self.inner.links).iter() {
-                    if *family != AccountFamily::Openai {
+                    if !matches!(family, AccountFamily::Openai | AccountFamily::Copilot) {
                         pending.cancel.cancel();
                     }
                 }
             }
             BrowserLifecycleEvent::LinkTabClosed { url } => {
                 for family in AccountFamily::ALL {
-                    if *family == AccountFamily::Openai {
+                    if matches!(family, AccountFamily::Openai | AccountFamily::Copilot) {
                         continue;
                     }
                     if self.inner.probe(*family).login_url() == url {
@@ -624,7 +627,7 @@ impl AccountService {
     fn cookies_cleared(&self, domain: &str) {
         let domain = domain.strip_prefix('.').unwrap_or(domain).to_lowercase();
         for family in AccountFamily::ALL {
-            if *family == AccountFamily::Openai {
+            if matches!(family, AccountFamily::Openai | AccountFamily::Copilot) {
                 continue;
             }
             let Some(host) = host_of(self.inner.probe(*family).login_url()) else {
@@ -879,6 +882,9 @@ impl Inner {
         if row.family() == Some(AccountFamily::Openai) {
             return self.refresh_openai(row, cancel).await;
         }
+        if row.family() == Some(AccountFamily::Copilot) {
+            return self.refresh_copilot(row, cancel).await;
+        }
         let deadline = Deadline {
             at: Instant::now() + self.timeout,
             cancel,
@@ -1020,6 +1026,8 @@ impl Inner {
                         adapter,
                         if adapter == AccountFamily::Openai {
                             "oauth:openai"
+                        } else if adapter == AccountFamily::Copilot {
+                            "cli:copilot"
                         } else {
                             BROWSER_PARTITION
                         },
