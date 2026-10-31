@@ -1,5 +1,7 @@
 use serde_json::Value;
-use zvs_contract::{ChatToolCallDto, DeltaKind, HostEventDraft, MessageDto, MessageRole};
+use zvs_contract::{
+    ChatToolCallDto, DeltaKind, HostEventDraft, McpServerDetailDto, MessageDto, MessageRole,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tone {
@@ -15,6 +17,7 @@ pub enum Entry {
     Tool(Box<ChatToolCallDto>),
     Notice { tone: Tone, text: String },
     Shell(Box<ShellRun>),
+    Server(Box<McpServerDetailDto>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

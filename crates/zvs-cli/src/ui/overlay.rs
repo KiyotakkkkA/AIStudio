@@ -211,6 +211,8 @@ fn row_lines(
 fn empty_text(overlay: &Overlay) -> &'static str {
     if overlay.panel == Panel::Resume && overlay.filter.is_empty() {
         copy::NO_CONVERSATIONS
+    } else if overlay.panel == Panel::Mcp && overlay.filter.is_empty() && overlay.tab == 0 {
+        copy::MCP_EMPTY
     } else {
         copy::NOTHING_FOUND
     }

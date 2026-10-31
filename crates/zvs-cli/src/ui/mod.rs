@@ -15,7 +15,7 @@ use zvs_contract::ExecMode;
 
 use crate::copy;
 use crate::state::overlay::Panel;
-use crate::state::palette::{COMMANDS, Command, matches};
+use crate::state::palette::{Command, every_item, loading, matches};
 use crate::state::transcript::Tone;
 use crate::state::{App, Phase};
 
@@ -195,8 +195,33 @@ fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
 }
 
 fn palette_view(frame: &mut Frame<'_>, above: Rect, app: &App) {
-    let found = matches(app.input.text());
+    let sources = app.sources();
+    let found = matches(app.input.text(), &sources);
     if found.is_empty() {
+        if loading(app.input.text(), &sources) {
+            let area = Rect {
+                x: above.x + 1,
+                y: above.y + above.height.saturating_sub(3),
+                width: above.width.saturating_sub(2),
+                height: 3.min(above.height),
+            };
+            frame.render_widget(Clear, area);
+            frame.render_widget(
+                Paragraph::new(Line::from(vec![
+                    Span::styled(
+                        format!(" {} ", transcript::spinner(app.frame)),
+                        theme::accent(),
+                    ),
+                    Span::styled(copy::LOADING, theme::muted()),
+                ]))
+                .block(panel(
+                    copy::COMMANDS_TITLE,
+                    theme::colors().muted,
+                    theme::colors().panel_bg,
+                )),
+                area,
+            );
+        }
         return;
     }
     let selected = app.palette.selected().min(found.len() - 1);
@@ -209,9 +234,10 @@ fn palette_view(frame: &mut Frame<'_>, above: Rect, app: &App) {
         width,
         height: height.min(above.height),
     };
-    let name_width = COMMANDS
+    let name_width = found
         .iter()
-        .map(|command| command.name().width())
+        .map(|item| item.shown().width())
+        .chain(every_item().iter().map(|item| item.shown().width()))
         .max()
         .unwrap_or(0)
         + 2;
@@ -220,17 +246,19 @@ fn palette_view(frame: &mut Frame<'_>, above: Rect, app: &App) {
         .enumerate()
         .skip(start)
         .take(PALETTE_ROWS)
-        .map(|(index, command)| {
-            let name = format!("/{:<name_width$}", command.name());
+        .map(|(index, item)| {
+            let shown = item.shown();
+            let pad = " ".repeat(name_width.saturating_sub(shown.width()));
+            let name = format!("{shown}{pad}");
             if index == selected {
                 Line::from(vec![
                     Span::styled(format!(" {name}"), theme::selected()),
-                    Span::styled(format!("{} ", command.description()), theme::selected()),
+                    Span::styled(format!("{} ", item.description()), theme::selected()),
                 ])
             } else {
                 Line::from(vec![
                     Span::styled(format!(" {name}"), theme::accent()),
-                    Span::styled(command.description(), theme::muted()),
+                    Span::styled(item.description(), theme::muted()),
                 ])
             }
         })
@@ -251,10 +279,10 @@ fn help_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
         copy::COMMANDS_TITLE,
         theme::eyebrow(),
     ))];
-    for command in COMMANDS {
+    for item in every_item() {
         lines.push(Line::from(vec![
-            Span::styled(format!("  /{:<13}", command.name()), theme::accent()),
-            Span::styled(command.description(), theme::text()),
+            Span::styled(format!("  /{:<13}", item.label()), theme::accent()),
+            Span::styled(item.description(), theme::text()),
         ]));
     }
     lines.push(Line::default());

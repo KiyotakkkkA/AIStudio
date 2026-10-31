@@ -15,8 +15,8 @@ export const ACCOUNT_ADAPTER_LABELS: Record<AccountFamily, string> = {
 export const ACCOUNT_DESC_LABELS: Record<AccountFamily, string> = {
   openai: "Откроется сайт вендора",
   copilot: "Требуется GitHub Copilot CLI",
-  "qwen-web": "Вход в системном браузере",
-  "zai-web": "Вход в системном браузере",
+  "qwen-web": "Вход во встроенном браузере",
+  "zai-web": "Вход во встроенном браузере",
 };
 
 export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, string> = {
@@ -60,7 +60,7 @@ export function adapterLabel(adapter: AccountFamily): string {
 }
 
 export function adapterDescription(adapter: AccountFamily, isLogged: boolean): string {
-  return !isLogged ? ACCOUNT_DESC_LABELS[adapter] || "Вход в системном браузере" : "Уже привязан";
+  return !isLogged ? ACCOUNT_DESC_LABELS[adapter] || "Вход во встроенном браузере" : "Уже привязан";
 }
 
 export function accountTitle(account: AccountDto): string {

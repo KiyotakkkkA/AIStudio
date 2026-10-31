@@ -1,7 +1,8 @@
 use zvs_contract::{
-    ChatContextDto, CliTheme, ConversationDto, ConversationId, ExecJudgeDto, ExecMode,
-    ExecPolicyDto, McpServerDto, McpServerId, McpServerStatus, ModelCapability, ProviderDto,
-    ProviderUsageDto, SkillDto, SkillId, SkillSource, SkillStatus, ThinkingEffort,
+    AccountFamily, ChatContextDto, CliTheme, ConversationDto, ConversationId, ExecJudgeDto,
+    ExecMode, ExecPolicyDto, McpOAuthState, McpServerDto, McpServerId, McpServerStatus,
+    ModelCapability, ProviderDto, ProviderUsageDto, SkillDto, SkillId, SkillSource, SkillStatus,
+    ThinkingEffort,
 };
 
 use super::ModelChoice;
@@ -12,6 +13,7 @@ use crate::format;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Panel {
+    Connect,
     Models,
     Effort,
     Resume,
@@ -35,11 +37,13 @@ pub enum Tone {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
+    Connect(AccountFamily),
     SelectModel(ModelChoice),
     SetEffort(ThinkingEffort),
     Resume(ConversationId),
     ToggleSkill { id: SkillId, enabled: bool },
     ToggleServer { id: McpServerId, start: bool },
+    SignIn(McpServerId),
     SetMode(ExecMode),
     SetJudge(Option<ExecJudgeDto>),
     Rebind(Shortcut),
@@ -336,7 +340,7 @@ pub const fn theme_label(theme: CliTheme) -> &'static str {
     }
 }
 
-const fn theme_hint(theme: CliTheme) -> &'static str {
+pub const fn theme_hint(theme: CliTheme) -> &'static str {
     match theme {
         CliTheme::Ember => copy::THEME_HINT_EMBER,
         CliTheme::Graphite => copy::THEME_HINT_GRAPHITE,
@@ -525,7 +529,7 @@ fn skill_rows(overlay: &Overlay) -> Vec<Row> {
         .collect()
 }
 
-const fn server_state(status: McpServerStatus) -> (&'static str, Tone) {
+pub const fn server_state(status: McpServerStatus) -> (&'static str, Tone) {
     match status {
         McpServerStatus::Disabled => (copy::MCP_DISABLED, Tone::Faint),
         McpServerStatus::Stopped => (copy::MCP_STOPPED, Tone::Faint),
@@ -551,7 +555,12 @@ fn server_rows(overlay: &Overlay) -> Vec<Row> {
             }
         })
         .map(|server| {
-            let (state, tone) = server_state(server.status);
+            let needs_sign_in = server.oauth == McpOAuthState::Required;
+            let (state, tone) = if needs_sign_in {
+                (copy::MCP_SIGN_IN_REQUIRED, Tone::Warn)
+            } else {
+                server_state(server.status)
+            };
             let running = matches!(
                 server.status,
                 McpServerStatus::Connected | McpServerStatus::Starting
@@ -576,11 +585,19 @@ fn server_rows(overlay: &Overlay) -> Vec<Row> {
                 .current(running)
                 .detail([
                     target.trim().to_owned(),
-                    server.last_error.clone().unwrap_or_default(),
+                    if needs_sign_in {
+                        copy::MCP_SIGN_IN_HINT.to_owned()
+                    } else {
+                        server.last_error.clone().unwrap_or_default()
+                    },
                 ])
-                .action(Action::ToggleServer {
-                    id: server.id,
-                    start: !running,
+                .action(if needs_sign_in {
+                    Action::SignIn(server.id)
+                } else {
+                    Action::ToggleServer {
+                        id: server.id,
+                        start: !running,
+                    }
                 })
         })
         .collect()
@@ -644,6 +661,52 @@ fn permission_rows(overlay: &Overlay, view: &View<'_>) -> Vec<Row> {
     rows
 }
 
+pub const CONNECTABLE: [AccountFamily; 4] = [
+    AccountFamily::QwenWeb,
+    AccountFamily::ZaiWeb,
+    AccountFamily::Openai,
+    AccountFamily::Copilot,
+];
+
+pub const fn account_label(family: AccountFamily) -> &'static str {
+    match family {
+        AccountFamily::QwenWeb => "Qwen",
+        AccountFamily::ZaiWeb => "Z.ai",
+        AccountFamily::Openai => "OpenAI",
+        AccountFamily::Copilot => "GitHub Copilot",
+    }
+}
+
+const fn connect_hint(family: AccountFamily) -> &'static str {
+    match family {
+        AccountFamily::QwenWeb | AccountFamily::ZaiWeb => copy::CONNECT_HINT_BROWSER,
+        AccountFamily::Openai => copy::CONNECT_HINT_OPENAI,
+        AccountFamily::Copilot => copy::CONNECT_HINT_COPILOT,
+    }
+}
+
+pub fn connected(providers: &[ProviderDto], family: AccountFamily) -> bool {
+    providers.iter().any(|provider| {
+        provider.summary.enabled
+            && provider.summary.adapter.account_family() == Some(family)
+            && provider.models.iter().any(|model| model.available)
+    })
+}
+
+fn connect_rows(view: &View<'_>) -> Vec<Row> {
+    CONNECTABLE
+        .iter()
+        .map(|family| {
+            let linked = connected(view.providers, *family);
+            Row::new(family.as_str(), "◆", account_label(*family))
+                .meta(if linked { copy::CONNECT_CONNECTED } else { "" })
+                .tone(if linked { Tone::Good } else { Tone::Plain })
+                .detail([connect_hint(*family).to_owned()])
+                .action(Action::Connect(*family))
+        })
+        .collect()
+}
+
 fn shortcut_rows(overlay: &Overlay, view: &View<'_>) -> Vec<Row> {
     SHORTCUTS
         .iter()
@@ -684,7 +747,7 @@ impl Overlay {
             expanded: Vec::new(),
             loading: !matches!(
                 panel,
-                Panel::Models | Panel::Effort | Panel::Shortcuts | Panel::Theme
+                Panel::Connect | Panel::Models | Panel::Effort | Panel::Shortcuts | Panel::Theme
             ),
             armed: false,
             capturing: None,
@@ -698,6 +761,7 @@ impl Overlay {
 
     pub const fn title(&self) -> &'static str {
         match self.panel {
+            Panel::Connect => copy::CONNECT_TITLE,
             Panel::Models => copy::MODELS_TITLE,
             Panel::Effort => copy::EFFORT_TITLE,
             Panel::Resume => copy::RESUME_TITLE,
@@ -712,6 +776,7 @@ impl Overlay {
 
     pub const fn icon(&self) -> &'static str {
         match self.panel {
+            Panel::Connect => "⇄",
             Panel::Models => "◆",
             Panel::Effort => "◐",
             Panel::Resume => "↺",
@@ -739,12 +804,13 @@ impl Overlay {
             Panel::Skills => fixed(&[copy::TAB_ALL, copy::TAB_ENABLED, copy::TAB_DISABLED]),
             Panel::Mcp => fixed(&[copy::TAB_ALL, copy::TAB_CONNECTED, copy::TAB_STOPPED]),
             Panel::Permissions => fixed(&[copy::TAB_MODE, copy::TAB_JUDGE]),
-            Panel::Effort | Panel::Shortcuts | Panel::Theme => Vec::new(),
+            Panel::Connect | Panel::Effort | Panel::Shortcuts | Panel::Theme => Vec::new(),
         }
     }
 
     pub fn rows(&self, view: &View<'_>) -> Vec<Row> {
         let rows = match self.panel {
+            Panel::Connect => connect_rows(view),
             Panel::Models => model_rows(view, self.tab),
             Panel::Effort => effort_rows(view),
             Panel::Resume => resume_rows(self, view),

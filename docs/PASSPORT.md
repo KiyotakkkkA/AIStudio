@@ -360,10 +360,23 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
   execution policy, provider and model listings, skills and MCP servers. Secrets, settings,
   accounts, provider editing and `cli.install`/`cli.uninstall` stay studio-only. Widening the
   list is a security decision, as above.
-  Copilot exception (2026-10-31): `cli.copilot.login` and `cli.copilot.cancelLogin` are
-  allowed. Login links only the active GitHub Copilot identity, creates its account-mode
-  text provider if needed, and discovers models through the existing services. No caller
-  supplied URL, credential, account family or provider patch is accepted.
+  Account exception (2026-11-01, widened from the Copilot-only login of 2026-10-31):
+  `cli.accounts.link` and `cli.accounts.cancelLink` are allowed. They take only an account
+  family (`openai`, `copilot`, `qwen-web`, `zai-web`); the sign-in runs in the app's own
+  account flow, then the host creates or re-enables that account's account-mode text provider
+  and discovers models through the existing services. No caller supplied URL, credential,
+  account id or provider patch is honoured. `/desktop` needs no channel: the client launches
+  the app with a `zvs-studio://conversation/<id>` link, the same entry point a toast uses.
+  MCP exception (2026-11-01): `cli.mcp.create`, `mcp.signIn` and `mcp.cancelSignIn` are
+  allowed, so `/mcp add` can connect a server. `cli.mcp.create` takes the studio's
+  `CreateMcpServerInput` but refuses any env or header value that refers to a stored secret
+  (`PermissionDenied`), so a console caller cannot aim a saved credential at an address of
+  its choosing; literal values only. Sign-in is the studio's own OAuth flow — the host opens
+  the system browser and keeps the grant — and takes only a server id. `mcp.create`,
+  `mcp.update`, `mcp.remove` and `mcp.signOut` stay studio-only. `mcp.get` is allowed for
+  `/mcp inspect`: it is read-only and returns the same server record `mcp.list` already gives
+  the console, plus the discovered tools, resources and prompts; the console shows env and
+  header names only, never their values.
   Limits (2026-10-31): `providers.usage` is allowed for the `/context` panel. It is read-only,
   takes only a provider id and returns the same `ProviderUsageDto` the studio meter shows;
   no credential, account detail or provider setting leaves the host.

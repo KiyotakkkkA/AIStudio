@@ -8,17 +8,18 @@ pub mod transcript;
 use std::collections::VecDeque;
 
 use zvs_contract::{
-    AllowRuleChangeDto, AllowRuleInput, AppError, BindFolderResultDto, ChatAnswerInput,
-    ChatAttachDto, ChatContextDto, ChatSendInput, ChatSkipInput, CliSessionDto, CliTheme,
-    ConversationDetailDto, ConversationDto, ConversationId, ExecMode, ExecPolicyDto,
-    FolderAccessAnswer, FolderGrantScope, HostEvent, HostEventDraft, McpServerDto, McpServerId,
-    McpServerStatus, PolicyRuleDto, ProviderDto, ProviderId, ProviderUsageDto, RunHandleDto, RunId,
+    AccountFamily, AllowRuleChangeDto, AllowRuleInput, AppError, BindFolderResultDto,
+    ChatAnswerInput, ChatAttachDto, ChatContextDto, ChatSendInput, ChatSkipInput, CliSessionDto,
+    CliTheme, ConversationDetailDto, ConversationDto, ConversationId, CreateMcpServerInput,
+    ExecJudgeDto, ExecMode, ExecPolicyDto, FolderAccessAnswer, FolderGrantScope, HostEvent,
+    HostEventDraft, McpOAuthState, McpServerDetailDto, McpServerDto, McpServerId, McpServerStatus,
+    PolicyRuleDto, ProviderDto, ProviderId, ProviderUsageDto, RunHandleDto, RunId,
     RunOutcomeStatus, SkillDto, SkillId, ThinkingEffort, WorkingFolderAccess,
 };
 
 use self::input::Input;
 use self::overlay::{Action, Overlay, Panel, View};
-use self::palette::{Command, Palette, is_command_text};
+use self::palette::{Arg, Command, Item, Palette, Pick, Sources, arg_slot, is_command_text};
 use self::prompt::{ApprovalDetail, Choice, Prompt, PromptKind};
 use self::shortcuts::{Chord, Keymap, SHORTCUTS, Shortcut};
 use self::transcript::{ShellEnd, ShellRun, Tone, Transcript};
@@ -99,9 +100,16 @@ pub struct ModelChoice {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum PolicyChange {
+    Mode(ExecMode),
+    Judge(Option<ExecJudgeDto>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Request {
-    LinkCopilot,
-    CancelCopilotLink,
+    LinkAccount(AccountFamily),
+    CancelLink(AccountFamily),
+    OpenDesktop(ConversationId),
     Open,
     Providers,
     Policy,
@@ -148,7 +156,11 @@ pub enum Request {
     },
     StartServer(McpServerId),
     StopServer(McpServerId),
-    SetPolicy(ExecPolicyDto),
+    AddServer(Box<CreateMcpServerInput>),
+    InspectServer(String),
+    SignIn(McpServerId),
+    CancelSignIn(McpServerId),
+    SetPolicy(PolicyChange),
     FocusVerification,
     Shell(String),
     StopShell,
@@ -159,7 +171,8 @@ pub enum Request {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Msg {
-    CopilotLinked(Result<Vec<ProviderDto>, AppError>),
+    AccountLinked(AccountFamily, Result<Vec<ProviderDto>, AppError>),
+    DesktopOpened(bool),
     Key(Key),
     Paste(String),
     Scroll(isize),
@@ -186,7 +199,10 @@ pub enum Msg {
     Servers(Result<Vec<McpServerDto>, AppError>),
     SkillChanged(Result<SkillDto, AppError>),
     ServerChanged(Result<McpServerDto, AppError>),
-    PolicySet(Result<ExecPolicyDto, AppError>),
+    ServerAdded(Result<McpServerDto, AppError>),
+    Inspected(Result<McpServerDetailDto, AppError>),
+    SignedIn(Result<McpServerDto, AppError>),
+    PolicySet(PolicyChange, Result<ExecPolicyDto, AppError>),
     Notice(zvs_contract::CliNotice),
     ShellOutput(String),
     ShellEnded(ShellEnd),
@@ -206,7 +222,13 @@ pub struct App {
     pub providers: Vec<ProviderDto>,
     pub model: Option<ModelChoice>,
     pub effort: ThinkingEffort,
-    pub copilot_linking: bool,
+    pub linking: Option<AccountFamily>,
+    pub joining: Option<McpServerId>,
+    pub signing: Option<McpServerId>,
+    pub lookup_arg: Option<Arg>,
+    pub lookup_servers: Option<Vec<McpServerDto>>,
+    pub lookup_conversations: Option<Vec<ConversationDto>>,
+    pub picked_load: bool,
     pub resume: Option<ConversationId>,
     pub mode: ExecMode,
     pub policy: Option<ExecPolicyDto>,
@@ -265,7 +287,13 @@ impl App {
             providers: Vec::new(),
             model: None,
             effort: ThinkingEffort::Auto,
-            copilot_linking: false,
+            linking: None,
+            joining: None,
+            signing: None,
+            lookup_arg: None,
+            lookup_servers: None,
+            lookup_conversations: None,
+            picked_load: false,
             resume: None,
             mode: ExecMode::AlwaysAsk,
             policy: None,
@@ -357,11 +385,110 @@ impl App {
         ]
     }
 
+    fn palette_allowed(&self) -> bool {
+        self.prompts.is_empty() && !self.help && self.overlay.is_none()
+    }
+
+    pub fn sources(&self) -> Sources<'_> {
+        Sources {
+            servers: self.lookup_servers.as_deref(),
+            conversations: self.lookup_conversations.as_deref(),
+            folder: &self.folder,
+        }
+    }
+
     pub fn palette_open(&self) -> bool {
-        self.prompts.is_empty()
-            && !self.help
-            && self.overlay.is_none()
-            && is_command_text(self.input.text())
+        let text = self.input.text();
+        self.palette_allowed()
+            && is_command_text(text)
+            && (palette::loading(text, &self.sources())
+                || !palette::matches(text, &self.sources()).is_empty())
+    }
+
+    fn lookup(&mut self) -> Vec<Request> {
+        let wanted = if self.palette_allowed() {
+            arg_slot(self.input.text()).map(|slot| slot.arg)
+        } else {
+            None
+        };
+        if wanted == self.lookup_arg {
+            return Vec::new();
+        }
+        self.lookup_arg = wanted;
+        match wanted {
+            Some(Arg::Server) => {
+                self.lookup_servers = None;
+                vec![Request::Servers]
+            }
+            Some(Arg::Conversation) => {
+                self.lookup_conversations = None;
+                vec![Request::Conversations]
+            }
+            Some(Arg::Theme) | None => Vec::new(),
+        }
+    }
+
+    fn pick(&mut self, pick: Pick) -> Vec<Request> {
+        match pick {
+            Pick::Server(id) => {
+                self.input.take();
+                vec![Request::InspectServer(id.to_string())]
+            }
+            Pick::Theme(theme) => {
+                self.input.take();
+                self.act(Action::SetTheme(theme))
+            }
+            Pick::Conversation(id) => {
+                if self.busy() {
+                    self.status = Some((Tone::Info, copy::BUSY.to_owned()));
+                    return Vec::new();
+                }
+                self.input.take();
+                self.picked_load = true;
+                vec![Request::Load(id)]
+            }
+        }
+    }
+
+    fn typed_argument(&mut self, command: Command, argument: &str) -> Vec<Request> {
+        let wanted = argument.to_lowercase();
+        match command {
+            Command::Theme => {
+                let found = CliTheme::ALL.iter().copied().find(|theme| {
+                    theme.as_str() == wanted
+                        || overlay::theme_label(*theme).to_lowercase() == wanted
+                });
+                match found {
+                    Some(theme) => self.pick(Pick::Theme(theme)),
+                    None => {
+                        self.status = Some((
+                            Tone::Error,
+                            format!("{}: {argument}", copy::THEME_NOT_FOUND),
+                        ));
+                        Vec::new()
+                    }
+                }
+            }
+            Command::Resume => {
+                let found = self.lookup_conversations.as_deref().and_then(|known| {
+                    overlay::in_folder(known, &self.folder)
+                        .into_iter()
+                        .find(|conversation| conversation.title.to_lowercase() == wanted)
+                        .map(|conversation| conversation.id)
+                });
+                match found {
+                    Some(id) => self.pick(Pick::Conversation(id)),
+                    None => {
+                        self.status = Some((
+                            Tone::Error,
+                            format!("{}: {argument}", copy::RESUME_NOT_FOUND),
+                        ));
+                        Vec::new()
+                    }
+                }
+            }
+            other => self.command(other),
+        }
     }
 
     pub fn capturing(&self) -> bool {
@@ -427,6 +554,15 @@ impl App {
     }
 
     pub fn update(&mut self, message: Msg) -> Vec<Request> {
+        let typed = matches!(message, Msg::Key(_) | Msg::Paste(_));
+        let mut requests = self.apply(message);
+        if typed && self.exit.is_none() {
+            requests.extend(self.lookup());
+        }
+        requests
+    }
+
+    fn apply(&mut self, message: Msg) -> Vec<Request> {
         match message {
             Msg::Key(key) => self.key(key),
             Msg::Paste(text) => {
@@ -452,25 +588,40 @@ impl App {
                 Vec::new()
             }
             Msg::Connected => vec![Request::Open, Request::Providers, Request::Policy],
-            Msg::CopilotLinked(result) => {
-                self.copilot_linking = false;
+            Msg::AccountLinked(family, result) => {
+                self.linking = None;
                 match result {
                     Ok(providers) => {
-                        let copilot: Vec<_> = providers
+                        let linked: Vec<_> = providers
                             .iter()
                             .filter(|provider| {
-                                provider.summary.adapter == zvs_contract::AdapterFamily::Copilot
+                                provider.summary.adapter.account_family() == Some(family)
                                     && provider.summary.enabled
                             })
                             .cloned()
                             .collect();
-                        self.model = default_model(&copilot).or_else(|| self.model.clone());
+                        self.model = default_model(&linked).or_else(|| self.model.clone());
                         self.providers = providers;
                         self.effort = ThinkingEffort::Auto;
-                        self.status = Some((Tone::Success, copy::COPILOT_LINKED.to_owned()));
+                        self.status = Some((
+                            Tone::Success,
+                            format!(
+                                "{} {}",
+                                overlay::account_label(family),
+                                copy::CONNECT_LINKED
+                            ),
+                        ));
                     }
                     Err(error) => self.fail(&error),
                 }
+                Vec::new()
+            }
+            Msg::DesktopOpened(opened) => {
+                self.status = Some(if opened {
+                    (Tone::Success, copy::DESKTOP_OPENED.to_owned())
+                } else {
+                    (Tone::Error, copy::DESKTOP_FAILED.to_owned())
+                });
                 Vec::new()
             }
             Msg::Pointer(pointer) => self.pointer(pointer),
@@ -563,18 +714,13 @@ impl App {
                 }
                 Vec::new()
             }
-            Msg::PolicySet(result) => {
+            Msg::PolicySet(change, result) => {
                 match result {
                     Ok(policy) => {
-                        let judge_changed = self
-                            .policy
-                            .as_ref()
-                            .is_some_and(|known| known.judge != policy.judge);
                         self.adopt_policy(policy);
-                        let text = if judge_changed {
-                            copy::JUDGE_SET
-                        } else {
-                            copy::MODE_SET
+                        let text = match change {
+                            PolicyChange::Judge(_) => copy::JUDGE_SET,
+                            PolicyChange::Mode(_) => copy::MODE_SET,
                         };
                         self.status = Some((Tone::Success, text.to_owned()));
                     }
@@ -585,12 +731,18 @@ impl App {
             Msg::Conversations(result) => {
                 match result {
                     Ok(list) => {
+                        if self.lookup_arg == Some(Arg::Conversation) {
+                            self.lookup_conversations = Some(list.clone());
+                        }
                         if let Some(overlay) = self.overlay_for(Panel::Resume) {
                             overlay.conversations = list;
                             overlay.loading = false;
                         }
                     }
-                    Err(error) => self.panel_failed(&error),
+                    Err(error) => {
+                        self.lookup_conversations.get_or_insert_with(Vec::new);
+                        self.panel_failed(&error);
+                    }
                 }
                 Vec::new()
             }
@@ -627,12 +779,18 @@ impl App {
             Msg::Servers(result) => {
                 match result {
                     Ok(list) => {
+                        if self.lookup_arg == Some(Arg::Server) {
+                            self.lookup_servers = Some(list.clone());
+                        }
                         if let Some(overlay) = self.overlay_for(Panel::Mcp) {
                             overlay.servers = list;
                             overlay.loading = false;
                         }
                     }
-                    Err(error) => self.panel_failed(&error),
+                    Err(error) => {
+                        self.lookup_servers.get_or_insert_with(Vec::new);
+                        self.panel_failed(&error);
+                    }
                 }
                 Vec::new()
             }
@@ -658,6 +816,11 @@ impl App {
             }
             Msg::ServerChanged(result) => {
                 match result {
+                    Ok(server) if self.joining == Some(server.id) => {
+                        self.joining = None;
+                        self.merge_server(&server);
+                        return self.joined(&server);
+                    }
                     Ok(server) => {
                         let running = matches!(
                             server.status,
@@ -677,6 +840,49 @@ impl App {
                         {
                             *known = server;
                         }
+                    }
+                    Err(error) => {
+                        self.joining = None;
+                        self.status = Some((Tone::Error, error.message));
+                    }
+                }
+                Vec::new()
+            }
+            Msg::ServerAdded(result) => match result {
+                Ok(server) => {
+                    self.joining = Some(server.id);
+                    self.status = Some((
+                        Tone::Info,
+                        format!("{} «{}»…", copy::MCP_STARTING_SERVER, server.name),
+                    ));
+                    if let Some(overlay) = self.overlay_for(Panel::Mcp) {
+                        overlay.servers.push(server.clone());
+                    }
+                    vec![Request::StartServer(server.id)]
+                }
+                Err(error) => {
+                    self.status = Some((Tone::Error, error.message));
+                    Vec::new()
+                }
+            },
+            Msg::Inspected(result) => {
+                match result {
+                    Ok(detail) => {
+                        self.transcript
+                            .entries
+                            .push(transcript::Entry::Server(Box::new(detail)));
+                        self.scroll = 0;
+                    }
+                    Err(error) => self.status = Some((Tone::Error, error.message)),
+                }
+                Vec::new()
+            }
+            Msg::SignedIn(result) => {
+                self.signing = None;
+                match result {
+                    Ok(server) => {
+                        self.merge_server(&server);
+                        self.status = Some(server_outcome(&server, Some(copy::MCP_SIGNED_IN)));
                     }
                     Err(error) => self.status = Some((Tone::Error, error.message)),
                 }
@@ -706,7 +912,9 @@ impl App {
                     requests
                 }
                 Err(error) => {
-                    if self.overlay.is_none() {
+                    if std::mem::take(&mut self.picked_load) {
+                        self.status = Some((Tone::Error, error.message));
+                    } else if self.overlay.is_none() {
                         self.quit(Some(&error.message.clone()));
                     } else {
                         self.panel_failed(&error);
@@ -899,14 +1107,17 @@ impl App {
             .as_ref()
             .map(|conversation| conversation.id)
         {
-            return vec![self.send(id, text)];
+            return vec![self.send(id, text), Request::Policy];
         }
         self.awaiting = true;
         self.pending = Some(text);
-        vec![Request::Create {
-            provider: model.provider,
-            model: model.model,
-        }]
+        vec![
+            Request::Create {
+                provider: model.provider,
+                model: model.model,
+            },
+            Request::Policy,
+        ]
     }
 
     fn command(&mut self, command: Command) -> Vec<Request> {
@@ -932,15 +1143,19 @@ impl App {
             Command::Resume => return self.open_panel(Panel::Resume),
             Command::Models => return self.open_panel(Panel::Models),
             Command::Effort => return self.open_panel(Panel::Effort),
-            Command::Copilot => {
-                if self.busy() || self.copilot_linking {
+            Command::Connect => {
+                if self.busy() || self.linking.is_some() || self.signing.is_some() {
                     self.status = Some((Tone::Info, copy::BUSY.to_owned()));
                 } else {
-                    self.copilot_linking = true;
-                    self.status = Some((Tone::Info, copy::COPILOT_LINKING.to_owned()));
-                    return vec![Request::LinkCopilot];
+                    return self.open_panel(Panel::Connect);
                 }
             }
+            Command::Desktop => match &self.conversation {
+                Some(conversation) => return vec![Request::OpenDesktop(conversation.id)],
+                None => {
+                    self.status = Some((Tone::Info, copy::DESKTOP_NO_CONVERSATION.to_owned()));
+                }
+            },
             Command::Context => return self.open_panel(Panel::Context),
             Command::Skills => return self.open_panel(Panel::Skills),
             Command::Mcp => return self.open_panel(Panel::Mcp),
@@ -1018,7 +1233,9 @@ impl App {
             return Vec::new();
         }
         let requests = match panel {
-            Panel::Models | Panel::Effort | Panel::Shortcuts | Panel::Theme => Vec::new(),
+            Panel::Connect | Panel::Models | Panel::Effort | Panel::Shortcuts | Panel::Theme => {
+                Vec::new()
+            }
             Panel::Resume => vec![Request::Conversations],
             Panel::Skills => vec![Request::Skills],
             Panel::Mcp => vec![Request::Servers],
@@ -1049,6 +1266,24 @@ impl App {
 
     fn act(&mut self, action: Action) -> Vec<Request> {
         match action {
+            Action::Connect(family) => {
+                if self.busy() {
+                    self.status = Some((Tone::Info, copy::BUSY.to_owned()));
+                    return Vec::new();
+                }
+                self.overlay = None;
+                self.linking = Some(family);
+                self.status = Some((
+                    Tone::Info,
+                    format!(
+                        "{} {}… {}",
+                        copy::CONNECT_LINKING,
+                        overlay::account_label(family),
+                        copy::CONNECT_CANCEL_HINT
+                    ),
+                ));
+                vec![Request::LinkAccount(family)]
+            }
             Action::SelectModel(choice) => {
                 self.status = Some((
                     Tone::Success,
@@ -1079,6 +1314,14 @@ impl App {
             } else {
                 Request::StopServer(id)
             }],
+            Action::SignIn(id) => {
+                let server = self
+                    .overlay
+                    .as_ref()
+                    .and_then(|overlay| overlay.servers.iter().find(|known| known.id == id))
+                    .cloned();
+                server.map_or_else(Vec::new, |server| self.sign_in(&server))
+            }
             Action::SetMode(mode) => {
                 if mode == ExecMode::NoRestrictions
                     && self.mode != mode
@@ -1089,13 +1332,9 @@ impl App {
                     self.status = Some((Tone::Error, copy::NO_RESTRICTIONS_CONFIRM.to_owned()));
                     return Vec::new();
                 }
-                let judge = self.policy.as_ref().and_then(|policy| policy.judge.clone());
-                vec![Request::SetPolicy(ExecPolicyDto { mode, judge })]
+                vec![Request::SetPolicy(PolicyChange::Mode(mode))]
             }
-            Action::SetJudge(judge) => vec![Request::SetPolicy(ExecPolicyDto {
-                mode: self.mode,
-                judge,
-            })],
+            Action::SetJudge(judge) => vec![Request::SetPolicy(PolicyChange::Judge(judge))],
             Action::Rebind(shortcut) => {
                 if let Some(overlay) = self.overlay.as_mut() {
                     overlay.capturing = Some(shortcut);
@@ -1117,6 +1356,88 @@ impl App {
                 vec![Request::SaveTheme(theme)]
             }
         }
+    }
+
+    fn mcp(&mut self, arguments: &str) -> Vec<Request> {
+        let words = match crate::mcp_add::split(arguments) {
+            Ok(words) => words,
+            Err(message) => {
+                self.status = Some((Tone::Error, message.to_owned()));
+                return Vec::new();
+            }
+        };
+        let mut words = words.into_iter();
+        match words.next().as_deref() {
+            Some("add") => {}
+            Some("inspect") => {
+                let name = words.collect::<Vec<_>>().join(" ");
+                if name.is_empty() {
+                    self.status = Some((Tone::Error, copy::MCP_INSPECT_USAGE.to_owned()));
+                    return Vec::new();
+                }
+                return vec![Request::InspectServer(name)];
+            }
+            _ => {
+                self.status = Some((Tone::Error, copy::MCP_ADD_UNKNOWN.to_owned()));
+                return Vec::new();
+            }
+        }
+        if self.linking.is_some() || self.signing.is_some() || self.joining.is_some() {
+            self.status = Some((Tone::Info, copy::BUSY.to_owned()));
+            return Vec::new();
+        }
+        match crate::mcp_add::parse(words) {
+            Ok(input) => {
+                self.status = Some((
+                    Tone::Info,
+                    format!("{} «{}»…", copy::MCP_ADDING, input.name),
+                ));
+                vec![Request::AddServer(Box::new(input))]
+            }
+            Err(message) => {
+                self.status = Some((Tone::Error, message.to_owned()));
+                Vec::new()
+            }
+        }
+    }
+
+    fn merge_server(&mut self, server: &McpServerDto) {
+        if let Some(overlay) = self.overlay_for(Panel::Mcp)
+            && let Some(known) = overlay
+                .servers
+                .iter_mut()
+                .find(|known| known.id == server.id)
+        {
+            *known = server.clone();
+        }
+    }
+
+    fn joined(&mut self, server: &McpServerDto) -> Vec<Request> {
+        if server.oauth == McpOAuthState::Required {
+            return self.sign_in(server);
+        }
+        self.status = Some(server_outcome(server, None));
+        Vec::new()
+    }
+
+    fn sign_in(&mut self, server: &McpServerDto) -> Vec<Request> {
+        if self.busy() || self.linking.is_some() || self.signing.is_some() {
+            self.status = Some((Tone::Info, copy::BUSY.to_owned()));
+            return Vec::new();
+        }
+        self.overlay = None;
+        self.signing = Some(server.id);
+        self.status = Some((
+            Tone::Info,
+            format!(
+                "{} «{}» {}… {}",
+                copy::MCP_SIGNING_IN,
+                server.name,
+                copy::MCP_IN_BROWSER,
+                copy::CONNECT_CANCEL_HINT
+            ),
+        ));
+        vec![Request::SignIn(server.id)]
     }
 
     fn save_shortcuts(&self) -> Request {
@@ -1256,10 +1577,20 @@ impl App {
 
     fn submit(&mut self) -> Vec<Request> {
         if self.palette_open()
-            && let Some(command) = self.palette.current(self.input.text())
+            && let Some(item) = self.palette.current(self.input.text(), &self.sources())
         {
-            self.input.take();
-            return self.command(command);
+            self.palette.reset();
+            return match item {
+                Item::Command(command) => {
+                    self.input.take();
+                    self.command(command)
+                }
+                Item::Sub(_) => {
+                    self.input.set(&item.completion());
+                    Vec::new()
+                }
+                Item::Value(value) => self.pick(value.pick),
+            };
         }
         let text = self.input.take();
         if text.is_empty() {
@@ -1270,6 +1601,16 @@ impl App {
         }
         if text.starts_with('/') && !text.starts_with("//") {
             return match Command::parse(&text) {
+                Some(Command::Mcp) if !palette::arguments(&text).is_empty() => {
+                    self.palette.reset();
+                    self.mcp(palette::arguments(&text))
+                }
+                Some(command)
+                    if command.arg().is_some() && !palette::arguments(&text).is_empty() =>
+                {
+                    self.palette.reset();
+                    self.typed_argument(command, palette::arguments(&text))
+                }
                 Some(command) => self.command(command),
                 None => {
                     self.status = Some((Tone::Error, format!("{}: {text}", copy::UNKNOWN_COMMAND)));
@@ -1318,10 +1659,19 @@ impl App {
     }
 
     fn key(&mut self, key: Key) -> Vec<Request> {
-        if self.copilot_linking && matches!(key, Key::Esc | Key::Interrupt) {
-            return vec![Request::CancelCopilotLink];
+        if let Some(family) = self.linking
+            && matches!(key, Key::Esc | Key::Interrupt)
+        {
+            return vec![Request::CancelLink(family)];
         }
-        if self.copilot_linking && !matches!(key, Key::PageUp | Key::PageDown) {
+        if let Some(id) = self.signing
+            && matches!(key, Key::Esc | Key::Interrupt)
+        {
+            return vec![Request::CancelSignIn(id)];
+        }
+        if (self.linking.is_some() || self.signing.is_some())
+            && !matches!(key, Key::PageUp | Key::PageDown)
+        {
             return Vec::new();
         }
         self.selection = None;
@@ -1377,16 +1727,23 @@ impl App {
             let text = self.input.text().to_owned();
             match key {
                 Key::Up => {
-                    self.palette.up(&text);
+                    let sources = self.sources();
+                    let mut palette = self.palette.clone();
+                    palette.up(&text, &sources);
+                    self.palette = palette;
                     return Vec::new();
                 }
                 Key::Down => {
-                    self.palette.down(&text);
+                    let sources = self.sources();
+                    let mut palette = self.palette.clone();
+                    palette.down(&text, &sources);
+                    self.palette = palette;
                     return Vec::new();
                 }
                 Key::Tab => {
-                    if let Some(command) = self.palette.current(&text) {
-                        self.input.set(&format!("/{}", command.name()));
+                    if let Some(item) = self.palette.current(&text, &self.sources()) {
+                        self.input.set(&item.completion());
+                        self.palette.reset();
                     }
                     return Vec::new();
                 }
@@ -1580,6 +1937,37 @@ impl App {
             }
             PromptKind::Question(_) => Vec::new(),
         }
+    }
+}
+
+pub fn server_outcome(server: &McpServerDto, prefix: Option<&str>) -> (Tone, String) {
+    let lead = prefix.map(|text| format!("{text}. ")).unwrap_or_default();
+    if server.status == McpServerStatus::Connected {
+        (
+            Tone::Success,
+            format!(
+                "{lead}{} «{}» {} · {}",
+                copy::MCP_SERVER,
+                server.name,
+                copy::MCP_CONNECTED,
+                crate::format::tools(server.tool_count)
+            ),
+        )
+    } else {
+        let reason = server
+            .last_error
+            .as_deref()
+            .map(|error| format!(": {error}"))
+            .unwrap_or_default();
+        (
+            Tone::Error,
+            format!(
+                "{lead}{} «{}» {}{reason}",
+                copy::MCP_SERVER,
+                server.name,
+                copy::MCP_NOT_STARTED
+            ),
+        )
     }
 }
 

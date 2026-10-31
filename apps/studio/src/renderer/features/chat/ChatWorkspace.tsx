@@ -19,6 +19,9 @@ export default observer(function ChatWorkspace() {
   }, [chat]);
   useEffect(() => {
     void execPolicy.load();
+    const refresh = (): void => void execPolicy.refresh();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
   }, [execPolicy]);
   const activeId = chat.active?.id ?? null;
   useEffect(() => {

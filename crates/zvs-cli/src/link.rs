@@ -214,7 +214,7 @@ mod tests {
         let mut lines = BufReader::new(reader).lines();
         let _ = lines.next_line().await;
         writer
-            .write_all(b"{\"type\":\"welcome\",\"version\":1}\n")
+            .write_all(b"{\"type\":\"welcome\",\"version\":2}\n")
             .await
             .expect("writes");
         while let Ok(Some(line)) = lines.next_line().await {
@@ -275,7 +275,7 @@ mod tests {
             let mut lines = BufReader::new(reader).lines();
             let _ = lines.next_line().await;
             let _ = writer
-                .write_all(b"{\"type\":\"welcome\",\"version\":1}\n")
+                .write_all(b"{\"type\":\"welcome\",\"version\":2}\n")
                 .await;
         });
         let (link, mut events) = Link::open(client).await.expect("opens");

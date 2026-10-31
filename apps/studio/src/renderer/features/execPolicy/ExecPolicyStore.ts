@@ -52,7 +52,7 @@ export default class ExecPolicyStore {
   setMode(mode: ExecMode): Promise<void> {
     if (!this.isAvailable(mode) || mode === this.mode) return this.saving;
     this.mode = mode;
-    return this.save();
+    return this.save({ mode });
   }
 
   selectJudgeProvider(id: string): Promise<void> {
@@ -60,8 +60,8 @@ export default class ExecPolicyStore {
     if (provider === undefined) return this.saving;
     this.judgeProviderId = provider.id;
     this.judgeModelId = provider.models.find((model) => model.available)?.externalId ?? null;
-    this.dropUnavailableMode();
-    return this.save();
+    const dropped = this.dropUnavailableMode();
+    return this.save({ judge: this.policy.judge, ...dropped });
   }
 
   setJudgeModel(id: string): Promise<void> {
@@ -69,14 +69,14 @@ export default class ExecPolicyStore {
       return this.saving;
     }
     this.judgeModelId = id;
-    return this.save();
+    return this.save({ judge: this.policy.judge });
   }
 
   clearJudge(): Promise<void> {
     this.judgeProviderId = null;
     this.judgeModelId = null;
-    this.dropUnavailableMode();
-    return this.save();
+    const dropped = this.dropUnavailableMode();
+    return this.save({ judge: null, ...dropped });
   }
 
   async load(): Promise<void> {
@@ -99,6 +99,22 @@ export default class ExecPolicyStore {
     }
   }
 
+  refresh(): Promise<void> {
+    if (!this.loaded) return this.saving;
+    this.saving = this.saving.then(async () => {
+      const stored = await this.ipc.call("execPolicy.get", undefined).catch(() => null);
+      if (stored === null) return;
+      const judge = stored.judge?.providerId;
+      const known = judge === undefined || this.providers.some((item) => item.id === judge);
+      const providers = known ? null : await this.loadProviders().catch(() => null);
+      runInAction(() => {
+        if (providers !== null) this.providers = providers;
+        this.apply(stored);
+      });
+    });
+    return this.saving;
+  }
+
   private async loadProviders(): Promise<ProviderDto[]> {
     const summaries = await this.ipc.call("providers.list", {
       capability: "text",
@@ -117,11 +133,11 @@ export default class ExecPolicyStore {
     this.judgeModelId = policy.judge?.modelId ?? null;
   }
 
-  private save(): Promise<void> {
-    const next = this.policy;
+  private save(change: Partial<ExecPolicyDto>): Promise<void> {
     this.saving = this.saving.then(async () => {
       try {
-        const stored = await this.ipc.call("execPolicy.set", next);
+        const current = await this.ipc.call("execPolicy.get", undefined);
+        const stored = await this.ipc.call("execPolicy.set", { ...current, ...change });
         runInAction(() => this.apply(stored));
       } catch {
         const stored = await this.ipc.call("execPolicy.get", undefined).catch(() => null);
@@ -131,7 +147,9 @@ export default class ExecPolicyStore {
     return this.saving;
   }
 
-  private dropUnavailableMode(): void {
-    if (!this.isAvailable(this.mode)) this.mode = "safety-ask";
+  private dropUnavailableMode(): Partial<ExecPolicyDto> {
+    if (this.isAvailable(this.mode)) return {};
+    this.mode = "safety-ask";
+    return { mode: this.mode };
   }
 }

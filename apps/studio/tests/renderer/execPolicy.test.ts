@@ -114,6 +114,33 @@ describe("ExecPolicyStore", () => {
     expect(store.mode).toBe("safety-ask");
   });
 
+  test("a mode change keeps a judge that the console chose meanwhile", async () => {
+    const { store, saved, restore } = setup([provider()], { mode: "safety-ask", judge: null });
+    await store.load();
+    restore({ mode: "safety-ask", judge: JUDGE });
+    await store.setMode("always-ask");
+    expect(saved.at(-1)).toEqual({ mode: "always-ask", judge: JUDGE });
+    expect(store.judgeModelId).toBe(JUDGE.modelId);
+  });
+
+  test("refreshing adopts the policy the console set", async () => {
+    const { store, restore } = setup([provider()], { mode: "always-ask", judge: null });
+    await store.load();
+    restore({ mode: "auto-bypass", judge: JUDGE });
+    await store.refresh();
+    expect(store.mode).toBe("auto-bypass");
+    expect(store.judgeProviderId).toBe(OLLAMA);
+    expect(store.judgeModelId).toBe(JUDGE.modelId);
+  });
+
+  test("refreshing before the first load leaves the store untouched", async () => {
+    const { store, restore } = setup([provider()], { mode: "always-ask", judge: null });
+    restore({ mode: "no-restrictions", judge: null });
+    await store.refresh();
+    expect(store.loaded).toBe(false);
+    expect(store.mode).toBe("always-ask");
+  });
+
   test("a refused save reverts to the stored policy", async () => {
     const { store, refuse } = setup([provider()], { mode: "safety-ask", judge: null });
     await store.load();

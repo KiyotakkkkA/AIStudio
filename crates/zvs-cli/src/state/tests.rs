@@ -7,23 +7,116 @@ const PROVIDERS: &str =
     include_str!("../../../../packages/shared/fixtures/providers/ProviderDto.valid.json");
 
 #[test]
-fn copilot_login_can_be_cancelled_and_adopts_its_models_after_completion() {
+fn connect_lists_the_four_account_providers_in_order() {
     let mut app = ready();
-    typed(&mut app, "/copilot");
-    assert_eq!(app.update(Msg::Key(Key::Enter)), vec![Request::LinkCopilot]);
-    assert!(app.copilot_linking);
-    assert_eq!(app.status.as_ref().unwrap().1, copy::COPILOT_LINKING);
+    typed(&mut app, "/connect");
+    assert!(app.update(Msg::Key(Key::Enter)).is_empty());
+    let overlay = app.overlay.as_ref().expect("panel");
+    assert_eq!(overlay.panel, Panel::Connect);
+    let titles: Vec<String> = overlay
+        .rows(&app.view())
+        .into_iter()
+        .map(|row| row.title)
+        .collect();
+    assert_eq!(titles, ["Qwen", "Z.ai", "OpenAI", "GitHub Copilot"]);
+}
+
+#[test]
+fn a_connected_family_is_marked_in_the_panel() {
+    let mut app = ready();
+    let mut qwen = provider();
+    qwen.summary.adapter = zvs_contract::AdapterFamily::QwenWeb;
+    qwen.summary.enabled = true;
+    app.update(Msg::Providers(Ok(vec![qwen])));
+    let rows = Overlay::new(Panel::Connect).rows(&app.view());
+    let marked: Vec<bool> = rows
+        .iter()
+        .map(|row| row.meta == copy::CONNECT_CONNECTED)
+        .collect();
+    let available = app.providers[0].models.iter().any(|model| model.available);
+    assert_eq!(marked, [available, false, false, false]);
+}
+
+#[test]
+fn connecting_an_account_can_be_cancelled_and_adopts_its_models_after_completion() {
+    let mut app = ready();
+    typed(&mut app, "/connect");
+    app.update(Msg::Key(Key::Enter));
+    app.update(Msg::Key(Key::Down));
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        vec![Request::LinkAccount(AccountFamily::ZaiWeb)]
+    );
+    assert!(app.overlay.is_none());
+    assert_eq!(app.linking, Some(AccountFamily::ZaiWeb));
+    assert!(
+        app.status
+            .as_ref()
+            .unwrap()
+            .1
+            .starts_with(copy::CONNECT_LINKING)
+    );
+    assert!(app.update(Msg::Key(Key::Char('x'))).is_empty());
     assert_eq!(
         app.update(Msg::Key(Key::Esc)),
-        vec![Request::CancelCopilotLink]
+        vec![Request::CancelLink(AccountFamily::ZaiWeb)]
     );
-    let mut copilot = provider();
-    copilot.summary.adapter = zvs_contract::AdapterFamily::Copilot;
-    app.update(Msg::CopilotLinked(Ok(vec![copilot.clone()])));
-    assert!(!app.copilot_linking);
-    assert_eq!(app.model.as_ref().unwrap().provider, copilot.summary.id);
+    let mut zai = provider();
+    zai.summary.adapter = zvs_contract::AdapterFamily::ZaiWeb;
+    zai.summary.enabled = true;
+    app.update(Msg::AccountLinked(
+        AccountFamily::ZaiWeb,
+        Ok(vec![zai.clone()]),
+    ));
+    assert_eq!(app.linking, None);
+    assert_eq!(app.model.as_ref().unwrap().provider, zai.summary.id);
     assert_eq!(app.effort, ThinkingEffort::Auto);
-    assert_eq!(app.status.as_ref().unwrap().1, copy::COPILOT_LINKED);
+    assert!(
+        app.status
+            .as_ref()
+            .unwrap()
+            .1
+            .ends_with(copy::CONNECT_LINKED)
+    );
+}
+
+#[test]
+fn a_failed_connection_releases_the_input() {
+    let mut app = ready();
+    app.update(Msg::Key(Key::Char('/')));
+    app.linking = Some(AccountFamily::Copilot);
+    app.update(Msg::AccountLinked(
+        AccountFamily::Copilot,
+        Err(AppError::new(
+            zvs_contract::AppErrorCode::RunCancelled,
+            "Отменено",
+        )),
+    ));
+    assert_eq!(app.linking, None);
+    typed(&mut app, "x");
+    assert_eq!(app.input.text(), "/x");
+}
+
+#[test]
+fn desktop_opens_the_current_conversation_or_explains_why_not() {
+    let mut app = ready();
+    typed(&mut app, "/desktop");
+    assert!(app.update(Msg::Key(Key::Enter)).is_empty());
+    assert_eq!(
+        app.status.as_ref().unwrap().1,
+        copy::DESKTOP_NO_CONVERSATION
+    );
+    let known = conversation();
+    app.conversation = Some(known.clone());
+    typed(&mut app, "/desktop");
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        vec![Request::OpenDesktop(known.id)]
+    );
+    app.update(Msg::DesktopOpened(true));
+    assert_eq!(app.status.as_ref().unwrap().1, copy::DESKTOP_OPENED);
+    app.update(Msg::DesktopOpened(false));
+    assert_eq!(app.status.as_ref().unwrap().1, copy::DESKTOP_FAILED);
 }
 const CONVERSATIONS: &str =
     include_str!("../../../../packages/shared/fixtures/chat/ConversationDto.valid.json");
@@ -340,11 +433,154 @@ fn disabling_confirmations_needs_a_second_enter() {
     assert!(app.update(Msg::Key(Key::Enter)).is_empty());
     assert_eq!(
         app.update(Msg::Key(Key::Enter)),
-        [Request::SetPolicy(ExecPolicyDto {
-            mode: ExecMode::NoRestrictions,
-            judge: None
-        })]
+        [Request::SetPolicy(PolicyChange::Mode(
+            ExecMode::NoRestrictions
+        ))]
     );
+}
+
+#[test]
+fn a_mode_change_leaves_a_judge_chosen_elsewhere_alone() {
+    let mut app = ready();
+    command(&mut app, "/permissions");
+    app.update(Msg::Policy(Ok(ExecPolicyDto {
+        mode: ExecMode::SafetyAsk,
+        judge: None,
+    })));
+    app.update(Msg::Key(Key::Up));
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::SetPolicy(PolicyChange::Mode(ExecMode::AlwaysAsk))]
+    );
+    let judge = zvs_contract::ExecJudgeDto {
+        provider_id: provider().summary.id.to_string(),
+        model_id: "openai/gpt-4o-mini".to_owned(),
+    };
+    app.update(Msg::PolicySet(
+        PolicyChange::Mode(ExecMode::AlwaysAsk),
+        Ok(ExecPolicyDto {
+            mode: ExecMode::AlwaysAsk,
+            judge: Some(judge.clone()),
+        }),
+    ));
+    assert_eq!(app.policy.and_then(|policy| policy.judge), Some(judge));
+    assert_eq!(
+        app.status.map(|status| status.1),
+        Some(copy::MODE_SET.to_owned())
+    );
+}
+
+#[test]
+fn each_message_refreshes_the_policy_shared_with_the_studio() {
+    let mut app = ready();
+    app.conversation = Some(conversation());
+    typed(&mut app, "привет");
+    let requests = app.update(Msg::Key(Key::Enter));
+    assert!(matches!(
+        requests.as_slice(),
+        [Request::Send(_), Request::Policy]
+    ));
+}
+
+const SERVERS: &str =
+    include_str!("../../../../packages/shared/fixtures/mcp/McpServerDto.valid.json");
+
+fn http_server(status: McpServerStatus, oauth: McpOAuthState) -> McpServerDto {
+    let mut server: McpServerDto = first(SERVERS);
+    server.name = "docs".to_owned();
+    server.transport = zvs_contract::McpTransport::Http;
+    server.command = None;
+    server.args = Vec::new();
+    server.env = zvs_contract::McpEnv::new();
+    server.url = Some("https://mcp.example.com/mcp".to_owned());
+    server.status = status;
+    server.oauth = oauth;
+    server.tool_count = 3;
+    server
+}
+
+#[test]
+fn mcp_add_creates_starts_and_signs_in_when_the_server_asks() {
+    let mut app = ready();
+    let requests = command(&mut app, "/mcp add docs https://mcp.example.com/mcp");
+    let [Request::AddServer(input)] = requests.as_slice() else {
+        panic!("adds: {requests:?}");
+    };
+    assert_eq!(input.name, "docs");
+    assert_eq!(
+        input.url,
+        Some(Some("https://mcp.example.com/mcp".to_owned()))
+    );
+
+    let stopped = http_server(McpServerStatus::Stopped, McpOAuthState::None);
+    let id = stopped.id;
+    assert_eq!(
+        app.update(Msg::ServerAdded(Ok(stopped))),
+        [Request::StartServer(id)]
+    );
+    assert_eq!(
+        app.update(Msg::ServerChanged(Ok(http_server(
+            McpServerStatus::Failed,
+            McpOAuthState::Required
+        )))),
+        [Request::SignIn(id)]
+    );
+    assert_eq!(app.signing, Some(id));
+    assert!(app.update(Msg::Key(Key::Char('x'))).is_empty());
+    assert_eq!(app.update(Msg::Key(Key::Esc)), [Request::CancelSignIn(id)]);
+    app.update(Msg::SignedIn(Ok(http_server(
+        McpServerStatus::Connected,
+        McpOAuthState::SignedIn,
+    ))));
+    assert_eq!(app.signing, None);
+    let (tone, text) = app.status.expect("status");
+    assert_eq!(tone, Tone::Success);
+    assert!(text.starts_with(copy::MCP_SIGNED_IN));
+}
+
+#[test]
+fn a_server_that_needs_no_sign_in_reports_its_tools() {
+    let mut app = ready();
+    command(&mut app, "/mcp add docs https://mcp.example.com/mcp");
+    let server = http_server(McpServerStatus::Stopped, McpOAuthState::None);
+    app.update(Msg::ServerAdded(Ok(server)));
+    assert!(
+        app.update(Msg::ServerChanged(Ok(http_server(
+            McpServerStatus::Connected,
+            McpOAuthState::None
+        ))))
+        .is_empty()
+    );
+    assert_eq!(app.joining, None);
+    assert_eq!(app.status.map(|status| status.0), Some(Tone::Success));
+}
+
+#[test]
+fn malformed_mcp_commands_explain_the_format() {
+    let mut app = ready();
+    assert!(command(&mut app, "/mcp add docs").is_empty());
+    assert_eq!(
+        app.status.clone().map(|status| status.1),
+        Some(copy::MCP_ADD_USAGE.to_owned())
+    );
+    assert!(command(&mut app, "/mcp drop docs").is_empty());
+    assert_eq!(
+        app.status.map(|status| status.1),
+        Some(copy::MCP_ADD_UNKNOWN.to_owned())
+    );
+}
+
+#[test]
+fn a_server_waiting_for_sign_in_offers_it_in_the_panel() {
+    let mut app = ready();
+    command(&mut app, "/mcp");
+    let server = http_server(McpServerStatus::Failed, McpOAuthState::Required);
+    let id = server.id;
+    app.update(Msg::Servers(Ok(vec![server])));
+    let rows = app.overlay.as_ref().expect("panel").rows(&app.view());
+    assert!(rows[0].meta.starts_with(copy::MCP_SIGN_IN_REQUIRED));
+    assert_eq!(app.update(Msg::Key(Key::Enter)), [Request::SignIn(id)]);
+    assert!(app.overlay.is_none());
 }
 
 #[test]
@@ -756,4 +992,124 @@ fn the_context_panel_also_asks_for_the_provider_limits() {
         "x",
     ))));
     assert!(app.status.is_none());
+}
+
+#[test]
+fn mcp_inspect_asks_for_the_named_server_and_posts_its_card() {
+    let mut app = ready();
+    assert_eq!(
+        command(&mut app, "/mcp inspect My Docs"),
+        [Request::InspectServer("My Docs".to_owned())]
+    );
+    assert_eq!(command(&mut app, "/mcp inspect"), [Request::Servers]);
+    assert_eq!(app.input.text(), "/mcp inspect ");
+    assert!(app.update(Msg::Key(Key::Enter)).is_empty());
+    assert_eq!(
+        app.status.clone().map(|status| status.1),
+        Some(copy::MCP_INSPECT_USAGE.to_owned())
+    );
+    let detail: McpServerDetailDto = first(include_str!(
+        "../../../../packages/shared/fixtures/mcp/McpServerDetailDto.valid.json"
+    ));
+    app.update(Msg::Inspected(Ok(detail)));
+    assert!(matches!(
+        app.transcript.entries.last(),
+        Some(Entry::Server(detail)) if detail.server.name == "qdrant"
+    ));
+}
+
+#[test]
+fn choosing_a_subcommand_in_the_palette_fills_it_in_for_its_arguments() {
+    let mut app = ready();
+    typed(&mut app, "/mcp a");
+    assert!(app.palette_open());
+    assert!(app.update(Msg::Key(Key::Enter)).is_empty());
+    assert_eq!(app.input.text(), "/mcp add ");
+    assert!(!app.palette_open());
+    app.input.clear();
+    typed(&mut app, "/mcp ");
+    app.update(Msg::Key(Key::Down));
+    app.update(Msg::Key(Key::Tab));
+    assert_eq!(app.input.text(), "/mcp inspect ");
+}
+
+#[test]
+fn server_names_are_fetched_when_the_argument_is_reached_and_enter_inspects() {
+    let mut app = ready();
+    typed(&mut app, "/mcp inspect");
+    assert_eq!(app.update(Msg::Key(Key::Char(' '))), [Request::Servers]);
+    assert!(app.palette_open());
+    assert!(palette::loading(app.input.text(), &app.sources()));
+    let server = http_server(McpServerStatus::Connected, McpOAuthState::None);
+    let id = server.id;
+    app.update(Msg::Servers(Ok(vec![server])));
+    assert!(app.update(Msg::Key(Key::Char('d'))).is_empty());
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::InspectServer(id.to_string())]
+    );
+    assert!(app.input.is_empty());
+    assert_eq!(app.lookup_arg, None);
+    typed(&mut app, "/mcp inspect ");
+    assert_eq!(app.lookup_arg, Some(palette::Arg::Server));
+    assert_eq!(app.lookup_servers, None);
+}
+
+#[test]
+fn tab_fills_in_a_server_name_without_running_it() {
+    let mut app = ready();
+    typed(&mut app, "/mcp inspect ");
+    app.update(Msg::Servers(Ok(vec![http_server(
+        McpServerStatus::Connected,
+        McpOAuthState::None,
+    )])));
+    assert!(app.update(Msg::Key(Key::Tab)).is_empty());
+    assert_eq!(app.input.text(), "/mcp inspect docs");
+}
+
+#[test]
+fn a_theme_is_applied_from_its_argument() {
+    let mut app = ready();
+    typed(&mut app, "/theme мох");
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::SaveTheme(CliTheme::Moss)]
+    );
+    typed(&mut app, "/theme frost");
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::SaveTheme(CliTheme::Frost)]
+    );
+    assert_eq!(app.theme, CliTheme::Frost);
+    assert!(command(&mut app, "/theme neon").is_empty());
+    assert_eq!(
+        app.status.map(|status| status.1),
+        Some(format!("{}: neon", copy::THEME_NOT_FOUND))
+    );
+}
+
+#[test]
+fn a_conversation_of_this_folder_resumes_from_its_title() {
+    let mut app = ready();
+    typed(&mut app, "/resume");
+    assert_eq!(
+        app.update(Msg::Key(Key::Char(' '))),
+        [Request::Conversations]
+    );
+    let mut own = conversation();
+    own.working_folder = Some(FOLDER.to_owned());
+    own.title = "План релиза".to_owned();
+    let id = own.id;
+    app.update(Msg::Conversations(Ok(vec![own])));
+    typed(&mut app, "план");
+    assert_eq!(app.update(Msg::Key(Key::Enter)), [Request::Load(id)]);
+    app.update(Msg::Loaded(Err(AppError::new(
+        zvs_contract::AppErrorCode::NotFound,
+        "Диалог удалён",
+    ))));
+    assert!(app.exit.is_none());
+    assert_eq!(
+        app.status.map(|status| status.1),
+        Some("Диалог удалён".to_owned())
+    );
 }

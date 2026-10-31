@@ -44,6 +44,38 @@ fn spawn_app(app: &Path) -> std::io::Result<()> {
         .map(drop)
 }
 
+pub fn conversation_link(id: zvs_contract::ConversationId) -> String {
+    zvs_contract::NotificationTargetDto::Conversation {
+        conversation_id: id,
+    }
+    .to_url()
+}
+
+#[cfg(windows)]
+pub fn open_conversation(id: zvs_contract::ConversationId) -> bool {
+    use std::os::windows::process::CommandExt;
+    const DETACHED_PROCESS: u32 = 0x0000_0008;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    let Some(app) = find_app() else {
+        return false;
+    };
+    zvs_pipe::allow_foreground();
+    std::process::Command::new(app)
+        .arg(conversation_link(id))
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+        .spawn()
+        .is_ok()
+}
+
+#[cfg(not(windows))]
+pub fn open_conversation(id: zvs_contract::ConversationId) -> bool {
+    let _ = (conversation_link(id), find_app());
+    false
+}
+
 #[cfg(windows)]
 async fn open(name: &str) -> std::io::Result<Result<Connection, &'static str>> {
     let client = zvs_pipe::connect(name).await?;

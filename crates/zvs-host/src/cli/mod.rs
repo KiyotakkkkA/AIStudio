@@ -9,7 +9,7 @@ use std::path::Path;
 use serde_json::json;
 use zvs_contract::{
     AppError, AppErrorCode, CLI_COMMAND, CliInstallDto, CliOpenInput, CliSessionDto,
-    WorkingFolderAccess,
+    CreateMcpServerInput, McpServerDto, WorkingFolderAccess,
 };
 
 pub use connection::{CLI_CHANNELS, CliDispatch, serve};
@@ -25,22 +25,75 @@ use crate::workspace::folder_access;
 pub const CLI_INSTALL_FAILED: &str = "Не удалось установить консольную версию";
 pub const CLI_UNINSTALL_FAILED: &str = "Не удалось удалить консольную версию";
 pub const CLI_NOT_BUNDLED: &str = "Консольная версия не входит в эту сборку";
+pub const CLI_CONNECT_FAILED: &str = "Не удалось подключить провайдера";
+pub const CLI_MCP_SECRET_REFUSED: &str = "Секреты недоступны консольной версии. Укажите значение напрямую или добавьте сервер в приложении";
 
-/// Narrow sign-in entry point: the pipe never receives general account/provider editing.
-pub async fn link_copilot(
+pub const fn account_label(family: zvs_contract::AccountFamily) -> &'static str {
+    use zvs_contract::AccountFamily;
+    match family {
+        AccountFamily::Openai => "OpenAI",
+        AccountFamily::Copilot => "GitHub Copilot",
+        AccountFamily::QwenWeb => "Qwen",
+        AccountFamily::ZaiWeb => "Z.ai",
+    }
+}
+
+const fn account_base_url(family: zvs_contract::AccountFamily) -> &'static str {
+    use zvs_contract::AccountFamily;
+    match family {
+        AccountFamily::Openai => zvs_openai::API_BASE,
+        AccountFamily::Copilot => zvs_copilot::BASE_URL,
+        AccountFamily::QwenWeb => zvs_qwen_web::protocol::API_BASE,
+        AccountFamily::ZaiWeb => zvs_zai_web::protocol::API_BASE,
+    }
+}
+
+const fn account_adapter(family: zvs_contract::AccountFamily) -> zvs_contract::AdapterFamily {
+    use zvs_contract::{AccountFamily, AdapterFamily};
+    match family {
+        AccountFamily::Openai => AdapterFamily::Openai,
+        AccountFamily::Copilot => AdapterFamily::Copilot,
+        AccountFamily::QwenWeb => AdapterFamily::QwenWeb,
+        AccountFamily::ZaiWeb => AdapterFamily::ZaiWeb,
+    }
+}
+
+fn account_provider_name(account: &zvs_contract::AccountDto) -> String {
+    let vendor = account_label(account.adapter);
+    if account.adapter != zvs_contract::AccountFamily::Openai {
+        return vendor.to_owned();
+    }
+    let title = account
+        .display_name
+        .as_deref()
+        .or(account.email_masked.as_deref())
+        .filter(|named| !named.is_empty())
+        .unwrap_or(vendor);
+    format!("{vendor} · {title}").chars().take(128).collect()
+}
+
+pub fn connect_failed(family: zvs_contract::AccountFamily) -> AppError {
+    AppError::new(
+        AppErrorCode::ProviderUnreachable,
+        format!("{CLI_CONNECT_FAILED}: {}", account_label(family)),
+    )
+}
+
+pub async fn link_account(
     services: &Services,
+    family: zvs_contract::AccountFamily,
 ) -> Result<zvs_contract::AccountLinkResult, AppError> {
     use zvs_contract::{
-        AccountFamily, AccountLinkResult, AdapterFamily, AuthMode, CreateProviderInput,
-        ProviderCapability, ProviderConnectionInput, ProviderKind, ProviderListFilter,
+        AccountLinkResult, AuthMode, CreateProviderInput, ProviderCapability,
+        ProviderConnectionInput, ProviderKind, ProviderListFilter,
     };
-    let result = services.accounts.link(AccountFamily::Copilot).await?;
+    let result = services.accounts.link(family).await?;
     if let AccountLinkResult::Linked { account, .. } = &result {
         let summaries = services.providers.list(&ProviderListFilter::default())?;
         let mut existing = None;
         for summary in summaries
             .into_iter()
-            .filter(|provider| provider.adapter == AdapterFamily::Copilot)
+            .filter(|provider| provider.adapter.account_family() == Some(family))
         {
             let provider = services.providers.get(&summary.id.to_string(), false)?;
             if provider.account_id == Some(account.id) {
@@ -59,13 +112,13 @@ pub async fn link_copilot(
             }
             Some(provider) => provider,
             None => services.providers.create(&CreateProviderInput {
-                name: "GitHub Copilot".to_owned(),
+                name: account_provider_name(account),
                 enabled: Some(true),
                 connection: ProviderConnectionInput {
                     kind: ProviderKind::OpenaiCompatible,
-                    adapter: Some(AdapterFamily::Copilot),
+                    adapter: Some(account_adapter(family)),
                     auth_mode: Some(AuthMode::Account),
-                    base_url: zvs_copilot::BASE_URL.to_owned(),
+                    base_url: account_base_url(family).to_owned(),
                     secret_id: None,
                     account_id: Some(Some(account.id)),
                     capabilities: vec![ProviderCapability::Text],
@@ -81,10 +134,29 @@ pub async fn link_copilot(
             )
             .await?;
         if !probe.outcome.succeeded() {
-            return Err(crate::drivers::ai::copilot::failure());
+            return Err(connect_failed(family));
         }
     }
     Ok(result)
+}
+
+pub fn create_mcp_server(
+    services: &Services,
+    input: &CreateMcpServerInput,
+) -> Result<McpServerDto, AppError> {
+    let refers_to_secret = input
+        .env
+        .iter()
+        .flatten()
+        .chain(input.headers.iter().flatten())
+        .any(|(_, value)| value.secret_id().is_some());
+    if refers_to_secret {
+        return Err(AppError::new(
+            AppErrorCode::PermissionDenied,
+            CLI_MCP_SECRET_REFUSED,
+        ));
+    }
+    services.mcp.create(input)
 }
 
 pub fn open(services: &Services, input: &CliOpenInput) -> Result<CliSessionDto, AppError> {

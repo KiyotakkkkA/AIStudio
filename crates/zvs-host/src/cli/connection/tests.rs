@@ -191,6 +191,10 @@ fn every_allowed_channel_is_a_contract_channel() {
         "accounts.unlink",
         "providers.create",
         "providers.update",
+        "mcp.create",
+        "mcp.update",
+        "mcp.remove",
+        "mcp.signOut",
     ] {
         assert!(!CLI_CHANNELS.contains(&studio_only), "{studio_only}");
     }

@@ -9,8 +9,9 @@ use ratatui::crossterm::execute;
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 use zvs_contract::{
-    AnswerFolderRequestInput, AppError, BindFolderInput, CliOpenInput, ProviderDto,
-    ProviderSummaryDto,
+    AnswerFolderRequestInput, AppError, AppErrorCode, BindFolderInput, CliOpenInput,
+    CreateMcpServerInput, ExecPolicyDto, McpOAuthState, McpServerDetailDto, McpServerDto,
+    ProviderDto, ProviderSummaryDto,
 };
 
 use crate::args::{self, Args};
@@ -20,7 +21,8 @@ use crate::launch::{self, Connection};
 use crate::link::{Incoming, Link};
 use crate::shell::{self, ShellControl};
 use crate::state::shortcuts::Chord;
-use crate::state::{App, Exit, Key, Msg, Pointer, Request, Selection};
+use crate::state::transcript::Tone;
+use crate::state::{App, Exit, Key, Msg, Pointer, PolicyChange, Request, Selection};
 use crate::theme_file;
 use crate::ui;
 use crate::version;
@@ -159,28 +161,68 @@ async fn providers(link: &Link) -> Result<Vec<ProviderDto>, AppError> {
     Ok(providers)
 }
 
+async fn set_policy(link: &Link, change: &PolicyChange) -> Result<ExecPolicyDto, AppError> {
+    let mut policy: ExecPolicyDto = link.call("execPolicy.get", &()).await?;
+    match change {
+        PolicyChange::Mode(mode) => policy.mode = *mode,
+        PolicyChange::Judge(judge) => policy.judge.clone_from(judge),
+    }
+    link.call("execPolicy.set", &policy).await
+}
+
+pub fn find_server<'a>(servers: &'a [McpServerDto], name: &str) -> Option<&'a McpServerDto> {
+    let wanted = name.trim().to_lowercase();
+    servers
+        .iter()
+        .find(|server| server.name.to_lowercase() == wanted)
+        .or_else(|| servers.iter().find(|server| server.namespace == wanted))
+        .or_else(|| {
+            servers
+                .iter()
+                .find(|server| server.id.to_string() == wanted)
+        })
+}
+
+async fn inspect_server(link: &Link, name: &str) -> Result<McpServerDetailDto, AppError> {
+    let servers: Vec<McpServerDto> = link.call("mcp.list", &()).await?;
+    let server = find_server(&servers, name).ok_or_else(|| {
+        AppError::new(
+            AppErrorCode::NotFound,
+            format!("{}: {name}", copy::MCP_NOT_FOUND),
+        )
+    })?;
+    link.call("mcp.get", &json!({ "id": server.id })).await
+}
+
 pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
     match request {
         Request::Open => Msg::Opened(link.call("cli.open", &CliOpenInput { cwd: folder }).await),
         Request::Providers => Msg::Providers(providers(&link).await),
-        Request::LinkCopilot => {
-            let result: Result<zvs_contract::AccountLinkResult, AppError> =
-                link.call("cli.copilot.login", &()).await;
-            Msg::CopilotLinked(match result {
-                Ok(zvs_contract::AccountLinkResult::Linked { .. }) => providers(&link).await,
-                Ok(
-                    zvs_contract::AccountLinkResult::Cancelled { detail }
-                    | zvs_contract::AccountLinkResult::Timeout { detail },
-                ) => Err(AppError::new(
-                    zvs_contract::AppErrorCode::RunCancelled,
-                    detail,
-                )),
-                Err(error) => Err(error),
-            })
+        Request::LinkAccount(family) => {
+            #[cfg(windows)]
+            zvs_pipe::allow_foreground();
+            let result: Result<zvs_contract::AccountLinkResult, AppError> = link
+                .call("cli.accounts.link", &json!({ "adapter": family }))
+                .await;
+            Msg::AccountLinked(
+                family,
+                match result {
+                    Ok(zvs_contract::AccountLinkResult::Linked { .. }) => providers(&link).await,
+                    Ok(
+                        zvs_contract::AccountLinkResult::Cancelled { detail }
+                        | zvs_contract::AccountLinkResult::Timeout { detail },
+                    ) => Err(AppError::new(
+                        zvs_contract::AppErrorCode::RunCancelled,
+                        detail,
+                    )),
+                    Err(error) => Err(error),
+                },
+            )
         }
-        Request::CancelCopilotLink => {
-            let result: Result<zvs_contract::AccountsCancelLinkOutput, AppError> =
-                link.call("cli.copilot.cancelLogin", &()).await;
+        Request::CancelLink(family) => {
+            let result: Result<zvs_contract::AccountsCancelLinkOutput, AppError> = link
+                .call("cli.accounts.cancelLink", &json!({ "adapter": family }))
+                .await;
             Msg::Answered(result.map(|_| ()))
         }
         Request::Policy => Msg::Policy(link.call("execPolicy.get", &()).await),
@@ -276,8 +318,24 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
         Request::StopServer(id) => {
             Msg::ServerChanged(link.call("mcp.stop", &json!({ "id": id })).await)
         }
-        Request::SetPolicy(policy) => Msg::PolicySet(link.call("execPolicy.set", &policy).await),
+        Request::AddServer(input) => Msg::ServerAdded(link.call("cli.mcp.create", &*input).await),
+        Request::InspectServer(name) => Msg::Inspected(inspect_server(&link, &name).await),
+        Request::SignIn(id) => {
+            #[cfg(windows)]
+            zvs_pipe::allow_foreground();
+            Msg::SignedIn(link.call("mcp.signIn", &json!({ "id": id })).await)
+        }
+        Request::CancelSignIn(id) => {
+            let result: Result<McpServerDto, AppError> =
+                link.call("mcp.cancelSignIn", &json!({ "id": id })).await;
+            Msg::Answered(result.map(drop))
+        }
+        Request::SetPolicy(change) => {
+            let result = set_policy(&link, &change).await;
+            Msg::PolicySet(change, result)
+        }
         Request::Shell(_)
+        | Request::OpenDesktop(_)
         | Request::StopShell
         | Request::Copy(_)
         | Request::SaveShortcuts(_)
@@ -372,6 +430,10 @@ fn dispatch(
         match request {
             Request::Shell(line) => run_shell(line, folder.to_owned(), shell.clone(), signals),
             Request::StopShell => shell.stop(),
+            Request::OpenDesktop(id) => {
+                let opened = launch::open_conversation(id);
+                let _ = signals.send(Signal::App(Box::new(Msg::DesktopOpened(opened))));
+            }
             Request::Copy(selection) => {
                 let copied = copy_to_clipboard(&selected_text(screen, &selection));
                 let _ = signals.send(Signal::App(Box::new(Msg::Copied(copied))));
@@ -524,9 +586,78 @@ async fn session(
     Ok((None, app.conversation.as_ref().map(|known| known.id)))
 }
 
+async fn add_server(input: CreateMcpServerInput) -> i32 {
+    let (link, _incoming) = match launch::connect(|message| eprintln!("{message}")).await {
+        Ok(connection) => connection,
+        Err(message) => {
+            eprintln!("{message}");
+            return 1;
+        }
+    };
+    eprintln!("{} «{}»…", copy::MCP_ADDING, input.name);
+    let created: McpServerDto = match link.call("cli.mcp.create", &input).await {
+        Ok(server) => server,
+        Err(error) => {
+            eprintln!("{}", error.message);
+            return 1;
+        }
+    };
+    let id = json!({ "id": created.id });
+    let started: McpServerDto = match link.call("mcp.start", &id).await {
+        Ok(server) => server,
+        Err(error) => {
+            eprintln!("{}", error.message);
+            return 1;
+        }
+    };
+    let (server, prefix) = if started.oauth == McpOAuthState::Required {
+        eprintln!(
+            "{} «{}» {}… {}",
+            copy::MCP_SIGNING_IN,
+            started.name,
+            copy::MCP_IN_BROWSER,
+            copy::MCP_SIGN_IN_CANCEL
+        );
+        #[cfg(windows)]
+        zvs_pipe::allow_foreground();
+        let signing = link.call::<_, McpServerDto>("mcp.signIn", &id);
+        let outcome = tokio::select! {
+            result = signing => Some(result),
+            _ = tokio::signal::ctrl_c() => None,
+        };
+        match outcome {
+            Some(Ok(server)) => (server, Some(copy::MCP_SIGNED_IN)),
+            Some(Err(error)) => {
+                eprintln!("{}", error.message);
+                return 1;
+            }
+            None => {
+                let _ = link.call::<_, Value>("mcp.cancelSignIn", &id).await;
+                eprintln!("{}", copy::MCP_SIGN_IN_CANCELLED);
+                return 130;
+            }
+        }
+    } else {
+        (started, None)
+    };
+    let (tone, text) = crate::state::server_outcome(&server, prefix);
+    if tone == Tone::Success {
+        println!("{text}");
+        0
+    } else {
+        eprintln!("{text}");
+        1
+    }
+}
+
 pub async fn run() -> i32 {
     let resume = match args::parse(std::env::args().skip(1)) {
         Ok(Args::Run { resume }) => resume,
+        Ok(Args::McpAdd(input)) => return add_server(*input).await,
+        Ok(Args::McpHelp) => {
+            println!("{}", args::mcp_usage());
+            return 0;
+        }
         Ok(Args::Version) => {
             println!("{}", version::version_line());
             return 0;
@@ -593,6 +724,22 @@ mod tests {
             KeyModifiers::NONE,
             KeyEventKind::Release,
         ))
+    }
+
+    #[test]
+    fn a_server_is_found_by_name_namespace_or_id() {
+        let cases: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../packages/shared/fixtures/mcp/McpServerDto.valid.json"
+        ))
+        .expect("fixture");
+        let mut server: McpServerDto =
+            serde_json::from_value(cases[0]["value"].clone()).expect("server");
+        server.name = "Qdrant Search".to_owned();
+        let servers = vec![server.clone()];
+        assert_eq!(find_server(&servers, "qdrant search"), Some(&server));
+        assert_eq!(find_server(&servers, "qdrant"), Some(&server));
+        assert_eq!(find_server(&servers, &server.id.to_string()), Some(&server));
+        assert_eq!(find_server(&servers, "other"), None);
     }
 
     #[test]

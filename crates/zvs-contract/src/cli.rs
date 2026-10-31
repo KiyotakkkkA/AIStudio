@@ -8,7 +8,7 @@ use crate::folders::{WorkingFolderAccess, check_folder_path};
 use crate::validate::{Validate, check, invalid, no_refinements};
 
 pub const CLI_COMMAND: &str = "aistudio";
-pub const CLI_PROTOCOL_VERSION: u32 = 1;
+pub const CLI_PROTOCOL_VERSION: u32 = 2;
 pub const CLI_LINE_MAX: usize = 8 * 1024 * 1024;
 pub const CLI_PIPE_PREFIX: &str = r"\\.\pipe\zvs-ai-studio-cli-";
 pub const CLI_LAUNCH_ARG: &str = "--cli";

@@ -189,3 +189,50 @@ fn the_theme_panel_lists_every_theme_and_redraws_in_the_previewed_one() {
     let _ = render(&app, 100, 20);
     assert_eq!(theme::active(), zvs_contract::CliTheme::Ember);
 }
+
+const SERVER_DETAILS: &str =
+    include_str!("../../../../packages/shared/fixtures/mcp/McpServerDetailDto.valid.json");
+
+fn inspected_app() -> App {
+    let mut app = ready(WorkingFolderAccess::Granted);
+    let cases: Vec<Value> = serde_json::from_str(SERVER_DETAILS).expect("fixture");
+    app.update(Msg::Inspected(Ok(serde_json::from_value(
+        cases[0]["value"].clone(),
+    )
+    .expect("detail"))));
+    app
+}
+
+#[test]
+fn an_inspected_server_lists_its_metadata_and_folds_its_tools() {
+    let mut app = inspected_app();
+    let screen = render(&app, 110, 40);
+    assert!(screen.contains("⧉ qdrant"));
+    assert!(screen.contains("npx -y mcp-server-qdrant"));
+    assert!(screen.contains(&format!("QDRANT_API_KEY ({})", copy::MCP_SECRET)));
+    assert!(!screen.contains(" kb"));
+    assert!(screen.contains(&format!("{} · 1", copy::MCP_TOOLS)));
+    assert!(screen.contains(&format!("Ctrl+O — {}", copy::MCP_EXPAND)));
+    assert!(!screen.contains("• search"));
+
+    app.update(Msg::Key(Key::Chord(shortcuts::Chord::ctrl('o'))));
+    let screen = render(&app, 110, 40);
+    assert!(screen.contains("• search"));
+    assert!(screen.contains(&format!("[{}]", copy::MCP_READ_ONLY)));
+    assert!(screen.contains("• collections"));
+    assert!(screen.contains(&format!("Ctrl+O — {}", copy::MCP_COLLAPSE)));
+}
+
+#[test]
+fn the_palette_shows_subcommands_only_once_their_command_is_typed() {
+    let mut app = ready(WorkingFolderAccess::Granted);
+    for value in "/mcp".chars() {
+        app.update(Msg::Key(Key::Char(value)));
+    }
+    let screen = render(&app, 110, 24);
+    assert!(!screen.contains("/mcp add"));
+    app.update(Msg::Key(Key::Char(' ')));
+    let screen = render(&app, 110, 24);
+    assert!(screen.contains("/mcp add"));
+    assert!(screen.contains(copy::CMD_MCP_INSPECT));
+}

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use zvs_contract::{AppError, CliOpenInput, CliThemeDto};
+use zvs_contract::{AccountLinkInput, AppError, CliOpenInput, CliThemeDto, CreateMcpServerInput};
 
 use super::IpcServer;
 use crate::cli;
@@ -8,12 +8,24 @@ use crate::services::Services;
 
 pub fn register(server: &mut IpcServer) {
     server
-        .handle("cli.copilot.login", |services: Arc<Services>, (): ()| async move {
-            cli::link_copilot(&services).await
-        })
-        .handle("cli.copilot.cancelLogin", |services: Arc<Services>, (): ()| async move {
-            Ok::<_, AppError>(services.accounts.cancel_link(zvs_contract::AccountFamily::Copilot))
-        })
+        .handle(
+            "cli.accounts.link",
+            |services: Arc<Services>, input: AccountLinkInput| async move {
+                cli::link_account(&services, input.adapter).await
+            },
+        )
+        .handle(
+            "cli.accounts.cancelLink",
+            |services: Arc<Services>, input: AccountLinkInput| async move {
+                Ok::<_, AppError>(services.accounts.cancel_link(input.adapter))
+            },
+        )
+        .handle(
+            "cli.mcp.create",
+            |services: Arc<Services>, input: CreateMcpServerInput| async move {
+                cli::create_mcp_server(&services, &input)
+            },
+        )
         .handle(
             "cli.open",
             |services: Arc<Services>, input: CliOpenInput| async move {

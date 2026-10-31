@@ -1,11 +1,14 @@
-use zvs_contract::ConversationId;
+use zvs_contract::{ConversationId, CreateMcpServerInput};
 
 use crate::copy;
+use crate::mcp_add;
 use crate::version;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Args {
     Run { resume: Option<ConversationId> },
+    McpAdd(Box<CreateMcpServerInput>),
+    McpHelp,
     Version,
     Help,
 }
@@ -15,13 +18,26 @@ pub enum ArgsError {
     Unknown(String),
     MissingResume,
     InvalidResume(String),
+    Mcp(&'static str),
+    McpUnknown(String),
 }
 
 pub fn usage() -> String {
     format!(
-        "{}\n\n{}:\n  aistudio\n  aistudio --resume <id>\n  aistudio --version\n  aistudio --help",
+        "{}\n\n{}:\n  aistudio\n  aistudio --resume <id>\n  aistudio mcp add ...           {}\n  aistudio --version\n  aistudio --help\n\n{}",
         version::version_line(),
-        copy::USAGE_COMMANDS
+        copy::USAGE_COMMANDS,
+        copy::USAGE_MCP_SHORT,
+        copy::USAGE_MCP_MORE
+    )
+}
+
+pub fn mcp_usage() -> String {
+    format!(
+        "{}\n\n{}:\n  aistudio mcp add [-e КЛЮЧ=значение]... [-H \"Имя: значение\"]... <имя> <адрес | команда [аргументы]...>\n  aistudio mcp --help\n\n{}",
+        version::version_line(),
+        copy::USAGE_COMMANDS,
+        copy::USAGE_MCP
     )
 }
 
@@ -30,11 +46,17 @@ fn fail(error: &ArgsError) -> String {
         ArgsError::Unknown(argument) => format!("{}: {argument}", copy::USAGE_UNKNOWN),
         ArgsError::MissingResume => copy::USAGE_RESUME_MISSING.to_owned(),
         ArgsError::InvalidResume(value) => format!("{}: {value}", copy::USAGE_RESUME_INVALID),
+        ArgsError::Mcp(message) => (*message).to_owned(),
+        ArgsError::McpUnknown(argument) => format!("{}: {argument}", copy::USAGE_UNKNOWN),
     }
 }
 
 pub fn report(error: &ArgsError) -> String {
-    format!("{}\n\n{}", fail(error), usage())
+    let help = match error {
+        ArgsError::Mcp(_) | ArgsError::McpUnknown(_) => mcp_usage(),
+        _ => usage(),
+    };
+    format!("{}\n\n{help}", fail(error))
 }
 
 pub fn parse<I>(arguments: I) -> Result<Args, ArgsError>
@@ -47,6 +69,23 @@ where
         match argument.as_str() {
             "--version" | "-V" => return Ok(Args::Version),
             "--help" | "-h" => return Ok(Args::Help),
+            "mcp" => {
+                return match arguments.next().as_deref() {
+                    Some("add") => {
+                        let rest: Vec<String> = arguments.collect();
+                        if rest.iter().any(|word| word == "--help" || word == "-h")
+                            && rest.len() == 1
+                        {
+                            return Ok(Args::McpHelp);
+                        }
+                        mcp_add::parse(rest)
+                            .map(|input| Args::McpAdd(Box::new(input)))
+                            .map_err(ArgsError::Mcp)
+                    }
+                    None | Some("--help" | "-h" | "help") => Ok(Args::McpHelp),
+                    Some(other) => Err(ArgsError::McpUnknown(other.to_owned())),
+                };
+            }
             "--resume" => {
                 let Some(value) = arguments.next() else {
                     return Err(ArgsError::MissingResume);
@@ -119,6 +158,45 @@ mod tests {
             parse(&["--wat"]),
             Err(ArgsError::Unknown("--wat".to_owned()))
         );
+    }
+
+    #[test]
+    fn mcp_add_takes_the_rest_of_the_line_verbatim() {
+        let Ok(Args::McpAdd(input)) = parse(&[
+            "mcp",
+            "add",
+            "-e",
+            "ROOT=D:\\work",
+            "files",
+            "npx",
+            "-y",
+            "server",
+            "--flag",
+        ]) else {
+            panic!("parses");
+        };
+        assert_eq!(input.name, "files");
+        assert_eq!(input.command, Some(Some("npx".to_owned())));
+        assert_eq!(input.args.expect("args"), ["-y", "server", "--flag"]);
+        assert_eq!(
+            parse(&["mcp", "add", "docs"]),
+            Err(ArgsError::Mcp(copy::MCP_ADD_USAGE))
+        );
+        assert_eq!(parse(&["mcp"]), Ok(Args::McpHelp));
+        assert_eq!(parse(&["mcp", "--help"]), Ok(Args::McpHelp));
+        assert_eq!(parse(&["mcp", "add", "--help"]), Ok(Args::McpHelp));
+        assert_eq!(
+            parse(&["mcp", "drop"]),
+            Err(ArgsError::McpUnknown("drop".to_owned()))
+        );
+    }
+
+    #[test]
+    fn the_general_help_points_to_the_mcp_help_which_holds_the_details() {
+        assert!(usage().contains("aistudio mcp --help"));
+        assert!(!usage().contains("--header"));
+        assert!(mcp_usage().contains("--header"));
+        assert!(report(&ArgsError::Mcp(copy::MCP_ADD_USAGE)).contains("--header"));
     }
 
     #[test]

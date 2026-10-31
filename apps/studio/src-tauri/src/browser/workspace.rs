@@ -42,7 +42,7 @@ use crate::browser::model::{
 };
 use crate::browser::network::NetworkRecorder;
 use crate::platform::site;
-use crate::window::{STUDIO, app_origin, same_origin};
+use crate::window::{STUDIO, app_origin, focus_studio, same_origin};
 
 pub const BROWSER_UI: &str = "browser-ui";
 const CHROME_PAGE: &str = "browser-ui/index.html";
@@ -187,6 +187,7 @@ impl BrowserWorkspace {
         self.ensure_chrome()?;
         let label = self.open_tab(Some(url))?;
         lock(&self.0.links).opened(label, url);
+        focus_studio(&self.0.app);
         Ok(())
     }
 

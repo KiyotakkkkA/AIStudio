@@ -2,12 +2,17 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use serde_json::Value;
 use unicode_width::UnicodeWidthStr;
-use zvs_contract::{ChatToolCallDto, ChatToolCallStatus};
+use zvs_contract::{
+    ChatToolCallDto, ChatToolCallStatus, McpCapabilityDto, McpCapabilityKind, McpOAuthState,
+    McpServerDetailDto, McpServerStatus, McpStartup, McpTransport, McpValue,
+};
 
 use super::text::{markdown, truncate, wrap};
 use super::theme;
 use crate::copy;
+use crate::format;
 use crate::state::App;
+use crate::state::shortcuts::Shortcut;
 use crate::state::transcript::{Entry, Segment, ShellEnd, ShellRun, Tone};
 
 pub const SPINNER: [&str; 8] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"];
@@ -308,6 +313,241 @@ fn reasoning(text: &str, expanded: bool, width: usize) -> Vec<Line<'static>> {
     lines
 }
 
+const FIELD_COLUMN: usize = 24;
+
+fn field(label: &str, value: &str, room: usize) -> Vec<Line<'static>> {
+    wrap(value, room.saturating_sub(FIELD_COLUMN).max(10))
+        .into_iter()
+        .enumerate()
+        .map(|(index, piece)| {
+            let lead = if index == 0 { label } else { "" };
+            let pad = " ".repeat(FIELD_COLUMN.saturating_sub(lead.width()));
+            Line::from(vec![
+                indent(),
+                Span::styled(format!("{lead}{pad}"), theme::muted()),
+                Span::styled(piece, theme::text()),
+            ])
+        })
+        .collect()
+}
+
+fn value_names(values: &std::collections::BTreeMap<String, McpValue>) -> String {
+    values
+        .iter()
+        .map(|(name, value)| match value {
+            McpValue::Secret { .. } => format!("{name} ({})", copy::MCP_SECRET),
+            McpValue::Literal { .. } => name.clone(),
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn server_state(oauth: McpOAuthState, status: McpServerStatus) -> (&'static str, Color) {
+    if oauth == McpOAuthState::Required {
+        return (copy::MCP_SIGN_IN_REQUIRED, theme::colors().warn);
+    }
+    match status {
+        McpServerStatus::Connected => (copy::MCP_CONNECTED, theme::colors().ok),
+        McpServerStatus::Starting => (copy::MCP_STARTING, theme::colors().warn),
+        McpServerStatus::Failed => (copy::MCP_FAILED, theme::colors().err),
+        McpServerStatus::Stopped => (copy::MCP_STOPPED, theme::colors().muted),
+        McpServerStatus::Disabled => (copy::MCP_DISABLED, theme::colors().muted),
+    }
+}
+
+fn capability_block(
+    title: &str,
+    items: &[&McpCapabilityDto],
+    expanded: bool,
+    toggle: &str,
+    room: usize,
+) -> Vec<Line<'static>> {
+    if items.is_empty() {
+        return Vec::new();
+    }
+    let action = if expanded {
+        copy::MCP_COLLAPSE
+    } else {
+        copy::MCP_EXPAND
+    };
+    let mut lines = vec![
+        Line::default(),
+        Line::from(vec![
+            indent(),
+            Span::styled(
+                format!("{title} · {}", format::number(items.len() as u64)),
+                theme::strong(),
+            ),
+            Span::styled(format!("   {toggle} — {action}"), theme::faint()),
+        ]),
+    ];
+    if !expanded {
+        return lines;
+    }
+    for item in items {
+        let mut flags = Vec::new();
+        if item.read_only {
+            flags.push(copy::MCP_READ_ONLY);
+        }
+        if item.destructive {
+            flags.push(copy::MCP_DESTRUCTIVE);
+        }
+        let mut head = vec![
+            indent(),
+            Span::styled("• ", theme::faint()),
+            Span::styled(item.name.clone(), theme::accent()),
+        ];
+        if let Some(title) = item.title.as_deref().filter(|title| *title != item.name) {
+            head.push(Span::styled(format!("  {title}"), theme::text()));
+        }
+        if !flags.is_empty() {
+            head.push(Span::styled(
+                format!("  [{}]", flags.join(", ")),
+                theme::faint(),
+            ));
+        }
+        lines.push(Line::from(head));
+        let about = item.uri.as_deref().map_or_else(
+            || item.description.clone(),
+            |uri| {
+                if item.description.is_empty() {
+                    uri.to_owned()
+                } else {
+                    format!("{uri} — {}", item.description)
+                }
+            },
+        );
+        for piece in about
+            .lines()
+            .flat_map(|line| wrap(line, room.saturating_sub(4).max(10)))
+        {
+            lines.push(Line::from(vec![
+                indent(),
+                Span::raw("  "),
+                Span::styled(piece, theme::muted()),
+            ]));
+        }
+    }
+    lines
+}
+
+fn server_card(
+    detail: &McpServerDetailDto,
+    expanded: bool,
+    toggle: &str,
+    width: usize,
+) -> Vec<Line<'static>> {
+    let server = &detail.server;
+    let room = width.saturating_sub(6).max(20);
+    let (state, color) = server_state(server.oauth, server.status);
+    let mut lines = vec![Line::from(vec![
+        Span::styled("  ⧉ ", theme::accent()),
+        Span::styled(server.name.clone(), theme::strong()),
+        Span::styled(
+            format!("  {state} · {}", server.transport.as_str()),
+            Style::new().fg(color),
+        ),
+    ])];
+    let mut fields: Vec<(&str, String)> = Vec::new();
+    match &server.url {
+        Some(url) => fields.push((copy::MCP_ADDRESS, url.clone())),
+        None => fields.push((
+            copy::MCP_COMMAND,
+            std::iter::once(server.command.clone().unwrap_or_default())
+                .chain(server.args.iter().cloned())
+                .collect::<Vec<_>>()
+                .join(" "),
+        )),
+    }
+    fields.push((copy::MCP_NAMESPACE, server.namespace.clone()));
+    if let Some(name) = &server.server_name {
+        let version = server.server_version.as_deref().unwrap_or_default();
+        fields.push((
+            copy::MCP_REPORTED_AS,
+            format!("{name} {version}").trim().to_owned(),
+        ));
+    }
+    if let Some(protocol) = &server.protocol_version {
+        fields.push((copy::MCP_PROTOCOL, protocol.clone()));
+    }
+    let startup = match server.startup {
+        McpStartup::Launch => copy::MCP_STARTUP_LAUNCH,
+        McpStartup::Manual => copy::MCP_STARTUP_MANUAL,
+    };
+    fields.push((
+        copy::MCP_STARTUP,
+        if server.enabled {
+            startup.to_owned()
+        } else {
+            format!("{startup}, {}", copy::MCP_DISABLED)
+        },
+    ));
+    if server.transport == McpTransport::Http {
+        let sign_in = match server.oauth {
+            McpOAuthState::None => copy::MCP_SIGN_IN_NONE,
+            McpOAuthState::Required => copy::MCP_SIGN_IN_REQUIRED,
+            McpOAuthState::SignedIn => copy::MCP_SIGN_IN_DONE,
+        };
+        fields.push((copy::MCP_SIGN_IN, sign_in.to_owned()));
+    }
+    if !server.env.is_empty() {
+        fields.push((copy::MCP_ENV, value_names(&server.env)));
+    }
+    if !server.headers.is_empty() {
+        fields.push((copy::MCP_HEADERS, value_names(&server.headers)));
+    }
+    if let Some(at) = server.last_connected_at {
+        fields.push((copy::MCP_LAST_CONNECTED, format::date(at)));
+    }
+    if let Some(error) = &server.last_error {
+        fields.push((copy::MCP_ERROR, error.clone()));
+    }
+    if let Some(instructions) = server
+        .instructions
+        .as_deref()
+        .filter(|text| !text.is_empty())
+    {
+        let shown = if expanded {
+            instructions.to_owned()
+        } else {
+            instructions.lines().next().unwrap_or_default().to_owned()
+        };
+        fields.push((copy::MCP_INSTRUCTIONS, shown));
+    }
+    for (label, value) in &fields {
+        lines.extend(field(label, value, room));
+    }
+    let of = |kind: McpCapabilityKind| -> Vec<&McpCapabilityDto> {
+        detail
+            .capabilities
+            .iter()
+            .filter(|capability| capability.kind == kind)
+            .collect()
+    };
+    lines.extend(capability_block(
+        copy::MCP_TOOLS,
+        &of(McpCapabilityKind::Tool),
+        expanded,
+        toggle,
+        room,
+    ));
+    lines.extend(capability_block(
+        copy::MCP_RESOURCES,
+        &of(McpCapabilityKind::Resource),
+        expanded,
+        toggle,
+        room,
+    ));
+    lines.extend(capability_block(
+        copy::MCP_PROMPTS,
+        &of(McpCapabilityKind::Prompt),
+        expanded,
+        toggle,
+        room,
+    ));
+    lines
+}
+
 fn assistant(text: &str, thought: &str, expanded: bool, width: usize) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     if !thought.trim().is_empty() {
@@ -382,6 +622,7 @@ pub fn key_lines(
 pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = Vec::new();
     let expanded = app.expanded;
+    let toggle = app.keymap.label(Shortcut::Details);
     for entry in &app.transcript.entries {
         lines.push(Line::default());
         lines.extend(match entry {
@@ -390,6 +631,7 @@ pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
             Entry::Tool(call) => tool(call, expanded, app.frame, width),
             Entry::Notice { tone, text } => notice(*tone, text, width),
             Entry::Shell(run) => shell_block(run, expanded, app.frame, width),
+            Entry::Server(detail) => server_card(detail, expanded, &toggle, width),
         });
     }
     if let Some(run) = &app.shell {

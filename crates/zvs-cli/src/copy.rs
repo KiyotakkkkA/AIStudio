@@ -11,6 +11,21 @@ pub const DISCONNECTED: &str = "Соединение с приложением �
 pub const NO_TERMINAL: &str = "Консольная версия работает только в интерактивном терминале";
 pub const USAGE_COMMANDS: &str = "Использование";
 pub const USAGE_UNKNOWN: &str = "Неизвестный аргумент";
+pub const USAGE_MCP_SHORT: &str = "подключить MCP-сервер";
+pub const USAGE_MCP_MORE: &str = "Подробнее о подключении MCP-серверов: aistudio mcp --help";
+pub const USAGE_MCP: &str =
+    "Подключение MCP-сервера (в сессии — /mcp add, сведения о сервере — /mcp inspect <имя>):
+  <адрес> вида http:// или https:// подключает http-сервер; если сервер требует вход,
+  открывается браузер. Иначе первое слово — команда stdio-сервера, остальные — её аргументы.
+  Ключи указываются до имени сервера:
+  -e, --env КЛЮЧ=значение        переменная окружения stdio-сервера
+  -H, --header \"Имя: значение\"   заголовок http-сервера
+  Сервер запускается сразу после добавления. Секреты из хранилища подключаются
+  только в приложении.
+
+Примеры:
+  aistudio mcp add docs https://mcp.example.com/mcp
+  aistudio mcp add -e ROOT=D:\\work files npx -y @modelcontextprotocol/server-filesystem D:\\work";
 pub const USAGE_RESUME_MISSING: &str = "После --resume укажите идентификатор диалога";
 pub const USAGE_RESUME_INVALID: &str = "Недопустимый идентификатор диалога";
 pub const RESUME_HINT: &str = "Продолжить этот диалог";
@@ -30,7 +45,7 @@ pub const WORKSPACE: &str = "Рабочая папка";
 pub const MODEL: &str = "Модель";
 pub const NO_MODEL: &str = "не выбрана";
 pub const NO_PROVIDER: &str =
-    "Нет включённого провайдера с текстовыми моделями. Добавьте его в приложении.";
+    "Нет включённого провайдера с текстовыми моделями. Подключите его командой /connect.";
 
 pub const YOU: &str = "Вы";
 pub const ASSISTANT: &str = "Ассистент";
@@ -113,9 +128,20 @@ pub const CMD_NEW: &str = "Начать новый диалог в этой па
 pub const CMD_CLEAR: &str = "Очистить экран";
 pub const CMD_EXIT: &str = "Завершить сессию";
 pub const CMD_MODELS: &str = "Провайдеры и модели";
-pub const CMD_COPILOT: &str = "Вход в GitHub Copilot";
-pub const COPILOT_LINKING: &str = "Вход в GitHub Copilot… Esc — отменить";
-pub const COPILOT_LINKED: &str = "GitHub Copilot подключён. Модель доступна через /models";
+pub const CMD_CONNECT: &str = "Подключение провайдера";
+pub const CMD_DESKTOP: &str = "Открыть диалог в приложении";
+pub const CONNECT_TITLE: &str = "Подключение провайдера";
+pub const CONNECT_LINKING: &str = "Вход в аккаунт";
+pub const CONNECT_CANCEL_HINT: &str = "Esc — отменить";
+pub const CONNECT_LINKED: &str = "подключён. Модель доступна через /models";
+pub const CONNECT_CONNECTED: &str = "подключён";
+pub const CONNECT_HINT_BROWSER: &str = "Вход во встроенном браузере приложения";
+pub const CONNECT_HINT_OPENAI: &str = "Вход в системном браузере";
+pub const CONNECT_HINT_COPILOT: &str = "Требуется GitHub Copilot CLI";
+pub const DESKTOP_OPENED: &str = "Диалог открыт в приложении";
+pub const DESKTOP_NO_CONVERSATION: &str =
+    "Нет открытого диалога. Отправьте сообщение или выберите диалог через /resume";
+pub const DESKTOP_FAILED: &str = "Не удалось открыть приложение ZVS AI Studio";
 pub const COPILOT_EFFORT_LOW: &str = "Низкое";
 pub const COPILOT_EFFORT_HIGH: &str = "Высокое";
 pub const COPILOT_EFFORT_LOW_HINT: &str = "Низкий уровень рассуждения";
@@ -125,6 +151,8 @@ pub const CMD_RESUME: &str = "Продолжить диалог этой пап�
 pub const CMD_CONTEXT: &str = "Заполнение контекста";
 pub const CMD_SKILLS: &str = "Навыки";
 pub const CMD_MCP: &str = "MCP-серверы";
+pub const CMD_MCP_ADD: &str = "Подключить MCP-сервер: <имя> <адрес | команда [аргументы]>";
+pub const CMD_MCP_INSPECT: &str = "Сведения о сервере и его инструменты: <имя>";
 pub const CMD_PERMISSIONS: &str = "Режим выполнения и модель-арбитр";
 pub const CMD_SHORTCUTS: &str = "Сочетания клавиш и их переназначение";
 pub const CMD_EFFORT: &str = "Сила размышления модели";
@@ -281,6 +309,54 @@ pub const MCP_CONNECTED: &str = "подключён";
 pub const MCP_FAILED: &str = "ошибка";
 pub const MCP_STARTED: &str = "Сервер запущен";
 pub const MCP_HALTED: &str = "Сервер остановлен";
+pub const MCP_SIGN_IN_REQUIRED: &str = "требуется вход";
+pub const MCP_SIGN_IN_HINT: &str = "Enter — войти через браузер";
+pub const MCP_EMPTY: &str = "Серверов нет. Подключите сервер командой /mcp add";
+pub const MCP_SERVER: &str = "Сервер";
+pub const MCP_ADDING: &str = "Подключение сервера";
+pub const MCP_STARTING_SERVER: &str = "Запуск сервера";
+pub const MCP_NOT_STARTED: &str = "добавлен, но не запущен";
+pub const MCP_SIGNING_IN: &str = "Вход на сервер";
+pub const MCP_IN_BROWSER: &str = "в браузере";
+pub const MCP_SIGNED_IN: &str = "Вход выполнен";
+pub const MCP_SIGN_IN_CANCEL: &str = "Ctrl+C — отменить";
+pub const MCP_SIGN_IN_CANCELLED: &str = "Вход отменён";
+pub const MCP_ADD_USAGE: &str = "Формат: /mcp add [-e КЛЮЧ=значение] [-H \"Имя: значение\"] <имя> <адрес | команда [аргументы]>";
+pub const MCP_ADD_UNKNOWN: &str = "Неизвестная подкоманда /mcp. Доступно: /mcp, /mcp add";
+pub const MCP_ADD_QUOTE: &str = "Не закрыта кавычка";
+pub const MCP_INSPECT_USAGE: &str = "Формат: /mcp inspect <имя>";
+pub const MCP_NOT_FOUND: &str = "Сервер не найден";
+pub const THEME_NOT_FOUND: &str = "Тема не найдена";
+pub const RESUME_NOT_FOUND: &str = "Диалог не найден";
+pub const MCP_ADDRESS: &str = "Адрес";
+pub const MCP_COMMAND: &str = "Команда";
+pub const MCP_NAMESPACE: &str = "Пространство имён";
+pub const MCP_REPORTED_AS: &str = "Сервер сообщает";
+pub const MCP_PROTOCOL: &str = "Протокол";
+pub const MCP_STARTUP: &str = "Запуск";
+pub const MCP_STARTUP_LAUNCH: &str = "вместе с приложением";
+pub const MCP_STARTUP_MANUAL: &str = "вручную";
+pub const MCP_SIGN_IN: &str = "Вход";
+pub const MCP_SIGN_IN_NONE: &str = "не требуется";
+pub const MCP_SIGN_IN_DONE: &str = "выполнен";
+pub const MCP_ENV: &str = "Переменные окружения";
+pub const MCP_HEADERS: &str = "Заголовки";
+pub const MCP_SECRET: &str = "секрет";
+pub const MCP_LAST_CONNECTED: &str = "Последнее подключение";
+pub const MCP_ERROR: &str = "Ошибка";
+pub const MCP_INSTRUCTIONS: &str = "Инструкции сервера";
+pub const MCP_TOOLS: &str = "Инструменты";
+pub const MCP_RESOURCES: &str = "Ресурсы";
+pub const MCP_PROMPTS: &str = "Промпты";
+pub const MCP_READ_ONLY: &str = "только чтение";
+pub const MCP_DESTRUCTIVE: &str = "изменяет данные";
+pub const MCP_EXPAND: &str = "показать";
+pub const MCP_COLLAPSE: &str = "скрыть";
+pub const MCP_ADD_ENV: &str = "Переменная окружения задаётся как КЛЮЧ=значение";
+pub const MCP_ADD_HEADER: &str = "Заголовок задаётся как «Имя: значение»";
+pub const MCP_ADD_HTTP_EXTRA: &str =
+    "Для http-сервера не указываются аргументы и переменные окружения";
+pub const MCP_ADD_STDIO_HEADERS: &str = "Заголовки указываются только для http-сервера";
 
 pub const PERMISSIONS_TITLE: &str = "Подтверждение действий";
 pub const TAB_MODE: &str = "Режим";

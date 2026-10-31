@@ -187,6 +187,9 @@ pub enum Shortcut {
     Skills,
     Mcp,
     Permissions,
+    Connect,
+    Desktop,
+    Theme,
     Help,
     Shortcuts,
 }
@@ -203,6 +206,9 @@ pub const SHORTCUTS: &[Shortcut] = &[
     Shortcut::Skills,
     Shortcut::Mcp,
     Shortcut::Permissions,
+    Shortcut::Connect,
+    Shortcut::Desktop,
+    Shortcut::Theme,
     Shortcut::Help,
     Shortcut::Shortcuts,
 ];
@@ -221,6 +227,9 @@ impl Shortcut {
             Self::Skills => "skills",
             Self::Mcp => "mcp",
             Self::Permissions => "permissions",
+            Self::Connect => "connect",
+            Self::Desktop => "desktop",
+            Self::Theme => "theme",
             Self::Help => "help",
             Self::Shortcuts => "shortcuts",
         }
@@ -239,6 +248,9 @@ impl Shortcut {
             Self::Skills => copy::CMD_SKILLS,
             Self::Mcp => copy::CMD_MCP,
             Self::Permissions => copy::CMD_PERMISSIONS,
+            Self::Connect => copy::CMD_CONNECT,
+            Self::Desktop => copy::CMD_DESKTOP,
+            Self::Theme => copy::CMD_THEME,
             Self::Help => copy::CMD_HELP,
             Self::Shortcuts => copy::CMD_SHORTCUTS,
         }
@@ -257,6 +269,9 @@ impl Shortcut {
             Self::Skills => Chord::alt('s'),
             Self::Mcp => Chord::alt('m'),
             Self::Permissions => Chord::alt('p'),
+            Self::Connect => Chord::alt('c'),
+            Self::Desktop => Chord::alt('d'),
+            Self::Theme => Chord::alt('t'),
             Self::Help => Chord::function(1),
             Self::Shortcuts => Chord::alt('k'),
         })
@@ -274,6 +289,9 @@ impl Shortcut {
             Self::Skills => Some(Command::Skills),
             Self::Mcp => Some(Command::Mcp),
             Self::Permissions => Some(Command::Permissions),
+            Self::Connect => Some(Command::Connect),
+            Self::Desktop => Some(Command::Desktop),
+            Self::Theme => Some(Command::Theme),
             Self::Help => Some(Command::Help),
             Self::Shortcuts => Some(Command::Shortcuts),
         }
@@ -438,6 +456,16 @@ mod tests {
             let chord = keymap.chord(*shortcut).expect("bound by default");
             assert!(!chord.reserved(), "{}", chord.label());
             assert_eq!(keymap.action(chord), Some(*shortcut));
+        }
+    }
+
+    #[test]
+    fn every_command_but_exit_has_a_shortcut() {
+        for command in super::super::palette::COMMANDS {
+            let bound = SHORTCUTS
+                .iter()
+                .any(|shortcut| shortcut.command() == Some(*command));
+            assert_eq!(bound, *command != Command::Exit, "{}", command.name());
         }
     }
 
