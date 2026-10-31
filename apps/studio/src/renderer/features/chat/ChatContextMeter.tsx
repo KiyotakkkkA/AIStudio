@@ -16,6 +16,9 @@ interface Segment {
 }
 
 const MESSAGE_FORMS = ["сообщение", "сообщения", "сообщений"] as const;
+const ESTIMATED_NOTE = "Оценка по числу символов.";
+const MEASURED_NOTE =
+  "Разбивка оценена по числу символов, расход последнего ответа передан провайдером.";
 
 function messagesWord(count: number): string {
   return plural(count, ...MESSAGE_FORMS);
@@ -313,7 +316,7 @@ export default observer(function ChatContextMeter({ store }: { readonly store: C
           ) : null}
 
           <p className="text-[11px] leading-snug text-main-500">
-            Оценка по числу символов.
+            {last !== undefined && !last.usageEstimated ? MEASURED_NOTE : ESTIMATED_NOTE}
             {store.attachedStoreIds.length > 0
               ? " Фрагменты из хранилищ добавляются при отправке."
               : ""}

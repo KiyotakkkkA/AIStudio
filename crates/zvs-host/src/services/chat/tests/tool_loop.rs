@@ -2145,3 +2145,61 @@ async fn the_browser_command_brings_the_browser_tools_and_its_skill_for_the_rest
             })
     );
 }
+
+#[tokio::test]
+async fn vendor_usage_replaces_the_estimate_and_the_window_reaches_the_context_meter() {
+    let test = Loop::new();
+    test.driver.round(|_| {
+        vec![
+            call("demo__lookup", &json!({ "query": "x" })),
+            TextDelta::Usage(crate::drivers::ai::TurnUsage {
+                input_tokens: Some(500),
+                output_tokens: Some(40),
+                context_window: Some(32_768),
+            }),
+        ]
+    });
+    test.driver.fallback(|_| {
+        vec![
+            text("Готово."),
+            TextDelta::Usage(crate::drivers::ai::TurnUsage {
+                input_tokens: Some(700),
+                output_tokens: Some(20),
+                context_window: None,
+            }),
+        ]
+    });
+    let created = test.conversation(&["demo.lookup"]);
+    let handle = test.turn(created, "Вопрос").await;
+    assert_eq!(test.harness.status(&handle), RunStatus::Succeeded);
+
+    let last = test.harness.last(created);
+    assert_eq!(last.content, "Готово.");
+    assert_eq!((last.tokens_in, last.tokens_out), (1200, 60));
+    assert!(!last.usage_estimated);
+
+    let measured = test
+        .harness
+        .chat
+        .context(&zvs_contract::ChatContextInput {
+            conversation_id: Some(created),
+            provider_id: test.harness.provider_id,
+            model_id: test.harness.model_id.clone(),
+            settings: None,
+            system_prompt: None,
+            command: None,
+        })
+        .expect("measures");
+    assert_eq!(measured.context_window, 32_768);
+}
+
+#[tokio::test]
+async fn a_turn_without_vendor_usage_keeps_the_estimate() {
+    let test = Loop::new();
+
+    let created = test.conversation(&[]);
+    test.turn(created, "Вопрос").await;
+    let last = test.harness.last(created);
+    assert!(last.usage_estimated);
+    assert!(last.tokens_out > 0);
+}

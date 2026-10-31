@@ -59,7 +59,7 @@ use crate::data::repositories::{ConversationPatch, MessagePatch, ProviderFilter,
 use crate::data::schema::{ConversationRow, FolderGrantRow, MemoryRow, MessageRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::ports::SharedTextDriver;
-use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta, ToolCall};
+use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta, ToolCall, TurnUsage};
 use crate::files::FILE_TOOLS;
 use crate::files::roots::SKILL_READ_ONLY;
 use crate::kernel::knowledge_nodes::{KNOWLEDGE_SEARCH, KNOWLEDGE_TOOLS, KnowledgeResult};
@@ -537,6 +537,23 @@ impl Inner {
 
     fn log(&self, level: LogLevel, message: &str, fields: &[(&str, Value)]) {
         self.logger.log(level, "chat", message, fields);
+    }
+
+    fn learn_usage(&self, provider_id: &str, model: &str, usage: &TurnUsage) {
+        let Some(window) = usage.context_window.filter(|window| *window > 0) else {
+            return;
+        };
+        if let Err(error) = self.read(|repositories| {
+            Ok(repositories
+                .models
+                .set_context_window(provider_id, model, window)?)
+        }) {
+            self.log(
+                LogLevel::Warn,
+                "Could not save the reported context window",
+                &[("error", json!(error.message))],
+            );
+        }
     }
 
     fn replies(&self) -> std::sync::MutexGuard<'_, ReplyBuffers> {
@@ -1479,6 +1496,7 @@ pub(crate) struct RoundOutput {
     pub(crate) reasoning: String,
     pub(crate) tool_calls: Vec<ToolCall>,
     pub(crate) web_sources: Vec<WebSourceDto>,
+    pub(crate) usage: Option<TurnUsage>,
 }
 
 struct CallOptions<'a> {
@@ -1561,6 +1579,7 @@ impl GenerateChatNode {
             reasoning: String::new(),
             tool_calls: Vec::new(),
             web_sources: Vec::new(),
+            usage: None,
         };
         let excluded = driver.excluded_policy_check_tools();
         let mut deltas = driver.stream(request, &context.cancel);
@@ -1588,6 +1607,7 @@ impl GenerateChatNode {
                     output.tool_calls.push(ToolCall { id, ..call });
                 }
                 TextDelta::WebSources(sources) => output.web_sources.extend(sources),
+                TextDelta::Usage(usage) => output.usage.get_or_insert_default().merge(usage),
                 TextDelta::Content { text, .. } if text.is_empty() => {}
                 TextDelta::Content {
                     text,
@@ -2024,6 +2044,8 @@ impl GenerateChatNode {
         let mut web_sources: Vec<WebSourceDto> = Vec::new();
         let mut executed = 0;
         let mut round = 0;
+        let mut usage = TurnUsage::default();
+        let usage_target = (base.provider_id.clone(), base.model.clone());
         let outcome: Result<(), AppError> = async {
             loop {
                 let last = round >= budget || executed >= budget;
@@ -2064,10 +2086,17 @@ impl GenerateChatNode {
                     text: output.text.clone(),
                     reasoning: output.reasoning.clone(),
                 });
+                if let Some(reported) = output.usage.clone() {
+                    usage.merge(reported);
+                }
+                let counted = usage.counted();
                 if let Err(error) = self.0.update_message(
                     &assistant_id,
                     &MessagePatch {
                         rounds: Some(rounds.clone()),
+                        tokens_in: counted.then(|| usage.input_tokens.unwrap_or(0)),
+                        tokens_out: counted.then(|| usage.output_tokens.unwrap_or(0)),
+                        usage_estimated: counted.then_some(false),
                         ..MessagePatch::default()
                     },
                 ) {
@@ -2249,6 +2278,7 @@ impl GenerateChatNode {
             Ok(())
         }
         .await;
+        self.0.learn_usage(&usage_target.0, &usage_target.1, &usage);
         if let Err(error) = outcome {
             let mut changed = Vec::new();
             {
@@ -2338,15 +2368,19 @@ impl NodeDef for PersistNode {
             .read(|repositories| Ok(repositories.chat.get_message(&input.assistant_id)?))?
             .filter(|message| message.run_id.as_deref() == Some(run_id.as_str()))
             .ok_or_else(|| AppError::new(AppErrorCode::Conflict, FOREIGN_MESSAGE))?;
-        let tokens_out =
-            estimate_tokens(&format!("{}{}", input.result.text, input.result.reasoning));
+        let tokens_out = message.usage_estimated.then(|| {
+            as_i64(estimate_tokens(&format!(
+                "{}{}",
+                input.result.text, input.result.reasoning
+            )))
+        });
         inner.update_message(
             &message.id,
             &MessagePatch {
                 content: Some(input.result.text),
                 reasoning: Some(input.result.reasoning),
                 web_sources: Some(input.result.web_sources),
-                tokens_out: Some(as_i64(tokens_out)),
+                tokens_out,
                 partial: Some(false),
                 duration_ms: Some((inner.now() - message.created_at).max(0)),
                 ..MessagePatch::default()

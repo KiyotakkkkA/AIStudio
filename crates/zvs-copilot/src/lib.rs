@@ -123,6 +123,130 @@ pub fn selectable(models: Vec<Model>) -> Vec<Model> {
         .collect()
 }
 
+pub const QUOTA_PREMIUM: &str = "premium_interactions";
+pub const QUOTA_CHAT: &str = "chat";
+
+/// One entry of `quotaSnapshots` (in `assistant.usage` events and the account quota result).
+#[derive(Debug, Clone, PartialEq)]
+pub struct QuotaSnapshot {
+    pub kind: &'static str,
+    pub unlimited: bool,
+    pub entitlement: f64,
+    pub used: f64,
+    pub remaining_percent: f64,
+    pub overage: f64,
+    pub resets_at: Option<i64>,
+}
+
+/// Premium requests first, then chat. Snapshots marked `hasQuota: false` are skipped.
+pub fn quota_snapshots(snapshots: &Value) -> Vec<QuotaSnapshot> {
+    [QUOTA_PREMIUM, QUOTA_CHAT]
+        .into_iter()
+        .filter_map(|kind| {
+            let snapshot = snapshots.get(kind)?;
+            if snapshot.get("hasQuota").and_then(Value::as_bool) == Some(false) {
+                return None;
+            }
+            let number = |field: &str| {
+                snapshot
+                    .get(field)
+                    .and_then(Value::as_f64)
+                    .filter(|value| value.is_finite())
+            };
+            let entitlement = number("entitlementRequests")?;
+            let unlimited = snapshot
+                .get("isUnlimitedEntitlement")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+                || entitlement < 0.0;
+            Some(QuotaSnapshot {
+                kind,
+                unlimited,
+                entitlement: entitlement.max(0.0),
+                used: number("usedRequests").unwrap_or(0.0).max(0.0),
+                remaining_percent: number("remainingPercentage")
+                    .unwrap_or(if unlimited { 100.0 } else { 0.0 })
+                    .clamp(0.0, 100.0),
+                overage: number("overage").unwrap_or(0.0).max(0.0),
+                resets_at: snapshot
+                    .get("resetDate")
+                    .and_then(Value::as_str)
+                    .and_then(iso_millis),
+            })
+        })
+        .collect()
+}
+
+fn digits(text: &str, start: usize, width: usize) -> Option<i64> {
+    let part = text.get(start..start + width)?;
+    part.bytes()
+        .all(|byte| byte.is_ascii_digit())
+        .then(|| part.parse().ok())
+        .flatten()
+}
+
+/// `YYYY-MM-DD`, optionally followed by `THH:MM[:SS[.fff]]` and `Z` or `±HH:MM`, as Unix ms.
+pub fn iso_millis(text: &str) -> Option<i64> {
+    let (year, month, day) = (
+        digits(text, 0, 4)?,
+        digits(text, 5, 2)?,
+        digits(text, 8, 2)?,
+    );
+    if text.get(4..5) != Some("-") || text.get(7..8) != Some("-") {
+        return None;
+    }
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    let shifted = if month <= 2 { year - 1 } else { year };
+    let era = shifted.div_euclid(400);
+    let of_era = shifted - era * 400;
+    let of_year = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
+    let of_cycle = of_era * 365 + of_era / 4 - of_era / 100 + of_year;
+    let days = era * 146_097 + of_cycle - 719_468;
+    let mut seconds = days * 86_400;
+    let rest = &text[10..];
+    if rest.is_empty() {
+        return Some(seconds * 1000);
+    }
+    if !rest.starts_with('T') && !rest.starts_with(' ') {
+        return None;
+    }
+    let (hour, minute) = (digits(rest, 1, 2)?, digits(rest, 4, 2)?);
+    if rest.get(3..4) != Some(":") || hour > 23 || minute > 59 {
+        return None;
+    }
+    seconds += hour * 3600 + minute * 60;
+    let mut tail = &rest[6..];
+    if let Some(after) = tail.strip_prefix(':') {
+        let second = digits(after, 0, 2).filter(|second| *second <= 60)?;
+        seconds += second;
+        tail = &after[2..];
+        if let Some(fraction) = tail.strip_prefix('.') {
+            let length = fraction.bytes().take_while(u8::is_ascii_digit).count();
+            if length == 0 {
+                return None;
+            }
+            tail = &fraction[length..];
+        }
+    }
+    let offset = match tail {
+        "" | "Z" | "z" => 0,
+        zone => {
+            let sign = match zone.get(..1)? {
+                "+" => 1,
+                "-" => -1,
+                _ => return None,
+            };
+            if zone.len() != 6 || zone.get(3..4) != Some(":") {
+                return None;
+            }
+            sign * (digits(zone, 1, 2)? * 3600 + digits(zone, 4, 2)? * 60)
+        }
+    };
+    Some((seconds - offset) * 1000)
+}
+
 /// No built-in tools, hooks, extensions, MCP, repository instructions or autonomous agents.
 /// ZVS supplies its transcript and executes injected tool calls through its own kernel.
 pub fn session_config(model: Option<&str>, directory: &str) -> Value {
@@ -249,6 +373,60 @@ mod tests {
     fn auto_keeps_the_model_default_effort_only() {
         assert_eq!(Choice::Auto.effort(None), Ok(None));
         assert!(Choice::Auto.effort(Some("high")).is_err());
+    }
+
+    #[test]
+    fn quota_snapshots_prefer_premium_requests_and_skip_absent_quotas() {
+        let snapshots = quota_snapshots(&json!({
+            "completions": {"entitlementRequests": 10, "usedRequests": 1},
+            "chat": {"isUnlimitedEntitlement": true, "entitlementRequests": -1,
+                "usedRequests": 4, "remainingPercentage": 100, "overage": 0},
+            "premium_interactions": {"isUnlimitedEntitlement": false, "entitlementRequests": 50,
+                "usedRequests": 12, "remainingPercentage": 76.4, "overage": 2,
+                "resetDate": "2026-11-01T00:00:00Z"}
+        }));
+        assert_eq!(snapshots.len(), 2);
+        assert_eq!(
+            snapshots[0],
+            QuotaSnapshot {
+                kind: QUOTA_PREMIUM,
+                unlimited: false,
+                entitlement: 50.0,
+                used: 12.0,
+                remaining_percent: 76.4,
+                overage: 2.0,
+                resets_at: Some(1_793_491_200_000),
+            }
+        );
+        assert!(snapshots[1].unlimited);
+        assert_eq!(snapshots[1].entitlement, 0.0);
+        assert!(
+            quota_snapshots(&json!({"premium_interactions": {"hasQuota": false,
+            "entitlementRequests": 50}}))
+            .is_empty()
+        );
+        assert!(quota_snapshots(&json!(null)).is_empty());
+    }
+
+    #[test]
+    fn iso_dates_become_unix_milliseconds() {
+        assert_eq!(iso_millis("1970-01-01"), Some(0));
+        assert_eq!(iso_millis("2026-11-01"), Some(1_793_491_200_000));
+        assert_eq!(iso_millis("2026-11-01T00:00:00Z"), Some(1_793_491_200_000));
+        assert_eq!(
+            iso_millis("2026-11-01T03:00:00.250+03:00"),
+            Some(1_793_491_200_000)
+        );
+        assert_eq!(iso_millis("2024-02-29T12:30"), Some(1_709_209_800_000));
+        for invalid in [
+            "soon",
+            "2026-13-01",
+            "2026-11-01X",
+            "2026-11-01T25:00",
+            "2026/11/01",
+        ] {
+            assert_eq!(iso_millis(invalid), None, "{invalid}");
+        }
     }
 
     #[test]

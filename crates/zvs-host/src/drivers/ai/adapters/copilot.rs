@@ -1,12 +1,14 @@
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock, Mutex, PoisonError};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use futures::StreamExt;
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AdapterFamily, AppError, AppErrorCode, AuthMode, DeltaKind, ModelCapability, ThinkingEffort,
-    ToolMode,
+    AdapterFamily, AppError, AppErrorCode, AuthMode, DeltaKind, ModelCapability, ProviderUsageDto,
+    ProviderUsageWindowDto, ThinkingEffort, ToolMode,
 };
 
 use super::account_family::flatten_prompt;
@@ -14,7 +16,7 @@ use crate::drivers::ai::capabilities::{AdapterCapabilities, Honours};
 use crate::drivers::ai::copilot::{Client, failure, protocol_error};
 use crate::drivers::ai::ports::{
     DeltaStream, DiscoveredModel, FinishReason, GenerateRequest, GenerateResult, SharedTextDriver,
-    TextDelta, TextGenerationDriver,
+    TextDelta, TextGenerationDriver, TokenUsage, TurnUsage,
 };
 use crate::drivers::ai::tool_dialect::{DefaultDialect, with_tool_dialect};
 
@@ -105,6 +107,109 @@ fn session_effort(
         .map_err(|_| AppError::new(AppErrorCode::ValidationFailed, EFFORT_UNSUPPORTED))
 }
 
+const USAGE_SOURCE: &str = "copilot";
+const QUOTA_TIMEOUT: Duration = Duration::from_secs(15);
+pub const QUOTA_PREMIUM_LABEL: &str = "Премиум-запросы";
+pub const QUOTA_CHAT_LABEL: &str = "Запросы в чате";
+pub const QUOTA_UNLIMITED: &str = "Без ограничений";
+pub const QUOTA_PENDING: &str = "Copilot передаёт остаток лимита вместе с ответом.";
+pub const QUOTA_OVERAGE: &str = "Запросов сверх лимита";
+
+/// The latest `quotaSnapshots` per identity, from the account quota call or a turn.
+static QUOTAS: LazyLock<Mutex<HashMap<String, (Value, i64)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn now_millis() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| {
+            i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX)
+        })
+}
+
+fn remember_quota(identity: &str, snapshots: &Value, at: i64) {
+    if snapshots.as_object().is_some_and(|map| !map.is_empty()) {
+        QUOTAS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(identity.to_owned(), (snapshots.clone(), at));
+    }
+}
+
+fn remembered_quota(identity: &str) -> Option<(Value, i64)> {
+    QUOTAS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .get(identity)
+        .cloned()
+}
+
+fn count(value: f64) -> String {
+    let rounded = value.round();
+    if rounded >= 1e15 {
+        return format!("{rounded:.0}");
+    }
+    let digits = format!("{rounded:.0}");
+    let mut grouped = String::with_capacity(digits.len() + digits.len() / 3);
+    for (index, digit) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
+            grouped.push('\u{a0}');
+        }
+        grouped.push(digit);
+    }
+    grouped
+}
+
+fn usage_report(snapshots: &Value, checked_at: i64) -> ProviderUsageDto {
+    let quotas = zvs_copilot::quota_snapshots(snapshots);
+    let windows: Vec<ProviderUsageWindowDto> = quotas
+        .iter()
+        .filter(|quota| !quota.unlimited)
+        .map(|quota| ProviderUsageWindowDto {
+            label: format!(
+                "{} · {} / {}",
+                if quota.kind == zvs_copilot::QUOTA_PREMIUM {
+                    QUOTA_PREMIUM_LABEL
+                } else {
+                    QUOTA_CHAT_LABEL
+                },
+                count(quota.used),
+                count(quota.entitlement)
+            ),
+            used_percent: 100.0 - quota.remaining_percent,
+            resets_at: quota.resets_at,
+        })
+        .collect();
+    let overage: f64 = quotas.iter().map(|quota| quota.overage).sum();
+    let detail = if overage > 0.0 {
+        Some(format!("{QUOTA_OVERAGE}: {}", count(overage)))
+    } else if windows.is_empty() && !quotas.is_empty() {
+        Some(QUOTA_UNLIMITED.to_owned())
+    } else if quotas.is_empty() {
+        Some(QUOTA_PENDING.to_owned())
+    } else {
+        None
+    };
+    ProviderUsageDto {
+        source: USAGE_SOURCE.to_owned(),
+        windows,
+        detail,
+        checked_at,
+    }
+}
+
+fn tokens(value: &Value) -> Option<i64> {
+    value.as_i64().filter(|count| *count >= 0)
+}
+
+fn call_usage(data: &Value) -> TurnUsage {
+    TurnUsage {
+        input_tokens: tokens(&data["inputTokens"]),
+        output_tokens: tokens(&data["outputTokens"]),
+        context_window: None,
+    }
+}
+
 enum TurnEvent {
     Delta(TextDelta),
     Done,
@@ -125,6 +230,18 @@ fn decode(event: &Value) -> Result<TurnEvent, AppError> {
                 },
             ))
         }
+        Some("assistant.usage") => Ok(TurnEvent::Delta(TextDelta::Usage(call_usage(
+            &event["data"],
+        )))),
+        Some("session.usage_info") => Ok(
+            match tokens(&event["data"]["tokenLimit"]).filter(|limit| *limit > 0) {
+                Some(limit) => TurnEvent::Delta(TextDelta::Usage(TurnUsage {
+                    context_window: Some(limit),
+                    ..TurnUsage::default()
+                })),
+                None => TurnEvent::Ignore,
+            },
+        ),
         Some("session.idle") => Ok(TurnEvent::Done),
         Some("session.error" | "session.shutdown") => Err(failure()),
         _ => Ok(TurnEvent::Ignore),
@@ -144,6 +261,25 @@ impl TextGenerationDriver for CopilotAdapter {
         let mut client = Client::start(cancel).await?;
         client.auth(Some(&self.identity)).await?;
         Ok(catalog(client.models().await?))
+    }
+
+    async fn usage(
+        &self,
+        cancel: &CancellationToken,
+    ) -> Result<Option<ProviderUsageDto>, AppError> {
+        let live = tokio::time::timeout(QUOTA_TIMEOUT, async {
+            let mut client = Client::start(cancel).await?;
+            client.auth(Some(&self.identity)).await?;
+            client.call("account.getQuota", json!({})).await
+        })
+        .await;
+        let now = now_millis();
+        if let Ok(Ok(result)) = &live {
+            remember_quota(&self.identity, &result["quotaSnapshots"], now);
+        }
+        let (snapshots, checked_at) =
+            remembered_quota(&self.identity).unwrap_or((Value::Null, now));
+        Ok(Some(usage_report(&snapshots, checked_at)))
     }
 
     fn stream(&self, request: &GenerateRequest, cancel: &CancellationToken) -> DeltaStream {
@@ -166,7 +302,7 @@ impl TextGenerationDriver for CopilotAdapter {
                     json!({"sessionId":session, "prompt":flatten_prompt(&request)}),
                 )
                 .await?;
-            Ok::<_, AppError>((client, session))
+            Ok::<_, AppError>((client, session, identity))
         };
         futures::stream::once(start)
             .flat_map(|result| {
@@ -176,18 +312,23 @@ impl TextGenerationDriver for CopilotAdapter {
                 };
                 futures::stream::unfold(Some(state), |state| async move {
                     let state = state?;
-                    let (mut client, session) = match state {
+                    let (mut client, session, identity) = match state {
                         Ok(state) => state,
                         Err(mut error) => return error.take().map(|error| (Err(error), None)),
                     };
                     loop {
-                        match client
-                            .event(&session)
-                            .await
-                            .and_then(|event| decode(&event))
-                        {
+                        match client.event(&session).await.and_then(|event| {
+                            if event["type"] == "assistant.usage" {
+                                remember_quota(
+                                    &identity,
+                                    &event["data"]["quotaSnapshots"],
+                                    now_millis(),
+                                );
+                            }
+                            decode(&event)
+                        }) {
                             Ok(TurnEvent::Delta(delta)) => {
-                                return Some((Ok(delta), Some(Ok((client, session)))));
+                                return Some((Ok(delta), Some(Ok((client, session, identity)))));
                             }
                             Ok(TurnEvent::Done) => return None,
                             Ok(TurnEvent::Ignore) => {}
@@ -207,12 +348,19 @@ impl TextGenerationDriver for CopilotAdapter {
         let mut stream = self.stream(request, cancel);
         let mut text = String::new();
         let mut reasoning = String::new();
+        let mut usage = TurnUsage::default();
         while let Some(delta) = stream.next().await {
-            if let TextDelta::Content { text: delta, kind } = delta? {
-                match kind {
-                    DeltaKind::Text => text.push_str(&delta),
-                    DeltaKind::Reasoning => reasoning.push_str(&delta),
-                }
+            match delta? {
+                TextDelta::Content {
+                    text: delta,
+                    kind: DeltaKind::Text,
+                } => text.push_str(&delta),
+                TextDelta::Content {
+                    text: delta,
+                    kind: DeltaKind::Reasoning,
+                } => reasoning.push_str(&delta),
+                TextDelta::Usage(reported) => usage.merge(reported),
+                TextDelta::ToolCall(_) | TextDelta::WebSources(_) => {}
             }
         }
         Ok(GenerateResult {
@@ -220,7 +368,14 @@ impl TextGenerationDriver for CopilotAdapter {
             text,
             reasoning: (!reasoning.is_empty()).then_some(reasoning),
             finish_reason: FinishReason::Stop,
-            usage: None,
+            usage: usage.counted().then(|| TokenUsage {
+                prompt_tokens: usage.input_tokens,
+                completion_tokens: usage.output_tokens,
+                total_tokens: usage
+                    .input_tokens
+                    .zip(usage.output_tokens)
+                    .map(|(input, output)| input.saturating_add(output)),
+            }),
             tool_calls: Vec::new(),
         })
     }
@@ -302,6 +457,104 @@ mod tests {
                 .message,
             MODEL_UNAVAILABLE
         );
+    }
+
+    fn usage_of(event: &Value) -> TurnUsage {
+        match decode(event).expect("decodes") {
+            TurnEvent::Delta(TextDelta::Usage(usage)) => usage,
+            _ => panic!("a usage delta"),
+        }
+    }
+
+    #[test]
+    fn call_usage_reports_tokens_and_the_window_comes_from_usage_info() {
+        let usage = usage_of(&json!({"type":"assistant.usage", "data":{
+            "model":"gpt-6.1-sol", "isAuto":true, "inputTokens":1200, "outputTokens":300}}));
+        assert_eq!(usage.input_tokens, Some(1200));
+        assert_eq!(usage.output_tokens, Some(300));
+        assert_eq!(usage.context_window, None);
+
+        let window = usage_of(&json!({"type":"session.usage_info", "data":{
+            "currentTokens":900, "tokenLimit":128000, "messagesLength":2}}));
+        assert_eq!(window.context_window, Some(128_000));
+        assert!(!window.counted());
+        assert!(matches!(
+            decode(&json!({"type":"session.usage_info", "data":{"tokenLimit":0}})).unwrap(),
+            TurnEvent::Ignore
+        ));
+    }
+
+    #[test]
+    fn quota_snapshots_become_provider_limit_windows() {
+        let report = usage_report(
+            &json!({
+                "chat": {"isUnlimitedEntitlement": true, "entitlementRequests": -1,
+                    "usedRequests": 0, "remainingPercentage": 100, "overage": 0},
+                "premium_interactions": {"isUnlimitedEntitlement": false,
+                    "entitlementRequests": 1500, "usedRequests": 1200, "remainingPercentage": 20,
+                    "overage": 0, "resetDate": "2026-11-01T00:00:00Z"}
+            }),
+            7,
+        );
+        assert_eq!(report.source, USAGE_SOURCE);
+        assert_eq!(report.checked_at, 7);
+        assert_eq!(
+            report.windows,
+            [ProviderUsageWindowDto {
+                label: format!("{QUOTA_PREMIUM_LABEL} · 1\u{a0}200 / 1\u{a0}500"),
+                used_percent: 80.0,
+                resets_at: Some(1_793_491_200_000),
+            }]
+        );
+        assert_eq!(report.detail, None);
+        zvs_contract::Validate::validate(&report).expect("a valid report");
+
+        let unlimited = usage_report(
+            &json!({"chat": {"isUnlimitedEntitlement": true, "entitlementRequests": -1}}),
+            1,
+        );
+        assert!(unlimited.windows.is_empty());
+        assert_eq!(unlimited.detail.as_deref(), Some(QUOTA_UNLIMITED));
+
+        let over = usage_report(
+            &json!({"premium_interactions": {"entitlementRequests": 50, "usedRequests": 50,
+                "remainingPercentage": 0, "overage": 3}}),
+            1,
+        );
+        assert_eq!(over.windows[0].used_percent, 100.0);
+        assert_eq!(over.detail, Some(format!("{QUOTA_OVERAGE}: 3")));
+        assert_eq!(
+            usage_report(&Value::Null, 1).detail.as_deref(),
+            Some(QUOTA_PENDING)
+        );
+    }
+
+    #[test]
+    fn a_turn_remembers_the_latest_quota_for_its_identity() {
+        let identity = "github.com/quota-test";
+        assert!(remembered_quota(identity).is_none());
+        remember_quota(identity, &json!({}), 1);
+        assert!(remembered_quota(identity).is_none());
+        remember_quota(identity, &json!({"chat": {"entitlementRequests": 10}}), 2);
+        assert_eq!(remembered_quota(identity).map(|(_, at)| at), Some(2));
+    }
+
+    #[test]
+    fn usage_from_several_calls_adds_up_and_keeps_the_latest_window() {
+        let mut total = TurnUsage::default();
+        total.merge(TurnUsage {
+            input_tokens: Some(100),
+            output_tokens: Some(10),
+            context_window: Some(64_000),
+        });
+        total.merge(TurnUsage {
+            input_tokens: Some(150),
+            output_tokens: None,
+            context_window: None,
+        });
+        assert_eq!(total.input_tokens, Some(250));
+        assert_eq!(total.output_tokens, Some(10));
+        assert_eq!(total.context_window, Some(64_000));
     }
 
     #[test]

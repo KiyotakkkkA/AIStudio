@@ -627,7 +627,7 @@ mod tests {
             .iter()
             .filter_map(|delta| match delta {
                 TextDelta::Content { text, .. } => Some(text.clone()),
-                TextDelta::ToolCall(_) | TextDelta::WebSources(_) => None,
+                TextDelta::ToolCall(_) | TextDelta::WebSources(_) | TextDelta::Usage(_) => None,
             })
             .collect()
     }

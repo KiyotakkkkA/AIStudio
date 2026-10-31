@@ -43,6 +43,24 @@ pub fn files(count: u64) -> String {
     plural(count, "файл", "файла", "файлов")
 }
 
+/// Unix milliseconds as a UTC `DD.MM.YYYY` day.
+pub fn date(millis: i64) -> String {
+    let days = millis.div_euclid(86_400_000) + 719_468;
+    let era = days.div_euclid(146_097);
+    let of_era = days - era * 146_097;
+    let year_of_era = (of_era - of_era / 1460 + of_era / 36_524 - of_era / 146_096) / 365;
+    let of_year = of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_index = (5 * of_year + 2) / 153;
+    let day = of_year - (153 * month_index + 2) / 5 + 1;
+    let month = if month_index < 10 {
+        month_index + 3
+    } else {
+        month_index - 9
+    };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    format!("{day:02}.{month:02}.{year}")
+}
+
 pub fn percent(part: u64, whole: u64) -> String {
     if whole == 0 {
         return "0\u{a0}%".to_owned();
@@ -71,5 +89,13 @@ mod tests {
         assert_eq!(tokens(21), "21 токен");
         assert_eq!(messages(112), "112 сообщений");
         assert_eq!(percent(1, 4), "25\u{a0}%");
+    }
+
+    #[test]
+    fn milliseconds_read_as_ru_ru_days() {
+        assert_eq!(date(0), "01.01.1970");
+        assert_eq!(date(1_793_491_200_000), "01.11.2026");
+        assert_eq!(date(1_709_209_800_000), "29.02.2024");
+        assert_eq!(date(-86_400_000), "31.12.1969");
     }
 }

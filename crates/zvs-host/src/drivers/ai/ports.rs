@@ -179,11 +179,39 @@ pub struct GenerateResult {
     pub tool_calls: Vec<ToolCall>,
 }
 
+/// Usage a vendor reported for one model call. Counts add up across calls in a turn; the
+/// context window describes the latest call.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TurnUsage {
+    pub input_tokens: Option<i64>,
+    pub output_tokens: Option<i64>,
+    pub context_window: Option<i64>,
+}
+
+impl TurnUsage {
+    pub fn merge(&mut self, next: Self) {
+        let add = |total: Option<i64>, more: Option<i64>| match (total, more) {
+            (Some(total), Some(more)) => Some(total.saturating_add(more)),
+            (total, more) => total.or(more),
+        };
+        self.input_tokens = add(self.input_tokens, next.input_tokens);
+        self.output_tokens = add(self.output_tokens, next.output_tokens);
+        if next.context_window.is_some() {
+            self.context_window = next.context_window;
+        }
+    }
+
+    pub const fn counted(&self) -> bool {
+        self.input_tokens.is_some() || self.output_tokens.is_some()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TextDelta {
     Content { text: String, kind: DeltaKind },
     ToolCall(ToolCall),
     WebSources(Vec<WebSourceDto>),
+    Usage(TurnUsage),
 }
 
 impl TextDelta {

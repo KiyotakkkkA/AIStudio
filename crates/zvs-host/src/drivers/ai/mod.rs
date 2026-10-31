@@ -21,7 +21,7 @@ pub use http::{HttpClient, HttpClientOptions, ProxyMode};
 pub use ports::{
     AiDriver, ChatMessage, ChatRole, DeltaStream, DiscoveredModel, EmbeddingDriver, FinishReason,
     GenerateRequest, GenerateResult, ImageDriver, TextDelta, TextGenerationDriver, TokenUsage,
-    ToolCall, ToolSpec,
+    ToolCall, ToolSpec, TurnUsage,
 };
 pub use registry::{
     AccountPort, AccountSnapshot, DatabaseAccounts, DatabaseProviders, ProviderRegistry,

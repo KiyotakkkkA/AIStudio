@@ -1,7 +1,7 @@
 use zvs_contract::{
     ChatContextDto, CliTheme, ConversationDto, ConversationId, ExecJudgeDto, ExecMode,
     ExecPolicyDto, McpServerDto, McpServerId, McpServerStatus, ModelCapability, ProviderDto,
-    SkillDto, SkillId, SkillSource, SkillStatus, ThinkingEffort,
+    ProviderUsageDto, SkillDto, SkillId, SkillSource, SkillStatus, ThinkingEffort,
 };
 
 use super::ModelChoice;
@@ -125,6 +125,7 @@ pub struct Overlay {
     pub capturing: Option<Shortcut>,
     pub conversations: Vec<ConversationDto>,
     pub context: Option<ChatContextDto>,
+    pub usage: Option<ProviderUsageDto>,
     pub skills: Vec<SkillDto>,
     pub servers: Vec<McpServerDto>,
 }
@@ -448,6 +449,33 @@ fn context_rows(overlay: &Overlay) -> Vec<Row> {
                 .tone(Tone::Warn),
         );
     }
+    if let Some(usage) = &overlay.usage {
+        rows.extend(limit_rows(usage));
+    }
+    rows
+}
+
+fn limit_rows(usage: &ProviderUsageDto) -> Vec<Row> {
+    let mut rows: Vec<Row> = usage
+        .windows
+        .iter()
+        .enumerate()
+        .map(|(index, window)| {
+            let used = window.used_percent.clamp(0.0, 100.0);
+            Row::new(format!("limit-{index}"), "◷", window.label.clone())
+                .meta(format!("{} {}\u{a0}%", copy::LIMIT_USED, used.round()))
+                .gauge(used / 100.0)
+                .tone(if used >= 85.0 { Tone::Warn } else { Tone::Good })
+                .detail(
+                    window
+                        .resets_at
+                        .map(|at| format!("{} {}", copy::LIMIT_RESETS, format::date(at))),
+                )
+        })
+        .collect();
+    if let Some(detail) = &usage.detail {
+        rows.push(Row::new("limit-detail", "◷", detail.clone()).tone(Tone::Faint));
+    }
     rows
 }
 
@@ -662,6 +690,7 @@ impl Overlay {
             capturing: None,
             conversations: Vec::new(),
             context: None,
+            usage: None,
             skills: Vec::new(),
             servers: Vec::new(),
         }
@@ -910,6 +939,39 @@ mod tests {
         assert_eq!(rows[overlay.selected].key, CliTheme::Moss.as_str());
         assert_eq!(rows[overlay.selected].meta, copy::THEME_CURRENT);
         assert_eq!(rows[0].action, Some(Action::SetTheme(CliTheme::Ember)));
+    }
+
+    #[test]
+    fn provider_limits_follow_the_context_breakdown() {
+        let mut overlay = Overlay::new(Panel::Context);
+        overlay.context = Some(
+            serde_json::from_value(json!({
+                "contextWindow": 1000, "reservedOutput": 100, "system": 50, "tools": 0,
+                "toolItems": [], "history": 0, "historyMessages": 0, "trimmed": 0, "total": 50
+            }))
+            .expect("context"),
+        );
+        overlay.usage = Some(
+            serde_json::from_value(json!({
+                "source": "copilot", "checkedAt": 1,
+                "windows": [{ "label": "Премиум-запросы · 40 / 50", "usedPercent": 90,
+                    "resetsAt": 1_793_491_200_000_i64 }],
+                "detail": "Запросов сверх лимита: 3"
+            }))
+            .expect("usage"),
+        );
+        let providers = providers();
+        let view = view(&providers);
+        let rows = overlay.rows(&view);
+        let limit = &rows[rows.len() - 2];
+        assert_eq!(limit.title, "Премиум-запросы · 40 / 50");
+        assert_eq!(limit.gauge, Some(0.9));
+        assert_eq!(limit.tone, Tone::Warn);
+        assert_eq!(limit.meta, format!("{} 90\u{a0}%", copy::LIMIT_USED));
+        assert_eq!(limit.detail, [format!("{} 01.11.2026", copy::LIMIT_RESETS)]);
+        let detail = rows.last().expect("a detail row");
+        assert_eq!(detail.title, "Запросов сверх лимита: 3");
+        assert_eq!(detail.tone, Tone::Faint);
     }
 
     #[test]

@@ -113,6 +113,21 @@ impl<'c> ModelRepository<'c> {
             .optional()
     }
 
+    /// Records the context window a vendor reported for a turn, for models whose catalog
+    /// entry has none (Copilot auto selection resolves per turn).
+    pub fn set_context_window(
+        &self,
+        provider_id: &str,
+        external_id: &str,
+        window: i64,
+    ) -> rusqlite::Result<usize> {
+        self.connection
+            .prepare_cached(
+                "UPDATE model SET context_window = ?3 WHERE provider_id = ?1 AND external_id = ?2",
+            )?
+            .execute(params![provider_id, external_id, window])
+    }
+
     pub fn replace_for_provider(
         &self,
         provider_id: &str,
@@ -125,16 +140,16 @@ impl<'c> ModelRepository<'c> {
         let previous = self
             .list_by_provider(provider_id, false)?
             .into_iter()
-            .map(|row| (row.external_id, row.id))
+            .map(|row| (row.external_id, (row.id, row.context_window)))
             .collect::<HashMap<_, _>>();
         self.connection
             .prepare_cached("DELETE FROM model WHERE provider_id = ?1")?
             .execute([provider_id])?;
         for draft in models {
-            let id = previous
-                .get(&draft.external_id)
-                .cloned()
-                .unwrap_or_else(|| new_id().hyphenated().to_string());
+            let (id, measured) = previous.get(&draft.external_id).cloned().map_or_else(
+                || (new_id().hyphenated().to_string(), None),
+                |(id, window)| (id, window),
+            );
             self.connection
                 .prepare_cached(
                     "INSERT INTO model (id, provider_id, external_id, is_free, no_training, display_name, family, context_window, max_output, size_bytes, capabilities, available, unavailable_reason, discovered_at) \
@@ -148,7 +163,7 @@ impl<'c> ModelRepository<'c> {
                     draft.no_training,
                     draft.display_name,
                     draft.family,
-                    draft.context_window,
+                    draft.context_window.or(measured),
                     draft.max_output,
                     draft.size_bytes,
                     json_text(&draft.capabilities)?,

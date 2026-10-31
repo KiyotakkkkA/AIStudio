@@ -26,15 +26,33 @@ Each model step runs in a fresh session with an empty working directory, built-i
 disabled, configuration discovery disabled, no skills, plugins, custom instructions or
 repository hooks, and remote mode off. ZVS tool calls use the existing injected dialect
 and host permission gate. Unexpected server requests are refused. Children are killed on
-completion, failure, cancellation and stream drop. Provider usage is unavailable; it is
-not estimated locally.
+completion, failure, cancellation and stream drop.
+
+Usage comes from the turn's own events. `assistant.usage` (one per model call) supplies input
+and output tokens; they add up across calls and replace the local estimate on the message.
+`session.usage_info.tokenLimit` is the window of the model that served the turn; it is saved on
+that model row (and kept across model refreshes that report none), so `auto` shows a real window
+in the context meter from the second turn on.
+
+Limits use the provider usage hook (`providers.usage`, the «Лимиты провайдера» block and the CLI
+`/context` panel). The adapter calls `account.getQuota` (name inferred from the SDK's
+`AccountGetQuotaRequest`/`AccountGetQuotaResult` types; an unknown method is ignored) and otherwise
+shows the last `quotaSnapshots` seen in an `assistant.usage` event, kept in memory per identity.
+`premium_interactions` comes first, then `chat`; `hasQuota: false` is skipped and
+`entitlementRequests: -1` or `isUnlimitedEntitlement` means unlimited. Before the first turn after
+a restart, and without the account call, the block says the remainder arrives with the answer.
+`session.quota.*` is not called: its result type was not published at the time of writing.
 
 Desktop: choose GitHub Copilot in the account sign-in menu, then select its models in the
 composer. CLI: `/copilot` signs in and discovers models; `/models` selects a model and
-`/effort` configures supported reasoning. Esc cancels sign-in. The pipe exposes only the
-Copilot-specific login/cancel channels, not general account or provider editing.
+`/effort` configures supported reasoning. Esc cancels sign-in; `/context` also shows the limits. The pipe
+exposes only the Copilot-specific login/cancel channels and the read-only `providers.usage`, not
+general account or provider editing.
 
 Protocol observations checked 2026-10-31 against Copilot CLI 1.0.105 (protocol 3).
+Usage field names (`AssistantUsageData`, `AssistantUsageQuotaSnapshot`, `UsageInfoData`) were
+read from copilot-sdk `generated/session-events.ts`, and `AccountQuotaSnapshot` from
+`generated/rpc.ts`, on 2026-10-31. No real quota response has been captured yet.
 The `auto` sentinel and the Free/Student routing were taken from the copilot-sdk generated RPC
 types and GitHub's auto model selection docs on 2026-10-31; a real Free-plan turn was not run.
 Unauthenticated status and isolated session creation were verified with the real executable;

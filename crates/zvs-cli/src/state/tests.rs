@@ -730,3 +730,30 @@ fn the_effort_shortcut_opens_the_panel() {
         Some(Panel::Effort)
     );
 }
+
+#[test]
+fn the_context_panel_also_asks_for_the_provider_limits() {
+    let mut app = ready();
+    typed(&mut app, "/context");
+    let requests = app.update(Msg::Key(Key::Enter));
+    let provider = app.model.as_ref().expect("a model").provider;
+    assert!(
+        matches!(requests.as_slice(), [Request::Context { .. }, Request::Usage(id)] if *id == provider)
+    );
+    let usage: zvs_contract::ProviderUsageDto = serde_json::from_value(json!({
+        "source": "copilot", "windows": [], "detail": null, "checkedAt": 1
+    }))
+    .expect("usage");
+    app.update(Msg::Usage(Ok(Some(usage.clone()))));
+    assert_eq!(
+        app.overlay
+            .as_ref()
+            .and_then(|overlay| overlay.usage.clone()),
+        Some(usage)
+    );
+    app.update(Msg::Usage(Err(AppError::new(
+        zvs_contract::AppErrorCode::ProviderUnreachable,
+        "x",
+    ))));
+    assert!(app.status.is_none());
+}

@@ -255,6 +255,8 @@ pub const CONTEXT_HISTORY: &str = "История";
 pub const CONTEXT_RESERVED: &str = "Резерв для ответа";
 pub const CONTEXT_FREE: &str = "Свободно";
 pub const CONTEXT_TRIMMED: &str = "Сокращено сообщений";
+pub const LIMIT_USED: &str = "использовано";
+pub const LIMIT_RESETS: &str = "Обновится";
 pub const CONTEXT_NEEDS_MODEL: &str = "Выберите модель через /models";
 
 pub const SKILLS_TITLE: &str = "Навыки";

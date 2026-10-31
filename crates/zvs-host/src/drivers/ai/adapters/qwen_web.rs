@@ -838,7 +838,7 @@ impl TextGenerationDriver for QwenWebAdapter {
                     zvs_contract::DeltaKind::Text => text.push_str(&chunk),
                 },
                 TextDelta::ToolCall(call) => tool_calls.push(call),
-                TextDelta::WebSources(_) => {}
+                TextDelta::WebSources(_) | TextDelta::Usage(_) => {}
             }
         }
         let summary = mem::take(&mut *summary.lock().unwrap_or_else(PoisonError::into_inner));

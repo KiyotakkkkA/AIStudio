@@ -12,8 +12,8 @@ use zvs_contract::{
     ChatAttachDto, ChatContextDto, ChatSendInput, ChatSkipInput, CliSessionDto, CliTheme,
     ConversationDetailDto, ConversationDto, ConversationId, ExecMode, ExecPolicyDto,
     FolderAccessAnswer, FolderGrantScope, HostEvent, HostEventDraft, McpServerDto, McpServerId,
-    McpServerStatus, PolicyRuleDto, ProviderDto, ProviderId, RunHandleDto, RunId, RunOutcomeStatus,
-    SkillDto, SkillId, ThinkingEffort, WorkingFolderAccess,
+    McpServerStatus, PolicyRuleDto, ProviderDto, ProviderId, ProviderUsageDto, RunHandleDto, RunId,
+    RunOutcomeStatus, SkillDto, SkillId, ThinkingEffort, WorkingFolderAccess,
 };
 
 use self::input::Input;
@@ -141,6 +141,7 @@ pub enum Request {
     },
     Skills,
     Servers,
+    Usage(ProviderId),
     SetSkill {
         id: SkillId,
         enabled: bool,
@@ -180,6 +181,7 @@ pub enum Msg {
     Loaded(Result<ConversationDetailDto, AppError>),
     Attached(Result<Option<ChatAttachDto>, AppError>),
     Context(Result<ChatContextDto, AppError>),
+    Usage(Result<Option<ProviderUsageDto>, AppError>),
     Skills(Result<Vec<SkillDto>, AppError>),
     Servers(Result<Vec<McpServerDto>, AppError>),
     SkillChanged(Result<SkillDto, AppError>),
@@ -604,6 +606,12 @@ impl App {
                 }
                 Vec::new()
             }
+            Msg::Usage(result) => {
+                if let (Ok(usage), Some(overlay)) = (result, self.overlay_for(Panel::Context)) {
+                    overlay.usage = usage;
+                }
+                Vec::new()
+            }
             Msg::Skills(result) => {
                 match result {
                     Ok(list) => {
@@ -1016,14 +1024,17 @@ impl App {
             Panel::Mcp => vec![Request::Servers],
             Panel::Permissions => vec![Request::Policy],
             Panel::Context => match &self.model {
-                Some(model) => vec![Request::Context {
-                    conversation: self
-                        .conversation
-                        .as_ref()
-                        .map(|conversation| conversation.id),
-                    provider: model.provider,
-                    model: model.model.clone(),
-                }],
+                Some(model) => vec![
+                    Request::Context {
+                        conversation: self
+                            .conversation
+                            .as_ref()
+                            .map(|conversation| conversation.id),
+                        provider: model.provider,
+                        model: model.model.clone(),
+                    },
+                    Request::Usage(model.provider),
+                ],
                 None => {
                     self.status = Some((Tone::Info, copy::CONTEXT_NEEDS_MODEL.to_owned()));
                     return Vec::new();

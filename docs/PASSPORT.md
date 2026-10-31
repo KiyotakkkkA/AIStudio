@@ -364,6 +364,9 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
   allowed. Login links only the active GitHub Copilot identity, creates its account-mode
   text provider if needed, and discovers models through the existing services. No caller
   supplied URL, credential, account family or provider patch is accepted.
+  Limits (2026-10-31): `providers.usage` is allowed for the `/context` panel. It is read-only,
+  takes only a provider id and returns the same `ProviderUsageDto` the studio meter shows;
+  no credential, account detail or provider setting leaves the host.
 - **Same events, same answers.** CLI connections are extra event-bus subscribers beside the
   window. An approval or a question reaches both; the first answer wins and the other side
   sees `Conflict`.

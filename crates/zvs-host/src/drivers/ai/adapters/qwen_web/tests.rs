@@ -344,7 +344,9 @@ async fn the_qwen_family_opens_a_chat_and_streams_reasoning_and_answer_as_distin
         .iter()
         .map(|delta| match delta {
             TextDelta::Content { kind, .. } => *kind,
-            TextDelta::ToolCall(_) | TextDelta::WebSources(_) => panic!("no tool calls"),
+            TextDelta::ToolCall(_) | TextDelta::WebSources(_) | TextDelta::Usage(_) => {
+                panic!("no tool calls")
+            }
         })
         .collect::<Vec<_>>();
     assert_eq!(

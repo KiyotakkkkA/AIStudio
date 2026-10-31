@@ -258,6 +258,10 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             Msg::Context(link.call("chat.context", &input).await)
         }
         Request::Skills => Msg::Skills(link.call("skills.list", &()).await),
+        Request::Usage(provider) => Msg::Usage(
+            link.call("providers.usage", &json!({ "id": provider }))
+                .await,
+        ),
         Request::Servers => Msg::Servers(link.call("mcp.list", &()).await),
         Request::SetSkill { id, enabled } => Msg::SkillChanged(
             link.call(

@@ -248,7 +248,7 @@ impl TextGenerationDriver for OpenaiAdapter {
                     result.reasoning.get_or_insert_default().push_str(&text)
                 }
                 Event::Delta(TextDelta::ToolCall(call)) => result.tool_calls.push(call),
-                Event::Delta(TextDelta::WebSources(_)) => {}
+                Event::Delta(TextDelta::WebSources(_) | TextDelta::Usage(_)) => {}
                 Event::Completed(usage) => result.usage = usage,
             }
         }
