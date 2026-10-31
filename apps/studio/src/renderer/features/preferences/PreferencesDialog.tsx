@@ -41,8 +41,12 @@ import {
   CLI_NOT_BUNDLED,
   CLI_NOT_INSTALLED,
   CLI_SETTING_ID,
+  CLI_THEME_HINT,
+  CLI_THEME_LABEL,
+  CLI_THEME_SETTING_ID,
   CLI_UNINSTALL,
 } from "./cliCopy";
+import CliThemes from "./CliThemes";
 import {
   FONT_FAMILIES,
   FONT_SIZES,
@@ -136,7 +140,7 @@ import {
 } from "../voice/voiceCopy";
 import { formatBytes } from "../downloads/downloadPresentation";
 import { DISABLED_NOTE, ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
-import { aboutSettingId, SETTING_ENTRIES, SETTING_IDS } from "./settingsIndex";
+import { aboutSettingId, SETTING_ENTRIES, SETTING_IDS, type AboutGroup } from "./settingsIndex";
 import {
   PROFILE_ABOUT_MAX,
   PROFILE_STYLE_MAX,
@@ -217,15 +221,17 @@ const SettingRow = observer(function SettingRow({
 });
 
 const InfoTableRows = observer(function InfoTableRows({
+  group,
   rows,
 }: {
+  readonly group: AboutGroup;
   readonly rows: readonly InfoRow[];
 }) {
   const { ui } = useStore();
   return (
     <dl className="m-0 grid grid-cols-[minmax(10rem,auto)_1fr] gap-x-6 gap-y-2.5 text-[13px]">
       {rows.map((row) => {
-        const id = aboutSettingId(row.label);
+        const id = aboutSettingId(group, row.label);
         const tone = ui.preferenceTarget === id ? "bg-accent-soft" : "";
         return (
           <div key={row.label} className="contents">
@@ -622,6 +628,15 @@ const CliSection = observer(function CliSection() {
           )}
         </div>
       </SettingRow>
+      <SettingRow
+        id={CLI_THEME_SETTING_ID}
+        label={CLI_THEME_LABEL}
+        hint={CLI_THEME_HINT}
+        error={cli.themeError ?? undefined}
+        stacked
+      >
+        <CliThemes />
+      </SettingRow>
     </div>
   );
 });
@@ -912,13 +927,13 @@ const AboutSection = observer(function AboutSection() {
         <h3 className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           Приложение
         </h3>
-        <InfoTableRows rows={appRows()} />
+        <InfoTableRows group="app" rows={appRows()} />
       </section>
       <section className="flex flex-col gap-3">
         <h3 className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
           {SECTION_LABELS.cli}
         </h3>
-        <InfoTableRows rows={cliRows()} />
+        <InfoTableRows group="cli" rows={cliRows()} />
       </section>
     </div>
   );

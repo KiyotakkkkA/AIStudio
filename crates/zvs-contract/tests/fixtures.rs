@@ -1083,6 +1083,7 @@ const TABLE: &[(&str, Check)] = &[
         "cli/CliInstallDto",
         round_trip::<zvs_contract::CliInstallDto>,
     ),
+    ("cli/CliThemeDto", round_trip::<zvs_contract::CliThemeDto>),
     (
         "voice/RecordingDeviceDto",
         round_trip::<zvs_contract::RecordingDeviceDto>,

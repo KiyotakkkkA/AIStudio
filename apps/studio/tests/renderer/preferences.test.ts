@@ -15,6 +15,7 @@ import {
   PREFERENCE_GROUPS,
   SECTION_LABELS,
   SETTING_SAVE_FAILED,
+  CLI_ROW_LABELS,
   cliRows,
   fontSizeLabel,
   fontStack,
@@ -80,9 +81,8 @@ test("fonts and sizes map to a font stack and an interface zoom", () => {
 
 test("the about section describes the CLI from the app environment", () => {
   const rows = cliRows();
-  expect(rows.map((row) => row.label)).toEqual(["Версия CLI", "Канал CLI"]);
-  expect(rows[0]?.value).toBe(CLI_VERSION);
-  expect(rows[1]?.value).toBe(CLI_CHANNEL);
+  expect(rows.map((row) => row.label)).toEqual([CLI_ROW_LABELS.version]);
+  expect(rows[0]?.value).toBe(`${CLI_CHANNEL} v${CLI_VERSION}`);
 });
 
 function appSettings(seed: Record<string, Json> = {}) {

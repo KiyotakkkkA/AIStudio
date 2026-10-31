@@ -1,16 +1,18 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::enums::wire_enum;
 use crate::errors::AppError;
 use crate::events::HostEvent;
 use crate::folders::{WorkingFolderAccess, check_folder_path};
-use crate::validate::{Validate, check, invalid};
+use crate::validate::{Validate, check, invalid, no_refinements};
 
 pub const CLI_COMMAND: &str = "aistudio";
 pub const CLI_PROTOCOL_VERSION: u32 = 1;
 pub const CLI_LINE_MAX: usize = 8 * 1024 * 1024;
 pub const CLI_PIPE_PREFIX: &str = r"\\.\pipe\zvs-ai-studio-cli-";
 pub const CLI_LAUNCH_ARG: &str = "--cli";
+pub const CLI_THEME_FILE: &str = "theme.json";
 
 pub fn cli_pipe_name(user_sid: &str) -> String {
     format!("{CLI_PIPE_PREFIX}{user_sid}")
@@ -101,6 +103,30 @@ impl Validate for CliInstallDto {
     }
 }
 
+wire_enum!(CliTheme {
+    Ember => "ember",
+    Graphite => "graphite",
+    Moss => "moss",
+    Dusk => "dusk",
+    Frost => "frost",
+});
+
+#[allow(clippy::derivable_impls)]
+impl Default for CliTheme {
+    fn default() -> Self {
+        Self::Ember
+    }
+}
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CliThemeDto {
+    pub theme: CliTheme,
+}
+
+no_refinements!(CliThemeDto);
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -155,6 +181,19 @@ mod tests {
                 .expect("parses"),
             CliClientMessage::FocusVerification
         );
+    }
+
+    #[test]
+    fn a_theme_is_named_on_the_wire_and_defaults_to_ember() {
+        assert_eq!(
+            serde_json::to_value(CliThemeDto {
+                theme: CliTheme::Graphite
+            })
+            .expect("serialises"),
+            json!({ "theme": "graphite" })
+        );
+        assert_eq!(CliThemeDto::default().theme, CliTheme::Ember);
+        assert!(parse::<CliThemeDto>(json!({ "theme": "neon" })).is_err());
     }
 
     #[test]

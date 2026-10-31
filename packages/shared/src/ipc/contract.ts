@@ -71,7 +71,7 @@ import {
 } from "../artifacts.js";
 import { OpenSiteInput, SiteIconDto, SiteIconInput } from "../sites.js";
 import { AllowRuleInput, ExecPolicyDto, PolicyRuleDto } from "../execPolicy.js";
-import { CliInstallDto, CliOpenInput, CliSessionDto } from "../cli.js";
+import { CliInstallDto, CliOpenInput, CliSessionDto, CliThemeDto } from "../cli.js";
 import {
   VoiceDevicesDto,
   VoiceModelInput,
@@ -565,6 +565,8 @@ export const contract = defineContract({
   "cli.status": { input: z.void(), output: CliInstallDto },
   "cli.install": { input: z.void(), output: CliInstallDto },
   "cli.uninstall": { input: z.void(), output: CliInstallDto },
+  "cli.theme.get": { input: z.void(), output: CliThemeDto },
+  "cli.theme.set": { input: CliThemeDto, output: CliThemeDto },
   "voice.devices": { input: z.void(), output: VoiceDevicesDto },
   "voice.select": { input: VoiceSelectInput, output: VoiceDevicesDto },
   "voice.models": { input: z.void(), output: VoiceModelsDto },

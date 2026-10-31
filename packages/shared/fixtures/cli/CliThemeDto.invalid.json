@@ -1,0 +1,12 @@
+[
+  {
+    "name": "unknown theme",
+    "value": {
+      "theme": "neon"
+    }
+  },
+  {
+    "name": "missing theme",
+    "value": {}
+  }
+]

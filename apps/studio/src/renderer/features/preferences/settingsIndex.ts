@@ -2,7 +2,7 @@ import type { PreferenceSection } from "../../stores/UiStore";
 import { JUDGE_ROW } from "../execPolicy/execPolicyCopy";
 import { ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
 import { ABOUT_ROW, STYLE_ROW, TOOL_CALLS_ROW } from "./profileCopy";
-import { CLI_SETTING_ID, CLI_TITLE } from "./cliCopy";
+import { CLI_SETTING_ID, CLI_THEME_LABEL, CLI_THEME_SETTING_ID, CLI_TITLE } from "./cliCopy";
 import { STORAGE_CLEAR_CACHE, STORAGE_CLEAR_ID } from "./storageCopy";
 import { VOICE_DEVICE_ROW, VOICE_MODEL_ROW } from "../voice/voiceCopy";
 import {
@@ -49,8 +49,10 @@ export const SETTING_IDS = {
 
 const SEARCH_LIMIT = 8;
 
-export function aboutSettingId(label: string): string {
-  return `about.${label}`;
+export type AboutGroup = "app" | "cli";
+
+export function aboutSettingId(group: AboutGroup, label: string): string {
+  return `about.${group}.${label}`;
 }
 
 export const SETTING_ENTRIES: readonly SettingEntry[] = [
@@ -94,10 +96,16 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: STORAGE_CLEAR_ID, section: "data", label: STORAGE_CLEAR_CACHE },
   { id: SETTING_IDS.components, section: "components", label: SECTION_LABELS.components },
   { id: CLI_SETTING_ID, section: "cli", label: CLI_TITLE },
+  { id: CLI_THEME_SETTING_ID, section: "cli", label: CLI_THEME_LABEL },
   { id: VOICE_DEVICE_ROW.key, section: "voice", label: VOICE_DEVICE_ROW.label },
   { id: VOICE_MODEL_ROW.key, section: "voice", label: VOICE_MODEL_ROW.label },
-  ...[...Object.values(APP_ROW_LABELS), ...Object.values(CLI_ROW_LABELS)].map((label) => ({
-    id: aboutSettingId(label),
+  ...Object.values(APP_ROW_LABELS).map((label) => ({
+    id: aboutSettingId("app", label),
+    section: "about" as const,
+    label,
+  })),
+  ...Object.values(CLI_ROW_LABELS).map((label) => ({
+    id: aboutSettingId("cli", label),
     section: "about" as const,
     label,
   })),

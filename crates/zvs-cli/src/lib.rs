@@ -7,5 +7,6 @@ pub mod link;
 pub mod runtime;
 pub mod shell;
 pub mod state;
+pub mod theme_file;
 pub mod ui;
 pub mod version;

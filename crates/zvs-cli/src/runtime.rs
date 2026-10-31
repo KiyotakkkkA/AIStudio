@@ -21,10 +21,12 @@ use crate::link::{Incoming, Link};
 use crate::shell::{self, ShellControl};
 use crate::state::shortcuts::Chord;
 use crate::state::{App, Exit, Key, Msg, Pointer, Request, Selection};
+use crate::theme_file;
 use crate::ui;
 use crate::version;
 
 const TICK: Duration = Duration::from_millis(100);
+const THEME_POLL: Duration = Duration::from_secs(1);
 const WHEEL_STEP: isize = 3;
 
 enum Signal {
@@ -271,9 +273,11 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             Msg::ServerChanged(link.call("mcp.stop", &json!({ "id": id })).await)
         }
         Request::SetPolicy(policy) => Msg::PolicySet(link.call("execPolicy.set", &policy).await),
-        Request::Shell(_) | Request::StopShell | Request::Copy(_) | Request::SaveShortcuts(_) => {
-            Msg::Tick
-        }
+        Request::Shell(_)
+        | Request::StopShell
+        | Request::Copy(_)
+        | Request::SaveShortcuts(_)
+        | Request::SaveTheme(_) => Msg::Tick,
         Request::FocusVerification => {
             #[cfg(windows)]
             zvs_pipe::allow_foreground();
@@ -372,6 +376,10 @@ fn dispatch(
                 let saved = keymap_file::save(&value);
                 let _ = signals.send(Signal::App(Box::new(Msg::ShortcutsSaved(saved))));
             }
+            Request::SaveTheme(theme) => {
+                let saved = theme_file::save(theme);
+                let _ = signals.send(Signal::App(Box::new(Msg::ThemeSaved(saved))));
+            }
             other => remote.push(other),
         }
     }
@@ -387,6 +395,31 @@ fn dispatch(
             let _ = signals.send(Signal::App(Box::new(message)));
         });
     }
+}
+
+fn watch_theme(signals: mpsc::UnboundedSender<Signal>) {
+    let Some(path) = theme_file::default_path() else {
+        return;
+    };
+    tokio::spawn(async move {
+        let mut seen = theme_file::modified(&path);
+        let mut polls = tokio::time::interval(THEME_POLL);
+        loop {
+            polls.tick().await;
+            let current = theme_file::modified(&path);
+            if current == seen {
+                continue;
+            }
+            seen = current;
+            let theme = theme_file::load_from(&path);
+            if signals
+                .send(Signal::App(Box::new(Msg::ThemeChanged(theme))))
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
 }
 
 fn forward(
@@ -446,6 +479,8 @@ async fn session(
 
     let mut app = App::new(&folder);
     app.keymap = keymap_file::load();
+    app.theme = theme_file::load();
+    watch_theme(signals.clone());
     app.resume = resume;
     let mut link: Option<Link> = None;
     let shell = ShellControl::default();

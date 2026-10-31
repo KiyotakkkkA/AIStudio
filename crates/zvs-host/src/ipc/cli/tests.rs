@@ -105,3 +105,24 @@ async fn a_build_without_the_cli_cannot_install_it() {
     let envelope = server.dispatch("cli.install", Value::Null).await;
     assert_eq!(envelope["error"]["message"], json!(CLI_NOT_BUNDLED));
 }
+
+#[tokio::test]
+async fn the_cli_theme_defaults_to_ember_and_keeps_a_saved_choice() {
+    let (_host, server) = registered();
+    let theme = data(server.dispatch("cli.theme.get", Value::Null).await);
+    assert_eq!(theme, json!({ "theme": "ember" }));
+
+    let saved = data(
+        server
+            .dispatch("cli.theme.set", json!({ "theme": "frost" }))
+            .await,
+    );
+    assert_eq!(saved, json!({ "theme": "frost" }));
+    let theme = data(server.dispatch("cli.theme.get", Value::Null).await);
+    assert_eq!(theme, json!({ "theme": "frost" }));
+
+    let envelope = server
+        .dispatch("cli.theme.set", json!({ "theme": "neon" }))
+        .await;
+    assert_eq!(envelope["error"]["code"], json!("VALIDATION_FAILED"));
+}

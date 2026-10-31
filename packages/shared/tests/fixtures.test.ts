@@ -298,6 +298,7 @@ const schemas: Record<string, z.ZodType> = {
   "cli/CliOpenInput": cli.CliOpenInput,
   "cli/CliSessionDto": cli.CliSessionDto,
   "cli/CliInstallDto": cli.CliInstallDto,
+  "cli/CliThemeDto": cli.CliThemeDto,
   "voice/RecordingDeviceDto": voice.RecordingDeviceDto,
   "voice/VoiceDevicesDto": voice.VoiceDevicesDto,
   "voice/VoiceSelectInput": voice.VoiceSelectInput,

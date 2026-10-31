@@ -101,7 +101,10 @@ pub fn markdown(text: &str, width: usize, indent: &'static str) -> Vec<Line<'sta
             if fenced && !language.is_empty() {
                 lines.push(Line::from(vec![
                     Span::raw(indent),
-                    Span::styled(format!(" {language} "), theme::eyebrow().bg(theme::CODE_BG)),
+                    Span::styled(
+                        format!(" {language} "),
+                        theme::eyebrow().bg(theme::colors().code_bg),
+                    ),
                 ]));
             }
             continue;
@@ -112,7 +115,9 @@ pub fn markdown(text: &str, width: usize, indent: &'static str) -> Vec<Line<'sta
                     Span::raw(indent),
                     Span::styled(
                         format!(" {piece} "),
-                        Style::new().fg(theme::EMBER_SOFT).bg(theme::CODE_BG),
+                        Style::new()
+                            .fg(theme::colors().accent_light)
+                            .bg(theme::colors().code_bg),
                     ),
                 ]));
             }

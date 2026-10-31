@@ -7,7 +7,7 @@ import Icon from "../../ui/atoms/Icon";
 import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import { useStore } from "../../stores/useStore";
 import VendorMark from "./VendorMark";
-import { adapterLabel } from "./accountPresentation";
+import { adapterLabel, adapterDescription } from "./accountPresentation";
 
 const TRIGGER = [
   "h-8 w-auto justify-center gap-1.75 rounded-control border-0 px-3.25",
@@ -62,17 +62,9 @@ function AccountLoginMenu() {
               <span className="flex w-full items-center gap-2.5">
                 <VendorMark family={family} size="sm" />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="font-medium">
-                    {family === "openai" ? "Продолжить с ChatGPT" : adapterLabel(family)}
-                  </span>
+                  <span className="font-medium">{adapterLabel(family)}</span>
                   <span className="text-[11px] text-main-400">
-                    {family === "copilot"
-                      ? "Требуется GitHub Copilot CLI"
-                      : family === "openai"
-                        ? "Вход в системном браузере"
-                        : accounts.accountFor(family) === null
-                          ? "Откроется сайт вендора"
-                          : "Уже привязан"}
+                    {adapterDescription(family, accounts.accountFor(family) !== null)}
                   </span>
                 </span>
               </span>

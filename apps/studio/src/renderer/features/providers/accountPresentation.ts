@@ -12,6 +12,13 @@ export const ACCOUNT_ADAPTER_LABELS: Record<AccountFamily, string> = {
   "zai-web": "Z.ai",
 };
 
+export const ACCOUNT_DESC_LABELS: Record<AccountFamily, string> = {
+  openai: "Откроется сайт вендора",
+  copilot: "Требуется GitHub Copilot CLI",
+  "qwen-web": "Вход в системном браузере",
+  "zai-web": "Вход в системном браузере",
+};
+
 export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, string> = {
   linked: "Аккаунт привязан",
   "needs-relink": "Нужен повторный вход",
@@ -50,6 +57,10 @@ export const ACCOUNT_VENDOR_MARKS: Record<AccountFamily, VendorMarkStyle> = {
 
 export function adapterLabel(adapter: AccountFamily): string {
   return ACCOUNT_ADAPTER_LABELS[adapter];
+}
+
+export function adapterDescription(adapter: AccountFamily, isLogged: boolean): string {
+  return !isLogged ? ACCOUNT_DESC_LABELS[adapter] || "Вход в системном браузере" : "Уже привязан";
 }
 
 export function accountTitle(account: AccountDto): string {

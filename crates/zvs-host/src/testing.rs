@@ -671,6 +671,9 @@ pub fn test_services(system: SystemService) -> TestServices {
             folders,
             picker: Some(picker.clone()),
             cli: cli.clone(),
+            cli_theme: crate::cli::CliThemeFile::new(
+                &workspace.join(crate::platform::paths::CLI_FOLDER),
+            ),
             voice,
         }),
         nodes,

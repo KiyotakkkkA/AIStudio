@@ -1184,6 +1184,9 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         folders,
         picker: Some(picker),
         cli: platform::cli_installer(paths.cli_path.clone()),
+        cli_theme: zvs_host::cli::CliThemeFile::new(
+            &paths.data_dir.join(zvs_host::platform::paths::CLI_FOLDER),
+        ),
         voice,
     });
     {

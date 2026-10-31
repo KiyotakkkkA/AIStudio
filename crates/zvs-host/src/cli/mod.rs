@@ -2,6 +2,7 @@ pub mod connection;
 pub mod installer;
 pub mod notices;
 pub mod path_list;
+pub mod theme;
 
 use std::path::Path;
 
@@ -15,6 +16,7 @@ pub use connection::{CLI_CHANNELS, CliDispatch, serve};
 pub use installer::{CliInstallState, CliInstaller, NoCliInstaller, SharedCliInstaller};
 pub use notices::CliNotices;
 pub use path_list::{path_contains, path_with, path_without};
+pub use theme::{CLI_THEME_SAVE_FAILED, CliThemeFile};
 
 use crate::platform::shell::TRAY_SETTING_KEY;
 use crate::services::Services;

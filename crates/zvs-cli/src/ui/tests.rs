@@ -128,11 +128,20 @@ fn column_of(screen: &str, text: &str) -> usize {
 fn the_shortcut_list_and_the_rebinding_panel_render() {
     let mut app = ready(WorkingFolderAccess::Granted);
     app.update(Msg::Key(Key::Char('?')));
-    app.update(Msg::Key(Key::Enter));
-    let screen = render(&app, 100, 40);
+    let screen = render(&app, 120, 40);
     assert!(screen.contains(copy::SHORTCUTS_TITLE), "{screen}");
+    for title in [
+        copy::KEYS_COMPOSE,
+        copy::KEYS_SESSION,
+        copy::KEYS_TRANSCRIPT,
+    ] {
+        assert!(screen.contains(title), "{screen}");
+    }
     assert!(screen.contains("Ctrl+O"), "{screen}");
-    assert!(screen.contains(copy::SHORTCUT_DETAILS), "{screen}");
+    assert!(screen.contains(copy::KEY_DETAILS), "{screen}");
+    assert!(screen.contains(copy::HINT_KEYS), "{screen}");
+    let narrow = render(&app, 50, 40);
+    assert!(narrow.contains(copy::KEYS_TRANSCRIPT), "{narrow}");
 
     for value in "/shortcuts".chars() {
         app.update(Msg::Key(Key::Char(value)));
@@ -159,4 +168,24 @@ fn the_shortcut_list_and_the_rebinding_panel_render() {
         starts[0]
     );
     let _ = render(&app, 20, 6);
+}
+
+#[test]
+fn the_theme_panel_lists_every_theme_and_redraws_in_the_previewed_one() {
+    let mut app = ready(WorkingFolderAccess::Granted);
+    for value in "/theme".chars() {
+        app.update(Msg::Key(Key::Char(value)));
+    }
+    app.update(Msg::Key(Key::Enter));
+    app.update(Msg::Key(Key::Down));
+    let screen = render(&app, 100, 20);
+    assert!(screen.contains(copy::THEME_TITLE), "{screen}");
+    assert!(screen.contains(copy::HINT_THEME), "{screen}");
+    for label in [copy::THEME_EMBER, copy::THEME_GRAPHITE, copy::THEME_FROST] {
+        assert!(screen.contains(label), "{screen}");
+    }
+    assert_eq!(theme::active(), zvs_contract::CliTheme::Graphite);
+    app.update(Msg::Key(Key::Esc));
+    let _ = render(&app, 100, 20);
+    assert_eq!(theme::active(), zvs_contract::CliTheme::Ember);
 }

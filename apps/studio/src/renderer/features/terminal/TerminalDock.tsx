@@ -242,7 +242,13 @@ export default observer(function TerminalDock({
             />
           </div>
         )}
-        <IconButton tooltip="top-right" label={HIDE_DOCK} path={mdiClose} iconSize={16} onClick={store.hide} />
+        <IconButton
+          tooltip="top-right"
+          label={HIDE_DOCK}
+          path={mdiClose}
+          iconSize={16}
+          onClick={store.hide}
+        />
       </div>
       {store.error === null ? null : (
         <Alert bar onDismiss={store.dismissError} dismissLabel={DISMISS_ERROR}>

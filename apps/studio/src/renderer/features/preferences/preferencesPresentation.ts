@@ -202,9 +202,7 @@ export const APP_ROW_LABELS = {
 } as const;
 
 export function appRows(): InfoRow[] {
-  return [
-    { label: APP_ROW_LABELS.version, value: APP_VERSION_LABEL },
-  ];
+  return [{ label: APP_ROW_LABELS.version, value: APP_VERSION_LABEL }];
 }
 
 export const CLI_ROW_LABELS = {
@@ -212,7 +210,5 @@ export const CLI_ROW_LABELS = {
 } as const;
 
 export function cliRows(): InfoRow[] {
-  return [
-    { label: CLI_ROW_LABELS.version, value: CLI_VERSION_LABEL },
-  ];
+  return [{ label: CLI_ROW_LABELS.version, value: CLI_VERSION_LABEL }];
 }

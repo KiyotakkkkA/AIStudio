@@ -91,8 +91,8 @@ pub use chat::{
 };
 pub use cli::{
     CLI_COMMAND, CLI_LAUNCH_ARG, CLI_LINE_MAX, CLI_PIPE_PREFIX, CLI_PROTOCOL_VERSION,
-    CliClientMessage, CliInstallDto, CliNotice, CliOpenInput, CliServerMessage, CliSessionDto,
-    cli_pipe_name,
+    CLI_THEME_FILE, CliClientMessage, CliInstallDto, CliNotice, CliOpenInput, CliServerMessage,
+    CliSessionDto, CliTheme, CliThemeDto, cli_pipe_name,
 };
 pub use documents::{
     DOCUMENT_BYTES_DATA_MAX, DOCUMENT_BYTES_PAGE_MAX, DOCUMENT_LIST_MAX, DOCUMENT_PATH_MAX,

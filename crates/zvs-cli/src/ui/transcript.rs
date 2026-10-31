@@ -21,14 +21,18 @@ pub fn spinner(frame: u64) -> &'static str {
 
 fn status_look(status: ChatToolCallStatus, frame: u64) -> (&'static str, Color, &'static str) {
     match status {
-        ChatToolCallStatus::Running => (spinner(frame), theme::ACCENT, copy::TOOL_RUNNING),
-        ChatToolCallStatus::AwaitingApproval => ("?", theme::WARN, copy::TOOL_AWAITING_APPROVAL),
-        ChatToolCallStatus::AwaitingAnswer => ("?", theme::WARN, copy::TOOL_AWAITING_ANSWER),
-        ChatToolCallStatus::Succeeded => ("✓", theme::OK, copy::TOOL_SUCCEEDED),
-        ChatToolCallStatus::Failed => ("✗", theme::ERR, copy::TOOL_FAILED),
-        ChatToolCallStatus::Refused => ("⊘", theme::ERR, copy::TOOL_REFUSED),
-        ChatToolCallStatus::Denied => ("⊘", theme::ERR, copy::TOOL_DENIED),
-        ChatToolCallStatus::Cancelled => ("○", theme::MUTED, copy::TOOL_CANCELLED),
+        ChatToolCallStatus::Running => (spinner(frame), theme::colors().accent, copy::TOOL_RUNNING),
+        ChatToolCallStatus::AwaitingApproval => {
+            ("?", theme::colors().warn, copy::TOOL_AWAITING_APPROVAL)
+        }
+        ChatToolCallStatus::AwaitingAnswer => {
+            ("?", theme::colors().warn, copy::TOOL_AWAITING_ANSWER)
+        }
+        ChatToolCallStatus::Succeeded => ("✓", theme::colors().ok, copy::TOOL_SUCCEEDED),
+        ChatToolCallStatus::Failed => ("✗", theme::colors().err, copy::TOOL_FAILED),
+        ChatToolCallStatus::Refused => ("⊘", theme::colors().err, copy::TOOL_REFUSED),
+        ChatToolCallStatus::Denied => ("⊘", theme::colors().err, copy::TOOL_DENIED),
+        ChatToolCallStatus::Cancelled => ("○", theme::colors().muted, copy::TOOL_CANCELLED),
     }
 }
 
@@ -66,7 +70,7 @@ fn indent() -> Span<'static> {
 fn tool(call: &ChatToolCallDto, expanded: bool, frame: u64, width: usize) -> Vec<Line<'static>> {
     let (icon, color, label) = status_look(call.status, frame);
     let mut lines = Vec::new();
-    let chip = Style::new().bg(theme::TOOL_BG);
+    let chip = Style::new().bg(theme::colors().tool_bg);
     let mut header = vec![
         Span::raw("  "),
         Span::styled(
@@ -75,7 +79,7 @@ fn tool(call: &ChatToolCallDto, expanded: bool, frame: u64, width: usize) -> Vec
         ),
         Span::styled(
             format!("{} ", call.name),
-            chip.fg(theme::INK).add_modifier(Modifier::BOLD),
+            chip.fg(theme::colors().ink).add_modifier(Modifier::BOLD),
         ),
         Span::styled(format!("  {label}"), Style::new().fg(color)),
     ];
@@ -133,7 +137,7 @@ fn tool(call: &ChatToolCallDto, expanded: bool, frame: u64, width: usize) -> Vec
     let output = call.error.as_ref().or(call.result.as_ref());
     if let Some(output) = output.filter(|text| !text.trim().is_empty()) {
         let style = if call.error.is_some() {
-            Style::new().fg(theme::ERR)
+            Style::new().fg(theme::colors().err)
         } else {
             theme::text()
         };
@@ -181,26 +185,41 @@ fn shell_block(run: &ShellRun, expanded: bool, frame: u64, width: usize) -> Vec<
     let (icon, color, label) = match run.end {
         None => (
             spinner(frame).to_owned(),
-            theme::ACCENT,
+            theme::colors().accent,
             copy::SHELL_RUNNING.to_owned(),
         ),
-        Some(ShellEnd::Exited(0)) => ("✓".to_owned(), theme::OK, copy::SHELL_DONE.to_owned()),
+        Some(ShellEnd::Exited(0)) => (
+            "✓".to_owned(),
+            theme::colors().ok,
+            copy::SHELL_DONE.to_owned(),
+        ),
         Some(ShellEnd::Exited(code)) => (
             "✗".to_owned(),
-            theme::ERR,
+            theme::colors().err,
             format!("{} {code}", copy::SHELL_EXIT),
         ),
-        Some(ShellEnd::Stopped) => ("○".to_owned(), theme::MUTED, copy::SHELL_STOPPED.to_owned()),
-        Some(ShellEnd::Failed) => ("✗".to_owned(), theme::ERR, copy::SHELL_FAILED.to_owned()),
+        Some(ShellEnd::Stopped) => (
+            "○".to_owned(),
+            theme::colors().muted,
+            copy::SHELL_STOPPED.to_owned(),
+        ),
+        Some(ShellEnd::Failed) => (
+            "✗".to_owned(),
+            theme::colors().err,
+            copy::SHELL_FAILED.to_owned(),
+        ),
     };
-    let chip = Style::new().bg(theme::SHELL_BG);
+    let chip = Style::new().bg(theme::colors().shell_bg);
     let room = width.saturating_sub(8).max(10);
     let mut lines = vec![Line::from(vec![
         Span::raw("  "),
-        Span::styled(" $ ", chip.fg(theme::WARN).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " $ ",
+            chip.fg(theme::colors().warn).add_modifier(Modifier::BOLD),
+        ),
         Span::styled(
             format!("{} ", truncate(&run.command, room)),
-            chip.fg(theme::INK).add_modifier(Modifier::BOLD),
+            chip.fg(theme::colors().ink).add_modifier(Modifier::BOLD),
         ),
         Span::styled(format!("  {icon} {label}"), Style::new().fg(color)),
     ])];
@@ -228,15 +247,17 @@ fn shell_block(run: &ShellRun, expanded: bool, frame: u64, width: usize) -> Vec<
 
 fn user(text: &str, width: usize) -> Vec<Line<'static>> {
     let room = width.saturating_sub(6).max(8);
-    let style = Style::new().fg(theme::INK).bg(theme::USER_BG);
+    let style = Style::new()
+        .fg(theme::colors().ink)
+        .bg(theme::colors().user_bg);
     let edge = Span::styled("  ", style);
     let mut lines = vec![Line::from(vec![
         edge.clone(),
         Span::styled(
             copy::YOU,
             Style::new()
-                .fg(theme::ACCENT)
-                .bg(theme::USER_BG)
+                .fg(theme::colors().accent)
+                .bg(theme::colors().user_bg)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
@@ -304,9 +325,9 @@ fn assistant(text: &str, thought: &str, expanded: bool, width: usize) -> Vec<Lin
 
 fn notice(tone: Tone, text: &str, width: usize) -> Vec<Line<'static>> {
     let (icon, color) = match tone {
-        Tone::Info => ("ⓘ", theme::MUTED),
-        Tone::Success => ("✓", theme::OK),
-        Tone::Error => ("✗", theme::ERR),
+        Tone::Info => ("ⓘ", theme::colors().muted),
+        Tone::Success => ("✓", theme::colors().ok),
+        Tone::Error => ("✗", theme::colors().err),
     };
     wrap(text, width.saturating_sub(6).max(8))
         .into_iter()
@@ -369,7 +390,6 @@ pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
             Entry::Tool(call) => tool(call, expanded, app.frame, width),
             Entry::Notice { tone, text } => notice(*tone, text, width),
             Entry::Shell(run) => shell_block(run, expanded, app.frame, width),
-            Entry::Keys(sections) => key_lines(sections, width, 2),
         });
     }
     if let Some(run) = &app.shell {

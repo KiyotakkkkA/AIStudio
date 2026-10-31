@@ -1,0 +1,14 @@
+[
+  {
+    "name": "default",
+    "value": {
+      "theme": "ember"
+    }
+  },
+  {
+    "name": "graphite",
+    "value": {
+      "theme": "graphite"
+    }
+  }
+]

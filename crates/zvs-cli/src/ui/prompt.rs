@@ -50,10 +50,10 @@ fn labelled(label: &str, value: &str, width: usize) -> Vec<Line<'static>> {
 
 fn change_mark(kind: FileChangeKind) -> (&'static str, Style) {
     match kind {
-        FileChangeKind::Create => ("+", Style::new().fg(theme::OK)),
-        FileChangeKind::Modify => ("~", Style::new().fg(theme::WARN)),
-        FileChangeKind::Move => ("→", Style::new().fg(theme::WARN)),
-        FileChangeKind::Delete => ("−", Style::new().fg(theme::ERR)),
+        FileChangeKind::Create => ("+", Style::new().fg(theme::colors().ok)),
+        FileChangeKind::Modify => ("~", Style::new().fg(theme::colors().warn)),
+        FileChangeKind::Move => ("→", Style::new().fg(theme::colors().warn)),
+        FileChangeKind::Delete => ("−", Style::new().fg(theme::colors().err)),
     }
 }
 
@@ -199,11 +199,11 @@ pub fn panel(prompt: &Prompt, width: usize) -> Panel {
                             ),
                             Span::styled(
                                 format!("  +{}", change.added),
-                                Style::new().fg(theme::OK),
+                                Style::new().fg(theme::colors().ok),
                             ),
                             Span::styled(
                                 format!(" −{}", change.removed),
-                                Style::new().fg(theme::ERR),
+                                Style::new().fg(theme::colors().err),
                             ),
                         ]));
                     }

@@ -1,7 +1,7 @@
 use zvs_contract::{
-    ChatContextDto, ConversationDto, ConversationId, ExecJudgeDto, ExecMode, ExecPolicyDto,
-    McpServerDto, McpServerId, McpServerStatus, ModelCapability, ProviderDto, SkillDto, SkillId,
-    SkillSource, SkillStatus, ThinkingEffort,
+    ChatContextDto, CliTheme, ConversationDto, ConversationId, ExecJudgeDto, ExecMode,
+    ExecPolicyDto, McpServerDto, McpServerId, McpServerStatus, ModelCapability, ProviderDto,
+    SkillDto, SkillId, SkillSource, SkillStatus, ThinkingEffort,
 };
 
 use super::ModelChoice;
@@ -20,6 +20,7 @@ pub enum Panel {
     Mcp,
     Permissions,
     Shortcuts,
+    Theme,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,6 +44,7 @@ pub enum Action {
     SetJudge(Option<ExecJudgeDto>),
     Rebind(Shortcut),
     ResetShortcuts,
+    SetTheme(CliTheme),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -135,6 +137,7 @@ pub struct View<'a> {
     pub mode: ExecMode,
     pub effort: ThinkingEffort,
     pub keymap: &'a Keymap,
+    pub theme: CliTheme,
 }
 
 pub const MODES: [ExecMode; 4] = [
@@ -318,6 +321,41 @@ fn effort_rows(view: &View<'_>) -> Vec<Row> {
                 .current(current)
                 .detail([hint.to_owned()])
                 .action(Action::SetEffort(*effort))
+        })
+        .collect()
+}
+
+pub const fn theme_label(theme: CliTheme) -> &'static str {
+    match theme {
+        CliTheme::Ember => copy::THEME_EMBER,
+        CliTheme::Graphite => copy::THEME_GRAPHITE,
+        CliTheme::Moss => copy::THEME_MOSS,
+        CliTheme::Dusk => copy::THEME_DUSK,
+        CliTheme::Frost => copy::THEME_FROST,
+    }
+}
+
+const fn theme_hint(theme: CliTheme) -> &'static str {
+    match theme {
+        CliTheme::Ember => copy::THEME_HINT_EMBER,
+        CliTheme::Graphite => copy::THEME_HINT_GRAPHITE,
+        CliTheme::Moss => copy::THEME_HINT_MOSS,
+        CliTheme::Dusk => copy::THEME_HINT_DUSK,
+        CliTheme::Frost => copy::THEME_HINT_FROST,
+    }
+}
+
+fn theme_rows(view: &View<'_>) -> Vec<Row> {
+    CliTheme::ALL
+        .iter()
+        .map(|theme| {
+            let current = *theme == view.theme;
+            Row::new(theme.as_str(), "●", theme_label(*theme))
+                .meta(if current { copy::THEME_CURRENT } else { "" })
+                .tone(if current { Tone::Accent } else { Tone::Plain })
+                .current(current)
+                .detail([theme_hint(*theme).to_owned()])
+                .action(Action::SetTheme(*theme))
         })
         .collect()
 }
@@ -616,7 +654,10 @@ impl Overlay {
             tab: 0,
             selected: 0,
             expanded: Vec::new(),
-            loading: !matches!(panel, Panel::Models | Panel::Effort | Panel::Shortcuts),
+            loading: !matches!(
+                panel,
+                Panel::Models | Panel::Effort | Panel::Shortcuts | Panel::Theme
+            ),
             armed: false,
             capturing: None,
             conversations: Vec::new(),
@@ -636,6 +677,7 @@ impl Overlay {
             Panel::Mcp => copy::MCP_TITLE,
             Panel::Permissions => copy::PERMISSIONS_TITLE,
             Panel::Shortcuts => copy::SHORTCUTS_TITLE,
+            Panel::Theme => copy::THEME_TITLE,
         }
     }
 
@@ -649,6 +691,7 @@ impl Overlay {
             Panel::Mcp => "⧉",
             Panel::Permissions => "◉",
             Panel::Shortcuts => "⌨",
+            Panel::Theme => "◑",
         }
     }
 
@@ -667,7 +710,7 @@ impl Overlay {
             Panel::Skills => fixed(&[copy::TAB_ALL, copy::TAB_ENABLED, copy::TAB_DISABLED]),
             Panel::Mcp => fixed(&[copy::TAB_ALL, copy::TAB_CONNECTED, copy::TAB_STOPPED]),
             Panel::Permissions => fixed(&[copy::TAB_MODE, copy::TAB_JUDGE]),
-            Panel::Effort | Panel::Shortcuts => Vec::new(),
+            Panel::Effort | Panel::Shortcuts | Panel::Theme => Vec::new(),
         }
     }
 
@@ -681,6 +724,7 @@ impl Overlay {
             Panel::Mcp => server_rows(self),
             Panel::Permissions => permission_rows(self, view),
             Panel::Shortcuts => shortcut_rows(self, view),
+            Panel::Theme => theme_rows(view),
         };
         let query = self.filter.text().trim().to_lowercase();
         rows.into_iter().filter(|row| row.matches(&query)).collect()
@@ -775,6 +819,7 @@ mod tests {
             mode: ExecMode::SafetyAsk,
             effort: ThinkingEffort::Auto,
             keymap: &KEYMAP,
+            theme: CliTheme::Ember,
         }
     }
 
@@ -850,6 +895,21 @@ mod tests {
         assert_eq!(rows.last().map(|row| row.gauge), Some(Some(0.4)));
         overlay.next_tab(2, true);
         assert_eq!(overlay.rows(&view)[0].title, "files.read");
+    }
+
+    #[test]
+    fn every_theme_is_listed_and_the_active_one_is_marked() {
+        let providers = providers();
+        let mut view = view(&providers);
+        view.theme = CliTheme::Moss;
+        let mut overlay = Overlay::new(Panel::Theme);
+        assert!(!overlay.loading);
+        let rows = overlay.rows(&view);
+        assert_eq!(rows.len(), CliTheme::ALL.len());
+        overlay.select_current(&view);
+        assert_eq!(rows[overlay.selected].key, CliTheme::Moss.as_str());
+        assert_eq!(rows[overlay.selected].meta, copy::THEME_CURRENT);
+        assert_eq!(rows[0].action, Some(Action::SetTheme(CliTheme::Ember)));
     }
 
     #[test]

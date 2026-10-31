@@ -119,5 +119,6 @@ pub struct Services {
     pub browser: crate::browser::BrowserAgent,
     pub picker: Option<SharedPicker>,
     pub cli: crate::cli::SharedCliInstaller,
+    pub cli_theme: crate::cli::CliThemeFile,
     pub voice: crate::voice::VoiceService,
 }

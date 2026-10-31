@@ -14,12 +14,14 @@ use unicode_width::UnicodeWidthStr;
 use zvs_contract::ExecMode;
 
 use crate::copy;
-use crate::state::palette::{COMMANDS, matches};
+use crate::state::overlay::Panel;
+use crate::state::palette::{COMMANDS, Command, matches};
 use crate::state::transcript::Tone;
 use crate::state::{App, Phase};
 
 const INPUT_MAX_LINES: usize = 8;
 const PALETTE_ROWS: usize = 8;
+const KEYS_GAP: usize = 4;
 
 pub use crate::state::overlay::mode_label;
 
@@ -123,7 +125,9 @@ fn input_height(app: &App) -> u16 {
 fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let shell = app.shell_mode();
     let lead = if shell {
-        Style::new().fg(theme::WARN).add_modifier(Modifier::BOLD)
+        Style::new()
+            .fg(theme::colors().warn)
+            .add_modifier(Modifier::BOLD)
     } else if app.busy() {
         theme::faint()
     } else {
@@ -131,21 +135,21 @@ fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
     };
     let block = if shell {
         Block::new()
-            .style(Style::new().bg(theme::SHELL_BG))
+            .style(Style::new().bg(theme::colors().shell_bg))
             .padding(Padding::new(1, 1, 0, 1))
             .title(Line::from(vec![
                 Span::styled(
                     format!(" {} ", copy::SHELL_MODE),
                     Style::new()
-                        .fg(theme::ON_WARN)
-                        .bg(theme::WARN)
+                        .fg(theme::colors().on_warn)
+                        .bg(theme::colors().warn)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(format!("  {}", app.folder), theme::faint()),
             ]))
     } else {
         Block::new()
-            .style(Style::new().bg(theme::PANEL_BG))
+            .style(Style::new().bg(theme::colors().panel_bg))
             .padding(Padding::new(1, 1, 1, 1))
     };
     let inner = block.inner(area);
@@ -233,7 +237,11 @@ fn palette_view(frame: &mut Frame<'_>, above: Rect, app: &App) {
         .collect();
     frame.render_widget(Clear, area);
     frame.render_widget(
-        Paragraph::new(lines).block(panel(copy::COMMANDS_TITLE, theme::MUTED, theme::PANEL_BG)),
+        Paragraph::new(lines).block(panel(
+            copy::COMMANDS_TITLE,
+            theme::colors().muted,
+            theme::colors().panel_bg,
+        )),
         area,
     );
 }
@@ -254,8 +262,101 @@ fn help_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let target = centered(area, 72, rows(lines.len() + 2));
     frame.render_widget(Clear, target);
     frame.render_widget(
-        Paragraph::new(lines).block(panel(copy::HELP_TITLE, theme::ACCENT, theme::PANEL_BG)),
+        Paragraph::new(lines).block(panel(
+            copy::HELP_TITLE,
+            theme::colors().accent,
+            theme::colors().panel_bg,
+        )),
         target,
+    );
+}
+
+fn key_column(title: &str, rows: &[(String, &str)]) -> (usize, Vec<Line<'static>>) {
+    let keys = rows.iter().map(|(keys, _)| keys.width()).max().unwrap_or(0) + 2;
+    let width = rows
+        .iter()
+        .map(|(_, meaning)| keys + meaning.width())
+        .chain([title.width()])
+        .max()
+        .unwrap_or(0);
+    let mut lines = vec![Line::from(Span::styled(title.to_owned(), theme::strong()))];
+    for (combo, meaning) in rows {
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("{combo}{}", " ".repeat(keys.saturating_sub(combo.width()))),
+                theme::accent(),
+            ),
+            Span::styled((*meaning).to_owned(), theme::text()),
+        ]));
+    }
+    (width, lines)
+}
+
+fn side_by_side(band: &[(usize, Vec<Line<'static>>)]) -> Vec<Line<'static>> {
+    let height = band.iter().map(|(_, lines)| lines.len()).max().unwrap_or(0);
+    (0..height)
+        .map(|row| {
+            let mut spans = Vec::new();
+            for (index, (width, lines)) in band.iter().enumerate() {
+                let line = lines.get(row).cloned().unwrap_or_default();
+                let used = line.width();
+                spans.extend(line.spans);
+                if index + 1 < band.len() {
+                    spans.push(Span::raw(" ".repeat(width.saturating_sub(used) + KEYS_GAP)));
+                }
+            }
+            Line::from(spans)
+        })
+        .collect()
+}
+
+pub fn key_panel_lines(app: &App, width: usize) -> Vec<Line<'static>> {
+    let mut lines = vec![
+        Line::from(Span::styled(copy::SHORTCUTS_TITLE, theme::strong())),
+        Line::default(),
+    ];
+    let mut band: Vec<(usize, Vec<Line<'static>>)> = Vec::new();
+    let mut used = 0;
+    for (title, rows) in app.key_columns() {
+        let column = key_column(title, &rows);
+        let needed = if band.is_empty() {
+            column.0
+        } else {
+            column.0 + KEYS_GAP
+        };
+        if !band.is_empty() && used + needed > width {
+            lines.extend(side_by_side(&band));
+            lines.push(Line::default());
+            band.clear();
+            used = 0;
+        }
+        used += if band.is_empty() { column.0 } else { needed };
+        band.push(column);
+    }
+    lines.extend(side_by_side(&band));
+    lines.push(Line::default());
+    lines.push(Line::from(vec![
+        Span::styled(format!("/{}", Command::Shortcuts.name()), theme::accent()),
+        Span::styled(format!(" {}", copy::KEYS_CUSTOMIZE), theme::faint()),
+        Span::raw("   "),
+        Span::styled(format!("/{}", Command::Theme.name()), theme::accent()),
+        Span::styled(format!(" {}", copy::KEYS_THEME), theme::faint()),
+    ]));
+    lines
+}
+
+fn keys_view(frame: &mut Frame<'_>, above: Rect, app: &App) {
+    let lines = key_panel_lines(app, usize::from(above.width.saturating_sub(4)));
+    let height = rows(lines.len() + 1).min(above.height);
+    let area = Rect {
+        y: above.y + above.height.saturating_sub(height),
+        height,
+        ..above
+    };
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(lines).block(Block::new().padding(Padding::new(2, 2, 1, 0))),
+        area,
     );
 }
 
@@ -263,9 +364,9 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let [top, bottom] =
         Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(area);
     let mode_color = match app.mode {
-        ExecMode::NoRestrictions => theme::WARN,
-        ExecMode::AlwaysAsk => theme::MUTED,
-        ExecMode::SafetyAsk | ExecMode::AutoBypass => theme::ACCENT,
+        ExecMode::NoRestrictions => theme::colors().warn,
+        ExecMode::AlwaysAsk => theme::colors().muted,
+        ExecMode::SafetyAsk | ExecMode::AutoBypass => theme::colors().accent,
     };
     let left = vec![
         Span::styled(" ◆ ", Style::new().fg(mode_color)),
@@ -289,9 +390,9 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
 
     let hint = if let Some((tone, message)) = &app.status {
         let color = match tone {
-            Tone::Info => theme::MUTED,
-            Tone::Success => theme::OK,
-            Tone::Error => theme::ERR,
+            Tone::Info => theme::colors().muted,
+            Tone::Success => theme::colors().ok,
+            Tone::Error => theme::colors().err,
         };
         Line::from(Span::styled(format!(" {message}"), Style::new().fg(color)))
     } else {
@@ -305,6 +406,14 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
             copy::HINT_VERIFY
         } else if app.capturing() {
             copy::HINT_CAPTURE
+        } else if app.keys_open() {
+            copy::HINT_KEYS
+        } else if app
+            .overlay
+            .as_ref()
+            .is_some_and(|overlay| overlay.panel == Panel::Theme)
+        {
+            copy::HINT_THEME
         } else if app.overlay.is_some() {
             copy::HINT_PANEL
         } else if app.palette_open() {
@@ -320,7 +429,11 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
 }
 
 fn prompt_view(frame: &mut Frame<'_>, area: Rect, content: prompt::Panel) {
-    let block = panel(&content.title, theme::WARN, theme::PROMPT_BG);
+    let block = panel(
+        &content.title,
+        theme::colors().warn,
+        theme::colors().prompt_bg,
+    );
     let inner = block.inner(area);
     frame.render_widget(Clear, area);
     frame.render_widget(Paragraph::new(content.lines).block(block), area);
@@ -383,13 +496,14 @@ fn highlight(frame: &mut Frame<'_>, app: &App) {
     for y in area.top()..area.bottom() {
         for x in area.left()..area.right() {
             if selection.contains(x, y) {
-                buffer[(x, y)].set_bg(theme::SELECTION_BG);
+                buffer[(x, y)].set_bg(theme::colors().selection_bg);
             }
         }
     }
 }
 
 pub fn draw(frame: &mut Frame<'_>, app: &App) {
+    theme::activate(app.active_theme());
     draw_screen(frame, app);
     highlight(frame, app);
 }
@@ -430,6 +544,9 @@ fn draw_screen(frame: &mut Frame<'_>, app: &App) {
             }
             if app.palette_open() {
                 palette_view(frame, body, app);
+            }
+            if app.keys_open() {
+                keys_view(frame, body, app);
             }
             footer(frame, status, app);
             if app.help {

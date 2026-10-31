@@ -10,6 +10,7 @@ import ProvidersPage from "../../src/renderer/pages/ProvidersPage.tsx";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { ADAPTERS, OLLAMA, provider, SECRETS, summary } from "./providerFixtures.ts";
 import { account, deferred, QWEN_ACCOUNT } from "./accountFixtures.ts";
+import { ACCOUNT_DESC_LABELS } from "../../src/renderer/features/providers/accountPresentation.ts";
 
 beforeEach(() => {
   // jsdom has no layout; Modal filters focus targets by their rendered dimensions.
@@ -77,7 +78,7 @@ test("the empty state explains account mode and offers only the vendors the host
     within(menu)
       .getAllByRole("menuitem")
       .map((item) => item.textContent),
-    ["QwenОткроется сайт вендора"],
+    [`Qwen${ACCOUNT_DESC_LABELS["qwen-web"]}`],
   );
 
   // The vendor's own page takes the password; our UI never offers a field for one.

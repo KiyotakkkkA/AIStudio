@@ -9,7 +9,7 @@ use std::collections::VecDeque;
 
 use zvs_contract::{
     AllowRuleChangeDto, AllowRuleInput, AppError, BindFolderResultDto, ChatAnswerInput,
-    ChatAttachDto, ChatContextDto, ChatSendInput, ChatSkipInput, CliSessionDto,
+    ChatAttachDto, ChatContextDto, ChatSendInput, ChatSkipInput, CliSessionDto, CliTheme,
     ConversationDetailDto, ConversationDto, ConversationId, ExecMode, ExecPolicyDto,
     FolderAccessAnswer, FolderGrantScope, HostEvent, HostEventDraft, McpServerDto, McpServerId,
     McpServerStatus, PolicyRuleDto, ProviderDto, ProviderId, RunHandleDto, RunId, RunOutcomeStatus,
@@ -153,6 +153,7 @@ pub enum Request {
     StopShell,
     Copy(Selection),
     SaveShortcuts(serde_json::Value),
+    SaveTheme(CliTheme),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -190,6 +191,8 @@ pub enum Msg {
     Pointer(Pointer),
     Copied(bool),
     ShortcutsSaved(bool),
+    ThemeSaved(bool),
+    ThemeChanged(CliTheme),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -222,7 +225,9 @@ pub struct App {
     pub scroll: usize,
     pub escape_armed: bool,
     pub help: bool,
+    pub keys: bool,
     pub keymap: Keymap,
+    pub theme: CliTheme,
     pub status: Option<(Tone, String)>,
     pub frame: u64,
     pub started: u64,
@@ -279,7 +284,9 @@ impl App {
             scroll: 0,
             escape_armed: false,
             help: false,
+            keys: false,
             keymap: Keymap::default(),
+            theme: CliTheme::default(),
             status: None,
             frame: 0,
             started: 0,
@@ -289,6 +296,63 @@ impl App {
 
     pub const fn busy(&self) -> bool {
         self.run.is_some() || self.awaiting
+    }
+
+    pub fn active_theme(&self) -> CliTheme {
+        self.overlay
+            .as_ref()
+            .filter(|overlay| overlay.panel == Panel::Theme)
+            .and_then(|overlay| {
+                let rows = overlay.rows(&self.view());
+                rows.get(overlay.selected.min(rows.len().saturating_sub(1)))
+                    .and_then(|row| CliTheme::parse(&row.key))
+            })
+            .unwrap_or(self.theme)
+    }
+
+    pub fn keys_open(&self) -> bool {
+        self.keys && self.prompts.is_empty() && self.overlay.is_none() && !self.help
+    }
+
+    pub fn key_columns(&self) -> Vec<(&'static str, Vec<(String, &'static str)>)> {
+        let bound = |shortcut: Shortcut| self.keymap.label(shortcut);
+        let fixed = |keys: &str| keys.to_owned();
+        vec![
+            (
+                copy::KEYS_COMPOSE,
+                vec![
+                    (fixed("/"), copy::KEY_COMMANDS),
+                    (fixed("!"), copy::KEY_SHELL),
+                    (fixed("Alt+Enter"), copy::KEY_NEWLINE),
+                    (fixed("↑ / ↓"), copy::KEY_HISTORY),
+                    (fixed("Tab"), copy::KEY_COMPLETE),
+                    (bound(Shortcut::ClearInput), copy::KEY_CLEAR_INPUT),
+                ],
+            ),
+            (
+                copy::KEYS_SESSION,
+                vec![
+                    (fixed("Enter"), copy::KEY_SEND),
+                    (fixed("Esc"), copy::KEY_STOP),
+                    (bound(Shortcut::NewChat), copy::KEY_NEW_CHAT),
+                    (bound(Shortcut::Models), copy::KEY_MODELS),
+                    (bound(Shortcut::Effort), copy::KEY_EFFORT),
+                    (bound(Shortcut::Resume), copy::KEY_RESUME),
+                    (bound(Shortcut::Permissions), copy::KEY_PERMISSIONS),
+                    (fixed("Esc Esc / Ctrl+C"), copy::KEY_QUIT),
+                ],
+            ),
+            (
+                copy::KEYS_TRANSCRIPT,
+                vec![
+                    (bound(Shortcut::Details), copy::KEY_DETAILS),
+                    (fixed("PgUp / PgDn"), copy::KEY_SCROLL),
+                    (bound(Shortcut::ClearScreen), copy::KEY_CLEAR_SCREEN),
+                    (bound(Shortcut::Context), copy::KEY_CONTEXT),
+                    (fixed(copy::KEY_MOUSE), copy::KEY_COPY),
+                ],
+            ),
+        ]
     }
 
     pub fn palette_open(&self) -> bool {
@@ -412,6 +476,16 @@ impl App {
                 if !saved {
                     self.status = Some((Tone::Error, copy::SHORTCUTS_SAVE_FAILED.to_owned()));
                 }
+                Vec::new()
+            }
+            Msg::ThemeSaved(saved) => {
+                if !saved {
+                    self.status = Some((Tone::Error, copy::THEME_SAVE_FAILED.to_owned()));
+                }
+                Vec::new()
+            }
+            Msg::ThemeChanged(theme) => {
+                self.theme = theme;
                 Vec::new()
             }
             Msg::Copied(copied) => {
@@ -864,6 +938,7 @@ impl App {
             Command::Mcp => return self.open_panel(Panel::Mcp),
             Command::Permissions => return self.open_panel(Panel::Permissions),
             Command::Shortcuts => return self.open_panel(Panel::Shortcuts),
+            Command::Theme => return self.open_panel(Panel::Theme),
         }
         Vec::new()
     }
@@ -877,6 +952,7 @@ impl App {
             mode: self.mode,
             effort: self.effort,
             keymap: &self.keymap,
+            theme: self.theme,
         }
     }
 
@@ -934,7 +1010,7 @@ impl App {
             return Vec::new();
         }
         let requests = match panel {
-            Panel::Models | Panel::Effort | Panel::Shortcuts => Vec::new(),
+            Panel::Models | Panel::Effort | Panel::Shortcuts | Panel::Theme => Vec::new(),
             Panel::Resume => vec![Request::Conversations],
             Panel::Skills => vec![Request::Skills],
             Panel::Mcp => vec![Request::Servers],
@@ -1020,6 +1096,15 @@ impl App {
                 self.status = Some((Tone::Success, copy::SHORTCUTS_RESTORED.to_owned()));
                 vec![self.save_shortcuts()]
             }
+            Action::SetTheme(theme) => {
+                self.theme = theme;
+                self.overlay = None;
+                self.status = Some((
+                    Tone::Success,
+                    format!("{}: {}", copy::THEME_SET, overlay::theme_label(theme)),
+                ));
+                vec![Request::SaveTheme(theme)]
+            }
         }
     }
 
@@ -1097,6 +1182,7 @@ impl App {
                     return Vec::new();
                 };
                 self.help = false;
+                self.keys = false;
                 self.overlay = None;
                 return self.command(command);
             }
@@ -1166,14 +1252,6 @@ impl App {
         }
         let text = self.input.take();
         if text.is_empty() {
-            return Vec::new();
-        }
-        if text.trim() == "?" {
-            let sections = self.key_sections();
-            self.transcript
-                .entries
-                .push(transcript::Entry::Keys(sections));
-            self.scroll = 0;
             return Vec::new();
         }
         if text.starts_with('!') {
@@ -1278,6 +1356,12 @@ impl App {
             }
             return Vec::new();
         }
+        if self.keys {
+            self.keys = false;
+            if matches!(key, Key::Esc | Key::Char('?')) {
+                return Vec::new();
+            }
+        }
         if self.palette_open() {
             let text = self.input.text().to_owned();
             match key {
@@ -1310,6 +1394,7 @@ impl App {
             Key::Enter => return self.submit(),
             Key::Esc => return self.escape(),
             Key::Newline => self.input.newline(),
+            Key::Char('?') if self.input.is_empty() => self.keys = true,
             Key::Char(value) => {
                 self.input.insert(&value.to_string());
                 self.palette.reset();

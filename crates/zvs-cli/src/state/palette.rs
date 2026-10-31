@@ -13,6 +13,7 @@ pub enum Command {
     Mcp,
     Permissions,
     Shortcuts,
+    Theme,
     Clear,
     Exit,
 }
@@ -29,6 +30,7 @@ pub const COMMANDS: &[Command] = &[
     Command::Mcp,
     Command::Permissions,
     Command::Shortcuts,
+    Command::Theme,
     Command::Clear,
     Command::Exit,
 ];
@@ -47,6 +49,7 @@ impl Command {
             Self::Mcp => "mcp",
             Self::Permissions => "permissions",
             Self::Shortcuts => "shortcuts",
+            Self::Theme => "theme",
             Self::Clear => "clear",
             Self::Exit => "exit",
         }
@@ -65,6 +68,7 @@ impl Command {
             Self::Mcp => copy::CMD_MCP,
             Self::Permissions => copy::CMD_PERMISSIONS,
             Self::Shortcuts => copy::CMD_SHORTCUTS,
+            Self::Theme => copy::CMD_THEME,
             Self::Clear => copy::CMD_CLEAR,
             Self::Exit => copy::CMD_EXIT,
         }
@@ -168,7 +172,8 @@ mod tests {
                 Command::Models,
                 Command::Mcp,
                 Command::Resume,
-                Command::Permissions
+                Command::Permissions,
+                Command::Theme
             ]
         );
         assert_eq!(matches("/con"), [Command::Context]);
@@ -180,7 +185,7 @@ mod tests {
     fn the_selection_wraps_and_tracks_the_filtered_list() {
         let mut palette = Palette::default();
         palette.up("/m");
-        assert_eq!(palette.current("/m"), Some(Command::Permissions));
+        assert_eq!(palette.current("/m"), Some(Command::Theme));
         palette.down("/m");
         assert_eq!(palette.current("/m"), Some(Command::Models));
         palette.down("/m");

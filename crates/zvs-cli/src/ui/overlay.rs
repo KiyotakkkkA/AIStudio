@@ -4,6 +4,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
+use zvs_contract::CliTheme;
 
 use super::text::{truncate, wrap};
 use super::theme;
@@ -13,15 +14,16 @@ use crate::state::App;
 use crate::state::overlay::{Overlay, Panel, Row, Tone};
 
 const GAUGE_WIDTH: usize = 24;
+const SWATCH_TITLE_WIDTH: usize = 12;
 
-const fn tone_color(tone: Tone) -> Color {
+fn tone_color(tone: Tone) -> Color {
     match tone {
-        Tone::Plain => theme::INK,
-        Tone::Accent => theme::ACCENT,
-        Tone::Good => theme::OK,
-        Tone::Warn => theme::WARN,
-        Tone::Bad => theme::ERR,
-        Tone::Faint => theme::FAINT,
+        Tone::Plain => theme::colors().ink,
+        Tone::Accent => theme::colors().accent,
+        Tone::Good => theme::colors().ok,
+        Tone::Warn => theme::colors().warn,
+        Tone::Bad => theme::colors().err,
+        Tone::Faint => theme::colors().faint,
     }
 }
 
@@ -80,20 +82,25 @@ fn table_header(column: usize) -> Line<'static> {
 fn table_row(row: &Row, selected: bool, column: usize, width: usize) -> Line<'static> {
     let color = tone_color(row.tone);
     let base = if selected {
-        Style::new().bg(theme::ACCENT_SOFT)
+        Style::new().bg(theme::colors().accent_soft)
     } else {
         Style::new()
     };
     let marker = if selected { " › " } else { "   " };
     let keys_style = match row.tone {
         Tone::Faint => theme::faint(),
-        Tone::Warn => Style::new().fg(theme::WARN).add_modifier(Modifier::BOLD),
+        Tone::Warn => Style::new()
+            .fg(theme::colors().warn)
+            .add_modifier(Modifier::BOLD),
         _ => theme::strong(),
     };
     let keys = truncate(&row.meta, column.saturating_sub(1));
     let pad = column.saturating_sub(keys.width());
     let mut spans = vec![
-        Span::styled(marker, base.fg(theme::ACCENT).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            marker,
+            base.fg(theme::colors().accent).add_modifier(Modifier::BOLD),
+        ),
         Span::styled(format!("{} ", row.icon), base.fg(color)),
         Span::styled(keys, base.patch(keys_style)),
         Span::styled(" ".repeat(pad), base),
@@ -102,7 +109,7 @@ fn table_row(row: &Row, selected: bool, column: usize, width: usize) -> Line<'st
     let title = truncate(&row.title, width.saturating_sub(used + 1));
     let title_width = title.width();
     let title_style = if row.tone == Tone::Accent {
-        Style::new().fg(theme::ACCENT)
+        Style::new().fg(theme::colors().accent)
     } else {
         theme::text()
     };
@@ -116,10 +123,19 @@ fn table_row(row: &Row, selected: bool, column: usize, width: usize) -> Line<'st
     Line::from(spans)
 }
 
-fn row_lines(row: &Row, selected: bool, expanded: bool, width: usize) -> Vec<Line<'static>> {
-    let color = tone_color(row.tone);
+fn row_lines(
+    row: &Row,
+    selected: bool,
+    expanded: bool,
+    width: usize,
+    swatch: Option<CliTheme>,
+) -> Vec<Line<'static>> {
+    let color = swatch.map_or_else(
+        || tone_color(row.tone),
+        |theme| theme::colors_of(theme).accent,
+    );
     let base = if selected {
-        Style::new().bg(theme::ACCENT_SOFT)
+        Style::new().bg(theme::colors().accent_soft)
     } else {
         Style::new()
     };
@@ -127,23 +143,43 @@ fn row_lines(row: &Row, selected: bool, expanded: bool, width: usize) -> Vec<Lin
     let title_style = if row.tone == Tone::Faint {
         theme::faint()
     } else if row.current {
-        Style::new().fg(theme::INK).add_modifier(Modifier::BOLD)
+        Style::new()
+            .fg(theme::colors().ink)
+            .add_modifier(Modifier::BOLD)
     } else {
         theme::text()
     };
     let mut spans = vec![
-        Span::styled(marker, base.fg(theme::ACCENT).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            marker,
+            base.fg(theme::colors().accent).add_modifier(Modifier::BOLD),
+        ),
         Span::styled(format!("{} ", row.icon), base.fg(color)),
     ];
     let title_width = if row.gauge.is_some() { 24 } else { width / 2 };
     let title = truncate(&row.title, title_width);
     let pad = if row.gauge.is_some() {
         title_width.saturating_sub(title.width())
+    } else if swatch.is_some() {
+        SWATCH_TITLE_WIDTH.saturating_sub(title.width())
     } else {
         2
     };
     spans.push(Span::styled(title, base.patch(title_style)));
     spans.push(Span::styled(" ".repeat(pad + 1), base));
+    if let Some(theme) = swatch {
+        let colors = theme::colors_of(theme);
+        for tint in [
+            colors.accent,
+            colors.accent_light,
+            colors.ok,
+            colors.warn,
+            colors.err,
+        ] {
+            spans.push(Span::styled("██", base.fg(tint)));
+        }
+        spans.push(Span::styled("  ", base));
+    }
     if let Some(value) = row.gauge {
         spans.extend(gauge(value, color).into_iter().map(|span| {
             let style = base.patch(span.style);
@@ -153,7 +189,7 @@ fn row_lines(row: &Row, selected: bool, expanded: bool, width: usize) -> Vec<Lin
     let used: usize = spans.iter().map(|span| span.content.width()).sum();
     let meta = truncate(&row.meta, width.saturating_sub(used + 1));
     let meta_width = meta.width();
-    spans.push(Span::styled(meta, base.fg(theme::MUTED)));
+    spans.push(Span::styled(meta, base.fg(theme::colors().muted)));
     let fill = width.saturating_sub(used + meta_width);
     if selected {
         spans.push(Span::styled(" ".repeat(fill), base));
@@ -220,7 +256,7 @@ pub fn draw(frame: &mut Frame<'_>, area: Rect, app: &App, overlay: &Overlay) {
         ])
     };
     frame.render_widget(
-        Paragraph::new(search_line).style(Style::new().bg(theme::PANEL_BG)),
+        Paragraph::new(search_line).style(Style::new().bg(theme::colors().panel_bg)),
         search,
     );
     if app.prompts.is_empty() {
@@ -266,6 +302,9 @@ pub fn draw(frame: &mut Frame<'_>, area: Rect, app: &App, overlay: &Overlay) {
                 index == selected,
                 overlay.is_expanded(&row.key),
                 width,
+                (overlay.panel == Panel::Theme)
+                    .then(|| CliTheme::parse(&row.key))
+                    .flatten(),
             )),
         }
         if index == selected {

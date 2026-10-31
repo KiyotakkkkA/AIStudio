@@ -430,28 +430,90 @@ fn chord(app: &mut App, chord: shortcuts::Chord) -> Vec<Request> {
 }
 
 #[test]
-fn a_line_holding_only_a_question_mark_lists_every_shortcut_in_the_chat() {
+fn a_question_mark_in_an_empty_line_toggles_the_shortcut_panel() {
     let mut app = ready();
     typed(&mut app, "?");
-    assert_eq!(app.input.text(), "?");
-    assert!(app.transcript.entries.is_empty());
-    assert!(app.update(Msg::Key(Key::Enter)).is_empty());
+    assert!(app.keys_open());
     assert!(app.input.is_empty());
-    let Some(Entry::Keys(sections)) = app.transcript.entries.last() else {
-        panic!("a shortcuts entry");
-    };
-    let (title, bound) = &sections[0];
-    assert_eq!(*title, copy::SHORTCUTS_TITLE);
-    assert_eq!(bound.len(), shortcuts::SHORTCUTS.len());
-    assert!(bound.contains(&("Ctrl+O".to_owned(), copy::SHORTCUT_DETAILS.to_owned())));
-    assert_eq!(sections[1].1.len(), copy::KEYS.len());
+    let columns = app.key_columns();
+    assert_eq!(
+        columns.iter().map(|(title, _)| *title).collect::<Vec<_>>(),
+        [
+            copy::KEYS_COMPOSE,
+            copy::KEYS_SESSION,
+            copy::KEYS_TRANSCRIPT
+        ]
+    );
+    assert!(
+        columns[2]
+            .1
+            .contains(&("Ctrl+O".to_owned(), copy::KEY_DETAILS))
+    );
+    typed(&mut app, "?");
+    assert!(!app.keys_open());
+    assert!(app.input.is_empty());
 
-    let shown = app.transcript.entries.len();
-    typed(&mut app, "?why");
-    assert_eq!(app.input.text(), "?why");
+    typed(&mut app, "?");
+    app.update(Msg::Key(Key::Esc));
+    assert!(!app.keys_open());
+    assert!(app.input.is_empty());
+    assert!(!app.escape_armed);
+}
+
+#[test]
+fn typing_closes_the_shortcut_panel_and_keeps_the_text() {
+    let mut app = ready();
+    typed(&mut app, "?");
+    typed(&mut app, "why?");
+    assert!(!app.keys_open());
+    assert_eq!(app.input.text(), "why?");
     app.update(Msg::Key(Key::Enter));
-    assert_eq!(app.transcript.entries.len(), shown + 1);
-    assert!(matches!(app.transcript.entries.last(), Some(Entry::User(text)) if text == "?why"));
+    assert!(matches!(app.transcript.entries.last(), Some(Entry::User(text)) if text == "why?"));
+    assert!(
+        app.transcript
+            .entries
+            .iter()
+            .all(|entry| matches!(entry, Entry::User(_)))
+    );
+}
+
+#[test]
+fn the_theme_panel_previews_the_selection_and_saves_on_enter() {
+    let mut app = ready();
+    typed(&mut app, "/theme");
+    assert!(app.update(Msg::Key(Key::Enter)).is_empty());
+    assert_eq!(
+        app.overlay.as_ref().map(|overlay| overlay.panel),
+        Some(Panel::Theme)
+    );
+    assert_eq!(app.active_theme(), CliTheme::Ember);
+    app.update(Msg::Key(Key::Down));
+    assert_eq!(app.active_theme(), CliTheme::Graphite);
+    assert_eq!(app.theme, CliTheme::Ember);
+
+    app.update(Msg::Key(Key::Esc));
+    assert!(app.overlay.is_none());
+    assert_eq!(app.active_theme(), CliTheme::Ember);
+
+    typed(&mut app, "/theme");
+    app.update(Msg::Key(Key::Enter));
+    app.update(Msg::Key(Key::Down));
+    app.update(Msg::Key(Key::Down));
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::SaveTheme(CliTheme::Moss)]
+    );
+    assert!(app.overlay.is_none());
+    assert_eq!(app.theme, CliTheme::Moss);
+    assert_eq!(app.active_theme(), CliTheme::Moss);
+
+    app.update(Msg::ThemeSaved(false));
+    assert_eq!(
+        app.status.as_ref().map(|(_, text)| text.as_str()),
+        Some(copy::THEME_SAVE_FAILED)
+    );
+    app.update(Msg::ThemeChanged(CliTheme::Frost));
+    assert_eq!(app.active_theme(), CliTheme::Frost);
 }
 
 #[test]

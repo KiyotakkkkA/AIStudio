@@ -128,6 +128,23 @@ pub const CMD_MCP: &str = "MCP-серверы";
 pub const CMD_PERMISSIONS: &str = "Режим выполнения и модель-арбитр";
 pub const CMD_SHORTCUTS: &str = "Сочетания клавиш и их переназначение";
 pub const CMD_EFFORT: &str = "Сила размышления модели";
+pub const CMD_THEME: &str = "Тема оформления";
+
+pub const THEME_TITLE: &str = "Тема оформления";
+pub const THEME_CURRENT: &str = "текущая";
+pub const THEME_SET: &str = "Тема изменена";
+pub const THEME_SAVE_FAILED: &str = "Не удалось сохранить тему оформления";
+pub const THEME_EMBER: &str = "Янтарь";
+pub const THEME_GRAPHITE: &str = "Графит";
+pub const THEME_MOSS: &str = "Мох";
+pub const THEME_DUSK: &str = "Сумерки";
+pub const THEME_FROST: &str = "Иней";
+pub const THEME_HINT_EMBER: &str = "Тёплая оранжевая гамма. Тема по умолчанию.";
+pub const THEME_HINT_GRAPHITE: &str = "Нейтральная серая гамма с синим акцентом.";
+pub const THEME_HINT_MOSS: &str = "Приглушённая зелёная гамма.";
+pub const THEME_HINT_DUSK: &str = "Фиолетовая гамма.";
+pub const THEME_HINT_FROST: &str = "Холодная бирюзовая гамма.";
+pub const HINT_THEME: &str = "↑/↓ — предпросмотр · Enter — применить · Esc — отмена";
 
 pub const EFFORT_TITLE: &str = "Размышление";
 pub const EFFORT_FAST: &str = "Быстрый";
@@ -151,10 +168,36 @@ pub const KEYS: &[(&str, &str)] = &[
     ("Выделение мышью", "скопировать текст"),
     ("! в начале строки", "выполнить команду в рабочей папке"),
     ("Ctrl+C", "выйти"),
-    ("? и Enter", "показать сочетания клавиш"),
+    ("?", "показать сочетания клавиш"),
 ];
 
 pub const SHORTCUTS_TITLE: &str = "Сочетания клавиш";
+pub const KEYS_COMPOSE: &str = "Ввод";
+pub const KEYS_SESSION: &str = "Сеанс";
+pub const KEYS_TRANSCRIPT: &str = "Просмотр";
+pub const KEY_COMMANDS: &str = "Команды";
+pub const KEY_SHELL: &str = "Команда в рабочей папке";
+pub const KEY_NEWLINE: &str = "Новая строка";
+pub const KEY_HISTORY: &str = "История ввода";
+pub const KEY_COMPLETE: &str = "Дополнить команду";
+pub const KEY_CLEAR_INPUT: &str = "Очистить строку";
+pub const KEY_SEND: &str = "Отправить сообщение";
+pub const KEY_STOP: &str = "Остановить ответ";
+pub const KEY_NEW_CHAT: &str = "Новый диалог";
+pub const KEY_MODELS: &str = "Модели";
+pub const KEY_EFFORT: &str = "Размышление";
+pub const KEY_RESUME: &str = "Продолжить диалог";
+pub const KEY_PERMISSIONS: &str = "Подтверждение действий";
+pub const KEY_QUIT: &str = "Выход";
+pub const KEY_DETAILS: &str = "Подробности инструментов";
+pub const KEY_SCROLL: &str = "Прокрутка";
+pub const KEY_CLEAR_SCREEN: &str = "Очистить экран";
+pub const KEY_CONTEXT: &str = "Контекст";
+pub const KEY_MOUSE: &str = "Мышь";
+pub const KEY_COPY: &str = "Выделить и скопировать";
+pub const KEYS_CUSTOMIZE: &str = "переназначить";
+pub const KEYS_THEME: &str = "тема оформления";
+pub const HINT_KEYS: &str = "? / Esc — закрыть";
 pub const SHORTCUT_COLUMN_KEYS: &str = "Сочетание";
 pub const SHORTCUT_COLUMN_ACTION: &str = "Действие";
 pub const SHORTCUT_DETAILS: &str = "Показать или скрыть подробности инструментов";

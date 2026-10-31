@@ -52,6 +52,8 @@
   "cli.install",
   "cli.open",
   "cli.status",
+  "cli.theme.get",
+  "cli.theme.set",
   "cli.uninstall",
   "documents.close",
   "documents.list",
