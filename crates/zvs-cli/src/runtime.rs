@@ -1,4 +1,4 @@
-use std::io::IsTerminal;
+use std::io::{self, IsTerminal};
 use std::time::Duration;
 
 use ratatui::crossterm::event::{
@@ -423,15 +423,19 @@ pub fn selected_text(screen: &[String], selection: &Selection) -> String {
     lines.join("\n")
 }
 
-fn copy_to_clipboard(text: &str) -> bool {
+fn copy_to_clipboard(text: &str) -> io::Result<usize> {
     #[cfg(windows)]
     {
-        zvs_pipe::copy_text(text).is_ok()
+        zvs_pipe::copy_text(text)
     }
+
     #[cfg(not(windows))]
     {
         let _ = text;
-        false
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "Копирование в буфер обмена поддерживается только на Windows",
+        ))
     }
 }
 
@@ -464,8 +468,9 @@ fn dispatch(
                 let _ = signals.send(Signal::App(Box::new(Msg::DesktopOpened(opened))));
             }
             Request::Copy(selection) => {
-                let copied = copy_to_clipboard(&selected_text(screen, &selection));
-                let _ = signals.send(Signal::App(Box::new(Msg::Copied(copied))));
+                let copied_count =
+                    copy_to_clipboard(&selected_text(screen, &selection)).unwrap_or(0);
+                let _ = signals.send(Signal::App(Box::new(Msg::Copied(Some(copied_count)))));
             }
             Request::SaveShortcuts(value) => {
                 let saved = keymap_file::save(&value);

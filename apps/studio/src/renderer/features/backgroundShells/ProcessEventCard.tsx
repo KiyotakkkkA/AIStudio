@@ -5,7 +5,6 @@ import { useStore } from "../../stores/useStore";
 import {
   OUTPUT,
   PROCESS_ENDED,
-  WOKEN_TURN,
   commandText,
   endedTone,
   exitCodeText,
@@ -17,7 +16,6 @@ export default observer(function ProcessEventCard({ event }: { readonly event: C
     <section className="rounded-card bg-main-850 px-3.5 py-2.5" aria-label={PROCESS_ENDED}>
       <p className="m-0 mb-1.5 flex flex-wrap items-baseline gap-x-2 text-[12px]">
         <span className="font-medium text-main-100">{PROCESS_ENDED}</span>
-        <span className="text-main-400">{WOKEN_TURN}</span>
       </p>
       <ul className="m-0 list-none space-y-1 p-0">
         {event.shells.map((ended) => (

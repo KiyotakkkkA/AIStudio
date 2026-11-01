@@ -217,7 +217,7 @@ Manual check:
 - Markdown export renders an event as «Фоновый процесс завершён» with each command and its
   exit code.
 - Desktop:
-  - `ProcessEventCard` shows «Фоновый процесс завершён · Диалог продолжен автоматически», and
+  - `ProcessEventCard` shows «Фоновый процесс завершён, and
     for each process the command, its exit code, a status dot and «Вывод», which opens the
     read-only dock tab.
   - `ChatStore` observes `wake` steps for the open dialog while idle. It adds the event
@@ -242,8 +242,7 @@ Manual check:
 - The task named no rule for a "server-like intent", so `shell.run` uses a small argv
   heuristic (`server_like`). A notified `code.run` is not checked, because its source cannot
   be classified reliably.
-- The «wake-up marker» is the event card itself. It sits directly above the turn it started
-  and says «Диалог продолжен автоматически». There is no extra label on the answer.
+- The «wake-up marker» is the event card itself. It sits directly above the turn it started. There is no extra label on the answer.
 - Clients learn about a host-started turn from a new `wake` step on the turn's own stream,
   which `ChatWakeStepDto` describes. This was the only way to stream the turn while the prompt
   is idle without a new channel.

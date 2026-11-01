@@ -126,7 +126,8 @@ pub fn encode(page: u32, text: &str) -> Vec<u8> {
 
 const CF_UNICODETEXT: u32 = 13;
 
-pub fn copy_text(text: &str) -> io::Result<()> {
+pub fn copy_text(text: &str) -> io::Result<usize> {
+    let char_count = text.chars().count();
     let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
     let bytes = wide.len() * size_of::<u16>();
     unsafe { OpenClipboard(None) }.map_err(|e| native(&e))?;
@@ -144,8 +145,9 @@ pub fn copy_text(text: &str) -> io::Result<()> {
             let _ = unsafe { GlobalFree(Some(memory)) };
             return Err(native(&error));
         }
-        Ok(())
+        Ok(char_count)
     })();
+
     let _ = unsafe { CloseClipboard() };
     result
 }

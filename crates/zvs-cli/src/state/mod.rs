@@ -268,7 +268,7 @@ pub enum Msg {
     ShellOutput(String),
     ShellEnded(ShellEnd),
     Pointer(Pointer),
-    Copied(bool),
+    Copied(Option<usize>),
     ShortcutsSaved(bool),
     ThemeSaved(bool),
     ThemeChanged(CliTheme),
@@ -744,11 +744,13 @@ impl App {
                 self.theme = theme;
                 Vec::new()
             }
-            Msg::Copied(copied) => {
-                self.status = Some(if copied {
-                    (Tone::Success, copy::COPIED.to_owned())
-                } else {
-                    (Tone::Error, copy::COPY_FAILED.to_owned())
+            Msg::Copied(copied_opt) => {
+                self.status = Some(match copied_opt {
+                    Some(n) => {
+                        let message = format!("{} ({})", copy::COPIED, n);
+                        (Tone::Success, message)
+                    }
+                    None => (Tone::Error, copy::COPY_FAILED.to_owned()),
                 });
                 Vec::new()
             }

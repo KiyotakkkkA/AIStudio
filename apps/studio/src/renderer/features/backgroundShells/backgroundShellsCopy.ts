@@ -39,7 +39,6 @@ export function statusLabel(status: BackgroundShellStatus, exitCode: number | nu
 }
 
 export const PROCESS_ENDED = "Фоновый процесс завершён";
-export const WOKEN_TURN = "Диалог продолжен автоматически";
 
 export function exitCodeText(exitCode: number | null): string {
   return exitCode === null ? "Без кода выхода" : `Код выхода ${String(exitCode)}`;
