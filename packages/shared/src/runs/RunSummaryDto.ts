@@ -31,6 +31,7 @@ export const RunSummaryDto = z.object({
   outcome: RunOutcomeDto.optional(),
   error: z.string().optional(),
   retryOfId: RunId.optional(),
+  parentRunId: RunId.optional(),
   createdAt: Timestamp,
   startedAt: Timestamp.optional(),
   finishedAt: Timestamp.optional(),

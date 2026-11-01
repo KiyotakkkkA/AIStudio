@@ -1542,3 +1542,115 @@ fn a_failed_goal_turn_is_reported_and_clears_the_footer() {
             .any(|entry| matches!(entry, Entry::Notice { text, .. } if text == copy::GOAL_FAILED))
     );
 }
+
+const CHILD: &str = "0199aa11-8888-7111-8111-111111111111";
+const LATER_CHILD: &str = "0199aa11-8888-7111-8111-222222222222";
+
+fn delegate_step(index: u64, id: &str, run: &str, status: &str) -> Msg {
+    event(
+        10 + index,
+        json!({ "type": "step", "step": { "domain": "tool-call", "index": index, "call": {
+            "id": id, "key": "agent.delegate", "name": "delegate_task", "round": 0,
+            "arguments": { "task": "Найди x", "preset": "explore" },
+            "status": if status == "running" { "running" } else { "succeeded" },
+            "meta": { "runId": run, "preset": "explore", "label": "Найди x", "task": "Найди x",
+                "model": "qwen3:8b", "modelSource": "preferred", "status": status,
+                "partial": false, "toolCalls": 0, "tokens": 0 }
+        } } }),
+    )
+}
+
+fn child_step(seq: u64, run: &str, index: u64, status: &str) -> Msg {
+    event(
+        seq,
+        json!({ "type": "step", "step": { "domain": "subagent", "runId": run, "index": index, "call": {
+            "id": format!("c{index}"), "key": "fs.read", "name": "fs__read", "round": 0,
+            "arguments": { "path": "lib.rs" }, "status": status
+        } } }),
+    )
+}
+
+#[test]
+fn child_steps_are_grouped_by_run_inside_the_live_segments() {
+    let mut app = running();
+    app.update(delegate_step(0, "d1", CHILD, "running"));
+    app.update(delegate_step(1, "d2", LATER_CHILD, "running"));
+    app.update(child_step(20, CHILD, 0, "running"));
+    app.update(child_step(21, CHILD, 0, "succeeded"));
+    app.update(child_step(22, CHILD, 1, "running"));
+    app.update(child_step(23, LATER_CHILD, 0, "running"));
+    let live = app.transcript.live.as_ref().expect("live");
+    assert_eq!(live.children[CHILD].len(), 2);
+    assert_eq!(
+        live.children[CHILD][0].status,
+        zvs_contract::ChatToolCallStatus::Succeeded
+    );
+    assert_eq!(live.children[LATER_CHILD].len(), 1);
+    assert_eq!(live.tools().count(), 2);
+}
+
+#[test]
+fn the_stop_shortcut_ends_the_newest_running_child_only() {
+    let mut app = running();
+    assert!(
+        app.update(Msg::Key(Key::Chord(
+            Shortcut::StopSubagent
+                .default_chord()
+                .expect("bound by default"),
+        )))
+        .is_empty()
+    );
+    assert_eq!(
+        app.status,
+        Some((Tone::Info, copy::SUBAGENT_NONE.to_owned()))
+    );
+    app.update(delegate_step(0, "d1", CHILD, "running"));
+    app.update(delegate_step(1, "d2", LATER_CHILD, "running"));
+    let later = zvs_contract::RunId::parse(LATER_CHILD).expect("a run id");
+    assert_eq!(
+        app.update(Msg::Key(Key::Chord(
+            Shortcut::StopSubagent
+                .default_chord()
+                .expect("bound by default"),
+        ))),
+        [Request::StopSubagent(later)]
+    );
+    assert_eq!(
+        app.status,
+        Some((Tone::Info, copy::SUBAGENT_STOPPING.to_owned()))
+    );
+    app.update(delegate_step(1, "d2", LATER_CHILD, "cancelled"));
+    let first = zvs_contract::RunId::parse(CHILD).expect("a run id");
+    typed(&mut app, "/subagent-stop");
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::StopSubagent(first)]
+    );
+    assert!(app.run.is_some());
+}
+
+#[test]
+fn a_child_approval_prompt_carries_the_subagent_title() {
+    let mut app = running();
+    app.update(event(
+        5,
+        json!({ "type": "approval", "request": {
+            "id": APPROVAL, "runId": CHILD, "subject": "demo.drop",
+            "subagent": { "runId": CHILD, "label": "Удали временные файлы" }
+        } }),
+    ));
+    let prompt = app.prompts.front().expect("a prompt");
+    assert_eq!(prompt.subagent.as_deref(), Some("Удали временные файлы"));
+    let PromptKind::Approval { run, .. } = &prompt.kind else {
+        panic!("an approval");
+    };
+    assert_eq!(run.to_string(), CHILD);
+    app.update(event(
+        6,
+        json!({ "type": "approval", "request": {
+            "id": "0199aa11-7777-7111-8111-222222222222", "runId": RUN, "subject": "demo.drop",
+            "subagent": { "runId": CHILD, "label": "Чужая метка" }
+        } }),
+    ));
+    assert_eq!(app.prompts.back().expect("a prompt").subagent, None);
+}

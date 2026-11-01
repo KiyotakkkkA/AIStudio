@@ -24,6 +24,7 @@ export interface TaskRowProps {
   readonly now: number;
   readonly selected: boolean;
   readonly busy: boolean;
+  readonly nested?: boolean;
   readonly onSelect: () => void;
   readonly onStop: () => void;
   readonly onRetry: () => void;
@@ -43,6 +44,7 @@ export default function TaskRow({
   now,
   selected,
   busy,
+  nested = false,
   onSelect,
   onStop,
   onRetry,
@@ -56,7 +58,7 @@ export default function TaskRow({
   return (
     <div
       onClick={onSelect}
-      className={`flex items-center gap-3 border-b border-line px-5 py-3 ${
+      className={`flex items-center gap-3 border-b border-line py-3 pr-5 ${nested ? "pl-14" : "pl-5"} ${
         selected ? "bg-main-750 shadow-[inset_2px_0_0_var(--color-accent-dark)]" : "hover:bg-main-800"
       }`}
     >
@@ -116,7 +118,7 @@ export default function TaskRow({
           Решить
         </Button>
       ) : null}
-      {run.status === "failed" || run.status === "interrupted" ? (
+      {(run.status === "failed" || run.status === "interrupted") && run.kind !== "subagent" ? (
         <Button size="sm" tone="secondary" disabled={busy} onClick={onRetry}>
           <Icon path={mdiRefresh} size={14} />
           Повторить

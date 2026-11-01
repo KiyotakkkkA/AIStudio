@@ -49,6 +49,7 @@ wire_enum!(RunKind {
     Download => "download",
     Browser => "browser",
     Skill => "skill",
+    Subagent => "subagent",
 });
 
 wire_enum!(StepStatus {
@@ -360,6 +361,12 @@ pub struct StartRunInput {
         deserialize_with = "crate::wire::present"
     )]
     pub retry_of_id: Option<RunId>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub parent_run_id: Option<RunId>,
     pub graph: RunGraph,
     #[serde(
         default,
@@ -382,6 +389,7 @@ impl StartRunInput {
             subject_id: None,
             title: None,
             retry_of_id: None,
+            parent_run_id: None,
             graph,
             input: None,
             concurrency: None,
@@ -506,6 +514,12 @@ pub struct RunDto {
         deserialize_with = "crate::wire::present"
     )]
     pub retry_of_id: Option<RunId>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub parent_run_id: Option<RunId>,
     pub status: RunStatus,
     pub graph: RunGraph,
     pub input: Json,
@@ -626,6 +640,12 @@ pub struct RunListFilter {
         deserialize_with = "crate::wire::present"
     )]
     pub subject_id: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub parent_run_id: Option<RunId>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -820,6 +840,12 @@ pub struct RunSummaryDto {
         deserialize_with = "crate::wire::present"
     )]
     pub retry_of_id: Option<RunId>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub parent_run_id: Option<RunId>,
     pub created_at: Timestamp,
     #[serde(
         default,

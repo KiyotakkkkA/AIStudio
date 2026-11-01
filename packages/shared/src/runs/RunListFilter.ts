@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RunId } from "../primitives/branded.js";
 import { Page } from "../primitives/paging.js";
 import { Timestamp } from "../primitives/time.js";
 import { RunKind, RunStatus } from "./RunDto.js";
@@ -8,6 +9,7 @@ export const RunListFilter = z.object({
   statuses: z.array(RunStatus).max(RunStatus.options.length).optional(),
   kinds: z.array(RunKind).max(RunKind.options.length).optional(),
   subjectId: z.string().min(1).max(128).optional(),
+  parentRunId: RunId.optional(),
   query: z.string().trim().max(200).optional(),
   from: Timestamp.optional(),
   to: Timestamp.optional(),

@@ -13,6 +13,7 @@ import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import TaskStore from "../../src/renderer/features/tasks/TaskStore.ts";
 import {
+  flattenRuns,
   groupOf,
   groupRuns,
   matchesStatusFilter,
@@ -48,6 +49,7 @@ const counts: RunCountsDto = {
     download: 0,
     browser: 0,
     skill: 0,
+    subagent: 0,
   },
 };
 
@@ -283,5 +285,68 @@ test("stopping, retrying and answering an approval go through the kernel and ref
 
   await store.clearFinished();
   expect(bridge.calls.some((call) => call.channel === "runs.clearFinished")).toBe(true);
+  store.dispose();
+});
+
+test("child runs nest under their parent and a single child can be stopped", async () => {
+  const child = summary({
+    id: RunId.parse("0199bb11-1111-7111-8111-000000000011"),
+    streamId: StreamId.parse("0199bb11-1111-7111-8111-000000000012"),
+    kind: "subagent",
+    title: "Найди x",
+    parentRunId: RunId.parse(RUN_ID),
+  });
+  const orphan = summary({
+    id: RunId.parse("0199bb11-1111-7111-8111-000000000013"),
+    streamId: StreamId.parse("0199bb11-1111-7111-8111-000000000014"),
+    kind: "subagent",
+    title: "Без родителя",
+    parentRunId: RunId.parse("0199bb11-1111-7111-8111-000000000099"),
+  });
+  const { store, bridge } = setup({
+    items: [summary({ kind: "chat" }), child, orphan],
+    counts,
+  });
+  await store.load();
+  expect(store.visible.map((run) => run.id)).toEqual([RUN_ID, orphan.id]);
+  expect(store.childrenOf(RunId.parse(RUN_ID)).map((run) => run.id)).toEqual([child.id]);
+  expect(store.kindCounts.subagent).toBe(2);
+  await store.stop(child.id);
+  expect(bridge.calls.find((call) => call.channel === "runs.cancel")?.payload).toEqual({
+    id: child.id,
+  });
+});
+
+test("run history lists a child right after its parent", () => {
+  const parent = summary({ kind: "chat" });
+  const child = summary({
+    id: RunId.parse("0199bb11-1111-7111-8111-000000000011"),
+    kind: "subagent",
+    parentRunId: RunId.parse(RUN_ID),
+  });
+  const later = summary({ id: RunId.parse("0199bb11-1111-7111-8111-000000000015") });
+  expect(flattenRuns([later, child, parent]).map(({ run, nested }) => [run.id, nested])).toEqual([
+    [later.id, false],
+    [parent.id, false],
+    [child.id, true],
+  ]);
+});
+
+test("a subagent approval forwarded on the turn's stream stays off the turn's row", async () => {
+  const { store, emit } = setup();
+  await store.load();
+  emit({
+    type: "approval",
+    seq: 1,
+    request: {
+      id: APPROVAL_ID,
+      runId: "0199bb11-1111-7111-8111-000000000011",
+      subject: "demo.drop",
+      scope: "global",
+      expiresAt: 1,
+      subagent: { runId: "0199bb11-1111-7111-8111-000000000011", label: "Найди x" },
+    },
+  });
+  expect(store.runs[0]?.approval).toBeUndefined();
   store.dispose();
 });

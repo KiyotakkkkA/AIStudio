@@ -215,6 +215,23 @@ impl ExecPolicyService {
         rules
     }
 
+    fn root_run(&self, run_id: &str) -> Result<String, AppError> {
+        let mut current = run_id.to_owned();
+        for _ in 0..8 {
+            let parent = self.inner.database.with_connection(|connection| {
+                Ok(Repositories::new(connection)
+                    .runs
+                    .get(&current)?
+                    .and_then(|run| run.parent_run_id))
+            })?;
+            match parent {
+                Some(parent) => current = parent,
+                None => break,
+            }
+        }
+        Ok(current)
+    }
+
     fn spend(&self, run_id: &str) -> bool {
         let mut spent = self
             .inner
@@ -254,7 +271,7 @@ impl ExecPolicyService {
             self.log(LogLevel::Warn, "The judge provider has no driver", &[]);
             return ask;
         };
-        let run = context.run_id.to_string();
+        let run = self.root_run(&context.run_id.to_string())?;
         if !self.spend(&run) {
             self.log(
                 LogLevel::Info,

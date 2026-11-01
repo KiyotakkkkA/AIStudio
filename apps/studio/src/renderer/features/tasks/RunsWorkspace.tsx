@@ -135,10 +135,11 @@ export default observer(function RunsWorkspace() {
           )}
           <ScrollArea className="flex min-h-0 flex-1 flex-col">
             {awaitingData(store) ? <TableSkeleton rows={10} /> : null}
-            {store.runs.map((run) => (
+            {store.rows.map(({ run, nested }) => (
               <RunHistoryRow
                 key={run.id}
                 run={run}
+                nested={nested}
                 selected={store.selectedId === run.id}
                 onSelect={() => void store.select(run.id)}
               />

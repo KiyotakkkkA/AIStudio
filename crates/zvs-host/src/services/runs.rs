@@ -269,6 +269,7 @@ fn run_dto(row: &RunRow) -> Result<RunDto, AppError> {
         subject_id: row.subject_id.clone(),
         title: row.title.clone(),
         retry_of_id: row.retry_of_id.as_deref().and_then(RunId::parse),
+        parent_run_id: row.parent_run_id.as_deref().and_then(RunId::parse),
         status: row.status,
         graph: row.graph.clone(),
         input: row.input.clone(),
@@ -320,6 +321,17 @@ struct Inner {
 #[derive(Clone)]
 pub struct RunService {
     inner: Arc<Inner>,
+}
+
+#[derive(Clone)]
+pub struct WeakRunService {
+    inner: std::sync::Weak<Inner>,
+}
+
+impl WeakRunService {
+    pub fn upgrade(&self) -> Option<RunService> {
+        self.inner.upgrade().map(|inner| RunService { inner })
+    }
 }
 
 impl RunService {
@@ -419,6 +431,12 @@ impl RunService {
         })
     }
 
+    pub fn downgrade(&self) -> WeakRunService {
+        WeakRunService {
+            inner: Arc::downgrade(&self.inner),
+        }
+    }
+
     pub fn permissions(&self) -> Arc<PermissionService> {
         Arc::clone(&self.inner.permissions)
     }
@@ -485,6 +503,7 @@ impl RunService {
             subject_id: input.subject_id.clone(),
             title: input.title().map(str::to_owned),
             retry_of_id: input.retry_of_id.map(|run| run.to_string()),
+            parent_run_id: input.parent_run_id.map(|run| run.to_string()),
             status: RunStatus::Queued,
             graph,
             input: input.input().clone(),
@@ -586,15 +605,41 @@ impl RunService {
     pub async fn cancel(&self, id: &RunId) -> Result<(), AppError> {
         let id = id.to_string();
         read_run(&self.inner.database, &id)?;
-        let active = self
-            .active()
-            .get(&id)
-            .map(|active| (Arc::clone(&active.scheduler), active.done.clone()));
-        if let Some((scheduler, done)) = active {
-            scheduler.cancel();
-            done.await;
+        let mut waiting = Vec::new();
+        for key in self.children(&id)?.into_iter().chain([id]) {
+            let active = self
+                .active()
+                .get(&key)
+                .map(|active| (Arc::clone(&active.scheduler), active.done.clone()));
+            if let Some((scheduler, done)) = active {
+                scheduler.cancel();
+                waiting.push(done);
+            }
         }
+        join_all(waiting).await;
         Ok(())
+    }
+
+    pub fn signal_cancel(&self, id: &RunId) {
+        let key = id.to_string();
+        let children = self.children(&key).unwrap_or_default();
+        let active = self.active();
+        for key in children.iter().chain([&key]) {
+            if let Some(active) = active.get(key) {
+                active.scheduler.cancel();
+            }
+        }
+    }
+
+    fn children(&self, parent: &str) -> Result<Vec<String>, AppError> {
+        Ok(self
+            .inner
+            .database
+            .with_connection(|connection| Ok(Repositories::new(connection).runs.unfinished()?))?
+            .into_iter()
+            .filter(|run| run.parent_run_id.as_deref() == Some(parent))
+            .map(|run| run.id)
+            .collect())
     }
 
     pub async fn wait(&self, id: &RunId) {
@@ -619,6 +664,7 @@ impl RunService {
             statuses: filter.statuses.clone().unwrap_or_default(),
             kinds: filter.kinds.clone().unwrap_or_default(),
             subject_id: filter.subject_id.clone(),
+            parent_run_id: filter.parent_run_id.map(|run| run.to_string()),
             query: filter.query().map(str::to_owned),
             from: filter.from,
             to: filter.to,
@@ -671,7 +717,7 @@ impl RunService {
         if original.status.is_unfinished() {
             return Err(AppError::new(AppErrorCode::Conflict, RUN_NOT_FINISHED));
         }
-        if original.kind == RunKind::Chat {
+        if matches!(original.kind, RunKind::Chat | RunKind::Subagent) {
             return Err(AppError::new(AppErrorCode::Conflict, CHAT_RETRY_REFUSED));
         }
         self.start(StartRunInput {
@@ -679,6 +725,7 @@ impl RunService {
             subject_id: original.subject_id,
             title: original.title,
             retry_of_id: Some(original.id),
+            parent_run_id: None,
             graph: original.graph,
             input: Some(original.input),
             concurrency: Some(original.concurrency),
@@ -773,6 +820,7 @@ impl RunService {
                     outcome: row.outcome.clone(),
                     error: row.error.clone(),
                     retry_of_id: row.retry_of_id.as_deref().and_then(RunId::parse),
+                    parent_run_id: row.parent_run_id.as_deref().and_then(RunId::parse),
                     created_at: row.created_at,
                     started_at: row.started_at,
                     finished_at: row.finished_at,

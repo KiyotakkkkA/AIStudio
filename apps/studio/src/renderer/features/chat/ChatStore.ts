@@ -20,6 +20,7 @@ import {
   type AccountId,
   type AdapterDescriptorDto,
   type ApprovalRequestDto,
+  type RunId,
   type ChatAttachDto,
   type ChatCitationDto,
   type ChatCommandDto,
@@ -60,6 +61,7 @@ import TerminalStore from "../terminal/TerminalStore";
 import BackgroundShellStore from "../backgroundShells/BackgroundShellStore";
 import { matchCommands, parseCommand } from "./chatCommands";
 import GoalStore from "./GoalStore";
+import SubagentSteps, { subagentLabel, type SubagentLabel } from "./SubagentSteps";
 import { GOAL_COMMAND } from "./goalCopy";
 import { toolSections } from "./toolSets";
 import { appendRound } from "./answerRounds";
@@ -125,12 +127,15 @@ export default class ChatStore {
   searchedStoreIds: VectorStoreDto["id"][] = [];
   approvals: {
     id: string;
+    runId: string;
     subject: string;
     busy: boolean;
     changes: FileDiffDto[];
     process?: ProcessPlanDto;
+    subagent: SubagentLabel | null;
   }[] = [];
-  folderRequests: FolderApprovalDto[] = [];
+  folderRequests: (FolderApprovalDto & { subagent: SubagentLabel | null })[] = [];
+  stoppingSubagents: string[] = [];
   questions: { request: QuestionRequestDto; busy: boolean }[] = [];
   answeringFolder = false;
   folderBusy = false;
@@ -139,6 +144,7 @@ export default class ChatStore {
   pendingTurn = false;
   goalEmpty = false;
   readonly goals: GoalStore;
+  readonly subagents = new SubagentSteps();
   readonly explorer: ExplorerStore;
   readonly terminal: TerminalStore;
   readonly backgroundShells: BackgroundShellStore;
@@ -216,6 +222,7 @@ export default class ChatStore {
         exports: false,
         siteIcons: false,
         goals: false,
+        subagents: false,
         buffer: false,
         timer: false,
         unsubscribe: false,
@@ -516,9 +523,10 @@ export default class ChatStore {
     this.goalEmpty = false;
   }
   get standaloneApprovals() {
-    const attached = new Set(
-      this.liveToolCalls.flatMap((call) => (call.approvalId === null ? [] : [call.approvalId])),
-    );
+    const attached = new Set([
+      ...this.liveToolCalls.flatMap((call) => (call.approvalId === null ? [] : [call.approvalId])),
+      ...this.subagents.approvalIds,
+    ]);
     return this.approvals.filter((request) => !attached.has(request.id));
   }
   approvalFor(id: string | null) {
@@ -889,6 +897,7 @@ export default class ChatStore {
         this.liveWebSources = [];
         this.liveSelections = [];
         this.liveToolCalls = [];
+        this.subagents.clear();
         this.liveRounds = [];
         this.outcome = null;
         this.retryText = "";
@@ -1044,6 +1053,7 @@ export default class ChatStore {
     this.liveWebSources = [];
     this.liveSelections = [];
     this.liveToolCalls = [];
+    this.subagents.clear();
     this.liveRounds = [];
     this.searchedStoreIds = [];
     this.pendingTurn = true;
@@ -1250,6 +1260,7 @@ export default class ChatStore {
         this.liveWebSources = [];
         this.liveSelections = [];
         this.liveToolCalls = [];
+        this.subagents.clear();
         this.liveRounds = [];
         this.pendingTurn = false;
         this.retryText = "";
@@ -1304,9 +1315,10 @@ export default class ChatStore {
     if (!request || request.busy || !this.run) return;
     request.busy = true;
     try {
+      const runId = request.runId as RunId;
       if (approve)
-        await this.ipc.call("runs.approve", { id: this.run.id, approvalId: id, always: false });
-      else await this.ipc.call("runs.deny", { id: this.run.id, approvalId: id });
+        await this.ipc.call("runs.approve", { id: runId, approvalId: id, always: false });
+      else await this.ipc.call("runs.deny", { id: runId, approvalId: id });
       runInAction(() => {
         this.approvals = this.approvals.filter((item) => item.id !== id);
       });
@@ -1408,25 +1420,49 @@ export default class ChatStore {
   private admitApproval(request: ApprovalRequestDto) {
     const run = this.run;
     if (!run) return;
+    const subagent = subagentLabel(request);
+    const own = request.runId === run.id;
+    const delegated =
+      subagent !== null && this.active !== null && request.conversationId === this.active.id;
+    if (!own && !delegated) return;
     const folder = FolderApprovalDto.safeParse(request);
-    if (folder.success && folder.data.runId === run.id) {
+    if (folder.success) {
       if (!this.folderRequests.some((item) => item.id === folder.data.id))
-        this.folderRequests.push(folder.data);
+        this.folderRequests.push({ ...folder.data, subagent });
       return;
     }
     const id = request.id;
     const subject = request.subject;
-    if (request.runId !== run.id || typeof id !== "string" || typeof subject !== "string") return;
+    const runId = request.runId;
+    if (typeof id !== "string" || typeof subject !== "string" || typeof runId !== "string") return;
     if (this.approvals.some((item) => item.id === id)) return;
     const files = FilesApprovalDto.safeParse(request);
     const process = ProcessApprovalDto.safeParse(request);
     this.approvals.push({
       id,
+      runId,
       subject,
       busy: false,
       changes: files.success ? files.data.changes : [],
       ...(process.success ? { process: process.data.process } : {}),
+      subagent,
     });
+  }
+
+  async stopSubagent(runId: string) {
+    if (this.stoppingSubagents.includes(runId)) return;
+    this.stoppingSubagents.push(runId);
+    try {
+      await this.ipc.call("runs.cancel", { id: runId as RunId });
+    } catch (error) {
+      runInAction(() => {
+        this.error = errorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.stoppingSubagents = this.stoppingSubagents.filter((item) => item !== runId);
+      });
+    }
   }
 
   private receive(event: RoutedEvent) {
@@ -1470,6 +1506,7 @@ export default class ChatStore {
       }
     }
     if (event.type === "step" && event.step.domain === "goal") this.goals.apply(event.step);
+    if (event.type === "step" && event.step.domain === "subagent") this.subagents.apply(event.step);
     if (event.type === "step" && event.step.domain === "tool-call") {
       const index = event.step.index;
       const call = ChatToolCallDto.safeParse(event.step.call);
@@ -1561,6 +1598,7 @@ export default class ChatStore {
         this.liveWebSources = [];
         this.liveSelections = [];
         this.liveToolCalls = [];
+        this.subagents.clear();
         this.liveRounds = [];
         this.pendingTurn = false;
       });

@@ -1,6 +1,9 @@
+use std::collections::BTreeMap;
+
 use serde_json::Value;
 use zvs_contract::{
-    ChatToolCallDto, DeltaKind, HostEventDraft, McpServerDetailDto, MessageDto, MessageRole,
+    ChatToolCallDto, DeltaKind, HostEventDraft, McpServerDetailDto, MessageDto, MessageRole, RunId,
+    SUBAGENT_DOMAIN,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,9 +63,29 @@ pub enum Segment {
     Tool(Box<ChatToolCallDto>),
 }
 
+pub const AGENT_DELEGATE: &str = "agent.delegate";
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Live {
     pub segments: Vec<Segment>,
+    pub children: BTreeMap<String, Vec<ChatToolCallDto>>,
+}
+
+pub fn subagent_run(call: &ChatToolCallDto) -> Option<&str> {
+    if call.key != AGENT_DELEGATE {
+        return None;
+    }
+    call.meta.as_ref()?.get("runId")?.as_str()
+}
+
+pub fn subagent_running(call: &ChatToolCallDto) -> bool {
+    call.key == AGENT_DELEGATE
+        && call
+            .meta
+            .as_ref()
+            .and_then(|meta| meta.get("status"))
+            .and_then(Value::as_str)
+            .is_some_and(|status| status == "running" || status == "queued")
 }
 
 impl Live {
@@ -74,7 +97,36 @@ impl Live {
         if !text.is_empty() || !reasoning.is_empty() {
             segments.push(Segment::Text { text, reasoning });
         }
-        Self { segments }
+        Self {
+            segments,
+            children: BTreeMap::new(),
+        }
+    }
+
+    fn child(&mut self, step: &serde_json::Map<String, Value>) {
+        let (Some(run), Some(index), Some(Ok(call))) = (
+            step.get("runId").and_then(Value::as_str),
+            step.get("index")
+                .and_then(Value::as_u64)
+                .and_then(|index| usize::try_from(index).ok()),
+            step.get("call")
+                .map(|call| serde_json::from_value::<ChatToolCallDto>(call.clone())),
+        ) else {
+            return;
+        };
+        let calls = self.children.entry(run.to_owned()).or_default();
+        let index = index.min(calls.len());
+        if index == calls.len() {
+            calls.push(call);
+        } else {
+            calls[index] = call;
+        }
+    }
+
+    pub fn children_of(&self, call: &ChatToolCallDto) -> &[ChatToolCallDto] {
+        subagent_run(call)
+            .and_then(|run| self.children.get(run))
+            .map_or(&[], Vec::as_slice)
     }
 
     fn token(&mut self, delta: &str, reasoning: bool) {
@@ -183,6 +235,8 @@ impl Transcript {
             HostEventDraft::Step { step } => {
                 if let Some(call) = tool_call(step) {
                     live.tool(call);
+                } else if step.get("domain").and_then(Value::as_str) == Some(SUBAGENT_DOMAIN) {
+                    live.child(step);
                 }
             }
             _ => {}
@@ -207,6 +261,16 @@ impl Transcript {
 
     pub fn clear(&mut self) {
         self.entries.clear();
+    }
+
+    pub fn newest_subagent(&self) -> Option<RunId> {
+        self.live
+            .as_ref()?
+            .tools()
+            .filter(|call| subagent_running(call))
+            .filter_map(subagent_run)
+            .filter_map(RunId::parse)
+            .last()
     }
 }
 

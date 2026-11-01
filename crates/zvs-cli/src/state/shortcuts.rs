@@ -192,6 +192,7 @@ pub enum Shortcut {
     Connect,
     Desktop,
     Theme,
+    StopSubagent,
     Help,
     Shortcuts,
 }
@@ -213,6 +214,7 @@ pub const SHORTCUTS: &[Shortcut] = &[
     Shortcut::Connect,
     Shortcut::Desktop,
     Shortcut::Theme,
+    Shortcut::StopSubagent,
     Shortcut::Help,
     Shortcut::Shortcuts,
 ];
@@ -236,6 +238,7 @@ impl Shortcut {
             Self::Connect => "connect",
             Self::Desktop => "desktop",
             Self::Theme => "theme",
+            Self::StopSubagent => "stopSubagent",
             Self::Help => "help",
             Self::Shortcuts => "shortcuts",
         }
@@ -259,6 +262,7 @@ impl Shortcut {
             Self::Connect => copy::CMD_CONNECT,
             Self::Desktop => copy::CMD_DESKTOP,
             Self::Theme => copy::CMD_THEME,
+            Self::StopSubagent => copy::CMD_STOP_SUBAGENT,
             Self::Help => copy::CMD_HELP,
             Self::Shortcuts => copy::CMD_SHORTCUTS,
         }
@@ -282,6 +286,7 @@ impl Shortcut {
             Self::Connect => Chord::alt('c'),
             Self::Desktop => Chord::alt('d'),
             Self::Theme => Chord::alt('t'),
+            Self::StopSubagent => Chord::alt('x'),
             Self::Help => Chord::function(1),
             Self::Shortcuts => Chord::alt('k'),
         })
@@ -304,6 +309,7 @@ impl Shortcut {
             Self::Connect => Some(Command::Connect),
             Self::Desktop => Some(Command::Desktop),
             Self::Theme => Some(Command::Theme),
+            Self::StopSubagent => Some(Command::StopSubagent),
             Self::Help => Some(Command::Help),
             Self::Shortcuts => Some(Command::Shortcuts),
         }

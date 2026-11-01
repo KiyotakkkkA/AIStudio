@@ -653,6 +653,7 @@ fn checkpoint(database: &Database, nodes: Value, status: RunStatus) -> Checkpoin
                 subject_id: None,
                 title: None,
                 retry_of_id: None,
+                parent_run_id: None,
                 status,
                 graph: graph.clone(),
                 input: Value::Null,

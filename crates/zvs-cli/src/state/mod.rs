@@ -174,6 +174,7 @@ pub enum Request {
     },
     Send(Box<ChatSendInput>),
     Cancel(RunId),
+    StopSubagent(RunId),
     StopGoal(ConversationId),
     ContinueGoal(ConversationId),
     Approve {
@@ -1585,6 +1586,13 @@ impl App {
             Command::Permissions => return self.open_panel(Panel::Permissions),
             Command::Shortcuts => return self.open_panel(Panel::Shortcuts),
             Command::Theme => return self.open_panel(Panel::Theme),
+            Command::StopSubagent => match self.transcript.newest_subagent() {
+                Some(run) => {
+                    self.status = Some((Tone::Info, copy::SUBAGENT_STOPPING.to_owned()));
+                    return vec![Request::StopSubagent(run)];
+                }
+                None => self.status = Some((Tone::Info, copy::SUBAGENT_NONE.to_owned())),
+            },
         }
         Vec::new()
     }

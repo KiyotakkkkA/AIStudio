@@ -40,6 +40,7 @@ use crate::testing::{FAKE_CAPABILITIES, TemporaryDatabase, temporary_database};
 use crate::tools::{ToolDescriptor, ToolRegistry, ToolRegistryOptions};
 
 mod goal;
+mod subagent;
 
 type Round = Box<dyn FnOnce(&GenerateRequest) -> Vec<TextDelta> + Send>;
 type Fallback = Arc<dyn Fn(usize) -> Vec<TextDelta> + Send + Sync>;

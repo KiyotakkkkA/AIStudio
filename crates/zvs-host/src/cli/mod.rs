@@ -9,7 +9,7 @@ use std::path::Path;
 use serde_json::json;
 use zvs_contract::{
     AppError, AppErrorCode, CLI_COMMAND, CliInstallDto, CliOpenInput, CliSessionDto,
-    CreateMcpServerInput, McpServerDto, WorkingFolderAccess,
+    ConversationId, CreateMcpServerInput, McpServerDto, RunId, RunKind, WorkingFolderAccess,
 };
 
 pub use connection::{CLI_CHANNELS, CliDispatch, serve};
@@ -27,6 +27,7 @@ pub const CLI_UNINSTALL_FAILED: &str = "Не удалось удалить ко�
 pub const CLI_NOT_BUNDLED: &str = "Консольная версия не входит в эту сборку";
 pub const CLI_CONNECT_FAILED: &str = "Не удалось подключить провайдера";
 pub const CLI_MCP_SECRET_REFUSED: &str = "Секреты недоступны консольной версии. Укажите значение напрямую или добавьте сервер в приложении";
+pub const CLI_NOT_A_SUBAGENT: &str = "Запуск не является субагентом диалога";
 
 pub const fn account_label(family: zvs_contract::AccountFamily) -> &'static str {
     use zvs_contract::AccountFamily;
@@ -157,6 +158,30 @@ pub fn create_mcp_server(
         ));
     }
     services.mcp.create(input)
+}
+
+pub async fn cancel_subagent(services: &Services, run_id: &RunId) -> Result<(), AppError> {
+    let refused = || AppError::new(AppErrorCode::PermissionDenied, CLI_NOT_A_SUBAGENT);
+    let run = services.runs.get(run_id).map_err(|_| refused())?;
+    if run.kind != RunKind::Subagent {
+        return Err(refused());
+    }
+    let parent = run
+        .parent_run_id
+        .and_then(|parent| services.runs.get(&parent).ok())
+        .filter(|parent| parent.kind == RunKind::Chat)
+        .ok_or_else(refused)?;
+    let reachable = parent.subject_id.is_some()
+        && parent.subject_id == run.subject_id
+        && parent
+            .subject_id
+            .as_deref()
+            .and_then(ConversationId::parse)
+            .is_some_and(|conversation| services.chat.get(&conversation).is_ok());
+    if !reachable {
+        return Err(refused());
+    }
+    services.runs.cancel(run_id).await
 }
 
 pub fn open(services: &Services, input: &CliOpenInput) -> Result<CliSessionDto, AppError> {

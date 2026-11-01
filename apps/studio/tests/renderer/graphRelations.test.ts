@@ -123,6 +123,7 @@ const NO_RUNS: RunCountsDto = {
     download: 0,
     browser: 0,
     skill: 0,
+    subagent: 0,
   },
 };
 

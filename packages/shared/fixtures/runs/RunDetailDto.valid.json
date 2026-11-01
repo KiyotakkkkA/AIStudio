@@ -9,6 +9,7 @@
         "subjectId": "s",
         "title": "T",
         "retryOfId": "0199aa11-1111-7111-8111-111111111111",
+        "parentRunId": "0199aa11-3333-7111-8111-111111111111",
         "status": "failed",
         "graph": {
           "nodes": [
@@ -74,6 +75,7 @@
         },
         "error": "e",
         "retryOfId": "0199aa11-1111-7111-8111-111111111111",
+        "parentRunId": "0199aa11-3333-7111-8111-111111111111",
         "startedAt": 2,
         "finishedAt": 3,
         "prunedAt": 4

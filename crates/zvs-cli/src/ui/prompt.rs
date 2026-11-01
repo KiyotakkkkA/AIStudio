@@ -228,6 +228,17 @@ pub fn panel(prompt: &Prompt, width: usize) -> Panel {
         }
         PromptKind::Question(state) => return question(state, prompt.selected, width),
     };
+    if let Some(label) = &prompt.subagent {
+        let mut titled = vec![Line::from(Span::styled(
+            truncate(
+                &copy::subagent_title(label),
+                width.saturating_sub(4).max(10),
+            ),
+            theme::accent().add_modifier(Modifier::BOLD),
+        ))];
+        titled.append(&mut lines);
+        lines = titled;
+    }
     Panel {
         title,
         lines,

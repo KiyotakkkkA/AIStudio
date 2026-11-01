@@ -9,6 +9,7 @@ use zvs_contract::{
     WebSourceDto, log_line,
 };
 
+use super::chat::subagent::concurrent_delegate;
 use super::chat::{BUDGET_EXHAUSTED, GenerateChatNode, KNOWLEDGE_COMPACTED, RoundOutput};
 use super::chat_ask::{ASK_ONCE, ASK_TOOL};
 use super::chat_history::{MESSAGE_OVERHEAD, tokens};
@@ -35,6 +36,7 @@ pub(crate) struct CallOutcome {
     pub(crate) content: String,
     pub(crate) compact: Option<String>,
     pub(crate) refund: bool,
+    pub(crate) usage: Option<TurnUsage>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +73,7 @@ pub(crate) enum RoundNext {
     Continue,
     Stop,
     Nudge(String),
+    Wrap,
 }
 
 pub(crate) struct BridgeOutcome {
@@ -292,8 +295,9 @@ impl ToolLoop<'_> {
         let loading: Mutex<Vec<String>> = Mutex::new(Vec::new());
         let mut executed = 0;
         let mut round = 0;
+        let mut wrapped = false;
         loop {
-            let last = budget.spent(round, executed);
+            let last = wrapped || budget.spent(round, executed);
             if last && !specs.is_empty() {
                 messages.push(ChatMessage::user(TOOL_BUDGET_NOTE));
             }
@@ -389,7 +393,10 @@ impl ToolLoop<'_> {
                     });
                 }
                 let concurrent = |entry: &PendingCall<'_>| {
-                    entry.refuse.is_none() && entry.tool.is_some_and(|tool| tool.read_only)
+                    entry.refuse.is_none()
+                        && entry.tool.is_some_and(|tool| {
+                            tool.read_only || concurrent_delegate(tool, &entry.call.arguments)
+                        })
                 };
                 let mut position = 0;
                 while position < pending.len() {
@@ -421,6 +428,9 @@ impl ToolLoop<'_> {
                         let outcome = outcome?;
                         if outcome.refund {
                             executed -= 1;
+                        }
+                        if let Some(usage) = outcome.usage {
+                            out.usage.merge(usage);
                         }
                         let status = calls.lock().unwrap_or_else(PoisonError::into_inner)
                             [entry.index]
@@ -472,6 +482,7 @@ impl ToolLoop<'_> {
             match hook.after_round(context, &report).await? {
                 RoundNext::Stop => break,
                 RoundNext::Continue => {}
+                RoundNext::Wrap => wrapped = true,
                 RoundNext::Nudge(note) => {
                     if !called {
                         messages.push(ChatMessage::assistant(output.text));

@@ -1121,6 +1121,18 @@ const TABLE: &[(&str, Check)] = &[
         "execPolicy/PolicyRuleDto",
         round_trip::<zvs_contract::PolicyRuleDto>,
     ),
+    (
+        "subagents/SubagentModelDto",
+        round_trip::<zvs_contract::SubagentModelDto>,
+    ),
+    (
+        "subagents/SubagentPreferencesDto",
+        round_trip::<zvs_contract::SubagentPreferencesDto>,
+    ),
+    (
+        "subagents/CliSubagentCancelInput",
+        round_trip::<zvs_contract::CliSubagentCancelInput>,
+    ),
     ("cli/CliOpenInput", round_trip::<zvs_contract::CliOpenInput>),
     (
         "cli/CliSessionDto",

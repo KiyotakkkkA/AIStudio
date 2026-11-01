@@ -11,6 +11,7 @@ use crate::policy::EXEC_POLICY_KEY;
 use crate::services::Services;
 use crate::services::health_check::is_health_check_key;
 use crate::services::profile::check_setting;
+use crate::services::subagents::SUBAGENTS_KEY;
 
 pub fn register(server: &mut IpcServer) {
     server
@@ -30,7 +31,7 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "settings.set",
             |services: Arc<Services>, input: SettingsSetInput| async move {
-                if input.key == EXEC_POLICY_KEY {
+                if input.key == EXEC_POLICY_KEY || input.key == SUBAGENTS_KEY {
                     return Err(invalid("key", "reserved"));
                 }
                 check_setting(&input.key, &input.value)?;

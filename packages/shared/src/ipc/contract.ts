@@ -79,6 +79,7 @@ import {
 } from "../artifacts.js";
 import { OpenSiteInput, SiteIconDto, SiteIconInput } from "../sites.js";
 import { AllowRuleInput, ExecPolicyDto, PolicyRuleDto } from "../execPolicy.js";
+import { CliSubagentCancelInput, SubagentPreferencesDto } from "../subagents.js";
 import { CliInstallDto, CliOpenInput, CliSessionDto, CliThemeDto } from "../cli.js";
 import {
   VoiceDevicesDto,
@@ -572,6 +573,8 @@ export const contract = defineContract({
   "execPolicy.get": { input: z.void(), output: ExecPolicyDto },
   "execPolicy.set": { input: ExecPolicyDto, output: ExecPolicyDto },
   "execPolicy.allowRule": { input: AllowRuleInput, output: PolicyRuleDto },
+  "subagents.get": { input: z.void(), output: SubagentPreferencesDto },
+  "subagents.set": { input: SubagentPreferencesDto, output: SubagentPreferencesDto },
   "cli.open": { input: CliOpenInput, output: CliSessionDto },
   "cli.accounts.link": { input: AccountLinkInput, output: AccountLinkResult },
   "cli.accounts.cancelLink": {
@@ -579,6 +582,7 @@ export const contract = defineContract({
     output: z.object({ cancelled: z.boolean() }),
   },
   "cli.mcp.create": { input: CreateMcpServerInput, output: McpServerDto },
+  "cli.subagents.cancel": { input: CliSubagentCancelInput, output: z.void() },
   "cli.status": { input: z.void(), output: CliInstallDto },
   "cli.install": { input: z.void(), output: CliInstallDto },
   "cli.uninstall": { input: z.void(), output: CliInstallDto },

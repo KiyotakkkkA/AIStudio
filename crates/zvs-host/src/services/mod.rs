@@ -30,6 +30,7 @@ pub mod secrets;
 pub mod settings;
 pub mod storage;
 pub mod stored;
+pub mod subagents;
 pub mod system;
 pub mod token_estimate;
 pub mod tool_loop;
@@ -58,6 +59,7 @@ pub use runs::{RunService, RunServiceOptions};
 pub use secrets::{SecretCreateInput, SecretService, SecretSummary, SecretUpdateInput};
 pub use settings::{SettingDto, SettingService};
 pub use storage::{StorageRoots, StorageService};
+pub use subagents::SubagentService;
 pub use system::SystemService;
 pub use vector_eval::{EvalSearch, VectorEvalService, VectorEvalServiceOptions};
 pub use vector_sources::{VectorSourceService, VectorSourceServiceOptions};
@@ -119,6 +121,7 @@ pub struct Services {
     pub artifacts: crate::artifacts::ArtifactStore,
     pub sites: crate::sites::SiteService,
     pub exec_policy: crate::policy::ExecPolicyService,
+    pub subagents: SubagentService,
     pub browser: crate::browser::BrowserAgent,
     pub picker: Option<SharedPicker>,
     pub cli: crate::cli::SharedCliInstaller,

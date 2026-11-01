@@ -23,6 +23,7 @@ pub enum Command {
     Permissions,
     Shortcuts,
     Theme,
+    StopSubagent,
     Clear,
     Exit,
 }
@@ -43,6 +44,7 @@ pub const COMMANDS: &[Command] = &[
     Command::Permissions,
     Command::Shortcuts,
     Command::Theme,
+    Command::StopSubagent,
     Command::Clear,
     Command::Exit,
 ];
@@ -65,6 +67,7 @@ impl Command {
             Self::Permissions => "permissions",
             Self::Shortcuts => "shortcuts",
             Self::Theme => "theme",
+            Self::StopSubagent => "subagent-stop",
             Self::Clear => "clear",
             Self::Exit => "exit",
         }
@@ -87,6 +90,7 @@ impl Command {
             Self::Permissions => copy::CMD_PERMISSIONS,
             Self::Shortcuts => copy::CMD_SHORTCUTS,
             Self::Theme => copy::CMD_THEME,
+            Self::StopSubagent => copy::CMD_STOP_SUBAGENT,
             Self::Clear => copy::CMD_CLEAR,
             Self::Exit => copy::CMD_EXIT,
         }

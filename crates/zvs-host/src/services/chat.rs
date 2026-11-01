@@ -18,8 +18,8 @@ use zvs_contract::{
     GRAPH_EXPANSION_DEFAULT_MAX, GoalReason, GoalStatus, GraphDirection, GraphExpansionDocument,
     GraphNeighborhood, GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId,
     MessageRole, ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph,
-    RunHandleDto, RunId, RunKind, RunOutcomeStatus, RunStatus, StartRunInput, StreamId,
-    ToolListFilter, ToolMode, ToolTier, Validate, VectorSearchHitDto, VectorStoreId,
+    RunHandleDto, RunId, RunKind, RunOutcomeStatus, RunStatus, SUBAGENT_DOMAIN, StartRunInput,
+    StreamId, ToolListFilter, ToolMode, ToolTier, Validate, VectorSearchHitDto, VectorStoreId,
     VendorTurnOptions, WEB_SOURCES_MAX, WebSourceDto, log_line, merge_graph_neighbors,
     model_tool_support, resolve_tool_mode,
 };
@@ -55,7 +55,8 @@ use super::profile::{
 };
 use super::retrieval_merge::{CHAT_FETCH_K, MergeOptions, StoreHits, merge_retrieval};
 use super::retrieval_query::retrieval_query;
-use super::runs::RunService;
+use super::runs::{RunService, WeakRunService};
+use super::subagents::SubagentService;
 use super::tool_loop::{
     CallOutcome, ChatTurn, LoopBudget, LoopCall, LoopHost, LoopTranscript, RoundHook, ToolLoop,
 };
@@ -159,6 +160,7 @@ pub struct ChatServiceOptions {
     pub mcp: Option<Arc<dyn McpServers>>,
     pub folders: Option<FolderAccessService>,
     pub shells: Option<BackgroundShells>,
+    pub subagents: Option<SubagentService>,
     pub logger: SharedLogger,
     pub clock: SharedClock,
 }
@@ -174,6 +176,7 @@ impl ChatServiceOptions {
             mcp: None,
             folders: None,
             shells: None,
+            subagents: None,
             logger: silent_logger(),
             clock: Arc::new(SystemClock),
         }
@@ -196,6 +199,8 @@ struct Inner {
     folders: FolderAccessService,
     shells: Option<BackgroundShells>,
     memory: MemoryService,
+    subagents: SubagentService,
+    runs: WeakRunService,
     logger: SharedLogger,
     clock: SharedClock,
     listeners: Mutex<Vec<ChatMessageListener>>,
@@ -798,7 +803,7 @@ impl Inner {
     fn save_tool_calls(
         &self,
         context: &StepContext,
-        assistant_id: &str,
+        sink: &CallSink,
         calls: &Mutex<Vec<ChatToolCallDto>>,
         changed: &[usize],
     ) {
@@ -810,6 +815,18 @@ impl Inner {
         if saved.is_empty() {
             return;
         }
+        let CallSink::Message(assistant_id) = sink else {
+            for (index, call) in saved {
+                let step = serde_json::Map::from_iter([
+                    ("domain".to_owned(), json!(SUBAGENT_DOMAIN)),
+                    ("runId".to_owned(), json!(context.run_id.to_string())),
+                    ("index".to_owned(), json!(index)),
+                    ("call".to_owned(), json!(call)),
+                ]);
+                let _ = context.emit(HostEventDraft::Step { step });
+            }
+            return;
+        };
         if let Err(error) =
             self.read(|repositories| Ok(repositories.chat.put_tool_calls(assistant_id, &saved)?))
         {
@@ -1429,6 +1446,9 @@ impl NodeDef for PrepareNode {
         }
         if tools_usable {
             offered.push(ask_tool(&offered));
+            if delegation_offered(&registered, &inner.subagents.preferences()) {
+                offered.push(delegate_tool(&offered));
+            }
         }
         if goal_turn {
             let tools = goal_tools(&offered);
@@ -1444,6 +1464,7 @@ impl NodeDef for PrepareNode {
         let processes = process_tools_section(&offered);
         let ended = inner.ended_shells_note(&input.conversation_id);
         let asking = ask_section(&offered);
+        let delegating = delegate_section(&offered);
         let later = deferred_section(&deferred, &offered);
         let goal_note = details
             .goal
@@ -1464,6 +1485,7 @@ impl NodeDef for PrepareNode {
             processes,
             ended,
             asking,
+            delegating,
             later,
             goal_note,
         ]
@@ -1618,6 +1640,7 @@ struct CallOptions<'a> {
     loading: &'a Mutex<Vec<String>>,
     skills: &'a Mutex<SkillTurn>,
     hook: &'a dyn RoundHook,
+    delegation: Option<&'a Delegation>,
 }
 
 fn knowledge_text(output: &Value, book: &mut Vec<ChatCitationDto>) -> Option<KnowledgeText> {
@@ -1704,7 +1727,7 @@ impl GenerateChatNode {
     async fn call_tool(
         &self,
         context: &StepContext,
-        assistant_id: &str,
+        sink: &CallSink,
         calls: &Arc<Mutex<Vec<ChatToolCallDto>>>,
         index: usize,
         options: CallOptions<'_>,
@@ -1713,6 +1736,7 @@ impl GenerateChatNode {
             content,
             compact: None,
             refund: false,
+            usage: None,
         };
         let inner = &self.0;
         let started = inner.now();
@@ -1733,7 +1757,7 @@ impl GenerateChatNode {
                     record.result = preview.map(|preview| preview.text);
                     record.duration_ms = u64::try_from(inner.now() - started).unwrap_or(0);
                 }
-                inner.save_tool_calls(context, assistant_id, calls, &[index]);
+                inner.save_tool_calls(context, sink, calls, &[index]);
                 match result {
                     None => format!(
                         "Tool call {}: {}",
@@ -1750,7 +1774,7 @@ impl GenerateChatNode {
                     }
                 }
             };
-        inner.save_tool_calls(context, assistant_id, calls, &[index]);
+        inner.save_tool_calls(context, sink, calls, &[index]);
         if let Some(reason) = options.refuse {
             return Ok(plain(settle(
                 ChatToolCallStatus::Refused,
@@ -1778,6 +1802,11 @@ impl GenerateChatNode {
                 outcome.error.as_deref(),
                 outcome.result,
             )));
+        }
+        if tool.key == AGENT_DELEGATE {
+            return self
+                .delegate(context, sink, calls, index, &options, &settle)
+                .await;
         }
         if tool.key == TOOL_SEARCH {
             let arguments = calls.lock().unwrap_or_else(PoisonError::into_inner)[index]
@@ -1850,7 +1879,7 @@ impl GenerateChatNode {
                 guard[index].status = ChatToolCallStatus::AwaitingAnswer;
                 guard[index].meta = record(None);
             }
-            inner.save_tool_calls(context, assistant_id, calls, &[index]);
+            inner.save_tool_calls(context, sink, calls, &[index]);
             return match context.ask_user(request.clone()).await {
                 Ok(outcome) => {
                     calls.lock().unwrap_or_else(PoisonError::into_inner)[index].meta =
@@ -1924,7 +1953,7 @@ impl GenerateChatNode {
         let observer_inner = Arc::clone(inner);
         let observer_context = context.clone();
         let observer_calls = Arc::clone(calls);
-        let observer_assistant = assistant_id.to_owned();
+        let observer_sink = sink.clone();
         let request = ToolStepRequest {
             key: tool.key.clone(),
             input: arguments,
@@ -1949,7 +1978,7 @@ impl GenerateChatNode {
                 }
                 observer_inner.save_tool_calls(
                     &observer_context,
-                    &observer_assistant,
+                    &observer_sink,
                     &observer_calls,
                     &[index],
                 );
@@ -1977,13 +2006,15 @@ impl GenerateChatNode {
                             .map(|formatted| (formatted, book.clone()))
                     };
                     if let Some((formatted, citations)) = formatted {
-                        if let Err(error) = inner.update_message(
-                            assistant_id,
-                            &MessagePatch {
-                                citations: Some(citations),
-                                ..MessagePatch::default()
-                            },
-                        ) {
+                        if let CallSink::Message(assistant_id) = sink
+                            && let Err(error) = inner.update_message(
+                                assistant_id,
+                                &MessagePatch {
+                                    citations: Some(citations),
+                                    ..MessagePatch::default()
+                                },
+                            )
+                        {
                             inner.log(
                                 LogLevel::Warn,
                                 "Could not save knowledge citations",
@@ -2001,6 +2032,7 @@ impl GenerateChatNode {
                             ),
                             compact: Some(formatted.compact),
                             refund: false,
+                            usage: None,
                         });
                     }
                 }
@@ -2126,9 +2158,16 @@ impl GenerateChatNode {
             ..base.clone().request()
         };
         let calls: Arc<Mutex<Vec<ChatToolCallDto>>> = Arc::new(Mutex::new(Vec::new()));
+        let sink = CallSink::Message(assistant_id.clone());
+        let delegation = Delegation::new(
+            &base.provider_id,
+            &base.model,
+            self.0.subagents.preferences().concurrency,
+        );
         let host = ChatLoopHost {
             node: self,
-            assistant_id: &assistant_id,
+            sink: sink.clone(),
+            delegation: Some(&delegation),
             limit: usize::try_from(tool_result_chars).unwrap_or(usize::MAX),
             scope: &knowledge.store_ids,
             book: Mutex::new(knowledge.citations.clone()),
@@ -2176,8 +2215,7 @@ impl GenerateChatNode {
                     }
                 }
             }
-            self.0
-                .save_tool_calls(context, &assistant_id, &calls, &changed);
+            self.0.save_tool_calls(context, &sink, &calls, &changed);
             return Err(error);
         }
         out.web_sources.truncate(WEB_SOURCES_MAX);
@@ -2191,7 +2229,8 @@ impl GenerateChatNode {
 
 struct ChatLoopHost<'a> {
     node: &'a GenerateChatNode,
-    assistant_id: &'a str,
+    sink: CallSink,
+    delegation: Option<&'a Delegation>,
     limit: usize,
     scope: &'a [VectorStoreId],
     book: Mutex<Vec<ChatCitationDto>>,
@@ -2211,7 +2250,7 @@ impl LoopHost for ChatLoopHost<'_> {
         self.node
             .call_tool(
                 context,
-                self.assistant_id,
+                &self.sink,
                 calls,
                 call.index,
                 CallOptions {
@@ -2228,15 +2267,19 @@ impl LoopHost for ChatLoopHost<'_> {
                     loading: call.loading,
                     skills: &self.skills,
                     hook: call.hook,
+                    delegation: self.delegation,
                 },
             )
             .await
     }
 
     fn rounds_saved(&self, context: &StepContext, rounds: &[ChatRoundDto], usage: &TurnUsage) {
+        let CallSink::Message(assistant_id) = &self.sink else {
+            return;
+        };
         let counted = usage.counted();
         if let Err(error) = self.node.0.update_message(
-            self.assistant_id,
+            assistant_id,
             &MessagePatch {
                 rounds: Some(rounds.to_vec()),
                 tokens_in: counted.then(|| usage.input_tokens.unwrap_or(0)),
@@ -2257,8 +2300,11 @@ impl LoopHost for ChatLoopHost<'_> {
     }
 
     fn offered_saved(&self, context: &StepContext, offered: &[OfferedTool]) {
+        let CallSink::Message(assistant_id) = &self.sink else {
+            return;
+        };
         if let Err(error) = self.node.0.update_message(
-            self.assistant_id,
+            assistant_id,
             &MessagePatch {
                 offered_tools: Some(offered_record(offered)),
                 ..MessagePatch::default()
@@ -2367,6 +2413,9 @@ impl ChatService {
             )
         });
         let memory = MemoryService::new(Arc::clone(&options.database), options.clock.clone());
+        let subagents = options.subagents.unwrap_or_else(|| {
+            SubagentService::new(Arc::clone(&options.database), options.clock.clone())
+        });
         let inner = Arc::new(Inner {
             database: options.database,
             tools: options.tools,
@@ -2375,6 +2424,8 @@ impl ChatService {
             folders,
             shells: options.shells,
             memory,
+            subagents,
+            runs: options.runs.downgrade(),
             logger: options.logger,
             clock: options.clock,
             listeners: Mutex::new(Vec::new()),
@@ -2385,6 +2436,10 @@ impl ChatService {
             .registry
             .register(GenerateChatNode(Arc::clone(&inner)))?;
         options.registry.register(PersistNode(Arc::clone(&inner)))?;
+        options.registry.register(DelegateNode)?;
+        options
+            .registry
+            .register(SubagentNode(Arc::clone(&inner)))?;
         Ok(Self {
             inner,
             runs: options.runs,
@@ -3127,6 +3182,9 @@ impl ChatService {
         };
         if tools_usable {
             offered.push(ask_tool(&offered));
+            if delegation_offered(&registered, &self.inner.subagents.preferences()) {
+                offered.push(delegate_tool(&offered));
+            }
         }
         let goal_listed = input.command == Some(ChatCommand::Goal)
             || details
@@ -3162,6 +3220,7 @@ impl ChatService {
             file_tools_section(&offered),
             process_tools_section(&offered),
             ask_section(&offered),
+            delegate_section(&offered),
             deferred_section(&deferred, &offered),
             if offered.is_empty() {
                 String::new()
@@ -3385,10 +3444,15 @@ impl ChatService {
                     }
                 }
                 HostEventDraft::Approval { request } => {
+                    let owner = request
+                        .get("runId")
+                        .and_then(Value::as_str)
+                        .unwrap_or(&row.id)
+                        .to_owned();
                     let pending = request
                         .get("id")
                         .and_then(Value::as_str)
-                        .map(|approval| approvals.is_pending(&row.id, approval))
+                        .map(|approval| approvals.is_pending(&owner, approval))
                         .transpose()?
                         .unwrap_or(false);
                     if pending {
@@ -3411,6 +3475,13 @@ impl ChatService {
         self.runs.cancel(id).await
     }
 }
+
+pub(crate) mod subagent;
+
+use subagent::{
+    AGENT_DELEGATE, CallSink, DelegateNode, Delegation, SubagentNode, delegate_section,
+    delegate_tool, delegation_offered,
+};
 
 #[cfg(test)]
 mod tests;

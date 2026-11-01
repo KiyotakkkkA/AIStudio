@@ -25,6 +25,7 @@ import AppSettingsStore from "../features/preferences/AppSettingsStore";
 import MemoryStore from "../features/memory/MemoryStore";
 import ProfileStore from "../features/preferences/ProfileStore";
 import ExecPolicyStore from "../features/execPolicy/ExecPolicyStore";
+import SubagentPreferencesStore from "../features/subagents/SubagentPreferencesStore";
 import VoiceStore from "../features/voice/VoiceStore";
 
 export interface RootStoreEnvironment {
@@ -56,6 +57,7 @@ export class RootStore {
   readonly memory: MemoryStore;
   readonly profile: ProfileStore;
   readonly execPolicy: ExecPolicyStore;
+  readonly subagents: SubagentPreferencesStore;
   readonly voice: VoiceStore;
 
   constructor(private readonly environment: RootStoreEnvironment) {
@@ -87,6 +89,7 @@ export class RootStore {
     this.memory = new MemoryStore(environment.ipc);
     this.profile = new ProfileStore(environment.ipc);
     this.execPolicy = new ExecPolicyStore(environment.ipc);
+    this.subagents = new SubagentPreferencesStore(environment.ipc);
     this.voice = new VoiceStore(environment.ipc);
     makeAutoObservable<RootStore, "environment">(
       this,
@@ -114,6 +117,7 @@ export class RootStore {
         memory: false,
         profile: false,
         execPolicy: false,
+        subagents: false,
         voice: false,
       },
       { autoBind: true },

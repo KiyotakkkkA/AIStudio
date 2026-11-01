@@ -817,6 +817,7 @@ async fn the_kernel_refuses_a_model_call_outside_the_runs_allowed_tools() {
         subject_id: None,
         title: None,
         retry_of_id: None,
+        parent_run_id: None,
         graph: RunGraph {
             nodes: vec![GraphNode {
                 dependencies: Some(Vec::new()),
@@ -909,6 +910,7 @@ async fn loaded_output(host: &Host, key: &str) -> Value {
             subject_id: None,
             title: None,
             retry_of_id: None,
+            parent_run_id: None,
             graph: RunGraph {
                 nodes: vec![GraphNode {
                     dependencies: Some(Vec::new()),

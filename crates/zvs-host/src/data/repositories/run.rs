@@ -18,6 +18,7 @@ pub struct RunDraft {
     pub subject_id: Option<String>,
     pub title: Option<String>,
     pub retry_of_id: Option<String>,
+    pub parent_run_id: Option<String>,
     pub status: RunStatus,
     pub graph: RunGraph,
     pub input: Value,
@@ -42,6 +43,7 @@ pub struct RunPageQuery {
     pub statuses: Vec<RunStatus>,
     pub kinds: Vec<RunKind>,
     pub subject_id: Option<String>,
+    pub parent_run_id: Option<String>,
     pub query: Option<String>,
     pub from: Option<Timestamp>,
     pub to: Option<Timestamp>,
@@ -133,8 +135,8 @@ impl<'c> RunRepository<'c> {
         self.connection
             .prepare_cached(&format!(
                 "INSERT INTO run (id, kind, subject_id, title, retry_of_id, status, graph, input, \
-                 stream_id, concurrency, created_at, started_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) RETURNING {}",
+                 stream_id, concurrency, created_at, started_at, parent_run_id) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13) RETURNING {}",
                 RunRow::COLUMNS
             ))?
             .query_row(
@@ -151,6 +153,7 @@ impl<'c> RunRepository<'c> {
                     draft.concurrency,
                     draft.created_at,
                     draft.started_at,
+                    draft.parent_run_id,
                 ],
                 RunRow::from_row,
             )
@@ -198,6 +201,10 @@ impl<'c> RunRepository<'c> {
         if let Some(subject_id) = &query.subject_id {
             conditions.push("subject_id = ?".to_owned());
             values.push(SqlValue::Text(subject_id.clone()));
+        }
+        if let Some(parent_run_id) = &query.parent_run_id {
+            conditions.push("parent_run_id = ?".to_owned());
+            values.push(SqlValue::Text(parent_run_id.clone()));
         }
         if query.live {
             conditions.push(format!(
@@ -618,6 +625,7 @@ mod tests {
             subject_id: None,
             title: Some(format!("run {id}")),
             retry_of_id: None,
+            parent_run_id: None,
             status,
             graph: RunGraph::new(vec![GraphNode::new("a", "work").normalized()]),
             input: Value::Null,

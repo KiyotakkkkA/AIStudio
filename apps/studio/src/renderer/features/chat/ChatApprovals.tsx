@@ -4,6 +4,7 @@ import Button from "../../ui/atoms/buttons/Button";
 import type ChatStore from "./ChatStore";
 import FadeIn from "../../ui/motion/FadeIn";
 import { isBuiltinTool, toolTitle } from "./toolCallCopy";
+import { subagentApprovalTitle } from "../subagents/subagentCopy";
 
 export default observer(function ChatApprovals({ store }: { readonly store: ChatStore }) {
   return (
@@ -16,6 +17,11 @@ export default observer(function ChatApprovals({ store }: { readonly store: Chat
             className="zvs-beam mb-2 flex flex-wrap items-center gap-3 rounded-card bg-warn-soft px-3.5 py-3"
           >
             <p className="min-w-0 flex-1 text-[13px] text-main-100">
+              {request.subagent === null ? null : (
+                <span className="block text-[12px] font-medium text-warn">
+                  {subagentApprovalTitle(request.subagent.label)}
+                </span>
+              )}
               Разрешить{" "}
               {request.subject === "llm.generate"
                 ? "генерацию ответа"

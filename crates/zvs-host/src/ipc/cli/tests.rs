@@ -173,3 +173,130 @@ async fn the_console_cannot_point_a_server_at_a_stored_secret() {
     );
     assert!(host.shared().mcp.list().expect("lists").is_empty());
 }
+
+fn seed_run(
+    host: &TestServices,
+    kind: zvs_contract::RunKind,
+    subject: Option<&str>,
+    parent: Option<&str>,
+) -> String {
+    let id = crate::platform::ids::new_id().hyphenated().to_string();
+    host.database
+        .with_connection(|connection| {
+            crate::data::Repositories::new(connection).runs.create(
+                &crate::data::repositories::RunDraft {
+                    id: id.clone(),
+                    kind,
+                    subject_id: subject.map(str::to_owned),
+                    title: None,
+                    retry_of_id: None,
+                    parent_run_id: parent.map(str::to_owned),
+                    status: zvs_contract::RunStatus::Running,
+                    graph: zvs_contract::RunGraph::new(Vec::new()),
+                    input: Value::Null,
+                    stream_id: crate::platform::ids::new_id().hyphenated().to_string(),
+                    concurrency: 1,
+                    created_at: 1,
+                    started_at: None,
+                },
+            )?;
+            Ok(())
+        })
+        .expect("seeds a run");
+    id
+}
+
+fn seed_conversation(host: &TestServices) -> String {
+    let provider =
+        host.database
+            .with_connection(|connection| {
+                let repositories = crate::data::Repositories::new(connection);
+                let provider = repositories.providers.create(
+                    &crate::data::repositories::ProviderDraft::new(
+                        zvs_contract::ProviderKind::Ollama,
+                        "Fake",
+                        "http://localhost:11434",
+                        vec![zvs_contract::ProviderCapability::Text],
+                        1,
+                    ),
+                )?;
+                repositories.models.replace_for_provider(
+                    &provider.id,
+                    &[crate::data::repositories::ModelDraft::new(
+                        "fake-model",
+                        "Fake",
+                        1,
+                    )],
+                    1,
+                )?;
+                Ok(provider.id)
+            })
+            .expect("seeds a provider");
+    host.shared()
+        .chat
+        .create(&zvs_contract::CreateConversationInput::new(
+            zvs_contract::ProviderId::parse(&provider).expect("a provider id"),
+            "fake-model".to_owned(),
+        ))
+        .expect("creates")
+        .id
+        .to_string()
+}
+
+#[tokio::test]
+async fn the_console_stops_only_a_subagent_of_a_reachable_dialog() {
+    let (host, server) = registered();
+    let conversation = seed_conversation(&host);
+    let turn = seed_run(
+        &host,
+        zvs_contract::RunKind::Chat,
+        Some(&conversation),
+        None,
+    );
+    let child = seed_run(
+        &host,
+        zvs_contract::RunKind::Subagent,
+        Some(&conversation),
+        Some(&turn),
+    );
+    let job = seed_run(&host, zvs_contract::RunKind::Job, None, None);
+    let stray = seed_run(
+        &host,
+        zvs_contract::RunKind::Subagent,
+        Some(&conversation),
+        Some(&job),
+    );
+    let gone = seed_run(&host, zvs_contract::RunKind::Chat, Some("missing"), None);
+    let orphan = seed_run(
+        &host,
+        zvs_contract::RunKind::Subagent,
+        Some("missing"),
+        Some(&gone),
+    );
+
+    for refused in [
+        &turn,
+        &job,
+        &stray,
+        &orphan,
+        &crate::platform::ids::new_id().hyphenated().to_string(),
+    ] {
+        let envelope = server
+            .dispatch("cli.subagents.cancel", json!({ "runId": refused }))
+            .await;
+        assert_eq!(
+            envelope["error"]["code"],
+            json!("PERMISSION_DENIED"),
+            "{refused}"
+        );
+        assert_eq!(
+            envelope["error"]["message"],
+            json!(crate::cli::CLI_NOT_A_SUBAGENT)
+        );
+    }
+    data(
+        server
+            .dispatch("cli.subagents.cancel", json!({ "runId": child }))
+            .await,
+    );
+}

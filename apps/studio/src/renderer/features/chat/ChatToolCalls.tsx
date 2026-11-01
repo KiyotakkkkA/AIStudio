@@ -54,6 +54,8 @@ import {
   toolPresentation,
 } from "./toolCallCopy";
 import { toolCallView } from "./toolCallView";
+import { SubagentGroup, type SubagentControls } from "./SubagentCard";
+import { AGENT_DELEGATE, delegateRuns, subagentMeta } from "./SubagentSteps";
 import {
   AuthorisationNote,
   Eyebrow,
@@ -144,7 +146,7 @@ function RunningSweep() {
   );
 }
 
-function ToolCallCard({
+export function ToolCallCard({
   call,
   approval,
   asking,
@@ -392,6 +394,12 @@ function ToolCallCard({
   );
 }
 
+export interface SubagentHandlers {
+  readonly stepsFor: (runId: string | undefined) => readonly ChatToolCallDto[];
+  readonly onStop: (runId: string) => void;
+  readonly stopping: readonly string[];
+}
+
 export default function ChatToolCalls({
   calls,
   approvalFor,
@@ -399,6 +407,7 @@ export default function ChatToolCalls({
   questionFor,
   onAnswer,
   onSkip,
+  subagents,
 }: {
   readonly calls: readonly ChatToolCallDto[];
   readonly approvalFor?: (id: string | null) => ToolCallApproval | undefined;
@@ -406,31 +415,54 @@ export default function ChatToolCalls({
   readonly questionFor?: (id: string) => ToolCallQuestion | undefined;
   readonly onAnswer?: (id: string, answers: QuestionAnswerDto[]) => void;
   readonly onSkip?: (id: string) => void;
+  readonly subagents?: SubagentHandlers;
 }) {
   if (calls.length === 0) return null;
   const live = questionFor !== undefined;
+  const controls: SubagentControls = {
+    stepsFor: subagents?.stepsFor ?? (() => []),
+    onStop: subagents?.onStop ?? (() => undefined),
+    stopping: subagents?.stopping ?? [],
+    approvalFor,
+    renderStep: (step, approval) => (
+      <ToolCallCard
+        key={step.id}
+        call={step}
+        approval={approval}
+        asking={undefined}
+        live={live}
+        onDecide={onDecide}
+      />
+    ),
+  };
   return (
     <ul aria-label={TOOL_CALLS_LABEL} className="m-0 mb-5 list-none space-y-1.5 p-0">
-      {calls.map((call) => {
-        const approval =
-          call.status === "awaiting-approval" ? approvalFor?.(call.approvalId) : undefined;
-        const record = call.key === ASK_TOOL ? questionRecord(call.meta) : null;
-        const asking =
-          record !== null && call.status === "awaiting-answer"
-            ? questionFor?.(record.request.id)
-            : undefined;
-        return (
-          <ToolCallCard
-            key={call.id}
-            call={call}
-            approval={approval}
-            asking={asking}
-            live={live}
-            onDecide={onDecide}
-            onAnswer={onAnswer}
-            onSkip={onSkip}
-          />
-        );
+      {delegateRuns(calls).flatMap((group) => {
+        const first = group[0];
+        if (first?.key === AGENT_DELEGATE && group.every((call) => subagentMeta(call) !== null)) {
+          return [<SubagentGroup key={first.id} calls={group} controls={controls} live={live} />];
+        }
+        return group.map((call) => {
+          const approval =
+            call.status === "awaiting-approval" ? approvalFor?.(call.approvalId) : undefined;
+          const record = call.key === ASK_TOOL ? questionRecord(call.meta) : null;
+          const asking =
+            record !== null && call.status === "awaiting-answer"
+              ? questionFor?.(record.request.id)
+              : undefined;
+          return (
+            <ToolCallCard
+              key={call.id}
+              call={call}
+              approval={approval}
+              asking={asking}
+              live={live}
+              onDecide={onDecide}
+              onAnswer={onAnswer}
+              onSkip={onSkip}
+            />
+          );
+        });
       })}
     </ul>
   );

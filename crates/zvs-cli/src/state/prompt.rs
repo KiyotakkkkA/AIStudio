@@ -87,6 +87,19 @@ pub enum PromptKind {
 pub struct Prompt {
     pub kind: PromptKind,
     pub selected: usize,
+    pub subagent: Option<String>,
+}
+
+fn subagent_label(request: &ApprovalRequestDto) -> Option<String> {
+    let subagent = request.get("subagent")?;
+    let run = subagent.get("runId")?;
+    if Some(run) != request.get("runId") {
+        return None;
+    }
+    subagent
+        .get("label")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
 }
 
 pub fn rules_apply(mode: ExecMode, detail: &ApprovalDetail) -> bool {
@@ -99,6 +112,11 @@ pub fn rules_apply(mode: ExecMode, detail: &ApprovalDetail) -> bool {
 }
 
 pub fn from_request(request: &ApprovalRequestDto, mode: ExecMode) -> Option<Prompt> {
+    let subagent = subagent_label(request);
+    from_value(request, mode).map(|prompt| Prompt { subagent, ..prompt })
+}
+
+fn from_value(request: &ApprovalRequestDto, mode: ExecMode) -> Option<Prompt> {
     let value = Value::Object(request.clone());
     if let Ok(folder) = serde_json::from_value::<FolderApprovalDto>(value.clone()) {
         return Some(Prompt::new(PromptKind::Folder {
@@ -222,7 +240,11 @@ impl QuestionState {
 
 impl Prompt {
     pub const fn new(kind: PromptKind) -> Self {
-        Self { kind, selected: 0 }
+        Self {
+            kind,
+            selected: 0,
+            subagent: None,
+        }
     }
 
     pub fn access(folder: &str) -> Self {

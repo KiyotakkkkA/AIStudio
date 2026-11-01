@@ -85,9 +85,9 @@ use zvs_host::services::{
     DriverSource, GraphService, GraphServiceOptions, HealthCheckOptions, HealthCheckService,
     McpService, McpServiceOptions, ProviderService, ProviderServiceOptions, RetentionService,
     RetentionServiceOptions, RunService, RunServiceOptions, SecretService, Services,
-    SettingService, StorageRoots, StorageService, SystemService, VectorEvalService,
-    VectorEvalServiceOptions, VectorSourceService, VectorSourceServiceOptions, VectorStoreService,
-    VectorStoreServiceOptions,
+    SettingService, StorageRoots, StorageService, SubagentService, SystemService,
+    VectorEvalService, VectorEvalServiceOptions, VectorSourceService, VectorSourceServiceOptions,
+    VectorStoreService, VectorStoreServiceOptions,
 };
 use zvs_host::skills::{
     SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillService, SkillServiceOptions,
@@ -961,16 +961,21 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         )
     });
     register_agentic_nodes(&nodes, agentic.store(), tools.clone())?;
+    let subagents = SubagentService::new(Arc::clone(&database), clock.clone())
+        .with_drivers(registry.clone())
+        .with_logger(logger.clone());
     let chat = ChatService::new(ChatServiceOptions {
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),
         mcp: Some(Arc::new(mcp.clone())),
         folders: Some(folders.clone()),
         shells: Some(shells.clone()),
+        subagents: Some(subagents.clone()),
         logger: logger.clone(),
         clock: clock.clone(),
         ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), Arc::clone(&nodes))
     })?;
+    register_kernel_tools(&nodes, &tools)?;
     let explorer = ExplorerService::new(folders.clone(), events.clone());
     let terminals = TerminalService::new(TerminalServiceOptions {
         folders: folders.clone(),
@@ -1192,6 +1197,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         artifacts,
         sites,
         exec_policy,
+        subagents,
         browser: agent.clone(),
         folders,
         picker: Some(picker),

@@ -6,6 +6,7 @@ import {
   mdiTrayArrowDown,
   mdiWeb,
   mdiDatabaseArrowDownOutline,
+  mdiRobotOutline,
 } from "@mdi/js";
 import type { RunDto, RunSummaryDto } from "@zvs/shared";
 import type { StatusTone } from "../../ui/atoms/statusTone";
@@ -22,6 +23,7 @@ export const KIND_LABELS: Record<RunKind, string> = {
   download: "загрузка",
   browser: "браузер",
   skill: "навык",
+  subagent: "субагент",
 };
 
 export const KIND_FILTER_LABELS: Record<RunKind, string> = {
@@ -33,6 +35,7 @@ export const KIND_FILTER_LABELS: Record<RunKind, string> = {
   download: "Загрузки",
   browser: "Браузер",
   skill: "Навыки",
+  subagent: "Субагенты",
 };
 
 export const KIND_ICONS: Record<RunKind, string> = {
@@ -44,6 +47,7 @@ export const KIND_ICONS: Record<RunKind, string> = {
   download: mdiTrayArrowDown,
   browser: mdiWeb,
   skill: mdiBookOpenOutline,
+  subagent: mdiRobotOutline,
 };
 
 export const STATUS_LABELS: Record<RunStatus, string> = {

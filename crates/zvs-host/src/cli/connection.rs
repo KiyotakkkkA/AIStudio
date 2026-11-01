@@ -32,6 +32,7 @@ pub const CLI_CHANNELS: &[&str] = &[
     "cli.accounts.link",
     "cli.mcp.create",
     "cli.open",
+    "cli.subagents.cancel",
     "execPolicy.allowRule",
     "execPolicy.get",
     "execPolicy.set",

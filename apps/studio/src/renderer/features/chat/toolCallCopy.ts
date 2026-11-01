@@ -26,6 +26,7 @@ import {
   mdiMagnify,
   mdiPuzzleEditOutline,
   mdiPuzzleOutline,
+  mdiRobotOutline,
   mdiScaleBalance,
   mdiScriptTextPlayOutline,
   mdiSendOutline,
@@ -42,6 +43,7 @@ import {
   type ToolAuthorisationDto,
 } from "@zvs/shared";
 import { EXEC_MODE_COPY } from "../execPolicy/execPolicyCopy";
+import { SUBAGENT_TOOL_TITLE } from "../subagents/subagentCopy";
 import {
   GOAL_PLAN_TOOL,
   GOAL_PLAN_TOOL_TITLE,
@@ -112,6 +114,7 @@ export const TOOL_PRESENTATION: Readonly<Record<string, ToolPresentation>> = {
   "download.fetch": { title: "Загрузка файла", icon: mdiDownloadOutline, category: "data" },
   "chat.ask": { title: "Вопрос пользователю", icon: mdiCommentQuestionOutline, category: "dialog" },
   [GOAL_TOOL]: { title: GOAL_TOOL_TITLE, icon: mdiFlagCheckered, category: "dialog" },
+  "agent.delegate": { title: SUBAGENT_TOOL_TITLE, icon: mdiRobotOutline, category: "dialog" },
   [GOAL_PLAN_TOOL]: { title: GOAL_PLAN_TOOL_TITLE, icon: mdiFormatListChecks, category: "dialog" },
   [GOAL_STEP_TOOL]: {
     title: GOAL_STEP_TOOL_TITLE,

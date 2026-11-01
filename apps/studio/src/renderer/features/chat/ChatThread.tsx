@@ -435,6 +435,11 @@ export default observer(function ChatThread({
                       questionFor={store.questionFor}
                       onAnswer={(id, answers) => void store.answerQuestion(id, answers)}
                       onSkip={(id) => void store.skipQuestion(id)}
+                      subagents={{
+                        stepsFor: store.subagents.callsFor,
+                        onStop: (runId) => void store.stopSubagent(runId),
+                        stopping: store.stoppingSubagents,
+                      }}
                     />
                   )}
                 />

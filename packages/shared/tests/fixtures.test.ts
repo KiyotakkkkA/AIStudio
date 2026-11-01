@@ -20,6 +20,7 @@ import * as documents from "../src/documents.js";
 import * as artifacts from "../src/artifacts.js";
 import * as sites from "../src/sites.js";
 import * as execPolicy from "../src/execPolicy.js";
+import * as subagents from "../src/subagents.js";
 import * as cli from "../src/cli.js";
 import * as voice from "../src/voice.js";
 import * as storage from "../src/storage.js";
@@ -309,6 +310,9 @@ const schemas: Record<string, z.ZodType> = {
   "execPolicy/AllowRuleChangeDto": execPolicy.AllowRuleChangeDto,
   "execPolicy/AllowRuleInput": execPolicy.AllowRuleInput,
   "execPolicy/PolicyRuleDto": execPolicy.PolicyRuleDto,
+  "subagents/SubagentModelDto": subagents.SubagentModelDto,
+  "subagents/SubagentPreferencesDto": subagents.SubagentPreferencesDto,
+  "subagents/CliSubagentCancelInput": subagents.CliSubagentCancelInput,
   "cli/CliOpenInput": cli.CliOpenInput,
   "cli/CliSessionDto": cli.CliSessionDto,
   "cli/CliInstallDto": cli.CliInstallDto,

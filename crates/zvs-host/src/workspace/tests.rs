@@ -243,6 +243,30 @@ impl Host {
             .expect("starts")
     }
 
+    fn start_child(
+        &self,
+        parent: &RunId,
+        conversation: ConversationId,
+        calls: Value,
+    ) -> RunHandleDto {
+        self.services
+            .runs
+            .start(
+                zvs_contract::parse(json!({
+                    "kind": "subagent",
+                    "subjectId": conversation.to_string(),
+                    "parentRunId": parent.to_string(),
+                    "graph": { "nodes": [{
+                        "id": "agent",
+                        "type": NODE,
+                        "input": { "conversationId": conversation.to_string(), "calls": calls }
+                    }] }
+                }))
+                .expect("a start input"),
+            )
+            .expect("starts")
+    }
+
     fn approvals(&self, run: &RunId) -> Vec<serde_json::Map<String, Value>> {
         self.services
             .run_events
@@ -373,6 +397,35 @@ async fn once_lets_the_call_through_and_the_next_call_asks_again() {
     assert_eq!(host.finish(&handle.id).await, (RunStatus::Succeeded, None));
     assert_eq!(host.approvals(&handle.id).len(), 2);
     assert!(host.folders().grants().expect("lists").is_empty());
+}
+
+#[tokio::test]
+async fn a_subagent_asks_again_after_a_once_grant_but_uses_a_conversation_grant() {
+    let host = Host::new();
+    let once = temporary_directory("child-once-");
+    let kept = temporary_directory("child-kept-");
+    let conversation = host.conversation();
+    let parent = host.start(
+        conversation,
+        json!([[[file(&once.join("a.txt"))]], [[file(&kept.join("a.txt"))]]]),
+    );
+    host.answer(&parent.id, 0, FolderAccessAnswer::Once).await;
+    host.answer(&parent.id, 1, FolderAccessAnswer::Conversation)
+        .await;
+    assert_eq!(host.finish(&parent.id).await, (RunStatus::Succeeded, None));
+
+    let child = host.start_child(&parent.id, conversation, one(&kept.join("b.txt")));
+    assert_eq!(host.finish(&child.id).await, (RunStatus::Succeeded, None));
+    assert!(host.approvals(&child.id).is_empty());
+
+    let child = host.start_child(&parent.id, conversation, one(&once.join("b.txt")));
+    let request = host.approval(&child.id, 0).await;
+    assert_eq!(request["conversationId"], json!(conversation.to_string()));
+    host.answer(&child.id, 0, FolderAccessAnswer::Deny).await;
+    assert_eq!(
+        host.finish(&child.id).await,
+        (RunStatus::Failed, Some(AppErrorCode::PermissionDenied))
+    );
 }
 
 #[tokio::test]
@@ -596,6 +649,7 @@ async fn binding_is_refused_while_a_turn_runs() {
                 subject_id: Some(conversation.to_string()),
                 title: None,
                 retry_of_id: None,
+                parent_run_id: None,
                 status: RunStatus::Running,
                 graph: serde_json::from_value::<RunGraph>(
                     json!({ "nodes": [{ "id": "a", "type": "chat.prepare" }] }),

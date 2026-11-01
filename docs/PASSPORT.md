@@ -388,6 +388,12 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
   so `/goal stop`, `/goal continue` and Ctrl+C work from the console. Both take only a dialog
   id; stop cancels the dialog's own turn, and continue starts a turn that is approved and
   policed exactly like one sent with `chat.send`.
+  Subagents (2026-11-01, TASK_048_EXTRA_4): `cli.subagents.cancel { runId }` is allowed, so
+  the console can stop one subagent without cancelling its turn. It is a narrow CLI-only
+  channel in the `cli.mcp.create` pattern: it accepts only a run of kind `subagent` whose
+  parent is a `chat` run of the same dialog, and only when that dialog exists; anything else is
+  refused with `PermissionDenied`. `runs.cancel`, `subagents.get` and `subagents.set` stay
+  studio-only.
 - **Same events, same answers.** CLI connections are extra event-bus subscribers beside the
   window. An approval or a question reaches both; the first answer wins and the other side
   sees `Conflict`.
@@ -583,6 +589,7 @@ Mapping:
 | --- | --- |
 | **Chat** | Fixed short graph: retrieve → generate → persist. Streams tokens as `token` events |
 | **Goal** | The chat graph with an open-ended round loop (`services/tool_loop.rs`, TASK_048_EXTRA_3). Ends on `goal.complete` with evidence, a round, token or minute budget (`paused`), the repetition guard or a stop (`stopped`), or a failed turn (`failed`). Progress goes out as `step` events with `domain: "goal"` |
+| **Subagent** | A child run (`RunKind::Subagent`, `parentRunId` = the turn) started by `agent.delegate` (`services/chat/subagent.rs`, TASK_048_EXTRA_4). One `subagent.run` node runs the shared tool loop with a narrowed tool set and its own budget, and returns only a report to the parent call. Its tool steps reach the parent's stream as `step` events with `domain: "subagent"` and the child `runId`; its tokens are not streamed. Cancelling the parent cancels every child |
 | **Scenarios** | User-authored DAG from the visual editor; nodes are `NodeDef`s from a registry |
 | **Agentic Build** | Self-extending plan: the model proposes steps, the kernel executes them under the same permission and approval rules |
 
@@ -794,6 +801,50 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   itself. While a goal is active, `chat.send` to its dialog is refused with `Conflict`;
   `chat.goal.stop` cancels the turn and `chat.goal.continue` renews the budget above the usage
   and starts a new turn.
+- **Subagents** (`agent.delegate`, `zvs-host/src/services/chat/subagent.rs`, TASK_048_EXTRA_4,
+  2026-11-01). A chat turn may hand a self-contained task to a child run of kind `subagent`
+  (`parentRunId` = the turn, `subjectId` = the dialog). The delegate call is a catalogue tool
+  (default tier `auto`, Russian description in `kernel_tools.rs`) handled like `chat.ask`: it
+  needs no approval of its own, because every call the child makes is admitted separately.
+  - *Ceiling.* `explore` offers `fs.list`, `fs.read`, `fs.search`, the knowledge and memory
+    tools the parent was offered, and `tool.search` over the parent's read-only deferred
+    tools; `general` offers the parent turn's tool set. Both drop `browser.*`, `chat.ask`,
+    `agent.delegate` (depth stays at 1) and the goal bridges. The child set is always a subset
+    of the parent's, and the child graph's `allowedTools` holds exactly those keys, so
+    admission refuses anything else; tiers are the same global tiers, so a child is never
+    above its parent and anything `off` does not exist for it. A child never asks the user;
+    it reports what it could not resolve.
+  - *Policy and judge.* The same global execution mode applies. Judge calls are counted
+    against the root run (`ExecPolicyService` walks `parentRunId`), so subagents cannot
+    multiply `JUDGE_CALLS_PER_RUN`. Audit is per call, as for any admitted call.
+  - *Approvals.* A child's approval is created on the child run and re-emitted on the
+    parent's stream with the dialog's `conversationId` and `subagent: { runId, label }`. It
+    reaches the same desktop surfaces (titled «Субагент: …») and the same console prompts;
+    answers go to the child run id, and the first answer wins.
+  - *Folders.* The child uses the dialog's working folder and its stored `always` and
+    `conversation` grants; a once-grant lives in the parent's own `FolderCall` and is never
+    inherited, so the child asks again. `chat:` paths are shared with the parent.
+  - *Budget.* Tool calls, tokens and minutes per child (`subagents.budget.toolCalls`,
+    `tokens`, `minutes`; defaults 20, 200 000 and 10). When one runs out the child is told to
+    write its report and the report is marked partial.
+  - *Report.* Capped at `TOOL_RESULT_MAX_CHARS` and fenced as untrusted data in
+    `<subagent-report preset status partial>`; meta `{ runId, preset, model, modelSource,
+    toolCalls, tokens, status, partial }` (plus the report and compact steps for display).
+    Child tokens are added to the parent turn's usage.
+  - *Concurrency.* Consecutive `explore` delegates run concurrently, at most N at a time
+    (preference `concurrency`, 1–4); `general` delegates are barriers and always run alone.
+    A child on an account-mode provider (`auth_mode = account`) takes every slot, so account
+    children run one at a time and the request pattern stays close to the person's own page
+    (D11).
+  - *Preferences.* `SubagentPreferencesDto { enabled, models, concurrency }` lives under the
+    reserved setting key `subagents` (refused by `settings.set`) and is reached only through
+    `subagents.get` and `subagents.set`, like the judge. `set` refuses a model whose provider
+    is disabled or lacks Text, that is unavailable, or that cannot call tools; `get` drops
+    models that have disappeared and stores the result. `enabled: false` removes
+    `agent.delegate` from the offered tools.
+  - *Model order.* The first listed model that is usable now (`modelSource: preferred`);
+    otherwise the dialog's model (`modelSource: dialog`). Account-mode models are allowed and
+    always serialise.
 - Sidecar runs with the app's privileges but no elevated rights; workspace roots are an
   explicit allow-list checked host-side, not in Rust.
 - **Folder access** (`zvs-host/src/workspace/`, TASK_036_EXTRA_1). A chat may bind one

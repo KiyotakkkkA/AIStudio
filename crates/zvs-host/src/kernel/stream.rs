@@ -331,6 +331,7 @@ mod tests {
                     subject_id: None,
                     title: None,
                     retry_of_id: None,
+                    parent_run_id: None,
                     status: RunStatus::Running,
                     graph: RunGraph::new(vec![GraphNode::new("a", "work").normalized()]),
                     input: Value::Null,

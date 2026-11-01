@@ -1,0 +1,50 @@
+[
+  {
+    "name": "duplicate model",
+    "value": {
+      "enabled": true,
+      "models": [
+        {
+          "providerId": "0199aa11-2222-7111-8111-111111111111",
+          "modelId": "qwen3:8b"
+        },
+        {
+          "providerId": "0199aa11-2222-7111-8111-111111111111",
+          "modelId": "qwen3:8b"
+        }
+      ],
+      "concurrency": 2
+    }
+  },
+  {
+    "name": "too many models",
+    "value": {
+      "enabled": true,
+      "models": [
+        { "providerId": "p", "modelId": "a" },
+        { "providerId": "p", "modelId": "b" },
+        { "providerId": "p", "modelId": "c" },
+        { "providerId": "p", "modelId": "d" },
+        { "providerId": "p", "modelId": "e" },
+        { "providerId": "p", "modelId": "f" }
+      ],
+      "concurrency": 2
+    }
+  },
+  {
+    "name": "concurrency above four",
+    "value": {
+      "enabled": true,
+      "models": [],
+      "concurrency": 5
+    }
+  },
+  {
+    "name": "concurrency zero",
+    "value": {
+      "enabled": true,
+      "models": [],
+      "concurrency": 0
+    }
+  }
+]

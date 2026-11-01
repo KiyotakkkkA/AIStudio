@@ -246,6 +246,10 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
         ),
         Request::Send(input) => Msg::Sent(link.call("chat.send", &*input).await),
         Request::Cancel(id) => void(link.call("chat.cancel", &json!({ "id": id })).await),
+        Request::StopSubagent(id) => void(
+            link.call("cli.subagents.cancel", &json!({ "runId": id }))
+                .await,
+        ),
         Request::StopGoal(id) => Msg::GoalStopped(
             link.call("chat.goal.stop", &json!({ "conversationId": id }))
                 .await,

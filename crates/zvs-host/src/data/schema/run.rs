@@ -11,6 +11,7 @@ pub struct RunRow {
     pub subject_id: Option<String>,
     pub title: Option<String>,
     pub retry_of_id: Option<String>,
+    pub parent_run_id: Option<String>,
     pub status: RunStatus,
     pub graph: RunGraph,
     pub input: Value,
@@ -26,7 +27,8 @@ pub struct RunRow {
 
 impl RunRow {
     pub const COLUMNS: &str = "id, kind, subject_id, title, retry_of_id, status, graph, input, \
-         outcome, stream_id, concurrency, created_at, started_at, finished_at, pruned_at, error";
+         outcome, stream_id, concurrency, created_at, started_at, finished_at, pruned_at, error, \
+         parent_run_id";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -35,6 +37,7 @@ impl RunRow {
             subject_id: row.get("subject_id")?,
             title: row.get("title")?,
             retry_of_id: row.get("retry_of_id")?,
+            parent_run_id: row.get("parent_run_id")?,
             status: row.get::<_, EnumColumn<RunStatus>>("status")?.0,
             graph: json_column(row, "graph")?,
             input: optional_json_column(row, "input")?.unwrap_or(Value::Null),

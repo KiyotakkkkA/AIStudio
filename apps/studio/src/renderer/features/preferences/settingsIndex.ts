@@ -1,5 +1,6 @@
 import type { PreferenceSection } from "../../stores/UiStore";
 import { JUDGE_ROW } from "../execPolicy/execPolicyCopy";
+import { SUBAGENTS_ROW } from "../subagents/subagentCopy";
 import { ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
 import { ABOUT_ROW, STYLE_ROW, TOOL_CALLS_ROW } from "./profileCopy";
 import { CLI_SETTING_ID, CLI_THEME_LABEL, CLI_THEME_SETTING_ID, CLI_TITLE } from "./cliCopy";
@@ -59,6 +60,7 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   ...GENERAL_ROWS.map((row) => ({ id: row.key, section: "general" as const, label: row.label })),
   { id: TOOL_CALLS_ROW.key, section: "general", label: TOOL_CALLS_ROW.label },
   { id: JUDGE_ROW.key, section: "general", label: JUDGE_ROW.label },
+  { id: SUBAGENTS_ROW.key, section: "general", label: SUBAGENTS_ROW.label },
   { id: STYLE_ROW.key, section: "profile", label: STYLE_ROW.label },
   { id: ABOUT_ROW.key, section: "profile", label: ABOUT_ROW.label },
   { id: SETTING_IDS.theme, section: "appearance", label: THEME_LABEL },

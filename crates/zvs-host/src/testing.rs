@@ -548,12 +548,14 @@ pub fn test_services(system: SystemService) -> TestServices {
     });
     crate::agentic::register_agentic_nodes(&nodes, agentic.store(), tools.clone())
         .expect("registers the agentic node");
+    let subagents = crate::services::SubagentService::new(database.shared(), clock.clone());
     let chat = crate::services::ChatService::new(crate::services::ChatServiceOptions {
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),
         mcp: Some(Arc::new(mcp.clone())),
         folders: Some(folders.clone()),
         shells: Some(shells.clone()),
+        subagents: Some(subagents.clone()),
         clock: clock.clone(),
         ..crate::services::ChatServiceOptions::new(
             database.shared(),
@@ -562,6 +564,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         )
     })
     .expect("a chat service");
+    crate::tools::register_kernel_tools(&nodes, &tools).expect("registers the dialog tools");
     let notifications = crate::notifications::NotificationService::new(
         crate::notifications::NotificationServiceOptions::new(
             database.shared(),
@@ -662,6 +665,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             artifacts: test_artifacts(workspace.join("conversations")),
             sites: crate::sites::SiteService::new(crate::sites::SiteServiceOptions::default()),
             exec_policy,
+            subagents,
             browser: crate::browser::BrowserAgent::new(clock.clone()),
             documents: crate::documents::DocumentService::new(
                 crate::documents::DocumentServiceOptions {

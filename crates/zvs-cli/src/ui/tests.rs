@@ -321,3 +321,118 @@ fn a_completed_goal_shows_its_summary_and_three_lines_of_evidence() {
     let screen = render(&app, 100, 40);
     assert!(screen.contains("пятая"));
 }
+
+fn plain(lines: &[ratatui::text::Line<'_>]) -> Vec<String> {
+    lines
+        .iter()
+        .map(|line| {
+            line.spans
+                .iter()
+                .map(|span| span.content.as_ref())
+                .collect()
+        })
+        .collect()
+}
+
+fn delegate(status: &str, report: &str) -> zvs_contract::ChatToolCallDto {
+    serde_json::from_value(json!({
+        "id": "d1", "key": "agent.delegate", "name": "delegate_task", "round": 0,
+        "arguments": { "task": "Найди x", "preset": "explore" },
+        "status": if status == "running" { "running" } else { "succeeded" },
+        "meta": { "runId": "0199aa11-8888-7111-8111-111111111111", "preset": "explore",
+            "label": "Найди x", "task": "Найди x", "model": "qwen3:8b",
+            "modelSource": "preferred", "status": status, "partial": status == "partial",
+            "toolCalls": 3, "tokens": 12345, "durationMs": 4200, "report": report }
+    }))
+    .expect("a delegate call")
+}
+
+fn child(index: usize) -> zvs_contract::ChatToolCallDto {
+    serde_json::from_value(json!({
+        "id": format!("c{index}"), "key": "fs.read", "name": format!("read_{index}"),
+        "round": 0, "arguments": {}, "status": "succeeded"
+    }))
+    .expect("a child call")
+}
+
+#[test]
+fn a_running_subagent_block_shows_the_header_and_the_last_five_child_calls() {
+    let children: Vec<_> = (0..7).map(child).collect();
+    let text = plain(&transcript::subagent_block(
+        &delegate("running", ""),
+        &children,
+        false,
+        0,
+        100,
+    ));
+    assert!(text[0].contains(copy::SUBAGENT_EXPLORE));
+    assert!(text[0].contains("Найди x"));
+    assert!(text[0].contains("qwen3:8b"));
+    assert!(text[1].contains(copy::SUBAGENT_RUNNING));
+    assert!(text[1].contains(&crate::format::tools(7)));
+    assert_eq!(text.len(), 2 + transcript::SUBAGENT_STEPS_SHOWN);
+    assert!(text[2].contains("read_2"));
+    assert!(text.last().expect("a line").contains("read_6"));
+    assert!(text[2].starts_with("      "));
+}
+
+#[test]
+fn a_finished_subagent_block_collapses_the_report_to_eight_lines() {
+    let report = (1..=12)
+        .map(|line| format!("строка {line}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let collapsed = plain(&transcript::subagent_block(
+        &delegate("partial", &report),
+        &[],
+        false,
+        0,
+        100,
+    ));
+    assert!(collapsed[1].contains(copy::SUBAGENT_PARTIAL));
+    assert!(
+        collapsed
+            .iter()
+            .any(|line| line.contains(copy::SUBAGENT_REPORT))
+    );
+    assert!(collapsed.iter().any(|line| line.contains("строка 8")));
+    assert!(!collapsed.iter().any(|line| line.contains("строка 9")));
+    assert!(
+        collapsed
+            .iter()
+            .any(|line| line.contains(&format!("{} 4", copy::MORE_LINES)))
+    );
+    let footer = collapsed.last().expect("a footer");
+    assert!(footer.contains(&crate::format::tokens(12_345)));
+    let expanded = plain(&transcript::subagent_block(
+        &delegate("ok", &report),
+        &[],
+        true,
+        0,
+        100,
+    ));
+    assert!(expanded.iter().any(|line| line.contains("строка 12")));
+}
+
+#[test]
+fn a_subagent_prompt_starts_with_its_title_line() {
+    let mut request = serde_json::Map::new();
+    request.insert(
+        "id".to_owned(),
+        json!("0199aa11-7777-7111-8111-111111111111"),
+    );
+    request.insert(
+        "runId".to_owned(),
+        json!("0199aa11-8888-7111-8111-111111111111"),
+    );
+    request.insert("subject".to_owned(), json!("demo.drop"));
+    request.insert(
+        "subagent".to_owned(),
+        json!({ "runId": "0199aa11-8888-7111-8111-111111111111", "label": "Удали файлы" }),
+    );
+    let prompt = crate::state::prompt::from_request(&request, zvs_contract::ExecMode::AlwaysAsk)
+        .expect("a prompt");
+    let panel = super::prompt::panel(&prompt, 80);
+    assert_eq!(plain(&panel.lines)[0], copy::subagent_title("Удали файлы"));
+    assert_eq!(panel.title, copy::APPROVAL_TITLE);
+}

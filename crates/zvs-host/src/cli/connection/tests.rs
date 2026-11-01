@@ -195,9 +195,13 @@ fn every_allowed_channel_is_a_contract_channel() {
         "mcp.update",
         "mcp.remove",
         "mcp.signOut",
+        "runs.cancel",
+        "subagents.get",
+        "subagents.set",
     ] {
         assert!(!CLI_CHANNELS.contains(&studio_only), "{studio_only}");
     }
+    assert!(CLI_CHANNELS.contains(&"cli.subagents.cancel"));
 }
 
 #[tokio::test]

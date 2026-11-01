@@ -13,7 +13,7 @@ use crate::copy;
 use crate::format;
 use crate::state::App;
 use crate::state::shortcuts::Shortcut;
-use crate::state::transcript::{Entry, Segment, ShellEnd, ShellRun, Tone};
+use crate::state::transcript::{AGENT_DELEGATE, Entry, Segment, ShellEnd, ShellRun, Tone};
 
 pub const SPINNER: [&str; 8] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"];
 pub const TICKS_PER_SECOND: u64 = 10;
@@ -264,6 +264,160 @@ fn tool(call: &ChatToolCallDto, expanded: bool, frame: u64, width: usize) -> Vec
                 Span::styled(copy::TRUNCATED, theme::faint()),
             ]));
         }
+    }
+    lines
+}
+
+pub const SUBAGENT_STEPS_SHOWN: usize = 5;
+pub const REPORT_LINES: usize = 8;
+
+fn meta_text<'a>(call: &'a ChatToolCallDto, key: &str) -> &'a str {
+    call.meta
+        .as_ref()
+        .and_then(|meta| meta.get(key))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+}
+
+fn meta_number(call: &ChatToolCallDto, key: &str) -> Option<u64> {
+    call.meta
+        .as_ref()
+        .and_then(|meta| meta.get(key))
+        .and_then(Value::as_u64)
+}
+
+pub fn subagent_block(
+    call: &ChatToolCallDto,
+    children: &[ChatToolCallDto],
+    expanded: bool,
+    frame: u64,
+    width: usize,
+) -> Vec<Line<'static>> {
+    let room = width.saturating_sub(8).max(10);
+    let status = meta_text(call, "status");
+    let running = status == "running" || status == "queued";
+    let partial = call
+        .meta
+        .as_ref()
+        .and_then(|meta| meta.get("partial"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let preset = if meta_text(call, "preset") == "general" {
+        copy::SUBAGENT_GENERAL
+    } else {
+        copy::SUBAGENT_EXPLORE
+    };
+    let label = match meta_text(call, "label") {
+        "" => meta_text(call, "task").lines().next().unwrap_or_default(),
+        label => label,
+    };
+    let (icon, color, word) = match status {
+        "running" => (
+            spinner(frame),
+            theme::colors().accent,
+            copy::SUBAGENT_RUNNING,
+        ),
+        "queued" => (spinner(frame), theme::colors().muted, copy::SUBAGENT_QUEUED),
+        "partial" => ("◐", theme::colors().warn, copy::SUBAGENT_PARTIAL),
+        "cancelled" => ("○", theme::colors().muted, copy::SUBAGENT_STOPPED),
+        "failed" => ("✗", theme::colors().err, copy::SUBAGENT_FAILED),
+        _ => ("✓", theme::colors().ok, copy::SUBAGENT_DONE),
+    };
+    let chip = Style::new().bg(theme::colors().tool_bg);
+    let mut lines = vec![Line::from(vec![
+        Span::raw("  "),
+        Span::styled(
+            format!(" {icon} "),
+            chip.fg(color).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("{preset} "),
+            chip.fg(theme::colors().ink).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("  {}", truncate(label, room.min(60))),
+            theme::text(),
+        ),
+        Span::styled(format!(" · {}", meta_text(call, "model")), theme::faint()),
+    ])];
+    if running {
+        lines.push(Line::from(vec![
+            indent(),
+            Span::styled(format!("{} ", spinner(frame)), Style::new().fg(color)),
+            Span::styled(word, Style::new().fg(color)),
+            Span::styled(
+                format!(" · {}", format::tools(children.len() as u64)),
+                theme::faint(),
+            ),
+        ]));
+        let hidden = children.len().saturating_sub(SUBAGENT_STEPS_SHOWN);
+        for child in children.iter().skip(hidden) {
+            if let Some(mut first) = tool(child, false, frame, width.saturating_sub(4))
+                .into_iter()
+                .next()
+            {
+                first.spans.insert(0, indent());
+                lines.push(first);
+            }
+        }
+        return lines;
+    }
+    let mut status_line = vec![indent(), Span::styled(word, Style::new().fg(color))];
+    if partial && status != "partial" {
+        status_line.push(Span::styled(
+            format!(" · {}", copy::SUBAGENT_PARTIAL),
+            Style::new().fg(theme::colors().warn),
+        ));
+    }
+    if let Some(count) = meta_number(call, "toolCalls") {
+        status_line.push(Span::styled(
+            format!(" · {}", format::tools(count)),
+            theme::faint(),
+        ));
+    }
+    lines.push(Line::from(status_line));
+    let report: Vec<String> = meta_text(call, "report")
+        .trim_end()
+        .split('\n')
+        .flat_map(|line| wrap(line, room))
+        .collect();
+    if report.iter().any(|line| !line.trim().is_empty()) {
+        lines.push(Line::from(vec![
+            indent(),
+            Span::styled(copy::SUBAGENT_REPORT, theme::eyebrow()),
+        ]));
+        let shown = if expanded { report.len() } else { REPORT_LINES };
+        for piece in report.iter().take(shown) {
+            lines.push(Line::from(vec![
+                indent(),
+                Span::styled(piece.clone(), theme::text()),
+            ]));
+        }
+        let hidden = report.len().saturating_sub(shown);
+        if hidden > 0 {
+            lines.push(Line::from(vec![
+                indent(),
+                Span::styled(format!("… {} {hidden}", copy::MORE_LINES), theme::faint()),
+            ]));
+        }
+    } else if let Some(error) = call.error.as_ref().filter(|error| !error.is_empty()) {
+        lines.push(Line::from(vec![
+            indent(),
+            Span::styled(error.clone(), Style::new().fg(theme::colors().err)),
+        ]));
+    }
+    let mut footer = Vec::new();
+    if let Some(tokens) = meta_number(call, "tokens").filter(|tokens| *tokens > 0) {
+        footer.push(format::tokens(tokens));
+    }
+    if let Some(ms) = meta_number(call, "durationMs") {
+        footer.push(duration(ms));
+    }
+    if !footer.is_empty() {
+        lines.push(Line::from(vec![
+            indent(),
+            Span::styled(footer.join(" · "), theme::faint()),
+        ]));
     }
     lines
 }
@@ -713,6 +867,9 @@ pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
         lines.extend(match entry {
             Entry::User(text) => user(text, width),
             Entry::Assistant { text, reasoning } => assistant(text, reasoning, expanded, width),
+            Entry::Tool(call) if call.key == AGENT_DELEGATE && call.meta.is_some() => {
+                subagent_block(call, &[], expanded, app.frame, width)
+            }
             Entry::Tool(call) => tool(call, expanded, app.frame, width),
             Entry::Notice { tone, text } => notice(*tone, text, width),
             Entry::Shell(run) => shell_block(run, expanded, app.frame, width),
@@ -728,6 +885,15 @@ pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
         for (index, segment) in live.segments.iter().enumerate() {
             lines.push(Line::default());
             match segment {
+                Segment::Tool(call) if call.key == AGENT_DELEGATE && call.meta.is_some() => {
+                    lines.extend(subagent_block(
+                        call,
+                        live.children_of(call),
+                        expanded,
+                        app.frame,
+                        width,
+                    ));
+                }
                 Segment::Tool(call) => lines.extend(tool(call, expanded, app.frame, width)),
                 Segment::Text { text, reasoning } => {
                     let thinking = index == last && text.is_empty();

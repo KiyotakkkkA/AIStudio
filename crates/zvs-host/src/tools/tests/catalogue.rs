@@ -6,6 +6,7 @@ use zvs_contract::{ToolListFilter, ToolSource};
 use crate::platform::clock::FakeClock;
 use crate::platform::events::EventBus;
 use crate::services::SystemService;
+use crate::services::chat::subagent::{AGENT_DELEGATE, delegate_tool};
 use crate::services::chat_ask::ask_tool;
 use crate::services::chat_memory::memory_tool;
 use crate::services::chat_tools::{offered_tools, tool_specs_json};
@@ -24,11 +25,16 @@ fn the_full_chat_tool_catalogue_is_measured() {
     let registered = host.tools.list(&ToolListFilter::default()).expect("lists");
     let keys: Vec<String> = registered
         .iter()
-        .filter(|tool| tool.source == ToolSource::Builtin && model_tool(&tool.key))
+        .filter(|tool| {
+            tool.source == ToolSource::Builtin
+                && model_tool(&tool.key)
+                && tool.key != AGENT_DELEGATE
+        })
         .map(|tool| tool.key.clone())
         .collect();
     let mut offered = offered_tools(&keys, &registered);
     offered.push(ask_tool(&offered));
+    offered.push(delegate_tool(&offered));
     offered.push(memory_tool(&offered));
     let size = tool_specs_json(&offered).chars().count();
     println!(
@@ -51,8 +57,9 @@ fn the_full_chat_tool_catalogue_is_measured() {
             "skill.load",
             "skill.save",
             "chat.ask",
+            "agent.delegate",
             "chat.memory"
         ]
     );
-    assert!(size < 15_000, "{size}");
+    assert!(size < 16_000, "{size}");
 }

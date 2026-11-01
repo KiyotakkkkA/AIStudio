@@ -37,6 +37,7 @@ pub mod shells;
 pub mod sites;
 pub mod skills;
 pub mod storage;
+pub mod subagents;
 pub mod system;
 pub mod terminal;
 pub mod toolchain;
@@ -243,6 +244,11 @@ pub use skills::{
 pub use storage::{
     StorageCategory, StorageCategoryUsage, StorageClearCacheOutput, StoragePart, StoragePartUsage,
     StorageUsageDto, StorageUsageInput,
+};
+pub use subagents::{
+    CliSubagentCancelInput, SUBAGENT_CONCURRENCY_DEFAULT, SUBAGENT_CONCURRENCY_MAX,
+    SUBAGENT_CONCURRENCY_MIN, SUBAGENT_DOMAIN, SUBAGENT_MODEL_ID_MAX, SUBAGENT_MODELS_MAX,
+    SubagentModelDto, SubagentPreferencesDto,
 };
 pub use system::{
     DeviceGpuDto, DeviceProfileDto, DeviceTier, ResourceSampleDto, SystemDemoJobInput,

@@ -1,0 +1,9 @@
+[
+  {
+    "name": "model",
+    "value": {
+      "providerId": "0199aa11-2222-7111-8111-111111111111",
+      "modelId": "qwen3:8b"
+    }
+  }
+]

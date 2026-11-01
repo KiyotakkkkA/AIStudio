@@ -16,6 +16,7 @@ import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import {
   groupRuns,
   matchesStatusFilter,
+  nestRuns,
   statusesOf,
   type TaskStatusFilter,
 } from "./runGroups";
@@ -32,7 +33,17 @@ const EMPTY_COUNTS: RunCountsDto = {
     cancelled: 0,
     interrupted: 0,
   },
-  byKind: { chat: 0, scenario: 0, agentic: 0, job: 0, indexing: 0, download: 0, browser: 0, skill: 0 },
+  byKind: {
+    chat: 0,
+    scenario: 0,
+    agentic: 0,
+    job: 0,
+    indexing: 0,
+    download: 0,
+    browser: 0,
+    skill: 0,
+    subagent: 0,
+  },
 };
 
 export default class TaskStore {
@@ -87,11 +98,17 @@ export default class TaskStore {
     );
   }
 
+  get nesting() {
+    return nestRuns(this.runs);
+  }
   get visible(): RunSummaryDto[] {
-    return this.runs.filter(
+    return this.nesting.roots.filter(
       (run) =>
         matchesStatusFilter(run, this.status) && (this.kind === "all" || run.kind === this.kind),
     );
+  }
+  childrenOf(id: RunId): RunSummaryDto[] {
+    return this.nesting.children.get(id) ?? [];
   }
   get groups() {
     return groupRuns(this.visible);
@@ -121,6 +138,7 @@ export default class TaskStore {
       download: 0,
       browser: 0,
       skill: 0,
+      subagent: 0,
     };
     for (const run of this.runs) counts[run.kind] += 1;
     return counts;
@@ -243,7 +261,9 @@ export default class TaskStore {
     }
     if (event.type === "approval") {
       const approval = RunApprovalDto.safeParse(event.request);
-      if (approval.success) run.approval = approval.data;
+      const owner = event.request.runId === undefined || event.request.runId === run.id;
+      if (approval.success && owner) run.approval = approval.data;
+      else if (approval.success) this.scheduleRefresh();
     }
     if (event.type === "step") {
       const step = parseStepEvent(event.step);

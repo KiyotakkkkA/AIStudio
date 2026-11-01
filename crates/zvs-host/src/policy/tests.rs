@@ -8,7 +8,7 @@ use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, AppErrorCode, ApprovalRequestDto, ExecJudgeDto, ExecMode, ExecPolicyDto,
     FileChangeKind, FileDiffDto, HostEventDraft, ProcessPlanDto, ProviderCapability, ProviderKind,
-    RunId, ToolAuthorisationDto, ToolAuthorisationKind,
+    RunGraph, RunId, RunKind, RunStatus, ToolAuthorisationDto, ToolAuthorisationKind,
 };
 
 use super::action::FileOperation;
@@ -22,7 +22,7 @@ use super::service::{
 use super::table::Family;
 use super::{ReviewVerdict, ReviewedAction, VENDOR_PACK};
 use crate::data::Repositories;
-use crate::data::repositories::{ModelDraft, ProviderDraft, ProviderPatch};
+use crate::data::repositories::{ModelDraft, ProviderDraft, ProviderPatch, RunDraft};
 use crate::drivers::ai::adapters::OPENAI_COMPATIBLE_CAPABILITIES;
 use crate::drivers::ai::capabilities::AdapterCapabilities;
 use crate::drivers::ai::ports::{
@@ -224,8 +224,12 @@ impl Host {
     }
 
     fn context(&self) -> StepContext {
+        self.context_for(RunId::new(new_id()))
+    }
+
+    fn context_for(&self, run_id: RunId) -> StepContext {
         StepContext::new(
-            RunId::new(new_id()),
+            run_id,
             CancellationToken::new(),
             KernelServices {
                 providers: Some(Arc::new(Drivers(
@@ -916,6 +920,62 @@ async fn the_judge_has_its_own_call_cap_per_run() {
             .await,
         ReviewVerdict::Run(_)
     ));
+}
+
+#[tokio::test]
+async fn subagents_spend_the_judge_cap_of_their_root_run() {
+    let host = Host::new();
+    host.mode(ExecMode::AutoBypass);
+    host.reply(Reply::Verdict(r#"{"decision":"allow","reason":"x"}"#));
+    let root = host.context();
+    let run = |id: &RunId, parent: Option<&RunId>| RunDraft {
+        id: id.to_string(),
+        kind: if parent.is_some() {
+            RunKind::Subagent
+        } else {
+            RunKind::Chat
+        },
+        subject_id: None,
+        title: None,
+        retry_of_id: None,
+        parent_run_id: parent.map(ToString::to_string),
+        status: RunStatus::Running,
+        graph: RunGraph::new(Vec::new()),
+        input: serde_json::Value::Null,
+        stream_id: new_id().hyphenated().to_string(),
+        concurrency: 1,
+        created_at: 1,
+        started_at: None,
+    };
+    let first = RunId::new(new_id());
+    let second = RunId::new(new_id());
+    host.database
+        .shared()
+        .with_connection(|connection| {
+            let runs = Repositories::new(connection).runs;
+            runs.create(&run(&root.run_id, None))?;
+            runs.create(&run(&first, Some(&root.run_id)))?;
+            runs.create(&run(&second, Some(&root.run_id)))?;
+            Ok(())
+        })
+        .expect("seeds the runs");
+    let child = |id: RunId| host.context_for(id);
+
+    for context in [child(first), child(second)] {
+        assert!(matches!(
+            host.review(&context, delete("C:/work/src/a.rs")).await,
+            ReviewVerdict::Run(_)
+        ));
+    }
+    assert_eq!(
+        host.review(&root, delete("C:/work/src/a.rs")).await,
+        ReviewVerdict::Ask { reason: None }
+    );
+    assert_eq!(
+        host.review(&child(first), delete("C:/work/src/a.rs")).await,
+        ReviewVerdict::Ask { reason: None }
+    );
+    assert_eq!(host.judge.calls(), 2);
 }
 
 #[test]

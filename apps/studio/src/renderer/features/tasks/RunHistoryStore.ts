@@ -8,6 +8,7 @@ import type {
   RunId,
   RunSummaryDto,
 } from "@zvs/shared";
+import { flattenRuns, type NestedRun } from "./runGroups";
 
 export type RunRangeKey = "all" | "today" | "week" | "month";
 
@@ -30,7 +31,17 @@ const EMPTY_COUNTS: RunCountsDto = {
     cancelled: 0,
     interrupted: 0,
   },
-  byKind: { chat: 0, scenario: 0, agentic: 0, job: 0, indexing: 0, download: 0, browser: 0, skill: 0 },
+  byKind: {
+    chat: 0,
+    scenario: 0,
+    agentic: 0,
+    job: 0,
+    indexing: 0,
+    download: 0,
+    browser: 0,
+    skill: 0,
+    subagent: 0,
+  },
 };
 
 const PAGE_SIZE = 40;
@@ -60,6 +71,10 @@ export default class RunHistoryStore {
       { ipc: false, searchTimer: false, revision: false },
       { autoBind: true },
     );
+  }
+
+  get rows(): NestedRun<RunSummaryDto>[] {
+    return flattenRuns(this.runs);
   }
 
   get hasMore(): boolean {

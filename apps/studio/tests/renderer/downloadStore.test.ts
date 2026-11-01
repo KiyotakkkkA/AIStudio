@@ -53,6 +53,7 @@ const counts: RunCountsDto = {
     download: 1,
     browser: 0,
     skill: 0,
+    subagent: 0,
   },
 };
 

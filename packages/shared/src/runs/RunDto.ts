@@ -21,6 +21,7 @@ export const RunKind = z.enum([
   "download",
   "browser",
   "skill",
+  "subagent",
 ]);
 export const GRAPH_TIMEOUT_MAX_MS = 3_600_000;
 export const GraphNode = z.object({
@@ -65,6 +66,7 @@ export const StartRunInput = z.object({
   subjectId: z.string().min(1).optional(),
   title: z.string().trim().min(1).max(200).optional(),
   retryOfId: RunId.optional(),
+  parentRunId: RunId.optional(),
   graph: RunGraph,
   input: z.json().default(null),
   concurrency: z.number().int().min(1).max(64).default(4),
@@ -79,6 +81,7 @@ export const RunDto = z.object({
   subjectId: z.string().optional(),
   title: z.string().optional(),
   retryOfId: RunId.optional(),
+  parentRunId: RunId.optional(),
   status: RunStatus,
   graph: RunGraph,
   input: z.json(),

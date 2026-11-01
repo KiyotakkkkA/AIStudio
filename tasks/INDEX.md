@@ -217,7 +217,7 @@ on its code. Suggested order: 045_EXTRA_3 → 045_EXTRA_5 (part A) → 045_EXTRA
 - [x] **TASK_048_EXTRA_1** — Execution policy: bypass engine, policy rules, judge model
 - [x] **TASK_048_EXTRA_2** — Background shell processes: host, desktop and CLI
 - [x] **TASK_048_EXTRA_3** — The /goal command: host loop, chat composer and CLI
-- [ ] **TASK_048_EXTRA_4** — Subagents: host core and policy, preferred models, desktop and CLI
+- [x] **TASK_048_EXTRA_4** — Subagents: host core and policy, preferred models, desktop and CLI
 - [ ] **TASK_048_EXTRA_5** — Background code and scripts, and waking the dialog when a process finishes
 - [ ] **TASK_049** — Mail integration (IMAP/SMTP)
 - [ ] **TASK_050** — Telegram and Git hosting integrations
@@ -331,7 +331,7 @@ you can settle the load-bearing ones early rather than being interrupted mid-tas
 | TASK_045_EXTRA_5 (resolved) | The user first chose (c), then changed it during the task: the new layout `conversations/<id>/{work,outputs,snapshots}` applies to every conversation, with no migration and no backward compatibility for beta data. Old `artifacts/` and `runs/` folders are not read, and old `<runId>/<name>` artifact ids no longer resolve. | **no** — moves user data |
 | TASK_048_EXTRA_2 (resolved) | 4 per dialog, 16 total, 60 minutes, 256 KiB; desktop output opens as a read-only tab in the «Терминал» dock | yes |
 | TASK_048_EXTRA_3 (resolved) | 40 rounds, 400 000 tokens, 30 minutes (`chat.goal.max*`); messages are refused while a goal is active | yes |
-| TASK_048_EXTRA_4 | Subagent kinds in v1 (fallback: `explore` and `general`, `general` one at a time); one preferred-model list or one per kind (fallback: one list) | yes |
+| TASK_048_EXTRA_4 (resolved) | Option c: `explore` and `general`, `general` always one at a time; option a: one ordered preferred-model list for every kind | yes |
 | TASK_048_EXTRA_5 | Consecutive wake-ups without a user message, and whether to wake in «Всегда спрашивать» (fallback: 3, every mode) | yes |
 | TASK_049 | Does mail send automatically once approved, or per message? | yes |
 | TASK_050 | Telegram: bot account, or your personal account? | **no** |

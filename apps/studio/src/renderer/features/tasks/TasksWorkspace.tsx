@@ -111,19 +111,22 @@ export default observer(function TasksWorkspace() {
                   </span>
                   <Chip>{groups[group].length}</Chip>
                 </div>
-                {groups[group].map((run) => (
-                  <TaskRow
-                    key={run.id}
-                    run={run}
-                    now={store.now}
-                    selected={store.selectedId === run.id}
-                    busy={store.busyId !== null}
-                    onSelect={() => void store.select(run.id)}
-                    onStop={() => void store.stop(run.id)}
-                    onRetry={() => void store.retry(run.id)}
-                    onReview={() => void store.select(run.id)}
-                  />
-                ))}
+                {groups[group].flatMap((parent) =>
+                  [parent, ...store.childrenOf(parent.id)].map((run) => (
+                    <TaskRow
+                      key={run.id}
+                      run={run}
+                      now={store.now}
+                      nested={run.id !== parent.id}
+                      selected={store.selectedId === run.id}
+                      busy={store.busyId !== null}
+                      onSelect={() => void store.select(run.id)}
+                      onStop={() => void store.stop(run.id)}
+                      onRetry={() => void store.retry(run.id)}
+                      onReview={() => void store.select(run.id)}
+                    />
+                  )),
+                )}
               </section>
             ))}
             {store.loaded && sections.length === 0 ? (

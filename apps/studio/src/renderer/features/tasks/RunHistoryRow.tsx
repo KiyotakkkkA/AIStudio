@@ -18,10 +18,16 @@ import {
 export interface RunHistoryRowProps {
   readonly run: RunSummaryDto;
   readonly selected: boolean;
+  readonly nested?: boolean;
   readonly onSelect: () => void;
 }
 
-export default function RunHistoryRow({ run, selected, onSelect }: RunHistoryRowProps) {
+export default function RunHistoryRow({
+  run,
+  selected,
+  nested = false,
+  onSelect,
+}: RunHistoryRowProps) {
   const tone = STATUS_TONES[run.status];
   const note = runNote(run);
   return (
@@ -29,7 +35,9 @@ export default function RunHistoryRow({ run, selected, onSelect }: RunHistoryRow
       type="button"
       onClick={onSelect}
       aria-current={selected ? "true" : undefined}
-      className={`flex w-full items-center gap-3 border-b border-line px-4 py-2.5 text-left ${
+      className={`flex w-full items-center gap-3 border-b border-line py-2.5 pr-4 text-left ${
+        nested ? "pl-11" : "pl-4"
+      } ${
         selected ? "bg-main-750" : "hover:bg-main-800"
       }`}
     >

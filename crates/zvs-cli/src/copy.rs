@@ -178,6 +178,23 @@ pub const CMD_MCP_ADD: &str = "Подключить MCP-сервер: <имя> <
 pub const CMD_MCP_INSPECT: &str = "Сведения о сервере и его инструменты: <имя>";
 pub const CMD_PERMISSIONS: &str = "Режим выполнения и модель-арбитр";
 pub const CMD_SHORTCUTS: &str = "Сочетания клавиш и их переназначение";
+pub const CMD_STOP_SUBAGENT: &str = "Остановить последний запущенный субагент";
+pub const SUBAGENT_NONE: &str = "Нет выполняющихся субагентов";
+pub const SUBAGENT_STOPPING: &str = "Остановка субагента…";
+pub const SUBAGENT_TITLE: &str = "Субагент";
+pub const SUBAGENT_EXPLORE: &str = "Исследование";
+pub const SUBAGENT_GENERAL: &str = "Общая задача";
+pub const SUBAGENT_RUNNING: &str = "Выполняется";
+pub const SUBAGENT_QUEUED: &str = "В очереди";
+pub const SUBAGENT_PARTIAL: &str = "Частичный результат";
+pub const SUBAGENT_STOPPED: &str = "Остановлен";
+pub const SUBAGENT_FAILED: &str = "Ошибка";
+pub const SUBAGENT_DONE: &str = "Готово";
+pub const SUBAGENT_REPORT: &str = "Отчёт";
+
+pub fn subagent_title(label: &str) -> String {
+    format!("{SUBAGENT_TITLE}: {label}")
+}
 pub const CMD_EFFORT: &str = "Сила размышления модели";
 pub const CMD_THEME: &str = "Тема оформления";
 

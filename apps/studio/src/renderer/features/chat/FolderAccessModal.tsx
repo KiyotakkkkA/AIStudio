@@ -1,6 +1,7 @@
 import { observer } from "mobx-react-lite";
 import ConfirmModal from "../../ui/molecules/ConfirmModal";
 import type ChatStore from "./ChatStore";
+import { subagentApprovalTitle } from "../subagents/subagentCopy";
 import FileChangeList from "./FileChangeList";
 import { CHANGES_TITLE } from "./fileChangesCopy";
 import {
@@ -19,7 +20,13 @@ export default observer(function FolderAccessModal({ store }: { readonly store: 
   return (
     <ConfirmModal
       open={request !== null}
-      title={request === null ? "" : accessTitle(request)}
+      title={
+        request === null
+          ? ""
+          : request.subagent === null
+            ? accessTitle(request)
+            : `${subagentApprovalTitle(request.subagent.label)} · ${accessTitle(request)}`
+      }
       tone="primary"
       cancelLabel={DENY}
       disabled={store.answeringFolder}

@@ -20,6 +20,7 @@ use crate::files::nodes::{
 };
 use crate::kernel::knowledge_nodes::{KNOWLEDGE_SEARCH, SEARCH_DESCRIPTION};
 use crate::kernel::{NodeRegistry, PermissionRequirement};
+use crate::services::chat::subagent::{AGENT_DELEGATE, DELEGATE_DESCRIPTION};
 use crate::skills::nodes::{
     LOAD_DESCRIPTION as SKILL_LOAD_DESCRIPTION, SAVE_DESCRIPTION as SKILL_SAVE_DESCRIPTION,
     SKILL_LOAD, SKILL_SAVE,
@@ -28,6 +29,7 @@ use crate::skills::nodes::{
 pub const NOT_TOOLS: &[&str] = &["llm.generate", "vector.index", "job.run", "download.fetch"];
 const ASK_BY_DEFAULT: &[&str] = &[FS_APPLY];
 const AUTO_BY_DEFAULT: &[&str] = &[
+    AGENT_DELEGATE,
     BROWSER_NAVIGATE,
     BROWSER_CLICK,
     BROWSER_TYPE,
@@ -42,6 +44,14 @@ struct BuiltinToolMeta {
 }
 
 const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
+    (
+        AGENT_DELEGATE,
+        BuiltinToolMeta {
+            display_name: "agent.delegate",
+            description: DELEGATE_DESCRIPTION,
+            destructive: false,
+        },
+    ),
     (
         "vector.search",
         BuiltinToolMeta {
