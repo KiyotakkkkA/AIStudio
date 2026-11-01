@@ -6,9 +6,18 @@ export const SUBAGENTS_ROW = {
   hint: "Модель может поручать отдельные задачи субагентам. Субагент работает в своём контексте с инструментами диалога и возвращает только отчёт.",
 } as const;
 
-export const SUBAGENTS_ENABLED = "Использовать субагентов";
-export const SUBAGENT_MODELS_TITLE = "Предпочтительные модели";
-export const SUBAGENT_MODELS_HINT = "Если ни одна недоступна, используется модель диалога";
+export const SUBAGENT_MODELS_ROW = {
+  key: "subagents.models",
+  label: "Предпочтительные модели",
+  hint: "Используется первая доступная модель списка. Если ни одна недоступна, используется модель диалога.",
+} as const;
+
+export const SUBAGENT_CONCURRENCY_ROW = {
+  key: "subagents.concurrency",
+  label: "Одновременно",
+  hint: "Число субагентов, выполняемых параллельно.",
+} as const;
+
 export const SUBAGENT_MODELS_EMPTY = "Список пуст, субагенты используют модель диалога.";
 export const SUBAGENT_PROVIDER = "Провайдер";
 export const SUBAGENT_MODEL = "Модель";
@@ -19,8 +28,6 @@ export const SUBAGENT_ADD = "Добавить";
 export const SUBAGENT_REMOVE = "Убрать модель";
 export const SUBAGENT_UP = "Выше";
 export const SUBAGENT_DOWN = "Ниже";
-export const SUBAGENT_CONCURRENCY = "Одновременно";
-export const SUBAGENT_CONCURRENCY_LABEL = "Число субагентов, выполняемых одновременно";
 export const SUBAGENT_ACCOUNT_NOTE = "Модели аккаунтов выполняют субагентов по одному";
 export const SUBAGENT_NO_PROVIDERS = "Нет включённых провайдеров текстовых моделей.";
 export const SUBAGENT_SAVE_FAILED = "Не удалось сохранить настройки субагентов";

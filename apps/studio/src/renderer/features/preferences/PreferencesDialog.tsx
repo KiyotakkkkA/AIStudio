@@ -103,22 +103,19 @@ import ModelFields, { availableModelOptions } from "../chat/ModelFields";
 import {
   SUBAGENT_ACCOUNT_NOTE,
   SUBAGENT_ADD,
-  SUBAGENT_CONCURRENCY,
-  SUBAGENT_CONCURRENCY_LABEL,
+  SUBAGENT_CONCURRENCY_ROW,
   SUBAGENT_DOWN,
   SUBAGENT_MISSING_MODEL,
   SUBAGENT_MODEL,
   SUBAGENT_MODEL_LABEL,
   SUBAGENT_MODELS_EMPTY,
-  SUBAGENT_MODELS_HINT,
-  SUBAGENT_MODELS_TITLE,
+  SUBAGENT_MODELS_ROW,
   SUBAGENT_NO_PROVIDERS,
   SUBAGENT_NONE,
   SUBAGENT_PROVIDER,
   SUBAGENT_PROVIDER_LABEL,
   SUBAGENT_REMOVE,
   SUBAGENT_UP,
-  SUBAGENTS_ENABLED,
   SUBAGENTS_ROW,
 } from "../subagents/subagentCopy";
 import {
@@ -481,112 +478,124 @@ const SubagentsRow = observer(function SubagentsRow() {
   const { subagents } = useStore();
   const empty = subagents.loaded && subagents.providers.length === 0;
   return (
-    <SettingRow
-      id={SUBAGENTS_ROW.key}
-      label={SUBAGENTS_ROW.label}
-      hint={SUBAGENTS_ROW.hint}
-      error={subagents.error ?? undefined}
-      stacked
-      footer={
-        empty ? <p className="m-0 text-[12px] text-main-500">{SUBAGENT_NO_PROVIDERS}</p> : undefined
-      }
-    >
-      <Toggle
-        label={SUBAGENTS_ENABLED}
-        checked={subagents.enabled}
-        onChange={(value) => void subagents.setEnabled(value)}
-      />
-      <div className="flex flex-col gap-1.5">
-        <p className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-          {SUBAGENT_MODELS_TITLE}
-        </p>
-        <p className="m-0 text-[12px] text-main-500">{SUBAGENT_MODELS_HINT}</p>
-        {subagents.views.length === 0 ? (
-          <p className="m-0 text-[12px] text-main-400">{SUBAGENT_MODELS_EMPTY}</p>
-        ) : (
-          <ol className="m-0 flex list-none flex-col gap-1 p-0">
-            {subagents.views.map((view, index) => (
-              <li
-                key={view.key}
-                className="flex min-w-0 items-center gap-2 rounded-control border border-line bg-main-800 px-2.5 py-1.5"
-              >
-                <span className="w-4 flex-none font-mono text-[11.5px] text-main-500">
-                  {index + 1}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[12.5px] text-main-100">
-                  {view.modelName}
-                  <span className="text-main-500"> · {view.providerName}</span>
-                </span>
-                {view.missing ? <Chip>{SUBAGENT_MISSING_MODEL}</Chip> : null}
-                <IconButton
-                  path={mdiChevronUp}
-                  label={SUBAGENT_UP}
-                  size="sm"
-                  disabled={index === 0}
-                  onClick={() => void subagents.move(index, -1)}
-                />
-                <IconButton
-                  path={mdiChevronDown}
-                  label={SUBAGENT_DOWN}
-                  size="sm"
-                  disabled={index === subagents.views.length - 1}
-                  onClick={() => void subagents.move(index, 1)}
-                />
-                <IconButton
-                  path={mdiClose}
-                  label={SUBAGENT_REMOVE}
-                  size="sm"
-                  onClick={() => void subagents.remove(index)}
-                />
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-      {subagents.full ? null : (
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="grid min-w-0 flex-1 grid-cols-2 gap-3 max-sm:grid-cols-1">
-            <ModelFields
-              providerTitle={SUBAGENT_PROVIDER}
-              providerLabel={SUBAGENT_PROVIDER_LABEL}
-              providerValue={subagents.draftProviderId ?? ""}
-              providerOptions={subagents.providers.map((provider) => ({
-                value: provider.id,
-                label: provider.name,
-              }))}
-              providerDisabled={subagents.providers.length === 0}
-              onProviderChange={subagents.selectDraftProvider}
-              modelTitle={SUBAGENT_MODEL}
-              modelLabel={SUBAGENT_MODEL_LABEL}
-              modelValue={subagents.draftModelId ?? ""}
-              modelOptions={availableModelOptions(subagents.draftProvider)}
-              modelDisabled={subagents.draftProvider === undefined}
-              onModelChange={subagents.setDraftModel}
-              placeholder={SUBAGENT_NONE}
-            />
-          </div>
-          <Button
-            tone="ghost"
-            disabled={!subagents.canAdd}
-            onClick={() => void subagents.addDraft()}
-          >
-            {SUBAGENT_ADD}
-          </Button>
-        </div>
-      )}
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-[12px] font-medium text-main-300">{SUBAGENT_CONCURRENCY}</span>
-        <SegmentedControl
-          label={SUBAGENT_CONCURRENCY_LABEL}
-          value={String(subagents.concurrency)}
-          options={CONCURRENCY_OPTIONS}
-          onChange={(value) => void subagents.setConcurrency(Number(value))}
+    <>
+      <SettingRow
+        id={SUBAGENTS_ROW.key}
+        label={SUBAGENTS_ROW.label}
+        hint={SUBAGENTS_ROW.hint}
+        error={subagents.error ?? undefined}
+      >
+        <Toggle
+          label={subagents.enabled ? TOGGLE_ON : TOGGLE_OFF}
+          checked={subagents.enabled}
+          onChange={(value) => void subagents.setEnabled(value)}
         />
-      </div>
-      {subagents.accountListed ? (
-        <p className="m-0 text-[12px] text-main-500">{SUBAGENT_ACCOUNT_NOTE}</p>
-      ) : null}
-    </SettingRow>
+      </SettingRow>
+      <Reveal show={subagents.enabled}>
+        <div className="ml-4 border-line pl-4">
+          <SettingRow
+            id={SUBAGENT_MODELS_ROW.key}
+            label={SUBAGENT_MODELS_ROW.label}
+            hint={SUBAGENT_MODELS_ROW.hint}
+            stacked
+            footer={
+              empty ? (
+                <p className="m-0 text-[12px] text-main-500">{SUBAGENT_NO_PROVIDERS}</p>
+              ) : undefined
+            }
+          >
+            {subagents.views.length === 0 ? (
+              <p className="m-0 text-[12px] text-main-400">{SUBAGENT_MODELS_EMPTY}</p>
+            ) : (
+              <ol className="m-0 flex list-none flex-col gap-1 p-0">
+                {subagents.views.map((view, index) => (
+                  <li
+                    key={view.key}
+                    className="flex min-w-0 items-center gap-2 rounded-control border border-line bg-main-800 px-2.5 py-1.5"
+                  >
+                    <span className="w-4 flex-none font-mono text-[11.5px] text-main-500">
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-main-100">
+                      {view.modelName}
+                      <span className="text-main-500"> · {view.providerName}</span>
+                    </span>
+                    {view.missing ? <Chip>{SUBAGENT_MISSING_MODEL}</Chip> : null}
+                    <IconButton
+                      path={mdiChevronUp}
+                      label={SUBAGENT_UP}
+                      size="sm"
+                      disabled={index === 0}
+                      onClick={() => void subagents.move(index, -1)}
+                    />
+                    <IconButton
+                      path={mdiChevronDown}
+                      label={SUBAGENT_DOWN}
+                      size="sm"
+                      disabled={index === subagents.views.length - 1}
+                      onClick={() => void subagents.move(index, 1)}
+                    />
+                    <IconButton
+                      path={mdiClose}
+                      label={SUBAGENT_REMOVE}
+                      size="sm"
+                      onClick={() => void subagents.remove(index)}
+                    />
+                  </li>
+                ))}
+              </ol>
+            )}
+            {subagents.full ? null : (
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="grid min-w-0 flex-1 grid-cols-2 gap-3 max-sm:grid-cols-1">
+                  <ModelFields
+                    providerTitle={SUBAGENT_PROVIDER}
+                    providerLabel={SUBAGENT_PROVIDER_LABEL}
+                    providerValue={subagents.draftProviderId ?? ""}
+                    providerOptions={subagents.providers.map((provider) => ({
+                      value: provider.id,
+                      label: provider.name,
+                    }))}
+                    providerDisabled={subagents.providers.length === 0}
+                    onProviderChange={subagents.selectDraftProvider}
+                    modelTitle={SUBAGENT_MODEL}
+                    modelLabel={SUBAGENT_MODEL_LABEL}
+                    modelValue={subagents.draftModelId ?? ""}
+                    modelOptions={availableModelOptions(subagents.draftProvider)}
+                    modelDisabled={subagents.draftProvider === undefined}
+                    onModelChange={subagents.setDraftModel}
+                    placeholder={SUBAGENT_NONE}
+                  />
+                </div>
+                <Button
+                  tone="ghost"
+                  disabled={!subagents.canAdd}
+                  onClick={() => void subagents.addDraft()}
+                >
+                  {SUBAGENT_ADD}
+                </Button>
+              </div>
+            )}
+          </SettingRow>
+          <SettingRow
+            id={SUBAGENT_CONCURRENCY_ROW.key}
+            label={SUBAGENT_CONCURRENCY_ROW.label}
+            hint={
+              subagents.accountListed
+                ? `${SUBAGENT_CONCURRENCY_ROW.hint} ${SUBAGENT_ACCOUNT_NOTE}.`
+                : SUBAGENT_CONCURRENCY_ROW.hint
+            }
+          >
+            <SegmentedControl
+              label={SUBAGENT_CONCURRENCY_ROW.label}
+              value={String(subagents.concurrency)}
+              options={CONCURRENCY_OPTIONS}
+              onChange={(value) => void subagents.setConcurrency(Number(value))}
+            />
+          </SettingRow>
+        </div>
+      </Reveal>
+    </>
   );
 });
 
