@@ -19,6 +19,11 @@ import GoalStore from "../../src/renderer/features/chat/GoalStore.ts";
 import {
   GOAL_CONTINUE_FAILED,
   GOAL_DONE,
+  GOAL_PLAN_TOOL,
+  GOAL_STEP_FIELD,
+  GOAL_STEP_SUMMARY,
+  GOAL_STEP_TOOL,
+  planProgressText,
   GOAL_STOP_FAILED,
   goalMinutesText,
   goalRoundText,
@@ -26,6 +31,11 @@ import {
   goalTokensText,
 } from "../../src/renderer/features/chat/goalCopy.ts";
 import { toolCallView } from "../../src/renderer/features/chat/toolCallView.ts";
+import {
+  BASE_TOOLS_TITLE,
+  COMMAND_TOOLS_TITLE,
+  toolSections,
+} from "../../src/renderer/features/chat/toolSets.ts";
 import { provider } from "./providerFixtures.ts";
 
 const ID = "0199ff11-8888-7111-8111-000000000001";
@@ -278,4 +288,48 @@ test("the composer refuses an empty goal with a reason and locks while a goal ru
   expect(running.store.goals.active).toBe(true);
   expect(running.store.canSend).toBe(false);
   running.store.dispose();
+});
+
+const plan = [
+  { id: "p1", title: "Найти модули", status: "done", stepIds: [], summary: "4 модуля" },
+  { id: "p2", title: "Добавить тесты", status: "running", stepIds: [], summary: null },
+] as const;
+
+test("the plan follows the live steps and counts what is done", () => {
+  const { store } = setup(goal());
+  expect(store.plan).toEqual([]);
+  store.apply(step({ plan: [...plan] } as Partial<ChatGoalStepDto>));
+  expect(store.plan.map((item) => item.title)).toEqual(["Найти модули", "Добавить тесты"]);
+  expect(store.planDone).toBe(1);
+  expect(planProgressText(store.planDone, store.plan.length)).toBe(
+    `${(1).toLocaleString("ru-RU")} из ${(2).toLocaleString("ru-RU")}`,
+  );
+  store.apply(
+    step({
+      round: 4,
+      plan: plan.map((item) => ({ ...item, status: "done" as const })),
+    } as Partial<ChatGoalStepDto>),
+  );
+  expect(store.planDone).toBe(2);
+});
+
+test("plan tool calls show their steps and the step summary", () => {
+  expect(
+    toolCallView({ key: GOAL_PLAN_TOOL, arguments: { steps: ["А", "Б"] }, meta: null }),
+  ).toEqual({
+    kind: "fields",
+    fields: [
+      { label: `${GOAL_STEP_FIELD} ${(1).toLocaleString("ru-RU")}`, value: "А" },
+      { label: `${GOAL_STEP_FIELD} ${(2).toLocaleString("ru-RU")}`, value: "Б" },
+    ],
+  });
+  expect(
+    toolCallView({ key: GOAL_STEP_TOOL, arguments: { summary: "готово" }, meta: null }),
+  ).toEqual({ kind: "fields", fields: [{ label: GOAL_STEP_SUMMARY, value: "готово" }] });
+  expect(
+    toolSections([
+      { key: GOAL_PLAN_TOOL, tokens: 1, source: "command" },
+      { key: "fs.read", tokens: 1, source: "base" },
+    ]).map((section) => section.title),
+  ).toEqual([BASE_TOOLS_TITLE, COMMAND_TOOLS_TITLE]);
 });

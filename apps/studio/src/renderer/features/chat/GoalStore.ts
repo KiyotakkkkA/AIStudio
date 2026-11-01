@@ -2,6 +2,7 @@ import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
   ChatGoalStepDto,
+  type AgenticPlanStepDto,
   type ChatGoalDto,
   type Contract,
   type ConversationDto,
@@ -52,6 +53,7 @@ export default class GoalStore {
       reason: live.reason,
       usage: live.usage,
       budget: live.budget,
+      plan: live.plan.length > 0 ? live.plan : base.plan,
     };
   }
 
@@ -61,6 +63,14 @@ export default class GoalStore {
 
   get paused(): boolean {
     return this.goal?.status === "paused";
+  }
+
+  get plan(): readonly AgenticPlanStepDto[] {
+    return this.goal?.plan ?? [];
+  }
+
+  get planDone(): number {
+    return this.plan.filter((step) => step.status === "done").length;
   }
 
   get visible(): boolean {

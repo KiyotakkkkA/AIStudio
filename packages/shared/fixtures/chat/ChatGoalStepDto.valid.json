@@ -38,5 +38,41 @@
         "minutes": 30
       }
     }
+  },
+  {
+    "name": "with a plan",
+    "value": {
+      "domain": "goal",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "status": "active",
+      "reason": null,
+      "round": 12,
+      "usage": {
+        "rounds": 12,
+        "tokens": 48200,
+        "elapsedMs": 185000
+      },
+      "budget": {
+        "rounds": 40,
+        "tokens": 400000,
+        "minutes": 30
+      },
+      "plan": [
+        {
+          "id": "p1",
+          "title": "Найти модули без тестов",
+          "status": "done",
+          "stepIds": [],
+          "summary": "Найдено 4 модуля"
+        },
+        {
+          "id": "p2",
+          "title": "Добавить тесты",
+          "status": "running",
+          "stepIds": [],
+          "summary": null
+        }
+      ]
+    }
   }
 ]

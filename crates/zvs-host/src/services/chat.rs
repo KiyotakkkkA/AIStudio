@@ -27,7 +27,7 @@ use zvs_contract::{
 use super::chat_ask::{ASK_MALFORMED, ASK_TOOL, answers_text, ask_request, ask_section, ask_tool};
 use super::chat_goal::{
     GOAL_CONTINUE_TEXT, GOAL_DESCRIPTION, GOAL_NEEDS_TOOLS, GOAL_NOT_PAUSED, GOAL_NOT_STOPPABLE,
-    GOAL_RUNNING, GOAL_TOOL, GoalHook, default_budget, ended, goal_section, goal_tool, restarted,
+    GOAL_RUNNING, GOAL_TOOL, GoalHook, default_budget, ended, goal_section, goal_tools, restarted,
     settled,
 };
 use super::chat_history::{
@@ -1431,7 +1431,8 @@ impl NodeDef for PrepareNode {
             offered.push(ask_tool(&offered));
         }
         if goal_turn {
-            offered.push(goal_tool(&offered));
+            let tools = goal_tools(&offered);
+            offered.extend(tools);
         }
         let (memory, memory_refs) =
             inner.memory_prompt(&input.conversation_id, tools_usable, &mut offered)?;
@@ -1447,13 +1448,8 @@ impl NodeDef for PrepareNode {
         let goal_note = details
             .goal
             .as_ref()
-            .filter(|_| goal_turn)
-            .and_then(|goal| {
-                offered
-                    .iter()
-                    .find(|tool| tool.key == GOAL_TOOL)
-                    .map(|tool| goal_section(goal, &tool.name))
-            })
+            .filter(|_| goal_turn && offered.iter().any(|tool| tool.key == GOAL_TOOL))
+            .map(|goal| goal_section(goal, &offered))
             .unwrap_or_default();
         let prompt = [
             details.system_prompt.clone(),
@@ -3131,6 +3127,13 @@ impl ChatService {
         };
         if tools_usable {
             offered.push(ask_tool(&offered));
+        }
+        let goal_listed = input.command == Some(ChatCommand::Goal)
+            || details
+                .is_some_and(|details| details.goal.as_ref().is_some_and(ChatGoalDto::active));
+        if tools_usable && goal_listed {
+            let tools = goal_tools(&offered);
+            offered.extend(tools);
         }
         let conversation_id = input
             .conversation_id

@@ -778,8 +778,13 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   user message with `ChatCommand::Goal` starts a goal: `ConversationDto.goal` holds its text,
   status (`active | paused | done | stopped | failed`), reason, budget and usage. The turn runs
   the same tool set, folder, grants, approvals, questions and execution policy as any other,
-  plus the bridge `goal.complete { summary, evidence }`, which, like `chat.ask`, is not a
-  registry tool and needs no admission; empty evidence is refused and the goal goes on. The
+  plus three bridges that, like `chat.ask`, are not registry tools and need no admission:
+  `goal.plan` (`update_plan { steps }`) and `goal.step` (`complete_step { summary }`), the
+  agentic session's planning (`agentic/plan.rs`), and `goal.complete { summary, evidence }`;
+  empty evidence is refused and the goal goes on. The plan lives in `ChatGoalDto.plan`, travels
+  with every `goal` step, is shown in the «План» section of the context panel and goes back to
+  the model on continuation; endless revisions stop the goal like repeated calls. `chat.context`
+  lists the three tools (source `command`) when `/goal` is chosen or a goal is active. The
   per-call budget does not apply: the loop (`ToolLoop` with `LoopBudget::Open` and the
   `GoalHook` round hook) stops on completion, on the round, token or minute budget
   (`chat.goal.maxRounds`, `maxTokens`, `maxMinutes`; defaults 40, 400 000 and 30), or when

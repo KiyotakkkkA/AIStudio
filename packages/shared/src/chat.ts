@@ -16,6 +16,7 @@ import { RunHandleDto } from "./runs/RunDto.js";
 import { ApprovalRequestDto, EventSeq } from "./events/HostEvent.js";
 import { QuestionRequestDto } from "./questions.js";
 import { Timestamp } from "./primitives/time.js";
+import { AgenticPlanStepDto } from "./agentic.js";
 
 export const ChatSettings = z.object({
   temperature: z.number().min(0).max(2).optional(),
@@ -201,6 +202,7 @@ export const ChatGoalDto = z
     budget: GoalBudgetDto,
     usage: GoalUsageDto,
     summary: z.string().max(GOAL_SUMMARY_MAX).nullable(),
+    plan: z.array(AgenticPlanStepDto).max(50).default([]),
     startedAt: z.number().int().nonnegative(),
     endedAt: z.number().int().nonnegative().nullable(),
   })
@@ -219,6 +221,7 @@ export const ChatGoalStepDto = z
     round: GoalCount,
     usage: GoalUsageDto,
     budget: GoalBudgetDto,
+    plan: z.array(AgenticPlanStepDto).max(50).default([]),
   })
   .refine(reasonMatchesStatus, { path: ["reason"] });
 export type ChatGoalStepDto = z.infer<typeof ChatGoalStepDto>;

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::agentic::{AGENTIC_PLAN_MAX, AgenticPlanStepDto};
 use crate::chat::CHAT_TEXT_MAX;
 use crate::enums::wire_enum;
 use crate::errors::AppError;
@@ -126,6 +127,8 @@ pub struct ChatGoalDto {
     pub usage: GoalUsageDto,
     #[serde(deserialize_with = "crate::wire::nullable")]
     pub summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plan: Vec<AgenticPlanStepDto>,
     pub started_at: Timestamp,
     #[serde(deserialize_with = "crate::wire::nullable")]
     pub ended_at: Option<Timestamp>,
@@ -140,6 +143,7 @@ impl ChatGoalDto {
             budget,
             usage: GoalUsageDto::default(),
             summary: None,
+            plan: Vec::new(),
             started_at: now,
             ended_at: None,
         }
@@ -156,6 +160,7 @@ impl Validate for ChatGoalDto {
         check::max_len("text", &self.text, CHAT_TEXT_MAX)?;
         nested("budget", self.budget.validate())?;
         nested("usage", self.usage.validate())?;
+        check_plan(&self.plan)?;
         if self.status.has_reason() != self.reason.is_some() {
             return Err(invalid("reason", "status"));
         }
@@ -187,6 +192,8 @@ pub struct ChatGoalStepDto {
     pub round: u64,
     pub usage: GoalUsageDto,
     pub budget: GoalBudgetDto,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plan: Vec<AgenticPlanStepDto>,
 }
 
 impl ChatGoalStepDto {
@@ -199,6 +206,7 @@ impl ChatGoalStepDto {
             round: goal.usage.rounds,
             usage: goal.usage,
             budget: goal.budget,
+            plan: goal.plan.clone(),
         }
     }
 }
@@ -213,8 +221,18 @@ impl Validate for ChatGoalStepDto {
         }
         check::safe_integer("round", self.round)?;
         nested("usage", self.usage.validate())?;
+        check_plan(&self.plan)?;
         nested("budget", self.budget.validate())
     }
+}
+
+fn check_plan(plan: &[AgenticPlanStepDto]) -> Result<(), AppError> {
+    if plan.len() > AGENTIC_PLAN_MAX {
+        return Err(invalid("plan", "maxItems"));
+    }
+    plan.iter()
+        .enumerate()
+        .try_for_each(|(index, step)| nested(&format!("plan.{index}"), step.validate()))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

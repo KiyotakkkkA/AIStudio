@@ -1,5 +1,11 @@
 import { ChatCitationDto, type ChatToolCallDto, type CodeLanguage, type Json } from "@zvs/shared";
-import { GOAL_TOOL } from "./goalCopy";
+import {
+  GOAL_PLAN_TOOL,
+  GOAL_STEP_FIELD,
+  GOAL_STEP_SUMMARY,
+  GOAL_STEP_TOOL,
+  GOAL_TOOL,
+} from "./goalCopy";
 import { LANGUAGE_LABEL, PROCESS_TOOL_CODE, PROCESS_TOOL_SHELL } from "./processCopy";
 
 export const SHELL_ID_LABEL = "Процесс";
@@ -246,6 +252,24 @@ export function toolCallView(
       const summary = text(args, "summary");
       const evidence = text(args, "evidence") ?? strings(args, "evidence").join("\n");
       return summary === null ? null : { kind: "goal", summary, evidence };
+    }
+    case GOAL_PLAN_TOOL: {
+      const steps = strings(args, "steps");
+      return steps.length === 0
+        ? null
+        : {
+            kind: "fields",
+            fields: steps.map((step, index) => ({
+              label: `${GOAL_STEP_FIELD} ${(index + 1).toLocaleString("ru-RU")}`,
+              value: step,
+            })),
+          };
+    }
+    case GOAL_STEP_TOOL: {
+      const summary = text(args, "summary");
+      return summary === null
+        ? null
+        : { kind: "fields", fields: [{ label: GOAL_STEP_SUMMARY, value: summary }] };
     }
     case "knowledge.list":
     case "vector.list":

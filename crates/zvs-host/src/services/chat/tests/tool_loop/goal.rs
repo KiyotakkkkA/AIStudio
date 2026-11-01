@@ -3,8 +3,9 @@ use std::sync::atomic::Ordering;
 
 use serde_json::json;
 use zvs_contract::{
-    AppErrorCode, ChatCommand, ChatGoalDto, ChatSendInput, ChatToolCallStatus, ConversationId,
-    GOAL_STEP_DOMAIN, GoalReason, GoalStatus, HostEventDraft, RunHandleDto, RunStatus,
+    AgenticPlanStepStatus, AppErrorCode, ChatCommand, ChatGoalDto, ChatSendInput,
+    ChatToolCallStatus, ConversationId, GOAL_STEP_DOMAIN, GoalReason, GoalStatus, HostEventDraft,
+    RunHandleDto, RunStatus,
 };
 
 use super::{Loop, call, call_with_id, text, within};
@@ -14,8 +15,9 @@ use crate::drivers::ai::{TextDelta, TurnUsage};
 use crate::platform::clock::{FakeClock, SharedClock};
 use crate::services::chat::tests::eventually;
 use crate::services::chat_goal::{
-    GOAL_CONTINUE_TEXT, GOAL_EVIDENCE_REQUIRED, GOAL_NOT_PAUSED, GOAL_NOT_STOPPABLE, GOAL_RUNNING,
-    GOAL_TOOL, GOAL_TOOL_NAME, MINUTES_KEY, ROUNDS_KEY, TOKENS_KEY,
+    GOAL_CONTINUE_TEXT, GOAL_EVIDENCE_REQUIRED, GOAL_NO_STEP, GOAL_NOT_PAUSED, GOAL_NOT_STOPPABLE,
+    GOAL_PLAN_NAME, GOAL_PLAN_TOOL, GOAL_RUNNING, GOAL_STEP_NAME, GOAL_STEP_TOOL, GOAL_TOOL,
+    GOAL_TOOL_NAME, GOAL_TOOLS, MINUTES_KEY, ROUNDS_KEY, TOKENS_KEY,
 };
 use crate::services::chat_tools::CHAT_TOOL_CALLS;
 
@@ -384,4 +386,111 @@ async fn an_active_goal_reads_as_paused_after_a_restart_and_is_never_resumed() {
     assert_eq!(goal.status, GoalStatus::Paused);
     assert_eq!(goal.reason, Some(GoalReason::Restart));
     assert!(test.driver.requests().is_empty());
+}
+
+#[tokio::test]
+async fn a_goal_keeps_a_plan_through_its_steps_and_closes_it_on_completion() {
+    let test = Loop::new();
+    test.driver
+        .round(|_| vec![call(GOAL_STEP_NAME, &json!({ "summary": "рано" }))]);
+    test.driver.round(|_| {
+        vec![call(
+            GOAL_PLAN_NAME,
+            &json!({ "steps": ["Найти модули", "Добавить тесты"] }),
+        )]
+    });
+    test.driver
+        .round(|_| vec![call(GOAL_STEP_NAME, &json!({ "summary": "4 модуля" }))]);
+    test.driver.round(|_| vec![complete(DONE, EVIDENCE)]);
+    let created = test.conversation(&["demo.lookup"]);
+
+    let handle = test.goal_turn(created, "Цель").await;
+
+    let calls = test.harness.last(created).tool_calls;
+    assert_eq!(calls[0].key, GOAL_STEP_TOOL);
+    assert_eq!(calls[0].status, ChatToolCallStatus::Failed);
+    assert_eq!(calls[0].error.as_deref(), Some(GOAL_NO_STEP));
+    assert_eq!(calls[1].key, GOAL_PLAN_TOOL);
+    assert_eq!(calls[1].status, ChatToolCallStatus::Succeeded);
+    let goal = test.goal_of(created);
+    assert_eq!(goal.status, GoalStatus::Done);
+    let plan: Vec<(&str, AgenticPlanStepStatus)> = goal
+        .plan
+        .iter()
+        .map(|step| (step.title.as_str(), step.status))
+        .collect();
+    assert_eq!(
+        plan,
+        [
+            ("Найти модули", AgenticPlanStepStatus::Done),
+            ("Добавить тесты", AgenticPlanStepStatus::Done)
+        ]
+    );
+    assert_eq!(goal.plan[0].summary.as_deref(), Some("4 модуля"));
+    let steps = test.goal_steps(&handle);
+    let planned = &steps[2]["plan"];
+    assert_eq!(planned[0]["status"], "running");
+    let system = test.driver.requests()[0].system.clone().unwrap_or_default();
+    assert!(system.contains(GOAL_PLAN_NAME));
+    assert!(system.contains(GOAL_STEP_NAME));
+}
+
+#[tokio::test]
+async fn a_continued_goal_sees_its_plan_in_the_system_prompt() {
+    let test = Loop::new();
+    test.set(ROUNDS_KEY, "1");
+    test.driver
+        .round(|_| vec![call(GOAL_PLAN_NAME, &json!({ "steps": ["Первый шаг"] }))]);
+    let created = test.conversation(&["demo.lookup"]);
+    test.goal_turn(created, "Цель").await;
+    assert_eq!(test.goal_of(created).status, GoalStatus::Paused);
+
+    test.driver.round(|_| vec![complete(DONE, EVIDENCE)]);
+    let resumed = test
+        .harness
+        .chat
+        .continue_goal(&created)
+        .expect("continues");
+    within(test.harness.runs.wait(&resumed.id)).await;
+
+    let system = test
+        .driver
+        .requests()
+        .pop()
+        .and_then(|request| request.system)
+        .unwrap_or_default();
+    assert!(system.contains("Current plan"));
+    assert!(system.contains("Первый шаг"));
+}
+
+#[tokio::test]
+async fn the_composer_lists_the_goal_tools_only_for_a_goal() {
+    let test = Loop::new();
+    let created = test.conversation(&["demo.lookup"]);
+    let listed = |command: Option<ChatCommand>| {
+        test.harness
+            .chat
+            .context(&zvs_contract::ChatContextInput {
+                conversation_id: Some(created),
+                provider_id: test.harness.provider_id,
+                model_id: test.harness.model_id.clone(),
+                settings: None,
+                system_prompt: None,
+                command,
+            })
+            .expect("measures")
+            .tool_items
+            .into_iter()
+            .filter(|item| GOAL_TOOLS.contains(&item.key.as_str()))
+            .map(|item| (item.key, item.source))
+            .collect::<Vec<_>>()
+    };
+    assert!(listed(None).is_empty());
+    assert_eq!(
+        listed(Some(ChatCommand::Goal)),
+        GOAL_TOOLS
+            .iter()
+            .map(|key| ((*key).to_owned(), zvs_contract::OfferedToolSource::Command))
+            .collect::<Vec<_>>()
+    );
 }

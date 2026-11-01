@@ -2,6 +2,14 @@ import type { ChatGoalDto, GoalReason, GoalStatus } from "@zvs/shared";
 
 export const GOAL_COMMAND = "goal";
 export const GOAL_TOOL = "goal.complete";
+export const GOAL_PLAN_TOOL = "goal.plan";
+export const GOAL_STEP_TOOL = "goal.step";
+export const GOAL_PLAN_TOOL_TITLE = "План цели";
+export const GOAL_STEP_TOOL_TITLE = "Шаг плана выполнен";
+export const GOAL_PLAN = "План";
+export const GOAL_PLAN_LABEL = "План цели";
+export const GOAL_STEP_FIELD = "Шаг";
+export const GOAL_STEP_SUMMARY = "Итог";
 export const GOAL_PLACEHOLDER = "Опишите цель…";
 export const GOAL_EMPTY = "Укажите цель после команды /goal";
 export const GOAL_LOCKED = "Во время выполнения цели сообщения недоступны";
@@ -33,6 +41,10 @@ const REASON: Record<GoalReason, string> = {
   user: "по запросу",
   error: "ход завершился ошибкой",
 };
+
+export function planProgressText(done: number, total: number): string {
+  return `${done.toLocaleString("ru-RU")} из ${total.toLocaleString("ru-RU")}`;
+}
 
 export function goalStatusText(goal: Pick<ChatGoalDto, "status" | "reason">): string {
   const status = STATUS[goal.status];

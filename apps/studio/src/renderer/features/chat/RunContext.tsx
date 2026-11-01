@@ -7,6 +7,7 @@ import Icon from "../../ui/atoms/Icon";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import type ChatStore from "./ChatStore";
 import SidePanelFrame from "./SidePanelFrame";
+import GoalPlan from "./GoalPlan";
 import { CONTEXT_PANEL } from "./explorer/explorerCopy";
 import {
   ARTIFACTS_SECTION,
@@ -92,6 +93,7 @@ export default observer(function RunContext({ store }: { readonly store: ChatSto
   return (
     <SidePanelFrame store={store} title={CONTEXT_PANEL}>
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 px-4 pt-1 pb-4.5">
+        <GoalPlan store={store} />
         <DialogArtifacts store={store} />
       </ScrollArea>
     </SidePanelFrame>

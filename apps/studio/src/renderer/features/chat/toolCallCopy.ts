@@ -1,6 +1,8 @@
 import {
   mdiAccountCheckOutline,
+  mdiCheckCircleOutline,
   mdiFlagCheckered,
+  mdiFormatListChecks,
   mdiAlertCircleOutline,
   mdiBookOpenPageVariantOutline,
   mdiBrain,
@@ -40,7 +42,14 @@ import {
   type ToolAuthorisationDto,
 } from "@zvs/shared";
 import { EXEC_MODE_COPY } from "../execPolicy/execPolicyCopy";
-import { GOAL_TOOL, GOAL_TOOL_TITLE } from "./goalCopy";
+import {
+  GOAL_PLAN_TOOL,
+  GOAL_PLAN_TOOL_TITLE,
+  GOAL_STEP_TOOL,
+  GOAL_STEP_TOOL_TITLE,
+  GOAL_TOOL,
+  GOAL_TOOL_TITLE,
+} from "./goalCopy";
 
 export type ToolCategory =
   "knowledge" | "files" | "process" | "skills" | "dialog" | "data" | "other";
@@ -103,6 +112,12 @@ export const TOOL_PRESENTATION: Readonly<Record<string, ToolPresentation>> = {
   "download.fetch": { title: "Загрузка файла", icon: mdiDownloadOutline, category: "data" },
   "chat.ask": { title: "Вопрос пользователю", icon: mdiCommentQuestionOutline, category: "dialog" },
   [GOAL_TOOL]: { title: GOAL_TOOL_TITLE, icon: mdiFlagCheckered, category: "dialog" },
+  [GOAL_PLAN_TOOL]: { title: GOAL_PLAN_TOOL_TITLE, icon: mdiFormatListChecks, category: "dialog" },
+  [GOAL_STEP_TOOL]: {
+    title: GOAL_STEP_TOOL_TITLE,
+    icon: mdiCheckCircleOutline,
+    category: "dialog",
+  },
   invalid_tool_call: {
     title: "Некорректный вызов инструмента",
     icon: mdiAlertCircleOutline,

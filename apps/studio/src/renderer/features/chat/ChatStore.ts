@@ -793,6 +793,7 @@ export default class ChatStore {
         () =>
           JSON.stringify([
             this.contextInput,
+            this.active?.goal?.status ?? null,
             this.active?.messages.length ?? 0,
             this.active?.updatedAt ?? 0,
             this.memoryTool(),
