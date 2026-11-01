@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import {
   mdiChevronDown,
@@ -22,11 +22,13 @@ import { RETRIEVAL_MODES, retrievalHint } from "./retrievalModes";
 import ChatAccountProviderSetup from "./ChatAccountProviderSetup";
 import ChatCommandMenu, { COMMAND_MENU_ID, commandOptionId } from "./ChatCommandMenu";
 import ChatContextMeter from "./ChatContextMeter";
+import ChatGoalBar from "./ChatGoalBar";
 import ChatModelGate from "./ChatModelGate";
 import ChatToolsBadge from "./ChatToolsBadge";
 import ModelFields, { availableModelOptions } from "./ModelFields";
 import ExecPolicyMenu, { type ExecPolicyBinding } from "../execPolicy/ExecPolicyMenu";
 import { REMOVE_COMMAND, commandText } from "./chatCommands";
+import { GOAL_EMPTY, GOAL_LOCKED, GOAL_PLACEHOLDER } from "./goalCopy";
 import SelectionChips from "./SelectionChips";
 import type ChatStore from "./ChatStore";
 import VoiceMenu, { type VoiceBinding } from "../voice/VoiceMenu";
@@ -55,6 +57,7 @@ export default observer(function ChatComposer({
   readonly voice?: VoiceBinding;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const hintId = useId();
   const [storesOpen, setStoresOpen] = useState(false);
   const wasGenerating = useRef(store.generating);
 
@@ -67,6 +70,7 @@ export default observer(function ChatComposer({
 
   return (
     <div className="mx-auto w-full max-w-4xl shrink-0 px-6 pt-2 pb-4">
+      <ChatGoalBar store={store} />
       {!store.available && !store.loading ? (
         <ChatModelGate store={store} />
       ) : (
@@ -142,10 +146,12 @@ export default observer(function ChatComposer({
             <TextArea
               aria-label="Сообщение"
               noBorder
-              placeholder="Задайте вопрос…"
+              placeholder={store.goalCommand ? GOAL_PLACEHOLDER : "Задайте вопрос…"}
               value={store.composer.text}
               maxLength={MESSAGE_MAX}
-              disabled={store.loading || store.generating}
+              disabled={store.loading || store.generating || store.goals.active}
+              aria-invalid={store.goalEmpty || undefined}
+              aria-describedby={store.goalEmpty || store.goals.active ? hintId : undefined}
               aria-controls={store.commandMatches.length > 0 ? COMMAND_MENU_ID : undefined}
               aria-activedescendant={
                 store.commandMatches.length > 0 ? commandOptionId(store.commandIndex) : undefined
@@ -185,6 +191,15 @@ export default observer(function ChatComposer({
                 }
               }}
             />
+            {store.goalEmpty || store.goals.active ? (
+              <p
+                id={hintId}
+                role={store.goalEmpty ? "alert" : undefined}
+                className={`m-0 px-1 pt-1 text-[11.5px] ${store.goalEmpty ? "text-err" : "text-main-400"}`}
+              >
+                {store.goalEmpty ? GOAL_EMPTY : GOAL_LOCKED}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-1">
             <Dropdown menuWidth={300} menuPlacement="top-left">

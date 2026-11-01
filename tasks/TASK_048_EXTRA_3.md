@@ -2,7 +2,7 @@
 task: TASK_048_EXTRA_3
 title: The /goal command — host loop, chat composer and CLI
 phase: 9 — Integrations
-status: todo
+status: done
 depends_on: [TASK_048_EXTRA_1, TASK_048_EXTRA_2]
 unblocks: [TASK_048_EXTRA_4]
 estimate: 8–10 h (three parts; one commit)
@@ -282,20 +282,100 @@ Manual check:
 
 ## Definition of done
 
-- [ ] An ordinary chat turn behaves exactly as before the loop extraction
-- [ ] A goal ends only by completion with evidence, budget, guard, stop or failure
-- [ ] Every round is persisted when it ends; restart never resumes silently
-- [ ] Approvals, questions and the execution policy behave as in a normal turn
-- [ ] Composer and CLI show every goal status with the right action
-- [ ] Channels in the contract and `CLI_CHANNELS`; PASSPORT updated
-- [ ] Copy Russian, in copy modules
+- [x] An ordinary chat turn behaves exactly as before the loop extraction
+- [x] A goal ends only by completion with evidence, budget, guard, stop or failure
+- [x] Every round is persisted when it ends; restart never resumes silently
+- [x] Approvals, questions and the execution policy behave as in a normal turn
+- [x] Composer and CLI show every goal status with the right action
+- [x] Channels in the contract and `CLI_CHANNELS`; PASSPORT updated
+- [x] Copy Russian, in copy modules
 - [ ] Gates pass; `pnpm build` left to CI if not run locally
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
-> Filled in by the agent that completes this task. Delete this line when writing it.
-
 **Built:**
+- DECISION 1, answered by the user: option a (40 rounds, 400 000 tokens, 30 minutes) and
+  option x (messages are refused while a goal is active).
+- Contract (`zvs-contract/src/goal.rs`, `packages/shared/src/chat.ts`, fixtures in
+  `fixtures/chat/`):
+  - `ChatCommand::Goal` (`"goal"`).
+  - `ChatGoalDto`: text, status, reason, budget, usage, summary, startedAt and endedAt.
+    `ConversationDto.goal` is left out when there is no goal, so the older fixtures still
+    round-trip.
+  - `GoalStatus`, `GoalReason`, `GoalBudgetDto` and `GoalUsageDto`.
+  - `ChatGoalStepDto`, the `domain: "goal"` step.
+  - `ChatGoalInput`.
+  - The channels `chat.goal.continue` (returns a `RunHandleDto`) and `chat.goal.stop` (returns
+    a `ConversationDto`). Both are in `CLI_CHANNELS`.
+  - Migration `0030_conversation_goal` (`conversation.goal`, JSON).
+- `services/tool_loop.rs`: the round loop taken out of `GenerateChatNode::respond`.
+  - `ToolLoop` is parameterised by `LoopBudget` (`Calls(n)` for chat, `Open` for a goal), a
+    `LoopHost` (call execution and persistence; chat implements it as `ChatLoopHost`) and a
+    `RoundHook`. The hook supplies the bridge tools (`handles` / `bridge`) and decides after
+    every round whether to continue, stop or nudge.
+  - `ChatTurn` is the old chat behaviour. Apart from the commands-list assertions, the existing
+    chat tests are unchanged and pass.
+  - `request_tokens` and `round_tokens` moved here from `agentic/node.rs`.
+- `services/chat_goal.rs`:
+  - The `goal.complete` bridge (`complete_goal`) and the English goal note.
+  - Budgets read from `chat.goal.maxRounds`, `chat.goal.maxTokens` and `chat.goal.maxMinutes`.
+  - `GoalHook`. It counts rounds, tokens and minutes, trips `LoopGuard`, refuses empty evidence,
+    saves the goal after every round (only while it is still `active` in the database, so a
+    stop is never overwritten) and emits the step.
+  - `ChatService::send` refuses a message with `Conflict` while a goal is active.
+  - `continue_goal` renews the budget as the default budget plus the usage so far, and adds a
+    user message «Продолжить работу над целью» marked `/goal`.
+  - `stop_goal` cancels the turn.
+  - `recover_goals` runs in the shell after `runs.recover`.
+  - The run's `End` event settles a goal that is still active: cancelled becomes
+    `stopped (user)`, anything else becomes `failed (error)`.
+- Desktop:
+  - `GoalStore`. It overlays the live steps on `conversation.goal`, reloads the dialog once when
+    a goal it does not know starts, and handles stop and continue. It takes an injected clock.
+  - `ChatGoalBar`, above the composer.
+  - The composer: the «/goal» chip with the placeholder «Опишите цель…», an empty goal refused
+    with a reason under the field, and a locked field with its reason during a goal.
+  - The completion card: the summary, a collapsible «Подтверждение», and the card open by
+    default.
+  - `goalCopy.ts`.
+  - Tests in `tests/renderer/chatGoal.test.ts`.
+- CLI:
+  - `ChatSendInput.command` is now passed through `App::send` and `pending_command`.
+  - `Command::Goal` (Alt+G). The subcommands `/goal stop` and `/goal continue` are offered only
+    when they apply (`Sub::offered`). A typed `/goal stop` or `/goal continue` that does not
+    apply explains why.
+  - The footer shows «Цель: раунд N из M · K мин» or «Цель приостановлена: …». The minutes
+    keep counting between rounds by frame ticks.
+  - `goal` steps update the footer and post notices on pause and stop.
+  - `goal.complete` renders as a block whose evidence is collapsed to three lines.
+  - The first Ctrl+C during a goal asks for confirmation and the second one stops the goal.
+    Any other key in between disarms it.
+- PASSPORT: §7 (dated note on the two channels), §11 (*Goal* row in the mapping table) and §14
+  (*Goals* after *Chat tool set*).
+
 **Deviated from plan:**
+- LoopGuard repetition sets `stopped` with the reason `repetition`, the same as the agentic
+  session (`Stopped / Loop`). Budget exhaustion sets `paused`.
+- A round without tool calls does not end a goal. The loop sends a nudge, and the budget bounds
+  how often that can happen.
+- During an open-ended loop the oldest tool results are replaced with a short placeholder when
+  the context would overflow (`shed_tool_results`). Ordinary chat turns are unaffected.
+- The CLI needed an Alt+G shortcut: a test requires every palette command except `/exit` to
+  have one.
+- `ChatGoalStepDto` also carries `reason`, so a pause shows its reason without a reload.
+
 **Next session should know:**
+- Gates not passing, and not caused by this task (both reproduce on a clean `main`):
+  - `cargo clippy` fails in `data/repositories/model.rs:149` on
+    `clippy::unnecessary_option_map_or_else`, a lint new in the current toolchain. With that
+    one lint allowed, clippy is clean across the workspace.
+  - `services::chat::tests::tool_loop::vendor_usage_replaces_the_estimate_and_the_window_reaches_the_context_meter`
+    fails with `tokens_out` 63 instead of 60.
+- Not run: `pnpm build` and `pnpm test:e2e`. The bar was not checked by eye in light and dark
+  themes or at narrow widths. It uses only theme tokens and wraps its progress line.
+- TASK_048_EXTRA_4 reuses `ToolLoop`. It should implement `LoopHost` and `RoundHook` rather
+  than add parameters to `ChatGenerateRequest`.
+- A goal continuation sees earlier rounds only through the saved assistant text, not their tool
+  results, because chat history replays text only.
+- TASK_052 can expose the three `chat.goal.*` settings.

@@ -251,6 +251,7 @@ pub(super) struct HarnessOptions {
     pub context_window: i64,
     pub max_output: i64,
     pub memory: bool,
+    pub clock: Option<SharedClock>,
 }
 
 impl Default for HarnessOptions {
@@ -269,6 +270,7 @@ impl Default for HarnessOptions {
             context_window: 1024,
             max_output: 128,
             memory: false,
+            clock: None,
         }
     }
 }
@@ -333,6 +335,7 @@ impl Harness {
             skills: options.skills,
             mcp: options.mcp,
             logger: logger.clone(),
+            clock: options.clock.unwrap_or_else(|| Arc::new(SystemClock)),
             ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), registry)
         })
         .expect("a chat service");

@@ -141,6 +141,8 @@ mod tests {
                 "chat.conversations.updateRetrieval",
                 "chat.conversations.updateStores",
                 "chat.evaluate",
+                "chat.goal.continue",
+                "chat.goal.stop",
                 "chat.messages.pin",
                 "chat.pickFolder",
                 "chat.send",

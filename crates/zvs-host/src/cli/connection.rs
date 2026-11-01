@@ -24,6 +24,8 @@ pub const CLI_CHANNELS: &[&str] = &[
     "chat.conversations.create",
     "chat.conversations.get",
     "chat.conversations.list",
+    "chat.goal.continue",
+    "chat.goal.stop",
     "chat.send",
     "chat.skip",
     "cli.accounts.cancelLink",

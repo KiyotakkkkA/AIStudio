@@ -1,0 +1,10 @@
+[
+  {
+    "name": "fractional tokens",
+    "value": {
+      "rounds": 1,
+      "tokens": 1.5,
+      "elapsedMs": 0
+    }
+  }
+]

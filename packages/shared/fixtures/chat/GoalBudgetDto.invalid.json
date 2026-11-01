@@ -1,0 +1,17 @@
+[
+  {
+    "name": "negative rounds",
+    "value": {
+      "rounds": -1,
+      "tokens": 1,
+      "minutes": 1
+    }
+  },
+  {
+    "name": "missing minutes",
+    "value": {
+      "rounds": 1,
+      "tokens": 1
+    }
+  }
+]

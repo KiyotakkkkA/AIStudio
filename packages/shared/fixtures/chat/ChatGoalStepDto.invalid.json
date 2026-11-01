@@ -1,0 +1,42 @@
+[
+  {
+    "name": "another domain",
+    "value": {
+      "domain": "shell",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "status": "active",
+      "reason": null,
+      "round": 12,
+      "usage": {
+        "rounds": 12,
+        "tokens": 48200,
+        "elapsedMs": 185000
+      },
+      "budget": {
+        "rounds": 40,
+        "tokens": 400000,
+        "minutes": 30
+      }
+    }
+  },
+  {
+    "name": "paused without a reason",
+    "value": {
+      "domain": "goal",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "status": "paused",
+      "reason": null,
+      "round": 12,
+      "usage": {
+        "rounds": 12,
+        "tokens": 48200,
+        "elapsedMs": 185000
+      },
+      "budget": {
+        "rounds": 40,
+        "tokens": 400000,
+        "minutes": 30
+      }
+    }
+  }
+]

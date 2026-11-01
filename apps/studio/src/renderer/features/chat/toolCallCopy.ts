@@ -1,5 +1,6 @@
 import {
   mdiAccountCheckOutline,
+  mdiFlagCheckered,
   mdiAlertCircleOutline,
   mdiBookOpenPageVariantOutline,
   mdiBrain,
@@ -39,6 +40,7 @@ import {
   type ToolAuthorisationDto,
 } from "@zvs/shared";
 import { EXEC_MODE_COPY } from "../execPolicy/execPolicyCopy";
+import { GOAL_TOOL, GOAL_TOOL_TITLE } from "./goalCopy";
 
 export type ToolCategory =
   "knowledge" | "files" | "process" | "skills" | "dialog" | "data" | "other";
@@ -100,6 +102,7 @@ export const TOOL_PRESENTATION: Readonly<Record<string, ToolPresentation>> = {
   "skill.script": { title: "Скрипт навыка", icon: mdiScriptTextPlayOutline, category: "skills" },
   "download.fetch": { title: "Загрузка файла", icon: mdiDownloadOutline, category: "data" },
   "chat.ask": { title: "Вопрос пользователю", icon: mdiCommentQuestionOutline, category: "dialog" },
+  [GOAL_TOOL]: { title: GOAL_TOOL_TITLE, icon: mdiFlagCheckered, category: "dialog" },
   invalid_tool_call: {
     title: "Некорректный вызов инструмента",
     icon: mdiAlertCircleOutline,

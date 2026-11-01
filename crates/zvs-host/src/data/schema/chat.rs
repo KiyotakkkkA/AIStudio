@@ -1,10 +1,10 @@
 use rusqlite::Row;
 use zvs_contract::{
-    ChatCitationDto, ChatCommand, ChatRoundDto, ChatSettings, ChatToolCallDto,
+    ChatCitationDto, ChatCommand, ChatGoalDto, ChatRoundDto, ChatSettings, ChatToolCallDto,
     DocumentSelectionDto, MessageRole, OfferedToolDto, RetrievalMode, Timestamp, WebSourceDto,
 };
 
-use super::columns::{EnumColumn, json_column};
+use super::columns::{EnumColumn, json_column, optional_json_column};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConversationRow {
@@ -21,6 +21,7 @@ pub struct ConversationRow {
     pub turn_folder: Option<String>,
     pub profile: String,
     pub pinned: bool,
+    pub goal: Option<ChatGoalDto>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
@@ -28,7 +29,7 @@ pub struct ConversationRow {
 impl ConversationRow {
     pub const COLUMNS: &str = "id, title, provider_id, model_id, settings, system_prompt, \
         attached_store_ids, use_relations, retrieval_mode, working_folder, turn_folder, \
-        profile, pinned, created_at, updated_at";
+        profile, pinned, goal, created_at, updated_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -45,6 +46,7 @@ impl ConversationRow {
             turn_folder: row.get("turn_folder")?,
             profile: row.get("profile")?,
             pinned: row.get("pinned")?,
+            goal: optional_json_column(row, "goal")?,
             created_at: row.get("created_at")?,
             updated_at: row.get("updated_at")?,
         })

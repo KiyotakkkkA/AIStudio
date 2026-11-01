@@ -76,7 +76,77 @@ fn indent() -> Span<'static> {
     Span::raw("    ")
 }
 
+pub const GOAL_TOOL: &str = "goal.complete";
+pub const EVIDENCE_LINES: usize = 3;
+
+fn goal_text(arguments: &Value, key: &str) -> String {
+    match arguments.get(key) {
+        Some(Value::String(text)) => text.trim().to_owned(),
+        Some(Value::Array(items)) => items
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => String::new(),
+    }
+}
+
+fn goal_block(call: &ChatToolCallDto, expanded: bool, width: usize) -> Vec<Line<'static>> {
+    let room = width.saturating_sub(8).max(10);
+    let mut lines = vec![Line::from(vec![
+        Span::styled("  ✓ ", Style::new().fg(theme::colors().ok)),
+        Span::styled(
+            copy::GOAL_DONE,
+            Style::new()
+                .fg(theme::colors().ok)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ])];
+    for piece in goal_text(&call.arguments, "summary")
+        .split('\n')
+        .flat_map(|line| wrap(line, room))
+    {
+        lines.push(Line::from(vec![
+            indent(),
+            Span::styled(piece, theme::text()),
+        ]));
+    }
+    let evidence: Vec<String> = goal_text(&call.arguments, "evidence")
+        .split('\n')
+        .flat_map(|line| wrap(line, room))
+        .collect();
+    if evidence.is_empty() {
+        return lines;
+    }
+    lines.push(Line::from(vec![
+        indent(),
+        Span::styled(copy::GOAL_EVIDENCE, theme::eyebrow()),
+    ]));
+    let shown = if expanded {
+        evidence.len()
+    } else {
+        EVIDENCE_LINES
+    };
+    for piece in evidence.iter().take(shown) {
+        lines.push(Line::from(vec![
+            indent(),
+            Span::styled(piece.clone(), theme::muted()),
+        ]));
+    }
+    let hidden = evidence.len().saturating_sub(shown);
+    if hidden > 0 {
+        lines.push(Line::from(vec![
+            indent(),
+            Span::styled(format!("… {} {hidden}", copy::MORE_LINES), theme::faint()),
+        ]));
+    }
+    lines
+}
+
 fn tool(call: &ChatToolCallDto, expanded: bool, frame: u64, width: usize) -> Vec<Line<'static>> {
+    if call.key == GOAL_TOOL && call.status == ChatToolCallStatus::Succeeded {
+        return goal_block(call, expanded, width);
+    }
     let (icon, color, label) = status_look(call.status, frame);
     let mut lines = Vec::new();
     let chip = Style::new().bg(theme::colors().tool_bg);

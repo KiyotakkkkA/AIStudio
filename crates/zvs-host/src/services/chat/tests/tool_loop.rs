@@ -39,6 +39,8 @@ use crate::services::profile::TOOL_CALLS_KEY;
 use crate::testing::{FAKE_CAPABILITIES, TemporaryDatabase, temporary_database};
 use crate::tools::{ToolDescriptor, ToolRegistry, ToolRegistryOptions};
 
+mod goal;
+
 type Round = Box<dyn FnOnce(&GenerateRequest) -> Vec<TextDelta> + Send>;
 type Fallback = Arc<dyn Fn(usize) -> Vec<TextDelta> + Send + Sync>;
 
@@ -295,6 +297,10 @@ impl Loop {
     }
 
     fn build(web: bool) -> Self {
+        Self::build_with(web, None)
+    }
+
+    fn build_with(web: bool, clock: Option<crate::platform::clock::SharedClock>) -> Self {
         let database = temporary_database();
         let registry = Arc::new(NodeRegistry::new());
         register_core_nodes(&registry).expect("registers the core nodes");
@@ -344,6 +350,7 @@ impl Loop {
             capabilities: vec![ProviderCapability::Text],
             context_window: 16384,
             max_output: 512,
+            clock,
             ..HarnessOptions::default()
         });
         Self {
@@ -2107,7 +2114,10 @@ async fn the_browser_command_brings_the_browser_tools_and_its_skill_for_the_rest
             .iter()
             .map(|command| command.command)
             .collect::<Vec<_>>(),
-        [zvs_contract::ChatCommand::BrowserUse]
+        [
+            zvs_contract::ChatCommand::BrowserUse,
+            zvs_contract::ChatCommand::Goal
+        ]
     );
     let created = harness.create(harness.input());
 

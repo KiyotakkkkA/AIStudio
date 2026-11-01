@@ -1,5 +1,5 @@
 use zvs_contract::{
-    CliTheme, ConversationDto, ConversationId, McpOAuthState, McpServerDto, McpServerId,
+    CliTheme, ConversationDto, ConversationId, GoalStatus, McpOAuthState, McpServerDto, McpServerId,
 };
 
 use super::overlay;
@@ -16,6 +16,7 @@ pub enum Command {
     Connect,
     Desktop,
     Context,
+    Goal,
     Skills,
     Mcp,
     Processes,
@@ -35,6 +36,7 @@ pub const COMMANDS: &[Command] = &[
     Command::Desktop,
     Command::New,
     Command::Context,
+    Command::Goal,
     Command::Skills,
     Command::Mcp,
     Command::Processes,
@@ -56,6 +58,7 @@ impl Command {
             Self::Connect => "connect",
             Self::Desktop => "desktop",
             Self::Context => "context",
+            Self::Goal => "goal",
             Self::Skills => "skills",
             Self::Mcp => "mcp",
             Self::Processes => "processes",
@@ -77,6 +80,7 @@ impl Command {
             Self::Connect => copy::CMD_CONNECT,
             Self::Desktop => copy::CMD_DESKTOP,
             Self::Context => copy::CMD_CONTEXT,
+            Self::Goal => copy::CMD_GOAL,
             Self::Skills => copy::CMD_SKILLS,
             Self::Mcp => copy::CMD_MCP,
             Self::Processes => copy::CMD_PROCESSES,
@@ -130,14 +134,22 @@ impl Command {
 pub enum Sub {
     McpAdd,
     McpInspect,
+    GoalStop,
+    GoalContinue,
 }
 
-pub const SUBS: &[Sub] = &[Sub::McpAdd, Sub::McpInspect];
+pub const SUBS: &[Sub] = &[
+    Sub::McpAdd,
+    Sub::McpInspect,
+    Sub::GoalStop,
+    Sub::GoalContinue,
+];
 
 impl Sub {
     pub const fn parent(self) -> Command {
         match self {
             Self::McpAdd | Self::McpInspect => Command::Mcp,
+            Self::GoalStop | Self::GoalContinue => Command::Goal,
         }
     }
 
@@ -145,6 +157,20 @@ impl Sub {
         match self {
             Self::McpAdd => "add",
             Self::McpInspect => "inspect",
+            Self::GoalStop => "stop",
+            Self::GoalContinue => "continue",
+        }
+    }
+
+    pub const fn immediate(self) -> bool {
+        matches!(self, Self::GoalStop | Self::GoalContinue)
+    }
+
+    pub const fn offered(self, goal: Option<GoalStatus>) -> bool {
+        match self {
+            Self::McpAdd | Self::McpInspect => true,
+            Self::GoalStop => matches!(goal, Some(GoalStatus::Active | GoalStatus::Paused)),
+            Self::GoalContinue => matches!(goal, Some(GoalStatus::Paused)),
         }
     }
 
@@ -152,12 +178,14 @@ impl Sub {
         match self {
             Self::McpAdd => copy::CMD_MCP_ADD,
             Self::McpInspect => copy::CMD_MCP_INSPECT,
+            Self::GoalStop => copy::CMD_GOAL_STOP,
+            Self::GoalContinue => copy::CMD_GOAL_CONTINUE,
         }
     }
 
     pub const fn arg(self) -> Option<Arg> {
         match self {
-            Self::McpAdd => None,
+            Self::McpAdd | Self::GoalStop | Self::GoalContinue => None,
             Self::McpInspect => Some(Arg::Server),
         }
     }
@@ -227,6 +255,7 @@ pub struct Sources<'a> {
     pub servers: Option<&'a [McpServerDto]>,
     pub conversations: Option<&'a [ConversationDto]>,
     pub folder: &'a str,
+    pub goal: Option<GoalStatus>,
 }
 
 pub fn subs_of(command: Command) -> impl Iterator<Item = Sub> {
@@ -425,7 +454,7 @@ pub fn matches(text: &str, sources: &Sources<'_>) -> Vec<Item> {
     }
     if let Some((command, partial)) = sub_query(text) {
         return subs_of(command)
-            .filter(|sub| sub.name().starts_with(&partial))
+            .filter(|sub| sub.offered(sources.goal) && sub.name().starts_with(&partial))
             .map(Item::Sub)
             .collect();
     }
@@ -490,6 +519,7 @@ mod tests {
         servers: None,
         conversations: None,
         folder: "",
+        goal: None,
     };
 
     fn matches(text: &str) -> Vec<Item> {

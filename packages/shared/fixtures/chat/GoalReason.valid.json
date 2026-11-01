@@ -1,0 +1,30 @@
+[
+  {
+    "name": "rounds",
+    "value": "rounds"
+  },
+  {
+    "name": "tokens",
+    "value": "tokens"
+  },
+  {
+    "name": "minutes",
+    "value": "minutes"
+  },
+  {
+    "name": "repetition",
+    "value": "repetition"
+  },
+  {
+    "name": "restart",
+    "value": "restart"
+  },
+  {
+    "name": "user",
+    "value": "user"
+  },
+  {
+    "name": "error",
+    "value": "error"
+  }
+]

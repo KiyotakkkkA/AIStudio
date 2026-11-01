@@ -48,6 +48,7 @@ fn fixture() -> Fixture {
                 turn_folder: None,
                 profile: String::new(),
                 pinned: false,
+                goal: None,
                 created_at: 1,
                 updated_at: 1,
             })?;

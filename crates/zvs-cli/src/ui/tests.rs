@@ -265,3 +265,59 @@ fn the_footer_counts_running_background_processes() {
     let screen = render(&app, 140, 30);
     assert!(screen.contains(&crate::format::processes(1)));
 }
+
+#[test]
+fn the_footer_shows_goal_progress_or_its_pause() {
+    let mut app = conversation_app();
+    app.goal = Some(crate::state::GoalState {
+        usage: zvs_contract::GoalUsageDto {
+            rounds: 12,
+            tokens: 1000,
+            elapsed_ms: 180_000,
+        },
+        ..crate::state::GoalState::started(0)
+    });
+    let screen = render(&app, 140, 30);
+    println!("{screen}");
+    assert!(screen.contains(&crate::format::goal_progress(12, 40, 180_000)));
+    app.goal = Some(crate::state::GoalState {
+        status: zvs_contract::GoalStatus::Paused,
+        reason: Some(zvs_contract::GoalReason::Minutes),
+        ..crate::state::GoalState::started(0)
+    });
+    let screen = render(&app, 140, 30);
+    assert!(screen.contains(&crate::format::with_reason(
+        copy::GOAL_PAUSED,
+        Some(zvs_contract::GoalReason::Minutes)
+    )));
+}
+
+#[test]
+fn a_completed_goal_shows_its_summary_and_three_lines_of_evidence() {
+    let mut app = conversation_app();
+    app.transcript
+        .entries
+        .push(crate::state::transcript::Entry::Tool(Box::new(
+            serde_json::from_value(json!({
+                "id": "g1", "key": "goal.complete", "name": "complete_goal", "round": 3,
+                "arguments": {
+                    "summary": "Тесты добавлены",
+                    "evidence": "первая\nвторая\nтретья\nчетвёртая\nпятая"
+                },
+                "status": "succeeded", "result": "The goal is recorded as achieved."
+            }))
+            .expect("call"),
+        )));
+    let screen = render(&app, 100, 40);
+    println!("{screen}");
+    assert!(screen.contains(copy::GOAL_DONE));
+    assert!(screen.contains("Тесты добавлены"));
+    assert!(screen.contains(copy::GOAL_EVIDENCE));
+    assert!(screen.contains("третья"));
+    assert!(!screen.contains("четвёртая"));
+    assert!(screen.contains(&format!("… {} 2", copy::MORE_LINES)));
+    assert!(!screen.contains("recorded as achieved"));
+    app.expanded = true;
+    let screen = render(&app, 100, 40);
+    assert!(screen.contains("пятая"));
+}

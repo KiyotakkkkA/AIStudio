@@ -954,7 +954,7 @@ fn a_model_without_reasoning_gets_no_effort_steps() {
 fn the_chosen_effort_is_sent_with_the_message() {
     let mut app = reasoning_app();
     app.effort = ThinkingEffort::Fast;
-    let Request::Send(input) = app.send(conversation().id, "привет".to_owned()) else {
+    let Request::Send(input) = app.send(conversation().id, "привет".to_owned(), None) else {
         panic!("a send request");
     };
     assert_eq!(input.vendor.effort, Some(ThinkingEffort::Fast));
@@ -1312,4 +1312,233 @@ fn stopping_a_process_takes_a_second_delete() {
     ))));
     assert_eq!(app.status.as_ref().unwrap().1, copy::PROCESS_STOPPED);
     assert_eq!(app.running_processes(), 0);
+}
+
+fn goal_step(seq: u64, status: &str, reason: Value, round: u64) -> Msg {
+    event(
+        seq,
+        json!({
+            "type": "step",
+            "step": {
+                "domain": GOAL_STEP_DOMAIN,
+                "conversationId": conversation().id,
+                "status": status,
+                "reason": reason,
+                "round": round,
+                "usage": { "rounds": round, "tokens": 1200, "elapsedMs": 180_000 },
+                "budget": { "rounds": 40, "tokens": 400_000, "minutes": 30 },
+            },
+        }),
+    )
+}
+
+fn goal_running() -> App {
+    let mut app = ready();
+    app.conversation = Some(conversation());
+    command(&mut app, "/goal добавить тесты");
+    app.update(Msg::Sent(Ok(handle())));
+    app
+}
+
+#[test]
+fn a_goal_is_sent_with_its_command_and_a_bare_goal_only_hints() {
+    let mut app = ready();
+    app.conversation = Some(conversation());
+    assert!(command(&mut app, "/goal").is_empty());
+    assert_eq!(app.status.as_ref().unwrap().1, copy::GOAL_HINT);
+    assert_eq!(app.input.text(), "/goal ");
+    app.input.take();
+    let requests = command(&mut app, "/goal добавить тесты");
+    let Some(Request::Send(input)) = requests.first() else {
+        panic!("sends: {requests:?}");
+    };
+    assert_eq!(input.command, Some(ChatCommand::Goal));
+    assert_eq!(input.text, "добавить тесты");
+    assert!(app.goal.is_some_and(|goal| goal.active()));
+    let Request::Send(plain) = app.send(conversation().id, "вопрос".to_owned(), None) else {
+        panic!("a send");
+    };
+    assert_eq!(plain.command, None);
+}
+
+#[test]
+fn a_goal_for_a_new_dialog_keeps_its_command_until_the_dialog_is_bound() {
+    let mut app = ready();
+    command(&mut app, "/goal собрать проект");
+    assert_eq!(app.pending_command, Some(ChatCommand::Goal));
+    let mut created = conversation();
+    created.working_folder = Some(FOLDER.to_owned());
+    created.working_folder_access = Some(WorkingFolderAccess::Granted);
+    app.update(Msg::Created(Ok(created.clone())));
+    let requests = app.update(Msg::Bound(Ok(BindFolderResultDto::Bound {
+        conversation: Box::new(created),
+    })));
+    let Some(Request::Send(input)) = requests.first() else {
+        panic!("sends: {requests:?}");
+    };
+    assert_eq!(input.command, Some(ChatCommand::Goal));
+    assert_eq!(app.pending_command, None);
+}
+
+#[test]
+fn goal_steps_drive_the_footer_and_never_become_tool_rows() {
+    let mut app = goal_running();
+    app.update(goal_step(1, "active", Value::Null, 12));
+    let goal = app.goal.expect("a goal");
+    assert_eq!(goal.usage.rounds, 12);
+    assert_eq!(goal.budget.rounds, 40);
+    assert!(
+        app.transcript
+            .live
+            .as_ref()
+            .is_some_and(|live| live.segments.is_empty())
+    );
+    app.frame += 30 * crate::ui::transcript::TICKS_PER_SECOND;
+    assert_eq!(app.goal_elapsed_ms(), 210_000);
+    app.update(goal_step(2, "paused", json!("tokens"), 13));
+    assert!(matches!(
+        app.transcript.entries.last(),
+        Some(Entry::Notice { text, .. })
+            if *text == crate::format::with_reason(copy::GOAL_PAUSED, Some(GoalReason::Tokens))
+    ));
+    app.frame += 600;
+    assert_eq!(app.goal_elapsed_ms(), 180_000);
+}
+
+#[test]
+fn messages_wait_while_a_goal_runs() {
+    let mut app = goal_running();
+    typed(&mut app, "ещё вопрос");
+    assert!(app.update(Msg::Key(Key::Enter)).is_empty());
+    assert_eq!(app.input.text(), "ещё вопрос");
+    assert_eq!(app.status.as_ref().unwrap().1, copy::GOAL_RUNNING);
+}
+
+#[test]
+fn ctrl_c_during_a_goal_asks_once_then_stops_it_instead_of_leaving() {
+    let mut app = goal_running();
+    let id = conversation().id;
+    assert!(app.update(Msg::Key(Key::Interrupt)).is_empty());
+    assert_eq!(app.status.as_ref().unwrap().1, copy::GOAL_STOP_CONFIRM);
+    assert!(app.exit.is_none());
+    assert_eq!(
+        app.update(Msg::Key(Key::Interrupt)),
+        [Request::StopGoal(id)]
+    );
+    assert!(app.exit.is_none());
+    let mut stopped = conversation();
+    stopped.goal = Some(ChatGoalDto {
+        status: GoalStatus::Stopped,
+        reason: Some(GoalReason::User),
+        ended_at: Some(5),
+        ..ChatGoalDto::new("добавить тесты", GoalBudgetDto::default(), 1)
+    });
+    app.update(Msg::GoalStopped(Ok(stopped)));
+    assert!(!app.goal.expect("a goal").shown());
+    assert!(matches!(
+        app.transcript.entries.last(),
+        Some(Entry::Notice { text, .. }) if text == copy::GOAL_STOPPED
+    ));
+    app.update(end("cancelled"));
+    app.update(Msg::Key(Key::Interrupt));
+    assert!(app.exit.is_some());
+}
+
+#[test]
+fn a_key_between_two_ctrl_c_disarms_the_goal_stop() {
+    let mut app = goal_running();
+    app.update(Msg::Key(Key::Interrupt));
+    app.update(Msg::Key(Key::Char('x')));
+    assert!(app.update(Msg::Key(Key::Interrupt)).is_empty());
+    assert!(app.goal_stop_armed);
+}
+
+#[test]
+fn goal_subcommands_are_offered_only_where_they_apply() {
+    let mut app = ready();
+    app.conversation = Some(conversation());
+    typed(&mut app, "/goal ");
+    assert!(!app.palette_open());
+    app.input.take();
+    app.goal = Some(GoalState::started(0));
+    typed(&mut app, "/goal ");
+    let offered = palette::matches(app.input.text(), &app.sources());
+    assert_eq!(offered, [Item::Sub(Sub::GoalStop)]);
+    app.input.take();
+    app.goal = Some(GoalState {
+        status: GoalStatus::Paused,
+        reason: Some(GoalReason::Rounds),
+        ..GoalState::started(0)
+    });
+    typed(&mut app, "/goal c");
+    assert_eq!(
+        palette::matches(app.input.text(), &app.sources()),
+        [Item::Sub(Sub::GoalContinue)]
+    );
+    let id = conversation().id;
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::ContinueGoal(id)]
+    );
+    assert!(app.awaiting);
+    assert!(app.goal.is_some_and(|goal| goal.active()));
+    assert!(matches!(
+        app.transcript.entries.last(),
+        Some(Entry::Notice { text, .. }) if text == copy::GOAL_CONTINUED
+    ));
+}
+
+#[test]
+fn typed_goal_subcommands_explain_when_they_do_not_apply() {
+    let mut app = ready();
+    app.conversation = Some(conversation());
+    assert!(command(&mut app, "/goal stop").is_empty());
+    assert_eq!(app.status.as_ref().unwrap().1, copy::GOAL_NOT_STOPPABLE);
+    assert!(command(&mut app, "/goal continue").is_empty());
+    assert_eq!(app.status.as_ref().unwrap().1, copy::GOAL_NOT_PAUSED);
+}
+
+#[test]
+fn resuming_a_dialog_with_a_paused_goal_restores_the_footer() {
+    let mut app = ready();
+    let mut own = conversation();
+    own.goal = Some(ChatGoalDto {
+        status: GoalStatus::Paused,
+        reason: Some(GoalReason::Restart),
+        ..ChatGoalDto::new("собрать проект", GoalBudgetDto::default(), 1)
+    });
+    app.update(Msg::Loaded(Ok(ConversationDetailDto {
+        conversation: own.clone(),
+        messages: Vec::new(),
+    })));
+    let goal = app.goal.expect("a goal");
+    assert_eq!(goal.status, GoalStatus::Paused);
+    assert_eq!(goal.reason, Some(GoalReason::Restart));
+    own.goal = Some(ChatGoalDto {
+        status: GoalStatus::Done,
+        summary: Some("Готово".to_owned()),
+        ended_at: Some(9),
+        ..ChatGoalDto::new("собрать проект", GoalBudgetDto::default(), 1)
+    });
+    app.update(Msg::Loaded(Ok(ConversationDetailDto {
+        conversation: own,
+        messages: Vec::new(),
+    })));
+    assert!(app.goal.is_none());
+}
+
+#[test]
+fn a_failed_goal_turn_is_reported_and_clears_the_footer() {
+    let mut app = goal_running();
+    app.update(goal_step(1, "active", Value::Null, 2));
+    app.update(end("failed"));
+    let goal = app.goal.expect("a goal");
+    assert_eq!(goal.status, GoalStatus::Failed);
+    assert!(!goal.shown());
+    assert!(
+        app.transcript
+            .entries
+            .iter()
+            .any(|entry| matches!(entry, Entry::Notice { text, .. } if text == copy::GOAL_FAILED))
+    );
 }

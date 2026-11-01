@@ -1,8 +1,8 @@
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use zvs_contract::{
-    ChatCitationDto, ChatRoundDto, ChatSettings, ChatToolCallDto, OfferedToolDto, RetrievalMode,
-    Timestamp, WebSourceDto,
+    ChatCitationDto, ChatGoalDto, ChatRoundDto, ChatSettings, ChatToolCallDto, OfferedToolDto,
+    RetrievalMode, Timestamp, WebSourceDto,
 };
 
 use crate::data::schema::columns::{EnumColumn, json_text};
@@ -20,6 +20,7 @@ pub struct ConversationPatch {
     pub working_folder: Option<Option<String>>,
     pub turn_folder: Option<Option<String>>,
     pub pinned: Option<bool>,
+    pub goal: Option<Option<ChatGoalDto>>,
     pub updated_at: Option<Timestamp>,
 }
 
@@ -68,6 +69,15 @@ impl ConversationPatch {
         }
         if let Some(pinned) = self.pinned {
             assignments.push(("pinned", SqlValue::Integer(i64::from(pinned))));
+        }
+        if let Some(goal) = &self.goal {
+            assignments.push((
+                "goal",
+                match goal {
+                    Some(goal) => SqlValue::Text(json_text(goal)?),
+                    None => SqlValue::Null,
+                },
+            ));
         }
         if let Some(updated_at) = self.updated_at {
             assignments.push(("updated_at", SqlValue::Integer(updated_at)));
@@ -174,8 +184,8 @@ impl<'c> ChatRepository<'c> {
     pub fn create(&self, row: &ConversationRow) -> rusqlite::Result<ConversationRow> {
         self.connection
             .prepare_cached(&format!(
-                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, retrieval_mode, working_folder, turn_folder, profile, pinned, created_at, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) RETURNING {}",
+                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, retrieval_mode, working_folder, turn_folder, profile, pinned, goal, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16) RETURNING {}",
                 ConversationRow::COLUMNS
             ))?
             .query_row(
@@ -193,6 +203,7 @@ impl<'c> ChatRepository<'c> {
                     row.turn_folder,
                     row.profile,
                     row.pinned,
+                    row.goal.as_ref().map(json_text).transpose()?,
                     row.created_at,
                     row.updated_at,
                 ],
@@ -386,6 +397,7 @@ mod tests {
             turn_folder: None,
             profile: String::new(),
             pinned: false,
+            goal: None,
             created_at: 1,
             updated_at,
         }

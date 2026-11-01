@@ -39,6 +39,7 @@ import {
   REJECT_CHANGES,
   fileChanges,
 } from "./fileChangesCopy";
+import { GOAL_TOOL } from "./goalCopy";
 import { ASK_TOOL, QUESTIONS_SKIPPED, QUESTIONS_UNANSWERED, questionRecord } from "./questionCopy";
 import {
   ALLOW_ONCE,
@@ -168,7 +169,8 @@ function ToolCallCard({
     setWasBlocking(blocking);
     setManual(null);
   }
-  const open = manual ?? blocking;
+  const completion = call.key === GOAL_TOOL && call.status === "succeeded";
+  const open = manual ?? (blocking || completion);
   const { motion: level } = useFx();
 
   const status = TOOL_CALL_STATUS[call.status];
@@ -259,7 +261,9 @@ function ToolCallCard({
             />
           )}
           {view !== null && <ToolCallViewBody view={view} />}
-          {view !== null && <RawArguments text={toolArgumentsText(call.arguments)} />}
+          {view !== null && view.kind !== "goal" && (
+            <RawArguments text={toolArgumentsText(call.arguments)} />
+          )}
           {record === null &&
             view === null &&
             finished === null &&
@@ -291,7 +295,7 @@ function ToolCallCard({
               <FileChangeList changes={applied} />
             </div>
           )}
-          {call.result !== null && record === null && !searched && (
+          {call.result !== null && record === null && !searched && view?.kind !== "goal" && (
             <ResultBlock result={call.result} truncated={call.truncated} />
           )}
           {call.error !== null && <p className="text-[12px] text-err">{call.error}</p>}

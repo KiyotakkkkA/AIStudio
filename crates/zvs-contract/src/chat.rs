@@ -6,6 +6,7 @@ use crate::errors::AppError;
 use crate::events::{ApprovalRequestDto, EventSeq};
 use crate::exec_policy::ToolAuthorisationDto;
 use crate::folders::{WorkingFolderAccess, check_folder_path};
+use crate::goal::ChatGoalDto;
 use crate::ids::{ConversationId, DocumentId, MessageId, ProviderId, RunId, VectorStoreId};
 use crate::primitives::{Json, Timestamp};
 use crate::questions::QuestionRequestDto;
@@ -60,6 +61,7 @@ wire_enum!(OfferedToolSource {
 
 wire_enum!(ChatCommand {
     BrowserUse => "browser-use",
+    Goal => "goal",
 });
 
 wire_enum!(MessageRole {
@@ -445,6 +447,8 @@ pub struct ConversationDto {
     pub working_folder_access: Option<WorkingFolderAccess>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub pinned: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal: Option<ChatGoalDto>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
@@ -461,6 +465,9 @@ impl Validate for ConversationDto {
         }
         if self.working_folder.is_some() != self.working_folder_access.is_some() {
             return Err(invalid("workingFolderAccess", "workingFolder"));
+        }
+        if let Some(goal) = &self.goal {
+            nested("goal", goal.validate())?;
         }
         check_int("createdAt", self.created_at)?;
         check_int("updatedAt", self.updated_at)

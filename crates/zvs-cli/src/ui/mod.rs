@@ -416,6 +416,24 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
             theme::accent(),
         ));
     }
+    if let Some(goal) = app.goal.filter(crate::state::GoalState::shown) {
+        left.push(Span::styled("  ·  ", theme::faint()));
+        left.push(if goal.active() {
+            Span::styled(
+                crate::format::goal_progress(
+                    goal.usage.rounds,
+                    goal.budget.rounds,
+                    app.goal_elapsed_ms(),
+                ),
+                theme::accent(),
+            )
+        } else {
+            Span::styled(
+                crate::format::with_reason(copy::GOAL_PAUSED, goal.reason),
+                Style::new().fg(theme::colors().warn),
+            )
+        });
+    }
     let used: usize = left.iter().map(|span| span.content.width()).sum();
     let room = usize::from(top.width).saturating_sub(used + 2);
     let folder = text::truncate(&app.folder, room);

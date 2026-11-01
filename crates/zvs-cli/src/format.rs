@@ -48,6 +48,36 @@ pub fn processes(count: u64) -> String {
     )
 }
 
+pub fn goal_reason(reason: zvs_contract::GoalReason) -> Option<&'static str> {
+    use zvs_contract::GoalReason;
+    match reason {
+        GoalReason::Rounds => Some(crate::copy::GOAL_REASON_ROUNDS),
+        GoalReason::Tokens => Some(crate::copy::GOAL_REASON_TOKENS),
+        GoalReason::Minutes => Some(crate::copy::GOAL_REASON_MINUTES),
+        GoalReason::Repetition => Some(crate::copy::GOAL_REASON_REPETITION),
+        GoalReason::Restart => Some(crate::copy::GOAL_REASON_RESTART),
+        GoalReason::Error => Some(crate::copy::GOAL_REASON_ERROR),
+        GoalReason::User => None,
+    }
+}
+
+pub fn with_reason(lead: &str, reason: Option<zvs_contract::GoalReason>) -> String {
+    match reason.and_then(goal_reason) {
+        Some(reason) => format!("{lead}: {reason}"),
+        None => lead.to_owned(),
+    }
+}
+
+pub fn goal_progress(round: u64, total: u64, elapsed_ms: u64) -> String {
+    format!(
+        "{}: раунд {} из {} · {} мин",
+        crate::copy::GOAL_FOOTER,
+        number(round),
+        number(total),
+        number(elapsed_ms / 60_000)
+    )
+}
+
 pub fn files(count: u64) -> String {
     plural(count, "файл", "файла", "файлов")
 }

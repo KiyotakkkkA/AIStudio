@@ -3,7 +3,6 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use futures::future::join_all;
 use regex::Regex;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -13,23 +12,27 @@ use zvs_contract::vector_stores::DEFAULT_CHAT_MIN_SCORE;
 use zvs_contract::{
     AppError, AppErrorCode, ChatAttachDto, ChatCitationDto, ChatCommand, ChatCommandDto,
     ChatContextDto, ChatContextInput, ChatContextToolDto, ChatEvalCaseDto, ChatEvalInput,
-    ChatEvalModeDto, ChatEvalRunDto, ChatRoundDto, ChatSendInput, ChatSettings, ChatToolCallDto,
-    ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationId,
+    ChatEvalModeDto, ChatEvalRunDto, ChatGoalDto, ChatRoundDto, ChatSendInput, ChatSettings,
+    ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationId,
     CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DeltaKind, DocumentId, FolderGrantScope,
-    GRAPH_EXPANSION_DEFAULT_MAX, GraphDirection, GraphExpansionDocument, GraphNeighborhood,
-    GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId, MessageRole,
-    OfferedToolSource, ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph,
-    RunHandleDto, RunId, RunKind, RunStatus, StartRunInput, StreamId, ToolListFilter, ToolMode,
-    ToolTier, Validate, VectorSearchHitDto, VectorStoreId, VendorTurnOptions, WEB_SOURCES_MAX,
-    WebSourceDto, log_line, merge_graph_neighbors, model_tool_support, resolve_tool_mode,
+    GRAPH_EXPANSION_DEFAULT_MAX, GoalReason, GoalStatus, GraphDirection, GraphExpansionDocument,
+    GraphNeighborhood, GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId,
+    MessageRole, ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph,
+    RunHandleDto, RunId, RunKind, RunOutcomeStatus, RunStatus, StartRunInput, StreamId,
+    ToolListFilter, ToolMode, ToolTier, Validate, VectorSearchHitDto, VectorStoreId,
+    VendorTurnOptions, WEB_SOURCES_MAX, WebSourceDto, log_line, merge_graph_neighbors,
+    model_tool_support, resolve_tool_mode,
 };
 
-use super::chat_ask::{
-    ASK_MALFORMED, ASK_ONCE, ASK_TOOL, answers_text, ask_request, ask_section, ask_tool,
+use super::chat_ask::{ASK_MALFORMED, ASK_TOOL, answers_text, ask_request, ask_section, ask_tool};
+use super::chat_goal::{
+    GOAL_CONTINUE_TEXT, GOAL_DESCRIPTION, GOAL_NEEDS_TOOLS, GOAL_NOT_PAUSED, GOAL_NOT_STOPPABLE,
+    GOAL_RUNNING, GOAL_TOOL, GoalHook, default_budget, ended, goal_section, goal_tool, restarted,
+    settled,
 };
 use super::chat_history::{
-    MESSAGE_OVERHEAD, RelatedSource, RetrievedSource, estimate_tokens, measure_context, tokens,
-    window_chat_history, with_selections,
+    RelatedSource, RetrievedSource, estimate_tokens, measure_context, tokens, window_chat_history,
+    with_selections,
 };
 use super::chat_memory::{
     MEMORY_FAILED, MEMORY_TOOL, MemoryRefs, apply_memory_call, memory_section, memory_tool,
@@ -39,11 +42,11 @@ use super::chat_reply::{
 };
 use super::chat_tools::{
     CHAT_TOOL_CALLS, HYBRID_INSTRUCTION, KNOWLEDGE_INSTRUCTION, KnowledgeText, OfferedTool,
-    TOOL_BUDGET_NOTE, TOOL_PREVIEW_CHARS, TOOL_RESULTS_INSTRUCTION, TOOL_SEARCH, ToolInputs,
-    ToolPlan, active_commands, cap_text, command_tools, deferred_section, fence_tool_result,
-    knowledge_catalogue, loaded_keys, loaded_tools_text, offered_record, parse_tool_arguments,
-    plan_tools, read_result_text, search_result_text, search_tool, search_tools,
-    tool_result_budget, tool_result_text, tool_specs, tool_specs_json, unoffered_text, wire_names,
+    TOOL_PREVIEW_CHARS, TOOL_RESULTS_INSTRUCTION, TOOL_SEARCH, ToolInputs, ToolPlan,
+    active_commands, cap_text, command_tools, deferred_section, knowledge_catalogue, loaded_keys,
+    loaded_tools_text, offered_record, plan_tools, read_result_text, search_result_text,
+    search_tool, search_tools, tool_result_budget, tool_result_text, tool_specs, tool_specs_json,
+    unoffered_text, wire_names,
 };
 use super::mcp::McpServers;
 use super::memory::MemoryService;
@@ -53,6 +56,9 @@ use super::profile::{
 use super::retrieval_merge::{CHAT_FETCH_K, MergeOptions, StoreHits, merge_retrieval};
 use super::retrieval_query::retrieval_query;
 use super::runs::RunService;
+use super::tool_loop::{
+    CallOutcome, ChatTurn, LoopBudget, LoopCall, LoopHost, LoopTranscript, RoundHook, ToolLoop,
+};
 use super::vector_stores::VectorSearchOptions;
 use crate::background::{BACKGROUND_TOOLS, BackgroundShells, status_line};
 use crate::commands::PROCESS_TOOLS;
@@ -90,6 +96,7 @@ pub const BROWSER_USE_DESCRIPTION: &str =
 pub fn command_description(command: ChatCommand) -> &'static str {
     match command {
         ChatCommand::BrowserUse => BROWSER_USE_DESCRIPTION,
+        ChatCommand::Goal => GOAL_DESCRIPTION,
     }
 }
 pub const HYBRID_SOURCES_MAX: usize = 3;
@@ -230,6 +237,7 @@ fn conversation_dto(
         working_folder: row.working_folder,
         working_folder_access,
         pinned: row.pinned,
+        goal: row.goal,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -620,6 +628,9 @@ impl Inner {
         else {
             return Ok(());
         };
+        if let HostEventDraft::End { outcome } = &event.body {
+            self.settle_goal(&message.conversation_id, outcome.status, now)?;
+        }
         let duration = (now - message.created_at).max(0);
         self.update_message(
             assistant_id,
@@ -663,6 +674,46 @@ impl Inner {
             }
             Ok(())
         })
+    }
+
+    fn settle_goal(
+        &self,
+        conversation: &str,
+        outcome: RunOutcomeStatus,
+        now: i64,
+    ) -> Result<(), AppError> {
+        self.database.transaction(|transaction| {
+            let repositories = Repositories::new(transaction);
+            let Some(goal) = repositories
+                .chat
+                .get(conversation)?
+                .and_then(|row| row.goal)
+                .and_then(|goal| settled(goal, outcome, now))
+            else {
+                return Ok(());
+            };
+            repositories.chat.update(
+                conversation,
+                &ConversationPatch {
+                    goal: Some(Some(goal)),
+                    ..ConversationPatch::default()
+                },
+            )?;
+            Ok(())
+        })
+    }
+
+    fn set_goal(&self, id: &str, goal: ChatGoalDto) -> Result<ConversationRow, AppError> {
+        self.read(|repositories| {
+            Ok(repositories.chat.update(
+                id,
+                &ConversationPatch {
+                    goal: Some(Some(goal)),
+                    ..ConversationPatch::default()
+                },
+            )?)
+        })?
+        .ok_or_else(|| AppError::new(AppErrorCode::NotFound, CONVERSATION_NOT_FOUND))
     }
 
     fn plan(
@@ -870,6 +921,8 @@ pub struct ChatGenerateRequest {
     pub conversation_id: String,
     #[serde(default)]
     pub memory: MemoryRefs,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub goal: bool,
 }
 
 impl Validate for ChatGenerateRequest {
@@ -1259,6 +1312,14 @@ impl NodeDef for PrepareNode {
             _ => Vec::new(),
         };
         let commands = active_commands(&conversation.messages[..=position]);
+        let goal_turn = user.command == Some(ChatCommand::Goal)
+            && details.goal.as_ref().is_some_and(ChatGoalDto::active);
+        if goal_turn && !tools_usable {
+            return Err(AppError::new(
+                AppErrorCode::ValidationFailed,
+                GOAL_NEEDS_TOOLS,
+            ));
+        }
         let ToolPlan {
             mut offered,
             deferred,
@@ -1369,6 +1430,9 @@ impl NodeDef for PrepareNode {
         if tools_usable {
             offered.push(ask_tool(&offered));
         }
+        if goal_turn {
+            offered.push(goal_tool(&offered));
+        }
         let (memory, memory_refs) =
             inner.memory_prompt(&input.conversation_id, tools_usable, &mut offered)?;
         if !deferred.is_empty() {
@@ -1380,6 +1444,17 @@ impl NodeDef for PrepareNode {
         let ended = inner.ended_shells_note(&input.conversation_id);
         let asking = ask_section(&offered);
         let later = deferred_section(&deferred, &offered);
+        let goal_note = details
+            .goal
+            .as_ref()
+            .filter(|_| goal_turn)
+            .and_then(|goal| {
+                offered
+                    .iter()
+                    .find(|tool| tool.key == GOAL_TOOL)
+                    .map(|tool| goal_section(goal, &tool.name))
+            })
+            .unwrap_or_default();
         let prompt = [
             details.system_prompt.clone(),
             profile,
@@ -1394,6 +1469,7 @@ impl NodeDef for PrepareNode {
             ended,
             asking,
             later,
+            goal_note,
         ]
         .into_iter()
         .filter(|part| !part.trim().is_empty())
@@ -1519,6 +1595,7 @@ impl NodeDef for PrepareNode {
             },
             conversation_id: input.conversation_id.clone(),
             memory: memory_refs,
+            goal: goal_turn,
         })
     }
 }
@@ -1544,19 +1621,7 @@ struct CallOptions<'a> {
     deferred: &'a [OfferedTool],
     loading: &'a Mutex<Vec<String>>,
     skills: &'a Mutex<SkillTurn>,
-}
-
-struct PendingCall<'a> {
-    call: ToolCall,
-    tool: Option<&'a OfferedTool>,
-    index: usize,
-    refuse: Option<&'static str>,
-}
-
-struct CallOutcome {
-    content: String,
-    compact: Option<String>,
-    refund: bool,
+    hook: &'a dyn RoundHook,
 }
 
 fn knowledge_text(output: &Value, book: &mut Vec<ChatCitationDto>) -> Option<KnowledgeText> {
@@ -1564,39 +1629,6 @@ fn knowledge_text(output: &Value, book: &mut Vec<ChatCitationDto>) -> Option<Kno
         KnowledgeResult::Search(output) => Some(search_result_text(&output, book)),
         KnowledgeResult::Read(output) => Some(read_result_text(&output, book)),
     }
-}
-
-struct Compactable {
-    index: usize,
-    round: usize,
-    compact: String,
-}
-
-fn messages_cost(messages: &[ChatMessage]) -> i64 {
-    messages
-        .iter()
-        .map(|message| tokens(&message.content) + MESSAGE_OVERHEAD)
-        .sum()
-}
-
-fn compact_knowledge(
-    messages: &mut [ChatMessage],
-    pending: &mut Vec<Compactable>,
-    round: usize,
-    budget: i64,
-) -> usize {
-    let mut compacted = 0;
-    while messages_cost(messages) > budget {
-        let Some(position) = pending.iter().position(|entry| entry.round < round) else {
-            break;
-        };
-        let entry = pending.remove(position);
-        if let Some(message) = messages.get_mut(entry.index) {
-            message.content = entry.compact;
-            compacted += 1;
-        }
-    }
-    compacted
 }
 
 impl GenerateChatNode {
@@ -1740,6 +1772,17 @@ impl GenerateChatNode {
                 Some(unoffered_text(&name, options.offered)),
             )));
         };
+        if options.hook.handles(&tool.key) {
+            let arguments = calls.lock().unwrap_or_else(PoisonError::into_inner)[index]
+                .arguments
+                .clone();
+            let outcome = options.hook.bridge(&tool.key, &arguments);
+            return Ok(plain(settle(
+                outcome.status,
+                outcome.error.as_deref(),
+                outcome.result,
+            )));
+        }
         if tool.key == TOOL_SEARCH {
             let arguments = calls.lock().unwrap_or_else(PoisonError::into_inner)[index]
                 .arguments
@@ -2025,31 +2068,47 @@ impl GenerateChatNode {
             knowledge,
             conversation_id,
             memory,
+            goal,
         } = request;
         let budget = usize::try_from(tool_calls).unwrap_or(CHAT_TOOL_CALLS);
-        let book = Mutex::new(knowledge.citations.clone());
-        let memory = Mutex::new(memory);
-        let skills = Mutex::new(SkillTurn::default());
-        let mut compactable: Vec<Compactable> = Vec::new();
         let driver = providers.text(&base.provider_id)?;
         let mode = if tools.is_empty() {
             ToolMode::None
         } else {
             resolve_tool_mode(driver.capabilities().tools, model_tools)
         };
-        let (mut offered, deferred): (Vec<OfferedTool>, Vec<OfferedTool>) =
-            if mode == ToolMode::None {
-                (Vec::new(), Vec::new())
-            } else {
-                (tools.clone(), deferred)
-            };
-        let mut specs = tool_specs(&offered);
-        let loading: Mutex<Vec<String>> = Mutex::new(Vec::new());
+        let (offered, deferred): (Vec<OfferedTool>, Vec<OfferedTool>) = if mode == ToolMode::None {
+            (Vec::new(), Vec::new())
+        } else {
+            (tools.clone(), deferred)
+        };
         if !tools.is_empty() && offered.is_empty() {
             context.emit(HostEventDraft::Log {
                 line: log_line(&[("message", json!(TOOLS_NOT_OFFERED))]),
             })?;
         }
+        let goal_hook = if goal {
+            if offered.is_empty() {
+                return Err(AppError::new(
+                    AppErrorCode::ValidationFailed,
+                    GOAL_NEEDS_TOOLS,
+                ));
+            }
+            Some(GoalHook::start(
+                Arc::clone(&self.0.database),
+                self.0.clock.clone(),
+                &conversation_id,
+                &offered,
+                context,
+            )?)
+        } else {
+            None
+        };
+        let hook: &dyn RoundHook = match &goal_hook {
+            Some(hook) => hook,
+            None => &ChatTurn,
+        };
+        let specs = tool_specs(&offered);
         let prompt = base.system.clone();
         let system = if specs.is_empty() {
             prompt
@@ -2065,255 +2124,41 @@ impl GenerateChatNode {
                 .join("\n\n"),
             )
         };
-        let mut template = GenerateRequest {
+        let template = GenerateRequest {
             system,
-            tools: specs.clone(),
+            tools: specs,
             ..base.clone().request()
         };
-        let mut messages = template.messages.clone();
         let calls: Arc<Mutex<Vec<ChatToolCallDto>>> = Arc::new(Mutex::new(Vec::new()));
-        let limit = usize::try_from(tool_result_chars).unwrap_or(usize::MAX);
-        let mut text = String::new();
-        let mut reasoning = String::new();
-        let mut rounds: Vec<ChatRoundDto> = Vec::new();
-        let mut web_sources: Vec<WebSourceDto> = Vec::new();
-        let mut executed = 0;
-        let mut round = 0;
-        let mut usage = TurnUsage::default();
-        let usage_target = (base.provider_id.clone(), base.model.clone());
-        let outcome: Result<(), AppError> = async {
-            loop {
-                let last = round >= budget || executed >= budget;
-                if last && !specs.is_empty() {
-                    messages.push(ChatMessage::user(TOOL_BUDGET_NOTE));
-                }
-                let overhead = tokens(template.system.as_deref().unwrap_or_default())
-                    + tokens(&tool_specs_json(&offered));
-                let compacted = compact_knowledge(
-                    &mut messages,
-                    &mut compactable,
-                    round,
-                    knowledge.context_budget.saturating_sub(overhead),
-                );
-                if compacted > 0 {
-                    context.emit(HostEventDraft::Log {
-                        line: log_line(&[
-                            ("message", json!(KNOWLEDGE_COMPACTED)),
-                            ("compacted", json!(compacted)),
-                            ("round", json!(round)),
-                        ]),
-                    })?;
-                }
-                let output = Self::generate_round(
-                    context,
-                    &driver,
-                    &GenerateRequest {
-                        messages: messages.clone(),
-                        ..template.clone()
-                    },
-                    &text,
-                )
-                .await?;
-                text.push_str(&output.text);
-                reasoning.push_str(&output.reasoning);
-                web_sources.extend(output.web_sources);
-                rounds.push(ChatRoundDto {
-                    text: output.text.clone(),
-                    reasoning: output.reasoning.clone(),
-                });
-                if let Some(reported) = output.usage.clone() {
-                    usage.merge(reported);
-                }
-                let counted = usage.counted();
-                if let Err(error) = self.0.update_message(
-                    &assistant_id,
-                    &MessagePatch {
-                        rounds: Some(rounds.clone()),
-                        tokens_in: counted.then(|| usage.input_tokens.unwrap_or(0)),
-                        tokens_out: counted.then(|| usage.output_tokens.unwrap_or(0)),
-                        usage_estimated: counted.then_some(false),
-                        ..MessagePatch::default()
-                    },
-                ) {
-                    self.0.log(
-                        LogLevel::Warn,
-                        "Could not save the answer rounds",
-                        &[
-                            ("runId", json!(context.run_id.to_string())),
-                            ("error", json!(error.message)),
-                        ],
-                    );
-                }
-                if output.tool_calls.is_empty() || specs.is_empty() {
-                    break;
-                }
-                messages.push(
-                    ChatMessage::assistant(output.text.clone())
-                        .with_tool_calls(output.tool_calls.clone()),
-                );
-                let mut by_name: HashMap<&str, &OfferedTool> = deferred
-                    .iter()
-                    .map(|tool| (tool.name.as_str(), tool))
-                    .collect();
-                by_name.extend(offered.iter().map(|tool| (tool.name.as_str(), tool)));
-                let mut pending = Vec::with_capacity(output.tool_calls.len());
-                let mut asked = false;
-                for call in output.tool_calls {
-                    let tool = by_name.get(call.name.as_str()).copied();
-                    if let Some(tool) = tool
-                        && !offered.iter().any(|known| known.key == tool.key)
-                    {
-                        loading
-                            .lock()
-                            .unwrap_or_else(PoisonError::into_inner)
-                            .push(tool.key.clone());
-                    }
-                    let index = {
-                        let mut guard = calls.lock().unwrap_or_else(PoisonError::into_inner);
-                        guard.push(ChatToolCallDto {
-                            id: call.id.clone(),
-                            key: tool.map_or_else(|| call.name.clone(), |tool| tool.key.clone()),
-                            name: call.name.clone(),
-                            round: round as u64,
-                            arguments: parse_tool_arguments(&call.arguments).map_or_else(
-                                || Value::String(call.arguments.clone()),
-                                Value::Object,
-                            ),
-                            status: ChatToolCallStatus::Running,
-                            result: None,
-                            truncated: false,
-                            error: None,
-                            approval_id: None,
-                            step_id: None,
-                            duration_ms: 0,
-                            meta: None,
-                            authorisation: None,
-                        });
-                        guard.len() - 1
-                    };
-                    let asking = tool.is_some_and(|tool| tool.key == ASK_TOOL);
-                    let refuse = if last || executed >= budget {
-                        Some(BUDGET_EXHAUSTED)
-                    } else if asking && asked {
-                        Some(ASK_ONCE)
-                    } else {
-                        None
-                    };
-                    asked |= asking;
-                    if refuse.is_none() && !asking {
-                        executed += 1;
-                    }
-                    pending.push(PendingCall {
-                        call,
-                        tool,
-                        index,
-                        refuse,
-                    });
-                }
-                let concurrent = |entry: &PendingCall<'_>| {
-                    entry.refuse.is_none() && entry.tool.is_some_and(|tool| tool.read_only)
-                };
-                let mut position = 0;
-                while position < pending.len() {
-                    let mut end = position + 1;
-                    if concurrent(&pending[position]) {
-                        while end < pending.len() && concurrent(&pending[end]) {
-                            end += 1;
-                        }
-                    }
-                    let group = &pending[position..end];
-                    let outcomes = join_all(group.iter().map(|entry| {
-                        self.call_tool(
-                            context,
-                            &assistant_id,
-                            &calls,
-                            entry.index,
-                            CallOptions {
-                                tool: entry.tool,
-                                label: format!("call{}", entry.index + 1),
-                                limit,
-                                refuse: entry.refuse,
-                                scope: &knowledge.store_ids,
-                                book: &book,
-                                conversation: &conversation_id,
-                                memory: &memory,
-                                offered: &offered,
-                                deferred: &deferred,
-                                loading: &loading,
-                                skills: &skills,
-                            },
-                        )
-                    }))
-                    .await;
-                    for (entry, outcome) in group.iter().zip(outcomes) {
-                        let outcome = outcome?;
-                        if outcome.refund {
-                            executed -= 1;
-                        }
-                        let status = calls.lock().unwrap_or_else(PoisonError::into_inner)
-                            [entry.index]
-                            .status;
-                        let shape = |content: String| {
-                            fence_tool_result(&entry.call.name, status.as_str(), &content)
-                        };
-                        if let Some(compact) = outcome.compact {
-                            compactable.push(Compactable {
-                                index: messages.len(),
-                                round,
-                                compact: shape(compact),
-                            });
-                        }
-                        messages.push(ChatMessage::tool(
-                            entry.call.id.clone(),
-                            shape(outcome.content),
-                        ));
-                    }
-                    position = end;
-                }
-                let loaded =
-                    std::mem::take(&mut *loading.lock().unwrap_or_else(PoisonError::into_inner));
-                let mut grew = false;
-                for key in loaded {
-                    if offered.iter().any(|tool| tool.key == key) {
-                        continue;
-                    }
-                    if let Some(tool) = deferred.iter().find(|tool| tool.key == key) {
-                        offered.push(OfferedTool {
-                            source: OfferedToolSource::Loaded,
-                            ..tool.clone()
-                        });
-                        grew = true;
-                    }
-                }
-                if grew {
-                    specs = tool_specs(&offered);
-                    template.tools = specs.clone();
-                    if let Err(error) = self.0.update_message(
-                        &assistant_id,
-                        &MessagePatch {
-                            offered_tools: Some(offered_record(&offered)),
-                            ..MessagePatch::default()
-                        },
-                    ) {
-                        self.0.log(
-                            LogLevel::Warn,
-                            "Could not save the loaded tools",
-                            &[
-                                ("runId", json!(context.run_id.to_string())),
-                                ("error", json!(error.message)),
-                            ],
-                        );
-                    }
-                }
-                if last {
-                    break;
-                }
-                round += 1;
-            }
-            Ok(())
+        let host = ChatLoopHost {
+            node: self,
+            assistant_id: &assistant_id,
+            limit: usize::try_from(tool_result_chars).unwrap_or(usize::MAX),
+            scope: &knowledge.store_ids,
+            book: Mutex::new(knowledge.citations.clone()),
+            conversation: &conversation_id,
+            memory: Mutex::new(memory),
+            skills: Mutex::new(SkillTurn::default()),
+        };
+        let mut out = LoopTranscript::default();
+        let outcome = ToolLoop {
+            driver,
+            template,
+            offered,
+            deferred,
+            budget: if goal_hook.is_some() {
+                LoopBudget::Open
+            } else {
+                LoopBudget::Calls(budget)
+            },
+            context_budget: knowledge.context_budget,
+            host: &host,
+            hook,
         }
+        .run(context, &calls, &mut out)
         .await;
-        self.0.learn_usage(&usage_target.0, &usage_target.1, &usage);
+        self.0
+            .learn_usage(&base.provider_id, &base.model, &out.usage);
         if let Err(error) = outcome {
             let mut changed = Vec::new();
             {
@@ -2339,12 +2184,99 @@ impl GenerateChatNode {
                 .save_tool_calls(context, &assistant_id, &calls, &changed);
             return Err(error);
         }
-        web_sources.truncate(WEB_SOURCES_MAX);
+        out.web_sources.truncate(WEB_SOURCES_MAX);
         Ok(GenerateOutput {
-            text,
-            reasoning,
-            web_sources,
+            text: out.text,
+            reasoning: out.reasoning,
+            web_sources: out.web_sources,
         })
+    }
+}
+
+struct ChatLoopHost<'a> {
+    node: &'a GenerateChatNode,
+    assistant_id: &'a str,
+    limit: usize,
+    scope: &'a [VectorStoreId],
+    book: Mutex<Vec<ChatCitationDto>>,
+    conversation: &'a str,
+    memory: Mutex<MemoryRefs>,
+    skills: Mutex<SkillTurn>,
+}
+
+#[async_trait]
+impl LoopHost for ChatLoopHost<'_> {
+    async fn call(
+        &self,
+        context: &StepContext,
+        calls: &Arc<Mutex<Vec<ChatToolCallDto>>>,
+        call: LoopCall<'_>,
+    ) -> Result<CallOutcome, AppError> {
+        self.node
+            .call_tool(
+                context,
+                self.assistant_id,
+                calls,
+                call.index,
+                CallOptions {
+                    tool: call.tool,
+                    label: call.label,
+                    limit: self.limit,
+                    refuse: call.refuse,
+                    scope: self.scope,
+                    book: &self.book,
+                    conversation: self.conversation,
+                    memory: &self.memory,
+                    offered: call.offered,
+                    deferred: call.deferred,
+                    loading: call.loading,
+                    skills: &self.skills,
+                    hook: call.hook,
+                },
+            )
+            .await
+    }
+
+    fn rounds_saved(&self, context: &StepContext, rounds: &[ChatRoundDto], usage: &TurnUsage) {
+        let counted = usage.counted();
+        if let Err(error) = self.node.0.update_message(
+            self.assistant_id,
+            &MessagePatch {
+                rounds: Some(rounds.to_vec()),
+                tokens_in: counted.then(|| usage.input_tokens.unwrap_or(0)),
+                tokens_out: counted.then(|| usage.output_tokens.unwrap_or(0)),
+                usage_estimated: counted.then_some(false),
+                ..MessagePatch::default()
+            },
+        ) {
+            self.node.0.log(
+                LogLevel::Warn,
+                "Could not save the answer rounds",
+                &[
+                    ("runId", json!(context.run_id.to_string())),
+                    ("error", json!(error.message)),
+                ],
+            );
+        }
+    }
+
+    fn offered_saved(&self, context: &StepContext, offered: &[OfferedTool]) {
+        if let Err(error) = self.node.0.update_message(
+            self.assistant_id,
+            &MessagePatch {
+                offered_tools: Some(offered_record(offered)),
+                ..MessagePatch::default()
+            },
+        ) {
+            self.node.0.log(
+                LogLevel::Warn,
+                "Could not save the loaded tools",
+                &[
+                    ("runId", json!(context.run_id.to_string())),
+                    ("error", json!(error.message)),
+                ],
+            );
+        }
     }
 }
 
@@ -2510,6 +2442,7 @@ impl ChatService {
             turn_folder: None,
             profile: profile.about,
             pinned: false,
+            goal: None,
             created_at: now,
             updated_at: now,
         };
@@ -2739,6 +2672,7 @@ impl ChatService {
                 js_slice(&parent.title, title_room)
             ),
             pinned: false,
+            goal: None,
             created_at: now,
             updated_at: now,
             ..parent
@@ -2891,6 +2825,95 @@ impl ChatService {
 
     pub fn send(&self, input: &ChatSendInput) -> Result<RunHandleDto, AppError> {
         input.validate()?;
+        let row = self
+            .inner
+            .conversation(&input.conversation_id.to_string())?;
+        if row.goal.as_ref().is_some_and(ChatGoalDto::active) {
+            return Err(AppError::new(AppErrorCode::Conflict, GOAL_RUNNING));
+        }
+        let goal = if input.command == Some(ChatCommand::Goal) {
+            let budget = self
+                .inner
+                .read(|repositories| Ok(default_budget(repositories)))?;
+            Some(ChatGoalDto::new(input.text(), budget, self.inner.now()))
+        } else {
+            None
+        };
+        self.start_turn(input, goal)
+    }
+
+    pub fn continue_goal(&self, id: &ConversationId) -> Result<RunHandleDto, AppError> {
+        let row = self.inner.conversation(&id.to_string())?;
+        let goal = row
+            .goal
+            .filter(|goal| goal.status == GoalStatus::Paused)
+            .ok_or_else(|| AppError::new(AppErrorCode::Conflict, GOAL_NOT_PAUSED))?;
+        let budget = self
+            .inner
+            .read(|repositories| Ok(default_budget(repositories)))?
+            .after(&goal.usage);
+        let resumed = ChatGoalDto {
+            status: GoalStatus::Active,
+            reason: None,
+            budget,
+            ..goal
+        };
+        self.start_turn(
+            &ChatSendInput {
+                command: Some(ChatCommand::Goal),
+                ..ChatSendInput::new(*id, GOAL_CONTINUE_TEXT)
+            },
+            Some(resumed),
+        )
+    }
+
+    pub async fn stop_goal(&self, id: &ConversationId) -> Result<ConversationDto, AppError> {
+        let key = id.to_string();
+        let row = self.inner.conversation(&key)?;
+        let goal = row
+            .goal
+            .filter(|goal| matches!(goal.status, GoalStatus::Active | GoalStatus::Paused))
+            .ok_or_else(|| AppError::new(AppErrorCode::Conflict, GOAL_NOT_STOPPABLE))?;
+        let running = goal.active();
+        let stopped = ended(
+            goal,
+            GoalStatus::Stopped,
+            Some(GoalReason::User),
+            self.inner.now(),
+        );
+        let row = self.inner.set_goal(&key, stopped)?;
+        if running
+            && let Some(run) = self
+                .inner
+                .read(|repositories| Ok(repositories.runs.unfinished()?))?
+                .into_iter()
+                .find(|run| run.kind == RunKind::Chat && run.subject_id.as_deref() == Some(&key))
+            && let Some(run_id) = RunId::parse(&run.id)
+        {
+            self.runs.cancel(&run_id).await?;
+        }
+        self.inner.dto(row)
+    }
+
+    pub fn recover_goals(&self) -> Result<usize, AppError> {
+        let rows = self
+            .inner
+            .read(|repositories| Ok(repositories.chat.list()?))?;
+        let mut paused = 0;
+        for row in rows {
+            if let Some(goal) = row.goal.and_then(restarted) {
+                self.inner.set_goal(&row.id, goal)?;
+                paused += 1;
+            }
+        }
+        Ok(paused)
+    }
+
+    fn start_turn(
+        &self,
+        input: &ChatSendInput,
+        goal: Option<ChatGoalDto>,
+    ) -> Result<RunHandleDto, AppError> {
         let conversation_id = input.conversation_id.to_string();
         let conversation = self.get(&input.conversation_id)?;
         self.inner.require_idle(&conversation_id)?;
@@ -3033,6 +3056,7 @@ impl ChatService {
                         provider_id: Some(provider_id.clone()),
                         model_id: Some(model_id.clone()),
                         settings: Some(settings),
+                        goal: goal.clone().map(Some),
                         ..ConversationPatch::touched(now)
                     },
                 )?;

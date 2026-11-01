@@ -59,6 +59,8 @@ import ExplorerStore from "./explorer/ExplorerStore";
 import TerminalStore from "../terminal/TerminalStore";
 import BackgroundShellStore from "../backgroundShells/BackgroundShellStore";
 import { matchCommands, parseCommand } from "./chatCommands";
+import GoalStore from "./GoalStore";
+import { GOAL_COMMAND } from "./goalCopy";
 import { toolSections } from "./toolSets";
 import { appendRound } from "./answerRounds";
 
@@ -135,6 +137,8 @@ export default class ChatStore {
   folderError: string | null = null;
   folderPrompt: { path: string } | null = null;
   pendingTurn = false;
+  goalEmpty = false;
+  readonly goals: GoalStore;
   readonly explorer: ExplorerStore;
   readonly terminal: TerminalStore;
   readonly backgroundShells: BackgroundShellStore;
@@ -172,6 +176,13 @@ export default class ChatStore {
     this.artifacts = new ArtifactActions(ipc);
     this.exports = new ConversationExport(ipc);
     this.siteIcons = new SiteIcons(ipc);
+    this.goals = new GoalStore(ipc, {
+      conversation: () => this.active,
+      refresh: (id) => this.refreshGoal(id),
+      replace: (conversation) => {
+        this.replaceConversation(conversation);
+      },
+    });
     makeAutoObservable<
       ChatStore,
       | "ipc"
@@ -204,6 +215,7 @@ export default class ChatStore {
         artifacts: false,
         exports: false,
         siteIcons: false,
+        goals: false,
         buffer: false,
         timer: false,
         unsubscribe: false,
@@ -481,6 +493,7 @@ export default class ChatStore {
   }
   typeText(value: string) {
     this.composer.setText(value);
+    this.goalEmpty = false;
     this.commandIndex = 0;
     this.commandsDismissed = false;
   }
@@ -500,6 +513,7 @@ export default class ChatStore {
   }
   clearCommand() {
     this.composer.setCommand(null);
+    this.goalEmpty = false;
   }
   get standaloneApprovals() {
     const attached = new Set(
@@ -522,8 +536,12 @@ export default class ChatStore {
       !this.loading &&
       !this.generating &&
       !this.changingOpenaiMode &&
+      !this.goals.active &&
       this.composer.text.trim().length > 0
     );
+  }
+  get goalCommand() {
+    return this.composer.command === GOAL_COMMAND;
   }
   get canRetry() {
     return !this.generating && this.retryText.length > 0;
@@ -845,6 +863,7 @@ export default class ChatStore {
     this.error = null;
     this.folderError = null;
     this.folderPrompt = null;
+    this.goals.reset();
     try {
       const [active, live] = await Promise.all([
         this.ipc.call("chat.conversations.get", { id }),
@@ -894,6 +913,7 @@ export default class ChatStore {
     if (this.generating) return;
     ++this.revision;
     this.active = null;
+    this.goals.reset();
     this.remember(null);
     this.loading = false;
     this.error = null;
@@ -999,11 +1019,16 @@ export default class ChatStore {
   }
 
   async send() {
+    if (this.goalCommand && this.composer.text.trim().length === 0) {
+      this.goalEmpty = true;
+      return;
+    }
     if (!this.canSend) return;
     const typed =
       this.composer.command === null ? parseCommand(this.commands, this.composer.text) : null;
     if (typed !== null && typed.text.length === 0) {
       this.completeCommand(typed.command);
+      if (typed.command === GOAL_COMMAND) this.goalEmpty = true;
       return;
     }
     const command = this.composer.command ?? typed?.command;
@@ -1443,6 +1468,7 @@ export default class ChatStore {
         this.timer ??= setTimeout(this.flush, 32);
       }
     }
+    if (event.type === "step" && event.step.domain === "goal") this.goals.apply(event.step);
     if (event.type === "step" && event.step.domain === "tool-call") {
       const index = event.step.index;
       const call = ChatToolCallDto.safeParse(event.step.call);
@@ -1546,6 +1572,49 @@ export default class ChatStore {
         if (revision === this.revision) this.loading = false;
       });
     }
+  }
+
+  async continueGoal() {
+    if (this.generating) return;
+    const run = await this.goals.resume();
+    if (run === null) return;
+    runInAction(() => {
+      if (this.run !== null) return;
+      this.run = run;
+      this.runStartedAt = Date.now();
+      this.lastSeq = -1;
+      this.error = null;
+      this.outcome = null;
+      this.liveText = "";
+      this.liveReasoning = "";
+      this.liveCitations = [];
+      this.liveWebSources = [];
+      this.liveSelections = [];
+      this.liveToolCalls = [];
+      this.liveRounds = [];
+      this.searchedStoreIds = [];
+      if (this.mounted) this.subscribe();
+    });
+  }
+
+  private async refreshGoal(id: ConversationId) {
+    try {
+      const fresh = await this.ipc.call("chat.conversations.get", { id });
+      runInAction(() => {
+        this.replaceConversation(fresh);
+      });
+    } catch {
+      return;
+    }
+  }
+
+  private replaceConversation(conversation: ConversationDto) {
+    if (this.active?.id === conversation.id) {
+      this.active = { ...this.active, goal: conversation.goal };
+    }
+    this.conversations = this.conversations.map((item) =>
+      item.id === conversation.id ? { ...item, goal: conversation.goal } : item,
+    );
   }
 
   async stop() {

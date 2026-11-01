@@ -2,5 +2,9 @@
   {
     "name": "browser use",
     "value": "browser-use"
+  },
+  {
+    "name": "goal",
+    "value": "goal"
   }
 ]

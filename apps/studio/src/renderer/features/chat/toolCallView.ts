@@ -1,4 +1,5 @@
 import { ChatCitationDto, type ChatToolCallDto, type CodeLanguage, type Json } from "@zvs/shared";
+import { GOAL_TOOL } from "./goalCopy";
 import { LANGUAGE_LABEL, PROCESS_TOOL_CODE, PROCESS_TOOL_SHELL } from "./processCopy";
 
 export const SHELL_ID_LABEL = "Процесс";
@@ -69,7 +70,8 @@ export type ToolCallView =
       readonly args: readonly string[];
       readonly packages: readonly string[];
     }
-  | { readonly kind: "fields"; readonly fields: readonly ViewField[] };
+  | { readonly kind: "fields"; readonly fields: readonly ViewField[] }
+  | { readonly kind: "goal"; readonly summary: string; readonly evidence: string };
 
 type JsonObject = { readonly [key: string]: Json };
 
@@ -239,6 +241,11 @@ export function toolCallView(
           ...(tail === null ? [] : [{ label: TAIL_LABEL, value: tail.toLocaleString("ru-RU") }]),
         ],
       };
+    }
+    case GOAL_TOOL: {
+      const summary = text(args, "summary");
+      const evidence = text(args, "evidence") ?? strings(args, "evidence").join("\n");
+      return summary === null ? null : { kind: "goal", summary, evidence };
     }
     case "knowledge.list":
     case "vector.list":

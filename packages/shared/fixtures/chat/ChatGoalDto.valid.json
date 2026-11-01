@@ -1,0 +1,86 @@
+[
+  {
+    "name": "active",
+    "value": {
+      "text": "Добавить тесты для каждого модуля",
+      "status": "active",
+      "reason": null,
+      "budget": {
+        "rounds": 40,
+        "tokens": 400000,
+        "minutes": 30
+      },
+      "usage": {
+        "rounds": 12,
+        "tokens": 48200,
+        "elapsedMs": 185000
+      },
+      "summary": null,
+      "startedAt": 1,
+      "endedAt": null
+    }
+  },
+  {
+    "name": "paused on tokens",
+    "value": {
+      "text": "Добавить тесты для каждого модуля",
+      "status": "paused",
+      "reason": "tokens",
+      "budget": {
+        "rounds": 40,
+        "tokens": 400000,
+        "minutes": 30
+      },
+      "usage": {
+        "rounds": 12,
+        "tokens": 48200,
+        "elapsedMs": 185000
+      },
+      "summary": null,
+      "startedAt": 1,
+      "endedAt": null
+    }
+  },
+  {
+    "name": "done",
+    "value": {
+      "text": "Добавить тесты для каждого модуля",
+      "status": "done",
+      "reason": null,
+      "budget": {
+        "rounds": 40,
+        "tokens": 400000,
+        "minutes": 30
+      },
+      "usage": {
+        "rounds": 12,
+        "tokens": 48200,
+        "elapsedMs": 185000
+      },
+      "summary": "Тесты добавлены, cargo test проходит",
+      "startedAt": 1,
+      "endedAt": 9
+    }
+  },
+  {
+    "name": "stopped on repetition",
+    "value": {
+      "text": "Добавить тесты для каждого модуля",
+      "status": "stopped",
+      "reason": "repetition",
+      "budget": {
+        "rounds": 40,
+        "tokens": 400000,
+        "minutes": 30
+      },
+      "usage": {
+        "rounds": 12,
+        "tokens": 48200,
+        "elapsedMs": 185000
+      },
+      "summary": null,
+      "startedAt": 1,
+      "endedAt": 9
+    }
+  }
+]

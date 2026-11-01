@@ -384,6 +384,10 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
   `shells.kill` are allowed, so the console can see and stop what an agent left running.
   They reach only processes the background service started (never an arbitrary pid), list by
   dialog id, and `shells.kill` stops a process tree that the person already approved starting.
+  Goals (2026-11-01, TASK_048_EXTRA_3): `chat.goal.stop` and `chat.goal.continue` are allowed,
+  so `/goal stop`, `/goal continue` and Ctrl+C work from the console. Both take only a dialog
+  id; stop cancels the dialog's own turn, and continue starts a turn that is approved and
+  policed exactly like one sent with `chat.send`.
 - **Same events, same answers.** CLI connections are extra event-bus subscribers beside the
   window. An approval or a question reaches both; the first answer wins and the other side
   sees `Conflict`.
@@ -578,6 +582,7 @@ Mapping:
 | Front-end | Graph shape |
 | --- | --- |
 | **Chat** | Fixed short graph: retrieve → generate → persist. Streams tokens as `token` events |
+| **Goal** | The chat graph with an open-ended round loop (`services/tool_loop.rs`, TASK_048_EXTRA_3). Ends on `goal.complete` with evidence, a round, token or minute budget (`paused`), the repetition guard or a stop (`stopped`), or a failed turn (`failed`). Progress goes out as `step` events with `domain: "goal"` |
 | **Scenarios** | User-authored DAG from the visual editor; nodes are `NodeDef`s from a registry |
 | **Agentic Build** | Self-extending plan: the model proposes steps, the kernel executes them under the same permission and approval rules |
 
@@ -769,6 +774,21 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   dialog, appended after the core tools so the cached prompt prefix holds. Folder grants,
   tiers, approvals and browser grants are unchanged; deciding *what is offered* is the only
   part this replaced.
+- **Goals** (`/goal`, `zvs-host/src/services/chat_goal.rs`, TASK_048_EXTRA_3, 2026-11-01). A
+  user message with `ChatCommand::Goal` starts a goal: `ConversationDto.goal` holds its text,
+  status (`active | paused | done | stopped | failed`), reason, budget and usage. The turn runs
+  the same tool set, folder, grants, approvals, questions and execution policy as any other,
+  plus the bridge `goal.complete { summary, evidence }`, which, like `chat.ask`, is not a
+  registry tool and needs no admission; empty evidence is refused and the goal goes on. The
+  per-call budget does not apply: the loop (`ToolLoop` with `LoopBudget::Open` and the
+  `GoalHook` round hook) stops on completion, on the round, token or minute budget
+  (`chat.goal.maxRounds`, `maxTokens`, `maxMinutes`; defaults 40, 400 000 and 30), or when
+  `LoopGuard` sees the same calls three rounds running. Older tool results are dropped from
+  the model context when it would overflow. The goal is saved after every round, and on start
+  an `active` goal from before a restart reads as `paused` (`restart`); it is never resumed by
+  itself. While a goal is active, `chat.send` to its dialog is refused with `Conflict`;
+  `chat.goal.stop` cancels the turn and `chat.goal.continue` renews the budget above the usage
+  and starts a new turn.
 - Sidecar runs with the app's privileges but no elevated rights; workspace roots are an
   explicit allow-list checked host-side, not in Rust.
 - **Folder access** (`zvs-host/src/workspace/`, TASK_036_EXTRA_1). A chat may bind one

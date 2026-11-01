@@ -10,17 +10,19 @@ use std::collections::VecDeque;
 use zvs_contract::{
     AccountFamily, AllowRuleChangeDto, AllowRuleInput, AppError, BackgroundShellDto,
     BackgroundShellId, BackgroundShellStatusDto, BindFolderResultDto, ChatAnswerInput,
-    ChatAttachDto, ChatContextDto, ChatSendInput, ChatSkipInput, CliSessionDto, CliTheme,
-    ConversationDetailDto, ConversationDto, ConversationId, CreateMcpServerInput, ExecJudgeDto,
-    ExecMode, ExecPolicyDto, FolderAccessAnswer, FolderGrantScope, HostEvent, HostEventDraft,
-    McpOAuthState, McpServerDetailDto, McpServerDto, McpServerId, McpServerStatus, PolicyRuleDto,
-    ProviderDto, ProviderId, ProviderUsageDto, RunHandleDto, RunId, RunOutcomeStatus,
-    SHELL_STEP_DOMAIN, ShellOutputDto, SkillDto, SkillId, ThinkingEffort, WorkingFolderAccess,
+    ChatAttachDto, ChatCommand, ChatContextDto, ChatGoalDto, ChatGoalStepDto, ChatSendInput,
+    ChatSkipInput, CliSessionDto, CliTheme, ConversationDetailDto, ConversationDto, ConversationId,
+    CreateMcpServerInput, ExecJudgeDto, ExecMode, ExecPolicyDto, FolderAccessAnswer,
+    FolderGrantScope, GOAL_STEP_DOMAIN, GoalBudgetDto, GoalReason, GoalStatus, GoalUsageDto,
+    HostEvent, HostEventDraft, McpOAuthState, McpServerDetailDto, McpServerDto, McpServerId,
+    McpServerStatus, PolicyRuleDto, ProviderDto, ProviderId, ProviderUsageDto, RunHandleDto, RunId,
+    RunOutcomeStatus, SHELL_STEP_DOMAIN, ShellOutputDto, SkillDto, SkillId, ThinkingEffort,
+    WorkingFolderAccess,
 };
 
 use self::input::Input;
 use self::overlay::{Action, Overlay, Panel, ProcessOutput, View};
-use self::palette::{Arg, Command, Item, Palette, Pick, Sources, arg_slot, is_command_text};
+use self::palette::{Arg, Command, Item, Palette, Pick, Sources, Sub, arg_slot, is_command_text};
 use self::prompt::{ApprovalDetail, Choice, Prompt, PromptKind};
 use self::shortcuts::{Chord, Keymap, SHORTCUTS, Shortcut};
 use self::transcript::{ShellEnd, ShellRun, Tone, Transcript};
@@ -107,6 +109,53 @@ pub enum PolicyChange {
     Judge(Option<ExecJudgeDto>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GoalState {
+    pub status: GoalStatus,
+    pub reason: Option<GoalReason>,
+    pub usage: GoalUsageDto,
+    pub budget: GoalBudgetDto,
+    pub seen: u64,
+}
+
+impl GoalState {
+    pub const fn of(goal: &ChatGoalDto, seen: u64) -> Self {
+        Self {
+            status: goal.status,
+            reason: goal.reason,
+            usage: goal.usage,
+            budget: goal.budget,
+            seen,
+        }
+    }
+
+    pub const fn started(seen: u64) -> Self {
+        Self {
+            status: GoalStatus::Active,
+            reason: None,
+            usage: GoalUsageDto {
+                rounds: 0,
+                tokens: 0,
+                elapsed_ms: 0,
+            },
+            budget: GoalBudgetDto {
+                rounds: zvs_contract::GOAL_DEFAULT_ROUNDS,
+                tokens: zvs_contract::GOAL_DEFAULT_TOKENS,
+                minutes: zvs_contract::GOAL_DEFAULT_MINUTES,
+            },
+            seen,
+        }
+    }
+
+    pub const fn active(&self) -> bool {
+        matches!(self.status, GoalStatus::Active)
+    }
+
+    pub const fn shown(&self) -> bool {
+        matches!(self.status, GoalStatus::Active | GoalStatus::Paused)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Request {
     LinkAccount(AccountFamily),
@@ -125,6 +174,8 @@ pub enum Request {
     },
     Send(Box<ChatSendInput>),
     Cancel(RunId),
+    StopGoal(ConversationId),
+    ContinueGoal(ConversationId),
     Approve {
         run: RunId,
         approval: String,
@@ -196,6 +247,7 @@ pub enum Msg {
     Created(Result<ConversationDto, AppError>),
     Bound(Result<BindFolderResultDto, AppError>),
     Sent(Result<RunHandleDto, AppError>),
+    GoalStopped(Result<ConversationDto, AppError>),
     Answered(Result<(), AppError>),
     RuleAdded(Result<PolicyRuleDto, AppError>),
     Conversations(Result<Vec<ConversationDto>, AppError>),
@@ -256,6 +308,9 @@ pub struct App {
     pub held: Vec<HostEvent>,
     pub cancelling: bool,
     pub pending: Option<String>,
+    pub pending_command: Option<ChatCommand>,
+    pub goal: Option<GoalState>,
+    pub goal_stop_armed: bool,
     pub expanded: bool,
     pub scroll: usize,
     pub escape_armed: bool,
@@ -322,6 +377,9 @@ impl App {
             held: Vec::new(),
             cancelling: false,
             pending: None,
+            pending_command: None,
+            goal: None,
+            goal_stop_armed: false,
             expanded: false,
             scroll: 0,
             escape_armed: false,
@@ -407,7 +465,20 @@ impl App {
             servers: self.lookup_servers.as_deref(),
             conversations: self.lookup_conversations.as_deref(),
             folder: &self.folder,
+            goal: self.goal.map(|goal| goal.status),
         }
+    }
+
+    pub fn goal_elapsed_ms(&self) -> u64 {
+        self.goal.map_or(0, |goal| {
+            let running = if goal.active() {
+                self.frame.saturating_sub(goal.seen) * 1000
+                    / crate::ui::transcript::TICKS_PER_SECOND
+            } else {
+                0
+            };
+            goal.usage.elapsed_ms.saturating_add(running)
+        })
     }
 
     pub fn palette_open(&self) -> bool {
@@ -922,6 +993,13 @@ impl App {
             Msg::Loaded(result) => match result {
                 Ok(detail) => {
                     let id = detail.conversation.id;
+                    self.goal = detail
+                        .conversation
+                        .goal
+                        .as_ref()
+                        .map(|goal| GoalState::of(goal, self.frame))
+                        .filter(GoalState::shown);
+                    self.goal_stop_armed = false;
                     self.transcript = Transcript::from_messages(
                         &detail
                             .messages
@@ -979,9 +1057,10 @@ impl App {
                     let id = conversation.id;
                     self.conversation = Some(*conversation);
                     self.grant = None;
+                    let command = self.pending_command.take();
                     self.pending
                         .take()
-                        .map(|text| self.send(id, text))
+                        .map(|text| self.send(id, text, command))
                         .into_iter()
                         .collect()
                 }
@@ -992,6 +1071,20 @@ impl App {
                 }
                 Err(error) => self.abandon(&error),
             },
+            Msg::GoalStopped(result) => {
+                match result {
+                    Ok(conversation) => {
+                        self.goal = conversation
+                            .goal
+                            .as_ref()
+                            .map(|goal| GoalState::of(goal, self.frame));
+                        self.conversation = Some(conversation);
+                        self.transcript.notice(Tone::Info, copy::GOAL_STOPPED);
+                    }
+                    Err(error) => self.fail(&error),
+                }
+                Vec::new()
+            }
             Msg::Sent(result) => {
                 self.awaiting = false;
                 match result {
@@ -1007,6 +1100,12 @@ impl App {
                     Err(error) => {
                         self.transcript.live = None;
                         self.held.clear();
+                        if self
+                            .goal
+                            .is_some_and(|goal| goal.active() && goal.usage.rounds == 0)
+                        {
+                            self.goal = None;
+                        }
                         self.fail(&error);
                         Vec::new()
                     }
@@ -1211,8 +1310,28 @@ impl App {
             HostEventDraft::Question { request } if request.run_id == run_id => {
                 self.prompts.push_back(prompt::question(request.clone()));
             }
+            HostEventDraft::Step { step }
+                if step.get("domain").and_then(serde_json::Value::as_str)
+                    == Some(GOAL_STEP_DOMAIN) =>
+            {
+                self.goal_step(step);
+            }
             HostEventDraft::End { outcome } => {
                 self.transcript.finish();
+                if let Some(goal) = self.goal.as_mut().filter(|goal| goal.active()) {
+                    match outcome.status {
+                        RunOutcomeStatus::Cancelled => {
+                            goal.status = GoalStatus::Stopped;
+                            goal.reason = Some(GoalReason::User);
+                        }
+                        RunOutcomeStatus::Failed | RunOutcomeStatus::Ok => {
+                            goal.status = GoalStatus::Failed;
+                            goal.reason = Some(GoalReason::Error);
+                            self.transcript.notice(Tone::Error, copy::GOAL_FAILED);
+                        }
+                    }
+                    self.goal_stop_armed = false;
+                }
                 match outcome.status {
                     RunOutcomeStatus::Ok => {}
                     RunOutcomeStatus::Cancelled => {
@@ -1236,10 +1355,117 @@ impl App {
         Vec::new()
     }
 
-    fn send(&mut self, id: ConversationId, text: String) -> Request {
+    fn goal_step(&mut self, step: &serde_json::Map<String, serde_json::Value>) {
+        let Ok(progress) =
+            serde_json::from_value::<ChatGoalStepDto>(serde_json::Value::Object(step.clone()))
+        else {
+            return;
+        };
+        if self
+            .conversation
+            .as_ref()
+            .map(|conversation| conversation.id)
+            != Some(progress.conversation_id)
+        {
+            return;
+        }
+        let before = self.goal.map(|goal| goal.status);
+        self.goal = Some(GoalState {
+            status: progress.status,
+            reason: progress.reason,
+            usage: progress.usage,
+            budget: progress.budget,
+            seen: self.frame,
+        });
+        if before == Some(progress.status) {
+            return;
+        }
+        match progress.status {
+            GoalStatus::Paused => self.transcript.notice(
+                Tone::Info,
+                crate::format::with_reason(copy::GOAL_PAUSED, progress.reason),
+            ),
+            GoalStatus::Stopped => self.transcript.notice(
+                Tone::Info,
+                crate::format::with_reason(copy::GOAL_STOPPED, progress.reason),
+            ),
+            GoalStatus::Active | GoalStatus::Done | GoalStatus::Failed => {}
+        }
+        if !progress.status.eq(&GoalStatus::Active) {
+            self.goal_stop_armed = false;
+        }
+    }
+
+    fn goal_command(&mut self, argument: &str) -> Vec<Request> {
+        let word = argument.to_lowercase();
+        if word == Sub::GoalStop.name() {
+            return self.goal_sub(Sub::GoalStop);
+        }
+        if word == Sub::GoalContinue.name() {
+            return self.goal_sub(Sub::GoalContinue);
+        }
+        if argument.is_empty() {
+            self.input.set("/goal ");
+            self.status = Some((Tone::Info, copy::GOAL_HINT.to_owned()));
+            return Vec::new();
+        }
+        if self.goal.is_some_and(|goal| goal.active()) {
+            self.status = Some((Tone::Info, copy::GOAL_RUNNING.to_owned()));
+            return Vec::new();
+        }
+        self.submit_with(argument.to_owned(), Some(ChatCommand::Goal))
+    }
+
+    fn goal_sub(&mut self, sub: Sub) -> Vec<Request> {
+        self.palette.reset();
+        let id = self
+            .conversation
+            .as_ref()
+            .map(|conversation| conversation.id);
+        let status = self.goal.map(|goal| goal.status);
+        match (sub, id) {
+            (Sub::GoalStop, Some(id)) if sub.offered(status) => {
+                self.goal_stop_armed = false;
+                self.status = Some((Tone::Info, copy::GOAL_STOPPING.to_owned()));
+                vec![Request::StopGoal(id)]
+            }
+            (Sub::GoalContinue, Some(id)) if sub.offered(status) => {
+                if self.busy() {
+                    self.status = Some((Tone::Info, copy::BUSY.to_owned()));
+                    return Vec::new();
+                }
+                self.awaiting = true;
+                self.transcript.notice(Tone::Info, copy::GOAL_CONTINUED);
+                self.transcript.start();
+                self.scroll = 0;
+                self.started = self.frame;
+                if let Some(goal) = self.goal.as_mut() {
+                    goal.status = GoalStatus::Active;
+                    goal.reason = None;
+                    goal.seen = self.frame;
+                }
+                vec![Request::ContinueGoal(id)]
+            }
+            (Sub::GoalStop, _) => {
+                self.status = Some((Tone::Info, copy::GOAL_NOT_STOPPABLE.to_owned()));
+                Vec::new()
+            }
+            _ => {
+                self.status = Some((Tone::Info, copy::GOAL_NOT_PAUSED.to_owned()));
+                Vec::new()
+            }
+        }
+    }
+
+    fn send(&mut self, id: ConversationId, text: String, command: Option<ChatCommand>) -> Request {
         self.awaiting = true;
         self.transcript.start();
+        if command == Some(ChatCommand::Goal) {
+            self.goal = Some(GoalState::started(self.frame));
+            self.goal_stop_armed = false;
+        }
         let mut input = ChatSendInput::new(id, text);
+        input.command = command;
         input.vendor.effort = Some(self.effort);
         if let Some(model) = &self.model
             && self
@@ -1266,6 +1492,15 @@ impl App {
     }
 
     fn submit_message(&mut self, text: String) -> Vec<Request> {
+        if self.goal.is_some_and(|goal| goal.active()) {
+            self.input.set(&text);
+            self.status = Some((Tone::Info, copy::GOAL_RUNNING.to_owned()));
+            return Vec::new();
+        }
+        self.submit_with(text, None)
+    }
+
+    fn submit_with(&mut self, text: String, command: Option<ChatCommand>) -> Vec<Request> {
         if self.busy() {
             self.input.set(&text);
             self.status = Some((Tone::Info, copy::BUSY.to_owned()));
@@ -1276,7 +1511,10 @@ impl App {
             self.transcript.notice(Tone::Error, copy::NO_PROVIDER);
             return Vec::new();
         };
-        self.transcript.push_user(&text);
+        self.transcript.push_user(&match command {
+            Some(command) => format!("/{} {text}", command.as_str()),
+            None => text.clone(),
+        });
         self.scroll = 0;
         self.started = self.frame;
         if let Some(id) = self
@@ -1284,10 +1522,14 @@ impl App {
             .as_ref()
             .map(|conversation| conversation.id)
         {
-            return vec![self.send(id, text), Request::Policy];
+            return vec![self.send(id, text, command), Request::Policy];
         }
         self.awaiting = true;
         self.pending = Some(text);
+        self.pending_command = command;
+        if command == Some(ChatCommand::Goal) {
+            self.goal = Some(GoalState::started(self.frame));
+        }
         vec![
             Request::Create {
                 provider: model.provider,
@@ -1312,6 +1554,8 @@ impl App {
                     self.status = Some((Tone::Info, copy::BUSY.to_owned()));
                 } else {
                     self.conversation = None;
+                    self.goal = None;
+                    self.goal_stop_armed = false;
                     self.transcript = Transcript::default();
                     self.scroll = 0;
                     self.status = Some((Tone::Success, copy::NEW_CHAT.to_owned()));
@@ -1334,6 +1578,7 @@ impl App {
                 }
             },
             Command::Context => return self.open_panel(Panel::Context),
+            Command::Goal => return self.goal_command(""),
             Command::Skills => return self.open_panel(Panel::Skills),
             Command::Mcp => return self.open_panel(Panel::Mcp),
             Command::Processes => return self.open_panel(Panel::Processes),
@@ -1829,6 +2074,10 @@ impl App {
                     self.input.take();
                     self.command(command)
                 }
+                Item::Sub(sub) if sub.immediate() => {
+                    self.input.take();
+                    self.goal_sub(sub)
+                }
                 Item::Sub(_) => {
                     self.input.set(&item.completion());
                     Vec::new()
@@ -1848,6 +2097,10 @@ impl App {
                 Some(Command::Mcp) if !palette::arguments(&text).is_empty() => {
                     self.palette.reset();
                     self.mcp(palette::arguments(&text))
+                }
+                Some(Command::Goal) => {
+                    self.palette.reset();
+                    self.goal_command(palette::arguments(&text))
                 }
                 Some(command)
                     if command.arg().is_some() && !palette::arguments(&text).is_empty() =>
@@ -1922,6 +2175,9 @@ impl App {
         if key != Key::Esc {
             self.escape_armed = false;
         }
+        if key != Key::Interrupt {
+            self.goal_stop_armed = false;
+        }
         self.status = None;
         if let Key::Chord(chord) = key
             && !self.capturing()
@@ -1930,6 +2186,21 @@ impl App {
         }
         match key {
             Key::Interrupt => {
+                if let Some(id) = self
+                    .conversation
+                    .as_ref()
+                    .map(|conversation| conversation.id)
+                    .filter(|_| self.goal.is_some_and(|goal| goal.active()))
+                {
+                    if self.goal_stop_armed {
+                        self.goal_stop_armed = false;
+                        self.status = Some((Tone::Info, copy::GOAL_STOPPING.to_owned()));
+                        return vec![Request::StopGoal(id)];
+                    }
+                    self.goal_stop_armed = true;
+                    self.status = Some((Tone::Info, copy::GOAL_STOP_CONFIRM.to_owned()));
+                    return Vec::new();
+                }
                 self.quit(None);
                 return Vec::new();
             }

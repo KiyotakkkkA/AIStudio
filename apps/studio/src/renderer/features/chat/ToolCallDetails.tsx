@@ -18,6 +18,7 @@ import { useFx, useTransition } from "../../ui/motion/fx";
 import { plural } from "../connections/connectionPresentation";
 import { sourceName } from "./citations";
 import { commandLine } from "./processCopy";
+import { GOAL_EVIDENCE } from "./goalCopy";
 import {
   ALL_STORES,
   AUTHORISATION_TITLE,
@@ -351,6 +352,15 @@ function ViewBody({ view }: { readonly view: ToolCallView }) {
           <CodeBlock source={view.source} />
         </div>
       );
+    case "goal":
+      return (
+        <div className="space-y-2">
+          <p className="m-0 text-[13px] leading-relaxed whitespace-pre-wrap text-main-100">
+            {view.summary}
+          </p>
+          {view.evidence.length > 0 ? <Evidence text={view.evidence} /> : null}
+        </div>
+      );
     case "fields":
       return (
         <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[11.5px]">
@@ -363,6 +373,36 @@ function ViewBody({ view }: { readonly view: ToolCallView }) {
         </dl>
       );
   }
+}
+
+function Evidence({ text }: { readonly text: string }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-1 rounded-pill text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase hover:text-main-200"
+      >
+        {GOAL_EVIDENCE}
+        <Icon
+          path={mdiChevronDown}
+          size={13}
+          className={`anim-on:transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      <Collapse open={open} id={id}>
+        <ScrollArea className="mt-1 max-h-64 rounded-control bg-main-900 px-2.5 py-2">
+          <pre className="m-0 font-mono text-[11.5px] wrap-break-word whitespace-pre-wrap text-main-200">
+            {text}
+          </pre>
+        </ScrollArea>
+      </Collapse>
+    </div>
+  );
 }
 
 export function ToolCallViewBody({ view }: { readonly view: ToolCallView }) {

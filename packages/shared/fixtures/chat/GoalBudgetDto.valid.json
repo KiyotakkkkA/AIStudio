@@ -1,0 +1,10 @@
+[
+  {
+    "name": "defaults",
+    "value": {
+      "rounds": 40,
+      "tokens": 400000,
+      "minutes": 30
+    }
+  }
+]

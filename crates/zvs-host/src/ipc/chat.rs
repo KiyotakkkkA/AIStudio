@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use zvs_contract::{
     AppError, AppErrorCode, BindFolderInput, BranchConversationInput, ChatAnswerInput,
-    ChatAttachInput, ChatContextInput, ChatEvalInput, ChatSendInput, ChatSkipInput,
+    ChatAttachInput, ChatContextInput, ChatEvalInput, ChatGoalInput, ChatSendInput, ChatSkipInput,
     ConversationRef, CreateConversationInput, PickFolderResultDto, PinConversationInput,
     PinMessageInput, RenameConversationInput, RunIdInput, TruncateConversationInput,
     UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
@@ -177,6 +177,18 @@ pub fn register(server: &mut IpcServer) {
             |services: Arc<Services>, input: RunIdInput| async move {
                 services.chat.cancel(&input.id).await?;
                 Ok::<(), AppError>(())
+            },
+        )
+        .handle(
+            "chat.goal.continue",
+            |services: Arc<Services>, input: ChatGoalInput| async move {
+                services.chat.continue_goal(&input.conversation_id)
+            },
+        )
+        .handle(
+            "chat.goal.stop",
+            |services: Arc<Services>, input: ChatGoalInput| async move {
+                services.chat.stop_goal(&input.conversation_id).await
             },
         )
         .handle(

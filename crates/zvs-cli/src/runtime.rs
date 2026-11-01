@@ -246,6 +246,14 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
         ),
         Request::Send(input) => Msg::Sent(link.call("chat.send", &*input).await),
         Request::Cancel(id) => void(link.call("chat.cancel", &json!({ "id": id })).await),
+        Request::StopGoal(id) => Msg::GoalStopped(
+            link.call("chat.goal.stop", &json!({ "conversationId": id }))
+                .await,
+        ),
+        Request::ContinueGoal(id) => Msg::Sent(
+            link.call("chat.goal.continue", &json!({ "conversationId": id }))
+                .await,
+        ),
         Request::Approve { run, approval } => void(
             link.call(
                 "runs.approve",

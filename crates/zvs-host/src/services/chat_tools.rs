@@ -187,6 +187,7 @@ pub fn offered_tools(enabled: &[String], registered: &[ToolDto]) -> Vec<OfferedT
 pub fn command_tools(command: ChatCommand) -> &'static [&'static str] {
     match command {
         ChatCommand::BrowserUse => &BROWSER_TOOLS,
+        ChatCommand::Goal => &[],
     }
 }
 

@@ -94,7 +94,7 @@ export const WebSourceDto = z.object({
   icon: WebUrl.optional(),
 });
 export type WebSourceDto = z.infer<typeof WebSourceDto>;
-export const CHAT_COMMANDS = ["browser-use"] as const;
+export const CHAT_COMMANDS = ["browser-use", "goal"] as const;
 export const ChatCommand = z.enum(CHAT_COMMANDS);
 export type ChatCommand = z.infer<typeof ChatCommand>;
 export const ChatCommandDto = z.object({
@@ -159,11 +159,77 @@ export const ConversationExportDto = z.object({
   path: z.string().min(1).max(EXPORT_PATH_MAX).optional(),
 });
 export type ConversationExportDto = z.infer<typeof ConversationExportDto>;
+export const GOAL_STEP_DOMAIN = "goal";
+export const GOAL_SUMMARY_MAX = 4000;
+export const GoalStatus = z.enum(["active", "paused", "done", "stopped", "failed"]);
+export type GoalStatus = z.infer<typeof GoalStatus>;
+export const GoalReason = z.enum([
+  "rounds",
+  "tokens",
+  "minutes",
+  "repetition",
+  "restart",
+  "user",
+  "error",
+]);
+export type GoalReason = z.infer<typeof GoalReason>;
+const GoalCount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+export const GoalBudgetDto = z.object({
+  rounds: GoalCount,
+  tokens: GoalCount,
+  minutes: GoalCount,
+});
+export type GoalBudgetDto = z.infer<typeof GoalBudgetDto>;
+export const GoalUsageDto = z.object({
+  rounds: GoalCount,
+  tokens: GoalCount,
+  elapsedMs: GoalCount,
+});
+export type GoalUsageDto = z.infer<typeof GoalUsageDto>;
+const REASONED_GOAL: readonly GoalStatus[] = ["paused", "stopped", "failed"];
+const FINISHED_GOAL: readonly GoalStatus[] = ["done", "stopped", "failed"];
+const reasonMatchesStatus = (goal: { status: GoalStatus; reason: GoalReason | null }) =>
+  REASONED_GOAL.includes(goal.status) === (goal.reason !== null);
+export const ChatGoalDto = z
+  .object({
+    text: z
+      .string()
+      .max(100000)
+      .refine((text) => text.trim().length > 0),
+    status: GoalStatus,
+    reason: GoalReason.nullable(),
+    budget: GoalBudgetDto,
+    usage: GoalUsageDto,
+    summary: z.string().max(GOAL_SUMMARY_MAX).nullable(),
+    startedAt: z.number().int().nonnegative(),
+    endedAt: z.number().int().nonnegative().nullable(),
+  })
+  .refine(reasonMatchesStatus, { path: ["reason"] })
+  .refine((goal) => goal.summary === null || goal.status === "done", { path: ["summary"] })
+  .refine((goal) => FINISHED_GOAL.includes(goal.status) === (goal.endedAt !== null), {
+    path: ["endedAt"],
+  });
+export type ChatGoalDto = z.infer<typeof ChatGoalDto>;
+export const ChatGoalStepDto = z
+  .object({
+    domain: z.literal(GOAL_STEP_DOMAIN),
+    conversationId: ConversationId,
+    status: GoalStatus,
+    reason: GoalReason.nullable(),
+    round: GoalCount,
+    usage: GoalUsageDto,
+    budget: GoalBudgetDto,
+  })
+  .refine(reasonMatchesStatus, { path: ["reason"] });
+export type ChatGoalStepDto = z.infer<typeof ChatGoalStepDto>;
+export const ChatGoalInput = z.object({ conversationId: ConversationId });
+export type ChatGoalInput = z.infer<typeof ChatGoalInput>;
 const ConversationFields = CreateConversationInput.extend({
   id: ConversationId,
   workingFolder: FolderPath.nullable().default(null),
   workingFolderAccess: WorkingFolderAccess.nullable().default(null),
   pinned: z.boolean().default(false),
+  goal: ChatGoalDto.nullable().default(null),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
 });

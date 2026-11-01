@@ -206,8 +206,23 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
             .iter()
             .map(|command| command.command)
             .collect::<Vec<_>>(),
-        [zvs_contract::ChatCommand::BrowserUse]
+        [
+            zvs_contract::ChatCommand::BrowserUse,
+            zvs_contract::ChatCommand::Goal
+        ]
     );
+    for channel in ["chat.goal.stop", "chat.goal.continue"] {
+        assert_eq!(
+            failed(
+                &channels
+                    .server
+                    .dispatch(channel, json!({ "conversationId": created.id }))
+                    .await
+            ),
+            &json!("CONFLICT"),
+            "{channel}"
+        );
+    }
     assert!(
         failed(
             &channels

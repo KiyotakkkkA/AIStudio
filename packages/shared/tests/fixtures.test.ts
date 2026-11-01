@@ -38,6 +38,12 @@ import {
   MessageDto,
   OfferedToolDto,
   ChatCommand,
+  ChatGoalDto,
+  ChatGoalStepDto,
+  GoalBudgetDto,
+  GoalReason,
+  GoalStatus,
+  GoalUsageDto,
   ChatCommandDto,
   OfferedToolSource,
   ThinkingEffort,
@@ -569,6 +575,13 @@ const schemas: Record<string, z.ZodType> = {
   "chat/PinMessageInput": contract["chat.messages.pin"].input,
   "chat/ChatCommand": ChatCommand,
   "chat/ChatCommandDto": ChatCommandDto,
+  "chat/GoalStatus": GoalStatus,
+  "chat/GoalReason": GoalReason,
+  "chat/GoalBudgetDto": GoalBudgetDto,
+  "chat/GoalUsageDto": GoalUsageDto,
+  "chat/ChatGoalDto": ChatGoalDto,
+  "chat/ChatGoalStepDto": ChatGoalStepDto,
+  "chat/ChatGoalInput": contract["chat.goal.stop"].input,
 };
 
 const root = fileURLToPath(new URL("../fixtures/", import.meta.url));

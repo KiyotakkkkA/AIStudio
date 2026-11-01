@@ -23,12 +23,12 @@ use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, ToolCall, ToolS
 use crate::files::FILE_TOOLS;
 use crate::kernel::nodes::PROVIDERS_UNAVAILABLE;
 use crate::kernel::{NodeDef, PermissionRequirement, StepContext, ToolStepRequest};
-use crate::services::chat::{FILE_TOOLS_RULES, GenerateChatNode, RoundOutput};
+use crate::services::chat::{FILE_TOOLS_RULES, GenerateChatNode};
 use crate::services::chat_tools::{
     OfferedTool, TOOL_RESULT_MAX_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result,
     parse_tool_arguments, tool_result_text, tool_specs, unoffered_text,
 };
-use crate::services::token_estimate::estimate_tokens;
+use crate::services::tool_loop::{request_tokens, round_tokens};
 use crate::skills::{presented, result_limit};
 use crate::tools::ToolRegistry;
 
@@ -246,42 +246,6 @@ fn system_prompt(offered: &[OfferedTool], mode: AgenticPermissionMode) -> String
         parts.push(FILE_TOOLS_RULES);
     }
     parts.join("\n\n")
-}
-
-fn request_tokens(request: &GenerateRequest) -> u64 {
-    let system = request.system.as_deref().map_or(0, estimate_tokens);
-    let messages: u64 = request
-        .messages
-        .iter()
-        .map(|message| {
-            estimate_tokens(&message.content)
-                + message
-                    .tool_calls
-                    .iter()
-                    .map(|call| estimate_tokens(&call.name) + estimate_tokens(&call.arguments))
-                    .sum::<u64>()
-        })
-        .sum();
-    let tools: u64 = request
-        .tools
-        .iter()
-        .map(|tool| {
-            estimate_tokens(&tool.name)
-                + estimate_tokens(&tool.description)
-                + estimate_tokens(&tool.parameters.to_string())
-        })
-        .sum();
-    system + messages + tools
-}
-
-fn round_tokens(round: &RoundOutput) -> u64 {
-    estimate_tokens(&round.text)
-        + estimate_tokens(&round.reasoning)
-        + round
-            .tool_calls
-            .iter()
-            .map(|call| estimate_tokens(&call.name) + estimate_tokens(&call.arguments))
-            .sum::<u64>()
 }
 
 fn text_argument(arguments: &Map<String, Value>, key: &str) -> String {

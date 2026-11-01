@@ -1226,6 +1226,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     services.health.start();
     retention.start();
     services.runs.recover()?;
+    services.chat.recover_goals()?;
     services.downloads.recover()?;
     {
         let mcp = services.mcp.clone();

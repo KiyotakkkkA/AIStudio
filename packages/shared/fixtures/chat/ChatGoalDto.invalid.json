@@ -1,0 +1,107 @@
+[
+  {
+    "name": "active with a reason",
+    "value": {
+      "text": "Добавить тесты для каждого модуля",
+      "status": "active",
+      "reason": "rounds",
+      "budget": {
+        "rounds": 40,
+        "tokens": 400000,
+        "minutes": 30
+      },
+      "usage": {
+        "rounds": 12,
+        "tokens": 48200,
+        "elapsedMs": 185000
+      },
+      "summary": null,
+      "startedAt": 1,
+      "endedAt": null
+    }
+  },
+  {
+    "name": "paused without a reason",
+    "value": {
+      "text": "Добавить тесты для каждого модуля",
+      "status": "paused",
+      "reason": null,
+      "budget": {
+        "rounds": 40,
+        "tokens": 400000,
+        "minutes": 30
+      },
+      "usage": {
+        "rounds": 12,
+        "tokens": 48200,
+        "elapsedMs": 185000
+      },
+      "summary": null,
+      "startedAt": 1,
+      "endedAt": null
+    }
+  },
+  {
+    "name": "done without an end",
+    "value": {
+      "text": "Добавить тесты для каждого модуля",
+      "status": "done",
+      "reason": null,
+      "budget": {
+        "rounds": 40,
+        "tokens": 400000,
+        "minutes": 30
+      },
+      "usage": {
+        "rounds": 12,
+        "tokens": 48200,
+        "elapsedMs": 185000
+      },
+      "summary": "x",
+      "startedAt": 1,
+      "endedAt": null
+    }
+  },
+  {
+    "name": "summary before done",
+    "value": {
+      "text": "Добавить тесты для каждого модуля",
+      "status": "paused",
+      "reason": "tokens",
+      "budget": {
+        "rounds": 40,
+        "tokens": 400000,
+        "minutes": 30
+      },
+      "usage": {
+        "rounds": 12,
+        "tokens": 48200,
+        "elapsedMs": 185000
+      },
+      "summary": "x",
+      "startedAt": 1,
+      "endedAt": null
+    }
+  },
+  {
+    "name": "blank text",
+    "value": {
+      "text": "   ",
+      "status": "active",
+      "reason": null,
+      "budget": {
+        "rounds": 40,
+        "tokens": 400000,
+        "minutes": 30
+      },
+      "usage": {
+        "rounds": 12,
+        "tokens": 48200,
+        "elapsedMs": 185000
+      },
+      "summary": null,
+      "startedAt": 1,
+      "endedAt": null
+    }
+  }
+]

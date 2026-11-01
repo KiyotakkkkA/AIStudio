@@ -16,6 +16,7 @@ pub mod exec_policy;
 pub mod explorer;
 pub mod files;
 pub mod folders;
+pub mod goal;
 pub mod graph;
 pub mod graph_expansion;
 pub mod ids;
@@ -134,6 +135,11 @@ pub use folders::{
     FolderAccessAnswer, FolderApprovalDto, FolderGrantChatDto, FolderGrantDto, FolderGrantRef,
     FolderGrantScope, FolderRequestEntryDto, FoldersListOutput, PickFolderResultDto,
     WorkingFolderAccess,
+};
+pub use goal::{
+    ChatGoalDto, ChatGoalInput, ChatGoalStepDto, GOAL_DEFAULT_MINUTES, GOAL_DEFAULT_ROUNDS,
+    GOAL_DEFAULT_TOKENS, GOAL_STEP_DOMAIN, GOAL_SUMMARY_MAX, GoalBudgetDto, GoalReason, GoalStatus,
+    GoalUsageDto,
 };
 pub use graph::{
     AddGraphEdgeInput, GRAPH_MAX_HOPS, GraphDirection, GraphEdgeDto, GraphEdgeKey,

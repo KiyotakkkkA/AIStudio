@@ -14,8 +14,8 @@ use crate::drivers::ai::ChatMessage;
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::kernel::knowledge_nodes::{SEARCH_DESCRIPTION, STORE_OUT_OF_SCOPE};
 use crate::kernel::{NodeRegistry, register_core_nodes};
-use crate::services::chat::{Compactable, compact_knowledge};
 use crate::services::chat_tools::{HYBRID_INSTRUCTION, KNOWLEDGE_INSTRUCTION};
+use crate::services::tool_loop::{Compactable, compact_knowledge};
 use crate::testing::{TemporaryDatabase, temporary_database};
 use crate::tools::{ToolRegistry, ToolRegistryOptions, register_kernel_tools};
 
