@@ -596,7 +596,10 @@ fn resuming_loads_the_conversation_and_reattaches() {
         conversation: own,
         messages: Vec::new(),
     };
-    assert_eq!(app.update(Msg::Loaded(Ok(detail))), [Request::Attach(id)]);
+    assert_eq!(
+        app.update(Msg::Loaded(Ok(detail))),
+        [Request::Attach(id), Request::Processes(id)]
+    );
     assert!(app.overlay.is_none());
     assert_eq!(
         app.conversation.map(|conversation| conversation.id),
@@ -1112,4 +1115,201 @@ fn a_conversation_of_this_folder_resumes_from_its_title() {
         app.status.map(|status| status.1),
         Some("Диалог удалён".to_owned())
     );
+}
+
+const SHELL_ONE: &str = "0199aa11-4444-7111-8111-111111111111";
+const SHELL_TWO: &str = "0199aa11-4444-7111-8111-222222222222";
+const SHELL_STREAM: &str = "0199aa11-5555-7111-8111-111111111111";
+
+fn background(id: &str, owner: &str, status: &str) -> BackgroundShellDto {
+    let ended = if status == "running" {
+        json!(null)
+    } else {
+        json!(2_000)
+    };
+    serde_json::from_value(json!({
+        "id": id,
+        "ownerId": owner,
+        "program": "C:/node/npx.cmd",
+        "argv": ["npx", "http-server"],
+        "cwd": "C:/work",
+        "status": status,
+        "exitCode": null,
+        "streamId": SHELL_STREAM,
+        "startedAt": 1_000,
+        "endedAt": ended,
+    }))
+    .expect("a background shell")
+}
+
+fn shell_status(id: &str, owner: &str, status: &str) -> Msg {
+    let value = json!({
+        "streamId": SHELL_STREAM,
+        "seq": 4,
+        "ts": 3_000,
+        "type": "step",
+        "step": { "domain": "shell", "id": id, "ownerId": owner, "status": status, "exitCode": null },
+    });
+    Msg::Event(Box::new(serde_json::from_value(value).expect("event")))
+}
+
+fn with_processes() -> (App, ConversationId) {
+    let mut app = ready();
+    let known = conversation();
+    let id = known.id;
+    app.conversation = Some(known);
+    let owner = id.to_string();
+    app.update(Msg::Processes(
+        id,
+        Ok(vec![
+            background(SHELL_ONE, &owner, "running"),
+            background(SHELL_TWO, &owner, "exited"),
+        ]),
+    ));
+    (app, id)
+}
+
+#[test]
+fn processes_need_a_dialog_and_list_running_ones_first() {
+    let mut app = ready();
+    typed(&mut app, "/processes");
+    assert!(app.update(Msg::Key(Key::Enter)).is_empty());
+    assert_eq!(
+        app.status.as_ref().unwrap().1,
+        copy::PROCESSES_NO_CONVERSATION
+    );
+
+    let (mut app, id) = with_processes();
+    typed(&mut app, "/processes");
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        vec![Request::Processes(id)]
+    );
+    app.update(Msg::Processes(id, Ok(app.processes.clone())));
+    let overlay = app.overlay.as_ref().expect("panel");
+    assert_eq!(overlay.panel, Panel::Processes);
+    assert!(!overlay.loading);
+    assert_eq!(overlay.rows(&app.view()).len(), 1);
+    app.update(Msg::Key(Key::Tab));
+    let overlay = app.overlay.as_ref().expect("panel");
+    assert_eq!(overlay.rows(&app.view()).len(), 2);
+}
+
+#[test]
+fn a_status_step_updates_the_footer_count_outside_any_turn() {
+    let (mut app, id) = with_processes();
+    let owner = id.to_string();
+    assert_eq!(app.running_processes(), 1);
+    app.awaiting = true;
+    assert!(
+        app.update(shell_status(SHELL_ONE, &owner, "stopped"))
+            .is_empty()
+    );
+    assert!(app.held.is_empty());
+    assert_eq!(app.running_processes(), 0);
+    assert_eq!(
+        app.update(shell_status(
+            "0199aa11-4444-7111-8111-333333333333",
+            &owner,
+            "running"
+        )),
+        vec![Request::Processes(id)]
+    );
+    assert!(
+        app.update(shell_status(
+            SHELL_ONE,
+            "0199aa11-1111-7111-8111-999999999999",
+            "running"
+        ))
+        .is_empty()
+    );
+    assert_eq!(app.running_processes(), 0);
+}
+
+#[test]
+fn the_output_view_follows_new_lines_and_polls_while_running() {
+    let (mut app, id) = with_processes();
+    typed(&mut app, "/processes");
+    app.update(Msg::Key(Key::Enter));
+    app.update(Msg::Processes(id, Ok(app.processes.clone())));
+    let shell: BackgroundShellId = serde_json::from_value(json!(SHELL_ONE)).expect("an id");
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        vec![Request::ProcessOutput {
+            id: shell,
+            since: None
+        }]
+    );
+    let mut output: ShellOutputDto = serde_json::from_value(json!({
+        "shell": app.processes[0],
+        "text": "one\ntwo\nthr",
+        "nextSeq": 12,
+        "truncated": false,
+        "eventSeq": 3,
+    }))
+    .expect("output");
+    app.update(Msg::ProcessOutput(Ok(output.clone())));
+    output.text = "ee\n".to_owned();
+    output.next_seq = 15;
+    app.update(Msg::ProcessOutput(Ok(output)));
+    let overlay = app.overlay.as_ref().expect("the output view");
+    assert_eq!(overlay.panel, Panel::ProcessOutput);
+    let lines: Vec<String> = overlay
+        .rows(&app.view())
+        .into_iter()
+        .map(|row| row.title)
+        .collect();
+    assert_eq!(lines, ["one", "two", "three"]);
+    assert_eq!(overlay.selected, 2);
+
+    app.frame = OUTPUT_POLL_TICKS - 1;
+    assert_eq!(
+        app.update(Msg::Tick),
+        vec![Request::ProcessOutput {
+            id: shell,
+            since: Some(15)
+        }]
+    );
+    app.update(Msg::Key(Key::Up));
+    assert!(
+        !app.overlay
+            .as_ref()
+            .unwrap()
+            .output
+            .as_ref()
+            .unwrap()
+            .follow
+    );
+    app.update(Msg::Key(Key::End));
+    assert!(
+        app.overlay
+            .as_ref()
+            .unwrap()
+            .output
+            .as_ref()
+            .unwrap()
+            .follow
+    );
+}
+
+#[test]
+fn stopping_a_process_takes_a_second_delete() {
+    let (mut app, id) = with_processes();
+    typed(&mut app, "/processes");
+    app.update(Msg::Key(Key::Enter));
+    app.update(Msg::Processes(id, Ok(app.processes.clone())));
+    assert!(app.update(Msg::Key(Key::Delete)).is_empty());
+    assert_eq!(app.status.as_ref().unwrap().1, copy::PROCESS_STOP_CONFIRM);
+    let shell: BackgroundShellId = serde_json::from_value(json!(SHELL_ONE)).expect("an id");
+    assert_eq!(
+        app.update(Msg::Key(Key::Delete)),
+        vec![Request::KillProcess(shell)]
+    );
+    app.update(Msg::ProcessKilled(Ok(background(
+        SHELL_ONE,
+        &id.to_string(),
+        "stopped",
+    ))));
+    assert_eq!(app.status.as_ref().unwrap().1, copy::PROCESS_STOPPED);
+    assert_eq!(app.running_processes(), 0);
 }

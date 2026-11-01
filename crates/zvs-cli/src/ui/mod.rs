@@ -407,6 +407,15 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
             theme::muted(),
         ),
     ];
+    let mut left = left;
+    let running = app.running_processes();
+    if running > 0 {
+        left.push(Span::styled("  ·  ", theme::faint()));
+        left.push(Span::styled(
+            format!("⚙ {}", crate::format::processes(running as u64)),
+            theme::accent(),
+        ));
+    }
     let used: usize = left.iter().map(|span| span.content.width()).sum();
     let room = usize::from(top.width).saturating_sub(used + 2);
     let folder = text::truncate(&app.folder, room);
@@ -442,6 +451,14 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
             .is_some_and(|overlay| overlay.panel == Panel::Theme)
         {
             copy::HINT_THEME
+        } else if let Some(panel) = app.overlay.as_ref().map(|overlay| overlay.panel)
+            && matches!(panel, Panel::Processes | Panel::ProcessOutput)
+        {
+            if panel == Panel::Processes {
+                copy::HINT_PROCESSES
+            } else {
+                copy::HINT_PROCESS_OUTPUT
+            }
         } else if app.overlay.is_some() {
             copy::HINT_PANEL
         } else if app.palette_open() {

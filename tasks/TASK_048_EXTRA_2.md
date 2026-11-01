@@ -2,7 +2,7 @@
 task: TASK_048_EXTRA_2
 title: Background shell processes — host, desktop and CLI
 phase: 9 — Integrations
-status: todo
+status: done
 depends_on: [TASK_048_EXTRA_1]
 unblocks: [TASK_048_EXTRA_3]
 estimate: 8–10 h (three parts; one commit)
@@ -266,21 +266,83 @@ Manual check:
 
 ## Definition of done
 
-- [ ] A background start is approved and reviewed exactly like a foreground `shell.run`
-- [ ] One owner can never read, list or kill another owner's process
-- [ ] Caps and lifetime are enforced and tested
-- [ ] No process survives dialog removal, session removal or app exit
-- [ ] Three channels in the contract and in `CLI_CHANNELS`, guard test updated
-- [ ] Desktop and CLI show live status and can stop every process
-- [ ] Copy Russian, in copy modules, counts through plural forms
-- [ ] PASSPORT §14 and §7 updated
-- [ ] Gates pass; `pnpm build` and `zvs-studio` clippy left to CI if not run locally
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] A background start is approved and reviewed exactly like a foreground `shell.run`
+- [x] One owner can never read, list or kill another owner's process
+- [x] Caps and lifetime are enforced and tested
+- [x] No process survives dialog removal, session removal or app exit
+- [x] Three channels in the contract and in `CLI_CHANNELS`, guard test updated
+- [x] Desktop and CLI show live status and can stop every process
+- [x] Copy Russian, in copy modules, counts through plural forms
+- [x] PASSPORT §14 and §7 updated
+- [x] Gates pass; `pnpm build` and `zvs-studio` clippy left to CI if not run locally
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
-> Filled in by the agent that completes this task. Delete this line when writing it.
-
 **Built:**
+- Contract (`zvs-contract/src/shells.rs`, `packages/shared/src/shells.ts`, fixtures in
+  `fixtures/shells/`):
+  - `BackgroundShellId`, `BackgroundShellStatus` and `BackgroundShellDto`.
+  - `BackgroundShellStatusDto`, which carries `domain: "shell"`.
+  - The inputs `ShellsListInput`, `ShellRef` and `ShellsOutputInput`.
+  - `ShellOutputDto` with `nextSeq` (a byte offset, used by the model) and `eventSeq` (a stream
+    event count, used for replay in the UI).
+  - `ProcessPlanDto.background` (refused together with `language`) and
+    `ProcessResultDto.shellId`.
+  - The channels `shells.list`, `shells.output` and `shells.kill`.
+- Host service, `zvs-host/src/background/`. `BackgroundShells` runs each process through
+  `default_spawn` with stdin closed and keeps:
+  - one ring buffer per process, with stdout and stderr merged;
+  - status steps and `token` events on the process's own stream;
+  - the caps 4 per owner and 16 total, and a 60-minute lifetime that kills the process tree;
+  - the last 8 ended processes per owner, and `take_ended` for the next-turn note.
+- `shell.run` with `background: true` follows the same approval and review path, then calls
+  `start` and returns `ProcessToolOutput::background`. Skill scripts, stdin, and calls with no
+  owner are refused.
+- Model tools: `shell.output` and `shell.kill`. They are core tools at tier `auto`, and the owner
+  is injected by both the chat and agentic loops.
+- The chat system prompt gets an «ended since the previous turn» note
+  (`ChatService::ended_shells_note`).
+- Lifecycle hooks:
+  - `chat.conversations.remove` and `agentic.remove` call `close_owner`.
+  - App exit runs a `ShutdownStage::Stop` task, `shells`.
+- Desktop:
+  - `features/backgroundShells/`: the store, `BackgroundShellsIndicator` (a count chip in the
+    thread header, beside the terminal button, with a popover listing «Вывод» and
+    «Остановить»), `BackgroundShellLine` (live status on the `shell.run` card) and the copy.
+  - The «Терминал» dock opens agent processes as read-only tabs: `TerminalView` takes a
+    `TerminalSource` and `readOnly`.
+  - `ProcessPlanView` shows «Режим: в фоне» in the approval.
+- CLI:
+  - `/processes` (Alt+B) with tabs «Работают» and «Все». Enter opens the output view, Delete
+    pressed twice stops the process.
+  - The output overlay re-polls by `sinceSeq` every second and follows the tail; End
+    re-follows.
+  - The footer shows «⚙ N фоновых процессов», and transcript rows are tagged «в фоне».
+  - Shell status steps are routed before the current-run filter.
+
 **Deviated from plan:**
+- **No `shell.list` model tool.** With three tools the full chat tool catalogue measured 15 116
+  characters, over the 15 000 budget guarded by `tools::tests::catalogue`. The start result
+  already carries the id, and ended processes reach the next turn, so the list tool was dropped
+  instead of raising the budget. The catalogue is now 14 973. People still list processes
+  through `shells.list` in the desktop app and the CLI.
+- **The indicator sits in the thread header** next to the «Терминал» button, not inside the
+  composer, because that is where the terminal control lives.
+- **`eventSeq` was added to `ShellOutputDto`** so that the dock tab can replay the buffer and then
+  follow the stream without duplicating output (the `terminal.attach` pattern).
+- **`shells.list` requires `ownerId`** rather than taking it as optional.
+- **`ipc::tests::the_ported_channels_are_registered` already failed on `main`** because
+  `cli.theme.get` and `cli.theme.set` were missing from its expected list. They were added
+  together with the `shells.*` channels.
+
 **Next session should know:**
+- The agentic workspace still renders `TerminalDock` without `background`. A session's
+  processes run and are killed with the session, but they are not shown on that page.
+- The two failures that already exist on `main` are untouched:
+  - `tool_loop::vendor_usage_replaces_the_estimate…` (output tokens 63 vs 60);
+  - the clippy lint `unnecessary_option_map_or_else` in `data/repositories/model.rs:149`.
+  Workspace clippy is otherwise clean when run with `-A clippy::unnecessary-option-map-or-else`.
+- Not run locally: `cargo test -p zvs-studio` and the workspace test run (a running dev build
+  locks `target/debug/zvs-studio.exe` and `zvs-jobd.exe`), `pnpm build` and `pnpm test:e2e`.
+- TASK_048_EXTRA_5 extends this to `code.run` and skill scripts, and adds `notify` wake-ups.

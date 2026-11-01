@@ -57,6 +57,7 @@ pub fn register(server: &mut IpcServer) {
             |services: Arc<Services>, input: ConversationRef| async move {
                 services.chat.remove(&input.id)?;
                 services.terminals.close_conversation(&input.id);
+                services.shells.close_owner(&input.id.to_string()).await;
                 crate::chat_files::remove_chat_dir(&services.artifacts, &input.id.to_string());
                 Ok::<(), zvs_contract::AppError>(())
             },

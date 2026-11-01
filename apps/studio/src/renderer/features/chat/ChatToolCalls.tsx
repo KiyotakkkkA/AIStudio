@@ -22,6 +22,7 @@ import { useFx, useTransition } from "../../ui/motion/fx";
 import ChatQuestionCard, { QuestionAnswers } from "./ChatQuestionCard";
 import FileChangeList from "./FileChangeList";
 import ProcessPlanView from "./ProcessPlanView";
+import BackgroundShellLine from "../backgroundShells/BackgroundShellLine";
 import {
   REJECT_PROCESS,
   RUN_PROCESS,
@@ -274,9 +275,13 @@ function ToolCallCard({
             )}
           {finished && (
             <div className="space-y-2">
-              <p className="m-0 font-mono text-[11.5px] text-main-300 tabular-nums">
-                {exitLabel(finished)} · {durationLabel(finished.durationMs)}
-              </p>
+              {finished.shellId === undefined ? (
+                <p className="m-0 font-mono text-[11.5px] text-main-300 tabular-nums">
+                  {exitLabel(finished)} · {durationLabel(finished.durationMs)}
+                </p>
+              ) : (
+                <BackgroundShellLine id={finished.shellId} />
+              )}
               <ProcessPlanView plan={finished.process} />
             </div>
           )}

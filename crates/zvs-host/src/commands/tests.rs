@@ -213,6 +213,7 @@ fn shell(argv: &[&str]) -> ShellRunInput {
         argv: argv.iter().map(|part| (*part).to_owned()).collect(),
         cwd: None,
         stdin: None,
+        background: false,
         conversation_id: String::new(),
     }
 }
@@ -533,6 +534,14 @@ fn inputs_are_validated() {
     assert!(shell(&[]).validate().is_err());
     assert!(shell(&[" "]).validate().is_err());
     assert!(shell(&["cargo", "check"]).validate().is_ok());
+    let mut served = shell(&["npx", "http-server"]);
+    served.background = true;
+    assert!(served.validate().is_ok());
+    served.stdin = Some("input".to_owned());
+    assert!(
+        served.validate().is_err(),
+        "a background process takes no stdin"
+    );
     assert!(
         serde_json::from_value::<ShellRunInput>(json!({ "argv": "npm test" })).is_err(),
         "a shell string is not an argument vector"
@@ -922,4 +931,74 @@ async fn a_program_that_cannot_start_reports_the_caller_message() {
     .expect_err("nothing to start");
     assert_eq!(error.code, AppErrorCode::NativeError);
     assert_eq!(error.message, CODE_NOT_STARTED);
+}
+
+#[tokio::test]
+async fn a_background_start_is_approved_like_a_foreground_run_and_returns_a_handle() {
+    let host = Host::new();
+    let folder = temporary_directory("background-");
+    let root = canonical(folder.path()).expect("a canonical path");
+    let conversation = host.bound(&root);
+    let handle = host.start(json!({
+        "id": "run",
+        "type": SHELL_RUN,
+        "input": {
+            "conversationId": conversation.to_string(),
+            "argv": stub_argv(),
+            "background": true
+        }
+    }));
+    let request = host.approval(&handle.id).await;
+    assert_eq!(request["kind"], json!("process"));
+    assert_eq!(request["process"]["background"], json!(true));
+    let approval: zvs_contract::ProcessApprovalDto =
+        zvs_contract::parse(Value::Object(request.clone())).expect("a process approval");
+    assert!(approval.process.background);
+    host.services
+        .runs
+        .approve(&handle.id, request["id"].as_str().expect("an id"), false)
+        .expect("approves");
+    assert_eq!(host.finish(&handle.id).await, RunStatus::Succeeded);
+    let (output, _) = host.step(&handle.id);
+    let id = output["shellId"].as_str().expect("a shell id").to_owned();
+    assert!(output["exitCode"].is_null());
+    assert!(
+        output["text"]
+            .as_str()
+            .is_some_and(|text| text.starts_with("Started in the background."))
+    );
+    let listed = host.services.shells.list(&conversation.to_string());
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].id.to_string(), id);
+    host.services
+        .shells
+        .close_owner(&conversation.to_string())
+        .await;
+    assert!(
+        host.services
+            .shells
+            .list(&conversation.to_string())
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn a_skill_script_and_a_run_without_a_dialog_cannot_go_to_the_background() {
+    let host = Host::new();
+    let node = host.shell_node(ProcessLimits::default());
+    let mut script = shell(&["skill:dashboard/scripts/build.py"]);
+    script.background = true;
+    script.conversation_id = host.conversation().to_string();
+    let error = node
+        .run(&context(CancellationToken::new()), script)
+        .await
+        .expect_err("refused");
+    assert_eq!(error.message, BACKGROUND_SCRIPT);
+    let mut orphan = shell(&["cargo", "check"]);
+    orphan.background = true;
+    let error = node
+        .run(&context(CancellationToken::new()), orphan)
+        .await
+        .expect_err("refused");
+    assert_eq!(error.message, crate::background::NO_OWNER);
 }

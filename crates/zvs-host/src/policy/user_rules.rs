@@ -319,6 +319,7 @@ mod tests {
                 cwd: cwd.to_owned(),
                 source: None,
                 packages: Vec::new(),
+                background: false,
             },
         }
     }

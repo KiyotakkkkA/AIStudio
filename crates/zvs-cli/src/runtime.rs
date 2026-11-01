@@ -300,6 +300,23 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             Msg::Context(link.call("chat.context", &input).await)
         }
         Request::Skills => Msg::Skills(link.call("skills.list", &()).await),
+        Request::Processes(owner) => Msg::Processes(
+            owner,
+            link.call("shells.list", &json!({ "ownerId": owner })).await,
+        ),
+        Request::ProcessOutput { id, since } => Msg::ProcessOutput(
+            link.call(
+                "shells.output",
+                &match since {
+                    Some(since) => json!({ "id": id, "sinceSeq": since }),
+                    None => json!({ "id": id }),
+                },
+            )
+            .await,
+        ),
+        Request::KillProcess(id) => {
+            Msg::ProcessKilled(link.call("shells.kill", &json!({ "id": id })).await)
+        }
         Request::Usage(provider) => Msg::Usage(
             link.call("providers.usage", &json!({ "id": provider }))
                 .await,

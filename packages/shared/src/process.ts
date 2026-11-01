@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ConversationId, RunId } from "./primitives/branded.js";
+import { BackgroundShellId, ConversationId, RunId } from "./primitives/branded.js";
 
 export const PROCESS_APPROVAL_KIND = "process";
 
@@ -14,12 +14,16 @@ export const ProcessPlanDto = z
     cwd: z.string().min(1).max(32767),
     source: z.string().max(262144).optional(),
     packages: z.array(z.string().min(1).max(214)).max(32),
+    background: z.boolean().optional(),
   })
   .refine((plan) => (plan.source === undefined) === (plan.language === undefined), {
     path: ["source"],
   })
   .refine((plan) => plan.packages.length === 0 || plan.language === "javascript", {
     path: ["packages"],
+  })
+  .refine((plan) => plan.background !== true || plan.language === undefined, {
+    path: ["background"],
   });
 export type ProcessPlanDto = z.infer<typeof ProcessPlanDto>;
 
@@ -29,6 +33,7 @@ export const ProcessResultDto = z.object({
   durationMs: z.number().int().nonnegative(),
   timedOut: z.boolean(),
   truncated: z.boolean(),
+  shellId: BackgroundShellId.optional(),
 });
 export type ProcessResultDto = z.infer<typeof ProcessResultDto>;
 

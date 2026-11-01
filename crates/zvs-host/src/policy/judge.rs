@@ -107,6 +107,7 @@ fn action_json(action: &ReviewedAction) -> Value {
             "argv": process.argv,
             "source": process.source,
             "packages": process.packages,
+            "background": process.background,
         }),
         ReviewedAction::Plain | ReviewedAction::Declared | ReviewedAction::Browser => json!({}),
     }

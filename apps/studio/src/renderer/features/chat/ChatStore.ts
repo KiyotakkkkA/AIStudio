@@ -2,6 +2,7 @@ import { makeAutoObservable, reaction, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
   ChatToolCallDto,
+  type BackgroundShellId,
   type ChatRoundDto,
   FilesApprovalDto,
   FolderApprovalDto,
@@ -56,6 +57,7 @@ import { dialogArtifacts, type DialogArtifact } from "./artifacts";
 import SiteIcons from "./SiteIcons";
 import ExplorerStore from "./explorer/ExplorerStore";
 import TerminalStore from "../terminal/TerminalStore";
+import BackgroundShellStore from "../backgroundShells/BackgroundShellStore";
 import { matchCommands, parseCommand } from "./chatCommands";
 import { toolSections } from "./toolSets";
 import { appendRound } from "./answerRounds";
@@ -135,6 +137,7 @@ export default class ChatStore {
   pendingTurn = false;
   readonly explorer: ExplorerStore;
   readonly terminal: TerminalStore;
+  readonly backgroundShells: BackgroundShellStore;
   readonly artifacts: ArtifactActions;
   readonly exports: ConversationExport;
   readonly siteIcons: SiteIcons;
@@ -165,6 +168,7 @@ export default class ChatStore {
   ) {
     this.explorer = new ExplorerStore(ipc, events);
     this.terminal = new TerminalStore(ipc, events);
+    this.backgroundShells = new BackgroundShellStore(ipc, events);
     this.artifacts = new ArtifactActions(ipc);
     this.exports = new ConversationExport(ipc);
     this.siteIcons = new SiteIcons(ipc);
@@ -196,6 +200,7 @@ export default class ChatStore {
         events: false,
         explorer: false,
         terminal: false,
+        backgroundShells: false,
         artifacts: false,
         exports: false,
         siteIcons: false,
@@ -1578,6 +1583,12 @@ export default class ChatStore {
     this.stopContext = undefined;
     this.explorer.dispose();
     this.terminal.dispose();
+    this.backgroundShells.dispose();
+  }
+
+  openShellOutput(id: BackgroundShellId) {
+    this.terminal.reveal();
+    void this.backgroundShells.view(id);
   }
 }
 

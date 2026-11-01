@@ -380,6 +380,10 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
   Limits (2026-10-31): `providers.usage` is allowed for the `/context` panel. It is read-only,
   takes only a provider id and returns the same `ProviderUsageDto` the studio meter shows;
   no credential, account detail or provider setting leaves the host.
+  Background processes (2026-11-01, TASK_048_EXTRA_2): `shells.list`, `shells.output` and
+  `shells.kill` are allowed, so the console can see and stop what an agent left running.
+  They reach only processes the background service started (never an arbitrary pid), list by
+  dialog id, and `shells.kill` stops a process tree that the person already approved starting.
 - **Same events, same answers.** CLI connections are extra event-bus subscribers beside the
   window. An approval or a question reaches both; the first answer wins and the other side
   sees `Conflict`.
@@ -821,6 +825,25 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   and there is no sandbox. `code.run` and `shell.run` share one runner
   (`toolchain/process.rs`): scratch folders, a timeout, kill-tree on cancel, capped streams and
   fenced output.
+- **Background processes** (`zvs-host/src/background/`, TASK_048_EXTRA_2, 2026-11-01).
+  `shell.run` with `background: true` starts the process and returns its id at once instead of
+  waiting. Approval is unchanged in kind: the same `permission_for`, the same execution policy
+  row and the same `kind: "process"` approval, whose plan carries `background: true` so the
+  person and the judge see that the process stays running. A skill script or a call with
+  `stdin` cannot go to the background, and a call outside a dialog or agentic session is refused.
+  The process belongs to its dialog or session (the host injects the owner; the model never
+  names it) and lives in `BackgroundShells`: at most 4 running per owner and 16 in total, a
+  60-minute lifetime after which its tree is killed (`timed-out`), stdout and stderr merged into
+  a 256 KiB buffer addressed by a monotonic byte `seq`, the last 8 ended processes per owner
+  kept for reading. `shell.output` (side-effect free) and `shell.kill` are core tools at tier
+  `auto` and reach only the caller's own processes; there is no model-facing list tool, because
+  the start result carries the id and ended processes reach the next turn (the chat tool
+  catalogue stays under its 15 000-character budget). Each process has its own
+  event stream: output as `token` events, status as a `step` with `domain: "shell"`
+  (`BackgroundShellStatusDto`). Processes that ended since the previous turn are listed in the
+  next turn's system prompt, once, with their last 20 lines fenced. Removing the dialog or the
+  session, and quitting the app (`ShutdownStage::Stop`), kills every process tree; nothing is
+  resumed after a restart. The «Терминал» dock is unchanged: it stays the person's own shell.
 - **Created files** (`zvs-host/src/artifacts.rs`, TASK_043). After a skill script runs, the
   documents it created or changed in its scratch folder (and paths named in its arguments) are
   recorded by reference in `<app data>/conversations/<id>/outputs/manifest.json` and reported in

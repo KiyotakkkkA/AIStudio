@@ -213,6 +213,10 @@ fn empty_text(overlay: &Overlay) -> &'static str {
         copy::NO_CONVERSATIONS
     } else if overlay.panel == Panel::Mcp && overlay.filter.is_empty() && overlay.tab == 0 {
         copy::MCP_EMPTY
+    } else if overlay.panel == Panel::Processes && overlay.filter.is_empty() {
+        copy::PROCESSES_EMPTY
+    } else if overlay.panel == Panel::ProcessOutput && overlay.filter.is_empty() {
+        copy::PROCESS_OUTPUT_EMPTY
     } else {
         copy::NOTHING_FOUND
     }

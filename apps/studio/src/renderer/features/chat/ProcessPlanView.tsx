@@ -6,6 +6,8 @@ import {
   FOLDER_TITLE,
   LANGUAGE_LABEL,
   LANGUAGE_TITLE,
+  MODE_TITLE,
+  BACKGROUND_MODE,
   PACKAGES_TITLE,
   PROGRAM_TITLE,
   SOURCE_TITLE,
@@ -38,6 +40,7 @@ export default function ProcessPlanView({
         )}
         <Row title={PROGRAM_TITLE} value={plan.program} />
         <Row title={FOLDER_TITLE} value={plan.cwd} />
+        {plan.background === true && <Row title={MODE_TITLE} value={BACKGROUND_MODE} />}
         {plan.packages.length > 0 && (
           <Row title={PACKAGES_TITLE} value={plan.packages.join(", ")} />
         )}

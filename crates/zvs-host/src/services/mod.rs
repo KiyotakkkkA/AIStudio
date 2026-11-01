@@ -112,6 +112,7 @@ pub struct Services {
     pub folders: FolderAccessService,
     pub explorer: ExplorerService,
     pub terminals: TerminalService,
+    pub shells: crate::background::BackgroundShells,
     pub documents: DocumentService,
     pub artifacts: crate::artifacts::ArtifactStore,
     pub sites: crate::sites::SiteService,

@@ -39,6 +39,15 @@ pub fn tools(count: u64) -> String {
     plural(count, "инструмент", "инструмента", "инструментов")
 }
 
+pub fn processes(count: u64) -> String {
+    plural(
+        count,
+        "фоновый процесс",
+        "фоновых процесса",
+        "фоновых процессов",
+    )
+}
+
 pub fn files(count: u64) -> String {
     plural(count, "файл", "файла", "файлов")
 }
@@ -88,6 +97,9 @@ mod tests {
         assert_eq!(tokens(11), "11 токенов");
         assert_eq!(tokens(21), "21 токен");
         assert_eq!(messages(112), "112 сообщений");
+        assert_eq!(processes(1), "1 фоновый процесс");
+        assert_eq!(processes(4), "4 фоновых процесса");
+        assert_eq!(processes(12), "12 фоновых процессов");
         assert_eq!(percent(1, 4), "25\u{a0}%");
     }
 

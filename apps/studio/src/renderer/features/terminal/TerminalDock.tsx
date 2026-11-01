@@ -2,9 +2,10 @@ import { useCallback, useRef, useState, type PointerEvent } from "react";
 import { observer } from "mobx-react-lite";
 import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
 import type { Terminal } from "@xterm/xterm";
-import type { TerminalSessionDto } from "@zvs/shared";
+import type { BackgroundShellDto, TerminalSessionDto } from "@zvs/shared";
 import {
   mdiChevronDown,
+  mdiRobotOutline,
   mdiClose,
   mdiContentCopy,
   mdiEraser,
@@ -41,6 +42,15 @@ import {
   exitLabel,
 } from "./terminalCopy";
 import Alert from "../../ui/molecules/Alert";
+import type BackgroundShellStore from "../backgroundShells/BackgroundShellStore";
+import {
+  AGENT_TAB,
+  CLOSE_TAB,
+  READ_ONLY_HINT,
+  STOP,
+  commandText,
+  statusLabel,
+} from "../backgroundShells/backgroundShellsCopy";
 
 const THREAD_MIN = 220;
 
@@ -52,16 +62,62 @@ function statusOf(session: TerminalSessionDto): { tone: "ok" | "idle" | "err"; l
   };
 }
 
+function shellTone(shell: BackgroundShellDto): "ok" | "idle" | "err" {
+  if (shell.status === "running") return "ok";
+  if (shell.status === "exited" && (shell.exitCode === null || shell.exitCode === 0)) return "idle";
+  if (shell.status === "stopped") return "idle";
+  return "err";
+}
+
+const ShellTab = observer(function ShellTab({
+  background,
+  shell,
+}: {
+  readonly background: BackgroundShellStore;
+  readonly shell: BackgroundShellDto;
+}) {
+  const active = background.viewing === shell.id;
+  const status = statusLabel(shell.status, shell.exitCode);
+  const command = commandText(shell);
+  return (
+    <div
+      role="tab"
+      aria-selected={active}
+      tabIndex={active ? 0 : -1}
+      onClick={() => void background.view(shell.id)}
+      title={`${AGENT_TAB}: ${command} · ${status}\n${shell.cwd}`}
+      className={`group flex h-7 max-w-56 min-w-0 flex-none cursor-default items-center gap-1.5 rounded-control pr-1 pl-2.5 text-[12px] ${active ? "bg-main-700 text-main-50" : "text-main-400 hover:bg-main-800 hover:text-main-100"}`}
+    >
+      <StatusDot tone={shellTone(shell)} title={status} />
+      <Icon path={mdiRobotOutline} size={13} className="flex-none text-accent-medium" />
+      <span className="truncate font-mono">{command}</span>
+      <button
+        type="button"
+        aria-label={`${CLOSE_TAB}: ${command}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          background.closeTab(shell.id);
+        }}
+        className={`flex size-5 flex-none items-center justify-center rounded-sm text-main-500 hover:bg-main-600 hover:text-main-50 ${active ? "" : "opacity-0 group-hover:opacity-100"}`}
+      >
+        <Icon path={mdiClose} size={13} />
+      </button>
+    </div>
+  );
+});
+
 const SessionTab = observer(function SessionTab({
   store,
   session,
+  background,
 }: {
   readonly store: TerminalStore;
   readonly session: TerminalSessionDto;
+  readonly background: BackgroundShellStore | undefined;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(session.title);
-  const active = store.activeId === session.id;
+  const active = store.activeId === session.id && (background?.viewing ?? null) === null;
   const status = statusOf(session);
   const commit = () => {
     setEditing(false);
@@ -72,7 +128,10 @@ const SessionTab = observer(function SessionTab({
       role="tab"
       aria-selected={active}
       tabIndex={active ? 0 : -1}
-      onClick={() => store.select(session.id)}
+      onClick={() => {
+        background?.leave();
+        store.select(session.id);
+      }}
       onDoubleClick={() => {
         setDraft(session.title);
         setEditing(true);
@@ -116,16 +175,20 @@ const SessionTab = observer(function SessionTab({
 export default observer(function TerminalDock({
   store,
   available,
+  background,
 }: {
   readonly store: TerminalStore;
   readonly available: boolean;
+  readonly background?: BackgroundShellStore;
 }) {
   const terminal = useRef<Terminal | null>(null);
   const onReady = useCallback((instance: Terminal | null) => {
     terminal.current = instance;
   }, []);
   if (!store.open) return null;
-  const active = store.active;
+  const viewed = background?.viewed ?? null;
+  const active = viewed === null ? store.active : null;
+  const error = store.error ?? background?.error ?? null;
 
   const startResize = (event: PointerEvent<HTMLDivElement>) => {
     const handle = event.currentTarget;
@@ -168,7 +231,10 @@ export default observer(function TerminalDock({
           className="flex min-w-0 flex-1 items-center gap-1 scrollbar-none overflow-x-auto"
         >
           {store.sessions.map((session) => (
-            <SessionTab key={session.id} store={store} session={session} />
+            <SessionTab key={session.id} store={store} session={session} background={background} />
+          ))}
+          {background?.tabs.map((shell) => (
+            <ShellTab key={shell.id} background={background} shell={shell} />
           ))}
           {available ? (
             <div className="flex flex-none items-center">
@@ -215,6 +281,23 @@ export default observer(function TerminalDock({
             </div>
           ) : null}
         </div>
+        {viewed === null || background === undefined ? null : (
+          <div className="flex flex-none items-center gap-0.5">
+            <IconButton
+              label={STOP}
+              path={mdiStopCircleOutline}
+              disabled={viewed.status !== "running" || background.isStopping(viewed.id)}
+              onClick={() => void background.stop(viewed.id)}
+            />
+            <IconButton
+              label={COPY}
+              path={mdiContentCopy}
+              onClick={() => {
+                if (terminal.current !== null) copySelection(terminal.current);
+              }}
+            />
+          </div>
+        )}
         {active === null ? null : (
           <div className="flex flex-none items-center gap-0.5">
             <IconButton
@@ -250,14 +333,36 @@ export default observer(function TerminalDock({
           onClick={store.hide}
         />
       </div>
-      {store.error === null ? null : (
-        <Alert bar onDismiss={store.dismissError} dismissLabel={DISMISS_ERROR}>
-          {store.error}
+      {error === null ? null : (
+        <Alert
+          bar
+          onDismiss={() => {
+            store.dismissError();
+            background?.dismissError();
+          }}
+          dismissLabel={DISMISS_ERROR}
+        >
+          {error}
         </Alert>
       )}
       <div className="relative min-h-0 flex-1">
         {!available ? (
           <p className="px-4 py-3 text-[12.5px] text-main-500">{NO_DIALOG}</p>
+        ) : viewed !== null && background !== undefined ? (
+          <>
+            <TerminalView
+              key={viewed.id}
+              store={background}
+              id={viewed.id}
+              onReady={onReady}
+              readOnly
+            />
+            <div className="pointer-events-none absolute right-3 bottom-2 flex items-center gap-2 rounded-control bg-main-800 px-3 py-1 text-[12px] text-main-300 shadow-card">
+              {viewed.status === "running"
+                ? READ_ONLY_HINT
+                : statusLabel(viewed.status, viewed.exitCode)}
+            </div>
+          </>
         ) : active !== null ? (
           <>
             <TerminalView key={active.id} store={store} id={active.id} onReady={onReady} />

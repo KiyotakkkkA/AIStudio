@@ -8,13 +8,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use zvs_contract::validate::{check, invalid};
 use zvs_contract::{
-    AppError, AppErrorCode, ArtifactDto, CodeLanguage, PROCESS_APPROVAL_KIND, PROCESS_ARG_MAX,
-    PROCESS_ARGV_MAX, PROCESS_PACKAGE_MAX, PROCESS_PACKAGES_MAX, PROCESS_SOURCE_MAX,
-    ProcessPlanDto, ProcessResultDto, ToolAuthorisationDto, ToolAuthorisationKind, ToolTier,
-    Validate,
+    AppError, AppErrorCode, ArtifactDto, BackgroundShellDto, BackgroundShellId, CodeLanguage,
+    PROCESS_APPROVAL_KIND, PROCESS_ARG_MAX, PROCESS_ARGV_MAX, PROCESS_PACKAGE_MAX,
+    PROCESS_PACKAGES_MAX, PROCESS_SOURCE_MAX, ProcessPlanDto, ProcessResultDto,
+    ToolAuthorisationDto, ToolAuthorisationKind, ToolTier, Validate,
 };
 
 use crate::artifacts::{Snapshot, library_env, mentioned_paths, produced, snapshot};
+use crate::background::{BackgroundShells, NO_OWNER, status_line};
 use crate::chat_files::{CHAT_DIR_ENV, is_working};
 use crate::conversations::is_owner;
 use crate::files::roots::{
@@ -44,7 +45,7 @@ pub const SHELL_RUN: &str = "shell.run";
 pub const PROCESS_TOOLS: [&str; 2] = [CODE_RUN, SHELL_RUN];
 
 pub const CODE_DESCRIPTION: &str = "Runs a short program written by the model. language: python — executed via uv run; dependencies are declared at the top of source as a PEP 723 header (# /// script, dependencies = [\"…\"], # ///); uv installs them into the app's own cache, nothing is installed globally. javascript — executed via Node.js as an ES module (import, not require); packages from packages are installed into a temporary folder via npm install with install scripts disabled. powershell — executed via powershell.exe without a profile. The process working directory is a temporary run folder; the conversation working folder, when set, is passed as the ZVS_WORKSPACE_DIR environment variable. Folder permissions do not sandbox this tool: the process runs with the user's rights, and the user confirms every run from the full program text. Execution time is limited; interactive input is not supported. Returns exit code, stdout, and stderr.";
-pub const SHELL_DESCRIPTION: &str = "Runs a project program, e.g. npm test or cargo check, or a skill script. argv is an array: argv[0] is the program, the rest are arguments. No shell command line is parsed, so pipes, redirections, and substitutions are unavailable. The program is looked up first in the folders of connected environments, then in PATH. A skill script is referenced as argv[0] = skill:<key>/scripts/<file>: .py runs via uv; .js, .mjs, and .cjs run via Node.js; the skill folder is passed as ZVS_SKILL_DIR. The process working directory is cwd (a path or chat:); without cwd it is the conversation working folder, or chat: for a skill script. Access to a cwd outside granted permissions is confirmed by the user, but the process itself runs with the user's rights. The user confirms every run from the full command. Execution time is limited; servers, background, and interactive processes are not supported; standard input comes only from stdin. Returns exit code, stdout, and stderr.";
+pub const SHELL_DESCRIPTION: &str = "Runs a project program, e.g. npm test or cargo check, or a skill script. argv is an array: argv[0] is the program, the rest are arguments. No shell command line is parsed, so pipes, redirections, and substitutions are unavailable. The program is looked up first in the folders of connected environments, then in PATH. A skill script is referenced as argv[0] = skill:<key>/scripts/<file>: .py runs via uv; .js, .mjs, and .cjs run via Node.js; the skill folder is passed as ZVS_SKILL_DIR. The process working directory is cwd (a path or chat:); without cwd it is the conversation working folder, or chat: for a skill script. Access to a cwd outside granted permissions is confirmed by the user, but the process itself runs with the user's rights. The user confirms every run from the full command. Execution time is limited and interactive input is not supported; standard input comes only from stdin. For a server, watcher or long build pass background: true to get a process id at once. Returns exit code, stdout, and stderr.";
 
 pub const CODE_ACTION: &str = "запуск кода";
 pub const SHELL_ACTION: &str = "запуск команды";
@@ -56,6 +57,8 @@ pub const NO_FOLDER: &str = "Команде нужна папка: выбери�
 pub const FOLDER_MISSING: &str = "Папка не найдена";
 pub const PROGRAM_NOT_FOUND: &str = "Программа не найдена в папках сред и в PATH";
 pub const PROCESS_DENIED: &str = "Запуск отклонён";
+pub const BACKGROUND_SCRIPT: &str = "Скрипт навыка нельзя запустить в фоне";
+pub const BACKGROUND_UNAVAILABLE: &str = "Фоновые процессы недоступны";
 
 pub const WORKSPACE_DIR_ENV: &str = "ZVS_WORKSPACE_DIR";
 pub const SCRATCH_DIR_ENV: &str = "ZVS_SCRATCH_DIR";
@@ -130,6 +133,7 @@ pub struct CommandToolOptions {
     pub limits: ProcessLimits,
     pub powershell: String,
     pub roots: VirtualRoots,
+    pub shells: Option<BackgroundShells>,
 }
 
 impl CommandToolOptions {
@@ -140,6 +144,7 @@ impl CommandToolOptions {
             limits: ProcessLimits::default(),
             powershell: POWERSHELL.to_owned(),
             roots: VirtualRoots::default(),
+            shells: None,
         }
     }
 }
@@ -158,6 +163,8 @@ pub struct ProcessToolOutput {
     pub process: ProcessPlanDto,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub artifacts: Vec<ArtifactDto>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shell_id: Option<BackgroundShellId>,
 }
 
 impl Validate for ProcessToolOutput {
@@ -179,6 +186,26 @@ impl ProcessToolOutput {
             stderr: run.stderr.clone(),
             process,
             artifacts: Vec::new(),
+            shell_id: None,
+        }
+    }
+
+    fn background(shell: &BackgroundShellDto, process: ProcessPlanDto) -> Self {
+        Self {
+            text: format!(
+                "Started in the background.\n{}\nRead its output with shell.output and stop it with shell.kill.",
+                status_line(shell)
+            ),
+            is_error: false,
+            exit_code: None,
+            timed_out: false,
+            truncated: false,
+            duration_ms: 0,
+            stdout: String::new(),
+            stderr: String::new(),
+            process,
+            artifacts: Vec::new(),
+            shell_id: Some(shell.id),
         }
     }
 
@@ -189,6 +216,7 @@ impl ProcessToolOutput {
             duration_ms: self.duration_ms,
             timed_out: self.timed_out,
             truncated: self.truncated,
+            shell_id: self.shell_id,
         });
         if !self.artifacts.is_empty()
             && let Some(fields) = meta.as_object_mut()
@@ -470,6 +498,7 @@ impl NodeDef for CodeRunNode {
             cwd: path_text(&folder),
             source: Some(input.source.clone()),
             packages: input.packages.clone(),
+            background: false,
         };
         tools
             .approve(
@@ -528,6 +557,11 @@ pub struct ShellRunInput {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(description = "Text passed to the process on standard input")]
     pub stdin: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[schemars(
+        description = "Keep running after the call returns; read with shell.output, stop with shell.kill"
+    )]
+    pub background: bool,
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
@@ -543,6 +577,9 @@ impl Validate for ShellRunInput {
         if let Some(cwd) = &self.cwd {
             check::non_empty("cwd", cwd)?;
             check::max_len("cwd", cwd, PATH_MAX_CHARS)?;
+        }
+        if self.background && self.stdin.is_some() {
+            return Err(invalid("stdin", "background"));
         }
         check_stdin(self.stdin.as_deref())
     }
@@ -725,11 +762,30 @@ impl NodeDef for ShellRunNode {
         let tools = &self.0;
         let program = input.argv.first().map(String::as_str).unwrap_or_default();
         let skill = match path_root(program) {
+            PathRoot::Skill { .. } if input.background => {
+                return Err(AppError::new(
+                    AppErrorCode::ValidationFailed,
+                    BACKGROUND_SCRIPT,
+                ));
+            }
             PathRoot::Skill { key, rest } => {
                 Some(skill_script(&tools.options, key, rest, &input.argv[1..])?)
             }
             _ => None,
         };
+        let shells =
+            if input.background {
+                if input.conversation_id.is_empty() {
+                    return Err(AppError::new(AppErrorCode::ValidationFailed, NO_OWNER));
+                }
+                Some(
+                    tools.options.shells.clone().ok_or_else(|| {
+                        AppError::new(AppErrorCode::Conflict, BACKGROUND_UNAVAILABLE)
+                    })?,
+                )
+            } else {
+                None
+            };
         let cwd = self.cwd(context, &input, skill.is_some()).await?;
         let chat = skill
             .as_ref()
@@ -759,6 +815,7 @@ impl NodeDef for ShellRunNode {
             cwd: path_text(&cwd),
             source: None,
             packages: Vec::new(),
+            background: input.background,
         };
         tools
             .approve(
@@ -771,6 +828,15 @@ impl NodeDef for ShellRunNode {
             )
             .await?;
         context.check_cancelled()?;
+        if let Some(shells) = shells {
+            let shell = shells.start(
+                &input.conversation_id,
+                &spec,
+                &input.argv,
+                SHELL_NOT_STARTED,
+            )?;
+            return Ok(ProcessToolOutput::background(&shell, process));
+        }
         let limits = tools.options.limits;
         let Some(script) = skill else {
             let run = run_process(

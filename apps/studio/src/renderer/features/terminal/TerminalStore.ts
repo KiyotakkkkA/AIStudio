@@ -108,6 +108,10 @@ export default class TerminalStore {
     this.open = false;
   }
 
+  reveal() {
+    this.open = true;
+  }
+
   select(id: TerminalId) {
     if (this.sessions.some((session) => session.id === id)) this.activeId = id;
   }

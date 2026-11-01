@@ -215,9 +215,10 @@ on its code. Suggested order: 045_EXTRA_3 → 045_EXTRA_5 (part A) → 045_EXTRA
 
 - [x] **TASK_048** — Integration framework: accounts, triggers, tool exposure
 - [x] **TASK_048_EXTRA_1** — Execution policy: bypass engine, policy rules, judge model
-- [ ] **TASK_048_EXTRA_2** — Background shell processes: host, desktop and CLI
+- [x] **TASK_048_EXTRA_2** — Background shell processes: host, desktop and CLI
 - [ ] **TASK_048_EXTRA_3** — The /goal command: host loop, chat composer and CLI
 - [ ] **TASK_048_EXTRA_4** — Subagents: host core and policy, preferred models, desktop and CLI
+- [ ] **TASK_048_EXTRA_5** — Background code and scripts, and waking the dialog when a process finishes
 - [ ] **TASK_049** — Mail integration (IMAP/SMTP)
 - [ ] **TASK_050** — Telegram and Git hosting integrations
 - [ ] **TASK_051** — Integrations page
@@ -259,7 +260,8 @@ Phase 8   026 ── 042 ── 043 ── 044
           031 ── 045 ── 046 ── 047
 Phase 9   031 ── 048 ─┬─ 049 ── 051
                       └─ 050
-          048 ── 048_EXTRA_1 ── 048_EXTRA_2 ── 048_EXTRA_3 ── 048_EXTRA_4
+          048 ── 048_EXTRA_1 ── 048_EXTRA_2 ─┬─ 048_EXTRA_3 ── 048_EXTRA_4
+                                             └─ 048_EXTRA_5
 Phase 10  all ── 052 … 057
 
 Phase M   034_EXTRA_1 ── 058 ── 059 ── 060 ── 061 ── 062 ── 063 ── 064 ── 065 ── 066 ── 067
@@ -327,9 +329,10 @@ you can settle the load-bearing ones early rather than being interrupted mid-tas
 | TASK_043 (superseded by ADR 0003) | LibreOffice integration removed in TASK_044 after the managed copy crashed on almost every conversion. Office documents render in the renderer (docx-preview, an OOXML sheet reader, slide text). «Компоненты» holds Node.js and uv. | moderate |
 | TASK_045_EXTRA_1 (resolved) | Option (a), all three: `chat.file` → `fs.*` on `chat:`, `skill.read` → `fs.read` on `skill:<key>/`, `skill.script` → `shell.run` with `argv[0] = skill:<key>/scripts/<file>`. The tier of a `chat:` or `skill:` call is decided in the permission resolver (`AppFolder`). | yes |
 | TASK_045_EXTRA_5 (resolved) | The user first chose (c), then changed it during the task: the new layout `conversations/<id>/{work,outputs,snapshots}` applies to every conversation, with no migration and no backward compatibility for beta data. Old `artifacts/` and `runs/` folders are not read, and old `<runId>/<name>` artifact ids no longer resolve. | **no** — moves user data |
-| TASK_048_EXTRA_2 | Background process limits (fallback 4 per dialog / 16 total / 60 min / 256 KiB); where desktop output opens (fallback: read-only dock tab) | yes |
+| TASK_048_EXTRA_2 (resolved) | 4 per dialog, 16 total, 60 minutes, 256 KiB; desktop output opens as a read-only tab in the «Терминал» dock | yes |
 | TASK_048_EXTRA_3 | Goal budgets, and whether messages are accepted during a goal (fallback 40 rounds / 400 000 tokens / 30 min, refused) | yes |
 | TASK_048_EXTRA_4 | Subagent kinds in v1 (fallback: `explore` and `general`, `general` one at a time); one preferred-model list or one per kind (fallback: one list) | yes |
+| TASK_048_EXTRA_5 | Consecutive wake-ups without a user message, and whether to wake in «Всегда спрашивать» (fallback: 3, every mode) | yes |
 | TASK_049 | Does mail send automatically once approved, or per message? | yes |
 | TASK_050 | Telegram: bot account, or your personal account? | **no** |
 | TASK_056 | Code-sign the installer? Auto-update or manual? WebView2 runtime: download, embed bootstrapper, or offline? | moderate |

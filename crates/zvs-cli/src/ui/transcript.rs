@@ -68,6 +68,10 @@ fn duration(ms: u64) -> String {
     }
 }
 
+fn short_id(id: &str) -> &str {
+    id.rsplit('-').next().unwrap_or(id)
+}
+
 fn indent() -> Span<'static> {
     Span::raw("    ")
 }
@@ -88,6 +92,17 @@ fn tool(call: &ChatToolCallDto, expanded: bool, frame: u64, width: usize) -> Vec
         ),
         Span::styled(format!("  {label}"), Style::new().fg(color)),
     ];
+    if let Some(shell) = call
+        .meta
+        .as_ref()
+        .and_then(|meta| meta.get("shellId"))
+        .and_then(|value| value.as_str())
+    {
+        header.push(Span::styled(
+            format!(" · {} {}", copy::PROCESS_IN_BACKGROUND, short_id(shell)),
+            theme::accent(),
+        ));
+    }
     if call.duration_ms > 0 {
         header.push(Span::styled(
             format!(" · {}", duration(call.duration_ms)),

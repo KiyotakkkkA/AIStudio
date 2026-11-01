@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use zvs_contract::{AppError, ToolDto, ToolSource, ToolTier};
 
 use super::registry::{ToolDescriptor, ToolRegistry};
+use crate::background::{KILL_DESCRIPTION, OUTPUT_DESCRIPTION, SHELL_KILL, SHELL_OUTPUT};
 use crate::browser::capability::{
     BROWSER_CLICK, BROWSER_DOWNLOAD, BROWSER_FIND, BROWSER_NAVIGATE, BROWSER_READ_PAGE,
     BROWSER_SCREENSHOT, BROWSER_SUBMIT, BROWSER_TYPE,
@@ -26,7 +27,13 @@ use crate::skills::nodes::{
 
 pub const NOT_TOOLS: &[&str] = &["llm.generate", "vector.index", "job.run", "download.fetch"];
 const ASK_BY_DEFAULT: &[&str] = &[FS_APPLY];
-const AUTO_BY_DEFAULT: &[&str] = &[BROWSER_NAVIGATE, BROWSER_CLICK, BROWSER_TYPE];
+const AUTO_BY_DEFAULT: &[&str] = &[
+    BROWSER_NAVIGATE,
+    BROWSER_CLICK,
+    BROWSER_TYPE,
+    SHELL_OUTPUT,
+    SHELL_KILL,
+];
 
 struct BuiltinToolMeta {
     display_name: &'static str,
@@ -121,6 +128,22 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
             display_name: "shell.run",
             description: SHELL_DESCRIPTION,
             destructive: true,
+        },
+    ),
+    (
+        SHELL_OUTPUT,
+        BuiltinToolMeta {
+            display_name: "shell.output",
+            description: OUTPUT_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        SHELL_KILL,
+        BuiltinToolMeta {
+            display_name: "shell.kill",
+            description: KILL_DESCRIPTION,
+            destructive: false,
         },
     ),
     (

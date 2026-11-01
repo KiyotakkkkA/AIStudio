@@ -517,12 +517,18 @@ pub fn test_services(system: SystemService) -> TestServices {
         },
     )
     .expect("registers the file nodes");
+    let shells = crate::background::BackgroundShells::new(
+        crate::background::BackgroundShellOptions::new(run_bus.clone(), clock.clone()),
+    );
+    crate::background::register_background_nodes(&nodes, &shells)
+        .expect("registers the background nodes");
     crate::commands::register_command_nodes(
         &nodes,
         &folders,
         runs.approvals(),
         crate::commands::CommandToolOptions {
             roots,
+            shells: Some(shells.clone()),
             ..crate::commands::CommandToolOptions::new(
                 Some(Arc::new(toolchain.clone())),
                 workspace.join("code-runs"),
@@ -547,6 +553,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         skills: Some(Arc::new(skills.clone())),
         mcp: Some(Arc::new(mcp.clone())),
         folders: Some(folders.clone()),
+        shells: Some(shells.clone()),
         clock: clock.clone(),
         ..crate::services::ChatServiceOptions::new(
             database.shared(),
@@ -637,6 +644,7 @@ pub fn test_services(system: SystemService) -> TestServices {
                 run_bus.clone(),
                 std::time::Duration::from_millis(50),
             ),
+            shells,
             terminals: crate::terminal::TerminalService::new(
                 crate::terminal::TerminalServiceOptions {
                     folders: folders.clone(),

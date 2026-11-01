@@ -1,0 +1,12 @@
+[
+  {
+    "name": "owner not a uuid",
+    "value": {
+      "ownerId": "dialog"
+    }
+  },
+  {
+    "name": "missing owner",
+    "value": {}
+  }
+]

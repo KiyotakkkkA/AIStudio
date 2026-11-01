@@ -61,6 +61,13 @@ import {
   TerminalShell,
   TerminalWriteInput,
 } from "../terminal.js";
+import {
+  BackgroundShellDto,
+  ShellOutputDto,
+  ShellRef,
+  ShellsListInput,
+  ShellsOutputInput,
+} from "../shells.js";
 import { NotificationTargetDto } from "../notifications.js";
 import {
   ArtifactApplicationDto,
@@ -326,6 +333,9 @@ export const contract = defineContract({
   "workspace.read": { input: ExplorerReadInput, output: ExplorerFileDto },
   "workspace.watch": { input: ConversationRef, output: ExplorerWatchDto },
   "workspace.unwatch": { input: ConversationRef, output: z.void() },
+  "shells.kill": { input: ShellRef, output: BackgroundShellDto },
+  "shells.list": { input: ShellsListInput, output: z.array(BackgroundShellDto) },
+  "shells.output": { input: ShellsOutputInput, output: ShellOutputDto },
   "terminal.shells": { input: z.void(), output: z.array(TerminalShell) },
   "terminal.list": { input: ConversationRef, output: z.array(TerminalSessionDto) },
   "terminal.create": { input: TerminalCreateInput, output: TerminalSessionDto },

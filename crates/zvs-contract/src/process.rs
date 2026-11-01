@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::enums::wire_enum;
 use crate::errors::AppError;
 use crate::folders::check_folder_path;
-use crate::ids::{ConversationId, RunId, is_wire_uuid};
+use crate::ids::{BackgroundShellId, ConversationId, RunId, is_wire_uuid};
 use crate::primitives::Timestamp;
 use crate::validate::{Validate, check, invalid, nested};
 
@@ -42,6 +42,8 @@ pub struct ProcessPlanDto {
     )]
     pub source: Option<String>,
     pub packages: Vec<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub background: bool,
 }
 
 impl Validate for ProcessPlanDto {
@@ -71,6 +73,9 @@ impl Validate for ProcessPlanDto {
             check::non_empty(&field, package)?;
             check::max_len(&field, package, PROCESS_PACKAGE_MAX)?;
         }
+        if self.background && self.language.is_some() {
+            return Err(invalid("background", "language"));
+        }
         Ok(())
     }
 }
@@ -84,6 +89,12 @@ pub struct ProcessResultDto {
     pub duration_ms: u64,
     pub timed_out: bool,
     pub truncated: bool,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub shell_id: Option<BackgroundShellId>,
 }
 
 impl Validate for ProcessResultDto {

@@ -997,6 +997,34 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::explorer::ExplorerWatchDto>,
     ),
     (
+        "shells/BackgroundShellStatus",
+        round_trip::<zvs_contract::shells::BackgroundShellStatus>,
+    ),
+    (
+        "shells/BackgroundShellDto",
+        round_trip::<zvs_contract::shells::BackgroundShellDto>,
+    ),
+    (
+        "shells/BackgroundShellStatusDto",
+        round_trip::<zvs_contract::shells::BackgroundShellStatusDto>,
+    ),
+    (
+        "shells/ShellsListInput",
+        round_trip::<zvs_contract::shells::ShellsListInput>,
+    ),
+    (
+        "shells/ShellRef",
+        round_trip::<zvs_contract::shells::ShellRef>,
+    ),
+    (
+        "shells/ShellsOutputInput",
+        round_trip::<zvs_contract::shells::ShellsOutputInput>,
+    ),
+    (
+        "shells/ShellOutputDto",
+        round_trip::<zvs_contract::shells::ShellOutputDto>,
+    ),
+    (
         "terminal/TerminalShell",
         round_trip::<zvs_contract::terminal::TerminalShell>,
     ),

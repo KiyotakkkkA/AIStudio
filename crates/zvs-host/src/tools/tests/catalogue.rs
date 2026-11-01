@@ -45,6 +45,8 @@ fn the_full_chat_tool_catalogue_is_measured() {
             "fs.read",
             "fs.search",
             "knowledge.search",
+            "shell.kill",
+            "shell.output",
             "shell.run",
             "skill.load",
             "skill.save",

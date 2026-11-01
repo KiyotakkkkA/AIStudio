@@ -61,6 +61,7 @@ pub fn register(server: &mut IpcServer) {
             "agentic.remove",
             |services: Arc<Services>, input: AgenticSessionRef| async move {
                 services.agentic.remove(&input.id.to_string())?;
+                services.shells.close_owner(&input.id.to_string()).await;
                 crate::chat_files::remove_chat_dir(&services.artifacts, &input.id.to_string());
                 Ok::<(), AppError>(())
             },

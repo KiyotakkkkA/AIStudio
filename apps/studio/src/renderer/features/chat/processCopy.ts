@@ -13,6 +13,7 @@ export const CODE_LEAD =
   "Модель предлагает запустить программу. Процесс работает с правами пользователя.";
 export const SHELL_LEAD =
   "Модель предлагает выполнить команду. Процесс работает с правами пользователя.";
+export const SHELL_BACKGROUND_LEAD = "Модель предлагает запустить команду в фоне.";
 export const RUN_PROCESS = "Запустить";
 export const REJECT_PROCESS = "Отклонить";
 export const LANGUAGE_TITLE = "Язык";
@@ -22,6 +23,8 @@ export const FOLDER_TITLE = "Папка";
 export const PACKAGES_TITLE = "Пакеты npm";
 export const SOURCE_TITLE = "Текст программы";
 export const ARGS_TITLE = "Аргументы";
+export const MODE_TITLE = "Режим";
+export const BACKGROUND_MODE = "В фоне, до остановки или завершения";
 export const TIMED_OUT = "Остановлен по истечении времени";
 export const NO_EXIT_CODE = "Код завершения неизвестен";
 
@@ -40,7 +43,8 @@ export function commandLine(argv: readonly string[]): string {
 }
 
 export function processLead(plan: ProcessPlanDto): string {
-  return plan.language === undefined ? SHELL_LEAD : CODE_LEAD;
+  if (plan.language !== undefined) return CODE_LEAD;
+  return plan.background === true ? SHELL_BACKGROUND_LEAD : SHELL_LEAD;
 }
 
 export function durationLabel(milliseconds: number): string {

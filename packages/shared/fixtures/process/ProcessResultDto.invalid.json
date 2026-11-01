@@ -13,5 +13,22 @@
       "timedOut": false,
       "truncated": false
     }
+  },
+  {
+    "name": "shell id not a uuid",
+    "value": {
+      "process": {
+        "program": "C:\\Program Files\\nodejs\\npx.cmd",
+        "argv": ["npx", "http-server", "-p", "8099"],
+        "cwd": "D:\\work\\app",
+        "packages": [],
+        "background": true
+      },
+      "exitCode": null,
+      "durationMs": 12,
+      "timedOut": false,
+      "truncated": false,
+      "shellId": "server"
+    }
   }
 ]

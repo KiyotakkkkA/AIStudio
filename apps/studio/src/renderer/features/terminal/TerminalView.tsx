@@ -4,14 +4,19 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import "./terminal.css";
-import type { TerminalId } from "@zvs/shared";
-import type TerminalStore from "./TerminalStore";
+import type { TerminalScreen } from "./TerminalStore";
 import { adoptInlineStyles, readTheme, watchTheme } from "./terminalTheme";
 
 const SYMBOLS_FONT = "Symbols Nerd Font Mono";
 const FONT_SIZE = 12.5;
 const FONT_FAMILY = `"JetBrains Mono Variable", "JetBrains Mono", "${SYMBOLS_FONT}", Consolas, monospace`;
 const SYMBOL_SAMPLE = String.fromCodePoint(0xe0b0, 0xf120);
+
+export interface TerminalSource {
+  connect(id: string, screen: TerminalScreen): () => void;
+  write(id: string, data: string): void;
+  resize(id: string, cols: number, rows: number): void;
+}
 
 export function copySelection(terminal: Terminal): boolean {
   if (!terminal.hasSelection()) return false;
@@ -35,10 +40,12 @@ export default function TerminalView({
   store,
   id,
   onReady,
+  readOnly = false,
 }: {
-  readonly store: TerminalStore;
-  readonly id: TerminalId;
+  readonly store: TerminalSource;
+  readonly id: string;
   readonly onReady?: (terminal: Terminal | null) => void;
+  readonly readOnly?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
 
@@ -50,7 +57,8 @@ export default function TerminalView({
       fontFamily: FONT_FAMILY,
       fontSize: FONT_SIZE,
       lineHeight: 1.2,
-      cursorBlink: true,
+      cursorBlink: !readOnly,
+      disableStdin: readOnly,
       scrollback: 5000,
       theme: readTheme(),
     });
@@ -103,7 +111,7 @@ export default function TerminalView({
     const stopTheme = watchTheme(() => {
       terminal.options.theme = readTheme();
     });
-    terminal.focus();
+    if (!readOnly) terminal.focus();
     onReady?.(terminal);
     return () => {
       disposed = true;
@@ -117,7 +125,7 @@ export default function TerminalView({
       terminal.dispose();
       releaseStyles();
     };
-  }, [store, id, onReady]);
+  }, [store, id, onReady, readOnly]);
 
   return <div ref={host} className="size-full min-h-0 min-w-0 overflow-hidden px-3 pt-2" />;
 }

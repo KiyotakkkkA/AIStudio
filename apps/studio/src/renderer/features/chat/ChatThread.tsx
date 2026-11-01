@@ -36,6 +36,7 @@ import { commandText } from "./chatCommands";
 import type ChatStore from "./ChatStore";
 import { CONTEXT_PANEL, FILES_PANEL, PANEL_GROUP_LABEL } from "./explorer/explorerCopy";
 import TerminalDock from "../terminal/TerminalDock";
+import BackgroundShellsIndicator from "../backgroundShells/BackgroundShellsIndicator";
 import { TERMINAL_PANEL } from "../terminal/terminalCopy";
 import { BROWSER_PANEL } from "../browser/browserCopy";
 import MemoryDropdown from "../memory/MemoryDropdown";
@@ -203,6 +204,10 @@ export default observer(function ChatThread({
             active={store.terminal.open}
             activeClassName="bg-accent-soft text-accent-medium hover:bg-accent-soft hover:text-accent-light"
             onClick={() => void store.terminal.toggle()}
+          />
+          <BackgroundShellsIndicator
+            store={store.backgroundShells}
+            onOutput={store.openShellOutput}
           />
           <MemoryDropdown conversationId={store.active?.id ?? null} />
           {store.pinnedMessages.length > 0 && (
@@ -519,7 +524,11 @@ export default observer(function ChatThread({
         {...(policy === undefined ? {} : { policy })}
         {...(voice === undefined ? {} : { voice })}
       />
-      <TerminalDock store={store.terminal} available={store.active !== null} />
+      <TerminalDock
+        store={store.terminal}
+        available={store.active !== null}
+        background={store.backgroundShells}
+      />
     </section>
   );
 });

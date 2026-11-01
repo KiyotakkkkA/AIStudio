@@ -20,6 +20,7 @@ pub mod scenarios;
 pub mod secrets;
 mod server;
 pub mod settings;
+pub mod shells;
 pub mod sites;
 pub mod skills;
 pub mod storage;
@@ -60,6 +61,7 @@ pub fn register(server: &mut IpcServer) {
     agentic::register(server);
     workspace::register(server);
     terminal::register(server);
+    shells::register(server);
     documents::register(server);
     artifacts::register(server);
     browser_grants::register(server);
@@ -150,6 +152,8 @@ mod tests {
                 "cli.mcp.create",
                 "cli.open",
                 "cli.status",
+                "cli.theme.get",
+                "cli.theme.set",
                 "cli.uninstall",
                 "documents.close",
                 "documents.list",
@@ -256,6 +260,9 @@ mod tests {
                 "secrets.update",
                 "settings.get",
                 "settings.set",
+                "shells.kill",
+                "shells.list",
+                "shells.output",
                 "sites.icon",
                 "sites.open",
                 "skills.create",

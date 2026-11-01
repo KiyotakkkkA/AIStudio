@@ -87,3 +87,6 @@ export type MemoryId = z.infer<typeof MemoryId>;
 
 export const AgenticSessionId = brandedId("AgenticSessionId");
 export type AgenticSessionId = z.infer<typeof AgenticSessionId>;
+
+export const BackgroundShellId = brandedId("BackgroundShellId");
+export type BackgroundShellId = z.infer<typeof BackgroundShellId>;

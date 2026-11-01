@@ -1,6 +1,10 @@
 import { ChatCitationDto, type ChatToolCallDto, type CodeLanguage, type Json } from "@zvs/shared";
 import { LANGUAGE_LABEL, PROCESS_TOOL_CODE, PROCESS_TOOL_SHELL } from "./processCopy";
 
+export const SHELL_ID_LABEL = "Процесс";
+export const SINCE_LABEL = "С позиции";
+export const TAIL_LABEL = "Последние строки";
+
 const Citations = ChatCitationDto.array();
 
 export interface FileTarget {
@@ -219,6 +223,21 @@ export function toolCallView(
         source,
         args: strings(args, "args"),
         packages: strings(args, "packages"),
+      };
+    }
+    case "shell.output":
+    case "shell.kill": {
+      const id = text(args, "id");
+      if (id === null) return null;
+      const since = count(args, "sinceSeq");
+      const tail = count(args, "tail");
+      return {
+        kind: "fields",
+        fields: [
+          { label: SHELL_ID_LABEL, value: id },
+          ...(since === null ? [] : [{ label: SINCE_LABEL, value: since.toLocaleString("ru-RU") }]),
+          ...(tail === null ? [] : [{ label: TAIL_LABEL, value: tail.toLocaleString("ru-RU") }]),
+        ],
       };
     }
     case "knowledge.list":

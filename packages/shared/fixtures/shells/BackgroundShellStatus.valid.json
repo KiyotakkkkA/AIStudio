@@ -1,0 +1,22 @@
+[
+  {
+    "name": "running",
+    "value": "running"
+  },
+  {
+    "name": "exited",
+    "value": "exited"
+  },
+  {
+    "name": "stopped",
+    "value": "stopped"
+  },
+  {
+    "name": "failed",
+    "value": "failed"
+  },
+  {
+    "name": "timed-out",
+    "value": "timed-out"
+  }
+]

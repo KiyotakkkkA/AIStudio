@@ -16,6 +16,7 @@ use super::plan::{
     signature, summary,
 };
 use super::store::{SessionStore, session_tools};
+use crate::background::BACKGROUND_TOOLS;
 use crate::commands::PROCESS_TOOLS;
 use crate::data::schema::{AgenticSessionRow, TranscriptCall, TranscriptEntry};
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, ToolCall, ToolSpec};
@@ -429,7 +430,10 @@ impl SessionNode {
     ) -> Result<String, AppError> {
         let shape = |status: &str, text: String| fence_tool_result(&call.name, status, &text);
         let mut arguments = parse_tool_arguments(&call.arguments).unwrap_or_default();
-        if FILE_TOOLS.contains(&tool.key.as_str()) || PROCESS_TOOLS.contains(&tool.key.as_str()) {
+        if FILE_TOOLS.contains(&tool.key.as_str())
+            || PROCESS_TOOLS.contains(&tool.key.as_str())
+            || BACKGROUND_TOOLS.contains(&tool.key.as_str())
+        {
             arguments.insert("conversationId".to_owned(), json!(session_id));
         }
         progress.usage.tool_calls += 1;

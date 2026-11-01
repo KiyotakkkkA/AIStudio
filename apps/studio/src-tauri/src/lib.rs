@@ -19,6 +19,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 use zvs_contract::{NOTIFICATION_SCHEME, NotificationTargetDto};
 use zvs_host::agentic::{AgenticService, AgenticServiceOptions, register_agentic_nodes};
 use zvs_host::artifacts::{ArtifactStore, DASHBOARDS};
+use zvs_host::background::{BackgroundShellOptions, BackgroundShells, register_background_nodes};
 use zvs_host::browser::{
     AgentControls, Browser as BrowserTools, BrowserAgent, BrowserGrants, BrowserLifecycle,
     profile_dir, register_browser_nodes, setting_limit,
@@ -919,12 +920,15 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             ..FileToolOptions::new(paths.conversations_dir.clone())
         },
     )?;
+    let shells = BackgroundShells::new(BackgroundShellOptions::new(events.clone(), clock.clone()));
+    register_background_nodes(&nodes, &shells)?;
     register_command_nodes(
         &nodes,
         &folders,
         runs.approvals(),
         CommandToolOptions {
             roots,
+            shells: Some(shells.clone()),
             ..CommandToolOptions::new(
                 Some(Arc::new(toolchain.clone())),
                 paths.cache_dir.join("code-runs"),
@@ -962,6 +966,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         skills: Some(Arc::new(skills.clone())),
         mcp: Some(Arc::new(mcp.clone())),
         folders: Some(folders.clone()),
+        shells: Some(shells.clone()),
         logger: logger.clone(),
         clock: clock.clone(),
         ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), Arc::clone(&nodes))
@@ -1029,6 +1034,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         let terminals = terminals.clone();
         shutdown.register(ShutdownStage::Stop, "terminals", move || async move {
             terminals.dispose();
+        });
+    }
+    {
+        let shells = shells.clone();
+        shutdown.register(ShutdownStage::Stop, "shells", move || async move {
+            shells.dispose().await;
         });
     }
     {
@@ -1176,6 +1187,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         chat,
         explorer: explorer.clone(),
         terminals,
+        shells,
         documents,
         artifacts,
         sites,

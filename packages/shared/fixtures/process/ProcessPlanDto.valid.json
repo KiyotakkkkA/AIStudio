@@ -18,5 +18,15 @@
       "source": "import _ from 'lodash';\nconsole.log(_.chunk([1, 2, 3], 2));\n",
       "packages": ["lodash@4.17.21"]
     }
+  },
+  {
+    "name": "background command",
+    "value": {
+      "program": "C:\\Program Files\\nodejs\\npx.cmd",
+      "argv": ["npx", "http-server", "-p", "8099"],
+      "cwd": "D:\\work\\app",
+      "packages": [],
+      "background": true
+    }
   }
 ]

@@ -32,6 +32,7 @@ pub mod runtimes;
 pub mod scenarios;
 pub mod secrets;
 pub mod settings;
+pub mod shells;
 pub mod sites;
 pub mod skills;
 pub mod storage;
@@ -217,6 +218,11 @@ pub use secrets::{
 };
 pub use settings::{
     SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, check_setting_key,
+};
+pub use shells::{
+    BackgroundShellDto, BackgroundShellStatus, BackgroundShellStatusDto, SHELL_BUFFER_MAX,
+    SHELL_LIFETIME_SECS, SHELL_STEP_DOMAIN, SHELLS_PER_OWNER_MAX, SHELLS_TOTAL_MAX, ShellOutputDto,
+    ShellRef, ShellsListInput, ShellsOutputInput,
 };
 pub use sites::{
     OpenSiteInput, SITE_ICON_BYTES_MAX, SITE_ICON_MIMES, SiteIconDto, SiteIconInput, SiteIconOutput,

@@ -30,5 +30,22 @@
       "timedOut": true,
       "truncated": false
     }
+  },
+  {
+    "name": "background start",
+    "value": {
+      "process": {
+        "program": "C:\\Program Files\\nodejs\\npx.cmd",
+        "argv": ["npx", "http-server", "-p", "8099"],
+        "cwd": "D:\\work\\app",
+        "packages": [],
+        "background": true
+      },
+      "exitCode": null,
+      "durationMs": 12,
+      "timedOut": false,
+      "truncated": false,
+      "shellId": "0199aa11-4444-7111-8111-111111111111"
+    }
   }
 ]

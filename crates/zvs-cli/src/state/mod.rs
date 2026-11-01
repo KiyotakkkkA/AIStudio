@@ -8,17 +8,18 @@ pub mod transcript;
 use std::collections::VecDeque;
 
 use zvs_contract::{
-    AccountFamily, AllowRuleChangeDto, AllowRuleInput, AppError, BindFolderResultDto,
-    ChatAnswerInput, ChatAttachDto, ChatContextDto, ChatSendInput, ChatSkipInput, CliSessionDto,
-    CliTheme, ConversationDetailDto, ConversationDto, ConversationId, CreateMcpServerInput,
-    ExecJudgeDto, ExecMode, ExecPolicyDto, FolderAccessAnswer, FolderGrantScope, HostEvent,
-    HostEventDraft, McpOAuthState, McpServerDetailDto, McpServerDto, McpServerId, McpServerStatus,
-    PolicyRuleDto, ProviderDto, ProviderId, ProviderUsageDto, RunHandleDto, RunId,
-    RunOutcomeStatus, SkillDto, SkillId, ThinkingEffort, WorkingFolderAccess,
+    AccountFamily, AllowRuleChangeDto, AllowRuleInput, AppError, BackgroundShellDto,
+    BackgroundShellId, BackgroundShellStatusDto, BindFolderResultDto, ChatAnswerInput,
+    ChatAttachDto, ChatContextDto, ChatSendInput, ChatSkipInput, CliSessionDto, CliTheme,
+    ConversationDetailDto, ConversationDto, ConversationId, CreateMcpServerInput, ExecJudgeDto,
+    ExecMode, ExecPolicyDto, FolderAccessAnswer, FolderGrantScope, HostEvent, HostEventDraft,
+    McpOAuthState, McpServerDetailDto, McpServerDto, McpServerId, McpServerStatus, PolicyRuleDto,
+    ProviderDto, ProviderId, ProviderUsageDto, RunHandleDto, RunId, RunOutcomeStatus,
+    SHELL_STEP_DOMAIN, ShellOutputDto, SkillDto, SkillId, ThinkingEffort, WorkingFolderAccess,
 };
 
 use self::input::Input;
-use self::overlay::{Action, Overlay, Panel, View};
+use self::overlay::{Action, Overlay, Panel, ProcessOutput, View};
 use self::palette::{Arg, Command, Item, Palette, Pick, Sources, arg_slot, is_command_text};
 use self::prompt::{ApprovalDetail, Choice, Prompt, PromptKind};
 use self::shortcuts::{Chord, Keymap, SHORTCUTS, Shortcut};
@@ -26,6 +27,7 @@ use self::transcript::{ShellEnd, ShellRun, Tone, Transcript};
 use crate::copy;
 
 pub const SCROLL_STEP: usize = 10;
+pub const OUTPUT_POLL_TICKS: u64 = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
@@ -167,6 +169,12 @@ pub enum Request {
     Copy(Selection),
     SaveShortcuts(serde_json::Value),
     SaveTheme(CliTheme),
+    Processes(ConversationId),
+    ProcessOutput {
+        id: BackgroundShellId,
+        since: Option<u64>,
+    },
+    KillProcess(BackgroundShellId),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -211,6 +219,9 @@ pub enum Msg {
     ShortcutsSaved(bool),
     ThemeSaved(bool),
     ThemeChanged(CliTheme),
+    Processes(ConversationId, Result<Vec<BackgroundShellDto>, AppError>),
+    ProcessOutput(Result<ShellOutputDto, AppError>),
+    ProcessKilled(Result<BackgroundShellDto, AppError>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -253,6 +264,7 @@ pub struct App {
     pub keymap: Keymap,
     pub theme: CliTheme,
     pub status: Option<(Tone, String)>,
+    pub processes: Vec<BackgroundShellDto>,
     pub frame: u64,
     pub started: u64,
     pub exit: Option<Exit>,
@@ -318,6 +330,7 @@ impl App {
             keymap: Keymap::default(),
             theme: CliTheme::default(),
             status: None,
+            processes: Vec::new(),
             frame: 0,
             started: 0,
             exit: None,
@@ -579,6 +592,24 @@ impl App {
             }
             Msg::Tick => {
                 self.frame = self.frame.wrapping_add(1);
+                self.poll_output()
+            }
+            Msg::Processes(owner, result) => {
+                self.adopt_processes(owner, result);
+                Vec::new()
+            }
+            Msg::ProcessOutput(result) => {
+                self.adopt_output(result);
+                Vec::new()
+            }
+            Msg::ProcessKilled(result) => {
+                match result {
+                    Ok(shell) => {
+                        self.replace_process(shell);
+                        self.status = Some((Tone::Success, copy::PROCESS_STOPPED.to_owned()));
+                    }
+                    Err(error) => self.status = Some((Tone::Error, error.message)),
+                }
                 Vec::new()
             }
             Msg::Connecting(message) => {
@@ -902,7 +933,8 @@ impl App {
                     self.scroll = 0;
                     self.overlay = None;
                     self.status = Some((Tone::Success, copy::RESUMED.to_owned()));
-                    let mut requests = vec![Request::Attach(id)];
+                    self.processes.clear();
+                    let mut requests = vec![Request::Attach(id), Request::Processes(id)];
                     if self.grant.is_some() {
                         requests.push(Request::Bind {
                             id,
@@ -934,6 +966,7 @@ impl App {
                 Ok(conversation) => {
                     let id = conversation.id;
                     self.conversation = Some(conversation);
+                    self.processes.clear();
                     vec![Request::Bind {
                         id,
                         grant: self.grant,
@@ -980,6 +1013,9 @@ impl App {
                 }
             }
             Msg::Event(event) => {
+                if let Some(requests) = self.process_event(&event) {
+                    return requests;
+                }
                 if self.awaiting && self.run.is_none() {
                     self.held.push(*event);
                     return Vec::new();
@@ -1000,6 +1036,147 @@ impl App {
                 Vec::new()
             }
         }
+    }
+
+    pub fn running_processes(&self) -> usize {
+        self.processes
+            .iter()
+            .filter(|shell| shell.status.running())
+            .count()
+    }
+
+    fn process_event(&mut self, event: &HostEvent) -> Option<Vec<Request>> {
+        let HostEventDraft::Step { step } = &event.body else {
+            return None;
+        };
+        if step.get("domain").and_then(|domain| domain.as_str()) != Some(SHELL_STEP_DOMAIN) {
+            return None;
+        }
+        let Ok(status) = serde_json::from_value::<BackgroundShellStatusDto>(
+            serde_json::Value::Object(step.clone()),
+        ) else {
+            return Some(Vec::new());
+        };
+        let Some(conversation) = self
+            .conversation
+            .as_ref()
+            .map(|conversation| conversation.id)
+        else {
+            return Some(Vec::new());
+        };
+        if status.owner_id != conversation.to_string() {
+            return Some(Vec::new());
+        }
+        let Some(known) = self
+            .processes
+            .iter_mut()
+            .find(|shell| shell.id == status.id)
+        else {
+            return Some(vec![Request::Processes(conversation)]);
+        };
+        known.status = status.status;
+        known.exit_code = status.exit_code;
+        if !status.status.running() {
+            known.ended_at = known.ended_at.or(Some(event.ts));
+        }
+        let shell = known.clone();
+        self.replace_process(shell);
+        Some(Vec::new())
+    }
+
+    fn adopt_processes(
+        &mut self,
+        owner: ConversationId,
+        result: Result<Vec<BackgroundShellDto>, AppError>,
+    ) {
+        if self
+            .conversation
+            .as_ref()
+            .map(|conversation| conversation.id)
+            != Some(owner)
+        {
+            return;
+        }
+        match result {
+            Ok(list) => {
+                self.processes.clone_from(&list);
+                if let Some(overlay) = self.overlay_for(Panel::Processes) {
+                    overlay.processes = list;
+                    overlay.loading = false;
+                }
+            }
+            Err(error) => {
+                if self.overlay_for(Panel::Processes).is_some() {
+                    self.panel_failed(&error);
+                }
+            }
+        }
+    }
+
+    fn replace_process(&mut self, shell: BackgroundShellDto) {
+        if let Some(known) = self.processes.iter_mut().find(|known| known.id == shell.id) {
+            known.clone_from(&shell);
+        }
+        if let Some(overlay) = self.overlay.as_mut() {
+            if let Some(known) = overlay
+                .processes
+                .iter_mut()
+                .find(|known| known.id == shell.id)
+            {
+                known.clone_from(&shell);
+            }
+            if let Some(output) = overlay
+                .output
+                .as_mut()
+                .filter(|output| output.id == shell.id)
+            {
+                output.running = shell.status.running();
+            }
+        }
+    }
+
+    fn adopt_output(&mut self, result: Result<ShellOutputDto, AppError>) {
+        let output = match result {
+            Ok(output) => output,
+            Err(error) => {
+                if self.overlay_for(Panel::ProcessOutput).is_some() {
+                    self.panel_failed(&error);
+                }
+                return;
+            }
+        };
+        let shell = output.shell.clone();
+        if let Some(overlay) = self.overlay_for(Panel::ProcessOutput)
+            && let Some(view) = overlay.output.as_mut().filter(|view| view.id == shell.id)
+        {
+            view.absorb(&output.text, output.next_seq, output.truncated);
+            view.running = shell.status.running();
+            let follow = view.follow;
+            let count = view.shown().len() + usize::from(view.truncated);
+            overlay.loading = false;
+            if follow {
+                overlay.selected = count.saturating_sub(1);
+            }
+        }
+        self.replace_process(shell);
+    }
+
+    fn poll_output(&self) -> Vec<Request> {
+        if !self.frame.is_multiple_of(OUTPUT_POLL_TICKS) {
+            return Vec::new();
+        }
+        self.overlay
+            .as_ref()
+            .filter(|overlay| overlay.panel == Panel::ProcessOutput && !overlay.loading)
+            .and_then(|overlay| overlay.output.as_ref())
+            .filter(|output| output.running)
+            .map(|output| {
+                vec![Request::ProcessOutput {
+                    id: output.id,
+                    since: output.next_seq,
+                }]
+            })
+            .unwrap_or_default()
     }
 
     fn pending_resume(&mut self) -> Vec<Request> {
@@ -1159,6 +1336,7 @@ impl App {
             Command::Context => return self.open_panel(Panel::Context),
             Command::Skills => return self.open_panel(Panel::Skills),
             Command::Mcp => return self.open_panel(Panel::Mcp),
+            Command::Processes => return self.open_panel(Panel::Processes),
             Command::Permissions => return self.open_panel(Panel::Permissions),
             Command::Shortcuts => return self.open_panel(Panel::Shortcuts),
             Command::Theme => return self.open_panel(Panel::Theme),
@@ -1233,9 +1411,19 @@ impl App {
             return Vec::new();
         }
         let requests = match panel {
-            Panel::Connect | Panel::Models | Panel::Effort | Panel::Shortcuts | Panel::Theme => {
-                Vec::new()
-            }
+            Panel::Connect
+            | Panel::Models
+            | Panel::Effort
+            | Panel::Shortcuts
+            | Panel::Theme
+            | Panel::ProcessOutput => Vec::new(),
+            Panel::Processes => match &self.conversation {
+                Some(conversation) => vec![Request::Processes(conversation.id)],
+                None => {
+                    self.status = Some((Tone::Info, copy::PROCESSES_NO_CONVERSATION.to_owned()));
+                    return Vec::new();
+                }
+            },
             Panel::Resume => vec![Request::Conversations],
             Panel::Skills => vec![Request::Skills],
             Panel::Mcp => vec![Request::Servers],
@@ -1354,6 +1542,16 @@ impl App {
                     format!("{}: {}", copy::THEME_SET, overlay::theme_label(theme)),
                 ));
                 vec![Request::SaveTheme(theme)]
+            }
+            Action::ShowOutput(id) => {
+                let Some(shell) = self.processes.iter().find(|shell| shell.id == id).cloned()
+                else {
+                    return Vec::new();
+                };
+                let mut overlay = Overlay::new(Panel::ProcessOutput);
+                overlay.output = Some(ProcessOutput::new(&shell));
+                self.overlay = Some(overlay);
+                vec![Request::ProcessOutput { id, since: None }]
             }
         }
     }
@@ -1536,6 +1734,52 @@ impl App {
             return Vec::new();
         };
         overlay.clamp(rows.len());
+        if overlay.panel == Panel::ProcessOutput {
+            match key {
+                Key::Up | Key::PageUp => {
+                    let step = if key == Key::Up { 1 } else { SCROLL_STEP };
+                    overlay.selected = overlay.selected.saturating_sub(step);
+                    if let Some(output) = overlay.output.as_mut() {
+                        output.follow = false;
+                    }
+                    return Vec::new();
+                }
+                Key::Down | Key::PageDown => {
+                    let step = if key == Key::Down { 1 } else { SCROLL_STEP };
+                    overlay.selected = (overlay.selected + step).min(rows.len().saturating_sub(1));
+                    return Vec::new();
+                }
+                Key::End => {
+                    overlay.selected = rows.len().saturating_sub(1);
+                    if let Some(output) = overlay.output.as_mut() {
+                        output.follow = true;
+                    }
+                    return Vec::new();
+                }
+                _ => {}
+            }
+        }
+        if overlay.panel == Panel::Processes && key == Key::Delete {
+            let target = rows
+                .get(overlay.selected)
+                .and_then(|row| {
+                    self.processes
+                        .iter()
+                        .find(|shell| shell.id.to_string() == row.key)
+                })
+                .filter(|shell| shell.status.running())
+                .map(|shell| shell.id);
+            let Some(id) = target else {
+                return Vec::new();
+            };
+            if !overlay.armed {
+                overlay.armed = true;
+                self.status = Some((Tone::Error, copy::PROCESS_STOP_CONFIRM.to_owned()));
+                return Vec::new();
+            }
+            overlay.armed = false;
+            return vec![Request::KillProcess(id)];
+        }
         match key {
             Key::Esc => {
                 if overlay.filter.is_empty() {

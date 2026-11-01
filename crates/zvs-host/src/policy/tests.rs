@@ -292,6 +292,7 @@ fn script(source: &str) -> ReviewedAction {
             cwd: "C:/work".to_owned(),
             source: Some(source.to_owned()),
             packages: Vec::new(),
+            background: false,
         },
     }
 }
@@ -306,6 +307,7 @@ fn shell(argv: &[&str]) -> ReviewedAction {
             cwd: "C:/work".to_owned(),
             source: None,
             packages: Vec::new(),
+            background: false,
         },
     }
 }

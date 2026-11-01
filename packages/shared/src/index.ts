@@ -18,6 +18,7 @@ export * from "./chat.js";
 export * from "./files.js";
 export * from "./explorer.js";
 export * from "./terminal.js";
+export * from "./shells.js";
 export * from "./notifications.js";
 export * from "./documents.js";
 export * from "./artifacts.js";

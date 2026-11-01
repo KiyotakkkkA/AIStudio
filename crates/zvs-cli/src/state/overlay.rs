@@ -1,8 +1,8 @@
 use zvs_contract::{
-    AccountFamily, ChatContextDto, CliTheme, ConversationDto, ConversationId, ExecJudgeDto,
-    ExecMode, ExecPolicyDto, McpOAuthState, McpServerDto, McpServerId, McpServerStatus,
-    ModelCapability, ProviderDto, ProviderUsageDto, SkillDto, SkillId, SkillSource, SkillStatus,
-    ThinkingEffort,
+    AccountFamily, BackgroundShellDto, BackgroundShellId, BackgroundShellStatus, ChatContextDto,
+    CliTheme, ConversationDto, ConversationId, ExecJudgeDto, ExecMode, ExecPolicyDto,
+    McpOAuthState, McpServerDto, McpServerId, McpServerStatus, ModelCapability, ProviderDto,
+    ProviderUsageDto, SkillDto, SkillId, SkillSource, SkillStatus, ThinkingEffort,
 };
 
 use super::ModelChoice;
@@ -20,6 +20,8 @@ pub enum Panel {
     Context,
     Skills,
     Mcp,
+    Processes,
+    ProcessOutput,
     Permissions,
     Shortcuts,
     Theme,
@@ -49,6 +51,7 @@ pub enum Action {
     Rebind(Shortcut),
     ResetShortcuts,
     SetTheme(CliTheme),
+    ShowOutput(BackgroundShellId),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -132,6 +135,123 @@ pub struct Overlay {
     pub usage: Option<ProviderUsageDto>,
     pub skills: Vec<SkillDto>,
     pub servers: Vec<McpServerDto>,
+    pub processes: Vec<BackgroundShellDto>,
+    pub output: Option<ProcessOutput>,
+}
+
+pub const OUTPUT_LINES_MAX: usize = 2000;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessOutput {
+    pub id: BackgroundShellId,
+    pub command: String,
+    pub running: bool,
+    pub lines: Vec<String>,
+    pub partial: String,
+    pub next_seq: Option<u64>,
+    pub truncated: bool,
+    pub follow: bool,
+}
+
+impl ProcessOutput {
+    pub fn new(shell: &BackgroundShellDto) -> Self {
+        Self {
+            id: shell.id,
+            command: process_command(shell),
+            running: shell.status.running(),
+            lines: Vec::new(),
+            partial: String::new(),
+            next_seq: None,
+            truncated: false,
+            follow: true,
+        }
+    }
+
+    pub fn absorb(&mut self, text: &str, next_seq: u64, truncated: bool) {
+        if self.next_seq.is_none() {
+            self.truncated = truncated;
+        }
+        self.next_seq = Some(next_seq);
+        let joined = format!("{}{text}", std::mem::take(&mut self.partial));
+        let mut pieces: Vec<&str> = joined.split('\n').collect();
+        if let Some(last) = pieces.pop() {
+            last.clone_into(&mut self.partial);
+        }
+        self.lines.extend(
+            pieces
+                .into_iter()
+                .map(|line| line.trim_end_matches('\r').to_owned()),
+        );
+        let excess = self.lines.len().saturating_sub(OUTPUT_LINES_MAX);
+        if excess > 0 {
+            self.lines.drain(..excess);
+            self.truncated = true;
+        }
+    }
+
+    pub fn shown(&self) -> Vec<String> {
+        let mut shown = self.lines.clone();
+        if !self.partial.is_empty() {
+            shown.push(self.partial.clone());
+        }
+        shown
+    }
+}
+
+pub fn process_command(shell: &BackgroundShellDto) -> String {
+    if shell.argv.is_empty() {
+        shell.program.clone()
+    } else {
+        shell.argv.join(" ")
+    }
+}
+
+pub fn process_state(status: BackgroundShellStatus, exit_code: Option<i32>) -> (String, Tone) {
+    match status {
+        BackgroundShellStatus::Running => (copy::PROCESS_RUNNING.to_owned(), Tone::Good),
+        BackgroundShellStatus::Exited => match exit_code {
+            Some(0) | None => (copy::PROCESS_EXITED.to_owned(), Tone::Faint),
+            Some(code) => (format!("{}, код {code}", copy::PROCESS_EXITED), Tone::Bad),
+        },
+        BackgroundShellStatus::Stopped => (copy::PROCESS_STOPPED_STATE.to_owned(), Tone::Faint),
+        BackgroundShellStatus::Failed => (copy::PROCESS_FAILED.to_owned(), Tone::Bad),
+        BackgroundShellStatus::TimedOut => (copy::PROCESS_TIMED_OUT.to_owned(), Tone::Warn),
+    }
+}
+
+fn process_rows(overlay: &Overlay) -> Vec<Row> {
+    overlay
+        .processes
+        .iter()
+        .filter(|shell| overlay.tab != 0 || shell.status.running())
+        .map(|shell| {
+            let (state, tone) = process_state(shell.status, shell.exit_code);
+            Row::new(shell.id.to_string(), "⚙", process_command(shell))
+                .meta(state)
+                .tone(tone)
+                .current(shell.status.running())
+                .detail([shell.cwd.clone(), shell.id.to_string()])
+                .action(Action::ShowOutput(shell.id))
+        })
+        .collect()
+}
+
+fn output_rows(overlay: &Overlay) -> Vec<Row> {
+    let Some(output) = &overlay.output else {
+        return Vec::new();
+    };
+    let mut rows = Vec::new();
+    if output.truncated {
+        rows.push(Row::new("truncated", "…", copy::PROCESS_TRUNCATED).tone(Tone::Faint));
+    }
+    rows.extend(
+        output
+            .shown()
+            .into_iter()
+            .enumerate()
+            .map(|(index, line)| Row::new(format!("line{index}"), " ", line)),
+    );
+    rows
 }
 
 pub struct View<'a> {
@@ -756,6 +876,8 @@ impl Overlay {
             usage: None,
             skills: Vec::new(),
             servers: Vec::new(),
+            processes: Vec::new(),
+            output: None,
         }
     }
 
@@ -768,6 +890,8 @@ impl Overlay {
             Panel::Context => copy::CONTEXT_TITLE,
             Panel::Skills => copy::SKILLS_TITLE,
             Panel::Mcp => copy::MCP_TITLE,
+            Panel::Processes => copy::PROCESSES_TITLE,
+            Panel::ProcessOutput => copy::PROCESS_OUTPUT_TITLE,
             Panel::Permissions => copy::PERMISSIONS_TITLE,
             Panel::Shortcuts => copy::SHORTCUTS_TITLE,
             Panel::Theme => copy::THEME_TITLE,
@@ -783,6 +907,7 @@ impl Overlay {
             Panel::Context => "▤",
             Panel::Skills => "✦",
             Panel::Mcp => "⧉",
+            Panel::Processes | Panel::ProcessOutput => "⚙",
             Panel::Permissions => "◉",
             Panel::Shortcuts => "⌨",
             Panel::Theme => "◑",
@@ -803,8 +928,13 @@ impl Overlay {
             Panel::Context => fixed(&[copy::TAB_SUMMARY, copy::TAB_TOOLS]),
             Panel::Skills => fixed(&[copy::TAB_ALL, copy::TAB_ENABLED, copy::TAB_DISABLED]),
             Panel::Mcp => fixed(&[copy::TAB_ALL, copy::TAB_CONNECTED, copy::TAB_STOPPED]),
+            Panel::Processes => fixed(&[copy::TAB_RUNNING, copy::TAB_ALL]),
             Panel::Permissions => fixed(&[copy::TAB_MODE, copy::TAB_JUDGE]),
-            Panel::Connect | Panel::Effort | Panel::Shortcuts | Panel::Theme => Vec::new(),
+            Panel::Connect
+            | Panel::Effort
+            | Panel::Shortcuts
+            | Panel::Theme
+            | Panel::ProcessOutput => Vec::new(),
         }
     }
 
@@ -817,6 +947,8 @@ impl Overlay {
             Panel::Context => context_rows(self),
             Panel::Skills => skill_rows(self),
             Panel::Mcp => server_rows(self),
+            Panel::Processes => process_rows(self),
+            Panel::ProcessOutput => output_rows(self),
             Panel::Permissions => permission_rows(self, view),
             Panel::Shortcuts => shortcut_rows(self, view),
             Panel::Theme => theme_rows(view),

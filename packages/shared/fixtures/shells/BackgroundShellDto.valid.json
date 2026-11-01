@@ -1,0 +1,47 @@
+[
+  {
+    "name": "running",
+    "value": {
+      "id": "0199aa11-4444-7111-8111-111111111111",
+      "ownerId": "0199aa11-1111-7111-8111-111111111111",
+      "program": "C:\\Program Files\\nodejs\\npx.cmd",
+      "argv": ["npx", "http-server", "-p", "8099"],
+      "cwd": "D:\\work\\app",
+      "status": "running",
+      "exitCode": null,
+      "streamId": "0199aa11-5555-7111-8111-111111111111",
+      "startedAt": 1767225600000,
+      "endedAt": null
+    }
+  },
+  {
+    "name": "exited with a code",
+    "value": {
+      "id": "0199aa11-4444-7111-8111-111111111111",
+      "ownerId": "0199aa11-1111-7111-8111-111111111111",
+      "program": "C:\\Program Files\\nodejs\\npx.cmd",
+      "argv": ["npx", "http-server", "-p", "8099"],
+      "cwd": "D:\\work\\app",
+      "status": "exited",
+      "exitCode": 1,
+      "streamId": "0199aa11-5555-7111-8111-111111111111",
+      "startedAt": 1767225600000,
+      "endedAt": 1767225660000
+    }
+  },
+  {
+    "name": "stopped",
+    "value": {
+      "id": "0199aa11-4444-7111-8111-111111111111",
+      "ownerId": "0199aa11-1111-7111-8111-111111111111",
+      "program": "C:\\Program Files\\nodejs\\npx.cmd",
+      "argv": ["npx", "http-server", "-p", "8099"],
+      "cwd": "D:\\work\\app",
+      "status": "stopped",
+      "exitCode": null,
+      "streamId": "0199aa11-5555-7111-8111-111111111111",
+      "startedAt": 1767225600000,
+      "endedAt": 1767225700000
+    }
+  }
+]

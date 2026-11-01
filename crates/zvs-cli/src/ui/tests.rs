@@ -236,3 +236,32 @@ fn the_palette_shows_subcommands_only_once_their_command_is_typed() {
     assert!(screen.contains("/mcp add"));
     assert!(screen.contains(copy::CMD_MCP_INSPECT));
 }
+
+#[test]
+fn the_footer_counts_running_background_processes() {
+    let mut app = ready(WorkingFolderAccess::Granted);
+    let cases: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../../packages/shared/fixtures/chat/ConversationDto.valid.json"
+    ))
+    .expect("fixture");
+    let conversation: zvs_contract::ConversationDto =
+        serde_json::from_value(cases[0]["value"].clone()).expect("a conversation");
+    let owner = conversation.id;
+    app.conversation = Some(conversation);
+    let shell: zvs_contract::BackgroundShellDto = serde_json::from_value(json!({
+        "id": "0199aa11-4444-7111-8111-111111111111",
+        "ownerId": owner.to_string(),
+        "program": "npx",
+        "argv": ["npx", "http-server"],
+        "cwd": "C:/work",
+        "status": "running",
+        "exitCode": null,
+        "streamId": "0199aa11-5555-7111-8111-111111111111",
+        "startedAt": 1_000,
+        "endedAt": null,
+    }))
+    .expect("a shell");
+    app.update(Msg::Processes(owner, Ok(vec![shell])));
+    let screen = render(&app, 140, 30);
+    assert!(screen.contains(&crate::format::processes(1)));
+}

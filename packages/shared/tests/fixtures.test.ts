@@ -14,6 +14,7 @@ import * as memory from "../src/memory.js";
 import * as agentic from "../src/agentic.js";
 import * as explorer from "../src/explorer.js";
 import * as terminal from "../src/terminal.js";
+import * as shells from "../src/shells.js";
 import * as notifications from "../src/notifications.js";
 import * as documents from "../src/documents.js";
 import * as artifacts from "../src/artifacts.js";
@@ -274,6 +275,13 @@ const schemas: Record<string, z.ZodType> = {
   "explorer/ExplorerChangeDto": explorer.ExplorerChangeDto,
   "explorer/ExplorerChangesDto": explorer.ExplorerChangesDto,
   "explorer/ExplorerWatchDto": explorer.ExplorerWatchDto,
+  "shells/BackgroundShellStatus": shells.BackgroundShellStatus,
+  "shells/BackgroundShellDto": shells.BackgroundShellDto,
+  "shells/BackgroundShellStatusDto": shells.BackgroundShellStatusDto,
+  "shells/ShellsListInput": shells.ShellsListInput,
+  "shells/ShellRef": shells.ShellRef,
+  "shells/ShellsOutputInput": shells.ShellsOutputInput,
+  "shells/ShellOutputDto": shells.ShellOutputDto,
   "terminal/TerminalShell": terminal.TerminalShell,
   "terminal/TerminalStatus": terminal.TerminalStatus,
   "terminal/TerminalSessionDto": terminal.TerminalSessionDto,
