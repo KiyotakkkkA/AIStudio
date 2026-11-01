@@ -118,6 +118,8 @@ fn event_row(conversation: ConversationId, created_at: i64) -> MessageRow {
         rounds: Vec::new(),
         tokens_in: 0,
         tokens_out: 0,
+        tokens_cached: 0,
+        tokens_reasoning: 0,
         usage_estimated: true,
         duration_ms: 0,
         run_id: None,

@@ -21,9 +21,7 @@ import Toggle from "../../ui/atoms/Toggle";
 import { RETRIEVAL_MODES, retrievalHint } from "./retrievalModes";
 import ChatAccountProviderSetup from "./ChatAccountProviderSetup";
 import ChatCommandMenu, { COMMAND_MENU_ID, commandOptionId } from "./ChatCommandMenu";
-import ChatContextMeter from "./ChatContextMeter";
 import ChatModelGate from "./ChatModelGate";
-import ChatToolsBadge from "./ChatToolsBadge";
 import ModelFields, { availableModelOptions } from "./ModelFields";
 import ExecPolicyMenu, { type ExecPolicyBinding } from "../execPolicy/ExecPolicyMenu";
 import { REMOVE_COMMAND, commandText } from "./chatCommands";
@@ -238,8 +236,6 @@ export default observer(function ChatComposer({
             <ChatAccountProviderSetup store={store} />
             {policy === undefined ? null : <ExecPolicyMenu {...policy} />}
             <span className="flex-1" />
-            <ChatToolsBadge store={store} />
-            <ChatContextMeter store={store} />
             <Dropdown menuWidth={300} menuPlacement="top-right">
               <Dropdown.Trigger
                 title="Провайдер и модель"

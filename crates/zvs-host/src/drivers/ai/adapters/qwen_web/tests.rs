@@ -641,6 +641,7 @@ async fn qwen_generate_collects_the_answer_the_reasoning_and_the_vendor_usage() 
             prompt_tokens: Some(621),
             completion_tokens: Some(186),
             total_tokens: Some(807),
+            ..TokenUsage::default()
         })
     );
 }

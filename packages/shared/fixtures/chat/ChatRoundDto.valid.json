@@ -12,5 +12,15 @@
       "text": "",
       "reasoning": ""
     }
+  },
+  {
+    "name": "with usage",
+    "value": {
+      "text": "Ответ",
+      "reasoning": "",
+      "tokensIn": 5416,
+      "tokensOut": 63,
+      "estimated": true
+    }
   }
 ]

@@ -240,6 +240,7 @@ fn usage_of(frame: &Value) -> Option<TokenUsage> {
         total_tokens: prompt_tokens
             .zip(completion_tokens)
             .map(|(prompt, completion)| prompt + completion),
+        ..TokenUsage::default()
     })
 }
 
@@ -453,6 +454,7 @@ mod tests {
                 prompt_tokens: Some(5),
                 completion_tokens: Some(2),
                 total_tokens: Some(7),
+                ..TokenUsage::default()
             })
         );
         assert!(result.tool_calls.is_empty());

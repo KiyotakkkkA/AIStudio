@@ -147,6 +147,7 @@ mod tests {
                 "chat.pickFolder",
                 "chat.send",
                 "chat.skip",
+                "chat.stats",
                 "chat.unbindFolder",
                 "cli.accounts.cancelLink",
                 "cli.accounts.link",

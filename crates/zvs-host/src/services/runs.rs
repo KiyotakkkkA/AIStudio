@@ -437,6 +437,10 @@ impl RunService {
         }
     }
 
+    pub fn services(&self) -> &KernelServices {
+        &self.inner.options.services
+    }
+
     pub fn permissions(&self) -> Arc<PermissionService> {
         Arc::clone(&self.inner.permissions)
     }

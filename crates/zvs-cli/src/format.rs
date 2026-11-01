@@ -78,6 +78,18 @@ pub fn goal_progress(round: u64, total: u64, elapsed_ms: u64) -> String {
     )
 }
 
+pub fn runtime(ms: u64) -> String {
+    let seconds = ms / 1000;
+    let (hours, minutes, rest) = (seconds / 3600, seconds / 60 % 60, seconds % 60);
+    if hours > 0 {
+        format!("{hours} ч {minutes} мин")
+    } else if minutes > 0 {
+        format!("{minutes} мин {rest} с")
+    } else {
+        format!("{rest} с")
+    }
+}
+
 pub fn files(count: u64) -> String {
     plural(count, "файл", "файла", "файлов")
 }
@@ -111,6 +123,13 @@ pub fn percent(part: u64, whole: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn runtime_reads_as_hours_minutes_or_seconds() {
+        assert_eq!(runtime(34_000), "34 с");
+        assert_eq!(runtime(634_000), "10 мин 34 с");
+        assert_eq!(runtime(3_742_000), "1 ч 2 мин");
+    }
 
     #[test]
     fn numbers_group_thousands_like_ru_ru() {

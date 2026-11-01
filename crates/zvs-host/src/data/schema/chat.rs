@@ -70,6 +70,8 @@ pub struct MessageRow {
     pub rounds: Vec<ChatRoundDto>,
     pub tokens_in: i64,
     pub tokens_out: i64,
+    pub tokens_cached: i64,
+    pub tokens_reasoning: i64,
     pub usage_estimated: bool,
     pub duration_ms: i64,
     pub run_id: Option<String>,
@@ -82,7 +84,7 @@ pub struct MessageRow {
 impl MessageRow {
     pub const COLUMNS: &str = "id, conversation_id, role, content, reasoning, citations, \
         (SELECT json_group_array(json(call) ORDER BY idx) FROM message_tool_call \
-        WHERE message_id = message.id) AS tool_calls, selections, command, offered_tools, web_sources, rounds, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, \
+        WHERE message_id = message.id) AS tool_calls, selections, command, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, \
         pinned, event, created_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
@@ -103,6 +105,8 @@ impl MessageRow {
             rounds: json_column(row, "rounds")?,
             tokens_in: row.get("tokens_in")?,
             tokens_out: row.get("tokens_out")?,
+            tokens_cached: row.get("tokens_cached")?,
+            tokens_reasoning: row.get("tokens_reasoning")?,
             usage_estimated: row.get("usage_estimated")?,
             duration_ms: row.get("duration_ms")?,
             run_id: row.get("run_id")?,

@@ -206,6 +206,11 @@ pub fn process_command(shell: &BackgroundShellDto) -> String {
     }
 }
 
+pub fn process_runtime(shell: &BackgroundShellDto, now: i64) -> u64 {
+    let end = shell.ended_at.unwrap_or(now);
+    u64::try_from(end.saturating_sub(shell.started_at)).unwrap_or(0)
+}
+
 pub fn process_state(status: BackgroundShellStatus, exit_code: Option<i32>) -> (String, Tone) {
     match status {
         BackgroundShellStatus::Running => (copy::PROCESS_RUNNING.to_owned(), Tone::Good),

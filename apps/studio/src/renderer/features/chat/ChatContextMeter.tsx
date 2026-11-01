@@ -16,9 +16,7 @@ interface Segment {
 }
 
 const MESSAGE_FORMS = ["сообщение", "сообщения", "сообщений"] as const;
-const ESTIMATED_NOTE = "Оценка по числу символов.";
-const MEASURED_NOTE =
-  "Разбивка оценена по числу символов, расход последнего ответа передан провайдером.";
+const ESTIMATED_NOTE = "Приблизительное количество";
 
 function messagesWord(count: number): string {
   return plural(count, ...MESSAGE_FORMS);
@@ -306,17 +304,18 @@ export default observer(function ChatContextMeter({ store }: { readonly store: C
 
           {last !== undefined ? (
             <section>
-              <p className="font-semibold text-main-100">Последний ответ</p>
+              <p className="font-semibold text-main-100">Статистика генерации</p>
               <div className="mt-1 divide-y divide-line">
                 <Row label="Вход" value={compactTokens(last.tokensIn)} />
                 <Row label="Выход" value={compactTokens(last.tokensOut)} />
-                <Row label="Всего за диалог" value={compactTokens(store.sessionTokens)} />
+                <Row label="Суммарный вход" value={compactTokens(store.sessionInput)} />
+                <Row label="Суммарный выход" value={compactTokens(store.sessionOutput)} />
               </div>
             </section>
           ) : null}
 
           <p className="text-[11px] leading-snug text-main-500">
-            {last !== undefined && !last.usageEstimated ? MEASURED_NOTE : ESTIMATED_NOTE}
+            {last !== undefined && <>{ESTIMATED_NOTE}</>}
             {store.attachedStoreIds.length > 0
               ? " Фрагменты из хранилищ добавляются при отправке."
               : ""}

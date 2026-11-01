@@ -13,21 +13,25 @@ export function currentRound(calls: readonly ChatToolCallDto[]): number {
   return calls.reduce((next, call) => Math.max(next, call.round + 1), 0);
 }
 
+type RoundText = "text" | "reasoning";
+
+const EMPTY_ROUND: ChatRoundDto = { text: "", reasoning: "", estimated: false };
+
 export function appendRound(
   rounds: readonly ChatRoundDto[],
   calls: readonly ChatToolCallDto[],
-  field: keyof ChatRoundDto,
+  field: RoundText,
   delta: string,
 ): ChatRoundDto[] {
   const index = currentRound(calls);
   const next = [...rounds];
-  while (next.length <= index) next.push({ text: "", reasoning: "" });
-  const round = next[index] ?? { text: "", reasoning: "" };
+  while (next.length <= index) next.push(EMPTY_ROUND);
+  const round = next[index] ?? EMPTY_ROUND;
   next[index] = { ...round, [field]: round[field] + delta };
   return next;
 }
 
-function joined(rounds: readonly ChatRoundDto[], field: keyof ChatRoundDto): string {
+function joined(rounds: readonly ChatRoundDto[], field: RoundText): string {
   return rounds.map((round) => round[field]).join("");
 }
 
@@ -58,7 +62,11 @@ export function answerBlocks(
   }
   const all = [
     ...rounds,
-    { text: content.slice(text.length), reasoning: reasoning.slice(thought.length) },
+    {
+      ...EMPTY_ROUND,
+      text: content.slice(text.length),
+      reasoning: reasoning.slice(thought.length),
+    },
   ];
   return all.flatMap((round, index) => [
     ...textBlock(`text-${String(index)}`, round.text, round.reasoning),

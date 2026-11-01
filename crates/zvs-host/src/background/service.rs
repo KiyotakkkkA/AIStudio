@@ -564,11 +564,15 @@ impl BackgroundShells {
     }
 
     pub fn take_ended(&self, owner: &str, lines: usize) -> Vec<EndedShell> {
-        self.take(owner, lines, false)
+        self.collect(owner, lines, false, true)
+    }
+
+    pub fn peek_ended(&self, owner: &str, lines: usize) -> Vec<EndedShell> {
+        self.collect(owner, lines, false, false)
     }
 
     pub fn take_notified(&self, owner: &str, lines: usize) -> Vec<EndedShell> {
-        self.take(owner, lines, true)
+        self.collect(owner, lines, true, true)
     }
 
     fn unreported(&self, owner: &str) -> Vec<Arc<Shell>> {
@@ -601,7 +605,7 @@ impl BackgroundShells {
         demoted
     }
 
-    fn take(&self, owner: &str, lines: usize, notified: bool) -> Vec<EndedShell> {
+    fn collect(&self, owner: &str, lines: usize, notified: bool, mark: bool) -> Vec<EndedShell> {
         let shells: Vec<Arc<Shell>> = self
             .shells()
             .iter()
@@ -615,7 +619,9 @@ impl BackgroundShells {
             if state.status.running() || state.reported || state.notify != notified {
                 continue;
             }
-            state.reported = true;
+            if mark {
+                state.reported = true;
+            }
             ended.push(EndedShell {
                 shell: shell.dto(&state),
                 tail: clipped_tail(&text, lines),

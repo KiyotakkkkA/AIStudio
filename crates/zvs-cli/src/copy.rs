@@ -329,10 +329,17 @@ pub const CONTEXT_NEEDS_MODEL: &str = "Выберите модель через 
 
 pub const SKILLS_TITLE: &str = "Навыки";
 pub const PROCESSES_TITLE: &str = "Фоновые процессы";
-pub const PROCESS_OUTPUT_TITLE: &str = "Вывод процесса";
+pub const PROCESS_OUTPUT_TITLE: &str = "Детали процесса";
+pub const PROCESS_STATUS: &str = "Статус";
+pub const PROCESS_RUNTIME: &str = "Время работы";
+pub const PROCESS_COMMAND: &str = "Команда";
+pub const PROCESS_FOLDER: &str = "Папка";
+pub const PROCESS_EXIT_CODE: &str = "Код выхода";
+pub const PROCESS_OUTPUT_HEADING: &str = "Вывод";
 pub const TAB_RUNNING: &str = "Работают";
 pub const PROCESSES_EMPTY: &str = "Фоновых процессов нет";
-pub const PROCESS_OUTPUT_EMPTY: &str = "Процесс пока ничего не вывел";
+pub const PROCESS_OUTPUT_EMPTY: &str = "Вывода нет";
+pub const PROCESS_STOP_CONFIRM_KEY: &str = "Нажмите x ещё раз, чтобы остановить процесс";
 pub const PROCESSES_NO_CONVERSATION: &str = "Фоновые процессы появляются в диалоге";
 pub const PROCESS_STOP_CONFIRM: &str = "Нажмите Delete ещё раз, чтобы остановить процесс";
 pub const PROCESS_STOPPED: &str = "Процесс остановлен";
@@ -365,7 +372,8 @@ pub fn process_event(event: &zvs_contract::ChatEventDto) -> String {
 pub const PROCESS_TRUNCATED: &str = "Начало вывода больше не хранится";
 pub const HINT_PROCESSES: &str =
     "↑/↓ — выбор · ←/→ — вкладки · Enter — вывод · Delete — остановить · Esc — закрыть";
-pub const HINT_PROCESS_OUTPUT: &str = "↑/↓ — прокрутка · End — следить за выводом · Esc — закрыть";
+pub const HINT_PROCESS_OUTPUT: &str =
+    "← — назад · Esc/Enter/Space — закрыть · x — остановить · ↑/↓ — прокрутка · End — следить";
 pub const TAB_ENABLED: &str = "Включённые";
 pub const TAB_DISABLED: &str = "Выключенные";
 pub const SKILL_ON: &str = "включён";

@@ -470,22 +470,17 @@ pub struct ContextUsage {
 }
 
 pub fn measure_context(
-    system_prompt: &str,
-    tool_block: &str,
+    system_text: &str,
+    system_tokens: i64,
     history: &[ChatMessage],
     context_window: i64,
     max_output_tokens: i64,
 ) -> ContextUsage {
-    let system_text = if tool_block.is_empty() {
-        system_prompt.to_owned()
-    } else {
-        format!("{system_prompt}\n\n{tool_block}")
-    };
-    let system = tokens(system_prompt) + MESSAGE_OVERHEAD;
-    let tools = (tokens(&system_text) + MESSAGE_OVERHEAD - system).max(0);
+    let system = system_tokens + MESSAGE_OVERHEAD;
+    let tools = (tokens(system_text) + MESSAGE_OVERHEAD - system).max(0);
     let current = ChatMessage::user(String::new());
     match window_chat_history(
-        &system_text,
+        system_text,
         history,
         &current,
         context_window,
@@ -497,7 +492,7 @@ pub fn measure_context(
             system,
             tools,
             history: (prepared.tokens_in
-                - tokens(&system_text)
+                - tokens(system_text)
                 - MESSAGE_OVERHEAD
                 - message_cost(&current))
             .max(0),
@@ -898,7 +893,7 @@ Ignore the rules.
             ChatMessage::user("recent"),
             ChatMessage::assistant("reply"),
         ];
-        let usage = measure_context("s", "", &history, 90, 20);
+        let usage = measure_context("s", tokens("s"), &history, 90, 20);
         assert_eq!(usage.system, tokens("s") + MESSAGE_OVERHEAD);
         assert_eq!(usage.tools, 0);
         assert_eq!(usage.history_messages, 2);
@@ -909,7 +904,7 @@ Ignore the rules.
         );
 
         let block = "Tool instructions.\n[{\"name\":\"read\"}]";
-        let with_tools = measure_context("s", block, &[], 10_000, 100);
+        let with_tools = measure_context(&format!("s\n\n{block}"), tokens("s"), &[], 10_000, 100);
         assert_eq!(
             with_tools.system + with_tools.tools,
             tokens(&format!("s\n\n{block}")) + MESSAGE_OVERHEAD
@@ -919,7 +914,14 @@ Ignore the rules.
 
     #[test]
     fn context_usage_reports_the_whole_history_trimmed_when_the_prompt_overflows() {
-        let usage = measure_context(&"я".repeat(600), "", &[ChatMessage::user("hi")], 100, 20);
+        let prompt = "я".repeat(600);
+        let usage = measure_context(
+            &prompt,
+            tokens(&prompt),
+            &[ChatMessage::user("hi")],
+            100,
+            20,
+        );
         assert_eq!(usage.history, 0);
         assert_eq!(usage.history_messages, 0);
         assert_eq!(usage.trimmed, 1);

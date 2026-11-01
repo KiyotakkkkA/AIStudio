@@ -20,9 +20,9 @@ function call(id: string, round: number): ChatToolCallDto {
 test("each round shows its reasoning and text before the calls it made", () => {
   const calls = [call("a", 0), call("b", 0), call("c", 1)];
   const rounds = [
-    { text: "Поиск.", reasoning: "Первая мысль." },
-    { text: "\n\nУточнение.", reasoning: "Вторая мысль." },
-    { text: "\n\nИтог.", reasoning: "" },
+    { text: "Поиск.", reasoning: "Первая мысль.", estimated: false },
+    { text: "\n\nУточнение.", reasoning: "Вторая мысль.", estimated: false },
+    { text: "\n\nИтог.", reasoning: "", estimated: false },
   ];
   const blocks = answerBlocks(
     "Поиск.\n\nУточнение.\n\nИтог.",
@@ -44,7 +44,7 @@ test("text past the saved rounds belongs to the round after the last calls", () 
   const blocks = answerBlocks(
     "Поиск.\n\nЧастичный",
     "Мысль.Ещё",
-    [{ text: "Поиск.", reasoning: "Мысль." }],
+    [{ text: "Поиск.", reasoning: "Мысль.", estimated: false }],
     calls,
   );
   expect(blocks.map((block) => block.kind)).toEqual(["text", "tools", "text"]);
@@ -63,9 +63,9 @@ test("a message without rounds keeps reasoning first and the answer after the ca
     { kind: "tools", key: "tools", calls },
     { kind: "text", key: "answer", text: "Ответ", reasoning: "" },
   ]);
-  expect(answerBlocks("Ответ", "", [{ text: "Другое", reasoning: "" }], [])).toEqual([
-    { kind: "text", key: "answer", text: "Ответ", reasoning: "" },
-  ]);
+  expect(
+    answerBlocks("Ответ", "", [{ text: "Другое", reasoning: "", estimated: false }], []),
+  ).toEqual([{ kind: "text", key: "answer", text: "Ответ", reasoning: "" }]);
 });
 
 test("streamed deltas go to the round after the latest call", () => {
@@ -76,13 +76,13 @@ test("streamed deltas go to the round after the latest call", () => {
   rounds = appendRound(rounds, calls, "text", "\n\nИтог");
   rounds = appendRound(rounds, calls, "text", ".");
   expect(rounds).toEqual([
-    { text: "Поиск.", reasoning: "Мысль" },
-    { text: "\n\nИтог.", reasoning: "" },
+    { text: "Поиск.", reasoning: "Мысль", estimated: false },
+    { text: "\n\nИтог.", reasoning: "", estimated: false },
   ]);
   expect(appendRound([], [call("a", 2)], "text", "x")).toEqual([
-    { text: "", reasoning: "" },
-    { text: "", reasoning: "" },
-    { text: "", reasoning: "" },
-    { text: "x", reasoning: "" },
+    { text: "", reasoning: "", estimated: false },
+    { text: "", reasoning: "", estimated: false },
+    { text: "", reasoning: "", estimated: false },
+    { text: "x", reasoning: "", estimated: false },
   ]);
 });

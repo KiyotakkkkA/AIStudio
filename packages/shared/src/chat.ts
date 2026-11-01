@@ -52,6 +52,9 @@ export type ChatToolCallStatus = z.infer<typeof ChatToolCallStatus>;
 export const ChatRoundDto = z.object({
   text: z.string(),
   reasoning: z.string(),
+  tokensIn: z.number().int().nonnegative().optional(),
+  tokensOut: z.number().int().nonnegative().optional(),
+  estimated: z.boolean().default(false),
 });
 export type ChatRoundDto = z.infer<typeof ChatRoundDto>;
 export const ChatToolCallDto = z.object({
@@ -294,6 +297,8 @@ export const MessageDto = z
     rounds: z.array(ChatRoundDto).default([]),
     tokensIn: z.number().int().nonnegative(),
     tokensOut: z.number().int().nonnegative(),
+    tokensCached: z.number().int().nonnegative().default(0),
+    tokensReasoning: z.number().int().nonnegative().default(0),
     usageEstimated: z.boolean(),
     durationMs: z.number().int().nonnegative(),
     runId: RunId.nullable(),
@@ -356,6 +361,52 @@ export const ChatContextDto = z.object({
   total: z.number().int().nonnegative(),
 });
 export type ChatContextDto = z.infer<typeof ChatContextDto>;
+export const CHAT_PROMPT_SECTIONS = [
+  "dialogPrompt",
+  "profile",
+  "memory",
+  "knowledge",
+  "mcpGuidance",
+  "command",
+  "skills",
+  "workspace",
+  "fileTools",
+  "processTools",
+  "endedShells",
+  "ask",
+  "delegate",
+  "deferred",
+  "goal",
+  "toolSpecs",
+] as const;
+export const ChatPromptSection = z.enum(CHAT_PROMPT_SECTIONS);
+export type ChatPromptSection = z.infer<typeof ChatPromptSection>;
+export const ChatHistoryStatus = z.enum(["included", "trimmed", "skipped"]);
+export type ChatHistoryStatus = z.infer<typeof ChatHistoryStatus>;
+export const ChatPromptSectionDto = z.object({
+  key: ChatPromptSection,
+  tokens: z.number().int().nonnegative(),
+  text: z.string(),
+});
+export type ChatPromptSectionDto = z.infer<typeof ChatPromptSectionDto>;
+export const ChatHistoryEntryDto = z.object({
+  messageId: MessageId,
+  role: MessageRole,
+  status: ChatHistoryStatus,
+  tokens: z.number().int().nonnegative(),
+  text: z.string(),
+  reasoningTokens: z.number().int().nonnegative(),
+  toolTokens: z.number().int().nonnegative(),
+});
+export type ChatHistoryEntryDto = z.infer<typeof ChatHistoryEntryDto>;
+export const ChatStatsDto = z.object({
+  context: ChatContextDto,
+  tokenizer: z.string().min(1),
+  sections: z.array(ChatPromptSectionDto),
+  deferred: z.array(ToolKey),
+  history: z.array(ChatHistoryEntryDto),
+});
+export type ChatStatsDto = z.infer<typeof ChatStatsDto>;
 export const TruncateConversationInput = ConversationRef.extend({ messageId: MessageId });
 export type TruncateConversationInput = z.infer<typeof TruncateConversationInput>;
 export const BranchConversationInput = ConversationRef.extend({ messageId: MessageId });

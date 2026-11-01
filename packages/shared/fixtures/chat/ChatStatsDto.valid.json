@@ -1,0 +1,67 @@
+[
+  {
+    "name": "sections and history",
+    "value": {
+      "context": {
+        "contextWindow": 8192,
+        "reservedOutput": 1024,
+        "system": 40,
+        "tools": 180,
+        "toolItems": [
+          {
+            "key": "mail.send",
+            "tokens": 120,
+            "source": "base"
+          }
+        ],
+        "history": 32,
+        "historyMessages": 1,
+        "trimmed": 1,
+        "total": 252
+      },
+      "tokenizer": "o200k_base",
+      "sections": [
+        {
+          "key": "dialogPrompt",
+          "tokens": 6,
+          "text": "Отвечай кратко."
+        },
+        {
+          "key": "toolSpecs",
+          "tokens": 180,
+          "text": "Tool results.\n[]"
+        }
+      ],
+      "deferred": ["browser.navigate"],
+      "history": [
+        {
+          "messageId": "0199aa11-2222-7222-8222-000000000001",
+          "role": "user",
+          "status": "trimmed",
+          "tokens": 20,
+          "text": "Старый вопрос",
+          "reasoningTokens": 0,
+          "toolTokens": 0
+        },
+        {
+          "messageId": "0199aa11-2222-7222-8222-000000000002",
+          "role": "assistant",
+          "status": "skipped",
+          "tokens": 8,
+          "text": "",
+          "reasoningTokens": 12,
+          "toolTokens": 340
+        },
+        {
+          "messageId": "0199aa11-2222-7222-8222-000000000003",
+          "role": "user",
+          "status": "included",
+          "tokens": 32,
+          "text": "Новый вопрос",
+          "reasoningTokens": 0,
+          "toolTokens": 0
+        }
+      ]
+    }
+  }
+]

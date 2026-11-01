@@ -573,6 +573,7 @@ const schemas: Record<string, z.ZodType> = {
   "chat/ChatAttachDto": ChatAttachDto,
   "chat/ChatContextInput": contract["chat.context"].input,
   "chat/ChatContextDto": contract["chat.context"].output,
+  "chat/ChatStatsDto": contract["chat.stats"].output,
   "chat/TruncateConversationInput": contract["chat.conversations.truncate"].input,
   "chat/BranchConversationInput": contract["chat.conversations.branch"].input,
   "chat/RenameConversationInput": contract["chat.conversations.rename"].input,

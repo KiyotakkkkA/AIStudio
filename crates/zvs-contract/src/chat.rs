@@ -291,6 +291,12 @@ impl Validate for WebSourceDto {
 pub struct ChatRoundDto {
     pub text: String,
     pub reasoning: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tokens_in: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tokens_out: Option<u64>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub estimated: bool,
 }
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -588,6 +594,10 @@ pub struct MessageDto {
     pub rounds: Vec<ChatRoundDto>,
     pub tokens_in: u64,
     pub tokens_out: u64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub tokens_cached: u64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub tokens_reasoning: u64,
     pub usage_estimated: bool,
     pub duration_ms: u64,
     #[serde(deserialize_with = "crate::wire::nullable")]
@@ -622,6 +632,8 @@ impl Validate for MessageDto {
         check_selections(&self.selections)?;
         check::safe_integer("tokensIn", self.tokens_in)?;
         check::safe_integer("tokensOut", self.tokens_out)?;
+        check::safe_integer("tokensCached", self.tokens_cached)?;
+        check::safe_integer("tokensReasoning", self.tokens_reasoning)?;
         check::safe_integer("durationMs", self.duration_ms)?;
         check_int("createdAt", self.created_at)
     }
@@ -797,6 +809,97 @@ impl Validate for ChatContextDto {
             check::safe_integer(field, value)?;
         }
         nested("toolItems", self.tool_items.validate())
+    }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+const fn is_zero(value: &u64) -> bool {
+    *value == 0
+}
+
+wire_enum!(ChatPromptSection {
+    DialogPrompt => "dialogPrompt",
+    Profile => "profile",
+    Memory => "memory",
+    Knowledge => "knowledge",
+    McpGuidance => "mcpGuidance",
+    Command => "command",
+    Skills => "skills",
+    Workspace => "workspace",
+    FileTools => "fileTools",
+    ProcessTools => "processTools",
+    EndedShells => "endedShells",
+    Ask => "ask",
+    Delegate => "delegate",
+    Deferred => "deferred",
+    Goal => "goal",
+    ToolSpecs => "toolSpecs",
+});
+
+wire_enum!(ChatHistoryStatus {
+    Included => "included",
+    Trimmed => "trimmed",
+    Skipped => "skipped",
+});
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatPromptSectionDto {
+    pub key: ChatPromptSection,
+    pub tokens: u64,
+    pub text: String,
+}
+
+impl Validate for ChatPromptSectionDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::safe_integer("tokens", self.tokens)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatHistoryEntryDto {
+    pub message_id: MessageId,
+    pub role: MessageRole,
+    pub status: ChatHistoryStatus,
+    pub tokens: u64,
+    pub text: String,
+    pub reasoning_tokens: u64,
+    pub tool_tokens: u64,
+}
+
+impl Validate for ChatHistoryEntryDto {
+    fn validate(&self) -> Result<(), AppError> {
+        for (field, value) in [
+            ("tokens", self.tokens),
+            ("reasoningTokens", self.reasoning_tokens),
+            ("toolTokens", self.tool_tokens),
+        ] {
+            check::safe_integer(field, value)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatStatsDto {
+    pub context: ChatContextDto,
+    pub tokenizer: String,
+    pub sections: Vec<ChatPromptSectionDto>,
+    pub deferred: Vec<String>,
+    pub history: Vec<ChatHistoryEntryDto>,
+}
+
+impl Validate for ChatStatsDto {
+    fn validate(&self) -> Result<(), AppError> {
+        nested("context", self.context.validate())?;
+        check::non_empty("tokenizer", &self.tokenizer)?;
+        nested("sections", self.sections.validate())?;
+        for key in &self.deferred {
+            check_tool_key("deferred", key)?;
+        }
+        nested("history", self.history.validate())
     }
 }
 

@@ -242,6 +242,16 @@ pub(crate) fn round_tokens(round: &RoundOutput) -> u64 {
             .sum::<u64>()
 }
 
+pub(crate) fn round_usage(request: &GenerateRequest, round: &RoundOutput) -> (u64, u64, bool) {
+    let count = |value: Option<i64>| u64::try_from(value.unwrap_or(0)).unwrap_or(0);
+    match &round.usage {
+        Some(usage) if usage.counted() => {
+            (count(usage.input_tokens), count(usage.output_tokens), false)
+        }
+        _ => (request_tokens(request), round_tokens(round), true),
+    }
+}
+
 fn spent_tokens(request: &GenerateRequest, round: &RoundOutput) -> u64 {
     match &round.usage {
         Some(usage) if usage.counted() => {
@@ -336,9 +346,13 @@ impl ToolLoop<'_> {
             out.text.push_str(&output.text);
             out.reasoning.push_str(&output.reasoning);
             out.web_sources.extend(output.web_sources.iter().cloned());
+            let (round_in, round_out, estimated) = round_usage(&request, &output);
             out.rounds.push(ChatRoundDto {
                 text: output.text.clone(),
                 reasoning: output.reasoning.clone(),
+                tokens_in: Some(round_in),
+                tokens_out: Some(round_out),
+                estimated,
             });
             if let Some(reported) = output.usage.clone() {
                 out.usage.merge(reported);

@@ -219,6 +219,8 @@ on its code. Suggested order: 045_EXTRA_3 → 045_EXTRA_5 (part A) → 045_EXTRA
 - [x] **TASK_048_EXTRA_3** — The /goal command: host loop, chat composer and CLI
 - [x] **TASK_048_EXTRA_4** — Subagents: host core and policy, preferred models, desktop and CLI
 - [x] **TASK_048_EXTRA_5** — Background code and scripts, and waking the dialog when a process finishes
+- [ ] **TASK_048_EXTRA_6** — Carrying tool results, sources and reasoning into later turns
+- [ ] **TASK_048_EXTRA_7** — Compacting history that no longer fits the context window
 - [ ] **TASK_049** — Mail integration (IMAP/SMTP)
 - [ ] **TASK_050** — Telegram and Git hosting integrations
 - [ ] **TASK_051** — Integrations page
@@ -261,7 +263,7 @@ Phase 8   026 ── 042 ── 043 ── 044
 Phase 9   031 ── 048 ─┬─ 049 ── 051
                       └─ 050
           048 ── 048_EXTRA_1 ── 048_EXTRA_2 ─┬─ 048_EXTRA_3 ── 048_EXTRA_4
-                                             └─ 048_EXTRA_5
+                                             └─ 048_EXTRA_5 ── 048_EXTRA_6 ── 048_EXTRA_7
 Phase 10  all ── 052 … 057
 
 Phase M   034_EXTRA_1 ── 058 ── 059 ── 060 ── 061 ── 062 ── 063 ── 064 ── 065 ── 066 ── 067
@@ -333,6 +335,8 @@ you can settle the load-bearing ones early rather than being interrupted mid-tas
 | TASK_048_EXTRA_3 (resolved) | 40 rounds, 400 000 tokens, 30 minutes (`chat.goal.max*`); messages are refused while a goal is active | yes |
 | TASK_048_EXTRA_4 (resolved) | Option c: `explore` and `general`, `general` always one at a time; option a: one ordered preferred-model list for every kind | yes |
 | TASK_048_EXTRA_5 (resolved) | Option a: at most 3 wake-ups in a row without a message from the person, in every execution policy mode | yes |
+| TASK_048_EXTRA_6 | What later turns carry: capped tool results or one-line summaries, cited sources, and reasoning or not? | yes |
+| TASK_048_EXTRA_7 | History summary made in the turn or in the background, and with which model? | yes |
 | TASK_049 | Does mail send automatically once approved, or per message? | yes |
 | TASK_050 | Telegram: bot account, or your personal account? | **no** |
 | TASK_056 | Code-sign the installer? Auto-update or manual? WebView2 runtime: download, embed bootstrapper, or offline? | moderate |

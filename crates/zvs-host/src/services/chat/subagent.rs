@@ -632,6 +632,7 @@ impl GenerateChatNode {
                         input_tokens: i64::try_from(output.tokens_in).ok(),
                         output_tokens: i64::try_from(output.tokens_out).ok(),
                         context_window: None,
+                        ..Default::default()
                     }),
                     ..plain(content)
                 })

@@ -1042,6 +1042,7 @@ async fn context_counts_the_offered_tools_one_by_one() {
             system_prompt: None,
             command: None,
         })
+        .await
         .expect("measures");
     assert_eq!(measured.tool_items.len(), 2);
     assert_eq!(measured.tool_items[0].key, "demo.lookup");
@@ -1781,6 +1782,7 @@ async fn attaching_to_a_turn_waiting_on_an_approval_returns_the_text_the_calls_a
         [zvs_contract::ChatRoundDto {
             text: "Сначала удаление.".to_owned(),
             reasoning: String::new(),
+            ..live.rounds[0].clone()
         }]
     );
     assert_eq!(live.approvals[0].get("id"), Some(&json!(approval)));
@@ -1942,7 +1944,19 @@ async fn a_recorded_turn_with_tool_calls_replays_to_the_live_state_from_a_lean_l
     assert_eq!(state.tool_calls, assistant.tool_calls);
     assert_eq!(state.content, assistant.content);
     assert_eq!(state.reasoning, assistant.reasoning);
-    assert_eq!(state.rounds, assistant.rounds);
+    let texts = |rounds: &[zvs_contract::ChatRoundDto]| {
+        rounds
+            .iter()
+            .map(|round| (round.text.clone(), round.reasoning.clone()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(texts(&state.rounds), texts(&assistant.rounds));
+    assert!(
+        assistant
+            .rounds
+            .iter()
+            .all(|round| round.estimated && round.tokens_in.is_some())
+    );
     assert_eq!(assistant.rounds.len(), 2);
     assert_eq!(assistant.rounds[0].text, "Поиск.");
     assert!(assistant.rounds[0].reasoning.starts_with("мысль0 "));
@@ -2167,6 +2181,7 @@ async fn vendor_usage_replaces_the_estimate_and_the_window_reaches_the_context_m
                 input_tokens: Some(500),
                 output_tokens: Some(40),
                 context_window: Some(32_768),
+                ..Default::default()
             }),
         ]
     });
@@ -2177,6 +2192,7 @@ async fn vendor_usage_replaces_the_estimate_and_the_window_reaches_the_context_m
                 input_tokens: Some(700),
                 output_tokens: Some(20),
                 context_window: None,
+                ..Default::default()
             }),
         ]
     });
@@ -2200,6 +2216,7 @@ async fn vendor_usage_replaces_the_estimate_and_the_window_reaches_the_context_m
             system_prompt: None,
             command: None,
         })
+        .await
         .expect("measures");
     assert_eq!(measured.context_window, 32_768);
 }

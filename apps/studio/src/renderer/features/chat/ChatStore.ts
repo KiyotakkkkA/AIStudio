@@ -56,6 +56,7 @@ import { suggestedBaseUrl } from "../providers/providerPresentation";
 import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
 import ArtifactActions from "./ArtifactActions";
 import ConversationExport from "./ConversationExport";
+import ChatStatsStore from "./stats/ChatStatsStore";
 import { dialogArtifacts, type DialogArtifact } from "./artifacts";
 import SiteIcons from "./SiteIcons";
 import ExplorerStore from "./explorer/ExplorerStore";
@@ -152,6 +153,7 @@ export default class ChatStore {
   readonly backgroundShells: BackgroundShellStore;
   readonly artifacts: ArtifactActions;
   readonly exports: ConversationExport;
+  readonly stats: ChatStatsStore;
   readonly siteIcons: SiteIcons;
   outcome: "ok" | "cancelled" | "failed" | null = null;
   revealed = 0;
@@ -185,6 +187,7 @@ export default class ChatStore {
     this.backgroundShells = new BackgroundShellStore(ipc, events);
     this.artifacts = new ArtifactActions(ipc);
     this.exports = new ConversationExport(ipc);
+    this.stats = new ChatStatsStore(ipc);
     this.siteIcons = new SiteIcons(ipc);
     this.goals = new GoalStore(ipc, {
       conversation: () => this.active,
@@ -226,6 +229,7 @@ export default class ChatStore {
         backgroundShells: false,
         artifacts: false,
         exports: false,
+        stats: false,
         siteIcons: false,
         goals: false,
         subagents: false,
@@ -562,11 +566,18 @@ export default class ChatStore {
   get canRetry() {
     return !this.generating && this.retryText.length > 0;
   }
-  get sessionTokens() {
+  get sessionInput() {
     return (
       this.active?.messages
         .filter((message) => message.role === "assistant")
-        .reduce((sum, message) => sum + message.tokensIn + message.tokensOut, 0) ?? 0
+        .reduce((sum, message) => sum + message.tokensIn, 0) ?? 0
+    );
+  }
+  get sessionOutput() {
+    return (
+      this.active?.messages
+        .filter((message) => message.role === "assistant")
+        .reduce((sum, message) => sum + message.tokensOut, 0) ?? 0
     );
   }
   get lastTurn() {
@@ -603,6 +614,7 @@ export default class ChatStore {
   async refreshContext() {
     const input = this.contextInput;
     const revision = ++this.contextRevision;
+    void this.stats.refresh(input);
     if (!input) {
       this.context = null;
       return;
@@ -813,6 +825,7 @@ export default class ChatStore {
             this.active?.goal?.status ?? null,
             this.active?.messages.length ?? 0,
             this.active?.updatedAt ?? 0,
+            this.generating,
             this.memoryTool(),
           ]),
         () => void this.refreshContext(),

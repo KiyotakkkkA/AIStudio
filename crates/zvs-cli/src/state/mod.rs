@@ -2049,6 +2049,48 @@ impl App {
         overlay.clamp(rows.len());
         if overlay.panel == Panel::ProcessOutput {
             match key {
+                Key::Esc | Key::Enter | Key::Char(' ') => {
+                    self.overlay = None;
+                    return Vec::new();
+                }
+                Key::Left => {
+                    let id = overlay.output.as_ref().map(|output| output.id);
+                    let mut back = Overlay::new(Panel::Processes);
+                    back.processes.clone_from(&self.processes);
+                    back.loading = false;
+                    let shown = self.processes.iter().find(|shell| Some(shell.id) == id);
+                    if shown.is_some_and(|shell| !shell.status.running()) {
+                        back.tab = 1;
+                    }
+                    let view = self.view();
+                    if let Some(index) = back
+                        .rows(&view)
+                        .iter()
+                        .position(|row| id.is_some_and(|id| row.key == id.to_string()))
+                    {
+                        back.selected = index;
+                    }
+                    self.overlay = Some(back);
+                    return Vec::new();
+                }
+                Key::Char('x') => {
+                    let Some(id) = overlay
+                        .output
+                        .as_ref()
+                        .filter(|output| output.running)
+                        .map(|output| output.id)
+                    else {
+                        return Vec::new();
+                    };
+                    if !overlay.armed {
+                        overlay.armed = true;
+                        self.status =
+                            Some((Tone::Error, copy::PROCESS_STOP_CONFIRM_KEY.to_owned()));
+                        return Vec::new();
+                    }
+                    overlay.armed = false;
+                    return vec![Request::KillProcess(id)];
+                }
                 Key::Up | Key::PageUp => {
                     let step = if key == Key::Up { 1 } else { SCROLL_STEP };
                     overlay.selected = overlay.selected.saturating_sub(step);
@@ -2069,7 +2111,7 @@ impl App {
                     }
                     return Vec::new();
                 }
-                _ => {}
+                _ => return Vec::new(),
             }
         }
         if overlay.panel == Panel::Processes && key == Key::Delete {

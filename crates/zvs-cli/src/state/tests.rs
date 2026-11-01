@@ -1314,6 +1314,61 @@ fn stopping_a_process_takes_a_second_delete() {
     assert_eq!(app.running_processes(), 0);
 }
 
+fn opened_output(app: &mut App, id: ConversationId) -> BackgroundShellId {
+    typed(app, "/processes");
+    app.update(Msg::Key(Key::Enter));
+    app.update(Msg::Processes(id, Ok(app.processes.clone())));
+    app.update(Msg::Key(Key::Enter));
+    serde_json::from_value(json!(SHELL_ONE)).expect("an id")
+}
+
+#[test]
+fn the_details_view_goes_back_to_the_list_or_closes() {
+    let (mut app, id) = with_processes();
+    opened_output(&mut app, id);
+    assert_eq!(
+        app.overlay.as_ref().expect("details").panel,
+        Panel::ProcessOutput
+    );
+    assert!(app.update(Msg::Key(Key::Char('q'))).is_empty());
+    assert!(app.overlay.as_ref().expect("details").filter.is_empty());
+
+    app.update(Msg::Key(Key::Left));
+    let overlay = app.overlay.as_ref().expect("the list");
+    assert_eq!(overlay.panel, Panel::Processes);
+    assert!(!overlay.loading);
+    assert_eq!(overlay.rows(&app.view())[overlay.selected].key, SHELL_ONE);
+    app.update(Msg::Key(Key::Esc));
+    assert!(app.overlay.is_none());
+
+    for key in [Key::Esc, Key::Enter, Key::Char(' ')] {
+        opened_output(&mut app, id);
+        app.update(Msg::Key(key));
+        assert!(app.overlay.is_none());
+    }
+}
+
+#[test]
+fn x_stops_the_shown_process_on_the_second_press() {
+    let (mut app, id) = with_processes();
+    let shell = opened_output(&mut app, id);
+    assert!(app.update(Msg::Key(Key::Char('x'))).is_empty());
+    assert_eq!(
+        app.status.as_ref().unwrap().1,
+        copy::PROCESS_STOP_CONFIRM_KEY
+    );
+    assert_eq!(
+        app.update(Msg::Key(Key::Char('x'))),
+        vec![Request::KillProcess(shell)]
+    );
+    app.update(Msg::ProcessKilled(Ok(background(
+        SHELL_ONE,
+        &id.to_string(),
+        "stopped",
+    ))));
+    assert!(app.update(Msg::Key(Key::Char('x'))).is_empty());
+}
+
 fn goal_step(seq: u64, status: &str, reason: Value, round: u64) -> Msg {
     event(
         seq,

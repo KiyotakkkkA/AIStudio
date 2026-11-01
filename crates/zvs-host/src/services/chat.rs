@@ -12,17 +12,17 @@ use zvs_contract::vector_stores::DEFAULT_CHAT_MIN_SCORE;
 use zvs_contract::{
     AppError, AppErrorCode, ChatAttachDto, ChatCitationDto, ChatCommand, ChatCommandDto,
     ChatContextDto, ChatContextInput, ChatContextToolDto, ChatEvalCaseDto, ChatEvalInput,
-    ChatEvalModeDto, ChatEvalRunDto, ChatEventDto, ChatGoalDto, ChatRoundDto, ChatSendInput,
-    ChatSettings, ChatToolCallDto, ChatToolCallStatus, ChatWakeStepDto, ConversationDetailDto,
-    ConversationDto, ConversationId, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
-    DeltaKind, DocumentId, FolderGrantScope, GRAPH_EXPANSION_DEFAULT_MAX, GoalReason, GoalStatus,
-    GraphDirection, GraphExpansionDocument, GraphNeighborhood, GraphNeighborsInput, HostEvent,
-    HostEventDraft, MessageDto, MessageId, MessageRole, ProviderCapability, ProviderId,
-    QuestionRecordDto, RetrievalMode, RunGraph, RunHandleDto, RunId, RunKind, RunOutcomeStatus,
-    RunStatus, SUBAGENT_DOMAIN, StartRunInput, StreamId, ToolListFilter, ToolMode, ToolTier,
-    Validate, VectorSearchHitDto, VectorStoreId, VendorTurnOptions, WAKE_STEP_DOMAIN,
-    WEB_SOURCES_MAX, WebSourceDto, log_line, merge_graph_neighbors, model_tool_support,
-    resolve_tool_mode,
+    ChatEvalModeDto, ChatEvalRunDto, ChatEventDto, ChatGoalDto, ChatPromptSection,
+    ChatPromptSectionDto, ChatRoundDto, ChatSendInput, ChatSettings, ChatStatsDto, ChatToolCallDto,
+    ChatToolCallStatus, ChatWakeStepDto, ConversationDetailDto, ConversationDto, ConversationId,
+    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DeltaKind, DocumentId, FolderGrantScope,
+    GRAPH_EXPANSION_DEFAULT_MAX, GoalReason, GoalStatus, GraphDirection, GraphExpansionDocument,
+    GraphNeighborhood, GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId,
+    MessageRole, ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph,
+    RunHandleDto, RunId, RunKind, RunOutcomeStatus, RunStatus, SUBAGENT_DOMAIN, StartRunInput,
+    StreamId, ToolListFilter, ToolMode, ToolTier, Validate, VectorSearchHitDto, VectorStoreId,
+    VendorTurnOptions, WAKE_STEP_DOMAIN, WEB_SOURCES_MAX, WebSourceDto, log_line,
+    merge_graph_neighbors, model_tool_support, resolve_tool_mode,
 };
 
 use super::chat_ask::{ASK_MALFORMED, ASK_TOOL, answers_text, ask_request, ask_section, ask_tool};
@@ -38,6 +38,7 @@ use super::chat_history::{
 use super::chat_memory::{
     MEMORY_FAILED, MEMORY_TOOL, MemoryRefs, apply_memory_call, memory_section, memory_tool,
 };
+use super::chat_prompt::{PromptParts, history_entries, in_tool_block, model_history};
 use super::chat_reply::{
     ReplyBuffers, ReplyChunk, TOOL_CALL_DOMAIN, append_round, apply_tool_call,
 };
@@ -58,6 +59,7 @@ use super::retrieval_merge::{CHAT_FETCH_K, MergeOptions, StoreHits, merge_retrie
 use super::retrieval_query::retrieval_query;
 use super::runs::{RunService, WeakRunService};
 use super::subagents::SubagentService;
+use super::token_estimate::TOKENIZER;
 use super::tool_loop::{
     CallOutcome, ChatTurn, LoopBudget, LoopCall, LoopHost, LoopTranscript, RoundHook, ToolLoop,
 };
@@ -343,6 +345,8 @@ fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
         rounds: row.rounds,
         tokens_in: count(row.tokens_in),
         tokens_out: count(row.tokens_out),
+        tokens_cached: count(row.tokens_cached),
+        tokens_reasoning: count(row.tokens_reasoning),
         usage_estimated: row.usage_estimated,
         duration_ms: count(row.duration_ms),
         run_id: row.run_id.as_deref().and_then(RunId::parse),
@@ -379,11 +383,15 @@ impl Inner {
             .with_connection(|connection| work(&Repositories::new(connection)))
     }
 
-    fn ended_shells_note(&self, conversation: &str) -> String {
+    fn ended_shells_note(&self, conversation: &str, consume: bool) -> String {
         let Some(shells) = &self.shells else {
             return String::new();
         };
-        let ended = shells.take_ended(conversation, ENDED_TAIL_LINES);
+        let ended = if consume {
+            shells.take_ended(conversation, ENDED_TAIL_LINES)
+        } else {
+            shells.peek_ended(conversation, ENDED_TAIL_LINES)
+        };
         if ended.is_empty() {
             return String::new();
         }
@@ -988,20 +996,6 @@ struct PrepareNode(Arc<Inner>);
 pub(crate) struct GenerateChatNode(Arc<Inner>);
 struct PersistNode(Arc<Inner>);
 
-const fn chat_role(role: MessageRole) -> ChatRole {
-    match role {
-        MessageRole::User | MessageRole::Event => ChatRole::User,
-        MessageRole::Assistant => ChatRole::Assistant,
-    }
-}
-
-fn model_message(message: &MessageDto) -> ChatMessage {
-    ChatMessage::new(
-        chat_role(message.role),
-        with_selections(&message.content, &message.selections),
-    )
-}
-
 const fn generate_role(role: ChatRole) -> Option<GenerateRole> {
     match role {
         ChatRole::System => Some(GenerateRole::System),
@@ -1017,6 +1011,113 @@ struct AttachedStore {
     description: String,
     documents: u64,
     floor: f64,
+}
+
+fn knowledge_prompt(attached: &[AttachedStore], hybrid: bool) -> String {
+    let catalogue = knowledge_catalogue(
+        &attached
+            .iter()
+            .map(|store| {
+                (
+                    store.name.clone(),
+                    store.description.clone(),
+                    store.documents,
+                )
+            })
+            .collect::<Vec<_>>(),
+    );
+    let hybrid = if hybrid {
+        format!(" {HYBRID_INSTRUCTION}")
+    } else {
+        String::new()
+    };
+    format!("{KNOWLEDGE_INSTRUCTION}{hybrid}\n{catalogue}")
+}
+
+struct Preview {
+    model: Model,
+    parts: PromptParts,
+    offered: Vec<OfferedTool>,
+    deferred: Vec<OfferedTool>,
+    messages: Vec<MessageDto>,
+}
+
+impl Preview {
+    fn system_text(&self) -> String {
+        let prompt = self.parts.compose();
+        if self.offered.is_empty() {
+            prompt
+        } else {
+            format!(
+                "{prompt}\n\n{TOOL_RESULTS_INSTRUCTION}\n{}",
+                tool_specs_json(&self.offered)
+            )
+        }
+    }
+
+    fn measure(&self) -> (ChatContextDto, usize) {
+        let system_text = self.system_text();
+        let system_part = self.parts.compose_where(|section| !in_tool_block(section));
+        let usage = measure_context(
+            &system_text,
+            tokens(&system_part),
+            &model_history(&self.messages),
+            self.model.context_window,
+            self.model.max_output_tokens,
+        );
+        let count = |value: i64| u64::try_from(value).unwrap_or(0);
+        let context = ChatContextDto {
+            context_window: count(self.model.context_window),
+            reserved_output: count(self.model.max_output_tokens),
+            system: count(usage.system),
+            tools: count(usage.tools),
+            tool_items: self
+                .offered
+                .iter()
+                .map(|tool| ChatContextToolDto {
+                    key: tool.key.clone(),
+                    tokens: count(tokens(&tool_specs_json(std::slice::from_ref(tool)))),
+                    source: tool.source,
+                })
+                .collect(),
+            history: count(usage.history),
+            history_messages: usage.history_messages as u64,
+            trimmed: usage.trimmed as u64,
+            total: count(usage.system + usage.tools + usage.history),
+        };
+        (context, usage.trimmed)
+    }
+}
+
+impl Inner {
+    fn attached_stores(&self, store_ids: &[VectorStoreId]) -> Vec<AttachedStore> {
+        store_ids
+            .iter()
+            .map(|store_id| {
+                let id = store_id.to_string();
+                let (row, documents) = self
+                    .read(|repositories| {
+                        Ok((
+                            repositories.vector_stores.find_by_id(&id)?,
+                            repositories.vector_documents.list_by_store(&id)?.len(),
+                        ))
+                    })
+                    .unwrap_or((None, 0));
+                AttachedStore {
+                    id: *store_id,
+                    name: row
+                        .as_ref()
+                        .map_or_else(|| id.clone(), |row| row.name.clone()),
+                    description: row
+                        .as_ref()
+                        .map(|row| row.description.clone())
+                        .unwrap_or_default(),
+                    documents: documents as u64,
+                    floor: row.map_or(DEFAULT_CHAT_MIN_SCORE, |row| row.chat_min_score),
+                }
+            })
+            .collect()
+    }
 }
 
 impl PrepareNode {
@@ -1291,39 +1392,10 @@ impl NodeDef for PrepareNode {
         {
             context.emit(HostEventDraft::Step { step })?;
         }
-        let history: Vec<ChatMessage> = conversation.messages[..position]
-            .iter()
-            .map(model_message)
-            .collect();
+        let history = model_history(&conversation.messages[..position]);
         let model = inner.resolve_model(&input.provider_id, &input.model_id, &input.settings)?;
         let details = &conversation.conversation;
-        let attached: Vec<AttachedStore> = details
-            .attached_store_ids
-            .iter()
-            .map(|store_id| {
-                let id = store_id.to_string();
-                let (row, documents) = inner
-                    .read(|repositories| {
-                        Ok((
-                            repositories.vector_stores.find_by_id(&id)?,
-                            repositories.vector_documents.list_by_store(&id)?.len(),
-                        ))
-                    })
-                    .unwrap_or((None, 0));
-                AttachedStore {
-                    id: *store_id,
-                    name: row
-                        .as_ref()
-                        .map_or_else(|| id.clone(), |row| row.name.clone()),
-                    description: row
-                        .as_ref()
-                        .map(|row| row.description.clone())
-                        .unwrap_or_default(),
-                    documents: documents as u64,
-                    floor: row.map_or(DEFAULT_CHAT_MIN_SCORE, |row| row.chat_min_score),
-                }
-            })
-            .collect();
+        let attached = inner.attached_stores(&details.attached_store_ids);
         let mode = details.retrieval_mode;
         let tools_usable = context
             .services
@@ -1419,24 +1491,10 @@ impl NodeDef for PrepareNode {
             Vec::new()
         };
         let prompt = if knowledge_on {
-            let catalogue = knowledge_catalogue(
-                &attached
-                    .iter()
-                    .map(|store| {
-                        (
-                            store.name.clone(),
-                            store.description.clone(),
-                            store.documents,
-                        )
-                    })
-                    .collect::<Vec<_>>(),
-            );
-            let hybrid = if mode == RetrievalMode::Hybrid && !ranked.is_empty() {
-                format!(" {HYBRID_INSTRUCTION}")
-            } else {
-                String::new()
-            };
-            format!("{KNOWLEDGE_INSTRUCTION}{hybrid}\n{catalogue}")
+            knowledge_prompt(
+                &attached,
+                mode == RetrievalMode::Hybrid && !ranked.is_empty(),
+            )
         } else {
             String::new()
         };
@@ -1477,7 +1535,7 @@ impl NodeDef for PrepareNode {
         let (profile, tool_calls) = inner.profile_prompt(&row.profile)?;
         let files = file_tools_section(&offered);
         let processes = process_tools_section(&offered);
-        let ended = inner.ended_shells_note(&input.conversation_id);
+        let ended = inner.ended_shells_note(&input.conversation_id, true);
         let asking = ask_section(&offered);
         let delegating = delegate_section(&offered);
         let later = deferred_section(&deferred, &offered);
@@ -1487,27 +1545,24 @@ impl NodeDef for PrepareNode {
             .filter(|_| goal_turn && offered.iter().any(|tool| tool.key == GOAL_TOOL))
             .map(|goal| goal_section(goal, &offered))
             .unwrap_or_default();
-        let prompt = [
-            details.system_prompt.clone(),
+        let prompt = PromptParts {
+            dialog: details.system_prompt.clone(),
             profile,
             memory,
-            prompt,
-            guidance,
-            command_note,
-            skill_note,
+            knowledge: prompt,
+            mcp_guidance: guidance,
+            command: command_note,
+            skills: skill_note,
             workspace,
-            files,
-            processes,
-            ended,
-            asking,
-            delegating,
-            later,
-            goal_note,
-        ]
-        .into_iter()
-        .filter(|part| !part.trim().is_empty())
-        .collect::<Vec<_>>()
-        .join("\n\n");
+            file_tools: files,
+            process_tools: processes,
+            ended_shells: ended,
+            ask: asking,
+            delegate: delegating,
+            deferred: later,
+            goal: goal_note,
+        }
+        .compose();
         let system = if offered.is_empty() {
             prompt.clone()
         } else {
@@ -1583,6 +1638,8 @@ impl NodeDef for PrepareNode {
             rounds: Vec::new(),
             tokens_in: prepared.tokens_in,
             tokens_out: 0,
+            tokens_cached: 0,
+            tokens_reasoning: 0,
             usage_estimated: true,
             duration_ms: 0,
             run_id: Some(run_id),
@@ -2300,6 +2357,8 @@ impl LoopHost for ChatLoopHost<'_> {
                 rounds: Some(rounds.to_vec()),
                 tokens_in: counted.then(|| usage.input_tokens.unwrap_or(0)),
                 tokens_out: counted.then(|| usage.output_tokens.unwrap_or(0)),
+                tokens_cached: counted.then(|| usage.cached_input_tokens.unwrap_or(0)),
+                tokens_reasoning: counted.then(|| usage.reasoning_tokens.unwrap_or(0)),
                 usage_estimated: counted.then_some(false),
                 ..MessagePatch::default()
             },
@@ -2821,6 +2880,8 @@ impl ChatService {
             rounds: Vec::new(),
             tokens_in: 0,
             tokens_out: tokens(text),
+            tokens_cached: 0,
+            tokens_reasoning: 0,
             usage_estimated: true,
             duration_ms: 0,
             run_id: None,
@@ -3116,6 +3177,8 @@ impl ChatService {
             rounds: Vec::new(),
             tokens_in: tokens(&with_selections(&text, &input.selections)),
             tokens_out: 0,
+            tokens_cached: 0,
+            tokens_reasoning: 0,
             usage_estimated: true,
             duration_ms: 0,
             run_id: None,
@@ -3173,7 +3236,7 @@ impl ChatService {
         Ok(handle)
     }
 
-    pub fn context(&self, input: &ChatContextInput) -> Result<ChatContextDto, AppError> {
+    async fn preview(&self, input: &ChatContextInput) -> Result<Preview, AppError> {
         input.validate()?;
         let conversation = input
             .conversation_id
@@ -3185,10 +3248,11 @@ impl ChatService {
             .settings
             .or_else(|| details.map(|details| details.settings))
             .unwrap_or_default();
-        let model =
-            self.inner
-                .resolve_model(&input.provider_id.to_string(), &input.model_id, &settings)?;
-        let system_prompt = input
+        let provider_id = input.provider_id.to_string();
+        let model = self
+            .inner
+            .resolve_model(&provider_id, &input.model_id, &settings)?;
+        let dialog = input
             .system_prompt
             .clone()
             .or_else(|| details.map(|details| details.system_prompt.clone()))
@@ -3197,16 +3261,26 @@ impl ChatService {
             Some(tools) => tools.list(&ToolListFilter::default())?,
             None => Vec::new(),
         };
-        let tools_usable = model.supports_tools != Some(false);
-        let knowledge = tools_usable
-            && details.is_some_and(|details| {
-                !details.attached_store_ids.is_empty()
-                    && details.retrieval_mode != RetrievalMode::Auto
-            });
-        let history: &[MessageDto] = conversation
+        let tools_usable = self
+            .runs
+            .services()
+            .providers
             .as_ref()
-            .map_or(&[], |detail| detail.messages.as_slice());
-        let mut commands = active_commands(history);
+            .and_then(|providers| providers.text(&provider_id).ok())
+            .map_or(model.supports_tools != Some(false), |driver| {
+                resolve_tool_mode(driver.capabilities().tools, model.supports_tools)
+                    != ToolMode::None
+            });
+        let messages: Vec<MessageDto> = conversation
+            .as_ref()
+            .map(|detail| detail.messages.clone())
+            .unwrap_or_default();
+        let attached = details
+            .map(|details| self.inner.attached_stores(&details.attached_store_ids))
+            .unwrap_or_default();
+        let mode = details.map_or(RetrievalMode::Auto, |details| details.retrieval_mode);
+        let wants_knowledge = !attached.is_empty() && mode != RetrievalMode::Auto && tools_usable;
+        let mut commands = active_commands(&messages);
         if let Some(command) = input.command
             && !commands.contains(&command)
         {
@@ -3216,17 +3290,52 @@ impl ChatService {
             mut offered,
             deferred,
         } = if tools_usable {
-            self.inner.plan(&registered, knowledge, &commands, history)
+            self.inner
+                .plan(&registered, wants_knowledge, &commands, &messages)
         } else {
             ToolPlan::default()
         };
-        let guidance = self.inner.mcp_guidance(&offered)?;
-        let command_note = self.inner.command_note(&commands, &offered);
-        let folder = details.and_then(|details| details.working_folder.as_deref());
-        let workspace = if offered.is_empty() && folder.is_none() {
+        let mcp_guidance = self.inner.mcp_guidance(&offered)?;
+        let command = self.inner.command_note(&commands, &offered);
+        let last_user = messages
+            .iter()
+            .rev()
+            .find(|message| message.role == MessageRole::User)
+            .map_or("", |message| message.content.as_str());
+        let skill_entries = match (&self.inner.skills, tools_usable) {
+            (Some(skills), true) => {
+                skills
+                    .catalogue(last_user, &tokio_util::sync::CancellationToken::new())
+                    .await
+            }
+            _ => Vec::new(),
+        };
+        let skills =
+            if !skill_entries.is_empty() && offered.iter().any(|tool| tool.key == SKILL_LOAD) {
+                catalogue_text(&skill_entries, &offered)
+            } else {
+                String::new()
+            };
+        let knowledge =
+            if wants_knowledge && offered.iter().any(|tool| tool.key == KNOWLEDGE_SEARCH) {
+                knowledge_prompt(&attached, mode == RetrievalMode::Hybrid)
+            } else {
+                String::new()
+            };
+        let row = input
+            .conversation_id
+            .map(|id| self.inner.conversation(&id.to_string()))
+            .transpose()?;
+        let folder = row.as_ref().and_then(|row| row.working_folder.as_deref());
+        let previous = row
+            .as_ref()
+            .filter(|_| !messages.is_empty())
+            .map(|row| row.turn_folder.as_deref());
+        let changed = previous.is_some_and(|previous| previous != folder);
+        let workspace = if offered.is_empty() && folder.is_none() && !changed {
             String::new()
         } else {
-            working_folder_section(folder, None)
+            working_folder_section(folder, previous)
         };
         if tools_usable {
             offered.push(ask_tool(&offered));
@@ -3234,10 +3343,11 @@ impl ChatService {
                 offered.push(delegate_tool(&offered));
             }
         }
-        let goal_listed = input.command == Some(ChatCommand::Goal)
-            || details
-                .is_some_and(|details| details.goal.as_ref().is_some_and(ChatGoalDto::active));
-        if tools_usable && goal_listed {
+        let goal_turn = tools_usable
+            && (input.command == Some(ChatCommand::Goal)
+                || details
+                    .is_some_and(|details| details.goal.as_ref().is_some_and(ChatGoalDto::active)));
+        if goal_turn {
             let tools = goal_tools(&offered);
             offered.extend(tools);
         }
@@ -3251,64 +3361,87 @@ impl ChatService {
         if !deferred.is_empty() {
             offered.push(search_tool(&offered, &deferred));
         }
-        let about = match &input.conversation_id {
-            Some(id) => self.inner.conversation(&id.to_string())?.profile,
+        let about = match &row {
+            Some(row) => row.profile.clone(),
             None => self.inner.profile()?.about,
         };
         let (profile, _) = self.inner.profile_prompt(&about)?;
-        let system_prompt = [system_prompt, profile, memory]
-            .into_iter()
-            .filter(|part| !part.trim().is_empty())
-            .collect::<Vec<_>>()
-            .join("\n\n");
-        let tool_block = [
-            guidance,
-            command_note,
-            workspace,
-            file_tools_section(&offered),
-            process_tools_section(&offered),
-            ask_section(&offered),
-            delegate_section(&offered),
-            deferred_section(&deferred, &offered),
-            if offered.is_empty() {
-                String::new()
-            } else {
-                format!("{TOOL_RESULTS_INSTRUCTION}\n{}", tool_specs_json(&offered))
-            },
-        ]
-        .into_iter()
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n\n");
-        let history: Vec<ChatMessage> = conversation
-            .as_ref()
-            .map(|detail| detail.messages.iter().map(model_message).collect())
+        let goal = details
+            .and_then(|details| details.goal.as_ref())
+            .filter(|_| goal_turn && offered.iter().any(|tool| tool.key == GOAL_TOOL))
+            .map(|goal| goal_section(goal, &offered))
             .unwrap_or_default();
-        let usage = measure_context(
-            &system_prompt,
-            &tool_block,
-            &history,
-            model.context_window,
-            model.max_output_tokens,
-        );
-        let count = |value: i64| u64::try_from(value).unwrap_or(0);
-        Ok(ChatContextDto {
-            context_window: count(model.context_window),
-            reserved_output: count(model.max_output_tokens),
-            system: count(usage.system),
-            tools: count(usage.tools),
-            tool_items: offered
+        let parts = PromptParts {
+            dialog,
+            profile,
+            memory,
+            knowledge,
+            mcp_guidance,
+            command,
+            skills,
+            workspace,
+            file_tools: file_tools_section(&offered),
+            process_tools: process_tools_section(&offered),
+            ended_shells: self.inner.ended_shells_note(&conversation_id, false),
+            ask: ask_section(&offered),
+            delegate: delegate_section(&offered),
+            deferred: deferred_section(&deferred, &offered),
+            goal,
+        };
+        Ok(Preview {
+            model,
+            parts,
+            offered,
+            deferred,
+            messages,
+        })
+    }
+
+    pub async fn context(&self, input: &ChatContextInput) -> Result<ChatContextDto, AppError> {
+        Ok(self.preview(input).await?.measure().0)
+    }
+
+    pub async fn stats(&self, input: &ChatContextInput) -> Result<ChatStatsDto, AppError> {
+        let preview = self.preview(input).await?;
+        let (context, trimmed) = preview.measure();
+        let count = |text: &str| {
+            if text.trim().is_empty() {
+                0
+            } else {
+                u64::try_from(tokens(text)).unwrap_or(0)
+            }
+        };
+        let mut sections: Vec<ChatPromptSectionDto> = preview
+            .parts
+            .sections()
+            .into_iter()
+            .map(|(key, text)| ChatPromptSectionDto {
+                key,
+                tokens: count(text),
+                text: text.to_owned(),
+            })
+            .collect();
+        if !preview.offered.is_empty() {
+            let text = format!(
+                "{TOOL_RESULTS_INSTRUCTION}\n{}",
+                tool_specs_json(&preview.offered)
+            );
+            sections.push(ChatPromptSectionDto {
+                key: ChatPromptSection::ToolSpecs,
+                tokens: count(&text),
+                text,
+            });
+        }
+        Ok(ChatStatsDto {
+            context,
+            tokenizer: TOKENIZER.to_owned(),
+            sections,
+            deferred: preview
+                .deferred
                 .iter()
-                .map(|tool| ChatContextToolDto {
-                    key: tool.key.clone(),
-                    tokens: count(tokens(&tool_specs_json(std::slice::from_ref(tool)))),
-                    source: tool.source,
-                })
+                .map(|tool| tool.key.clone())
                 .collect(),
-            history: count(usage.history),
-            history_messages: usage.history_messages as u64,
-            trimmed: usage.trimmed as u64,
-            total: count(usage.system + usage.tools + usage.history),
+            history: history_entries(&preview.messages, trimmed),
         })
     }
 

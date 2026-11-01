@@ -11,7 +11,7 @@ use super::theme;
 use super::transcript::spinner;
 use crate::copy;
 use crate::state::App;
-use crate::state::overlay::{Overlay, Panel, Row, Tone};
+use crate::state::overlay::{Overlay, Panel, Row, Tone, process_runtime, process_state};
 
 const GAUGE_WIDTH: usize = 24;
 const SWATCH_TITLE_WIDTH: usize = 12;
@@ -215,15 +215,176 @@ fn empty_text(overlay: &Overlay) -> &'static str {
         copy::MCP_EMPTY
     } else if overlay.panel == Panel::Processes && overlay.filter.is_empty() {
         copy::PROCESSES_EMPTY
-    } else if overlay.panel == Panel::ProcessOutput && overlay.filter.is_empty() {
-        copy::PROCESS_OUTPUT_EMPTY
     } else {
         copy::NOTHING_FOUND
     }
 }
 
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| {
+            i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX)
+        })
+}
+
+fn field(label: &str, column: usize, value: Vec<Span<'static>>) -> Line<'static> {
+    let mut spans = vec![
+        Span::raw("  "),
+        Span::styled(format!("{label}:"), theme::strong()),
+        Span::raw(" ".repeat(column.saturating_sub(label.width() + 1))),
+    ];
+    spans.extend(value);
+    Line::from(spans)
+}
+
+pub fn process_lines(app: &App, overlay: &Overlay, width: usize, now: i64) -> Vec<Line<'static>> {
+    let Some(output) = &overlay.output else {
+        return Vec::new();
+    };
+    let shell = app.processes.iter().find(|shell| shell.id == output.id);
+    let labels = [
+        copy::PROCESS_STATUS,
+        copy::PROCESS_RUNTIME,
+        copy::PROCESS_COMMAND,
+        copy::PROCESS_FOLDER,
+        copy::PROCESS_EXIT_CODE,
+    ];
+    let column = labels.iter().map(|label| label.width()).max().unwrap_or(0) + 3;
+    let mut lines = vec![
+        Line::from(Span::styled(
+            format!("  {}", copy::PROCESS_OUTPUT_TITLE),
+            theme::accent().add_modifier(Modifier::BOLD),
+        )),
+        Line::default(),
+    ];
+    if let Some(shell) = shell {
+        let (state, tone) = process_state(shell.status, shell.exit_code);
+        lines.push(field(
+            copy::PROCESS_STATUS,
+            column,
+            vec![Span::styled(state, Style::new().fg(tone_color(tone)))],
+        ));
+        lines.push(field(
+            copy::PROCESS_RUNTIME,
+            column,
+            vec![Span::styled(
+                crate::format::runtime(process_runtime(shell, now)),
+                theme::text(),
+            )],
+        ));
+    }
+    let room = width.saturating_sub(column + 4).max(8);
+    for (index, piece) in wrap(&output.command, room).into_iter().enumerate() {
+        if index == 0 {
+            lines.push(field(
+                copy::PROCESS_COMMAND,
+                column,
+                vec![Span::styled(piece, theme::text())],
+            ));
+        } else {
+            lines.push(Line::from(vec![
+                Span::raw(" ".repeat(column + 2)),
+                Span::styled(piece, theme::text()),
+            ]));
+        }
+    }
+    if let Some(shell) = shell {
+        lines.push(field(
+            copy::PROCESS_FOLDER,
+            column,
+            vec![Span::styled(truncate(&shell.cwd, room), theme::muted())],
+        ));
+        if let Some(code) = shell.exit_code.filter(|_| !shell.status.running()) {
+            lines.push(field(
+                copy::PROCESS_EXIT_CODE,
+                column,
+                vec![Span::styled(code.to_string(), theme::text())],
+            ));
+        }
+    }
+    lines.push(Line::default());
+    lines.push(Line::from(Span::styled(
+        format!("  {}:", copy::PROCESS_OUTPUT_HEADING),
+        theme::strong(),
+    )));
+    lines
+}
+
+fn draw_process(frame: &mut Frame<'_>, area: Rect, app: &App, overlay: &Overlay) {
+    let width = usize::from(area.width);
+    let head = process_lines(app, overlay, width, now_ms());
+    let [rule, top, output, footer] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(u16::try_from(head.len()).unwrap_or(u16::MAX)),
+        Constraint::Fill(1),
+        Constraint::Length(2),
+    ])
+    .areas(area);
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled("─".repeat(width), theme::accent()))),
+        rule,
+    );
+    frame.render_widget(Paragraph::new(head), top);
+    let view = app.view();
+    let rows = overlay.rows(&view);
+    if overlay.loading {
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled(format!("  {} ", spinner(app.frame)), theme::accent()),
+                Span::styled(copy::LOADING, theme::muted()),
+            ])),
+            output,
+        );
+    } else if rows.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                format!("  {}", copy::PROCESS_OUTPUT_EMPTY),
+                theme::faint(),
+            ))),
+            output,
+        );
+    } else {
+        let lines: Vec<Line<'static>> = rows
+            .iter()
+            .map(|row| {
+                let style = if row.tone == Tone::Faint {
+                    theme::faint()
+                } else {
+                    theme::text()
+                };
+                Line::from(Span::styled(
+                    format!("  {}", truncate(&row.title, width.saturating_sub(3))),
+                    style,
+                ))
+            })
+            .collect();
+        let height = usize::from(output.height);
+        let selected = overlay.selected.min(rows.len() - 1);
+        let offset = (selected + 1).saturating_sub(height);
+        frame.render_widget(
+            Paragraph::new(lines).scroll((u16::try_from(offset).unwrap_or(u16::MAX), 0)),
+            output,
+        );
+    }
+    frame.render_widget(
+        Paragraph::new(vec![
+            Line::default(),
+            Line::from(Span::styled(
+                format!("  {}", copy::HINT_PROCESS_OUTPUT),
+                theme::faint(),
+            )),
+        ]),
+        footer,
+    );
+}
+
 pub fn draw(frame: &mut Frame<'_>, area: Rect, app: &App, overlay: &Overlay) {
     frame.render_widget(Clear, area);
+    if overlay.panel == Panel::ProcessOutput {
+        draw_process(frame, area, app, overlay);
+        return;
+    }
     let view = app.view();
     let rows = overlay.rows(&view);
     let tabs = overlay.tabs(&view);

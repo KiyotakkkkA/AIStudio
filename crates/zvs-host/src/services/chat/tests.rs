@@ -1634,6 +1634,7 @@ async fn context_breaks_down_the_prompt_and_history_the_next_turn_will_carry() {
             system_prompt: Some("Always be helpful.".to_owned()),
             command: None,
         })
+        .await
         .expect("measures a draft");
     assert_eq!(draft.context_window, 1024);
     assert_eq!(draft.reserved_output, 128);
@@ -1664,6 +1665,7 @@ async fn context_breaks_down_the_prompt_and_history_the_next_turn_will_carry() {
             system_prompt: None,
             command: None,
         })
+        .await
         .expect("measures a conversation");
     assert_eq!(measured.system, draft.system);
     assert_eq!(measured.history_messages, 2);
@@ -1675,6 +1677,112 @@ async fn context_breaks_down_the_prompt_and_history_the_next_turn_will_carry() {
     assert_eq!(
         measured.total,
         measured.system + measured.tools + measured.history
+    );
+}
+
+#[tokio::test]
+async fn stats_preview_the_exact_system_prompt_the_next_turn_sends() {
+    let harness = Harness::new();
+    let created = harness.create(CreateConversationInput {
+        system_prompt: Some("Always be helpful.".to_owned()),
+        ..harness.input()
+    });
+    within(harness.turn(created, "first question")).await;
+    let input = ChatContextInput {
+        conversation_id: Some(created),
+        provider_id: harness.provider_id,
+        model_id: harness.model_id.clone(),
+        settings: None,
+        system_prompt: None,
+        command: None,
+    };
+    let stats = harness.chat.stats(&input).await.expect("stats");
+    let context = harness.chat.context(&input).await.expect("context");
+    assert_eq!(stats.context, context);
+    within(harness.turn(created, "second question")).await;
+
+    let sent = harness
+        .driver
+        .requests()
+        .last()
+        .and_then(|request| request.system.clone())
+        .expect("a system prompt");
+    let previewed = stats
+        .sections
+        .iter()
+        .filter(|section| section.key != zvs_contract::ChatPromptSection::ToolSpecs)
+        .map(|section| section.text.as_str())
+        .filter(|text| !text.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    assert_eq!(format!("{previewed}\n\n{TOOL_RESULTS_INSTRUCTION}"), sent);
+    assert_eq!(stats.tokenizer, crate::services::token_estimate::TOKENIZER);
+    assert_eq!(
+        stats
+            .history
+            .iter()
+            .map(|entry| (entry.role, entry.status))
+            .collect::<Vec<_>>(),
+        [
+            (MessageRole::User, zvs_contract::ChatHistoryStatus::Included),
+            (
+                MessageRole::Assistant,
+                zvs_contract::ChatHistoryStatus::Included
+            ),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn an_empty_answer_is_skipped_in_the_next_request_and_marked_in_stats() {
+    let harness = Harness::new();
+    harness.driver.script(FakeScript {
+        deltas: Some(Vec::new()),
+        ..FakeScript::default()
+    });
+    let created = harness.conversation();
+    within(harness.turn(created, "first question")).await;
+    harness.driver.script(FakeScript {
+        deltas: Some(vec!["Ответ".to_owned()]),
+        ..FakeScript::default()
+    });
+    within(harness.turn(created, "second question")).await;
+
+    let sent = harness
+        .driver
+        .requests()
+        .last()
+        .expect("a request")
+        .messages
+        .clone();
+    assert!(
+        sent.iter()
+            .all(|message| message.role != crate::drivers::ai::ChatRole::Assistant)
+    );
+    let stats = harness
+        .chat
+        .stats(&ChatContextInput {
+            conversation_id: Some(created),
+            provider_id: harness.provider_id,
+            model_id: harness.model_id.clone(),
+            settings: None,
+            system_prompt: None,
+            command: None,
+        })
+        .await
+        .expect("stats");
+    assert_eq!(
+        stats
+            .history
+            .iter()
+            .map(|entry| entry.status)
+            .collect::<Vec<_>>(),
+        [
+            zvs_contract::ChatHistoryStatus::Included,
+            zvs_contract::ChatHistoryStatus::Skipped,
+            zvs_contract::ChatHistoryStatus::Included,
+            zvs_contract::ChatHistoryStatus::Included,
+        ]
     );
 }
 

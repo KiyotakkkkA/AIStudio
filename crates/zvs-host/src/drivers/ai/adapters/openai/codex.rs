@@ -310,6 +310,10 @@ impl Client {
                         prompt_tokens: total.get("inputTokens").and_then(Value::as_i64),
                         completion_tokens: total.get("outputTokens").and_then(Value::as_i64),
                         total_tokens: total.get("totalTokens").and_then(Value::as_i64),
+                        cached_tokens: total.get("cachedInputTokens").and_then(Value::as_i64),
+                        reasoning_tokens: total
+                            .get("reasoningOutputTokens")
+                            .and_then(Value::as_i64),
                     });
                 }
                 Some("error") => return Err(stream_error(params)),
@@ -481,6 +485,8 @@ mod tests {
             client.next_event().await.expect("completed"),
             Event::Completed(Some(TokenUsage {
                 total_tokens: Some(5),
+                cached_tokens: Some(1),
+                reasoning_tokens: Some(1),
                 ..
             }))
         ));

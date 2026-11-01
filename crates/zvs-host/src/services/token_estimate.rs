@@ -1,35 +1,16 @@
-use std::sync::LazyLock;
+use tiktoken_rs::{CoreBPE, o200k_base_singleton};
 
-use regex::Regex;
+pub const TOKENIZER: &str = "o200k_base";
 
-pub const CYRILLIC_CHARS_PER_TOKEN: u64 = 3;
-pub const LATIN_CHARS_PER_TOKEN: u64 = 4;
-
-static CLASSES: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?s)(\p{Script=Cyrillic})|(\p{Script=Latin})|([\p{Nd}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{P}\p{S}])|([\s\x{feff}])|(.)",
-    )
-    .expect("a valid pattern")
-});
+fn tokenizer() -> &'static CoreBPE {
+    o200k_base_singleton()
+}
 
 pub fn estimate_tokens(text: &str) -> u64 {
-    let (mut cyrillic, mut latin, mut single, mut other) = (0_u64, 0_u64, 0_u64, 0_u64);
-    for captures in CLASSES.captures_iter(text) {
-        if captures.get(1).is_some() {
-            cyrillic += 1;
-        } else if captures.get(2).is_some() {
-            latin += 1;
-        } else if captures.get(3).is_some() {
-            single += 1;
-        } else if captures.get(5).is_some() {
-            other += 1;
-        }
+    if text.is_empty() {
+        return 0;
     }
-    let scale = CYRILLIC_CHARS_PER_TOKEN * LATIN_CHARS_PER_TOKEN;
-    let weighted = cyrillic * LATIN_CHARS_PER_TOKEN
-        + latin * CYRILLIC_CHARS_PER_TOKEN
-        + (single + other * 2) * scale;
-    weighted.div_ceil(scale)
+    tokenizer().count_ordinary(text) as u64
 }
 
 #[cfg(test)]
@@ -39,7 +20,7 @@ mod tests {
     const SAMPLES: &[(&str, u64, &str)] = &[
         (
             "russian prose",
-            123,
+            95,
             "Верховный суд Российской Федерации рассмотрел кассационную жалобу общества с ограниченной ответственностью на решение арбитражного суда и постановление апелляционного суда. Суд указал, что при разрешении спора нижестоящие инстанции неправильно применили нормы материального права, поскольку не учли условия договора поставки и фактические обстоятельства дела. Дело направлено на новое рассмотрение в суд первой инстанции.\n",
         ),
         (
@@ -49,33 +30,37 @@ mod tests {
         ),
         (
             "russian question",
-            42,
+            32,
             "Спасибо! А что во втором пункте? Можешь объяснить подробнее, почему суд так решил и какие статьи Гражданского кодекса он применил?\n",
         ),
         (
             "russian with numbers",
-            88,
+            64,
             "Дело № А33-13638/2020: истец ООО «Ромашка» требовал взыскать 1 250 000 руб. по договору № 15/2019 от 01.03.2019 (см. ст. 309, 310 ГК РФ).\n",
         ),
     ];
 
     #[test]
-    fn the_estimate_is_within_a_quarter_of_the_qwen_tokenizer() {
+    fn the_samples_count_exactly_as_o200k_base() {
         for (name, tokens, text) in SAMPLES {
-            let estimate = estimate_tokens(text);
-            let error = estimate.abs_diff(*tokens) * 4;
-            assert!(error <= *tokens, "{name}: {estimate} vs {tokens}");
+            assert_eq!(estimate_tokens(text), *tokens, "{name}");
         }
     }
 
     #[test]
-    fn the_estimate_is_script_aware_and_never_cheaper_than_a_cjk_character_each() {
+    fn the_count_is_the_tokenizer_count_and_ignores_special_token_syntax() {
         assert_eq!(estimate_tokens(""), 0);
-        assert_eq!(estimate_tokens("абв"), 1);
-        assert_eq!(estimate_tokens("abcd"), 1);
-        assert_eq!(estimate_tokens("最高法院"), 4);
-        assert!(estimate_tokens("привет мир") * 4 < "привет мир".len() as u64);
-        assert_eq!(estimate_tokens("\u{1F600}"), 1);
-        assert_eq!(estimate_tokens("\u{0300}"), 2);
+        assert_eq!(estimate_tokens("hello"), 1);
+        assert_eq!(
+            estimate_tokens("hello world"),
+            tokenizer().count_ordinary("hello world") as u64
+        );
+        assert!(estimate_tokens("<|endoftext|>") > 1);
+    }
+
+    #[test]
+    fn a_long_text_costs_less_than_one_token_per_character() {
+        let text = "Выручка компании за третий квартал выросла. ".repeat(50);
+        assert!(estimate_tokens(&text) * 2 < text.chars().count() as u64);
     }
 }

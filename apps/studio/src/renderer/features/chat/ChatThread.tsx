@@ -3,6 +3,7 @@ import { observer } from "mobx-react-lite";
 import { Dropdown, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
 import {
+  mdiChartBoxOutline,
   mdiCodeJson,
   mdiConsole,
   mdiExportVariant,
@@ -57,6 +58,8 @@ import PinnedNavigator from "./PinnedNavigator";
 import { PINS_PANEL, currentPin, pinPreview } from "./pinnedMessages";
 import { BRANCH_IN_NEW_DIALOG, CREATE_BRANCH } from "./branching";
 import ProcessEventCard from "../backgroundShells/ProcessEventCard";
+import ChatStatsView from "./stats/ChatStatsView";
+import { STATS_EXPORT_GROUP, STATS_TOGGLE } from "./stats/chatStatsCopy";
 
 export default observer(function ChatThread({
   store,
@@ -75,6 +78,8 @@ export default observer(function ChatThread({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [pinAt, setPinAt] = useState<string | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const statsOpen = store.stats.open;
   const { motion: level } = useFx();
   const pop = useTransition("reveal");
   const scrollLatest = () => {
@@ -113,6 +118,13 @@ export default observer(function ChatThread({
       ?.scrollIntoView({ block: "start", behavior: level === "full" ? "smooth" : "auto" });
     setPinAt(id);
   };
+  useLayoutEffect(() => {
+    if (statsOpen || focusId === null) return;
+    const target = viewport.current?.querySelector(`[data-message-id="${focusId}"]`);
+    pinned.current = false;
+    target?.scrollIntoView({ block: "start" });
+    setFocusId(null);
+  }, [statsOpen, focusId]);
   const artifactTarget = store.artifactTarget;
   useEffect(() => {
     const element = viewport.current;
@@ -224,9 +236,16 @@ export default observer(function ChatThread({
         </div>
         <div
           role="group"
-          aria-label={EXPORT}
+          aria-label={STATS_EXPORT_GROUP}
           className="flex flex-none items-center gap-0.5 rounded-control bg-main-800 p-0.5"
         >
+          <PanelButton
+            label={STATS_TOGGLE}
+            path={mdiChartBoxOutline}
+            active={statsOpen}
+            activeClassName="bg-accent-soft text-accent-medium hover:bg-accent-soft hover:text-accent-light"
+            onClick={store.stats.toggle}
+          />
           <Dropdown menuWidth={210} menuPlacement="bottom-right">
             <IconDropdownButton
               label={EXPORT}
@@ -270,7 +289,16 @@ export default observer(function ChatThread({
           </Alert>
         </div>
       )}
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      {statsOpen ? (
+        <ChatStatsView
+          store={store}
+          onOpenMessage={(id) => {
+            store.stats.close();
+            setFocusId(id);
+          }}
+        />
+      ) : null}
+      <div className={`relative min-h-0 flex-1 flex-col ${statsOpen ? "hidden" : "flex"}`}>
         <ScrollArea
           ref={viewport}
           showScrollbar={false}
@@ -499,7 +527,7 @@ export default observer(function ChatThread({
         )}
       </div>
       <AnimatePresence>
-        {jump && (
+        {jump && !statsOpen && (
           <motion.div
             initial={{ opacity: 0, y: level === "full" ? 10 : 0 }}
             animate={{ opacity: 1, y: 0 }}

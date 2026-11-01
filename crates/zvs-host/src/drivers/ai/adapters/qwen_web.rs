@@ -212,6 +212,7 @@ fn to_usage(raw: zvs_qwen_web::Usage) -> TokenUsage {
         prompt_tokens: count(raw.input_tokens),
         completion_tokens: count(raw.output_tokens),
         total_tokens: count(raw.total_tokens),
+        ..TokenUsage::default()
     }
 }
 

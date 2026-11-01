@@ -5,6 +5,7 @@ pub mod chat_ask;
 pub mod chat_goal;
 pub mod chat_history;
 pub mod chat_memory;
+pub mod chat_prompt;
 pub mod chat_reply;
 pub mod chat_tools;
 pub mod crypto;

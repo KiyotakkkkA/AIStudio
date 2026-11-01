@@ -109,17 +109,28 @@ async fn the_context_breakdown_counts_the_profile_a_new_dialog_would_carry() {
         command: None,
     };
     let created = test.harness.conversation();
-    let empty = test.harness.chat.context(&input(None)).expect("context");
+    let empty = test
+        .harness
+        .chat
+        .context(&input(None))
+        .await
+        .expect("context");
     test.set(
         PROFILE_ABOUT_KEY,
         &json!("Backend-разработчик, пишет на Rust"),
     );
 
-    let fresh = test.harness.chat.context(&input(None)).expect("context");
+    let fresh = test
+        .harness
+        .chat
+        .context(&input(None))
+        .await
+        .expect("context");
     let existing = test
         .harness
         .chat
         .context(&input(Some(created)))
+        .await
         .expect("context");
     assert!(fresh.system > empty.system);
     assert_eq!(existing.system, empty.system);

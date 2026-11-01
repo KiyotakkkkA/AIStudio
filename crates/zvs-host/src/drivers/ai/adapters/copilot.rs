@@ -207,6 +207,8 @@ fn call_usage(data: &Value) -> TurnUsage {
         input_tokens: tokens(&data["inputTokens"]),
         output_tokens: tokens(&data["outputTokens"]),
         context_window: None,
+        cached_input_tokens: tokens(&data["cacheReadTokens"]),
+        reasoning_tokens: None,
     }
 }
 
@@ -371,6 +373,8 @@ impl TextGenerationDriver for CopilotAdapter {
             usage: usage.counted().then(|| TokenUsage {
                 prompt_tokens: usage.input_tokens,
                 completion_tokens: usage.output_tokens,
+                cached_tokens: usage.cached_input_tokens,
+                reasoning_tokens: usage.reasoning_tokens,
                 total_tokens: usage
                     .input_tokens
                     .zip(usage.output_tokens)
@@ -546,11 +550,13 @@ mod tests {
             input_tokens: Some(100),
             output_tokens: Some(10),
             context_window: Some(64_000),
+            ..Default::default()
         });
         total.merge(TurnUsage {
             input_tokens: Some(150),
             output_tokens: None,
             context_window: None,
+            ..Default::default()
         });
         assert_eq!(total.input_tokens, Some(250));
         assert_eq!(total.output_tokens, Some(10));

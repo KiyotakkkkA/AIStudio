@@ -475,7 +475,7 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
             if panel == Panel::Processes {
                 copy::HINT_PROCESSES
             } else {
-                copy::HINT_PROCESS_OUTPUT
+                ""
             }
         } else if app.overlay.is_some() {
             copy::HINT_PANEL

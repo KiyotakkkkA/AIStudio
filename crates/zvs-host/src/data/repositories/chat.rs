@@ -96,6 +96,8 @@ pub struct MessagePatch {
     pub rounds: Option<Vec<ChatRoundDto>>,
     pub tokens_in: Option<i64>,
     pub tokens_out: Option<i64>,
+    pub tokens_cached: Option<i64>,
+    pub tokens_reasoning: Option<i64>,
     pub usage_estimated: Option<bool>,
     pub duration_ms: Option<i64>,
     pub run_id: Option<Option<String>>,
@@ -129,6 +131,12 @@ impl MessagePatch {
         }
         if let Some(tokens) = self.tokens_out {
             assignments.push(("tokens_out", SqlValue::Integer(tokens)));
+        }
+        if let Some(tokens) = self.tokens_cached {
+            assignments.push(("tokens_cached", SqlValue::Integer(tokens)));
+        }
+        if let Some(tokens) = self.tokens_reasoning {
+            assignments.push(("tokens_reasoning", SqlValue::Integer(tokens)));
         }
         if let Some(estimated) = self.usage_estimated {
             assignments.push(("usage_estimated", SqlValue::Integer(i64::from(estimated))));
@@ -258,8 +266,8 @@ impl<'c> ChatRepository<'c> {
     pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
         self.connection
             .prepare_cached(
-                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, command, offered_tools, web_sources, rounds, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, command, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
             )?
             .execute(params![
                 row.id,
@@ -275,6 +283,8 @@ impl<'c> ChatRepository<'c> {
                 json_text(&row.rounds)?,
                 row.tokens_in,
                 row.tokens_out,
+                row.tokens_cached,
+                row.tokens_reasoning,
                 row.usage_estimated,
                 row.duration_ms,
                 row.run_id,
@@ -349,7 +359,8 @@ impl<'c> ChatRepository<'c> {
         self.connection
             .prepare_cached(
                 "UPDATE message SET content = content || ?2, reasoning = reasoning || ?3, \
-                 tokens_out = tokens_out + ?4, duration_ms = MAX(?5 - created_at, 0) WHERE id = ?1",
+                 tokens_out = tokens_out + CASE WHEN usage_estimated THEN ?4 ELSE 0 END, \
+                 duration_ms = MAX(?5 - created_at, 0) WHERE id = ?1",
             )?
             .execute(params![id, content, reasoning, tokens_out, now])?;
         Ok(())
@@ -420,6 +431,8 @@ mod tests {
             rounds: Vec::new(),
             tokens_in: 1,
             tokens_out: 0,
+            tokens_cached: 0,
+            tokens_reasoning: 0,
             usage_estimated: true,
             duration_ms: 0,
             run_id: None,

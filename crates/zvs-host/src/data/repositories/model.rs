@@ -146,10 +146,10 @@ impl<'c> ModelRepository<'c> {
             .prepare_cached("DELETE FROM model WHERE provider_id = ?1")?
             .execute([provider_id])?;
         for draft in models {
-            let (id, measured) = previous.get(&draft.external_id).cloned().map_or_else(
-                || (new_id().hyphenated().to_string(), None),
-                |(id, window)| (id, window),
-            );
+            let (id, measured) = previous
+                .get(&draft.external_id)
+                .cloned()
+                .unwrap_or_else(|| (new_id().hyphenated().to_string(), None));
             self.connection
                 .prepare_cached(
                     "INSERT INTO model (id, provider_id, external_id, is_free, no_training, display_name, family, context_window, max_output, size_bytes, capabilities, available, unavailable_reason, discovered_at) \

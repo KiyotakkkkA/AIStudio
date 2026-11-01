@@ -285,8 +285,8 @@ test("live text and reasoning are split into rounds at each tool call", async ()
   });
 
   expect(store.liveRounds).toEqual([
-    { text: "Поиск.", reasoning: "Мысль." },
-    { text: "\n\nИтог.", reasoning: "Ещё." },
+    { text: "Поиск.", reasoning: "Мысль.", estimated: false },
+    { text: "\n\nИтог.", reasoning: "Ещё.", estimated: false },
   ]);
   expect(store.liveText).toBe("Поиск.\n\nИтог.");
   store.dispose();

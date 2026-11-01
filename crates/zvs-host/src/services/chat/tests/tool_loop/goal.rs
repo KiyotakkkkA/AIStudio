@@ -234,6 +234,7 @@ async fn a_goal_pauses_when_its_tokens_run_out() {
                 input_tokens: Some(900),
                 output_tokens: Some(200),
                 context_window: None,
+                ..Default::default()
             }),
         ]
     });
@@ -467,7 +468,7 @@ async fn a_continued_goal_sees_its_plan_in_the_system_prompt() {
 async fn the_composer_lists_the_goal_tools_only_for_a_goal() {
     let test = Loop::new();
     let created = test.conversation(&["demo.lookup"]);
-    let listed = |command: Option<ChatCommand>| {
+    let listed = async |command: Option<ChatCommand>| {
         test.harness
             .chat
             .context(&zvs_contract::ChatContextInput {
@@ -478,6 +479,7 @@ async fn the_composer_lists_the_goal_tools_only_for_a_goal() {
                 system_prompt: None,
                 command,
             })
+            .await
             .expect("measures")
             .tool_items
             .into_iter()
@@ -485,9 +487,9 @@ async fn the_composer_lists_the_goal_tools_only_for_a_goal() {
             .map(|item| (item.key, item.source))
             .collect::<Vec<_>>()
     };
-    assert!(listed(None).is_empty());
+    assert!(listed(None).await.is_empty());
     assert_eq!(
-        listed(Some(ChatCommand::Goal)),
+        listed(Some(ChatCommand::Goal)).await,
         GOAL_TOOLS
             .iter()
             .map(|key| ((*key).to_owned(), zvs_contract::OfferedToolSource::Command))

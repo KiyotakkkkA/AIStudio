@@ -267,6 +267,51 @@ fn the_footer_counts_running_background_processes() {
 }
 
 #[test]
+fn process_details_list_status_runtime_command_and_output() {
+    let mut app = ready(WorkingFolderAccess::Granted);
+    let shell: zvs_contract::BackgroundShellDto = serde_json::from_value(json!({
+        "id": "0199aa11-4444-7111-8111-111111111111",
+        "ownerId": "0199aa11-2222-7111-8111-111111111111",
+        "program": "cargo",
+        "argv": ["cargo", "test", "--workspace"],
+        "cwd": "C:/work",
+        "status": "exited",
+        "exitCode": 101,
+        "streamId": "0199aa11-5555-7111-8111-111111111111",
+        "startedAt": 1_000,
+        "endedAt": 635_000,
+    }))
+    .expect("a shell");
+    app.processes = vec![shell.clone()];
+    let mut overlay =
+        crate::state::overlay::Overlay::new(crate::state::overlay::Panel::ProcessOutput);
+    let mut output = crate::state::overlay::ProcessOutput::new(&shell);
+    output.absorb(
+        "running 4 tests
+",
+        16,
+        false,
+    );
+    overlay.output = Some(output);
+    overlay.loading = false;
+    app.overlay = Some(overlay);
+    let screen = render(&app, 110, 30);
+    for expected in [
+        copy::PROCESS_OUTPUT_TITLE,
+        copy::PROCESS_STATUS,
+        "10 мин 34 с",
+        "cargo test --workspace",
+        copy::PROCESS_EXIT_CODE,
+        "101",
+        "running 4 tests",
+        copy::HINT_PROCESS_OUTPUT,
+    ] {
+        assert!(screen.contains(expected), "{expected}");
+    }
+    assert_eq!(screen.matches(copy::HINT_PROCESS_OUTPUT).count(), 1);
+}
+
+#[test]
 fn the_footer_shows_goal_progress_or_its_pause() {
     let mut app = conversation_app();
     app.goal = Some(crate::state::GoalState {

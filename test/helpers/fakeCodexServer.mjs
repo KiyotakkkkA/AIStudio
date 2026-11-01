@@ -49,7 +49,17 @@ for await (const line of lines) {
     } else {
       write({
         method: "thread/tokenUsage/updated",
-        params: { tokenUsage: { last: { inputTokens: 3, outputTokens: 2, totalTokens: 5 } } },
+        params: {
+          tokenUsage: {
+            last: {
+              inputTokens: 3,
+              cachedInputTokens: 1,
+              outputTokens: 2,
+              reasoningOutputTokens: 1,
+              totalTokens: 5,
+            },
+          },
+        },
       });
       write({
         method: "turn/completed",

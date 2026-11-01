@@ -981,7 +981,13 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   tools its turn offered and why (`offeredTools`: `base`, `knowledge`, `memory`, `command` or
   `loaded`). A call to a tool that does not exist is answered with the names that were offered.
   `chat.context` counts the same set, with each tool's source, and the composer's grey tools
-  badge renders it. An agentic session reports in
+  badge renders it. `chat.stats` previews the next request section by section (each system
+  prompt part with its text, the tool specs, each history message as included, trimmed or
+  skipped) for the chat page's «Статистика» view. It assembles the prompt through the same
+  `PromptParts` as `chat.prepare` and reads ended processes without consuming them. Token
+  counts come from the `o200k_base` tokenizer unless the provider reports usage. Reported usage
+  includes cached input and reasoning tokens where the vendor sends them. Empty assistant
+  answers are not sent as history. An agentic session reports in
   `tools` the tools its current mode offers, not the stored selection. `skill.load` returns the instructions,
   each file with a one-line purpose, and the text of the manifest's `metadata.read-first` files
   up to 16 000 characters (the rest are named as required reading); tool keys in its result

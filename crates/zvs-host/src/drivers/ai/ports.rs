@@ -167,6 +167,8 @@ pub struct TokenUsage {
     pub prompt_tokens: Option<i64>,
     pub completion_tokens: Option<i64>,
     pub total_tokens: Option<i64>,
+    pub cached_tokens: Option<i64>,
+    pub reasoning_tokens: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -186,6 +188,8 @@ pub struct TurnUsage {
     pub input_tokens: Option<i64>,
     pub output_tokens: Option<i64>,
     pub context_window: Option<i64>,
+    pub cached_input_tokens: Option<i64>,
+    pub reasoning_tokens: Option<i64>,
 }
 
 impl TurnUsage {
@@ -196,6 +200,8 @@ impl TurnUsage {
         };
         self.input_tokens = add(self.input_tokens, next.input_tokens);
         self.output_tokens = add(self.output_tokens, next.output_tokens);
+        self.cached_input_tokens = add(self.cached_input_tokens, next.cached_input_tokens);
+        self.reasoning_tokens = add(self.reasoning_tokens, next.reasoning_tokens);
         if next.context_window.is_some() {
             self.context_window = next.context_window;
         }
@@ -203,6 +209,18 @@ impl TurnUsage {
 
     pub const fn counted(&self) -> bool {
         self.input_tokens.is_some() || self.output_tokens.is_some()
+    }
+}
+
+impl From<TokenUsage> for TurnUsage {
+    fn from(usage: TokenUsage) -> Self {
+        Self {
+            input_tokens: usage.prompt_tokens,
+            output_tokens: usage.completion_tokens,
+            context_window: None,
+            cached_input_tokens: usage.cached_tokens,
+            reasoning_tokens: usage.reasoning_tokens,
+        }
     }
 }
 

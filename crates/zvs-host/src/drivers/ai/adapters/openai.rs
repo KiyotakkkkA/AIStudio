@@ -12,7 +12,7 @@ use crate::drivers::ai::capabilities::{AdapterCapabilities, Honours};
 use crate::drivers::ai::openai::failure;
 use crate::drivers::ai::ports::{
     ChatRole, DeltaStream, DiscoveredModel, FinishReason, GenerateRequest, GenerateResult,
-    TextDelta, TextGenerationDriver, TokenUsage, ToolCall,
+    TextDelta, TextGenerationDriver, TokenUsage, ToolCall, TurnUsage,
 };
 use crate::drivers::ai::transport::{RequestSpec, SharedTransport};
 
@@ -157,6 +157,12 @@ pub fn decode_event(value: &Value) -> Result<Option<Event>, AppError> {
                     prompt_tokens: usage.get("input_tokens").and_then(Value::as_i64),
                     completion_tokens: usage.get("output_tokens").and_then(Value::as_i64),
                     total_tokens: usage.get("total_tokens").and_then(Value::as_i64),
+                    cached_tokens: usage
+                        .pointer("/input_tokens_details/cached_tokens")
+                        .and_then(Value::as_i64),
+                    reasoning_tokens: usage
+                        .pointer("/output_tokens_details/reasoning_tokens")
+                        .and_then(Value::as_i64),
                 });
             Ok(Some(Event::Completed(usage)))
         }
@@ -263,7 +269,9 @@ impl TextGenerationDriver for OpenaiAdapter {
             .filter_map(|event| async move {
                 match event {
                     Ok(Event::Delta(delta)) => Some(Ok(delta)),
-                    Ok(Event::Completed(_)) => None,
+                    Ok(Event::Completed(usage)) => {
+                        usage.map(|usage| Ok(TextDelta::Usage(TurnUsage::from(usage))))
+                    }
                     Err(error) => Some(Err(error)),
                 }
             })
@@ -301,8 +309,9 @@ impl TextGenerationDriver for OpenaiAdapter {
         cancel: &CancellationToken,
     ) -> Result<Option<ProviderUsageDto>, AppError> {
         let mut usage = ProviderUsageDto {
-            source: if self.codex { "codex" } else { "direct" }.to_owned(), windows: Vec::new(),
-            detail: Some("OpenAI не передаёт остаток лимита для этого подключения. Расход подписки доступен в настройках ChatGPT.".to_owned()),
+            source: if self.codex { "codex" } else { "direct" }.to_owned(),
+            windows: Vec::new(),
+            detail: Some("Расход подписки доступен в настройках ChatGPT.".to_owned()),
             checked_at: crate::drivers::ai::openai::now_seconds() * 1000,
         };
         if self.codex {
@@ -356,6 +365,40 @@ mod tests {
                 .generate(&request, &CancellationToken::new())
                 .await
                 .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_streamed_turn_reports_usage_with_cached_and_reasoning_tokens() {
+        let server = MockServer::start().await;
+        let frames = [
+            json!({"type":"response.output_text.delta", "delta":"Ответ"}),
+            json!({"type":"response.completed", "response":{"status":"completed", "usage":{
+                "input_tokens":5416,
+                "input_tokens_details":{"cached_tokens":4096},
+                "output_tokens":63,
+                "output_tokens_details":{"reasoning_tokens":21},
+                "total_tokens":5479
+            }}}),
+        ]
+        .map(|value| format!("data: {value}\n\n"));
+        server.reply("/v1/responses", Reply::chunks(frames));
+        let driver = OpenaiAdapter::new(transport_for(&server.url("/v1")), false);
+        let request = GenerateRequest::new("selected", vec![ChatMessage::user("Привет")]);
+        let deltas: Vec<TextDelta> = driver
+            .stream(&request, &CancellationToken::new())
+            .map(|delta| delta.expect("a delta"))
+            .collect()
+            .await;
+        assert_eq!(
+            deltas.last(),
+            Some(&TextDelta::Usage(TurnUsage {
+                input_tokens: Some(5416),
+                output_tokens: Some(63),
+                context_window: None,
+                cached_input_tokens: Some(4096),
+                reasoning_tokens: Some(21),
+            }))
         );
     }
 

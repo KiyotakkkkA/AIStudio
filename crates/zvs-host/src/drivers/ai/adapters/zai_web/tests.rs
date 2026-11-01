@@ -233,6 +233,7 @@ async fn generate_collects_the_answer_and_the_vendor_usage() {
             prompt_tokens: Some(621),
             completion_tokens: Some(3),
             total_tokens: Some(624),
+            ..TokenUsage::default()
         })
     );
 }

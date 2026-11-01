@@ -324,6 +324,14 @@ fn usage(raw: Option<&Value>) -> Option<TokenUsage> {
         prompt_tokens: first_number(&[raw.get("prompt_tokens"), raw.get("input_tokens")]),
         completion_tokens: first_number(&[raw.get("completion_tokens"), raw.get("output_tokens")]),
         total_tokens: first_number(&[raw.get("total_tokens")]),
+        cached_tokens: first_number(&[
+            raw.pointer("/prompt_tokens_details/cached_tokens"),
+            raw.pointer("/input_tokens_details/cached_tokens"),
+        ]),
+        reasoning_tokens: first_number(&[
+            raw.pointer("/completion_tokens_details/reasoning_tokens"),
+            raw.pointer("/output_tokens_details/reasoning_tokens"),
+        ]),
     })
 }
 
@@ -664,6 +672,7 @@ mod tests {
                 prompt_tokens: Some(7),
                 completion_tokens: Some(3),
                 total_tokens: Some(10),
+                ..TokenUsage::default()
             })
         );
         let body = server.last_body();
@@ -1213,6 +1222,7 @@ mod tests {
                 prompt_tokens: Some(2),
                 completion_tokens: Some(1),
                 total_tokens: None,
+                ..TokenUsage::default()
             })
         );
     }
