@@ -269,10 +269,14 @@ pub fn subs_of(command: Command) -> impl Iterator<Item = Sub> {
 }
 
 pub fn every_item() -> Vec<Item> {
-    COMMANDS
-        .iter()
+    let mut commands = COMMANDS.to_vec();
+    commands.sort_by_key(|command| command.name());
+    commands
+        .into_iter()
         .flat_map(|command| {
-            std::iter::once(Item::Command(*command)).chain(subs_of(*command).map(Item::Sub))
+            let mut subs: Vec<Sub> = subs_of(command).collect();
+            subs.sort_by_key(|sub| sub.name());
+            std::iter::once(Item::Command(command)).chain(subs.into_iter().map(Item::Sub))
         })
         .collect()
 }
@@ -457,26 +461,27 @@ pub fn matches(text: &str, sources: &Sources<'_>) -> Vec<Item> {
             .collect();
     }
     if let Some((command, partial)) = sub_query(text) {
-        return subs_of(command)
+        let mut subs: Vec<Sub> = subs_of(command)
             .filter(|sub| sub.offered(sources.goal) && sub.name().starts_with(&partial))
-            .map(Item::Sub)
             .collect();
+        subs.sort_by_key(|sub| sub.name());
+        return subs.into_iter().map(Item::Sub).collect();
     }
     if !is_command_text(text) {
         return Vec::new();
     }
     let query = text[1..].to_lowercase();
-    let mut found: Vec<(usize, usize, Command)> = COMMANDS
+    let mut found: Vec<(usize, Command)> = COMMANDS
         .iter()
-        .enumerate()
-        .filter_map(|(order, command)| {
-            score(command.name(), &query).map(|rank| (rank, order, *command))
-        })
+        .copied()
+        .filter_map(|command| score(command.name(), &query).map(|rank| (rank, command)))
         .collect();
-    found.sort_unstable_by_key(|(rank, order, _)| (*rank, *order));
+    found.sort_by(|(rank_a, a), (rank_b, b)| {
+        rank_a.cmp(rank_b).then_with(|| a.name().cmp(b.name()))
+    });
     found
         .into_iter()
-        .map(|(_, _, command)| Item::Command(command))
+        .map(|(_, command)| Item::Command(command))
         .collect()
 }
 
@@ -560,8 +565,10 @@ mod tests {
     }
 
     #[test]
-    fn a_slash_lists_every_command_in_order_without_subcommands() {
-        assert_eq!(commands("/"), COMMANDS);
+    fn a_slash_lists_every_command_alphabetically_without_subcommands() {
+        let mut sorted = COMMANDS.to_vec();
+        sorted.sort_by_key(|command| command.name());
+        assert_eq!(commands("/"), sorted);
         assert_eq!(matches("/").len(), COMMANDS.len());
         assert_eq!(matches("/mcp"), [MCP]);
         assert!(matches("hello").is_empty());
@@ -573,10 +580,10 @@ mod tests {
         assert_eq!(
             commands("/m"),
             [
-                Command::Models,
                 Command::Mcp,
-                Command::Resume,
+                Command::Models,
                 Command::Permissions,
+                Command::Resume,
                 Command::Theme
             ]
         );
@@ -643,12 +650,12 @@ mod tests {
             Some(Item::Command(Command::Theme))
         );
         palette.down("/m", &NONE);
+        assert_eq!(palette.current("/m", &NONE), Some(MCP));
+        palette.down("/m", &NONE);
         assert_eq!(
             palette.current("/m", &NONE),
             Some(Item::Command(Command::Models))
         );
-        palette.down("/m", &NONE);
-        assert_eq!(palette.current("/m", &NONE), Some(MCP));
         assert_eq!(commands("/mo"), [Command::Models, Command::Permissions]);
         assert_eq!(
             palette.current("/mo", &NONE),

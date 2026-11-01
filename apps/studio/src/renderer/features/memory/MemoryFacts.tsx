@@ -1,8 +1,9 @@
 import { observer } from "mobx-react-lite";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   mdiAccountOutline,
   mdiBrain,
+  mdiChevronDown,
   mdiCreationOutline,
   mdiDeleteOutline,
   mdiForumOutline,
@@ -26,6 +27,7 @@ import {
   ACCOUNT_PLACEHOLDER,
   ACCOUNT_TAB,
   ADD,
+  ADVANCED_LABEL,
   CANCEL,
   CLEAR,
   CLEAR_ACCOUNT_TITLE,
@@ -52,6 +54,7 @@ import {
 import Alert from "../../ui/molecules/Alert";
 import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import { LoadingStatus } from "../../ui/molecules/LoadingSkeleton";
+import Reveal from "../../ui/motion/Reveal";
 
 type Scope = "account" | "dialog";
 
@@ -62,7 +65,7 @@ const MemoryRow = observer(function MemoryRow({ memory }: { readonly memory: Mem
   const byModel = memory.source === "model";
   if (editing !== null)
     return (
-      <li className="px-3 py-3">
+      <li className="p-3">
         <TextComposer
           label={EDIT}
           placeholder={ACCOUNT_PLACEHOLDER}
@@ -216,7 +219,12 @@ const AccountFacts = observer(function AccountFacts() {
   if (memory.account.length === 0)
     return (
       <div className="flex justify-center">
-        <EmptyState icon={mdiBrain} title={ACCOUNT_EMPTY_TITLE} description={ACCOUNT_EMPTY} />
+        <EmptyState
+          icon={mdiBrain}
+          title={ACCOUNT_EMPTY_TITLE}
+          description={ACCOUNT_EMPTY}
+          compact
+        />
       </div>
     );
   return (
@@ -231,7 +239,12 @@ const DialogFacts = observer(function DialogFacts() {
   if (memory.dialogs.length === 0)
     return (
       <div className="flex justify-center">
-        <EmptyState icon={mdiForumOutline} title={DIALOG_EMPTY_TITLE} description={DIALOG_EMPTY} />
+        <EmptyState
+          icon={mdiForumOutline}
+          title={DIALOG_EMPTY_TITLE}
+          description={DIALOG_EMPTY}
+          compact
+        />
       </div>
     );
   return (
@@ -259,6 +272,8 @@ const DialogFacts = observer(function DialogFacts() {
 function MemoryFacts() {
   const { memory } = useStore();
   const [scope, setScope] = useState<Scope>("account");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const advancedId = useId();
   useEffect(() => {
     void memory.load();
   }, [memory]);
@@ -287,15 +302,38 @@ function MemoryFacts() {
           options={options}
           onChange={setScope}
         />
-        <span className="min-w-0 flex-1 text-[12px] text-main-500">
-          {scope === "account" ? ACCOUNT_HINT : DIALOG_HINT}
-        </span>
+        <span className="flex-1" />
         {scope === "account" && memory.account.length > 0 ? (
           <ClearButton title={CLEAR_ACCOUNT_TITLE} />
         ) : null}
       </div>
       {memory.error === null ? null : <Alert>{memory.error}</Alert>}
-      <Composer key={scope} scope={scope} />
+      <div className="flex flex-col">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            aria-expanded={advancedOpen}
+            aria-controls={advancedId}
+            onClick={() => setAdvancedOpen((value) => !value)}
+            className="flex w-fit flex-none items-center gap-1 rounded-control text-[12px] text-main-400 hover:text-main-100 anim-on:transition-colors"
+          >
+            {ADVANCED_LABEL}
+            <Icon
+              path={mdiChevronDown}
+              size={14}
+              className={`anim-on:transition-transform ${advancedOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          <span className="min-w-0 flex-1 truncate text-right text-[12px] text-main-500">
+            {scope === "account" ? ACCOUNT_HINT : DIALOG_HINT}
+          </span>
+        </div>
+        <Reveal show={advancedOpen}>
+          <div id={advancedId} className="pt-3">
+            <Composer key={scope} scope={scope} />
+          </div>
+        </Reveal>
+      </div>
       {scope === "account" ? <AccountFacts /> : <DialogFacts />}
     </div>
   );

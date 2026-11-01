@@ -1,18 +1,12 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { createRootStore, type RootStore, type RootStoreEnvironment } from "../stores/RootStore";
+import type { ReactNode } from "react";
+import type { RootStore } from "../stores/RootStore";
 import { StoreContext } from "../stores/StoreContext";
 
 export interface StoreProviderProps {
-  readonly environment: RootStoreEnvironment;
+  readonly store: RootStore;
   readonly children: ReactNode;
 }
 
-export default function StoreProvider({ environment, children }: StoreProviderProps) {
-  const [store] = useState<RootStore>(() => createRootStore(environment));
-
-  useEffect(() => {
-    void store.boot();
-  }, [store]);
-
+export default function StoreProvider({ store, children }: StoreProviderProps) {
   return <StoreContext value={store}>{children}</StoreContext>;
 }

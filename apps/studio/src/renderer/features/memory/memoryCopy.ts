@@ -24,6 +24,7 @@ export const MODEL_ROW = {
 } as const;
 
 export const SCOPE_TABS_LABEL = "Область памяти";
+export const ADVANCED_LABEL = "Расширенные настройки памяти";
 export const ACCOUNT_TAB = "Общая";
 export const DIALOG_TAB = "Диалоги";
 export const ACCOUNT_HINT = "Факты о пользователе. Доступны во всех диалогах.";

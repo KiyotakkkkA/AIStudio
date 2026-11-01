@@ -6,6 +6,7 @@ import { createIpcClient } from "@zvs/ipc";
 import { contract, type AccountDto, type AccountLinkResult, type Contract } from "@zvs/shared";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import StoreProvider from "../../src/renderer/app/StoreProvider.tsx";
+import { createRootStore } from "../../src/renderer/stores/RootStore.ts";
 import ProvidersPage from "../../src/renderer/pages/ProvidersPage.tsx";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { ADAPTERS, OLLAMA, provider, SECRETS, summary } from "./providerFixtures.ts";
@@ -33,7 +34,10 @@ function renderTab(accounts: readonly AccountDto[] = []) {
   render(
     <MemoryRouter>
       <StoreProvider
-        environment={{ ipc: createIpcClient(contract, bridge), events: createEventRouter() }}
+        store={createRootStore({
+          ipc: createIpcClient(contract, bridge),
+          events: createEventRouter(),
+        })}
       >
         <ProvidersPage />
       </StoreProvider>

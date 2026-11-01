@@ -200,14 +200,14 @@ export function ToolCallCard({
             call.status === "running" ? "zvs-shimmer-text" : ""
           }`}
         >
+          {call.durationMs > 0 && (
+            <span className="shrink-0 font-mono text-[11px] text-main-500 tabular-nums">
+              {durationLabel(call.durationMs)}
+            </span>
+          )}
           <StatusMark status={call.status} />
           {status.label}
         </span>
-        {call.durationMs > 0 && (
-          <span className="shrink-0 font-mono text-[11px] text-main-500 tabular-nums">
-            {durationLabel(call.durationMs)}
-          </span>
-        )}
         <Icon
           path={mdiChevronDown}
           size={15}

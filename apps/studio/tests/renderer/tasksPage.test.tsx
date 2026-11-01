@@ -6,6 +6,7 @@ import { createIpcClient } from "@zvs/ipc";
 import { contract, RunSummaryDto, type Contract, type RunCountsDto } from "@zvs/shared";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import StoreProvider from "../../src/renderer/app/StoreProvider.tsx";
+import { createRootStore } from "../../src/renderer/stores/RootStore.ts";
 import TasksPage from "../../src/renderer/pages/TasksPage.tsx";
 import RunsPage from "../../src/renderer/pages/RunsPage.tsx";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
@@ -90,7 +91,10 @@ function renderTasks() {
   render(
     <MemoryRouter>
       <StoreProvider
-        environment={{ ipc: createIpcClient(contract, bridge), events: createEventRouter() }}
+        store={createRootStore({
+          ipc: createIpcClient(contract, bridge),
+          events: createEventRouter(),
+        })}
       >
         <TasksPage />
       </StoreProvider>
@@ -162,7 +166,10 @@ test("Runs & Logs lists history and selects the run named in the query string", 
   render(
     <MemoryRouter initialEntries={[`/runs?run=${FAILED}`]}>
       <StoreProvider
-        environment={{ ipc: createIpcClient(contract, bridge), events: createEventRouter() }}
+        store={createRootStore({
+          ipc: createIpcClient(contract, bridge),
+          events: createEventRouter(),
+        })}
       >
         <RunsPage />
       </StoreProvider>

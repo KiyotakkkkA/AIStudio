@@ -7,15 +7,22 @@ export interface EmptyStateProps {
   readonly title: string;
   readonly description: string;
   readonly action?: ReactNode;
+  readonly compact?: boolean;
 }
 
-export default function EmptyState({ icon, title, description, action }: EmptyStateProps) {
+export default function EmptyState({ icon, title, description, action, compact }: EmptyStateProps) {
   return (
     <KitEmptyState
-      className="max-w-110 border-0 bg-transparent px-6 py-10 text-center shadow-none"
+      className={`max-w-110 border-0 bg-transparent px-6 text-center shadow-none ${
+        compact ? "py-6" : "py-10"
+      }`}
       icon={
-        <span className="mx-auto flex size-12 items-center justify-center rounded-card bg-accent-soft text-accent-medium">
-          <Icon path={icon} size={22} />
+        <span
+          className={`mx-auto flex items-center justify-center rounded-card bg-accent-soft text-accent-medium ${
+            compact ? "size-10" : "size-12"
+          }`}
+        >
+          <Icon path={icon} size={compact ? 18 : 22} />
         </span>
       }
       title={

@@ -6,6 +6,7 @@ import { createIpcClient } from "@zvs/ipc";
 import { contract, type Contract, type ProviderCapability } from "@zvs/shared";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import StoreProvider from "../../src/renderer/app/StoreProvider.tsx";
+import { createRootStore } from "../../src/renderer/stores/RootStore.ts";
 import ProvidersPage from "../../src/renderer/pages/ProvidersPage.tsx";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import {
@@ -36,7 +37,10 @@ function renderPage(selectedProvider = provider()) {
   render(
     <MemoryRouter>
       <StoreProvider
-        environment={{ ipc: createIpcClient(contract, bridge), events: createEventRouter() }}
+        store={createRootStore({
+          ipc: createIpcClient(contract, bridge),
+          events: createEventRouter(),
+        })}
       >
         <ProvidersPage />
       </StoreProvider>

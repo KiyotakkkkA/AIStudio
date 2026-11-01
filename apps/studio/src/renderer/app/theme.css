@@ -348,17 +348,20 @@ select:focus-visible,
   animation: var(--animate-zvs-shimmer-text);
 }
 
-.zvs-trace {
-  stroke-dasharray: 30 200;
-  animation: zvs-trace 1.5s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;
+:root:not([data-motion="none"]) .zvs-avatar-live .zvs-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: zvs-blink 4.2s ease-in-out infinite;
 }
 
-@keyframes zvs-trace {
-  from {
-    stroke-dashoffset: 18;
+@keyframes zvs-blink {
+  0%,
+  91%,
+  100% {
+    transform: scaleY(1);
   }
-  to {
-    stroke-dashoffset: -88;
+  94.5% {
+    transform: scaleY(0.12);
   }
 }
 
@@ -416,11 +419,6 @@ select:focus-visible,
   animation: none;
   background: none;
   color: var(--color-main-400);
-}
-
-:root[data-motion="none"] .zvs-trace {
-  stroke-dasharray: none;
-  animation: none;
 }
 
 :root[data-motion="none"] .animate-zvs-sweep,

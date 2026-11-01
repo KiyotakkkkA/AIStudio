@@ -13,6 +13,7 @@ import {
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import StoreProvider from "../../src/renderer/app/StoreProvider.tsx";
+import { createRootStore } from "../../src/renderer/stores/RootStore.ts";
 import DownloadsPage from "../../src/renderer/pages/DownloadsPage.tsx";
 
 const GIB = 1024 ** 3;
@@ -163,7 +164,10 @@ function renderPage() {
   render(
     <MemoryRouter>
       <StoreProvider
-        environment={{ ipc: createIpcClient(contract, bridge), events: createEventRouter() }}
+        store={createRootStore({
+          ipc: createIpcClient(contract, bridge),
+          events: createEventRouter(),
+        })}
       >
         <DownloadsPage />
       </StoreProvider>

@@ -98,7 +98,7 @@ fn the_palette_opens_above_the_input() {
     let screen = render(&app, 90, 24);
     println!("{screen}");
     assert!(screen.contains(copy::COMMANDS_TITLE));
-    assert!(screen.contains("/models"));
+    assert!(screen.contains("/clear"));
 }
 
 #[test]

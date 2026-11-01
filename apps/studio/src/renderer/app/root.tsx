@@ -1,20 +1,20 @@
 import { StrictMode, useState } from "react";
 import { RouterProvider } from "react-router-dom";
-import type { RootStoreEnvironment } from "../stores/RootStore";
+import type { RootStore } from "../stores/RootStore";
 import ErrorBoundary from "./ErrorBoundary";
 import { createAppRouter } from "./router";
 import StoreProvider from "./StoreProvider";
 
 export interface RootProps {
-  readonly environment: RootStoreEnvironment;
+  readonly store: RootStore;
 }
 
-export default function Root({ environment }: RootProps) {
+export default function Root({ store }: RootProps) {
   const [router] = useState(createAppRouter);
   return (
     <StrictMode>
       <ErrorBoundary>
-        <StoreProvider environment={environment}>
+        <StoreProvider store={store}>
           <RouterProvider router={router} />
         </StoreProvider>
       </ErrorBoundary>
