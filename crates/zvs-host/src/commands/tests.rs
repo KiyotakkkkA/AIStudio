@@ -8,8 +8,8 @@ use futures::future::BoxFuture;
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, ApprovalRequestDto, BindFolderInput, CodeLanguage, ConversationId,
-    CreateConversationInput, FolderGrantScope, HostEventDraft, ProcessResultDto,
+    AppError, AppErrorCode, ApprovalRequestDto, BackgroundShellDto, BindFolderInput, CodeLanguage,
+    ConversationId, CreateConversationInput, FolderGrantScope, HostEventDraft, ProcessResultDto,
     ProviderCapability, ProviderId, ProviderKind, RunHandleDto, RunId, RunStatus, ToolListFilter,
     ToolTier, Validate,
 };
@@ -204,6 +204,8 @@ fn code(language: CodeLanguage, source: &str) -> CodeRunInput {
         args: vec!["--flag".to_owned(), "1".to_owned()],
         stdin: None,
         packages: Vec::new(),
+        background: false,
+        notify: false,
         conversation_id: String::new(),
     }
 }
@@ -214,6 +216,7 @@ fn shell(argv: &[&str]) -> ShellRunInput {
         cwd: None,
         stdin: None,
         background: false,
+        notify: false,
         conversation_id: String::new(),
     }
 }
@@ -265,6 +268,17 @@ impl Host {
 
     fn options(&self, launcher: Option<Arc<dyn CommandLauncher>>) -> CommandToolOptions {
         CommandToolOptions::new(launcher, self.services.workspace.join("code-tests"))
+    }
+
+    fn background_code_node(&self, launcher: Option<Arc<dyn CommandLauncher>>) -> CodeRunNode {
+        CodeRunNode::new(
+            &self.services.folders,
+            self.services.runs.approvals(),
+            CommandToolOptions {
+                shells: Some(self.services.shells.clone()),
+                ..self.options(launcher)
+            },
+        )
     }
 
     fn code_node(&self, launcher: Option<Arc<dyn CommandLauncher>>) -> CodeRunNode {
@@ -546,6 +560,47 @@ fn inputs_are_validated() {
         serde_json::from_value::<ShellRunInput>(json!({ "argv": "npm test" })).is_err(),
         "a shell string is not an argument vector"
     );
+    let mut job = code(CodeLanguage::Python, "print(1)");
+    job.notify = true;
+    assert!(job.validate().is_err(), "notify needs background");
+    job.background = true;
+    assert!(job.validate().is_ok());
+    job.stdin = Some("input".to_owned());
+    assert!(job.validate().is_err(), "background code takes no stdin");
+    let mut tests = shell(&["cargo", "test"]);
+    tests.notify = true;
+    assert!(tests.validate().is_err(), "notify needs background");
+    tests.background = true;
+    assert!(tests.validate().is_ok());
+    for argv in [
+        &["npx", "http-server", "-p", "8099"][..],
+        &["npm", "run", "dev"],
+        &["pnpm", "dev"],
+        &["npm", "start"],
+        &["python", "-m", "http.server"],
+        &["cargo", "watch", "-x", "check"],
+        &["C:\\tools\\vite.cmd"],
+        &["tsc", "--watch"],
+    ] {
+        let mut served = shell(argv);
+        served.background = true;
+        assert!(
+            served.validate().is_ok(),
+            "{argv:?} may run in the background"
+        );
+        served.notify = true;
+        let error = served.validate().expect_err("a server never finishes");
+        assert_eq!(error.message, NOTIFY_SERVER, "{argv:?}");
+    }
+    for argv in [
+        &["cargo", "build", "--profile", "dev"][..],
+        &["npm", "test"],
+        &["pnpm", "run", "build"],
+        &["pytest", "tests"],
+    ] {
+        let parts: Vec<String> = argv.iter().map(|part| (*part).to_owned()).collect();
+        assert!(!server_like(&parts), "{argv:?}");
+    }
 }
 
 #[tokio::test]
@@ -983,17 +1038,9 @@ async fn a_background_start_is_approved_like_a_foreground_run_and_returns_a_hand
 }
 
 #[tokio::test]
-async fn a_skill_script_and_a_run_without_a_dialog_cannot_go_to_the_background() {
+async fn a_run_without_a_dialog_cannot_go_to_the_background() {
     let host = Host::new();
     let node = host.shell_node(ProcessLimits::default());
-    let mut script = shell(&["skill:dashboard/scripts/build.py"]);
-    script.background = true;
-    script.conversation_id = host.conversation().to_string();
-    let error = node
-        .run(&context(CancellationToken::new()), script)
-        .await
-        .expect_err("refused");
-    assert_eq!(error.message, BACKGROUND_SCRIPT);
     let mut orphan = shell(&["cargo", "check"]);
     orphan.background = true;
     let error = node
@@ -1001,4 +1048,73 @@ async fn a_skill_script_and_a_run_without_a_dialog_cannot_go_to_the_background()
         .await
         .expect_err("refused");
     assert_eq!(error.message, crate::background::NO_OWNER);
+}
+
+async fn ended(host: &Host, id: &zvs_contract::BackgroundShellId) -> BackgroundShellDto {
+    for _ in 0..2400 {
+        let shell = host.services.shells.get(None, id).expect("the shell");
+        if !shell.status.running() {
+            return shell;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    panic!("the background process did not end in time");
+}
+
+#[tokio::test]
+async fn background_code_keeps_its_scratch_folder_until_the_program_ends() {
+    let host = Host::new();
+    let node = host.background_code_node(Some(Stub::shared(&[("uv", "hang")])));
+    let run = context(CancellationToken::new());
+    let conversation = host.conversation().to_string();
+    let mut input = code(CodeLanguage::Python, "import time; time.sleep(600)");
+    input.background = true;
+    input.notify = true;
+    input.conversation_id = conversation.clone();
+    let output = node.run(&run, input).await.expect("starts");
+    let id = output.shell_id.expect("a process id");
+    assert!(output.process.background);
+    assert_eq!(output.process.language, Some(CodeLanguage::Python));
+    assert!(output.text.contains(NOTIFY_TEXT));
+    let scratch = host
+        .services
+        .workspace
+        .join("code-tests")
+        .join(run.run_id.to_string());
+    assert!(crate::toolchain::process::is_pinned(&scratch));
+    for index in 0..crate::toolchain::process::SCRATCH_KEEP + 2 {
+        crate::toolchain::process::prepare_scratch(
+            &host.services.workspace.join("code-tests"),
+            &format!("later-{index:02}"),
+        )
+        .expect("prepares");
+    }
+    assert!(Path::new(&output.process.cwd).is_dir());
+    let shell = host.services.shells.get(None, &id).expect("the shell");
+    assert_eq!(shell.argv[..2], ["python".to_owned(), "main.py".to_owned()]);
+    host.services.shells.kill(None, &id).await.expect("stops");
+    assert!(!crate::toolchain::process::is_pinned(&scratch));
+    host.services.shells.close_owner(&conversation).await;
+}
+
+#[tokio::test]
+async fn a_background_program_that_finishes_is_reported_to_the_wake_up() {
+    let host = Host::new();
+    let node = host.background_code_node(Some(Stub::shared(&[("uv", "fail")])));
+    let conversation = host.conversation().to_string();
+    let mut input = code(CodeLanguage::Python, "raise SystemExit(3)");
+    input.background = true;
+    input.notify = true;
+    input.conversation_id = conversation.clone();
+    let output = node
+        .run(&context(CancellationToken::new()), input)
+        .await
+        .expect("starts");
+    let shell = ended(&host, &output.shell_id.expect("a process id")).await;
+    assert_eq!(shell.exit_code, Some(3));
+    assert!(host.services.shells.take_ended(&conversation, 5).is_empty());
+    let notified = host.services.shells.take_notified(&conversation, 5);
+    assert_eq!(notified.len(), 1);
+    assert!(notified[0].tail.contains("broken input"));
+    host.services.shells.close_owner(&conversation).await;
 }

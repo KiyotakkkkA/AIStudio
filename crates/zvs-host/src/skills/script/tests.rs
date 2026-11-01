@@ -41,3 +41,21 @@ fn old_scratch_folders_are_pruned() {
     assert!(!left.contains(&"old-00".to_owned()));
     assert!(left.contains(&format!("old-{:02}", SCRATCH_KEEP + 3)));
 }
+
+#[test]
+fn a_pinned_scratch_folder_survives_pruning_until_it_is_released() {
+    let root = temporary_directory("studio-skill-pinned-");
+    let pinned = root.path().join("background");
+    std::fs::create_dir_all(&pinned).expect("a folder");
+    let pin = crate::toolchain::process::pin_scratch(&pinned);
+    std::thread::sleep(Duration::from_millis(15));
+    for index in 0..SCRATCH_KEEP + 2 {
+        std::fs::create_dir_all(root.path().join(format!("new-{index:02}"))).expect("a folder");
+        std::thread::sleep(Duration::from_millis(15));
+    }
+    prepare_scratch(root.path(), "current").expect("prepares");
+    assert!(pinned.is_dir());
+    drop(pin);
+    prepare_scratch(root.path(), "current").expect("prepares");
+    assert!(!pinned.exists());
+}

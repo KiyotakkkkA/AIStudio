@@ -11,6 +11,7 @@ use crate::ids::{ConversationId, DocumentId, MessageId, ProviderId, RunId, Vecto
 use crate::primitives::{Json, Timestamp};
 use crate::questions::QuestionRequestDto;
 use crate::runs::RunHandleDto;
+use crate::shells::{EndedShellDto, SHELLS_TOTAL_MAX};
 use crate::tools::check_tool_key;
 use crate::validate::{Validate, check, invalid, js_trim, nested};
 use crate::vector_stores::VectorSearchHitDto;
@@ -67,7 +68,48 @@ wire_enum!(ChatCommand {
 wire_enum!(MessageRole {
     User => "user",
     Assistant => "assistant",
+    Event => "event",
 });
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatEventDto {
+    pub shells: Vec<EndedShellDto>,
+}
+
+pub const WAKE_STEP_DOMAIN: &str = "wake";
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatWakeStepDto {
+    pub domain: String,
+    pub message: MessageDto,
+}
+
+impl Validate for ChatWakeStepDto {
+    fn validate(&self) -> Result<(), AppError> {
+        if self.domain != WAKE_STEP_DOMAIN {
+            return Err(invalid("domain", "literal"));
+        }
+        if self.message.role != MessageRole::Event {
+            return Err(invalid("message.role", "event"));
+        }
+        nested("message", self.message.validate())
+    }
+}
+
+impl Validate for ChatEventDto {
+    fn validate(&self) -> Result<(), AppError> {
+        if self.shells.is_empty() {
+            return Err(invalid("shells", "minItems"));
+        }
+        if self.shells.len() > SHELLS_TOTAL_MAX {
+            return Err(invalid("shells", "maxItems"));
+        }
+        nested("shells", self.shells.validate())
+    }
+}
 
 fn positive(field: &str, value: u64) -> Result<(), AppError> {
     check::safe_integer(field, value)?;
@@ -553,11 +595,23 @@ pub struct MessageDto {
     pub partial: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub pinned: bool,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub event: Option<ChatEventDto>,
     pub created_at: Timestamp,
 }
 
 impl Validate for MessageDto {
     fn validate(&self) -> Result<(), AppError> {
+        if (self.role == MessageRole::Event) != self.event.is_some() {
+            return Err(invalid("event", "role"));
+        }
+        if let Some(event) = &self.event {
+            nested("event", event.validate())?;
+        }
         nested("citations", self.citations.validate())?;
         nested("toolCalls", self.tool_calls.validate())?;
         nested("offeredTools", self.offered_tools.validate())?;

@@ -1,6 +1,8 @@
 import { makeAutoObservable, reaction, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
+  ChatWakeStepDto,
+  WAKE_STEP_DOMAIN,
   ChatToolCallDto,
   type BackgroundShellId,
   type ChatRoundDto,
@@ -169,6 +171,8 @@ export default class ChatStore {
   private attaching = false;
   private contiguous = false;
   private held: RoutedEvent[] = [];
+  private stopWakes: (() => void) | undefined;
+  private waking = false;
 
   private memoryTool: () => boolean = () => false;
 
@@ -209,6 +213,8 @@ export default class ChatStore {
       | "attaching"
       | "contiguous"
       | "held"
+      | "stopWakes"
+      | "waking"
       | "memoryTool"
     >(
       this,
@@ -240,6 +246,8 @@ export default class ChatStore {
         attaching: false,
         contiguous: false,
         held: false,
+        stopWakes: false,
+        waking: false,
       },
       { autoBind: true },
     );
@@ -759,6 +767,7 @@ export default class ChatStore {
 
   async mount() {
     this.mounted = true;
+    this.stopWakes ??= this.events.observe(this.observeWake);
     this.loading = true;
     this.error = null;
     const revision = ++this.revision;
@@ -1400,6 +1409,31 @@ export default class ChatStore {
       };
   }
 
+  private observeWake(event: RoutedEvent) {
+    if (event.type !== "step" || event.step.domain !== WAKE_STEP_DOMAIN) return;
+    const wake = ChatWakeStepDto.safeParse(event.step);
+    if (!wake.success) return;
+    const message = wake.data.message;
+    const active = this.active;
+    if (active === null || active.id !== message.conversationId) return;
+    if (this.run !== null || this.sending) return;
+    if (!active.messages.some((item) => item.id === message.id))
+      this.active = { ...active, messages: [...active.messages, message] };
+    void this.followWake(message.conversationId);
+  }
+
+  private async followWake(id: ConversationId) {
+    if (this.waking) return;
+    this.waking = true;
+    const live = await this.attachment(id);
+    runInAction(() => {
+      this.waking = false;
+      if (live === null || this.active?.id !== id || this.run !== null) return;
+      this.restore(live);
+      if (this.mounted) this.subscribe();
+    });
+  }
+
   private async reattach() {
     const run = this.run;
     const id = this.active?.id;
@@ -1689,6 +1723,8 @@ export default class ChatStore {
     }
     this.stopContext?.();
     this.stopContext = undefined;
+    this.stopWakes?.();
+    this.stopWakes = undefined;
     this.explorer.dispose();
     this.terminal.dispose();
     this.backgroundShells.dispose();

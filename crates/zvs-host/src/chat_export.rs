@@ -91,10 +91,29 @@ fn quote(text: &str) -> String {
         .join("\n")
 }
 
+fn event_markdown(message: &MessageDto) -> String {
+    let lines: Vec<String> = message
+        .event
+        .iter()
+        .flat_map(|event| &event.shells)
+        .map(|ended| {
+            let code = ended
+                .shell
+                .exit_code
+                .map_or_else(|| "нет".to_owned(), |code| code.to_string());
+            format!("- `{}` — код выхода {code}", ended.shell.argv.join(" "))
+        })
+        .collect();
+    format!("## {EVENT_HEADING}\n\n{}", lines.join("\n"))
+}
+
+pub const EVENT_HEADING: &str = "Фоновый процесс завершён";
+
 fn message_markdown(message: &MessageDto) -> String {
     let mut parts = vec![match message.role {
         MessageRole::User => "## Вы".to_owned(),
         MessageRole::Assistant => "## Ассистент".to_owned(),
+        MessageRole::Event => return event_markdown(message),
     }];
     let reasoning = message.reasoning.trim();
     if !reasoning.is_empty() {

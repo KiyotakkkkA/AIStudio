@@ -56,6 +56,7 @@ import { LoadingStatus, SkeletonLines } from "../../ui/molecules/LoadingSkeleton
 import PinnedNavigator from "./PinnedNavigator";
 import { PINS_PANEL, currentPin, pinPreview } from "./pinnedMessages";
 import { BRANCH_IN_NEW_DIALOG, CREATE_BRANCH } from "./branching";
+import ProcessEventCard from "../backgroundShells/ProcessEventCard";
 
 export default observer(function ChatThread({
   store,
@@ -315,7 +316,11 @@ export default observer(function ChatThread({
               </div>
             )}
             {store.active?.messages.map((message) =>
-              message.role === "user" ? (
+              message.role === "event" ? (
+                <div key={message.id} data-message-id={message.id}>
+                  {message.event !== undefined && <ProcessEventCard event={message.event} />}
+                </div>
+              ) : message.role === "user" ? (
                 <div key={message.id} className="group flex justify-end">
                   <div className="flex max-w-[78%] flex-col items-end">
                     {editingId === message.id ? (

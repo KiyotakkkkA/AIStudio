@@ -342,6 +342,26 @@ pub const PROCESS_FAILED: &str = "ошибка";
 pub const PROCESS_TIMED_OUT: &str = "превышено время";
 pub const PROCESS_EXITED: &str = "завершён";
 pub const PROCESS_IN_BACKGROUND: &str = "в фоне";
+pub const PROCESS_ENDED_EVENT: &str = "Фоновый процесс завершён";
+pub const PROCESS_NO_CODE: &str = "нет";
+
+pub fn process_event(event: &zvs_contract::ChatEventDto) -> String {
+    let lines: Vec<String> = event
+        .shells
+        .iter()
+        .map(|ended| {
+            let code = ended
+                .shell
+                .exit_code
+                .map_or_else(|| PROCESS_NO_CODE.to_owned(), |code| code.to_string());
+            format!(
+                "{PROCESS_ENDED_EVENT}: {} · код выхода {code}",
+                ended.shell.argv.join(" ")
+            )
+        })
+        .collect();
+    lines.join("\n")
+}
 pub const PROCESS_TRUNCATED: &str = "Начало вывода больше не хранится";
 pub const HINT_PROCESSES: &str =
     "↑/↓ — выбор · ←/→ — вкладки · Enter — вывод · Delete — остановить · Esc — закрыть";

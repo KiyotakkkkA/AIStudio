@@ -11,13 +11,13 @@ use zvs_contract::{
     AccountFamily, AllowRuleChangeDto, AllowRuleInput, AppError, BackgroundShellDto,
     BackgroundShellId, BackgroundShellStatusDto, BindFolderResultDto, ChatAnswerInput,
     ChatAttachDto, ChatCommand, ChatContextDto, ChatGoalDto, ChatGoalStepDto, ChatSendInput,
-    ChatSkipInput, CliSessionDto, CliTheme, ConversationDetailDto, ConversationDto, ConversationId,
-    CreateMcpServerInput, ExecJudgeDto, ExecMode, ExecPolicyDto, FolderAccessAnswer,
-    FolderGrantScope, GOAL_STEP_DOMAIN, GoalBudgetDto, GoalReason, GoalStatus, GoalUsageDto,
-    HostEvent, HostEventDraft, McpOAuthState, McpServerDetailDto, McpServerDto, McpServerId,
-    McpServerStatus, PolicyRuleDto, ProviderDto, ProviderId, ProviderUsageDto, RunHandleDto, RunId,
-    RunOutcomeStatus, SHELL_STEP_DOMAIN, ShellOutputDto, SkillDto, SkillId, ThinkingEffort,
-    WorkingFolderAccess,
+    ChatSkipInput, ChatWakeStepDto, CliSessionDto, CliTheme, ConversationDetailDto,
+    ConversationDto, ConversationId, CreateMcpServerInput, ExecJudgeDto, ExecMode, ExecPolicyDto,
+    FolderAccessAnswer, FolderGrantScope, GOAL_STEP_DOMAIN, GoalBudgetDto, GoalReason, GoalStatus,
+    GoalUsageDto, HostEvent, HostEventDraft, McpOAuthState, McpServerDetailDto, McpServerDto,
+    McpServerId, McpServerStatus, PolicyRuleDto, ProviderDto, ProviderId, ProviderUsageDto,
+    RunHandleDto, RunId, RunOutcomeStatus, SHELL_STEP_DOMAIN, ShellOutputDto, SkillDto, SkillId,
+    ThinkingEffort, WAKE_STEP_DOMAIN, WorkingFolderAccess,
 };
 
 use self::input::Input;
@@ -1034,10 +1034,38 @@ impl App {
                 }
             },
             Msg::Attached(result) => {
+                let woken = self.awaiting && self.run.is_none();
+                let held = if woken {
+                    self.awaiting = false;
+                    std::mem::take(&mut self.held)
+                } else {
+                    Vec::new()
+                };
                 match result {
-                    Ok(Some(live)) => self.adopt_live(live),
-                    Ok(None) => {}
-                    Err(error) => self.fail(&error),
+                    Ok(Some(live)) => {
+                        let stream = live.run.stream_id;
+                        let seen = live.seq;
+                        self.adopt_live(live);
+                        return held
+                            .into_iter()
+                            .filter(|event| {
+                                event.stream_id == stream
+                                    && seen.is_none_or(|seen| event.seq > seen)
+                            })
+                            .flat_map(|event| self.event(event))
+                            .collect();
+                    }
+                    Ok(None) => {
+                        if woken {
+                            self.transcript.live = None;
+                        }
+                    }
+                    Err(error) => {
+                        if woken {
+                            self.transcript.live = None;
+                        }
+                        self.fail(&error);
+                    }
                 }
                 Vec::new()
             }
@@ -1116,6 +1144,9 @@ impl App {
                 if let Some(requests) = self.process_event(&event) {
                     return requests;
                 }
+                if let Some(requests) = self.wake_event(&event) {
+                    return requests;
+                }
                 if self.awaiting && self.run.is_none() {
                     self.held.push(*event);
                     return Vec::new();
@@ -1143,6 +1174,35 @@ impl App {
             .iter()
             .filter(|shell| shell.status.running())
             .count()
+    }
+
+    fn wake_event(&mut self, event: &HostEvent) -> Option<Vec<Request>> {
+        let HostEventDraft::Step { step } = &event.body else {
+            return None;
+        };
+        if step.get("domain").and_then(|domain| domain.as_str()) != Some(WAKE_STEP_DOMAIN) {
+            return None;
+        }
+        let Ok(wake) =
+            serde_json::from_value::<ChatWakeStepDto>(serde_json::Value::Object(step.clone()))
+        else {
+            return Some(Vec::new());
+        };
+        let conversation = self
+            .conversation
+            .as_ref()
+            .map(|conversation| conversation.id);
+        if conversation != Some(wake.message.conversation_id) || self.busy() {
+            return Some(Vec::new());
+        }
+        if let Some(result) = &wake.message.event {
+            self.transcript
+                .notice(Tone::Info, copy::process_event(result));
+        }
+        self.transcript.start();
+        self.started = self.frame;
+        self.awaiting = true;
+        Some(vec![Request::Attach(wake.message.conversation_id)])
     }
 
     fn process_event(&mut self, event: &HostEvent) -> Option<Vec<Request>> {

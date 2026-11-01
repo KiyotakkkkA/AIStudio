@@ -243,3 +243,68 @@ test("no live turn leaves the chat idle and a failed run without a message shows
   store.dispose();
   running.dispose();
 });
+
+const wakeMessage = {
+  id: "0199ff11-7777-7111-8111-000000000009",
+  conversationId: conversation.id,
+  role: "event",
+  content: "Background processes ended.",
+  citations: [],
+  tokensIn: 0,
+  tokensOut: 0,
+  usageEstimated: true,
+  durationMs: 0,
+  runId: handle.id,
+  partial: false,
+  createdAt: 3,
+  event: {
+    shells: [
+      {
+        shell: {
+          id: "0199ff11-8888-7111-8111-000000000001",
+          ownerId: conversation.id,
+          program: "cargo",
+          argv: ["cargo", "test"],
+          cwd: "D:\\work",
+          status: "exited",
+          exitCode: 0,
+          streamId: "0199ff11-8888-7111-8111-000000000002",
+          startedAt: 1,
+          endedAt: 2,
+        },
+        tail: "ok",
+      },
+    ],
+  },
+};
+
+function wake(context: ReturnType<typeof setup>, conversationId: string = conversation.id) {
+  context.events.dispatch({
+    type: "step",
+    ...handle,
+    seq: 1,
+    ts: 1,
+    step: { domain: "wake", message: { ...wakeMessage, conversationId } },
+  });
+}
+
+test("a wake-up turn in the open dialog shows its event and follows the new turn", async () => {
+  const context = await reopened(null);
+  expect(context.store.run).toBeNull();
+  context.attach(live({ content: "Тесты прошли" }));
+  wake(context);
+  await vi.waitFor(() => expect(context.store.run).toEqual(handle));
+  expect(context.store.active?.messages.map((message) => message.role)).toContain("event");
+  expect(context.store.liveText).toBe("Тесты прошли");
+  context.store.dispose();
+});
+
+test("a wake-up of another dialog leaves the open one alone", async () => {
+  const context = await reopened(null);
+  context.attach(live());
+  wake(context, "0199ff11-4444-7111-8111-000000000099");
+  await Promise.resolve();
+  expect(context.store.run).toBeNull();
+  expect(context.store.active?.messages.map((message) => message.role)).not.toContain("event");
+  context.store.dispose();
+});

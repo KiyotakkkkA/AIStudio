@@ -1,7 +1,8 @@
 use rusqlite::Row;
 use zvs_contract::{
-    ChatCitationDto, ChatCommand, ChatGoalDto, ChatRoundDto, ChatSettings, ChatToolCallDto,
-    DocumentSelectionDto, MessageRole, OfferedToolDto, RetrievalMode, Timestamp, WebSourceDto,
+    ChatCitationDto, ChatCommand, ChatEventDto, ChatGoalDto, ChatRoundDto, ChatSettings,
+    ChatToolCallDto, DocumentSelectionDto, MessageRole, OfferedToolDto, RetrievalMode, Timestamp,
+    WebSourceDto,
 };
 
 use super::columns::{EnumColumn, json_column, optional_json_column};
@@ -74,6 +75,7 @@ pub struct MessageRow {
     pub run_id: Option<String>,
     pub partial: bool,
     pub pinned: bool,
+    pub event: Option<ChatEventDto>,
     pub created_at: Timestamp,
 }
 
@@ -81,7 +83,7 @@ impl MessageRow {
     pub const COLUMNS: &str = "id, conversation_id, role, content, reasoning, citations, \
         (SELECT json_group_array(json(call) ORDER BY idx) FROM message_tool_call \
         WHERE message_id = message.id) AS tool_calls, selections, command, offered_tools, web_sources, rounds, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, \
-        pinned, created_at";
+        pinned, event, created_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -106,6 +108,7 @@ impl MessageRow {
             run_id: row.get("run_id")?,
             partial: row.get("partial")?,
             pinned: row.get("pinned")?,
+            event: optional_json_column(row, "event")?,
             created_at: row.get("created_at")?,
         })
     }

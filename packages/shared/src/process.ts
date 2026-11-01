@@ -21,9 +21,6 @@ export const ProcessPlanDto = z
   })
   .refine((plan) => plan.packages.length === 0 || plan.language === "javascript", {
     path: ["packages"],
-  })
-  .refine((plan) => plan.background !== true || plan.language === undefined, {
-    path: ["background"],
   });
 export type ProcessPlanDto = z.infer<typeof ProcessPlanDto>;
 

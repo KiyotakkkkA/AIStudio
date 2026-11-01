@@ -1,0 +1,37 @@
+[
+  {
+    "name": "still running",
+    "value": {
+      "shell": {
+        "id": "0199aa11-4444-7111-8111-111111111111",
+        "ownerId": "0199aa11-1111-7111-8111-111111111111",
+        "program": "C:\\Users\\dev\\.cargo\\bin\\cargo.exe",
+        "argv": ["cargo", "test"],
+        "cwd": "D:\\work\\app",
+        "status": "running",
+        "exitCode": null,
+        "streamId": "0199aa11-5555-7111-8111-111111111111",
+        "startedAt": 1767225600000,
+        "endedAt": null
+      },
+      "tail": ""
+    }
+  },
+  {
+    "name": "no tail",
+    "value": {
+      "shell": {
+        "id": "0199aa11-4444-7111-8111-111111111111",
+        "ownerId": "0199aa11-1111-7111-8111-111111111111",
+        "program": "C:\\Users\\dev\\.cargo\\bin\\cargo.exe",
+        "argv": ["cargo", "test"],
+        "cwd": "D:\\work\\app",
+        "status": "exited",
+        "exitCode": 0,
+        "streamId": "0199aa11-5555-7111-8111-111111111111",
+        "startedAt": 1767225600000,
+        "endedAt": 1767225660000
+      }
+    }
+  }
+]

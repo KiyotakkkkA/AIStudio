@@ -258,8 +258,8 @@ impl<'c> ChatRepository<'c> {
     pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
         self.connection
             .prepare_cached(
-                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, command, offered_tools, web_sources, rounds, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, pinned, created_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, command, offered_tools, web_sources, rounds, tokens_in, tokens_out, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
             )?
             .execute(params![
                 row.id,
@@ -280,6 +280,7 @@ impl<'c> ChatRepository<'c> {
                 row.run_id,
                 row.partial,
                 row.pinned,
+                row.event.as_ref().map(json_text).transpose()?,
                 row.created_at,
             ])?;
         let calls: Vec<(usize, &ChatToolCallDto)> = row.tool_calls.iter().enumerate().collect();
@@ -424,6 +425,7 @@ mod tests {
             run_id: None,
             partial: false,
             pinned: false,
+            event: None,
             created_at,
         }
     }

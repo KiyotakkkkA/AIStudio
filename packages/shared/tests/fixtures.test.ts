@@ -39,6 +39,8 @@ import {
   MessageDto,
   OfferedToolDto,
   ChatCommand,
+  ChatEventDto,
+  ChatWakeStepDto,
   ChatGoalDto,
   ChatGoalStepDto,
   GoalBudgetDto,
@@ -289,6 +291,7 @@ const schemas: Record<string, z.ZodType> = {
   "shells/ShellRef": shells.ShellRef,
   "shells/ShellsOutputInput": shells.ShellsOutputInput,
   "shells/ShellOutputDto": shells.ShellOutputDto,
+  "shells/EndedShellDto": shells.EndedShellDto,
   "terminal/TerminalShell": terminal.TerminalShell,
   "terminal/TerminalStatus": terminal.TerminalStatus,
   "terminal/TerminalSessionDto": terminal.TerminalSessionDto,
@@ -585,6 +588,8 @@ const schemas: Record<string, z.ZodType> = {
   "chat/GoalUsageDto": GoalUsageDto,
   "chat/ChatGoalDto": ChatGoalDto,
   "chat/ChatGoalStepDto": ChatGoalStepDto,
+  "chat/ChatEventDto": ChatEventDto,
+  "chat/ChatWakeStepDto": ChatWakeStepDto,
   "chat/ChatGoalInput": contract["chat.goal.stop"].input,
 };
 

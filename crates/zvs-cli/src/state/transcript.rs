@@ -189,6 +189,11 @@ impl Transcript {
                 MessageRole::User => transcript
                     .entries
                     .push(Entry::User(message.content.clone())),
+                MessageRole::Event => {
+                    if let Some(event) = &message.event {
+                        transcript.notice(Tone::Info, crate::copy::process_event(event));
+                    }
+                }
                 MessageRole::Assistant => {
                     transcript.entries.extend(
                         message

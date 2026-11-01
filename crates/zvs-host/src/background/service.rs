@@ -7,10 +7,10 @@ use tokio::process::Child;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, BackgroundShellDto, BackgroundShellId, BackgroundShellStatus,
-    BackgroundShellStatusDto, HostEventDraft, RunOutcomeDto, RunOutcomeStatus, SHELL_BUFFER_MAX,
-    SHELL_LIFETIME_SECS, SHELL_STEP_DOMAIN, SHELLS_PER_OWNER_MAX, SHELLS_TOTAL_MAX, ShellOutputDto,
-    Timestamp,
+    AppError, AppErrorCode, ArtifactDto, BackgroundShellDto, BackgroundShellId,
+    BackgroundShellStatus, BackgroundShellStatusDto, HostEventDraft, RunOutcomeDto,
+    RunOutcomeStatus, SHELL_BUFFER_MAX, SHELL_LIFETIME_SECS, SHELL_STEP_DOMAIN, SHELL_TAIL_MAX,
+    SHELLS_PER_OWNER_MAX, SHELLS_TOTAL_MAX, ShellOutputDto, Timestamp,
 };
 
 use crate::drivers::mcp::{default_spawn, kill_tree};
@@ -70,6 +70,31 @@ impl BackgroundShellOptions {
 pub struct EndedShell {
     pub shell: BackgroundShellDto,
     pub tail: String,
+    pub artifacts: Vec<ArtifactDto>,
+}
+
+pub type ShellFinish = Box<dyn FnOnce() -> Vec<ArtifactDto> + Send>;
+pub type EndedListener = Arc<dyn Fn(&str, bool) + Send + Sync>;
+
+#[derive(Default)]
+pub struct ShellStart {
+    pub notify: bool,
+    pub finish: Option<ShellFinish>,
+}
+
+impl ShellStart {
+    pub fn notify(notify: bool) -> Self {
+        Self {
+            notify,
+            finish: None,
+        }
+    }
+
+    #[must_use]
+    pub fn finishing(mut self, finish: ShellFinish) -> Self {
+        self.finish = Some(finish);
+        self
+    }
 }
 
 #[derive(Clone)]
@@ -80,6 +105,7 @@ pub struct BackgroundShells {
 struct Inner {
     options: BackgroundShellOptions,
     shells: Mutex<Vec<Arc<Shell>>>,
+    listeners: Arc<Mutex<Vec<EndedListener>>>,
 }
 
 struct Shell {
@@ -93,6 +119,7 @@ struct Shell {
     stop: CancellationToken,
     state: Mutex<ShellState>,
     task: Mutex<Option<JoinHandle<()>>>,
+    finish: Mutex<Option<ShellFinish>>,
 }
 
 struct ShellState {
@@ -105,6 +132,8 @@ struct ShellState {
     reported: bool,
     closed: bool,
     events: u64,
+    notify: bool,
+    artifacts: Vec<ArtifactDto>,
 }
 
 enum Ending {
@@ -136,6 +165,18 @@ fn last_lines(text: &str, lines: usize) -> &str {
         }
     }
     &trimmed[cut + 1..]
+}
+
+fn clipped_tail(text: &str, lines: usize) -> String {
+    let tail = last_lines(text, lines);
+    if tail.len() <= SHELL_TAIL_MAX {
+        return tail.to_owned();
+    }
+    let mut cut = tail.len() - SHELL_TAIL_MAX;
+    while !tail.is_char_boundary(cut) {
+        cut += 1;
+    }
+    tail[cut..].to_owned()
 }
 
 impl Shell {
@@ -198,8 +239,9 @@ impl Shell {
         );
     }
 
-    fn finish(&self, ending: &Ending, now: Timestamp) {
+    fn finish(&self, ending: &Ending, now: Timestamp, artifacts: Vec<ArtifactDto>) {
         let mut state = lock(&self.state);
+        state.artifacts = artifacts;
         let (status, code) = match ending {
             Ending::Exited(code) => (BackgroundShellStatus::Exited, *code),
             Ending::Failed => (BackgroundShellStatus::Failed, None),
@@ -254,6 +296,7 @@ impl Shell {
                 handle.abort();
             }
         }
+        drop(lock(&self.finish).take());
     }
 }
 
@@ -274,7 +317,13 @@ async fn drain(shell: Arc<Shell>, mut stream: impl AsyncRead + Unpin, limit: usi
     }
 }
 
-async fn supervise(shell: Arc<Shell>, mut child: Child, limits: ShellLimits, clock: SharedClock) {
+async fn supervise(
+    shell: Arc<Shell>,
+    mut child: Child,
+    limits: ShellLimits,
+    clock: SharedClock,
+    listeners: Arc<Mutex<Vec<EndedListener>>>,
+) {
     let mut readers = Vec::new();
     if let Some(pipe) = child.stdout.take() {
         readers.push(tokio::spawn(drain(Arc::clone(&shell), pipe, limits.buffer)));
@@ -300,7 +349,19 @@ async fn supervise(shell: Arc<Shell>, mut child: Child, limits: ShellLimits, clo
             handle.abort();
         }
     }
-    shell.finish(&ending, clock.now());
+    let finish = lock(&shell.finish).take();
+    let artifacts = match finish {
+        Some(finish) => tokio::task::spawn_blocking(finish)
+            .await
+            .unwrap_or_default(),
+        None => Vec::new(),
+    };
+    shell.finish(&ending, clock.now(), artifacts);
+    let notify = lock(&shell.state).notify;
+    let listeners = lock(&listeners).clone();
+    for listener in listeners {
+        listener(&shell.owner, notify);
+    }
 }
 
 impl BackgroundShells {
@@ -309,8 +370,13 @@ impl BackgroundShells {
             inner: Arc::new(Inner {
                 options,
                 shells: Mutex::new(Vec::new()),
+                listeners: Arc::new(Mutex::new(Vec::new())),
             }),
         }
+    }
+
+    pub fn on_ended(&self, listener: EndedListener) {
+        lock(&self.inner.listeners).push(listener);
     }
 
     pub fn limits(&self) -> ShellLimits {
@@ -339,6 +405,7 @@ impl BackgroundShells {
         spec: &LaunchSpec,
         argv: &[String],
         not_started: &str,
+        launch: ShellStart,
     ) -> Result<BackgroundShellDto, AppError> {
         let limits = self.inner.options.limits;
         let mut shells = self.shells();
@@ -389,8 +456,11 @@ impl BackgroundShells {
                 reported: false,
                 closed: false,
                 events: 0,
+                notify: launch.notify,
+                artifacts: Vec::new(),
             }),
             task: Mutex::new(None),
+            finish: Mutex::new(launch.finish),
         });
         let dto = {
             let mut state = lock(&shell.state);
@@ -402,6 +472,7 @@ impl BackgroundShells {
             child,
             limits,
             Arc::clone(&self.inner.options.clock),
+            Arc::clone(&self.inner.listeners),
         ));
         *lock(&shell.task) = Some(task);
         shells.push(shell);
@@ -493,6 +564,44 @@ impl BackgroundShells {
     }
 
     pub fn take_ended(&self, owner: &str, lines: usize) -> Vec<EndedShell> {
+        self.take(owner, lines, false)
+    }
+
+    pub fn take_notified(&self, owner: &str, lines: usize) -> Vec<EndedShell> {
+        self.take(owner, lines, true)
+    }
+
+    fn unreported(&self, owner: &str) -> Vec<Arc<Shell>> {
+        self.shells()
+            .iter()
+            .filter(|shell| shell.owner == owner)
+            .filter(|shell| {
+                let state = lock(&shell.state);
+                !state.status.running() && !state.reported
+            })
+            .cloned()
+            .collect()
+    }
+
+    pub fn has_notified(&self, owner: &str) -> bool {
+        self.unreported(owner)
+            .iter()
+            .any(|shell| lock(&shell.state).notify)
+    }
+
+    pub fn demote(&self, owner: &str) -> usize {
+        let mut demoted = 0;
+        for shell in self.unreported(owner) {
+            let mut state = lock(&shell.state);
+            if state.notify {
+                state.notify = false;
+                demoted += 1;
+            }
+        }
+        demoted
+    }
+
+    fn take(&self, owner: &str, lines: usize, notified: bool) -> Vec<EndedShell> {
         let shells: Vec<Arc<Shell>> = self
             .shells()
             .iter()
@@ -503,13 +612,14 @@ impl BackgroundShells {
         for shell in shells {
             let (text, _, _, _) = shell.read(None);
             let mut state = lock(&shell.state);
-            if state.status.running() || state.reported {
+            if state.status.running() || state.reported || state.notify != notified {
                 continue;
             }
             state.reported = true;
             ended.push(EndedShell {
                 shell: shell.dto(&state),
-                tail: last_lines(&text, lines).to_owned(),
+                tail: clipped_tail(&text, lines),
+                artifacts: state.artifacts.clone(),
             });
         }
         ended

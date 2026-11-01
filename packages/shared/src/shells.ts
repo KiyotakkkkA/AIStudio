@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ArtifactDto } from "./artifacts.js";
 import { BackgroundShellId, StreamId } from "./primitives/branded.js";
 
 export const SHELL_STEP_DOMAIN = "shell";
@@ -6,6 +7,8 @@ export const SHELLS_PER_OWNER_MAX = 4;
 export const SHELLS_TOTAL_MAX = 16;
 export const SHELL_LIFETIME_SECS = 3600;
 export const SHELL_BUFFER_MAX = 262_144;
+export const SHELL_TAIL_MAX = 16_000;
+export const SHELL_ARTIFACTS_MAX = 64;
 
 export const BackgroundShellStatus = z.enum([
   "running",
@@ -65,3 +68,12 @@ export const ShellOutputDto = z.object({
   eventSeq: z.number().int().nonnegative(),
 });
 export type ShellOutputDto = z.infer<typeof ShellOutputDto>;
+
+export const EndedShellDto = z
+  .object({
+    shell: BackgroundShellDto,
+    tail: z.string().max(SHELL_TAIL_MAX),
+    artifacts: z.array(ArtifactDto).max(SHELL_ARTIFACTS_MAX).default([]),
+  })
+  .refine((ended) => ended.shell.status !== "running", { path: ["shell", "status"] });
+export type EndedShellDto = z.infer<typeof EndedShellDto>;

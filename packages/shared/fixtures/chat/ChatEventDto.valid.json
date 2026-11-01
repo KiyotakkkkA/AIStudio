@@ -1,0 +1,69 @@
+[
+  {
+    "name": "two processes",
+    "value": {
+      "shells": [
+        {
+          "shell": {
+            "id": "0199aa11-4444-7111-8111-111111111111",
+            "ownerId": "0199aa11-1111-7111-8111-111111111111",
+            "program": "C:\\Users\\dev\\.cargo\\bin\\cargo.exe",
+            "argv": ["cargo", "test"],
+            "cwd": "D:\\work\\app",
+            "status": "exited",
+            "exitCode": 0,
+            "streamId": "0199aa11-5555-7111-8111-111111111111",
+            "startedAt": 1767225600000,
+            "endedAt": 1767225660000
+          },
+          "tail": "test result: ok. 42 passed; 0 failed"
+        },
+        {
+          "shell": {
+            "id": "0199aa11-4444-7111-8111-111111111111",
+            "ownerId": "0199aa11-1111-7111-8111-111111111111",
+            "program": "uv",
+            "argv": ["skill:xlsx/scripts/build.py", "spec.json"],
+            "cwd": "D:\\work\\app",
+            "status": "exited",
+            "exitCode": 0,
+            "streamId": "0199aa11-5555-7111-8111-111111111111",
+            "startedAt": 1767225600000,
+            "endedAt": 1767225660000
+          },
+          "tail": "done",
+          "artifacts": [
+            {
+              "id": "0199aa11-1111-7111-8111-111111111111/report.xlsx",
+              "name": "report.xlsx",
+              "format": "xlsx",
+              "sizeBytes": 4096
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "one process",
+    "value": {
+      "shells": [
+        {
+          "shell": {
+            "id": "0199aa11-4444-7111-8111-111111111111",
+            "ownerId": "0199aa11-1111-7111-8111-111111111111",
+            "program": "C:\\Users\\dev\\.cargo\\bin\\cargo.exe",
+            "argv": ["cargo", "test"],
+            "cwd": "D:\\work\\app",
+            "status": "exited",
+            "exitCode": 0,
+            "streamId": "0199aa11-5555-7111-8111-111111111111",
+            "startedAt": 1767225600000,
+            "endedAt": 1767225660000
+          },
+          "tail": "test result: ok. 42 passed; 0 failed"
+        }
+      ]
+    }
+  }
+]

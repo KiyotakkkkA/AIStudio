@@ -83,14 +83,15 @@ pub use chat::{
     BranchConversationInput, ChatAttachDto, ChatAttachInput, ChatAttachOutput, ChatCitationDto,
     ChatCommand, ChatCommandDto, ChatCommandsOutput, ChatContextDto, ChatContextInput,
     ChatContextToolDto, ChatConversationsListOutput, ChatEvalCaseDto, ChatEvalInput,
-    ChatEvalModeDto, ChatEvalRunDto, ChatRoundDto, ChatSendInput, ChatSettings, ChatToolCallDto,
-    ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationExportDto,
-    ConversationExportFormat, ConversationRef, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
-    DocumentSelectionDto, ExportConversationInput, MessageDto, MessageRole, OfferedToolDto,
-    OfferedToolSource, PinConversationInput, PinMessageInput, RenameConversationInput,
-    RetrievalMode, ThinkingEffort, TruncateConversationInput, UpdateConversationRelationsInput,
-    UpdateConversationRetrievalInput, UpdateConversationStoresInput, VendorTurnOptions,
-    WEB_SOURCES_MAX, WebSourceDto,
+    ChatEvalModeDto, ChatEvalRunDto, ChatEventDto, ChatRoundDto, ChatSendInput, ChatSettings,
+    ChatToolCallDto, ChatToolCallStatus, ChatWakeStepDto, ConversationDetailDto, ConversationDto,
+    ConversationExportDto, ConversationExportFormat, ConversationRef, CreateConversationInput,
+    DEFAULT_CONVERSATION_TITLE, DocumentSelectionDto, ExportConversationInput, MessageDto,
+    MessageRole, OfferedToolDto, OfferedToolSource, PinConversationInput, PinMessageInput,
+    RenameConversationInput, RetrievalMode, ThinkingEffort, TruncateConversationInput,
+    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    UpdateConversationStoresInput, VendorTurnOptions, WAKE_STEP_DOMAIN, WEB_SOURCES_MAX,
+    WebSourceDto,
 };
 pub use cli::{
     CLI_COMMAND, CLI_LAUNCH_ARG, CLI_LINE_MAX, CLI_PIPE_PREFIX, CLI_PROTOCOL_VERSION,
@@ -227,9 +228,10 @@ pub use settings::{
     SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, check_setting_key,
 };
 pub use shells::{
-    BackgroundShellDto, BackgroundShellStatus, BackgroundShellStatusDto, SHELL_BUFFER_MAX,
-    SHELL_LIFETIME_SECS, SHELL_STEP_DOMAIN, SHELLS_PER_OWNER_MAX, SHELLS_TOTAL_MAX, ShellOutputDto,
-    ShellRef, ShellsListInput, ShellsOutputInput,
+    BackgroundShellDto, BackgroundShellStatus, BackgroundShellStatusDto, EndedShellDto,
+    SHELL_ARTIFACTS_MAX, SHELL_BUFFER_MAX, SHELL_LIFETIME_SECS, SHELL_STEP_DOMAIN, SHELL_TAIL_MAX,
+    SHELLS_PER_OWNER_MAX, SHELLS_TOTAL_MAX, ShellOutputDto, ShellRef, ShellsListInput,
+    ShellsOutputInput,
 };
 pub use sites::{
     OpenSiteInput, SITE_ICON_BYTES_MAX, SITE_ICON_MIMES, SiteIconDto, SiteIconInput, SiteIconOutput,

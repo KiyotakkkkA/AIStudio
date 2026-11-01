@@ -17,6 +17,7 @@ import { ApprovalRequestDto, EventSeq } from "./events/HostEvent.js";
 import { QuestionRequestDto } from "./questions.js";
 import { Timestamp } from "./primitives/time.js";
 import { AgenticPlanStepDto } from "./agentic.js";
+import { EndedShellDto, SHELLS_TOTAL_MAX } from "./shells.js";
 
 export const ChatSettings = z.object({
   temperature: z.number().min(0).max(2).optional(),
@@ -269,29 +270,50 @@ export type DocumentSelectionDto = z.infer<typeof DocumentSelectionDto>;
 
 const Selections = z.array(DocumentSelectionDto).max(CHAT_SELECTIONS_MAX);
 
-export const MessageDto = z.object({
-  id: MessageId,
-  conversationId: ConversationId,
-  role: z.enum(["user", "assistant"]),
-  content: z.string(),
-  reasoning: z.string().default(""),
-  citations: z.array(ChatCitationDto),
-  toolCalls: z.array(ChatToolCallDto).default([]),
-  selections: Selections.default([]),
-  command: ChatCommand.optional(),
-  offeredTools: z.array(OfferedToolDto).default([]),
-  webSources: z.array(WebSourceDto).max(WEB_SOURCES_MAX).default([]),
-  rounds: z.array(ChatRoundDto).default([]),
-  tokensIn: z.number().int().nonnegative(),
-  tokensOut: z.number().int().nonnegative(),
-  usageEstimated: z.boolean(),
-  durationMs: z.number().int().nonnegative(),
-  runId: RunId.nullable(),
-  partial: z.boolean(),
-  pinned: z.boolean().default(false),
-  createdAt: z.number().int(),
+export const MessageRole = z.enum(["user", "assistant", "event"]);
+export type MessageRole = z.infer<typeof MessageRole>;
+
+export const ChatEventDto = z.object({
+  shells: z.array(EndedShellDto).min(1).max(SHELLS_TOTAL_MAX),
 });
+export type ChatEventDto = z.infer<typeof ChatEventDto>;
+
+export const MessageDto = z
+  .object({
+    id: MessageId,
+    conversationId: ConversationId,
+    role: MessageRole,
+    content: z.string(),
+    reasoning: z.string().default(""),
+    citations: z.array(ChatCitationDto),
+    toolCalls: z.array(ChatToolCallDto).default([]),
+    selections: Selections.default([]),
+    command: ChatCommand.optional(),
+    offeredTools: z.array(OfferedToolDto).default([]),
+    webSources: z.array(WebSourceDto).max(WEB_SOURCES_MAX).default([]),
+    rounds: z.array(ChatRoundDto).default([]),
+    tokensIn: z.number().int().nonnegative(),
+    tokensOut: z.number().int().nonnegative(),
+    usageEstimated: z.boolean(),
+    durationMs: z.number().int().nonnegative(),
+    runId: RunId.nullable(),
+    partial: z.boolean(),
+    pinned: z.boolean().default(false),
+    event: ChatEventDto.optional(),
+    createdAt: z.number().int(),
+  })
+  .refine((message) => (message.role === "event") === (message.event !== undefined), {
+    path: ["event"],
+  });
 export type MessageDto = z.infer<typeof MessageDto>;
+
+export const WAKE_STEP_DOMAIN = "wake";
+
+export const ChatWakeStepDto = z.object({
+  domain: z.literal(WAKE_STEP_DOMAIN),
+  message: MessageDto.refine((message) => message.role === "event", { path: ["role"] }),
+});
+export type ChatWakeStepDto = z.infer<typeof ChatWakeStepDto>;
 export const ConversationDetailDto = ConversationFields.extend({
   messages: z.array(MessageDto),
 }).refine(folderAccessMatches, { path: ["workingFolderAccess"] });

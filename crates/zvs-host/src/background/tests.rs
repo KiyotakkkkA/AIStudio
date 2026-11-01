@@ -1,12 +1,15 @@
 use std::collections::BTreeMap;
 use std::io::Write;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use zvs_contract::{AppErrorCode, BackgroundShellStatus, HostEventDraft, SHELL_STEP_DOMAIN};
+use zvs_contract::{
+    AppErrorCode, ArtifactDto, BackgroundShellStatus, HostEventDraft, SHELL_STEP_DOMAIN,
+};
 
 use super::service::{
-    BackgroundShellOptions, BackgroundShells, OWNER_LIMIT, SHELL_MISSING, ShellLimits, TOTAL_LIMIT,
+    BackgroundShellOptions, BackgroundShells, OWNER_LIMIT, SHELL_MISSING, ShellLimits, ShellStart,
+    TOTAL_LIMIT,
 };
 use crate::platform::clock::FakeClock;
 use crate::platform::events::EventBus;
@@ -131,7 +134,13 @@ async fn a_background_shell_keeps_its_output_and_reports_its_exit_code() {
     let fixture = fixture(ShellLimits::default());
     let shell = fixture
         .shells
-        .start(OWNER, &spec("lines"), &argv("lines"), NOT_STARTED)
+        .start(
+            OWNER,
+            &spec("lines"),
+            &argv("lines"),
+            NOT_STARTED,
+            ShellStart::default(),
+        )
         .expect("starts");
     assert_eq!(shell.status, BackgroundShellStatus::Running);
     assert_eq!(shell.ended_at, None);
@@ -169,7 +178,13 @@ async fn stopping_a_shell_kills_it_and_reports_stopped() {
     let fixture = fixture(ShellLimits::default());
     let shell = fixture
         .shells
-        .start(OWNER, &spec("hang"), &argv("hang"), NOT_STARTED)
+        .start(
+            OWNER,
+            &spec("hang"),
+            &argv("hang"),
+            NOT_STARTED,
+            ShellStart::default(),
+        )
         .expect("starts");
     printed(&fixture, &shell.id, "started").await;
     let stopped = tokio::time::timeout(
@@ -192,7 +207,13 @@ async fn a_shell_past_its_lifetime_is_stopped() {
     });
     let shell = fixture
         .shells
-        .start(OWNER, &spec("hang"), &argv("hang"), NOT_STARTED)
+        .start(
+            OWNER,
+            &spec("hang"),
+            &argv("hang"),
+            NOT_STARTED,
+            ShellStart::default(),
+        )
         .expect("starts");
     assert_eq!(
         settled(&fixture, &shell.id).await,
@@ -209,17 +230,35 @@ async fn the_owner_and_total_caps_count_running_shells_only() {
     });
     let first = fixture
         .shells
-        .start(OWNER, &spec("hang"), &argv("hang"), NOT_STARTED)
+        .start(
+            OWNER,
+            &spec("hang"),
+            &argv("hang"),
+            NOT_STARTED,
+            ShellStart::default(),
+        )
         .expect("starts");
     let error = fixture
         .shells
-        .start(OWNER, &spec("hang"), &argv("hang"), NOT_STARTED)
+        .start(
+            OWNER,
+            &spec("hang"),
+            &argv("hang"),
+            NOT_STARTED,
+            ShellStart::default(),
+        )
         .expect_err("over the owner cap");
     assert_eq!(error.code, AppErrorCode::Conflict);
     assert_eq!(error.message, OWNER_LIMIT);
     fixture
         .shells
-        .start(OTHER, &spec("hang"), &argv("hang"), NOT_STARTED)
+        .start(
+            OTHER,
+            &spec("hang"),
+            &argv("hang"),
+            NOT_STARTED,
+            ShellStart::default(),
+        )
         .expect("another owner starts");
     let error = fixture
         .shells
@@ -228,6 +267,7 @@ async fn the_owner_and_total_caps_count_running_shells_only() {
             &spec("hang"),
             &argv("hang"),
             NOT_STARTED,
+            ShellStart::default(),
         )
         .expect_err("over the total cap");
     assert_eq!(error.message, TOTAL_LIMIT);
@@ -238,7 +278,13 @@ async fn the_owner_and_total_caps_count_running_shells_only() {
         .expect("stops the first");
     fixture
         .shells
-        .start(OWNER, &spec("hang"), &argv("hang"), NOT_STARTED)
+        .start(
+            OWNER,
+            &spec("hang"),
+            &argv("hang"),
+            NOT_STARTED,
+            ShellStart::default(),
+        )
         .expect("a stopped shell frees its place");
     fixture.shells.dispose().await;
     assert_eq!(fixture.shells.running_count(), 0);
@@ -249,7 +295,13 @@ async fn one_owner_cannot_reach_another_owners_shell() {
     let fixture = fixture(ShellLimits::default());
     let shell = fixture
         .shells
-        .start(OWNER, &spec("lines"), &argv("lines"), NOT_STARTED)
+        .start(
+            OWNER,
+            &spec("lines"),
+            &argv("lines"),
+            NOT_STARTED,
+            ShellStart::default(),
+        )
         .expect("starts");
     for error in [
         fixture
@@ -282,7 +334,13 @@ async fn output_is_paged_by_sequence_and_the_buffer_is_capped() {
     });
     let shell = fixture
         .shells
-        .start(OWNER, &spec("flood"), &argv("flood"), NOT_STARTED)
+        .start(
+            OWNER,
+            &spec("flood"),
+            &argv("flood"),
+            NOT_STARTED,
+            ShellStart::default(),
+        )
         .expect("starts");
     settled(&fixture, &shell.id).await;
     let all = fixture
@@ -313,7 +371,13 @@ async fn an_ended_shell_is_reported_to_the_next_turn_once() {
     let fixture = fixture(ShellLimits::default());
     let shell = fixture
         .shells
-        .start(OWNER, &spec("lines"), &argv("lines"), NOT_STARTED)
+        .start(
+            OWNER,
+            &spec("lines"),
+            &argv("lines"),
+            NOT_STARTED,
+            ShellStart::default(),
+        )
         .expect("starts");
     settled(&fixture, &shell.id).await;
     let ended = fixture.shells.take_ended(OWNER, 2);
@@ -329,11 +393,23 @@ async fn closing_an_owner_kills_and_forgets_its_shells() {
     let fixture = fixture(ShellLimits::default());
     let mine = fixture
         .shells
-        .start(OWNER, &spec("hang"), &argv("hang"), NOT_STARTED)
+        .start(
+            OWNER,
+            &spec("hang"),
+            &argv("hang"),
+            NOT_STARTED,
+            ShellStart::default(),
+        )
         .expect("starts");
     let theirs = fixture
         .shells
-        .start(OTHER, &spec("hang"), &argv("hang"), NOT_STARTED)
+        .start(
+            OTHER,
+            &spec("hang"),
+            &argv("hang"),
+            NOT_STARTED,
+            ShellStart::default(),
+        )
         .expect("starts");
     tokio::time::timeout(Duration::from_secs(30), fixture.shells.close_owner(OWNER))
         .await
@@ -361,7 +437,13 @@ async fn only_the_newest_ended_shells_are_kept() {
     for _ in 0..4 {
         let shell = fixture
             .shells
-            .start(OWNER, &spec("lines"), &argv("lines"), NOT_STARTED)
+            .start(
+                OWNER,
+                &spec("lines"),
+                &argv("lines"),
+                NOT_STARTED,
+                ShellStart::default(),
+            )
             .expect("starts");
         settled(&fixture, &shell.id).await;
         ids.push(shell.id);
@@ -393,9 +475,104 @@ async fn a_program_that_cannot_start_reports_the_caller_message() {
             },
             &argv("missing"),
             NOT_STARTED,
+            ShellStart::default(),
         )
         .expect_err("nothing to start");
     assert_eq!(error.code, AppErrorCode::NativeError);
     assert_eq!(error.message, NOT_STARTED);
     assert!(fixture.shells.list(OWNER).is_empty());
+}
+
+async fn heard(heard: &Mutex<Vec<(String, bool)>>) -> Vec<(String, bool)> {
+    for _ in 0..600 {
+        let seen = heard.lock().expect("the log").clone();
+        if !seen.is_empty() {
+            return seen;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    panic!("no listener was called");
+}
+
+#[tokio::test]
+async fn a_notified_shell_waits_for_its_wake_up_and_carries_what_its_exit_hook_found() {
+    let fixture = fixture(ShellLimits::default());
+    let log: Arc<Mutex<Vec<(String, bool)>>> = Arc::default();
+    let sink = Arc::clone(&log);
+    fixture
+        .shells
+        .on_ended(Arc::new(move |owner: &str, notify: bool| {
+            sink.lock()
+                .expect("the log")
+                .push((owner.to_owned(), notify));
+        }));
+    let artifact = ArtifactDto {
+        id: format!("{OWNER}/report.xlsx"),
+        name: "report.xlsx".to_owned(),
+        format: "xlsx".to_owned(),
+        size_bytes: 10,
+    };
+    let found = artifact.clone();
+    let shell = fixture
+        .shells
+        .start(
+            OWNER,
+            &spec("lines"),
+            &argv("lines"),
+            NOT_STARTED,
+            ShellStart::notify(true).finishing(Box::new(move || vec![found])),
+        )
+        .expect("starts");
+    settled(&fixture, &shell.id).await;
+    assert_eq!(heard(&log).await, vec![(OWNER.to_owned(), true)]);
+    assert!(fixture.shells.has_notified(OWNER));
+    assert!(fixture.shells.take_ended(OWNER, 2).is_empty());
+    let ended = fixture.shells.take_notified(OWNER, 2);
+    assert_eq!(ended.len(), 1);
+    assert_eq!(ended[0].tail, "two\nthree");
+    assert_eq!(ended[0].artifacts, vec![artifact]);
+    assert!(!fixture.shells.has_notified(OWNER));
+    assert!(fixture.shells.take_notified(OWNER, 2).is_empty());
+}
+
+#[tokio::test]
+async fn a_demoted_shell_goes_back_to_the_next_turn_note() {
+    let fixture = fixture(ShellLimits::default());
+    let shell = fixture
+        .shells
+        .start(
+            OWNER,
+            &spec("lines"),
+            &argv("lines"),
+            NOT_STARTED,
+            ShellStart::notify(true),
+        )
+        .expect("starts");
+    settled(&fixture, &shell.id).await;
+    assert_eq!(fixture.shells.demote(OWNER), 1);
+    assert!(fixture.shells.take_notified(OWNER, 2).is_empty());
+    assert_eq!(fixture.shells.take_ended(OWNER, 2).len(), 1);
+}
+
+#[tokio::test]
+async fn a_killed_shell_still_runs_its_exit_hook() {
+    let fixture = fixture(ShellLimits::default());
+    let ran = Arc::new(Mutex::new(false));
+    let flag = Arc::clone(&ran);
+    let shell = fixture
+        .shells
+        .start(
+            OWNER,
+            &spec("hang"),
+            &argv("hang"),
+            NOT_STARTED,
+            ShellStart::default().finishing(Box::new(move || {
+                *flag.lock().expect("the flag") = true;
+                Vec::new()
+            })),
+        )
+        .expect("starts");
+    printed(&fixture, &shell.id, "started").await;
+    fixture.shells.kill(None, &shell.id).await.expect("stops");
+    assert!(*ran.lock().expect("the flag"));
 }

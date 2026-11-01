@@ -28,17 +28,5 @@
       "cwd": "D:\\work",
       "packages": []
     }
-  },
-  {
-    "name": "background code",
-    "value": {
-      "program": "Python",
-      "language": "python",
-      "argv": [],
-      "cwd": "D:\\scratch\\run",
-      "source": "print(1)",
-      "packages": [],
-      "background": true
-    }
   }
 ]

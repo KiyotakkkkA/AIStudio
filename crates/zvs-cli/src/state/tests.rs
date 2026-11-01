@@ -1654,3 +1654,62 @@ fn a_child_approval_prompt_carries_the_subagent_title() {
     ));
     assert_eq!(app.prompts.back().expect("a prompt").subagent, None);
 }
+
+const WAKES: &str =
+    include_str!("../../../../packages/shared/fixtures/chat/ChatWakeStepDto.valid.json");
+
+fn wake_step(conversation: ConversationId) -> Msg {
+    let mut step: Value = first(WAKES);
+    step["message"]["conversationId"] = json!(conversation);
+    let value = json!({
+        "streamId": STREAM,
+        "seq": 3,
+        "ts": 3_000,
+        "type": "step",
+        "step": step,
+    });
+    Msg::Event(Box::new(serde_json::from_value(value).expect("event")))
+}
+
+#[test]
+fn a_wake_up_turn_shows_its_card_and_streams_while_the_prompt_is_idle() {
+    let mut app = ready();
+    let known = conversation();
+    let id = known.id;
+    app.conversation = Some(known);
+    assert_eq!(app.update(wake_step(id)), vec![Request::Attach(id)]);
+    assert!(app.transcript.entries.iter().any(|entry| matches!(
+        entry,
+        Entry::Notice { text, .. } if text.starts_with(copy::PROCESS_ENDED_EVENT)
+    )));
+    assert!(app.busy());
+    app.update(event(5, json!({ "type": "token", "delta": " after" })));
+    let mut live: ChatAttachDto = first(include_str!(
+        "../../../../packages/shared/fixtures/chat/ChatAttachDto.valid.json"
+    ));
+    live.run = handle();
+    live.seq = Some(4);
+    live.content = "Результат".to_owned();
+    live.approvals.clear();
+    live.questions.clear();
+    app.update(Msg::Attached(Ok(Some(live))));
+    assert!(!app.awaiting);
+    assert_eq!(app.run.as_ref().map(|run| run.id), Some(handle().id));
+    assert!(app.transcript.live.is_some());
+}
+
+#[test]
+fn a_wake_up_of_another_dialog_or_during_a_turn_is_ignored() {
+    let mut app = ready();
+    let known = conversation();
+    let id = known.id;
+    app.conversation = Some(known);
+    let other = ConversationId::parse("0199aa11-9999-7111-8111-111111111111").expect("an id");
+    assert!(app.update(wake_step(other)).is_empty());
+    app.run = Some(handle());
+    assert!(app.update(wake_step(id)).is_empty());
+    assert!(!app.transcript.entries.iter().any(|entry| matches!(
+        entry,
+        Entry::Notice { text, .. } if text.starts_with(copy::PROCESS_ENDED_EVENT)
+    )));
+}

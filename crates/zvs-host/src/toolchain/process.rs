@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,6 +20,46 @@ pub const PROCESS_OUTPUT_BYTES: usize = 64 * 1024;
 pub const SCRATCH_KEEP: usize = 16;
 const DRAIN_GRACE: Duration = Duration::from_secs(2);
 const DEFAULT_PATHEXT: &str = ".COM;.EXE;.BAT;.CMD";
+
+static PINNED: LazyLock<Mutex<HashMap<PathBuf, usize>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn pinned() -> std::sync::MutexGuard<'static, HashMap<PathBuf, usize>> {
+    PINNED.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+#[derive(Debug)]
+pub struct ScratchPin {
+    path: PathBuf,
+}
+
+impl ScratchPin {
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for ScratchPin {
+    fn drop(&mut self) {
+        let mut pins = pinned();
+        if let Some(count) = pins.get_mut(&self.path) {
+            *count -= 1;
+            if *count == 0 {
+                pins.remove(&self.path);
+            }
+        }
+    }
+}
+
+pub fn pin_scratch(path: &Path) -> ScratchPin {
+    let path = path.to_path_buf();
+    *pinned().entry(path.clone()).or_insert(0) += 1;
+    ScratchPin { path }
+}
+
+pub fn is_pinned(path: &Path) -> bool {
+    pinned().contains_key(path)
+}
 
 static STREAM_FENCE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)<(/?)(stdout|stderr)").expect("a valid pattern"));
@@ -125,7 +166,7 @@ pub fn prepare_scratch(root: &Path, run: &str) -> Result<PathBuf, AppError> {
         .map_err(failed)?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
-        .filter(|path| path.is_dir() && *path != scratch)
+        .filter(|path| path.is_dir() && *path != scratch && !is_pinned(path))
         .filter_map(|path| {
             let modified = fs::metadata(&path).and_then(|meta| meta.modified()).ok()?;
             Some((modified, path))

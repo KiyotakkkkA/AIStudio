@@ -1,6 +1,7 @@
 import { AppErrorCode, type BackgroundShellDto, type BackgroundShellStatus } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 import { plural } from "../connections/connectionPresentation";
+import type { StatusTone } from "../../ui/atoms/statusTone";
 
 export const BACKGROUND_LABEL = "Фоновые процессы";
 export const IN_BACKGROUND = "В фоне";
@@ -35,6 +36,19 @@ export function statusLabel(status: BackgroundShellStatus, exitCode: number | nu
     case "timed-out":
       return "Превышено время";
   }
+}
+
+export const PROCESS_ENDED = "Фоновый процесс завершён";
+export const WOKEN_TURN = "Диалог продолжен автоматически";
+
+export function exitCodeText(exitCode: number | null): string {
+  return exitCode === null ? "Без кода выхода" : `Код выхода ${String(exitCode)}`;
+}
+
+export function endedTone(shell: Pick<BackgroundShellDto, "status" | "exitCode">): StatusTone {
+  if (shell.status === "exited" && shell.exitCode === 0) return "ok";
+  if (shell.status === "stopped") return "idle";
+  return "err";
 }
 
 export function commandText(shell: Pick<BackgroundShellDto, "argv" | "program">): string {

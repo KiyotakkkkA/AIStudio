@@ -574,6 +574,11 @@ Core concepts:
   the tier says `ask`, admission hands it a ticket on the `StepContext` instead, and the node
   raises one approval itself once it can show what it is about to do (`fs.apply`: the combined
   diff, merged with any folder request into a single modal).
+- **Wake-up turn** — a chat turn the host starts when a background process started with
+  `notify: true` ends (§14 *Background processes*). It is an ordinary chat run: the same graph,
+  tools, approvals, questions, execution policy and run concurrency limits; it only opens with
+  a `role: "event"` message instead of a message from the person, and it never widens what the
+  turn may do.
 - **Question gate** — `StepContext::ask_user` suspends the run on a question to the user,
   counted like an approval: the run is `blocked`, a `question` event carries the request, and
   nothing new is scheduled until `chat.answer` or `chat.skip` resolves it. It has no timeout;
@@ -905,8 +910,8 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `shell.run` with `background: true` starts the process and returns its id at once instead of
   waiting. Approval is unchanged in kind: the same `permission_for`, the same execution policy
   row and the same `kind: "process"` approval, whose plan carries `background: true` so the
-  person and the judge see that the process stays running. A skill script or a call with
-  `stdin` cannot go to the background, and a call outside a dialog or agentic session is refused.
+  person and the judge see that the process stays running. A call with `stdin` cannot go to
+  the background, and a call outside a dialog or agentic session is refused.
   The process belongs to its dialog or session (the host injects the owner; the model never
   names it) and lives in `BackgroundShells`: at most 4 running per owner and 16 in total, a
   60-minute lifetime after which its tree is killed (`timed-out`), stdout and stderr merged into
@@ -920,6 +925,31 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   next turn's system prompt, once, with their last 20 lines fenced. Removing the dialog or the
   session, and quitting the app (`ShutdownStage::Stop`), kills every process tree; nothing is
   resumed after a restart. The «Терминал» dock is unchanged: it stays the person's own shell.
+  **Code and scripts** (TASK_048_EXTRA_5, 2026-11-01). `code.run` takes `background: true` as
+  well, with the same approval, policy row and judge input (`ProcessPlanDto.background` is
+  allowed together with `language`). Its npm install still runs in the foreground; only the
+  program goes to the background, and its scratch folder is pinned (`pin_scratch`) so that
+  `prepare_scratch` never prunes it while the process runs; the pin is released when the
+  process ends or is killed. A skill script can go to the background too: the files it created
+  are collected when it ends, by the same rules as a foreground script, and reported with its
+  result. Every background start carries an optional exit hook (`ShellStart::finishing`) that
+  runs once, after the output is drained.
+  **Waking** (TASK_048_EXTRA_5). All three background starts take `notify: true`; it needs
+  `background` and `shell.run` refuses it for a server-like argument vector (`server_like`:
+  dev servers, watchers, `npm start`, `run dev`, `http.server` and the like). A notified process
+  is left out of the passive next-turn note. When it ends, `ChatService` waits
+  `WAKE_DELAY` (1.5 s) so that processes ending together are coalesced, then starts a turn in
+  its dialog with no message from the person: the turn opens with a `role: "event"` message
+  whose `event` (`ChatEventDto`) holds each process (`EndedShellDto`: the final
+  `BackgroundShellDto`, the last 20 lines of output and the created files) and whose content
+  is the model-facing text with the output fenced as untrusted. Rules: the dialog must still
+  exist; a running turn queues the wake-up, which starts when that turn ends (a message sent
+  meanwhile runs first); at most `WAKE_STREAK_MAX` = 3 event messages may follow the last
+  message from the person, and past that the processes are demoted to the passive next-turn
+  note; wake-ups happen in every execution policy mode (DECISION: option a); nothing wakes
+  after a restart because no process survives one. The wake-up turn emits a `step` with
+  `domain: "wake"` (`ChatWakeStepDto`, carrying the event message) so that the desktop app
+  and the CLI attach to it while their prompt is idle. Agentic sessions are not woken.
 - **Created files** (`zvs-host/src/artifacts.rs`, TASK_043). After a skill script runs, the
   documents it created or changed in its scratch folder (and paths named in its arguments) are
   recorded by reference in `<app data>/conversations/<id>/outputs/manifest.json` and reported in

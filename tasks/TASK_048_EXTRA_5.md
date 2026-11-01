@@ -2,7 +2,7 @@
 task: TASK_048_EXTRA_5
 title: Background code and scripts, and waking the dialog when a process finishes
 phase: 9 — Integrations
-status: todo
+status: done
 depends_on: [TASK_048_EXTRA_2]
 unblocks: []
 estimate: 6–8 h (host, desktop and CLI; one commit)
@@ -165,8 +165,100 @@ Manual check:
 
 ## Handoff
 
-> Filled in by the agent that completes this task. Delete this line when writing it.
-
 **Built:**
+- DECISION answered by the user: option a. At most 3 wake-ups in a row without a message from
+  the person (`WAKE_STREAK_MAX`), and wake-ups happen in every execution policy mode.
+- Contract (`zvs-contract` and `packages/shared`):
+  - `MessageRole::Event` (`"event"`) and `MessageDto.event: ChatEventDto`. The validator
+    requires `event` exactly when the role is `event`.
+  - `EndedShellDto` holds the final `BackgroundShellDto`, a tail of at most 16 000 characters,
+    and the created files.
+  - `ChatWakeStepDto` carries `domain: "wake"` and the event message.
+  - `ProcessPlanDto.background` can now be combined with `language`.
+  - Fixtures were added for all of the above. Background code moved from the invalid to the
+    valid `ProcessPlanDto` fixture.
+  - Migration `0032_message_event` adds `message.event`.
+- `BackgroundShells`:
+  - `start` takes a `ShellStart`, which carries `notify` and an optional exit hook. The hook
+    runs once after the output is drained, on `spawn_blocking`. It is dropped if the task is
+    aborted.
+  - Added `on_ended` listeners, `take_notified`, `has_notified` and `demote`.
+  - `take_ended` skips notified processes, so the passive note never takes a process that is
+    waiting for a wake-up.
+- Scratch pins: `pin_scratch` returns a counted `ScratchPin` guard, and `prepare_scratch`
+  skips pinned folders.
+- `code.run`:
+  - Takes `background` and `notify`. `stdin` is refused in the background.
+  - It goes through the same approval and review path, and the plan carries `background`.
+  - npm install runs in the foreground. The program starts through `BackgroundShells` with
+    argv `[language, main.*, …args]`.
+  - The run's scratch folder is pinned until the process ends or is killed.
+- `shell.run`:
+  - Skill scripts can run in the background. Artifact collection moved into `ScriptOutputs`,
+    which the foreground path and the exit hook share.
+  - A scratch cwd is pinned for the script.
+  - `notify` needs `background` and is refused (`NOTIFY_SERVER`) for a server-like argument
+    vector (`server_like`).
+- The tool descriptions, the schema descriptions, the «Process tools» prompt rules and the
+  background tool result now describe `notify`. With `notify`, the tool result says the
+  conversation will be continued.
+- `services/chat/wake.rs`:
+  - `ChatService` registers an ended listener on the shells and an end hook on every turn's
+    observer.
+  - A notified exit schedules one wake-up per dialog after `WAKE_DELAY` (1.5 s), which
+    coalesces processes that end together.
+  - `wake()` checks, in order:
+    - The dialog still exists. If it does not, the processes are demoted.
+    - The dialog is idle. If not, the turn end reschedules the wake-up.
+    - The streak is under the cap. If not, the processes are demoted to the passive note.
+  - It then starts the turn through `start_turn_with`, with an event message in place of the
+    person's message. Integration triggers are not announced for that message.
+  - The prepare node emits the `wake` step. History maps event messages to the user role.
+- Markdown export renders an event as «Фоновый процесс завершён» with each command and its
+  exit code.
+- Desktop:
+  - `ProcessEventCard` shows «Фоновый процесс завершён · Диалог продолжен автоматически», and
+    for each process the command, its exit code, a status dot and «Вывод», which opens the
+    read-only dock tab.
+  - `ChatStore` observes `wake` steps for the open dialog while idle. It adds the event
+    message, then attaches and follows the run.
+- CLI:
+  - Event messages and live wake-ups show a notice line: «Фоновый процесс завершён: <cmd> ·
+    код выхода N».
+  - On a `wake` step for the current dialog while idle, the CLI attaches. Events held
+    meanwhile are replayed after the attach `seq`.
+- Tests:
+  - Background service: notify, the exit hook, demote, and a killed process running its hook.
+  - Commands: validation and `server_like`, a background `code.run` keeping its scratch
+    folder, a notified failure, and a background script reporting its artifacts.
+  - Scratch pin.
+  - Chat wake rules, 7 tests: continue, coalesce, no notify, queue behind a running turn,
+    streak cap, streak reset, removed dialog.
+  - CLI: 2 tests. Renderer: 2 tests.
+- PASSPORT: §14 *Background processes* (code and scripts, waking and its limits) and §11
+  (*Wake-up turn*).
+
 **Deviated from plan:**
+- The task named no rule for a "server-like intent", so `shell.run` uses a small argv
+  heuristic (`server_like`). A notified `code.run` is not checked, because its source cannot
+  be classified reliably.
+- The «wake-up marker» is the event card itself. It sits directly above the turn it started
+  and says «Диалог продолжен автоматически». There is no extra label on the answer.
+- Clients learn about a host-started turn from a new `wake` step on the turn's own stream,
+  which `ChatWakeStepDto` describes. This was the only way to stream the turn while the prompt
+  is idle without a new channel.
+- The tail kept for an event is the last 20 lines, the same as the passive note. Child
+  processes that print a preamble, such as the test harness, take up some of those lines.
+
 **Next session should know:**
+- Not run locally:
+  - `cargo test --workspace` as a whole. A running dev build locks `target/debug/zvs-jobd.exe`,
+    so the other crates were tested one at a time.
+  - `zvs-studio` tests, `pnpm build` and `pnpm test:e2e`.
+- Failures that already exist on `main`, left alone:
+  - the `tool_loop::vendor_usage_replaces_the_estimate…` host test (63 vs 60);
+  - clippy's `unnecessary_option_map_or_else` in `data/repositories/model.rs:149`;
+  - two TS2352 casts in `tests/renderer/chatGoal.test.ts`;
+  - prettier on `apps/studio/src/renderer/ui/atoms/assistantGeometry.ts`.
+- An agentic session's `notify` is accepted and does nothing extra. On exit the wake finds no
+  dialog and demotes the process, so the session's own note still sees it.

@@ -2,6 +2,7 @@ mod knowledge;
 mod memory;
 mod profile;
 mod tool_loop;
+mod wake;
 mod workspace;
 
 use std::future::Future;
@@ -252,6 +253,8 @@ pub(super) struct HarnessOptions {
     pub max_output: i64,
     pub memory: bool,
     pub clock: Option<SharedClock>,
+    pub shells: Option<crate::background::BackgroundShells>,
+    pub wake_delay: Option<Duration>,
 }
 
 impl Default for HarnessOptions {
@@ -271,6 +274,8 @@ impl Default for HarnessOptions {
             max_output: 128,
             memory: false,
             clock: None,
+            shells: None,
+            wake_delay: None,
         }
     }
 }
@@ -336,6 +341,8 @@ impl Harness {
             mcp: options.mcp,
             logger: logger.clone(),
             clock: options.clock.unwrap_or_else(|| Arc::new(SystemClock)),
+            shells: options.shells,
+            wake_delay: options.wake_delay.unwrap_or(WAKE_DELAY),
             ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), registry)
         })
         .expect("a chat service");

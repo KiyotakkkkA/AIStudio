@@ -800,6 +800,14 @@ const TABLE: &[(&str, Check)] = &[
     ),
     ("chat/ChatGoalDto", round_trip::<zvs_contract::ChatGoalDto>),
     (
+        "chat/ChatEventDto",
+        round_trip::<zvs_contract::ChatEventDto>,
+    ),
+    (
+        "chat/ChatWakeStepDto",
+        round_trip::<zvs_contract::ChatWakeStepDto>,
+    ),
+    (
         "chat/ChatGoalStepDto",
         round_trip::<zvs_contract::ChatGoalStepDto>,
     ),
@@ -1042,6 +1050,10 @@ const TABLE: &[(&str, Check)] = &[
     (
         "shells/ShellOutputDto",
         round_trip::<zvs_contract::shells::ShellOutputDto>,
+    ),
+    (
+        "shells/EndedShellDto",
+        round_trip::<zvs_contract::shells::EndedShellDto>,
     ),
     (
         "terminal/TerminalShell",

@@ -55,6 +55,7 @@ impl Host {
             CommandToolOptions {
                 limits,
                 roots: VirtualRoots::new(store, Some(self.services.skills.library().clone())),
+                shells: Some(self.services.shells.clone()),
                 ..self.options(launcher)
             },
         )
@@ -377,4 +378,50 @@ async fn a_skill_folder_is_never_a_cwd_and_a_skill_script_runs_in_the_chat_folde
         .await
         .expect("runs in the chat folder");
     assert_eq!(allowed.exit_code, Some(0));
+}
+
+#[tokio::test]
+async fn a_background_script_reports_its_files_when_it_ends() {
+    let host = Host::new().with_skill();
+    let store = host.store();
+    let node = host.script_node(
+        Some(Stub::shared(&[("uv", "chat")])),
+        Some(store),
+        ProcessLimits::default(),
+    );
+    let conversation = host.conversation().to_string();
+    let output = node
+        .run(
+            &context(CancellationToken::new()),
+            ShellRunInput {
+                conversation_id: conversation.clone(),
+                background: true,
+                notify: true,
+                ..script("scripts/extract.py")
+            },
+        )
+        .await
+        .expect("starts");
+    assert!(output.artifacts.is_empty());
+    assert!(output.process.background);
+    let id = output.shell_id.expect("a process id");
+    super::ended(&host, &id).await;
+    let mut notified = Vec::new();
+    for _ in 0..200 {
+        notified = host.services.shells.take_notified(&conversation, 5);
+        if !notified.is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    assert_eq!(notified.len(), 1);
+    assert_eq!(
+        notified[0]
+            .artifacts
+            .iter()
+            .map(|artifact| artifact.name.as_str())
+            .collect::<Vec<_>>(),
+        ["result.csv"]
+    );
+    host.services.shells.close_owner(&conversation).await;
 }

@@ -14,8 +14,8 @@ use zvs_contract::{
     ToolAuthorisationDto, ToolAuthorisationKind, ToolTier, Validate,
 };
 
-use crate::artifacts::{Snapshot, library_env, mentioned_paths, produced, snapshot};
-use crate::background::{BackgroundShells, NO_OWNER, status_line};
+use crate::artifacts::{ArtifactStore, Snapshot, library_env, mentioned_paths, produced, snapshot};
+use crate::background::{BackgroundShells, NO_OWNER, ShellStart, status_line};
 use crate::chat_files::{CHAT_DIR_ENV, is_working};
 use crate::conversations::is_owner;
 use crate::files::roots::{
@@ -34,7 +34,7 @@ use crate::skills::script::{
 use crate::toolchain::CommandLauncher;
 use crate::toolchain::LaunchSpec;
 use crate::toolchain::process::{
-    ProcessLimits, ProcessRun, SCRATCH_FAILED, find_program, joined_path, path_dirs,
+    ProcessLimits, ProcessRun, SCRATCH_FAILED, find_program, joined_path, path_dirs, pin_scratch,
     prepare_scratch, process_text, run_process,
 };
 use crate::toolchain::service::SETTINGS_HINT;
@@ -44,8 +44,8 @@ pub const CODE_RUN: &str = "code.run";
 pub const SHELL_RUN: &str = "shell.run";
 pub const PROCESS_TOOLS: [&str; 2] = [CODE_RUN, SHELL_RUN];
 
-pub const CODE_DESCRIPTION: &str = "Runs a short program written by the model. language: python — executed via uv run; dependencies are declared at the top of source as a PEP 723 header (# /// script, dependencies = [\"…\"], # ///); uv installs them into the app's own cache, nothing is installed globally. javascript — executed via Node.js as an ES module (import, not require); packages from packages are installed into a temporary folder via npm install with install scripts disabled. powershell — executed via powershell.exe without a profile. The process working directory is a temporary run folder; the conversation working folder, when set, is passed as the ZVS_WORKSPACE_DIR environment variable. Folder permissions do not sandbox this tool: the process runs with the user's rights, and the user confirms every run from the full program text. Execution time is limited; interactive input is not supported. Returns exit code, stdout, and stderr.";
-pub const SHELL_DESCRIPTION: &str = "Runs a project program, e.g. npm test or cargo check, or a skill script. argv is an array: argv[0] is the program, the rest are arguments. No shell command line is parsed, so pipes, redirections, and substitutions are unavailable. The program is looked up first in the folders of connected environments, then in PATH. A skill script is referenced as argv[0] = skill:<key>/scripts/<file>: .py runs via uv; .js, .mjs, and .cjs run via Node.js; the skill folder is passed as ZVS_SKILL_DIR. The process working directory is cwd (a path or chat:); without cwd it is the conversation working folder, or chat: for a skill script. Access to a cwd outside granted permissions is confirmed by the user, but the process itself runs with the user's rights. The user confirms every run from the full command. Execution time is limited and interactive input is not supported; standard input comes only from stdin. For a server, watcher or long build pass background: true to get a process id at once. Returns exit code, stdout, and stderr.";
+pub const CODE_DESCRIPTION: &str = "Runs a short program written by the model. language: python — executed via uv run; dependencies are declared at the top of source as a PEP 723 header (# /// script, dependencies = [\"…\"], # ///); uv installs them into the app's own cache, nothing is installed globally. javascript — executed via Node.js as an ES module (import, not require); packages from packages are installed into a temporary folder via npm install with install scripts disabled. powershell — executed via powershell.exe without a profile. The process working directory is a temporary run folder; the conversation working folder, when set, is passed as the ZVS_WORKSPACE_DIR environment variable. Folder permissions do not sandbox this tool: the process runs with the user's rights, and the user confirms every run from the full program text. Execution time is limited; interactive input is not supported. For a long job pass background: true to get a process id at once (read it with shell.output); add notify: true and the conversation is continued with the result when the program ends. Returns exit code, stdout, and stderr.";
+pub const SHELL_DESCRIPTION: &str = "Runs a project program, e.g. npm test or cargo check, or a skill script. argv is an array: argv[0] is the program, the rest are arguments. No shell command line is parsed, so pipes, redirections, and substitutions are unavailable. The program is looked up first in the folders of connected environments, then in PATH. A skill script is referenced as argv[0] = skill:<key>/scripts/<file>: .py runs via uv; .js, .mjs, and .cjs run via Node.js; the skill folder is passed as ZVS_SKILL_DIR. The process working directory is cwd (a path or chat:); without cwd it is the conversation working folder, or chat: for a skill script. Access to a cwd outside granted permissions is confirmed by the user, but the process itself runs with the user's rights. The user confirms every run from the full command. Execution time is limited and interactive input is not supported; standard input comes only from stdin. For a server, watcher or long build pass background: true to get a process id at once. Add notify: true for work that finishes, such as a build, tests or a job: the conversation is continued with the result when the process ends; never for a server or watcher. Returns exit code, stdout, and stderr.";
 
 pub const CODE_ACTION: &str = "запуск кода";
 pub const SHELL_ACTION: &str = "запуск команды";
@@ -57,8 +57,11 @@ pub const NO_FOLDER: &str = "Команде нужна папка: выбери�
 pub const FOLDER_MISSING: &str = "Папка не найдена";
 pub const PROGRAM_NOT_FOUND: &str = "Программа не найдена в папках сред и в PATH";
 pub const PROCESS_DENIED: &str = "Запуск отклонён";
-pub const BACKGROUND_SCRIPT: &str = "Скрипт навыка нельзя запустить в фоне";
 pub const BACKGROUND_UNAVAILABLE: &str = "Фоновые процессы недоступны";
+pub const NOTIFY_SERVER: &str =
+    "Продолжение диалога по завершении недоступно для сервера или наблюдателя";
+pub const NOTIFY_TEXT: &str = "The conversation will be continued automatically with the result when this process ends; do not poll it with shell.output.";
+pub const BACKGROUND_TEXT: &str = "Read its output with shell.output and stop it with shell.kill.";
 
 pub const WORKSPACE_DIR_ENV: &str = "ZVS_WORKSPACE_DIR";
 pub const SCRATCH_DIR_ENV: &str = "ZVS_SCRATCH_DIR";
@@ -77,6 +80,59 @@ pub const PACKAGE_MANIFEST: &str = "{\n  \"private\": true\n}\n";
 const STDIN_MAX_CHARS: usize = 1_048_576;
 const PATH_MAX_CHARS: usize = 32_767;
 const UTF8_BOM: &str = "\u{feff}";
+
+const SERVER_PROGRAMS: [&str; 7] = [
+    "nodemon",
+    "vite",
+    "http-server",
+    "live-server",
+    "serve",
+    "webpack-dev-server",
+    "cargo-watch",
+];
+const SERVER_ARGS: [&str; 5] = ["serve", "runserver", "watch", "--watch", "http-server"];
+const SERVER_SCRIPTS: [&str; 5] = ["dev", "start", "serve", "watch", "preview"];
+const SCRIPT_RUNNERS: [&str; 4] = ["npm", "pnpm", "yarn", "bun"];
+
+pub fn server_like(argv: &[String]) -> bool {
+    let Some(program) = argv.first() else {
+        return false;
+    };
+    let stem = Path::new(&program.to_ascii_lowercase())
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if SERVER_PROGRAMS.contains(&stem.as_str()) {
+        return true;
+    }
+    let args: Vec<String> = argv[1..]
+        .iter()
+        .map(|arg| arg.to_ascii_lowercase())
+        .collect();
+    if SCRIPT_RUNNERS.contains(&stem.as_str())
+        && args
+            .first()
+            .is_some_and(|first| SERVER_SCRIPTS.contains(&first.as_str()))
+    {
+        return true;
+    }
+    args.iter().enumerate().any(|(index, arg)| {
+        SERVER_ARGS.contains(&arg.as_str())
+            || arg.ends_with(".server")
+            || arg.starts_with("--watch=")
+            || (arg == "run"
+                && args
+                    .get(index + 1)
+                    .is_some_and(|next| SERVER_SCRIPTS.contains(&next.as_str())))
+    })
+}
+
+fn check_notify(background: bool, notify: bool) -> Result<(), AppError> {
+    if notify && !background {
+        return Err(invalid("notify", "background"));
+    }
+    Ok(())
+}
 
 static PACKAGE_SPEC: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*(@[A-Za-z0-9._~^<>=*+| -]+)?$")
@@ -190,12 +246,14 @@ impl ProcessToolOutput {
         }
     }
 
-    fn background(shell: &BackgroundShellDto, process: ProcessPlanDto) -> Self {
+    fn background(shell: &BackgroundShellDto, process: ProcessPlanDto, notify: bool) -> Self {
+        let next = if notify {
+            format!("{NOTIFY_TEXT}\n{BACKGROUND_TEXT}")
+        } else {
+            BACKGROUND_TEXT.to_owned()
+        };
         Self {
-            text: format!(
-                "Started in the background.\n{}\nRead its output with shell.output and stop it with shell.kill.",
-                status_line(shell)
-            ),
+            text: format!("Started in the background.\n{}\n{next}", status_line(shell)),
             is_error: false,
             exit_code: None,
             timed_out: false,
@@ -293,6 +351,24 @@ impl Tools {
     fn working_folder(&self, conversation: &str) -> Result<Option<PathBuf>, AppError> {
         self.folders.working_folder_of(conversation)
     }
+
+    fn shells(
+        &self,
+        background: bool,
+        conversation: &str,
+    ) -> Result<Option<BackgroundShells>, AppError> {
+        if !background {
+            return Ok(None);
+        }
+        if conversation.is_empty() {
+            return Err(AppError::new(AppErrorCode::ValidationFailed, NO_OWNER));
+        }
+        self.options
+            .shells
+            .clone()
+            .map(Some)
+            .ok_or_else(|| AppError::new(AppErrorCode::Conflict, BACKGROUND_UNAVAILABLE))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -315,6 +391,12 @@ pub struct CodeRunInput {
         description = "Только для javascript: пакеты npm, например lodash или lodash@4.17.21"
     )]
     pub packages: Vec<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[schemars(description = "Keep running after the call returns; read with shell.output")]
+    pub background: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[schemars(description = "With background: continue the conversation when the program ends")]
+    pub notify: bool,
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
@@ -323,6 +405,10 @@ pub struct CodeRunInput {
 impl Validate for CodeRunInput {
     fn validate(&self) -> Result<(), AppError> {
         check::non_empty("source", &self.source)?;
+        if self.background && self.stdin.is_some() {
+            return Err(invalid("stdin", "background"));
+        }
+        check_notify(self.background, self.notify)?;
         check::max_len("source", &self.source, PROCESS_SOURCE_MAX)?;
         check_args("args", &self.args)?;
         check_stdin(self.stdin.as_deref())?;
@@ -483,6 +569,7 @@ impl NodeDef for CodeRunNode {
         let approval = context.take_deferred_approval();
         context.check_cancelled()?;
         let tools = &self.0;
+        let shells = tools.shells(input.background, &input.conversation_id)?;
         let workspace = tools.working_folder(&input.conversation_id)?;
         let run_id = context.run_id.to_string();
         let folder = tools
@@ -498,7 +585,7 @@ impl NodeDef for CodeRunNode {
             cwd: path_text(&folder),
             source: Some(input.source.clone()),
             packages: input.packages.clone(),
-            background: false,
+            background: input.background,
         };
         tools
             .approve(
@@ -524,6 +611,26 @@ impl NodeDef for CodeRunNode {
                 );
                 return Ok(ProcessToolOutput::of(&installed, text, process));
             }
+        }
+        if let Some(shells) = shells {
+            let pin = pin_scratch(&tools.options.scratch.join(&run_id));
+            let mut argv = vec![
+                input.language.as_str().to_owned(),
+                source_file(input.language).to_owned(),
+            ];
+            argv.extend(input.args.iter().cloned());
+            let launch = ShellStart::notify(input.notify).finishing(Box::new(move || {
+                drop(pin);
+                Vec::new()
+            }));
+            let shell = shells.start(
+                &input.conversation_id,
+                &plan.run,
+                &argv,
+                CODE_NOT_STARTED,
+                launch,
+            )?;
+            return Ok(ProcessToolOutput::background(&shell, process, input.notify));
         }
         let run = run_process(
             &plan.run,
@@ -562,6 +669,11 @@ pub struct ShellRunInput {
         description = "Keep running after the call returns; read with shell.output, stop with shell.kill"
     )]
     pub background: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[schemars(
+        description = "With background: continue the conversation when the process ends; not for servers or watchers"
+    )]
+    pub notify: bool,
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
@@ -580,6 +692,11 @@ impl Validate for ShellRunInput {
         }
         if self.background && self.stdin.is_some() {
             return Err(invalid("stdin", "background"));
+        }
+        check_notify(self.background, self.notify)?;
+        if self.notify && server_like(&self.argv) {
+            return Err(AppError::new(AppErrorCode::ValidationFailed, NOTIFY_SERVER)
+                .with_detail("field", "notify"));
         }
         check_stdin(self.stdin.as_deref())
     }
@@ -650,6 +767,78 @@ pub fn skill_script(
         spec,
         dir: script.dir,
     })
+}
+
+struct ScriptOutputs {
+    store: ArtifactStore,
+    owner: String,
+    run: String,
+    mentioned: Vec<PathBuf>,
+    cwd: PathBuf,
+    script_dir: PathBuf,
+    before: Snapshot,
+    libraries: Vec<(String, PathBuf, Snapshot)>,
+    started: std::time::SystemTime,
+}
+
+impl ScriptOutputs {
+    fn watch(
+        store: Option<&ArtifactStore>,
+        spec: &mut LaunchSpec,
+        context: &StepContext,
+        input: &ShellRunInput,
+        cwd: &Path,
+        script_dir: &Path,
+    ) -> Option<Self> {
+        let store = store?;
+        let libraries = store
+            .libraries()
+            .iter()
+            .map(|(name, folder)| {
+                let _ = std::fs::create_dir_all(folder);
+                spec.env.insert(library_env(name), path_text(folder));
+                (name.clone(), folder.clone(), snapshot(folder))
+            })
+            .collect();
+        let run = context.run_id.to_string();
+        let owner = if is_owner(&input.conversation_id) {
+            input.conversation_id.clone()
+        } else {
+            run.clone()
+        };
+        Some(Self {
+            store: store.clone(),
+            owner,
+            run,
+            mentioned: mentioned_paths(&input.argv[1..], cwd),
+            cwd: cwd.to_path_buf(),
+            script_dir: script_dir.to_path_buf(),
+            before: snapshot(cwd),
+            libraries,
+            started: std::time::SystemTime::now(),
+        })
+    }
+
+    fn collect(self) -> Vec<ArtifactDto> {
+        let results: Vec<PathBuf> =
+            produced(&self.cwd, &self.before, &self.mentioned, self.started)
+                .into_iter()
+                .filter(|path| {
+                    !path.starts_with(&self.script_dir)
+                        && path
+                            .strip_prefix(&self.cwd)
+                            .map_or(true, |relative| !is_working(relative))
+                })
+                .collect();
+        let mut kept = self.store.keep(&self.owner, &self.run, &results);
+        for (name, folder, previous) in &self.libraries {
+            kept.extend(
+                self.store
+                    .adopt(name, &produced(folder, previous, &[], self.started)),
+            );
+        }
+        kept
+    }
 }
 
 pub struct ShellRunNode(Tools);
@@ -762,30 +951,12 @@ impl NodeDef for ShellRunNode {
         let tools = &self.0;
         let program = input.argv.first().map(String::as_str).unwrap_or_default();
         let skill = match path_root(program) {
-            PathRoot::Skill { .. } if input.background => {
-                return Err(AppError::new(
-                    AppErrorCode::ValidationFailed,
-                    BACKGROUND_SCRIPT,
-                ));
-            }
             PathRoot::Skill { key, rest } => {
                 Some(skill_script(&tools.options, key, rest, &input.argv[1..])?)
             }
             _ => None,
         };
-        let shells =
-            if input.background {
-                if input.conversation_id.is_empty() {
-                    return Err(AppError::new(AppErrorCode::ValidationFailed, NO_OWNER));
-                }
-                Some(
-                    tools.options.shells.clone().ok_or_else(|| {
-                        AppError::new(AppErrorCode::Conflict, BACKGROUND_UNAVAILABLE)
-                    })?,
-                )
-            } else {
-                None
-            };
+        let shells = tools.shells(input.background, &input.conversation_id)?;
         let cwd = self.cwd(context, &input, skill.is_some()).await?;
         let chat = skill
             .as_ref()
@@ -828,16 +999,39 @@ impl NodeDef for ShellRunNode {
             )
             .await?;
         context.check_cancelled()?;
+        let limits = tools.options.limits;
         if let Some(shells) = shells {
+            let mut spec = spec;
+            let mut launch = ShellStart::notify(input.notify);
+            let mut not_started = SHELL_NOT_STARTED;
+            if let Some(script) = &skill {
+                not_started = SCRIPT_NOT_STARTED;
+                let pin = cwd
+                    .starts_with(&tools.options.scratch)
+                    .then(|| pin_scratch(&cwd));
+                let outputs = ScriptOutputs::watch(
+                    tools.options.roots.chats(),
+                    &mut spec,
+                    context,
+                    &input,
+                    &cwd,
+                    &script.dir,
+                );
+                launch = launch.finishing(Box::new(move || {
+                    let kept = outputs.map(ScriptOutputs::collect).unwrap_or_default();
+                    drop(pin);
+                    kept
+                }));
+            }
             let shell = shells.start(
                 &input.conversation_id,
                 &spec,
                 &input.argv,
-                SHELL_NOT_STARTED,
+                not_started,
+                launch,
             )?;
-            return Ok(ProcessToolOutput::background(&shell, process));
+            return Ok(ProcessToolOutput::background(&shell, process, input.notify));
         }
-        let limits = tools.options.limits;
         let Some(script) = skill else {
             let run = run_process(
                 &spec,
@@ -851,20 +1045,14 @@ impl NodeDef for ShellRunNode {
             return Ok(ProcessToolOutput::of(&run, text, process));
         };
         let mut spec = spec;
-        let store = tools.options.roots.chats();
-        let libraries: Vec<(String, PathBuf, Snapshot)> = store.map_or_else(Vec::new, |store| {
-            store
-                .libraries()
-                .iter()
-                .map(|(name, folder)| {
-                    let _ = std::fs::create_dir_all(folder);
-                    spec.env.insert(library_env(name), path_text(folder));
-                    (name.clone(), folder.clone(), snapshot(folder))
-                })
-                .collect()
-        });
-        let before = snapshot(&cwd);
-        let started = std::time::SystemTime::now();
+        let outputs = ScriptOutputs::watch(
+            tools.options.roots.chats(),
+            &mut spec,
+            context,
+            &input,
+            &cwd,
+            &script.dir,
+        );
         let run = run_process(
             &spec,
             input.stdin.as_deref(),
@@ -873,29 +1061,7 @@ impl NodeDef for ShellRunNode {
             SCRIPT_NOT_STARTED,
         )
         .await?;
-        let artifacts = store.map_or_else(Vec::new, |store| {
-            let mentioned = mentioned_paths(&input.argv[1..], &cwd);
-            let results: Vec<PathBuf> = produced(&cwd, &before, &mentioned, started)
-                .into_iter()
-                .filter(|path| {
-                    !path.starts_with(&script.dir)
-                        && path
-                            .strip_prefix(&cwd)
-                            .map_or(true, |relative| !is_working(relative))
-                })
-                .collect();
-            let run = context.run_id.to_string();
-            let owner = if is_owner(&input.conversation_id) {
-                input.conversation_id.as_str()
-            } else {
-                run.as_str()
-            };
-            let mut kept = store.keep(owner, &run, &results);
-            for (name, folder, previous) in &libraries {
-                kept.extend(store.adopt(name, &produced(folder, previous, &[], started)));
-            }
-            kept
-        });
+        let artifacts = outputs.map(ScriptOutputs::collect).unwrap_or_default();
         let mut text = process_text(&run, "script", limits);
         if !artifacts.is_empty() {
             let names: Vec<&str> = artifacts

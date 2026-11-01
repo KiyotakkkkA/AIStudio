@@ -1,17 +1,20 @@
 use serde::{Deserialize, Serialize};
 
+use crate::artifacts::ArtifactDto;
 use crate::enums::wire_enum;
 use crate::errors::AppError;
 use crate::ids::{BackgroundShellId, StreamId, is_wire_uuid};
 use crate::primitives::Timestamp;
 use crate::process::{PROCESS_ARG_MAX, PROCESS_ARGV_MAX, PROCESS_PROGRAM_MAX};
-use crate::validate::{Validate, check, invalid, no_refinements};
+use crate::validate::{Validate, check, invalid, nested, no_refinements};
 
 pub const SHELL_STEP_DOMAIN: &str = "shell";
 pub const SHELLS_PER_OWNER_MAX: usize = 4;
 pub const SHELLS_TOTAL_MAX: usize = 16;
 pub const SHELL_LIFETIME_SECS: u64 = 3600;
 pub const SHELL_BUFFER_MAX: usize = 262_144;
+pub const SHELL_TAIL_MAX: usize = 16_000;
+pub const SHELL_ARTIFACTS_MAX: usize = 64;
 
 wire_enum!(BackgroundShellStatus {
     Running => "running",
@@ -191,5 +194,29 @@ mod tests {
     fn the_owner_is_a_uuid() {
         assert!(parse::<ShellsListInput>(json!({ "ownerId": OWNER })).is_ok());
         assert!(parse::<ShellsListInput>(json!({ "ownerId": "dialog" })).is_err());
+    }
+}
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EndedShellDto {
+    pub shell: BackgroundShellDto,
+    pub tail: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<ArtifactDto>,
+}
+
+impl Validate for EndedShellDto {
+    fn validate(&self) -> Result<(), AppError> {
+        nested("shell", self.shell.validate())?;
+        if self.shell.status.running() {
+            return Err(invalid("shell.status", "ended"));
+        }
+        check::max_len("tail", &self.tail, SHELL_TAIL_MAX)?;
+        if self.artifacts.len() > SHELL_ARTIFACTS_MAX {
+            return Err(invalid("artifacts", "maxItems"));
+        }
+        nested("artifacts", self.artifacts.validate())
     }
 }

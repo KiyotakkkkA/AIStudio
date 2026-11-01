@@ -12,16 +12,17 @@ use zvs_contract::vector_stores::DEFAULT_CHAT_MIN_SCORE;
 use zvs_contract::{
     AppError, AppErrorCode, ChatAttachDto, ChatCitationDto, ChatCommand, ChatCommandDto,
     ChatContextDto, ChatContextInput, ChatContextToolDto, ChatEvalCaseDto, ChatEvalInput,
-    ChatEvalModeDto, ChatEvalRunDto, ChatGoalDto, ChatRoundDto, ChatSendInput, ChatSettings,
-    ChatToolCallDto, ChatToolCallStatus, ConversationDetailDto, ConversationDto, ConversationId,
-    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DeltaKind, DocumentId, FolderGrantScope,
-    GRAPH_EXPANSION_DEFAULT_MAX, GoalReason, GoalStatus, GraphDirection, GraphExpansionDocument,
-    GraphNeighborhood, GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId,
-    MessageRole, ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph,
-    RunHandleDto, RunId, RunKind, RunOutcomeStatus, RunStatus, SUBAGENT_DOMAIN, StartRunInput,
-    StreamId, ToolListFilter, ToolMode, ToolTier, Validate, VectorSearchHitDto, VectorStoreId,
-    VendorTurnOptions, WEB_SOURCES_MAX, WebSourceDto, log_line, merge_graph_neighbors,
-    model_tool_support, resolve_tool_mode,
+    ChatEvalModeDto, ChatEvalRunDto, ChatEventDto, ChatGoalDto, ChatRoundDto, ChatSendInput,
+    ChatSettings, ChatToolCallDto, ChatToolCallStatus, ChatWakeStepDto, ConversationDetailDto,
+    ConversationDto, ConversationId, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
+    DeltaKind, DocumentId, FolderGrantScope, GRAPH_EXPANSION_DEFAULT_MAX, GoalReason, GoalStatus,
+    GraphDirection, GraphExpansionDocument, GraphNeighborhood, GraphNeighborsInput, HostEvent,
+    HostEventDraft, MessageDto, MessageId, MessageRole, ProviderCapability, ProviderId,
+    QuestionRecordDto, RetrievalMode, RunGraph, RunHandleDto, RunId, RunKind, RunOutcomeStatus,
+    RunStatus, SUBAGENT_DOMAIN, StartRunInput, StreamId, ToolListFilter, ToolMode, ToolTier,
+    Validate, VectorSearchHitDto, VectorStoreId, VendorTurnOptions, WAKE_STEP_DOMAIN,
+    WEB_SOURCES_MAX, WebSourceDto, log_line, merge_graph_neighbors, model_tool_support,
+    resolve_tool_mode,
 };
 
 use super::chat_ask::{ASK_MALFORMED, ASK_TOOL, answers_text, ask_request, ask_section, ask_tool};
@@ -148,7 +149,7 @@ pub const WORKING_FOLDER_RULES: &str = "Relative paths resolve against the worki
 pub const WORKING_FOLDER_CHANGED: &str = "The working folder changed since the previous turn";
 pub const FILE_TOOLS_HEADING: &str = "File tools";
 pub const PROCESS_TOOLS_HEADING: &str = "Process tools";
-pub const PROCESS_TOOLS_RULES: &str = "Use the code tool for a quick computation or conversion, and the shell tool to run the project's own build and test commands, then read their output to check a change. The user approves every run after seeing the full source or command. Pass a command as an argument vector, not a shell string: there are no pipes, redirections or glob expansion. Interactive input is not supported, and each run has a time limit. For a dev server, a watcher or a long build, start the command with background: true, then read it with shell.output and stop it with shell.kill when it is no longer needed; a background process ends with the conversation.";
+pub const PROCESS_TOOLS_RULES: &str = "Use the code tool for a quick computation or conversion, and the shell tool to run the project's own build and test commands, then read their output to check a change. The user approves every run after seeing the full source or command. Pass a command as an argument vector, not a shell string: there are no pipes, redirections or glob expansion. Interactive input is not supported, and each run has a time limit. For a dev server, a watcher or a long build, start the command with background: true, then read it with shell.output and stop it with shell.kill when it is no longer needed; a background process ends with the conversation. A long code run can go to the background the same way. For work that finishes, such as a build, tests or a job, also pass notify: true and end your answer: the conversation is continued with the result when the process ends, so do not poll it. Never pass notify for a server or a watcher.";
 pub const FILE_TOOLS_RULES: &str = "Read a file with the read tool in this turn before you change it; a change to a file that was not read, or that changed since it was read, is refused. Put every change of one task into a single apply call, so the user reviews and applies it as one diff. Paths may be absolute; relative paths resolve against the working folder. A path that starts with chat: is in this conversation's own file folder, which needs neither a prior read nor approval; skill:<key>/ paths are read-only skill folders.";
 
 pub struct ChatServiceOptions {
@@ -163,6 +164,7 @@ pub struct ChatServiceOptions {
     pub subagents: Option<SubagentService>,
     pub logger: SharedLogger,
     pub clock: SharedClock,
+    pub wake_delay: std::time::Duration,
 }
 
 impl ChatServiceOptions {
@@ -179,6 +181,7 @@ impl ChatServiceOptions {
             subagents: None,
             logger: silent_logger(),
             clock: Arc::new(SystemClock),
+            wake_delay: WAKE_DELAY,
         }
     }
 }
@@ -205,6 +208,8 @@ struct Inner {
     clock: SharedClock,
     listeners: Mutex<Vec<ChatMessageListener>>,
     replies: Mutex<ReplyBuffers>,
+    waking: Mutex<HashSet<String>>,
+    wake_delay: std::time::Duration,
 }
 
 #[derive(Clone)]
@@ -343,6 +348,7 @@ fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
         run_id: row.run_id.as_deref().and_then(RunId::parse),
         partial: row.partial,
         pinned: row.pinned,
+        event: row.event,
         created_at: row.created_at,
     })
 }
@@ -569,7 +575,8 @@ impl Inner {
         let valid = run.is_some_and(|run| {
             run.kind == RunKind::Chat && run.subject_id.as_deref() == Some(conversation_id)
         }) && user.is_some_and(|user| {
-            user.run_id.as_deref() == Some(run_key.as_str()) && user.role == MessageRole::User
+            user.run_id.as_deref() == Some(run_key.as_str())
+                && matches!(user.role, MessageRole::User | MessageRole::Event)
         });
         if valid {
             Ok(())
@@ -983,7 +990,7 @@ struct PersistNode(Arc<Inner>);
 
 const fn chat_role(role: MessageRole) -> ChatRole {
     match role {
-        MessageRole::User => ChatRole::User,
+        MessageRole::User | MessageRole::Event => ChatRole::User,
         MessageRole::Assistant => ChatRole::Assistant,
     }
 }
@@ -1276,6 +1283,14 @@ impl NodeDef for PrepareNode {
             .position(|message| message.id.to_string() == input.user_id)
             .ok_or_else(|| AppError::new(AppErrorCode::Conflict, INVALID_TURN))?;
         let user = &conversation.messages[position];
+        if user.role == MessageRole::Event
+            && let Ok(Value::Object(step)) = serde_json::to_value(ChatWakeStepDto {
+                domain: WAKE_STEP_DOMAIN.to_owned(),
+                message: user.clone(),
+            })
+        {
+            context.emit(HostEventDraft::Step { step })?;
+        }
         let history: Vec<ChatMessage> = conversation.messages[..position]
             .iter()
             .map(model_message)
@@ -1573,6 +1588,7 @@ impl NodeDef for PrepareNode {
             run_id: Some(run_id),
             partial: true,
             pinned: false,
+            event: None,
             created_at: now,
         };
         inner.read(|repositories| Ok(repositories.chat.add_message(&row)?))?;
@@ -2430,6 +2446,8 @@ impl ChatService {
             clock: options.clock,
             listeners: Mutex::new(Vec::new()),
             replies: Mutex::new(ReplyBuffers::default()),
+            waking: Mutex::new(HashSet::new()),
+            wake_delay: options.wake_delay,
         });
         options.registry.register(PrepareNode(Arc::clone(&inner)))?;
         options
@@ -2440,10 +2458,17 @@ impl ChatService {
         options
             .registry
             .register(SubagentNode(Arc::clone(&inner)))?;
-        Ok(Self {
+        let service = Self {
             inner,
             runs: options.runs,
-        })
+        };
+        if let Some(shells) = &service.inner.shells {
+            let waker = Waker::of(&service);
+            shells.on_ended(Arc::new(move |owner: &str, notify: bool| {
+                waker.ended(owner, notify);
+            }));
+        }
+        Ok(service)
     }
 
     pub fn list(&self) -> Result<Vec<ConversationDto>, AppError> {
@@ -2801,6 +2826,7 @@ impl ChatService {
             run_id: None,
             partial: false,
             pinned: false,
+            event: None,
             created_at: now,
         };
         let saved = self.inner.read(|repositories| {
@@ -2965,6 +2991,15 @@ impl ChatService {
         input: &ChatSendInput,
         goal: Option<ChatGoalDto>,
     ) -> Result<RunHandleDto, AppError> {
+        self.start_turn_with(input, goal, None)
+    }
+
+    fn start_turn_with(
+        &self,
+        input: &ChatSendInput,
+        goal: Option<ChatGoalDto>,
+        event: Option<ChatEventDto>,
+    ) -> Result<RunHandleDto, AppError> {
         let conversation_id = input.conversation_id.to_string();
         let conversation = self.get(&input.conversation_id)?;
         self.inner.require_idle(&conversation_id)?;
@@ -3061,10 +3096,15 @@ impl ChatService {
             ..StartRunInput::new(RunKind::Chat, graph)
         };
         let now = self.inner.now();
+        let woken = event.is_some();
         let user = MessageRow {
             id: user_id,
             conversation_id: conversation_id.clone(),
-            role: MessageRole::User,
+            role: if woken {
+                MessageRole::Event
+            } else {
+                MessageRole::User
+            },
             content: text.clone(),
             reasoning: String::new(),
             citations: Vec::<ChatCitationDto>::new(),
@@ -3081,10 +3121,13 @@ impl ChatService {
             run_id: None,
             partial: false,
             pinned: false,
+            event,
             created_at: now,
         };
         let announced = (user.id.clone(), user.content.clone());
         let inner = Arc::clone(&self.inner);
+        let waker = Waker::of(self);
+        let observed = conversation_id.clone();
         let observer: RunObserver = Arc::new(move |event: &HostEvent| {
             if let Err(error) = inner.record(&assistant_id, event) {
                 inner.log(
@@ -3092,6 +3135,9 @@ impl ChatService {
                     "Could not record a chat event",
                     &[("error", json!(error.message))],
                 );
+            }
+            if matches!(event.body, HostEventDraft::End { .. }) {
+                waker.turn_ended(&observed);
             }
         });
         let (handle, subscription) = self.runs.start_with(
@@ -3116,12 +3162,14 @@ impl ChatService {
             Some(observer),
         )?;
         drop(subscription);
-        self.announce(
-            &conversation_id,
-            &announced.0,
-            &announced.1,
-            &conversation.messages,
-        );
+        if !woken {
+            self.announce(
+                &conversation_id,
+                &announced.0,
+                &announced.1,
+                &conversation.messages,
+            );
+        }
         Ok(handle)
     }
 
@@ -3477,6 +3525,10 @@ impl ChatService {
 }
 
 pub(crate) mod subagent;
+pub(crate) mod wake;
+
+use wake::Waker;
+pub use wake::{WAKE_DELAY, WAKE_HEADING, WAKE_STREAK_MAX, wake_streak, wake_text};
 
 use subagent::{
     AGENT_DELEGATE, CallSink, DelegateNode, Delegation, SubagentNode, delegate_section,

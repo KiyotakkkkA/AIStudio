@@ -73,9 +73,6 @@ impl Validate for ProcessPlanDto {
             check::non_empty(&field, package)?;
             check::max_len(&field, package, PROCESS_PACKAGE_MAX)?;
         }
-        if self.background && self.language.is_some() {
-            return Err(invalid("background", "language"));
-        }
         Ok(())
     }
 }
