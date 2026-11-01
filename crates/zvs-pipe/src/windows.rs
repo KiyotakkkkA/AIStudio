@@ -11,7 +11,9 @@ use tokio::net::windows::named_pipe::{
 use windows::Win32::Foundation::{
     CloseHandle, ERROR_PIPE_BUSY, GlobalFree, HANDLE, HLOCAL, LocalFree,
 };
-use windows::Win32::Globalization::{CP_OEMCP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS, MultiByteToWideChar};
+use windows::Win32::Globalization::{
+    CP_ACP, CP_OEMCP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS, MultiByteToWideChar,
+};
 use windows::Win32::Security::Authorization::{
     ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
 };
@@ -76,11 +78,19 @@ fn token_sid(process: HANDLE) -> io::Result<String> {
 }
 
 pub fn oem_text(bytes: &[u8]) -> String {
+    page_text(CP_OEMCP, bytes)
+}
+
+pub fn ansi_text(bytes: &[u8]) -> String {
+    page_text(CP_ACP, bytes)
+}
+
+fn page_text(page: u32, bytes: &[u8]) -> String {
     if bytes.is_empty() {
         return String::new();
     }
     let flags = MULTI_BYTE_TO_WIDE_CHAR_FLAGS(0);
-    let needed = unsafe { MultiByteToWideChar(CP_OEMCP, flags, bytes, None) };
+    let needed = unsafe { MultiByteToWideChar(page, flags, bytes, None) };
     let Ok(size) = usize::try_from(needed) else {
         return String::from_utf8_lossy(bytes).into_owned();
     };
@@ -88,9 +98,30 @@ pub fn oem_text(bytes: &[u8]) -> String {
         return String::from_utf8_lossy(bytes).into_owned();
     }
     let mut wide = vec![0_u16; size];
-    let written = unsafe { MultiByteToWideChar(CP_OEMCP, flags, bytes, Some(&mut wide)) };
+    let written = unsafe { MultiByteToWideChar(page, flags, bytes, Some(&mut wide)) };
     let written = usize::try_from(written).unwrap_or(0).min(wide.len());
     String::from_utf16_lossy(&wide[..written])
+}
+
+#[cfg(test)]
+pub fn oem_page() -> u32 {
+    unsafe { windows::Win32::Globalization::GetOEMCP() }
+}
+
+#[cfg(test)]
+pub fn ansi_page() -> u32 {
+    unsafe { windows::Win32::Globalization::GetACP() }
+}
+
+#[cfg(test)]
+pub fn encode(page: u32, text: &str) -> Vec<u8> {
+    use windows::Win32::Globalization::WideCharToMultiByte;
+    let wide: Vec<u16> = text.encode_utf16().collect();
+    let needed = unsafe { WideCharToMultiByte(page, 0, &wide, None, None, None) };
+    let mut bytes = vec![0_u8; usize::try_from(needed).unwrap_or(0)];
+    let written = unsafe { WideCharToMultiByte(page, 0, &wide, Some(&mut bytes), None, None) };
+    bytes.truncate(usize::try_from(written).unwrap_or(0));
+    bytes
 }
 
 const CF_UNICODETEXT: u32 = 13;

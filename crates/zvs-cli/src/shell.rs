@@ -47,13 +47,7 @@ pub fn command(line: &str, folder: &str) -> Command {
 }
 
 pub fn decode(bytes: &[u8]) -> String {
-    match std::str::from_utf8(bytes) {
-        Ok(text) => text.to_owned(),
-        #[cfg(windows)]
-        Err(_) => zvs_pipe::oem_text(bytes),
-        #[cfg(not(windows))]
-        Err(_) => String::from_utf8_lossy(bytes).into_owned(),
-    }
+    zvs_pipe::console_text(bytes)
 }
 
 fn pump<R: AsyncRead + Unpin + Send + 'static>(reader: R, lines: mpsc::UnboundedSender<String>) {

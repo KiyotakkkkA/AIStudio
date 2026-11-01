@@ -17,8 +17,9 @@ use crate::drivers::mcp::{default_spawn, kill_tree};
 use crate::platform::clock::SharedClock;
 use crate::platform::events::{EventBus, StreamHandle};
 use crate::platform::ids::new_id;
-use crate::terminal::service::{decode, trim_scrollback};
+use crate::terminal::service::trim_scrollback;
 use crate::toolchain::LaunchSpec;
+use zvs_pipe::ConsoleText;
 
 pub const SHELL_MISSING: &str = "Фоновый процесс не найден";
 pub const OWNER_LIMIT: &str = "Запущено максимальное число фоновых процессов для этого диалога";
@@ -302,18 +303,21 @@ impl Shell {
 
 async fn drain(shell: Arc<Shell>, mut stream: impl AsyncRead + Unpin, limit: usize) {
     let mut buffer = [0_u8; READ_CHUNK];
-    let mut pending = Vec::new();
+    let mut decoder = ConsoleText::new();
     loop {
         match stream.read(&mut buffer).await {
             Ok(0) | Err(_) => break,
             Ok(read) => {
-                pending.extend_from_slice(&buffer[..read]);
-                shell.append(decode(&mut pending), limit);
+                let text = decoder.push(&buffer[..read]);
+                if !text.is_empty() {
+                    shell.append(text, limit);
+                }
             }
         }
     }
-    if !pending.is_empty() {
-        shell.append(String::from_utf8_lossy(&pending).into_owned(), limit);
+    let rest = decoder.finish();
+    if !rest.is_empty() {
+        shell.append(rest, limit);
     }
 }
 

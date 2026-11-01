@@ -50,7 +50,7 @@ impl VersionProbe for ProcessProbe {
             .map_err(|_| "не ответил за отведённое время".to_owned())?
             .map_err(|error| error.to_string())?;
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr = zvs_pipe::console_text(&output.stderr);
             return Err(format!(
                 "завершился с кодом {}{}",
                 output
@@ -64,7 +64,7 @@ impl VersionProbe for ProcessProbe {
                 }
             ));
         }
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+        Ok(zvs_pipe::console_text(&output.stdout).trim().to_owned())
     }
 }
 

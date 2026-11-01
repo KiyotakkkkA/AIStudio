@@ -10890,6 +10890,7 @@ dependencies = [
  "zvs-copilot",
  "zvs-core",
  "zvs-openai",
+ "zvs-pipe",
  "zvs-qwen-web",
  "zvs-zai-web",
 ]

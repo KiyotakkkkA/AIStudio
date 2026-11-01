@@ -9,7 +9,7 @@ use zvs_contract::{
     TerminalStatusDto,
 };
 
-use super::service::{decode, trim_scrollback};
+use super::service::trim_scrollback;
 use super::{NO_SHELL, SESSION_EXITED, SESSIONS_LIMIT, TerminalService};
 use crate::data::Repositories;
 use crate::data::repositories::{ModelDraft, ProviderDraft};
@@ -141,18 +141,10 @@ fn process(host: &Host) -> FakeProcess {
 #[test]
 fn a_split_utf8_sequence_waits_for_its_tail() {
     let bytes = "привет".as_bytes();
-    let mut pending = bytes[..3].to_vec();
-    assert_eq!(decode(&mut pending), "п");
-    assert_eq!(pending, bytes[2..3]);
-    pending.extend_from_slice(&bytes[3..]);
-    assert_eq!(decode(&mut pending), "ривет");
-    assert!(pending.is_empty());
-}
-
-#[test]
-fn invalid_bytes_become_replacement_characters() {
-    let mut pending = vec![b'a', 0xff, b'b'];
-    assert_eq!(decode(&mut pending), "a\u{fffd}b");
+    let mut decoder = zvs_pipe::ConsoleText::new();
+    assert_eq!(decoder.push(&bytes[..3]), "п");
+    assert_eq!(decoder.push(&bytes[3..]), "ривет");
+    assert!(decoder.finish().is_empty());
 }
 
 #[test]

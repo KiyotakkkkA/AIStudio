@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
+use zvs_pipe::ConsoleText;
 
 use serde_json::Value;
 use zvs_contract::validate::invalid;
@@ -87,31 +88,6 @@ fn path_text(path: &Path) -> String {
 
 fn missing() -> AppError {
     AppError::new(AppErrorCode::NotFound, SESSION_MISSING)
-}
-
-fn incomplete_tail(bytes: &[u8]) -> usize {
-    for back in 1..=bytes.len().min(3) {
-        let byte = bytes[bytes.len() - back];
-        if byte & 0b1100_0000 == 0b1000_0000 {
-            continue;
-        }
-        let needed = match byte {
-            0b1111_0000..=0b1111_0111 => 4,
-            0b1110_0000..=0b1110_1111 => 3,
-            0b1100_0000..=0b1101_1111 => 2,
-            _ => 1,
-        };
-        return if needed > back { back } else { 0 };
-    }
-    0
-}
-
-pub fn decode(pending: &mut Vec<u8>) -> String {
-    let keep = incomplete_tail(pending);
-    let tail = pending.split_off(pending.len() - keep);
-    let text = String::from_utf8_lossy(pending).into_owned();
-    *pending = tail;
-    text
 }
 
 pub fn trim_scrollback(scrollback: &mut String, max: usize) {
@@ -208,14 +184,13 @@ impl Session {
 
 fn read_loop(session: Arc<Session>, generation: u64, mut reader: Box<dyn Read + Send>) {
     let mut buffer = [0_u8; READ_CHUNK];
-    let mut pending = Vec::new();
+    let mut decoder = ConsoleText::new();
     let mut answered = false;
     loop {
         match reader.read(&mut buffer) {
             Ok(0) | Err(_) => break,
             Ok(read) => {
-                pending.extend_from_slice(&buffer[..read]);
-                let mut text = decode(&mut pending);
+                let mut text = decoder.push(&buffer[..read]);
                 if !answered && text.contains(CURSOR_QUERY) {
                     answered = true;
                     text = text.replacen(CURSOR_QUERY, "", 1);
@@ -225,8 +200,9 @@ fn read_loop(session: Arc<Session>, generation: u64, mut reader: Box<dyn Read + 
             }
         }
     }
-    if !pending.is_empty() {
-        session.output(generation, String::from_utf8_lossy(&pending).into_owned());
+    let rest = decoder.finish();
+    if !rest.is_empty() {
+        session.output(generation, rest);
     }
 }
 

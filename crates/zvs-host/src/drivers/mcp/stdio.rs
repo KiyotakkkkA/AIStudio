@@ -189,8 +189,15 @@ impl StdioTransport {
         if let Some(stderr) = stderr {
             let stderr_hooks = hooks.clone();
             tokio::spawn(async move {
-                let mut lines = BufReader::new(stderr).lines();
-                while let Ok(Some(line)) = lines.next_line().await {
+                let mut reader = BufReader::new(stderr);
+                let mut buffer = Vec::new();
+                loop {
+                    buffer.clear();
+                    match reader.read_until(b'\n', &mut buffer).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {}
+                    }
+                    let line = zvs_pipe::console_text(&buffer);
                     let line = line.trim();
                     if !line.is_empty() {
                         stderr_hooks.log(McpLogLevel::Debug, js_slice(line, 1000));

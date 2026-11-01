@@ -1,9 +1,12 @@
+mod console_text;
 #[cfg(windows)]
 mod windows;
 
+pub use console_text::{ConsoleText, console_text};
+
 #[cfg(windows)]
 pub use windows::{
-    allow_foreground, connect, copy_text, create_server, current_user_sid, oem_text,
+    allow_foreground, ansi_text, connect, copy_text, create_server, current_user_sid, oem_text,
 };
 
 #[cfg(windows)]

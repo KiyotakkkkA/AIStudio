@@ -125,10 +125,7 @@ async fn drain(mut stream: impl AsyncRead + Unpin, capture: SharedCapture, limit
 
 fn taken(capture: &SharedCapture) -> (String, bool) {
     let capture = capture.lock().unwrap_or_else(PoisonError::into_inner);
-    (
-        String::from_utf8_lossy(&capture.bytes).into_owned(),
-        capture.truncated,
-    )
+    (zvs_pipe::console_text(&capture.bytes), capture.truncated)
 }
 
 pub fn fenced(tag: &str, text: &str) -> String {
