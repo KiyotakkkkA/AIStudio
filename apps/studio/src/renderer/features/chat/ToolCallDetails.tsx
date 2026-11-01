@@ -88,7 +88,7 @@ function Field({ label, children }: { readonly label: string; readonly children:
 
 function QueryLine({ query, mono = false }: { readonly query: string; readonly mono?: boolean }) {
   return (
-    <div className="flex items-start gap-2 rounded-control bg-main-900 px-2.5 py-2 fx-on:shadow-[inset_0_0_0_1px_var(--color-line)]">
+    <div className="flex items-start gap-2 rounded-control bg-main-800 px-2.5 py-2 fx-on:shadow-[inset_0_0_0_1px_var(--color-line)]">
       <Icon path={mdiMagnify} size={14} className="mt-px shrink-0 text-main-500" />
       <span
         className={`min-w-0 flex-1 text-[12.5px] wrap-break-word text-main-100 ${mono ? "font-mono text-[12px]" : ""}`}
@@ -153,7 +153,7 @@ function Found({ citations }: { readonly citations: readonly ChatCitationDto[] }
             initial={level === "full" ? { opacity: 0, x: -6 } : false}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: Math.min(index, 8) * 0.035, duration: 0.2 }}
-            className="flex min-w-0 items-center gap-2.5 rounded-control bg-main-900 px-2.5 py-1.5"
+            className="flex min-w-0 items-center gap-2.5 rounded-control bg-main-800 px-2.5 py-1.5"
           >
             <span className="w-5 shrink-0 font-mono text-[10.5px] text-main-500 tabular-nums">
               {index + 1}
@@ -180,7 +180,7 @@ function Found({ citations }: { readonly citations: readonly ChatCitationDto[] }
 function CodeBlock({ source }: { readonly source: string }) {
   const lines = source.split("\n");
   return (
-    <ScrollArea className="max-h-64 rounded-control bg-main-900 py-2">
+    <ScrollArea className="max-h-64 rounded-control bg-main-800 py-2">
       <pre className="m-0 font-mono text-[11.5px] leading-[1.55] text-main-200">
         {lines.map((line, index) => (
           <span key={index} className="flex">
@@ -259,7 +259,7 @@ function ViewBody({ view }: { readonly view: ToolCallView }) {
             {view.files.map((file) => (
               <li
                 key={`${file.path}:${String(file.start)}:${String(file.end)}`}
-                className="flex min-w-0 items-center gap-2 rounded-control bg-main-900 px-2.5 py-1.5"
+                className="flex min-w-0 items-center gap-2 rounded-control bg-main-800 px-2.5 py-1.5"
               >
                 <Icon path={mdiFileOutline} size={14} className="shrink-0 text-info" />
                 <span
@@ -305,7 +305,7 @@ function ViewBody({ view }: { readonly view: ToolCallView }) {
             )}
           </div>
           {view.args.length === 0 ? null : (
-            <div className="rounded-control bg-main-900 px-2.5 py-2 font-mono text-[11.5px] break-all text-main-200">
+            <div className="rounded-control bg-main-800 px-2.5 py-2 font-mono text-[11.5px] break-all text-main-200">
               {commandLine(view.args)}
             </div>
           )}
@@ -320,7 +320,7 @@ function ViewBody({ view }: { readonly view: ToolCallView }) {
     case "command":
       return (
         <div className="space-y-2">
-          <div className="rounded-control bg-main-900 px-2.5 py-2 font-mono text-[12px] break-all text-main-100 fx-on:shadow-[inset_0_0_0_1px_var(--color-line)]">
+          <div className="rounded-control bg-main-800 px-2.5 py-2 font-mono text-[12px] break-all text-main-100 fx-on:shadow-[inset_0_0_0_1px_var(--color-line)]">
             <span aria-hidden="true" className="text-accent-medium select-none">
               ${" "}
             </span>
@@ -395,7 +395,7 @@ function Evidence({ text }: { readonly text: string }) {
         />
       </button>
       <Collapse open={open} id={id}>
-        <ScrollArea className="mt-1 max-h-64 rounded-control bg-main-900 px-2.5 py-2">
+        <ScrollArea className="mt-1 max-h-64 rounded-control bg-main-800 px-2.5 py-2">
           <pre className="m-0 font-mono text-[11.5px] wrap-break-word whitespace-pre-wrap text-main-200">
             {text}
           </pre>
@@ -429,7 +429,7 @@ export function RawArguments({ text }: { readonly text: string }) {
         />
       </button>
       <Collapse open={open} id={id}>
-        <ScrollArea className="mt-1 max-h-48 rounded-control bg-main-900 px-2.5 py-2">
+        <ScrollArea className="mt-1 max-h-48 rounded-control bg-main-800 px-2.5 py-2">
           <pre className="m-0 font-mono text-[11.5px] wrap-break-word whitespace-pre-wrap text-main-300">
             {text}
           </pre>
@@ -480,7 +480,7 @@ export function ResultBlock({
           />
         </span>
       </div>
-      <ScrollArea className="max-h-60 rounded-control bg-main-900 px-2.5 py-2">
+      <ScrollArea className="max-h-60 rounded-control bg-main-800 px-2.5 py-2">
         <pre className="m-0 font-mono text-[11.5px] wrap-break-word whitespace-pre-wrap text-main-300">
           {result}
         </pre>

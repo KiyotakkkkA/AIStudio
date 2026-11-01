@@ -1,4 +1,4 @@
-import { useId, useState, type CSSProperties } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type {
   ChatToolCallDto,
@@ -18,7 +18,7 @@ import {
   type StatusTone,
 } from "../../ui/atoms/statusTone";
 import Collapse from "../../ui/motion/Collapse";
-import { useFx, useTransition } from "../../ui/motion/fx";
+import { useTransition } from "../../ui/motion/fx";
 import ChatQuestionCard, { QuestionAnswers } from "./ChatQuestionCard";
 import FileChangeList from "./FileChangeList";
 import ProcessPlanView from "./ProcessPlanView";
@@ -46,13 +46,13 @@ import {
   APPROVAL_PROMPT,
   APPROVAL_QUESTION,
   ARGUMENTS_TITLE,
-  CATEGORY_BADGE,
   FORBID,
   TOOL_CALLS_LABEL,
   TOOL_KEY_LABEL,
   isBuiltinTool,
   toolPresentation,
 } from "./toolCallCopy";
+import { PipelineItem, PipelineList } from "./Pipeline";
 import { toolCallView } from "./toolCallView";
 import { SubagentGroup, type SubagentControls } from "./SubagentCard";
 import { AGENT_DELEGATE, delegateRuns, subagentMeta } from "./SubagentSteps";
@@ -135,17 +135,6 @@ function StatusMark({ status }: { readonly status: ChatToolCallDto["status"] }) 
   );
 }
 
-function RunningSweep() {
-  return (
-    <span
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-x-0 bottom-0 h-px overflow-hidden"
-    >
-      <span className="block h-full w-2/5 animate-zvs-sweep bg-linear-to-r from-transparent via-accent-dark to-transparent" />
-    </span>
-  );
-}
-
 export function ToolCallCard({
   call,
   approval,
@@ -173,7 +162,6 @@ export function ToolCallCard({
   }
   const completion = call.key === GOAL_TOOL && call.status === "succeeded";
   const open = manual ?? (blocking || completion);
-  const { motion: level } = useFx();
 
   const status = TOOL_CALL_STATUS[call.status];
   const presentation = toolPresentation(call.key);
@@ -190,27 +178,14 @@ export function ToolCallCard({
   const searched = view?.kind === "search" && view.citations !== null;
 
   return (
-    <motion.li
-      layout={level === "full" ? "position" : false}
-      initial={!live || level === "none" ? false : { opacity: 0, y: level === "full" ? 6 : 0 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22 }}
-      style={{ "--zvs-beam-color": "var(--color-warn)" } as CSSProperties}
-      className={`relative overflow-hidden rounded-card bg-main-800 ${blocking ? "zvs-beam" : ""}`}
-    >
+    <PipelineItem icon={presentation.icon} enter={live} layout="position" tail={open}>
       <button
         type="button"
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={() => setManual(!open)}
-        className="group/call flex min-h-9 w-full cursor-pointer items-center gap-2.5 px-3 py-1.5 text-left text-[12px] hover:bg-main-750/40"
+        className="group/call flex min-h-8 w-full cursor-pointer items-center gap-2.5 py-1 text-left text-[12px]"
       >
-        <span
-          aria-hidden="true"
-          className={`flex size-6 shrink-0 items-center justify-center rounded-pill ${CATEGORY_BADGE[presentation.category]}`}
-        >
-          <Icon path={presentation.icon} size={13} />
-        </span>
         <span
           title={builtin ? call.key : undefined}
           className={`shrink-0 text-[12.5px] font-medium text-main-100 ${builtin ? "" : "font-mono text-[12px]"}`}
@@ -239,9 +214,8 @@ export function ToolCallCard({
           className={`shrink-0 text-main-500 group-hover/call:text-main-200 anim-on:transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
-      {call.status === "running" ? <RunningSweep /> : null}
       <Collapse open={open} id={bodyId}>
-        <div className="space-y-2.5 px-3 pt-1 pb-3 text-[12px]">
+        <div className="space-y-2.5 pt-1 pb-3 text-[12px]">
           {asking && (
             <ChatQuestionCard
               request={asking.request}
@@ -272,7 +246,7 @@ export function ToolCallCard({
             proposedProcess === undefined && (
               <div>
                 <Eyebrow>{ARGUMENTS_TITLE}</Eyebrow>
-                <ScrollArea className="max-h-48 rounded-control bg-main-900 px-2.5 py-2">
+                <ScrollArea className="max-h-48 rounded-control bg-main-800 px-2.5 py-2">
                   <pre className="m-0 font-mono text-[11.5px] wrap-break-word whitespace-pre-wrap text-main-300">
                     {toolArgumentsText(call.arguments)}
                   </pre>
@@ -390,7 +364,7 @@ export function ToolCallCard({
           )}
         </div>
       </Collapse>
-    </motion.li>
+    </PipelineItem>
   );
 }
 
@@ -400,15 +374,7 @@ export interface SubagentHandlers {
   readonly stopping: readonly string[];
 }
 
-export default function ChatToolCalls({
-  calls,
-  approvalFor,
-  onDecide,
-  questionFor,
-  onAnswer,
-  onSkip,
-  subagents,
-}: {
+export interface ToolCallItemsProps {
   readonly calls: readonly ChatToolCallDto[];
   readonly approvalFor?: (id: string | null) => ToolCallApproval | undefined;
   readonly onDecide?: (id: string, approve: boolean) => void;
@@ -416,8 +382,17 @@ export default function ChatToolCalls({
   readonly onAnswer?: (id: string, answers: QuestionAnswerDto[]) => void;
   readonly onSkip?: (id: string) => void;
   readonly subagents?: SubagentHandlers;
-}) {
-  if (calls.length === 0) return null;
+}
+
+export function ToolCallItems({
+  calls,
+  approvalFor,
+  onDecide,
+  questionFor,
+  onAnswer,
+  onSkip,
+  subagents,
+}: ToolCallItemsProps): ReactNode {
   const live = questionFor !== undefined;
   const controls: SubagentControls = {
     stepsFor: subagents?.stepsFor ?? (() => []),
@@ -435,35 +410,40 @@ export default function ChatToolCalls({
       />
     ),
   };
+  return delegateRuns(calls).flatMap((group) => {
+    const first = group[0];
+    if (first?.key === AGENT_DELEGATE && group.every((call) => subagentMeta(call) !== null)) {
+      return [<SubagentGroup key={first.id} calls={group} controls={controls} live={live} />];
+    }
+    return group.map((call) => {
+      const approval =
+        call.status === "awaiting-approval" ? approvalFor?.(call.approvalId) : undefined;
+      const record = call.key === ASK_TOOL ? questionRecord(call.meta) : null;
+      const asking =
+        record !== null && call.status === "awaiting-answer"
+          ? questionFor?.(record.request.id)
+          : undefined;
+      return (
+        <ToolCallCard
+          key={call.id}
+          call={call}
+          approval={approval}
+          asking={asking}
+          live={live}
+          onDecide={onDecide}
+          onAnswer={onAnswer}
+          onSkip={onSkip}
+        />
+      );
+    });
+  });
+}
+
+export default function ChatToolCalls(props: ToolCallItemsProps) {
+  if (props.calls.length === 0) return null;
   return (
-    <ul aria-label={TOOL_CALLS_LABEL} className="m-0 mb-5 list-none space-y-1.5 p-0">
-      {delegateRuns(calls).flatMap((group) => {
-        const first = group[0];
-        if (first?.key === AGENT_DELEGATE && group.every((call) => subagentMeta(call) !== null)) {
-          return [<SubagentGroup key={first.id} calls={group} controls={controls} live={live} />];
-        }
-        return group.map((call) => {
-          const approval =
-            call.status === "awaiting-approval" ? approvalFor?.(call.approvalId) : undefined;
-          const record = call.key === ASK_TOOL ? questionRecord(call.meta) : null;
-          const asking =
-            record !== null && call.status === "awaiting-answer"
-              ? questionFor?.(record.request.id)
-              : undefined;
-          return (
-            <ToolCallCard
-              key={call.id}
-              call={call}
-              approval={approval}
-              asking={asking}
-              live={live}
-              onDecide={onDecide}
-              onAnswer={onAnswer}
-              onSkip={onSkip}
-            />
-          );
-        });
-      })}
-    </ul>
+    <PipelineList label={TOOL_CALLS_LABEL} className="mb-5">
+      <ToolCallItems {...props} />
+    </PipelineList>
   );
 }

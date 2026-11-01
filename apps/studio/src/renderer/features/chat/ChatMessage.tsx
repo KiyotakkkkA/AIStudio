@@ -16,6 +16,8 @@ import ChatMarkdown from "./ChatMarkdown";
 import AnswerQuote from "./AnswerQuote";
 import ReasoningBlock from "./ReasoningBlock";
 import { answerBlocks } from "./answerRounds";
+import { PIPELINE_LABEL, PipelineList } from "./Pipeline";
+import { TOOL_CALLS_LABEL } from "./toolCallCopy";
 import ChatSources from "./ChatSources";
 import WebSourceCard from "./WebSourceCard";
 import { WEB_SOURCES_TAB } from "./webSources";
@@ -51,7 +53,7 @@ export default function ChatMessage({
   since = null,
   usage,
   toolCalls = [],
-  renderTools,
+  renderToolItems,
   artifacts,
   onEdit,
   onRefresh,
@@ -74,7 +76,7 @@ export default function ChatMessage({
   readonly since?: number | null;
   readonly usage?: string;
   readonly toolCalls?: readonly ChatToolCallDto[];
-  readonly renderTools: (calls: readonly ChatToolCallDto[]) => ReactNode;
+  readonly renderToolItems: (calls: readonly ChatToolCallDto[]) => ReactNode;
   readonly artifacts?: ReactNode;
   readonly onEdit?: () => void;
   readonly onRefresh?: () => void;
@@ -122,31 +124,58 @@ export default function ChatMessage({
   );
   const sources = citationSources(citations, storeName);
 
+  const units: ReactNode[] = [];
+  let pipelineItems: ReactNode[] = [];
+  let pipelineKey = "";
+  let pipelineReasoning = false;
+  const flushPipeline = () => {
+    if (pipelineItems.length === 0) return;
+    units.push(
+      <PipelineList key={pipelineKey} label={pipelineReasoning ? PIPELINE_LABEL : TOOL_CALLS_LABEL}>
+        {pipelineItems}
+      </PipelineList>,
+    );
+    pipelineItems = [];
+    pipelineReasoning = false;
+  };
+  blocks.forEach((block, index) => {
+    if (block.kind === "tools") {
+      if (pipelineItems.length === 0) pipelineKey = block.key;
+      pipelineItems.push(<Fragment key={block.key}>{renderToolItems(block.calls)}</Fragment>);
+      return;
+    }
+    const last = generating && index === blocks.length - 1;
+    if (block.reasoning.trim().length > 0) {
+      if (pipelineItems.length === 0) pipelineKey = block.key;
+      pipelineReasoning = true;
+      pipelineItems.push(
+        <ReasoningBlock
+          key={`${block.key}-reasoning`}
+          reasoning={block.reasoning}
+          thinking={last && block.text === ""}
+        />,
+      );
+    }
+    if (block.text.trim().length === 0) return;
+    flushPipeline();
+    units.push(
+      messageId === undefined || generating ? (
+        <Fragment key={block.key}>{markdown(block.text, last)}</Fragment>
+      ) : (
+        <AnswerQuote key={block.key} messageId={messageId}>
+          {markdown(block.text, false)}
+        </AnswerQuote>
+      ),
+    );
+  });
+  flushPipeline();
+
   return (
     <article aria-label="Ответ ассистента" className="group flex min-w-0 gap-3">
       <AssistantAvatar size={28} live={generating} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <div className="space-y-3">
-          {blocks.map((block, index) => {
-            if (block.kind === "tools")
-              return <Fragment key={block.key}>{renderTools(block.calls)}</Fragment>;
-            const last = generating && index === blocks.length - 1;
-            return (
-              <Fragment key={block.key}>
-                {block.reasoning.trim().length > 0 && (
-                  <ReasoningBlock
-                    reasoning={block.reasoning}
-                    thinking={last && block.text === ""}
-                  />
-                )}
-                {block.text.trim().length === 0 ? null : messageId === undefined || generating ? (
-                  markdown(block.text, last)
-                ) : (
-                  <AnswerQuote messageId={messageId}>{markdown(block.text, false)}</AnswerQuote>
-                )}
-              </Fragment>
-            );
-          })}
+          {units}
           {generating && <GenerationStatus label={status} since={since} />}
           <ChatSources
             sources={sources}

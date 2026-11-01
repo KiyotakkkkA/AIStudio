@@ -51,7 +51,7 @@ export default function ProcessPlanView({
           {code ? SOURCE_TITLE : COMMAND_TITLE}
         </p>
         <ScrollArea
-          className={`${expanded ? "max-h-96" : "max-h-48"} rounded-control bg-main-900 px-2.5 py-2`}
+          className={`${expanded ? "max-h-96" : "max-h-48"} rounded-control bg-main-800 px-2.5 py-2`}
         >
           <pre className="m-0 font-mono text-[11.5px] wrap-break-word whitespace-pre-wrap text-main-200">
             {body}

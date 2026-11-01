@@ -36,7 +36,7 @@ export default observer(function ChatGoalBar({ store }: { readonly store: ChatSt
     return (
       <div
         role="status"
-        className="mb-2 flex min-w-0 items-center gap-2.5 rounded-card border border-line bg-main-850 py-1.5 pr-1.5 pl-3 text-[12.5px]"
+        className="flex min-w-0 items-center gap-2.5 py-1.5 pr-1.5 pl-3 text-[12.5px]"
       >
         <Icon path={mdiFlagCheckered} size={16} className="shrink-0 text-ok" />
         <span className="shrink-0 font-medium text-main-100">{GOAL_DONE}</span>
@@ -52,10 +52,7 @@ export default observer(function ChatGoalBar({ store }: { readonly store: ChatSt
 
   const status = goalStatusText(goal);
   return (
-    <section
-      aria-label={GOAL_LABEL}
-      className="mb-2 rounded-card border border-line bg-main-850 px-3 py-2 text-[12.5px]"
-    >
+    <section aria-label={GOAL_LABEL} className="px-3 py-2 text-[12.5px]">
       <div className="flex min-w-0 items-center gap-2.5">
         <Icon path={mdiFlagOutline} size={16} className="shrink-0 text-accent-medium" />
         <span className="min-w-0 flex-1 truncate font-medium text-main-100" title={goal.text}>

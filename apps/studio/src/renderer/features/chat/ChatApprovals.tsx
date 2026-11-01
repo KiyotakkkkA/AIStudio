@@ -8,13 +8,13 @@ import { subagentApprovalTitle } from "../subagents/subagentCopy";
 
 export default observer(function ChatApprovals({ store }: { readonly store: ChatStore }) {
   return (
-    <div className="space-y-2">
+    <>
       {store.standaloneApprovals.map((request) => (
         <FadeIn key={request.id}>
           <div
             role="status"
             style={{ "--zvs-beam-color": "var(--color-warn)" } as CSSProperties}
-            className="zvs-beam mb-2 flex flex-wrap items-center gap-3 rounded-card bg-warn-soft px-3.5 py-3"
+            className="zvs-beam flex flex-wrap items-center gap-3 bg-warn-soft px-3.5 py-3"
           >
             <p className="min-w-0 flex-1 text-[13px] text-main-100">
               {request.subagent === null ? null : (
@@ -52,6 +52,6 @@ export default observer(function ChatApprovals({ store }: { readonly store: Chat
           </div>
         </FadeIn>
       ))}
-    </div>
+    </>
   );
 });

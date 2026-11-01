@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, type CSSProperties } from "react";
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { observer } from "mobx-react-lite";
 import { mdiShieldAlertOutline } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
@@ -8,11 +15,12 @@ import Icon from "../../ui/atoms/Icon";
 import GenerationStatus from "../../ui/molecules/GenerationStatus";
 import TextComposer from "../../ui/molecules/TextComposer";
 import ChatMarkdown from "../chat/ChatMarkdown";
-import ChatToolCalls from "../chat/ChatToolCalls";
+import { ToolCallItems } from "../chat/ChatToolCalls";
 import ReasoningBlock from "../chat/ReasoningBlock";
+import { PIPELINE_LABEL, PipelineList } from "../chat/Pipeline";
 import FileChangeList from "../chat/FileChangeList";
 import { commandLine } from "../chat/processCopy";
-import { toolTitle } from "../chat/toolCallCopy";
+import { TOOL_CALLS_LABEL, toolTitle } from "../chat/toolCallCopy";
 import { shouldPinToBottom } from "../chat/scroll";
 import {
   APPROVAL_TITLE,
@@ -64,7 +72,7 @@ const ApprovalBar = observer(function ApprovalBar({ store }: { readonly store: A
     <div
       role="alert"
       style={{ "--zvs-beam-color": "var(--color-warn)" } as CSSProperties}
-      className="zvs-beam flex flex-col gap-2.5 rounded-card bg-warn-soft px-3.5 py-3"
+      className="zvs-beam mx-auto -mb-2.5 flex w-[92%] flex-col gap-2.5 rounded-t-[18px] bg-warn-soft px-3.5 py-3"
     >
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-warn">
@@ -185,27 +193,6 @@ function UserInput({ text, note }: { readonly text: string; readonly note?: stri
   );
 }
 
-function AgentText({
-  text,
-  reasoning,
-  streaming,
-}: {
-  readonly text: string;
-  readonly reasoning: string;
-  readonly streaming: boolean;
-}) {
-  const content = splitArtifacts(text).text;
-  if (content.length === 0 && reasoning.trim().length === 0) return null;
-  return (
-    <div className="min-w-0 space-y-3">
-      {reasoning.trim().length === 0 ? null : (
-        <ReasoningBlock reasoning={reasoning} thinking={streaming && content.length === 0} />
-      )}
-      {content.length === 0 ? null : <ChatMarkdown content={content} streaming={streaming} />}
-    </div>
-  );
-}
-
 const Composer = observer(function Composer({ store }: { readonly store: AgenticStore }) {
   const session = store.session;
   if (session === null || !store.editable) return null;
@@ -254,6 +241,57 @@ export default observer(function SessionStream({ store }: { readonly store: Agen
   }, []);
   if (session === null) return null;
   const live = session.status === "running";
+  const units: ReactNode[] = [];
+  let pipelineItems: ReactNode[] = [];
+  let pipelineKey = "";
+  let pipelineReasoning = false;
+  const flushPipeline = () => {
+    if (pipelineItems.length === 0) return;
+    units.push(
+      <PipelineList key={pipelineKey} label={pipelineReasoning ? PIPELINE_LABEL : TOOL_CALLS_LABEL}>
+        {pipelineItems}
+      </PipelineList>,
+    );
+    pipelineItems = [];
+    pipelineReasoning = false;
+  };
+  for (const entry of streamBlocks(entries)) {
+    if (entry.kind === "instruction") {
+      flushPipeline();
+      units.push(<UserInput key={entry.id} text={entry.text} />);
+      continue;
+    }
+    if (entry.kind === "tools") {
+      if (pipelineItems.length === 0) pipelineKey = entry.id;
+      pipelineItems.push(
+        <Fragment key={entry.id}>
+          <ToolCallItems calls={entry.steps.map((step) => callOf(step, store.stream.approval))} />
+        </Fragment>,
+      );
+      continue;
+    }
+    const text = splitArtifacts(entry.text).text;
+    const streaming = live && store.stream.open === entry.id;
+    if (entry.reasoning.trim().length > 0) {
+      if (pipelineItems.length === 0) pipelineKey = entry.id;
+      pipelineReasoning = true;
+      pipelineItems.push(
+        <ReasoningBlock
+          key={`${entry.id}-reasoning`}
+          reasoning={entry.reasoning}
+          thinking={streaming && text.length === 0}
+        />,
+      );
+    }
+    if (text.length === 0) continue;
+    flushPipeline();
+    units.push(
+      <div key={entry.id} className="min-w-0">
+        <ChatMarkdown content={text} streaming={streaming} />
+      </div>,
+    );
+  }
+  flushPipeline();
   return (
     <section aria-label={STREAM_TITLE} className="flex min-h-0 min-w-0 flex-1 flex-col">
       <ScrollArea
@@ -280,24 +318,7 @@ export default observer(function SessionStream({ store }: { readonly store: Agen
               <SkeletonLines count={3} />
             </LoadingStatus>
           ) : null}
-          {streamBlocks(entries).map((entry) =>
-            entry.kind === "instruction" ? (
-              <UserInput key={entry.id} text={entry.text} />
-            ) : entry.kind === "tools" ? (
-              <div key={entry.id} className="[&>ul]:mb-0">
-                <ChatToolCalls
-                  calls={entry.steps.map((step) => callOf(step, store.stream.approval))}
-                />
-              </div>
-            ) : (
-              <AgentText
-                key={entry.id}
-                text={entry.text}
-                reasoning={entry.reasoning}
-                streaming={live && store.stream.open === entry.id}
-              />
-            ),
-          )}
+          {units}
           {store.streamLoaded ? <Outcome store={store} /> : null}
           <SessionArtifacts store={store} />
           {store.editable
@@ -311,7 +332,7 @@ export default observer(function SessionStream({ store }: { readonly store: Agen
             : null}
         </div>
       </ScrollArea>
-      <div className="flex-none px-6 pb-5">
+      <div className="flex-none px-6 pt-3 pb-5">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-2.5">
           <ApprovalBar store={store} />
           <Composer store={store} />

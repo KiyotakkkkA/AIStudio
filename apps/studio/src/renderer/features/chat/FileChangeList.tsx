@@ -23,7 +23,7 @@ const LINE_TONE: Record<DiffLineTone, string> = {
 function FileChange({ change, open }: { readonly change: FileDiffDto; readonly open: boolean }) {
   const lines = diffLines(change.diff);
   return (
-    <li className="overflow-hidden rounded-control bg-main-900">
+    <li className="overflow-hidden rounded-control bg-main-800">
       <details open={open} className="group/file">
         <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 px-2.5 py-1.5 text-[11.5px] [&::-webkit-details-marker]:hidden">
           <span className="shrink-0 text-main-400">{CHANGE_KIND_LABEL[change.kind]}</span>

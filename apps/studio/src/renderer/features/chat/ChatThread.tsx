@@ -26,8 +26,9 @@ import type { ExecPolicyBinding } from "../execPolicy/ExecPolicyMenu";
 import type { VoiceBinding } from "../voice/VoiceMenu";
 import ChatApprovals from "./ChatApprovals";
 import ChatWorkingFolder from "./ChatWorkingFolder";
+import ChatGoalBar from "./ChatGoalBar";
 import FolderAccessModal from "./FolderAccessModal";
-import ChatToolCalls from "./ChatToolCalls";
+import { ToolCallItems } from "./ChatToolCalls";
 import { answerCitations, questionSelections } from "./citations";
 import { answerArtifacts } from "./artifacts";
 import ChatArtifacts from "./ChatArtifacts";
@@ -379,7 +380,7 @@ export default observer(function ChatThread({
                     stores={store.stores}
                     partial={message.partial}
                     toolCalls={message.toolCalls}
-                    renderTools={(calls) => <ChatToolCalls calls={calls} />}
+                    renderToolItems={(calls) => <ToolCallItems calls={calls} />}
                     artifacts={
                       <ChatArtifacts
                         artifacts={answerArtifacts(message.toolCalls)}
@@ -427,8 +428,8 @@ export default observer(function ChatThread({
                   }
                   partial={store.outcome !== "ok"}
                   toolCalls={store.liveToolCalls}
-                  renderTools={(calls) => (
-                    <ChatToolCalls
+                  renderToolItems={(calls) => (
+                    <ToolCallItems
                       calls={calls}
                       approvalFor={store.approvalFor}
                       onDecide={(id, approve) => void store.decideApproval(id, approve)}
@@ -515,13 +516,12 @@ export default observer(function ChatThread({
           </motion.div>
         )}
       </AnimatePresence>
-      <div className="px-6">
-        <div className="mx-auto w-full max-w-4xl">
+      <div className="mx-auto w-full max-w-4xl shrink-0 px-6 pt-3">
+        <div className="mx-auto flex w-[92%] flex-col divide-y divide-line overflow-clip rounded-t-[18px] border border-b-0 border-line bg-main-850">
           <ChatApprovals store={store} />
+          <ChatWorkingFolder store={store} />
+          <ChatGoalBar store={store} />
         </div>
-      </div>
-      <div className="mx-auto w-full max-w-4xl shrink-0 px-6">
-        <ChatWorkingFolder store={store} />
       </div>
       <FolderAccessModal store={store} />
       <ChatComposer

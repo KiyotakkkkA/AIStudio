@@ -48,7 +48,7 @@ export const NO_RESTRICTIONS_ACCEPT = "Отключить";
 export const JUDGE_ROW = {
   key: "execPolicy.judgeModel",
   label: "Модель-арбитр",
-  hint: "Оценивает опасные действия в режиме «Автопроверка». Получает только описание действия и правила, без истории диалога.",
+  hint: "Оценивает опасные действия в режиме «Автопроверка».",
 } as const;
 
 export const JUDGE_PROVIDER = "Провайдер";

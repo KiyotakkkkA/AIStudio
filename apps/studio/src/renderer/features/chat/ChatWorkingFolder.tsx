@@ -27,7 +27,7 @@ export default observer(function ChatWorkingFolder({ store }: { readonly store: 
   const hint = store.generating ? FOLDER_LOCKED : undefined;
 
   return (
-    <div className="-mb-1 flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1 px-3.5 py-1.5">
       <div
         role="group"
         aria-label={WORKING_FOLDER_LABEL}

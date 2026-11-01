@@ -22,7 +22,6 @@ import { RETRIEVAL_MODES, retrievalHint } from "./retrievalModes";
 import ChatAccountProviderSetup from "./ChatAccountProviderSetup";
 import ChatCommandMenu, { COMMAND_MENU_ID, commandOptionId } from "./ChatCommandMenu";
 import ChatContextMeter from "./ChatContextMeter";
-import ChatGoalBar from "./ChatGoalBar";
 import ChatModelGate from "./ChatModelGate";
 import ChatToolsBadge from "./ChatToolsBadge";
 import ModelFields, { availableModelOptions } from "./ModelFields";
@@ -69,8 +68,7 @@ export default observer(function ChatComposer({
   }, [store.generating]);
 
   return (
-    <div className="mx-auto w-full max-w-4xl shrink-0 px-6 pt-2 pb-4">
-      <ChatGoalBar store={store} />
+    <div className="mx-auto w-full max-w-4xl shrink-0 px-6 pt-0 pb-4">
       {!store.available && !store.loading ? (
         <ChatModelGate store={store} />
       ) : (

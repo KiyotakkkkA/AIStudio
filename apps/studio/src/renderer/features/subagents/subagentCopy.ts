@@ -3,7 +3,7 @@ import { plural } from "../connections/connectionPresentation";
 export const SUBAGENTS_ROW = {
   key: "subagents.preferences",
   label: "Субагенты",
-  hint: "Модель может поручать отдельные задачи субагентам. Субагент работает в своём контексте с инструментами диалога и возвращает только отчёт.",
+  hint: "Модель может поручать отдельные задачи субагентам.",
 } as const;
 
 export const SUBAGENT_MODELS_ROW = {
@@ -14,8 +14,8 @@ export const SUBAGENT_MODELS_ROW = {
 
 export const SUBAGENT_CONCURRENCY_ROW = {
   key: "subagents.concurrency",
-  label: "Одновременно",
-  hint: "Число субагентов, выполняемых параллельно.",
+  label: "Максимум запущенных одновременно",
+  hint: "Число субагентов, работающих параллельно.",
 } as const;
 
 export const SUBAGENT_MODELS_EMPTY = "Список пуст, субагенты используют модель диалога.";
