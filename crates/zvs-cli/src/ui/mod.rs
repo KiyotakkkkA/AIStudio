@@ -16,12 +16,14 @@ use zvs_contract::ExecMode;
 use crate::copy;
 use crate::state::overlay::Panel;
 use crate::state::palette::{Command, every_item, loading, matches};
+use crate::state::shortcuts::Shortcut;
 use crate::state::transcript::Tone;
 use crate::state::{App, Phase};
 
 const INPUT_MAX_LINES: usize = 8;
 const PALETTE_ROWS: usize = 8;
 const KEYS_GAP: usize = 4;
+const QUEUE_ROWS: usize = 5;
 
 pub use crate::state::overlay::mode_label;
 
@@ -120,6 +122,74 @@ fn input_height(app: &App) -> u16 {
         .count()
         .clamp(1, INPUT_MAX_LINES);
     rows(count + 2)
+}
+
+pub fn queue_lines(app: &App, width: usize) -> Vec<Line<'static>> {
+    if app.queue.is_empty() {
+        return Vec::new();
+    }
+    let mut title = format!(" {} · {}", copy::QUEUE_TITLE, copy::queued(app.queue.len()));
+    if app.queue_urgent {
+        title.push_str(&format!(" · {}", copy::QUEUE_SENDING));
+    }
+    let rule = "┄".repeat(width.saturating_sub(title.width() + 2));
+    let mut lines = vec![Line::from(vec![
+        Span::styled(format!("┄{title} "), theme::muted()),
+        Span::styled(rule, theme::faint()),
+    ])];
+    let selected = app.queue_selected.unwrap_or(usize::MAX);
+    let start = selected
+        .min(app.queue.len().saturating_sub(1))
+        .saturating_sub(QUEUE_ROWS - 1)
+        .min(app.queue.len().saturating_sub(QUEUE_ROWS));
+    for (index, message) in app.queue.iter().enumerate().skip(start).take(QUEUE_ROWS) {
+        let chosen = index == selected;
+        let editing = app
+            .queue_editing
+            .as_ref()
+            .is_some_and(|(id, _)| *id == message.id);
+        let marker = if chosen { " › " } else { "   " };
+        let flat = message
+            .text
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        let body = text::truncate(&flat, width.saturating_sub(4));
+        let style = if editing || chosen {
+            theme::accent()
+        } else {
+            theme::muted()
+        };
+        lines.push(Line::from(vec![
+            Span::styled(marker, theme::accent()),
+            Span::styled(body, style),
+        ]));
+    }
+    let key = |shortcut| app.keymap.label(shortcut);
+    let hint = format!(
+        " {}/{} {} · {} {} · {} {} · {} {}",
+        key(Shortcut::QueuePrevious),
+        key(Shortcut::QueueNext),
+        copy::QUEUE_SELECT,
+        key(Shortcut::QueueEdit),
+        copy::QUEUE_EDIT,
+        key(Shortcut::QueueRemove),
+        copy::QUEUE_REMOVE,
+        key(Shortcut::QueueSend),
+        copy::QUEUE_SEND,
+    );
+    lines.push(Line::from(Span::styled(
+        text::truncate(&hint, width),
+        theme::faint(),
+    )));
+    lines
+}
+
+fn queue_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
+    frame.render_widget(
+        Paragraph::new(queue_lines(app, usize::from(area.width))),
+        area,
+    );
 }
 
 fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
@@ -591,12 +661,18 @@ fn draw_screen(frame: &mut Frame<'_>, app: &App) {
                 .as_ref()
                 .map_or_else(|| input_height(app), |panel| rows(panel.lines.len() + 2))
                 .min(area.height.saturating_sub(4));
-            let [body, bottom, status] = Layout::vertical([
+            let queue_height = rows(queue_lines(app, usize::from(area.width)).len())
+                .min(area.height.saturating_sub(bottom_height + 4));
+            let [body, queued, bottom, status] = Layout::vertical([
                 Constraint::Fill(1),
+                Constraint::Length(queue_height),
                 Constraint::Length(bottom_height),
                 Constraint::Length(2),
             ])
             .areas(area);
+            if queue_height > 0 {
+                queue_view(frame, queued, app);
+            }
             match &app.overlay {
                 Some(current) => overlay::draw(frame, body, app, current),
                 None => transcript_view(frame, body, app),

@@ -20,7 +20,7 @@ use crate::keymap_file;
 use crate::launch::{self, Connection};
 use crate::link::{Incoming, Link};
 use crate::shell::{self, ShellControl};
-use crate::state::shortcuts::Chord;
+use crate::state::shortcuts::{Chord, ChordKey};
 use crate::state::transcript::Tone;
 use crate::state::{App, Exit, Key, Msg, Pointer, PolicyChange, Request, Selection};
 use crate::theme_file;
@@ -66,6 +66,15 @@ pub fn key(event: KeyEvent, pasting: bool) -> Option<Key> {
             Key::Chord(Chord::character(value, false, true, shift)?)
         }
         KeyCode::F(number) => Key::Chord(Chord::function_key(number, control, alt, shift)?),
+        KeyCode::Up if alt && !control => {
+            Key::Chord(Chord::named(ChordKey::Up, false, true, shift)?)
+        }
+        KeyCode::Down if alt && !control => {
+            Key::Chord(Chord::named(ChordKey::Down, false, true, shift)?)
+        }
+        KeyCode::Enter | KeyCode::Char('\r' | '\n') if alt && !shift && !control && !pasting => {
+            Key::Chord(Chord::named(ChordKey::Enter, false, true, false)?)
+        }
         KeyCode::Enter | KeyCode::Char('\r' | '\n') if shifted || pasting => Key::Newline,
         KeyCode::Enter | KeyCode::Char('\r' | '\n') => Key::Enter,
         KeyCode::Char(value) => Key::Char(value),
@@ -252,6 +261,35 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
         ),
         Request::StopGoal(id) => Msg::GoalStopped(
             link.call("chat.goal.stop", &json!({ "conversationId": id }))
+                .await,
+        ),
+        Request::QueueList(id) => Msg::Queue(
+            link.call("chat.queue.list", &json!({ "conversationId": id }))
+                .await,
+        ),
+        Request::QueueAdd { id, text } => Msg::Queue(
+            link.call(
+                "chat.queue.add",
+                &json!({ "conversationId": id, "text": text }),
+            )
+            .await,
+        ),
+        Request::QueueEdit { id, message, text } => Msg::Queue(
+            link.call(
+                "chat.queue.edit",
+                &json!({ "conversationId": id, "messageId": message, "text": text }),
+            )
+            .await,
+        ),
+        Request::QueueRemove { id, message } => Msg::Queue(
+            link.call(
+                "chat.queue.remove",
+                &json!({ "conversationId": id, "messageId": message }),
+            )
+            .await,
+        ),
+        Request::QueueSend(id) => Msg::Queue(
+            link.call("chat.queue.flush", &json!({ "conversationId": id }))
                 .await,
         ),
         Request::ContinueGoal(id) => Msg::Sent(
@@ -881,7 +919,23 @@ mod tests {
         );
         assert_eq!(
             key(pressed(KeyCode::Enter, KeyModifiers::ALT), false),
+            Some(Key::Chord(Chord::alt_key(ChordKey::Enter)))
+        );
+        assert_eq!(
+            key(pressed(KeyCode::Enter, KeyModifiers::SHIFT), false),
             Some(Key::Newline)
+        );
+        assert_eq!(
+            key(pressed(KeyCode::Enter, KeyModifiers::ALT), true),
+            Some(Key::Newline)
+        );
+        assert_eq!(
+            key(pressed(KeyCode::Up, KeyModifiers::ALT), false),
+            Some(Key::Chord(Chord::alt_key(ChordKey::Up)))
+        );
+        assert_eq!(
+            key(pressed(KeyCode::Down, KeyModifiers::NONE), false),
+            Some(Key::Down)
         );
         assert_eq!(
             key(pressed(KeyCode::Char('ж'), KeyModifiers::NONE), false),

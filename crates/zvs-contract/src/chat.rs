@@ -856,6 +856,37 @@ impl Validate for ChatPromptSectionDto {
     }
 }
 
+wire_enum!(ChatCarriedKind {
+    ToolCall => "toolCall",
+    Source => "source",
+});
+
+wire_enum!(ChatCarriedStatus {
+    Sent => "sent",
+    Shortened => "shortened",
+    Dropped => "dropped",
+});
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatCarriedPartDto {
+    pub kind: ChatCarriedKind,
+    pub label: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub marker: String,
+    pub status: ChatCarriedStatus,
+    pub tokens: u64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub truncated: bool,
+}
+
+impl Validate for ChatCarriedPartDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("label", &self.label)?;
+        check::safe_integer("tokens", self.tokens)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatHistoryEntryDto {
@@ -865,7 +896,8 @@ pub struct ChatHistoryEntryDto {
     pub tokens: u64,
     pub text: String,
     pub reasoning_tokens: u64,
-    pub tool_tokens: u64,
+    #[serde(default)]
+    pub carried: Vec<ChatCarriedPartDto>,
 }
 
 impl Validate for ChatHistoryEntryDto {
@@ -873,11 +905,10 @@ impl Validate for ChatHistoryEntryDto {
         for (field, value) in [
             ("tokens", self.tokens),
             ("reasoningTokens", self.reasoning_tokens),
-            ("toolTokens", self.tool_tokens),
         ] {
             check::safe_integer(field, value)?;
         }
-        Ok(())
+        nested("carried", self.carried.validate())
     }
 }
 

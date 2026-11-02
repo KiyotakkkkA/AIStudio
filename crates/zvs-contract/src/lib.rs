@@ -28,6 +28,7 @@ pub mod primitives;
 pub mod process;
 pub mod providers;
 pub mod questions;
+pub mod queue;
 pub mod runs;
 pub mod runtimes;
 pub mod scenarios;
@@ -80,19 +81,19 @@ pub use browser::{
 };
 pub use channels::{CHANNELS, is_channel};
 pub use chat::{
-    BranchConversationInput, ChatAttachDto, ChatAttachInput, ChatAttachOutput, ChatCitationDto,
-    ChatCommand, ChatCommandDto, ChatCommandsOutput, ChatContextDto, ChatContextInput,
-    ChatContextToolDto, ChatConversationsListOutput, ChatEvalCaseDto, ChatEvalInput,
-    ChatEvalModeDto, ChatEvalRunDto, ChatEventDto, ChatHistoryEntryDto, ChatHistoryStatus,
-    ChatPromptSection, ChatPromptSectionDto, ChatRoundDto, ChatSendInput, ChatSettings,
-    ChatStatsDto, ChatToolCallDto, ChatToolCallStatus, ChatWakeStepDto, ConversationDetailDto,
-    ConversationDto, ConversationExportDto, ConversationExportFormat, ConversationRef,
-    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DocumentSelectionDto,
-    ExportConversationInput, MessageDto, MessageRole, OfferedToolDto, OfferedToolSource,
-    PinConversationInput, PinMessageInput, RenameConversationInput, RetrievalMode, ThinkingEffort,
-    TruncateConversationInput, UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
-    UpdateConversationStoresInput, VendorTurnOptions, WAKE_STEP_DOMAIN, WEB_SOURCES_MAX,
-    WebSourceDto,
+    BranchConversationInput, ChatAttachDto, ChatAttachInput, ChatAttachOutput, ChatCarriedKind,
+    ChatCarriedPartDto, ChatCarriedStatus, ChatCitationDto, ChatCommand, ChatCommandDto,
+    ChatCommandsOutput, ChatContextDto, ChatContextInput, ChatContextToolDto,
+    ChatConversationsListOutput, ChatEvalCaseDto, ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto,
+    ChatEventDto, ChatHistoryEntryDto, ChatHistoryStatus, ChatPromptSection, ChatPromptSectionDto,
+    ChatRoundDto, ChatSendInput, ChatSettings, ChatStatsDto, ChatToolCallDto, ChatToolCallStatus,
+    ChatWakeStepDto, ConversationDetailDto, ConversationDto, ConversationExportDto,
+    ConversationExportFormat, ConversationRef, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
+    DocumentSelectionDto, ExportConversationInput, MessageDto, MessageRole, OfferedToolDto,
+    OfferedToolSource, PinConversationInput, PinMessageInput, RenameConversationInput,
+    RetrievalMode, ThinkingEffort, TruncateConversationInput, UpdateConversationRelationsInput,
+    UpdateConversationRetrievalInput, UpdateConversationStoresInput, VendorTurnOptions,
+    WAKE_STEP_DOMAIN, WEB_SOURCES_MAX, WebSourceDto,
 };
 pub use cli::{
     CLI_COMMAND, CLI_LAUNCH_ARG, CLI_LINE_MAX, CLI_PIPE_PREFIX, CLI_PROTOCOL_VERSION,
@@ -195,6 +196,10 @@ pub use providers::{
 pub use questions::{
     ChatAnswerInput, ChatSkipInput, QUESTIONS_MAX, QuestionAnswerDto, QuestionDto, QuestionKind,
     QuestionOptionDto, QuestionRecordDto, QuestionRequestDto,
+};
+pub use queue::{
+    CHAT_QUEUE_MAX, ChatQueueAddInput, ChatQueueDto, ChatQueueEditInput, ChatQueueInput,
+    ChatQueueRemoveInput, ChatQueueStepDto, ChatQueuedMessageDto, QUEUE_STEP_DOMAIN,
 };
 pub use runs::{
     DEFAULT_CONCURRENCY, DEFAULT_RUN_LIST_LIMIT, GRAPH_ALLOWED_TOOLS_MAX, GRAPH_MAX_NODES,

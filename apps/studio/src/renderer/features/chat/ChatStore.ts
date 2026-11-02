@@ -3,6 +3,7 @@ import type { IpcClient } from "@zvs/ipc";
 import {
   ChatWakeStepDto,
   WAKE_STEP_DOMAIN,
+  QUEUE_STEP_DOMAIN,
   ChatToolCallDto,
   type BackgroundShellId,
   type ChatRoundDto,
@@ -64,6 +65,7 @@ import TerminalStore from "../terminal/TerminalStore";
 import BackgroundShellStore from "../backgroundShells/BackgroundShellStore";
 import { matchCommands, parseCommand } from "./chatCommands";
 import GoalStore from "./GoalStore";
+import QueueStore from "./QueueStore";
 import SubagentSteps, { subagentLabel, type SubagentLabel } from "./SubagentSteps";
 import { GOAL_COMMAND } from "./goalCopy";
 import { toolSections } from "./toolSets";
@@ -147,6 +149,7 @@ export default class ChatStore {
   pendingTurn = false;
   goalEmpty = false;
   readonly goals: GoalStore;
+  readonly queue: QueueStore;
   readonly subagents = new SubagentSteps();
   readonly explorer: ExplorerStore;
   readonly terminal: TerminalStore;
@@ -175,6 +178,8 @@ export default class ChatStore {
   private held: RoutedEvent[] = [];
   private stopWakes: (() => void) | undefined;
   private waking = false;
+  private followPending = false;
+  private refreshing: Promise<void> | null = null;
 
   private memoryTool: () => boolean = () => false;
 
@@ -194,6 +199,12 @@ export default class ChatStore {
       refresh: (id) => this.refreshGoal(id),
       replace: (conversation) => {
         this.replaceConversation(conversation);
+      },
+    });
+    this.queue = new QueueStore(ipc, {
+      conversationId: () => this.active?.id ?? null,
+      sent: (id) => {
+        void this.followLive(id);
       },
     });
     makeAutoObservable<
@@ -218,6 +229,8 @@ export default class ChatStore {
       | "held"
       | "stopWakes"
       | "waking"
+      | "followPending"
+      | "refreshing"
       | "memoryTool"
     >(
       this,
@@ -232,6 +245,7 @@ export default class ChatStore {
         stats: false,
         siteIcons: false,
         goals: false,
+        queue: false,
         subagents: false,
         buffer: false,
         timer: false,
@@ -252,6 +266,8 @@ export default class ChatStore {
         held: false,
         stopWakes: false,
         waking: false,
+        followPending: false,
+        refreshing: false,
       },
       { autoBind: true },
     );
@@ -559,6 +575,20 @@ export default class ChatStore {
       !this.goals.active &&
       this.composer.text.trim().length > 0
     );
+  }
+  get canQueue() {
+    return (
+      this.available &&
+      !this.loading &&
+      this.active !== null &&
+      (this.generating || this.goals.active) &&
+      this.composer.command === null &&
+      !this.queue.full &&
+      this.composer.text.trim().length > 0
+    );
+  }
+  get queueing() {
+    return this.active !== null && (this.generating || this.goals.active);
   }
   get goalCommand() {
     return this.composer.command === GOAL_COMMAND;
@@ -895,6 +925,8 @@ export default class ChatStore {
     this.folderError = null;
     this.folderPrompt = null;
     this.goals.reset();
+    this.queue.reset();
+    void this.queue.load(id);
     try {
       const [active, live] = await Promise.all([
         this.ipc.call("chat.conversations.get", { id }),
@@ -946,6 +978,7 @@ export default class ChatStore {
     ++this.revision;
     this.active = null;
     this.goals.reset();
+    this.queue.reset();
     this.remember(null);
     this.loading = false;
     this.error = null;
@@ -1053,6 +1086,10 @@ export default class ChatStore {
   async send() {
     if (this.goalCommand && this.composer.text.trim().length === 0) {
       this.goalEmpty = true;
+      return;
+    }
+    if (this.canQueue) {
+      if (await this.queue.add(this.composer.text)) this.composer.setText("");
       return;
     }
     if (!this.canSend) return;
@@ -1423,6 +1460,10 @@ export default class ChatStore {
   }
 
   private observeWake(event: RoutedEvent) {
+    if (event.type === "step" && event.step.domain === QUEUE_STEP_DOMAIN) {
+      this.queue.apply(event.step);
+      return;
+    }
     if (event.type !== "step" || event.step.domain !== WAKE_STEP_DOMAIN) return;
     const wake = ChatWakeStepDto.safeParse(event.step);
     if (!wake.success) return;
@@ -1613,7 +1654,30 @@ export default class ChatStore {
     this.questions = [];
     this.folderRequests = [];
     this.stopping = false;
-    void this.refreshCompleted();
+    const follow = this.followPending;
+    this.followPending = false;
+    const id = this.active?.id;
+    this.refreshing = this.refreshCompleted();
+    if (follow && id !== undefined) void this.followLive(id);
+  }
+
+  private async followLive(id: ConversationId) {
+    if (this.run !== null || this.sending) {
+      this.followPending = true;
+      return;
+    }
+    await this.refreshing;
+    const [active, live] = await Promise.all([
+      this.ipc.call("chat.conversations.get", { id }).catch(() => null),
+      this.attachment(id),
+    ]);
+    runInAction(() => {
+      if (this.active?.id !== id || this.run !== null || this.sending) return;
+      if (active !== null) this.active = active;
+      if (live === null) return;
+      this.restore(live);
+      if (this.mounted) this.subscribe();
+    });
   }
 
   private flush() {

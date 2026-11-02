@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -14,7 +15,7 @@ use zvs_contract::{
 
 use super::registry::NodeRegistry;
 use super::types::{NodeDef, PermissionRequirement, StepContext};
-use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta};
+use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta, ToolCall};
 use crate::drivers::sidecar::{JobProgress, JobRunOptions};
 use crate::indexing::{IndexContext, IndexProgress};
 use crate::services::vector_stores::VectorSearchOptions;
@@ -23,6 +24,9 @@ pub const PROVIDERS_UNAVAILABLE: &str = "Provider service unavailable";
 pub const VECTORS_UNAVAILABLE: &str = "Сервис векторного поиска недоступен";
 pub const JOBS_UNAVAILABLE: &str = "Сервис задач недоступен";
 pub const INDEXING_UNAVAILABLE: &str = "Сервис индексации недоступен";
+pub const TOOL_CALLS_NOT_ASSISTANT: &str =
+    "Вызовы инструментов допустимы только в сообщении ассистента";
+pub const TOOL_RESULT_UNPAIRED: &str = "Результат инструмента не связан с предшествующим вызовом";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -30,6 +34,7 @@ pub enum GenerateRole {
     System,
     User,
     Assistant,
+    Tool,
 }
 
 impl GenerateRole {
@@ -38,8 +43,26 @@ impl GenerateRole {
             Self::System => ChatRole::System,
             Self::User => ChatRole::User,
             Self::Assistant => ChatRole::Assistant,
+            Self::Tool => ChatRole::Tool,
         }
     }
+
+    pub const fn from_chat(role: ChatRole) -> Self {
+        match role {
+            ChatRole::System => Self::System,
+            ChatRole::User => Self::User,
+            ChatRole::Assistant => Self::Assistant,
+            ChatRole::Tool => Self::Tool,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateToolCall {
+    pub id: String,
+    pub name: String,
+    pub arguments: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -47,6 +70,51 @@ impl GenerateRole {
 pub struct GenerateMessage {
     pub role: GenerateRole,
     pub content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<GenerateToolCall>,
+}
+
+impl GenerateMessage {
+    pub fn new(role: GenerateRole, content: impl Into<String>) -> Self {
+        Self {
+            role,
+            content: content.into(),
+            tool_call_id: None,
+            tool_calls: Vec::new(),
+        }
+    }
+
+    pub fn from_chat(message: &ChatMessage) -> Self {
+        Self {
+            role: GenerateRole::from_chat(message.role),
+            content: message.content.clone(),
+            tool_call_id: message.tool_call_id.clone(),
+            tool_calls: message
+                .tool_calls
+                .iter()
+                .map(|call| GenerateToolCall {
+                    id: call.id.clone(),
+                    name: call.name.clone(),
+                    arguments: call.arguments.clone(),
+                })
+                .collect(),
+        }
+    }
+
+    fn into_chat(self) -> ChatMessage {
+        ChatMessage {
+            role: self.role.chat_role(),
+            content: self.content,
+            tool_call_id: self.tool_call_id,
+            tool_calls: self
+                .tool_calls
+                .into_iter()
+                .map(|call| ToolCall::new(call.id, call.name, call.arguments))
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -104,7 +172,7 @@ impl GenerateNodeInput {
                 self.model,
                 self.messages
                     .into_iter()
-                    .map(|message| ChatMessage::new(message.role.chat_role(), message.content))
+                    .map(GenerateMessage::into_chat)
                     .collect(),
             )
         }
@@ -131,6 +199,37 @@ impl Validate for GenerateNodeInput {
         }
         if let Some(tokens) = self.max_output_tokens {
             positive("maxOutputTokens", tokens)?;
+        }
+        let mut called: HashSet<&str> = HashSet::new();
+        for message in &self.messages {
+            if !message.tool_calls.is_empty() && message.role != GenerateRole::Assistant {
+                return Err(AppError::new(
+                    AppErrorCode::ValidationFailed,
+                    TOOL_CALLS_NOT_ASSISTANT,
+                ));
+            }
+            for call in &message.tool_calls {
+                check::non_empty("toolCalls.id", &call.id)?;
+                check::non_empty("toolCalls.name", &call.name)?;
+                called.insert(&call.id);
+            }
+            let answers = message.tool_call_id.as_deref();
+            match (message.role, answers) {
+                (GenerateRole::Tool, Some(id)) if called.contains(id) => {}
+                (GenerateRole::Tool, _) => {
+                    return Err(AppError::new(
+                        AppErrorCode::ValidationFailed,
+                        TOOL_RESULT_UNPAIRED,
+                    ));
+                }
+                (_, Some(_)) => {
+                    return Err(AppError::new(
+                        AppErrorCode::ValidationFailed,
+                        TOOL_RESULT_UNPAIRED,
+                    ));
+                }
+                (_, None) => {}
+            }
         }
         Ok(())
     }

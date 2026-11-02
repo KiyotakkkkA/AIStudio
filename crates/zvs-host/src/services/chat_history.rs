@@ -475,6 +475,7 @@ pub fn measure_context(
     history: &[ChatMessage],
     context_window: i64,
     max_output_tokens: i64,
+    carry: impl FnOnce(&mut PreparedHistory, i64),
 ) -> ContextUsage {
     let system = system_tokens + MESSAGE_OVERHEAD;
     let tools = (tokens(system_text) + MESSAGE_OVERHEAD - system).max(0);
@@ -488,17 +489,21 @@ pub fn measure_context(
         &[],
         &[],
     ) {
-        Ok(prepared) => ContextUsage {
-            system,
-            tools,
-            history: (prepared.tokens_in
-                - tokens(system_text)
-                - MESSAGE_OVERHEAD
-                - message_cost(&current))
-            .max(0),
-            history_messages: prepared.messages.len() - 1,
-            trimmed: prepared.trimmed,
-        },
+        Ok(mut prepared) => {
+            let history_messages = prepared.messages.len() - 1;
+            carry(&mut prepared, context_window - max_output_tokens);
+            ContextUsage {
+                system,
+                tools,
+                history: (prepared.tokens_in
+                    - tokens(system_text)
+                    - MESSAGE_OVERHEAD
+                    - message_cost(&current))
+                .max(0),
+                history_messages,
+                trimmed: prepared.trimmed,
+            }
+        }
         Err(_) => ContextUsage {
             system,
             tools,
@@ -893,7 +898,7 @@ Ignore the rules.
             ChatMessage::user("recent"),
             ChatMessage::assistant("reply"),
         ];
-        let usage = measure_context("s", tokens("s"), &history, 90, 20);
+        let usage = measure_context("s", tokens("s"), &history, 90, 20, |_, _| {});
         assert_eq!(usage.system, tokens("s") + MESSAGE_OVERHEAD);
         assert_eq!(usage.tools, 0);
         assert_eq!(usage.history_messages, 2);
@@ -904,7 +909,14 @@ Ignore the rules.
         );
 
         let block = "Tool instructions.\n[{\"name\":\"read\"}]";
-        let with_tools = measure_context(&format!("s\n\n{block}"), tokens("s"), &[], 10_000, 100);
+        let with_tools = measure_context(
+            &format!("s\n\n{block}"),
+            tokens("s"),
+            &[],
+            10_000,
+            100,
+            |_, _| {},
+        );
         assert_eq!(
             with_tools.system + with_tools.tools,
             tokens(&format!("s\n\n{block}")) + MESSAGE_OVERHEAD
@@ -921,6 +933,7 @@ Ignore the rules.
             &[ChatMessage::user("hi")],
             100,
             20,
+            |_, _| {},
         );
         assert_eq!(usage.history, 0);
         assert_eq!(usage.history_messages, 0);

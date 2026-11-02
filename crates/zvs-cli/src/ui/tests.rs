@@ -147,7 +147,7 @@ fn the_shortcut_list_and_the_rebinding_panel_render() {
         app.update(Msg::Key(Key::Char(value)));
     }
     app.update(Msg::Key(Key::Enter));
-    let screen = render(&app, 100, 30);
+    let screen = render(&app, 100, 40);
     assert!(screen.contains(copy::SHORTCUT_COLUMN_KEYS), "{screen}");
     let starts: Vec<usize> = shortcuts::SHORTCUTS
         .iter()
@@ -160,7 +160,7 @@ fn the_shortcut_list_and_the_rebinding_panel_render() {
     );
 
     app.update(Msg::Key(Key::Enter));
-    let capturing = render(&app, 100, 30);
+    let capturing = render(&app, 100, 40);
     assert!(capturing.contains(copy::SHORTCUT_PRESS), "{capturing}");
     assert!(capturing.contains(copy::HINT_CAPTURE), "{capturing}");
     assert_eq!(
@@ -480,4 +480,44 @@ fn a_subagent_prompt_starts_with_its_title_line() {
     let panel = super::prompt::panel(&prompt, 80);
     assert_eq!(plain(&panel.lines)[0], copy::subagent_title("Удали файлы"));
     assert_eq!(panel.title, copy::APPROVAL_TITLE);
+}
+
+#[test]
+fn the_queue_is_a_muted_section_above_the_input_with_its_shortcuts() {
+    let mut app = conversation_app();
+    app.queue = vec![
+        zvs_contract::ChatQueuedMessageDto {
+            id: "q1".to_owned(),
+            text: "Добавь тесты".to_owned(),
+            created_at: 1,
+        },
+        zvs_contract::ChatQueuedMessageDto {
+            id: "q2".to_owned(),
+            text: "И проверь clippy".to_owned(),
+            created_at: 2,
+        },
+    ];
+    app.queue_selected = Some(0);
+    app.queue_urgent = true;
+    let screen = render(&app, 120, 30);
+    assert!(screen.contains(&copy::queued(2)), "{screen}");
+    assert!(screen.contains(copy::QUEUE_SENDING), "{screen}");
+    assert!(screen.contains(" › Добавь тесты"), "{screen}");
+    assert!(screen.contains("   И проверь clippy"), "{screen}");
+    assert!(screen.contains("Alt+↑/Alt+↓"), "{screen}");
+    assert!(
+        screen.contains(&format!("Alt+Enter {}", copy::QUEUE_SEND)),
+        "{screen}"
+    );
+    let queue_row = screen
+        .lines()
+        .position(|line| line.contains("И проверь clippy"))
+        .expect("a queued row");
+    let input_row = screen
+        .lines()
+        .position(|line| line.contains("Сообщение…"))
+        .unwrap_or(usize::MAX);
+    assert!(queue_row < input_row, "{screen}");
+    app.queue.clear();
+    assert!(!render(&app, 120, 30).contains(copy::QUEUE_TITLE));
 }

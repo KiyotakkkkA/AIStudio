@@ -334,6 +334,37 @@ export const ChatSendInput = z.object({
   vendor: VendorTurnOptions.optional(),
 });
 export type ChatSendInput = z.infer<typeof ChatSendInput>;
+
+export const QUEUE_STEP_DOMAIN = "queue";
+export const CHAT_QUEUE_MAX = 10;
+const QueuedMessageId = z.string().min(1).max(64);
+const QueuedText = z.string().trim().min(1).max(100000);
+export const ChatQueuedMessageDto = z.object({
+  id: QueuedMessageId,
+  text: QueuedText,
+  createdAt: Timestamp,
+});
+export type ChatQueuedMessageDto = z.infer<typeof ChatQueuedMessageDto>;
+export const ChatQueueDto = z.object({
+  conversationId: ConversationId,
+  messages: z.array(ChatQueuedMessageDto).max(CHAT_QUEUE_MAX),
+  urgent: z.boolean(),
+});
+export type ChatQueueDto = z.infer<typeof ChatQueueDto>;
+export const ChatQueueStepDto = ChatQueueDto.extend({ domain: z.literal(QUEUE_STEP_DOMAIN) });
+export type ChatQueueStepDto = z.infer<typeof ChatQueueStepDto>;
+export const ChatQueueInput = z.object({ conversationId: ConversationId });
+export type ChatQueueInput = z.infer<typeof ChatQueueInput>;
+export const ChatQueueAddInput = ChatQueueInput.extend({ text: QueuedText });
+export type ChatQueueAddInput = z.infer<typeof ChatQueueAddInput>;
+export const ChatQueueEditInput = ChatQueueInput.extend({
+  messageId: QueuedMessageId,
+  text: QueuedText,
+});
+export type ChatQueueEditInput = z.infer<typeof ChatQueueEditInput>;
+export const ChatQueueRemoveInput = ChatQueueInput.extend({ messageId: QueuedMessageId });
+export type ChatQueueRemoveInput = z.infer<typeof ChatQueueRemoveInput>;
+
 export const ChatContextInput = z.object({
   conversationId: ConversationId.optional(),
   providerId: ProviderId,
@@ -389,6 +420,19 @@ export const ChatPromptSectionDto = z.object({
   text: z.string(),
 });
 export type ChatPromptSectionDto = z.infer<typeof ChatPromptSectionDto>;
+export const ChatCarriedKind = z.enum(["toolCall", "source"]);
+export type ChatCarriedKind = z.infer<typeof ChatCarriedKind>;
+export const ChatCarriedStatus = z.enum(["sent", "shortened", "dropped"]);
+export type ChatCarriedStatus = z.infer<typeof ChatCarriedStatus>;
+export const ChatCarriedPartDto = z.object({
+  kind: ChatCarriedKind,
+  label: z.string().min(1),
+  marker: z.string().default(""),
+  status: ChatCarriedStatus,
+  tokens: z.number().int().nonnegative(),
+  truncated: z.boolean().default(false),
+});
+export type ChatCarriedPartDto = z.infer<typeof ChatCarriedPartDto>;
 export const ChatHistoryEntryDto = z.object({
   messageId: MessageId,
   role: MessageRole,
@@ -396,7 +440,7 @@ export const ChatHistoryEntryDto = z.object({
   tokens: z.number().int().nonnegative(),
   text: z.string(),
   reasoningTokens: z.number().int().nonnegative(),
-  toolTokens: z.number().int().nonnegative(),
+  carried: z.array(ChatCarriedPartDto).default([]),
 });
 export type ChatHistoryEntryDto = z.infer<typeof ChatHistoryEntryDto>;
 export const ChatStatsDto = z.object({

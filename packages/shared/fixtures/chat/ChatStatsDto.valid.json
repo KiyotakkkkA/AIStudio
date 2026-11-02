@@ -41,7 +41,7 @@
           "tokens": 20,
           "text": "Старый вопрос",
           "reasoningTokens": 0,
-          "toolTokens": 0
+          "carried": []
         },
         {
           "messageId": "0199aa11-2222-7222-8222-000000000002",
@@ -50,7 +50,7 @@
           "tokens": 8,
           "text": "",
           "reasoningTokens": 12,
-          "toolTokens": 340
+          "carried": []
         },
         {
           "messageId": "0199aa11-2222-7222-8222-000000000003",
@@ -59,7 +59,37 @@
           "tokens": 32,
           "text": "Новый вопрос",
           "reasoningTokens": 0,
-          "toolTokens": 0
+          "carried": []
+        },
+        {
+          "messageId": "0199aa11-2222-7222-8222-000000000004",
+          "role": "assistant",
+          "status": "included",
+          "tokens": 24,
+          "text": "Отпуск длится 28 дней [1].",
+          "reasoningTokens": 40,
+          "carried": [
+            {
+              "kind": "toolCall",
+              "label": "fs.read",
+              "status": "sent",
+              "tokens": 2010,
+              "truncated": true
+            },
+            {
+              "kind": "toolCall",
+              "label": "knowledge.search",
+              "status": "shortened",
+              "tokens": 48
+            },
+            {
+              "kind": "source",
+              "label": "policy.md",
+              "marker": "[1]",
+              "status": "dropped",
+              "tokens": 90
+            }
+          ]
         }
       ]
     }

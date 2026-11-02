@@ -1245,7 +1245,7 @@ fn typed_nodes_publish_json_schema_for_tool_exposure() {
     assert_eq!(
         generate.input_schema()["anyOf"][0]["properties"]["messages"]["items"]["properties"]["role"]
             ["enum"],
-        json!(["system", "user", "assistant"])
+        json!(["system", "user", "assistant", "tool"])
     );
     let job = registry.resolve("job.run").expect("a node");
     assert_eq!(job.permission(), &PermissionRequirement::tool("job.run"));
@@ -1466,6 +1466,13 @@ async fn core_generation_streams_text_and_reasoning_through_the_provider_port() 
         json!({ "providerId": "", "model": "m", "messages": [] }),
         json!({ "providerId": "p", "model": "m", "messages": [], "temperature": 3 }),
         json!({ "providerId": "p", "model": "m", "messages": [{ "role": "tool", "content": "" }] }),
+        json!({ "providerId": "p", "model": "m", "messages": [
+            { "role": "assistant", "content": "", "toolCalls": [{ "id": "c1", "name": "f", "arguments": "{}" }] },
+            { "role": "tool", "content": "r", "toolCallId": "c2" }
+        ] }),
+        json!({ "providerId": "p", "model": "m", "messages": [
+            { "role": "user", "content": "", "toolCalls": [{ "id": "c1", "name": "f", "arguments": "{}" }] }
+        ] }),
     ] {
         assert_eq!(
             generate

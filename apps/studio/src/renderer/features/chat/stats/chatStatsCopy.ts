@@ -1,4 +1,9 @@
-import type { ChatHistoryStatus, ChatPromptSection } from "@zvs/shared";
+import type {
+  ChatCarriedKind,
+  ChatCarriedStatus,
+  ChatHistoryStatus,
+  ChatPromptSection,
+} from "@zvs/shared";
 import { plural } from "../../connections/connectionPresentation";
 
 export const STATS_TOGGLE = "Статистика";
@@ -29,8 +34,21 @@ export const TOOLS_DEFERRED =
 
 export const HISTORY_HEADING = "История в следующем запросе";
 export const HISTORY_EMPTY = "В диалоге пока нет сообщений.";
-export const HISTORY_NOT_SENT = "не передаётся";
 export const HISTORY_SOURCES = "Фрагменты из хранилищ добавляются при отправке.";
+export const HISTORY_CARRIED = "Передаётся вместе с ответом";
+export const CARRIED_TRUNCATED = "обрезано до лимита";
+export const REASONING_LABEL = "Рассуждения";
+
+export const CARRIED_STATUS_LABELS: Readonly<Record<ChatCarriedStatus, string>> = {
+  sent: "Передаётся",
+  shortened: "Сокращено",
+  dropped: "Не передаётся",
+};
+
+export const CARRIED_KIND_LABELS: Readonly<Record<ChatCarriedKind, string>> = {
+  toolCall: "Инструмент",
+  source: "Источник",
+};
 
 export const TURNS_HEADING = "Расход по ответам";
 export const TURNS_EMPTY = "Ответов пока нет.";

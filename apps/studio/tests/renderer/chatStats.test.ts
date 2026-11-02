@@ -11,14 +11,20 @@ import {
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import ChatStatsStore from "../../src/renderer/features/chat/stats/ChatStatsStore.ts";
 import {
+  carriedRows,
   chatHints,
   dialogTotals,
-  notSent,
   repeatedCalls,
   sectionRows,
   toolCallCounts,
   turnRows,
 } from "../../src/renderer/features/chat/stats/chatStatsModel.ts";
+import {
+  CARRIED_KIND_LABELS,
+  CARRIED_STATUS_LABELS,
+  CARRIED_TRUNCATED,
+  REASONING_LABEL,
+} from "../../src/renderer/features/chat/stats/chatStatsCopy.ts";
 
 const CONVERSATION = "0199aa11-2222-7111-8111-111111111111";
 const PROVIDER = "0199aa11-1111-7111-8111-111111111111";
@@ -164,7 +170,7 @@ test("an MCP server without calls is named when it takes more than its share", (
   expect(hints.some((hint) => hint.key === "server:mcp:x")).toBe(true);
 });
 
-test("trimmed history is a hint and parts that are not sent are listed", () => {
+test("trimmed history is a hint", () => {
   const trimmed = {
     ...stats({ tools: 100 }),
     history: [
@@ -175,14 +181,63 @@ test("trimmed history is a hint and parts that are not sent are listed", () => {
         tokens: 900,
         text: "Старое",
         reasoningTokens: 0,
-        toolTokens: 0,
+        carried: [],
       },
     ],
   };
   const hints = chatHints({ stats: trimmed, messages: [], groups: [], toolLabel: (key) => key });
   expect(hints.find((hint) => hint.key === "trimmed")?.saving).toBe(900);
-  expect(notSent({ reasoningTokens: 3, toolTokens: 0 })).toHaveLength(1);
-  expect(notSent({ reasoningTokens: 0, toolTokens: 0 })).toEqual([]);
+});
+
+test("carried parts map their codes to copy and reasoning is listed as not sent", () => {
+  const entry = {
+    messageId: message("assistant").id,
+    role: "assistant" as const,
+    status: "included" as const,
+    tokens: 30,
+    text: "Ответ [1]",
+    reasoningTokens: 12,
+    carried: [
+      {
+        kind: "toolCall" as const,
+        label: "fs.read",
+        marker: "",
+        status: "sent" as const,
+        tokens: 2010,
+        truncated: true,
+      },
+      {
+        kind: "toolCall" as const,
+        label: "fs.search",
+        marker: "",
+        status: "shortened" as const,
+        tokens: 40,
+        truncated: false,
+      },
+      {
+        kind: "source" as const,
+        label: "policy.md",
+        marker: "[1]",
+        status: "dropped" as const,
+        tokens: 90,
+        truncated: false,
+      },
+    ],
+  };
+  const rows = carriedRows(entry, (key) => `tool:${key}`);
+  expect(rows.map((row) => [row.kind, row.label, row.statusLabel, row.note, row.tokens])).toEqual([
+    [
+      CARRIED_KIND_LABELS.toolCall,
+      "tool:fs.read",
+      CARRIED_STATUS_LABELS.sent,
+      CARRIED_TRUNCATED,
+      2010,
+    ],
+    [CARRIED_KIND_LABELS.toolCall, "tool:fs.search", CARRIED_STATUS_LABELS.shortened, "", 40],
+    [CARRIED_KIND_LABELS.source, "[1] policy.md", CARRIED_STATUS_LABELS.dropped, "", 90],
+    [REASONING_LABEL, "", CARRIED_STATUS_LABELS.dropped, "", 12],
+  ]);
+  expect(carriedRows({ ...entry, carried: [], reasoningTokens: 0 }, (key) => key)).toEqual([]);
 });
 
 const INPUT: ChatContextInput = {

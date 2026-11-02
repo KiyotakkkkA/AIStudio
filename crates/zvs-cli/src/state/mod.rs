@@ -19,12 +19,15 @@ use zvs_contract::{
     RunHandleDto, RunId, RunOutcomeStatus, SHELL_STEP_DOMAIN, ShellOutputDto, SkillDto, SkillId,
     ThinkingEffort, WAKE_STEP_DOMAIN, WorkingFolderAccess,
 };
+use zvs_contract::{
+    CHAT_QUEUE_MAX, ChatQueueDto, ChatQueueStepDto, ChatQueuedMessageDto, QUEUE_STEP_DOMAIN,
+};
 
 use self::input::Input;
 use self::overlay::{Action, Overlay, Panel, ProcessOutput, View};
 use self::palette::{Arg, Command, Item, Palette, Pick, Sources, Sub, arg_slot, is_command_text};
 use self::prompt::{ApprovalDetail, Choice, Prompt, PromptKind};
-use self::shortcuts::{Chord, Keymap, SHORTCUTS, Shortcut};
+use self::shortcuts::{Chord, ChordKey, Keymap, SHORTCUTS, Shortcut};
 use self::transcript::{ShellEnd, ShellRun, Tone, Transcript};
 use crate::copy;
 
@@ -177,6 +180,21 @@ pub enum Request {
     StopSubagent(RunId),
     StopGoal(ConversationId),
     ContinueGoal(ConversationId),
+    QueueList(ConversationId),
+    QueueAdd {
+        id: ConversationId,
+        text: String,
+    },
+    QueueEdit {
+        id: ConversationId,
+        message: String,
+        text: String,
+    },
+    QueueRemove {
+        id: ConversationId,
+        message: String,
+    },
+    QueueSend(ConversationId),
     Approve {
         run: RunId,
         approval: String,
@@ -249,6 +267,7 @@ pub enum Msg {
     Bound(Result<BindFolderResultDto, AppError>),
     Sent(Result<RunHandleDto, AppError>),
     GoalStopped(Result<ConversationDto, AppError>),
+    Queue(Result<ChatQueueDto, AppError>),
     Answered(Result<(), AppError>),
     RuleAdded(Result<PolicyRuleDto, AppError>),
     Conversations(Result<Vec<ConversationDto>, AppError>),
@@ -312,6 +331,10 @@ pub struct App {
     pub pending_command: Option<ChatCommand>,
     pub goal: Option<GoalState>,
     pub goal_stop_armed: bool,
+    pub queue: Vec<ChatQueuedMessageDto>,
+    pub queue_urgent: bool,
+    pub queue_selected: Option<usize>,
+    pub queue_editing: Option<(String, String)>,
     pub expanded: bool,
     pub scroll: usize,
     pub escape_armed: bool,
@@ -381,6 +404,10 @@ impl App {
             pending_command: None,
             goal: None,
             goal_stop_armed: false,
+            queue: Vec::new(),
+            queue_urgent: false,
+            queue_selected: None,
+            queue_editing: None,
             expanded: false,
             scroll: 0,
             escape_armed: false,
@@ -425,10 +452,19 @@ impl App {
                 vec![
                     (fixed("/"), copy::KEY_COMMANDS),
                     (fixed("!"), copy::KEY_SHELL),
-                    (fixed("Alt+Enter"), copy::KEY_NEWLINE),
+                    (fixed("Shift+Enter"), copy::KEY_NEWLINE),
                     (fixed("↑ / ↓"), copy::KEY_HISTORY),
                     (fixed("Tab"), copy::KEY_COMPLETE),
                     (bound(Shortcut::ClearInput), copy::KEY_CLEAR_INPUT),
+                    (
+                        format!(
+                            "{} / {}",
+                            bound(Shortcut::QueuePrevious),
+                            bound(Shortcut::QueueNext)
+                        ),
+                        copy::KEY_QUEUE,
+                    ),
+                    (bound(Shortcut::QueueSend), copy::KEY_QUEUE_SEND),
                 ],
             ),
             (
@@ -1015,7 +1051,12 @@ impl App {
                     self.overlay = None;
                     self.status = Some((Tone::Success, copy::RESUMED.to_owned()));
                     self.processes.clear();
-                    let mut requests = vec![Request::Attach(id), Request::Processes(id)];
+                    self.clear_queue();
+                    let mut requests = vec![
+                        Request::Attach(id),
+                        Request::Processes(id),
+                        Request::QueueList(id),
+                    ];
                     if self.grant.is_some() {
                         requests.push(Request::Bind {
                             id,
@@ -1102,6 +1143,13 @@ impl App {
                 }
                 Err(error) => self.abandon(&error),
             },
+            Msg::Queue(result) => match result {
+                Ok(queue) => self.set_queue(queue),
+                Err(error) => {
+                    self.status = Some((Tone::Error, error.message));
+                    Vec::new()
+                }
+            },
             Msg::GoalStopped(result) => {
                 match result {
                     Ok(conversation) => {
@@ -1149,6 +1197,9 @@ impl App {
                 if let Some(requests) = self.wake_event(&event) {
                     return requests;
                 }
+                if let Some(requests) = self.queue_event(&event) {
+                    return requests;
+                }
                 if self.awaiting && self.run.is_none() {
                     self.held.push(*event);
                     return Vec::new();
@@ -1176,6 +1227,120 @@ impl App {
             .iter()
             .filter(|shell| shell.status.running())
             .count()
+    }
+
+    fn conversation_id(&self) -> Option<ConversationId> {
+        self.conversation
+            .as_ref()
+            .map(|conversation| conversation.id)
+    }
+
+    fn clear_queue(&mut self) {
+        self.queue.clear();
+        self.queue_urgent = false;
+        self.queue_selected = None;
+        if let Some((_, saved)) = self.queue_editing.take() {
+            self.input.set(&saved);
+        }
+    }
+
+    pub fn set_queue(&mut self, queue: ChatQueueDto) -> Vec<Request> {
+        if self.conversation_id() != Some(queue.conversation_id) {
+            return Vec::new();
+        }
+        let before = std::mem::replace(&mut self.queue, queue.messages);
+        self.queue_urgent = queue.urgent && !self.queue.is_empty();
+        self.queue_selected = match self.queue_selected {
+            _ if self.queue.is_empty() => None,
+            Some(index) => Some(index.min(self.queue.len() - 1)),
+            None => None,
+        };
+        if let Some((editing, saved)) = self.queue_editing.clone()
+            && !self.queue.iter().any(|message| message.id == editing)
+        {
+            self.queue_editing = None;
+            self.input.set(&saved);
+        }
+        if before.is_empty() || !self.queue.is_empty() || self.busy() {
+            return Vec::new();
+        }
+        for message in &before {
+            self.transcript.push_user(&message.text);
+        }
+        self.transcript.start();
+        self.started = self.frame;
+        self.scroll = 0;
+        self.awaiting = true;
+        vec![Request::Attach(queue.conversation_id)]
+    }
+
+    fn queue_event(&mut self, event: &HostEvent) -> Option<Vec<Request>> {
+        let HostEventDraft::Step { step } = &event.body else {
+            return None;
+        };
+        if step.get("domain").and_then(|domain| domain.as_str()) != Some(QUEUE_STEP_DOMAIN) {
+            return None;
+        }
+        let Ok(parsed) =
+            serde_json::from_value::<ChatQueueStepDto>(serde_json::Value::Object(step.clone()))
+        else {
+            return Some(Vec::new());
+        };
+        Some(self.set_queue(parsed.queue))
+    }
+
+    fn move_queue(&mut self, delta: isize) {
+        if self.queue.is_empty() {
+            self.status = Some((Tone::Info, copy::QUEUE_EMPTY.to_owned()));
+            return;
+        }
+        let last = self.queue.len() - 1;
+        self.queue_selected = Some(match self.queue_selected {
+            None if delta < 0 => last,
+            None => 0,
+            Some(index) => index.saturating_add_signed(delta).min(last),
+        });
+    }
+
+    fn selected_queued(&self) -> Option<&ChatQueuedMessageDto> {
+        self.queue_selected.and_then(|index| self.queue.get(index))
+    }
+
+    fn edit_queued(&mut self) {
+        let Some(message) = self.selected_queued().cloned() else {
+            self.status = Some((Tone::Info, copy::QUEUE_EMPTY.to_owned()));
+            return;
+        };
+        let saved = match self.queue_editing.take() {
+            Some((_, saved)) => saved,
+            None => self.input.text().to_owned(),
+        };
+        self.input.set(&message.text);
+        self.queue_editing = Some((message.id, saved));
+        self.palette.reset();
+        self.status = Some((Tone::Info, copy::QUEUE_EDITING.to_owned()));
+    }
+
+    fn remove_queued(&mut self) -> Vec<Request> {
+        let (Some(id), Some(message)) = (self.conversation_id(), self.selected_queued().cloned())
+        else {
+            self.status = Some((Tone::Info, copy::QUEUE_EMPTY.to_owned()));
+            return Vec::new();
+        };
+        vec![Request::QueueRemove {
+            id,
+            message: message.id,
+        }]
+    }
+
+    fn send_queue(&mut self) -> Vec<Request> {
+        match self.conversation_id() {
+            Some(id) if !self.queue.is_empty() => vec![Request::QueueSend(id)],
+            _ => {
+                self.status = Some((Tone::Info, copy::QUEUE_EMPTY.to_owned()));
+                Vec::new()
+            }
+        }
     }
 
     fn wake_event(&mut self, event: &HostEvent) -> Option<Vec<Request>> {
@@ -1381,7 +1546,10 @@ impl App {
             }
             HostEventDraft::End { outcome } => {
                 self.transcript.finish();
-                if let Some(goal) = self.goal.as_mut().filter(|goal| goal.active()) {
+                let yielded = outcome.status == RunOutcomeStatus::Ok
+                    && self.queue_urgent
+                    && !self.queue.is_empty();
+                if let Some(goal) = self.goal.as_mut().filter(|goal| goal.active() && !yielded) {
                     match outcome.status {
                         RunOutcomeStatus::Cancelled => {
                             goal.status = GoalStatus::Stopped;
@@ -1555,7 +1723,27 @@ impl App {
     }
 
     fn submit_message(&mut self, text: String) -> Vec<Request> {
-        if self.goal.is_some_and(|goal| goal.active()) {
+        if let Some((message, saved)) = self.queue_editing.take() {
+            self.input.set(&saved);
+            let Some(id) = self.conversation_id() else {
+                return Vec::new();
+            };
+            self.status = Some((Tone::Success, copy::QUEUE_SAVED.to_owned()));
+            return vec![Request::QueueEdit { id, message, text }];
+        }
+        let goal_running = self.goal.is_some_and(|goal| goal.active());
+        if let Some(id) = self.conversation_id()
+            && (self.busy() || goal_running)
+        {
+            if self.queue.len() >= CHAT_QUEUE_MAX {
+                self.input.set(&text);
+                self.status = Some((Tone::Info, copy::QUEUE_FULL.to_owned()));
+                return Vec::new();
+            }
+            self.status = Some((Tone::Info, copy::QUEUE_ADDED.to_owned()));
+            return vec![Request::QueueAdd { id, text }];
+        }
+        if goal_running {
             self.input.set(&text);
             self.status = Some((Tone::Info, copy::GOAL_RUNNING.to_owned()));
             return Vec::new();
@@ -1619,6 +1807,7 @@ impl App {
                     self.conversation = None;
                     self.goal = None;
                     self.goal_stop_armed = false;
+                    self.clear_queue();
                     self.transcript = Transcript::default();
                     self.scroll = 0;
                     self.status = Some((Tone::Success, copy::NEW_CHAT.to_owned()));
@@ -2004,9 +2193,17 @@ impl App {
 
     fn shortcut(&mut self, chord: Chord) -> Vec<Request> {
         let Some(shortcut) = self.keymap.action(chord) else {
+            if chord.key == ChordKey::Enter && self.overlay.is_none() && self.prompts.is_empty() {
+                self.input.newline();
+            }
             return Vec::new();
         };
         match shortcut {
+            Shortcut::QueuePrevious => self.move_queue(-1),
+            Shortcut::QueueNext => self.move_queue(1),
+            Shortcut::QueueEdit => self.edit_queued(),
+            Shortcut::QueueRemove => return self.remove_queued(),
+            Shortcut::QueueSend => return self.send_queue(),
             Shortcut::Details => self.expanded = !self.expanded,
             Shortcut::ClearInput => {
                 if let Some(overlay) = self.overlay.as_mut() {
@@ -2387,6 +2584,11 @@ impl App {
         }
         match key {
             Key::Enter => return self.submit(),
+            Key::Esc if self.queue_editing.is_some() => {
+                if let Some((_, saved)) = self.queue_editing.take() {
+                    self.input.set(&saved);
+                }
+            }
             Key::Esc => return self.escape(),
             Key::Newline => self.input.newline(),
             Key::Char('?') if self.input.is_empty() => self.keys = true,

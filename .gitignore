@@ -9,6 +9,7 @@ dist/
 out/
 build/
 target/
+.tools/
 *.node
 apps/studio/resources/native/
 apps/studio/resources/sidecar/

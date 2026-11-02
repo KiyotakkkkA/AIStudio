@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use zvs_contract::{
     AppError, AppErrorCode, BindFolderInput, BranchConversationInput, ChatAnswerInput,
-    ChatAttachInput, ChatContextInput, ChatEvalInput, ChatGoalInput, ChatSendInput, ChatSkipInput,
+    ChatAttachInput, ChatContextInput, ChatEvalInput, ChatGoalInput, ChatQueueAddInput,
+    ChatQueueEditInput, ChatQueueInput, ChatQueueRemoveInput, ChatSendInput, ChatSkipInput,
     ConversationRef, CreateConversationInput, PickFolderResultDto, PinConversationInput,
     PinMessageInput, RenameConversationInput, RunIdInput, TruncateConversationInput,
     UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
@@ -195,6 +196,36 @@ pub fn register(server: &mut IpcServer) {
             "chat.goal.stop",
             |services: Arc<Services>, input: ChatGoalInput| async move {
                 services.chat.stop_goal(&input.conversation_id).await
+            },
+        )
+        .handle(
+            "chat.queue.list",
+            |services: Arc<Services>, input: ChatQueueInput| async move {
+                services.chat.queue(&input)
+            },
+        )
+        .handle(
+            "chat.queue.add",
+            |services: Arc<Services>, input: ChatQueueAddInput| async move {
+                services.chat.queue_add(&input)
+            },
+        )
+        .handle(
+            "chat.queue.edit",
+            |services: Arc<Services>, input: ChatQueueEditInput| async move {
+                services.chat.queue_edit(&input)
+            },
+        )
+        .handle(
+            "chat.queue.remove",
+            |services: Arc<Services>, input: ChatQueueRemoveInput| async move {
+                services.chat.queue_remove(&input)
+            },
+        )
+        .handle(
+            "chat.queue.flush",
+            |services: Arc<Services>, input: ChatQueueInput| async move {
+                services.chat.queue_flush(&input)
             },
         )
         .handle(

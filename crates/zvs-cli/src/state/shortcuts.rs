@@ -9,6 +9,9 @@ pub const KEYMAP_VERSION: u64 = 1;
 pub enum ChordKey {
     Char(char),
     F(u8),
+    Up,
+    Down,
+    Enter,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -82,6 +85,27 @@ impl Chord {
         }
     }
 
+    pub const fn alt_key(key: ChordKey) -> Self {
+        Self {
+            ctrl: false,
+            alt: true,
+            shift: false,
+            key,
+        }
+    }
+
+    pub const fn named(key: ChordKey, ctrl: bool, alt: bool, shift: bool) -> Option<Self> {
+        if !ctrl && !alt {
+            return None;
+        }
+        Some(Self {
+            ctrl,
+            alt,
+            shift,
+            key,
+        })
+    }
+
     pub const fn function(number: u8) -> Self {
         Self {
             ctrl: false,
@@ -129,6 +153,9 @@ impl Chord {
         parts.push(match self.key {
             ChordKey::Char(value) => value.to_uppercase().collect(),
             ChordKey::F(number) => format!("F{number}"),
+            ChordKey::Up => "↑".to_owned(),
+            ChordKey::Down => "↓".to_owned(),
+            ChordKey::Enter => "Enter".to_owned(),
         });
         parts.join("+")
     }
@@ -148,6 +175,15 @@ impl Chord {
             }
         }
         let key = key?;
+        let named = match key.as_str() {
+            "↑" | "up" => Some(ChordKey::Up),
+            "↓" | "down" => Some(ChordKey::Down),
+            "enter" => Some(ChordKey::Enter),
+            _ => None,
+        };
+        if let Some(named) = named {
+            return Self::named(named, ctrl, alt, shift).filter(|chord| !chord.reserved());
+        }
         if let Some(number) = key.strip_prefix('f').filter(|digits| !digits.is_empty())
             && let Ok(number) = number.parse::<u8>()
         {
@@ -193,6 +229,11 @@ pub enum Shortcut {
     Desktop,
     Theme,
     StopSubagent,
+    QueuePrevious,
+    QueueNext,
+    QueueEdit,
+    QueueRemove,
+    QueueSend,
     Help,
     Shortcuts,
 }
@@ -215,6 +256,11 @@ pub const SHORTCUTS: &[Shortcut] = &[
     Shortcut::Desktop,
     Shortcut::Theme,
     Shortcut::StopSubagent,
+    Shortcut::QueuePrevious,
+    Shortcut::QueueNext,
+    Shortcut::QueueEdit,
+    Shortcut::QueueRemove,
+    Shortcut::QueueSend,
     Shortcut::Help,
     Shortcut::Shortcuts,
 ];
@@ -239,6 +285,11 @@ impl Shortcut {
             Self::Desktop => "desktop",
             Self::Theme => "theme",
             Self::StopSubagent => "stopSubagent",
+            Self::QueuePrevious => "queuePrevious",
+            Self::QueueNext => "queueNext",
+            Self::QueueEdit => "queueEdit",
+            Self::QueueRemove => "queueRemove",
+            Self::QueueSend => "queueSend",
             Self::Help => "help",
             Self::Shortcuts => "shortcuts",
         }
@@ -263,6 +314,11 @@ impl Shortcut {
             Self::Desktop => copy::CMD_DESKTOP,
             Self::Theme => copy::CMD_THEME,
             Self::StopSubagent => copy::CMD_STOP_SUBAGENT,
+            Self::QueuePrevious => copy::SHORTCUT_QUEUE_PREVIOUS,
+            Self::QueueNext => copy::SHORTCUT_QUEUE_NEXT,
+            Self::QueueEdit => copy::SHORTCUT_QUEUE_EDIT,
+            Self::QueueRemove => copy::SHORTCUT_QUEUE_REMOVE,
+            Self::QueueSend => copy::SHORTCUT_QUEUE_SEND,
             Self::Help => copy::CMD_HELP,
             Self::Shortcuts => copy::CMD_SHORTCUTS,
         }
@@ -287,6 +343,11 @@ impl Shortcut {
             Self::Desktop => Chord::alt('d'),
             Self::Theme => Chord::alt('t'),
             Self::StopSubagent => Chord::alt('x'),
+            Self::QueuePrevious => Chord::alt_key(ChordKey::Up),
+            Self::QueueNext => Chord::alt_key(ChordKey::Down),
+            Self::QueueEdit => Chord::alt('i'),
+            Self::QueueRemove => Chord::alt('r'),
+            Self::QueueSend => Chord::alt_key(ChordKey::Enter),
             Self::Help => Chord::function(1),
             Self::Shortcuts => Chord::alt('k'),
         })
@@ -294,7 +355,13 @@ impl Shortcut {
 
     pub const fn command(self) -> Option<Command> {
         match self {
-            Self::Details | Self::ClearInput => None,
+            Self::Details
+            | Self::ClearInput
+            | Self::QueuePrevious
+            | Self::QueueNext
+            | Self::QueueEdit
+            | Self::QueueRemove
+            | Self::QueueSend => None,
             Self::NewChat => Some(Command::New),
             Self::ClearScreen => Some(Command::Clear),
             Self::Models => Some(Command::Models),
@@ -451,6 +518,13 @@ mod tests {
         assert!(Chord::parse("Ctrl").is_none());
         assert!(Chord::parse("Ctrl+O+P").is_none());
         assert!(Chord::parse("F13").is_none());
+        assert_eq!(Chord::parse("Alt+Up"), Some(Chord::alt_key(ChordKey::Up)));
+        assert_eq!(Chord::alt_key(ChordKey::Down).label(), "Alt+↓");
+        assert_eq!(
+            Chord::parse(&Chord::alt_key(ChordKey::Enter).label()),
+            Some(Chord::alt_key(ChordKey::Enter))
+        );
+        assert!(Chord::parse("Up").is_none());
     }
 
     #[test]

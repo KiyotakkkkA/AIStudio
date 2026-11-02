@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+
 use zvs_contract::{
-    ChatHistoryEntryDto, ChatHistoryStatus, ChatPromptSection, MessageDto, MessageRole,
+    ChatHistoryEntryDto, ChatHistoryStatus, ChatPromptSection, MessageDto, MessageId, MessageRole,
 };
 
+use super::chat_carry::Carried;
 use super::chat_history::{MESSAGE_OVERHEAD, tokens, with_selections};
 use crate::drivers::ai::{ChatMessage, ChatRole};
 
@@ -83,7 +86,9 @@ pub const fn in_tool_block(section: ChatPromptSection) -> bool {
 }
 
 pub fn sendable(message: &MessageDto) -> bool {
-    message.role != MessageRole::Assistant || !message.content.trim().is_empty()
+    message.role != MessageRole::Assistant
+        || !message.content.trim().is_empty()
+        || !message.tool_calls.is_empty()
 }
 
 const fn chat_role(role: MessageRole) -> ChatRole {
@@ -100,10 +105,16 @@ pub fn model_message(message: &MessageDto) -> ChatMessage {
     )
 }
 
-pub fn model_history(messages: &[MessageDto]) -> Vec<ChatMessage> {
+pub fn sendable_messages(messages: &[MessageDto]) -> Vec<&MessageDto> {
     messages
         .iter()
         .filter(|message| sendable(message))
+        .collect()
+}
+
+pub fn model_history(messages: &[MessageDto]) -> Vec<ChatMessage> {
+    sendable_messages(messages)
+        .into_iter()
         .map(model_message)
         .collect()
 }
@@ -112,7 +123,11 @@ fn count(value: i64) -> u64 {
     u64::try_from(value).unwrap_or(0)
 }
 
-pub fn history_entries(messages: &[MessageDto], trimmed: usize) -> Vec<ChatHistoryEntryDto> {
+pub fn history_entries(
+    messages: &[MessageDto],
+    trimmed: usize,
+    carried: &HashMap<MessageId, Carried>,
+) -> Vec<ChatHistoryEntryDto> {
     let mut remaining = trimmed;
     messages
         .iter()
@@ -126,13 +141,6 @@ pub fn history_entries(messages: &[MessageDto], trimmed: usize) -> Vec<ChatHisto
             } else {
                 ChatHistoryStatus::Included
             };
-            let tool_tokens: i64 = message
-                .tool_calls
-                .iter()
-                .map(|call| {
-                    tokens(&call.arguments.to_string()) + call.result.as_deref().map_or(0, tokens)
-                })
-                .sum();
             ChatHistoryEntryDto {
                 message_id: message.id,
                 role: message.role,
@@ -140,7 +148,10 @@ pub fn history_entries(messages: &[MessageDto], trimmed: usize) -> Vec<ChatHisto
                 tokens: count(tokens(&text) + MESSAGE_OVERHEAD),
                 text,
                 reasoning_tokens: count(tokens(&message.reasoning)),
-                tool_tokens: count(tool_tokens),
+                carried: carried
+                    .get(&message.id)
+                    .map(Carried::parts)
+                    .unwrap_or_default(),
             }
         })
         .collect()
@@ -218,7 +229,7 @@ mod tests {
             message(IDS[2], "user", "Повтор"),
             message(IDS[3], "assistant", "Ответ"),
         ];
-        let entries = history_entries(&messages, 2);
+        let entries = history_entries(&messages, 2, &HashMap::new());
         assert_eq!(
             entries.iter().map(|entry| entry.status).collect::<Vec<_>>(),
             [

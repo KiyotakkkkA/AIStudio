@@ -26,6 +26,7 @@ use zvs_contract::{
 };
 
 use super::chat_ask::{ASK_MALFORMED, ASK_TOOL, answers_text, ask_request, ask_section, ask_tool};
+use super::chat_carry::{Carried, CarryShape, SourceLookup, carry_into, cited_citations};
 use super::chat_goal::{
     GOAL_CONTINUE_TEXT, GOAL_DESCRIPTION, GOAL_NEEDS_TOOLS, GOAL_NOT_PAUSED, GOAL_NOT_STOPPABLE,
     GOAL_RUNNING, GOAL_TOOL, GoalHook, default_budget, ended, goal_section, goal_tools, restarted,
@@ -38,7 +39,9 @@ use super::chat_history::{
 use super::chat_memory::{
     MEMORY_FAILED, MEMORY_TOOL, MemoryRefs, apply_memory_call, memory_section, memory_tool,
 };
-use super::chat_prompt::{PromptParts, history_entries, in_tool_block, model_history};
+use super::chat_prompt::{
+    PromptParts, history_entries, in_tool_block, model_history, sendable_messages,
+};
 use super::chat_reply::{
     ReplyBuffers, ReplyChunk, TOOL_CALL_DOMAIN, append_round, apply_tool_call,
 };
@@ -70,14 +73,14 @@ use crate::data::repositories::{ConversationPatch, MessagePatch, ProviderFilter,
 use crate::data::schema::{ConversationRow, FolderGrantRow, MemoryRow, MessageRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::ports::SharedTextDriver;
-use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta, ToolCall, TurnUsage};
+use crate::drivers::ai::{ChatMessage, GenerateRequest, TextDelta, ToolCall, TurnUsage};
 use crate::files::FILE_TOOLS;
 use crate::files::roots::SKILL_READ_ONLY;
 use crate::kernel::knowledge_nodes::{KNOWLEDGE_SEARCH, KNOWLEDGE_TOOLS, KnowledgeResult};
-use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateOutput, GenerateRole};
+use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateOutput};
 use crate::kernel::{
     ApprovalDecision, NodeDef, NodeRegistry, PermissionRequirement, QuestionOutcome, RunObserver,
-    StepContext, ToolStepRequest,
+    StepContext, ToolStepRequest, VectorSearch,
 };
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
@@ -212,6 +215,7 @@ struct Inner {
     replies: Mutex<ReplyBuffers>,
     waking: Mutex<HashSet<String>>,
     wake_delay: std::time::Duration,
+    queues: queue::Queues,
 }
 
 #[derive(Clone)]
@@ -648,7 +652,10 @@ impl Inner {
         else {
             return Ok(());
         };
-        if let HostEventDraft::End { outcome } = &event.body {
+        if let HostEventDraft::End { outcome } = &event.body
+            && !(outcome.status == RunOutcomeStatus::Ok
+                && self.queue_yielded(&message.conversation_id))
+        {
             self.settle_goal(&message.conversation_id, outcome.status, now)?;
         }
         let duration = (now - message.created_at).max(0);
@@ -996,15 +1003,6 @@ struct PrepareNode(Arc<Inner>);
 pub(crate) struct GenerateChatNode(Arc<Inner>);
 struct PersistNode(Arc<Inner>);
 
-const fn generate_role(role: ChatRole) -> Option<GenerateRole> {
-    match role {
-        ChatRole::System => Some(GenerateRole::System),
-        ChatRole::User => Some(GenerateRole::User),
-        ChatRole::Assistant => Some(GenerateRole::Assistant),
-        ChatRole::Tool => None,
-    }
-}
-
 struct AttachedStore {
     id: VectorStoreId,
     name: String,
@@ -1040,6 +1038,62 @@ struct Preview {
     offered: Vec<OfferedTool>,
     deferred: Vec<OfferedTool>,
     messages: Vec<MessageDto>,
+    shape: CarryShape,
+    lookup: SourceLookup,
+}
+
+fn carry_shape(mode: ToolMode, offered: &[OfferedTool]) -> CarryShape {
+    if mode == ToolMode::Native && !offered.is_empty() {
+        CarryShape::Native
+    } else {
+        CarryShape::Text
+    }
+}
+
+async fn source_lookup(
+    inner: &Inner,
+    vectors: Option<&Arc<dyn VectorSearch>>,
+    messages: &[&MessageDto],
+) -> SourceLookup {
+    let mut lookup = SourceLookup::default();
+    let mut order: Vec<(VectorStoreId, String)> = Vec::new();
+    let mut wanted: HashMap<(VectorStoreId, String), Vec<u64>> = HashMap::new();
+    for citation in messages
+        .iter()
+        .filter(|message| message.role == MessageRole::Assistant)
+        .flat_map(|message| cited_citations(message))
+    {
+        lookup.stores.entry(citation.store_id).or_insert_with(|| {
+            let id = citation.store_id.to_string();
+            inner
+                .read(|repositories| Ok(repositories.vector_stores.find_by_id(&id)?))
+                .ok()
+                .flatten()
+                .map_or(id, |row| row.name)
+        });
+        let key = (citation.store_id, citation.document_id.clone());
+        let indices = wanted.entry(key.clone()).or_insert_with(|| {
+            order.push(key);
+            Vec::new()
+        });
+        if !indices.contains(&citation.chunk_index) {
+            indices.push(citation.chunk_index);
+        }
+    }
+    let Some(vectors) = vectors.filter(|vectors| vectors.has_chunks()) else {
+        return lookup;
+    };
+    for key in order {
+        let indices = wanted.remove(&key).unwrap_or_default();
+        if let Ok(chunks) = vectors.chunks(&key.0.to_string(), &key.1, &indices).await {
+            for chunk in chunks {
+                lookup
+                    .excerpts
+                    .insert((key.0, key.1.clone(), chunk.chunk_index), chunk.text);
+            }
+        }
+    }
+    lookup
 }
 
 impl Preview {
@@ -1055,15 +1109,20 @@ impl Preview {
         }
     }
 
-    fn measure(&self) -> (ChatContextDto, usize) {
+    fn measure(&self) -> (ChatContextDto, usize, HashMap<MessageId, Carried>) {
         let system_text = self.system_text();
         let system_part = self.parts.compose_where(|section| !in_tool_block(section));
+        let sent = sendable_messages(&self.messages);
+        let mut carried = HashMap::new();
         let usage = measure_context(
             &system_text,
             tokens(&system_part),
             &model_history(&self.messages),
             self.model.context_window,
             self.model.max_output_tokens,
+            |prepared, budget| {
+                carried = carry_into(prepared, &sent, &self.lookup, self.shape, budget);
+            },
         );
         let count = |value: i64| u64::try_from(value).unwrap_or(0);
         let context = ChatContextDto {
@@ -1085,7 +1144,7 @@ impl Preview {
             trimmed: usage.trimmed as u64,
             total: count(usage.system + usage.tools + usage.history),
         };
-        (context, usage.trimmed)
+        (context, usage.trimmed, carried)
     }
 }
 
@@ -1397,15 +1456,15 @@ impl NodeDef for PrepareNode {
         let details = &conversation.conversation;
         let attached = inner.attached_stores(&details.attached_store_ids);
         let mode = details.retrieval_mode;
-        let tools_usable = context
+        let tool_mode = context
             .services
             .providers
             .as_ref()
             .and_then(|providers| providers.text(&input.provider_id).ok())
-            .is_some_and(|driver| {
+            .map_or(ToolMode::None, |driver| {
                 resolve_tool_mode(driver.capabilities().tools, model.supports_tools)
-                    != ToolMode::None
             });
+        let tools_usable = tool_mode != ToolMode::None;
         let registered = match &inner.tools {
             Some(tools) => tools.list(&ToolListFilter::default())?,
             None => Vec::new(),
@@ -1571,7 +1630,7 @@ impl NodeDef for PrepareNode {
                 tool_specs_json(&offered)
             )
         };
-        let prepared = window_chat_history(
+        let mut prepared = window_chat_history(
             &system,
             &history,
             &ChatMessage::user(with_selections(&user.content, &user.selections)),
@@ -1580,6 +1639,15 @@ impl NodeDef for PrepareNode {
             &sources,
             &related,
         )?;
+        let sent = sendable_messages(&conversation.messages[..position]);
+        let lookup = source_lookup(inner, context.services.vector_stores.as_ref(), &sent).await;
+        carry_into(
+            &mut prepared,
+            &sent,
+            &lookup,
+            carry_shape(tool_mode, &offered),
+            model.context_window - model.max_output_tokens,
+        );
         let run_id = context.run_id.to_string();
         if !details.attached_store_ids.is_empty() {
             let stats = merged.stats;
@@ -1656,12 +1724,7 @@ impl NodeDef for PrepareNode {
                 messages: prepared
                     .messages
                     .iter()
-                    .filter_map(|message| {
-                        generate_role(message.role).map(|role| GenerateMessage {
-                            role,
-                            content: message.content.clone(),
-                        })
-                    })
+                    .map(GenerateMessage::from_chat)
                     .collect(),
                 system: Some(prompt),
                 temperature: input.settings.temperature,
@@ -2314,6 +2377,10 @@ struct ChatLoopHost<'a> {
 
 #[async_trait]
 impl LoopHost for ChatLoopHost<'_> {
+    fn yields(&self) -> bool {
+        self.node.0.queue_yields(self.conversation)
+    }
+
     async fn call(
         &self,
         context: &StepContext,
@@ -2507,6 +2574,7 @@ impl ChatService {
             replies: Mutex::new(ReplyBuffers::default()),
             waking: Mutex::new(HashSet::new()),
             wake_delay: options.wake_delay,
+            queues: Mutex::new(HashMap::new()),
         });
         options.registry.register(PrepareNode(Arc::clone(&inner)))?;
         options
@@ -3047,12 +3115,20 @@ impl ChatService {
         Ok(paused)
     }
 
+    pub(crate) fn start_turn_queued(
+        &self,
+        input: &ChatSendInput,
+        preceding: &[String],
+    ) -> Result<RunHandleDto, AppError> {
+        self.start_turn_with(input, None, None, preceding)
+    }
+
     fn start_turn(
         &self,
         input: &ChatSendInput,
         goal: Option<ChatGoalDto>,
     ) -> Result<RunHandleDto, AppError> {
-        self.start_turn_with(input, goal, None)
+        self.start_turn_with(input, goal, None, &[])
     }
 
     fn start_turn_with(
@@ -3060,6 +3136,7 @@ impl ChatService {
         input: &ChatSendInput,
         goal: Option<ChatGoalDto>,
         event: Option<ChatEventDto>,
+        preceding: &[String],
     ) -> Result<RunHandleDto, AppError> {
         let conversation_id = input.conversation_id.to_string();
         let conversation = self.get(&input.conversation_id)?;
@@ -3084,6 +3161,34 @@ impl ChatService {
             &[],
             &[],
         )?;
+        let earlier: Vec<MessageRow> = preceding
+            .iter()
+            .map(|text| MessageRow {
+                id: new_id().hyphenated().to_string(),
+                conversation_id: conversation_id.clone(),
+                role: MessageRole::User,
+                content: text.clone(),
+                reasoning: String::new(),
+                citations: Vec::new(),
+                tool_calls: Vec::new(),
+                selections: Vec::new(),
+                command: None,
+                offered_tools: Vec::new(),
+                web_sources: Vec::new(),
+                rounds: Vec::new(),
+                tokens_in: tokens(text),
+                tokens_out: 0,
+                tokens_cached: 0,
+                tokens_reasoning: 0,
+                usage_estimated: true,
+                duration_ms: 0,
+                run_id: None,
+                partial: false,
+                pinned: false,
+                event: None,
+                created_at: self.inner.now(),
+            })
+            .collect();
         let user_id = new_id().hyphenated().to_string();
         let assistant_id = new_id().hyphenated().to_string();
         let previous_user = conversation
@@ -3199,13 +3304,20 @@ impl ChatService {
                     &[("error", json!(error.message))],
                 );
             }
-            if matches!(event.body, HostEventDraft::End { .. }) {
-                waker.turn_ended(&observed);
+            if let HostEventDraft::End { outcome } = &event.body {
+                waker.turn_ended(&observed, outcome.status);
             }
         });
         let (handle, subscription) = self.runs.start_with(
             start,
             |repositories, run_id| {
+                for row in &earlier {
+                    repositories.chat.add_message(&MessageRow {
+                        run_id: Some(run_id.to_string()),
+                        created_at: now,
+                        ..row.clone()
+                    })?;
+                }
                 repositories.chat.add_message(&MessageRow {
                     run_id: Some(run_id.to_string()),
                     ..user
@@ -3261,16 +3373,21 @@ impl ChatService {
             Some(tools) => tools.list(&ToolListFilter::default())?,
             None => Vec::new(),
         };
-        let tools_usable = self
+        let tool_mode = self
             .runs
             .services()
             .providers
             .as_ref()
             .and_then(|providers| providers.text(&provider_id).ok())
-            .map_or(model.supports_tools != Some(false), |driver| {
-                resolve_tool_mode(driver.capabilities().tools, model.supports_tools)
-                    != ToolMode::None
-            });
+            .map_or(
+                if model.supports_tools == Some(false) {
+                    ToolMode::None
+                } else {
+                    ToolMode::Native
+                },
+                |driver| resolve_tool_mode(driver.capabilities().tools, model.supports_tools),
+            );
+        let tools_usable = tool_mode != ToolMode::None;
         let messages: Vec<MessageDto> = conversation
             .as_ref()
             .map(|detail| detail.messages.clone())
@@ -3388,12 +3505,20 @@ impl ChatService {
             deferred: deferred_section(&deferred, &offered),
             goal,
         };
+        let lookup = source_lookup(
+            &self.inner,
+            self.runs.services().vector_stores.as_ref(),
+            &sendable_messages(&messages),
+        )
+        .await;
         Ok(Preview {
             model,
             parts,
+            shape: carry_shape(tool_mode, &offered),
             offered,
             deferred,
             messages,
+            lookup,
         })
     }
 
@@ -3403,7 +3528,7 @@ impl ChatService {
 
     pub async fn stats(&self, input: &ChatContextInput) -> Result<ChatStatsDto, AppError> {
         let preview = self.preview(input).await?;
-        let (context, trimmed) = preview.measure();
+        let (context, trimmed, carried) = preview.measure();
         let count = |text: &str| {
             if text.trim().is_empty() {
                 0
@@ -3441,7 +3566,7 @@ impl ChatService {
                 .iter()
                 .map(|tool| tool.key.clone())
                 .collect(),
-            history: history_entries(&preview.messages, trimmed),
+            history: history_entries(&preview.messages, trimmed, &carried),
         })
     }
 
@@ -3657,8 +3782,11 @@ impl ChatService {
     }
 }
 
+pub(crate) mod queue;
 pub(crate) mod subagent;
 pub(crate) mod wake;
+
+pub use queue::{QUEUE_FULL, QUEUE_MESSAGE_NOT_FOUND, QUEUE_YIELDED};
 
 use wake::Waker;
 pub use wake::{WAKE_DELAY, WAKE_HEADING, WAKE_STREAK_MAX, wake_streak, wake_text};

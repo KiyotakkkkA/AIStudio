@@ -1,5 +1,6 @@
 use serde_json::{Value, json};
 
+use super::shortcuts::ChordKey;
 use super::transcript::Entry;
 use super::*;
 
@@ -351,12 +352,159 @@ fn a_prompt_left_open_is_dropped_when_the_run_ends() {
 }
 
 #[test]
-fn a_message_while_busy_is_kept_in_the_input() {
+fn a_message_while_busy_goes_to_the_queue() {
     let mut app = running();
     typed(&mut app, "ещё");
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::QueueAdd {
+            id: conversation().id,
+            text: "ещё".to_owned()
+        }]
+    );
+    assert_eq!(app.input.text(), "");
+    assert_eq!(app.status, Some((Tone::Info, copy::QUEUE_ADDED.to_owned())));
+}
+
+fn queued(id: &str, text: &str) -> ChatQueuedMessageDto {
+    ChatQueuedMessageDto {
+        id: id.to_owned(),
+        text: text.to_owned(),
+        created_at: 1,
+    }
+}
+
+fn queue_step(seq: u64, messages: &[ChatQueuedMessageDto], urgent: bool) -> Msg {
+    event(
+        seq,
+        json!({
+            "type": "step",
+            "step": {
+                "domain": "queue",
+                "conversationId": conversation().id,
+                "messages": messages,
+                "urgent": urgent,
+            },
+        }),
+    )
+}
+
+fn alt(key: ChordKey) -> Msg {
+    Msg::Key(Key::Chord(Chord::alt_key(key)))
+}
+
+#[test]
+fn the_queue_follows_host_steps_and_its_shortcuts_select_edit_remove_and_send() {
+    let mut app = running();
+    let id = conversation().id;
+    app.update(queue_step(
+        3,
+        &[queued("q1", "Первое"), queued("q2", "Второе")],
+        false,
+    ));
+    assert_eq!(app.queue.len(), 2);
+    assert_eq!(app.queue_selected, None);
+
+    app.update(alt(ChordKey::Up));
+    assert_eq!(app.queue_selected, Some(1));
+    app.update(alt(ChordKey::Up));
+    app.update(alt(ChordKey::Up));
+    assert_eq!(app.queue_selected, Some(0));
+    app.update(alt(ChordKey::Down));
+    assert_eq!(app.queue_selected, Some(1));
+
+    typed(&mut app, "черновик");
+    app.update(Msg::Key(Key::Chord(Chord::alt('i'))));
+    assert_eq!(app.input.text(), "Второе");
+    assert_eq!(app.status.as_ref().unwrap().1, copy::QUEUE_EDITING);
+    app.update(Msg::Key(Key::Esc));
+    assert_eq!(app.input.text(), "черновик");
+    assert!(app.queue_editing.is_none());
+
+    app.update(Msg::Key(Key::Chord(Chord::alt('i'))));
+    app.input.set("Изменённое");
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::QueueEdit {
+            id,
+            message: "q2".to_owned(),
+            text: "Изменённое".to_owned()
+        }]
+    );
+    assert_eq!(app.input.text(), "черновик");
+
+    assert_eq!(
+        app.update(Msg::Key(Key::Chord(Chord::alt('r')))),
+        [Request::QueueRemove {
+            id,
+            message: "q2".to_owned()
+        }]
+    );
+    assert_eq!(app.update(alt(ChordKey::Enter)), [Request::QueueSend(id)]);
+
+    app.update(Msg::Queue(Ok(ChatQueueDto {
+        conversation_id: id,
+        messages: vec![queued("q1", "Первое")],
+        urgent: true,
+    })));
+    assert!(app.queue_urgent);
+    assert_eq!(app.queue_selected, Some(0));
+}
+
+#[test]
+fn an_emptied_queue_shows_the_sent_messages_and_attaches_once_idle() {
+    let mut app = running();
+    let id = conversation().id;
+    app.update(queue_step(
+        3,
+        &[queued("q1", "Первое"), queued("q2", "Второе")],
+        false,
+    ));
+    app.update(end("ok"));
+    assert_eq!(app.update(queue_step(4, &[], false)), [Request::Attach(id)]);
+    assert!(app.awaiting);
+    let users: Vec<&str> = app
+        .transcript
+        .entries
+        .iter()
+        .filter_map(|entry| match entry {
+            Entry::User(text) => Some(text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(users[users.len() - 2..], ["Первое", "Второе"]);
+    assert!(app.queue.is_empty());
+
+    let mut busy = running();
+    busy.update(queue_step(3, &[queued("q1", "Первое")], false));
+    assert!(busy.update(queue_step(4, &[], false)).is_empty());
+}
+
+#[test]
+fn an_empty_queue_explains_itself_and_an_unbound_alt_enter_types_a_newline() {
+    let mut app = running();
+    assert!(app.update(alt(ChordKey::Enter)).is_empty());
+    assert_eq!(app.status.as_ref().unwrap().1, copy::QUEUE_EMPTY);
+    assert!(app.update(Msg::Key(Key::Chord(Chord::alt('r')))).is_empty());
+
+    app.keymap.unbind(Shortcut::QueueSend);
+    typed(&mut app, "a");
+    app.update(alt(ChordKey::Enter));
+    typed(&mut app, "b");
+    assert_eq!(app.input.text(), "a\nb");
+}
+
+#[test]
+fn a_full_queue_keeps_the_message_in_the_input() {
+    let mut app = running();
+    let messages: Vec<ChatQueuedMessageDto> = (0..CHAT_QUEUE_MAX)
+        .map(|index| queued(&format!("q{index}"), "x"))
+        .collect();
+    app.update(queue_step(3, &messages, false));
+    typed(&mut app, "лишнее");
     assert!(app.update(Msg::Key(Key::Enter)).is_empty());
-    assert_eq!(app.input.text(), "ещё");
-    assert_eq!(app.status, Some((Tone::Info, copy::BUSY.to_owned())));
+    assert_eq!(app.input.text(), "лишнее");
+    assert_eq!(app.status.as_ref().unwrap().1, copy::QUEUE_FULL);
 }
 
 #[test]
@@ -598,7 +746,11 @@ fn resuming_loads_the_conversation_and_reattaches() {
     };
     assert_eq!(
         app.update(Msg::Loaded(Ok(detail))),
-        [Request::Attach(id), Request::Processes(id)]
+        [
+            Request::Attach(id),
+            Request::Processes(id),
+            Request::QueueList(id)
+        ]
     );
     assert!(app.overlay.is_none());
     assert_eq!(
@@ -1461,12 +1613,29 @@ fn goal_steps_drive_the_footer_and_never_become_tool_rows() {
 }
 
 #[test]
-fn messages_wait_while_a_goal_runs() {
+fn messages_are_queued_while_a_goal_runs() {
     let mut app = goal_running();
     typed(&mut app, "ещё вопрос");
-    assert!(app.update(Msg::Key(Key::Enter)).is_empty());
-    assert_eq!(app.input.text(), "ещё вопрос");
-    assert_eq!(app.status.as_ref().unwrap().1, copy::GOAL_RUNNING);
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::QueueAdd {
+            id: conversation().id,
+            text: "ещё вопрос".to_owned()
+        }]
+    );
+}
+
+#[test]
+fn a_goal_turn_that_yields_to_the_queue_is_not_reported_as_failed() {
+    let mut app = goal_running();
+    app.update(goal_step(1, "active", Value::Null, 3));
+    app.update(queue_step(2, &[queued("q1", "Срочно")], true));
+    app.update(end("ok"));
+    assert!(app.goal.expect("a goal").active());
+    assert!(!app.transcript.entries.iter().any(|entry| matches!(
+        entry,
+        Entry::Notice { text, .. } if text == copy::GOAL_FAILED
+    )));
 }
 
 #[test]

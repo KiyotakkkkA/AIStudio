@@ -40,6 +40,7 @@ use crate::testing::{FAKE_CAPABILITIES, TemporaryDatabase, temporary_database};
 use crate::tools::{ToolDescriptor, ToolRegistry, ToolRegistryOptions};
 
 mod goal;
+mod queue;
 mod subagent;
 
 type Round = Box<dyn FnOnce(&GenerateRequest) -> Vec<TextDelta> + Send>;
@@ -491,6 +492,87 @@ async fn a_native_call_is_admitted_run_as_its_own_step_and_fed_back_fenced_befor
     )));
 }
 
+async fn carried_turn(test: &Loop) -> (ConversationId, Vec<ChatMessage>) {
+    test.driver.round(|_| {
+        vec![
+            text("Checking."),
+            call("demo__lookup", &json!({ "query": "x" })),
+        ]
+    });
+    test.driver.fallback(|_| vec![text("It is x.")]);
+    let created = test.conversation(&["demo.lookup"]);
+    test.turn(created, "Question").await;
+    test.turn(created, "And again?").await;
+    let messages = test.driver.requests().pop().expect("a request").messages;
+    (created, messages)
+}
+
+#[tokio::test]
+async fn a_later_turn_carries_the_earlier_call_with_its_result_and_stats_list_it_as_sent() {
+    let test = Loop::new();
+    let (created, messages) = carried_turn(&test).await;
+    assert_eq!(test.calls.lookups(), ["x"]);
+    let call_id = test.harness.messages(created)[1].tool_calls[0].id.clone();
+    assert_eq!(
+        messages,
+        [
+            ChatMessage::user("Question"),
+            ChatMessage::assistant("").with_tool_calls(vec![ToolCall::new(
+                &call_id,
+                "demo__lookup",
+                r#"{"query":"x"}"#
+            )]),
+            ChatMessage::tool(
+                &call_id,
+                "<tool_result name=\"demo__lookup\" status=\"succeeded\">\nfound x\n</tool_result>"
+            ),
+            ChatMessage::assistant("Checking.\n\nIt is x."),
+            ChatMessage::user("And again?"),
+        ]
+    );
+    let stats = test
+        .harness
+        .chat
+        .stats(&zvs_contract::ChatContextInput {
+            conversation_id: Some(created),
+            provider_id: test.harness.provider_id,
+            model_id: test.harness.model_id.clone(),
+            settings: None,
+            system_prompt: None,
+            command: None,
+        })
+        .await
+        .expect("stats");
+    let carried = &stats.history[1].carried;
+    assert_eq!(carried.len(), 1);
+    assert_eq!(carried[0].kind, zvs_contract::ChatCarriedKind::ToolCall);
+    assert_eq!(carried[0].label, "demo.lookup");
+    assert_eq!(carried[0].status, zvs_contract::ChatCarriedStatus::Sent);
+    assert!(carried[0].tokens > 0);
+    assert!(stats.history[0].carried.is_empty());
+}
+
+#[tokio::test]
+async fn a_web_driver_sees_the_carried_call_in_its_own_text_dialect() {
+    let test = Loop::web();
+    let (_, messages) = carried_turn(&test).await;
+    assert!(
+        messages
+            .iter()
+            .all(|message| message.role != ChatRole::Tool && message.tool_calls.is_empty())
+    );
+    assert!(messages.iter().any(|message| {
+        message.role == ChatRole::Assistant
+            && message
+                .content
+                .contains("\"zvs_call_tool\":\"demo__lookup\"")
+    }));
+    assert!(messages.iter().any(
+        |message| message.content.starts_with(INJECTED_RESULT_PREFIX)
+            && message.content.contains("found x")
+    ));
+}
+
 #[tokio::test]
 async fn only_tools_picked_for_the_conversation_and_not_off_are_offered() {
     let test = Loop::new();
@@ -746,16 +828,21 @@ async fn cancelling_during_a_tool_call_leaves_a_consistent_partial_conversation(
     let next = test.turn(created, "Again").await;
     assert_eq!(test.harness.status(&next), RunStatus::Succeeded);
     let last = test.driver.requests().pop().expect("a request");
-    assert!(
-        last.messages
-            .iter()
-            .all(|message| message.role != ChatRole::Tool)
-    );
-    assert!(
-        last.messages
-            .iter()
-            .all(|message| message.tool_calls.is_empty())
-    );
+    let called: Vec<&str> = last
+        .messages
+        .iter()
+        .flat_map(|message| message.tool_calls.iter().map(|call| call.id.as_str()))
+        .collect();
+    let answered: Vec<&ChatMessage> = last
+        .messages
+        .iter()
+        .filter(|message| message.role == ChatRole::Tool)
+        .collect();
+    assert_eq!(called, [assistant.tool_calls[0].id.as_str()]);
+    assert_eq!(answered.len(), 1);
+    assert_eq!(answered[0].tool_call_id.as_deref(), Some(called[0]));
+    assert!(answered[0].content.contains("status=\"cancelled\""));
+    assert!(!answered[0].content.contains(CANCELLED_MESSAGE));
 }
 
 #[tokio::test]

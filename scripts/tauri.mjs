@@ -6,12 +6,11 @@ import process from "node:process";
 import { readAppEnv } from "./app-env.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const localProtoc = join(
-  root,
-  "target/tools/protoc/bin",
-  process.platform === "win32" ? "protoc.exe" : "protoc",
-);
-if (!process.env.PROTOC && existsSync(localProtoc)) process.env.PROTOC = localProtoc;
+const protocName = process.platform === "win32" ? "protoc.exe" : "protoc";
+const localProtoc = [".tools/protoc/bin", "target/tools/protoc/bin"]
+  .map((folder) => join(root, folder, protocName))
+  .find((path) => existsSync(path));
+if (!process.env.PROTOC && localProtoc !== undefined) process.env.PROTOC = localProtoc;
 
 const [command, ...passed] = process.argv.slice(2);
 if (command !== "dev" && command !== "build") throw new Error("Usage: tauri.mjs <dev|build> [...]");

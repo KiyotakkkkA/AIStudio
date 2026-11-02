@@ -394,6 +394,10 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
   parent is a `chat` run of the same dialog, and only when that dialog exists; anything else is
   refused with `PermissionDenied`. `runs.cancel`, `subagents.get` and `subagents.set` stay
   studio-only.
+  Message queue (2026-11-02): `chat.queue.list`, `chat.queue.add`, `chat.queue.edit`,
+  `chat.queue.remove` and `chat.queue.flush` are allowed. They take only a dialog id and the
+  person's own text; a queued message is sent exactly like one from `chat.send` (same graph,
+  approvals and policy), and nothing in the queue reaches the model before that.
 - **Same events, same answers.** CLI connections are extra event-bus subscribers beside the
   window. An approval or a question reaches both; the first answer wins and the other side
   sees `Conflict`.
@@ -587,6 +591,42 @@ Core concepts:
 - **Concurrent tool calls** — in the chat loop, consecutive side-effect-free calls of one
   round run concurrently; a call with side effects is a barrier and keeps its place. Results
   go back to the model in the original call order.
+- **What a later turn sees** (`services/chat_carry.rs`, TASK_048_EXTRA_6, DECISION: option a).
+  Besides each earlier message's final `content` and selections, every kept assistant answer
+  carries (1) its tool calls: name, arguments and the result cut to `RESULT_CAP_TOKENS` =
+  2 000 tokens and marked as truncated; a call that did not succeed carries only its status
+  (`failed`, `refused`, `denied`, `cancelled`), never its error text; (2) the sources behind every
+  `[n]` and `[[n]]` marker in the answer: title, store and location (or URL) and an excerpt of
+  up to 300 characters. `[n]` numbers the message citations followed by the citations of its
+  successful tool calls, as the renderer does; excerpts are read by `VectorSearch::chunks`, not
+  by a new search. Uncited passages and reasoning are never carried. Everything carried is
+  fenced as untrusted (`<tool_result>`, `<carried_source>`). The sources go as one user message
+  before the answer; the calls go as one assistant message with `tool_calls` followed by one
+  `tool` message per call id, then the answer. The shape follows the current turn, not the one
+  that produced the message: a native adapter offering tools gets that shape (it crosses the
+  prepare → generate step in `GenerateMessage.toolCalls` / `toolCallId`); every other turn gets
+  it encoded by `DefaultDialect`, the text dialect of the web adapters. Budget: the window keeps
+  messages first (`window_chat_history`, unchanged); carried parts then get what is left, at
+  most `CARRY_SHARE_PERCENT` = 50 % of the history room. When they do not fit they are shed
+  oldest message first, in three passes: results become a one-line stub (the call id keeps
+  exactly one result), then whole call records are dropped, then sources. Carried parts never
+  push a message out. `chat.stats` reports each part per message (`ChatCarriedPartDto`: `sent`,
+  `shortened`, `dropped`), and the «Статистика» view lists reasoning as «Не передаётся».
+- **Message queue** (`services/chat/queue.rs`, 2026-11-02). While a dialog has a running turn
+  (or an active goal), a message from the person goes to a per-dialog queue held in host
+  memory (`chat.queue.*`, at most `CHAT_QUEUE_MAX` = 10, lost on restart); every change is
+  broadcast as a `step` with `domain: "queue"` (`ChatQueueStepDto`) on its own stream, so the
+  desktop app and the CLI show the same queue. When the turn ends `ok`, everything queued
+  starts one turn: the messages are stored as separate `user` messages in order and the turn
+  answers the last. A cancelled or failed turn keeps the queue unsent. `chat.queue.flush`
+  («Отправить все сейчас») sends at once when the dialog is idle; during a turn it marks the
+  queue urgent, and the tool loop ends the turn at the next safepoint — after a round of tool
+  calls, before the next model request (`LoopHost::yields`). A turn streaming its final answer
+  has no safepoint and is not cut. The cut answer keeps its text and tool calls, which reach
+  the next turn through the carried parts above (an answer with tool calls but no text is now
+  sent too). A goal turn that yields is not settled: the goal stays active and the queued turn
+  continues it (`command: goal` on its last message). Adding to the queue while the dialog is
+  idle sends at once.
 
 Mapping:
 

@@ -441,6 +441,10 @@ impl RunService {
         &self.inner.options.services
     }
 
+    pub fn events(&self) -> &EventBus {
+        &self.inner.events
+    }
+
     pub fn permissions(&self) -> Arc<PermissionService> {
         Arc::clone(&self.inner.permissions)
     }

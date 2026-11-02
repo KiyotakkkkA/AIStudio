@@ -1,5 +1,21 @@
-import type { ChatPromptSection, ChatStatsDto, MessageDto } from "@zvs/shared";
-import { SECTION_LABELS, answersWord, messagesWord, tokensWord, toolsWord } from "./chatStatsCopy";
+import type {
+  ChatCarriedStatus,
+  ChatHistoryEntryDto,
+  ChatPromptSection,
+  ChatStatsDto,
+  MessageDto,
+} from "@zvs/shared";
+import {
+  CARRIED_KIND_LABELS,
+  CARRIED_STATUS_LABELS,
+  CARRIED_TRUNCATED,
+  REASONING_LABEL,
+  SECTION_LABELS,
+  answersWord,
+  messagesWord,
+  tokensWord,
+  toolsWord,
+} from "./chatStatsCopy";
 
 export const TOOLS_SHARE_LIMIT = 0.3;
 export const SERVER_SHARE_LIMIT = 0.15;
@@ -219,7 +235,7 @@ export function chatHints({
       key: `repeat:${repeated.key}`,
       title: `${toolLabel(repeated.key)}: одинаковые вызовы в ${answersWord(repeated.answers)}`,
       detail:
-        "Результаты инструментов из прошлых ответов не передаются модели, поэтому вызов повторяется. Короткий вывод из результата в сообщении сохраняет его в истории.",
+        "Результаты прошлых вызовов передаются модели, пока помещаются в окно. При нехватке места они сокращаются, и вызов повторяется. Короткий вывод из результата в сообщении сохраняет его в истории.",
       saving: 0,
     });
 
@@ -240,12 +256,38 @@ export function chatHints({
   return hints.sort((left, right) => right.saving - left.saving).slice(0, HINTS_MAX);
 }
 
-export function notSent(entry: {
-  readonly reasoningTokens: number;
-  readonly toolTokens: number;
-}): string[] {
-  const parts: string[] = [];
-  if (entry.reasoningTokens > 0) parts.push(`рассуждения ${tokensWord(entry.reasoningTokens)}`);
-  if (entry.toolTokens > 0) parts.push(`инструменты ${tokensWord(entry.toolTokens)}`);
-  return parts;
+export interface CarriedRow {
+  readonly key: string;
+  readonly kind: string;
+  readonly label: string;
+  readonly status: ChatCarriedStatus;
+  readonly statusLabel: string;
+  readonly note: string;
+  readonly tokens: number;
+}
+
+export function carriedRows(
+  entry: ChatHistoryEntryDto,
+  toolLabel: (key: string) => string,
+): CarriedRow[] {
+  const rows: CarriedRow[] = entry.carried.map((part, index) => ({
+    key: `${part.kind}:${String(index)}`,
+    kind: CARRIED_KIND_LABELS[part.kind],
+    label: part.kind === "toolCall" ? toolLabel(part.label) : `${part.marker} ${part.label}`.trim(),
+    status: part.status,
+    statusLabel: CARRIED_STATUS_LABELS[part.status],
+    note: part.truncated ? CARRIED_TRUNCATED : "",
+    tokens: part.tokens,
+  }));
+  if (entry.reasoningTokens > 0)
+    rows.push({
+      key: "reasoning",
+      kind: REASONING_LABEL,
+      label: "",
+      status: "dropped",
+      statusLabel: CARRIED_STATUS_LABELS.dropped,
+      note: "",
+      tokens: entry.reasoningTokens,
+    });
+  return rows;
 }

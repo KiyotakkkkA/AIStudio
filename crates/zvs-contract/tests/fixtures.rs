@@ -820,6 +820,30 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ChatGoalInput>,
     ),
     (
+        "chat/ChatQueueDto",
+        round_trip::<zvs_contract::ChatQueueDto>,
+    ),
+    (
+        "chat/ChatQueueStepDto",
+        round_trip::<zvs_contract::ChatQueueStepDto>,
+    ),
+    (
+        "chat/ChatQueueInput",
+        round_trip::<zvs_contract::ChatQueueInput>,
+    ),
+    (
+        "chat/ChatQueueAddInput",
+        round_trip::<zvs_contract::ChatQueueAddInput>,
+    ),
+    (
+        "chat/ChatQueueEditInput",
+        round_trip::<zvs_contract::ChatQueueEditInput>,
+    ),
+    (
+        "chat/ChatQueueRemoveInput",
+        round_trip::<zvs_contract::ChatQueueRemoveInput>,
+    ),
+    (
         "chat/ChatCommandDto",
         round_trip::<zvs_contract::ChatCommandDto>,
     ),

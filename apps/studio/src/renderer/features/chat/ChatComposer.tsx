@@ -25,7 +25,8 @@ import ChatModelGate from "./ChatModelGate";
 import ModelFields, { availableModelOptions } from "./ModelFields";
 import ExecPolicyMenu, { type ExecPolicyBinding } from "../execPolicy/ExecPolicyMenu";
 import { REMOVE_COMMAND, commandText } from "./chatCommands";
-import { GOAL_EMPTY, GOAL_LOCKED, GOAL_PLACEHOLDER } from "./goalCopy";
+import { GOAL_EMPTY, GOAL_PLACEHOLDER } from "./goalCopy";
+import { QUEUE_HINT } from "./queueCopy";
 import SelectionChips from "./SelectionChips";
 import type ChatStore from "./ChatStore";
 import VoiceMenu, { type VoiceBinding } from "../voice/VoiceMenu";
@@ -145,9 +146,9 @@ export default observer(function ChatComposer({
               placeholder={store.goalCommand ? GOAL_PLACEHOLDER : "Задайте вопрос…"}
               value={store.composer.text}
               maxLength={MESSAGE_MAX}
-              disabled={store.loading || store.generating || store.goals.active}
+              disabled={store.loading}
               aria-invalid={store.goalEmpty || undefined}
-              aria-describedby={store.goalEmpty || store.goals.active ? hintId : undefined}
+              aria-describedby={store.goalEmpty || store.queueing ? hintId : undefined}
               aria-controls={store.commandMatches.length > 0 ? COMMAND_MENU_ID : undefined}
               aria-activedescendant={
                 store.commandMatches.length > 0 ? commandOptionId(store.commandIndex) : undefined
@@ -187,13 +188,13 @@ export default observer(function ChatComposer({
                 }
               }}
             />
-            {store.goalEmpty || store.goals.active ? (
+            {store.goalEmpty || store.queueing ? (
               <p
                 id={hintId}
                 role={store.goalEmpty ? "alert" : undefined}
                 className={`m-0 px-1 pt-1 text-[11.5px] ${store.goalEmpty ? "text-err" : "text-main-400"}`}
               >
-                {store.goalEmpty ? GOAL_EMPTY : GOAL_LOCKED}
+                {store.goalEmpty ? GOAL_EMPTY : QUEUE_HINT}
               </p>
             ) : null}
           </div>

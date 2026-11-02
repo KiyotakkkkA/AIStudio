@@ -12,7 +12,6 @@ export const GOAL_STEP_FIELD = "Шаг";
 export const GOAL_STEP_SUMMARY = "Итог";
 export const GOAL_PLACEHOLDER = "Опишите цель…";
 export const GOAL_EMPTY = "Укажите цель после команды /goal";
-export const GOAL_LOCKED = "Во время выполнения цели сообщения недоступны";
 export const GOAL_LABEL = "Цель";
 export const GOAL_DONE = "Цель достигнута";
 export const GOAL_STOP = "Остановить";

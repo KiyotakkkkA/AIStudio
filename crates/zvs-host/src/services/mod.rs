@@ -2,6 +2,7 @@ pub mod accounts;
 pub mod approvals;
 pub mod chat;
 pub mod chat_ask;
+pub mod chat_carry;
 pub mod chat_goal;
 pub mod chat_history;
 pub mod chat_memory;

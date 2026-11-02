@@ -1,0 +1,17 @@
+[
+  {
+    "name": "queue step",
+    "value": {
+      "domain": "queue",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "messages": [
+        {
+          "id": "0199bb22-3333-7333-8333-000000000001",
+          "text": "Ещё одно",
+          "createdAt": 1767225600001
+        }
+      ],
+      "urgent": false
+    }
+  }
+]

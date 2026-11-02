@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { mdiCheck, mdiChevronDown, mdiChevronRight, mdiContentCopy } from "@mdi/js";
-import type { ChatStatsDto, MessageDto } from "@zvs/shared";
+import type { ChatCarriedStatus, ChatStatsDto, MessageDto } from "@zvs/shared";
 import Button from "../../../ui/atoms/buttons/Button";
 import IconButton from "../../../ui/atoms/buttons/IconButton";
 import Chip from "../../../ui/atoms/Chip";
@@ -16,9 +16,9 @@ import type ChatStore from "../ChatStore";
 import {
   type SectionRow,
   type ToolGroup,
+  carriedRows,
   chatHints,
   dialogTotals,
-  notSent,
   sectionRows,
   toolCallCounts,
   turnRows,
@@ -28,8 +28,8 @@ import {
   HINTS_EMPTY,
   HINTS_HEADING,
   HISTORY_EMPTY,
+  HISTORY_CARRIED,
   HISTORY_HEADING,
-  HISTORY_NOT_SENT,
   HISTORY_SOURCES,
   ROLE_LABELS,
   SECTIONS_HEADING,
@@ -65,6 +65,12 @@ import {
 } from "./chatStatsCopy";
 
 const PREVIEW_CHARS = 140;
+
+const CARRIED_TONES: Readonly<Record<ChatCarriedStatus, string>> = {
+  sent: "text-ok",
+  shortened: "text-warn",
+  dropped: "text-main-500",
+};
 
 function toolLabel(key: string): string {
   return isBuiltinTool(key) ? toolTitle(key) : key;
@@ -334,7 +340,7 @@ function HistoryCard({
       ) : (
         <ul className="max-h-120 divide-y divide-line overflow-y-auto text-[12px]">
           {stats.history.map((entry) => {
-            const dropped = notSent(entry);
+            const carried = entry.status === "included" ? carriedRows(entry, toolLabel) : [];
             const muted = entry.status !== "included";
             return (
               <li key={entry.messageId}>
@@ -350,9 +356,33 @@ function HistoryCard({
                     <span className={`line-clamp-2 ${muted ? "text-main-500" : "text-main-300"}`}>
                       {entry.text.slice(0, PREVIEW_CHARS) || "—"}
                     </span>
-                    {dropped.length > 0 ? (
-                      <span className="block text-[11px] text-main-500">
-                        {HISTORY_NOT_SENT}: {dropped.join(", ")}
+                    {carried.length > 0 ? (
+                      <span
+                        role="list"
+                        aria-label={HISTORY_CARRIED}
+                        className="mt-1 block space-y-0.5 text-[11px]"
+                      >
+                        {carried.map((row) => (
+                          <span
+                            key={row.key}
+                            role="listitem"
+                            className="flex min-w-0 items-center gap-1.5"
+                          >
+                            <span className="shrink-0 text-main-500">{row.kind}</span>
+                            <span className="min-w-0 flex-1 truncate text-main-400">
+                              {row.label}
+                              {row.note === "" ? null : (
+                                <span className="text-main-500"> · {row.note}</span>
+                              )}
+                            </span>
+                            <span className={`shrink-0 ${CARRIED_TONES[row.status]}`}>
+                              {row.statusLabel}
+                            </span>
+                            <span className="w-12 shrink-0 text-right font-mono text-main-500">
+                              {compactTokens(row.tokens)}
+                            </span>
+                          </span>
+                        ))}
                       </span>
                     ) : null}
                   </span>

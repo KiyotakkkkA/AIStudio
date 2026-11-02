@@ -582,10 +582,10 @@ impl NodeDef for SkillGenerateNode {
             ..GenerateNodeInput {
                 provider_id: input.provider_id.clone(),
                 model: input.model.clone(),
-                messages: vec![GenerateMessage {
-                    role: GenerateRole::User,
-                    content: input.message.clone(),
-                }],
+                messages: vec![GenerateMessage::new(
+                    GenerateRole::User,
+                    input.message.clone(),
+                )],
                 system: Some(system),
                 temperature: None,
                 top_k: None,

@@ -40,7 +40,7 @@ pub const ACCESS_DENIED: &str = "Доступ к папке не предост�
 
 pub const WELCOME_HINT: &str = "Введите сообщение, / для списка команд или ? для сочетаний клавиш";
 pub const INPUT_PLACEHOLDER: &str =
-    "Сообщение…  (/ — команды, ? — сочетания клавиш, Alt+Enter — новая строка)";
+    "Сообщение…  (/ — команды, ? — сочетания клавиш, Shift+Enter — новая строка)";
 pub const WORKSPACE: &str = "Рабочая папка";
 pub const MODEL: &str = "Модель";
 pub const NO_MODEL: &str = "не выбрана";
@@ -59,7 +59,7 @@ pub const CHAT_CLEARED: &str = "Экран очищен";
 
 pub const HINT_IDLE: &str =
     "Enter — отправить · ? — сочетания клавиш · Esc Esc — выход · PgUp/PgDn — прокрутка";
-pub const HINT_RUNNING: &str = "Esc — остановить · PgUp/PgDn — прокрутка";
+pub const HINT_RUNNING: &str = "Enter — в очередь · Esc — остановить · PgUp/PgDn — прокрутка";
 pub const HINT_PROMPT: &str = "↑/↓ — выбор · Enter — подтвердить · Esc — отклонить";
 pub const HINT_PALETTE: &str = "↑/↓ — выбор · Tab — дополнить · Enter — выполнить · Esc — закрыть";
 pub const COPIED: &str = "Скопировано в буфер обмена";
@@ -228,7 +228,7 @@ pub const EFFORT_UNSUPPORTED: &str = "Модель не поддерживает
 pub const KEYS_TITLE: &str = "Клавиши";
 pub const KEYS: &[(&str, &str)] = &[
     ("Enter", "отправить сообщение"),
-    ("Alt+Enter, Shift+Enter", "новая строка"),
+    ("Shift+Enter", "новая строка"),
     ("↑ / ↓", "история ввода"),
     ("Esc", "остановить ответ"),
     ("Esc Esc", "выйти"),
@@ -246,6 +246,8 @@ pub const KEYS_TRANSCRIPT: &str = "Просмотр";
 pub const KEY_COMMANDS: &str = "Команды";
 pub const KEY_SHELL: &str = "Команда в рабочей папке";
 pub const KEY_NEWLINE: &str = "Новая строка";
+pub const KEY_QUEUE: &str = "Выбор в очереди";
+pub const KEY_QUEUE_SEND: &str = "Отправить очередь сейчас";
 pub const KEY_HISTORY: &str = "История ввода";
 pub const KEY_COMPLETE: &str = "Дополнить команду";
 pub const KEY_CLEAR_INPUT: &str = "Очистить строку";
@@ -269,6 +271,27 @@ pub const HINT_KEYS: &str = "? / Esc — закрыть";
 pub const SHORTCUT_COLUMN_KEYS: &str = "Сочетание";
 pub const SHORTCUT_COLUMN_ACTION: &str = "Действие";
 pub const SHORTCUT_DETAILS: &str = "Показать или скрыть подробности инструментов";
+pub const SHORTCUT_QUEUE_PREVIOUS: &str = "Выбрать предыдущее сообщение в очереди";
+pub const SHORTCUT_QUEUE_NEXT: &str = "Выбрать следующее сообщение в очереди";
+pub const SHORTCUT_QUEUE_EDIT: &str = "Изменить выбранное сообщение в очереди";
+pub const SHORTCUT_QUEUE_REMOVE: &str = "Удалить выбранное сообщение из очереди";
+pub const SHORTCUT_QUEUE_SEND: &str = "Отправить все сообщения из очереди сейчас";
+
+pub const QUEUE_TITLE: &str = "Очередь";
+pub const QUEUE_SENDING: &str = "отправка после текущего шага";
+pub const QUEUE_SELECT: &str = "выбор";
+pub const QUEUE_EDIT: &str = "изменить";
+pub const QUEUE_REMOVE: &str = "удалить";
+pub const QUEUE_SEND: &str = "отправить все сейчас";
+pub const QUEUE_ADDED: &str = "Сообщение добавлено в очередь";
+pub const QUEUE_FULL: &str = "В очереди может быть не больше 10 сообщений";
+pub const QUEUE_EMPTY: &str = "Очередь пуста";
+pub const QUEUE_EDITING: &str = "Изменение сообщения в очереди: Enter — сохранить, Esc — отмена";
+pub const QUEUE_SAVED: &str = "Сообщение в очереди изменено";
+
+pub fn queued(count: usize) -> String {
+    crate::format::plural(count as u64, "сообщение", "сообщения", "сообщений")
+}
 pub const SHORTCUT_CLEAR_INPUT: &str = "Очистить строку ввода";
 pub const SHORTCUT_NONE: &str = "не назначено";
 pub const SHORTCUT_PRESS: &str = "нажмите сочетание…";
@@ -276,7 +299,8 @@ pub const SHORTCUTS_RESET: &str = "Восстановить сочетания �
 pub const SHORTCUT_SET: &str = "Назначено";
 pub const SHORTCUT_MOVED: &str = "снято с действия";
 pub const SHORTCUT_REMOVED: &str = "Сочетание убрано";
-pub const SHORTCUT_INVALID: &str = "Используйте Ctrl или Alt с буквой либо клавиши F1–F12";
+pub const SHORTCUT_INVALID: &str =
+    "Используйте Ctrl или Alt с буквой, стрелкой или Enter либо клавиши F1–F12";
 pub const SHORTCUT_RESERVED: &str =
     "Это сочетание используется терминалом и не может быть назначено";
 pub const SHORTCUTS_RESTORED: &str = "Восстановлены сочетания по умолчанию";

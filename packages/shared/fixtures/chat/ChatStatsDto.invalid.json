@@ -36,7 +36,7 @@
           "tokens": 20,
           "text": "Старый вопрос",
           "reasoningTokens": 0,
-          "toolTokens": 0
+          "carried": []
         },
         {
           "messageId": "0199aa11-2222-7222-8222-000000000002",
@@ -45,7 +45,7 @@
           "tokens": 8,
           "text": "",
           "reasoningTokens": 12,
-          "toolTokens": 340
+          "carried": []
         },
         {
           "messageId": "0199aa11-2222-7222-8222-000000000003",
@@ -54,7 +54,7 @@
           "tokens": 32,
           "text": "Новый вопрос",
           "reasoningTokens": 0,
-          "toolTokens": 0
+          "carried": []
         }
       ]
     }
@@ -101,7 +101,7 @@
           "tokens": 20,
           "text": "Старый вопрос",
           "reasoningTokens": 0,
-          "toolTokens": 0
+          "carried": []
         }
       ]
     }
@@ -148,7 +148,7 @@
           "tokens": 20,
           "text": "Старый вопрос",
           "reasoningTokens": 0,
-          "toolTokens": 0
+          "carried": []
         },
         {
           "messageId": "0199aa11-2222-7222-8222-000000000002",
@@ -157,7 +157,7 @@
           "tokens": 8,
           "text": "",
           "reasoningTokens": 12,
-          "toolTokens": 340
+          "carried": []
         },
         {
           "messageId": "0199aa11-2222-7222-8222-000000000003",
@@ -166,7 +166,7 @@
           "tokens": 32,
           "text": "Новый вопрос",
           "reasoningTokens": 0,
-          "toolTokens": 0
+          "carried": []
         }
       ]
     }
@@ -213,7 +213,44 @@
           "tokens": -1,
           "text": "Старый вопрос",
           "reasoningTokens": 0,
-          "toolTokens": 0
+          "carried": []
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown carried status",
+    "value": {
+      "context": {
+        "contextWindow": 8192,
+        "reservedOutput": 1024,
+        "system": 40,
+        "tools": 0,
+        "toolItems": [],
+        "history": 32,
+        "historyMessages": 1,
+        "trimmed": 0,
+        "total": 72
+      },
+      "tokenizer": "o200k_base",
+      "sections": [],
+      "deferred": [],
+      "history": [
+        {
+          "messageId": "0199aa11-2222-7222-8222-000000000002",
+          "role": "assistant",
+          "status": "included",
+          "tokens": 32,
+          "text": "Ответ",
+          "reasoningTokens": 0,
+          "carried": [
+            {
+              "kind": "toolCall",
+              "label": "fs.read",
+              "status": "partial",
+              "tokens": 10
+            }
+          ]
         }
       ]
     }

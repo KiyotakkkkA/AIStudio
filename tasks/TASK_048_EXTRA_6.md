@@ -2,7 +2,7 @@
 task: TASK_048_EXTRA_6
 title: Carrying tool results, sources and reasoning into later turns
 phase: 9 — Integrations
-status: todo
+status: done
 depends_on: [TASK_048_EXTRA_5]
 unblocks: [TASK_048_EXTRA_7]
 estimate: 6–8 h (host, contract, desktop statistics view; one commit)
@@ -167,14 +167,78 @@ Manual check:
 
 ## Definition of done
 
-- [ ] Tool records and cited sources reach later turns under a budget
-- [ ] Native pairing is valid; text dialects get the text block
-- [ ] Shedding order is tested
-- [ ] The statistics view reflects carried, shortened and dropped parts
-- [ ] PASSPORT updated
-- [ ] Gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Tool records and cited sources reach later turns under a budget
+- [x] Native pairing is valid; text dialects get the text block
+- [x] Shedding order is tested
+- [x] The statistics view reflects carried, shortened and dropped parts
+- [x] PASSPORT updated
+- [ ] Gates pass (see Handoff: two failures that were already on `main`, and the workspace
+      run that was not finished)
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
-*(to be filled in by the session that implements this task)*
+**Decisions (asked, answered by the user):** option a: compact results under a cap, plus the
+cited sources, and no reasoning. Cap: 2 000 tokens per call. Depth: every message that fits.
+Store passages that were injected but not cited: never carried.
+
+**Built:**
+- `services/chat_carry.rs`:
+  - `Carried::of` builds, for one assistant message, its tool calls and its cited sources.
+    - Each call carries its arguments and its result, cut by `truncate_tokens` to
+      `RESULT_CAP_TOKENS` and marked with `TRUNCATED_NOTE`. A failed, refused, denied or
+      cancelled call carries its status only, without the error text.
+    - The sources are those behind `[n]` (message citations, then the citations of
+      successful tool calls, numbered as `answerCitations` numbers them in the renderer) and
+      `[[n]]` (web sources). Markers inside code fences and markdown links are ignored. Each
+      source is fenced as `<carried_source>`.
+  - `expand` renders the parts as a sources user message, an assistant message with
+    `tool_calls`, one `tool` message per call id, and then the answer. `CarryShape::Text`
+    passes the same messages through `DefaultDialect.encode_history`.
+  - `fit` sheds the parts oldest first, in three passes: results to a one-line stub
+    (`SHORTENED_NOTE`), then whole calls, then sources.
+  - `carry_into` runs after `window_chat_history`. It gives the carried parts what the
+    messages left, at most `CARRY_SHARE_PERCENT` of the history room, splices the parts in
+    and adds their cost to `tokens_in`.
+- `token_estimate::truncate_tokens`: the longest char-boundary prefix within a token limit.
+- `GenerateMessage` gains `toolCallId` and `toolCalls`, and `GenerateRole` gains `tool`, so
+  the native shape survives the prepare → generate step. `GenerateNodeInput::validate`
+  refuses tool calls outside an assistant message and a tool result without a preceding call
+  (`TOOL_CALLS_NOT_ASSISTANT`, `TOOL_RESULT_UNPAIRED`). The `llm.generate` schema now lists the
+  `tool` role.
+- `PrepareNode` and `Preview` resolve the tool mode once. The shape is native only when the
+  adapter is native and the turn offers tools; otherwise it is text. `source_lookup` reads
+  store names and the excerpts of the cited chunks (`VectorSearch::chunks`, no new search).
+- Contract: `ChatCarriedPartDto` (`kind`, `label`, `marker`, `status`, `tokens`,
+  `truncated`), `ChatCarriedKind`, and `ChatCarriedStatus`. `ChatHistoryEntryDto.toolTokens`
+  is replaced by `carried`. The Zod schema and both `ChatStatsDto` fixtures are updated, and
+  there is a new invalid case.
+- «Статистика»: each included message lists its carried parts. The status reads
+  «Передаётся», «Сокращено» or «Не передаётся», with «обрезано до лимита» on a truncated
+  result, and reasoning reads «Не передаётся» (`carriedRows`). The repeated-call hint text now
+  matches the new behaviour.
+- PASSPORT §11, *What a later turn sees*.
+
+**Tests:**
+- `chat_carry`, 13 tests: carried and uncited parts, markers, tool-meta numbering, native
+  pairing and stubs, the prepare → generate round trip, the text dialect, the cap, the
+  shedding order, the share limit, messages kept over parts, and event messages staying
+  `user`.
+- `tool_loop`: a later turn carries the call, and stats list it as sent; a web driver sees it
+  in its dialect.
+- The cancelled-call test now asserts valid pairing instead of no tool messages.
+- `kernel` validation cases, and `chatStats.test.ts` for `carriedRows`.
+
+**Gates:**
+- `cargo fmt`, `clippy -p zvs-host -p zvs-contract -D warnings`, `cargo test -p zvs-host`,
+  `cargo test -p zvs-contract`, `pnpm lint` and `pnpm test` pass.
+- `pnpm typecheck` fails in `tests/renderer/chatGoal.test.ts` (TS2352, goal plan casts).
+  `pnpm format:check` fails on `ui/atoms/assistantGeometry.ts`. This task touches neither
+  file.
+- The full `cargo test --workspace` run was interrupted and not repeated.
+
+**Notes:**
+- Excerpts are fetched for every sent message, not only the kept ones; a long dialog with
+  many cited fragments pays for those reads in `chat.stats` too.
+- In a turn with an open budget, the tool loop's own `shed_tool_results` can also stub
+  carried results, which keeps the pairing valid.

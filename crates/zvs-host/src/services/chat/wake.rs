@@ -4,7 +4,7 @@ use std::time::Duration;
 use serde_json::json;
 use zvs_contract::{
     AppErrorCode, ChatEventDto, ChatSendInput, ConversationId, EndedShellDto, MessageDto,
-    MessageRole, RunHandleDto,
+    MessageRole, RunHandleDto, RunOutcomeStatus,
 };
 
 use super::{ChatService, ENDED_TAIL_LINES, Inner};
@@ -92,10 +92,11 @@ impl Waker {
         }
     }
 
-    pub(crate) fn turn_ended(&self, conversation: &str) {
+    pub(crate) fn turn_ended(&self, conversation: &str, outcome: RunOutcomeStatus) {
         let Some(service) = self.service() else {
             return;
         };
+        service.queue_turn_ended(conversation, outcome);
         if service
             .inner
             .shells
@@ -181,7 +182,7 @@ impl ChatService {
         }
         let text = wake_text(&ended);
         let event = wake_event(ended);
-        self.start_turn_with(&ChatSendInput::new(id, text), None, Some(event))
+        self.start_turn_with(&ChatSendInput::new(id, text), None, Some(event), &[])
             .map(Some)
     }
 }

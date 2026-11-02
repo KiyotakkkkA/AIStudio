@@ -13,6 +13,23 @@ pub fn estimate_tokens(text: &str) -> u64 {
     tokenizer().count_ordinary(text) as u64
 }
 
+pub fn truncate_tokens(text: &str, limit: u64) -> (&str, bool) {
+    if estimate_tokens(text) <= limit {
+        return (text, false);
+    }
+    let bounds: Vec<usize> = text.char_indices().map(|(index, _)| index).collect();
+    let (mut low, mut high) = (0, bounds.len() - 1);
+    while low < high {
+        let middle = (low + high).div_ceil(2);
+        if estimate_tokens(&text[..bounds[middle]]) <= limit {
+            low = middle;
+        } else {
+            high = middle - 1;
+        }
+    }
+    (&text[..bounds[low]], true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -56,6 +73,21 @@ mod tests {
             tokenizer().count_ordinary("hello world") as u64
         );
         assert!(estimate_tokens("<|endoftext|>") > 1);
+    }
+
+    #[test]
+    fn truncation_keeps_the_longest_prefix_within_the_limit_on_a_char_boundary() {
+        assert_eq!(truncate_tokens("short", 10), ("short", false));
+        let text = "Верховный суд рассмотрел жалобу. ".repeat(40);
+        let (kept, truncated) = truncate_tokens(&text, 50);
+        assert!(truncated);
+        assert!(estimate_tokens(kept) <= 50);
+        assert!(estimate_tokens(&text[..kept.len() + kept_next(&text, kept.len())]) > 50);
+        assert!(text.starts_with(kept));
+    }
+
+    fn kept_next(text: &str, at: usize) -> usize {
+        text[at..].chars().next().map_or(0, char::len_utf8)
     }
 
     #[test]

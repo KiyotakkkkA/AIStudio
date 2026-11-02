@@ -28,6 +28,7 @@ import type { VoiceBinding } from "../voice/VoiceMenu";
 import ChatApprovals from "./ChatApprovals";
 import ChatWorkingFolder from "./ChatWorkingFolder";
 import ChatGoalBar from "./ChatGoalBar";
+import ChatQueueBar from "./ChatQueueBar";
 import FolderAccessModal from "./FolderAccessModal";
 import { ToolCallItems } from "./ChatToolCalls";
 import { answerCitations, questionSelections } from "./citations";
@@ -554,6 +555,7 @@ export default observer(function ChatThread({
           <ChatApprovals store={store} />
           <ChatWorkingFolder store={store} />
           <ChatGoalBar store={store} />
+          <ChatQueueBar store={store} />
         </div>
       </div>
       <FolderAccessModal store={store} />

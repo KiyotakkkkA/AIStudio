@@ -43,6 +43,7 @@ import {
   ChatWakeStepDto,
   ChatGoalDto,
   ChatGoalStepDto,
+  ChatQueueStepDto,
   GoalBudgetDto,
   GoalReason,
   GoalStatus,
@@ -592,6 +593,12 @@ const schemas: Record<string, z.ZodType> = {
   "chat/ChatEventDto": ChatEventDto,
   "chat/ChatWakeStepDto": ChatWakeStepDto,
   "chat/ChatGoalInput": contract["chat.goal.stop"].input,
+  "chat/ChatQueueDto": contract["chat.queue.list"].output,
+  "chat/ChatQueueStepDto": ChatQueueStepDto,
+  "chat/ChatQueueInput": contract["chat.queue.flush"].input,
+  "chat/ChatQueueAddInput": contract["chat.queue.add"].input,
+  "chat/ChatQueueEditInput": contract["chat.queue.edit"].input,
+  "chat/ChatQueueRemoveInput": contract["chat.queue.remove"].input,
 };
 
 const root = fileURLToPath(new URL("../fixtures/", import.meta.url));

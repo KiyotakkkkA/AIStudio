@@ -10,7 +10,9 @@ use zvs_contract::{
 };
 
 use super::chat::subagent::concurrent_delegate;
-use super::chat::{BUDGET_EXHAUSTED, GenerateChatNode, KNOWLEDGE_COMPACTED, RoundOutput};
+use super::chat::{
+    BUDGET_EXHAUSTED, GenerateChatNode, KNOWLEDGE_COMPACTED, QUEUE_YIELDED, RoundOutput,
+};
 use super::chat_ask::{ASK_ONCE, ASK_TOOL};
 use super::chat_history::{MESSAGE_OVERHEAD, tokens};
 use super::chat_tools::{
@@ -136,6 +138,10 @@ pub(crate) trait LoopHost: Send + Sync {
     fn rounds_saved(&self, context: &StepContext, rounds: &[ChatRoundDto], usage: &TurnUsage);
 
     fn offered_saved(&self, context: &StepContext, offered: &[OfferedTool]);
+
+    fn yields(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Default)]
@@ -503,6 +509,12 @@ impl ToolLoop<'_> {
                     }
                     messages.push(ChatMessage::user(note));
                 }
+            }
+            if host.yields() {
+                context.emit(HostEventDraft::Log {
+                    line: log_line(&[("message", json!(QUEUE_YIELDED)), ("round", json!(round))]),
+                })?;
+                break;
             }
             round += 1;
         }
