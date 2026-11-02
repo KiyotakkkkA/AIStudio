@@ -223,7 +223,7 @@ on its code. Suggested order: 045_EXTRA_3 → 045_EXTRA_5 (part A) → 045_EXTRA
 - [ ] **TASK_048_EXTRA_7** — Compacting history that no longer fits the context window
 - [x] **TASK_049** — Mail integration (IMAP/SMTP)
 - [x] **TASK_050** — Telegram and Git hosting integrations
-- [ ] **TASK_051** — Plugins page
+- [x] **TASK_051** — Plugins page
 
 ## Phase 10 — Production readiness
 

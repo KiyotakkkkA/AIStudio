@@ -2,6 +2,7 @@ import { mdiConsoleLine } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import Icon from "../../ui/atoms/Icon";
 import PluginMark from "../plugins/PluginMark";
+import { accountMark } from "../plugins/signInTypes";
 import type ChatStore from "./ChatStore";
 import { ACCOUNTS_LABEL, COMMANDS_LABEL, type MenuEntry } from "./chatCommands";
 
@@ -22,8 +23,10 @@ function EntryMark({ entry }: { readonly entry: MenuEntry }) {
       </span>
     );
   }
-  return (
-    <PluginMark kind={entry.type === "plugin" ? entry.plugin : entry.account.kind} size="xs" />
+  return entry.type === "plugin" ? (
+    <PluginMark kind={entry.plugin} size="xs" />
+  ) : (
+    <PluginMark kind={entry.account.kind} mark={accountMark(entry.account)} size="xs" />
   );
 }
 

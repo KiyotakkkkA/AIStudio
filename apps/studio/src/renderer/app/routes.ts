@@ -8,7 +8,7 @@ export const ROUTES = {
   scenarios: "/scenarios",
   skills: "/skills",
   connections: "/connections",
-  integrations: "/integrations",
+  plugins: "/plugins",
   tools: "/tools",
   tasks: "/tasks",
   downloads: "/downloads",

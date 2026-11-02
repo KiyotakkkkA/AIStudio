@@ -2,7 +2,7 @@
 task: TASK_051
 title: Plugins page
 phase: 9 — Integrations
-status: todo
+status: done
 depends_on: [TASK_049, TASK_050, TASK_076]
 unblocks: []
 estimate: 4 h
@@ -139,21 +139,57 @@ accounts, that the rail shows the API quota, and that write tools appear on the 
 
 ## Definition of done
 
-- [ ] Catalogue with search, tabs, sections and logos
-- [ ] Any number of accounts per plugin and per sign-in type
-- [ ] Forms generated from provider schemas, credentials only as secret pickers over all secrets
-- [ ] Browser and device-code sign-in with cancel
-- [ ] Test connection reports per-direction results
-- [ ] Automation rail shows real triggers, tools, activity and quota
-- [ ] Tests and gates pass
+- [x] Catalogue with search, tabs, sections and logos
+- [x] Any number of accounts per plugin and per sign-in type
+- [x] Forms generated from provider schemas, credentials only as secret pickers over all secrets
+- [x] Browser and device-code sign-in with cancel
+- [x] Test connection reports per-direction results
+- [x] Automation rail shows real triggers, tools, activity and quota
+- [x] Tests and gates pass
 - [ ] `pnpm typecheck && pnpm lint && pnpm build` pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- Route `/plugins/:kind?/:accountId?` and the «Плагины» rail item replace «Интеграции»;
+  `pages/IntegrationsPage.tsx` is gone. The rail marks an item active on its sub-paths too.
+- `features/plugins/PluginStore.ts` — loads `integrations.kinds|list`, `secrets.list`,
+  `scenarios.list` and `workers.list`; accounts grouped by kind; catalogue search, tabs and
+  collapsible sections; selection from the route with `redirect` / `consumeRedirect` for the
+  view to follow; create, update, test, enable / disable, remove, sign-in and cancel, each
+  followed by `integrations.get` + `integrations.activity` + `workers.list` for that account;
+  observes `domain: "integrations"` `device-code` steps for the sign-in panel.
+- `signInTypes.ts` — the sign-in types per plugin (Google, Яндекс, Mail.ru, IMAP / SMTP; token or
+  browser for GitHub and GitLab; bot token for Telegram) with the fixed config value, the hidden
+  and the additionally required keys. `oauthToken` is always hidden: the host writes it on sign-in.
+- `PluginFormVm.ts` — the generated form over `describe()` (`text`, `url`, `number`, `boolean`,
+  `select`, `secret`), validation, and a config that keeps stored values of hidden fields.
+- `MAIL_PRESET_MARKS` (`google`, `yandex`, `mailru`, `imap`); `PluginMark` takes a `mark`, and the
+  composer chips and the `/` menu show the account's preset mark.
+- Views: `PluginCatalogue`, `PluginsWorkspace` (plugin header and three columns),
+  `PluginAccountList`, `PluginAccountPane`, `PluginField`, `SignInTypeChoice`, `SignInPanel`
+  (device code, copy, verification URL, expiry countdown, «Отмена»), `AutomationRail`.
+- `tests/renderer/plugins.test.ts` — 11 tests.
+
 **Deviated from plan:**
+- The accounts column reuses `EntityListPanel` (262 px) instead of a 250 px one, so it matches
+  the Connections and Secrets columns.
+- A browser-type account is created disabled, signed in, then enabled; with a token type
+  «Подключить» creates it enabled.
+- `describe()` marks manual-only mail fields only through help text, so the hidden keys per sign-in
+  type are listed in `signInTypes.ts` instead of read from the descriptor.
+
 **Next session should know:**
+- `IntegrationAccountDto` carries no error code, so «Нужен вход» is derived: a browser-type
+  account without `oauthToken`, or one whose `test` / `enable` / `signIn` failed with
+  `PROVIDER_SESSION_EXPIRED` in this session. A `statusCode` on the DTO would make it exact.
+- A cancelled sign-in comes back as `CONFLICT`; the store tells it apart by its own cancel flag.
+- No IPC channel opens an arbitrary URL, so the verification URL is shown as selectable text;
+  the host opens the browser itself.
+- Not run here: `pnpm build`, `pnpm test:e2e` (the smoke test now expects «Плагины»), and the
+  cargo gates (no Rust changed). `pnpm format:check` reports
+  `apps/studio/src/renderer/ui/atoms/assistantGeometry.ts`, which this task does not touch.
 
 ---
 

@@ -12,7 +12,7 @@ const AgenticBuildPage = lazy(() => import("../pages/AgenticBuildPage"));
 const ScenariosPage = lazy(() => import("../pages/ScenariosPage"));
 const SkillsPage = lazy(() => import("../pages/SkillsPage"));
 const ConnectionsPage = lazy(() => import("../pages/ConnectionsPage"));
-const IntegrationsPage = lazy(() => import("../pages/IntegrationsPage"));
+const PluginsPage = lazy(() => import("../pages/PluginsPage"));
 const ToolsPage = lazy(() => import("../pages/ToolsPage"));
 const TasksPage = lazy(() => import("../pages/TasksPage"));
 const DownloadsPage = lazy(() => import("../pages/DownloadsPage"));
@@ -44,7 +44,7 @@ export const routes: RouteObject[] = [
       page(ROUTES.scenarios, ScenariosPage),
       page(ROUTES.skills, SkillsPage),
       page(ROUTES.connections, ConnectionsPage),
-      page(ROUTES.integrations, IntegrationsPage),
+      page(`${ROUTES.plugins}/:kind?/:accountId?`, PluginsPage),
       page(ROUTES.tools, ToolsPage),
       page(ROUTES.tasks, TasksPage),
       page(ROUTES.downloads, DownloadsPage),

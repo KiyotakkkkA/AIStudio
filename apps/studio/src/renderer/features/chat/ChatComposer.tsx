@@ -26,6 +26,7 @@ import ModelFields, { availableModelOptions } from "./ModelFields";
 import ExecPolicyMenu, { type ExecPolicyBinding } from "../execPolicy/ExecPolicyMenu";
 import { REMOVE_COMMAND, REMOVE_PLUGIN, commandText } from "./chatCommands";
 import PluginMark from "../plugins/PluginMark";
+import { accountMark } from "../plugins/signInTypes";
 import { pluginChipLabel } from "../plugins/pluginPresentation";
 import { GOAL_EMPTY, GOAL_PLACEHOLDER } from "./goalCopy";
 import { QUEUE_HINT } from "./queueCopy";
@@ -128,7 +129,12 @@ export default observer(function ChatComposer({
                   key={account.id}
                   className="inline-flex h-7 items-center gap-1.5 rounded-full bg-main-800 pr-1.5 pl-1 text-[12px] font-medium text-main-100"
                 >
-                  <PluginMark kind={account.kind} size="xs" className="rounded-full" />
+                  <PluginMark
+                    kind={account.kind}
+                    mark={accountMark(account)}
+                    size="xs"
+                    className="rounded-full"
+                  />
                   <span className="max-w-48 truncate">{pluginChipLabel(account)}</span>
                   <button
                     type="button"

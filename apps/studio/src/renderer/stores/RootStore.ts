@@ -13,6 +13,7 @@ import DownloadStore from "../features/downloads/DownloadStore";
 import TaskStore from "../features/tasks/TaskStore";
 import RunHistoryStore from "../features/tasks/RunHistoryStore";
 import ConnectionStore from "../features/connections/ConnectionStore";
+import PluginStore from "../features/plugins/PluginStore";
 import ToolStore from "../features/tools/ToolStore";
 import ToolchainStore from "../features/toolchain/ToolchainStore";
 import SkillStore from "../features/skills/SkillStore";
@@ -45,6 +46,7 @@ export class RootStore {
   readonly downloads: DownloadStore;
   readonly runs: RunHistoryStore;
   readonly connections: ConnectionStore;
+  readonly plugins: PluginStore;
   readonly tools: ToolStore;
   readonly toolchain: ToolchainStore;
   readonly skills: SkillStore;
@@ -74,6 +76,7 @@ export class RootStore {
     this.downloads = new DownloadStore(environment.ipc, environment.events);
     this.runs = new RunHistoryStore(environment.ipc);
     this.connections = new ConnectionStore(environment.ipc);
+    this.plugins = new PluginStore(environment.ipc, environment.events);
     this.tools = new ToolStore(environment.ipc);
     this.toolchain = new ToolchainStore(environment.ipc, environment.events);
     this.skills = new SkillStore(environment.ipc);
@@ -106,6 +109,7 @@ export class RootStore {
         downloads: false,
         runs: false,
         connections: false,
+        plugins: false,
         tools: false,
         toolchain: false,
         skills: false,
@@ -145,6 +149,7 @@ export class RootStore {
     this.downloads.dispose();
     this.runs.dispose();
     this.connections.dispose();
+    this.plugins.dispose();
     this.tools.dispose();
     this.toolchain.dispose();
     this.skills.dispose();

@@ -16,7 +16,10 @@ export function useAppNavigation(): AppNavigation {
 
   const current = isRoutePath(pathname) ? pathname : DEFAULT_ROUTE;
 
-  const isActive = useCallback((path: string) => pathname === path, [pathname]);
+  const isActive = useCallback(
+    (path: string) => pathname === path || pathname.startsWith(`${path}/`),
+    [pathname],
+  );
 
   const go = useCallback(
     (path: string) => {

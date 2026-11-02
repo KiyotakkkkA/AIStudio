@@ -1,5 +1,6 @@
 import type { IntegrationKind } from "@zvs/shared";
 import Icon from "../../ui/atoms/Icon";
+import type { VendorMarkStyle } from "../providers/accountPresentation";
 import { PLUGIN_MARKS } from "./pluginPresentation";
 
 type PluginMarkSize = "xs" | "sm" | "md" | "lg";
@@ -13,19 +14,20 @@ const SIZES: Record<PluginMarkSize, { readonly box: string; readonly icon: numbe
 
 export interface PluginMarkProps {
   readonly kind: IntegrationKind;
+  readonly mark?: VendorMarkStyle;
   readonly size?: PluginMarkSize;
   readonly className?: string;
 }
 
-export default function PluginMark({ kind, size = "sm", className = "" }: PluginMarkProps) {
-  const mark = PLUGIN_MARKS[kind];
+export default function PluginMark({ kind, mark, size = "sm", className = "" }: PluginMarkProps) {
+  const style = mark ?? PLUGIN_MARKS[kind];
   const { box, icon } = SIZES[size];
   return (
     <span
       aria-hidden="true"
-      className={`flex flex-none items-center justify-center ${box} ${mark.tile} ${className}`}
+      className={`flex flex-none items-center justify-center ${box} ${style.tile} ${className}`}
     >
-      <Icon path={mark.logo} size={icon} fillRule="evenodd" />
+      <Icon path={style.logo} size={icon} fillRule="evenodd" />
     </span>
   );
 }
