@@ -4,7 +4,7 @@ import { isIpcError } from "@zvs/ipc";
 export const WORKING_FOLDER_LABEL = "Рабочая папка";
 export const CHOOSE_FOLDER = "Выбрать папку";
 export const CHANGE_FOLDER = "Сменить папку";
-export const REMOVE_FOLDER = "Убрать папку";
+export const REMOVE_FOLDER = "Отключить папку";
 export const FOLDER_ACCESS_MISSING = "Нет доступа";
 export const RESTORE_FOLDER_ACCESS = "Предоставить доступ";
 export const FOLDER_LOCKED = "Рабочую папку нельзя изменить во время ответа";
@@ -20,12 +20,12 @@ export const SUBFOLDERS_NOTE =
   "Доступ распространяется на все вложенные папки. Допустимые действия определяются на странице «Инструменты».";
 export const CREATES_LABEL = "Будут созданы:";
 
-export const FOLDER_ERROR_FALLBACK = "Не удалось изменить рабочую папку. Попробуйте ещё раз.";
+export const FOLDER_ERROR_FALLBACK = "Не удалось изменить рабочую папку. Повторите попытку.";
 export const ANSWER_ERROR_FALLBACK = "Не удалось передать ответ на запрос доступа.";
 
 const ERRORS: Partial<Record<AppErrorCode, string>> = {
   [AppErrorCode.PERMISSION_DENIED]:
-    "Эта папка недоступна: системные папки, корни дисков, сетевые и съёмные диски и данные приложения закрыты для доступа.",
+    "Доступ к системным папкам, корням дисков, сетевым и съёмным дискам и данным приложения запрещён.",
   [AppErrorCode.NOT_FOUND]: "Папка не найдена.",
   [AppErrorCode.VALIDATION_FAILED]: "Выбранный путь не является папкой.",
   [AppErrorCode.CONFLICT]: `${FOLDER_LOCKED}.`,

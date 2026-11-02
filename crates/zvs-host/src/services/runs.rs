@@ -40,8 +40,7 @@ pub const ATTENTION_WINDOW: Duration = Duration::from_secs(24 * 60 * 60);
 pub const RUN_NOT_FOUND: &str = "Запуск не найден";
 pub const SERVICE_STOPPED: &str = "Сервис выполнения остановлен";
 pub const RUN_NOT_FINISHED: &str = "Запуск ещё не завершён";
-pub const CHAT_RETRY_REFUSED: &str =
-    "Ход чата повторяется со страницы чата: граф ссылается на сообщения исходного хода";
+pub const CHAT_RETRY_REFUSED: &str = "Повторите запрос на странице диалога";
 pub const RESUMING_MESSAGE: &str = "Возобновление с последней контрольной точки";
 pub const ABANDONED_ON_EXIT: &str = "Выполнение прервано завершением приложения";
 pub const APPROVAL_INTERRUPTED: &str = "Approval interrupted";

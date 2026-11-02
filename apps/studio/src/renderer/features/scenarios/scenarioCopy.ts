@@ -12,19 +12,19 @@ import { plural } from "../connections/connectionPresentation";
 import type { AttachRefusal, ConnectRefusal, Refusal } from "./graphModel";
 
 export const NODE_TYPE_LABELS: Readonly<Record<string, string>> = {
-  "trigger.chat": "Сообщение в чате",
+  "trigger.chat": "Сообщение в диалоге",
   "trigger.mail": "Новое письмо",
   "trigger.schedule": "Расписание",
   "trigger.webhook": "Вебхук",
   "trigger.integration": "Событие интеграции",
   "agent.tools": "ИИ-агент",
-  "model.chat": "Чат-модель",
+  "model.chat": "Текстовая модель",
   "memory.window": "История диалога",
   "memory.facts": "Память",
   "knowledge.stores": "Векторные хранилища",
   "embedding.model": "Модель эмбеддингов",
   "tool.set": "Набор инструментов",
-  "output.chatReply": "Ответ в чат",
+  "output.chatReply": "Ответ в диалог",
   "output.chatMessage": "Сообщение в диалог",
   "output.newChat": "Новый диалог",
   "output.notify": "Уведомление",
@@ -40,7 +40,7 @@ export const ROLE_LABELS: Record<ScenarioNodeRole, string> = {
 };
 
 export const SLOT_LABELS: Record<ScenarioSlot, string> = {
-  model: "Чат-модель",
+  model: "Текстовая модель",
   memory: "Память",
   tool: "Инструменты",
   embedding: "Эмбеддинги",
@@ -78,9 +78,9 @@ export function nextForPort(name: string, port: string): string {
     : `Шаги для выхода «${label}» узла «${name}»`;
 }
 export const DIALOG_LABEL = "Диалог";
-export const DIALOG_FROM_TRIGGER = "Диалог, из которого пришло сообщение";
+export const DIALOG_FROM_TRIGGER = "Диалог исходного сообщения";
 export const STORES_NONE = "Векторных хранилищ нет";
-export const DIALOG_MISSING = "Не определён: нет триггера «Сообщение в чате»";
+export const DIALOG_MISSING = "Не определён: нет триггера «Сообщение в диалоге»";
 export const GRANTED_SECTION = "Подключено другими узлами";
 
 export function grantedBy(name: string): string {
@@ -89,15 +89,15 @@ export function grantedBy(name: string): string {
 
 export const SCENARIO_LOAD_FAILED = "Не удалось загрузить сценарий.";
 export const SCENARIO_ACTION_FAILED = "Не удалось выполнить операцию со сценарием.";
-export const SCENARIO_MISSING = "Сценарий не найден — возможно, он уже удалён.";
+export const SCENARIO_MISSING = "Сценарий не найден.";
 export const DRAFT_SAVE_FAILED = "Черновик не сохранён. Изменения останутся в редакторе.";
 
 export const CONNECT_REFUSALS: Record<ConnectRefusal, string> = {
   selfLoop: "Узел нельзя соединить с самим собой",
-  notTrunk: "Основной связью соединяются только шаги сценария, а не подузлы",
-  intoTrigger: "Триггер запускает сценарий, входящая связь к нему невозможна",
-  duplicate: "Такая связь уже есть",
-  cycle: "Связь замкнула бы цикл",
+  notTrunk: "Основная связь допустима только между шагами сценария",
+  intoTrigger: "У триггера не может быть входящих связей",
+  duplicate: "Связь уже существует",
+  cycle: "Связь создаёт цикл",
 };
 
 export function slotLabel(slot: ScenarioSlot, required: boolean): string {
@@ -161,8 +161,8 @@ export function issueText(issue: ScenarioIssueDto, nameOf: (id: string) => strin
     unreachable: `Узел ${node} не достижим от триггера`,
     restrictedTool: `Инструмент «${issue.param ?? ""}» недоступен в наборе ${node}`,
     invalidPort: `У узла ${node} нет выхода «${issue.param ?? ""}»`,
-    missingDialog: `Узлу ${node} нужен диалог: сценарий должен запускаться триггером «Сообщение в чате»`,
-    limitedDialog: `Без триггера «Сообщение в чате» узел ${node} работает только с глобальной памятью`,
+    missingDialog: `Узлу ${node} требуется триггер «Сообщение в диалоге»`,
+    limitedDialog: `Без триггера «Сообщение в диалоге» узел ${node} работает только с общей памятью`,
     duplicateKind: `Слот ${slot} узла ${node} принимает не больше одного узла каждого вида`,
   };
   return texts[issue.rule];

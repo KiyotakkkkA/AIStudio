@@ -37,8 +37,9 @@ use crate::skills::{presented, result_limit};
 use crate::tools::ToolRegistry;
 
 pub const EFFECTS_UNAVAILABLE: &str = "Действия сценария недоступны";
-pub const MODEL_MISSING: &str = "К ИИ-агенту не подключена чат-модель";
-pub const NO_REPLY_TARGET: &str = "Ответить некуда: сценарий запущен не сообщением в чате";
+pub const MODEL_MISSING: &str = "К ИИ-агенту не подключена текстовая модель";
+pub const NO_REPLY_TARGET: &str =
+    "Диалог для ответа не определён: сценарий запущен не сообщением в диалоге";
 pub const UNKNOWN_TOOL: &str = "Инструмент не предоставлен агенту";
 pub const DEFAULT_ITERATIONS: u64 = 8;
 pub const DEFAULT_MEMORY: u64 = 10;

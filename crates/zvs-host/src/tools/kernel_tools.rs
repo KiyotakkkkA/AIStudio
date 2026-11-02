@@ -47,7 +47,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         AGENT_DELEGATE,
         BuiltinToolMeta {
-            display_name: "agent.delegate",
+            display_name: "Выполнение задачи субагентом",
             description: DELEGATE_DESCRIPTION,
             destructive: false,
         },
@@ -55,7 +55,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         "vector.search",
         BuiltinToolMeta {
-            display_name: "vector.search",
+            display_name: "Семантический поиск",
             description: "Semantic search over a vector store; returns chunks with relevance scores. storeId — the UUID from vector.list.",
             destructive: false,
         },
@@ -63,7 +63,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         "vector.list",
         BuiltinToolMeta {
-            display_name: "vector.list",
+            display_name: "Список хранилищ",
             description: "List vector stores: UUID, name, description, and document count. Pass the UUID to vector.search as storeId.",
             destructive: false,
         },
@@ -71,7 +71,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         KNOWLEDGE_SEARCH,
         BuiltinToolMeta {
-            display_name: "knowledge.search",
+            display_name: "Поиск в хранилищах диалога",
             description: SEARCH_DESCRIPTION,
             destructive: false,
         },
@@ -79,7 +79,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         SKILL_LOAD,
         BuiltinToolMeta {
-            display_name: "skill.load",
+            display_name: "Загрузка навыка",
             description: SKILL_LOAD_DESCRIPTION,
             destructive: false,
         },
@@ -87,7 +87,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         SKILL_SAVE,
         BuiltinToolMeta {
-            display_name: "skill.save",
+            display_name: "Сохранение навыка",
             description: SKILL_SAVE_DESCRIPTION,
             destructive: true,
         },
@@ -95,7 +95,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         FS_LIST,
         BuiltinToolMeta {
-            display_name: "fs.list",
+            display_name: "Просмотр папки",
             description: FS_LIST_DESCRIPTION,
             destructive: false,
         },
@@ -103,7 +103,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         FS_READ,
         BuiltinToolMeta {
-            display_name: "fs.read",
+            display_name: "Чтение файлов",
             description: FS_READ_DESCRIPTION,
             destructive: false,
         },
@@ -111,7 +111,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         FS_SEARCH,
         BuiltinToolMeta {
-            display_name: "fs.search",
+            display_name: "Поиск по файлам",
             description: FS_SEARCH_DESCRIPTION,
             destructive: false,
         },
@@ -119,7 +119,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         FS_APPLY,
         BuiltinToolMeta {
-            display_name: "fs.apply",
+            display_name: "Изменение файлов",
             description: FS_APPLY_DESCRIPTION,
             destructive: false,
         },
@@ -127,7 +127,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         CODE_RUN,
         BuiltinToolMeta {
-            display_name: "code.run",
+            display_name: "Выполнение программы",
             description: CODE_DESCRIPTION,
             destructive: true,
         },
@@ -135,7 +135,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         SHELL_RUN,
         BuiltinToolMeta {
-            display_name: "shell.run",
+            display_name: "Выполнение команды",
             description: SHELL_DESCRIPTION,
             destructive: true,
         },
@@ -143,7 +143,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         SHELL_OUTPUT,
         BuiltinToolMeta {
-            display_name: "shell.output",
+            display_name: "Вывод фонового процесса",
             description: OUTPUT_DESCRIPTION,
             destructive: false,
         },
@@ -151,7 +151,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         SHELL_KILL,
         BuiltinToolMeta {
-            display_name: "shell.kill",
+            display_name: "Остановка фонового процесса",
             description: KILL_DESCRIPTION,
             destructive: false,
         },
@@ -159,7 +159,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         BROWSER_NAVIGATE,
         BuiltinToolMeta {
-            display_name: "browser.navigate",
+            display_name: "Переход по адресу",
             description: NAVIGATE_DESCRIPTION,
             destructive: false,
         },
@@ -167,7 +167,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         BROWSER_READ_PAGE,
         BuiltinToolMeta {
-            display_name: "browser.read_page",
+            display_name: "Чтение страницы",
             description: READ_PAGE_DESCRIPTION,
             destructive: false,
         },
@@ -175,7 +175,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         BROWSER_SCREENSHOT,
         BuiltinToolMeta {
-            display_name: "browser.screenshot",
+            display_name: "Снимок страницы",
             description: SCREENSHOT_DESCRIPTION,
             destructive: false,
         },
@@ -183,7 +183,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         BROWSER_FIND,
         BuiltinToolMeta {
-            display_name: "browser.find",
+            display_name: "Поиск на странице",
             description: FIND_DESCRIPTION,
             destructive: false,
         },
@@ -191,7 +191,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         BROWSER_CLICK,
         BuiltinToolMeta {
-            display_name: "browser.click",
+            display_name: "Нажатие на элемент",
             description: CLICK_DESCRIPTION,
             destructive: false,
         },
@@ -199,7 +199,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         BROWSER_TYPE,
         BuiltinToolMeta {
-            display_name: "browser.type",
+            display_name: "Ввод текста",
             description: TYPE_DESCRIPTION,
             destructive: false,
         },
@@ -207,7 +207,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         BROWSER_SUBMIT,
         BuiltinToolMeta {
-            display_name: "browser.submit",
+            display_name: "Отправка формы",
             description: SUBMIT_DESCRIPTION,
             destructive: true,
         },
@@ -215,7 +215,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
     (
         BROWSER_DOWNLOAD,
         BuiltinToolMeta {
-            display_name: "browser.download",
+            display_name: "Загрузка файла",
             description: DOWNLOAD_DESCRIPTION,
             destructive: true,
         },

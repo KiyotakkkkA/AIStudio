@@ -15,8 +15,8 @@ use crate::platform::paths::utc_iso;
 pub const NETWORK_ENTRY_LIMIT: usize = 1000;
 pub const POST_DATA_LIMIT: usize = 64 * 1024;
 pub const BODY_LIMIT: usize = 1024 * 1024;
-pub const NO_NETWORK_ENTRY: &str = "Unknown network entry";
-pub const NO_RECORDING_TAB: &str = "No tab to record";
+pub const NO_NETWORK_ENTRY: &str = "Сетевой запрос не найден";
+pub const NO_RECORDING_TAB: &str = "Нет вкладки для записи сетевых запросов";
 
 const REDACTED_HEADERS: [&str; 5] = [
     "authorization",

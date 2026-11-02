@@ -38,7 +38,7 @@ const REASON: Record<GoalReason, string> = {
   repetition: "повторяющиеся вызовы",
   restart: "приложение было перезапущено",
   user: "по запросу",
-  error: "ход завершился ошибкой",
+  error: "обработка запроса завершилась ошибкой",
 };
 
 export function planProgressText(done: number, total: number): string {

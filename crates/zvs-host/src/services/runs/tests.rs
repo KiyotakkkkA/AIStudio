@@ -835,13 +835,9 @@ async fn retry_starts_a_new_run_linked_to_the_original_and_refuses_chat_and_live
     assert_eq!(history.list(json!({})).items[0].retry_of_id, Some(failed));
 
     let chat = history.run("chat", "Ход чата", work()).await;
-    assert!(
-        history
-            .service
-            .retry(&chat)
-            .expect_err("refused")
-            .message
-            .contains("страницы чата")
+    assert_eq!(
+        history.service.retry(&chat).expect_err("refused").message,
+        CHAT_RETRY_REFUSED
     );
 
     let live = history.start("job", "Ещё выполняется", work());

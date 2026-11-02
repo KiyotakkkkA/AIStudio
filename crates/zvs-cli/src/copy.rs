@@ -38,9 +38,8 @@ pub const ACCESS_ALWAYS: &str = "Разрешить всегда";
 pub const ACCESS_DENY: &str = "Отказать и выйти";
 pub const ACCESS_DENIED: &str = "Доступ к папке не предоставлен. Сессия завершена.";
 
-pub const WELCOME_HINT: &str = "Введите сообщение, / для списка команд или ? для сочетаний клавиш";
-pub const INPUT_PLACEHOLDER: &str =
-    "Сообщение…  (/ — команды, ? — сочетания клавиш, Shift+Enter — новая строка)";
+pub const WELCOME_HINT: &str = "/ — команды · ? — сочетания клавиш";
+pub const INPUT_PLACEHOLDER: &str = "Сообщение…";
 pub const WORKSPACE: &str = "Рабочая папка";
 pub const MODEL: &str = "Модель";
 pub const NO_MODEL: &str = "не выбрана";
@@ -84,7 +83,7 @@ pub const FOLDER_CONVERSATION: &str = "Разрешить для этого ди
 pub const FOLDER_ALWAYS: &str = "Разрешить всегда";
 
 pub const VERIFY_TITLE: &str = "Проверка браузера";
-pub const VERIFY_BODY: &str = "Провайдер запросил проверку браузера. Окно проверки открыто: пройдите проверку, и ответ продолжится.";
+pub const VERIFY_BODY: &str = "Провайдер запросил проверку браузера. Завершите проверку в открытом окне для продолжения ответа.";
 pub const VERIFY_SITE: &str = "Сайт";
 pub const HINT_VERIFY: &str = "Enter — показать окно проверки · Esc — остановить ответ";
 
@@ -93,22 +92,22 @@ pub const SHELL_PLACEHOLDER: &str = "Команда для cmd в рабочей
 pub const HINT_SHELL: &str = "Enter — выполнить в рабочей папке · Esc — очистить";
 pub const HINT_SHELL_RUNNING: &str = "Esc — остановить команду";
 pub const SHELL_RUNNING: &str = "выполняется";
-pub const SHELL_DONE: &str = "готово";
+pub const SHELL_DONE: &str = "завершено";
 pub const SHELL_EXIT: &str = "код выхода";
 pub const SHELL_STOPPED: &str = "остановлено";
 pub const SHELL_FAILED: &str = "Не удалось запустить команду";
-pub const SHELL_BUSY: &str = "Дождитесь окончания команды или остановите её клавишей Esc";
+pub const SHELL_BUSY: &str = "Команда выполняется. Esc — остановить";
 
 pub const QUESTION_TITLE: &str = "Вопрос";
 pub const QUESTION_OTHER: &str = "Другой вариант";
-pub const QUESTION_TEXT_HINT: &str = "Введите ответ и нажмите Enter";
+pub const QUESTION_TEXT_HINT: &str = "Enter — отправить ответ";
 pub const QUESTION_MULTI_HINT: &str = "Пробел — отметить · Enter — далее · Esc — пропустить";
 pub const QUESTION_SKIPPED: &str = "Вопрос пропущен";
 
 pub const TOOL_RUNNING: &str = "выполняется";
-pub const TOOL_AWAITING_APPROVAL: &str = "ждёт подтверждения";
-pub const TOOL_AWAITING_ANSWER: &str = "ждёт ответа";
-pub const TOOL_SUCCEEDED: &str = "готово";
+pub const TOOL_AWAITING_APPROVAL: &str = "ожидание подтверждения";
+pub const TOOL_AWAITING_ANSWER: &str = "ожидание ответа";
+pub const TOOL_SUCCEEDED: &str = "выполнено";
 pub const TOOL_FAILED: &str = "ошибка";
 pub const TOOL_REFUSED: &str = "запрещено";
 pub const TOOL_DENIED: &str = "отклонено";
@@ -121,7 +120,7 @@ pub const MORE_LINES: &str = "ещё строк:";
 pub const COMMANDS_TITLE: &str = "Команды";
 pub const HELP_TITLE: &str = "Справка";
 pub const UNKNOWN_COMMAND: &str = "Неизвестная команда";
-pub const BUSY: &str = "Дождитесь окончания ответа или остановите его клавишей Esc";
+pub const BUSY: &str = "Обработка запроса. Esc — остановить";
 
 pub const CMD_HELP: &str = "Список команд и клавиш";
 pub const CMD_NEW: &str = "Начать новый диалог в этой папке";
@@ -155,7 +154,7 @@ pub const CMD_GOAL: &str = "Работа над целью: <цель>";
 pub const CMD_GOAL_STOP: &str = "Остановить цель";
 pub const CMD_GOAL_CONTINUE: &str = "Продолжить приостановленную цель";
 pub const GOAL_HINT: &str = "Укажите цель после команды: /goal <цель>";
-pub const GOAL_RUNNING: &str = "Цель выполняется. Остановить её: /goal stop или Ctrl+C";
+pub const GOAL_RUNNING: &str = "Выполняется работа над целью. /goal stop или Ctrl+C — остановить";
 pub const GOAL_NOT_STOPPABLE: &str = "Нет выполняемой или приостановленной цели";
 pub const GOAL_NOT_PAUSED: &str = "Нет приостановленной цели";
 pub const GOAL_STOP_CONFIRM: &str = "Нажмите Ctrl+C ещё раз, чтобы остановить цель";
@@ -172,13 +171,13 @@ pub const GOAL_REASON_TOKENS: &str = "исчерпан лимит токенов
 pub const GOAL_REASON_MINUTES: &str = "исчерпан лимит времени";
 pub const GOAL_REASON_REPETITION: &str = "повторяющиеся вызовы";
 pub const GOAL_REASON_RESTART: &str = "приложение было перезапущено";
-pub const GOAL_REASON_ERROR: &str = "ход завершился ошибкой";
+pub const GOAL_REASON_ERROR: &str = "обработка запроса завершилась ошибкой";
 pub const CMD_MCP: &str = "MCP-серверы";
 pub const CMD_MCP_ADD: &str = "Подключить MCP-сервер: <имя> <адрес | команда [аргументы]>";
 pub const CMD_MCP_INSPECT: &str = "Сведения о сервере и его инструменты: <имя>";
 pub const CMD_PERMISSIONS: &str = "Режим выполнения и модель-арбитр";
 pub const CMD_SHORTCUTS: &str = "Сочетания клавиш и их переназначение";
-pub const CMD_STOP_SUBAGENT: &str = "Остановить последний запущенный субагент";
+pub const CMD_STOP_SUBAGENT: &str = "Остановить последнего запущенного субагента";
 pub const SUBAGENT_NONE: &str = "Нет выполняющихся субагентов";
 pub const SUBAGENT_STOPPING: &str = "Остановка субагента…";
 pub const SUBAGENT_TITLE: &str = "Субагент";
@@ -189,13 +188,13 @@ pub const SUBAGENT_QUEUED: &str = "В очереди";
 pub const SUBAGENT_PARTIAL: &str = "Частичный результат";
 pub const SUBAGENT_STOPPED: &str = "Остановлен";
 pub const SUBAGENT_FAILED: &str = "Ошибка";
-pub const SUBAGENT_DONE: &str = "Готово";
+pub const SUBAGENT_DONE: &str = "Завершён";
 pub const SUBAGENT_REPORT: &str = "Отчёт";
 
 pub fn subagent_title(label: &str) -> String {
     format!("{SUBAGENT_TITLE}: {label}")
 }
-pub const CMD_EFFORT: &str = "Сила размышления модели";
+pub const CMD_EFFORT: &str = "Режим рассуждения";
 pub const CMD_THEME: &str = "Тема оформления";
 
 pub const THEME_TITLE: &str = "Тема оформления";
@@ -214,16 +213,16 @@ pub const THEME_HINT_DUSK: &str = "Фиолетовая гамма.";
 pub const THEME_HINT_FROST: &str = "Холодная бирюзовая гамма.";
 pub const HINT_THEME: &str = "↑/↓ — предпросмотр · Enter — применить · Esc — отмена";
 
-pub const EFFORT_TITLE: &str = "Размышление";
+pub const EFFORT_TITLE: &str = "Режим рассуждения";
 pub const EFFORT_FAST: &str = "Быстрый";
 pub const EFFORT_AUTO: &str = "Авто";
-pub const EFFORT_THINKING: &str = "Глубокое";
-pub const EFFORT_HINT_FAST: &str = "Отвечает без этапа размышления.";
-pub const EFFORT_HINT_AUTO: &str = "Модель сама решает, нужно ли размышление.";
-pub const EFFORT_HINT_THINKING: &str = "Всегда размышляет перед ответом.";
-pub const EFFORT_SET: &str = "Режим размышления изменён";
+pub const EFFORT_THINKING: &str = "С рассуждением";
+pub const EFFORT_HINT_FAST: &str = "Ответ без этапа рассуждения.";
+pub const EFFORT_HINT_AUTO: &str = "Рассуждение используется при необходимости.";
+pub const EFFORT_HINT_THINKING: &str = "Рассуждение перед каждым ответом.";
+pub const EFFORT_SET: &str = "Режим рассуждения изменён";
 pub const EFFORT_CURRENT: &str = "текущий";
-pub const EFFORT_UNSUPPORTED: &str = "Модель не поддерживает регулирование размышления";
+pub const EFFORT_UNSUPPORTED: &str = "Модель не поддерживает выбор режима рассуждения";
 
 pub const KEYS_TITLE: &str = "Клавиши";
 pub const KEYS: &[(&str, &str)] = &[
@@ -255,7 +254,7 @@ pub const KEY_SEND: &str = "Отправить сообщение";
 pub const KEY_STOP: &str = "Остановить ответ";
 pub const KEY_NEW_CHAT: &str = "Новый диалог";
 pub const KEY_MODELS: &str = "Модели";
-pub const KEY_EFFORT: &str = "Размышление";
+pub const KEY_EFFORT: &str = "Режим рассуждения";
 pub const KEY_RESUME: &str = "Продолжить диалог";
 pub const KEY_PERMISSIONS: &str = "Подтверждение действий";
 pub const KEY_QUIT: &str = "Выход";
@@ -298,14 +297,14 @@ pub const SHORTCUT_PRESS: &str = "нажмите сочетание…";
 pub const SHORTCUTS_RESET: &str = "Восстановить сочетания по умолчанию";
 pub const SHORTCUT_SET: &str = "Назначено";
 pub const SHORTCUT_MOVED: &str = "снято с действия";
-pub const SHORTCUT_REMOVED: &str = "Сочетание убрано";
+pub const SHORTCUT_REMOVED: &str = "Сочетание удалено";
 pub const SHORTCUT_INVALID: &str =
     "Используйте Ctrl или Alt с буквой, стрелкой или Enter либо клавиши F1–F12";
 pub const SHORTCUT_RESERVED: &str =
     "Это сочетание используется терминалом и не может быть назначено";
 pub const SHORTCUTS_RESTORED: &str = "Восстановлены сочетания по умолчанию";
 pub const SHORTCUTS_SAVE_FAILED: &str = "Не удалось сохранить сочетания клавиш";
-pub const HINT_CAPTURE: &str = "Нажмите новое сочетание · Backspace — убрать · Esc — отмена";
+pub const HINT_CAPTURE: &str = "Нажмите новое сочетание · Backspace — удалить · Esc — отмена";
 
 pub const MODE: &str = "Подтверждение действий";
 pub const MODE_ALWAYS_ASK: &str = "Всегда спрашивать";
@@ -334,7 +333,7 @@ pub const TAB_RECENT: &str = "Недавние";
 pub const TAB_PINNED: &str = "Закреплённые";
 pub const RESUMED: &str = "Диалог продолжен";
 pub const UPDATED: &str = "Изменён";
-pub const NO_CONVERSATIONS: &str = "В этой папке ещё нет диалогов";
+pub const NO_CONVERSATIONS: &str = "В этой папке нет диалогов";
 
 pub const CONTEXT_TITLE: &str = "Контекст";
 pub const TAB_SUMMARY: &str = "Сводка";
@@ -364,7 +363,7 @@ pub const TAB_RUNNING: &str = "Работают";
 pub const PROCESSES_EMPTY: &str = "Фоновых процессов нет";
 pub const PROCESS_OUTPUT_EMPTY: &str = "Вывода нет";
 pub const PROCESS_STOP_CONFIRM_KEY: &str = "Нажмите x ещё раз, чтобы остановить процесс";
-pub const PROCESSES_NO_CONVERSATION: &str = "Фоновые процессы появляются в диалоге";
+pub const PROCESSES_NO_CONVERSATION: &str = "Нет открытого диалога";
 pub const PROCESS_STOP_CONFIRM: &str = "Нажмите Delete ещё раз, чтобы остановить процесс";
 pub const PROCESS_STOPPED: &str = "Процесс остановлен";
 pub const PROCESS_RUNNING: &str = "выполняется";
@@ -393,7 +392,7 @@ pub fn process_event(event: &zvs_contract::ChatEventDto) -> String {
         .collect();
     lines.join("\n")
 }
-pub const PROCESS_TRUNCATED: &str = "Начало вывода больше не хранится";
+pub const PROCESS_TRUNCATED: &str = "Начало вывода удалено";
 pub const HINT_PROCESSES: &str =
     "↑/↓ — выбор · ←/→ — вкладки · Enter — вывод · Delete — остановить · Esc — закрыть";
 pub const HINT_PROCESS_OUTPUT: &str =

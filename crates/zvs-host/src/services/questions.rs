@@ -14,9 +14,9 @@ use crate::kernel::types::cancelled;
 pub const QUESTION_NOT_PENDING: &str = "Вопрос больше не ожидает ответа";
 pub const ANSWER_UNKNOWN_QUESTION: &str = "Ответ относится к вопросу, которого нет в запросе";
 pub const ANSWER_REPEATED: &str = "На один вопрос дано несколько ответов";
-pub const ANSWER_UNKNOWN_OPTION: &str = "Выбран вариант, которого нет в вопросе";
-pub const ANSWER_ONE_OPTION: &str = "В этом вопросе выбирается один вариант";
-pub const ANSWER_NO_OTHER: &str = "В этом вопросе нельзя указать свой вариант";
+pub const ANSWER_UNKNOWN_OPTION: &str = "Выбран недопустимый вариант ответа";
+pub const ANSWER_ONE_OPTION: &str = "Допустим только один вариант ответа";
+pub const ANSWER_NO_OTHER: &str = "Произвольный ответ не допускается";
 pub const ANSWER_EMPTY: &str = "Ответ не заполнен";
 
 struct Waiter {

@@ -9,11 +9,9 @@ export const LANGUAGE_LABEL: Record<CodeLanguage, string> = {
   powershell: "PowerShell",
 };
 
-export const CODE_LEAD =
-  "Модель предлагает запустить программу. Процесс работает с правами пользователя.";
-export const SHELL_LEAD =
-  "Модель предлагает выполнить команду. Процесс работает с правами пользователя.";
-export const SHELL_BACKGROUND_LEAD = "Модель предлагает запустить команду в фоне.";
+export const CODE_LEAD = "Требуется подтверждение запуска программы с правами пользователя.";
+export const SHELL_LEAD = "Требуется подтверждение выполнения команды с правами пользователя.";
+export const SHELL_BACKGROUND_LEAD = "Требуется подтверждение фонового запуска команды.";
 export const RUN_PROCESS = "Запустить";
 export const REJECT_PROCESS = "Отклонить";
 export const LANGUAGE_TITLE = "Язык";

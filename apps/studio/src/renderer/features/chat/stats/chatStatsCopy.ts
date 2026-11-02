@@ -25,7 +25,7 @@ export const SECTIONS_HEADING = "Состав системного промпт�
 export const SECTION_EMPTY = "не используется";
 export const SECTION_COPY = "Копировать";
 export const SKILLS_APPROXIMATE =
-  "Каталог навыков подбирается по тексту сообщения, поэтому при отправке он может отличаться.";
+  "Состав каталога навыков может измениться при отправке сообщения.";
 
 export const TOOLS_HEADING = "Инструменты";
 export const TOOLS_UNUSED = "не вызывался";
@@ -33,10 +33,10 @@ export const TOOLS_DEFERRED =
   "Отложенные инструменты не занимают окно и загружаются по запросу модели";
 
 export const HISTORY_HEADING = "История в следующем запросе";
-export const HISTORY_EMPTY = "В диалоге пока нет сообщений.";
+export const HISTORY_EMPTY = "В диалоге нет сообщений.";
 export const HISTORY_SOURCES = "Фрагменты из хранилищ добавляются при отправке.";
 export const HISTORY_CARRIED = "Передаётся вместе с ответом";
-export const CARRIED_TRUNCATED = "обрезано до лимита";
+export const CARRIED_TRUNCATED = "сокращено до лимита";
 export const REASONING_LABEL = "Рассуждения";
 
 export const CARRIED_STATUS_LABELS: Readonly<Record<ChatCarriedStatus, string>> = {
@@ -51,7 +51,7 @@ export const CARRIED_KIND_LABELS: Readonly<Record<ChatCarriedKind, string>> = {
 };
 
 export const TURNS_HEADING = "Расход по ответам";
-export const TURNS_EMPTY = "Ответов пока нет.";
+export const TURNS_EMPTY = "Ответов нет.";
 export const TURNS_TABLE = "Таблица";
 export const TURNS_CHART = "График";
 export const SERIES_INPUT = "Вход";
@@ -65,7 +65,7 @@ export const TURN_ESTIMATED = "оценка";
 export const TURN_REPORTED = "провайдер";
 
 export const HINTS_HEADING = "Рекомендации";
-export const HINTS_EMPTY = "Явных резервов для сокращения контекста нет.";
+export const HINTS_EMPTY = "Рекомендаций по сокращению контекста нет.";
 
 export const SECTION_LABELS: Readonly<Record<ChatPromptSection, string>> = {
   dialogPrompt: "Промпт диалога",

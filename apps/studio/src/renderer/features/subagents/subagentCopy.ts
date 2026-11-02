@@ -3,18 +3,18 @@ import { plural } from "../connections/connectionPresentation";
 export const SUBAGENTS_ROW = {
   key: "subagents.preferences",
   label: "Субагенты",
-  hint: "Модель может поручать отдельные задачи субагентам.",
+  hint: "Выполнение отдельных задач субагентами.",
 } as const;
 
 export const SUBAGENT_MODELS_ROW = {
   key: "subagents.models",
   label: "Предпочтительные модели",
-  hint: "Используется первая доступная модель списка. Если ни одна недоступна, используется модель диалога.",
+  hint: "Первая доступная модель из списка или модель диалога, если доступных нет.",
 } as const;
 
 export const SUBAGENT_CONCURRENCY_ROW = {
   key: "subagents.concurrency",
-  label: "Максимум запущенных одновременно",
+  label: "Лимит параллельных субагентов",
   hint: "Число субагентов, работающих параллельно.",
 } as const;
 
@@ -25,10 +25,10 @@ export const SUBAGENT_PROVIDER_LABEL = "Провайдер модели суба
 export const SUBAGENT_MODEL_LABEL = "Модель субагента";
 export const SUBAGENT_NONE = "Не выбрана";
 export const SUBAGENT_ADD = "Добавить";
-export const SUBAGENT_REMOVE = "Убрать модель";
+export const SUBAGENT_REMOVE = "Удалить модель из списка";
 export const SUBAGENT_UP = "Выше";
 export const SUBAGENT_DOWN = "Ниже";
-export const SUBAGENT_ACCOUNT_NOTE = "Модели аккаунтов выполняют субагентов по одному";
+export const SUBAGENT_ACCOUNT_NOTE = "Субагенты с моделями аккаунтов выполняются последовательно";
 export const SUBAGENT_NO_PROVIDERS = "Нет включённых провайдеров текстовых моделей.";
 export const SUBAGENT_SAVE_FAILED = "Не удалось сохранить настройки субагентов";
 export const SUBAGENT_MISSING_MODEL = "Модель недоступна";

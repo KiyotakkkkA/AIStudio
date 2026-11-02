@@ -12,11 +12,12 @@ export const CHANGE_KIND_LABEL: Record<FileChangeKind, string> = {
 };
 
 export const CHANGES_TITLE = "Изменения файлов";
-export const DIFF_TRUNCATED = "Дифф сокращён";
+export const DIFF_TRUNCATED = "Список изменений сокращён";
 export const NO_TEXT_CHANGES = "Содержимое не изменилось";
 export const APPROVE_CHANGES = "Применить изменения";
 export const REJECT_CHANGES = "Отклонить";
-export const CHANGES_LEAD = "Модель предлагает изменить файлы. Набор применяется только целиком.";
+export const CHANGES_LEAD =
+  "Требуется подтверждение изменений файлов. Все изменения применяются вместе.";
 
 export function filesWord(count: number): string {
   return plural(count, "файл", "файла", "файлов");

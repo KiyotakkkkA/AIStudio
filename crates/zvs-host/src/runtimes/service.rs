@@ -36,14 +36,14 @@ use crate::services::rerank::LocalRerankEngine;
 
 pub const INSTALLED_KEY: &str = "runtimes.installed";
 pub const RECOMMENDED_MODEL_REFS: &[&str] = &["curated:embedding:bge-m3-f16"];
-pub const NO_SUCH_ENGINE: &str = "Такого движка нет";
-pub const NOT_INSTALLED: &str = "Этот движок не установлен";
-pub const ALREADY_INSTALLING: &str = "Этот движок уже устанавливается";
+pub const NO_SUCH_ENGINE: &str = "Движок не найден";
+pub const NOT_INSTALLED: &str = "Движок не установлен";
+pub const ALREADY_INSTALLING: &str = "Установка движка уже выполняется";
 pub const NO_ENGINE: &str =
     "Локальный движок не установлен. Откройте «Загрузки» и установите llama.cpp.";
-pub const NO_ONNX_ENGINE: &str =
-    "Для файлов .onnx движок ещё не подключён: используйте модель в формате GGUF";
-pub const NO_PROJECTOR: &str = "Рядом с моделью нет файла mmproj: скачайте проектор в «Загрузках», без него распознавание не запустится";
+pub const NO_ONNX_ENGINE: &str = "Формат ONNX не поддерживается. Выберите модель GGUF";
+pub const NO_PROJECTOR: &str =
+    "Файл проектора mmproj не найден рядом с моделью. Установите проектор в разделе «Загрузки»";
 pub const UNSUPPORTED_PLATFORM: &str = "Для этой операционной системы такой сборки не существует";
 const SERVER_NAMES: [&str; 2] = ["llama-server", "llama-server.exe"];
 

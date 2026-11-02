@@ -11,10 +11,11 @@ pub const PROCESS_GONE: &str = "Процесс страницы остановл
 pub const LOAD_FAILED: &str = "Страница не загрузилась";
 pub const FORM_RESUBMISSION: &str =
     "Страница открывается только после отправки формы. Вернитесь на страницу входа и повторите.";
-pub const TAB_LIMIT_REACHED: &str = "Close a tab before opening another (limit: 30)";
-pub const UNKNOWN_TAB: &str = "Unknown tab";
-pub const INVALID_ORDER: &str = "Invalid tab order";
-pub const NO_ACTIVE_TAB: &str = "No active tab";
+pub const TAB_LIMIT_REACHED: &str =
+    "Достигнут лимит вкладок: 30. Закройте вкладку перед открытием новой";
+pub const UNKNOWN_TAB: &str = "Вкладка не найдена";
+pub const INVALID_ORDER: &str = "Некорректный порядок вкладок";
+pub const NO_ACTIVE_TAB: &str = "Нет активной вкладки";
 
 const BLANK: &str = "about:blank";
 

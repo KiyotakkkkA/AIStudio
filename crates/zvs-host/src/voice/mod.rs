@@ -37,12 +37,12 @@ pub const VOICE_DEVICES_FAILED: &str = "Не удалось получить с�
 pub const VOICE_DEVICE_NOT_FOUND: &str = "Устройство записи не подключено";
 pub const UNNAMED_DEVICE: &str = "Микрофон";
 pub const SPEECH_UNSUPPORTED: &str = "Распознавание речи доступно только в Windows на x64";
-pub const SPEECH_MODEL_UNKNOWN: &str = "Такой модели распознавания речи нет";
+pub const SPEECH_MODEL_UNKNOWN: &str = "Модель распознавания речи не найдена";
 pub const SPEECH_MODEL_NOT_INSTALLED: &str = "Модель распознавания речи не установлена";
 pub const SPEECH_NOT_READY: &str =
     "Распознавание речи не настроено: установите модель в параметрах голосового ввода";
-pub const ALREADY_RECORDING: &str = "Запись уже идёт";
-pub const NOT_RECORDING: &str = "Запись не идёт";
+pub const ALREADY_RECORDING: &str = "Запись уже выполняется";
+pub const NOT_RECORDING: &str = "Запись не выполняется";
 pub const RECORDING_FAILED: &str = "Не удалось начать запись с микрофона";
 pub const ENGINE_UNPACK_FAILED: &str = "В архиве движка нет программы whisper-cli";
 pub const MAX_RECORDING_SAMPLES: usize = SAMPLE_RATE as usize * 10 * 60;

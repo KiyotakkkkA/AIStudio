@@ -1,9 +1,8 @@
 import type { ModelCapability, ThinkingEffort } from "@zvs/shared";
 
-export const ACCOUNT_SETUP_UNAVAILABLE = "Не реализовано";
+export const ACCOUNT_SETUP_UNAVAILABLE = "Настройка недоступна";
 export const EFFORT_LABEL = "Режим рассуждения";
-export const EFFORT_UNSUPPORTED =
-  "Модель не поддерживает рассуждение: ответ формируется в быстром режиме.";
+export const EFFORT_UNSUPPORTED = "Модель поддерживает только быстрый режим.";
 export const WEB_SEARCH_LABEL = "Поиск в сети";
 
 export const EFFORT_STEPS: readonly ThinkingEffort[] = ["fast", "auto", "thinking"];
@@ -12,12 +11,12 @@ export const FIXED_EFFORT_STEPS: readonly ThinkingEffort[] = ["fast", "thinking"
 export const EFFORT_LABELS: Record<ThinkingEffort, string> = {
   fast: "Быстрый",
   auto: "Авто",
-  thinking: "Мышление",
+  thinking: "С рассуждением",
 };
 
 export const EFFORT_HINTS: Record<ThinkingEffort, string> = {
   fast: "Ответ без этапа рассуждения.",
-  auto: "Модель решает, требуется ли рассуждение.",
+  auto: "Рассуждение используется при необходимости.",
   thinking: "Рассуждение перед каждым ответом.",
 };
 

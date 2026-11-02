@@ -4,7 +4,8 @@ use std::sync::Arc;
 use zeroize::Zeroizing;
 use zvs_contract::{AppError, AppErrorCode, SecretInput};
 
-pub const UNAVAILABLE_MESSAGE: &str = "Хранилище ключей операционной системы недоступно, поэтому секрет нельзя ни зашифровать, ни расшифровать. Открытые значения не сохраняются никогда.";
+pub const UNAVAILABLE_MESSAGE: &str =
+    "Хранилище ключей операционной системы недоступно. Чтение и сохранение секретов невозможны.";
 pub const ENCRYPT_FAILED_MESSAGE: &str = "Не удалось зашифровать секрет";
 pub const DECRYPT_FAILED_MESSAGE: &str = "Не удалось расшифровать секрет";
 

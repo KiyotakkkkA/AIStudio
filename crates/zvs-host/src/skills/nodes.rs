@@ -37,12 +37,13 @@ pub const LOAD_DESCRIPTION: &str = "Loads a skill by identifier from the skill l
 pub const SAVE_DESCRIPTION: &str = "Saves a skill into the user's skill library: identifier, name, description used for skill selection, Markdown instructions, and text files under references/, scripts/, and assets/. A skill with the same identifier is overwritten only with replace: true; built-in skills cannot be overwritten. Every call is confirmed by the user. Returns the skill state and any errors found.";
 
 pub const NO_PROVIDERS: &str = "Сервис провайдеров недоступен";
-pub const NOT_OFFERED: &str = "Модель вызвала инструмент, который не был ей предложен";
+pub const NOT_OFFERED: &str = "Инструмент недоступен для текущего запроса";
 pub const NOT_AN_OBJECT: &str = "Аргументы вызова не являются JSON-объектом";
 pub const BUDGET_EXHAUSTED: &str = "Бюджет вызовов инструментов исчерпан";
 pub const NO_TOOL_CALLS: &str = "Вызов инструментов недоступен в этом запуске";
 pub const CALL_DENIED: &str = "Вызов отклонён пользователем";
-pub const CALL_FORBIDDEN: &str = "Инструмент запрещён разрешением или не входит в набор навыка";
+pub const CALL_FORBIDDEN: &str =
+    "Инструмент запрещён настройками разрешений или не входит в набор навыка";
 pub const TOOL_REPORTED_ERROR: &str = "Инструмент вернул ошибку";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

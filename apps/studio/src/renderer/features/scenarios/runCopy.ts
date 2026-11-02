@@ -10,7 +10,7 @@ export const PINNED_INVALID = "Входные данные должны быть
 
 export const LAST_RUN = "Последний запуск";
 export const NO_RUNS = "Запусков нет";
-export const NO_STEP_SELECTED = "Выберите шаг слева";
+export const NO_STEP_SELECTED = "Выберите шаг";
 export const NO_STEP_DATA = "Нет данных";
 export const NO_STEP_LOGS = "Записей нет";
 
@@ -45,13 +45,13 @@ export const OVERLAP_LABELS: Record<ScenarioOverlap, string> = {
   queue: "Ставить в очередь",
 };
 
-export const OVERLAP_HINT = "Что делать, если триггер срабатывает во время предыдущего запуска.";
+export const OVERLAP_HINT = "Действие при срабатывании триггера во время текущего запуска.";
 
 export const TOOL_CALL_LABEL = "Вызов инструмента";
 
 export const APPROVAL_DENIED_COPY = "Разрешение на действие не получено: запрос отклонён или истёк";
 export const PERMISSION_DENIED_COPY = "Инструмент запрещён настройками разрешений";
-export const APPROVAL_PROMPT = "Шаг ждёт разрешения на инструмент";
+export const APPROVAL_PROMPT = "Требуется разрешение на вызов инструмента";
 export const APPROVAL_DECIDE_FAILED = "Не удалось передать решение по разрешению.";
 
 export function permissionCopy(code: string | null): string | null {

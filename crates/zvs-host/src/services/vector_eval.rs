@@ -33,7 +33,7 @@ use crate::platform::logger::{LogLevel, SharedLogger};
 pub const EXPECTED_MISSING: &str = "Ожидаемый документ не найден в хранилище";
 pub const CASE_NOT_FOUND: &str = "Вопрос проверки не найден";
 pub const NO_CASES: &str = "Добавьте хотя бы один вопрос для проверки";
-pub const ALREADY_RUNNING: &str = "Проверка уже идёт";
+pub const ALREADY_RUNNING: &str = "Проверка уже выполняется";
 
 #[async_trait]
 pub trait EvalSearch: Send + Sync {

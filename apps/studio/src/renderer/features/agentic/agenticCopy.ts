@@ -28,14 +28,13 @@ export const DECIDE_FAILED = "Не удалось передать решени�
 export const FOLDER_FAILED = "Не удалось выбрать папку.";
 
 export const EMPTY_TITLE = "Сессий нет";
-export const EMPTY_DESCRIPTION =
-  "Сессия составляет план и выполняет его инструментами в рабочей папке.";
+export const EMPTY_DESCRIPTION = "Создайте сессию для выполнения задачи в рабочей папке.";
 export const LOADING = "Загрузка…";
 
 export const PLAN_TITLE = "План";
 export const PLAN_EMPTY = "План ещё не составлен";
-export const PLAN_PENDING = "Изменения плана применятся на границе шага";
-export const PLAN_HINT = "Агент получит изменения плана на границе шага.";
+export const PLAN_PENDING = "Изменения плана применятся после текущего шага";
+export const PLAN_HINT = "Изменения применяются после текущего шага.";
 export const EDIT_STEP = "Переименовать шаг";
 export const DELETE_STEP = "Удалить шаг";
 export const STEP_TITLE_LABEL = "Название шага";
@@ -45,9 +44,9 @@ export const GOAL_TITLE = "Цель";
 export const STREAM_TITLE = "Ход сессии";
 export const SUMMARY_TITLE = "Итог";
 export const INSTRUCTION_LABEL = "Инструкция для агента";
-export const INSTRUCTION_PLACEHOLDER = "Инструкция для агента — будет передана после текущего шага";
+export const INSTRUCTION_PLACEHOLDER = "Инструкция после текущего шага";
 export const INSTRUCTION_SEND = "Отправить";
-export const INSTRUCTIONS_QUEUED = "Ожидают границы шага";
+export const INSTRUCTIONS_QUEUED = "Ожидают завершения шага";
 
 export const APPROVAL_TITLE = "Требуется подтверждение";
 export const APPROVE_ONCE = "Разрешить один раз";
@@ -56,17 +55,16 @@ export const DENY = "Отклонить";
 
 export const SESSION_TITLE = "Сессия";
 export const MODE_TITLE = "Режим разрешений";
-export const MODE_PENDING = "Новый режим применится на границе шага";
+export const MODE_PENDING = "Новый режим применится после текущего шага";
 export const WORKSPACE_TITLE = "Рабочая папка";
 export const CHANGED_TITLE = "Изменённые файлы";
 export const CHANGED_EMPTY = "Файлы не изменялись";
 export const BUDGET_TITLE = "Бюджет";
 
 export const FORM_GOAL = "Цель";
-export const FORM_GOAL_PLACEHOLDER = "Что нужно сделать в рабочей папке";
+export const FORM_GOAL_PLACEHOLDER = "Задача для выполнения";
 export const FORM_WORKSPACE = "Рабочая папка";
-export const FORM_WORKSPACE_HELP =
-  "Файлы и команды сессии ограничены этой папкой. Без неё сессия не запускается.";
+export const FORM_WORKSPACE_HELP = "Обязательная папка для файлов и команд сессии.";
 export const FORM_PICK_FOLDER = "Выбрать папку";
 export const FORM_NO_FOLDER = "Папка не выбрана";
 export const FORM_PROVIDER = "Провайдер";
@@ -74,7 +72,7 @@ export const FORM_MODEL = "Модель";
 export const FORM_NO_PROVIDERS = "Нет включённых провайдеров с генерацией текста";
 export const FORM_BUDGET = "Бюджет";
 export const FORM_BUDGET_HELP =
-  "Пустое поле — значение из настроек. По исчерпании сессия приостанавливается.";
+  "Если поле пустое, используется лимит из настроек. При исчерпании лимита сессия приостанавливается.";
 export const FORM_STEPS = "Шаги";
 export const FORM_TOKENS = "Токены";
 export const FORM_MINUTES = "Минуты";
@@ -95,7 +93,7 @@ export const MODE_HINTS: Record<AgenticPermissionMode, string> = {
 export const PHASE_LABELS: Record<SessionPhase, string> = {
   planning: "Составление плана",
   running: "Выполняется",
-  approval: "Ждёт подтверждения",
+  approval: "Ожидание подтверждения",
   budget: "Бюджет исчерпан",
   stopped: "Остановлена",
   failed: "Ошибка",
@@ -119,7 +117,7 @@ export const STOP_REASON_COPY: Record<AgenticStopReason, string> = {
   steps: "Исчерпан лимит шагов.",
   tokens: "Исчерпан лимит токенов.",
   time: "Исчерпан лимит времени.",
-  loop: "Агент повторял одни и те же действия, сессия остановлена.",
+  loop: "Сессия остановлена из-за повторяющихся действий.",
   cancelled: "Сессия остановлена пользователем.",
   error: "Сессия завершилась с ошибкой.",
 };
@@ -174,7 +172,7 @@ export function progressLabel(current: number | null, total: number): string {
 }
 
 export function extendLead(steps: number, tokens: number, minutes: number): string {
-  return `Новые лимиты: ${stepsWord(steps)}, ${compactNumber(tokens)} токенов, ${minutes.toLocaleString("ru-RU")} мин. План и история сохраняются.`;
+  return `Новые лимиты: ${stepsWord(steps)}, ${compactNumber(tokens)} токенов, ${minutes.toLocaleString("ru-RU")} мин.`;
 }
 
 export function removeLead(goal: string): string {

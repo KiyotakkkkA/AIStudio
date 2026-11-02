@@ -947,7 +947,10 @@ mod tests {
     #[test]
     fn a_collapsed_tool_block_shows_one_line_of_arguments_and_result() {
         let text = plain(&tool(&call("one\ntwo\nthree"), false, 0, 80));
-        assert_eq!(text[0], "   ✓ read_file   готово · 1,2 с");
+        assert_eq!(
+            text[0],
+            format!("   ✓ read_file   {} · 1,2 с", copy::TOOL_SUCCEEDED)
+        );
         assert_eq!(text[1], "    path: src/main.rs  lines: 40");
         assert_eq!(text[2], "    ⎿ one");
         assert_eq!(text[3], format!("    … {} 2", copy::MORE_LINES));

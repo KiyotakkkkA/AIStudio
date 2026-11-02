@@ -34,7 +34,7 @@ pub const SPEECH_MODELS: &[SpeechModel] = &[
         item_ref: "curated:speech:whisper-base-q8_0",
         name: "whisper-base",
         display_name: "Whisper Base",
-        description: "Лёгкая модель распознавания речи: быстро работает на любом процессоре, но чаще ошибается в длинных фразах и терминах.",
+        description: "Модель распознавания речи для компьютеров с ограниченными ресурсами. Возможны ошибки в длинных фразах и терминах.",
         version: "Q8_0",
         file_name: "ggml-base-q8_0.bin",
         size_bytes: 81_768_585,
@@ -45,7 +45,7 @@ pub const SPEECH_MODELS: &[SpeechModel] = &[
         item_ref: "curated:speech:whisper-small-q8_0",
         name: "whisper-small",
         display_name: "Whisper Small",
-        description: "Сбалансированная модель распознавания речи: уверенно распознаёт русский и английский, фраза в несколько секунд обрабатывается за секунду-две на современном процессоре.",
+        description: "Модель распознавания русской и английской речи со средними требованиями к ресурсам.",
         version: "Q8_0",
         file_name: "ggml-small-q8_0.bin",
         size_bytes: 264_464_607,
@@ -56,7 +56,7 @@ pub const SPEECH_MODELS: &[SpeechModel] = &[
         item_ref: "curated:speech:whisper-large-v3-turbo-q5_0",
         name: "whisper-large-v3-turbo",
         display_name: "Whisper Large v3 Turbo",
-        description: "Самая точная модель распознавания речи из набора: лучше справляется с акцентом, шумом и специальной лексикой. Требует мощного процессора и около 2 ГБ оперативной памяти во время работы.",
+        description: "Модель распознавания речи с повышенными требованиями к процессору. При работе требуется около 2 ГБ оперативной памяти.",
         version: "Q5_0",
         file_name: "ggml-large-v3-turbo-q5_0.bin",
         size_bytes: 574_041_195,
@@ -66,7 +66,8 @@ pub const SPEECH_MODELS: &[SpeechModel] = &[
 ];
 
 pub const ENGINE_DISPLAY_NAME: &str = "whisper.cpp · CPU";
-const ENGINE_DESCRIPTION: &str = "Движок локального распознавания речи для моделей Whisper. Считает на процессоре с ускорением OpenBLAS.";
+const ENGINE_DESCRIPTION: &str =
+    "Локальное распознавание речи моделями Whisper на процессоре с ускорением OpenBLAS.";
 const SPEECH_TAG: &str = "распознавание речи";
 
 pub fn speech_supported(platform: Platform) -> bool {

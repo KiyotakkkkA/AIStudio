@@ -10,10 +10,10 @@ import { plural } from "../connections/connectionPresentation";
 export const ASK_TOOL = "chat.ask";
 
 export const QUESTIONS_TITLE = "Уточняющие вопросы";
-export const QUESTIONS_LEAD = "Ответ продолжит выполнение запроса.";
+export const QUESTIONS_LEAD = "Выполнение запроса продолжится после ответа.";
 export const RECOMMENDED = "Рекомендуется";
 export const OTHER_OPTION = "Другое";
-export const OTHER_PLACEHOLDER = "Свой вариант";
+export const OTHER_PLACEHOLDER = "Другой вариант";
 export const TEXT_PLACEHOLDER = "Ответ";
 export const MULTIPLE_HINT = "Можно выбрать несколько вариантов";
 export const SUBMIT_ANSWERS = "Ответить";
@@ -21,7 +21,7 @@ export const SKIP_QUESTIONS = "Пропустить";
 export const QUESTIONS_SKIPPED = "Вопросы пропущены";
 export const QUESTIONS_UNANSWERED = "Вопрос остался без ответа";
 export const NO_ANSWER = "Без ответа";
-export const ANSWER_FAILED = "Не удалось отправить ответ. Попробуйте ещё раз.";
+export const ANSWER_FAILED = "Не удалось отправить ответ. Повторите попытку.";
 
 export function questionsWord(count: number): string {
   return plural(count, "вопрос", "вопроса", "вопросов");

@@ -6,14 +6,14 @@ export const VOICE_OPTIONS = "Параметры голосового ввода
 export const VOICE_DEVICE_ROW = {
   key: "voice.input.device",
   label: "Устройство записи",
-  hint: "Микрофон, с которого идёт запись голоса.",
+  hint: "Микрофон для записи речи.",
 } as const;
 export const VOICE_MODEL_ROW = {
   key: "voice.model",
   label: "Модель распознавания речи",
   hint: "Распознавание выполняется на этом компьютере. Другие модели доступны в «Загрузках».",
 } as const;
-export const VOICE_DEFAULT_DEVICE = "Как в системе";
+export const VOICE_DEFAULT_DEVICE = "Системное устройство";
 export const VOICE_DEVICE_MISSING = "Устройство не подключено";
 export const VOICE_REFRESH = "Обновить список устройств";
 export const VOICE_SETUP = "Настроить";

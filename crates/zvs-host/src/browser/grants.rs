@@ -8,7 +8,8 @@ use crate::data::{Database, Repositories};
 use crate::platform::clock::SharedClock;
 use crate::platform::ids::new_id;
 
-pub const NOT_GRANTABLE: &str = "Это действие подтверждается каждый раз и не выдаётся сайту";
+pub const NOT_GRANTABLE: &str =
+    "Для этого действия требуется отдельное подтверждение при каждом вызове";
 pub const NOT_A_SITE: &str = "Разрешение выдаётся только сайту с адресом HTTP или HTTPS";
 
 #[derive(Debug, Clone, PartialEq, Eq)]

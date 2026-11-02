@@ -19,17 +19,17 @@ pub const CALLBACK_PATH: &str = "/callback";
 pub const SIGN_IN_TIMEOUT: Duration = Duration::from_secs(300);
 pub const REFRESH_MARGIN_MS: Timestamp = 60_000;
 pub const AUTH_REQUIRED: &str =
-    "Сервер требует входа: нажмите «Войти», чтобы авторизоваться в браузере";
+    "Требуется вход на сервер. Выберите «Войти» для авторизации в браузере";
 pub const SIGN_IN_CANCELLED: &str = "Вход отменён";
 pub const SIGN_IN_TIMED_OUT: &str = "Вход не завершён за 5 минут";
 const MAX_REQUEST_BYTES: usize = 16 * 1024;
 const CALLBACK_PAGE: &str = include_str!("oauth_callback.html");
 const PAGE_DONE_TITLE: &str = "Вход выполнен";
-const PAGE_DONE: &str = "Сервис успешно подключен.";
-const PAGE_DONE_HINT: &str = "Вернитесь в ZVS AI Studio — эту вкладку можно закрыть.";
+const PAGE_DONE: &str = "Сервис подключён.";
+const PAGE_DONE_HINT: &str = "Закройте вкладку и вернитесь в ZVS AI Studio.";
 const PAGE_FAILED_TITLE: &str = "Вход не выполнен";
 const PAGE_FAILED: &str = "Сервер авторизации не подтвердил вход.";
-const PAGE_FAILED_HINT: &str = "Вернитесь в ZVS AI Studio и нажмите «Войти» ещё раз.";
+const PAGE_FAILED_HINT: &str = "Повторите вход в ZVS AI Studio.";
 const ICON_DONE: &str = "M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z";
 const ICON_FAILED: &str = "M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z";
 

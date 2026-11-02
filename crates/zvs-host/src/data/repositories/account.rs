@@ -6,7 +6,7 @@ use crate::data::repositories::{SecretRepository, SecretUsageDraft};
 use crate::data::schema::{AccountRow, SecretConsumerKind};
 use crate::platform::ids::new_id;
 
-pub const NO_ACCOUNT_LINKED: &str = "no account linked";
+pub const NO_ACCOUNT_LINKED: &str = "Аккаунт не привязан";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AccountDraft {

@@ -26,8 +26,7 @@ pub const LOCAL_CAPABILITIES: AdapterCapabilities = AdapterCapabilities {
 
 pub const WEIGHT_EXTENSIONS: [&str; 4] = ["gguf", "safetensors", "bin", "onnx"];
 pub const MODEL_DIRECTORIES: [&str; 2] = ["models", "embeddings"];
-pub const NO_ENGINE_MESSAGE: &str =
-    "Локальный движок эмбеддингов не подключён: файл модели виден, но посчитать вектор нечем";
+pub const NO_ENGINE_MESSAGE: &str = "Локальный движок эмбеддингов не подключён";
 
 #[async_trait]
 pub trait LocalModelStore: Send + Sync {

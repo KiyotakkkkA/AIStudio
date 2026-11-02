@@ -14,13 +14,13 @@ export const PANEL_OFF = "Использование памяти отключе
 export const ENABLED_ROW = {
   key: "memory.enabled",
   label: "Память",
-  hint: "Добавлять сохранённые факты о вас при генерации ответа",
+  hint: "Использовать сохранённые факты при формировании ответа.",
 } as const;
 
 export const MODEL_ROW = {
   key: "memory.model",
   label: "Сохранение моделью",
-  hint: "Разрешить модели сохранять, изменять и удалять данные о вас.",
+  hint: "Разрешить модели добавлять, изменять и удалять записи памяти.",
 } as const;
 
 export const SCOPE_TABS_LABEL = "Область памяти";
@@ -29,7 +29,7 @@ export const ACCOUNT_TAB = "Общая";
 export const DIALOG_TAB = "Диалоги";
 export const ACCOUNT_HINT = "Факты о пользователе. Доступны во всех диалогах.";
 export const DIALOG_HINT = "Факты одного диалога. Удаляются вместе с ним.";
-export const ACCOUNT_PLACEHOLDER = "Новый факт, например: отвечать кратко, примеры кода — на Rust";
+export const ACCOUNT_PLACEHOLDER = "Новая запись общей памяти";
 export const DIALOG_PLACEHOLDER = "Новый факт для выбранного диалога";
 export const DIALOG_PICKER = "Выберите диалог";
 export const ADD = "Добавить";
@@ -39,10 +39,10 @@ export const EDIT = "Изменить";
 export const REMOVE = "Удалить";
 export const CLEAR = "Очистить";
 export const ACCOUNT_EMPTY_TITLE = "Общая память пуста";
-export const ACCOUNT_EMPTY = "Добавьте факт вручную или попросите модель его запомнить.";
+export const ACCOUNT_EMPTY = "Добавьте запись.";
 export const DIALOG_EMPTY_TITLE = "Память диалогов пуста";
-export const DIALOG_EMPTY = "Модель сохраняет факты по ходу диалога.";
-export const NO_DIALOGS = "Диалогов нет: факт можно добавить после первого диалога.";
+export const DIALOG_EMPTY = "Выберите диалог и добавьте запись.";
+export const NO_DIALOGS = "Диалогов нет. Создайте диалог для добавления записи.";
 export const LOADING = "Загрузка памяти…";
 export const SOURCE_USER = "Вручную";
 export const SOURCE_MODEL = "Модель";
@@ -53,8 +53,8 @@ export const CLEAR_DIALOG_TITLE = "Очистить память диалога"
 export const CLEAR_CONSEQUENCE = "Записи будут удалены без возможности восстановления.";
 export const REMOVE_TITLE = "Удалить запись";
 
-export const LOAD_ERROR = "Не удалось загрузить память. Попробуйте ещё раз.";
-const SAVE_ERROR = "Не удалось сохранить запись. Попробуйте ещё раз.";
+export const LOAD_ERROR = "Не удалось загрузить память. Повторите попытку.";
+const SAVE_ERROR = "Не удалось сохранить запись. Повторите попытку.";
 export const ALREADY_REMOVED = "Запись уже удалена.";
 
 const HOST_WORDED = new Set<AppErrorCode>([AppErrorCode.CONFLICT]);
