@@ -86,15 +86,16 @@ pub use chat::{
     ChatCarriedPartDto, ChatCarriedStatus, ChatCitationDto, ChatCommand, ChatCommandDto,
     ChatCommandsOutput, ChatContextDto, ChatContextInput, ChatContextToolDto,
     ChatConversationsListOutput, ChatEvalCaseDto, ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto,
-    ChatEventDto, ChatHistoryEntryDto, ChatHistoryStatus, ChatPromptSection, ChatPromptSectionDto,
-    ChatRoundDto, ChatSendInput, ChatSettings, ChatStatsDto, ChatToolCallDto, ChatToolCallStatus,
-    ChatWakeStepDto, ConversationDetailDto, ConversationDto, ConversationExportDto,
-    ConversationExportFormat, ConversationRef, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
-    DocumentSelectionDto, ExportConversationInput, MessageDto, MessageRole, OfferedToolDto,
-    OfferedToolSource, PinConversationInput, PinMessageInput, RenameConversationInput,
-    RetrievalMode, ThinkingEffort, TruncateConversationInput, UpdateConversationRelationsInput,
-    UpdateConversationRetrievalInput, UpdateConversationStoresInput, VendorTurnOptions,
-    WAKE_STEP_DOMAIN, WEB_SOURCES_MAX, WebSourceDto,
+    ChatEventDto, ChatHistoryEntryDto, ChatHistoryStatus, ChatPluginDto, ChatPromptSection,
+    ChatPromptSectionDto, ChatRoundDto, ChatSendInput, ChatSettings, ChatStatsDto, ChatToolCallDto,
+    ChatToolCallStatus, ChatWakeStepDto, ConversationDetailDto, ConversationDto,
+    ConversationExportDto, ConversationExportFormat, ConversationRef, CreateConversationInput,
+    DEFAULT_CONVERSATION_TITLE, DocumentSelectionDto, ExportConversationInput, MessageDto,
+    MessageRole, OfferedToolDto, OfferedToolSource, PinConversationInput, PinMessageInput,
+    RenameConversationInput, RetrievalMode, ThinkingEffort, TruncateConversationInput,
+    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    UpdateConversationStoresInput, VendorTurnOptions, WAKE_STEP_DOMAIN, WEB_SOURCES_MAX,
+    WebSourceDto,
 };
 pub use cli::{
     CLI_COMMAND, CLI_LAUNCH_ARG, CLI_LINE_MAX, CLI_PIPE_PREFIX, CLI_PROTOCOL_VERSION,
@@ -231,9 +232,8 @@ pub use scenarios::{
 };
 pub use secrets::{
     CreateSecretInput, FieldDefault, FieldDescriptor, FieldKind, FieldOption, RotationStatus,
-    SecretDto, SecretFields, SecretFilter, SecretInput, SecretRef, SecretScope, SecretSummaryDto,
-    SecretTypeKey, SecretTypeSchema, SecretsListOutput, SecretsRemoveOutput, SecretsTypesOutput,
-    UpdateSecretInput, find_secret_type_schema, is_secret_type_key, secret_type_registry,
+    SecretDto, SecretFilter, SecretInput, SecretRef, SecretScope, SecretSummaryDto,
+    SecretsListOutput, SecretsRemoveOutput, UpdateSecretInput,
 };
 pub use settings::{
     SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, check_setting_key,

@@ -271,7 +271,7 @@ test("the composer refuses an empty goal with a reason and locks while a goal ru
   const { store, bridge, detail } = chat(null);
   await store.mount();
   await store.select(detail.id);
-  store.completeCommand("goal");
+  store.composer.addCommand("goal");
   expect(store.goalCommand).toBe(true);
   await store.send();
   expect(store.goalEmpty).toBe(true);

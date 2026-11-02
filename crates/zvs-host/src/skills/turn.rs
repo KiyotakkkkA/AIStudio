@@ -176,6 +176,7 @@ mod tests {
             read_only: true,
             source: zvs_contract::OfferedToolSource::Base,
             server: None,
+            plugin: None,
         };
         assert_eq!(
             presented(

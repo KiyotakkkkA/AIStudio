@@ -296,6 +296,7 @@ pub fn delegate_tool(offered: &[OfferedTool]) -> OfferedTool {
         read_only: false,
         source: zvs_contract::OfferedToolSource::Base,
         server: None,
+        plugin: None,
     }
 }
 

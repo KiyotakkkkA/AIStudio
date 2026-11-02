@@ -1,20 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import {
-  buildFieldsSchema,
-  findSecretTypeSchema,
-  SECRET_TYPE_REGISTRY,
-  type SecretDto,
-  type SecretId,
-} from "@zvs/shared";
+import type { SecretDto, SecretId } from "@zvs/shared";
 import { SecretFormVm } from "../../src/renderer/features/secrets/SecretFormVm.ts";
 
 const ID = "0199aa11-1111-7111-8111-000000000042" as SecretId;
 
-function ollamaSecret(overrides: Partial<SecretDto> = {}): SecretDto {
+function storedSecret(overrides: Partial<SecretDto> = {}): SecretDto {
   return {
     id: ID,
-    type: "ollama",
     name: "Ollama — личный",
     scope: "personal",
     hint: "osk_live_••••4f2a",
@@ -23,60 +16,31 @@ function ollamaSecret(overrides: Partial<SecretDto> = {}): SecretDto {
     rotationStatus: "ok",
     rotatesAt: null,
     updatedAt: 1_700_000_000_000,
-    fields: { baseUrl: "https://ollama.com/api" },
     note: "Только для локальных экспериментов",
     ...overrides,
   };
 }
 
-test("switching the type swaps the credential fields and keeps name and scope", () => {
-  const vm = new SecretFormVm(SECRET_TYPE_REGISTRY, ollamaSecret({ scope: "shared" }));
-  assert.deepEqual(
-    vm.credentialFields.map((field) => field.key),
-    ["baseUrl"],
-  );
-
-  vm.setType("openrouter");
-
-  assert.equal(vm.name, "Ollama — личный");
-  assert.equal(vm.scope, "shared");
-  assert.deepEqual(
-    vm.credentialFields.map((field) => field.key),
-    ["baseUrl", "referer"],
-  );
-  assert.equal(vm.fieldValues.baseUrl, "https://openrouter.ai/api/v1");
-  assert.equal(vm.schemaChip, "openrouter@1");
-});
-
-test("defaults from the registry prefill a new form", () => {
-  const vm = new SecretFormVm(SECRET_TYPE_REGISTRY);
-
-  assert.equal(vm.type, "ollama");
+test("a new form starts clean and sends only a name, scope, value and metadata", () => {
+  const vm = new SecretFormVm();
   assert.equal(vm.isNew, true);
-  assert.equal(vm.fieldValues.baseUrl, "https://ollama.com/api");
   assert.equal(vm.dirty, false);
-});
 
-test("client validation agrees with the host schema on a malformed field", () => {
-  const vm = new SecretFormVm(SECRET_TYPE_REGISTRY);
-  vm.setName("Ollama");
-  vm.setValue("osk_live_secret");
-  vm.setField("baseUrl", "не ссылка");
+  vm.setName("Бот Telegram");
+  vm.setValue("123456:token");
+  vm.setTags(["telegram"]);
 
-  assert.equal(vm.validate(), false);
-  assert.equal(vm.errorOf("fields.baseUrl") !== undefined, true);
-
-  const schema = findSecretTypeSchema("ollama");
-  if (schema === undefined) throw new Error("В реестре нет схемы ollama");
-  assert.equal(buildFieldsSchema(schema).safeParse(vm.fieldsPayload()).success, false);
-
-  vm.setField("baseUrl", "https://ollama.com/api");
   assert.equal(vm.validate(), true);
-  assert.equal(buildFieldsSchema(schema).safeParse(vm.fieldsPayload()).success, true);
+  assert.deepEqual(vm.toCreateInput(), {
+    name: "Бот Telegram",
+    scope: "personal",
+    value: "123456:token",
+    tags: ["telegram"],
+  });
 });
 
-test("a new secret of a type with a required secret field demands a value", () => {
-  const vm = new SecretFormVm(SECRET_TYPE_REGISTRY);
+test("a new secret demands a value", () => {
+  const vm = new SecretFormVm();
   vm.setName("Ollama");
 
   assert.equal(vm.valueRequired, true);
@@ -89,7 +53,7 @@ test("a new secret of a type with a required secret field demands a value", () =
 });
 
 test("editing without touching the value omits it from the update payload", () => {
-  const vm = new SecretFormVm(SECRET_TYPE_REGISTRY, ollamaSecret());
+  const vm = new SecretFormVm(storedSecret());
   vm.setName("Ollama — рабочий");
 
   assert.equal(vm.valueRequired, false);
@@ -98,16 +62,24 @@ test("editing without touching the value omits it from the update payload", () =
   const payload = vm.toUpdateInput();
   assert.equal(Object.hasOwn(payload, "value"), false);
   assert.equal(payload.name, "Ollama — рабочий");
-  assert.deepEqual(payload.fields, { baseUrl: "https://ollama.com/api" });
 
   vm.setValue("osk_live_new");
   assert.equal(vm.toUpdateInput().value, "osk_live_new");
 });
 
 test("the form reports dirty only after a real change", () => {
-  const vm = new SecretFormVm(SECRET_TYPE_REGISTRY, ollamaSecret());
+  const vm = new SecretFormVm(storedSecret());
   assert.equal(vm.dirty, false);
 
   vm.setNote("Другая заметка");
   assert.equal(vm.dirty, true);
+});
+
+test("a copy keeps the configuration and asks for the value again", () => {
+  const vm = new SecretFormVm(storedSecret({ scope: "shared" }), true);
+  assert.equal(vm.isNew, true);
+  assert.equal(vm.name, "Ollama — личный (копия)");
+  assert.equal(vm.scope, "shared");
+  assert.equal(vm.dirty, true);
+  assert.equal(vm.validate(), false);
 });

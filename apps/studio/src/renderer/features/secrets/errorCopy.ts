@@ -35,18 +35,8 @@ const COPY: Record<AppErrorCode, string> = {
   [AppErrorCode.NOT_IMPLEMENTED]: "Функция недоступна.",
 };
 
-const ISSUE_COPY: Record<string, string> = {
-  invalid_type: "Некорректное значение.",
-  invalid_format: "Некорректный формат.",
-  invalid_value: "Недопустимое значение.",
-  too_small: "Обязательное поле.",
-  too_big: "Значение слишком длинное.",
-  unrecognized_keys: "Неизвестное поле.",
-};
-
 const FIELD_COPY: Record<string, string> = {
   name: "Укажите название.",
-  type: "Неизвестный тип секрета.",
   value: "Укажите значение секрета.",
 };
 
@@ -60,19 +50,7 @@ export function fieldErrorsFrom(error: unknown): Record<string, string> {
   const details = error.details ?? {};
   const field = typeof details.field === "string" ? details.field : undefined;
   if (field === undefined) return {};
-  if (field !== "fields") return { [field]: FIELD_COPY[field] ?? "Некорректное значение." };
-
-  const issues = Array.isArray(details.issues) ? details.issues : [];
-  const errors: Record<string, string> = {};
-  for (const issue of issues) {
-    if (typeof issue !== "object" || issue === null) continue;
-    const entry = issue as { path?: unknown; code?: unknown };
-    const path = typeof entry.path === "string" && entry.path.length > 0 ? entry.path : "";
-    const code = typeof entry.code === "string" ? entry.code : "";
-    const key = path.length === 0 ? "fields" : `fields.${path}`;
-    errors[key] = ISSUE_COPY[code] ?? "Некорректное значение.";
-  }
-  return Object.keys(errors).length > 0 ? errors : { fields: "Проверьте заполненные поля." };
+  return { [field]: FIELD_COPY[field] ?? "Некорректное значение." };
 }
 
 export function consumersFrom(error: unknown): SecretConsumerRef[] {

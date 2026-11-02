@@ -2,12 +2,14 @@ import { z } from "zod";
 import {
   ConversationId,
   DocumentId,
+  IntegrationId,
   MessageId,
   ProviderId,
   RunId,
   VectorStoreId,
 } from "./primitives/branded.js";
 import { Json } from "./primitives/json.js";
+import { IntegrationKind } from "./integrations.js";
 import { FolderGrantScope, FolderPath, WorkingFolderAccess } from "./folders.js";
 import { ToolKey } from "./tools/ToolDto.js";
 import { WebUrl } from "./sites.js";
@@ -102,6 +104,25 @@ export type WebSourceDto = z.infer<typeof WebSourceDto>;
 export const CHAT_COMMANDS = ["browser-use", "goal"] as const;
 export const ChatCommand = z.enum(CHAT_COMMANDS);
 export type ChatCommand = z.infer<typeof ChatCommand>;
+export const CHAT_COMMANDS_MAX = 8;
+export const CHAT_PLUGINS_MAX = 16;
+function distinct(items: readonly unknown[]): boolean {
+  return new Set(items).size === items.length;
+}
+export const ChatCommands = z
+  .array(ChatCommand)
+  .max(CHAT_COMMANDS_MAX)
+  .refine(distinct, { message: "unique" });
+export const ChatPluginIds = z
+  .array(IntegrationId)
+  .max(CHAT_PLUGINS_MAX)
+  .refine(distinct, { message: "unique" });
+export const ChatPluginDto = z.object({
+  accountId: IntegrationId,
+  kind: IntegrationKind,
+  name: z.string().trim().min(1).max(120),
+});
+export type ChatPluginDto = z.infer<typeof ChatPluginDto>;
 export const ChatCommandDto = z.object({
   command: ChatCommand,
   description: z.string().trim().min(1).max(500),
@@ -291,7 +312,8 @@ export const MessageDto = z
     citations: z.array(ChatCitationDto),
     toolCalls: z.array(ChatToolCallDto).default([]),
     selections: Selections.default([]),
-    command: ChatCommand.optional(),
+    commands: ChatCommands.default([]),
+    plugins: z.array(ChatPluginDto).max(CHAT_PLUGINS_MAX).default([]),
     offeredTools: z.array(OfferedToolDto).default([]),
     webSources: z.array(WebSourceDto).max(WEB_SOURCES_MAX).default([]),
     rounds: z.array(ChatRoundDto).default([]),
@@ -330,7 +352,8 @@ export const ChatSendInput = z.object({
   modelId: z.string().min(1).optional(),
   settings: ChatSettings.optional(),
   selections: Selections.default([]),
-  command: ChatCommand.optional(),
+  commands: ChatCommands.default([]),
+  plugins: ChatPluginIds.default([]),
   vendor: VendorTurnOptions.optional(),
 });
 export type ChatSendInput = z.infer<typeof ChatSendInput>;
@@ -371,7 +394,8 @@ export const ChatContextInput = z.object({
   modelId: z.string().min(1),
   settings: ChatSettings.optional(),
   systemPrompt: z.string().max(100000).optional(),
-  command: ChatCommand.optional(),
+  commands: ChatCommands.default([]),
+  plugins: ChatPluginIds.default([]),
 });
 export type ChatContextInput = z.infer<typeof ChatContextInput>;
 export const ChatContextToolDto = z.object({

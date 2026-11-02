@@ -267,7 +267,6 @@ mod tests {
                 "secrets.get",
                 "secrets.list",
                 "secrets.remove",
-                "secrets.types",
                 "secrets.update",
                 "settings.get",
                 "settings.set",

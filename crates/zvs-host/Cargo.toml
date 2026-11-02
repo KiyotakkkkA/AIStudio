@@ -22,7 +22,7 @@ mail-parser = { version = "=1.0.1", features = ["full_encoding"] }
 notify.workspace = true
 portable-pty.workspace = true
 regex.workspace = true
-reqwest = { workspace = true, features = ["system-proxy", "json"] }
+reqwest = { workspace = true, features = ["system-proxy", "json", "multipart"] }
 rmcp.workspace = true
 rusqlite.workspace = true
 rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }

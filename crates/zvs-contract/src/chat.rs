@@ -7,7 +7,10 @@ use crate::events::{ApprovalRequestDto, EventSeq};
 use crate::exec_policy::ToolAuthorisationDto;
 use crate::folders::{WorkingFolderAccess, check_folder_path};
 use crate::goal::ChatGoalDto;
-use crate::ids::{ConversationId, DocumentId, MessageId, ProviderId, RunId, VectorStoreId};
+use crate::ids::{
+    ConversationId, DocumentId, IntegrationId, MessageId, ProviderId, RunId, VectorStoreId,
+};
+use crate::integrations::{INTEGRATION_NAME_MAX, IntegrationKind};
 use crate::primitives::{Json, Timestamp};
 use crate::questions::QuestionRequestDto;
 use crate::runs::RunHandleDto;
@@ -22,6 +25,8 @@ pub const SYSTEM_PROMPT_MAX: usize = 100_000;
 pub const CHAT_TEXT_MAX: usize = 100_000;
 pub const ATTACHED_STORES_MAX: usize = 64;
 pub const CHAT_SELECTIONS_MAX: usize = 8;
+pub const CHAT_COMMANDS_MAX: usize = 8;
+pub const CHAT_PLUGINS_MAX: usize = 16;
 pub const SELECTION_TEXT_MAX: usize = 8_000;
 pub const SELECTION_NAME_MAX: usize = 1024;
 pub const WEB_SOURCE_URL_MAX: usize = 4096;
@@ -570,6 +575,45 @@ fn check_selections(selections: &[DocumentSelectionDto]) -> Result<(), AppError>
 }
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatPluginDto {
+    pub account_id: IntegrationId,
+    pub kind: IntegrationKind,
+    pub name: String,
+}
+
+impl Validate for ChatPluginDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::trimmed_name("name", &self.name, INTEGRATION_NAME_MAX)
+    }
+}
+
+fn check_commands(commands: &[ChatCommand]) -> Result<(), AppError> {
+    if commands.len() > CHAT_COMMANDS_MAX {
+        return Err(invalid("commands", "maxItems"));
+    }
+    for (index, command) in commands.iter().enumerate() {
+        if commands[..index].contains(command) {
+            return Err(invalid(&format!("commands.{index}"), "unique"));
+        }
+    }
+    Ok(())
+}
+
+fn check_plugins(plugins: &[IntegrationId]) -> Result<(), AppError> {
+    if plugins.len() > CHAT_PLUGINS_MAX {
+        return Err(invalid("plugins", "maxItems"));
+    }
+    for (index, plugin) in plugins.iter().enumerate() {
+        if plugins[..index].contains(plugin) {
+            return Err(invalid(&format!("plugins.{index}"), "unique"));
+        }
+    }
+    Ok(())
+}
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageDto {
@@ -584,8 +628,10 @@ pub struct MessageDto {
     pub tool_calls: Vec<ChatToolCallDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub selections: Vec<DocumentSelectionDto>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub command: Option<ChatCommand>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub commands: Vec<ChatCommand>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plugins: Vec<ChatPluginDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub offered_tools: Vec<OfferedToolDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -625,6 +671,11 @@ impl Validate for MessageDto {
         nested("citations", self.citations.validate())?;
         nested("toolCalls", self.tool_calls.validate())?;
         nested("offeredTools", self.offered_tools.validate())?;
+        check_commands(&self.commands)?;
+        if self.plugins.len() > CHAT_PLUGINS_MAX {
+            return Err(invalid("plugins", "maxItems"));
+        }
+        nested("plugins", self.plugins.validate())?;
         if self.web_sources.len() > WEB_SOURCES_MAX {
             return Err(invalid("webSources", "maxItems"));
         }
@@ -679,12 +730,10 @@ pub struct ChatSendInput {
     pub settings: Option<ChatSettings>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub selections: Vec<DocumentSelectionDto>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub command: Option<ChatCommand>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub commands: Vec<ChatCommand>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plugins: Vec<IntegrationId>,
     #[serde(default, skip_serializing_if = "VendorTurnOptions::is_default")]
     pub vendor: VendorTurnOptions,
 }
@@ -698,7 +747,8 @@ impl ChatSendInput {
             model_id: None,
             settings: None,
             selections: Vec::new(),
-            command: None,
+            commands: Vec::new(),
+            plugins: Vec::new(),
             vendor: VendorTurnOptions::default(),
         }
     }
@@ -717,6 +767,8 @@ impl Validate for ChatSendInput {
         if let Some(settings) = &self.settings {
             nested("settings", settings.validate())?;
         }
+        check_commands(&self.commands)?;
+        check_plugins(&self.plugins)?;
         check_selections(&self.selections)
     }
 }
@@ -744,12 +796,10 @@ pub struct ChatContextInput {
         deserialize_with = "crate::wire::present"
     )]
     pub system_prompt: Option<String>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub command: Option<ChatCommand>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub commands: Vec<ChatCommand>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plugins: Vec<IntegrationId>,
 }
 
 impl Validate for ChatContextInput {
@@ -761,7 +811,8 @@ impl Validate for ChatContextInput {
         if let Some(prompt) = &self.system_prompt {
             check::max_len("systemPrompt", prompt, SYSTEM_PROMPT_MAX)?;
         }
-        Ok(())
+        check_commands(&self.commands)?;
+        check_plugins(&self.plugins)
     }
 }
 
@@ -1253,19 +1304,33 @@ mod tests {
             parse::<ChatSendInput>(json!({ "conversationId": CONVERSATION, "text": " hi " }))
                 .expect("parses");
         assert_eq!(input.text(), "hi");
-        assert_eq!(input.command, None);
+        assert!(input.commands.is_empty());
+        assert!(input.plugins.is_empty());
         let command = parse::<ChatSendInput>(json!({
             "conversationId": CONVERSATION,
             "text": "открой сайт",
-            "command": "browser-use"
+            "commands": ["browser-use", "goal"],
+            "plugins": ["0199aa11-1111-7111-8111-000000000001", "0199aa11-1111-7111-8111-000000000002"]
         }))
         .expect("parses");
-        assert_eq!(command.command, Some(ChatCommand::BrowserUse));
+        assert_eq!(
+            command.commands,
+            [ChatCommand::BrowserUse, ChatCommand::Goal]
+        );
+        assert_eq!(command.plugins.len(), 2);
         assert!(
             parse::<ChatSendInput>(json!({
                 "conversationId": CONVERSATION,
                 "text": "x",
-                "command": "unknown"
+                "commands": ["unknown"]
+            }))
+            .is_err()
+        );
+        assert!(
+            parse::<ChatSendInput>(json!({
+                "conversationId": CONVERSATION,
+                "text": "x",
+                "commands": ["goal", "goal"]
             }))
             .is_err()
         );

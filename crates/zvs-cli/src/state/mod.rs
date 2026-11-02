@@ -1696,7 +1696,7 @@ impl App {
             self.goal_stop_armed = false;
         }
         let mut input = ChatSendInput::new(id, text);
-        input.command = command;
+        input.commands = command.into_iter().collect();
         input.vendor.effort = Some(self.effort);
         if let Some(model) = &self.model
             && self

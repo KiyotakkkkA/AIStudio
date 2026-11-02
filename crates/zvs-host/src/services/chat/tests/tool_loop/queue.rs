@@ -297,7 +297,7 @@ async fn sending_now_during_a_goal_keeps_the_goal_and_continues_it_with_the_queu
         .harness
         .chat
         .send(&ChatSendInput {
-            command: Some(ChatCommand::Goal),
+            commands: vec![ChatCommand::Goal],
             ..ChatSendInput::new(created, "Удали лишнее")
         })
         .expect("starts a goal");
@@ -330,7 +330,7 @@ async fn sending_now_during_a_goal_keeps_the_goal_and_continues_it_with_the_queu
         .find(|message| message.content == "Только временные файлы")
         .expect("the queued message");
     assert_eq!(queued.role, MessageRole::User);
-    assert_eq!(queued.command, Some(ChatCommand::Goal));
+    assert_eq!(queued.commands, [ChatCommand::Goal]);
     let requests = test.driver.requests();
     assert!(
         requests[1]

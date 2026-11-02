@@ -1559,13 +1559,13 @@ fn a_goal_is_sent_with_its_command_and_a_bare_goal_only_hints() {
     let Some(Request::Send(input)) = requests.first() else {
         panic!("sends: {requests:?}");
     };
-    assert_eq!(input.command, Some(ChatCommand::Goal));
+    assert_eq!(input.commands, [ChatCommand::Goal]);
     assert_eq!(input.text, "добавить тесты");
     assert!(app.goal.is_some_and(|goal| goal.active()));
     let Request::Send(plain) = app.send(conversation().id, "вопрос".to_owned(), None) else {
         panic!("a send");
     };
-    assert_eq!(plain.command, None);
+    assert!(plain.commands.is_empty());
 }
 
 #[test]
@@ -1583,7 +1583,7 @@ fn a_goal_for_a_new_dialog_keeps_its_command_until_the_dialog_is_bound() {
     let Some(Request::Send(input)) = requests.first() else {
         panic!("sends: {requests:?}");
     };
-    assert_eq!(input.command, Some(ChatCommand::Goal));
+    assert_eq!(input.commands, [ChatCommand::Goal]);
     assert_eq!(app.pending_command, None);
 }
 

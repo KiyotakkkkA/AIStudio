@@ -28,7 +28,6 @@ pub struct SecretRow {
     pub scope: SecretScope,
     pub cipher_version: i64,
     pub hint: Option<String>,
-    pub fields: String,
     pub tags: String,
     pub note: Option<String>,
     pub rotation_days: Option<i64>,
@@ -38,7 +37,7 @@ pub struct SecretRow {
 }
 
 impl SecretRow {
-    pub const COLUMNS: &str = "id, type, name, scope, cipher_version, hint, fields, tags, note, rotation_days, rotates_at, created_at, updated_at";
+    pub const COLUMNS: &str = "id, type, name, scope, cipher_version, hint, tags, note, rotation_days, rotates_at, created_at, updated_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -48,7 +47,6 @@ impl SecretRow {
             scope: row.get::<_, ScopeColumn>("scope")?.0,
             cipher_version: row.get("cipher_version")?,
             hint: row.get("hint")?,
-            fields: row.get("fields")?,
             tags: row.get("tags")?,
             note: row.get("note")?,
             rotation_days: row.get("rotation_days")?,

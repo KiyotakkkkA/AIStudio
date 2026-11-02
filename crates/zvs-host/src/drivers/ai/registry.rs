@@ -755,7 +755,7 @@ mod tests {
         let key = secrets
             .create(SecretCreateInput {
                 value: Some(Plaintext::new("sk-first")),
-                ..SecretCreateInput::new("custom", "Key", SecretScope::Personal)
+                ..SecretCreateInput::new("user", "Key", SecretScope::Personal)
             })
             .expect("a secret");
         let row = fixture.create(&ProviderDraft {
@@ -829,7 +829,6 @@ mod tests {
                         cipher: None,
                         cipher_version: 1,
                         hint: None,
-                        fields: "{}".to_owned(),
                         tags: "[]".to_owned(),
                         note: None,
                         rotation_days: None,

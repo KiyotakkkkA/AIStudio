@@ -3,6 +3,7 @@ import {
   CHAT_SELECTIONS_MAX,
   type ChatCommand,
   type DocumentSelectionDto,
+  type IntegrationId,
   type ProviderDto,
   type ProviderId,
   type RetrievalMode,
@@ -19,7 +20,8 @@ export default class ConversationVm {
   attachedStoreIds: VectorStoreId[] = [];
   useRelations = false;
   retrievalMode: RetrievalMode = "hybrid";
-  command: ChatCommand | null = null;
+  commands: ChatCommand[] = [];
+  plugins: IntegrationId[] = [];
   selections: DocumentSelectionDto[] = [];
   effort: ThinkingEffort = "auto";
   webSearch = false;
@@ -74,8 +76,28 @@ export default class ConversationVm {
   setWebSearch(value: boolean) {
     this.webSearch = value;
   }
-  setCommand(value: ChatCommand | null) {
-    this.command = value;
+  addCommand(value: ChatCommand) {
+    if (!this.commands.includes(value)) this.commands = [...this.commands, value];
+  }
+  removeCommand(value: ChatCommand) {
+    this.commands = this.commands.filter((command) => command !== value);
+  }
+  addPlugin(value: IntegrationId) {
+    if (!this.plugins.includes(value)) this.plugins = [...this.plugins, value];
+  }
+  removePlugin(value: IntegrationId) {
+    this.plugins = this.plugins.filter((plugin) => plugin !== value);
+  }
+  get hasAttachments() {
+    return this.commands.length > 0 || this.plugins.length > 0;
+  }
+  removeLastAttachment() {
+    if (this.plugins.length > 0) this.plugins = this.plugins.slice(0, -1);
+    else this.commands = this.commands.slice(0, -1);
+  }
+  clearAttachments() {
+    this.commands = [];
+    this.plugins = [];
   }
   selectProvider(provider: ProviderDto) {
     this.providerId = provider.id;

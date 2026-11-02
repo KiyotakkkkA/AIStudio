@@ -1,8 +1,8 @@
 use rusqlite::Row;
 use zvs_contract::{
-    ChatCitationDto, ChatCommand, ChatEventDto, ChatGoalDto, ChatRoundDto, ChatSettings,
-    ChatToolCallDto, DocumentSelectionDto, MessageRole, OfferedToolDto, RetrievalMode, Timestamp,
-    WebSourceDto,
+    ChatCitationDto, ChatCommand, ChatEventDto, ChatGoalDto, ChatPluginDto, ChatRoundDto,
+    ChatSettings, ChatToolCallDto, DocumentSelectionDto, MessageRole, OfferedToolDto,
+    RetrievalMode, Timestamp, WebSourceDto,
 };
 
 use super::columns::{EnumColumn, json_column, optional_json_column};
@@ -64,7 +64,8 @@ pub struct MessageRow {
     pub citations: Vec<ChatCitationDto>,
     pub tool_calls: Vec<ChatToolCallDto>,
     pub selections: Vec<DocumentSelectionDto>,
-    pub command: Option<ChatCommand>,
+    pub commands: Vec<ChatCommand>,
+    pub plugins: Vec<ChatPluginDto>,
     pub offered_tools: Vec<OfferedToolDto>,
     pub web_sources: Vec<WebSourceDto>,
     pub rounds: Vec<ChatRoundDto>,
@@ -84,7 +85,7 @@ pub struct MessageRow {
 impl MessageRow {
     pub const COLUMNS: &str = "id, conversation_id, role, content, reasoning, citations, \
         (SELECT json_group_array(json(call) ORDER BY idx) FROM message_tool_call \
-        WHERE message_id = message.id) AS tool_calls, selections, command, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, \
+        WHERE message_id = message.id) AS tool_calls, selections, commands, plugins, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, \
         pinned, event, created_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
@@ -97,9 +98,8 @@ impl MessageRow {
             citations: json_column(row, "citations")?,
             tool_calls: json_column(row, "tool_calls")?,
             selections: json_column(row, "selections")?,
-            command: row
-                .get::<_, Option<EnumColumn<ChatCommand>>>("command")?
-                .map(|column| column.0),
+            commands: json_column(row, "commands")?,
+            plugins: json_column(row, "plugins")?,
             offered_tools: json_column(row, "offered_tools")?,
             web_sources: json_column(row, "web_sources")?,
             rounds: json_column(row, "rounds")?,

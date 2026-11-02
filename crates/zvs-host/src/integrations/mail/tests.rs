@@ -90,7 +90,7 @@ impl Rig {
             .secrets
             .create(SecretCreateInput {
                 value: Some(Plaintext::new(value)),
-                ..SecretCreateInput::new("custom", name, SecretScope::Personal)
+                ..SecretCreateInput::new("user", name, SecretScope::Personal)
             })
             .expect("a secret")
             .id;

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { IntegrationId, SecretId } from "./primitives/branded.js";
 import { Timestamp } from "./primitives/time.js";
-import { FieldDescriptor } from "./secrets/SecretTypeSchema.js";
+import { FieldDescriptor } from "./fields.js";
 import { TOOL_KEY_PATTERN } from "./tools/ToolDto.js";
 
 const trimmedName = (max: number) =>
@@ -13,7 +13,7 @@ const trimmedName = (max: number) =>
 const CapabilityName = z.string().min(1).max(128).regex(TOOL_KEY_PATTERN);
 const count = z.number().int().nonnegative();
 
-export const IntegrationKind = z.enum(["mail", "telegram", "git"]);
+export const IntegrationKind = z.enum(["mail", "telegram", "github", "gitlab"]);
 export type IntegrationKind = z.infer<typeof IntegrationKind>;
 
 export const IntegrationStatus = z.enum([

@@ -115,7 +115,24 @@
     "value": {
       "conversationId": "0199aa11-2222-7111-8111-111111111111",
       "text": "x",
-      "command": "deploy"
+      "commands": ["deploy"]
+    }
+  },
+  {
+    "name": "a repeated command",
+    "value": {
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "text": "x",
+      "commands": ["goal", "goal"]
+    }
+  },
+  {
+    "name": "a repeated plugin",
+    "value": {
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "text": "x",
+      "commands": ["goal"],
+      "plugins": ["0199aa11-1111-7111-8111-0000000000a1", "0199aa11-1111-7111-8111-0000000000a1"]
     }
   }
 ]

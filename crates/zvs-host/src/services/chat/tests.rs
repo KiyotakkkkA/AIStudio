@@ -433,7 +433,7 @@ impl Harness {
         let handle = self
             .chat
             .send(&ChatSendInput {
-                command: Some(command),
+                commands: vec![command],
                 ..ChatSendInput::new(conversation, text)
             })
             .expect("sends");
@@ -1632,7 +1632,8 @@ async fn context_breaks_down_the_prompt_and_history_the_next_turn_will_carry() {
             model_id: harness.model_id.clone(),
             settings: None,
             system_prompt: Some("Always be helpful.".to_owned()),
-            command: None,
+            commands: Vec::new(),
+            plugins: Vec::new(),
         })
         .await
         .expect("measures a draft");
@@ -1663,7 +1664,8 @@ async fn context_breaks_down_the_prompt_and_history_the_next_turn_will_carry() {
             model_id: harness.model_id.clone(),
             settings: None,
             system_prompt: None,
-            command: None,
+            commands: Vec::new(),
+            plugins: Vec::new(),
         })
         .await
         .expect("measures a conversation");
@@ -1694,7 +1696,8 @@ async fn stats_preview_the_exact_system_prompt_the_next_turn_sends() {
         model_id: harness.model_id.clone(),
         settings: None,
         system_prompt: None,
-        command: None,
+        commands: Vec::new(),
+        plugins: Vec::new(),
     };
     let stats = harness.chat.stats(&input).await.expect("stats");
     let context = harness.chat.context(&input).await.expect("context");
@@ -1767,7 +1770,8 @@ async fn an_empty_answer_is_skipped_in_the_next_request_and_marked_in_stats() {
             model_id: harness.model_id.clone(),
             settings: None,
             system_prompt: None,
-            command: None,
+            commands: Vec::new(),
+            plugins: Vec::new(),
         })
         .await
         .expect("stats");

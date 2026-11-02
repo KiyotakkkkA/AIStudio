@@ -13,25 +13,28 @@ use zvs_contract::{
     IntegrationAccountDetailDto, IntegrationAccountDto, IntegrationAccountToolDto,
     IntegrationActivityDto, IntegrationActivityInput, IntegrationActivityLevel, IntegrationConfig,
     IntegrationId, IntegrationKind, IntegrationKindDto, IntegrationStatus,
-    IntegrationTestResultDto, IntegrationValue, RunKind, RunOutcomeStatus, SecretId, SecretScope,
-    Timestamp, ToolSource, ToolTier, UpdateIntegrationInput, Validate, WorkerDto, WorkerStatus,
+    IntegrationTestResultDto, IntegrationValue, RunKind, RunOutcomeDto, RunOutcomeStatus, SecretId,
+    SecretScope, Timestamp, ToolSource, ToolTier, UpdateIntegrationInput, Validate, WorkerDto,
+    WorkerStatus,
 };
 
 use super::tools::{IntegrationToolNodeSpec, register_integration_tool_node};
 use super::{
-    IntegrationApproval, IntegrationCallTarget, IntegrationConfigView, IntegrationEvent,
-    IntegrationGateway, IntegrationHandled, IntegrationProvider, IntegrationSession,
-    IntegrationToolCall, SharedGateway, SignInRequest, account_tool_key, check_config,
-    check_provider,
+    CursorView, IntegrationApproval, IntegrationCallTarget, IntegrationConfigView,
+    IntegrationEvent, IntegrationGateway, IntegrationHandled, IntegrationProvider,
+    IntegrationSession, IntegrationToolCall, SharedGateway, SignInPrompt, SignInRequest,
+    account_tool_key, check_config, check_provider,
 };
 use crate::data::repositories::{IntegrationCounter, IntegrationPatch};
 use crate::data::schema::{IntegrationAccountRow, IntegrationActivityRow, SecretConsumerKind};
 use crate::data::{Database, Repositories};
 use crate::kernel::{NodeRegistry, RunWatcher};
 use crate::platform::clock::{SharedClock, SystemClock};
+use crate::platform::events::EventBus;
 use crate::platform::external::{OPEN_FAILED, UrlOpener};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
+use crate::services::secrets::USER_SECRET;
 use crate::services::{ApprovalService, SecretCreateInput, SecretService};
 use crate::tools::{ToolDescriptor, ToolRegistry};
 use crate::workers::{Backoff, WorkerBody, WorkerFault, WorkerSpec, WorkerSupervisor};
@@ -47,7 +50,6 @@ const ACTIVITY_MESSAGE_MAX: usize = 1000;
 const EVENT_ID_MAX: usize = 512;
 const CONNECTED: &str = "Подключение установлено";
 const SIGNED_IN: &str = "Вход через браузер выполнен";
-const OAUTH_SECRET_TYPE: &str = "custom";
 
 pub type TriggerSink = Arc<dyn Fn(&Value) -> Result<Vec<String>, AppError> + Send + Sync>;
 
@@ -70,6 +72,7 @@ pub struct IntegrationServiceOptions {
     pub providers: Vec<Arc<dyn IntegrationProvider>>,
     pub approvals: Option<Arc<ApprovalService>>,
     pub opener: Option<UrlOpener>,
+    pub events: Option<EventBus>,
     pub clock: SharedClock,
     pub logger: SharedLogger,
     pub backoff: Backoff,
@@ -92,6 +95,7 @@ impl IntegrationServiceOptions {
             providers: Vec::new(),
             approvals: None,
             opener: None,
+            events: None,
             clock: Arc::new(SystemClock),
             logger: silent_logger(),
             backoff: Backoff::default(),
@@ -494,14 +498,52 @@ impl IntegrationService {
             previous.cancel();
         }
         let account = self.account_dto(&row)?;
+        let stream = self
+            .inner
+            .options
+            .events
+            .as_ref()
+            .and_then(|events| events.open_stream().ok());
+        let account_id = row.id.clone();
+        let prompt = |prompt: &SignInPrompt| {
+            self.note(
+                &account_id,
+                IntegrationActivityLevel::Info,
+                &format!("Код подтверждения: {}", prompt.user_code),
+            );
+            if let Some(stream) = &stream {
+                stream.emit(HostEventDraft::Step {
+                    step: Map::from_iter([
+                        ("domain".to_owned(), json!("integrations")),
+                        ("accountId".to_owned(), json!(account_id)),
+                        ("phase".to_owned(), json!("device-code")),
+                        ("userCode".to_owned(), json!(prompt.user_code)),
+                        ("verificationUri".to_owned(), json!(prompt.verification_uri)),
+                        ("expiresAt".to_owned(), json!(prompt.expires_at)),
+                    ]),
+                });
+            }
+        };
         let outcome = provider
             .sign_in(SignInRequest {
                 account: &account,
                 config: &self.view(&row),
                 opener: &opener,
                 cancel: &cancel,
+                prompt: &prompt,
             })
             .await;
+        if let Some(stream) = &stream {
+            stream.end(RunOutcomeDto {
+                status: match &outcome {
+                    Ok(_) => RunOutcomeStatus::Ok,
+                    Err(_) if cancel.is_cancelled() => RunOutcomeStatus::Cancelled,
+                    Err(_) => RunOutcomeStatus::Failed,
+                },
+                code: None,
+                message: None,
+            });
+        }
         if !cancel.is_cancelled() {
             self.inner
                 .signing
@@ -530,7 +572,7 @@ impl IntegrationService {
                 let created = secrets.create(SecretCreateInput {
                     value: Some(signed.value),
                     ..SecretCreateInput::new(
-                        OAUTH_SECRET_TYPE,
+                        USER_SECRET,
                         format!("{} · OAuth · {short}", row.name),
                         SecretScope::Personal,
                     )
@@ -771,6 +813,7 @@ impl IntegrationService {
             .approval(&IntegrationToolCall {
                 account: self.account_dto(&row)?,
                 config: self.view(&row),
+                cursors: CursorView::new(row.id.clone(), self.clone()),
                 tool: target.tool.clone(),
                 input: input.clone(),
                 approved: None,
@@ -808,6 +851,7 @@ impl IntegrationService {
             .call_tool(IntegrationToolCall {
                 account: self.account_dto(&row)?,
                 config: self.view(&row),
+                cursors: CursorView::new(row.id.clone(), self.clone()),
                 tool: target.tool,
                 input,
                 approved,
@@ -1095,5 +1139,21 @@ impl IntegrationGateway for ServiceGateway {
         self.service(&target)?
             .call(target, input, approved, cancel)
             .await
+    }
+}
+
+impl crate::services::chat_plugins::ChatPlugins for IntegrationService {
+    fn plugin(&self, account_id: &str) -> Option<crate::services::chat_plugins::ChatPluginInfo> {
+        let row = self.require(account_id).ok().filter(|row| row.enabled)?;
+        let provider = self.provider(row.kind).ok()?;
+        Some(crate::services::chat_plugins::ChatPluginInfo {
+            plugin: zvs_contract::ChatPluginDto {
+                account_id: integration_id(&row.id).ok()?,
+                kind: row.kind,
+                name: row.name,
+            },
+            label: provider.label(),
+            instructions: provider.instructions(),
+        })
     }
 }

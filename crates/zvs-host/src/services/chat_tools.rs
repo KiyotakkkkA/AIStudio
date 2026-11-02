@@ -92,6 +92,8 @@ pub struct OfferedTool {
     pub source: OfferedToolSource,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub server: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
 }
 
 impl Validate for OfferedTool {
@@ -180,6 +182,9 @@ pub fn offered_tools(enabled: &[String], registered: &[ToolDto]) -> Vec<OfferedT
                 server: (tool.source == ToolSource::Mcp)
                     .then(|| tool.source_ref.clone())
                     .flatten(),
+                plugin: (tool.source == ToolSource::Integration)
+                    .then(|| tool.source_ref.clone())
+                    .flatten(),
             }
         })
         .collect()
@@ -197,6 +202,7 @@ pub struct ToolInputs<'a> {
     pub servers: &'a HashSet<String>,
     pub knowledge: bool,
     pub commands: &'a [ChatCommand],
+    pub plugins: &'a [String],
     pub loaded: &'a [String],
 }
 
@@ -226,6 +232,11 @@ pub fn plan_tools(inputs: &ToolInputs<'_>) -> ToolPlan {
                         .is_some_and(|server| inputs.servers.contains(server)))
                 && (inputs.knowledge || !KNOWLEDGE_TOOLS.contains(&key))
                 && (commanded.contains(&key) || !BROWSER_TOOLS.contains(&key))
+                && (tool.source != ToolSource::Integration
+                    || tool
+                        .source_ref
+                        .as_ref()
+                        .is_some_and(|account| inputs.plugins.contains(account)))
         })
         .map(|tool| tool.key.clone())
         .collect();
@@ -236,7 +247,7 @@ pub fn plan_tools(inputs: &ToolInputs<'_>) -> ToolPlan {
                 let key = tool.key.as_str();
                 let source = if KNOWLEDGE_TOOLS.contains(&key) {
                     OfferedToolSource::Knowledge
-                } else if commanded.contains(&key) {
+                } else if commanded.contains(&key) || tool.plugin.is_some() {
                     OfferedToolSource::Command
                 } else {
                     OfferedToolSource::Base
@@ -276,7 +287,7 @@ pub fn active_commands(messages: &[MessageDto]) -> Vec<ChatCommand> {
     for command in messages
         .iter()
         .filter(|message| message.role == MessageRole::User)
-        .filter_map(|message| message.command)
+        .flat_map(|message| message.commands.iter().copied())
     {
         if !commands.contains(&command) {
             commands.push(command);
@@ -343,6 +354,7 @@ pub fn search_tool(offered: &[OfferedTool], deferred: &[OfferedTool]) -> Offered
         read_only: true,
         source: OfferedToolSource::Base,
         server: None,
+        plugin: None,
     }
 }
 
@@ -952,6 +964,7 @@ mod tests {
             servers,
             knowledge: false,
             commands: &[],
+            plugins: &[],
             loaded: &[],
         }
     }
@@ -1006,6 +1019,36 @@ mod tests {
                 source: OfferedToolSource::Knowledge,
             }
         );
+    }
+
+    #[test]
+    fn integration_tools_are_offered_only_for_attached_plugin_accounts() {
+        let registered = vec![
+            tool("fs.read", json!({ "source": "builtin" })),
+            tool(
+                "github.aaaa1111.readFile",
+                json!({ "source": "integration", "sourceRef": "account-a" }),
+            ),
+            tool(
+                "github.bbbb2222.readFile",
+                json!({ "source": "integration", "sourceRef": "account-b" }),
+            ),
+        ];
+        let servers = live();
+        let plain = plan_tools(&inputs(&registered, &servers));
+        assert_eq!(keys(&plain.offered), ["fs.read"]);
+        let attached = ["account-b".to_owned()];
+        let plugged = plan_tools(&ToolInputs {
+            plugins: &attached,
+            ..inputs(&registered, &servers)
+        });
+        assert_eq!(
+            keys(&plugged.offered),
+            ["fs.read", "github.bbbb2222.readFile"]
+        );
+        assert_eq!(plugged.offered[1].source, OfferedToolSource::Command);
+        assert_eq!(plugged.offered[1].plugin.as_deref(), Some("account-b"));
+        assert!(plugged.deferred.is_empty());
     }
 
     #[test]
@@ -1074,7 +1117,7 @@ mod tests {
             "content": "x",
             "citations": [],
             "toolCalls": calls,
-            "command": command,
+            "commands": command.into_iter().collect::<Vec<_>>(),
             "tokensIn": 1,
             "tokensOut": 0,
             "usageEstimated": true,

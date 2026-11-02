@@ -18,17 +18,16 @@ use zvs_contract::{
     ProviderDto, ProviderId, ProviderListFilter, ProviderRef, ProviderSettingsDto,
     ProviderSummaryDto, ProvidersGetInput, ProvidersRemoveOutput, RemoveGraphEdgeInput,
     ResourceSampleDto, ResultEnvelope, RunOutcomeDto, SecretDto, SecretFilter, SecretRef,
-    SecretSummaryDto, SecretTypeSchema, SecretsRemoveOutput, SecretsTypesOutput,
-    SetDefaultModelInput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput,
-    Sort, SortDirection, StreamId, SystemDemoJobInput, SystemDemoStreamInput,
-    SystemDemoStreamOutput, SystemDeviceInput, SystemNativePingInput, SystemNativePingOutput,
-    SystemPingInput, SystemPingOutput, UpdateProviderInput, UpdateSecretInput,
-    UpdateVectorStoreInput, Validate, VectorChunkDto, VectorChunksInput, VectorDocumentDto,
-    VectorDocumentsRemoveInput, VectorDocumentsRemoveOutput, VectorEvalCaseDto, VectorEvalCaseRef,
-    VectorEvalRemoveOutput, VectorEvalRunDto, VectorEvalRunInput, VectorEvalSetDto,
-    VectorOcrConfig, VectorRerankConfig, VectorSearchHitDto, VectorSearchInput,
-    VectorSearchResultDto, VectorSourceDto, VectorSourceRef, VectorSourcesRemoveOutput,
-    VectorStoreDto, VectorStoreRef, VectorStoresRemoveOutput, secret_type_registry,
+    SecretSummaryDto, SecretsRemoveOutput, SetDefaultModelInput, SettingsGetInput,
+    SettingsGetOutput, SettingsSetInput, SettingsSetOutput, Sort, SortDirection, StreamId,
+    SystemDemoJobInput, SystemDemoStreamInput, SystemDemoStreamOutput, SystemDeviceInput,
+    SystemNativePingInput, SystemNativePingOutput, SystemPingInput, SystemPingOutput,
+    UpdateProviderInput, UpdateSecretInput, UpdateVectorStoreInput, Validate, VectorChunkDto,
+    VectorChunksInput, VectorDocumentDto, VectorDocumentsRemoveInput, VectorDocumentsRemoveOutput,
+    VectorEvalCaseDto, VectorEvalCaseRef, VectorEvalRemoveOutput, VectorEvalRunDto,
+    VectorEvalRunInput, VectorEvalSetDto, VectorOcrConfig, VectorRerankConfig, VectorSearchHitDto,
+    VectorSearchInput, VectorSearchResultDto, VectorSourceDto, VectorSourceRef,
+    VectorSourcesRemoveOutput, VectorStoreDto, VectorStoreRef, VectorStoresRemoveOutput,
 };
 
 type Check = fn(Value) -> Result<Value, String>;
@@ -325,11 +324,6 @@ const TABLE: &[(&str, Check)] = &[
     (
         "settings/SettingsSetOutput",
         round_trip::<SettingsSetOutput>,
-    ),
-    ("secrets/SecretTypeSchema", round_trip::<SecretTypeSchema>),
-    (
-        "secrets/SecretsTypesOutput",
-        round_trip::<SecretsTypesOutput>,
     ),
     ("secrets/SecretFilter", round_trip::<SecretFilter>),
     ("secrets/SecretRef", round_trip::<SecretRef>),
@@ -1596,8 +1590,6 @@ const TABLE: &[(&str, Check)] = &[
 ];
 
 const SECRET_OUTPUTS: &[&str] = &[
-    "secrets/SecretsTypesOutput",
-    "secrets/SecretTypeSchema",
     "secrets/SecretSummaryDto",
     "secrets/SecretDto",
     "secrets/SecretsRemoveOutput",
@@ -1860,15 +1852,5 @@ fn no_secrets_output_fixture_carries_a_value_field() {
             "
 "
         )
-    );
-}
-
-#[test]
-fn the_rust_registry_matches_the_registry_fixture() {
-    let path = fixtures_root().join("secrets/SecretsTypesOutput.valid.json");
-    let (_, fixture) = cases(&path).remove(0);
-    assert_eq!(
-        serde_json::to_value(secret_type_registry()).expect("serialises"),
-        fixture
     );
 }

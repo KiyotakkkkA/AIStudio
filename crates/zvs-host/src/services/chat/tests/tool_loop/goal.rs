@@ -63,7 +63,7 @@ impl Loop {
         self.harness
             .chat
             .send(&ChatSendInput {
-                command: Some(ChatCommand::Goal),
+                commands: vec![ChatCommand::Goal],
                 ..ChatSendInput::new(conversation, text)
             })
             .expect("starts a goal")
@@ -214,7 +214,7 @@ async fn a_goal_pauses_when_its_rounds_run_out_and_continues_with_a_renewed_budg
         .find(|message| message.role == zvs_contract::MessageRole::User)
         .expect("the continuation");
     assert_eq!(user.content, GOAL_CONTINUE_TEXT);
-    assert_eq!(user.command, Some(ChatCommand::Goal));
+    assert_eq!(user.commands, [ChatCommand::Goal]);
     let again = test
         .harness
         .chat
@@ -477,7 +477,8 @@ async fn the_composer_lists_the_goal_tools_only_for_a_goal() {
                 model_id: test.harness.model_id.clone(),
                 settings: None,
                 system_prompt: None,
-                command,
+                commands: command.into_iter().collect(),
+                plugins: Vec::new(),
             })
             .await
             .expect("measures")

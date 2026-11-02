@@ -14,7 +14,8 @@ use crate::validate::{Validate, check, invalid, js_trim, nested, no_refinements}
 wire_enum!(IntegrationKind {
     Mail => "mail",
     Telegram => "telegram",
-    Git => "git",
+    Github => "github",
+    Gitlab => "gitlab",
 });
 
 wire_enum!(IntegrationStatus {

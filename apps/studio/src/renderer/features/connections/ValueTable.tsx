@@ -62,6 +62,7 @@ function ValueTable({ vm, table, secrets, namePlaceholder, empty }: ValueTablePr
                           placeholder={
                             secretOptions.length === 0 ? "Секретов пока нет" : "Выберите секрет"
                           }
+                          searchable
                           invalid={vm.errorOf(`${table}.${row.id}.value`) !== undefined}
                           options={secretOptions}
                           onChange={(value) => {

@@ -39,6 +39,7 @@ use super::chat_history::{
 use super::chat_memory::{
     MEMORY_FAILED, MEMORY_TOOL, MemoryRefs, apply_memory_call, memory_section, memory_tool,
 };
+use super::chat_plugins::{ChatPlugins, active_plugins, plugin_note, resolve_plugins};
 use super::chat_prompt::{
     PromptParts, history_entries, in_tool_block, model_history, sendable_messages,
 };
@@ -97,6 +98,7 @@ use zvs_contract::{BindFolderInput, BindFolderResultDto};
 
 pub const CHAT_RELATED_MAX: usize = 3;
 pub const COMMAND_HEADING: &str = "Instructions of the command";
+const BLANK_LINE: &str = "\n\n";
 pub const BROWSER_USE_DESCRIPTION: &str =
     "Работа во встроенном браузере: открытие и чтение страниц, действия на сайтах";
 
@@ -164,6 +166,7 @@ pub struct ChatServiceOptions {
     pub tools: Option<ToolRegistry>,
     pub skills: Option<Arc<dyn SkillCatalogue>>,
     pub mcp: Option<Arc<dyn McpServers>>,
+    pub plugins: Option<Arc<dyn ChatPlugins>>,
     pub folders: Option<FolderAccessService>,
     pub shells: Option<BackgroundShells>,
     pub subagents: Option<SubagentService>,
@@ -181,6 +184,7 @@ impl ChatServiceOptions {
             tools: None,
             skills: None,
             mcp: None,
+            plugins: None,
             folders: None,
             shells: None,
             subagents: None,
@@ -204,6 +208,7 @@ struct Inner {
     tools: Option<ToolRegistry>,
     skills: Option<Arc<dyn SkillCatalogue>>,
     mcp: Option<Arc<dyn McpServers>>,
+    plugins: Option<Arc<dyn ChatPlugins>>,
     folders: FolderAccessService,
     shells: Option<BackgroundShells>,
     memory: MemoryService,
@@ -343,7 +348,8 @@ fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
         citations: row.citations,
         tool_calls: row.tool_calls,
         selections: row.selections,
-        command: row.command,
+        commands: row.commands,
+        plugins: row.plugins,
         offered_tools: row.offered_tools,
         web_sources: row.web_sources,
         rounds: row.rounds,
@@ -748,6 +754,7 @@ impl Inner {
         registered: &[ToolDto],
         knowledge: bool,
         commands: &[ChatCommand],
+        plugins: &[String],
         history: &[MessageDto],
     ) -> ToolPlan {
         let servers = self
@@ -760,11 +767,27 @@ impl Inner {
             servers: &servers,
             knowledge,
             commands,
+            plugins,
             loaded: &loaded_keys(history),
         })
     }
 
-    fn command_note(&self, commands: &[ChatCommand], offered: &[OfferedTool]) -> String {
+    fn command_note(
+        &self,
+        commands: &[ChatCommand],
+        plugins: &[String],
+        offered: &[OfferedTool],
+    ) -> String {
+        let commanded = self.commanded_note(commands, offered);
+        let plugged = plugin_note(self.plugins.as_deref(), plugins, offered);
+        [commanded, plugged]
+            .into_iter()
+            .filter(|note| !note.is_empty())
+            .collect::<Vec<_>>()
+            .join(BLANK_LINE)
+    }
+
+    fn commanded_note(&self, commands: &[ChatCommand], offered: &[OfferedTool]) -> String {
         let Some(skills) = &self.skills else {
             return String::new();
         };
@@ -1475,7 +1498,8 @@ impl NodeDef for PrepareNode {
             _ => Vec::new(),
         };
         let commands = active_commands(&conversation.messages[..=position]);
-        let goal_turn = user.command == Some(ChatCommand::Goal)
+        let plugins = active_plugins(&conversation.messages[..=position]);
+        let goal_turn = user.commands.contains(&ChatCommand::Goal)
             && details.goal.as_ref().is_some_and(ChatGoalDto::active);
         if goal_turn && !tools_usable {
             return Err(AppError::new(
@@ -1491,13 +1515,14 @@ impl NodeDef for PrepareNode {
                 &registered,
                 wants_knowledge,
                 &commands,
+                &plugins,
                 &conversation.messages[..position],
             )
         } else {
             ToolPlan::default()
         };
         let guidance = inner.mcp_guidance(&offered)?;
-        let command_note = inner.command_note(&commands, &offered);
+        let command_note = inner.command_note(&commands, &plugins, &offered);
         let skill_note =
             if !skill_entries.is_empty() && offered.iter().any(|tool| tool.key == SKILL_LOAD) {
                 catalogue_text(&skill_entries, &offered)
@@ -1700,7 +1725,8 @@ impl NodeDef for PrepareNode {
             citations: prepared.citations.clone(),
             tool_calls: Vec::new(),
             selections: Vec::new(),
-            command: None,
+            commands: Vec::new(),
+            plugins: Vec::new(),
             offered_tools: offered_record(&offered),
             web_sources: Vec::new(),
             rounds: Vec::new(),
@@ -2563,6 +2589,7 @@ impl ChatService {
             tools: options.tools,
             skills: options.skills,
             mcp: options.mcp,
+            plugins: options.plugins,
             folders,
             shells: options.shells,
             memory,
@@ -2942,7 +2969,8 @@ impl ChatService {
             citations: Vec::new(),
             tool_calls: Vec::new(),
             selections: Vec::new(),
-            command: None,
+            commands: Vec::new(),
+            plugins: Vec::new(),
             offered_tools: Vec::new(),
             web_sources: Vec::new(),
             rounds: Vec::new(),
@@ -3037,7 +3065,7 @@ impl ChatService {
         if row.goal.as_ref().is_some_and(ChatGoalDto::active) {
             return Err(AppError::new(AppErrorCode::Conflict, GOAL_RUNNING));
         }
-        let goal = if input.command == Some(ChatCommand::Goal) {
+        let goal = if input.commands.contains(&ChatCommand::Goal) {
             let budget = self
                 .inner
                 .read(|repositories| Ok(default_budget(repositories)))?;
@@ -3066,7 +3094,7 @@ impl ChatService {
         };
         self.start_turn(
             &ChatSendInput {
-                command: Some(ChatCommand::Goal),
+                commands: vec![ChatCommand::Goal],
                 ..ChatSendInput::new(*id, GOAL_CONTINUE_TEXT)
             },
             Some(resumed),
@@ -3172,7 +3200,8 @@ impl ChatService {
                 citations: Vec::new(),
                 tool_calls: Vec::new(),
                 selections: Vec::new(),
-                command: None,
+                commands: Vec::new(),
+                plugins: Vec::new(),
                 offered_tools: Vec::new(),
                 web_sources: Vec::new(),
                 rounds: Vec::new(),
@@ -3276,7 +3305,16 @@ impl ChatService {
             citations: Vec::<ChatCitationDto>::new(),
             tool_calls: Vec::new(),
             selections: input.selections.clone(),
-            command: input.command,
+            commands: if woken {
+                Vec::new()
+            } else {
+                input.commands.clone()
+            },
+            plugins: if woken {
+                Vec::new()
+            } else {
+                resolve_plugins(self.inner.plugins.as_deref(), &input.plugins)?
+            },
             offered_tools: Vec::new(),
             web_sources: Vec::new(),
             rounds: Vec::new(),
@@ -3398,22 +3436,29 @@ impl ChatService {
         let mode = details.map_or(RetrievalMode::Auto, |details| details.retrieval_mode);
         let wants_knowledge = !attached.is_empty() && mode != RetrievalMode::Auto && tools_usable;
         let mut commands = active_commands(&messages);
-        if let Some(command) = input.command
-            && !commands.contains(&command)
-        {
-            commands.push(command);
+        for command in &input.commands {
+            if !commands.contains(command) {
+                commands.push(*command);
+            }
+        }
+        let mut plugins = active_plugins(&messages);
+        for plugin in &input.plugins {
+            let plugin = plugin.to_string();
+            if !plugins.contains(&plugin) {
+                plugins.push(plugin);
+            }
         }
         let ToolPlan {
             mut offered,
             deferred,
         } = if tools_usable {
             self.inner
-                .plan(&registered, wants_knowledge, &commands, &messages)
+                .plan(&registered, wants_knowledge, &commands, &plugins, &messages)
         } else {
             ToolPlan::default()
         };
         let mcp_guidance = self.inner.mcp_guidance(&offered)?;
-        let command = self.inner.command_note(&commands, &offered);
+        let command = self.inner.command_note(&commands, &plugins, &offered);
         let last_user = messages
             .iter()
             .rev()
@@ -3461,7 +3506,7 @@ impl ChatService {
             }
         }
         let goal_turn = tools_usable
-            && (input.command == Some(ChatCommand::Goal)
+            && (input.commands.contains(&ChatCommand::Goal)
                 || details
                     .is_some_and(|details| details.goal.as_ref().is_some_and(ChatGoalDto::active)));
         if goal_turn {

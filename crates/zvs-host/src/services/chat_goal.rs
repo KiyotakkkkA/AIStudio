@@ -73,6 +73,7 @@ fn bridge_tool(
         read_only: false,
         source: OfferedToolSource::Command,
         server: None,
+        plugin: None,
     }
 }
 

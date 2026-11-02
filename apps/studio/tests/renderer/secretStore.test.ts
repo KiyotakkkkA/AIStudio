@@ -5,7 +5,6 @@ import {
   AppError,
   AppErrorCode,
   contract,
-  SECRET_TYPE_REGISTRY,
   type Contract,
   type SecretDto,
   type SecretId,
@@ -20,7 +19,6 @@ const CREATED = "0199aa11-1111-7111-8111-000000000003" as SecretId;
 
 function summary(overrides: Partial<SecretSummaryDto> & { id: SecretId }): SecretSummaryDto {
   return {
-    type: "ollama",
     name: "Ollama — личный",
     scope: "personal",
     hint: "osk_live_••••4f2a",
@@ -34,12 +32,11 @@ function summary(overrides: Partial<SecretSummaryDto> & { id: SecretId }): Secre
 }
 
 function detail(base: SecretSummaryDto): SecretDto {
-  return { ...base, fields: { baseUrl: "https://ollama.com/api" }, note: null };
+  return { ...base, note: null };
 }
 
 function storeWith(summaries: SecretSummaryDto[]) {
   const bridge = createFakeBridge<Contract>();
-  bridge.handle("secrets.types", () => SECRET_TYPE_REGISTRY.map((schema) => ({ ...schema })));
   bridge.handle("secrets.list", () => summaries);
   bridge.handle("secrets.get", ({ id }) => {
     const found = summaries.find((secret) => secret.id === id);
@@ -49,10 +46,10 @@ function storeWith(summaries: SecretSummaryDto[]) {
   return { bridge, store: new SecretStore(createIpcClient(contract, bridge)) };
 }
 
-test("load fetches the registry and the list once", async () => {
+test("load fetches the list", async () => {
   const rows = [
     summary({ id: OLLAMA }),
-    summary({ id: OPENROUTER, type: "openrouter", name: "OpenRouter", scope: "shared" }),
+    summary({ id: OPENROUTER, name: "OpenRouter", scope: "shared" }),
   ];
   const { bridge, store } = storeWith(rows);
 
@@ -60,17 +57,15 @@ test("load fetches the registry and the list once", async () => {
 
   assert.equal(store.loaded, true);
   assert.equal(store.loading, false);
-  assert.equal(store.types.length, SECRET_TYPE_REGISTRY.length);
   assert.equal(store.total, 2);
   assert.deepEqual(store.counts, { all: 2, personal: 1, shared: 1, public: 0 });
 
-  await store.load();
-  assert.equal(bridge.calls.filter((call) => call.channel === "secrets.types").length, 1);
+  assert.equal(bridge.calls.filter((call) => call.channel === "secrets.list").length, 1);
 });
 
 test("a failing host leaves the page usable and shows mapped copy", async () => {
   const bridge = createFakeBridge<Contract>();
-  bridge.fail("secrets.types", AppErrorCode.DB_ERROR, "raw host text");
+  bridge.fail("secrets.list", AppErrorCode.DB_ERROR, "raw host text");
   const store = new SecretStore(createIpcClient(contract, bridge));
 
   await store.load();
@@ -85,7 +80,6 @@ test("filter and query narrow the list while counts follow the query", async () 
     summary({ id: OLLAMA }),
     summary({
       id: OPENROUTER,
-      type: "openrouter",
       name: "OpenRouter — main",
       scope: "shared",
       tags: ["cloud"],
@@ -122,10 +116,7 @@ test("selecting a secret loads its detail and builds a clean form", async () => 
 });
 
 test("a dirty form defers the next selection until the discard is confirmed", async () => {
-  const rows = [
-    summary({ id: OLLAMA }),
-    summary({ id: OPENROUTER, type: "openrouter", name: "OpenRouter" }),
-  ];
+  const rows = [summary({ id: OLLAMA }), summary({ id: OPENROUTER, name: "OpenRouter" })];
   const { store } = storeWith(rows);
   await store.load();
   await store.select(OLLAMA);
@@ -147,7 +138,7 @@ test("create adds the secret to the list and selects it", async () => {
   const rows = [summary({ id: OLLAMA })];
   const { bridge, store } = storeWith(rows);
   bridge.handle("secrets.create", (input) =>
-    detail(summary({ id: CREATED, name: input.name, type: input.type, scope: input.scope })),
+    detail(summary({ id: CREATED, name: input.name, scope: input.scope })),
   );
   await store.load();
   store.startCreate();
@@ -169,9 +160,7 @@ test("a validation failure from the host lands on the field, not in a banner", a
   bridge.handle("secrets.create", () => {
     throw new AppError(AppErrorCode.VALIDATION_FAILED, "raw host text", {
       details: {
-        field: "fields",
-        type: "ollama",
-        issues: [{ path: "baseUrl", code: "invalid_format" }],
+        field: "name",
       },
     });
   });
@@ -183,7 +172,7 @@ test("a validation failure from the host lands on the field, not in a banner", a
   const saved = await store.submit();
 
   assert.equal(saved, false);
-  assert.equal(store.form?.errorOf("fields.baseUrl"), "Некорректный формат.");
+  assert.equal(store.form?.errorOf("name"), "Укажите название.");
   assert.equal(store.form?.banner, null);
 });
 
@@ -226,7 +215,7 @@ test("duplicating copies the configuration into a new form that still needs the 
   const rows = [summary({ id: OLLAMA, tags: ["llm", "prod"] })];
   const { bridge, store } = storeWith(rows);
   bridge.handle("secrets.create", (input) =>
-    detail(summary({ id: CREATED, name: input.name, type: input.type, scope: input.scope })),
+    detail(summary({ id: CREATED, name: input.name, scope: input.scope })),
   );
   await store.load();
   await store.select(OLLAMA);

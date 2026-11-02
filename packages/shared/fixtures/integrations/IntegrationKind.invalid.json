@@ -2,5 +2,9 @@
   {
     "name": "webhook",
     "value": "webhook"
+  },
+  {
+    "name": "the retired git kind",
+    "value": "git"
   }
 ]

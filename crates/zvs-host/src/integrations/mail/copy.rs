@@ -52,9 +52,6 @@ pub fn sent(recipients: &[String]) -> String {
     format!("Письмо отправлено: {}", recipients.join(", "))
 }
 
-pub const SIGN_IN_REQUIRED: &str = "Требуется вход через браузер. Откройте настройки интеграции.";
-pub const OAUTH_FAILED: &str = "Сервер авторизации отклонил запрос";
-pub const OAUTH_UNREACHABLE: &str = "Сервер авторизации недоступен";
 pub const OAUTH_NOT_USED: &str = "Вход через браузер доступен только для Google, Яндекса и Mail.ru";
 pub const CLIENT_ID_HELP: &str =
     "Учётные данные приложения, зарегистрированного у почтового провайдера.";

@@ -151,24 +151,13 @@ test("the demo stream counts to completion over the event channel", async () => 
 });
 
 test("the secret channels answer the renderer without ever carrying a value", async () => {
-  const types = await page.evaluate(() => window.zvs.call("secrets.types", undefined));
-  expect(types).toMatchObject({ ok: true });
-  expect((types as { data: { key: string }[] }).data.map((schema) => schema.key)).toEqual([
-    "ollama",
-    "openrouter",
-    "mistral",
-    "custom",
-  ]);
-
   const VALUE = "osk_live_0a1b2c3d4e5f60718293a4b5c6d7e8f4f2a";
   const created = await page.evaluate(
     (value) =>
       window.zvs.call("secrets.create", {
-        type: "ollama",
         name: "Ollama — e2e",
         scope: "personal",
         value,
-        fields: { baseUrl: "https://ollama.com/api" },
         tags: ["e2e"],
       }),
     VALUE,
@@ -179,16 +168,12 @@ test("the secret channels answer the renderer without ever carrying a value", as
   expect(listed).toMatchObject({ ok: true, data: [{ hint: "osk_live_…4f2a" }] });
   expect(JSON.stringify(listed)).not.toContain(VALUE);
 
-  const rejected = await page.evaluate(
-    (value) =>
-      window.zvs.call("secrets.create", {
-        type: "ollama",
-        name: "Ollama — sneaky",
-        scope: "personal",
-        value,
-        fields: { sneaky: "value" },
-      }),
-    VALUE,
+  const rejected = await page.evaluate(() =>
+    window.zvs.call("secrets.create", {
+      name: "Ollama — empty",
+      scope: "personal",
+      value: "   ",
+    }),
   );
   expect(rejected).toMatchObject({ ok: false, error: { code: "VALIDATION_FAILED" } });
 });

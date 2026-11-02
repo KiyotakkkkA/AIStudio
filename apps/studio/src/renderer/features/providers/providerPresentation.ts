@@ -9,7 +9,6 @@ import type {
   ProviderKind,
   ProviderStatus,
   ProviderSummaryDto,
-  SecretSummaryDto,
 } from "@zvs/shared";
 import { plural } from "../connections/connectionPresentation";
 import type { StatusTone } from "../../ui/atoms/statusTone";
@@ -78,23 +77,8 @@ const ADAPTER_BASE_URLS: Partial<Record<AdapterFamily, string>> = {
   local: LOCAL_BASE_URL,
 };
 
-const KIND_SECRET_TYPES: Record<ProviderKind, readonly string[]> = {
-  ollama: ["ollama", "custom"],
-  openrouter: ["openrouter", "custom"],
-  mistral: ["mistral", "custom"],
-  "openai-compatible": ["ollama", "openrouter", "mistral", "custom"],
-};
-
 export function suggestedBaseUrl(kind: ProviderKind, adapter: AdapterFamily): string {
   return ADAPTER_BASE_URLS[adapter] ?? KIND_BASE_URLS[kind];
-}
-
-export function secretsForKind(
-  secrets: readonly SecretSummaryDto[],
-  kind: ProviderKind,
-): SecretSummaryDto[] {
-  const allowed = KIND_SECRET_TYPES[kind];
-  return secrets.filter((secret) => allowed.includes(secret.type));
 }
 
 export function statusTone(status: ProviderStatus): StatusTone {

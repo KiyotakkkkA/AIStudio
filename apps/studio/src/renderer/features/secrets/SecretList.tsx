@@ -71,7 +71,6 @@ function SecretList({ onSelect, onCreate }: SecretListProps) {
         <SecretListItem
           key={secret.id}
           secret={secret}
-          schema={secrets.schemaOf(secret.type)}
           selected={secrets.selectedId === secret.id}
           now={now}
           onSelect={() => {

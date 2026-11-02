@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use serde_json::{Value, json};
 use zvs_contract::{
-    AppError, AppErrorCode, RotationStatus, SecretDto, SecretFields, SecretId, SecretScope,
-    SecretSummaryDto, SecretTypeKey, Timestamp,
+    AppError, AppErrorCode, RotationStatus, SecretDto, SecretId, SecretScope, SecretSummaryDto,
+    Timestamp,
 };
 
 use crate::data::repositories::{
@@ -17,6 +17,7 @@ use crate::services::crypto::{CryptoService, Plaintext};
 use crate::services::secret_policy::{compute_hint, rotation_due_at, rotation_status};
 
 pub const CIPHER_VERSION: i64 = 1;
+pub const USER_SECRET: &str = "user";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecretConsumer {
@@ -33,7 +34,6 @@ pub struct SecretSummary {
     pub cipher_version: i64,
     pub hint: Option<String>,
     pub usage_count: u64,
-    pub fields: SecretFields,
     pub tags: Vec<String>,
     pub note: Option<String>,
     pub rotation_days: Option<i64>,
@@ -49,7 +49,6 @@ pub struct SecretCreateInput {
     pub name: String,
     pub scope: SecretScope,
     pub value: Option<Plaintext>,
-    pub fields: SecretFields,
     pub tags: Vec<String>,
     pub note: Option<String>,
     pub rotation_days: Option<i64>,
@@ -63,7 +62,6 @@ impl SecretCreateInput {
             name: name.into(),
             scope,
             value: None,
-            fields: SecretFields::new(),
             tags: Vec::new(),
             note: None,
             rotation_days: None,
@@ -77,7 +75,6 @@ pub struct SecretUpdateInput {
     pub name: Option<String>,
     pub scope: Option<SecretScope>,
     pub value: Option<Plaintext>,
-    pub fields: Option<SecretFields>,
     pub tags: Option<Vec<String>>,
     pub note: Option<Option<String>>,
     pub rotation_days: Option<Option<i64>>,
@@ -223,7 +220,6 @@ impl SecretService {
                 cipher,
                 cipher_version: CIPHER_VERSION,
                 hint: value.map(|value| compute_hint(value.expose())),
-                fields: Value::Object(input.fields).to_string(),
                 tags: json!(input.tags).to_string(),
                 note: input.note,
                 rotation_days: input.rotation_days,
@@ -263,7 +259,6 @@ impl SecretService {
             patch.name = Some(require_text(name, "name")?);
         }
         patch.scope = input.scope;
-        patch.fields = input.fields.map(|fields| Value::Object(fields).to_string());
         patch.tags = input.tags.map(|tags| json!(tags).to_string());
         patch.note = input.note;
         if let Some(rotation_days) = input.rotation_days {
@@ -396,10 +391,6 @@ impl SecretService {
 }
 
 fn to_summary(row: SecretRow, now: Timestamp, usage_count: u64) -> Result<SecretSummary, AppError> {
-    let fields = match parse(&row.id, "fields", &row.fields)? {
-        Value::Object(fields) => fields,
-        _ => SecretFields::new(),
-    };
     let tags = match parse(&row.id, "tags", &row.tags)? {
         Value::Array(tags) => tags
             .into_iter()
@@ -419,7 +410,6 @@ fn to_summary(row: SecretRow, now: Timestamp, usage_count: u64) -> Result<Secret
         cipher_version: row.cipher_version,
         hint: row.hint,
         usage_count,
-        fields,
         tags,
         note: row.note,
         rotation_days: row.rotation_days,
@@ -468,7 +458,9 @@ pub fn public_not_found() -> AppError {
 }
 
 pub fn to_secret_summary_dto(summary: &SecretSummary) -> Result<SecretSummaryDto, AppError> {
-    let r#type = SecretTypeKey::parse(&summary.r#type).ok_or_else(public_not_found)?;
+    if summary.r#type != USER_SECRET {
+        return Err(public_not_found());
+    }
     let id = SecretId::parse(&summary.id).ok_or_else(|| {
         AppError::new(AppErrorCode::DbError, "Секрет хранится в повреждённом виде")
             .with_detail("secretId", summary.id.clone())
@@ -476,7 +468,6 @@ pub fn to_secret_summary_dto(summary: &SecretSummary) -> Result<SecretSummaryDto
     })?;
     Ok(SecretSummaryDto {
         id,
-        r#type,
         name: summary.name.clone(),
         scope: summary.scope,
         hint: summary.hint.clone(),
@@ -492,7 +483,6 @@ pub fn to_secret_dto(summary: &SecretSummary) -> Result<SecretDto, AppError> {
     let base = to_secret_summary_dto(summary)?;
     Ok(SecretDto {
         id: base.id,
-        r#type: base.r#type,
         name: base.name,
         scope: base.scope,
         hint: base.hint,
@@ -501,7 +491,6 @@ pub fn to_secret_dto(summary: &SecretSummary) -> Result<SecretDto, AppError> {
         rotation_status: base.rotation_status,
         rotates_at: base.rotates_at,
         updated_at: base.updated_at,
-        fields: summary.fields.clone(),
         note: summary.note.clone(),
     })
 }
@@ -552,12 +541,8 @@ mod tests {
     fn input() -> SecretCreateInput {
         SecretCreateInput {
             value: Some(Plaintext::new(VALUE)),
-            fields: json!({ "baseUrl": "https://openrouter.ai/api/v1" })
-                .as_object()
-                .cloned()
-                .expect("an object"),
             tags: vec!["llm".to_owned()],
-            ..SecretCreateInput::new("openrouter", "OpenRouter — main", SecretScope::Personal)
+            ..SecretCreateInput::new(USER_SECRET, "OpenRouter — main", SecretScope::Personal)
         }
     }
 
@@ -588,10 +573,6 @@ mod tests {
         let created = service.create(input()).expect("creates");
         assert_eq!(created.hint.as_deref(), Some("sk-or-v1-…9c31"));
         assert_eq!(created.tags, ["llm"]);
-        assert_eq!(
-            Value::Object(created.fields.clone()),
-            json!({ "baseUrl": "https://openrouter.ai/api/v1" })
-        );
         assert_eq!(created.rotation, RotationStatus::Ok);
         assert_eq!(created.cipher_version, CIPHER_VERSION);
 
@@ -787,7 +768,7 @@ mod tests {
 
         let bare = service
             .create(SecretCreateInput::new(
-                "custom",
+                USER_SECRET,
                 "no value",
                 SecretScope::Public,
             ))

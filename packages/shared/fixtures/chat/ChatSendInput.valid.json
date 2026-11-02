@@ -52,7 +52,7 @@
     "value": {
       "conversationId": "0199aa11-2222-7111-8111-111111111111",
       "text": "Найди расписание на сайте",
-      "command": "browser-use"
+      "commands": ["browser-use"]
     }
   },
   {
@@ -60,7 +60,16 @@
     "value": {
       "conversationId": "0199aa11-2222-7111-8111-111111111111",
       "text": "Добавить тесты",
-      "command": "goal"
+      "commands": ["goal"]
+    }
+  },
+  {
+    "name": "several commands and plugins",
+    "value": {
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "text": "Найди расписание на сайте",
+      "commands": ["browser-use", "goal"],
+      "plugins": ["0199aa11-1111-7111-8111-0000000000a1"]
     }
   }
 ]

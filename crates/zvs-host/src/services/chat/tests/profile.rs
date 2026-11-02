@@ -106,7 +106,8 @@ async fn the_context_breakdown_counts_the_profile_a_new_dialog_would_carry() {
         model_id: test.harness.model_id.clone(),
         settings: None,
         system_prompt: None,
-        command: None,
+        commands: Vec::new(),
+        plugins: Vec::new(),
     };
     let created = test.harness.conversation();
     let empty = test

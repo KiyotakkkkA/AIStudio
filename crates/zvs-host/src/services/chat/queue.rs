@@ -198,7 +198,11 @@ impl ChatService {
             return Ok(None);
         };
         let input = ChatSendInput {
-            command: continuing.then_some(ChatCommand::Goal),
+            commands: if continuing {
+                vec![ChatCommand::Goal]
+            } else {
+                Vec::new()
+            },
             ..ChatSendInput::new(conversation, last.text.clone())
         };
         let earlier: Vec<String> = preceding

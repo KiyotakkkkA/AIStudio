@@ -4,16 +4,9 @@ use crate::drivers::ai::identity::AccountIdentity;
 
 fn authorization_url(step: &Value) -> Result<&str, AppError> {
     let url = step["url"].as_str().ok_or_else(protocol_error)?;
-    let parsed = Url::parse(url).map_err(|_| protocol_error())?;
-    if parsed.scheme() != "https"
-        || parsed.host_str() != Some("github.com")
-        || !parsed.username().is_empty()
-        || parsed.password().is_some()
-        || parsed.port().is_some()
-    {
-        return Err(protocol_error());
-    }
-    Ok(url)
+    crate::integrations::oauth::trusted_https_url(url, &["github.com"])
+        .map(|_| url)
+        .ok_or_else(protocol_error)
 }
 
 impl Inner {

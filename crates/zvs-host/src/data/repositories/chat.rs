@@ -266,8 +266,8 @@ impl<'c> ChatRepository<'c> {
     pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
         self.connection
             .prepare_cached(
-                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, command, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, commands, plugins, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
             )?
             .execute(params![
                 row.id,
@@ -277,7 +277,8 @@ impl<'c> ChatRepository<'c> {
                 row.reasoning,
                 json_text(&row.citations)?,
                 json_text(&row.selections)?,
-                row.command.map(EnumColumn),
+                json_text(&row.commands)?,
+                json_text(&row.plugins)?,
                 json_text(&row.offered_tools)?,
                 json_text(&row.web_sources)?,
                 json_text(&row.rounds)?,
@@ -425,7 +426,8 @@ mod tests {
             citations: Vec::new(),
             tool_calls: Vec::new(),
             selections: Vec::new(),
-            command: None,
+            commands: Vec::new(),
+            plugins: Vec::new(),
             offered_tools: Vec::new(),
             web_sources: Vec::new(),
             rounds: Vec::new(),

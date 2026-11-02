@@ -57,6 +57,7 @@ are Rust.
 | D10 | Shell and host | **Tauri 2 (WebView2 on Windows); the whole host in Rust; no Node runtime in the shipped app** *(decided 2026-10-10; complete 2026-10-19, TASK_076)* | One language for host and core, so no FFI layer, no Node ABI rebuilds and no JSON hop to reach `zvs-core`. A much smaller install and memory footprint than a bundled Chromium. Capability-scoped IPC instead of a preload convention | A rewrite of ~22k lines of host TypeScript (Phase M). Multi-webview needs Tauri's `unstable` feature. Only WebView2 is verified. Electron APIs are replaced one by one, as listed below |
 | D11 | Account-mode providers | **Qwen only; no vendor whose web API demands a proof of work or other anti-automation challenge** *(decided 2026-10-19, ADR 0001)* | Account mode sends the requests the user's own signed-in page sends and nothing more; solving a vendor's anti-bot challenge would mean shipping code that defeats its abuse protection | DeepSeek is offered only through its official API (`openai-compatible`) or OpenRouter; existing `deepseek-web` rows are deleted by migration 0002 |
 | D12 | Inbound events | **No webhooks; integrations pull through supervised background workers (long polling, IDLE, interval polling)** *(decided 2026-10-28, ADR 0004)* | A desktop app has no public endpoint, and a listener open to the internet is a server product with its own attack surface | Event latency is the poll interval; events arrive only while the app runs |
+| D13 | Secrets | **A secret is a name, a value, a scope and metadata; no types, every picker lists every secret** *(decided 2026-11-02, ADR 0006)* | A type registry duplicated consumer configuration and hid usable secrets from pickers | Choosing the right secret is the user's job, helped by search |
 
 **D10, what replaced what.** `BrowserWindow` became a Tauri window with a `studio` webview.
 The preloads became capabilities: the studio webview may call only `ipc_call` and
@@ -493,8 +494,10 @@ Aggregates (initial): `secret`, `identity`, `provider`, `model`, `vector_store`,
 **Secrets at rest**: the secret *value* is encrypted with **Windows DPAPI** (current-user
 scope, called through the `windows` crate behind a `CryptoBackend` port; on other platforms
 the backend reports itself unavailable until verified), and the ciphertext is stored in SQLite;
-metadata (name, type, scope, tags, rotation date) is plaintext so the Secrets page can list
-and filter without decrypting. Decryption happens in a service, only at point of use, and a
+metadata (name, scope, tags, note, rotation date) is plaintext so the Secrets page can list
+and search without decrypting. Secrets have no types (D13, ADR 0006): the `type` column is a
+host-side kind, `user` for every secret the Secrets page shows and other values for
+host-internal credentials (account tokens), which `secrets.*` never lists or touches. Decryption happens in a service, only at point of use, and a
 decrypted value is never logged, never returned in a DTO, and never crosses IPC.
 
 ---
@@ -816,7 +819,14 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   switches. The `browser.*` tools are offered only after a user message carries the
   `/browser-use` command (`ChatCommand`, listed by `chat.commands`). The command then holds for
   the rest of the dialog, and the bundled `browser-use` skill's instructions go into the
-  system prompt. Pages can carry prompt injection, so the browser is never reachable by
+  system prompt. A message carries any number of commands (`commands: ChatCommand[]`) and of
+  **plugins** (`plugins`, integration account ids; TASK_050). Integration tools are offered only
+  for accounts attached as plugins by some user message of the dialog, as fixed tools with source
+  `command`; each attached account adds its provider's English `instructions()`, its label and
+  name and the wire names of its offered tools to the system prompt. The composer attaches them
+  through `/`: commands, then one entry per plugin kind with an enabled account (`/mail`,
+  `/github`, `/gitlab`, `/telegram`), and a kind with several accounts opens a sub-list of them.
+  The chips clear after each message. Scenarios and agentic sessions are unaffected. Pages can carry prompt injection, so the browser is never reachable by
   search. Core tools (`fs.*`, `code.run`, `shell.run`, `skill.load`) always go out with their
   schemas. When the other tools' schemas exceed `DEFERRED_TOKENS_MAX` (2000 tokens), those
   tools are **deferred**: the system prompt lists each by name and first line, and
@@ -1218,8 +1228,10 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `workers.list` and `workers.restart` expose the state, and the composition root disposes
   every worker at the `Stop` shutdown stage. There is no inbound HTTP (D12, ADR 0004).
 - **Integrations** (`zvs-host/src/integrations/`, TASK_048). An `IntegrationProvider` per
-  `IntegrationKind` (`mail | telegram | git`) provides `describe()` (a `FieldDescriptor`
-  list), `triggers()`, `tools()`, `test()`, `start()`, `stop()` and `call_tool()`. Accounts
+  `IntegrationKind` (`mail | telegram | github | gitlab`; the user-facing name is *plugin*)
+  provides `describe()` (a `FieldDescriptor` list), `instructions()` (for the chat plugin note),
+  `triggers()`, `tools()`, `test()`, `start()`, `stop()` and `call_tool()`. A user may connect
+  any number of accounts of each kind. Accounts
   live in `integration_account` with a non-secret config map. **A credential is a secret
   reference by construction:** a config value is a `{ secretId }` reference or a plain
   text/number/boolean. A `secret` field accepts only a reference, and any other value is
@@ -1241,8 +1253,15 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   A provider may narrow its tools per account (`account_tools(config)`), keep cursors in
   `integration_cursor` (`IntegrationSession::cursor` / `set_cursor`), react to a scenario run that
   finished `ok` for one of its events (`handled`, fed by `IntegrationService::run_watcher`), and
-  sign in through the browser (`sign_in`: loopback + PKCE, the grant saved as a secret into the
-  field the provider names). A tool spec marked `approved_per_call` resolves at `ask` minimum,
+  sign in through the browser (`sign_in`: loopback + PKCE or a device code, the grant saved as a
+  user secret into the field the provider names). A device-code flow reports its code through
+  `SignInRequest::prompt`: the service writes «Код подтверждения: …» to the activity log and
+  emits a step `{ domain: "integrations", accountId, phase: "device-code", userCode,
+  verificationUri, expiresAt }` on its own event stream, ended with the sign-in outcome. Tool
+  calls read and write cursors through `IntegrationToolCall::cursors`. The generic OAuth code
+  (grant, PKCE authorize URL, code exchange, refresh, device flow, `trusted_https_url`) lives in
+  `integrations/oauth.rs`; mail and git hosting use it, and the Copilot sign-in reuses the URL
+  check. A tool spec marked `approved_per_call` resolves at `ask` minimum,
   defers its approval, and the provider's `approval()` builds the request the user sees; the
   call then receives exactly the approved fields, so nothing other than what was shown runs.
 - **Mail** (`zvs-host/src/integrations/mail/`, TASK_049, DECISION: every send needs approval,
@@ -1263,6 +1282,39 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   any `untrusted: true` gets it wrapped in `<untrusted_content>` with an instruction in the
   system prompt. `mail.search` and `mail.read` are read-only; `markRead` (off by default) marks a
   message seen only after a run it started ends `ok`.
+- **Telegram** (`zvs-host/src/integrations/telegram/`, TASK_050, DECISION: bot account only).
+  Bot API over `reqwest`: `botToken` is a secret; the token never appears in an error, a log line
+  or the activity log. The worker calls `getMe`, then long-polls `getUpdates` (50 s) from the
+  `offset` cursor; the first start reads the latest update id and skips the backlog. Each
+  `message` or `channel_post` fires `telegram.message` with the update id as event id and a
+  payload whose text, caption, chat title, sender name and file name are `UntrustedTextDto`; the
+  last 50 messages are kept in the `recent` cursor for `telegram.recentMessages`.
+  `allowedChats` (ids or `@username`) filters what is emitted and where a bot may send.
+  `access`: `read` (default) or `readWrite`, which registers `telegram.sendMessage` and
+  `telegram.sendFile` (multipart, up to 50 MB) at `ask`. A 429 sleeps `retry_after` with the
+  wait in the worker detail; a tool retries once when the wait is at most 5 s. A rejected token
+  stops the worker as `failed`; a 409 (another poller or a webhook) retries with backoff.
+- **GitHub and GitLab** (`zvs-host/src/integrations/git/`, TASK_050). One
+  `GitHostingProvider` per kind over a shared client; `forge.rs` holds the endpoint and payload
+  differences. `auth`: `token` (a personal access token secret) or `oauth` — GitHub uses the
+  device flow (`/login/device/code`, the code shown to the user, polling with `slow_down`);
+  the client id is the account's `oauthClientId` or `GITHUB_CLIENT_ID` (empty until ZVS
+  registers an OAuth App, so the field is required for now). GitLab uses loopback + PKCE against
+  `<baseUrl>/oauth/*` with the user's application id (and secret for a confidential app) and
+  refreshes the grant. `baseUrl` covers GitHub Enterprise Server and self-hosted GitLab. The
+  worker polls each `repositories` entry every `pollSeconds` (120 s, at least 30 s): issues and
+  pull/merge requests by an updated-since cursor, comments (GitHub issue comments, GitLab
+  `commented` events), and branch heads; the first poll only records cursors. Every GET
+  remembers its ETag and sends `If-None-Match`, so an unchanged GitHub list costs no quota.
+  Triggers: `<kind>.issueOpened`, `.issueCommented`, `.pullRequestOpened`,
+  `.pullRequestUpdated` (event id includes `updated_at`), `.push` (one per new branch head);
+  every payload is marked untrusted and titles and bodies are `UntrustedTextDto`. Tools:
+  `<kind>.readFile`, `<kind>.listIssues`, and with `access: readWrite` `<kind>.createIssue`,
+  `<kind>.comment` and `<kind>.createPullRequest` at `ask`; the host refuses a write on a
+  read-only account. Rate limits: `x-ratelimit-*` / `ratelimit-*` headers are kept per account and
+  shown as the worker detail («Лимит API: осталось … из …»); a 403 with nothing remaining or a
+  429 makes the worker sleep until the reset or `retry-after` instead of failing, and a tool
+  retries once when the wait is at most 5 s. The plugin does not clone, commit or push.
 - **Tray and autostart** — with `app.tray` on, closing the studio window hides it. Runs,
   streams and downloads keep going, and only «Выход» in the tray menu goes through the shutdown
   coordinator. `app.autostart` is mirrored from the OS registration, which is the source of

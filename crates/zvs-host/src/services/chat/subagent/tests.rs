@@ -15,6 +15,7 @@ fn tool(key: &str, read_only: bool) -> OfferedTool {
         read_only,
         source: OfferedToolSource::Base,
         server: None,
+        plugin: None,
     }
 }
 

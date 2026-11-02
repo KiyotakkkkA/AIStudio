@@ -384,7 +384,6 @@ mod tests {
                 cipher: None,
                 cipher_version: 1,
                 hint: None,
-                fields: "{}".to_owned(),
                 tags: "[]".to_owned(),
                 note: None,
                 rotation_days: None,

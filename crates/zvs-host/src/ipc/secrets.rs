@@ -1,28 +1,23 @@
 use std::sync::Arc;
 
-use serde_json::Value;
 use zvs_contract::{
-    AppError, AppErrorCode, CreateSecretInput, SecretDto, SecretFields, SecretFilter, SecretInput,
-    SecretRef, SecretTypeSchema, SecretsListOutput, SecretsRemoveOutput, SecretsTypesOutput,
-    UpdateSecretInput, find_secret_type_schema, is_secret_type_key, secret_type_registry,
+    AppError, AppErrorCode, CreateSecretInput, SecretDto, SecretFilter, SecretInput, SecretRef,
+    SecretsListOutput, SecretsRemoveOutput, UpdateSecretInput,
 };
 
 use super::IpcServer;
 use crate::data::repositories::SecretFilter as RepositoryFilter;
-use crate::services::secret_fields::check_fields;
-use crate::services::secrets::{public_not_found, to_secret_dto, to_secret_summary_dto};
+use crate::services::secrets::{
+    USER_SECRET, public_not_found, to_secret_dto, to_secret_summary_dto,
+};
 use crate::services::{
     Plaintext, SecretCreateInput, SecretService, SecretSummary, SecretUpdateInput, Services,
 };
 
+pub const VALUE_REQUIRED: &str = "Значение секрета обязательно";
+
 pub fn register(server: &mut IpcServer) {
     server
-        .handle(
-            "secrets.types",
-            |_services: Arc<Services>, _input: ()| async move {
-                Ok::<SecretsTypesOutput, AppError>(secret_type_registry().to_vec())
-            },
-        )
         .handle(
             "secrets.list",
             |services: Arc<Services>, input: SecretFilter| async move {
@@ -68,50 +63,39 @@ fn list(secrets: &SecretService, input: &SecretFilter) -> Result<SecretsListOutp
     secrets
         .list(&RepositoryFilter {
             scope: input.scope,
-            r#type: input.r#type.map(|key| key.as_str()),
+            r#type: Some(USER_SECRET),
             query: input.query.as_deref(),
         })?
         .iter()
-        .filter(|secret| is_secret_type_key(&secret.r#type))
         .map(to_secret_summary_dto)
         .collect()
 }
 
 fn create(secrets: &SecretService, input: CreateSecretInput) -> Result<SecretDto, AppError> {
-    let schema = require_schema(input.r#type.as_str())?;
-    require_value_presence(schema, input.value.as_ref())?;
-    let fields = parse_fields(schema, &input.fields())?;
+    require_value(input.value.as_ref())?;
     let tags = input.tags();
     let created = secrets.create(SecretCreateInput {
         value: input.value.as_ref().map(Plaintext::from),
-        fields,
         tags,
         note: input.note,
         rotation_days: input
             .rotation_days
             .and_then(|days| i64::try_from(days).ok()),
         rotates_at: None,
-        ..SecretCreateInput::new(input.r#type.as_str(), input.name, input.scope)
+        ..SecretCreateInput::new(USER_SECRET, input.name, input.scope)
     })?;
     to_secret_dto(&created)
 }
 
 fn update(secrets: &SecretService, input: UpdateSecretInput) -> Result<SecretDto, AppError> {
     let id = input.id.to_string();
-    let current = require_public_secret(secrets, &id)?;
-    let schema = require_schema(&current.r#type)?;
-    let fields = input
-        .fields
-        .as_ref()
-        .map(|fields| parse_fields(schema, fields))
-        .transpose()?;
+    require_public_secret(secrets, &id)?;
     let updated = secrets.update(
         &id,
         SecretUpdateInput {
             name: input.name,
             scope: input.scope,
             value: input.value.as_ref().map(Plaintext::from),
-            fields,
             tags: input.tags,
             note: input.note.map(Some),
             rotation_days: input
@@ -125,65 +109,30 @@ fn update(secrets: &SecretService, input: UpdateSecretInput) -> Result<SecretDto
 
 fn require_public_secret(secrets: &SecretService, id: &str) -> Result<SecretSummary, AppError> {
     let secret = secrets.get(id)?;
-    if is_secret_type_key(&secret.r#type) {
+    if secret.r#type == USER_SECRET {
         Ok(secret)
     } else {
         Err(public_not_found())
     }
 }
 
-fn require_schema(r#type: &str) -> Result<&'static SecretTypeSchema, AppError> {
-    find_secret_type_schema(r#type).ok_or_else(|| {
-        AppError::new(AppErrorCode::ValidationFailed, "Неизвестный тип секрета")
-            .with_detail("field", "type")
-            .with_detail("type", r#type)
-    })
-}
-
-fn require_value_presence(
-    schema: &SecretTypeSchema,
-    value: Option<&SecretInput>,
-) -> Result<(), AppError> {
-    let required = schema.secret_field().is_some_and(|field| field.required);
-    if required && value.is_none_or(|value| value.expose().trim().is_empty()) {
-        Err(AppError::new(
-            AppErrorCode::ValidationFailed,
-            "Значение секрета обязательно",
+fn require_value(value: Option<&SecretInput>) -> Result<(), AppError> {
+    if value.is_none_or(|value| value.expose().trim().is_empty()) {
+        Err(
+            AppError::new(AppErrorCode::ValidationFailed, VALUE_REQUIRED)
+                .with_detail("field", "value"),
         )
-        .with_detail("field", "value")
-        .with_detail("type", schema.key.clone()))
     } else {
         Ok(())
     }
-}
-
-fn parse_fields(
-    schema: &SecretTypeSchema,
-    fields: &SecretFields,
-) -> Result<SecretFields, AppError> {
-    check_fields(schema, fields).map_err(|issues| {
-        AppError::new(
-            AppErrorCode::ValidationFailed,
-            "Поля не соответствуют схеме типа",
-        )
-        .with_detail("field", "fields")
-        .with_detail("type", schema.key.clone())
-        .with_detail(
-            "issues",
-            issues
-                .iter()
-                .map(|issue| issue.to_json())
-                .collect::<Vec<Value>>(),
-        )
-    })
 }
 
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
 
-    use serde_json::json;
-    use zvs_contract::{SecretScope, SecretTypeKey};
+    use serde_json::{Value, json};
+    use zvs_contract::SecretScope;
 
     use super::*;
     use crate::platform::clock::FakeClock;
@@ -212,11 +161,9 @@ mod tests {
 
     fn draft() -> Value {
         json!({
-            "type": "ollama",
             "name": "Ollama — personal",
             "scope": "personal",
             "value": VALUE,
-            "fields": {},
             "tags": ["llm"],
         })
     }
@@ -238,30 +185,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn secrets_types_returns_the_whole_registry() {
-        let host = host();
-        let server = server_for(&host);
-        let types = data(server.dispatch("secrets.types", Value::Null).await);
-        assert_eq!(
-            types
-                .as_array()
-                .expect("an array")
-                .iter()
-                .map(|schema| schema["key"].clone())
-                .collect::<Vec<_>>(),
-            SecretTypeKey::ALL
-                .iter()
-                .map(|key| json!(key.as_str()))
-                .collect::<Vec<_>>()
-        );
-        assert_eq!(
-            serde_json::from_value::<SecretsTypesOutput>(types).expect("parses"),
-            secret_type_registry()
-        );
-    }
-
-    #[tokio::test]
-    async fn secrets_create_stores_the_schema_fields_applies_defaults_and_returns_no_value() {
+    async fn secrets_create_returns_the_hint_and_no_value() {
         let host = host();
         let server = server_for(&host);
         let created = data(server.dispatch("secrets.create", draft()).await);
@@ -269,73 +193,29 @@ mod tests {
         assert!(created.get("cipher").is_none());
         assert!(!created.to_string().contains(VALUE));
         assert_eq!(created["hint"], json!("osk_live_…4f2a"));
-        assert_eq!(
-            created["fields"],
-            json!({ "baseUrl": "https://ollama.com/api" })
-        );
+        assert!(created.get("fields").is_none());
+        assert!(created.get("type").is_none());
         assert_eq!(created["usageCount"], json!(0));
         assert_eq!(created["rotationStatus"], json!("ok"));
         serde_json::from_value::<SecretDto>(created).expect("matches the contract");
     }
 
     #[tokio::test]
-    async fn secrets_create_rejects_an_unknown_field_an_unknown_type_and_a_missing_credential() {
+    async fn secrets_create_demands_a_value() {
         let host = host();
         let server = server_for(&host);
-        let unknown_field = server
-            .dispatch(
-                "secrets.create",
-                with(draft(), json!({ "fields": { "sneaky": "value" } })),
-            )
-            .await;
-        assert_eq!(code(&unknown_field), "VALIDATION_FAILED");
-        assert_eq!(
-            unknown_field["error"]["details"],
-            json!({
-                "field": "fields",
-                "type": "ollama",
-                "issues": [{ "path": "", "code": "unrecognized_keys" }],
-            })
-        );
         for payload in [
-            with(draft(), json!({ "type": "aws" })),
             with(draft(), json!({ "value": "   " })),
-            with(draft(), json!({ "fields": { "baseUrl": "not a url" } })),
+            json!({ "name": "Без значения", "scope": "personal", "tags": [] }),
         ] {
-            assert_eq!(
-                code(&server.dispatch("secrets.create", payload).await),
-                "VALIDATION_FAILED"
-            );
+            let response = server.dispatch("secrets.create", payload).await;
+            assert_eq!(code(&response), "VALIDATION_FAILED");
+            assert_eq!(response["error"]["message"], json!(VALUE_REQUIRED));
         }
         assert_eq!(
             data(server.dispatch("secrets.list", json!({})).await),
             json!([])
         );
-    }
-
-    #[tokio::test]
-    async fn secrets_create_demands_a_credential_for_every_type_in_the_registry() {
-        let host = host();
-        let server = server_for(&host);
-        for schema in secret_type_registry() {
-            let response = server
-                .dispatch(
-                    "secrets.create",
-                    json!({
-                        "type": schema.key,
-                        "name": format!("Без значения — {}", schema.key),
-                        "scope": "personal",
-                        "fields": {},
-                        "tags": [],
-                    }),
-                )
-                .await;
-            assert_eq!(code(&response), "VALIDATION_FAILED", "{}", schema.key);
-            assert_eq!(
-                response["error"]["message"],
-                json!("Значение секрета обязательно")
-            );
-        }
     }
 
     #[tokio::test]
@@ -361,14 +241,6 @@ mod tests {
                 .await,
         );
         assert_eq!(fetched, created);
-        assert_eq!(
-            data(
-                server
-                    .dispatch("secrets.list", json!({ "type": "mistral" }))
-                    .await
-            ),
-            json!([])
-        );
         assert_eq!(
             data(
                 server
@@ -405,7 +277,6 @@ mod tests {
         );
         assert_eq!(renamed["name"], json!("Ollama — work"));
         assert_eq!(renamed["hint"], created["hint"]);
-        assert_eq!(renamed["fields"], created["fields"]);
         assert_eq!(host.crypto.encrypt_calls(), encrypt_calls);
 
         let replaced = data(
@@ -502,36 +373,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn secrets_update_validates_replacement_fields_against_the_stored_type_schema() {
-        let host = host();
-        let server = server_for(&host);
-        let created = data(server.dispatch("secrets.create", draft()).await);
-        assert_eq!(
-            code(
-                &server
-                    .dispatch(
-                        "secrets.update",
-                        json!({ "id": created["id"], "fields": { "sneaky": 1 } }),
-                    )
-                    .await
-            ),
-            "VALIDATION_FAILED"
-        );
-        let updated = data(
-            server
-                .dispatch(
-                    "secrets.update",
-                    json!({ "id": created["id"], "fields": {} }),
-                )
-                .await,
-        );
-        assert_eq!(
-            updated["fields"],
-            json!({ "baseUrl": "https://ollama.com/api" })
-        );
-    }
-
-    #[tokio::test]
     async fn secrets_remove_deletes_an_unused_secret_and_names_the_consumers_of_a_used_one() {
         let host = host();
         let server = server_for(&host);
@@ -620,7 +461,7 @@ mod tests {
             ),
             (
                 "secrets.create",
-                with(draft(), json!({ "fields": { "x": VALUE } })),
+                with(draft(), json!({ "note": VALUE, "value": "  " })),
             ),
             ("secrets.create", draft()),
             ("secrets.remove", json!({ "id": created["id"] })),

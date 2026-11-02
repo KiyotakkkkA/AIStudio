@@ -8,7 +8,11 @@
     "value": "telegram"
   },
   {
-    "name": "git",
-    "value": "git"
+    "name": "github",
+    "value": "github"
+  },
+  {
+    "name": "gitlab",
+    "value": "gitlab"
   }
 ]

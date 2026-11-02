@@ -27,7 +27,6 @@ pub struct SecretDraft {
     pub cipher: Option<Vec<u8>>,
     pub cipher_version: i64,
     pub hint: Option<String>,
-    pub fields: String,
     pub tags: String,
     pub note: Option<String>,
     pub rotation_days: Option<i64>,
@@ -44,7 +43,6 @@ pub struct SecretPatch {
     pub cipher: Option<Option<Vec<u8>>>,
     pub cipher_version: Option<i64>,
     pub hint: Option<Option<String>>,
-    pub fields: Option<String>,
     pub tags: Option<String>,
     pub note: Option<Option<String>>,
     pub rotation_days: Option<Option<i64>>,
@@ -75,7 +73,6 @@ impl SecretPatch {
         );
         push("cipher_version", self.cipher_version.map(SqlValue::Integer));
         push("hint", self.hint.as_ref().map(nullable_text));
-        push("fields", self.fields.as_deref().map(text));
         push("tags", self.tags.as_deref().map(text));
         push("note", self.note.as_ref().map(nullable_text));
         push(
@@ -206,8 +203,8 @@ impl<'c> SecretRepository<'c> {
             .unwrap_or_else(|| new_id().hyphenated().to_string());
         self.connection
             .prepare_cached(&format!(
-                "INSERT INTO secret (id, type, name, scope, cipher, cipher_version, hint, fields, tags, note, rotation_days, rotates_at, created_at, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14) RETURNING {}",
+                "INSERT INTO secret (id, type, name, scope, cipher, cipher_version, hint, tags, note, rotation_days, rotates_at, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13) RETURNING {}",
                 SecretRow::COLUMNS
             ))?
             .query_row(
@@ -219,7 +216,6 @@ impl<'c> SecretRepository<'c> {
                     draft.cipher,
                     draft.cipher_version,
                     draft.hint,
-                    draft.fields,
                     draft.tags,
                     draft.note,
                     draft.rotation_days,
@@ -342,7 +338,6 @@ mod tests {
             cipher: Some(b"ciphertext".to_vec()),
             cipher_version: 1,
             hint: Some("…4f2a".to_owned()),
-            fields: r#"{"baseUrl":"https://ollama.com/api"}"#.to_owned(),
             tags: r#"["llm","cloud"]"#.to_owned(),
             note: None,
             rotation_days: None,

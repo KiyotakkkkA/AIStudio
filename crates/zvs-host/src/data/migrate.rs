@@ -220,6 +220,21 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0034_integration_cursor",
         sql: include_str!("../../migrations/0034_integration_cursor.sql"),
     },
+    Migration {
+        id: 35,
+        name: "0035_secret_kinds",
+        sql: include_str!("../../migrations/0035_secret_kinds.sql"),
+    },
+    Migration {
+        id: 36,
+        name: "0036_integration_git_kinds",
+        sql: include_str!("../../migrations/0036_integration_git_kinds.sql"),
+    },
+    Migration {
+        id: 37,
+        name: "0037_message_commands",
+        sql: include_str!("../../migrations/0037_message_commands.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -711,14 +726,140 @@ mod tests {
         assert_eq!(
             query(
                 &database,
-                "SELECT coalesce(command, 'none') FROM message ORDER BY id"
+                "SELECT commands || plugins FROM message ORDER BY id"
             ),
-            ["none", "none"]
+            ["[][]", "[][]"]
         );
         assert!(
             query(
                 &database,
                 "SELECT name FROM pragma_table_info('conversation') WHERE name = 'enabled_tools'"
+            )
+            .is_empty()
+        );
+    }
+
+    #[test]
+    fn user_secrets_lose_their_types_and_fields_and_keep_their_names_unique() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..35], &options(&backups, &clock)).expect("applies");
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    r#"INSERT INTO secret (id, type, name, scope, fields, tags, note, created_at, updated_at) VALUES ('s1', 'ollama', 'Main', 'personal', '{"baseUrl":"https://ollama.com/api"}', '[]', NULL, 1, 1), ('s2', 'openrouter', 'Main', 'personal', '{}', '[]', NULL, 1, 1), ('s3', 'custom', 'Bot', 'personal', '{"description":"Telegram bot"}', '[]', NULL, 1, 1), ('s4', 'custom', 'Kept', 'personal', '{"description":"ignored"}', '[]', 'own note', 1, 1), ('s5', 'account-token', 'Main', 'personal', '{}', '[]', NULL, 1, 1);"#,
+                )?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        assert_eq!(
+            query(
+                &database,
+                "SELECT type || ' ' || name || ' ' || coalesce(note, '-') FROM secret ORDER BY id"
+            ),
+            [
+                "user Main -",
+                "user Main · openrouter -",
+                "user Bot Telegram bot",
+                "user Kept own note",
+                "account-token Main -",
+            ]
+        );
+        assert!(
+            query(
+                &database,
+                "SELECT name FROM pragma_table_info('secret') WHERE name = 'fields'"
+            )
+            .is_empty()
+        );
+    }
+
+    #[test]
+    fn integration_accounts_accept_github_and_gitlab_and_keep_their_history() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..36], &options(&backups, &clock)).expect("applies");
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    r#"INSERT INTO integration_account (id, kind, name, created_at, updated_at) VALUES ('a1', 'mail', 'Почта', 1, 1), ('a2', 'git', 'Старый', 1, 1);
+                    INSERT INTO integration_event (account_id, trigger, event_id, received_at) VALUES ('a1', 'mail.received', 'e1', 1), ('a2', 'git.push', 'e2', 1);
+                    INSERT INTO integration_activity (account_id, at, level, message) VALUES ('a1', 1, 'info', 'Подключение установлено');
+                    INSERT INTO integration_cursor (account_id, key, value, updated_at) VALUES ('a1', 'INBOX', '1:2', 1);"#,
+                )?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        assert_eq!(
+            query(&database, "SELECT id FROM integration_account"),
+            ["a1"]
+        );
+        assert_eq!(
+            query(&database, "SELECT event_id FROM integration_event"),
+            ["e1"]
+        );
+        assert_eq!(
+            query(&database, "SELECT message FROM integration_activity"),
+            ["Подключение установлено"]
+        );
+        assert_eq!(
+            query(&database, "SELECT value FROM integration_cursor"),
+            ["1:2"]
+        );
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    "INSERT INTO integration_account (id, kind, name, created_at, updated_at) VALUES ('a3', 'github', 'GitHub', 1, 1), ('a4', 'gitlab', 'GitLab', 1, 1);
+                    INSERT INTO integration_cursor (account_id, key, value, updated_at) VALUES ('a3', 'o/r:items', '1', 1);
+                    DELETE FROM integration_account WHERE id = 'a3';",
+                )?;
+                Ok(())
+            })
+            .expect("the new kinds are accepted and still cascade");
+        assert!(
+            query(
+                &database,
+                "SELECT value FROM integration_cursor WHERE account_id = 'a3'"
+            )
+            .is_empty()
+        );
+        assert!(
+            database
+                .with_connection(|connection| Ok(connection.execute_batch(
+                    "INSERT INTO integration_account (id, kind, name, created_at, updated_at) VALUES ('a5', 'git', 'x', 1, 1)"
+                )?))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn a_stored_command_becomes_a_one_item_command_list() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..37], &options(&backups, &clock)).expect("applies");
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    r#"INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, created_at, updated_at) VALUES ('c1', 't', 'p', 'm', '{}', '', '[]', 1, 1);
+                    INSERT INTO message (id, conversation_id, role, content, citations, offered_tools, command, tokens_in, tokens_out, usage_estimated, duration_ms, partial, created_at) VALUES ('m1', 'c1', 'user', 'x', '[]', '[]', 'goal', 0, 0, 1, 0, 0, 1), ('m2', 'c1', 'user', 'y', '[]', '[]', NULL, 0, 0, 1, 0, 0, 2);"#,
+                )?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        assert_eq!(
+            query(
+                &database,
+                "SELECT commands || ' ' || plugins FROM message ORDER BY id"
+            ),
+            [r#"["goal"] []"#, "[] []"]
+        );
+        assert!(
+            query(
+                &database,
+                "SELECT name FROM pragma_table_info('message') WHERE name = 'command'"
             )
             .is_empty()
         );

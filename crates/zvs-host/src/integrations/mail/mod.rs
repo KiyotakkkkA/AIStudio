@@ -632,7 +632,7 @@ impl IntegrationProvider for MailProvider {
         let grant = oauth::exchange(
             &self.http,
             CodeExchange {
-                preset: &preset,
+                provider: preset.key,
                 token_endpoint: self.token_endpoint(&preset),
                 client,
                 code: &code,

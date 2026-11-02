@@ -26,6 +26,7 @@ import {
   type RunId,
   type ChatAttachDto,
   type ChatCitationDto,
+  type ChatCommand,
   type ChatCommandDto,
   type ChatContextDto,
   type ChatContextInput,
@@ -36,6 +37,9 @@ import {
   type DocumentSelectionDto,
   type FolderAccessAnswer,
   type FolderGrantScope,
+  type IntegrationAccountDto,
+  type IntegrationId,
+  type IntegrationKind,
   type McpServerDto,
   type MessageId,
   type ProviderDto,
@@ -63,7 +67,7 @@ import SiteIcons from "./SiteIcons";
 import ExplorerStore from "./explorer/ExplorerStore";
 import TerminalStore from "../terminal/TerminalStore";
 import BackgroundShellStore from "../backgroundShells/BackgroundShellStore";
-import { matchCommands, parseCommand } from "./chatCommands";
+import { menuEntries, parseCommands, withoutSlashToken, type MenuEntry } from "./chatCommands";
 import GoalStore from "./GoalStore";
 import QueueStore from "./QueueStore";
 import SubagentSteps, { subagentLabel, type SubagentLabel } from "./SubagentSteps";
@@ -99,8 +103,10 @@ export default class ChatStore {
   adapters: AdapterDescriptorDto[] = [];
   servers: McpServerDto[] = [];
   commands: ChatCommandDto[] = [];
+  pluginAccounts: IntegrationAccountDto[] = [];
   commandIndex = 0;
   commandsDismissed = false;
+  pickingPlugin: IntegrationKind | null = null;
   context: ChatContextDto | null = null;
   providerUsage: ProviderUsageDto | null = null;
   providerUsageError: string | null = null;
@@ -524,9 +530,22 @@ export default class ChatStore {
   useMemorySwitch(source: () => boolean) {
     this.memoryTool = source;
   }
-  get commandMatches() {
-    if (this.composer.command !== null || this.commandsDismissed) return [];
-    return matchCommands(this.commands, this.composer.text);
+  get commandMatches(): MenuEntry[] {
+    if (this.commandsDismissed) return [];
+    return menuEntries({
+      commands: this.commands,
+      accounts: this.pluginAccounts,
+      attachedCommands: this.composer.commands,
+      attachedPlugins: this.composer.plugins,
+      text: this.composer.text,
+      picking: this.pickingPlugin,
+    });
+  }
+  get attachedPlugins(): IntegrationAccountDto[] {
+    return this.composer.plugins.flatMap((id) => {
+      const account = this.pluginAccounts.find((entry) => entry.id === id);
+      return account === undefined ? [] : [account];
+    });
   }
   typeText(value: string) {
     this.composer.setText(value);
@@ -539,17 +558,39 @@ export default class ChatStore {
     if (count === 0) return;
     this.commandIndex = (this.commandIndex + step + count) % count;
   }
-  completeCommand(command = this.commandMatches[this.commandIndex]?.command) {
-    if (command === undefined) return;
-    this.composer.setCommand(command);
-    this.composer.setText("");
+  completeCommand(entry: MenuEntry | undefined = this.commandMatches[this.commandIndex]) {
+    if (entry === undefined) return;
     this.commandIndex = 0;
+    if (entry.type === "account") {
+      this.composer.addPlugin(entry.account.id);
+      this.pickingPlugin = null;
+      return;
+    }
+    this.composer.setText(withoutSlashToken(this.composer.text));
+    if (entry.type === "command") {
+      this.composer.addCommand(entry.command);
+      return;
+    }
+    const [only, ...others] = entry.accounts;
+    if (only !== undefined && others.length === 0) this.composer.addPlugin(only.id);
+    else this.pickingPlugin = entry.plugin;
   }
   dismissCommands() {
+    if (this.pickingPlugin !== null) {
+      this.pickingPlugin = null;
+      return;
+    }
     this.commandsDismissed = true;
   }
-  clearCommand() {
-    this.composer.setCommand(null);
+  removeCommand(command: ChatCommand) {
+    this.composer.removeCommand(command);
+    this.goalEmpty = false;
+  }
+  removePlugin(id: IntegrationId) {
+    this.composer.removePlugin(id);
+  }
+  removeLastAttachment() {
+    this.composer.removeLastAttachment();
     this.goalEmpty = false;
   }
   get standaloneApprovals() {
@@ -584,7 +625,7 @@ export default class ChatStore {
       !this.loading &&
       this.active !== null &&
       (this.generating || this.goals.active) &&
-      this.composer.command === null &&
+      !this.composer.hasAttachments &&
       !this.queue.full &&
       this.composer.text.trim().length > 0
     );
@@ -593,7 +634,7 @@ export default class ChatStore {
     return this.active !== null && (this.generating || this.goals.active);
   }
   get goalCommand() {
-    return this.composer.command === GOAL_COMMAND;
+    return this.composer.commands.includes(GOAL_COMMAND);
   }
   get canRetry() {
     return !this.generating && this.retryText.length > 0;
@@ -628,19 +669,22 @@ export default class ChatStore {
     const providerId = this.composer.providerId;
     const modelId = this.model?.externalId;
     if (!providerId || !modelId || !this.available) return null;
-    const command = this.composer.command ?? undefined;
+    const commands = [...this.composer.commands];
+    const plugins = [...this.composer.plugins];
     if (this.active)
       return {
         conversationId: this.active.id,
         providerId,
         modelId,
-        command,
+        commands,
+        plugins,
       };
     return {
       providerId,
       modelId,
       systemPrompt: this.composer.systemPrompt,
-      command,
+      commands,
+      plugins,
     };
   }
   async refreshContext() {
@@ -816,20 +860,33 @@ export default class ChatStore {
     this.error = null;
     const revision = ++this.revision;
     try {
-      const [conversations, summaries, stores, tools, accounts, adapters, servers, commands, last] =
-        await Promise.all([
-          this.ipc.call("chat.conversations.list", undefined),
-          this.ipc.call("providers.list", { capability: "text", enabled: true }),
-          this.ipc.call("vectorStores.list", undefined),
-          this.ipc
-            .call("tools.list", { includeUnavailable: true })
-            .catch((): ToolDto[] => this.tools),
-          this.ipc.call("accounts.list", undefined).catch((): AccountDto[] => []),
-          this.ipc.call("providers.adapters", undefined).catch((): AdapterDescriptorDto[] => []),
-          this.ipc.call("mcp.list", undefined).catch((): McpServerDto[] => this.servers),
-          this.ipc.call("chat.commands", undefined).catch((): ChatCommandDto[] => this.commands),
-          this.lastConversation(),
-        ]);
+      const [
+        conversations,
+        summaries,
+        stores,
+        tools,
+        accounts,
+        adapters,
+        servers,
+        commands,
+        last,
+        pluginAccounts,
+      ] = await Promise.all([
+        this.ipc.call("chat.conversations.list", undefined),
+        this.ipc.call("providers.list", { capability: "text", enabled: true }),
+        this.ipc.call("vectorStores.list", undefined),
+        this.ipc
+          .call("tools.list", { includeUnavailable: true })
+          .catch((): ToolDto[] => this.tools),
+        this.ipc.call("accounts.list", undefined).catch((): AccountDto[] => []),
+        this.ipc.call("providers.adapters", undefined).catch((): AdapterDescriptorDto[] => []),
+        this.ipc.call("mcp.list", undefined).catch((): McpServerDto[] => this.servers),
+        this.ipc.call("chat.commands", undefined).catch((): ChatCommandDto[] => this.commands),
+        this.lastConversation(),
+        this.ipc
+          .call("integrations.list", undefined)
+          .catch((): IntegrationAccountDto[] => this.pluginAccounts),
+      ]);
       const providers = await Promise.all(
         summaries.map((provider) =>
           this.ipc.call("providers.get", { id: provider.id, selectedOnly: true }),
@@ -845,6 +902,7 @@ export default class ChatStore {
         this.adapters = adapters;
         this.servers = servers;
         this.commands = commands;
+        this.pluginAccounts = pluginAccounts;
         this.remembered = last;
         if (!this.composer.providerId && providers[0]) this.composer.selectProvider(providers[0]);
         this.loading = false;
@@ -1095,14 +1153,18 @@ export default class ChatStore {
       return;
     }
     if (!this.canSend) return;
-    const typed =
-      this.composer.command === null ? parseCommand(this.commands, this.composer.text) : null;
+    const typed = parseCommands(this.commands, this.composer.text);
     if (typed !== null && typed.text.length === 0) {
-      this.completeCommand(typed.command);
-      if (typed.command === GOAL_COMMAND) this.goalEmpty = true;
+      for (const command of typed.commands) this.composer.addCommand(command);
+      this.composer.setText("");
+      if (typed.commands.includes(GOAL_COMMAND)) this.goalEmpty = true;
       return;
     }
-    const command = this.composer.command ?? typed?.command;
+    const commands = [...this.composer.commands];
+    for (const command of typed?.commands ?? []) {
+      if (!commands.includes(command)) commands.push(command);
+    }
+    const plugins = [...this.composer.plugins];
     const text = typed?.text ?? this.composer.text.trim();
     this.sending = true;
     this.runStartedAt = Date.now();
@@ -1127,7 +1189,8 @@ export default class ChatStore {
         modelId: this.composer.modelId,
         settings: { temperature: this.composer.temperature },
         selections: [...this.composer.selections],
-        command,
+        commands,
+        plugins,
         vendor: this.vendorOptions,
       });
       const sentSelections = [...this.composer.selections];
@@ -1136,7 +1199,7 @@ export default class ChatStore {
         this.lastSeq = -1;
         this.liveSelections = sentSelections;
         this.composer.setText("");
-        this.composer.setCommand(null);
+        this.composer.clearAttachments();
         this.composer.clearSelections();
         this.sending = false;
         if (this.mounted) this.subscribe();

@@ -9,6 +9,9 @@ import {
   contract,
   type ChatContextToolDto,
   type Contract,
+  type IntegrationAccountDto,
+  type IntegrationId,
+  type IntegrationKind,
 } from "@zvs/shared";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
@@ -28,8 +31,10 @@ import {
 } from "../../src/renderer/features/chat/toolSets.ts";
 import {
   commandText,
-  matchCommands,
-  parseCommand,
+  menuEntries,
+  parseCommands,
+  slashQuery,
+  withoutSlashToken,
 } from "../../src/renderer/features/chat/chatCommands.ts";
 import { durationLabel } from "../../src/renderer/features/chat/processCopy.ts";
 import { provider } from "./providerFixtures.ts";
@@ -82,6 +87,34 @@ const browserUse = {
   command: "browser-use",
   description: "Работа во встроенном браузере: открытие и чтение страниц, действия на сайтах",
 } as const;
+const goal = {
+  command: "goal",
+  description: "Цель",
+} as const;
+function account(
+  id: string,
+  kind: IntegrationKind,
+  name: string,
+  enabled = true,
+): IntegrationAccountDto {
+  return {
+    id: `0199aa22-2222-7222-8222-00000000000${id}` as IntegrationId,
+    kind,
+    name,
+    enabled,
+    config: {},
+    status: enabled ? "running" : "disabled",
+    statusDetail: null,
+    lastActivityAt: null,
+    counters: { events: 0, duplicates: 0, runs: 0, toolCalls: 0, errors: 0 },
+    createdAt: 1,
+    updatedAt: 1,
+  };
+}
+const work = account("1", "github", "Работа");
+const personal = account("2", "github", "Личный");
+const bot = account("3", "telegram", "Бот");
+const off = account("4", "gitlab", "Отключён", false);
 const baseItems: ChatContextToolDto[] = [
   { key: "fs.read", tokens: 30, source: "base" },
   { key: "chat.ask", tokens: 20, source: "base" },
@@ -93,17 +126,17 @@ function setup() {
     .handle("chat.conversations.list", () => [detail])
     .handle("chat.conversations.get", () => detail)
     .handle("chat.conversations.create", () => detail)
-    .handle("chat.commands", () => [browserUse])
+    .handle("chat.commands", () => [browserUse, goal])
+    .handle("integrations.list", () => [work, personal, bot, off])
     .handle("providers.list", () => [saved])
     .handle("providers.get", () => saved)
     .handle("vectorStores.list", () => [])
     .handle("tools.list", () => [tool("mcp.docs.search"), tool("fs.read", { source: "builtin" })])
     .handle("chat.send", () => handle)
     .handle("chat.context", (input) => {
-      const toolItems: ChatContextToolDto[] =
-        input.command === "browser-use"
-          ? [...baseItems, { key: "browser.navigate", tokens: 50, source: "command" }]
-          : baseItems;
+      const toolItems: ChatContextToolDto[] = input.commands.includes("browser-use")
+        ? [...baseItems, { key: "browser.navigate", tokens: 50, source: "command" }]
+        : baseItems;
       const tools = toolItems.reduce((sum, item) => sum + item.tokens, 0);
       return {
         contextWindow: 8192,
@@ -126,7 +159,7 @@ function setup() {
 test("the tools badge follows the host's breakdown and a command adds its tools", async () => {
   const { store, bridge, events } = setup();
   await store.mount();
-  expect(store.commands).toEqual([browserUse]);
+  expect(store.commands).toEqual([browserUse, goal]);
   await vi.waitFor(() => expect(store.contextUsed).toBe(62));
   expect(store.toolSections).toEqual([{ title: BASE_TOOLS_TITLE, items: baseItems }]);
 
@@ -135,59 +168,101 @@ test("the tools badge follows the host's breakdown and a command adds its tools"
   await vi.waitFor(() => expect(store.contextUsed).toBe(112));
   expect(
     bridge.calls.filter((call) => call.channel === "chat.context").at(-1)?.payload,
-  ).toMatchObject({ modelId: saved.models[0]!.externalId, command: "browser-use" });
+  ).toMatchObject({
+    modelId: saved.models[0]!.externalId,
+    commands: ["browser-use"],
+    plugins: [],
+  });
   expect(store.toolSections.map((section) => section.title)).toEqual([
     BASE_TOOLS_TITLE,
     COMMAND_TOOLS_TITLE,
   ]);
 
-  store.clearCommand();
+  store.removeCommand("browser-use");
   await vi.waitFor(() => expect(store.contextUsed).toBe(62));
   store.dispose();
   events.dispose();
 });
 
-test("a slash opens the command list, the keys move through it and a pick becomes a chip", async () => {
+test("a slash lists commands and plugins, a pick becomes a chip and more can follow", async () => {
   const { store, events } = setup();
   await store.mount();
   expect(store.commandMatches).toEqual([]);
 
   store.typeText("/");
-  expect(store.commandMatches).toEqual([browserUse]);
-  store.moveCommand(1);
-  expect(store.commandIndex).toBe(0);
+  expect(store.commandMatches.map((entry) => entry.label)).toEqual([
+    "/browser-use",
+    "/goal",
+    "/github",
+    "/telegram",
+  ]);
+  store.moveCommand(-1);
+  expect(store.commandIndex).toBe(3);
   store.typeText("/brx");
-  expect(store.commandMatches).toEqual([]);
-  store.typeText("/browser-use now");
   expect(store.commandMatches).toEqual([]);
 
   store.typeText("/b");
   store.dismissCommands();
   expect(store.commandMatches).toEqual([]);
-  store.typeText("/br");
-  expect(store.commandMatches).toEqual([browserUse]);
-
+  store.typeText("Найди /br");
   store.completeCommand();
-  expect(store.composer.command).toBe("browser-use");
-  expect(store.composer.text).toBe("");
-  store.typeText("/");
+  expect(store.composer.commands).toEqual(["browser-use"]);
+  expect(store.composer.text).toBe("Найди ");
+
+  store.typeText("Найди /");
+  expect(store.commandMatches.map((entry) => entry.label)).toEqual([
+    "/goal",
+    "/github",
+    "/telegram",
+  ]);
+  store.typeText("Найди /go");
+  store.completeCommand();
+  expect(store.composer.commands).toEqual(["browser-use", "goal"]);
+
+  store.typeText("Найди /tel");
+  store.completeCommand();
+  expect(store.composer.plugins).toEqual([bot.id]);
+
+  store.typeText("Найди /gith");
+  store.completeCommand();
+  expect(store.pickingPlugin).toBe("github");
+  expect(store.composer.text).toBe("Найди ");
+  expect(store.commandMatches.map((entry) => entry.label)).toEqual(["Работа", "Личный"]);
+  store.moveCommand(1);
+  store.completeCommand();
+  expect(store.pickingPlugin).toBeNull();
+  expect(store.composer.plugins).toEqual([bot.id, personal.id]);
+  expect(store.attachedPlugins.map((entry) => entry.name)).toEqual(["Бот", "Личный"]);
+
+  store.typeText("Найди /gith");
+  store.completeCommand();
+  expect(store.composer.plugins).toEqual([bot.id, personal.id, work.id]);
+  store.typeText("/git");
   expect(store.commandMatches).toEqual([]);
+
+  store.typeText("");
+  store.removeLastAttachment();
+  expect(store.composer.plugins).toEqual([bot.id, personal.id]);
   store.dispose();
   events.dispose();
 });
 
-test("a turn carries its command once and a typed command is understood on send", async () => {
+test("a turn carries its commands and plugins once and typed commands are understood on send", async () => {
   const { store, bridge, events } = setup();
   await store.mount();
   store.typeText("/b");
+  store.completeCommand();
+  store.typeText("/tel");
   store.completeCommand();
   store.typeText("Открой расписание");
   await store.send();
   expect(bridge.calls.find((call) => call.channel === "chat.send")?.payload).toMatchObject({
     text: "Открой расписание",
-    command: "browser-use",
+    commands: ["browser-use"],
+    plugins: [bot.id],
   });
-  expect(store.composer.command).toBeNull();
+  expect(store.composer.commands).toEqual([]);
+  expect(store.composer.plugins).toEqual([]);
   expect(
     bridge.calls.find((call) => call.channel === "chat.conversations.create")?.payload,
   ).not.toHaveProperty("enabledTools");
@@ -197,39 +272,51 @@ test("a turn carries its command once and a typed command is understood on send"
   store.typeText("/browser-use");
   await vi.waitFor(() => expect(store.canSend).toBe(true));
   await store.send();
-  expect(store.composer.command).toBe("browser-use");
+  expect(store.composer.commands).toEqual(["browser-use"]);
   expect(bridge.calls.filter((call) => call.channel === "chat.send")).toHaveLength(1);
 
-  store.clearCommand();
-  store.typeText("/browser-use   Следующая страница ");
+  store.removeCommand("browser-use");
+  store.typeText("/browser-use /goal  Следующая страница ");
   await store.send();
   expect(bridge.calls.filter((call) => call.channel === "chat.send").at(-1)?.payload).toMatchObject(
-    { text: "Следующая страница", command: "browser-use" },
+    { text: "Следующая страница", commands: ["browser-use", "goal"], plugins: [] },
   );
   events.dispatch({ type: "end", ...handle, seq: 2, ts: Date.now(), outcome: { status: "ok" } });
   await vi.waitFor(() => expect(store.generating).toBe(false));
-
-  store.typeText("/unknown привет");
-  await vi.waitFor(() => expect(store.canSend).toBe(true));
-  await store.send();
-  const last = bridge.calls.filter((call) => call.channel === "chat.send").at(-1)?.payload;
-  expect(last).toMatchObject({ text: "/unknown привет" });
-  expect(last?.command).toBeUndefined();
   store.dispose();
   events.dispose();
 });
 
-test("commands match by prefix and parse only when known", () => {
-  expect(matchCommands([browserUse], "/BR")).toEqual([browserUse]);
-  expect(matchCommands([browserUse], "br")).toEqual([]);
-  expect(matchCommands([browserUse], "/br x")).toEqual([]);
-  expect(parseCommand([browserUse], "  /Browser-Use  найди\nрасписание ")).toEqual({
-    command: "browser-use",
+test("commands match the slash token at the caret and parse only when known", () => {
+  expect(slashQuery("/BR")).toBe("br");
+  expect(slashQuery("br")).toBeNull();
+  expect(slashQuery("/br x")).toBeNull();
+  expect(slashQuery("Найди /gi")).toBe("gi");
+  expect(slashQuery("a/b")).toBeNull();
+  expect(withoutSlashToken("Найди /gi")).toBe("Найди ");
+  expect(
+    menuEntries({
+      commands: [browserUse, goal],
+      accounts: [work, off],
+      attachedCommands: ["goal"],
+      attachedPlugins: [],
+      text: "/",
+      picking: null,
+    }).map((entry) => [entry.label, entry.description]),
+  ).toEqual([
+    ["/browser-use", browserUse.description],
+    ["/github", "Файлы, задачи и запросы на слияние · Работа"],
+  ]);
+  expect(parseCommands([browserUse, goal], "  /Browser-Use  найди\nрасписание ")).toEqual({
+    commands: ["browser-use"],
     text: "найди\nрасписание",
   });
-  expect(parseCommand([browserUse], "/browser-use")).toEqual({ command: "browser-use", text: "" });
-  expect(parseCommand([browserUse], "/deploy now")).toBeNull();
-  expect(parseCommand([browserUse], "no slash")).toBeNull();
+  expect(parseCommands([browserUse, goal], "/goal /browser-use")).toEqual({
+    commands: ["goal", "browser-use"],
+    text: "",
+  });
+  expect(parseCommands([browserUse], "/deploy now")).toBeNull();
+  expect(parseCommands([browserUse], "no slash")).toBeNull();
   expect(commandText("browser-use")).toBe("/browser-use");
 });
 

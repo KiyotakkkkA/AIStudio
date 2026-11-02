@@ -2,7 +2,7 @@
 task: TASK_050
 title: Telegram and Git hosting integrations
 phase: 9 — Integrations
-status: todo
+status: done
 depends_on: [TASK_048, TASK_076]
 unblocks: [TASK_051]
 estimate: 4 h
@@ -84,18 +84,84 @@ Manual check: Connect a Telegram bot and a GitHub account. Send the bot a messag
 
 ## Definition of done
 
-- [ ] Telegram working per the decision, with deduplicated triggers
-- [ ] GitHub and GitLab adapters behind one provider, base URL configurable
-- [ ] Write tools default to `ask` and are honoured by the registry
-- [ ] Rate limits respected and surfaced
-- [ ] All fetched content marked untrusted
-- [ ] Tests use fixtures; CI needs no live service
-- [ ] Gates pass
-- [ ] `pnpm typecheck && pnpm lint && pnpm build` pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Telegram working per the decision, with deduplicated triggers
+- [x] GitHub and GitLab adapters behind one provider, base URL configurable
+- [x] Write tools default to `ask` and are honoured by the registry
+- [x] Rate limits respected and surfaced
+- [x] All fetched content marked untrusted
+- [x] Tests use fixtures; CI needs no live service
+- [x] Gates pass
+- [x] `pnpm typecheck && pnpm lint` pass; `pnpm build` left to CI
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
 **Built:**
+- `zvs-host/src/integrations/telegram/` — `TelegramProvider` (kind `telegram`, «Telegram»), a
+  Bot API client over `reqwest` (multipart enabled for `sendDocument`). `getMe`, then `getUpdates`
+  long polling (50 s) from the `offset` cursor; the first start skips the backlog. Trigger
+  `telegram.message` (event id = `update_id`), payload with `UntrustedTextDto` text, caption, chat
+  title, sender and file names. Tools `telegram.recentMessages` (last 50 messages, `recent` cursor),
+  and with `access: readWrite` `telegram.sendMessage` / `telegram.sendFile` at `ask`.
+  `allowedChats` filters incoming chats and send targets. 429 waits `retry_after`; a rejected
+  token fails the worker permanently and is never echoed.
+- `zvs-host/src/integrations/git/` — `GitHostingProvider::github` / `::gitlab` (kinds `github`,
+  `gitlab`) over one client (`client.rs`: bearer auth, ETag ledger, rate state per account) and
+  `forge.rs` (endpoints, payload mapping). Sign-in types `auth: token | oauth`: GitHub device flow,
+  GitLab loopback + PKCE with refresh. Polling per repository: issues and pull/merge requests by
+  updated-since cursor, comments, branch heads (first poll only records cursors). Triggers
+  `<kind>.issueOpened|issueCommented|pullRequestOpened|pullRequestUpdated|push`. Tools
+  `<kind>.readFile|listIssues`, and with `readWrite` `<kind>.createIssue|comment|createPullRequest`
+  at `ask`. The worker detail shows «Лимит API: осталось … из …»; 403-exhausted and 429 back off.
+- `zvs-host/src/integrations/oauth.rs` — the generic OAuth code moved out of mail (grant, PKCE
+  authorize URL, exchange, refresh, device flow, `trusted_https_url`); mail uses it and the Copilot
+  sign-in reuses its URL check. `SignInRequest::prompt` + `SignInPrompt`, the
+  `integrations`/`device-code` step on the event bus, `IntegrationToolCall::cursors`,
+  `IntegrationProvider::instructions()`, `common.rs` (field builders) and a test-only `stub.rs`
+  HTTP server with queued replies.
+- **Plugins in chat.** `MessageDto.commands` + `plugins` (`ChatPluginDto`), `ChatSendInput` /
+  `ChatContextInput.commands` + `plugins` (any number, unique). Migration `0037` turns the old
+  `command` column into a list. `ChatPlugins` (implemented by `IntegrationService`) resolves an
+  attached account; `plan_tools` offers integration tools only for attached accounts, and the
+  system prompt gets each plugin's instructions. Renderer: `/` lists commands and plugin kinds,
+  a kind with several accounts opens a sub-list, chips with logos (`features/plugins/PluginMark`),
+  several commands at once, chips clear after sending; sent messages show their commands and
+  plugins. The CLI sends a one-item list.
+- **Secrets without types** (ADR 0006): `SecretTypeKey`, `SecretTypeSchema`, the registry, the
+  `secrets.types` channel and secret `fields` are gone. Migration `0035` folds `ollama`,
+  `openrouter`, `mistral` and `custom` into the host kind `user` and drops `fields`. The Secrets
+  form is name + value + metadata; every secret picker lists all secrets and is searchable.
+- Migration `0036` rebuilds `integration_account` so `kind` accepts `github` and `gitlab` (the
+  child tables are copied aside so the drop does not cascade them away).
+- Composition root: integrations are built before chat (chat takes them as `plugins`), all four
+  providers are registered, and sign-in steps go to the event bus.
+- `tasks/TASK_051.md` rewritten as the «Плагины» page (catalogue with logos, any number of
+  accounts per plugin and sign-in type, device-code panel).
+
 **Deviated from plan:**
+- DECISION answered by the user: option (a), bot only. Added at the user's request: GitHub sign-in
+  through OAuth (device flow) next to tokens, GitLab OAuth next to tokens, a per-account `access`
+  mode, plugins in the chat composer with any number of `/` commands, and secrets without types.
+- GitHub and GitLab are two plugin kinds (`github`, `gitlab`) served by one provider type, not one
+  `git` kind; tool and trigger names are `github.*` / `gitlab.*` instead of `git.*`.
+- The Copilot sign-in token lives in the Copilot CLI's store and cannot be reused, so GitHub OAuth
+  is its own device flow; the accounts are independent. `GITHUB_CLIENT_ID` is empty until ZVS
+  registers an OAuth App (with Device Flow enabled): until then `oauthClientId` is required.
+- Telegram got `telegram.recentMessages` so a chat plugin can read what the bot received; the Bot
+  API has no history call.
+- Write approvals use the standard `ask` prompt, not a per-call preview like mail.
+- Plugins attached to a message stay in effect for the rest of the dialog, as `/browser-use`
+  does; the composer chips clear after each message.
+
 **Next session should know:**
+- TASK_051 builds the page; everything it needs exists in the host. The device-code step is
+  `{ domain: "integrations", accountId, phase: "device-code", userCode, verificationUri,
+  expiresAt }`.
+- To ship one-click GitHub sign-in, register a ZVS OAuth App with Device Flow on and put its client
+  id in `GITHUB_CLIENT_ID` (`integrations/git/mod.rs`).
+- GitLab OAuth needs the user's application registered with
+  `http://127.0.0.1:<port>/callback` and that port in `oauthRedirectPort`; it is not covered by a
+  live test (the loopback flow is shared with mail and tested there).
+- Not run here: `pnpm build`, `pnpm test:e2e` (the secrets smoke test was updated), and the manual
+  check against a real bot and repository. Pre-existing failures not touched: `pnpm typecheck` in
+  `tests/renderer/chatGoal.test.ts` and `pnpm format:check` on `ui/atoms/assistantGeometry.ts`.

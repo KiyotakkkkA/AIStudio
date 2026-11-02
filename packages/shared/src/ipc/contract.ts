@@ -130,8 +130,6 @@ import {
 import { CreateSecretInput } from "../secrets/CreateSecretInput.js";
 import { UpdateSecretInput } from "../secrets/UpdateSecretInput.js";
 import { SecretDto, SecretScope, SecretSummaryDto } from "../secrets/SecretDto.js";
-import { SecretTypeKey } from "../secrets/registry.js";
-import { SecretTypeSchema } from "../secrets/SecretTypeSchema.js";
 import {
   CreateProviderInput,
   ProbeRequest,
@@ -263,7 +261,6 @@ import {
 
 export const SecretFilter = z.object({
   scope: SecretScope.optional(),
-  type: SecretTypeKey.optional(),
   query: z.string().max(128).optional(),
 });
 export type SecretFilter = z.infer<typeof SecretFilter>;
@@ -613,10 +610,6 @@ export const contract = defineContract({
   "settings.set": {
     input: z.object({ key: SettingKey, value: Json }),
     output: z.object({ key: SettingKey, value: Json, updatedAt: Timestamp }),
-  },
-  "secrets.types": {
-    input: z.void(),
-    output: z.array(SecretTypeSchema),
   },
   "secrets.list": {
     input: SecretFilter,

@@ -46,7 +46,9 @@ use zvs_host::indexing::{
     DocumentExtractorOptions, ImageExtractor, IndexingService, IndexingServiceOptions,
     PdfExtractor, image_extensions,
 };
+use zvs_host::integrations::git::GitHostingProvider;
 use zvs_host::integrations::mail::MailProvider;
+use zvs_host::integrations::telegram::TelegramProvider;
 use zvs_host::integrations::{IntegrationService, IntegrationServiceOptions};
 use zvs_host::kernel::{
     KernelServices, NodeRegistry, register_core_nodes, register_download_nodes, register_job_nodes,
@@ -965,10 +967,32 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let subagents = SubagentService::new(Arc::clone(&database), clock.clone())
         .with_drivers(registry.clone())
         .with_logger(logger.clone());
+    let workers = WorkerSupervisor::new(clock.clone(), logger.clone());
+    let integrations = IntegrationService::new(IntegrationServiceOptions {
+        clock: clock.clone(),
+        logger: logger.clone(),
+        providers: vec![
+            Arc::new(MailProvider::new(http.client().clone()).with_clock(clock.clone())),
+            Arc::new(TelegramProvider::new(http.client().clone())),
+            Arc::new(GitHostingProvider::github(http.client().clone()).with_clock(clock.clone())),
+            Arc::new(GitHostingProvider::gitlab(http.client().clone()).with_clock(clock.clone())),
+        ],
+        approvals: Some(runs.approvals()),
+        opener: Some(zvs_host::platform::external::system_url_opener()),
+        events: Some(events.clone()),
+        ..IntegrationServiceOptions::new(
+            Arc::clone(&database),
+            tools.clone(),
+            Arc::clone(&nodes),
+            Arc::clone(&secrets),
+            workers.clone(),
+        )
+    })?;
     let chat = ChatService::new(ChatServiceOptions {
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),
         mcp: Some(Arc::new(mcp.clone())),
+        plugins: Some(Arc::new(integrations.clone())),
         folders: Some(folders.clone()),
         shells: Some(shells.clone()),
         subagents: Some(subagents.clone()),
@@ -1117,23 +1141,6 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         ..ScenarioRunnerOptions::new(scenarios.clone(), runs.clone())
     });
     chat.on_message(scenario_runs.chat_listener());
-    let workers = WorkerSupervisor::new(clock.clone(), logger.clone());
-    let integrations = IntegrationService::new(IntegrationServiceOptions {
-        clock: clock.clone(),
-        logger: logger.clone(),
-        providers: vec![Arc::new(
-            MailProvider::new(http.client().clone()).with_clock(clock.clone()),
-        )],
-        approvals: Some(runs.approvals()),
-        opener: Some(zvs_host::platform::external::system_url_opener()),
-        ..IntegrationServiceOptions::new(
-            Arc::clone(&database),
-            tools.clone(),
-            Arc::clone(&nodes),
-            Arc::clone(&secrets),
-            workers.clone(),
-        )
-    })?;
     integrations.attach_sink(scenario_runs.integration_sink());
     runs.watch(integrations.run_watcher());
     {

@@ -244,6 +244,8 @@ const INPUT: ChatContextInput = {
   conversationId: CONVERSATION as ChatContextInput["conversationId"],
   providerId: PROVIDER as ChatContextInput["providerId"],
   modelId: "model",
+  commands: [],
+  plugins: [],
 };
 
 test("statistics load only while open and the latest request wins", async () => {

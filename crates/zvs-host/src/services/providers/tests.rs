@@ -126,7 +126,7 @@ impl Fixture {
     }
 
     fn create_secret(&self, name: &str, value: &str, rotates_at: Option<Timestamp>) -> String {
-        let mut input = SecretCreateInput::new("openrouter", name, SecretScope::Personal);
+        let mut input = SecretCreateInput::new("user", name, SecretScope::Personal);
         input.value = Some(Plaintext::new(value));
         input.rotates_at = rotates_at;
         self.secrets.create(input).expect("creates a secret").id

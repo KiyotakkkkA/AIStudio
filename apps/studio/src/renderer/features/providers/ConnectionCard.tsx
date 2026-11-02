@@ -23,7 +23,6 @@ import {
   ADAPTER_LABELS,
   CAPABILITY_LABELS,
   KIND_LABELS,
-  secretsForKind,
   STATUS_LABELS,
   statusTone,
 } from "./providerPresentation";
@@ -38,7 +37,7 @@ interface ConnectionCardProps {
 function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
   const { providers } = useStore();
   const summary = providers.selectedSummary;
-  const pickable = secretsForKind(providers.secrets, vm.kind);
+  const pickable = providers.secrets;
   const account = vm.account;
   const hasAuthModeChoice = !vm.isLocal && vm.descriptor.authModes.length > 1;
   const showsVendor = !vm.isLocal && !isAccountFamily(vm.adapter);
@@ -203,6 +202,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
                   label="API-токен"
                   value={vm.secretId ?? ""}
                   placeholder="Выберите секрет"
+                  searchable
                   invalid={vm.errorOf("secretId") !== undefined}
                   options={pickable.map((secret) => ({
                     value: secret.id,

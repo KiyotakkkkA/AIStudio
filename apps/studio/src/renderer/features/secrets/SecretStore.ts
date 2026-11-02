@@ -6,7 +6,6 @@ import type {
   SecretDto,
   SecretId,
   SecretSummaryDto,
-  SecretTypeSchema,
   UpdateSecretInput,
 } from "@zvs/shared";
 import { consumersFrom, errorCopy, fieldErrorsFrom, type SecretConsumerRef } from "./errorCopy";
@@ -28,7 +27,6 @@ export type PendingIntent =
 
 export class SecretStore {
   summaries: SecretSummaryDto[] = [];
-  types: SecretTypeSchema[] = [];
   selectedId: SecretId | null = null;
   selected: SecretDto | null = null;
   form: SecretFormVm | null = null;
@@ -52,7 +50,6 @@ export class SecretStore {
     return this.summaries.filter(
       (secret) =>
         secret.name.toLowerCase().includes(query) ||
-        secret.type.toLowerCase().includes(query) ||
         secret.tags.some((tag) => tag.toLowerCase().includes(query)),
     );
   }
@@ -80,11 +77,7 @@ export class SecretStore {
   }
 
   get ready(): boolean {
-    return this.types.length > 0;
-  }
-
-  schemaOf(type: string): SecretTypeSchema | undefined {
-    return this.types.find((schema) => schema.key === type);
+    return this.loaded && this.error === null;
   }
 
   async load(): Promise<void> {
@@ -92,11 +85,8 @@ export class SecretStore {
     this.loading = true;
     this.error = null;
     try {
-      const types =
-        this.types.length > 0 ? this.types : await this.ipc.call("secrets.types", undefined);
       const summaries = await this.ipc.call("secrets.list", {});
       runInAction(() => {
-        this.types = [...types];
         this.summaries = [...summaries];
         this.loaded = true;
         this.loading = false;
@@ -119,7 +109,7 @@ export class SecretStore {
       runInAction(() => {
         if (this.selectedId !== id) return;
         this.selected = secret;
-        this.form = new SecretFormVm(this.types, secret);
+        this.form = new SecretFormVm(secret);
       });
     } catch (error: unknown) {
       runInAction(() => {
@@ -133,7 +123,7 @@ export class SecretStore {
     if (!this.ready) return;
     this.selectedId = null;
     this.selected = null;
-    this.form = new SecretFormVm(this.types);
+    this.form = new SecretFormVm();
   }
 
   requestCreate(): void {
@@ -149,7 +139,7 @@ export class SecretStore {
     if (!this.ready || source === null) return;
     this.selectedId = null;
     this.selected = null;
-    this.form = new SecretFormVm(this.types, source, true);
+    this.form = new SecretFormVm(source, true);
   }
 
   requestDuplicate(): void {
@@ -188,7 +178,7 @@ export class SecretStore {
       this.form = null;
       return;
     }
-    this.form = new SecretFormVm(this.types, this.selected);
+    this.form = new SecretFormVm(this.selected);
   }
 
   setFilter(filter: ScopeFilter): void {
@@ -294,7 +284,6 @@ export class SecretStore {
   private applySaved(secret: SecretDto): void {
     const summary: SecretSummaryDto = {
       id: secret.id,
-      type: secret.type,
       name: secret.name,
       scope: secret.scope,
       hint: secret.hint,
@@ -309,6 +298,6 @@ export class SecretStore {
     else this.summaries = this.summaries.map((item, at) => (at === index ? summary : item));
     this.selectedId = secret.id;
     this.selected = secret;
-    this.form = new SecretFormVm(this.types, secret);
+    this.form = new SecretFormVm(secret);
   }
 }

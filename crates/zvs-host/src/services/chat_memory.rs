@@ -126,6 +126,7 @@ pub fn memory_tool(offered: &[OfferedTool]) -> OfferedTool {
         read_only: false,
         source: zvs_contract::OfferedToolSource::Memory,
         server: None,
+        plugin: None,
     }
 }
 

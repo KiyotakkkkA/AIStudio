@@ -469,6 +469,7 @@ impl AgentNode {
                     read_only: node.side_effect_free(),
                     source: zvs_contract::OfferedToolSource::Base,
                     server: None,
+                    plugin: None,
                 })
             })
             .collect())

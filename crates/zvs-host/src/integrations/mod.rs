@@ -1,5 +1,11 @@
+mod common;
+pub mod git;
 pub mod mail;
+pub mod oauth;
 mod service;
+#[cfg(test)]
+mod stub;
+pub mod telegram;
 mod tools;
 
 use std::sync::Arc;
@@ -11,7 +17,7 @@ use zvs_contract::validate::{check, invalid};
 use zvs_contract::{
     AppError, AppErrorCode, FieldDescriptor, FieldKind, IntegrationAccountDto,
     IntegrationActivityLevel, IntegrationCheckDto, IntegrationConfig, IntegrationKind,
-    IntegrationToolDto, IntegrationTriggerDto, IntegrationValue, SecretId, Validate,
+    IntegrationToolDto, IntegrationTriggerDto, IntegrationValue, SecretId, Timestamp, Validate,
 };
 
 use crate::platform::external::UrlOpener;
@@ -194,11 +200,19 @@ impl IntegrationSession {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignInPrompt {
+    pub user_code: String,
+    pub verification_uri: String,
+    pub expires_at: Timestamp,
+}
+
 pub struct SignInRequest<'a> {
     pub account: &'a IntegrationAccountDto,
     pub config: &'a IntegrationConfigView,
     pub opener: &'a UrlOpener,
     pub cancel: &'a CancellationToken,
+    pub prompt: &'a (dyn Fn(&SignInPrompt) + Send + Sync),
 }
 
 pub struct SignedIn {
@@ -206,9 +220,33 @@ pub struct SignedIn {
     pub value: Plaintext,
 }
 
+#[derive(Clone)]
+pub struct CursorView {
+    account_id: String,
+    service: IntegrationService,
+}
+
+impl CursorView {
+    pub(crate) const fn new(account_id: String, service: IntegrationService) -> Self {
+        Self {
+            account_id,
+            service,
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Result<Option<String>, AppError> {
+        self.service.cursor(&self.account_id, key)
+    }
+
+    pub fn set(&self, key: &str, value: &str) -> Result<(), AppError> {
+        self.service.set_cursor(&self.account_id, key, value)
+    }
+}
+
 pub struct IntegrationToolCall {
     pub account: IntegrationAccountDto,
     pub config: IntegrationConfigView,
+    pub cursors: CursorView,
     pub tool: String,
     pub input: Map<String, Value>,
     pub approved: Option<Map<String, Value>>,
@@ -222,6 +260,10 @@ pub trait IntegrationProvider: Send + Sync {
     fn label(&self) -> String;
 
     fn describe(&self) -> Vec<FieldDescriptor>;
+
+    fn instructions(&self) -> String {
+        String::new()
+    }
 
     fn triggers(&self) -> Vec<IntegrationTriggerDto>;
 

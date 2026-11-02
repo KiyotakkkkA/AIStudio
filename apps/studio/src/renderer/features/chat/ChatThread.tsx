@@ -61,6 +61,8 @@ import { BRANCH_IN_NEW_DIALOG, CREATE_BRANCH } from "./branching";
 import ProcessEventCard from "../backgroundShells/ProcessEventCard";
 import ChatStatsView from "./stats/ChatStatsView";
 import { STATS_EXPORT_GROUP, STATS_TOGGLE } from "./stats/chatStatsCopy";
+import PluginMark from "../plugins/PluginMark";
+import { pluginChipLabel } from "../plugins/pluginPresentation";
 
 export default observer(function ChatThread({
   store,
@@ -377,11 +379,24 @@ export default observer(function ChatThread({
                       </div>
                     ) : (
                       <>
-                        {message.command !== undefined && (
-                          <span className="mb-1 font-mono text-[11.5px] text-main-400">
-                            {commandText(message.command)}
+                        {message.commands.length > 0 || message.plugins.length > 0 ? (
+                          <span className="mb-1 flex flex-wrap justify-end gap-x-2 gap-y-0.5 text-[11.5px] text-main-400">
+                            {message.commands.map((command) => (
+                              <span key={command} className="font-mono">
+                                {commandText(command)}
+                              </span>
+                            ))}
+                            {message.plugins.map((plugin) => (
+                              <span
+                                key={plugin.accountId}
+                                className="inline-flex items-center gap-1"
+                              >
+                                <PluginMark kind={plugin.kind} size="xs" />
+                                {pluginChipLabel(plugin)}
+                              </span>
+                            ))}
                           </span>
-                        )}
+                        ) : null}
                         <div className="rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
                           {message.content}
                         </div>

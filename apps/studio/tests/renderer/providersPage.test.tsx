@@ -18,6 +18,7 @@ import {
   SECRETS,
   summary,
 } from "./providerFixtures.ts";
+import { SEARCH_PLACEHOLDER } from "../../src/renderer/ui/atoms/SelectInput.tsx";
 
 function renderPage(selectedProvider = provider()) {
   const bridge = createFakeBridge<Contract>();
@@ -86,7 +87,11 @@ test("the page mounts one form and one list, with the token as a picker over sec
   assert.equal(document.querySelectorAll('input[type="password"]').length, 0);
   const tokenField = screen.getByText("API-токен").parentElement;
   assert.ok(tokenField !== null);
-  assert.equal(tokenField.querySelectorAll("input").length, 0, "the token is picked, never typed");
+  assert.equal(
+    tokenField.querySelectorAll(`input:not([placeholder="${SEARCH_PLACEHOLDER}"])`).length,
+    0,
+    "the token is picked, never typed",
+  );
   assert.equal(screen.queryByRole("radiogroup", { name: "Способ авторизации" }), null);
 
   const models = screen.getAllByText("gpt-oss:120b");

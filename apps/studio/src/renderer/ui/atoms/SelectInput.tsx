@@ -1,5 +1,8 @@
 import { Select, type PositionAnchor, type SelectOption } from "@kiyotakkkka/zvs-uikit-lib";
 
+export const SEARCH_PLACEHOLDER = "Поиск";
+export const EMPTY_MESSAGE = "Ничего не найдено";
+
 export interface SelectInputProps {
   readonly value: string;
   readonly options: readonly SelectOption[];
@@ -9,6 +12,7 @@ export interface SelectInputProps {
   readonly invalid?: boolean;
   readonly disabled?: boolean;
   readonly menuPlacement?: PositionAnchor;
+  readonly searchable?: boolean;
 }
 
 export default function SelectInput({
@@ -20,6 +24,7 @@ export default function SelectInput({
   invalid = false,
   disabled = false,
   menuPlacement = "bottom-left",
+  searchable = false,
 }: SelectInputProps) {
   const trigger = [
     "h-9 w-full gap-2 rounded-control bg-main-900 px-3 py-0 text-[13px] text-main-100",
@@ -32,6 +37,9 @@ export default function SelectInput({
       options={[...options]}
       onChange={onChange}
       placeholder={placeholder}
+      searchable={searchable}
+      searchPlaceholder={SEARCH_PLACEHOLDER}
+      emptyMessage={EMPTY_MESSAGE}
       disabled={disabled}
       className="w-full"
       menuPlacement={menuPlacement}

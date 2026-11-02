@@ -203,7 +203,7 @@
       "reasoning": "",
       "citations": [],
       "toolCalls": [],
-      "command": "browser-use",
+      "commands": ["browser-use"],
       "tokensIn": 12,
       "tokensOut": 0,
       "usageEstimated": true,
@@ -301,7 +301,7 @@
       "reasoning": "",
       "citations": [],
       "toolCalls": [],
-      "command": "goal",
+      "commands": ["goal"],
       "tokensIn": 12,
       "tokensOut": 0,
       "usageEstimated": true,
@@ -395,6 +395,33 @@
       "usageEstimated": false,
       "durationMs": 40,
       "runId": "0199aa11-4444-7111-8111-111111111111",
+      "partial": false,
+      "createdAt": 3
+    }
+  },
+  {
+    "name": "several commands and plugins",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111114",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "role": "user",
+      "content": "Найди расписание на сайте",
+      "reasoning": "",
+      "citations": [],
+      "toolCalls": [],
+      "commands": ["browser-use", "goal"],
+      "plugins": [
+        {
+          "accountId": "0199aa11-1111-7111-8111-0000000000a1",
+          "kind": "github",
+          "name": "Работа"
+        }
+      ],
+      "tokensIn": 12,
+      "tokensOut": 0,
+      "usageEstimated": true,
+      "durationMs": 0,
+      "runId": null,
       "partial": false,
       "createdAt": 3
     }

@@ -24,7 +24,9 @@ import ChatCommandMenu, { COMMAND_MENU_ID, commandOptionId } from "./ChatCommand
 import ChatModelGate from "./ChatModelGate";
 import ModelFields, { availableModelOptions } from "./ModelFields";
 import ExecPolicyMenu, { type ExecPolicyBinding } from "../execPolicy/ExecPolicyMenu";
-import { REMOVE_COMMAND, commandText } from "./chatCommands";
+import { REMOVE_COMMAND, REMOVE_PLUGIN, commandText } from "./chatCommands";
+import PluginMark from "../plugins/PluginMark";
+import { pluginChipLabel } from "../plugins/pluginPresentation";
 import { GOAL_EMPTY, GOAL_PLACEHOLDER } from "./goalCopy";
 import { QUEUE_HINT } from "./queueCopy";
 import SelectionChips from "./SelectionChips";
@@ -102,22 +104,42 @@ export default observer(function ChatComposer({
             </div>
           ) : null}
           <ChatCommandMenu store={store} />
-          {(store.attachedStoreIds.length > 0 || store.composer.command !== null) && (
+          {(store.attachedStoreIds.length > 0 || store.composer.hasAttachments) && (
             <div className="flex flex-wrap gap-1.5 px-1">
-              {store.composer.command !== null && (
-                <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-accent-soft pr-1.5 pl-2.5 text-[12px] font-medium text-accent-medium">
+              {store.composer.commands.map((command) => (
+                <span
+                  key={command}
+                  className="inline-flex h-7 items-center gap-1.5 rounded-full bg-accent-soft pr-1.5 pl-2.5 text-[12px] font-medium text-accent-medium"
+                >
                   <Icon path={mdiConsoleLine} size={14} />
-                  <span className="font-mono">{commandText(store.composer.command)}</span>
+                  <span className="font-mono">{commandText(command)}</span>
                   <button
                     type="button"
-                    aria-label={REMOVE_COMMAND}
+                    aria-label={`${REMOVE_COMMAND} ${commandText(command)}`}
                     className="flex size-4.5 items-center justify-center rounded-full hover:bg-accent-dark hover:text-on-accent"
-                    onClick={store.clearCommand}
+                    onClick={() => store.removeCommand(command)}
                   >
                     <Icon path={mdiClose} size={13} />
                   </button>
                 </span>
-              )}
+              ))}
+              {store.attachedPlugins.map((account) => (
+                <span
+                  key={account.id}
+                  className="inline-flex h-7 items-center gap-1.5 rounded-full bg-main-800 pr-1.5 pl-1 text-[12px] font-medium text-main-100"
+                >
+                  <PluginMark kind={account.kind} size="xs" className="rounded-full" />
+                  <span className="max-w-48 truncate">{pluginChipLabel(account)}</span>
+                  <button
+                    type="button"
+                    aria-label={`${REMOVE_PLUGIN} ${pluginChipLabel(account)}`}
+                    className="flex size-4.5 items-center justify-center rounded-full hover:bg-main-600"
+                    onClick={() => store.removePlugin(account.id)}
+                  >
+                    <Icon path={mdiClose} size={13} />
+                  </button>
+                </span>
+              ))}
               {store.stores
                 .filter((item) => store.attachedStoreIds.includes(item.id))
                 .map((item) => (
@@ -176,10 +198,10 @@ export default observer(function ChatComposer({
                 if (
                   event.key === "Backspace" &&
                   store.composer.text.length === 0 &&
-                  store.composer.command !== null
+                  store.composer.hasAttachments
                 ) {
                   event.preventDefault();
-                  store.clearCommand();
+                  store.removeLastAttachment();
                   return;
                 }
                 if (event.key === "Enter" && !event.shiftKey) {

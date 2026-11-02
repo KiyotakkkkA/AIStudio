@@ -56,7 +56,6 @@ export const ADAPTERS: AdapterDescriptorDto[] = [
 export const SECRETS: SecretSummaryDto[] = [
   {
     id: SECRET,
-    type: "ollama",
     name: "Ollama — личный",
     scope: "personal",
     hint: "osk_live_••••4f2a",

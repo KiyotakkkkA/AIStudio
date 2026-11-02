@@ -539,7 +539,8 @@ async fn a_later_turn_carries_the_earlier_call_with_its_result_and_stats_list_it
             model_id: test.harness.model_id.clone(),
             settings: None,
             system_prompt: None,
-            command: None,
+            commands: Vec::new(),
+            plugins: Vec::new(),
         })
         .await
         .expect("stats");
@@ -1127,7 +1128,8 @@ async fn context_counts_the_offered_tools_one_by_one() {
             model_id: setup.harness.model_id.clone(),
             settings: None,
             system_prompt: None,
-            command: None,
+            commands: Vec::new(),
+            plugins: Vec::new(),
         })
         .await
         .expect("measures");
@@ -2243,10 +2245,10 @@ async fn the_browser_command_brings_the_browser_tools_and_its_skill_for_the_rest
         ));
     }
     let messages = harness.messages(created);
-    assert_eq!(messages[0].command, None);
+    assert!(messages[0].commands.is_empty());
     assert_eq!(
-        messages[2].command,
-        Some(zvs_contract::ChatCommand::BrowserUse)
+        messages[2].commands,
+        [zvs_contract::ChatCommand::BrowserUse]
     );
     assert!(
         messages[5]
@@ -2301,7 +2303,8 @@ async fn vendor_usage_replaces_the_estimate_and_the_window_reaches_the_context_m
             model_id: test.harness.model_id.clone(),
             settings: None,
             system_prompt: None,
-            command: None,
+            commands: Vec::new(),
+            plugins: Vec::new(),
         })
         .await
         .expect("measures");

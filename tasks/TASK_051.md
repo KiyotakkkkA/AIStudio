@@ -1,86 +1,150 @@
 ---
 task: TASK_051
-title: Integrations page
+title: Plugins page
 phase: 9 — Integrations
 status: todo
 depends_on: [TASK_049, TASK_050, TASK_076]
 unblocks: []
-estimate: 3 h
+estimate: 4 h
 ---
 
-# TASK_051 — Integrations page
+# TASK_051 — Plugins page
 
-> **Post-migration note (2026-10-10).** This task runs after Phase M (TASK_058 – TASK_076):
-> the app is Tauri 2 with a Rust host. Read every `apps/studio/src/host/…` path below as its
-> Rust counterpart in `crates/zvs-host/src/…` (or `apps/studio/src-tauri/src/…` for
-> window, webview and OS-shell code) using the path map in PASSPORT §5. Electron APIs named
-> below map as PASSPORT §2 D10 describes. Host code is Rust, so the gates also include
-> `cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`, and
-> host tests are Rust tests, not Vitest.
+> **Revised 2026-11-02 (TASK_050).** Integrations are now presented as **plugins**. A plugin is
+> set up once on this page and then attached in the chat composer with `/` (TASK_050 built the
+> composer side). This task replaces the old three-column tabbed «Интеграции» page. Host and
+> contract are done: `integrations.kinds|list|get|create|update|remove|test|enable|disable|
+> activity|signIn|cancelSignIn`, `workers.*`, and the `integrations` device-code step event.
 
 ## Context
 
-The page from `/design/Integrations.dc.html` and the close of Phase 9: a tab per account kind, and beneath each the same three-column shape — a 250 px accounts list, the configuration form generated from the provider's field schema, and a 286 px rail listing exposed triggers and tools, what uses them, recent activity and counters.
+Four plugins exist: **Почта** (Google, Яндекс, Mail.ru and any IMAP/SMTP server), **GitHub**
+(token or browser sign-in), **GitLab** (token or browser sign-in, any base URL) and
+**Telegram** (bot token). A user may connect **several accounts of every plugin and every
+sign-in type**: two GitHub accounts, one on a token and one signed in through the browser; three
+mailboxes; two bots. The page must treat the account list as unbounded from the start.
 
-Because TASK_048's providers describe their own fields using the same `FieldDescriptor` shape as the secret-type registry (TASK_011), the form is generated rather than hand-written per tab — the same trick that made the Secrets page cheap.
+The reference for the catalogue is the plugin directory of a chat product: a page title and a
+one-line subtitle, a wide search field, segment tabs, then sections of plugins in a two-column
+list. Each row has the plugin logo in a rounded tile, the name, a one-line description and a
+trailing action (`+` to connect, or the number of connected accounts). It reads as a catalogue,
+not as settings.
 
 ## Why
 
-Integrations that can only be configured through the database are not a feature. This is also where the credential rule becomes visible to the user.
+The composer can attach a plugin only after an account exists. Without this page, accounts
+can be created only through IPC.
 
 ## Depends on
 
-- `TASK_049` — Mail integration (IMAP/SMTP).
-- `TASK_050` — Telegram and Git hosting integrations.
+- `TASK_049` — Mail integration.
+- `TASK_050` — Telegram, GitHub and GitLab plugins, the chat composer plugins.
 
 ## Read first
 
-- `/design/Integrations.dc.html`
-- `/docs/PASSPORT.md` §13
+- `/docs/PASSPORT.md` §13, §14 (Integrations, Mail, Telegram, GitHub and GitLab, Chat tool set),
+  ADR 0004, ADR 0006
+- `apps/studio/src/renderer/features/plugins/` — `PluginMark`, `pluginPresentation.ts` (labels,
+  descriptions and logos already used by the composer; extend them, do not fork them)
+- `/design/Integrations.dc.html` — only for the account form and the automation rail; the
+  tabbed shell and its Webhooks tab are gone
 
 ## Scope
 
 **In scope**
-- `features/integrations/` store, form view-model, organisms
-- Tab per kind with counts
-- Accounts list with status dots and protocol chips
-- Generated configuration form, including grouped sections (incoming / outgoing for mail)
-- Test connection with per-direction results
-- Automation rail: triggers, tools, used-by, activity log, counters
-- Enable/disable per account
+- Route and nav item «Плагины» (replaces «Интеграции»), `features/plugins/` store and view-models
+- Catalogue view: title «Плагины», subtitle «Подключите плагины, чтобы использовать их в
+  диалогах и сценариях», search over name and description, segment tabs «Все» and
+  «Подключённые», sections «Почта и сообщения» (Почта, Telegram) and «Разработка» (GitHub,
+  GitLab) in a two-column list with logos
+- Plugin view: header with the large logo, name, description and «Подключить аккаунт»; the
+  list of that plugin's accounts (any number), each with status dot, sign-in type chip and
+  name; the selected account's form and automation rail
+- Account creation per sign-in type, forms generated from `describe()`
+- Logos for every plugin and every mail preset
+- Device-code sign-in panel for GitHub, loopback sign-in for GitLab and mail presets
+- Test connection, enable / disable, remove, rename
 
 **Out of scope** (do not do these, even if tempting)
-- A Webhooks tab — dropped by ADR 0004; the page has Mail, Telegram and Git hosting only
-- Per-tool tier editing — that lives on the Tools page
+- Webhooks (ADR 0004)
+- Per-tool tier editing — the Tools page owns it
+- New plugins or new provider fields; if the form needs a host change, note it in Handoff
 
 ## Steps
 
-1. Store and form view-model reusing the generated-form machinery from TASK_012, driven by `describe()` from each provider.
-2. Field grouping: the mail form has Account, Incoming, Outgoing and Sync sections, so `FieldDescriptor` needs an optional `section` — add it in `packages/shared` and use it here rather than hardcoding a mail-specific layout.
-3. Credential fields render as secret pickers by construction (TASK_048 made a raw credential unrepresentable) — verify that visually and note it in Handoff if any provider slipped through.
-4. Test connection: show per-direction results where a provider reports them, as the mail result line does.
-5. Automation rail: trigger and tool chips, the used-by list linking to scenarios, the recent activity log and the 24-hour counters from the mockup.
-6. States: no accounts for this kind, needs re-authorisation, disabled, failing with its reason.
-7. Tests: generated form renders each provider's schema; section grouping works; enable/disable round-trips.
+1. **Store and route.** `PluginStore` loads `integrations.kinds` and `integrations.list` once
+   and keeps accounts grouped by kind; it refreshes an account after every mutation and listens
+   for step events with `domain: "integrations"`. Selection is a plugin kind plus an optional
+   account id, kept in the route (`/plugins`, `/plugins/:kind`, `/plugins/:kind/:accountId`).
+2. **Catalogue.** Matches the reference layout described above, using the ZVS tokens (warm
+   palette, light and dark): 16 px gutter, rounded search field, segment tabs as pills, section
+   headings with a chevron, rows of `PluginMark size="md"` + name + description + action. The
+   action is a `+` icon button when the plugin has no account, otherwise a count chip
+   (`plural()` — «2 аккаунта»). «Подключённые» shows only plugins with accounts. Empty search:
+   the shared empty state. The whole row opens the plugin view.
+3. **Plugin view.** Back link to the catalogue, header (`PluginMark size="lg"`, name,
+   description, primary «Подключить аккаунт»), then three columns as in the design: accounts
+   list (250 px, any length, scrolls), the account form, the automation rail (286 px). With no
+   accounts the middle column is the add-account flow itself.
+4. **Sign-in types.** «Подключить аккаунт» first asks for the type, as a segmented choice with
+   logos, then shows the generated form for that type only:
+   - Почта: Google, Яндекс, Mail.ru (each with its own logo and «Войти»), «Другой сервер
+     (IMAP / SMTP)» with the manual fields. The `protocol` field is set by the choice and hidden.
+     `describe()` already marks manual-only fields; hide them for presets.
+   - GitHub: «Токен доступа» (token secret) or «Вход через GitHub» (device flow; client id field
+     shown as optional with the host help text). `auth` is set by the choice and hidden.
+   - GitLab: «Токен доступа» or «Вход через GitLab» (application id, optional secret, redirect
+     port). `baseUrl` is shown for both.
+   - Telegram: bot token only.
+   The account name is required and defaults to the plugin label plus a number when another
+   account already has that name.
+5. **Generated form.** Reuse the generated-form machinery of the Secrets page history (TASK_012)
+   rather than hand-writing fields: `text`, `url`, `number`, `boolean`, `select` and `secret`.
+   A `secret` field is a `SelectInput searchable` over **all** secrets (ADR 0006) with a link to
+   the Secrets page; there is no way to type a credential. Fields with help text show it under
+   the input. Optional `section` grouping is not needed now: order follows `describe()`.
+6. **Browser sign-in.** «Войти» calls `integrations.signIn` and shows a waiting panel with
+   «Отмена» (`integrations.cancelSignIn`). For GitHub the panel shows the `userCode` from the
+   `device-code` step in large monospace with a copy button, the verification URL and the
+   expiry countdown; the browser opens on its own. On success the account reloads and the
+   form shows «Вход выполнен»; errors map through `AppErrorCode`, never by parsing text.
+7. **Automation rail.** Triggers and tools from `integrations.get` (tool chips show «ask» for
+   side-effecting ones), «Используется в» with links to scenarios bound to the account, the
+   last activity lines (`integrations.activity`), the counters, and the worker detail as the
+   health line: it carries the API quota for GitHub and GitLab («Лимит API: осталось … из …») and
+   the rate-limit wait when there is one.
+8. **Logos.** Extend `PLUGIN_MARKS` with `MAIL_PRESET_MARKS` for `google`, `yandex`, `mailru`
+   and `imap`; bundled inline SVG paths only (identification use), no network images. The same
+   marks appear in the catalogue, the plugin header, the account list, the type choice and the
+   composer chips.
+9. **States.** No accounts; signing in; needs sign-in (`PROVIDER_SESSION_EXPIRED`); disabled;
+   failing with its reason; rate-limited (running, detail shows the wait).
+10. **Tests.** Store: grouping by kind, several accounts per kind and per sign-in type, catalogue
+    filter and search, the device-code step updates the sign-in panel, enable / disable and
+    remove round-trip. Form view-model: hidden fields per sign-in type, the secret picker lists
+    every secret. Presentational markup is covered once by the e2e smoke test.
 
 ## Verify
 
 ```bash
 pnpm --filter studio test
-pnpm --filter studio dev
 pnpm typecheck && pnpm lint && pnpm build
 cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 ```
 
-Manual check: Configure a real mail account and a Telegram bot through the page. Test both. Confirm the automation rail lists their triggers and tools, and that those tools appear on the Tools page with the right tiers.
+Manual check: Connect two GitHub accounts (one token, one browser sign-in), a Gmail mailbox and
+a Telegram bot through the page. Test each. Confirm the composer lists `/github` with both
+accounts, that the rail shows the API quota, and that write tools appear on the Tools page at
+«ask».
 
 ## Definition of done
 
-- [ ] Page matches the mockup across the tabs that have providers
-- [ ] Forms generated from provider schemas, with sections
-- [ ] No raw credential field exists on any tab
+- [ ] Catalogue with search, tabs, sections and logos
+- [ ] Any number of accounts per plugin and per sign-in type
+- [ ] Forms generated from provider schemas, credentials only as secret pickers over all secrets
+- [ ] Browser and device-code sign-in with cancel
 - [ ] Test connection reports per-direction results
-- [ ] Automation rail shows real triggers, tools and activity
+- [ ] Automation rail shows real triggers, tools, activity and quota
 - [ ] Tests and gates pass
 - [ ] `pnpm typecheck && pnpm lint && pnpm build` pass
 - [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
