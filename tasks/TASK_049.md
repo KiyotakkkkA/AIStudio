@@ -2,7 +2,7 @@
 task: TASK_049
 title: Mail integration (IMAP/SMTP)
 phase: 9 — Integrations
-status: todo
+status: done
 depends_on: [TASK_048, TASK_076]
 unblocks: [TASK_051]
 estimate: 4 h
@@ -88,16 +88,67 @@ Manual check: Connect a real mailbox. Confirm test connection reports both direc
 ## Definition of done
 
 - [ ] IMAP and SMTP working with real credentials from Secrets
-- [ ] Trigger fires once per message and survives restarts without replay
-- [ ] Mail content marked untrusted end to end
-- [ ] `mail.send` threads correctly and respects the approval decision
-- [ ] Certificate validation never disabled
+- [x] Trigger fires once per message and survives restarts without replay
+- [x] Mail content marked untrusted end to end
+- [x] `mail.send` threads correctly and respects the approval decision
+- [x] Certificate validation never disabled
 - [ ] Tests and gates pass
 - [ ] `pnpm typecheck && pnpm lint && pnpm build` pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
-**Built:**
+**Built:** `zvs-host/src/integrations/mail/` — `MailProvider` (kind `mail`, label «Почта»).
+`imap.rs` (async-imap 0.12.0: TLS or STARTTLS, LOGIN or XOAUTH2, EXAMINE/SELECT, UID
+SEARCH/FETCH with `BODY.PEEK`, `+FLAGS.SILENT (\Seen)`, IDLE), `smtp.rs` (lettre 0.11.23: TLS
+wrapper or required STARTTLS, PLAIN/LOGIN or XOAUTH2, `In-Reply-To` and `References`),
+`message.rs` (mail-parser 1.0.1 into `MailMessageDto` / `MailBodyDto`), `sync.rs` (IDLE for one
+folder, polling otherwise, a UIDVALIDITY:UID cursor per folder in the new `integration_cursor`
+table, migration `0034`), `tls.rs` (rustls 0.23.46 + ring, system roots; only the roots can be
+swapped, verification is never off), `settings.rs`, `copy.rs`, and `oauth/` with one file per
+preset — `google.rs`, `yandex.rs`, `mailru.rs` — plus PKCE authorize, code exchange, refresh and
+the XOAUTH2 authenticator. Tools `mail.send` (per-call approval with the letter), `mail.search`,
+`mail.read`; trigger `mail.received` (event id `<folder>:<Message-ID>`, payload carries `ref`,
+not the body). Contract: `UntrustedTextDto`, `MailRefDto`, `MailAttachmentDto`,
+`MailMessageDto`, `MailBodyDto`, `MailDraftDto`, `MailApprovalDto` with Zod mirrors and golden
+fixtures in `fixtures/mail/`. Framework (`integrations/`): `IntegrationGateway` replaces the
+caller closure; `IntegrationToolSpec::approved_per_call()` makes a node resolve at `ask`
+minimum, defer its approval, ask the provider's `approval()` for the request and pass the
+approved fields into `call_tool`; `account_tools(config)`; `handled()` through
+`IntegrationService::run_watcher` (wired in the composition root and `testing.rs`);
+`sign_in()` plus channels `integrations.signIn` / `integrations.cancelSignIn`, which store the
+grant as a `custom` secret and point the named config field at it;
+`IntegrationConfigView::secret_id` / `update_secret`. Scenarios: an agent whose input carries
+`untrusted: true` gets it in `<untrusted_content>` plus `UNTRUSTED_INPUT_INSTRUCTION`.
+Renderer: `features/mail/MailDraftView.tsx` shows the letter in the chat tool call, the
+standalone chat approval, the scenario canvas bar (without «Разрешать всегда») and the Tasks
+rail. Tests: `integrations::mail::tests` run against a stub IMAP/SMTP server over real TLS with
+a test CA (`mail/fixtures/*.der`, test-only keys): trigger fires once, a restart does not
+replay, threading headers, search filters, untrusted bodies, read-only refusal, an unknown CA is
+refused, mark-read, XOAUTH2, token refresh saved back, and the kernel node raising the
+`kind: "mail"` approval with a denial sending nothing.
+
 **Deviated from plan:**
+- DECISION answered by the user: option (a), and the approval shows the letter in full.
+- Added during the task at the user's request: OAuth sign-in for Google, Yandex and Mail.ru
+  (the task scoped Gmail out), and a per-account `access` mode: `read` (default; `mail.send`
+  is not registered and the host refuses a send) or `readWrite`.
+- Added `mail.read`: the trigger carries a body reference, and something has to resolve it.
+- Messages over 2 MiB are fetched headers-only, so their snippet is empty and attachments are
+  not listed. Non-ASCII search terms use `CHARSET UTF-8` with quoted strings.
+- Mail.ru endpoints (`o2.mail.ru/login`, `/token`, scope `userinfo mail.imap`) follow
+  Thunderbird's mapping; Mail.ru's own IMAP OAuth docs were not found. Yandex uses
+  `oauth.yandex.com` with `mail:imap_full mail:smtp`.
+- No client ids are shipped: the user registers an OAuth app with each provider and enters its
+  id and secret (`oauthClientId`, `oauthClientSecret`); Yandex and Mail.ru need a fixed
+  redirect, so `oauthRedirectPort` pins `http://127.0.0.1:<port>/callback`.
+
 **Next session should know:**
+- TASK_051 builds the form: `integrations.kinds` now returns the mail descriptor; manual-only
+  fields are optional in the descriptor and enforced in `settings::load`, so the page should
+  hide them for the OAuth presets and offer «Войти» (`integrations.signIn`) for them.
+- Approvals still expire after the 60 s default, so an unattended scenario's send is denied if
+  nobody answers in time.
+- Not run here: `pnpm build`, `pnpm test:e2e`, the manual check against a real mailbox, and real
+  OAuth sign-ins (no client ids). Pre-existing failures not touched: `pnpm typecheck` in
+  `tests/renderer/chatGoal.test.ts` and `pnpm format:check` on `ui/atoms/assistantGeometry.ts`.

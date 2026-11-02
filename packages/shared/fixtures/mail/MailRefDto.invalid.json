@@ -1,0 +1,18 @@
+[
+  {
+    "name": "zero uid",
+    "value": {
+      "folder": "INBOX",
+      "uidValidity": 1730000000,
+      "uid": 0
+    }
+  },
+  {
+    "name": "empty folder",
+    "value": {
+      "folder": "",
+      "uidValidity": 1730000000,
+      "uid": 42
+    }
+  }
+]

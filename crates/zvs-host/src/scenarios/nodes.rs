@@ -18,7 +18,10 @@ use super::catalogue::{
     TRIGGER_MAIL, TRIGGER_SCHEDULE, TRIGGER_WEBHOOK,
 };
 use super::compile::FROM_PREFIX;
-use super::template::{TemplateScope, civil_date, render, text_of};
+use super::template::{
+    TemplateScope, UNTRUSTED_INPUT_INSTRUCTION, carries_untrusted, civil_date, fence_untrusted,
+    render, text_of,
+};
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, ToolCall};
 use crate::kernel::knowledge_nodes::KNOWLEDGE_SEARCH;
 use crate::kernel::nodes::PROVIDERS_UNAVAILABLE;
@@ -528,6 +531,8 @@ impl NodeDef for AgentNode {
         let stores = store_ids(input.knowledge.as_ref());
         let searches = offered.iter().any(|tool| tool.key == KNOWLEDGE_SEARCH);
         let specs = tool_specs(&offered);
+        let upstream = input.upstream();
+        let untrusted = carries_untrusted(&upstream);
         let mut session = Session {
             by_name: offered
                 .iter()
@@ -549,6 +554,11 @@ impl NodeDef for AgentNode {
             } else {
                 TOOL_RESULTS_INSTRUCTION.to_owned()
             },
+            if untrusted {
+                UNTRUSTED_INPUT_INSTRUCTION.to_owned()
+            } else {
+                String::new()
+            },
         ]
         .into_iter()
         .filter(|part| !part.trim().is_empty())
@@ -562,7 +572,12 @@ impl NodeDef for AgentNode {
                 .unwrap_or(DEFAULT_MEMORY);
             messages.extend(history(&input.event, size));
         }
-        messages.push(ChatMessage::user(text_of(&input.upstream())));
+        let text = text_of(&upstream);
+        messages.push(ChatMessage::user(if untrusted {
+            fence_untrusted(&text)
+        } else {
+            text
+        }));
         let template = GenerateRequest {
             system: (!system.is_empty()).then_some(system),
             temperature: model.get("temperature").and_then(Value::as_f64),

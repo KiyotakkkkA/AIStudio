@@ -76,15 +76,15 @@ impl FakeProvider {
 }
 
 fn tool(name: &str, side_effect: bool) -> IntegrationToolSpec {
-    IntegrationToolSpec {
-        tool: IntegrationToolDto {
+    IntegrationToolSpec::new(
+        IntegrationToolDto {
             name: name.to_owned(),
             label: name.to_owned(),
             description: String::new(),
             side_effect,
         },
-        input_schema: json!({ "type": "object" }),
-    }
+        json!({ "type": "object" }),
+    )
 }
 
 #[async_trait]
@@ -530,17 +530,20 @@ async fn tools_register_per_account_and_leave_with_it() {
 async fn a_tool_call_reaches_the_provider_with_its_account() {
     let rig = rig();
     let account = rig.account("Рабочий", "steady").await;
-    let caller = rig.service.caller();
-    let output = caller(
-        IntegrationCallTarget {
-            account_id: account.id.to_string(),
-            tool: SEND.to_owned(),
-        },
-        serde_json::Map::new(),
-        tokio_util::sync::CancellationToken::new(),
-    )
-    .await
-    .expect("calls");
+    let output = rig
+        .service
+        .gateway()
+        .call(
+            IntegrationCallTarget {
+                account_id: account.id.to_string(),
+                tool: SEND.to_owned(),
+            },
+            serde_json::Map::new(),
+            None,
+            tokio_util::sync::CancellationToken::new(),
+        )
+        .await
+        .expect("calls");
     assert_eq!(output, json!({ "tool": SEND }));
     assert_eq!(
         rig.provider

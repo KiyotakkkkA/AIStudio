@@ -20,10 +20,12 @@ import {
 import type TaskStore from "./TaskStore";
 import { RailSkeleton } from "../../ui/organisms/PageSkeletons";
 import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
+import MailDraftView from "../mail/MailDraftView";
 
 export default observer(function TaskDetailRail({ store }: { readonly store: TaskStore }) {
   const navigate = useNavigate();
   const run = store.selected;
+  const mail = run?.approval === undefined ? undefined : store.mailPreviews[run.approval.id];
   return (
     <aside
       aria-label="Детали запуска"
@@ -88,6 +90,7 @@ export default observer(function TaskDetailRail({ store }: { readonly store: Tas
               <p className="m-0 font-mono text-[11px] text-main-500">
                 область {run.approval.scope} · до {formatDateTime(run.approval.expiresAt)}
               </p>
+              {mail === undefined ? null : <MailDraftView preview={mail} expanded />}
               <div className="flex gap-2">
                 <Button
                   tone="primary"

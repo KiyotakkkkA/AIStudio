@@ -5,6 +5,7 @@ import type ChatStore from "./ChatStore";
 import FadeIn from "../../ui/motion/FadeIn";
 import { isBuiltinTool, toolTitle } from "./toolCallCopy";
 import { subagentApprovalTitle } from "../subagents/subagentCopy";
+import MailDraftView from "../mail/MailDraftView";
 
 export default observer(function ChatApprovals({ store }: { readonly store: ChatStore }) {
   return (
@@ -32,6 +33,11 @@ export default observer(function ChatApprovals({ store }: { readonly store: Chat
                     : request.subject}{" "}
               для этого запроса?
             </p>
+            {request.mail === undefined ? null : (
+              <div className="w-full">
+                <MailDraftView preview={request.mail} expanded />
+              </div>
+            )}
             <div className="flex gap-2">
               <Button
                 size="sm"

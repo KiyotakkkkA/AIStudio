@@ -67,6 +67,18 @@ pub fn register(server: &mut IpcServer) {
             },
         )
         .handle(
+            "integrations.signIn",
+            |services: Arc<Services>, input: IntegrationRef| async move {
+                services.integrations.sign_in(&input.id.to_string()).await
+            },
+        )
+        .handle(
+            "integrations.cancelSignIn",
+            |services: Arc<Services>, input: IntegrationRef| async move {
+                services.integrations.cancel_sign_in(&input.id.to_string())
+            },
+        )
+        .handle(
             "integrations.activity",
             |services: Arc<Services>, input: IntegrationActivityInput| async move {
                 services.integrations.activity(&input)

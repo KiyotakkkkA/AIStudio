@@ -1,3 +1,4 @@
+pub mod mail;
 mod service;
 mod tools;
 
@@ -10,23 +11,28 @@ use zvs_contract::validate::{check, invalid};
 use zvs_contract::{
     AppError, AppErrorCode, FieldDescriptor, FieldKind, IntegrationAccountDto,
     IntegrationActivityLevel, IntegrationCheckDto, IntegrationConfig, IntegrationKind,
-    IntegrationToolDto, IntegrationTriggerDto, IntegrationValue, Validate,
+    IntegrationToolDto, IntegrationTriggerDto, IntegrationValue, SecretId, Validate,
 };
 
-use crate::services::SecretService;
+use crate::platform::external::UrlOpener;
 use crate::services::crypto::Plaintext;
+use crate::services::{SecretService, SecretUpdateInput};
 use crate::workers::{WorkerContext, WorkerFault};
 
 pub use service::{
     ACCOUNT_NOT_FOUND, Dispatched, EVENT_RETENTION_MS, IntegrationService,
     IntegrationServiceOptions, KIND_UNAVAILABLE, TriggerSink, UNKNOWN_TRIGGER, worker_key,
 };
-pub use tools::{IntegrationCallTarget, IntegrationToolCaller, account_tool_key};
+pub use tools::{
+    APPROVAL_UNAVAILABLE, IntegrationCallTarget, IntegrationGateway, SharedGateway,
+    account_tool_key,
+};
 
 pub const CREDENTIAL_NOT_A_SECRET: &str =
     "Учётные данные указываются только выбором секрета из хранилища секретов";
 pub const SECRET_NOT_CONFIGURED: &str = "В настройках интеграции не выбран секрет";
 pub const FIELD_REQUIRED: &str = "Заполните обязательное поле";
+pub const SIGN_IN_UNSUPPORTED: &str = "Для этой интеграции вход через браузер не используется";
 
 const CREDENTIAL_HINTS: &[&str] = &[
     "password",
@@ -42,6 +48,38 @@ const CREDENTIAL_HINTS: &[&str] = &[
 pub struct IntegrationToolSpec {
     pub tool: IntegrationToolDto,
     pub input_schema: Value,
+    pub per_call_approval: bool,
+}
+
+impl IntegrationToolSpec {
+    pub const fn new(tool: IntegrationToolDto, input_schema: Value) -> Self {
+        Self {
+            tool,
+            input_schema,
+            per_call_approval: false,
+        }
+    }
+
+    #[must_use]
+    pub fn approved_per_call(mut self) -> Self {
+        self.per_call_approval = true;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IntegrationApproval {
+    pub kind: String,
+    pub action: String,
+    pub denied: String,
+    pub fields: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IntegrationHandled {
+    pub trigger: String,
+    pub event_id: String,
+    pub payload: Value,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -93,6 +131,25 @@ impl IntegrationConfigView {
         }
     }
 
+    pub fn secret_id(&self, key: &str) -> Option<SecretId> {
+        self.values.get(key).and_then(IntegrationValue::secret_id)
+    }
+
+    pub fn update_secret(&self, key: &str, value: Plaintext) -> Result<(), AppError> {
+        let id = self.secret_id(key).ok_or_else(|| {
+            AppError::new(AppErrorCode::SecretMissing, SECRET_NOT_CONFIGURED)
+                .with_detail("field", key)
+        })?;
+        self.secrets.update(
+            &id.to_string(),
+            SecretUpdateInput {
+                value: Some(value),
+                ..SecretUpdateInput::default()
+            },
+        )?;
+        Ok(())
+    }
+
     pub fn secret(&self, key: &str) -> Result<Plaintext, AppError> {
         let id = self
             .values
@@ -126,6 +183,27 @@ impl IntegrationSession {
         self.service
             .note(&self.account.id.to_string(), level, message);
     }
+
+    pub fn cursor(&self, key: &str) -> Result<Option<String>, AppError> {
+        self.service.cursor(&self.account.id.to_string(), key)
+    }
+
+    pub fn set_cursor(&self, key: &str, value: &str) -> Result<(), AppError> {
+        self.service
+            .set_cursor(&self.account.id.to_string(), key, value)
+    }
+}
+
+pub struct SignInRequest<'a> {
+    pub account: &'a IntegrationAccountDto,
+    pub config: &'a IntegrationConfigView,
+    pub opener: &'a UrlOpener,
+    pub cancel: &'a CancellationToken,
+}
+
+pub struct SignedIn {
+    pub field: String,
+    pub value: Plaintext,
 }
 
 pub struct IntegrationToolCall {
@@ -133,6 +211,7 @@ pub struct IntegrationToolCall {
     pub config: IntegrationConfigView,
     pub tool: String,
     pub input: Map<String, Value>,
+    pub approved: Option<Map<String, Value>>,
     pub cancel: CancellationToken,
 }
 
@@ -148,6 +227,10 @@ pub trait IntegrationProvider: Send + Sync {
 
     fn tools(&self) -> Vec<IntegrationToolSpec>;
 
+    fn account_tools(&self, _config: &IntegrationConfig) -> Vec<IntegrationToolSpec> {
+        self.tools()
+    }
+
     async fn test(
         &self,
         config: &IntegrationConfigView,
@@ -158,6 +241,29 @@ pub trait IntegrationProvider: Send + Sync {
     async fn stop(&self, _account: &IntegrationAccountDto) {}
 
     async fn call_tool(&self, call: IntegrationToolCall) -> Result<Value, AppError>;
+
+    async fn approval(
+        &self,
+        _call: &IntegrationToolCall,
+    ) -> Result<Option<IntegrationApproval>, AppError> {
+        Ok(None)
+    }
+
+    async fn handled(
+        &self,
+        _account: &IntegrationAccountDto,
+        _config: &IntegrationConfigView,
+        _event: &IntegrationHandled,
+    ) -> Result<(), AppError> {
+        Ok(())
+    }
+
+    async fn sign_in(&self, _request: SignInRequest<'_>) -> Result<SignedIn, AppError> {
+        Err(AppError::new(
+            AppErrorCode::NotImplemented,
+            SIGN_IN_UNSUPPORTED,
+        ))
+    }
 }
 
 fn looks_like_credential(key: &str) -> bool {

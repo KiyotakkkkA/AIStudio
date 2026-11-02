@@ -46,6 +46,7 @@ use zvs_host::indexing::{
     DocumentExtractorOptions, ImageExtractor, IndexingService, IndexingServiceOptions,
     PdfExtractor, image_extensions,
 };
+use zvs_host::integrations::mail::MailProvider;
 use zvs_host::integrations::{IntegrationService, IntegrationServiceOptions};
 use zvs_host::kernel::{
     KernelServices, NodeRegistry, register_core_nodes, register_download_nodes, register_job_nodes,
@@ -1120,6 +1121,11 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let integrations = IntegrationService::new(IntegrationServiceOptions {
         clock: clock.clone(),
         logger: logger.clone(),
+        providers: vec![Arc::new(
+            MailProvider::new(http.client().clone()).with_clock(clock.clone()),
+        )],
+        approvals: Some(runs.approvals()),
+        opener: Some(zvs_host::platform::external::system_url_opener()),
         ..IntegrationServiceOptions::new(
             Arc::clone(&database),
             tools.clone(),
@@ -1129,6 +1135,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         )
     })?;
     integrations.attach_sink(scenario_runs.integration_sink());
+    runs.watch(integrations.run_watcher());
     {
         let integrations = integrations.clone();
         shutdown.register(ShutdownStage::Stop, "integrations", move || async move {

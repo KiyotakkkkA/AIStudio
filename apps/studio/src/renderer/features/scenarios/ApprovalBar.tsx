@@ -4,6 +4,8 @@ import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import type ScenarioEditor from "./ScenarioEditor";
 import { APPROVAL_PROMPT } from "./runCopy";
+import MailDraftView from "../mail/MailDraftView";
+import { MAIL_LEAD, SEND_MAIL } from "../mail/mailCopy";
 
 function ApprovalBar({ editor }: { readonly editor: ScenarioEditor }) {
   const run = editor.execution;
@@ -16,7 +18,12 @@ function ApprovalBar({ editor }: { readonly editor: ScenarioEditor }) {
     >
       <Icon path={mdiShieldAlertOutline} size={16} />
       <span className="min-w-0 flex-1">
-        {`${APPROVAL_PROMPT} «${editor.labelOf(approval.subject)}»`}
+        {run.mail === null ? `${APPROVAL_PROMPT} «${editor.labelOf(approval.subject)}»` : MAIL_LEAD}
+        {run.mail === null ? null : (
+          <span className="mt-2 block">
+            <MailDraftView preview={run.mail} />
+          </span>
+        )}
       </span>
       <Button
         size="sm"
@@ -24,16 +31,18 @@ function ApprovalBar({ editor }: { readonly editor: ScenarioEditor }) {
         disabled={run.deciding}
         onClick={() => void run.decide(true)}
       >
-        Разрешить
+        {run.mail === null ? "Разрешить" : SEND_MAIL}
       </Button>
-      <Button
-        size="sm"
-        tone="secondary"
-        disabled={run.deciding}
-        onClick={() => void run.decide(true, true)}
-      >
-        Разрешать всегда
-      </Button>
+      {run.mail === null ? (
+        <Button
+          size="sm"
+          tone="secondary"
+          disabled={run.deciding}
+          onClick={() => void run.decide(true, true)}
+        >
+          Разрешать всегда
+        </Button>
+      ) : null}
       <Button size="sm" tone="ghost" disabled={run.deciding} onClick={() => void run.decide(false)}>
         Отклонить
       </Button>

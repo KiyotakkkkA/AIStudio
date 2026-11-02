@@ -1237,7 +1237,32 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `integration` and the account as `sourceRef`. A side-effecting tool defaults to `ask` and
   stays under the tool ceiling (§14). Disable or remove withdraws them. Counters, `last_error`
   and the last 200 activity lines per account feed the automation rail. Channels:
-  `integrations.kinds|list|get|create|update|remove|test|enable|disable|activity`.
+  `integrations.kinds|list|get|create|update|remove|test|enable|disable|activity|signIn|cancelSignIn`.
+  A provider may narrow its tools per account (`account_tools(config)`), keep cursors in
+  `integration_cursor` (`IntegrationSession::cursor` / `set_cursor`), react to a scenario run that
+  finished `ok` for one of its events (`handled`, fed by `IntegrationService::run_watcher`), and
+  sign in through the browser (`sign_in`: loopback + PKCE, the grant saved as a secret into the
+  field the provider names). A tool spec marked `approved_per_call` resolves at `ask` minimum,
+  defers its approval, and the provider's `approval()` builds the request the user sees; the
+  call then receives exactly the approved fields, so nothing other than what was shown runs.
+- **Mail** (`zvs-host/src/integrations/mail/`, TASK_049, DECISION: every send needs approval,
+  with the letter shown). IMAP via `async-imap`, SMTP via `lettre`, parsing via `mail-parser`;
+  rustls with the system root store and no way to disable verification (tests swap only the
+  roots). Protocols: manual `imap` (password secrets, TLS or STARTTLS) and the OAuth presets
+  `google`, `yandex`, `mailru` (one file each in `mail/oauth/`, fixed hosts, XOAUTH2 for both
+  IMAP and SMTP, the user's own OAuth client id and secret, the grant refreshed and written back
+  to its secret). `access`: `read` (default; `mail.send` is not registered and a send is refused
+  in the host with `PermissionDenied`) or `readWrite` (`mail.send` raises a `kind: "mail"`
+  approval, `MailApprovalDto`, carrying the account and the full `MailDraftDto`; no «always»).
+  The worker IDLEs when one folder is watched and the server offers IDLE, otherwise polls
+  `pollSeconds`; the last UID per folder (with UIDVALIDITY) is kept as a cursor, a first
+  connection reads only unseen mail newer than `ignoreOlderDays`. `mail.received` fires per
+  message with event id `<folder>:<Message-ID>` and a `MailMessageDto` payload (headers,
+  snippet, attachments listed, `ref` to the body). Every field from the sender is an
+  `UntrustedTextDto` (`untrusted: true` is a literal), and a scenario agent whose input carries
+  any `untrusted: true` gets it wrapped in `<untrusted_content>` with an instruction in the
+  system prompt. `mail.search` and `mail.read` are read-only; `markRead` (off by default) marks a
+  message seen only after a run it started ends `ok`.
 - **Tray and autostart** — with `app.tray` on, closing the studio window hides it. Runs,
   streams and downloads keep going, and only «Выход» in the tray menu goes through the shutdown
   coordinator. `app.autostart` is mirrored from the OS registration, which is the source of

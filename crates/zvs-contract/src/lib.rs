@@ -21,6 +21,7 @@ pub mod graph;
 pub mod graph_expansion;
 pub mod ids;
 pub mod integrations;
+pub mod mail;
 pub mod mcp;
 pub mod memory;
 pub mod notifications;
@@ -166,6 +167,10 @@ pub use integrations::{
     IntegrationSecretRef, IntegrationStatus, IntegrationTestResultDto, IntegrationToolDto,
     IntegrationTriggerDto, IntegrationValue, UpdateIntegrationInput, WorkerDto, WorkerRef,
     WorkerStatus,
+};
+pub use mail::{
+    MAIL_APPROVAL_KIND, MailApprovalDto, MailAttachmentDto, MailBodyDto, MailDraftDto,
+    MailMessageDto, MailRefDto, UntrustedTextDto,
 };
 pub use mcp::{
     CreateMcpServerInput, McpCallResultDto, McpCapabilityDto, McpCapabilityKind, McpContentDto,

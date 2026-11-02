@@ -1,0 +1,23 @@
+[
+  {
+    "name": "declared trusted",
+    "value": {
+      "text": "x",
+      "untrusted": false
+    }
+  },
+  {
+    "name": "unmarked",
+    "value": {
+      "text": "x"
+    }
+  },
+  {
+    "name": "extra field",
+    "value": {
+      "text": "x",
+      "untrusted": true,
+      "trusted": true
+    }
+  }
+]

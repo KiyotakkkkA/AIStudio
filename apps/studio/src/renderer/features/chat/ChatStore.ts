@@ -70,6 +70,7 @@ import SubagentSteps, { subagentLabel, type SubagentLabel } from "./SubagentStep
 import { GOAL_COMMAND } from "./goalCopy";
 import { toolSections } from "./toolSets";
 import { appendRound } from "./answerRounds";
+import { mailPreview, type MailPreview } from "../mail/mailCopy";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
 const LAST_CONVERSATION_KEY = "chat.conversation.last";
@@ -137,6 +138,7 @@ export default class ChatStore {
     busy: boolean;
     changes: FileDiffDto[];
     process?: ProcessPlanDto;
+    mail?: MailPreview;
     subagent: SubagentLabel | null;
   }[] = [];
   folderRequests: (FolderApprovalDto & { subagent: SubagentLabel | null })[] = [];
@@ -1526,6 +1528,7 @@ export default class ChatStore {
     if (this.approvals.some((item) => item.id === id)) return;
     const files = FilesApprovalDto.safeParse(request);
     const process = ProcessApprovalDto.safeParse(request);
+    const mail = mailPreview(request);
     this.approvals.push({
       id,
       runId,
@@ -1533,6 +1536,7 @@ export default class ChatStore {
       busy: false,
       changes: files.success ? files.data.changes : [],
       ...(process.success ? { process: process.data.process } : {}),
+      ...(mail === null ? {} : { mail }),
       subagent,
     });
   }

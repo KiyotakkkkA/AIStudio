@@ -2,33 +2,37 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, PoisonError, Weak};
 use std::time::Instant;
 
+use async_trait::async_trait;
 use futures::FutureExt;
 use serde_json::{Map, Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::integrations::config_secret_ids;
 use zvs_contract::validate::check;
 use zvs_contract::{
-    AppError, AppErrorCode, CreateIntegrationInput, IntegrationAccountDetailDto,
-    IntegrationAccountDto, IntegrationAccountToolDto, IntegrationActivityDto,
-    IntegrationActivityInput, IntegrationActivityLevel, IntegrationConfig, IntegrationId,
-    IntegrationKind, IntegrationKindDto, IntegrationStatus, IntegrationTestResultDto, Timestamp,
-    ToolSource, ToolTier, UpdateIntegrationInput, Validate, WorkerDto, WorkerStatus,
+    AppError, AppErrorCode, CreateIntegrationInput, HostEvent, HostEventDraft,
+    IntegrationAccountDetailDto, IntegrationAccountDto, IntegrationAccountToolDto,
+    IntegrationActivityDto, IntegrationActivityInput, IntegrationActivityLevel, IntegrationConfig,
+    IntegrationId, IntegrationKind, IntegrationKindDto, IntegrationStatus,
+    IntegrationTestResultDto, IntegrationValue, RunKind, RunOutcomeStatus, SecretId, SecretScope,
+    Timestamp, ToolSource, ToolTier, UpdateIntegrationInput, Validate, WorkerDto, WorkerStatus,
 };
 
-use super::tools::register_integration_tool_node;
+use super::tools::{IntegrationToolNodeSpec, register_integration_tool_node};
 use super::{
-    IntegrationCallTarget, IntegrationConfigView, IntegrationEvent, IntegrationProvider,
-    IntegrationSession, IntegrationToolCall, IntegrationToolCaller, account_tool_key, check_config,
+    IntegrationApproval, IntegrationCallTarget, IntegrationConfigView, IntegrationEvent,
+    IntegrationGateway, IntegrationHandled, IntegrationProvider, IntegrationSession,
+    IntegrationToolCall, SharedGateway, SignInRequest, account_tool_key, check_config,
     check_provider,
 };
 use crate::data::repositories::{IntegrationCounter, IntegrationPatch};
 use crate::data::schema::{IntegrationAccountRow, IntegrationActivityRow, SecretConsumerKind};
 use crate::data::{Database, Repositories};
-use crate::kernel::NodeRegistry;
+use crate::kernel::{NodeRegistry, RunWatcher};
 use crate::platform::clock::{SharedClock, SystemClock};
+use crate::platform::external::{OPEN_FAILED, UrlOpener};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
-use crate::services::SecretService;
+use crate::services::{ApprovalService, SecretCreateInput, SecretService};
 use crate::tools::{ToolDescriptor, ToolRegistry};
 use crate::workers::{Backoff, WorkerBody, WorkerFault, WorkerSpec, WorkerSupervisor};
 
@@ -42,6 +46,8 @@ const ACTIVITY_KEEP: usize = 200;
 const ACTIVITY_MESSAGE_MAX: usize = 1000;
 const EVENT_ID_MAX: usize = 512;
 const CONNECTED: &str = "Подключение установлено";
+const SIGNED_IN: &str = "Вход через браузер выполнен";
+const OAUTH_SECRET_TYPE: &str = "custom";
 
 pub type TriggerSink = Arc<dyn Fn(&Value) -> Result<Vec<String>, AppError> + Send + Sync>;
 
@@ -62,6 +68,8 @@ pub struct IntegrationServiceOptions {
     pub secrets: Arc<SecretService>,
     pub workers: WorkerSupervisor,
     pub providers: Vec<Arc<dyn IntegrationProvider>>,
+    pub approvals: Option<Arc<ApprovalService>>,
+    pub opener: Option<UrlOpener>,
     pub clock: SharedClock,
     pub logger: SharedLogger,
     pub backoff: Backoff,
@@ -82,6 +90,8 @@ impl IntegrationServiceOptions {
             secrets,
             workers,
             providers: Vec::new(),
+            approvals: None,
+            opener: None,
             clock: Arc::new(SystemClock),
             logger: silent_logger(),
             backoff: Backoff::default(),
@@ -94,6 +104,7 @@ struct Inner {
     providers: BTreeMap<IntegrationKind, Arc<dyn IntegrationProvider>>,
     sink: Mutex<Option<TriggerSink>>,
     observed: Mutex<HashMap<String, (WorkerStatus, u64)>>,
+    signing: Mutex<HashMap<String, CancellationToken>>,
 }
 
 #[derive(Clone)]
@@ -153,6 +164,7 @@ impl IntegrationService {
                 providers,
                 sink: Mutex::new(None),
                 observed: Mutex::new(HashMap::new()),
+                signing: Mutex::new(HashMap::new()),
             }),
         };
         let weak = Arc::downgrade(&service.inner);
@@ -313,7 +325,7 @@ impl IntegrationService {
             Ok(provider) => (
                 provider.triggers(),
                 provider
-                    .tools()
+                    .account_tools(&row.config)
                     .into_iter()
                     .map(|spec| IntegrationAccountToolDto {
                         key: account_tool_key(&spec.tool.name, &row.id),
@@ -462,6 +474,122 @@ impl IntegrationService {
         })
     }
 
+    pub async fn sign_in(&self, id: &str) -> Result<IntegrationAccountDto, AppError> {
+        let row = self.require(id)?;
+        let provider = self.provider(row.kind)?;
+        let opener = self
+            .inner
+            .options
+            .opener
+            .clone()
+            .ok_or_else(|| AppError::new(AppErrorCode::NotImplemented, OPEN_FAILED))?;
+        let cancel = CancellationToken::new();
+        if let Some(previous) = self
+            .inner
+            .signing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(row.id.clone(), cancel.clone())
+        {
+            previous.cancel();
+        }
+        let account = self.account_dto(&row)?;
+        let outcome = provider
+            .sign_in(SignInRequest {
+                account: &account,
+                config: &self.view(&row),
+                opener: &opener,
+                cancel: &cancel,
+            })
+            .await;
+        if !cancel.is_cancelled() {
+            self.inner
+                .signing
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .remove(&row.id);
+        }
+        let signed = match outcome {
+            Ok(signed) => signed,
+            Err(error) => {
+                self.note(&row.id, IntegrationActivityLevel::Error, &error.message);
+                return Err(error);
+            }
+        };
+        let row = self.require(&row.id)?;
+        let secrets = &self.inner.options.secrets;
+        let existing = row
+            .config
+            .get(&signed.field)
+            .and_then(IntegrationValue::secret_id)
+            .filter(|secret| secrets.get(&secret.to_string()).is_ok());
+        match existing {
+            Some(_) => self.view(&row).update_secret(&signed.field, signed.value)?,
+            None => {
+                let short: String = row.id.chars().take(8).collect();
+                let created = secrets.create(SecretCreateInput {
+                    value: Some(signed.value),
+                    ..SecretCreateInput::new(
+                        OAUTH_SECRET_TYPE,
+                        format!("{} · OAuth · {short}", row.name),
+                        SecretScope::Personal,
+                    )
+                })?;
+                let secret = SecretId::parse(&created.id)
+                    .ok_or_else(|| AppError::new(AppErrorCode::Unknown, ACCOUNT_NOT_FOUND))?;
+                let mut config = row.config.clone();
+                config.insert(signed.field.clone(), IntegrationValue::secret(secret));
+                let updated = self.patch(
+                    &row.id,
+                    &IntegrationPatch {
+                        config: Some(config),
+                        last_error: Some(None),
+                        updated_at: Some(self.now()),
+                        ..IntegrationPatch::default()
+                    },
+                )?;
+                self.sync_secret_usage(&row.id, &row.config, &updated.config)?;
+            }
+        }
+        self.note(&row.id, IntegrationActivityLevel::Info, SIGNED_IN);
+        let row = self.require(&row.id)?;
+        if row.enabled {
+            self.launch(&row).await?;
+        }
+        self.account(&row.id)
+    }
+
+    pub fn cancel_sign_in(&self, id: &str) -> Result<IntegrationAccountDto, AppError> {
+        let row = self.require(id)?;
+        if let Some(token) = self
+            .inner
+            .signing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&row.id)
+        {
+            token.cancel();
+        }
+        self.account(&row.id)
+    }
+
+    pub fn cursor(&self, account_id: &str, key: &str) -> Result<Option<String>, AppError> {
+        self.database().with_connection(|connection| {
+            Ok(Repositories::new(connection)
+                .integrations
+                .cursor(account_id, key)?)
+        })
+    }
+
+    pub fn set_cursor(&self, account_id: &str, key: &str, value: &str) -> Result<(), AppError> {
+        let at = self.now();
+        self.database().with_connection(|connection| {
+            Ok(Repositories::new(connection)
+                .integrations
+                .set_cursor(account_id, key, value, at)?)
+        })
+    }
+
     pub fn activity(
         &self,
         input: &IntegrationActivityInput,
@@ -585,7 +713,7 @@ impl IntegrationService {
         row: &IntegrationAccountRow,
         provider: &dyn IntegrationProvider,
     ) -> Result<(), AppError> {
-        for spec in provider.tools() {
+        for spec in provider.account_tools(&row.config) {
             let key = account_tool_key(&spec.tool.name, &row.id);
             self.inner.options.tools.register(&ToolDescriptor {
                 source_ref: Some(row.id.clone()),
@@ -594,18 +722,22 @@ impl IntegrationService {
                 input_schema: spec.input_schema.clone(),
                 read_only: !spec.tool.side_effect,
                 destructive: false,
-                tier: spec.tool.side_effect.then_some(ToolTier::Ask),
+                tier: (spec.tool.side_effect || spec.per_call_approval).then_some(ToolTier::Ask),
                 ..ToolDescriptor::new(key.clone(), ToolSource::Integration)
             })?;
             register_integration_tool_node(
                 &self.inner.options.nodes,
-                key,
-                IntegrationCallTarget {
-                    account_id: row.id.clone(),
-                    tool: spec.tool.name.clone(),
+                IntegrationToolNodeSpec {
+                    key,
+                    target: IntegrationCallTarget {
+                        account_id: row.id.clone(),
+                        tool: spec.tool.name.clone(),
+                    },
+                    side_effect: spec.tool.side_effect,
+                    per_call_approval: spec.per_call_approval,
                 },
-                spec.tool.side_effect,
-                self.caller(),
+                self.gateway(),
+                self.inner.options.approvals.clone(),
             )?;
         }
         Ok(())
@@ -623,24 +755,40 @@ impl IntegrationService {
         Ok(())
     }
 
-    pub(super) fn caller(&self) -> IntegrationToolCaller {
-        let weak: Weak<Inner> = Arc::downgrade(&self.inner);
-        Arc::new(move |target, input, cancel| {
-            let weak = weak.clone();
-            async move {
-                let inner = weak
-                    .upgrade()
-                    .ok_or_else(|| not_found(&target.account_id))?;
-                Self { inner }.call(target, input, cancel).await
-            }
-            .boxed()
-        })
+    pub fn gateway(&self) -> SharedGateway {
+        Arc::new(ServiceGateway(Arc::downgrade(&self.inner)))
+    }
+
+    async fn approval(
+        &self,
+        target: &IntegrationCallTarget,
+        input: &Map<String, Value>,
+        cancel: &CancellationToken,
+    ) -> Result<Option<IntegrationApproval>, AppError> {
+        let row = self.require(&target.account_id)?;
+        let provider = self.provider(row.kind)?;
+        let outcome = provider
+            .approval(&IntegrationToolCall {
+                account: self.account_dto(&row)?,
+                config: self.view(&row),
+                tool: target.tool.clone(),
+                input: input.clone(),
+                approved: None,
+                cancel: cancel.clone(),
+            })
+            .await;
+        if let Err(error) = &outcome {
+            self.bump(&row.id, IntegrationCounter::Errors, 1);
+            self.note(&row.id, IntegrationActivityLevel::Error, &error.message);
+        }
+        outcome
     }
 
     async fn call(
         &self,
         target: IntegrationCallTarget,
         input: Map<String, Value>,
+        approved: Option<Map<String, Value>>,
         cancel: CancellationToken,
     ) -> Result<Value, AppError> {
         let row = self.require(&target.account_id)?;
@@ -662,6 +810,7 @@ impl IntegrationService {
                 config: self.view(&row),
                 tool: target.tool,
                 input,
+                approved,
                 cancel,
             })
             .await;
@@ -750,6 +899,61 @@ impl IntegrationService {
                 self.note(&row.id, IntegrationActivityLevel::Error, &error.message);
                 Err(error)
             }
+        }
+    }
+
+    pub fn run_watcher(&self) -> RunWatcher {
+        let weak = Arc::downgrade(&self.inner);
+        Arc::new(move |run_id: &str, event: &HostEvent| {
+            let HostEventDraft::End { outcome } = &event.body else {
+                return;
+            };
+            if outcome.status != RunOutcomeStatus::Ok {
+                return;
+            }
+            let Some(inner) = weak.upgrade() else {
+                return;
+            };
+            let service = Self { inner };
+            let run_id = run_id.to_owned();
+            let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+                return;
+            };
+            runtime.spawn(async move { service.settle(&run_id).await });
+        })
+    }
+
+    async fn settle(&self, run_id: &str) {
+        let run = match self
+            .database()
+            .with_connection(|connection| Ok(Repositories::new(connection).runs.get(run_id)?))
+        {
+            Ok(Some(run)) if run.kind == RunKind::Scenario => run,
+            _ => return,
+        };
+        let input = &run.input;
+        let (Some(account_id), Some(trigger), Some(event_id), Some(payload)) = (
+            input.get("accountId").and_then(Value::as_str),
+            input.get("trigger").and_then(Value::as_str),
+            input.get("eventId").and_then(Value::as_str),
+            input.get("payload"),
+        ) else {
+            return;
+        };
+        let Ok(row) = self.require(account_id) else {
+            return;
+        };
+        let (Ok(provider), Ok(account)) = (self.provider(row.kind), self.account_dto(&row)) else {
+            return;
+        };
+        let handled = IntegrationHandled {
+            trigger: trigger.to_owned(),
+            event_id: event_id.to_owned(),
+            payload: payload.clone(),
+        };
+        if let Err(error) = provider.handled(&account, &self.view(&row), &handled).await {
+            self.bump(&row.id, IntegrationCounter::Errors, 1);
+            self.note(&row.id, IntegrationActivityLevel::Error, &error.message);
         }
     }
 
@@ -856,5 +1060,40 @@ impl IntegrationService {
             }
             WorkerStatus::Starting | WorkerStatus::Stopped => {}
         }
+    }
+}
+
+struct ServiceGateway(Weak<Inner>);
+
+impl ServiceGateway {
+    fn service(&self, target: &IntegrationCallTarget) -> Result<IntegrationService, AppError> {
+        self.0
+            .upgrade()
+            .map(|inner| IntegrationService { inner })
+            .ok_or_else(|| not_found(&target.account_id))
+    }
+}
+
+#[async_trait]
+impl IntegrationGateway for ServiceGateway {
+    async fn approval(
+        &self,
+        target: &IntegrationCallTarget,
+        input: &Map<String, Value>,
+        cancel: &CancellationToken,
+    ) -> Result<Option<IntegrationApproval>, AppError> {
+        self.service(target)?.approval(target, input, cancel).await
+    }
+
+    async fn call(
+        &self,
+        target: IntegrationCallTarget,
+        input: Map<String, Value>,
+        approved: Option<Map<String, Value>>,
+        cancel: CancellationToken,
+    ) -> Result<Value, AppError> {
+        self.service(&target)?
+            .call(target, input, approved, cancel)
+            .await
     }
 }

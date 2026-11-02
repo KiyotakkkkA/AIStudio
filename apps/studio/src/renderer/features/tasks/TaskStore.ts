@@ -21,6 +21,7 @@ import {
   type TaskStatusFilter,
 } from "./runGroups";
 import { parseStepEvent } from "./stepEvent";
+import { mailPreview, type MailPreview } from "../mail/mailCopy";
 
 const EMPTY_COUNTS: RunCountsDto = {
   total: 0,
@@ -60,6 +61,7 @@ export default class TaskStore {
   loaded = false;
   clearing = false;
   busyId: string | null = null;
+  mailPreviews: Record<string, MailPreview> = {};
   error: string | null = null;
   private readonly seen = new Map<StreamId, number>();
   private unobserve: (() => void) | undefined;
@@ -262,6 +264,8 @@ export default class TaskStore {
     if (event.type === "approval") {
       const approval = RunApprovalDto.safeParse(event.request);
       const owner = event.request.runId === undefined || event.request.runId === run.id;
+      const mail = mailPreview(event.request);
+      if (mail !== null && approval.success) this.mailPreviews[approval.data.id] = mail;
       if (approval.success && owner) run.approval = approval.data;
       else if (approval.success) this.scheduleRefresh();
     }

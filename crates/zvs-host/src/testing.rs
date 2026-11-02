@@ -583,6 +583,7 @@ pub fn test_services(system: SystemService) -> TestServices {
     let integrations = crate::integrations::IntegrationService::new(
         crate::integrations::IntegrationServiceOptions {
             clock: clock.clone(),
+            approvals: Some(runs.approvals()),
             ..crate::integrations::IntegrationServiceOptions::new(
                 database.shared(),
                 tools.clone(),
@@ -594,6 +595,7 @@ pub fn test_services(system: SystemService) -> TestServices {
     )
     .expect("an integration service");
     integrations.attach_sink(scenario_runs.integration_sink());
+    runs.watch(integrations.run_watcher());
     scenario_effects.attach(Arc::new(crate::scenarios::HostScenarioEffects {
         chat: chat.clone(),
         notifications: Some(notifications.clone()),

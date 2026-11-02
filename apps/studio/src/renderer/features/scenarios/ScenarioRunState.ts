@@ -39,6 +39,7 @@ import {
   RUN_LOAD_FAILED,
   runErrorCopy,
 } from "./runCopy";
+import { mailPreview, type MailPreview } from "../mail/mailCopy";
 
 const OUTCOME_PHASES = { ok: "succeeded", failed: "failed", cancelled: "cancelled" } as const;
 
@@ -55,6 +56,7 @@ export default class ScenarioRunState {
   starting = false;
   cancelling = false;
   approval: RunApprovalDto | null = null;
+  mail: MailPreview | null = null;
   deciding = false;
   error: string | null = null;
   loaded = false;
@@ -312,7 +314,10 @@ export default class ScenarioRunState {
     }
     if (event.type === "approval") {
       const approval = RunApprovalDto.safeParse(event.request);
-      if (approval.success) this.approval = approval.data;
+      if (approval.success) {
+        this.approval = approval.data;
+        this.mail = mailPreview(event.request);
+      }
       return;
     }
     if (event.type === "log") {

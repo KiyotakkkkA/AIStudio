@@ -1,0 +1,48 @@
+[
+  {
+    "name": "plain body",
+    "value": {
+      "untrusted": true,
+      "message": {
+        "untrusted": true,
+        "ref": {
+          "folder": "INBOX",
+          "uidValidity": 1730000000,
+          "uid": 42
+        },
+        "messageId": "<ticket-42@example.com>",
+        "from": {
+          "text": "Иван Петров <ivan@example.com>",
+          "untrusted": true
+        },
+        "fromAddress": "ivan@example.com",
+        "to": ["support@example.org"],
+        "subject": {
+          "text": "Не работает вход",
+          "untrusted": true
+        },
+        "date": 1730000000000,
+        "inReplyTo": null,
+        "references": [],
+        "snippet": {
+          "text": "Добрый день, после обновления не получается войти",
+          "untrusted": true
+        },
+        "attachments": [
+          {
+            "name": {
+              "text": "screen.png",
+              "untrusted": true
+            },
+            "contentType": "image/png",
+            "size": 20480
+          }
+        ],
+        "size": 40960,
+        "seen": false
+      },
+      "text": "текст",
+      "truncated": false
+    }
+  }
+]

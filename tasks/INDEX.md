@@ -221,7 +221,7 @@ on its code. Suggested order: 045_EXTRA_3 → 045_EXTRA_5 (part A) → 045_EXTRA
 - [x] **TASK_048_EXTRA_5** — Background code and scripts, and waking the dialog when a process finishes
 - [x] **TASK_048_EXTRA_6** — Carrying tool results, sources and reasoning into later turns
 - [ ] **TASK_048_EXTRA_7** — Compacting history that no longer fits the context window
-- [ ] **TASK_049** — Mail integration (IMAP/SMTP)
+- [x] **TASK_049** — Mail integration (IMAP/SMTP)
 - [ ] **TASK_050** — Telegram and Git hosting integrations
 - [ ] **TASK_051** — Integrations page
 
@@ -337,7 +337,7 @@ you can settle the load-bearing ones early rather than being interrupted mid-tas
 | TASK_048_EXTRA_5 (resolved) | Option a: at most 3 wake-ups in a row without a message from the person, in every execution policy mode | yes |
 | TASK_048_EXTRA_6 (resolved) | Option a: results capped at 2 000 tokens and cited sources, no reasoning; every message that fits; uncited passages never carried | yes |
 | TASK_048_EXTRA_7 | History summary made in the turn or in the background, and with which model? | yes |
-| TASK_049 | Does mail send automatically once approved, or per message? | yes |
+| TASK_049 (resolved) | Option (a), with the letter shown in the approval: every send needs approval, no «always». Per account, `access` is `read` (default, sending refused in the host) or `readWrite`. | yes |
 | TASK_050 | Telegram: bot account, or your personal account? | **no** |
 | TASK_056 | Code-sign the installer? Auto-update or manual? WebView2 runtime: download, embed bootstrapper, or offline? | moderate |
 

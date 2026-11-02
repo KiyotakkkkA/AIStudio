@@ -64,6 +64,8 @@ import {
   ToolCallViewBody,
 } from "./ToolCallDetails";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import MailDraftView from "../mail/MailDraftView";
+import { MAIL_LEAD, REJECT_MAIL, SEND_MAIL, type MailPreview } from "../mail/mailCopy";
 
 export const TOOL_CALL_STATUS: Record<
   ChatToolCallDto["status"],
@@ -97,6 +99,7 @@ export interface ToolCallApproval {
   readonly busy: boolean;
   readonly changes?: readonly FileDiffDto[];
   readonly process?: ProcessPlanDto;
+  readonly mail?: MailPreview;
 }
 
 export interface ToolCallQuestion {
@@ -169,10 +172,14 @@ export function ToolCallCard({
   const proposed = approval?.changes ?? [];
   const applied = call.key === FILE_TOOL_APPLY ? fileChanges(call.meta) : [];
   const proposedProcess = approval?.process;
+  const proposedMail = approval?.mail;
   const finished = proposedProcess === undefined ? processResult(call.meta) : null;
   const record = call.key === ASK_TOOL ? questionRecord(call.meta) : null;
   const view =
-    record === null && finished === null && proposedProcess === undefined
+    record === null &&
+    finished === null &&
+    proposedProcess === undefined &&
+    proposedMail === undefined
       ? toolCallView(call)
       : null;
   const searched = view?.kind === "search" && view.citations !== null;
@@ -324,7 +331,30 @@ export function ToolCallCard({
               </div>
             </div>
           )}
-          {approval && proposed.length === 0 && !proposedProcess && (
+          {approval && proposedMail && (
+            <div role="status" className="space-y-2 rounded-control bg-warn-soft px-3 py-2.5">
+              <p className="m-0 text-[12.5px] text-main-100">{MAIL_LEAD}</p>
+              <MailDraftView preview={proposedMail} expanded />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  disabled={approval.busy}
+                  tone="primary"
+                  onClick={() => onDecide?.(approval.id, true)}
+                >
+                  {SEND_MAIL}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={approval.busy}
+                  onClick={() => onDecide?.(approval.id, false)}
+                >
+                  {REJECT_MAIL}
+                </Button>
+              </div>
+            </div>
+          )}
+          {approval && proposed.length === 0 && !proposedProcess && !proposedMail && (
             <div
               role="status"
               className="flex flex-wrap items-center gap-3 rounded-control bg-warn-soft px-3 py-2.5"

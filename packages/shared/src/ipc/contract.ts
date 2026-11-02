@@ -471,6 +471,8 @@ export const contract = defineContract({
   "integrations.test": { input: IntegrationRef, output: IntegrationTestResultDto },
   "integrations.enable": { input: IntegrationRef, output: IntegrationAccountDto },
   "integrations.disable": { input: IntegrationRef, output: IntegrationAccountDto },
+  "integrations.signIn": { input: IntegrationRef, output: IntegrationAccountDto },
+  "integrations.cancelSignIn": { input: IntegrationRef, output: IntegrationAccountDto },
   "integrations.activity": {
     input: IntegrationActivityInput,
     output: z.array(IntegrationActivityDto),

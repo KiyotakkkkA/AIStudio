@@ -1,0 +1,10 @@
+[
+  {
+    "name": "inbox message",
+    "value": {
+      "folder": "INBOX",
+      "uidValidity": 1730000000,
+      "uid": 42
+    }
+  }
+]

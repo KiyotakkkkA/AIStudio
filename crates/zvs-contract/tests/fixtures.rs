@@ -240,6 +240,24 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::UpdateIntegrationInput>,
     ),
     (
+        "mail/UntrustedTextDto",
+        round_trip::<zvs_contract::UntrustedTextDto>,
+    ),
+    ("mail/MailRefDto", round_trip::<zvs_contract::MailRefDto>),
+    (
+        "mail/MailMessageDto",
+        round_trip::<zvs_contract::MailMessageDto>,
+    ),
+    ("mail/MailBodyDto", round_trip::<zvs_contract::MailBodyDto>),
+    (
+        "mail/MailDraftDto",
+        round_trip::<zvs_contract::MailDraftDto>,
+    ),
+    (
+        "mail/MailApprovalDto",
+        round_trip::<zvs_contract::MailApprovalDto>,
+    ),
+    (
         "integrations/WorkerDto",
         round_trip::<zvs_contract::WorkerDto>,
     ),

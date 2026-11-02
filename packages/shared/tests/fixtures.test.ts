@@ -25,6 +25,7 @@ import * as cli from "../src/cli.js";
 import * as voice from "../src/voice.js";
 import * as storage from "../src/storage.js";
 import * as integrations from "../src/integrations.js";
+import * as mail from "../src/mail.js";
 import {
   AccountDto,
   ChatCitationDto,
@@ -234,6 +235,12 @@ const schemas: Record<string, z.ZodType> = {
   "integrations/WorkerDto": integrations.WorkerDto,
   "integrations/WorkerRef": integrations.WorkerRef,
   "integrations/WorkerStatus": integrations.WorkerStatus,
+  "mail/UntrustedTextDto": mail.UntrustedTextDto,
+  "mail/MailRefDto": mail.MailRefDto,
+  "mail/MailMessageDto": mail.MailMessageDto,
+  "mail/MailBodyDto": mail.MailBodyDto,
+  "mail/MailDraftDto": mail.MailDraftDto,
+  "mail/MailApprovalDto": mail.MailApprovalDto,
   "files/FileChangeKind": files.FileChangeKind,
   "files/FileDiffDto": files.FileDiffDto,
   "files/FileChangesDto": files.FileChangesDto,

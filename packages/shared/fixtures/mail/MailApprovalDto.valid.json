@@ -1,0 +1,49 @@
+[
+  {
+    "name": "reply from a scenario",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111111",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "mail",
+      "subject": "mail.a1b2c3d4.send",
+      "scope": "global",
+      "expiresAt": 60000,
+      "tool": "mail.a1b2c3d4.send",
+      "action": "Отправка письма: ivan@example.com",
+      "account": "Поддержка",
+      "draft": {
+        "from": "Поддержка <support@example.org>",
+        "to": ["ivan@example.com"],
+        "cc": [],
+        "subject": "Re: Не работает вход",
+        "text": "Здравствуйте, Иван.\n\nПроверьте, пожалуйста, раскладку клавиатуры.",
+        "inReplyTo": "<ticket-42@example.com>",
+        "references": ["<ticket-42@example.com>"]
+      }
+    }
+  },
+  {
+    "name": "from a dialog",
+    "value": {
+      "id": "0199aa11-3333-7111-8111-111111111111",
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "kind": "mail",
+      "subject": "mail.a1b2c3d4.send",
+      "scope": "global",
+      "expiresAt": 60000,
+      "tool": "mail.a1b2c3d4.send",
+      "action": "Отправка письма: ivan@example.com",
+      "account": "Поддержка",
+      "draft": {
+        "from": "Поддержка <support@example.org>",
+        "to": ["ivan@example.com"],
+        "cc": [],
+        "subject": "Re: Не работает вход",
+        "text": "Здравствуйте, Иван.\n\nПроверьте, пожалуйста, раскладку клавиатуры.",
+        "inReplyTo": "<ticket-42@example.com>",
+        "references": ["<ticket-42@example.com>"]
+      },
+      "conversationId": "0199aa11-2222-7111-8111-111111111111"
+    }
+  }
+]
