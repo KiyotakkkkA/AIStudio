@@ -1,7 +1,19 @@
-import { mdiClose, mdiFlashOutline, mdiLogin, mdiLogout, mdiPlay, mdiStop } from "@mdi/js";
+import {
+  mdiClose,
+  mdiDeleteOutline,
+  mdiDotsHorizontal,
+  mdiFlashOutline,
+  mdiLogin,
+  mdiLogout,
+  mdiPlay,
+  mdiStop,
+} from "@mdi/js";
 import { observer } from "mobx-react-lite";
+import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
+import { useState } from "react";
 import type { McpStartup, McpTransport } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
+import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import SegmentedControl from "../../ui/atoms/SegmentedControl";
@@ -10,10 +22,13 @@ import StatusDot from "../../ui/atoms/StatusDot";
 import { STATUS_TONE_TEXT } from "../../ui/atoms/statusTone";
 import TextInput from "../../ui/atoms/TextInput";
 import Toggle from "../../ui/atoms/Toggle";
+import { ActionMenu, ActionMenuItem } from "../../ui/molecules/ActionMenu";
+import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import Field from "../../ui/molecules/Field";
 import type ConnectionStore from "./ConnectionStore";
 import { STARTUP_LABELS, STATE_LABELS, STATE_TONES } from "./connectionPresentation";
 import type { ServerFormVm } from "./ServerFormVm";
+import Disclosure from "./Disclosure";
 import TestResultLine from "./TestResultLine";
 import ValueTable from "./ValueTable";
 import Alert from "../../ui/molecules/Alert";
@@ -42,13 +57,11 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
   const oauthable = !vm.isNew && server !== null && server.transport === "http";
   const signedIn = oauthable && server.oauth === "signed-in";
   const needsSignIn = oauthable && (server.oauth === "required" || state === "reauth");
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   return (
-    <section className="flex flex-none flex-col gap-3.25 rounded-card border border-line bg-main-900 p-4">
+    <section className="flex flex-none flex-col gap-3.25">
       <div className="flex items-center gap-2.25">
-        <h2 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-          Настройка сервера
-        </h2>
         {state === null ? (
           <Chip>Новый</Chip>
         ) : (
@@ -57,6 +70,7 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
             <span className={STATUS_TONE_TEXT[STATE_TONES[state]]}>{STATE_LABELS[state]}</span>
           </Chip>
         )}
+        <span className="flex-1" />
         <Toggle
           checked={vm.enabled}
           disabled={store.switching}
@@ -65,6 +79,47 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
             void store.setServerEnabled(checked);
           }}
         />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <h2 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
+          Настройка сервера
+        </h2>
+        <Button
+          tone="secondary"
+          disabled={(!vm.isNew && !vm.dirty) || store.saving}
+          onClick={store.resetForm}
+        >
+          Отменить
+        </Button>
+        <Button
+          tone="primary"
+          disabled={store.saving || (!vm.isNew && !vm.dirty)}
+          onClick={() => {
+            void store.submit();
+          }}
+        >
+          {store.saving ? "Сохранение…" : "Сохранить"}
+        </Button>
+        {vm.isNew ? null : (
+          <Dropdown menuWidth={220} menuPlacement="bottom-right">
+            <IconDropdownButton
+              label="Действия с сервером"
+              tooltip="bottom-right"
+              path={mdiDotsHorizontal}
+            />
+            <ActionMenu label="Действия с сервером">
+              <ActionMenuItem
+                icon={mdiDeleteOutline}
+                danger
+                disabled={store.removing}
+                onClick={() => setConfirmingRemove(true)}
+              >
+                Удалить сервер
+              </ActionMenuItem>
+            </ActionMenu>
+          </Dropdown>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-3.25">
@@ -172,9 +227,6 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
           <div>
             <span className="mb-1.5 flex items-center text-[12px] font-medium text-main-300">
               Заголовки
-              <span className="ml-1.5 font-normal text-main-500">
-                — статические токены берутся из секретов
-              </span>
             </span>
             <ValueTable
               vm={vm}
@@ -193,7 +245,7 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
         </p>
       )}
 
-      <div className="mt-0.5 flex items-center gap-3">
+      <div className="flex items-center gap-3 border-b border-line pb-3.25">
         <Button
           tone="primary"
           disabled={store.testing || store.saving || !vm.enabled}
@@ -272,20 +324,29 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
       </div>
 
       {vm.isNew || server?.instructions == null ? null : (
-        <details className="group rounded-control bg-main-800 px-3 py-2.25">
-          <summary className="cursor-pointer list-none text-[12px] font-medium text-main-300 [&::-webkit-details-marker]:hidden">
-            Инструкции сервера
-            <span className="ml-1.5 font-normal text-main-500">
-              — передаются модели вместе с инструментами
-            </span>
-          </summary>
-          <p className="mt-2 text-xs/relaxed whitespace-pre-wrap text-main-400">
+        <Disclosure label="Инструкции сервера" className="border-b border-line">
+          <p className="pb-2 text-[12.5px]/relaxed whitespace-pre-wrap text-main-400">
             {server.instructions}
           </p>
-        </details>
+        </Disclosure>
       )}
 
       {vm.banner === null ? null : <Alert>{vm.banner}</Alert>}
+
+      <ConfirmDialog
+        open={confirmingRemove}
+        title="Удалить сервер?"
+        confirmLabel="Удалить"
+        confirmTone="danger"
+        onCancel={() => setConfirmingRemove(false)}
+        onConfirm={() => {
+          setConfirmingRemove(false);
+          void store.removeSelected();
+        }}
+      >
+        «{vm.name}» будет остановлен и удалён. Его инструменты пропадут из реестра, а сценарии и
+        навыки, которые на них ссылаются, перестанут их вызывать.
+      </ConfirmDialog>
     </section>
   );
 }

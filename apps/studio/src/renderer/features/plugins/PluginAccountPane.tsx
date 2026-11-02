@@ -3,22 +3,26 @@ import {
   mdiCheck,
   mdiCheckCircleOutline,
   mdiDeleteOutline,
+  mdiDotsHorizontal,
   mdiFlashOutline,
   mdiLogin,
   mdiToyBrickOutline,
 } from "@mdi/js";
 import { observer } from "mobx-react-lite";
-import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import { Dropdown, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import { useState } from "react";
 import type { IntegrationTestResultDto } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
-import IconButton from "../../ui/atoms/buttons/IconButton";
+import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
 import StatusDot from "../../ui/atoms/StatusDot";
 import { STATUS_TONE_TEXT } from "../../ui/atoms/statusTone";
 import TextInput from "../../ui/atoms/TextInput";
 import Toggle from "../../ui/atoms/Toggle";
+import { ActionMenu, ActionMenuItem, ActionMenuSeparator } from "../../ui/molecules/ActionMenu";
 import Alert from "../../ui/molecules/Alert";
+import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import EmptyState from "../../ui/molecules/EmptyState";
 import Field from "../../ui/molecules/Field";
 import { formatLatency } from "../connections/connectionPresentation";
@@ -44,6 +48,7 @@ export const SAVING = "Сохранение…";
 export const CONNECT = "Подключить";
 export const CANCEL = "Отменить";
 export const REMOVE_ACCOUNT = "Удалить аккаунт";
+export const ACCOUNT_ACTIONS = "Действия с аккаунтом";
 export const NEW_ACCOUNT = "Новый";
 export const CHOOSE_TYPE_TITLE = "Выберите способ подключения";
 export const CHOOSE_TYPE_HINT = "Поля формы зависят от выбранного способа.";
@@ -130,15 +135,15 @@ const AccountForm = observer(function AccountForm({
   const reason =
     account !== null && (state === "failed" || state === "retrying") ? account.statusDetail : null;
   const test = store.selectedTest;
+  const [confirming, setConfirming] = useState(false);
+  const showCancel = vm.isNew ? store.accountsOf(kind).length > 0 : true;
+  const showSave = !(vm.isNew && vm.type.browser);
 
   return (
     <>
-      <section className="flex flex-none flex-col gap-3.5 rounded-card border border-line bg-main-900 p-4">
+      <section className="flex flex-none flex-col gap-3.5">
         <div className="flex items-center gap-2.5">
           <PluginMark kind={kind} mark={vm.type.mark} size="sm" />
-          <h2 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-            {ACCOUNT_HEADING}
-          </h2>
           <Chip>{vm.type.chip}</Chip>
           {account === null || state === null || tone === null ? (
             <Chip tone="accent">{NEW_ACCOUNT}</Chip>
@@ -148,6 +153,7 @@ const AccountForm = observer(function AccountForm({
               <span className={STATUS_TONE_TEXT[tone]}>{store.stateLabel(account)}</span>
             </Chip>
           )}
+          <span className="flex-1" />
           {account === null ? null : (
             <Toggle
               checked={account.enabled}
@@ -157,6 +163,67 @@ const AccountForm = observer(function AccountForm({
                 void store.setEnabled(checked);
               }}
             />
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <h2 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
+            {ACCOUNT_HEADING}
+          </h2>
+          {showCancel ? (
+            vm.isNew ? (
+              <Button tone="secondary" onClick={store.cancelAdding}>
+                {CANCEL}
+              </Button>
+            ) : (
+              <Button
+                tone="secondary"
+                disabled={!vm.dirty || store.saving}
+                onClick={store.resetForm}
+              >
+                {CANCEL}
+              </Button>
+            )
+          ) : null}
+          {showSave ? (
+            <Button
+              tone="primary"
+              disabled={store.saving || (!vm.isNew && !vm.dirty)}
+              onClick={() => {
+                void store.save();
+              }}
+            >
+              {store.saving ? SAVING : vm.isNew ? CONNECT : SAVE}
+            </Button>
+          ) : null}
+          {account === null ? null : (
+            <Dropdown menuWidth={220} menuPlacement="bottom-right">
+              <IconDropdownButton
+                label={ACCOUNT_ACTIONS}
+                tooltip="bottom-right"
+                path={mdiDotsHorizontal}
+              />
+              <ActionMenu label={ACCOUNT_ACTIONS}>
+                <ActionMenuItem
+                  icon={mdiFlashOutline}
+                  disabled={store.testing || store.saving || store.signingIn || vm.dirty}
+                  onClick={() => {
+                    void store.test();
+                  }}
+                >
+                  {store.testing ? TESTING : TEST_CONNECTION}
+                </ActionMenuItem>
+                <ActionMenuSeparator />
+                <ActionMenuItem
+                  icon={mdiDeleteOutline}
+                  danger
+                  disabled={store.removing}
+                  onClick={() => setConfirming(true)}
+                >
+                  {REMOVE_ACCOUNT}
+                </ActionMenuItem>
+              </ActionMenu>
+            </Dropdown>
           )}
         </div>
 
@@ -190,7 +257,7 @@ const AccountForm = observer(function AccountForm({
       </section>
 
       {account === null || (test === null && !store.testing) ? null : (
-        <section className="flex flex-none flex-col gap-2.5 rounded-card border border-line bg-main-900 p-4">
+        <section className="flex flex-none flex-col gap-2.5">
           <h2 className="text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
             {TEST_CONNECTION}
           </h2>
@@ -202,68 +269,20 @@ const AccountForm = observer(function AccountForm({
         </section>
       )}
 
-      <div className="flex flex-none flex-wrap items-center gap-3 rounded-card border border-line bg-main-900 px-4 py-3">
-        {account === null ? null : (
-          <IconButton
-            key={account.id}
-            tone="danger"
-            size="md"
-            path={mdiDeleteOutline}
-            label={REMOVE_ACCOUNT}
-            disabled={store.removing}
-            needConfirm
-            modalSetup={{
-              title: "Удалить аккаунт?",
-              content: (
-                <>
-                  Аккаунт «{account.name}» будет отключён и удалён. Его инструменты пропадут из
-                  реестра, а сценарии, которые от него зависят, перестанут запускаться.
-                </>
-              ),
-              tone: "danger",
-              confirmLabel: "Удалить",
-            }}
-            onClick={() => {
-              void store.remove();
-            }}
-          />
-        )}
-        {account === null ? null : (
-          <Button
-            tone="secondary"
-            disabled={store.testing || store.saving || store.signingIn || vm.dirty}
-            onClick={() => {
-              void store.test();
-            }}
-          >
-            <Icon path={mdiFlashOutline} size={15} />
-            {store.testing ? TESTING : TEST_CONNECTION}
-          </Button>
-        )}
-        <span className="flex-1" />
-        {vm.isNew ? (
-          store.accountsOf(kind).length === 0 ? null : (
-            <Button tone="secondary" onClick={store.cancelAdding}>
-              {CANCEL}
-            </Button>
-          )
-        ) : (
-          <Button tone="secondary" disabled={!vm.dirty || store.saving} onClick={store.resetForm}>
-            {CANCEL}
-          </Button>
-        )}
-        {vm.isNew && vm.type.browser ? null : (
-          <Button
-            tone="primary"
-            disabled={store.saving || (!vm.isNew && !vm.dirty)}
-            onClick={() => {
-              void store.save();
-            }}
-          >
-            {store.saving ? SAVING : vm.isNew ? CONNECT : SAVE}
-          </Button>
-        )}
-      </div>
+      <ConfirmDialog
+        open={confirming && account !== null}
+        title="Удалить аккаунт?"
+        confirmLabel="Удалить"
+        confirmTone="danger"
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          void store.remove();
+        }}
+      >
+        Аккаунт «{account?.name}» будет отключён и удалён. Его инструменты пропадут из реестра, а
+        сценарии, которые от него зависят, перестанут запускаться.
+      </ConfirmDialog>
     </>
   );
 });

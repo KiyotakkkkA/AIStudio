@@ -1,9 +1,8 @@
-import { mdiDeleteOutline, mdiPlus, mdiPowerPlugOutline, mdiViewGridPlusOutline } from "@mdi/js";
+import { mdiPlus, mdiPowerPlugOutline, mdiViewGridPlusOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useEffect } from "react";
 import Button from "../../ui/atoms/buttons/Button";
-import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
 import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import EmptyState from "../../ui/molecules/EmptyState";
@@ -94,52 +93,6 @@ function ConnectionsWorkspace() {
           <ScrollArea className="flex min-w-0 flex-1 flex-col gap-3.5 px-4.5 py-4">
             <ServerSetupCard store={store} vm={form} />
             <ExposedToolsCard store={store} />
-
-            <div className="flex flex-none items-center gap-3 rounded-card border border-line bg-main-900 px-4 py-3">
-              {form.isNew ? null : (
-                <IconButton
-                  key={form.serverId}
-                  tone="danger"
-                  size="md"
-                  path={mdiDeleteOutline}
-                  label="Удалить сервер"
-                  disabled={store.removing}
-                  needConfirm
-                  modalSetup={{
-                    title: "Удалить сервер?",
-                    content: (
-                      <>
-                        «{form.name}» будет остановлен и удалён. Его инструменты пропадут из
-                        реестра, а сценарии и навыки, которые на них ссылаются, перестанут их
-                        вызывать.
-                      </>
-                    ),
-                    tone: "danger",
-                    confirmLabel: "Удалить",
-                  }}
-                  onClick={() => {
-                    void store.removeSelected();
-                  }}
-                />
-              )}
-              <span className="flex-1" />
-              <Button
-                tone="secondary"
-                disabled={(!form.isNew && !form.dirty) || store.saving}
-                onClick={store.resetForm}
-              >
-                Отменить
-              </Button>
-              <Button
-                tone="primary"
-                disabled={store.saving || (!form.isNew && !form.dirty)}
-                onClick={() => {
-                  void store.submit();
-                }}
-              >
-                {store.saving ? "Сохранение…" : "Сохранить"}
-              </Button>
-            </div>
           </ScrollArea>
         )}
 
