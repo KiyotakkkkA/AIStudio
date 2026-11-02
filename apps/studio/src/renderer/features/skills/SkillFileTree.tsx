@@ -52,8 +52,8 @@ function SkillFileTree({ store, vm }: { readonly store: SkillStore; readonly vm:
       <div className="flex h-9 flex-none items-center px-3 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
         Файлы навыка
       </div>
-      <ScrollArea className="flex min-h-0 flex-1 flex-col px-1.5 pb-3">
-        <TreeView aria-label="Файлы навыка">
+      <ScrollArea className="flex min-h-0 flex-1 flex-col">
+        <TreeView aria-label="Файлы навыка" className="border-none">
           <TreeView.Element
             label={MANIFEST_PATH}
             description="Описание и инструкции"

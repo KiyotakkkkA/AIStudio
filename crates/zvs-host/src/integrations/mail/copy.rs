@@ -55,9 +55,7 @@ pub fn sent(recipients: &[String]) -> String {
 pub const OAUTH_NOT_USED: &str = "Вход через браузер доступен только для Google, Яндекса и Mail.ru";
 pub const CLIENT_ID_HELP: &str =
     "Учётные данные приложения, зарегистрированного у почтового провайдера.";
-pub const REDIRECT_PORT_HELP: &str = "Порт зарегистрированного адреса возврата http://127.0.0.1:<порт>/callback. Если не указан, выбирается свободный порт.";
 pub const OAUTH_TOKEN_HELP: &str = "Значение сохраняется после входа через браузер.";
 pub const MANUAL_ONLY_HELP: &str = "Применяется только для IMAP / SMTP.";
-pub const REDIRECT_PORT_BUSY: &str = "Порт адреса возврата занят другой программой";
 pub const ACCESS_HELP: &str = "«Только чтение» — без отправки писем. «Чтение и отправка» — отправка с подтверждением каждого письма.";
 pub const SEND_DISABLED: &str = "Отправка недоступна: для почтового ящика разрешено только чтение";

@@ -135,9 +135,12 @@ export class PluginFormVm {
 
   config(): IntegrationConfig {
     const visible = new Set(this.visibleFields.map((field) => field.key));
+    const known = new Set(this.fields.map((field) => field.key));
     const config: IntegrationConfig = {};
     for (const [key, value] of Object.entries(this.stored)) {
-      if (!visible.has(key)) config[key] = value;
+      // Round-trip only keys the provider still describes: a removed field
+      // must not bounce back into the config, the host refuses unknown keys.
+      if (!visible.has(key) && known.has(key)) config[key] = value;
     }
     for (const field of this.visibleFields) {
       const value = this.values[field.key];

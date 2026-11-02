@@ -4,7 +4,7 @@ use zvs_contract::{AppError, AppErrorCode, FieldDefault, FieldDescriptor, FieldK
 
 use super::copy;
 use super::oauth::{MailPreset, PRESETS, preset};
-use crate::integrations::{FIELD_REQUIRED, IntegrationConfigView};
+use crate::integrations::{IntegrationConfigView, required_field};
 use crate::services::crypto::Plaintext;
 
 pub const PROTOCOL: &str = "protocol";
@@ -26,7 +26,6 @@ pub const SMTP_USER: &str = "smtpUser";
 pub const SMTP_PASSWORD: &str = "smtpPassword";
 pub const OAUTH_CLIENT_ID: &str = "oauthClientId";
 pub const OAUTH_CLIENT_SECRET: &str = "oauthClientSecret";
-pub const OAUTH_REDIRECT_PORT: &str = "oauthRedirectPort";
 pub const OAUTH_TOKEN: &str = "oauthToken";
 pub const FOLDERS: &str = "folders";
 pub const POLL_SECONDS: &str = "pollSeconds";
@@ -100,9 +99,11 @@ impl MailSettings {
 
 pub fn required_text(config: &IntegrationConfigView, key: &str) -> Result<String, AppError> {
     optional_text(config, key).ok_or_else(|| {
-        AppError::new(AppErrorCode::ValidationFailed, FIELD_REQUIRED)
-            .with_detail("field", format!("config.{key}"))
-            .with_detail("rule", "required")
+        let label = describe()
+            .into_iter()
+            .find(|field| field.key == key)
+            .map_or_else(|| key.to_owned(), |field| field.label);
+        required_field(&format!("config.{key}"), &label)
     })
 }
 
@@ -112,6 +113,24 @@ pub fn optional_text(config: &IntegrationConfigView, key: &str) -> Option<String
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_owned)
+}
+
+pub fn client_id(config: &IntegrationConfigView) -> Result<Plaintext, AppError> {
+    let missing = || {
+        required_field(
+            &format!("config.{OAUTH_CLIENT_ID}"),
+            "Идентификатор приложения OAuth",
+        )
+    };
+    if config.secret_id(OAUTH_CLIENT_ID).is_none() {
+        return Err(missing());
+    }
+    let value = config.secret(OAUTH_CLIENT_ID)?;
+    let value = value.expose().trim();
+    if value.is_empty() {
+        return Err(missing());
+    }
+    Ok(Plaintext::new(value))
 }
 
 pub fn port(config: &IntegrationConfigView, key: &str) -> Result<Option<u16>, AppError> {
@@ -372,7 +391,7 @@ pub fn describe() -> Vec<FieldDescriptor> {
             field(
                 OAUTH_CLIENT_ID,
                 "Идентификатор приложения OAuth",
-                FieldKind::Text,
+                FieldKind::Secret,
                 false,
             ),
             copy::CLIENT_ID_HELP,
@@ -385,10 +404,6 @@ pub fn describe() -> Vec<FieldDescriptor> {
                 false,
             ),
             copy::CLIENT_ID_HELP,
-        ),
-        with_help(
-            number(OAUTH_REDIRECT_PORT, "Порт адреса возврата", None),
-            copy::REDIRECT_PORT_HELP,
         ),
         with_help(
             field(OAUTH_TOKEN, "Вход OAuth", FieldKind::Secret, false),

@@ -533,10 +533,14 @@ async fn an_expiring_grant_is_refreshed_and_saved_back() {
         expires_at: Some(NOW + 1000),
     };
     let token = rig.secret(&grant.encode());
+    let client_id = rig.secret(" client\n");
     let config = IntegrationConfig::from([
         (PROTOCOL.to_owned(), IntegrationValue::text("yandex")),
         (ADDRESS.to_owned(), IntegrationValue::text(USER)),
-        (OAUTH_CLIENT_ID.to_owned(), IntegrationValue::text("client")),
+        (
+            OAUTH_CLIENT_ID.to_owned(),
+            IntegrationValue::secret(client_id),
+        ),
         (OAUTH_TOKEN.to_owned(), IntegrationValue::secret(token)),
     ]);
     let view = crate::integrations::IntegrationConfigView::new(
@@ -549,11 +553,98 @@ async fn an_expiring_grant_is_refreshed_and_saved_back() {
     let sent = request.await.expect("the request");
     assert!(sent.contains("grant_type=refresh_token"));
     assert!(sent.contains("refresh_token=refresh"));
+    assert!(sent.contains("client_id=client&") || sent.ends_with("client_id=client"));
     let saved =
         MailGrant::parse(view.secret(OAUTH_TOKEN).expect("saved").expose()).expect("a grant");
     assert_eq!(saved.access_token, "fresh");
     assert_eq!(saved.refresh_token.as_deref(), Some("refresh"));
     assert_eq!(saved.expires_at, Some(NOW + 3_600_000));
+}
+
+#[tokio::test]
+async fn browser_sign_in_resolves_the_client_id_secret_for_authorization_and_exchange() {
+    use crate::integrations::stub::{Reply, StubServer};
+
+    let rig = rig().await;
+    let server = StubServer::start().await;
+    server.steady("/token", Reply::json(&json!({ "access_token": "fresh" })));
+    let provider = MailProvider::new(reqwest::Client::new())
+        .with_token_endpoint(format!("{}/token", server.origin()));
+    let config = IntegrationConfig::from([
+        (PROTOCOL.to_owned(), IntegrationValue::text("google")),
+        (ADDRESS.to_owned(), IntegrationValue::text(USER)),
+        (
+            OAUTH_CLIENT_ID.to_owned(),
+            IntegrationValue::secret(rig.secret(" client\n")),
+        ),
+        (
+            OAUTH_CLIENT_SECRET.to_owned(),
+            IntegrationValue::secret(rig.secret("client-secret")),
+        ),
+    ]);
+    let account = rig.account(config.clone(), false).await;
+    let view = IntegrationConfigView::new(config, Arc::clone(&rig.host.shared().secrets));
+    let opener: crate::integrations::UrlOpener = Arc::new(|address| {
+        let url = url::Url::parse(address).expect("authorization URL");
+        let query: std::collections::HashMap<String, String> =
+            url.query_pairs().into_owned().collect();
+        assert_eq!(query["client_id"], "client");
+        let mut callback = url::Url::parse(&query["redirect_uri"]).expect("callback URL");
+        callback
+            .query_pairs_mut()
+            .append_pair("code", "auth-code")
+            .append_pair("state", &query["state"]);
+        tokio::spawn(async move {
+            reqwest::get(callback).await.expect("local callback");
+        });
+        Ok(())
+    });
+    let cancel = CancellationToken::new();
+    let signed = tokio::time::timeout(
+        Duration::from_secs(5),
+        provider.sign_in(SignInRequest {
+            account: &account,
+            config: &view,
+            opener: &opener,
+            cancel: &cancel,
+            prompt: &|_| {},
+        }),
+    )
+    .await
+    .expect("sign-in completes")
+    .expect("signs in");
+    let grant = MailGrant::parse(signed.value.expose()).expect("grant");
+    assert_eq!(grant.client_id, "client");
+    assert_eq!(grant.access_token, "fresh");
+    let request = server.calls_to("/token").pop().expect("token exchange");
+    let form: std::collections::HashMap<String, String> =
+        url::form_urlencoded::parse(&request.body)
+            .into_owned()
+            .collect();
+    assert_eq!(form["client_id"], "client");
+    assert_eq!(form["client_secret"], "client-secret");
+    assert_eq!(form["code"], "auth-code");
+    assert!(!form["code_verifier"].is_empty());
+}
+
+#[tokio::test]
+async fn a_missing_client_id_secret_reference_is_a_required_field_error() {
+    let rig = rig().await;
+    for value in [None, Some(IntegrationValue::text("client"))] {
+        let config = value
+            .into_iter()
+            .map(|value| (OAUTH_CLIENT_ID.to_owned(), value))
+            .collect();
+        let view = IntegrationConfigView::new(config, Arc::clone(&rig.host.shared().secrets));
+        let error = settings::client_id(&view).expect_err("requires client ID");
+        assert_eq!(error.code, AppErrorCode::ValidationFailed);
+        let expected = crate::integrations::required_field(
+            "config.oauthClientId",
+            "Идентификатор приложения OAuth",
+        );
+        assert_eq!(error.message, expected.message);
+        assert_eq!(error.details, expected.details);
+    }
 }
 
 #[tokio::test]

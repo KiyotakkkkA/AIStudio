@@ -370,6 +370,7 @@ export default class PluginStore {
   async startSignIn(): Promise<void> {
     if (this.signIn !== null) return;
     const form = this.form;
+    if (form !== null && !form.validate()) return;
     let id = this.accountId;
     if (form !== null && (form.isNew || form.dirty)) id = await this.save();
     if (id === null) return;

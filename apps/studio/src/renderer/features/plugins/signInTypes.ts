@@ -46,7 +46,7 @@ const MAIL_MANUAL = [
   "smtpPassword",
 ];
 
-const OAUTH_CLIENT = ["oauthClientId", "oauthClientSecret", "oauthRedirectPort"];
+const OAUTH_CLIENT = ["oauthClientId", "oauthClientSecret"];
 
 const SMTP_LOGIN = ["smtpUser", "smtpPassword"];
 
@@ -59,7 +59,7 @@ function mailPreset(id: "google" | "yandex" | "mailru", label: string): SignInTy
     mark: MAIL_PRESET_MARKS[id],
     fixed: { protocol: id },
     hidden: MAIL_MANUAL,
-    required: [],
+    required: ["oauthClientId"],
     browser: true,
   };
 }

@@ -4,11 +4,23 @@ use async_trait::async_trait;
 use zvs_contract::{AppError, AppErrorCode};
 use zvs_host::artifact_pages::{PAGES_UNAVAILABLE, PageOpener};
 use zvs_host::drivers::ai::{SessionFactory, SharedSessionGateway};
+use zvs_host::platform::external::{OPEN_FAILED, UrlOpener};
 use zvs_host::services::AccountBrowser;
 
 use super::{AccountGateway, BrowserWorkspace};
 
 pub const BROWSER_UNAVAILABLE: &str = "Browser is unavailable";
+
+/// Opens OAuth and sign-in pages of plugin accounts in the integrated browser,
+/// next to the account linking tabs, instead of the system browser.
+pub fn workspace_url_opener(workspace: &BrowserWorkspace) -> UrlOpener {
+    let workspace = workspace.clone();
+    Arc::new(move |url| {
+        workspace.open_page_tab(url).map_err(|reason| {
+            AppError::new(AppErrorCode::Unknown, OPEN_FAILED).with_detail("reason", reason)
+        })
+    })
+}
 
 pub struct WorkspaceOpener(pub BrowserWorkspace);
 

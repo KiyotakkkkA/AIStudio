@@ -41,9 +41,9 @@ pub use tls::MailTrust;
 pub use copy::{SEND_DENIED, UNKNOWN_TOOL};
 pub use settings::{
     ACCESS, ADDRESS, FOLDERS, IGNORE_OLDER_DAYS, IMAP_HOST, IMAP_PASSWORD, IMAP_PORT,
-    IMAP_SECURITY, IMAP_USER, MARK_READ, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAUTH_REDIRECT_PORT,
-    OAUTH_TOKEN, POLL_SECONDS, PROTOCOL, READ_ONLY, READ_WRITE, SMTP_HOST, SMTP_PASSWORD,
-    SMTP_PORT, SMTP_REUSE_LOGIN, SMTP_SECURITY, SMTP_USER,
+    IMAP_SECURITY, IMAP_USER, MARK_READ, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAUTH_TOKEN,
+    POLL_SECONDS, PROTOCOL, READ_ONLY, READ_WRITE, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT,
+    SMTP_REUSE_LOGIN, SMTP_SECURITY, SMTP_USER,
 };
 
 pub const SEND: &str = "mail.send";
@@ -287,13 +287,16 @@ impl MailProvider {
             return Ok(current.access_token);
         }
         let secret = Self::client_secret(config)?;
-        let client_id = settings::optional_text(config, OAUTH_CLIENT_ID)
-            .unwrap_or_else(|| current.client_id.clone());
+        let client_id = if config.secret_id(OAUTH_CLIENT_ID).is_some() {
+            settings::client_id(config)?
+        } else {
+            Plaintext::new(&current.client_id)
+        };
         let renewed = oauth::refresh(
             &self.http,
             self.token_endpoint(preset),
             &OAuthClient {
-                id: &client_id,
+                id: client_id.expose(),
                 secret: secret.as_ref().map(Plaintext::expose),
             },
             &current,
@@ -607,18 +610,11 @@ impl IntegrationProvider for MailProvider {
                 .with_detail("field", format!("config.{PROTOCOL}"))
         })?;
         settings::required_text(config, ADDRESS)?;
-        let client_id = settings::required_text(config, OAUTH_CLIENT_ID)?;
+        let client_id = settings::client_id(config)?;
         let secret = Self::client_secret(config)?;
-        let wanted = settings::port(config, OAUTH_REDIRECT_PORT)?;
-        let loopback = Loopback::bind(wanted).await?;
-        if wanted.is_some() && loopback.port() != wanted {
-            return Err(
-                AppError::new(AppErrorCode::Conflict, copy::REDIRECT_PORT_BUSY)
-                    .with_detail("field", format!("config.{OAUTH_REDIRECT_PORT}")),
-            );
-        }
+        let loopback = Loopback::bind(None).await?;
         let client = OAuthClient {
-            id: &client_id,
+            id: client_id.expose(),
             secret: secret.as_ref().map(Plaintext::expose),
         };
         let pkce = Pkce::generate();

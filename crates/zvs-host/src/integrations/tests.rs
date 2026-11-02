@@ -368,7 +368,7 @@ async fn a_credential_value_in_the_config_is_rejected() {
         ))
         .await
         .expect_err("the credential is required");
-    assert_eq!(required.message, FIELD_REQUIRED);
+    assert_eq!(required.message, format!("{FIELD_REQUIRED} «token»."));
 
     let unavailable = rig
         .service

@@ -14,8 +14,15 @@ pub const REFRESH_MARGIN_MS: Timestamp = 120_000;
 pub const DEVICE_GRANT: &str = "urn:ietf:params:oauth:grant-type:device_code";
 pub const SLOW_DOWN_STEP: Duration = Duration::from_secs(5);
 
-pub const SIGN_IN_REQUIRED: &str = "Требуется вход через браузер. Откройте настройки интеграции.";
+pub const SIGN_IN_REQUIRED: &str =
+    "Требуется вход через браузер. Откройте аккаунт в разделе «Плагины» и нажмите «Войти».";
 pub const OAUTH_FAILED: &str = "Сервер авторизации отклонил запрос";
+pub const OAUTH_CLIENT_REJECTED: &str =
+    "Сервер отклонил учётные данные приложения. Проверьте идентификатор и секрет приложения OAuth.";
+pub const OAUTH_REDIRECT_REJECTED: &str =
+    "Сервер отклонил адрес возврата. Проверьте настройки приложения OAuth.";
+pub const OAUTH_SCOPE_REJECTED: &str =
+    "Сервер отклонил запрошенные права доступа. Проверьте разрешения приложения OAuth.";
 pub const OAUTH_UNREACHABLE: &str = "Сервер авторизации недоступен";
 pub const DEVICE_DENIED: &str = "Вход отклонён на странице подтверждения";
 pub const DEVICE_EXPIRED: &str = "Код подтверждения устарел. Повторите вход.";
@@ -58,6 +65,26 @@ pub fn sign_in_required() -> AppError {
 
 fn failed() -> AppError {
     AppError::new(AppErrorCode::ProviderAuthFailed, OAUTH_FAILED)
+}
+
+fn rejected(status: reqwest::StatusCode, body: &Value) -> AppError {
+    let (code, message) = match body.get("error").and_then(Value::as_str) {
+        Some("invalid_client") => ("invalid_client", OAUTH_CLIENT_REJECTED),
+        Some("unauthorized_client") => ("unauthorized_client", OAUTH_CLIENT_REJECTED),
+        Some("redirect_uri_mismatch") => ("redirect_uri_mismatch", OAUTH_REDIRECT_REJECTED),
+        Some("invalid_scope") => ("invalid_scope", OAUTH_SCOPE_REJECTED),
+        Some("invalid_grant") => {
+            return sign_in_required()
+                .with_detail("status", status.as_u16().to_string())
+                .with_detail("oauthError", "invalid_grant");
+        }
+        Some("invalid_request") => ("invalid_request", OAUTH_FAILED),
+        Some("unsupported_grant_type") => ("unsupported_grant_type", OAUTH_FAILED),
+        _ => ("unknown", OAUTH_FAILED),
+    };
+    AppError::new(AppErrorCode::ProviderAuthFailed, message)
+        .with_detail("status", status.as_u16().to_string())
+        .with_detail("oauthError", code)
 }
 
 fn unreachable() -> AppError {
@@ -132,15 +159,7 @@ async fn token(
     }
     let (status, body) = post_form(http, endpoint, &fields).await?;
     if !status.is_success() || body.get("error").is_some() {
-        let refused = body
-            .get("error")
-            .and_then(Value::as_str)
-            .is_some_and(|error| error == "invalid_grant");
-        return Err(if refused {
-            sign_in_required()
-        } else {
-            failed().with_detail("status", status.as_u16().to_string())
-        });
+        return Err(rejected(status, &body));
     }
     serde_json::from_value::<TokenResponse>(body).map_err(|_| failed())
 }
@@ -338,4 +357,75 @@ pub fn trusted_https_url(address: &str, hosts: &[&str]) -> Option<Url> {
         && parsed.password().is_none()
         && parsed.port().is_none())
     .then_some(parsed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::integrations::stub::{Reply, StubServer};
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn token_rejection_reports_the_cause_without_copying_provider_payloads() {
+        let server = StubServer::start().await;
+        let http = reqwest::Client::new();
+        let client = OAuthClient {
+            id: "client",
+            secret: Some("secret"),
+        };
+        for (code, message, app_code) in [
+            (
+                "invalid_client",
+                OAUTH_CLIENT_REJECTED,
+                AppErrorCode::ProviderAuthFailed,
+            ),
+            (
+                "redirect_uri_mismatch",
+                OAUTH_REDIRECT_REJECTED,
+                AppErrorCode::ProviderAuthFailed,
+            ),
+            (
+                "invalid_scope",
+                OAUTH_SCOPE_REJECTED,
+                AppErrorCode::ProviderAuthFailed,
+            ),
+            (
+                "invalid_grant",
+                SIGN_IN_REQUIRED,
+                AppErrorCode::ProviderSessionExpired,
+            ),
+            (
+                "sensitive-unexpected-value",
+                OAUTH_FAILED,
+                AppErrorCode::ProviderAuthFailed,
+            ),
+        ] {
+            server.steady(
+                "/token",
+                Reply::json(&json!({
+                    "error": code,
+                    "error_description": "sensitive-provider-text",
+                    "access_token": "sensitive-token",
+                }))
+                .status(400),
+            );
+            let error = token(&http, &format!("{}/token", server.origin()), &client, &[])
+                .await
+                .err()
+                .expect("rejected");
+            assert_eq!(error.code, app_code);
+            assert_eq!(error.message, message);
+            let details = serde_json::to_value(&error.details).expect("details");
+            assert_eq!(details["status"], "400");
+            assert_eq!(
+                details["oauthError"],
+                if code == "sensitive-unexpected-value" {
+                    "unknown"
+                } else {
+                    code
+                }
+            );
+            assert!(!details.to_string().contains("sensitive"));
+        }
+    }
 }

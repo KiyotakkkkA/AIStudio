@@ -19,7 +19,11 @@ import {
 } from "@zvs/shared";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import PluginStore from "../../src/renderer/features/plugins/PluginStore.ts";
-import { PluginFormVm, secretOptions } from "../../src/renderer/features/plugins/PluginFormVm.ts";
+import {
+  FIELD_REQUIRED,
+  PluginFormVm,
+  secretOptions,
+} from "../../src/renderer/features/plugins/PluginFormVm.ts";
 import { SIGN_IN_EXPIRED } from "../../src/renderer/features/plugins/pluginErrors.ts";
 import {
   accountsWord,
@@ -63,7 +67,7 @@ const MAIL_FIELDS: FieldDescriptor[] = [
   field("smtpReuseLogin", "boolean", { default: true }),
   field("smtpUser", "text"),
   field("smtpPassword", "secret"),
-  field("oauthClientId", "text"),
+  field("oauthClientId", "secret"),
   field("oauthClientSecret", "secret"),
   field("oauthToken", "secret"),
 ];
@@ -317,6 +321,24 @@ test("the device-code step fills the sign-in panel and cancel clears it", async 
   assert.equal(store.error, null);
 });
 
+test("sign-in validates an unchanged account before calling the host", async () => {
+  const { bridge, store } = storeWith([
+    account(1, "mail", { protocol: "google", address: "support@example.com" }),
+  ]);
+  await store.load();
+  store.select("mail", id(1));
+  assert.equal(store.form?.dirty, false);
+
+  await store.startSignIn();
+
+  assert.equal(store.form?.errorOf("config.oauthClientId"), FIELD_REQUIRED);
+  assert.equal(store.signIn, null);
+  assert.equal(
+    bridge.calls.some((call) => call.channel === "integrations.signIn"),
+    false,
+  );
+});
+
 test("a successful browser sign-in on a new account enables it", async () => {
   const { bridge, store, listed } = storeWith([]);
   await store.load();
@@ -479,6 +501,22 @@ test("the form sends the fixed choice, secret references and keeps hidden stored
     smtpReuseLogin: false,
     protocol: "imap",
   });
+});
+
+test("mail browser sign-in requires a client ID secret for every preset", () => {
+  for (const type of SIGN_IN_TYPES.mail.filter((entry) => entry.browser)) {
+    const vm = new PluginFormVm(MAIL_FIELDS, type, null, "Mail");
+    vm.setValue("address", "support@example.com");
+    const clientId = vm.visibleFields.find((entry) => entry.key === "oauthClientId");
+    assert.ok(clientId);
+    assert.equal(vm.isRequired(clientId), true);
+    assert.equal(vm.validate(), false);
+    assert.equal(vm.errorOf("config.oauthClientId"), FIELD_REQUIRED);
+
+    vm.setValue("oauthClientId", SECRET_A);
+    assert.equal(vm.validate(), true);
+    assert.deepEqual(vm.config().oauthClientId, { secretId: SECRET_A });
+  }
 });
 
 test("the secret picker lists every secret", async () => {

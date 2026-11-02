@@ -1,4 +1,4 @@
-import { mdiChevronRight, mdiMagnify, mdiPlus, mdiToyBrickOutline } from "@mdi/js";
+import { mdiChevronRight, mdiPlus, mdiToyBrickOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useNavigate } from "react-router-dom";
@@ -6,9 +6,12 @@ import type { IntegrationKind } from "@zvs/shared";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
+import SegmentedControl from "../../ui/atoms/SegmentedControl";
+import TextInput from "../../ui/atoms/TextInput";
 import Alert from "../../ui/molecules/Alert";
 import EmptyState from "../../ui/molecules/EmptyState";
 import { EMPTY_MESSAGE } from "../../ui/atoms/SelectInput";
+import PageHeader from "../../ui/organisms/PageHeader";
 import PluginMark from "./PluginMark";
 import {
   CATALOGUE_SUBTITLE,
@@ -78,105 +81,87 @@ const PluginRow = observer(function PluginRow({
 function PluginCatalogue({ store }: { readonly store: PluginStore }) {
   const searching = store.query.trim().length > 0;
   return (
-    <ScrollArea className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="mx-auto flex w-full max-w-230 flex-col gap-6 px-4 pt-10 pb-12 sm:px-8">
-        <header className="flex flex-col gap-1.5">
-          <h1 className="m-0 text-[24px]/8 font-semibold tracking-[-0.02em] text-main-50">
-            {CATALOGUE_TITLE}
-          </h1>
-          <p className="text-[13.5px] text-main-400">{CATALOGUE_SUBTITLE}</p>
-        </header>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <PageHeader icon={mdiToyBrickOutline} title={CATALOGUE_TITLE} subtitle={CATALOGUE_SUBTITLE} />
 
-        <label className="flex h-11 items-center gap-2.5 rounded-full border border-line bg-main-900 px-4 text-main-400 focus-within:border-accent-dark hover:border-line-strong">
-          <Icon path={mdiMagnify} size={18} className="flex-none" />
-          <input
-            type="search"
-            value={store.query}
+      <ScrollArea className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="mx-auto flex w-full max-w-230 flex-col gap-5 px-4 pt-5 pb-12 sm:px-8">
+          <TextInput
+            preset="search"
             aria-label={SEARCH_PLACEHOLDER}
             placeholder={SEARCH_PLACEHOLDER}
+            value={store.query}
             onChange={(event) => {
               store.setQuery(event.target.value);
             }}
-            className="min-w-0 flex-1 bg-transparent text-[13.5px] text-main-100 outline-none placeholder:text-main-500"
           />
-        </label>
 
-        <div role="tablist" aria-label={CATALOGUE_TITLE} className="flex items-center gap-1">
-          {CATALOGUE_TABS.map((tab) => {
-            const selected = store.tab === tab.value;
-            return (
-              <button
-                key={tab.value}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                onClick={() => {
-                  store.setTab(tab.value);
-                }}
-                className={`h-8.5 rounded-full px-4 text-[12.5px] font-semibold ${
-                  selected
-                    ? "bg-main-700 text-main-50"
-                    : "text-main-400 hover:bg-main-800 hover:text-main-100"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {store.error === null ? null : <Alert onDismiss={store.dismissError}>{store.error}</Alert>}
-
-        {store.catalogueEmpty && store.loaded ? (
-          <div className="flex justify-center pt-6">
-            <EmptyState
-              icon={mdiToyBrickOutline}
-              title={searching || store.tab === "all" ? EMPTY_MESSAGE : NOTHING_CONNECTED}
-              description={
-                searching || store.tab === "all" ? EMPTY_SEARCH_HINT : NOTHING_CONNECTED_HINT
-              }
+          <div>
+            <SegmentedControl
+              label={CATALOGUE_TITLE}
+              value={store.tab}
+              options={CATALOGUE_TABS}
+              onChange={(tab) => {
+                store.setTab(tab);
+              }}
             />
           </div>
-        ) : (
-          store.sections.map((section) => {
-            const collapsed = store.isCollapsed(section.id);
-            return (
-              <section key={section.id} className="flex flex-col gap-2">
-                <h2 className="m-0">
-                  <button
-                    type="button"
-                    aria-expanded={!collapsed}
-                    onClick={() => {
-                      store.toggleSection(section.id);
-                    }}
-                    className="flex items-center gap-1 rounded-control py-1 text-[16px] font-semibold tracking-[-0.01em] text-main-50 hover:text-main-200"
-                  >
-                    {section.label}
-                    <Icon
-                      path={mdiChevronRight}
-                      size={18}
-                      className={`text-main-500 transition-transform ${collapsed ? "" : "rotate-90"}`}
-                    />
-                  </button>
-                </h2>
-                {collapsed ? null : (
-                  <ul className="m-0 grid list-none grid-cols-1 gap-x-8 gap-y-1 p-0 md:grid-cols-2">
-                    {section.entries.map((entry) => (
-                      <PluginRow
-                        key={entry.kind}
-                        store={store}
-                        kind={entry.kind}
-                        count={entry.count}
+
+          {store.error === null ? null : (
+            <Alert onDismiss={store.dismissError}>{store.error}</Alert>
+          )}
+
+          {store.catalogueEmpty && store.loaded ? (
+            <div className="flex justify-center pt-6">
+              <EmptyState
+                icon={mdiToyBrickOutline}
+                title={searching || store.tab === "all" ? EMPTY_MESSAGE : NOTHING_CONNECTED}
+                description={
+                  searching || store.tab === "all" ? EMPTY_SEARCH_HINT : NOTHING_CONNECTED_HINT
+                }
+              />
+            </div>
+          ) : (
+            store.sections.map((section) => {
+              const collapsed = store.isCollapsed(section.id);
+              return (
+                <section key={section.id} className="flex flex-col gap-2">
+                  <h2 className="m-0">
+                    <button
+                      type="button"
+                      aria-expanded={!collapsed}
+                      onClick={() => {
+                        store.toggleSection(section.id);
+                      }}
+                      className="flex items-center gap-1 rounded-control py-1 text-[16px] font-semibold tracking-[-0.01em] text-main-50 hover:text-main-200"
+                    >
+                      {section.label}
+                      <Icon
+                        path={mdiChevronRight}
+                        size={18}
+                        className={`text-main-500 transition-transform ${collapsed ? "" : "rotate-90"}`}
                       />
-                    ))}
-                  </ul>
-                )}
-              </section>
-            );
-          })
-        )}
-      </div>
-    </ScrollArea>
+                    </button>
+                  </h2>
+                  {collapsed ? null : (
+                    <ul className="m-0 grid list-none grid-cols-1 gap-x-8 gap-y-1 p-0 md:grid-cols-2">
+                      {section.entries.map((entry) => (
+                        <PluginRow
+                          key={entry.kind}
+                          store={store}
+                          kind={entry.kind}
+                          count={entry.count}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              );
+            })
+          )}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
 

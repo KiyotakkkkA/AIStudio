@@ -36,9 +36,20 @@ pub use tools::{
 
 pub const CREDENTIAL_NOT_A_SECRET: &str =
     "Учётные данные указываются только выбором секрета из хранилища секретов";
-pub const SECRET_NOT_CONFIGURED: &str = "В настройках интеграции не выбран секрет";
+pub const SECRET_NOT_CONFIGURED: &str = "В настройках аккаунта не выбран секрет";
 pub const FIELD_REQUIRED: &str = "Заполните обязательное поле";
 pub const SIGN_IN_UNSUPPORTED: &str = "Для этой интеграции вход через браузер не используется";
+
+/// Validation error that names the field, so the message stays clear wherever
+/// it surfaces — the account form, the journal or a tool call in a dialog.
+pub fn required_field(path: &str, label: &str) -> AppError {
+    AppError::new(
+        AppErrorCode::ValidationFailed,
+        format!("{FIELD_REQUIRED} «{label}»."),
+    )
+    .with_detail("field", path.to_owned())
+    .with_detail("rule", "required")
+}
 
 const CREDENTIAL_HINTS: &[&str] = &[
     "password",
@@ -388,11 +399,10 @@ pub fn check_config(
     }
     for field in fields.iter().filter(|field| field.required) {
         if !config.contains_key(&field.key) {
-            return Err(
-                AppError::new(AppErrorCode::ValidationFailed, FIELD_REQUIRED)
-                    .with_detail("field", format!("config.{}", field.key))
-                    .with_detail("rule", "required"),
-            );
+            return Err(required_field(
+                &format!("config.{}", field.key),
+                &field.label,
+            ));
         }
     }
     Ok(())

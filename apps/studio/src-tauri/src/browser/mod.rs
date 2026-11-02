@@ -8,7 +8,7 @@ pub mod model;
 pub mod network;
 mod workspace;
 
-pub use accounts::{WorkspaceOpener, WorkspacePages, gateway_sessions};
+pub use accounts::{WorkspaceOpener, WorkspacePages, gateway_sessions, workspace_url_opener};
 pub use bearer::BearerTokens;
 pub use gateway::{AccountGateway, WebviewPages};
 pub use workspace::{BROWSER_UI, BrowserWorkspace};

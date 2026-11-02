@@ -110,7 +110,7 @@ use zvs_host::{IpcServer, ipc};
 use crate::browser::gateway::GatewayOptions;
 use crate::browser::{
     AccountGateway, BearerTokens, BrowserWorkspace, WebviewPages, WorkspaceOpener, WorkspacePages,
-    gateway_sessions,
+    gateway_sessions, workspace_url_opener,
 };
 use crate::commands::Host;
 use crate::picker::DialogPicker;
@@ -978,7 +978,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             Arc::new(GitHostingProvider::gitlab(http.client().clone()).with_clock(clock.clone())),
         ],
         approvals: Some(runs.approvals()),
-        opener: Some(zvs_host::platform::external::system_url_opener()),
+        opener: Some(workspace_url_opener(&workspace)),
         events: Some(events.clone()),
         ..IntegrationServiceOptions::new(
             Arc::clone(&database),
