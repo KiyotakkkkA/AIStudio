@@ -1,4 +1,7 @@
+pub mod attachments;
+mod composer;
 pub mod input;
+pub mod modal;
 pub mod overlay;
 pub mod palette;
 pub mod prompt;
@@ -23,7 +26,9 @@ use zvs_contract::{
     CHAT_QUEUE_MAX, ChatQueueDto, ChatQueueStepDto, ChatQueuedMessageDto, QUEUE_STEP_DOMAIN,
 };
 
+use self::attachments::Attachment;
 use self::input::Input;
+use self::modal::{Content, Modal};
 use self::overlay::{Action, Overlay, Panel, ProcessOutput, View};
 use self::palette::{Arg, Command, Item, Palette, Pick, Sources, Sub, arg_slot, is_command_text};
 use self::prompt::{ApprovalDetail, Choice, Prompt, PromptKind};
@@ -176,6 +181,13 @@ pub enum Request {
         grant: Option<FolderGrantScope>,
     },
     Send(Box<ChatSendInput>),
+    SendAttachments {
+        input: Box<ChatSendInput>,
+        attachments: Vec<Attachment>,
+    },
+    AttachmentOptions {
+        images: bool,
+    },
     Cancel(RunId),
     StopSubagent(RunId),
     StopGoal(ConversationId),
@@ -253,7 +265,9 @@ pub enum Msg {
     DesktopOpened(bool),
     Key(Key),
     Paste(String),
+    AttachmentOptions(Result<Vec<Attachment>, AppError>),
     Scroll(isize),
+    Resize(u16, u16),
     Tick,
     Connecting(&'static str),
     Connected,
@@ -266,6 +280,11 @@ pub enum Msg {
     Created(Result<ConversationDto, AppError>),
     Bound(Result<BindFolderResultDto, AppError>),
     Sent(Result<RunHandleDto, AppError>),
+    AttachmentsSent {
+        result: Result<RunHandleDto, AppError>,
+        text: String,
+        attachments: Vec<Attachment>,
+    },
     GoalStopped(Result<ConversationDto, AppError>),
     Queue(Result<ChatQueueDto, AppError>),
     Answered(Result<(), AppError>),
@@ -334,16 +353,24 @@ pub struct App {
     pub queue: Vec<ChatQueuedMessageDto>,
     pub queue_urgent: bool,
     pub queue_selected: Option<usize>,
-    pub queue_editing: Option<(String, String)>,
+    pub queue_editing: Option<(String, Input)>,
     pub expanded: bool,
     pub scroll: usize,
     pub escape_armed: bool,
     pub help: bool,
+    pub modal: Option<Modal>,
+    pub goal_plan: Vec<zvs_contract::AgenticPlanStepDto>,
+    pub attachment_options: Vec<Attachment>,
+    pub attachment_lookup: Option<bool>,
+    pub attachment_selected: usize,
+    pub outgoing_attachments: Vec<Attachment>,
     pub keys: bool,
     pub keymap: Keymap,
     pub theme: CliTheme,
     pub status: Option<(Tone, String)>,
     pub processes: Vec<BackgroundShellDto>,
+    pub subagents: Vec<zvs_contract::ChatToolCallDto>,
+    pub viewport: (u16, u16),
     pub frame: u64,
     pub started: u64,
     pub exit: Option<Exit>,
@@ -412,11 +439,19 @@ impl App {
             scroll: 0,
             escape_armed: false,
             help: false,
+            modal: None,
+            goal_plan: Vec::new(),
+            attachment_options: Vec::new(),
+            attachment_lookup: None,
+            attachment_selected: 0,
+            outgoing_attachments: Vec::new(),
             keys: false,
             keymap: Keymap::default(),
             theme: CliTheme::default(),
             status: None,
             processes: Vec::new(),
+            subagents: Vec::new(),
+            viewport: (80, 24),
             frame: 0,
             started: 0,
             exit: None,
@@ -440,7 +475,11 @@ impl App {
     }
 
     pub fn keys_open(&self) -> bool {
-        self.keys && self.prompts.is_empty() && self.overlay.is_none() && !self.help
+        self.keys
+            && self.prompts.is_empty()
+            && self.overlay.is_none()
+            && self.modal.is_none()
+            && !self.help
     }
 
     pub fn key_columns(&self) -> Vec<(&'static str, Vec<(String, &'static str)>)> {
@@ -494,7 +533,7 @@ impl App {
     }
 
     fn palette_allowed(&self) -> bool {
-        self.prompts.is_empty() && !self.help && self.overlay.is_none()
+        self.prompts.is_empty() && !self.help && self.modal.is_none() && self.overlay.is_none()
     }
 
     pub fn sources(&self) -> Sources<'_> {
@@ -502,6 +541,7 @@ impl App {
             servers: self.lookup_servers.as_deref(),
             conversations: self.lookup_conversations.as_deref(),
             folder: &self.folder,
+            subagents: &self.subagents,
             goal: self.goal.map(|goal| goal.status),
         }
     }
@@ -527,6 +567,15 @@ impl App {
     }
 
     fn lookup(&mut self) -> Vec<Request> {
+        if self.attachments_open() {
+            let images = self.supports_images();
+            if self.attachment_lookup != Some(images) {
+                self.attachment_lookup = Some(images);
+                return vec![Request::AttachmentOptions { images }];
+            }
+            return Vec::new();
+        }
+        self.attachment_lookup = None;
         let wanted = if self.palette_allowed() {
             arg_slot(self.input.text()).map(|slot| slot.arg)
         } else {
@@ -545,12 +594,21 @@ impl App {
                 self.lookup_conversations = None;
                 vec![Request::Conversations]
             }
-            Some(Arg::Theme) | None => Vec::new(),
+            Some(Arg::Subagent | Arg::Theme) | None => Vec::new(),
         }
     }
 
     fn pick(&mut self, pick: Pick) -> Vec<Request> {
         match pick {
+            Pick::Subagent { run, stop } => {
+                self.input.take();
+                if stop {
+                    self.stop_subagent(run)
+                } else {
+                    self.modal = Some(Modal::new(Content::Subagent(run.to_string())));
+                    Vec::new()
+                }
+            }
             Pick::Server(id) => {
                 self.input.take();
                 vec![Request::InspectServer(id.to_string())]
@@ -677,6 +735,12 @@ impl App {
     pub fn update(&mut self, message: Msg) -> Vec<Request> {
         let typed = matches!(message, Msg::Key(_) | Msg::Paste(_));
         let mut requests = self.apply(message);
+        self.subagents = self.transcript.subagents();
+        if let Some(overlay) = &mut self.overlay
+            && matches!(overlay.panel, Panel::Subagents | Panel::StopSubagents)
+        {
+            overlay.subagents.clone_from(&self.subagents);
+        }
         if typed && self.exit.is_none() {
             requests.extend(self.lookup());
         }
@@ -686,16 +750,58 @@ impl App {
     fn apply(&mut self, message: Msg) -> Vec<Request> {
         match message {
             Msg::Key(key) => self.key(key),
-            Msg::Paste(text) => {
-                if let Some(other) = self.question_input() {
-                    other.insert(&text);
-                } else if self.prompts.is_empty() {
-                    self.input.insert(&text);
+            Msg::AttachmentOptions(result) => {
+                match result {
+                    Ok(options) => self.attachment_options = options,
+                    Err(error) => self.status = Some((Tone::Error, error.message)),
                 }
                 Vec::new()
             }
+            Msg::Paste(text) => {
+                if let Some(other) = self.question_input() {
+                    other.insert(&text);
+                } else if self.prompts.is_empty()
+                    && self.modal.is_none()
+                    && !self.help
+                    && self.overlay.is_none()
+                {
+                    if self.supports_images()
+                        && let Some(image) = attachments::image_path(&text)
+                    {
+                        if self
+                            .input
+                            .attachments()
+                            .iter()
+                            .filter(|a| a.image())
+                            .count()
+                            < zvs_contract::IMAGES_MAX
+                        {
+                            self.input.attach(image, self.input.cursor());
+                        } else {
+                            self.status = Some((Tone::Error, copy::ATTACHMENTS_LIMIT.to_owned()));
+                        }
+                    } else {
+                        self.input.insert(&text);
+                    }
+                }
+                Vec::new()
+            }
+            Msg::Resize(width, height) => {
+                self.viewport = (width, height);
+                Vec::new()
+            }
             Msg::Scroll(delta) => {
-                self.scroll = self.scroll.saturating_add_signed(delta);
+                if self.help && self.modal.is_none() {
+                    self.modal = Some(Modal::new(Content::Help));
+                }
+                if self.modal.is_some() {
+                    self.clamp_modal();
+                }
+                if let Some(modal) = &mut self.modal {
+                    modal.offset = modal.offset.saturating_add_signed(-delta);
+                } else {
+                    self.scroll = self.scroll.saturating_add_signed(delta);
+                }
                 Vec::new()
             }
             Msg::Tick => {
@@ -739,8 +845,12 @@ impl App {
                             })
                             .cloned()
                             .collect();
-                        self.model = default_model(&linked).or_else(|| self.model.clone());
                         self.providers = providers;
+                        if let Some(choice) = default_model(&linked)
+                            && self.can_select_model(&choice)
+                        {
+                            self.model = Some(choice);
+                        }
                         self.effort = ThinkingEffort::Auto;
                         self.status = Some((
                             Tone::Success,
@@ -1038,6 +1148,12 @@ impl App {
                         .as_ref()
                         .map(|goal| GoalState::of(goal, self.frame))
                         .filter(GoalState::shown);
+                    self.goal_plan = detail
+                        .conversation
+                        .goal
+                        .as_ref()
+                        .map(|g| g.plan.clone())
+                        .unwrap_or_default();
                     self.goal_stop_armed = false;
                     self.transcript = Transcript::from_messages(
                         &detail
@@ -1164,6 +1280,20 @@ impl App {
                 }
                 Vec::new()
             }
+            Msg::AttachmentsSent {
+                result,
+                text,
+                attachments,
+            } => {
+                if result.is_err() {
+                    self.input.end();
+                    self.input.insert(&text);
+                    for attachment in attachments {
+                        self.input.attach(attachment, self.input.cursor());
+                    }
+                }
+                self.apply(Msg::Sent(result))
+            }
             Msg::Sent(result) => {
                 self.awaiting = false;
                 match result {
@@ -1184,6 +1314,8 @@ impl App {
                             .is_some_and(|goal| goal.active() && goal.usage.rounds == 0)
                         {
                             self.goal = None;
+                            self.goal_plan.clear();
+                            self.outgoing_attachments.clear();
                         }
                         self.fail(&error);
                         Vec::new()
@@ -1240,7 +1372,7 @@ impl App {
         self.queue_urgent = false;
         self.queue_selected = None;
         if let Some((_, saved)) = self.queue_editing.take() {
-            self.input.set(&saved);
+            self.input = saved;
         }
     }
 
@@ -1259,7 +1391,7 @@ impl App {
             && !self.queue.iter().any(|message| message.id == editing)
         {
             self.queue_editing = None;
-            self.input.set(&saved);
+            self.input = saved;
         }
         if before.is_empty() || !self.queue.is_empty() || self.busy() {
             return Vec::new();
@@ -1313,7 +1445,7 @@ impl App {
         };
         let saved = match self.queue_editing.take() {
             Some((_, saved)) => saved,
-            None => self.input.text().to_owned(),
+            None => self.input.clone(),
         };
         self.input.set(&message.text);
         self.queue_editing = Some((message.id, saved));
@@ -1515,7 +1647,12 @@ impl App {
 
     fn abandon(&mut self, error: &AppError) -> Vec<Request> {
         self.awaiting = false;
-        self.pending = None;
+        if let Some(text) = self.pending.take() {
+            self.input.insert(&text);
+            for attachment in std::mem::take(&mut self.outgoing_attachments) {
+                self.input.attach(attachment, self.input.cursor());
+            }
+        }
         self.transcript.live = None;
         self.fail(error);
         Vec::new()
@@ -1600,6 +1737,7 @@ impl App {
         {
             return;
         }
+        self.goal_plan.clone_from(&progress.plan);
         let before = self.goal.map(|goal| goal.status);
         self.goal = Some(GoalState {
             status: progress.status,
@@ -1629,6 +1767,9 @@ impl App {
 
     fn goal_command(&mut self, argument: &str) -> Vec<Request> {
         let word = argument.to_lowercase();
+        if word == Sub::GoalPlan.name() {
+            return self.goal_sub(Sub::GoalPlan);
+        }
         if word == Sub::GoalStop.name() {
             return self.goal_sub(Sub::GoalStop);
         }
@@ -1649,6 +1790,10 @@ impl App {
 
     fn goal_sub(&mut self, sub: Sub) -> Vec<Request> {
         self.palette.reset();
+        if sub == Sub::GoalPlan {
+            self.modal = Some(Modal::new(Content::GoalPlan));
+            return Vec::new();
+        }
         let id = self
             .conversation
             .as_ref()
@@ -1692,6 +1837,7 @@ impl App {
         self.awaiting = true;
         self.transcript.start();
         if command == Some(ChatCommand::Goal) {
+            self.goal_plan.clear();
             self.goal = Some(GoalState::started(self.frame));
             self.goal_stop_armed = false;
         }
@@ -1719,12 +1865,19 @@ impl App {
             input.provider_id = Some(model.provider);
             input.model_id = Some(model.model.clone());
         }
-        Request::Send(Box::new(input))
+        if self.outgoing_attachments.is_empty() {
+            Request::Send(Box::new(input))
+        } else {
+            Request::SendAttachments {
+                input: Box::new(input),
+                attachments: std::mem::take(&mut self.outgoing_attachments),
+            }
+        }
     }
 
     fn submit_message(&mut self, text: String) -> Vec<Request> {
         if let Some((message, saved)) = self.queue_editing.take() {
-            self.input.set(&saved);
+            self.input = saved;
             let Some(id) = self.conversation_id() else {
                 return Vec::new();
             };
@@ -1806,6 +1959,8 @@ impl App {
                 } else {
                     self.conversation = None;
                     self.goal = None;
+                    self.goal_plan.clear();
+                    self.outgoing_attachments.clear();
                     self.goal_stop_armed = false;
                     self.clear_queue();
                     self.transcript = Transcript::default();
@@ -1837,13 +1992,7 @@ impl App {
             Command::Permissions => return self.open_panel(Panel::Permissions),
             Command::Shortcuts => return self.open_panel(Panel::Shortcuts),
             Command::Theme => return self.open_panel(Panel::Theme),
-            Command::StopSubagent => match self.transcript.newest_subagent() {
-                Some(run) => {
-                    self.status = Some((Tone::Info, copy::SUBAGENT_STOPPING.to_owned()));
-                    return vec![Request::StopSubagent(run)];
-                }
-                None => self.status = Some((Tone::Info, copy::SUBAGENT_NONE.to_owned())),
-            },
+            Command::Subagents => return self.subagents_command(""),
         }
         Vec::new()
     }
@@ -1920,7 +2069,9 @@ impl App {
             | Panel::Effort
             | Panel::Shortcuts
             | Panel::Theme
-            | Panel::ProcessOutput => Vec::new(),
+            | Panel::ProcessOutput
+            | Panel::Subagents
+            | Panel::StopSubagents => Vec::new(),
             Panel::Processes => match &self.conversation {
                 Some(conversation) => vec![Request::Processes(conversation.id)],
                 None => {
@@ -1977,6 +2128,9 @@ impl App {
                 vec![Request::LinkAccount(family)]
             }
             Action::SelectModel(choice) => {
+                if !self.can_select_model(&choice) {
+                    return Vec::new();
+                }
                 self.status = Some((
                     Tone::Success,
                     format!(
@@ -1999,6 +2153,11 @@ impl App {
                 self.overlay = None;
                 Vec::new()
             }
+            Action::ShowSubagent(id) => {
+                self.modal = Some(Modal::new(Content::Subagent(id)));
+                Vec::new()
+            }
+            Action::StopSubagent(id) => self.stop_subagent(id),
             Action::Resume(id) => vec![Request::Load(id)],
             Action::ToggleSkill { id, enabled } => vec![Request::SetSkill { id, enabled }],
             Action::ToggleServer { id, start } => vec![if start {
@@ -2199,6 +2358,15 @@ impl App {
             return Vec::new();
         };
         match shortcut {
+            Shortcut::StopSubagent => {
+                return match self.transcript.newest_subagent() {
+                    Some(run) => self.stop_subagent(run),
+                    None => {
+                        self.status = Some((Tone::Info, copy::SUBAGENT_NONE.to_owned()));
+                        Vec::new()
+                    }
+                };
+            }
             Shortcut::QueuePrevious => self.move_queue(-1),
             Shortcut::QueueNext => self.move_queue(1),
             Shortcut::QueueEdit => self.edit_queued(),
@@ -2224,6 +2392,7 @@ impl App {
                     return Vec::new();
                 };
                 self.help = false;
+                self.modal = None;
                 self.keys = false;
                 self.overlay = None;
                 return self.command(command);
@@ -2374,6 +2543,27 @@ impl App {
     }
 
     fn submit(&mut self) -> Vec<Request> {
+        let line = self.input.text().trim();
+        if matches!(line, "/subagents list" | "/subagents stop") {
+            let line = self.input.take();
+            return self.subagents_command(palette::arguments(&line));
+        }
+        if self.attachments_open() {
+            self.choose_attachment();
+            return Vec::new();
+        }
+        if !self.input.attachments().is_empty() && self.model.is_none() {
+            self.status = Some((Tone::Error, copy::NO_PROVIDER.to_owned()));
+            return Vec::new();
+        }
+        if !self.input.attachments().is_empty()
+            && (self.busy()
+                || self.goal.is_some_and(|g| g.active())
+                || self.queue_editing.is_some())
+        {
+            self.status = Some((Tone::Info, copy::ATTACHMENTS_BUSY.to_owned()));
+            return Vec::new();
+        }
         if self.palette_open()
             && let Some(item) = self.palette.current(self.input.text(), &self.sources())
         {
@@ -2382,6 +2572,10 @@ impl App {
                 Item::Command(command) => {
                     self.input.take();
                     self.command(command)
+                }
+                Item::Sub(sub) if matches!(sub, Sub::SubagentsList | Sub::SubagentsStop) => {
+                    self.input.take();
+                    self.subagents_command(sub.name())
                 }
                 Item::Sub(sub) if sub.immediate() => {
                     self.input.take();
@@ -2394,18 +2588,26 @@ impl App {
                 Item::Value(value) => self.pick(value.pick),
             };
         }
+        let attachments = self.input.attachments();
+        let plain = self.input.plain_text();
         let text = self.input.take();
-        if text.is_empty() {
+        let text = if attachments.is_empty() { text } else { plain };
+        self.outgoing_attachments = attachments;
+        if text.is_empty() && self.outgoing_attachments.is_empty() {
             return Vec::new();
         }
-        if text.starts_with('!') {
+        if self.outgoing_attachments.is_empty() && text.starts_with('!') {
             return self.submit_shell(&text);
         }
-        if text.starts_with('/') && !text.starts_with("//") {
+        if self.outgoing_attachments.is_empty() && text.starts_with('/') && !text.starts_with("//")
+        {
             return match Command::parse(&text) {
                 Some(Command::Mcp) if !palette::arguments(&text).is_empty() => {
                     self.palette.reset();
                     self.mcp(palette::arguments(&text))
+                }
+                Some(Command::Subagents) => {
+                    return self.subagents_command(palette::arguments(&text));
                 }
                 Some(Command::Goal) => {
                     self.palette.reset();
@@ -2480,6 +2682,18 @@ impl App {
         {
             return Vec::new();
         }
+        if (self.modal.is_some() || self.help) && key != Key::Interrupt {
+            self.clamp_modal();
+            let modal = self.modal.get_or_insert_with(|| Modal::new(Content::Help));
+            if modal.key(key) {
+                self.modal = None;
+                self.help = false;
+            }
+            return Vec::new();
+        }
+        if self.overlay.is_some() && matches!(key, Key::PageUp | Key::PageDown) {
+            return self.overlay_key(key);
+        }
         self.selection = None;
         if key != Key::Esc {
             self.escape_armed = false;
@@ -2547,6 +2761,33 @@ impl App {
                 return Vec::new();
             }
         }
+        if self.attachments_open() {
+            let count = self.attachment_choices().len();
+            match key {
+                Key::Up => {
+                    self.attachment_selected =
+                        (self.attachment_selected + count.saturating_sub(1)) % count.max(1);
+                    return Vec::new();
+                }
+                Key::Down => {
+                    self.attachment_selected = (self.attachment_selected + 1) % count.max(1);
+                    return Vec::new();
+                }
+                Key::Tab | Key::Enter => {
+                    self.choose_attachment();
+                    return Vec::new();
+                }
+                Key::Esc => {
+                    if let Some((start, _)) = self.input.mention() {
+                        while self.input.cursor() > start {
+                            self.input.backspace();
+                        }
+                    }
+                    return Vec::new();
+                }
+                _ => self.attachment_selected = 0,
+            }
+        }
         if self.palette_open() {
             let text = self.input.text().to_owned();
             match key {
@@ -2586,7 +2827,7 @@ impl App {
             Key::Enter => return self.submit(),
             Key::Esc if self.queue_editing.is_some() => {
                 if let Some((_, saved)) = self.queue_editing.take() {
-                    self.input.set(&saved);
+                    self.input = saved;
                 }
             }
             Key::Esc => return self.escape(),

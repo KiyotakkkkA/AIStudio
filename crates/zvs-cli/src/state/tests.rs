@@ -927,7 +927,7 @@ fn chords_run_their_commands_and_unbound_ones_do_nothing() {
     assert!(app.help && app.overlay.is_none());
     assert!(chord(&mut app, shortcuts::Chord::ctrl('x')).is_empty());
 
-    app.help = false;
+    app.update(Msg::Key(Key::Esc));
     chord(&mut app, shortcuts::Chord::ctrl('o'));
     assert!(app.expanded);
     typed(&mut app, "draft");
@@ -1678,16 +1678,23 @@ fn a_key_between_two_ctrl_c_disarms_the_goal_stop() {
 }
 
 #[test]
-fn goal_subcommands_are_offered_only_where_they_apply() {
+fn goal_subcommands_are_discoverable_before_a_goal_is_started() {
     let mut app = ready();
     app.conversation = Some(conversation());
     typed(&mut app, "/goal ");
-    assert!(!app.palette_open());
+    assert!(app.palette_open());
     app.input.take();
     app.goal = Some(GoalState::started(0));
     typed(&mut app, "/goal ");
     let offered = palette::matches(app.input.text(), &app.sources());
-    assert_eq!(offered, [Item::Sub(Sub::GoalStop)]);
+    assert_eq!(
+        offered,
+        [
+            Item::Sub(Sub::GoalContinue),
+            Item::Sub(Sub::GoalPlan),
+            Item::Sub(Sub::GoalStop)
+        ]
+    );
     app.input.take();
     app.goal = Some(GoalState {
         status: GoalStatus::Paused,
@@ -1770,6 +1777,213 @@ fn a_failed_goal_turn_is_reported_and_clears_the_footer() {
 const CHILD: &str = "0199aa11-8888-7111-8111-111111111111";
 const LATER_CHILD: &str = "0199aa11-8888-7111-8111-222222222222";
 
+#[test]
+fn modal_navigation_scrolls_help_without_moving_the_transcript() {
+    let mut app = ready();
+    command(&mut app, "/help");
+    app.update(Msg::Resize(70, 20));
+    app.update(Msg::Key(Key::PageDown));
+    assert!(app.modal.as_ref().unwrap().offset > 0);
+    assert_eq!(app.scroll, 0);
+    app.update(Msg::Key(Key::End));
+    app.clamp_modal();
+    let end = app.modal.as_ref().unwrap().offset;
+    app.update(Msg::Key(Key::Up));
+    assert_eq!(app.modal.as_ref().unwrap().offset, end - 1);
+    app.update(Msg::Scroll(3));
+    assert_eq!(app.modal.as_ref().unwrap().offset, end - 4);
+    app.update(Msg::Key(Key::Esc));
+    assert!(!app.help && app.modal.is_none());
+}
+
+#[test]
+fn goal_plan_is_available_from_restored_and_live_goal_data() {
+    let mut app = ready();
+    command(&mut app, "/goal plan");
+    assert_eq!(app.modal.as_ref().unwrap().content, Content::GoalPlan);
+    assert!(app.goal_plan.is_empty());
+    app.update(Msg::Key(Key::Esc));
+    let mut own = conversation();
+    let mut goal = ChatGoalDto::new("цель", GoalBudgetDto::default(), 1);
+    goal.plan = vec![serde_json::from_value(json!({ "id":"p1", "title":"Проверка", "status":"running", "stepIds":[], "summary":null })).unwrap()];
+    own.goal = Some(goal);
+    app.update(Msg::Loaded(Ok(ConversationDetailDto {
+        conversation: own,
+        messages: Vec::new(),
+    })));
+    command(&mut app, "/goal plan");
+    assert_eq!(app.goal_plan.len(), 1);
+    assert_eq!(app.goal_plan[0].title, "Проверка");
+}
+
+#[test]
+fn subagents_list_selects_live_details_and_stop_selects_the_requested_run() {
+    let mut app = running();
+    app.update(delegate_step(0, "d1", CHILD, "running"));
+    app.update(delegate_step(1, "d2", LATER_CHILD, "running"));
+    app.update(child_step(13, CHILD, 0, "running"));
+    command(&mut app, "/subagents list");
+    let rows = app.overlay.as_ref().unwrap().rows(&app.view());
+    assert_eq!(rows.len(), 2);
+    app.update(Msg::Key(Key::Enter));
+    assert_eq!(
+        app.modal.as_ref().unwrap().content,
+        Content::Subagent(CHILD.to_owned())
+    );
+    let text = crate::ui::modal::content(&app, 80)
+        .1
+        .iter()
+        .map(ToString::to_string)
+        .collect::<String>();
+    assert!(text.contains("fs__read"));
+    app.update(Msg::Key(Key::Esc));
+    app.update(Msg::Key(Key::Esc));
+    assert_eq!(
+        command(&mut app, &format!("/subagents stop {LATER_CHILD}")),
+        [Request::StopSubagent(RunId::parse(LATER_CHILD).unwrap())]
+    );
+    typed(&mut app, "/subagents list ");
+    assert!(app.palette_open());
+    assert_eq!(palette::matches(app.input.text(), &app.sources()).len(), 2);
+}
+
+fn draft_image() -> Attachment {
+    Attachment::Image {
+        path: "C:\\images\\снимок.png".to_owned(),
+        name: "снимок.png".to_owned(),
+    }
+}
+
+fn image_app() -> App {
+    let mut app = ready();
+    let mut p = provider();
+    p.summary.adapter = zvs_contract::AdapterFamily::QwenWeb;
+    app.model = default_model(&[p.clone()]);
+    app.providers = vec![p];
+    app
+}
+
+#[test]
+fn pasted_paths_only_become_images_for_supported_providers() {
+    let mut app = image_app();
+    let pasted = "\"C:\\images\\снимок.png\"";
+    app.update(Msg::Paste(pasted.to_owned()));
+    assert_eq!(app.input.attachments(), [draft_image()]);
+    let old = app.model.clone();
+    let mut unsupported = app.model.clone().unwrap();
+    unsupported.provider = ProviderId::parse("0199aa11-8888-7111-8111-333333333333").unwrap();
+    app.act(Action::SelectModel(unsupported.clone()));
+    assert_eq!(app.model, old);
+    assert_eq!(
+        app.modal.as_ref().unwrap().content,
+        Content::Warning(copy::IMAGE_PROVIDER_WARNING.to_owned())
+    );
+    app.update(Msg::Key(Key::Esc));
+    app.input.backspace();
+    app.input.backspace();
+    app.act(Action::SelectModel(unsupported.clone()));
+    assert_eq!(app.model, Some(unsupported));
+    assert!(app.modal.is_none());
+    let mut app = ready();
+    app.update(Msg::Paste(pasted.to_owned()));
+    assert!(app.input.attachments().is_empty());
+    assert_eq!(app.input.text(), pasted);
+}
+
+#[test]
+fn at_filters_and_attaches_a_store_without_sending_its_label_as_text() {
+    let mut app = ready();
+    app.conversation = Some(conversation());
+    let store = Attachment::Store {
+        id: zvs_contract::VectorStoreId::parse(CHILD).unwrap(),
+        name: "Документы".to_owned(),
+    };
+    app.attachment_options = vec![store.clone(), draft_image()];
+    typed(&mut app, "Вопрос @док");
+    assert_eq!(
+        app.attachment_choices().as_slice(),
+        std::slice::from_ref(&store)
+    );
+    app.update(Msg::Key(Key::Enter));
+    assert_eq!(
+        app.input.attachments().as_slice(),
+        std::slice::from_ref(&store)
+    );
+    assert_eq!(app.input.plain_text(), "Вопрос");
+    let requests = app.update(Msg::Key(Key::Enter));
+    let Request::SendAttachments { input, attachments } = &requests[0] else {
+        panic!("attachment send")
+    };
+    assert_eq!(input.text, "Вопрос");
+    assert_eq!(attachments, &[store]);
+}
+
+#[test]
+fn image_only_messages_send_and_failed_imports_restore_the_attachment() {
+    let mut app = image_app();
+    app.conversation = Some(conversation());
+    app.input.attach(draft_image(), 0);
+    let requests = app.update(Msg::Key(Key::Enter));
+    let Request::SendAttachments { input, attachments } = &requests[0] else {
+        panic!("attachment send")
+    };
+    assert!(input.text.is_empty());
+    assert_eq!(attachments, &[draft_image()]);
+    app.update(Msg::AttachmentsSent {
+        result: Err(AppError::new(
+            zvs_contract::AppErrorCode::ValidationFailed,
+            "failure",
+        )),
+        text: String::new(),
+        attachments: attachments.clone(),
+    });
+    assert_eq!(app.input.attachments(), [draft_image()]);
+    app.input.backspace();
+    app.input.backspace();
+    assert!(app.input.attachments().is_empty());
+}
+
+#[test]
+fn editing_the_queue_restores_the_whole_attachment_draft() {
+    let mut app = image_app();
+    app.conversation = Some(conversation());
+    app.input.attach(draft_image(), 0);
+    app.queue = vec![ChatQueuedMessageDto {
+        id: "queued".to_owned(),
+        text: "message".to_owned(),
+        created_at: 1,
+    }];
+    app.queue_selected = Some(0);
+    app.edit_queued();
+    assert_eq!(app.input.text(), "message");
+    app.update(Msg::Key(Key::Esc));
+    assert_eq!(app.input.attachments(), [draft_image()]);
+    app.input.left();
+    app.input.left();
+    app.input.delete();
+    assert!(app.input.is_empty());
+}
+
+#[test]
+fn connecting_another_provider_preserves_an_image_draft_and_its_model() {
+    let mut app = image_app();
+    app.input.attach(draft_image(), 0);
+    let old = app.model.clone();
+    let mut connected = provider();
+    connected.summary.adapter = zvs_contract::AdapterFamily::Copilot;
+    connected.summary.enabled = true;
+    connected.summary.id = ProviderId::parse("0199aa11-8888-7111-8111-333333333333").unwrap();
+    let mut providers = app.providers.clone();
+    providers.push(connected);
+    app.update(Msg::AccountLinked(AccountFamily::Copilot, Ok(providers)));
+    assert_eq!(app.model, old);
+    assert_eq!(
+        app.modal.as_ref().unwrap().content,
+        Content::Warning(copy::IMAGE_PROVIDER_WARNING.to_owned())
+    );
+    assert!(app.input.has_images());
+}
+
 fn delegate_step(index: u64, id: &str, run: &str, status: &str) -> Msg {
     event(
         10 + index,
@@ -1845,7 +2059,7 @@ fn the_stop_shortcut_ends_the_newest_running_child_only() {
     );
     app.update(delegate_step(1, "d2", LATER_CHILD, "cancelled"));
     let first = zvs_contract::RunId::parse(CHILD).expect("a run id");
-    typed(&mut app, "/subagent-stop");
+    typed(&mut app, &format!("/subagents stop {CHILD}"));
     assert_eq!(
         app.update(Msg::Key(Key::Enter)),
         [Request::StopSubagent(first)]

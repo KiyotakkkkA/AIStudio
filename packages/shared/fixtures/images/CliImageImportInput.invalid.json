@@ -1,0 +1,30 @@
+[
+  {
+    "name": "relative path",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "paths": ["image.png"]
+    }
+  },
+  {
+    "name": "empty selection",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "paths": []
+    }
+  },
+  {
+    "name": "too many images",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "paths": [
+        "C:\\work\\image.png",
+        "C:\\work\\image.png",
+        "C:\\work\\image.png",
+        "C:\\work\\image.png",
+        "C:\\work\\image.png",
+        "C:\\work\\image.png"
+      ]
+    }
+  }
+]

@@ -220,3 +220,15 @@ pub fn uninstall(services: &Services) -> Result<CliInstallDto, AppError> {
     })?;
     Ok(status(services))
 }
+
+/// Paths are selected by the person in a trusted, same-user CLI client.
+pub async fn import_images(
+    services: &Services,
+    input: zvs_contract::CliImageImportInput,
+) -> Result<Vec<zvs_contract::ImageAttachmentDto>, AppError> {
+    services.chat.get(&input.id)?;
+    let loader = crate::images::ImageLoader::new(services.artifacts.clone());
+    tokio::task::spawn_blocking(move || loader.import(&input.id.to_string(), &input.paths))
+        .await
+        .map_err(|_| AppError::new(AppErrorCode::Unknown, crate::images::IMAGE_MISSING))?
+}

@@ -10964,6 +10964,7 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "unicode-width",
  "zvs-contract",

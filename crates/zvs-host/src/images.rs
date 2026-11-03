@@ -167,7 +167,8 @@ impl ImageLoader {
         Ok(folder)
     }
 
-    /// Accepts only paths obtained by a trusted host picker (never paths supplied over IPC).
+    /// Accepts paths selected by the person through the host picker or the same-user CLI.
+    /// Never expose this loader as a model tool or to an untrusted webview.
     pub fn import(
         &self,
         owner: &str,

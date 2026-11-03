@@ -1,3 +1,5 @@
+use super::attachments::{Attachment, Token};
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Input {
     text: String,
@@ -5,6 +7,7 @@ pub struct Input {
     history: Vec<String>,
     browsing: Option<usize>,
     draft: String,
+    tokens: Vec<Token>,
 }
 
 impl Input {
@@ -21,6 +24,7 @@ impl Input {
     }
 
     pub fn set(&mut self, text: &str) {
+        self.tokens.clear();
         self.text = text.to_owned();
         self.cursor = self.text.len();
         self.browsing = None;
@@ -32,6 +36,12 @@ impl Input {
 
     pub fn insert(&mut self, value: &str) {
         let value = value.replace("\r\n", "\n").replace('\r', "\n");
+        for token in &mut self.tokens {
+            if token.start >= self.cursor {
+                token.start += value.len();
+                token.end += value.len();
+            }
+        }
         self.text.insert_str(self.cursor, &value);
         self.cursor += value.len();
         self.browsing = None;
@@ -41,7 +51,95 @@ impl Input {
         self.insert("\n");
     }
 
+    pub fn attachments(&self) -> Vec<Attachment> {
+        self.tokens
+            .iter()
+            .map(|token| token.attachment.clone())
+            .collect()
+    }
+
+    pub fn has_images(&self) -> bool {
+        self.tokens.iter().any(|t| t.attachment.image())
+    }
+
+    pub fn pieces(&self, start: usize, end: usize) -> Vec<(&str, Option<&Attachment>)> {
+        let mut pieces = Vec::new();
+        let mut at = start;
+        for token in self
+            .tokens
+            .iter()
+            .filter(|token| token.start >= start && token.end <= end)
+        {
+            if at < token.start {
+                pieces.push((&self.text[at..token.start], None));
+            }
+            pieces.push((&self.text[token.start..token.end], Some(&token.attachment)));
+            at = token.end;
+        }
+        if at < end {
+            pieces.push((&self.text[at..end], None));
+        }
+        pieces
+    }
+
+    pub fn mention(&self) -> Option<(usize, &str)> {
+        let before = &self.text[..self.cursor];
+        let at = before.rfind('@')?;
+        if at > 0 && !before[..at].ends_with(char::is_whitespace) {
+            return None;
+        }
+        if self.tokens.iter().any(|t| at >= t.start && at < t.end) {
+            return None;
+        }
+        let query = &before[at + 1..];
+        (!query.contains('\n')).then_some((at, query))
+    }
+
+    pub fn attach(&mut self, attachment: Attachment, start: usize) {
+        self.remove(start, self.cursor);
+        self.cursor = start;
+        let label = format!(
+            "[{} {}]",
+            attachment.icon(),
+            attachment.name().replace(['\n', '\r'], " ")
+        );
+        self.insert(&label);
+        self.tokens.push(Token {
+            start,
+            end: self.cursor,
+            attachment,
+        });
+        self.tokens.sort_by_key(|t| t.start);
+        if self.text[self.cursor..].starts_with(' ') {
+            self.right();
+        } else {
+            self.insert(" ");
+        }
+    }
+
+    fn remove(&mut self, start: usize, end: usize) {
+        self.tokens.retain(|t| t.end <= start || t.start >= end);
+        for t in &mut self.tokens {
+            if t.start >= end {
+                t.start -= end - start;
+                t.end -= end - start;
+            }
+        }
+        self.text.replace_range(start..end, "");
+    }
+
+    pub fn plain_text(&self) -> String {
+        let mut text = self.text.clone();
+        for token in self.tokens.iter().rev() {
+            text.replace_range(token.start..token.end, "");
+        }
+        text.trim().to_owned()
+    }
+
     fn previous_boundary(&self) -> Option<usize> {
+        if let Some(token) = self.tokens.iter().find(|t| t.end == self.cursor) {
+            return Some(token.start);
+        }
         self.text[..self.cursor]
             .char_indices()
             .last()
@@ -49,6 +147,9 @@ impl Input {
     }
 
     fn next_boundary(&self) -> Option<usize> {
+        if let Some(token) = self.tokens.iter().find(|t| t.start == self.cursor) {
+            return Some(token.end);
+        }
         self.text[self.cursor..]
             .chars()
             .next()
@@ -57,14 +158,14 @@ impl Input {
 
     pub fn backspace(&mut self) {
         if let Some(at) = self.previous_boundary() {
-            self.text.replace_range(at..self.cursor, "");
+            self.remove(at, self.cursor);
             self.cursor = at;
         }
     }
 
     pub fn delete(&mut self) {
         if let Some(end) = self.next_boundary() {
-            self.text.replace_range(self.cursor..end, "");
+            self.remove(self.cursor, end);
         }
     }
 
@@ -118,6 +219,13 @@ impl Input {
             .nth(column)
             .map_or(end, |(at, _)| at);
         self.cursor = start + offset;
+        if let Some(token) = self
+            .tokens
+            .iter()
+            .find(|t| t.start < self.cursor && self.cursor < t.end)
+        {
+            self.cursor = token.end;
+        }
     }
 
     pub fn up(&mut self) -> bool {
@@ -142,17 +250,22 @@ impl Input {
     }
 
     pub fn take(&mut self) -> String {
+        let had_attachments = !self.tokens.is_empty();
+        self.tokens.clear();
         let text = std::mem::take(&mut self.text);
         self.cursor = 0;
         self.browsing = None;
         let trimmed = text.trim().to_owned();
-        if !trimmed.is_empty() && self.history.last() != Some(&trimmed) {
+        if !had_attachments && !trimmed.is_empty() && self.history.last() != Some(&trimmed) {
             self.history.push(trimmed.clone());
         }
         trimmed
     }
 
     pub fn history_back(&mut self) {
+        if !self.tokens.is_empty() {
+            return;
+        }
         if self.history.is_empty() {
             return;
         }
@@ -170,6 +283,9 @@ impl Input {
     }
 
     pub fn history_forward(&mut self) {
+        if !self.tokens.is_empty() {
+            return;
+        }
         let Some(index) = self.browsing else {
             return;
         };
@@ -194,6 +310,53 @@ impl Input {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn image() -> Attachment {
+        Attachment::Image {
+            path: "C:/test/снимок.png".to_owned(),
+            name: "снимок.png".to_owned(),
+        }
+    }
+
+    #[test]
+    fn attachments_are_atomic_and_offsets_survive_surrounding_edits() {
+        let mut input = Input::default();
+        input.insert("текст @сни");
+        input.attach(image(), input.mention().unwrap().0);
+        input.left();
+        let after = input.cursor();
+        input.left();
+        assert_eq!(input.cursor(), "текст ".len());
+        input.right();
+        assert_eq!(input.cursor(), after);
+        input.home();
+        input.insert("до ");
+        input.end();
+        input.insert("после");
+        assert_eq!(input.plain_text(), "до текст  после");
+        for _ in 0..6 {
+            input.left();
+        }
+        input.backspace();
+        assert!(input.attachments().is_empty());
+        assert_eq!(input.text(), "до текст  после");
+        input.attach(image(), input.cursor());
+        input.left();
+        input.left();
+        input.delete();
+        assert!(input.attachments().is_empty());
+    }
+
+    #[test]
+    fn vertical_navigation_never_places_the_cursor_inside_a_token() {
+        let mut input = Input::default();
+        input.attach(image(), 0);
+        input.insert("\nabc");
+        input.up();
+        assert_eq!(input.cursor(), "[▧ снимок.png]".len());
+        input.backspace();
+        assert_eq!(input.text(), " \nabc");
+    }
 
     #[test]
     fn editing_respects_multibyte_characters() {

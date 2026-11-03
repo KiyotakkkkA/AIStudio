@@ -120,7 +120,7 @@ pub fn translate(batch: &[Event]) -> Vec<Msg> {
                     _ => None,
                 }
             }
-            Event::Resize(..) => Some(Msg::Tick),
+            Event::Resize(width, height) => Some(Msg::Resize(*width, *height)),
             _ => None,
         })
         .collect()
@@ -253,6 +253,45 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             )
             .await,
         ),
+        Request::AttachmentOptions { images } => {
+            let stores: Result<Vec<zvs_contract::VectorStoreDto>, AppError> =
+                link.call("vectorStores.list", &()).await;
+            let result = match stores {
+                Ok(stores) => {
+                    let mut options: Vec<_> = stores
+                        .into_iter()
+                        .map(|s| crate::state::attachments::Attachment::Store {
+                            id: s.id,
+                            name: s.name,
+                        })
+                        .collect();
+                    if images {
+                        options.extend(
+                            tokio::task::spawn_blocking(move || {
+                                crate::state::attachments::discover(&folder)
+                            })
+                            .await
+                            .unwrap_or_default(),
+                        );
+                    }
+                    Ok(options)
+                }
+                Err(error) => Err(error),
+            };
+            Msg::AttachmentOptions(result)
+        }
+        Request::SendAttachments {
+            mut input,
+            attachments,
+        } => {
+            let text = input.text.clone();
+            let result = send_attachments(&link, &mut input, &attachments).await;
+            Msg::AttachmentsSent {
+                result,
+                text,
+                attachments,
+            }
+        }
         Request::Send(input) => Msg::Sent(link.call("chat.send", &*input).await),
         Request::Cancel(id) => void(link.call("chat.cancel", &json!({ "id": id })).await),
         Request::StopSubagent(id) => void(
@@ -616,6 +655,8 @@ async fn session(
     }
 
     let mut app = App::new(&folder);
+    let size = terminal.size()?;
+    app.viewport = (size.width, size.height);
     app.keymap = keymap_file::load();
     app.theme = theme_file::load();
     watch_theme(signals.clone());
@@ -778,9 +819,148 @@ pub async fn run() -> i32 {
     }
 }
 
+async fn send_attachments(
+    link: &Link,
+    input: &mut zvs_contract::ChatSendInput,
+    attachments: &[crate::state::attachments::Attachment],
+) -> Result<zvs_contract::RunHandleDto, AppError> {
+    use crate::state::attachments::Attachment;
+    let paths: Vec<_> = attachments
+        .iter()
+        .filter_map(|a| match a {
+            Attachment::Image { path, .. } => Some(path.clone()),
+            _ => None,
+        })
+        .collect();
+    if !paths.is_empty() {
+        input.images = link
+            .call(
+                "cli.images.import",
+                &zvs_contract::CliImageImportInput {
+                    id: input.conversation_id,
+                    paths,
+                },
+            )
+            .await?;
+    }
+    let stores: Vec<_> = attachments
+        .iter()
+        .filter_map(|a| match a {
+            Attachment::Store { id, .. } => Some(*id),
+            _ => None,
+        })
+        .collect();
+    if !stores.is_empty() {
+        let detail: zvs_contract::ConversationDetailDto = link
+            .call(
+                "chat.conversations.get",
+                &json!({ "id": input.conversation_id }),
+            )
+            .await?;
+        let mut ids = detail.conversation.attached_store_ids;
+        for id in stores {
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        let _: zvs_contract::ConversationDto = link
+            .call(
+                "chat.conversations.updateStores",
+                &json!({ "id": input.conversation_id, "attachedStoreIds": ids }),
+            )
+            .await?;
+    }
+    link.call("chat.send", &*input).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn attachments_import_then_merge_stores_before_sending_references() {
+        use crate::state::attachments::Attachment;
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        let conversation_cases: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../packages/shared/fixtures/chat/ConversationDto.valid.json"
+        ))
+        .unwrap();
+        let conversation = conversation_cases[1]["value"].clone();
+        let conversation_id =
+            zvs_contract::ConversationId::parse(conversation["id"].as_str().unwrap()).unwrap();
+        let handles: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../packages/shared/fixtures/runs/RunHandleDto.valid.json"
+        ))
+        .unwrap();
+        let handle = handles[0]["value"].clone();
+        let image = json!({ "id":"0199aa11-8888-7111-8111-111111111111", "name":"image.png", "mimeType":"image/png", "sizeBytes":33 });
+        let mut detail = conversation.clone();
+        detail["messages"] = json!([]);
+        let (client, server) = tokio::io::duplex(64 * 1024);
+        let fixture = tokio::spawn(async move {
+            let (reader, mut writer) = tokio::io::split(server);
+            let mut lines = BufReader::new(reader).lines();
+            lines.next_line().await.unwrap().unwrap();
+            writer
+                .write_all(
+                    format!(
+                        "{}\n",
+                        json!({ "type":"welcome", "version":zvs_contract::CLI_PROTOCOL_VERSION })
+                    )
+                    .as_bytes(),
+                )
+                .await
+                .unwrap();
+            let mut calls = Vec::new();
+            for data in [json!([image]), detail, conversation, handle] {
+                let call: Value =
+                    serde_json::from_str(&lines.next_line().await.unwrap().unwrap()).unwrap();
+                writer.write_all(format!("{}\n", json!({ "type":"result", "id":call["id"], "envelope": { "ok":true, "data":data } })).as_bytes()).await.unwrap();
+                calls.push(call);
+            }
+            calls
+        });
+        let (link, _events) = Link::open(client).await.unwrap();
+        let store =
+            zvs_contract::VectorStoreId::parse("0199aa11-5555-7111-8111-222222222222").unwrap();
+        let mut input = zvs_contract::ChatSendInput::new(conversation_id, "question");
+        let attachments = [
+            Attachment::Image {
+                path: "C:/image.png".to_owned(),
+                name: "image.png".to_owned(),
+            },
+            Attachment::Store {
+                id: store,
+                name: "docs".to_owned(),
+            },
+        ];
+        send_attachments(&link, &mut input, &attachments)
+            .await
+            .unwrap();
+        let calls = fixture.await.unwrap();
+        let channels: Vec<_> = calls
+            .iter()
+            .map(|c| c["channel"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            channels,
+            [
+                "cli.images.import",
+                "chat.conversations.get",
+                "chat.conversations.updateStores",
+                "chat.send"
+            ]
+        );
+        assert_eq!(
+            calls[2]["payload"]["attachedStoreIds"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(calls[3]["payload"]["images"][0]["name"], "image.png");
+        assert!(calls[3]["payload"]["images"][0].get("path").is_none());
+    }
 
     fn pressed(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
         KeyEvent::new(code, modifiers)

@@ -24,7 +24,10 @@ pub fn spinner(frame: u64) -> &'static str {
     SPINNER[usize::try_from(frame).unwrap_or(0) % SPINNER.len()]
 }
 
-fn status_look(status: ChatToolCallStatus, frame: u64) -> (&'static str, Color, &'static str) {
+pub(super) fn status_look(
+    status: ChatToolCallStatus,
+    frame: u64,
+) -> (&'static str, Color, &'static str) {
     match status {
         ChatToolCallStatus::Running => (spinner(frame), theme::colors().accent, copy::TOOL_RUNNING),
         ChatToolCallStatus::AwaitingApproval => {

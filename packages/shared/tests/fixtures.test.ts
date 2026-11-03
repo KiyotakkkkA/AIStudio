@@ -572,6 +572,7 @@ const schemas: Record<string, z.ZodType> = {
   "chat/ConversationExportDto": contract["chat.conversations.export"].output,
   "chat/ConversationDto": ConversationDto,
   "images/ImageAttachmentDto": ImageAttachmentDto,
+  "images/CliImageImportInput": contract["cli.images.import"].input,
   "images/ImageReadInput": contract["chat.images.read"].input,
   "images/ImageDataDto": contract["chat.images.read"].output,
   "chat/MessageDto": MessageDto,

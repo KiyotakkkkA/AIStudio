@@ -481,3 +481,26 @@ pub const MODE_HINT_SAFETY_ASK: &str = "Подтверждение требуе�
 pub const MODE_HINT_AUTO_BYPASS: &str = "Опасные действия с файлами и запуск кода оценивают правила и модель-арбитр. Если решение не принято, запрашивается подтверждение.";
 pub const MODE_HINT_NO_RESTRICTIONS: &str = "Подтверждения не запрашиваются. Отключённые инструменты, запрещённые папки и поля оплаты остаются недоступны.";
 pub const JUDGE_HINT: &str = "Оценивает опасные действия в режиме «Автопроверка».";
+
+pub const CMD_SUBAGENTS: &str = "Субагенты: список, подробности и остановка";
+pub const CMD_SUBAGENTS_LIST: &str = "Список субагентов и текущая работа";
+pub const CMD_SUBAGENTS_STOP: &str = "Остановить выбранного субагента";
+pub const CMD_GOAL_PLAN: &str = "Показать план работы над целью";
+pub const GOAL_PLAN_TITLE: &str = "План работы над целью";
+pub const GOAL_PLAN_EMPTY: &str = "Плана работы над целью нет";
+pub const SUBAGENTS_TITLE: &str = "Субагенты";
+pub const SUBAGENT_DETAILS: &str = "Текущая работа субагента";
+pub const SUBAGENT_NOT_FOUND: &str = "Субагент не найден";
+pub const SUBAGENTS_USAGE: &str = "Доступно: /subagents list [id], /subagents stop [id]";
+pub const MODAL_HINT: &str = "↑/↓, PgUp/PgDn, колесо — прокрутка · Esc — закрыть";
+pub const IMAGE_PROVIDER_WARNING: &str = "Выбранный вами провайдер не поддерживает прикрепление изображений, очистите поле ввода для смены";
+pub const ATTACHMENTS_TITLE: &str = "Вложения";
+pub const ATTACHMENTS_LIMIT: &str =
+    "К сообщению можно прикрепить не больше 5 изображений и 64 хранилищ";
+pub const ATTACHMENTS_BUSY: &str =
+    "Дождитесь завершения ответа, чтобы отправить сообщение с вложениями";
+pub const IMAGE_KIND: &str = "изображение";
+pub const STORE_KIND: &str = "хранилище";
+
+pub const GOAL_STEP_QUEUED: &str = "ожидает";
+pub const GOAL_STEP_DONE: &str = "завершён";

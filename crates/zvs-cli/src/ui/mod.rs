@@ -1,4 +1,5 @@
 pub mod banner;
+pub mod modal;
 pub mod overlay;
 pub mod prompt;
 pub mod text;
@@ -248,15 +249,40 @@ fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
                 } else {
                     line
                 };
-                Line::from(vec![
-                    Span::styled(prompt, lead),
-                    Span::styled(body.to_owned(), theme::text()),
-                ])
+                let mut spans = vec![Span::styled(prompt, lead)];
+                if shell {
+                    spans.push(Span::styled(body.to_owned(), theme::text()));
+                } else {
+                    let start = text
+                        .split('\n')
+                        .take(index)
+                        .map(|line| line.len() + 1)
+                        .sum();
+                    spans.extend(app.input.pieces(start, start + line.len()).into_iter().map(
+                        |(piece, attachment)| {
+                            Span::styled(
+                                piece.to_owned(),
+                                attachment.map_or_else(theme::text, |attachment| {
+                                    let color = if attachment.image() {
+                                        theme::colors().ok
+                                    } else {
+                                        theme::colors().accent
+                                    };
+                                    Style::new()
+                                        .fg(color)
+                                        .bg(theme::colors().accent_soft)
+                                        .add_modifier(Modifier::BOLD)
+                                }),
+                            )
+                        },
+                    ));
+                }
+                Line::from(spans)
             })
             .collect()
     };
     frame.render_widget(Paragraph::new(lines), inner);
-    if app.prompts.is_empty() && !app.help && app.overlay.is_none() {
+    if app.prompts.is_empty() && !app.help && app.modal.is_none() && app.overlay.is_none() {
         let shift = usize::from(shell && row == 0);
         let x = inner.x + rows(column + 2 - shift).min(inner.width.saturating_sub(1));
         let y = inner.y + rows(row - first);
@@ -344,29 +370,70 @@ fn palette_view(frame: &mut Frame<'_>, above: Rect, app: &App) {
     );
 }
 
-fn help_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let mut lines = vec![Line::from(Span::styled(
-        copy::COMMANDS_TITLE,
-        theme::eyebrow(),
-    ))];
-    for item in every_item() {
-        lines.push(Line::from(vec![
-            Span::styled(format!("  /{:<13}", item.label()), theme::accent()),
-            Span::styled(item.description(), theme::text()),
-        ]));
+fn help_column(title: &str, entries: &[(String, String)], width: usize) -> Vec<Line<'static>> {
+    let width = width.max(1);
+    let key_width = entries
+        .iter()
+        .map(|(key, _)| key.width())
+        .max()
+        .unwrap_or(0)
+        .min(width / 2)
+        .max(1);
+    let meaning_width = width.saturating_sub(key_width + 2).max(1);
+    let mut lines = vec![
+        Line::from(Span::styled(title.to_owned(), theme::strong())),
+        Line::default(),
+    ];
+    for (key, meaning) in entries {
+        let keys = text::wrap(key, key_width);
+        let meanings = text::wrap(meaning, meaning_width);
+        for row in 0..keys.len().max(meanings.len()) {
+            let key = keys.get(row).cloned().unwrap_or_default();
+            let padding = key_width.saturating_sub(key.width()) + 2;
+            lines.push(Line::from(vec![
+                Span::styled(key, theme::accent()),
+                Span::raw(" ".repeat(padding)),
+                Span::styled(
+                    meanings.get(row).cloned().unwrap_or_default(),
+                    theme::text(),
+                ),
+            ]));
+        }
     }
-    lines.push(Line::default());
-    lines.extend(transcript::key_lines(&app.key_sections(), 70, 0));
-    let target = centered(area, 72, rows(lines.len() + 2));
-    frame.render_widget(Clear, target);
-    frame.render_widget(
-        Paragraph::new(lines).block(panel(
-            copy::HELP_TITLE,
-            theme::colors().accent,
-            theme::colors().panel_bg,
-        )),
-        target,
-    );
+    lines
+}
+
+pub fn help_lines(app: &App, width: usize) -> Vec<Line<'static>> {
+    let commands = every_item()
+        .into_iter()
+        .map(|item| (format!("/{}", item.label()), item.description()))
+        .collect();
+    let mut sections = vec![(copy::COMMANDS_TITLE, commands)];
+    sections.extend(app.key_sections());
+    if width >= 90 {
+        let usable = width.saturating_sub(KEYS_GAP * 2);
+        let column = usable / 3;
+        let band: Vec<_> = sections
+            .iter()
+            .enumerate()
+            .map(|(index, (title, entries))| {
+                let column = if index == 2 {
+                    usable - column * 2
+                } else {
+                    column
+                };
+                (column, help_column(title, entries, column))
+            })
+            .collect();
+        side_by_side(&band)
+    } else {
+        let mut lines = Vec::new();
+        for (title, entries) in sections {
+            lines.extend(help_column(title, &entries, width));
+            lines.push(Line::default());
+        }
+        lines
+    }
 }
 
 fn key_column(title: &str, rows: &[(String, &str)]) -> (usize, Vec<Line<'static>>) {
@@ -684,12 +751,15 @@ fn draw_screen(frame: &mut Frame<'_>, app: &App) {
             if app.palette_open() {
                 palette_view(frame, body, app);
             }
+            if app.attachments_open() {
+                attachment_view(frame, body, app);
+            }
             if app.keys_open() {
                 keys_view(frame, body, app);
             }
             footer(frame, status, app);
-            if app.help {
-                help_view(frame, area, app);
+            if app.help || app.modal.is_some() {
+                modal::draw(frame, area, app);
             }
         }
     }
@@ -697,3 +767,51 @@ fn draw_screen(frame: &mut Frame<'_>, app: &App) {
 
 #[cfg(test)]
 mod tests;
+
+fn attachment_view(frame: &mut Frame<'_>, above: Rect, app: &App) {
+    let choices = app.attachment_choices();
+    let selected = app.attachment_selected.min(choices.len().saturating_sub(1));
+    let start = selected.saturating_sub(PALETTE_ROWS - 1);
+    let mut lines: Vec<Line<'static>> = choices
+        .iter()
+        .enumerate()
+        .skip(start)
+        .take(PALETTE_ROWS)
+        .map(|(index, a)| {
+            let kind = if a.image() {
+                copy::IMAGE_KIND
+            } else {
+                copy::STORE_KIND
+            };
+            Line::from(Span::styled(
+                text::truncate(
+                    &format!(" {} · {kind}", a.name()),
+                    usize::from(above.width.saturating_sub(4)),
+                ),
+                if index == selected {
+                    theme::selected()
+                } else {
+                    theme::text()
+                },
+            ))
+        })
+        .collect();
+    if lines.is_empty() {
+        lines.push(Line::from(copy::NOTHING_FOUND));
+    }
+    let height = rows(lines.len() + 2).min(above.height);
+    let area = Rect {
+        y: above.bottom().saturating_sub(height),
+        height,
+        ..above
+    };
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(lines).block(panel(
+            copy::ATTACHMENTS_TITLE,
+            theme::colors().accent,
+            theme::colors().panel_bg,
+        )),
+        area,
+    );
+}

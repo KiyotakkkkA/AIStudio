@@ -158,6 +158,7 @@ mod tests {
                 "chat.unbindFolder",
                 "cli.accounts.cancelLink",
                 "cli.accounts.link",
+                "cli.images.import",
                 "cli.install",
                 "cli.mcp.create",
                 "cli.open",

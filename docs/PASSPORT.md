@@ -399,6 +399,14 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
   `chat.queue.remove` and `chat.queue.flush` are allowed. They take only a dialog id and the
   person's own text; a queued message is sent exactly like one from `chat.send` (same graph,
   approvals and policy), and nothing in the queue reaches the model before that.
+  Attachments (2026-11-03): `vectorStores.list` and `chat.conversations.updateStores` are
+  allowed for user-selected store attachments, together with the narrow
+  `cli.images.import { id, paths }` channel. Image paths come from an explicit selection
+  in the CLI composer or a pasted absolute path, never a model tool. The host checks the
+  conversation, validates the path DTO, and imports through `ImageLoader` with the same
+  format, size, count, integrity and conversation quota checks as the native image picker.
+  Bytes and manifests stay in the conversation's `attachments` folder. The CLI checks image
+  support before composing a turn; the chat service also checks it before sending.
 - **Same events, same answers.** CLI connections are extra event-bus subscribers beside the
   window. An approval or a question reaches both; the first answer wins and the other side
   sees `Conflict`.

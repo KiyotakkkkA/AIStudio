@@ -79,3 +79,34 @@ pub fn validate_images(images: &[ImageAttachmentDto]) -> Result<(), AppError> {
     }
     Ok(())
 }
+
+/// Explicit user-selected paths from the same-user CLI, never a model tool input.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CliImageImportInput {
+    pub id: crate::ConversationId,
+    pub paths: Vec<String>,
+}
+
+impl Validate for CliImageImportInput {
+    fn validate(&self) -> Result<(), AppError> {
+        if self.paths.is_empty() || self.paths.len() > IMAGES_MAX {
+            return Err(invalid("paths", "maxItems"));
+        }
+        for path in &self.paths {
+            crate::folders::check_folder_path("paths", path)?;
+            let bytes = path.as_bytes();
+            let absolute = path.starts_with('/')
+                || path.starts_with(r"\\")
+                || (bytes.len() >= 3
+                    && bytes[0].is_ascii_alphabetic()
+                    && bytes[1] == b':'
+                    && matches!(bytes[2], b'/' | b'\\'));
+            if !absolute || path.contains('\0') {
+                return Err(invalid("paths", "absolute"));
+            }
+        }
+        Ok(())
+    }
+}

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ImageAttachments, ImageDataDto, ImageReadInput } from "../images.js";
+import { CliImageImportInput, ImageAttachments, ImageDataDto, ImageReadInput } from "../images.js";
 import { ProviderUsageDto } from "../providers/ProviderDto.js";
 import {
   AgenticInstructInput,
@@ -596,6 +596,7 @@ export const contract = defineContract({
     output: z.object({ cancelled: z.boolean() }),
   },
   "cli.mcp.create": { input: CreateMcpServerInput, output: McpServerDto },
+  "cli.images.import": { input: CliImageImportInput, output: ImageAttachments },
   "cli.subagents.cancel": { input: CliSubagentCancelInput, output: z.void() },
   "cli.status": { input: z.void(), output: CliInstallDto },
   "cli.install": { input: z.void(), output: CliInstallDto },

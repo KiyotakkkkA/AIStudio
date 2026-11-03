@@ -376,7 +376,7 @@ impl Shortcut {
             Self::Connect => Some(Command::Connect),
             Self::Desktop => Some(Command::Desktop),
             Self::Theme => Some(Command::Theme),
-            Self::StopSubagent => Some(Command::StopSubagent),
+            Self::StopSubagent => Some(Command::Subagents),
             Self::Help => Some(Command::Help),
             Self::Shortcuts => Some(Command::Shortcuts),
         }

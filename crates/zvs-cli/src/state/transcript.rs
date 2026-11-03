@@ -88,6 +88,23 @@ pub fn subagent_running(call: &ChatToolCallDto) -> bool {
             .is_some_and(|status| status == "running" || status == "queued")
 }
 
+pub fn subagent_status(call: &ChatToolCallDto) -> &'static str {
+    use crate::copy;
+    match call
+        .meta
+        .as_ref()
+        .and_then(|meta| meta.get("status"))
+        .and_then(Value::as_str)
+    {
+        Some("running") => copy::SUBAGENT_RUNNING,
+        Some("queued") => copy::SUBAGENT_QUEUED,
+        Some("partial") => copy::SUBAGENT_PARTIAL,
+        Some("cancelled") => copy::SUBAGENT_STOPPED,
+        Some("failed") => copy::SUBAGENT_FAILED,
+        _ => copy::SUBAGENT_DONE,
+    }
+}
+
 impl Live {
     pub fn attached(text: String, reasoning: String, tools: Vec<ChatToolCallDto>) -> Self {
         let mut segments: Vec<Segment> = tools
@@ -266,6 +283,25 @@ impl Transcript {
 
     pub fn clear(&mut self) {
         self.entries.clear();
+    }
+
+    pub fn subagents(&self) -> Vec<ChatToolCallDto> {
+        let mut calls: Vec<ChatToolCallDto> = self
+            .entries
+            .iter()
+            .filter_map(|entry| match entry {
+                Entry::Tool(call) if subagent_run(call).is_some() => Some(call.as_ref().clone()),
+                _ => None,
+            })
+            .collect();
+        if let Some(live) = &self.live {
+            calls.extend(
+                live.tools()
+                    .filter(|call| subagent_run(call).is_some())
+                    .cloned(),
+            );
+        }
+        calls
     }
 
     pub fn newest_subagent(&self) -> Option<RunId> {

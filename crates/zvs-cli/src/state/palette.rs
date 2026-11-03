@@ -23,7 +23,7 @@ pub enum Command {
     Permissions,
     Shortcuts,
     Theme,
-    StopSubagent,
+    Subagents,
     Clear,
     Exit,
 }
@@ -44,7 +44,7 @@ pub const COMMANDS: &[Command] = &[
     Command::Permissions,
     Command::Shortcuts,
     Command::Theme,
-    Command::StopSubagent,
+    Command::Subagents,
     Command::Clear,
     Command::Exit,
 ];
@@ -67,7 +67,7 @@ impl Command {
             Self::Permissions => "permissions",
             Self::Shortcuts => "shortcuts",
             Self::Theme => "theme",
-            Self::StopSubagent => "subagent-stop",
+            Self::Subagents => "subagents",
             Self::Clear => "clear",
             Self::Exit => "exit",
         }
@@ -90,7 +90,7 @@ impl Command {
             Self::Permissions => copy::CMD_PERMISSIONS,
             Self::Shortcuts => copy::CMD_SHORTCUTS,
             Self::Theme => copy::CMD_THEME,
-            Self::StopSubagent => copy::CMD_STOP_SUBAGENT,
+            Self::Subagents => copy::CMD_SUBAGENTS,
             Self::Clear => copy::CMD_CLEAR,
             Self::Exit => copy::CMD_EXIT,
         }
@@ -122,6 +122,7 @@ pub enum Arg {
     Server,
     Theme,
     Conversation,
+    Subagent,
 }
 
 impl Command {
@@ -140,6 +141,9 @@ pub enum Sub {
     McpInspect,
     GoalStop,
     GoalContinue,
+    GoalPlan,
+    SubagentsList,
+    SubagentsStop,
 }
 
 pub const SUBS: &[Sub] = &[
@@ -147,13 +151,17 @@ pub const SUBS: &[Sub] = &[
     Sub::McpInspect,
     Sub::GoalStop,
     Sub::GoalContinue,
+    Sub::GoalPlan,
+    Sub::SubagentsList,
+    Sub::SubagentsStop,
 ];
 
 impl Sub {
     pub const fn parent(self) -> Command {
         match self {
             Self::McpAdd | Self::McpInspect => Command::Mcp,
-            Self::GoalStop | Self::GoalContinue => Command::Goal,
+            Self::GoalStop | Self::GoalContinue | Self::GoalPlan => Command::Goal,
+            Self::SubagentsList | Self::SubagentsStop => Command::Subagents,
         }
     }
 
@@ -163,11 +171,14 @@ impl Sub {
             Self::McpInspect => "inspect",
             Self::GoalStop => "stop",
             Self::GoalContinue => "continue",
+            Self::GoalPlan => "plan",
+            Self::SubagentsList => "list",
+            Self::SubagentsStop => "stop",
         }
     }
 
     pub const fn immediate(self) -> bool {
-        matches!(self, Self::GoalStop | Self::GoalContinue)
+        matches!(self, Self::GoalStop | Self::GoalContinue | Self::GoalPlan)
     }
 
     pub const fn offered(self, goal: Option<GoalStatus>) -> bool {
@@ -175,6 +186,7 @@ impl Sub {
             Self::McpAdd | Self::McpInspect => true,
             Self::GoalStop => matches!(goal, Some(GoalStatus::Active | GoalStatus::Paused)),
             Self::GoalContinue => matches!(goal, Some(GoalStatus::Paused)),
+            Self::GoalPlan | Self::SubagentsList | Self::SubagentsStop => true,
         }
     }
 
@@ -184,12 +196,16 @@ impl Sub {
             Self::McpInspect => copy::CMD_MCP_INSPECT,
             Self::GoalStop => copy::CMD_GOAL_STOP,
             Self::GoalContinue => copy::CMD_GOAL_CONTINUE,
+            Self::GoalPlan => copy::CMD_GOAL_PLAN,
+            Self::SubagentsList => copy::CMD_SUBAGENTS_LIST,
+            Self::SubagentsStop => copy::CMD_SUBAGENTS_STOP,
         }
     }
 
     pub const fn arg(self) -> Option<Arg> {
         match self {
-            Self::McpAdd | Self::GoalStop | Self::GoalContinue => None,
+            Self::McpAdd | Self::GoalStop | Self::GoalContinue | Self::GoalPlan => None,
+            Self::SubagentsList | Self::SubagentsStop => Some(Arg::Subagent),
             Self::McpInspect => Some(Arg::Server),
         }
     }
@@ -204,6 +220,10 @@ pub enum Pick {
     Server(McpServerId),
     Theme(CliTheme),
     Conversation(ConversationId),
+    Subagent {
+        run: zvs_contract::RunId,
+        stop: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -258,6 +278,7 @@ impl Item {
 pub struct Sources<'a> {
     pub servers: Option<&'a [McpServerDto]>,
     pub conversations: Option<&'a [ConversationDto]>,
+    pub subagents: &'a [zvs_contract::ChatToolCallDto],
     pub folder: &'a str,
     pub goal: Option<GoalStatus>,
 }
@@ -440,6 +461,38 @@ fn conversation_values(
 
 pub fn values(slot: &ArgSlot, sources: &Sources<'_>) -> Option<Vec<Value>> {
     match slot.arg {
+        Arg::Subagent => Some(
+            sources
+                .subagents
+                .iter()
+                .filter_map(|call| {
+                    let run = super::transcript::subagent_run(call)?;
+                    let stop = slot.prefix.contains(" stop ");
+                    if stop && !super::transcript::subagent_running(call) {
+                        return None;
+                    }
+                    let label = call
+                        .arguments
+                        .get("task")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or(&call.name);
+                    if !run.to_lowercase().contains(&slot.query)
+                        && !label.to_lowercase().contains(&slot.query)
+                    {
+                        return None;
+                    }
+                    Some(Value {
+                        label: label.to_owned(),
+                        meta: run.to_owned(),
+                        completion: format!("{}{run}", slot.prefix),
+                        pick: Pick::Subagent {
+                            run: zvs_contract::RunId::parse(run)?,
+                            stop,
+                        },
+                    })
+                })
+                .collect(),
+        ),
         Arg::Server => sources.servers.map(|servers| server_values(slot, servers)),
         Arg::Theme => Some(theme_values(slot)),
         Arg::Conversation => sources
@@ -462,13 +515,19 @@ pub fn matches(text: &str, sources: &Sources<'_>) -> Vec<Item> {
     }
     if let Some((command, partial)) = sub_query(text) {
         let mut subs: Vec<Sub> = subs_of(command)
-            .filter(|sub| sub.offered(sources.goal) && sub.name().starts_with(&partial))
+            .filter(|sub| sub.name().starts_with(&partial))
             .collect();
         subs.sort_by_key(|sub| sub.name());
         return subs.into_iter().map(Item::Sub).collect();
     }
     if !is_command_text(text) {
         return Vec::new();
+    }
+    if text.eq_ignore_ascii_case("/goal") || text.eq_ignore_ascii_case("/subagents") {
+        let command = find_command(&text[1..]).expect("known command");
+        return std::iter::once(Item::Command(command))
+            .chain(subs_of(command).map(Item::Sub))
+            .collect();
     }
     let query = text[1..].to_lowercase();
     let mut found: Vec<(usize, Command)> = COMMANDS
@@ -527,6 +586,7 @@ mod tests {
     const NONE: Sources<'static> = Sources {
         servers: None,
         conversations: None,
+        subagents: &[],
         folder: "",
         goal: None,
     };
@@ -670,5 +730,17 @@ mod tests {
         assert_eq!(Command::parse("/nope"), None);
         assert_eq!(Command::parse("exit"), None);
         assert_eq!(arguments("/mcp  add docs x"), "add docs x");
+    }
+
+    #[test]
+    fn goal_and_subagents_show_subcommands_before_a_space() {
+        let goal = matches("/goal");
+        for sub in [Sub::GoalStop, Sub::GoalContinue, Sub::GoalPlan] {
+            assert!(goal.contains(&Item::Sub(sub)));
+        }
+        let subagents = matches("/subagents");
+        assert!(subagents.contains(&Item::Sub(Sub::SubagentsList)));
+        assert!(subagents.contains(&Item::Sub(Sub::SubagentsStop)));
+        assert!(Command::parse("/subagent-stop").is_none());
     }
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FolderPath } from "./folders.js";
 import { ConversationId } from "./primitives/branded.js";
 
 export const IMAGES_MAX = 5;
@@ -24,3 +25,14 @@ export const ImageDataDto = z.object({
   dataUrl: z.string().min(1).max(IMAGE_DATA_URL_MAX),
 });
 export type ImageDataDto = z.infer<typeof ImageDataDto>;
+
+export const CliImageImportInput = z.object({
+  id: ConversationId,
+  paths: z
+    .array(
+      FolderPath.refine((path) => /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(path) && !path.includes("\0")),
+    )
+    .min(1)
+    .max(IMAGES_MAX),
+});
+export type CliImageImportInput = z.infer<typeof CliImageImportInput>;

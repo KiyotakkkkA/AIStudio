@@ -244,6 +244,55 @@ fn seed_conversation(host: &TestServices) -> String {
 }
 
 #[tokio::test]
+async fn cli_image_import_reuses_conversation_storage_and_validates_selection() {
+    let (host, server) = registered();
+    let id = seed_conversation(&host);
+    let folder = tempfile::tempdir().expect("temporary folder");
+    let path = folder.path().join("image.png");
+    let mut png = vec![0; 33];
+    png[..8].copy_from_slice(b"\x89PNG\r\n\x1a\n");
+    std::fs::write(&path, &png).expect("image");
+    let missing = server
+        .dispatch(
+            "cli.images.import",
+            json!({"id": "0199aa11-8888-7111-8111-111111111111", "paths": [path]}),
+        )
+        .await;
+    assert_eq!(missing["error"]["code"], "NOT_FOUND");
+    let imported = data(
+        server
+            .dispatch("cli.images.import", json!({"id": id, "paths": [path]}))
+            .await,
+    );
+    let image: zvs_contract::ImageAttachmentDto =
+        serde_json::from_value(imported[0].clone()).expect("image reference");
+    let loader = crate::images::ImageLoader::new(host.shared().artifacts.clone());
+    assert_eq!(
+        loader
+            .load(&id, &image)
+            .expect("stored copy")
+            .bytes
+            .as_ref(),
+        png
+    );
+    for paths in [
+        json!([]),
+        json!(["relative.png"]),
+        json!([path, path, path, path, path, path]),
+    ] {
+        let envelope = server
+            .dispatch("cli.images.import", json!({"id": id, "paths": paths}))
+            .await;
+        assert_eq!(envelope["ok"], false);
+    }
+    std::fs::write(&path, b"invalid image").expect("invalid contents");
+    let envelope = server
+        .dispatch("cli.images.import", json!({"id": id, "paths": [path]}))
+        .await;
+    assert_eq!(envelope["error"]["message"], crate::images::IMAGE_INVALID);
+}
+
+#[tokio::test]
 async fn the_console_stops_only_a_subagent_of_a_reachable_dialog() {
     let (host, server) = registered();
     let conversation = seed_conversation(&host);

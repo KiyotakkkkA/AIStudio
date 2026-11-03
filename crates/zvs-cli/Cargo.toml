@@ -24,6 +24,7 @@ zvs-contract = { path = "../zvs-contract" }
 zvs-pipe = { path = "../zvs-pipe" }
 
 [dev-dependencies]
+tempfile.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "test-util"] }
 
 [lints]

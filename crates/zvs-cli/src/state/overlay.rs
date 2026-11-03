@@ -22,6 +22,8 @@ pub enum Panel {
     Mcp,
     Processes,
     ProcessOutput,
+    Subagents,
+    StopSubagents,
     Permissions,
     Shortcuts,
     Theme,
@@ -52,6 +54,8 @@ pub enum Action {
     ResetShortcuts,
     SetTheme(CliTheme),
     ShowOutput(BackgroundShellId),
+    ShowSubagent(String),
+    StopSubagent(zvs_contract::RunId),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -137,6 +141,7 @@ pub struct Overlay {
     pub servers: Vec<McpServerDto>,
     pub processes: Vec<BackgroundShellDto>,
     pub output: Option<ProcessOutput>,
+    pub subagents: Vec<zvs_contract::ChatToolCallDto>,
 }
 
 pub const OUTPUT_LINES_MAX: usize = 2000;
@@ -872,7 +877,13 @@ impl Overlay {
             expanded: Vec::new(),
             loading: !matches!(
                 panel,
-                Panel::Connect | Panel::Models | Panel::Effort | Panel::Shortcuts | Panel::Theme
+                Panel::Connect
+                    | Panel::Models
+                    | Panel::Effort
+                    | Panel::Shortcuts
+                    | Panel::Theme
+                    | Panel::Subagents
+                    | Panel::StopSubagents
             ),
             armed: false,
             capturing: None,
@@ -883,6 +894,7 @@ impl Overlay {
             servers: Vec::new(),
             processes: Vec::new(),
             output: None,
+            subagents: Vec::new(),
         }
     }
 
@@ -897,6 +909,7 @@ impl Overlay {
             Panel::Mcp => copy::MCP_TITLE,
             Panel::Processes => copy::PROCESSES_TITLE,
             Panel::ProcessOutput => copy::PROCESS_OUTPUT_TITLE,
+            Panel::Subagents | Panel::StopSubagents => copy::SUBAGENTS_TITLE,
             Panel::Permissions => copy::PERMISSIONS_TITLE,
             Panel::Shortcuts => copy::SHORTCUTS_TITLE,
             Panel::Theme => copy::THEME_TITLE,
@@ -912,7 +925,9 @@ impl Overlay {
             Panel::Context => "▤",
             Panel::Skills => "✦",
             Panel::Mcp => "⧉",
-            Panel::Processes | Panel::ProcessOutput => "⚙",
+            Panel::Processes | Panel::ProcessOutput | Panel::Subagents | Panel::StopSubagents => {
+                "⚙"
+            }
             Panel::Permissions => "◉",
             Panel::Shortcuts => "⌨",
             Panel::Theme => "◑",
@@ -939,7 +954,9 @@ impl Overlay {
             | Panel::Effort
             | Panel::Shortcuts
             | Panel::Theme
-            | Panel::ProcessOutput => Vec::new(),
+            | Panel::ProcessOutput
+            | Panel::Subagents
+            | Panel::StopSubagents => Vec::new(),
         }
     }
 
@@ -954,6 +971,34 @@ impl Overlay {
             Panel::Mcp => server_rows(self),
             Panel::Processes => process_rows(self),
             Panel::ProcessOutput => output_rows(self),
+            Panel::Subagents | Panel::StopSubagents => self
+                .subagents
+                .iter()
+                .filter_map(|call| {
+                    use super::transcript::{subagent_run, subagent_running};
+                    let run = subagent_run(call)?;
+                    let running = subagent_running(call);
+                    if self.panel == Panel::StopSubagents && !running {
+                        return None;
+                    }
+                    let title = call
+                        .arguments
+                        .get("task")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or(&call.name);
+                    let row = Row::new(run, "·", title)
+                        .meta(format!(
+                            "{} · {run}",
+                            super::transcript::subagent_status(call)
+                        ))
+                        .current(running);
+                    Some(row.action(if self.panel == Panel::StopSubagents {
+                        Action::StopSubagent(zvs_contract::RunId::parse(run)?)
+                    } else {
+                        Action::ShowSubagent(run.to_owned())
+                    }))
+                })
+                .collect(),
             Panel::Permissions => permission_rows(self, view),
             Panel::Shortcuts => shortcut_rows(self, view),
             Panel::Theme => theme_rows(view),

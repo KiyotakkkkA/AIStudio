@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use zvs_contract::{
-    AccountLinkInput, AppError, CliOpenInput, CliSubagentCancelInput, CliThemeDto,
-    CreateMcpServerInput,
+    AccountLinkInput, AppError, CliImageImportInput, CliOpenInput, CliSubagentCancelInput,
+    CliThemeDto, CreateMcpServerInput,
 };
 
 use super::IpcServer;
@@ -27,6 +27,12 @@ pub fn register(server: &mut IpcServer) {
             "cli.mcp.create",
             |services: Arc<Services>, input: CreateMcpServerInput| async move {
                 cli::create_mcp_server(&services, &input)
+            },
+        )
+        .handle(
+            "cli.images.import",
+            |services: Arc<Services>, input: CliImageImportInput| async move {
+                cli::import_images(&services, input).await
             },
         )
         .handle(

@@ -751,6 +751,10 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ImageAttachmentDto>,
     ),
     (
+        "images/CliImageImportInput",
+        round_trip::<zvs_contract::CliImageImportInput>,
+    ),
+    (
         "images/ImageReadInput",
         round_trip::<zvs_contract::ImageReadInput>,
     ),

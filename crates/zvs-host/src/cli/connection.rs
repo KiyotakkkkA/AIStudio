@@ -24,6 +24,7 @@ pub const CLI_CHANNELS: &[&str] = &[
     "chat.conversations.create",
     "chat.conversations.get",
     "chat.conversations.list",
+    "chat.conversations.updateStores",
     "chat.goal.continue",
     "chat.goal.stop",
     "chat.queue.add",
@@ -37,6 +38,7 @@ pub const CLI_CHANNELS: &[&str] = &[
     "cli.accounts.link",
     "cli.mcp.create",
     "cli.open",
+    "cli.images.import",
     "cli.subagents.cancel",
     "execPolicy.allowRule",
     "execPolicy.get",
@@ -59,6 +61,7 @@ pub const CLI_CHANNELS: &[&str] = &[
     "skills.list",
     "skills.setEnabled",
     "system.ping",
+    "vectorStores.list",
 ];
 pub const CLI_CHANNEL_REFUSED: &str = "Канал недоступен консольной версии";
 const OUTGOING: usize = 4096;

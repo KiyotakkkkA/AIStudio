@@ -202,6 +202,11 @@ fn every_allowed_channel_is_a_contract_channel() {
         assert!(!CLI_CHANNELS.contains(&studio_only), "{studio_only}");
     }
     assert!(CLI_CHANNELS.contains(&"cli.subagents.cancel"));
+    assert!(CLI_CHANNELS.contains(&"cli.images.import"));
+    assert!(CLI_CHANNELS.contains(&"vectorStores.list"));
+    assert!(CLI_CHANNELS.contains(&"chat.conversations.updateStores"));
+    assert!(!CLI_CHANNELS.contains(&"chat.images.pick"));
+    assert!(!CLI_CHANNELS.contains(&"chat.images.read"));
 }
 
 #[tokio::test]

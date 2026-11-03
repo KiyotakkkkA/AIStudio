@@ -306,4 +306,7 @@ pub use voice::{
     VoiceSelectModelInput, VoiceTranscriptDto,
 };
 
-pub use images::{IMAGE_DATA_URL_MAX, ImageAttachmentDto, ImageDataDto, ImageReadInput};
+pub use images::{
+    CliImageImportInput, IMAGE_DATA_URL_MAX, IMAGES_MAX, ImageAttachmentDto, ImageDataDto,
+    ImageReadInput,
+};
