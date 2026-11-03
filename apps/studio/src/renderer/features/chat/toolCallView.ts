@@ -1,4 +1,4 @@
-import { ChatCitationDto, type ChatToolCallDto, type CodeLanguage, type Json } from "@zvs/shared";
+import { ChatCitationDto, type ChatToolCallDto, type Json } from "@zvs/shared";
 import {
   GOAL_PLAN_TOOL,
   GOAL_STEP_FIELD,
@@ -6,7 +6,7 @@ import {
   GOAL_STEP_TOOL,
   GOAL_TOOL,
 } from "./goalCopy";
-import { LANGUAGE_LABEL, PROCESS_TOOL_CODE, PROCESS_TOOL_SHELL } from "./processCopy";
+import { PROCESS_TOOL_SHELL } from "./processCopy";
 
 export const SHELL_ID_LABEL = "Процесс";
 export const SINCE_LABEL = "С позиции";
@@ -68,13 +68,6 @@ export type ToolCallView =
       readonly kind: "command";
       readonly argv: readonly string[];
       readonly cwd: string | null;
-    }
-  | {
-      readonly kind: "program";
-      readonly language: string;
-      readonly source: string;
-      readonly args: readonly string[];
-      readonly packages: readonly string[];
     }
   | { readonly kind: "fields"; readonly fields: readonly ViewField[] }
   | { readonly kind: "goal"; readonly summary: string; readonly evidence: string };
@@ -152,10 +145,6 @@ function documentView(call: Pick<ChatToolCallDto, "meta">, args: JsonObject): To
   };
 }
 
-function isLanguage(value: string | null): value is CodeLanguage {
-  return value !== null && value in LANGUAGE_LABEL;
-}
-
 export function toolCallView(
   call: Pick<ChatToolCallDto, "key" | "arguments" | "meta">,
 ): ToolCallView | null {
@@ -220,18 +209,6 @@ export function toolCallView(
     case PROCESS_TOOL_SHELL: {
       const argv = strings(args, "argv");
       return argv.length === 0 ? null : { kind: "command", argv, cwd: text(args, "cwd") };
-    }
-    case PROCESS_TOOL_CODE: {
-      const language = text(args, "language");
-      const source = text(args, "source");
-      if (source === null) return null;
-      return {
-        kind: "program",
-        language: isLanguage(language) ? LANGUAGE_LABEL[language] : (language ?? ""),
-        source,
-        args: strings(args, "args"),
-        packages: strings(args, "packages"),
-      };
     }
     case "shell.output":
     case "shell.kill": {

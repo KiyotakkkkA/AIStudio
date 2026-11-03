@@ -113,9 +113,6 @@ test("process, skill and job calls get their own views and unknown calls fall ba
     cwd: "app",
   });
   expect(
-    toolCallView(call("code.run", { language: "python", source: "print(1)", packages: [] })),
-  ).toMatchObject({ kind: "program", language: "Python", source: "print(1)" });
-  expect(
     toolCallView(call("skill.script", { key: "docx", path: "scripts/a.py", args: ["-v"] })),
   ).toMatchObject({ kind: "skill", skill: "docx", path: "scripts/a.py", args: ["-v"] });
   expect(toolCallView(call("job.run", { job: "reindex", params: { a: 1 } }))).toEqual({

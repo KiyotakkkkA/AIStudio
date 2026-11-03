@@ -15,7 +15,7 @@ Download a published dataset (CSV, XLSX, JSON) with `download.fetch` when it is 
 
 ## APIs without a connector
 
-With `code.run` or `shell.run`, and only when the user provides the endpoint and the credentials themselves:
+With `shell.run`, and only when the user provides the endpoint and the credentials themselves:
 
 - Call the API with a short script that writes JSON to a file; keep the token in an environment variable, never in the script, the spec or the dashboard.
 - Respect pagination and rate limits; stop on errors instead of retrying in a loop.

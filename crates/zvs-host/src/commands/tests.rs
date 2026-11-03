@@ -8,7 +8,7 @@ use futures::future::BoxFuture;
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, ApprovalRequestDto, BackgroundShellDto, BindFolderInput, CodeLanguage,
+    AppError, AppErrorCode, ApprovalRequestDto, BackgroundShellDto, BindFolderInput,
     ConversationId, CreateConversationInput, FolderGrantScope, HostEventDraft, ProcessResultDto,
     ProviderCapability, ProviderId, ProviderKind, RunHandleDto, RunId, RunStatus, ToolListFilter,
     ToolTier, Validate,
@@ -27,7 +27,6 @@ use crate::testing::{TestServices, temporary_directory, test_services};
 use crate::toolchain::process::{
     PROCESS_TIMEOUT, ProcessLimits, find_program, process_text, run_process,
 };
-use crate::toolchain::service::SETTINGS_HINT;
 use crate::toolchain::{CommandLauncher, LaunchSpec};
 use crate::workspace::canonical;
 
@@ -69,12 +68,15 @@ fn process_stub() {
     };
     let mut stdout = std::io::stdout();
     match mode.as_str() {
+        "script" => {
+            let source = std::fs::read_to_string("_work/main.mjs").expect("reads cached script");
+            let _ = writeln!(stdout, "{source}");
+        }
         "echo" => {
             let cwd = std::env::current_dir().expect("a working directory");
             let _ = writeln!(stdout, "stdin={rest}");
             let _ = writeln!(stdout, "cwd={}", cwd.display());
             for name in [
-                WORKSPACE_DIR_ENV,
                 SCRATCH_DIR_ENV,
                 "PYTHONIOENCODING",
                 "ZVS_SKILL_DIR",
@@ -197,19 +199,6 @@ fn context(cancel: CancellationToken) -> StepContext {
     )
 }
 
-fn code(language: CodeLanguage, source: &str) -> CodeRunInput {
-    CodeRunInput {
-        language,
-        source: source.to_owned(),
-        args: vec!["--flag".to_owned(), "1".to_owned()],
-        stdin: None,
-        packages: Vec::new(),
-        background: false,
-        notify: false,
-        conversation_id: String::new(),
-    }
-}
-
 fn shell(argv: &[&str]) -> ShellRunInput {
     ShellRunInput {
         argv: argv.iter().map(|part| (*part).to_owned()).collect(),
@@ -268,25 +257,6 @@ impl Host {
 
     fn options(&self, launcher: Option<Arc<dyn CommandLauncher>>) -> CommandToolOptions {
         CommandToolOptions::new(launcher, self.services.workspace.join("code-tests"))
-    }
-
-    fn background_code_node(&self, launcher: Option<Arc<dyn CommandLauncher>>) -> CodeRunNode {
-        CodeRunNode::new(
-            &self.services.folders,
-            self.services.runs.approvals(),
-            CommandToolOptions {
-                shells: Some(self.services.shells.clone()),
-                ..self.options(launcher)
-            },
-        )
-    }
-
-    fn code_node(&self, launcher: Option<Arc<dyn CommandLauncher>>) -> CodeRunNode {
-        CodeRunNode::new(
-            &self.services.folders,
-            self.services.runs.approvals(),
-            self.options(launcher),
-        )
     }
 
     fn shell_node(&self, limits: ProcessLimits) -> ShellRunNode {
@@ -390,161 +360,25 @@ impl Host {
 }
 
 #[test]
-fn both_tools_are_destructive_builtins_that_ask_by_default() {
+fn shell_is_a_destructive_builtin_that_asks_by_default() {
     let host = Host::new();
     let tools = host
         .services
         .tools
         .list(&ToolListFilter::default())
         .expect("lists");
-    for (key, description) in [(CODE_RUN, CODE_DESCRIPTION), (SHELL_RUN, SHELL_DESCRIPTION)] {
-        let tool = tools
-            .iter()
-            .find(|tool| tool.key == key)
-            .unwrap_or_else(|| panic!("{key} is a tool"));
-        assert!(tool.destructive, "{key}");
-        assert!(!tool.read_only, "{key}");
-        assert_eq!(tool.tier, ToolTier::Ask, "{key}");
-        assert_eq!(tool.description, description);
-    }
-}
-
-#[test]
-fn each_language_builds_its_command_line_cwd_and_env() {
-    let stub = Stub::shared(&[]);
-    let options = CommandToolOptions::new(Some(stub.clone()), PathBuf::from("scratch"));
-    let folder = Path::new("scratch").join("run").join("call");
-    let workspace = Path::new("work");
-    let file = |name: &str| folder.join(name).to_string_lossy().into_owned();
-
-    let python = code_plan(
-        &code(CodeLanguage::Python, "print(1)"),
-        &folder,
-        Some(workspace),
-        &options,
-    )
-    .expect("plans python");
-    assert!(python.install.is_none());
-    assert_eq!(python.run.cwd.as_deref(), Some(folder.as_path()));
-    assert_eq!(python.run.env["PYTHONIOENCODING"], "utf-8");
-    assert_eq!(python.run.env["PYTHONUTF8"], "1");
-    assert_eq!(
-        python.run.env[SCRATCH_DIR_ENV],
-        folder.to_string_lossy().as_ref()
-    );
-    assert_eq!(python.run.env[WORKSPACE_DIR_ENV], "work");
-
-    let mut script = code(CodeLanguage::Javascript, "console.log(1)");
-    script.packages = vec!["lodash@4.17.21".to_owned(), "@scope/tool".to_owned()];
-    let javascript = code_plan(&script, &folder, None, &options).expect("plans javascript");
-    let install = javascript.install.expect("an npm install");
-    assert_eq!(install.cwd.as_deref(), Some(folder.as_path()));
-    assert!(!javascript.run.env.contains_key(WORKSPACE_DIR_ENV));
-    assert!(!javascript.run.env.contains_key("PYTHONUTF8"));
-
-    let powershell = code_plan(
-        &code(CodeLanguage::Powershell, "Get-Date"),
-        &folder,
-        Some(workspace),
-        &options,
-    )
-    .expect("plans powershell");
-    assert!(powershell.install.is_none());
-    assert_eq!(powershell.run.command, POWERSHELL);
-    assert_eq!(
-        powershell.run.args,
-        [
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            &file("main.ps1"),
-            "--flag",
-            "1"
-        ]
-    );
-    assert_eq!(powershell.run.cwd.as_deref(), Some(folder.as_path()));
-    assert_eq!(powershell.run.env[WORKSPACE_DIR_ENV], "work");
-
-    assert_eq!(
-        stub.calls(),
-        [
-            (
-                "uv".to_owned(),
-                vec![
-                    "run".to_owned(),
-                    file("main.py"),
-                    "--flag".to_owned(),
-                    "1".to_owned()
-                ]
-            ),
-            (
-                "node".to_owned(),
-                vec![file("main.mjs"), "--flag".to_owned(), "1".to_owned()]
-            ),
-            (
-                "npm".to_owned(),
-                vec![
-                    "install".to_owned(),
-                    "--ignore-scripts".to_owned(),
-                    "--no-audit".to_owned(),
-                    "--no-fund".to_owned(),
-                    "lodash@4.17.21".to_owned(),
-                    "@scope/tool".to_owned()
-                ]
-            ),
-        ]
-    );
-    assert!(source_text(CodeLanguage::Powershell, "Write-Output 'ок'").starts_with('\u{feff}'));
-    assert_eq!(source_text(CodeLanguage::Python, "x"), "x");
-}
-
-#[tokio::test]
-async fn a_missing_toolchain_refuses_with_the_settings_hint_before_anything_is_written() {
-    let host = Host::new();
-    let toolchain: Arc<dyn CommandLauncher> = Arc::new(host.services.toolchain.clone());
-    let node = host.code_node(Some(toolchain));
-    for language in [CodeLanguage::Python, CodeLanguage::Javascript] {
-        let error = node
-            .run(&context(CancellationToken::new()), code(language, "1"))
-            .await
-            .expect_err("no runtime is connected");
-        assert_eq!(error.code, AppErrorCode::NotFound);
-        assert!(error.message.ends_with(SETTINGS_HINT), "{}", error.message);
-    }
-    let none = host
-        .code_node(None)
-        .run(
-            &context(CancellationToken::new()),
-            code(CodeLanguage::Python, "print(1)"),
-        )
-        .await
-        .expect_err("no toolchain");
-    assert_eq!(none.message, CODE_NO_TOOLCHAIN);
-    assert!(!host.services.workspace.join("code-tests").exists());
+    let tool = tools
+        .iter()
+        .find(|tool| tool.key == SHELL_RUN)
+        .expect("shell is a tool");
+    assert!(tool.destructive);
+    assert!(!tool.read_only);
+    assert_eq!(tool.tier, ToolTier::Ask);
+    assert_eq!(tool.description, SHELL_DESCRIPTION);
 }
 
 #[test]
 fn inputs_are_validated() {
-    let mut python = code(CodeLanguage::Python, "print(1)");
-    python.packages = vec!["requests".to_owned()];
-    assert!(python.validate().is_err());
-    for refused in [
-        "--global",
-        "git+https://example.com/x.git",
-        "file:../evil",
-        "https://example.com/x.tgz",
-        "Upper",
-    ] {
-        let mut script = code(CodeLanguage::Javascript, "1");
-        script.packages = vec![refused.to_owned()];
-        assert!(script.validate().is_err(), "{refused}");
-    }
-    let mut script = code(CodeLanguage::Javascript, "1");
-    script.packages = vec!["left-pad@^1.3.0".to_owned(), "@types/node".to_owned()];
-    assert!(script.validate().is_ok());
-    assert!(code(CodeLanguage::Python, "").validate().is_err());
     assert!(shell(&[]).validate().is_err());
     assert!(shell(&[" "]).validate().is_err());
     assert!(shell(&["cargo", "check"]).validate().is_ok());
@@ -560,13 +394,6 @@ fn inputs_are_validated() {
         serde_json::from_value::<ShellRunInput>(json!({ "argv": "npm test" })).is_err(),
         "a shell string is not an argument vector"
     );
-    let mut job = code(CodeLanguage::Python, "print(1)");
-    job.notify = true;
-    assert!(job.validate().is_err(), "notify needs background");
-    job.background = true;
-    assert!(job.validate().is_ok());
-    job.stdin = Some("input".to_owned());
-    assert!(job.validate().is_err(), "background code takes no stdin");
     let mut tests = shell(&["cargo", "test"]);
     tests.notify = true;
     assert!(tests.validate().is_err(), "notify needs background");
@@ -601,65 +428,6 @@ fn inputs_are_validated() {
         let parts: Vec<String> = argv.iter().map(|part| (*part).to_owned()).collect();
         assert!(!server_like(&parts), "{argv:?}");
     }
-}
-
-#[tokio::test]
-async fn npm_install_runs_with_scripts_disabled_before_the_program() {
-    let host = Host::new();
-    let folder = temporary_directory("code-workspace-");
-    let root = canonical(folder.path()).expect("a canonical path");
-    let conversation = host.bound(&root);
-    let stub = Stub::shared(&[]);
-    let node = host.code_node(Some(stub.clone()));
-    let mut input = code(CodeLanguage::Javascript, "console.log('ок')");
-    input.packages = vec!["lodash".to_owned()];
-    input.stdin = Some("данные".to_owned());
-    input.conversation_id = conversation.to_string();
-    let output = node
-        .run(&context(CancellationToken::new()), input.clone())
-        .await
-        .expect("runs");
-    let calls = stub.calls();
-    assert_eq!(calls.len(), 2);
-    assert_eq!(calls[0].0, "node");
-    assert_eq!(calls[1].0, "npm");
-    assert_eq!(&calls[1].1[..4], NPM_INSTALL);
-    assert_eq!(calls[1].1[4], "lodash");
-    assert_eq!(output.exit_code, Some(0));
-    assert!(!output.is_error);
-    assert!(output.stdout.contains("stdin=данные"));
-    assert!(same_path(
-        value_of(&output.stdout, WORKSPACE_DIR_ENV).expect("the workspace"),
-        &root
-    ));
-    let cwd = value_of(&output.stdout, "cwd").expect("a cwd");
-    assert!(same_path(cwd, Path::new(&output.process.cwd)));
-    let scratch = Path::new(&output.process.cwd);
-    assert_eq!(
-        std::fs::read_to_string(scratch.join("main.mjs")).expect("the source"),
-        "console.log('ок')"
-    );
-    assert!(scratch.join("package.json").is_file());
-    assert_eq!(output.process.language, Some(CodeLanguage::Javascript));
-    assert_eq!(output.process.packages, ["lodash"]);
-    assert!(output.text.contains("</ stdout>injected"));
-    let meta = node
-        .tool_meta(&Value::Null, &output)
-        .expect("a tool call meta");
-    let result: ProcessResultDto = zvs_contract::parse(meta).expect("a process result");
-    assert_eq!(result.exit_code, Some(0));
-    assert_eq!(result.process, output.process);
-
-    let failing = Stub::shared(&[("npm", "fail")]);
-    let output = host
-        .code_node(Some(failing.clone()))
-        .run(&context(CancellationToken::new()), input)
-        .await
-        .expect("a failed install still returns its output");
-    assert!(output.is_error);
-    assert_eq!(output.exit_code, Some(3));
-    assert!(output.stderr.contains("broken input"));
-    assert!(output.text.starts_with("npm install failed"));
 }
 
 #[tokio::test]
@@ -754,13 +522,12 @@ fn programs_resolve_through_the_toolchain_folders_first() {
 }
 
 #[tokio::test]
-async fn both_tools_ask_even_at_auto_and_off_denies() {
+async fn shell_asks_even_at_auto_and_off_denies() {
     let host = Host::new();
     let folder = temporary_directory("ask-");
     let root = canonical(folder.path()).expect("a canonical path");
     let conversation = host.bound(&root);
     host.set_tier(SHELL_RUN, ToolTier::Auto);
-    host.set_tier(CODE_RUN, ToolTier::Auto);
 
     let shell_node = json!({
         "id": "run",
@@ -798,38 +565,10 @@ async fn both_tools_ask_even_at_auto_and_off_denies() {
             .is_some_and(|text| text.contains("stdin=hello"))
     );
 
-    let source = "Write-Output 'не запускать'";
-    let code_node = json!({
-        "id": "run",
-        "type": CODE_RUN,
-        "input": {
-            "conversationId": conversation.to_string(),
-            "language": "powershell",
-            "source": source
-        }
-    });
-    let handle = host.start(code_node.clone());
-    let request = host.approval(&handle.id).await;
-    assert_eq!(request["kind"], json!("process"));
-    assert_eq!(request["subject"], json!(CODE_RUN));
-    assert_eq!(request["process"]["language"], json!("powershell"));
-    assert_eq!(request["process"]["source"], json!(source));
-    let scratch = PathBuf::from(request["process"]["cwd"].as_str().expect("a cwd"));
-    host.services
-        .runs
-        .deny(&handle.id, request["id"].as_str().expect("an id"))
-        .expect("denies");
-    assert_eq!(host.finish(&handle.id).await, RunStatus::Failed);
-    assert_eq!(host.step(&handle.id).1.as_deref(), Some(PROCESS_DENIED));
-    assert!(!scratch.exists());
-
     host.set_tier(SHELL_RUN, ToolTier::Off);
-    host.set_tier(CODE_RUN, ToolTier::Off);
-    for node in [shell_node, code_node] {
-        let handle = host.start(node);
-        assert_eq!(host.finish(&handle.id).await, RunStatus::Failed);
-        assert!(host.approvals(&handle.id).is_empty());
-    }
+    let handle = host.start(shell_node);
+    assert_eq!(host.finish(&handle.id).await, RunStatus::Failed);
+    assert!(host.approvals(&handle.id).is_empty());
 }
 
 #[tokio::test]
@@ -980,12 +719,12 @@ async fn a_program_that_cannot_start_reports_the_caller_message() {
         None,
         ProcessLimits::default(),
         &CancellationToken::new(),
-        CODE_NOT_STARTED,
+        SHELL_NOT_STARTED,
     )
     .await
     .expect_err("nothing to start");
     assert_eq!(error.code, AppErrorCode::NativeError);
-    assert_eq!(error.message, CODE_NOT_STARTED);
+    assert_eq!(error.message, SHELL_NOT_STARTED);
 }
 
 #[tokio::test]
@@ -1062,47 +801,24 @@ async fn ended(host: &Host, id: &zvs_contract::BackgroundShellId) -> BackgroundS
 }
 
 #[tokio::test]
-async fn background_code_keeps_its_scratch_folder_until_the_program_ends() {
-    let host = Host::new();
-    let node = host.background_code_node(Some(Stub::shared(&[("uv", "hang")])));
-    let run = context(CancellationToken::new());
-    let conversation = host.conversation().to_string();
-    let mut input = code(CodeLanguage::Python, "import time; time.sleep(600)");
-    input.background = true;
-    input.notify = true;
-    input.conversation_id = conversation.clone();
-    let output = node.run(&run, input).await.expect("starts");
-    let id = output.shell_id.expect("a process id");
-    assert!(output.process.background);
-    assert_eq!(output.process.language, Some(CodeLanguage::Python));
-    assert!(output.text.contains(NOTIFY_TEXT));
-    let scratch = host
-        .services
-        .workspace
-        .join("code-tests")
-        .join(run.run_id.to_string());
-    assert!(crate::toolchain::process::is_pinned(&scratch));
-    for index in 0..crate::toolchain::process::SCRATCH_KEEP + 2 {
-        crate::toolchain::process::prepare_scratch(
-            &host.services.workspace.join("code-tests"),
-            &format!("later-{index:02}"),
-        )
-        .expect("prepares");
-    }
-    assert!(Path::new(&output.process.cwd).is_dir());
-    let shell = host.services.shells.get(None, &id).expect("the shell");
-    assert_eq!(shell.argv[..2], ["python".to_owned(), "main.py".to_owned()]);
-    host.services.shells.kill(None, &id).await.expect("stops");
-    assert!(!crate::toolchain::process::is_pinned(&scratch));
-    host.services.shells.close_owner(&conversation).await;
-}
-
-#[tokio::test]
 async fn a_background_program_that_finishes_is_reported_to_the_wake_up() {
     let host = Host::new();
-    let node = host.background_code_node(Some(Stub::shared(&[("uv", "fail")])));
-    let conversation = host.conversation().to_string();
-    let mut input = code(CodeLanguage::Python, "raise SystemExit(3)");
+    let node = ShellRunNode::new(
+        &host.services.folders,
+        host.services.runs.approvals(),
+        CommandToolOptions {
+            shells: Some(host.services.shells.clone()),
+            ..host.options(None)
+        },
+    );
+    let folder = temporary_directory("notify-shell-");
+    let conversation = host
+        .bound(&canonical(folder.path()).expect("a path"))
+        .to_string();
+    let mut input = ShellRunInput {
+        argv: stub_argv(),
+        ..shell(&[])
+    };
     input.background = true;
     input.notify = true;
     input.conversation_id = conversation.clone();
@@ -1111,10 +827,10 @@ async fn a_background_program_that_finishes_is_reported_to_the_wake_up() {
         .await
         .expect("starts");
     let shell = ended(&host, &output.shell_id.expect("a process id")).await;
-    assert_eq!(shell.exit_code, Some(3));
+    assert_eq!(shell.exit_code, Some(0));
     assert!(host.services.shells.take_ended(&conversation, 5).is_empty());
     let notified = host.services.shells.take_notified(&conversation, 5);
     assert_eq!(notified.len(), 1);
-    assert!(notified[0].tail.contains("broken input"));
+    assert_eq!(notified[0].shell.exit_code, Some(0));
     host.services.shells.close_owner(&conversation).await;
 }

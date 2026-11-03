@@ -39,7 +39,7 @@ export const LOAD_ERROR = "Не удалось загрузить разреше
 export const REVOKE_ERROR = "Не удалось отозвать разрешение. Попробуйте ещё раз.";
 export const ALREADY_REVOKED = "Разрешение уже отозвано.";
 export const PROCESS_TOOLS_NOTE =
-  "«code.run» и «shell.run» не ограничены разрешениями на папки: каждый запуск подтверждается отдельно.";
+  "«shell.run» не ограничен разрешениями на папки: каждый запуск подтверждается отдельно.";
 
 export function grantCountLabel(count: number): string {
   return plural(count, "папка", "папки", "папок");

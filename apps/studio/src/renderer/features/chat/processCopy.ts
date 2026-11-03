@@ -1,6 +1,5 @@
 import { ProcessResultDto, type CodeLanguage, type Json, type ProcessPlanDto } from "@zvs/shared";
 
-export const PROCESS_TOOL_CODE = "code.run";
 export const PROCESS_TOOL_SHELL = "shell.run";
 
 export const LANGUAGE_LABEL: Record<CodeLanguage, string> = {

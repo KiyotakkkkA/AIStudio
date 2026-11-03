@@ -412,6 +412,10 @@ impl ToolRegistry {
             .database
             .with_connection(|connection| Ok(Repositories::new(connection).tools.list()?))?;
         rows.iter()
+            .filter(|row| {
+                row.source != ToolSource::Builtin
+                    || !super::kernel_tools::RETIRED_BUILTINS.contains(&row.key.as_str())
+            })
             .filter(|row| include_unavailable || row.available)
             .filter(|row| filter.source.is_none_or(|source| row.source == source))
             .filter(|row| filter.tier.is_none_or(|tier| row.tier == tier))

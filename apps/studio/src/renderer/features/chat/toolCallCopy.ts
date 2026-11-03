@@ -7,7 +7,6 @@ import {
   mdiBookOpenPageVariantOutline,
   mdiBrain,
   mdiCameraOutline,
-  mdiCodeBraces,
   mdiCogPlayOutline,
   mdiStopCircleOutline,
   mdiCommentQuestionOutline,
@@ -93,7 +92,6 @@ export const TOOL_PRESENTATION: Readonly<Record<string, ToolPresentation>> = {
   "fs.read": { title: "Чтение файлов", icon: mdiFileDocumentMultipleOutline, category: "files" },
   "fs.search": { title: "Поиск по файлам", icon: mdiFileFind, category: "files" },
   "fs.apply": { title: "Изменение файлов", icon: mdiFileDocumentEditOutline, category: "files" },
-  "code.run": { title: "Выполнение программы", icon: mdiCodeBraces, category: "process" },
   "shell.run": {
     title: "Выполнить команду в терминале",
     icon: mdiConsoleLine,

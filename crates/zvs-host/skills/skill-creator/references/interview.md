@@ -12,7 +12,7 @@ Ask before writing. A skill built on a guess triggers on the wrong requests and 
 
 ## Questions that matter only sometimes
 
-- **Tools.** Which tools the skill needs: files (`fs.read`, `fs.apply`), knowledge stores (`knowledge.search`), commands (`shell.run`, `code.run`), connector tools. Use only keys the user names or that are offered in this conversation.
+- **Tools.** Which tools the skill needs: files (`fs.read`, `fs.apply`), knowledge stores (`knowledge.search`), commands (`shell.run`), connector tools. Use only keys the user names or that are offered in this conversation.
 - **Scripts.** Whether a step is mechanical enough to be a script: parsing a format, converting files, computing numbers, rendering a document. Deterministic work belongs in a script; judgement belongs in the instructions.
 - **Model.** Whether the skill needs a particular model. Usually it does not; the user can set one later on the «Навыки» page.
 - **Reference material.** Examples, templates, glossaries or specifications the user can paste or point to. These go into `references/` or `assets/`.

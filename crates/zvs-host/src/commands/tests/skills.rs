@@ -6,6 +6,7 @@ use crate::files::VirtualRoots;
 use crate::files::roots::SKILL_READ_ONLY;
 use crate::skills::library::{SKILL_FILE_NOT_FOUND, SKILL_SCRIPT_OUTSIDE};
 use crate::skills::script::{SCRIPT_NO_TOOLCHAIN, SCRIPT_UNSUPPORTED};
+use crate::toolchain::service::SETTINGS_HINT;
 
 const KEY: &str = "extract";
 
@@ -424,4 +425,33 @@ async fn a_background_script_reports_its_files_when_it_ends() {
         ["result.csv"]
     );
     host.services.shells.close_owner(&conversation).await;
+}
+
+#[tokio::test]
+async fn a_cached_script_runs_through_shell_without_a_bound_workspace() {
+    let host = Host::new();
+    let store = host.store();
+    let owner = host.conversation().to_string();
+    let roots = VirtualRoots::new(Some(store.clone()), None);
+    let folder = roots.chat_folder(&owner).expect("the cache folder");
+    std::fs::create_dir_all(folder.join("_work")).expect("creates script folder");
+    std::fs::write(folder.join("_work/main.mjs"), "console.log(1)").expect("saves a script");
+    let node = host.script_node(None, Some(store), ProcessLimits::default());
+    let output = node
+        .run(
+            &context(CancellationToken::new()),
+            ShellRunInput {
+                argv: stub_argv(),
+                cwd: Some("chat:".to_owned()),
+                stdin: Some("script".to_owned()),
+                conversation_id: owner,
+                ..shell(&[])
+            },
+        )
+        .await
+        .expect("runs without a workspace grant");
+    assert_eq!(output.exit_code, Some(0));
+    assert!(output.stdout.contains("console.log(1)"));
+    assert!(same_path(&output.process.cwd, &folder));
+    assert!(output.process.language.is_none());
 }

@@ -22,7 +22,6 @@ Allow, for example:
 - build, test, lint, format, type-check, dependency listing and dry-run commands, and inspection commands such as git status, docker ps, docker inspect, docker logs or pip list;
 - creating or overwriting files the agent is clearly producing inside the project or the working folder: generated code, reports, data exports;
 - a script or shell string that starts other programs, when every program it starts would itself be allowed under these rules.
-code.run executes in a new, empty scratch folder created for that one call; files it writes there are throwaway.
 
 Ask when the action:
 - deletes or overwrites user data that is not regenerated: documents, photos, databases, archives, or anything outside the project;

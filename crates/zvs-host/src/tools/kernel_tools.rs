@@ -12,7 +12,7 @@ use crate::browser::nodes::{
     CLICK_DESCRIPTION, DOWNLOAD_DESCRIPTION, FIND_DESCRIPTION, NAVIGATE_DESCRIPTION,
     READ_PAGE_DESCRIPTION, SCREENSHOT_DESCRIPTION, SUBMIT_DESCRIPTION, TYPE_DESCRIPTION,
 };
-use crate::commands::nodes::{CODE_DESCRIPTION, CODE_RUN, SHELL_DESCRIPTION, SHELL_RUN};
+use crate::commands::nodes::{SHELL_DESCRIPTION, SHELL_RUN};
 use crate::files::nodes::{
     APPLY_DESCRIPTION as FS_APPLY_DESCRIPTION, FS_APPLY, FS_LIST, FS_READ, FS_SEARCH,
     LIST_DESCRIPTION as FS_LIST_DESCRIPTION, READ_DESCRIPTION as FS_READ_DESCRIPTION,
@@ -27,6 +27,7 @@ use crate::skills::nodes::{
 };
 
 pub const NOT_TOOLS: &[&str] = &["llm.generate", "vector.index", "job.run", "download.fetch"];
+pub(super) const RETIRED_BUILTINS: &[&str] = &["code.run"];
 const ASK_BY_DEFAULT: &[&str] = &[FS_APPLY];
 const AUTO_BY_DEFAULT: &[&str] = &[
     AGENT_DELEGATE,
@@ -125,14 +126,6 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
         },
     ),
     (
-        CODE_RUN,
-        BuiltinToolMeta {
-            display_name: "Выполнение программы",
-            description: CODE_DESCRIPTION,
-            destructive: true,
-        },
-    ),
-    (
         SHELL_RUN,
         BuiltinToolMeta {
             display_name: "Выполнение команды",
@@ -225,6 +218,7 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
 pub const GRAPH_ONLY_TOOLS: &[&str] = &["vector.search", "vector.list"];
 
 const RENAMED_TOOLS: &[(&str, &[&str])] = &[
+    ("code.run", &[]),
     ("chat.file", &[FS_READ, FS_LIST, FS_APPLY]),
     ("skill.read", &[FS_READ]),
     ("skill.script", &[SHELL_RUN]),
@@ -269,6 +263,10 @@ pub fn register_kernel_tools(
     nodes: &NodeRegistry,
     tools: &ToolRegistry,
 ) -> Result<Vec<ToolDto>, AppError> {
+    // Withdraw the retired builtin from existing installations as well.
+    for key in RETIRED_BUILTINS {
+        tools.deregister(key)?;
+    }
     let mut registered: BTreeMap<String, ToolDto> = BTreeMap::new();
     let mut order: Vec<String> = Vec::new();
     for node in nodes.list() {

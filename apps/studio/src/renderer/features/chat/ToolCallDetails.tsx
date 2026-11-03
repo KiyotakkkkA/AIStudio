@@ -333,25 +333,6 @@ function ViewBody({ view }: { readonly view: ToolCallView }) {
           )}
         </div>
       );
-    case "program":
-      return (
-        <div className="space-y-2">
-          <Tags>
-            {view.language === "" ? null : (
-              <span className="rounded-pill bg-main-100 px-1.5 py-0.5 text-[11px] font-medium text-main-900">
-                {view.language}
-              </span>
-            )}
-            {view.packages.map((name) => (
-              <Tag key={name} mono>
-                {name}
-              </Tag>
-            ))}
-            {view.args.length === 0 ? null : <Tag mono>{commandLine(view.args)}</Tag>}
-          </Tags>
-          <CodeBlock source={view.source} />
-        </div>
-      );
     case "goal":
       return (
         <div className="space-y-2">

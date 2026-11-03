@@ -42,10 +42,23 @@ fn the_full_chat_tool_catalogue_is_measured() {
         offered.len()
     );
     let names: Vec<&str> = offered.iter().map(|tool| tool.key.as_str()).collect();
+    let shell = offered
+        .iter()
+        .find(|tool| tool.key == "shell.run")
+        .expect("shell tool");
+    assert_eq!(
+        crate::services::chat::process_tools_section(&offered),
+        format!(
+            "{}: {}\n{}",
+            crate::services::chat::PROCESS_TOOLS_HEADING,
+            shell.name,
+            crate::services::chat::PROCESS_TOOLS_RULES
+        )
+    );
+    assert!(crate::services::chat::process_tools_section(&[]).is_empty());
     assert_eq!(
         names,
         [
-            "code.run",
             "fs.apply",
             "fs.list",
             "fs.read",
@@ -62,4 +75,41 @@ fn the_full_chat_tool_catalogue_is_measured() {
         ]
     );
     assert!(size < 16_000, "{size}");
+}
+
+#[test]
+fn retired_code_tool_is_withdrawn_on_registration() {
+    let host = test_services(SystemService::new(
+        Arc::new(FakeClock::default()),
+        EventBus::default(),
+        Duration::ZERO,
+    ));
+    host.tools
+        .register(&crate::tools::ToolDescriptor::new(
+            "code.run",
+            ToolSource::Builtin,
+        ))
+        .expect("seeds an old installation");
+    crate::tools::register_kernel_tools(&host.nodes, &host.tools).expect("registers current tools");
+    assert!(
+        !host
+            .tools
+            .find_by_key("code.run")
+            .expect("looks up")
+            .expect("keeps history")
+            .available
+    );
+    assert!(
+        !host
+            .tools
+            .list(&ToolListFilter::default())
+            .expect("lists")
+            .iter()
+            .any(|tool| tool.key == "code.run")
+    );
+    assert!(
+        !crate::tools::current_tool_keys(&["code.run".to_owned(), "shell.run".to_owned()])
+            .contains(&"code.run".to_owned())
+    );
+    assert!(host.nodes.get("code.run").is_err());
 }

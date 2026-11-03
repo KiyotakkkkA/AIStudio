@@ -23,7 +23,7 @@ use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, ToolCall, ToolS
 use crate::files::FILE_TOOLS;
 use crate::kernel::nodes::PROVIDERS_UNAVAILABLE;
 use crate::kernel::{NodeDef, PermissionRequirement, StepContext, ToolStepRequest};
-use crate::services::chat::{FILE_TOOLS_RULES, GenerateChatNode};
+use crate::services::chat::{FILE_TOOLS_RULES, GenerateChatNode, PROCESS_TOOLS_RULES};
 use crate::services::chat_tools::{
     OfferedTool, TOOL_RESULT_MAX_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result,
     parse_tool_arguments, tool_result_text, tool_specs, unoffered_text,
@@ -244,6 +244,12 @@ fn system_prompt(offered: &[OfferedTool], mode: AgenticPermissionMode) -> String
         .any(|tool| FILE_TOOLS.contains(&tool.key.as_str()))
     {
         parts.push(FILE_TOOLS_RULES);
+    }
+    if offered
+        .iter()
+        .any(|tool| PROCESS_TOOLS.contains(&tool.key.as_str()))
+    {
+        parts.push(PROCESS_TOOLS_RULES);
     }
     parts.join("\n\n")
 }

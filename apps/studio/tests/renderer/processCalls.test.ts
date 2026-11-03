@@ -100,12 +100,6 @@ test("the call summary shows the command before and after the run", () => {
     meta: result({}),
   } as unknown as ChatToolCallDto;
   expect(toolCallSummary(done)).toBe('npm run "test unit"');
-  const code = {
-    key: "code.run",
-    arguments: { language: "powershell", source: "Get-Date" },
-    meta: null,
-  } as unknown as ChatToolCallDto;
-  expect(toolCallSummary(code)).toBe("PowerShell");
 });
 
 test("a process approval keeps its plan for the tool card", async () => {

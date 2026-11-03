@@ -853,7 +853,7 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   through `/`: commands, then one entry per plugin kind with an enabled account (`/mail`,
   `/github`, `/gitlab`, `/telegram`), and a kind with several accounts opens a sub-list of them.
   The chips clear after each message. Scenarios and agentic sessions are unaffected. Pages can carry prompt injection, so the browser is never reachable by
-  search. Core tools (`fs.*`, `code.run`, `shell.run`, `skill.load`) always go out with their
+  search. Core tools (`fs.*`, `shell.run`, `skill.load`) always go out with their
   schemas. When the other tools' schemas exceed `DEFERRED_TOKENS_MAX` (2000 tokens), those
   tools are **deferred**: the system prompt lists each by name and first line, and
   `tool.search` (`names` or `query`, at most five matches, refunded against the call budget)
@@ -967,19 +967,16 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   everything already written if any write fails. NTFS has no cross-file transaction: this is
   all-or-nothing by rollback, not atomic. Line endings and a BOM are kept.
 - **Process tools** (`zvs-host/src/commands/`, TASK_036_EXTRA_3) are offered alongside the
-  file tools: `code.run` (Python through `uv run` with PEP 723 dependencies in uv's app cache,
-  JavaScript through `node` as an ES module with `packages[]` installed into the run's scratch
-  folder by `npm install --ignore-scripts --no-audit --no-fund`, PowerShell through
-  `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File`) and `shell.run`
+  file tools: `shell.run`
   (an argument vector, never a shell string; `argv[0]` resolved through the connected toolchain
   folders first, then `PATH`; cwd is the working folder or a `cwd` that goes through
   `ensure_access`, and with neither the call is refused; `argv[0] = skill:<key>/scripts/<file>`
   runs a skill script through uv (`.py`) or Node.js (`.js`, `.mjs`, `.cjs`) with
-  `ZVS_SKILL_DIR`, in `chat:` by default). Both are destructive with a minimum
-  tier of `ask` through `permission_for`, so `auto` still asks and `off` denies; each raises one
-  `kind: "process"` approval showing the program, the cwd, the full source or argv and the
-  package list. Folder grants do **not** limit them: the process runs with the user's rights
-  and there is no sandbox. `code.run` and `shell.run` share one runner
+  `ZVS_SKILL_DIR`, in `chat:` by default). The tool is destructive with a minimum
+  tier of `ask` through `permission_for`, so `auto` still asks and `off` denies; it raises one
+  `kind: "process"` approval showing the program, the cwd and argv.
+  Folder grants do **not** limit the process: it runs with the user's rights
+  and there is no sandbox. `shell.run` and skill scripts share one runner
   (`toolchain/process.rs`): scratch folders, a timeout, kill-tree on cancel, capped streams and
   fenced output.
 - **Background processes** (`zvs-host/src/background/`, TASK_048_EXTRA_2, 2026-11-01).
@@ -1001,16 +998,17 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   next turn's system prompt, once, with their last 20 lines fenced. Removing the dialog or the
   session, and quitting the app (`ShutdownStage::Stop`), kills every process tree; nothing is
   resumed after a restart. The «Терминал» dock is unchanged: it stays the person's own shell.
-  **Code and scripts** (TASK_048_EXTRA_5, 2026-11-01). `code.run` takes `background: true` as
-  well, with the same approval, policy row and judge input (`ProcessPlanDto.background` is
-  allowed together with `language`). Its npm install still runs in the foreground; only the
-  program goes to the background, and its scratch folder is pinned (`pin_scratch`) so that
-  `prepare_scratch` never prunes it while the process runs; the pin is released when the
-  process ends or is killed. A skill script can go to the background too: the files it created
+  **Code and scripts** (2026-11-03). Model-written code is saved with `fs.apply` in
+  `chat:_work/`, the conversation cache folder, and executed with `shell.run` and
+  `cwd: "chat:"` using a relative script path. Prefer Node.js and uv installed through
+  app environments; global runtimes and other executables are allowed. The dedicated
+  `code.run` tool, source writer and package installer have been removed. A skill script can
+  go to the background too: the files it created
   are collected when it ends, by the same rules as a foreground script, and reported with its
   result. Every background start carries an optional exit hook (`ShellStart::finishing`) that
   runs once, after the output is drained.
-  **Waking** (TASK_048_EXTRA_5). All three background starts take `notify: true`; it needs
+  **Waking** (TASK_048_EXTRA_5). `shell.run` and skill script background starts take
+  `notify: true`; it needs
   `background` and `shell.run` refuses it for a server-like argument vector (`server_like`:
   dev servers, watchers, `npm start`, `run dev`, `http.server` and the like). A notified process
   is left out of the passive next-turn note. When it ends, `ChatService` waits
@@ -1124,7 +1122,7 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   | tier `ask`, not destructive | asks | runs | runs | runs |
   | `fs.apply` delete, overwrite, move onto a path | asks | asks | rules → judge → asks | runs |
   | `browser.submit`, `browser.download` | asks | asks | asks | runs |
-  | `shell.run`, `code.run` | asks | asks | rules → judge → asks | runs |
+  | `shell.run` | asks | asks | rules → judge → asks | runs |
   | tier `off`, disabled tool, forbidden folder, outside a grant or the session workspace, credential and payment fields | refused | refused | refused | refused |
 
   The last row is the floor: no mode reaches it. `always-ask` is today's behaviour. Destructive
@@ -1168,7 +1166,8 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   host cannot see asks in every mode but `no-restrictions`. Rule packs are JSON
   (`{ id, allows, rules[] }`, each rule `files: { paths, operations }`, `process: { argv, cwd }`
   or `code: { languages, avoid }`, `**` matching any run of arguments, `{a,b}` alternation,
-  case-insensitive). A `code` rule matches a `code.run` script in one of its languages whose
+  case-insensitive). A legacy `code` rule matches a source-bearing process plan whose
+  language is listed and whose
   source matches none of the `avoid` regexes. Since 2026-10-29 the vendor pack ends in two
   catch-alls so routine work stops asking: `allow-unflagged` allows any command no `ask` or
   `deny` rule names (vendor `ask` outranks vendor `allow`), and `allow-plain-scripts` allows a
