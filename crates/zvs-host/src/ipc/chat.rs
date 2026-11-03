@@ -170,6 +170,17 @@ pub fn register(server: &mut IpcServer) {
             },
         )
         .handle(
+            "chat.images.pick",
+            |services: Arc<Services>, input: ConversationRef| async move {
+                services.chat.get(&input.id)?;
+                let picker = services.picker.clone().ok_or_else(|| AppError::new(AppErrorCode::Conflict, PICKER_UNAVAILABLE))?;
+                let paths = picker.pick_images().await?;
+                let loader = crate::images::ImageLoader::new(services.artifacts.clone());
+                tokio::task::spawn_blocking(move || loader.import(&input.id.to_string(), &paths))
+                    .await.map_err(|_| AppError::new(AppErrorCode::Unknown, crate::images::IMAGE_MISSING))?
+            },
+        )
+        .handle(
             "chat.send",
             |services: Arc<Services>, input: ChatSendInput| async move { services.chat.send(&input) },
         )

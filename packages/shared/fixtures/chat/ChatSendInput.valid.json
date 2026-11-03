@@ -71,5 +71,35 @@
       "commands": ["browser-use", "goal"],
       "plugins": ["0199aa11-1111-7111-8111-0000000000a1"]
     }
+  },
+  {
+    "name": "image only",
+    "value": {
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "text": "",
+      "images": [
+        {
+          "id": "b222dc0d-1910-427d-b25e-291a8570e556",
+          "name": "image.png",
+          "mimeType": "image/png",
+          "sizeBytes": 68
+        }
+      ]
+    }
+  },
+  {
+    "name": "text and image",
+    "value": {
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "text": "Describe",
+      "images": [
+        {
+          "id": "b222dc0d-1910-427d-b25e-291a8570e556",
+          "name": "image.png",
+          "mimeType": "image/png",
+          "sizeBytes": 68
+        }
+      ]
+    }
   }
 ]

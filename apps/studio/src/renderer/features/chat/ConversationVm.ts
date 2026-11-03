@@ -1,6 +1,8 @@
 import { makeAutoObservable } from "mobx";
 import {
   CHAT_SELECTIONS_MAX,
+  IMAGES_MAX,
+  type ImageAttachmentDto,
   type ChatCommand,
   type DocumentSelectionDto,
   type IntegrationId,
@@ -13,6 +15,7 @@ import {
 
 export default class ConversationVm {
   text = "";
+  images: ImageAttachmentDto[] = [];
   providerId: ProviderId | null = null;
   modelId = "";
   temperature = 0.7;
@@ -30,6 +33,15 @@ export default class ConversationVm {
     makeAutoObservable(this, {}, { autoBind: true });
   }
 
+  setImages(images: readonly ImageAttachmentDto[]) {
+    this.images = images.slice(0, IMAGES_MAX);
+  }
+  removeImage(id: string) {
+    this.images = this.images.filter((image) => image.id !== id);
+  }
+  clearImages() {
+    this.images = [];
+  }
   setText(value: string) {
     this.text = value;
   }
@@ -89,15 +101,17 @@ export default class ConversationVm {
     this.plugins = this.plugins.filter((plugin) => plugin !== value);
   }
   get hasAttachments() {
-    return this.commands.length > 0 || this.plugins.length > 0;
+    return this.images.length > 0 || this.commands.length > 0 || this.plugins.length > 0;
   }
   removeLastAttachment() {
-    if (this.plugins.length > 0) this.plugins = this.plugins.slice(0, -1);
+    if (this.images.length > 0) this.images = this.images.slice(0, -1);
+    else if (this.plugins.length > 0) this.plugins = this.plugins.slice(0, -1);
     else this.commands = this.commands.slice(0, -1);
   }
   clearAttachments() {
     this.commands = [];
     this.plugins = [];
+    this.images = [];
   }
   selectProvider(provider: ProviderDto) {
     this.providerId = provider.id;

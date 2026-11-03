@@ -5,6 +5,7 @@ use serde_json::{Number, Value};
 
 #[derive(Deserialize)]
 struct Capabilities {
+    vision: Option<bool>,
     think: Option<bool>,
     reasoning_effort: Option<bool>,
 }
@@ -53,6 +54,7 @@ pub struct ZaiModel {
     pub context_window: Option<i64>,
     pub max_output: Option<i64>,
     pub thinking: bool,
+    pub vision: bool,
     pub reasoning_efforts: Vec<String>,
     pub hidden: bool,
 }
@@ -127,6 +129,10 @@ fn to_model(id: String, entry: &ModelEntry) -> ZaiModel {
         .or_else(|| text(info.and_then(|info| info.name.as_deref())))
         .unwrap_or_else(|| id.clone());
     ZaiModel {
+        vision: meta
+            .and_then(|meta| meta.capabilities.as_ref())
+            .and_then(|capabilities| capabilities.vision)
+            .unwrap_or(false),
         context_window: known_context_window(&id, &display_name),
         display_name,
         max_output: positive(

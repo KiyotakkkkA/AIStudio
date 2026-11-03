@@ -746,6 +746,10 @@ const TABLE: &[(&str, Check)] = &[
         "chat/ConversationDto",
         round_trip::<zvs_contract::ConversationDto>,
     ),
+    (
+        "images/ImageAttachmentDto",
+        round_trip::<zvs_contract::ImageAttachmentDto>,
+    ),
     ("chat/MessageDto", round_trip::<zvs_contract::MessageDto>),
     (
         "chat/ConversationDetailDto",

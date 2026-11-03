@@ -9,6 +9,10 @@ pub const SAVE_DIALOG_UNAVAILABLE: &str = "Окно сохранения фай�
 pub trait PickerPort: Send + Sync {
     async fn pick(&self, kind: VectorSourceKind) -> Result<Vec<String>, AppError>;
 
+    async fn pick_images(&self) -> Result<Vec<String>, AppError> {
+        self.pick(VectorSourceKind::File).await
+    }
+
     async fn save_as(&self, _suggested_name: &str) -> Result<Option<String>, AppError> {
         Err(AppError::new(
             AppErrorCode::NotImplemented,

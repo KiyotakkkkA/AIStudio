@@ -143,6 +143,7 @@ mod tests {
                 "chat.evaluate",
                 "chat.goal.continue",
                 "chat.goal.stop",
+                "chat.images.pick",
                 "chat.messages.pin",
                 "chat.pickFolder",
                 "chat.queue.add",

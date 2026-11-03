@@ -42,6 +42,7 @@ impl<'de> Deserialize<'de> for Flag {
 
 #[derive(Deserialize)]
 struct Flags {
+    vision: Option<Flag>,
     thinking: Option<Flag>,
 }
 
@@ -86,6 +87,7 @@ pub struct QwenModel {
     /// Whether turns on this model run in `Thinking` mode rather than `Fast`.
     pub thinking: bool,
     pub auto_thinking: bool,
+    pub vision: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -228,6 +230,10 @@ fn to_model(id: String, entry: &ModelEntry) -> Result<QwenModel, ()> {
         });
     let thinking = enabled(thinking);
     Ok(QwenModel {
+        vision: enabled(
+            meta.and_then(|meta| meta.capabilities.as_ref())
+                .and_then(|flags| flags.vision.as_ref()),
+        ),
         auto_thinking: thinking && enabled(meta.and_then(|meta| meta.auto_thinking.as_ref())),
         display_name: text(entry.name.as_deref())
             .or_else(|| text(entry.info.as_ref().and_then(|info| info.name.as_deref())))

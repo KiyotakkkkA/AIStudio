@@ -130,3 +130,14 @@ using its fetch context does not guarantee acceptance by Qwen: deferred vendor i
 interactive verification, account limits, and changes to the private API still require live
 validation. If verification is requested, open Qwen in the app browser and complete it manually
 in this shared profile, then retry. No challenge tokens or browser fingerprints are fabricated.
+
+## Image upload transport (2026-11-03)
+
+A host request may carry an `UploadFile` alongside the existing string body. The internal
+`start.file` command supplies its name, MIME and base64 bytes to the trusted gateway page.
+The page decodes them into a Blob and sends FormData with the `file` field, leaving the
+Content-Type boundary to the browser. Both fetch and XHR accept that body. Session bearers,
+refresh, cancellation and response routing use the existing mechanisms; no file bytes or
+vendor credentials enter the renderer. Z.ai uses multipart uploads; Qwen uses the gateway
+for its upload grant and the host for its temporary-authorized OSS PUT. See the provider
+READMEs for reference dates and pending live verification.

@@ -59,6 +59,7 @@ as malformed. Only these fields are used:
 | `name`, then `info.name`                  | `display_name`                         |
 | `info.is_active == false`                 | row dropped                            |
 | `info.params.max_tokens`                  | `max_output`                           |
+| `info.meta.capabilities.vision`           | `vision`                               |
 | `info.meta.capabilities.think`            | `thinking`                             |
 | `info.meta.capabilities.reasoning_effort` | `reasoning_efforts` offered at all     |
 | `info.meta.info.thinking_effort_level[]`  | `reasoning_efforts` (`low/high/max`)   |
@@ -186,7 +187,7 @@ last one is kept. `done: true` on any frame also means `Finished`.
 
 The host maps `auth` to a session expiry, `captcha` to a browser verification, and the rest to
 «Вендор прервал генерацию» with `vendorCode`. A stream that ends without `Finished` is a
-truncated turn. Web search, images and tool calls in the vendor's format are not decoded.
+truncated turn. Web search, generated images and tool calls in the vendor's format are not decoded.
 
 ## Chats in the host
 
@@ -203,6 +204,33 @@ default to a 600-second timeout (`DEFAULT_TIMEOUT_SECONDS`).
 
 `EXCLUDED_POLICY_CHECK_TOOLS_NAMES` is empty: no Z.ai call is left to the vendor. See the
 `zvs-qwen-web` README for what the list means.
+
+## Image input (reference review 2026-11-03; live verification pending)
+
+`images.rs` builds file entries and multimodal message parts without I/O. This extension
+was reviewed against [GLM-Free-API vision.go](https://github.com/izaart95-jpg/GLM-Free-API/blob/main/internal/zbridge/vision.go)
+on 2026-11-03. `UPLOAD_REFERENCE_DATE` records the review; `UPLOAD_LIVE_VERIFIED = false`
+marks it as reference-derived, not a new live observation. Existing live observation dates
+above remain unchanged. The user approved this workflow because browser control was
+unavailable in the implementation session.
+
+The host uses the shared [ImageLoader](../zvs-host/src/images/README.md) to load validated
+pixels. It posts them to `/api/v1/files/` as multipart form data, field `file`, through the
+signed-in browser gateway. FormData supplies the boundary; credentials remain in the page.
+Uploads do not request completion captchas. An upload must return a usable file id before
+any completion is sent.
+
+Each owning message keeps its text and gains an `image_url` part whose URL is the uploaded
+file id. A top-level `files` array carries the complete uploaded file entry, including
+`ref_user_msg_id`. The signature still covers the original last-user text. Text-only bodies
+are unchanged. Failed or malformed uploads abort instead of continuing without the image.
+Discovery adds `ModelCapability::Vision` only for `info.meta.capabilities.vision == true`;
+this is independent of the adapter's image-generation capability, which remains false.
+
+Live verification remains required for the current multipart response, message/file binding
+on initial and continued chats, image-only messages, and actual model understanding. The host
+fixture is synthetic; no live capture is claimed. Tests cover multipart pixels, file-id parts,
+unchanged signature text, and failure before completion.
 
 ## Tests
 

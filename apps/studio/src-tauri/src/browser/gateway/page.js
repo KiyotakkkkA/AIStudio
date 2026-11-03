@@ -336,6 +336,14 @@ export default function gateway(command) {
     });
   };
   const prepareBody = async () => {
+    if (object(command.file) !== null) {
+      const file = command.file;
+      const binary = globalThis.atob(file.data);
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      const form = new globalThis.FormData();
+      form.append("file", new globalThis.Blob([bytes], { type: file.mime_type }), file.name);
+      return form;
+    }
     const captcha = object(command.captcha);
     if (captcha === null || typeof command.body !== "string") return command.body;
     let param;
@@ -413,7 +421,7 @@ export default function gateway(command) {
       redirect: "follow",
       signal: controller.signal,
     };
-    if (typeof body === "string") init.body = body;
+    if (body !== null && body !== undefined) init.body = body;
     if (typeof command.referrer === "string") init.referrer = command.referrer;
     const response = await globalThis.fetch(url, init);
     const received = [];
@@ -468,7 +476,7 @@ export default function gateway(command) {
       xhr.ontimeout = xhr.onerror;
       xhr.onabort = () =>
         reject(new globalThis.DOMException("The request was aborted", "AbortError"));
-      xhr.send(typeof body === "string" ? body : null);
+      xhr.send(body ?? null);
     });
 
   void (async () => {

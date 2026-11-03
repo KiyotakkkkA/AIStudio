@@ -15,6 +15,7 @@ import {
 } from "@zvs/shared";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
+import { VISION_UNSUPPORTED } from "../../src/renderer/features/chat/imageCopy.ts";
 import ChatStore, { SELECTIONS_FULL } from "../../src/renderer/features/chat/ChatStore.ts";
 import { shouldPinToBottom } from "../../src/renderer/features/chat/scroll.ts";
 import { ADAPTERS, MODEL, model, provider } from "./providerFixtures.ts";
@@ -654,5 +655,84 @@ test("the last opened conversation is remembered and reopened on the next mount"
   await stale.mount();
   expect(stale.active).toBeNull();
   stale.dispose();
+  events.dispose();
+});
+
+const imageAttachment = {
+  id: "b222dc0d-1910-427d-b25e-291a8570e556",
+  name: "image.png",
+  mimeType: "image/png" as const,
+  sizeBytes: 68,
+};
+
+test.each(["qwen-web", "zai-web"] as const)(
+  "%s loads and sends image-only messages",
+  async (adapter) => {
+    const { store, bridge, events } = setup();
+    const vision = provider({ adapter, authMode: "account" });
+    store.providers = [vision];
+    store.composer.selectProvider(vision);
+    store.active = { ...structuredClone(conversation), providerId: vision.id };
+    bridge.handle("chat.images.pick", () => [imageAttachment]);
+    let sent: unknown;
+    bridge.handle("chat.send", (input) => {
+      sent = input;
+      return handle;
+    });
+    await store.pickImages();
+    expect(store.composer.images).toEqual([imageAttachment]);
+    expect(store.canSend).toBe(true);
+    await store.send();
+    expect(sent).toMatchObject({ text: "", images: [imageAttachment] });
+    expect(store.composer.images).toEqual([]);
+    store.dispose();
+    events.dispose();
+  },
+);
+
+test("image attachments block unsupported providers and cannot enter the text queue", async () => {
+  const { store, events } = setup();
+  store.providers = [saved];
+  store.composer.selectProvider(saved);
+  store.composer.setImages([imageAttachment]);
+  store.composer.setText("Describe");
+  expect(store.supportsImages).toBe(false);
+  expect(store.canSend).toBe(false);
+  store.active = structuredClone(conversation);
+  store.run = handle;
+  expect(store.canQueue).toBe(false);
+  await store.send();
+  expect(store.error).toBe(VISION_UNSUPPORTED);
+  store.dispose();
+  events.dispose();
+});
+
+test("an image picker result is discarded after switching conversations", async () => {
+  const { store, bridge, events } = setup();
+  const vision = provider({ adapter: "qwen-web", authMode: "account" });
+  store.providers = [vision];
+  store.composer.selectProvider(vision);
+  store.active = { ...structuredClone(conversation), providerId: vision.id };
+  let finish: (images: (typeof imageAttachment)[]) => void = () => undefined;
+  let markStarted: () => void = () => undefined;
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
+  bridge.handle(
+    "chat.images.pick",
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+        markStarted();
+      }),
+  );
+  const picking = store.pickImages();
+  await started;
+  store.newChat();
+  finish([imageAttachment]);
+  await picking;
+  expect(store.composer.images).toEqual([]);
+  expect(store.pickingImages).toBe(false);
+  store.dispose();
   events.dispose();
 });

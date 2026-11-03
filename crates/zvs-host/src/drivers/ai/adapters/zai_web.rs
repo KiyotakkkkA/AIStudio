@@ -60,6 +60,9 @@ const FAMILY: AdapterFamily = AdapterFamily::ZaiWeb;
 fn to_discovered_model(model: ZaiModel) -> DiscoveredModel {
     let context_window = model.context_window.unwrap_or(ZAI_DEFAULT_CONTEXT_WINDOW);
     let mut capabilities = vec![ModelCapability::Streaming];
+    if model.vision {
+        capabilities.push(ModelCapability::Vision);
+    }
     if model.thinking {
         capabilities.push(ModelCapability::Reasoning);
     }
@@ -211,6 +214,9 @@ fn history_key(model: &str, system: Option<&str>, messages: &[ChatMessage]) -> u
     for message in messages {
         message.role.hash(&mut hasher);
         message.content.hash(&mut hasher);
+        for image in &message.images {
+            image.attachment.hash(&mut hasher);
+        }
         message.tool_call_id.hash(&mut hasher);
         format!("{:?}", message.tool_calls).hash(&mut hasher);
     }
@@ -457,6 +463,52 @@ impl Shared {
         })
     }
 
+    async fn upload_images(
+        &self,
+        request: &GenerateRequest,
+        message_id: &str,
+        offset: usize,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<(usize, Value)>, AppError> {
+        crate::images::validate_inputs(&request.messages)?;
+        let mut files = Vec::new();
+        for (index, message) in request.messages.iter().enumerate() {
+            for image in &message.images {
+                if image.bytes.is_empty() || image.bytes.len() as u64 != image.attachment.size_bytes
+                {
+                    return Err(crate::drivers::ai::transport::upload::upload_failed());
+                }
+                let attachment = &image.attachment;
+                let spec = Self::referer(
+                    self.web_request(RequestSpec::upload(
+                        zvs_zai_web::images::UPLOAD_PATH,
+                        crate::drivers::ai::transport::upload::UploadFile {
+                            name: attachment.name.clone(),
+                            mime_type: attachment.mime_type.clone(),
+                            bytes: image.bytes.clone(),
+                        },
+                    )),
+                    "/",
+                );
+                let response = self.core.request(&spec, cancel).await?;
+                let payload = self
+                    .core
+                    .decode(&response, zvs_zai_web::images::UPLOAD_PATH)?;
+                let file = zvs_zai_web::images::file_entry(
+                    &payload,
+                    &attachment.name,
+                    attachment.size_bytes,
+                    &(self.core.new_id)(),
+                    message_id,
+                    self.core.clock.now(),
+                )
+                .ok_or_else(crate::drivers::ai::transport::upload::upload_failed)?;
+                files.push((index + offset, file));
+            }
+        }
+        Ok(files)
+    }
+
     async fn open(
         &self,
         request: &GenerateRequest,
@@ -521,7 +573,17 @@ impl Shared {
             timestamp_ms: self.core.clock.now(),
             prompt: turn.signature_prompt(),
         };
-        let mut spec = RequestSpec::post(ZAI_COMPLETIONS_PATH, turn.body())
+        let files = self
+            .upload_images(
+                request,
+                &message_id,
+                dialog.len() - request.messages.len(),
+                cancel,
+            )
+            .await?;
+        let body = zvs_zai_web::images::attach_images(turn.body(), &files)
+            .ok_or_else(crate::drivers::ai::transport::upload::upload_failed)?;
+        let mut spec = RequestSpec::post(ZAI_COMPLETIONS_PATH, body)
             .with_header("x-signature", signed.signature());
         for (key, value) in signed.query("") {
             spec = spec.with_query(key, value);

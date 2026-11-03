@@ -4,6 +4,7 @@
 //! the date of every observation it relies on. It sends nothing itself: the host supplies the
 //! browser session, and that session is what the vendor's own page uses.
 
+pub mod images;
 pub mod models;
 pub mod page;
 pub mod protocol;

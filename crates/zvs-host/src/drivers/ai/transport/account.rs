@@ -215,6 +215,7 @@ impl AccountTransport {
             method: spec.method.as_str().to_owned(),
             headers,
             body,
+            file: spec.file.clone(),
         })
     }
 

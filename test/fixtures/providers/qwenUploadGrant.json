@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "request_id": "fixture-request-id",
+  "data": {
+    "file_id": "fixture-image-id",
+    "file_url": "https://qwen-webui-prod.oss-accelerate.aliyuncs.com/fixture-user/fixture-image-id_image.png?x-oss-signature-version=OSS4-HMAC-SHA256&x-oss-signature=fixture",
+    "file_path": "fixture-user/fixture-image-id_image.png",
+    "bucketname": "qwen-webui-prod",
+    "region": "oss-ap-southeast-1",
+    "endpoint": "oss-accelerate.aliyuncs.com",
+    "access_key_id": "fixture-access-key",
+    "access_key_secret": "fixture-secret-not-a-credential",
+    "security_token": "fixture-temporary-token"
+  }
+}

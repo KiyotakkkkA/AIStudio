@@ -220,7 +220,13 @@ impl ApiTransport {
             .client()
             .request(method, url)
             .headers(self.headers_for(spec, accept)?);
-        if let Some(body) = &spec.body {
+        if let Some(file) = &spec.file {
+            let part = reqwest::multipart::Part::bytes(file.bytes.to_vec())
+                .file_name(file.name.clone())
+                .mime_str(&file.mime_type)
+                .map_err(|_| request_failed())?;
+            request = request.multipart(reqwest::multipart::Form::new().part("file", part));
+        } else if let Some(body) = &spec.body {
             request = request.body(serde_json::to_vec(body).map_err(|_| request_failed())?);
         }
         tokio::select! {

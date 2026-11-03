@@ -14,6 +14,7 @@ pub mod account;
 pub mod api;
 pub mod openai;
 pub mod session;
+pub mod upload;
 
 pub use account::{
     AccountCredentials, AccountTransport, AccountTransportOptions, SharedAccountCredentials,
@@ -52,6 +53,7 @@ pub struct RequestSpec {
     pub headers: Vec<(String, String)>,
     pub body: Option<Value>,
     pub accept: Option<String>,
+    pub file: Option<upload::UploadFile>,
 }
 
 impl RequestSpec {
@@ -63,11 +65,19 @@ impl RequestSpec {
             headers: Vec::new(),
             body: None,
             accept: None,
+            file: None,
         }
     }
 
     pub fn get(path: impl Into<String>) -> Self {
         Self::new(RequestMethod::Get, path)
+    }
+
+    pub fn upload(path: impl Into<String>, file: upload::UploadFile) -> Self {
+        Self {
+            file: Some(file),
+            ..Self::new(RequestMethod::Post, path)
+        }
     }
 
     pub fn post(path: impl Into<String>, body: Value) -> Self {
@@ -122,6 +132,16 @@ pub type ByteStream = BoxStream<'static, Result<Vec<u8>, AppError>>;
 #[async_trait]
 pub trait Transport: Send + Sync {
     fn base_url(&self) -> &str;
+
+    async fn put_object(
+        &self,
+        url: &str,
+        headers: &[(String, String)],
+        bytes: Arc<[u8]>,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        upload::put_object(url, headers, bytes, cancel).await
+    }
 
     async fn oauth_token(&self, _cancel: &CancellationToken) -> Result<String, AppError> {
         Err(crate::drivers::ai::openai::auth_error())

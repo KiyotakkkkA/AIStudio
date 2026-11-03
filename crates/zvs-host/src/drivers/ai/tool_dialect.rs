@@ -249,7 +249,7 @@ pub fn injected_messages(
                 }
                 return ChatMessage::user(injected_result_message(name, &content));
             }
-            ChatMessage::new(message.role, message.content.clone())
+            message.clone()
         })
         .collect()
 }

@@ -658,10 +658,13 @@ pub struct MessageDto {
     )]
     pub event: Option<ChatEventDto>,
     pub created_at: Timestamp,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub images: Vec<crate::ImageAttachmentDto>,
 }
 
 impl Validate for MessageDto {
     fn validate(&self) -> Result<(), AppError> {
+        crate::images::validate_images(&self.images)?;
         if (self.role == MessageRole::Event) != self.event.is_some() {
             return Err(invalid("event", "role"));
         }
@@ -736,6 +739,8 @@ pub struct ChatSendInput {
     pub plugins: Vec<IntegrationId>,
     #[serde(default, skip_serializing_if = "VendorTurnOptions::is_default")]
     pub vendor: VendorTurnOptions,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub images: Vec<crate::ImageAttachmentDto>,
 }
 
 impl ChatSendInput {
@@ -743,6 +748,7 @@ impl ChatSendInput {
         Self {
             conversation_id,
             text: text.into(),
+            images: Vec::new(),
             provider_id: None,
             model_id: None,
             settings: None,
@@ -760,7 +766,12 @@ impl ChatSendInput {
 
 impl Validate for ChatSendInput {
     fn validate(&self) -> Result<(), AppError> {
-        check::trimmed_name("text", &self.text, CHAT_TEXT_MAX)?;
+        crate::images::validate_images(&self.images)?;
+        if self.images.is_empty() {
+            check::trimmed_name("text", &self.text, CHAT_TEXT_MAX)?;
+        } else {
+            check::max_len("text", self.text(), CHAT_TEXT_MAX)?;
+        }
         if let Some(model_id) = &self.model_id {
             check::non_empty("modelId", model_id)?;
         }

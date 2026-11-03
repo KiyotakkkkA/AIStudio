@@ -74,6 +74,8 @@ pub struct GenerateMessage {
     pub tool_call_id: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<GenerateToolCall>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub images: Vec<zvs_contract::ImageAttachmentDto>,
 }
 
 impl GenerateMessage {
@@ -83,11 +85,17 @@ impl GenerateMessage {
             content: content.into(),
             tool_call_id: None,
             tool_calls: Vec::new(),
+            images: Vec::new(),
         }
     }
 
     pub fn from_chat(message: &ChatMessage) -> Self {
         Self {
+            images: message
+                .images
+                .iter()
+                .map(|image| image.attachment.clone())
+                .collect(),
             role: GenerateRole::from_chat(message.role),
             content: message.content.clone(),
             tool_call_id: message.tool_call_id.clone(),
@@ -105,6 +113,11 @@ impl GenerateMessage {
 
     fn into_chat(self) -> ChatMessage {
         ChatMessage {
+            images: self
+                .images
+                .into_iter()
+                .map(crate::images::ImageInput::reference)
+                .collect(),
             role: self.role.chat_role(),
             content: self.content,
             tool_call_id: self.tool_call_id,
@@ -202,6 +215,10 @@ impl Validate for GenerateNodeInput {
         }
         let mut called: HashSet<&str> = HashSet::new();
         for message in &self.messages {
+            zvs_contract::images::validate_images(&message.images)?;
+            if !message.images.is_empty() && message.role != GenerateRole::User {
+                return Err(zvs_contract::validate::invalid("images", "role"));
+            }
             if !message.tool_calls.is_empty() && message.role != GenerateRole::Assistant {
                 return Err(AppError::new(
                     AppErrorCode::ValidationFailed,

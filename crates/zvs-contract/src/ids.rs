@@ -91,7 +91,7 @@ pub fn is_wire_uuid(value: &str) -> bool {
     wire_uuid::parse(value).is_some()
 }
 
-mod wire_uuid {
+pub(crate) mod wire_uuid {
     use serde::de::Error as _;
     use serde::{Deserialize, Deserializer, Serializer};
     use uuid::Uuid;

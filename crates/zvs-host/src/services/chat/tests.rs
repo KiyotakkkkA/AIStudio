@@ -1,3 +1,4 @@
+mod images;
 mod knowledge;
 mod memory;
 mod profile;
@@ -255,6 +256,7 @@ pub(super) struct HarnessOptions {
     pub clock: Option<SharedClock>,
     pub shells: Option<crate::background::BackgroundShells>,
     pub wake_delay: Option<Duration>,
+    pub images: Option<crate::images::ImageLoader>,
 }
 
 impl Default for HarnessOptions {
@@ -276,6 +278,7 @@ impl Default for HarnessOptions {
             clock: None,
             shells: None,
             wake_delay: None,
+            images: None,
         }
     }
 }
@@ -336,6 +339,7 @@ impl Harness {
                 .expect("grants");
         }
         let chat = ChatService::new(ChatServiceOptions {
+            images: options.images,
             tools: options.tools,
             skills: options.skills,
             mcp: options.mcp,

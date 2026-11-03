@@ -46,6 +46,35 @@ impl PickerPort for DialogPicker {
         Ok(paths.into_iter().filter_map(path_text).collect())
     }
 
+    async fn pick_images(&self) -> Result<Vec<String>, AppError> {
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        let mut dialog = self
+            .0
+            .dialog()
+            .file()
+            .add_filter("Изображения", &["png", "jpg", "jpeg", "gif", "webp"]);
+        if let Some(studio) = self.0.get_webview_window("studio") {
+            dialog = dialog.set_parent(&studio);
+        }
+        dialog.pick_files(move |paths| {
+            let _ = sender.send(paths);
+        });
+        let paths = receiver
+            .await
+            .map_err(|_| AppError::new(AppErrorCode::Unknown, zvs_host::images::IMAGE_MISSING))?;
+        paths
+            .unwrap_or_default()
+            .into_iter()
+            .map(|path| {
+                path.into_path()
+                    .map(|path| path.to_string_lossy().into_owned())
+                    .map_err(|_| {
+                        AppError::new(AppErrorCode::Unknown, zvs_host::images::IMAGE_MISSING)
+                    })
+            })
+            .collect()
+    }
+
     async fn save_as(&self, suggested_name: &str) -> Result<Option<String>, AppError> {
         let (sender, receiver) = oneshot::channel::<Option<FilePath>>();
         let mut dialog = self.0.dialog().file().set_file_name(suggested_name);

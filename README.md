@@ -56,3 +56,16 @@ packages/ipc              typed renderer client over the bridge
 ```
 
 `tasks`, `design` and `references` are kept local (see `.gitignore`).
+
+## Image attachments
+
+The composer offers «Загрузить изображение» for Qwen and Z.ai account providers. Attach up to
+five PNG, JPEG, GIF or WebP files, at most 20 MiB each; an image can be sent without text.
+Attachments remain with the conversation after restart and are copied when branching. Other
+providers cannot send a conversation containing image attachments. This is vision input;
+image generation is a separate capability.
+
+The reusable host pipeline is documented in [crates/zvs-host/src/images/README.md](crates/zvs-host/src/images/README.md).
+Provider upload protocols were compared with the reference projects on 2026-11-03;
+**live-client verification is pending**. See the [Qwen](crates/zvs-qwen-web/README.md) and
+[Z.ai](crates/zvs-zai-web/README.md) protocol notes for sources and remaining verification.

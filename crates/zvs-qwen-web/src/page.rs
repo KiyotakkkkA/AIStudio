@@ -79,9 +79,12 @@ pub fn page_plan(url: &str) -> PagePlan {
     let path = url
         .strip_prefix(API_BASE)
         .map(|rest| rest.split(['?', '#']).next().unwrap_or_default());
-    let turn = matches!(path, Some(CHATS_NEW_PATH | COMPLETIONS_PATH));
+    let turn = matches!(
+        path,
+        Some(CHATS_NEW_PATH | COMPLETIONS_PATH | crate::images::UPLOAD_PATH)
+    );
     PagePlan {
-        transport: if path == Some(CHATS_NEW_PATH) {
+        transport: if matches!(path, Some(CHATS_NEW_PATH | crate::images::UPLOAD_PATH)) {
             PageTransport::Xhr
         } else {
             PageTransport::Fetch

@@ -134,6 +134,7 @@ async fn the_qwen_family_lists_models_from_the_recorded_payload() {
                 max_output: Some(32_768),
                 capabilities: vec![
                     ModelCapability::Streaming,
+                    ModelCapability::Vision,
                     ModelCapability::Reasoning,
                     ModelCapability::AdaptiveReasoning,
                 ],
@@ -144,7 +145,7 @@ async fn the_qwen_family_lists_models_from_the_recorded_payload() {
                 family: Some("qwen".to_owned()),
                 context_window: Some(262_144),
                 max_output: Some(65_536),
-                capabilities: vec![ModelCapability::Streaming],
+                capabilities: vec![ModelCapability::Streaming, ModelCapability::Vision],
                 ..DiscoveredModel::named("qwen3.5-omni-plus")
             },
             DiscoveredModel {
@@ -709,9 +710,13 @@ fn qwen_uses_legacy_thinking_only_when_the_explicit_capability_is_absent() {
         }))
         .expect("maps");
         let wanted = if expected {
-            vec![ModelCapability::Streaming, ModelCapability::Reasoning]
+            vec![
+                ModelCapability::Streaming,
+                ModelCapability::Vision,
+                ModelCapability::Reasoning,
+            ]
         } else {
-            vec![ModelCapability::Streaming]
+            vec![ModelCapability::Streaming, ModelCapability::Vision]
         };
         assert_eq!(models[0].capabilities, wanted, "{capability} {ability}");
     }
@@ -1416,3 +1421,5 @@ async fn qwen_excludes_no_tools_from_the_policy_through_the_dialect() {
     let driver = qwen_web_driver(options(&server));
     assert!(driver.excluded_policy_check_tools().is_empty());
 }
+
+mod images;

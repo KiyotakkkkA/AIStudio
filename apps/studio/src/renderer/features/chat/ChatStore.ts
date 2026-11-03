@@ -2,6 +2,8 @@ import { makeAutoObservable, reaction, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
   ChatWakeStepDto,
+  IMAGES_MAX,
+  type ImageAttachmentDto,
   WAKE_STEP_DOMAIN,
   QUEUE_STEP_DOMAIN,
   ChatToolCallDto,
@@ -56,6 +58,7 @@ import {
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import ConversationVm from "./ConversationVm";
+import { IMAGES_FULL, VISION_UNSUPPORTED } from "./imageCopy";
 import { accountProviderLabel } from "../providers/accountPresentation";
 import { suggestedBaseUrl } from "../providers/providerPresentation";
 import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
@@ -124,6 +127,8 @@ export default class ChatStore {
   artifactTarget: { messageId: MessageId; artifactId: string; nonce: number } | null = null;
   loading = false;
   sending = false;
+  pickingImages = false;
+  private retryImages: ImageAttachmentDto[] = [];
   branching = false;
   stopping = false;
   error: string | null = null;
@@ -609,14 +614,49 @@ export default class ChatStore {
   get available() {
     return this.provider?.enabled === true && this.model?.available === true;
   }
+  get supportsImages() {
+    return this.provider?.adapter === "qwen-web" || this.provider?.adapter === "zai-web";
+  }
+  async pickImages() {
+    if (!this.supportsImages || this.generating || this.loading || this.pickingImages) return;
+    if (this.composer.images.length >= IMAGES_MAX) {
+      this.error = IMAGES_FULL;
+      return;
+    }
+    const revision = this.revision;
+    this.pickingImages = true;
+    this.error = null;
+    try {
+      const id = await this.ensureConversation();
+      const images = await this.ipc.call("chat.images.pick", { id });
+      runInAction(() => {
+        if (revision !== this.revision || this.active?.id !== id) return;
+        if (this.composer.images.length + images.length > IMAGES_MAX) {
+          this.error = IMAGES_FULL;
+          return;
+        }
+        this.composer.setImages([...this.composer.images, ...images]);
+      });
+    } catch (error) {
+      runInAction(() => {
+        if (revision === this.revision) this.error = errorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.pickingImages = false;
+      });
+    }
+  }
   get canSend() {
     return (
       this.available &&
       !this.loading &&
       !this.generating &&
       !this.changingOpenaiMode &&
+      !this.pickingImages &&
       !this.goals.active &&
-      this.composer.text.trim().length > 0
+      (this.composer.images.length === 0 || this.supportsImages) &&
+      (this.composer.text.trim().length > 0 || this.composer.images.length > 0)
     );
   }
   get canQueue() {
@@ -637,7 +677,7 @@ export default class ChatStore {
     return this.composer.commands.includes(GOAL_COMMAND);
   }
   get canRetry() {
-    return !this.generating && this.retryText.length > 0;
+    return !this.generating && (this.retryText.length > 0 || this.retryImages.length > 0);
   }
   get sessionInput() {
     return (
@@ -1017,6 +1057,8 @@ export default class ChatStore {
         this.retryText = "";
         this.pendingTurn = false;
         this.composer.setText("");
+        this.composer.clearImages();
+        this.retryImages = [];
         if (live !== null && this.run === null) {
           this.restore(live);
           if (this.mounted) this.subscribe();
@@ -1055,6 +1097,8 @@ export default class ChatStore {
     this.retryText = "";
     this.pendingTurn = false;
     this.composer.setText("");
+    this.composer.clearImages();
+    this.retryImages = [];
   }
 
   async renameConversation(id: ConversationId) {
@@ -1152,6 +1196,10 @@ export default class ChatStore {
       if (await this.queue.add(this.composer.text)) this.composer.setText("");
       return;
     }
+    if (this.composer.images.length > 0 && !this.supportsImages) {
+      this.error = VISION_UNSUPPORTED;
+      return;
+    }
     if (!this.canSend) return;
     const typed = parseCommands(this.commands, this.composer.text);
     if (typed !== null && typed.text.length === 0) {
@@ -1165,12 +1213,14 @@ export default class ChatStore {
       if (!commands.includes(command)) commands.push(command);
     }
     const plugins = [...this.composer.plugins];
+    const images = [...this.composer.images];
     const text = typed?.text ?? this.composer.text.trim();
     this.sending = true;
     this.runStartedAt = Date.now();
     this.error = null;
     this.outcome = null;
     this.retryText = text;
+    this.retryImages = images;
     this.liveText = "";
     this.liveCitations = [];
     this.liveWebSources = [];
@@ -1185,6 +1235,7 @@ export default class ChatStore {
       const run = await this.ipc.call("chat.send", {
         conversationId: id,
         text,
+        images,
         providerId: this.composer.providerId ?? undefined,
         modelId: this.composer.modelId,
         settings: { temperature: this.composer.temperature },
@@ -1401,19 +1452,23 @@ export default class ChatStore {
   }
 
   async refreshMessage(messageId: MessageId, content: string) {
+    const images = this.active?.messages.find((message) => message.id === messageId)?.images ?? [];
     const selections = this.messageSelections(messageId);
     if (!(await this.truncateMessage(messageId))) return;
     this.composer.setText(content);
     this.composer.setSelections(selections);
+    this.composer.setImages(images);
     await this.send();
   }
 
   async editMessage(messageId: MessageId, content: string): Promise<boolean> {
     const text = content.trim();
+    const images = this.active?.messages.find((message) => message.id === messageId)?.images ?? [];
     const selections = this.messageSelections(messageId);
-    if (!text || !(await this.truncateMessage(messageId))) return false;
+    if ((!text && images.length === 0) || !(await this.truncateMessage(messageId))) return false;
     this.composer.setText(text);
     this.composer.setSelections(selections);
+    this.composer.setImages(images);
     await this.send();
     return true;
   }
@@ -1427,8 +1482,12 @@ export default class ChatStore {
   retry() {
     if (this.canRetry) {
       this.composer.setText(this.retryText);
+      this.composer.setImages(this.retryImages);
       void this.send();
     }
+  }
+  get pendingUserImages() {
+    return this.pendingTurn ? this.retryImages : [];
   }
   get pendingUserText() {
     return this.pendingTurn ? this.retryText : "";

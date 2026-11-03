@@ -1,3 +1,4 @@
+import ImageAttachments from "./ImageAttachments";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Dropdown, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
@@ -354,6 +355,7 @@ export default observer(function ChatThread({
               ) : message.role === "user" ? (
                 <div key={message.id} className="group flex justify-end">
                   <div className="flex max-w-[78%] flex-col items-end">
+                    <ImageAttachments images={message.images ?? []} />
                     {editingId === message.id ? (
                       <div className="w-[min(78vw,620px)] space-y-2 rounded-card bg-main-900 p-2.5 shadow-pop">
                         <TextArea
@@ -366,7 +368,10 @@ export default observer(function ChatThread({
                           <Button onClick={() => setEditingId(null)}>Отмена</Button>
                           <Button
                             tone="primary"
-                            disabled={!editingText.trim() || store.generating}
+                            disabled={
+                              (!editingText.trim() && (message.images?.length ?? 0) === 0) ||
+                              store.generating
+                            }
                             onClick={() => {
                               void store
                                 .editMessage(message.id, editingText)
@@ -397,9 +402,11 @@ export default observer(function ChatThread({
                             ))}
                           </span>
                         ) : null}
-                        <div className="rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
-                          {message.content}
-                        </div>
+                        {message.content && (
+                          <div className="rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
+                            {message.content}
+                          </div>
+                        )}
                       </>
                     )}
                     <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
@@ -449,9 +456,10 @@ export default observer(function ChatThread({
                 </div>
               ),
             )}
-            {store.pendingUserText && (
+            {(store.pendingUserText || store.pendingUserImages.length > 0) && (
               <div className="flex justify-end">
                 <div className="max-w-[78%] animate-zvs-rise rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
+                  <ImageAttachments images={store.pendingUserImages} />
                   {store.pendingUserText}
                 </div>
               </div>
@@ -535,7 +543,9 @@ export default observer(function ChatThread({
           <PinnedNavigator
             items={store.pinnedMessages.map((message) => ({
               id: message.id,
-              label: pinPreview(message.content),
+              label: message.content.trim()
+                ? pinPreview(message.content)
+                : (message.images?.[0]?.name ?? pinPreview(message.content)),
             }))}
             current={pinAt}
             onSelect={jumpToPin}

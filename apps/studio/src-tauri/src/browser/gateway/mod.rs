@@ -626,6 +626,10 @@ impl AccountGateway {
                 "method": request.method,
                 "headers": page_headers(request),
                 "body": request.body,
+                "file": request.file.as_ref().map(|file| json!({
+                    "name": file.name, "mime_type": file.mime_type,
+                    "data": base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &file.bytes),
+                })),
                 "referrer": referrer(request, origin),
                 "page": page.as_str(),
                 "app": application_page(page),

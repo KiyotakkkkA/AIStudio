@@ -134,5 +134,71 @@
       "commands": ["goal"],
       "plugins": ["0199aa11-1111-7111-8111-0000000000a1", "0199aa11-1111-7111-8111-0000000000a1"]
     }
+  },
+  {
+    "name": "duplicate images",
+    "value": {
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "text": "",
+      "images": [
+        {
+          "id": "b222dc0d-1910-427d-b25e-291a8570e556",
+          "name": "image.png",
+          "mimeType": "image/png",
+          "sizeBytes": 68
+        },
+        {
+          "id": "b222dc0d-1910-427d-b25e-291a8570e556",
+          "name": "image.png",
+          "mimeType": "image/png",
+          "sizeBytes": 68
+        }
+      ]
+    }
+  },
+  {
+    "name": "too many images",
+    "value": {
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "text": "",
+      "images": [
+        {
+          "id": "b222dc0d-1910-427d-b25e-291a8570e550",
+          "name": "image.png",
+          "mimeType": "image/png",
+          "sizeBytes": 68
+        },
+        {
+          "id": "b222dc0d-1910-427d-b25e-291a8570e551",
+          "name": "image.png",
+          "mimeType": "image/png",
+          "sizeBytes": 68
+        },
+        {
+          "id": "b222dc0d-1910-427d-b25e-291a8570e552",
+          "name": "image.png",
+          "mimeType": "image/png",
+          "sizeBytes": 68
+        },
+        {
+          "id": "b222dc0d-1910-427d-b25e-291a8570e553",
+          "name": "image.png",
+          "mimeType": "image/png",
+          "sizeBytes": 68
+        },
+        {
+          "id": "b222dc0d-1910-427d-b25e-291a8570e554",
+          "name": "image.png",
+          "mimeType": "image/png",
+          "sizeBytes": 68
+        },
+        {
+          "id": "b222dc0d-1910-427d-b25e-291a8570e555",
+          "name": "image.png",
+          "mimeType": "image/png",
+          "sizeBytes": 68
+        }
+      ]
+    }
   }
 ]

@@ -266,8 +266,8 @@ impl<'c> ChatRepository<'c> {
     pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
         self.connection
             .prepare_cached(
-                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, commands, plugins, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
+                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, commands, plugins, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at, images) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
             )?
             .execute(params![
                 row.id,
@@ -293,6 +293,7 @@ impl<'c> ChatRepository<'c> {
                 row.pinned,
                 row.event.as_ref().map(json_text).transpose()?,
                 row.created_at,
+                json_text(&row.images)?,
             ])?;
         let calls: Vec<(usize, &ChatToolCallDto)> = row.tool_calls.iter().enumerate().collect();
         self.put_tool_calls(&row.id, &calls)?;
@@ -425,6 +426,7 @@ mod tests {
             reasoning: String::new(),
             citations: Vec::new(),
             tool_calls: Vec::new(),
+            images: Vec::new(),
             selections: Vec::new(),
             commands: Vec::new(),
             plugins: Vec::new(),

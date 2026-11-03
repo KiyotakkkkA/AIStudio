@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ImageAttachments } from "./images.js";
 import {
   ConversationId,
   DocumentId,
@@ -311,6 +312,7 @@ export const MessageDto = z
     reasoning: z.string().default(""),
     citations: z.array(ChatCitationDto),
     toolCalls: z.array(ChatToolCallDto).default([]),
+    images: ImageAttachments.optional(),
     selections: Selections.default([]),
     commands: ChatCommands.default([]),
     plugins: z.array(ChatPluginDto).max(CHAT_PLUGINS_MAX).default([]),
@@ -345,17 +347,20 @@ export const ConversationDetailDto = ConversationFields.extend({
   messages: z.array(MessageDto),
 }).refine(folderAccessMatches, { path: ["workingFolderAccess"] });
 export type ConversationDetailDto = z.infer<typeof ConversationDetailDto>;
-export const ChatSendInput = z.object({
-  conversationId: ConversationId,
-  text: z.string().trim().min(1).max(100000),
-  providerId: ProviderId.optional(),
-  modelId: z.string().min(1).optional(),
-  settings: ChatSettings.optional(),
-  selections: Selections.default([]),
-  commands: ChatCommands.default([]),
-  plugins: ChatPluginIds.default([]),
-  vendor: VendorTurnOptions.optional(),
-});
+export const ChatSendInput = z
+  .object({
+    images: ImageAttachments.default([]),
+    conversationId: ConversationId,
+    text: z.string().trim().max(100000),
+    providerId: ProviderId.optional(),
+    modelId: z.string().min(1).optional(),
+    settings: ChatSettings.optional(),
+    selections: Selections.default([]),
+    commands: ChatCommands.default([]),
+    plugins: ChatPluginIds.default([]),
+    vendor: VendorTurnOptions.optional(),
+  })
+  .refine((input) => input.text.length > 0 || input.images.length > 0, { path: ["text"] });
 export type ChatSendInput = z.infer<typeof ChatSendInput>;
 
 export const QUEUE_STEP_DOMAIN = "queue";

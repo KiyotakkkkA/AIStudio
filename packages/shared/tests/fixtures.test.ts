@@ -3,6 +3,7 @@ import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { ImageAttachmentDto } from "../src/images.js";
 import * as skills from "../src/skills/index.js";
 import * as scenarios from "../src/scenarios.js";
 import * as toolchain from "../src/toolchain/index.js";
@@ -570,6 +571,7 @@ const schemas: Record<string, z.ZodType> = {
   "chat/ExportConversationInput": contract["chat.conversations.export"].input,
   "chat/ConversationExportDto": contract["chat.conversations.export"].output,
   "chat/ConversationDto": ConversationDto,
+  "images/ImageAttachmentDto": ImageAttachmentDto,
   "chat/MessageDto": MessageDto,
   "chat/ConversationDetailDto": ConversationDetailDto,
   "chat/ChatSendInput": contract["chat.send"].input,

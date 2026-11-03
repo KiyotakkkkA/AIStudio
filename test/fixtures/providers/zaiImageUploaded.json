@@ -1,0 +1,5 @@
+{
+  "id": "fixture-image-id",
+  "filename": "image.png",
+  "meta": { "name": "image.png", "content_type": "image/png", "size": 68 }
+}

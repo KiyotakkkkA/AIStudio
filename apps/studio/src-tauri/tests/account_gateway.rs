@@ -10,7 +10,7 @@ use axum::body::{Body, Bytes};
 use axum::extract::State;
 use axum::http::{HeaderMap, Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use futures::{StreamExt, stream};
 use serde_json::{Value, json};
 use tauri::window::WindowBuilder;
@@ -132,6 +132,14 @@ fn serve() -> (u16, Arc<Fixture>) {
                 )
                 .route("/api/me", get(me))
                 .route("/echo", get(echo).post(echo))
+                .route("/upload", post(|headers: HeaderMap, body: Bytes| async move {
+                    axum::Json(json!({
+                        "contentType": headers.get(header::CONTENT_TYPE).and_then(|value| value.to_str().ok()),
+                        "hasPixels": body.windows(6).any(|bytes| bytes == [0, 255, 1, 128, 2, 127]),
+                        "hasFileName": String::from_utf8_lossy(&body).contains("image.png"),
+                        "cookie": headers.get(header::COOKIE).and_then(|value| value.to_str().ok()),
+                    }))
+                }))
                 .route(
                     "/third-party",
                     get(|headers: HeaderMap| async move {
@@ -309,6 +317,9 @@ async fn scenario(app: AppHandle, profile: PathBuf, port: u16, fixture: Arc<Fixt
         BrowserLifecycle::new(),
         tokens.clone(),
         Arc::new(zvs_host::platform::events::EventBus::default()),
+        zvs_host::browser::BrowserAgent::new(Arc::new(
+            zvs_host::platform::clock::FakeClock::default(),
+        )),
     );
     let options = GatewayOptions {
         head_timeout: Duration::from_secs(3),
@@ -421,6 +432,38 @@ async fn scenario(app: AppHandle, profile: PathBuf, port: u16, fixture: Arc<Fixt
         "a gateway request does not overwrite the captured token",
         tokens.token(&origin) == Some(AccountToken::bearer("tab-token")),
         "",
+    );
+
+    let mut upload = SessionRequest::new("POST");
+    upload.file = Some(zvs_host::drivers::ai::transport::upload::UploadFile {
+        name: "image.png".into(),
+        mime_type: "image/png".into(),
+        bytes: Arc::from([0u8, 255, 1, 128, 2, 127]),
+    });
+    let uploaded = within(gateway.fetch(
+        &format!("{origin}/upload"),
+        upload,
+        &CancellationToken::new(),
+    ))
+    .await;
+    let uploaded = match uploaded {
+        Some(Ok(response)) => response.text().await.ok(),
+        _ => None,
+    };
+    let uploaded = uploaded
+        .and_then(|body| serde_json::from_str::<Value>(&body).ok())
+        .unwrap_or_default();
+    report.check(
+        "multipart uploads preserve binary pixels, filename, boundary and profile cookies",
+        uploaded["hasPixels"] == true
+            && uploaded["hasFileName"] == true
+            && uploaded["contentType"]
+                .as_str()
+                .is_some_and(|value| value.starts_with("multipart/form-data; boundary="))
+            && uploaded["cookie"]
+                .as_str()
+                .is_some_and(|value| value.contains("sid=fixture-session")),
+        &uploaded,
     );
 
     let third = open_tab(&workspace, format!("http://localhost:{port}/third-party")).await;

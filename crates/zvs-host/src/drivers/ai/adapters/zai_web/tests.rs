@@ -112,7 +112,11 @@ async fn visible_models_are_listed_with_their_reasoning_and_output_limit() {
                 family: Some("glm".to_owned()),
                 context_window: Some(1_000_000),
                 max_output: Some(128_000),
-                capabilities: vec![ModelCapability::Streaming, ModelCapability::Reasoning],
+                capabilities: vec![
+                    ModelCapability::Streaming,
+                    ModelCapability::Vision,
+                    ModelCapability::Reasoning
+                ],
                 ..DiscoveredModel::named("x-preview-l")
             },
             DiscoveredModel {
@@ -382,3 +386,5 @@ async fn zai_excludes_no_tool_from_the_tool_policy() {
     let driver = adapter(&server);
     assert!(driver.excluded_policy_check_tools().is_empty());
 }
+
+mod images;

@@ -31,6 +31,8 @@ import { pluginChipLabel } from "../plugins/pluginPresentation";
 import { GOAL_EMPTY, GOAL_PLACEHOLDER } from "./goalCopy";
 import { QUEUE_HINT } from "./queueCopy";
 import SelectionChips from "./SelectionChips";
+import ImageAttachments from "./ImageAttachments";
+import { UPLOAD_IMAGE, LOADING_IMAGES } from "./imageCopy";
 import type ChatStore from "./ChatStore";
 import VoiceMenu, { type VoiceBinding } from "../voice/VoiceMenu";
 import { appendDictation } from "../voice/dictation";
@@ -104,6 +106,7 @@ export default observer(function ChatComposer({
               />
             </div>
           ) : null}
+          <ImageAttachments images={store.composer.images} onRemove={store.composer.removeImage} />
           <ChatCommandMenu store={store} />
           {(store.attachedStoreIds.length > 0 || store.composer.hasAttachments) && (
             <div className="flex flex-wrap gap-1.5 px-1">
@@ -239,16 +242,20 @@ export default observer(function ChatComposer({
                 rounded="rounded-lg"
                 className="rounded-card border-line bg-main-900 p-1 shadow-pop"
               >
-                <Dropdown.Item
-                  role="menuitem"
-                  rounded="rounded-lg"
-                  className="text-[13px] text-main-100"
-                >
-                  <span className="flex items-center gap-2">
-                    <Icon path={mdiUpload} size={17} className="text-main-400" />
-                    Загрузить с устройства
-                  </span>
-                </Dropdown.Item>
+                {store.supportsImages && (
+                  <Dropdown.Item
+                    role="menuitem"
+                    rounded="rounded-lg"
+                    className="text-[13px] text-main-100"
+                    disabled={store.pickingImages || store.generating || store.loading}
+                    onClick={() => void store.pickImages()}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon path={mdiUpload} size={17} className="text-main-400" />
+                      {store.pickingImages ? LOADING_IMAGES : UPLOAD_IMAGE}
+                    </span>
+                  </Dropdown.Item>
+                )}
                 <Dropdown.Item
                   role="menuitem"
                   rounded="rounded-lg"

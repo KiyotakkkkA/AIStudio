@@ -1,0 +1,38 @@
+[
+  {
+    "name": "path is not an id",
+    "value": {
+      "id": "../escape",
+      "name": "image.png",
+      "mimeType": "image/png",
+      "sizeBytes": 68
+    }
+  },
+  {
+    "name": "unsupported MIME",
+    "value": {
+      "id": "b222dc0d-1910-427d-b25e-291a8570e556",
+      "name": "image.png",
+      "mimeType": "image/svg+xml",
+      "sizeBytes": 68
+    }
+  },
+  {
+    "name": "oversized",
+    "value": {
+      "id": "b222dc0d-1910-427d-b25e-291a8570e556",
+      "name": "image.png",
+      "mimeType": "image/png",
+      "sizeBytes": 20971521
+    }
+  },
+  {
+    "name": "empty",
+    "value": {
+      "id": "b222dc0d-1910-427d-b25e-291a8570e556",
+      "name": "image.png",
+      "mimeType": "image/png",
+      "sizeBytes": 0
+    }
+  }
+]

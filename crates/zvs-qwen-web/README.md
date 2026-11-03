@@ -25,11 +25,12 @@ Base `https://chat.qwen.ai/api/v2` (`protocol::API_BASE`). Headers on every call
 `source: web`, `Version: <frontend build>` (`WEB_VERSION`, read from the page's script path
 by `WEB_VERSION_PATTERN`), `x-request-id`, and a `referer` on the page the client would be on.
 
-| Call       | Path                                        | Transport                                | Referer       |
-| ---------- | ------------------------------------------- | ---------------------------------------- | ------------- |
-| Model list | `GET /models/`                              | fetch                                    | `/`           |
-| New chat   | `POST /chats/new`                           | XHR (the anti-abuse SDK instruments XHR) | `/c/new-chat` |
-| Turn       | `POST /chat/completions?chat_id=<id>` (SSE) | fetch                                    | `/c/<id>`     |
+| Call         | Path                                        | Transport                                | Referer       |
+| ------------ | ------------------------------------------- | ---------------------------------------- | ------------- |
+| Model list   | `GET /models/`                              | fetch                                    | `/`           |
+| New chat     | `POST /chats/new`                           | XHR (the anti-abuse SDK instruments XHR) | `/c/new-chat` |
+| Turn         | `POST /chat/completions?chat_id=<id>` (SSE) | fetch                                    | `/c/<id>`     |
+| Upload grant | `POST /files/getstsToken`                   | XHR                                      | `/`           |
 
 `page::page_plan` tells the gateway how each request must leave the page: the transport,
 the verification-dialog pattern, the `localStorage` bearer key (`token`) and the session
@@ -48,6 +49,7 @@ Rows are read from `data` or `data.data`. Only these fields are used:
 | `info.meta.max_context_length`                                         | `context_window`                        |
 | `info.meta.max_generation_length`                                      | `max_output`                            |
 | `info.meta.capabilities.thinking`, else `info.meta.abilities.thinking` | `thinking`                              |
+| `info.meta.capabilities.vision`                                        | `vision`                                |
 | `info.meta.auto_thinking` (only when `thinking`)                       | `auto_thinking`                         |
 
 Flags arrive as booleans or numbers (`abilities.thinking` is `1` or `3`). A model with
@@ -168,8 +170,9 @@ the hidden gateway webview of the browser's work profile (PASSPORT D10), so the 
 cookies are never copied out. It is an unofficial web-protocol integration, not the Qwen OAuth
 or Qwen Code API.
 
-- Discovery advertises only `Streaming`, `Reasoning` and `AdaptiveReasoning`. Vision, files,
-  audio, video and image generation are not exposed; turns carry text with an empty `files`.
+- Discovery advertises `Streaming`, `Reasoning`, `AdaptiveReasoning` and `Vision` when
+  `info.meta.capabilities.vision` is enabled. Image attachments are sent in the user message's
+  `files`; audio, video and image generation are not exposed.
   The adapter capability `image` means image generation through `ImageDriver`, not vision
   input. Refreshing the provider's model list updates stored capability badges.
 - The model list is cached for an hour (`MODELS_TTL_MS`). A stale list is kept when a refresh
@@ -249,6 +252,57 @@ Renewal, observed in FE `0.3.20` on 2026-10-20:
   bearer and each reload started a new verification.
 - Not covered: an `unauthorized` frame inside a stream that is already answering ends the turn
   as an expired session.
+
+## Image input (observed 2026-11-03, FE 0.3.32)
+
+`images.rs` holds the upload-grant body, grant validation, OSS4-HMAC-SHA256 signing and
+vision file entries without I/O; `images::UPLOAD_OBSERVATION` records the live capture
+(grant request and response, the pre-signed `file_url`, and the client's own OSS PUT).
+
+The host loads validated pixels through the reusable [ImageLoader](../zvs-host/src/images/README.md),
+then posts `{filename, filesize, filetype: "image"}` to `/api/v2/files/getstsToken` through
+the signed-in gateway (XHR, including the page's normal session refresh and anti-abuse hooks).
+The client sends `filesize` as a **string**; the crate mirrors that.
+
+The grant's `data` carries `file_id`, `file_path` (`<user_id>/<file_id>_<filename>`),
+`bucketname`, `region` (with an `oss-` prefix: `oss-ap-southeast-1`), `endpoint`
+(`oss-accelerate.aliyuncs.com`), `access_key_id`, `access_key_secret`, `security_token` and a
+`file_url` that is already a **pre-signed GET URL**: its query holds `x-oss-signature` with a
+*different* temporary credential and expires in 300 s.
+
+For the PUT the client strips the query and signs the request itself with the grant's own
+`access_key_id`/`access_key_secret`/`security_token`: PUT to
+`https://<bucketname>.oss-accelerate.aliyuncs.com/<file_path>` with `content-type`,
+`x-oss-content-sha256: UNSIGNED-PAYLOAD`, `x-oss-date`, `x-oss-security-token`,
+`x-oss-user-agent` and `authorization: OSS4-HMAC-SHA256
+Credential=<access_key_id>/<day>/<region>/oss/aliyun_v4_request,Signature=…`. The scope region
+comes from the grant's `region` field, never from the host: the live host is the
+`oss-accelerate` alias, whose label is not a region — an earlier revision derived the region
+from the hostname and every PUT failed the OSS signature check. The host labels remain only a
+fallback for grants without the fields. This PUT leaves the host directly (system proxy,
+native roots, no redirects) and carries only the temporary OSS credentials — never vendor
+cookies or the account bearer.
+
+After the PUT succeeds, the turn's user message carries an uploaded image entry with the file
+id, name, MIME, size and `file_class: "vision"`, `showType: "image"`; `url` is the pre-signed
+`file_url` (query kept), `file.user_id` is the first segment of `file_path`, and `itemId`
+differs from `uploadTaskId`. The client also serialises `File`-object artifacts into `file`
+(`lastModified`, `webkitRelativePath`, `name`, `size`, `type`); the vendor accepts entries
+without them, so the crate omits them. Text-only bodies are unchanged. A continued vendor chat
+uploads images from the new tail only; a fresh/retried chat uploads the images in its retained
+history. Image ids participate in the continuation key. Failed grants or PUTs abort the turn
+before any completion; attachments are never silently discarded.
+
+The earlier reference review of [encryptarun/qwen-api](https://github.com/encryptarun/qwen-api)
+(public proxy interface only), the
+[gpt4free Qwen provider](https://github.com/xtekky/gpt4free/blob/main/g4f/Provider/Qwen.py)
+and [Qwen2API upload code](https://github.com/Rfym21/Qwen2API/blob/main/src/utils/upload.js)
+predates this capture; the references agreed with the live wire format except the region
+handling above. The upload fixtures use synthetic credentials.
+
+Tests: `cargo test -p zvs-qwen-web` checks grant validation (including the accelerate host),
+signing and attachment bodies; host tests cover PUT ordering, continuation, and failing
+uploads without text-only fallback.
 
 ## References
 

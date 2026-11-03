@@ -70,6 +70,9 @@ const FAMILY: AdapterFamily = AdapterFamily::QwenWeb;
 
 fn to_discovered_model(model: QwenModel) -> DiscoveredModel {
     let mut capabilities = vec![ModelCapability::Streaming];
+    if model.vision {
+        capabilities.push(ModelCapability::Vision);
+    }
     if model.thinking {
         capabilities.push(ModelCapability::Reasoning);
     }
@@ -271,6 +274,9 @@ fn history_key(model: &str, system: Option<&str>, messages: &[ChatMessage]) -> u
     for message in messages {
         message.role.hash(&mut hasher);
         message.content.hash(&mut hasher);
+        for image in &message.images {
+            image.attachment.hash(&mut hasher);
+        }
         message.tool_call_id.hash(&mut hasher);
         format!("{:?}", message.tool_calls).hash(&mut hasher);
     }
@@ -532,6 +538,55 @@ impl Shared {
         )
     }
 
+    async fn upload_images(
+        &self,
+        messages: &[ChatMessage],
+        cancel: &CancellationToken,
+    ) -> Result<Vec<Value>, AppError> {
+        crate::images::validate_inputs(messages)?;
+        let mut files = Vec::new();
+        for message in messages {
+            for image in &message.images {
+                if image.bytes.is_empty() || image.bytes.len() as u64 != image.attachment.size_bytes
+                {
+                    return Err(crate::drivers::ai::transport::upload::upload_failed());
+                }
+                let attachment = &image.attachment;
+                let spec = self.web_request(
+                    RequestSpec::post(
+                        zvs_qwen_web::images::UPLOAD_PATH,
+                        zvs_qwen_web::images::upload_body(&attachment.name, attachment.size_bytes),
+                    ),
+                    "/",
+                )?;
+                let response = self.core.request(&spec, cancel).await?;
+                let payload = self
+                    .core
+                    .decode(&response, zvs_qwen_web::images::UPLOAD_PATH)?;
+                let grant = zvs_qwen_web::images::UploadGrant::parse(&payload)
+                    .ok_or_else(crate::drivers::ai::transport::upload::upload_failed)?;
+                self.core
+                    .transport
+                    .put_object(
+                        grant.object_url(),
+                        &grant.headers(&attachment.mime_type, self.core.clock.now()),
+                        image.bytes.clone(),
+                        cancel,
+                    )
+                    .await?;
+                files.push(grant.attachment(
+                    &attachment.name,
+                    &attachment.mime_type,
+                    attachment.size_bytes,
+                    &(self.core.new_id)(),
+                    &(self.core.new_id)(),
+                    self.core.clock.now(),
+                ));
+            }
+        }
+        Ok(files)
+    }
+
     async fn open(
         &self,
         request: &GenerateRequest,
@@ -561,17 +616,29 @@ impl Shared {
             ),
         };
         let chained = parent_id.is_some();
-        let frames = self.core.frames(
-            self.turn(
-                &chat_id,
-                &request.model,
-                &prompt,
-                thinking,
-                chat_type,
-                parent_id.as_deref(),
-            )?,
-            cancel,
-        );
+        let slice = if chained {
+            let start = request
+                .messages
+                .iter()
+                .rposition(|message| message.role == ChatRole::Assistant)
+                .map_or(0, |index| index + 1);
+            &request.messages[start..]
+        } else {
+            &request.messages
+        };
+        let files = self.upload_images(slice, cancel).await?;
+        let mut spec = self.turn(
+            &chat_id,
+            &request.model,
+            &prompt,
+            thinking,
+            chat_type,
+            parent_id.as_deref(),
+        )?;
+        if let Some(body) = spec.body.take() {
+            spec.body = Some(zvs_qwen_web::images::attach_images(body, &files));
+        }
+        let frames = self.core.frames(spec, cancel);
         Ok(Opened {
             frames,
             chat_id,

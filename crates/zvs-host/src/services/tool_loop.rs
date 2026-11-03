@@ -173,7 +173,11 @@ pub(crate) struct Compactable {
 fn messages_cost(messages: &[ChatMessage]) -> i64 {
     messages
         .iter()
-        .map(|message| tokens(&message.content) + MESSAGE_OVERHEAD)
+        .map(|message| {
+            tokens(&message.content)
+                + MESSAGE_OVERHEAD
+                + message.images.len() as i64 * crate::images::IMAGE_TOKEN_ESTIMATE
+        })
         .sum()
 }
 

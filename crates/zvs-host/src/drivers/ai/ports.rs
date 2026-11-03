@@ -58,6 +58,7 @@ pub struct ChatMessage {
     pub content: String,
     pub tool_call_id: Option<String>,
     pub tool_calls: Vec<ToolCall>,
+    pub images: Vec<crate::images::ImageInput>,
 }
 
 impl ChatMessage {
@@ -67,7 +68,17 @@ impl ChatMessage {
             content: content.into(),
             tool_call_id: None,
             tool_calls: Vec::new(),
+            images: Vec::new(),
         }
+    }
+
+    #[must_use]
+    pub fn with_images(mut self, images: Vec<zvs_contract::ImageAttachmentDto>) -> Self {
+        self.images = images
+            .into_iter()
+            .map(crate::images::ImageInput::reference)
+            .collect();
+        self
     }
 
     pub fn system(content: impl Into<String>) -> Self {

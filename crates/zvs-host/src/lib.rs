@@ -15,6 +15,7 @@ pub mod documents;
 pub mod downloads;
 pub mod drivers;
 pub mod files;
+pub mod images;
 pub mod indexing;
 pub mod integrations;
 pub mod ipc;

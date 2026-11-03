@@ -103,6 +103,7 @@ pub fn model_message(message: &MessageDto) -> ChatMessage {
         chat_role(message.role),
         with_selections(&message.content, &message.selections),
     )
+    .with_images(message.images.clone())
 }
 
 pub fn sendable_messages(messages: &[MessageDto]) -> Vec<&MessageDto> {

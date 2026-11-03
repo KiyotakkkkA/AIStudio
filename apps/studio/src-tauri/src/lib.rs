@@ -989,6 +989,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         )
     })?;
     let chat = ChatService::new(ChatServiceOptions {
+        images: Some(zvs_host::images::ImageLoader::new(artifacts.clone())),
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),
         mcp: Some(Arc::new(mcp.clone())),

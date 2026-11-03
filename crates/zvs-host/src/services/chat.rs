@@ -173,6 +173,7 @@ pub struct ChatServiceOptions {
     pub logger: SharedLogger,
     pub clock: SharedClock,
     pub wake_delay: std::time::Duration,
+    pub images: Option<crate::images::ImageLoader>,
 }
 
 impl ChatServiceOptions {
@@ -191,6 +192,7 @@ impl ChatServiceOptions {
             logger: silent_logger(),
             clock: Arc::new(SystemClock),
             wake_delay: WAKE_DELAY,
+            images: None,
         }
     }
 }
@@ -221,6 +223,7 @@ struct Inner {
     waking: Mutex<HashSet<String>>,
     wake_delay: std::time::Duration,
     queues: queue::Queues,
+    images: Option<crate::images::ImageLoader>,
 }
 
 #[derive(Clone)]
@@ -347,6 +350,7 @@ fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
         reasoning: row.reasoning,
         citations: row.citations,
         tool_calls: row.tool_calls,
+        images: row.images,
         selections: row.selections,
         commands: row.commands,
         plugins: row.plugins,
@@ -682,7 +686,15 @@ impl Inner {
                     && !message.content.is_empty()
             })
             .map(|first| {
-                let collapsed = SPACES.replace_all(&first.content, " ");
+                let title = if first.content.trim().is_empty() {
+                    first
+                        .images
+                        .first()
+                        .map_or(DEFAULT_CONVERSATION_TITLE, |image| image.name.as_str())
+                } else {
+                    &first.content
+                };
+                let collapsed = SPACES.replace_all(title, " ");
                 js_slice(&collapsed, TITLE_MAX).to_owned()
             });
         let id = message.conversation_id.clone();
@@ -1658,7 +1670,8 @@ impl NodeDef for PrepareNode {
         let mut prepared = window_chat_history(
             &system,
             &history,
-            &ChatMessage::user(with_selections(&user.content, &user.selections)),
+            &ChatMessage::user(with_selections(&user.content, &user.selections))
+                .with_images(user.images.clone()),
             model.context_window,
             model.max_output_tokens,
             &sources,
@@ -1724,6 +1737,7 @@ impl NodeDef for PrepareNode {
             reasoning: String::new(),
             citations: prepared.citations.clone(),
             tool_calls: Vec::new(),
+            images: Vec::new(),
             selections: Vec::new(),
             commands: Vec::new(),
             plugins: Vec::new(),
@@ -2314,11 +2328,23 @@ impl GenerateChatNode {
                 .join("\n\n"),
             )
         };
-        let template = GenerateRequest {
+        let mut template = GenerateRequest {
             system,
             tools: specs,
             ..base.clone().request()
         };
+        if template
+            .messages
+            .iter()
+            .any(|message| !message.images.is_empty())
+        {
+            let loader = self.0.images.as_ref().ok_or_else(|| {
+                AppError::new(AppErrorCode::Conflict, crate::images::IMAGE_MISSING)
+            })?;
+            loader
+                .load_messages(&conversation_id, &mut template.messages, &context.cancel)
+                .await?;
+        }
         let calls: Arc<Mutex<Vec<ChatToolCallDto>>> = Arc::new(Mutex::new(Vec::new()));
         let sink = CallSink::Message(assistant_id.clone());
         let delegation = Delegation::new(
@@ -2585,6 +2611,7 @@ impl ChatService {
             SubagentService::new(Arc::clone(&options.database), options.clock.clone())
         });
         let inner = Arc::new(Inner {
+            images: options.images,
             database: options.database,
             tools: options.tools,
             skills: options.skills,
@@ -2968,6 +2995,7 @@ impl ChatService {
             reasoning: String::new(),
             citations: Vec::new(),
             tool_calls: Vec::new(),
+            images: Vec::new(),
             selections: Vec::new(),
             commands: Vec::new(),
             plugins: Vec::new(),
@@ -3179,11 +3207,40 @@ impl ChatService {
         let model = self
             .inner
             .resolve_model(&provider_id, &model_id, &settings)?;
+        input.validate()?;
+        if !input.images.is_empty()
+            || conversation
+                .messages
+                .iter()
+                .any(|message| !message.images.is_empty())
+        {
+            let supported = self
+                .inner
+                .read(|repositories| Ok(repositories.providers.find_by_id(&provider_id)?))?
+                .is_some_and(|provider| {
+                    matches!(provider.adapter.as_str(), "qwen-web" | "zai-web")
+                });
+            if !supported {
+                return Err(AppError::new(
+                    AppErrorCode::ValidationFailed,
+                    crate::images::VISION_UNSUPPORTED,
+                ));
+            }
+            if !input.images.is_empty() {
+                let loader = self.inner.images.as_ref().ok_or_else(|| {
+                    AppError::new(AppErrorCode::Conflict, crate::images::IMAGE_MISSING)
+                })?;
+                for image in &input.images {
+                    loader.validate_reference(&conversation_id, image)?;
+                }
+            }
+        }
         let text = input.text().to_owned();
         window_chat_history(
             &details.system_prompt,
             &[],
-            &ChatMessage::user(with_selections(&text, &input.selections)),
+            &ChatMessage::user(with_selections(&text, &input.selections))
+                .with_images(input.images.clone()),
             model.context_window,
             model.max_output_tokens,
             &[],
@@ -3199,6 +3256,7 @@ impl ChatService {
                 reasoning: String::new(),
                 citations: Vec::new(),
                 tool_calls: Vec::new(),
+                images: Vec::new(),
                 selections: Vec::new(),
                 commands: Vec::new(),
                 plugins: Vec::new(),
@@ -3304,6 +3362,7 @@ impl ChatService {
             reasoning: String::new(),
             citations: Vec::<ChatCitationDto>::new(),
             tool_calls: Vec::new(),
+            images: input.images.clone(),
             selections: input.selections.clone(),
             commands: if woken {
                 Vec::new()

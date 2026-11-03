@@ -111,6 +111,7 @@ fn event_row(conversation: ConversationId, created_at: i64) -> MessageRow {
         reasoning: String::new(),
         citations: Vec::new(),
         tool_calls: Vec::new(),
+        images: Vec::new(),
         selections: Vec::new(),
         commands: Vec::new(),
         plugins: Vec::new(),

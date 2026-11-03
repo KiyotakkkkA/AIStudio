@@ -44,6 +44,7 @@ pub struct SessionRequest {
     pub method: String,
     pub headers: Vec<(String, String)>,
     pub body: Option<String>,
+    pub file: Option<super::upload::UploadFile>,
 }
 
 impl SessionRequest {

@@ -550,6 +550,9 @@ pub fn test_services(system: SystemService) -> TestServices {
         .expect("registers the agentic node");
     let subagents = crate::services::SubagentService::new(database.shared(), clock.clone());
     let chat = crate::services::ChatService::new(crate::services::ChatServiceOptions {
+        images: Some(crate::images::ImageLoader::new(test_artifacts(
+            workspace.join("conversations"),
+        ))),
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),
         mcp: Some(Arc::new(mcp.clone())),

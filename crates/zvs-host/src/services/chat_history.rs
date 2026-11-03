@@ -69,7 +69,9 @@ pub fn tokens(text: &str) -> i64 {
 }
 
 fn message_cost(message: &ChatMessage) -> i64 {
-    tokens(&message.content) + MESSAGE_OVERHEAD
+    tokens(&message.content)
+        + MESSAGE_OVERHEAD
+        + message.images.len() as i64 * crate::images::IMAGE_TOKEN_ESTIMATE
 }
 
 pub fn source_label(path: &str, page: Option<u64>, section: &str) -> String {
@@ -414,11 +416,15 @@ pub fn window_chat_history(
     }
 
     let mut recent: Vec<ChatMessage> = Vec::new();
+    let mut image_count = current.images.len();
     for item in history.iter().rev() {
         let cost = message_cost(item);
-        if used + cost > budget {
+        if used + cost > budget
+            || image_count + item.images.len() > zvs_contract::images::IMAGES_MAX
+        {
             break;
         }
+        image_count += item.images.len();
         used += cost;
         recent.push(item.clone());
     }

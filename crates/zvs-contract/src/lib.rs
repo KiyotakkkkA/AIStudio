@@ -20,6 +20,7 @@ pub mod goal;
 pub mod graph;
 pub mod graph_expansion;
 pub mod ids;
+pub mod images;
 pub mod integrations;
 pub mod mail;
 pub mod mcp;
@@ -304,3 +305,5 @@ pub use voice::{
     VOICE_TRANSCRIPT_MAX, VoiceDevicesDto, VoiceModelInput, VoiceModelsDto, VoiceSelectInput,
     VoiceSelectModelInput, VoiceTranscriptDto,
 };
+
+pub use images::ImageAttachmentDto;

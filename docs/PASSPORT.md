@@ -731,6 +731,24 @@ known dialect must be a row, not a file.**
 - Streaming: the vendor stream is consumed on the host and re-emitted as `token` events on the
   one event channel (D4). The renderer never sees a vendor payload.
 
+### Vision input (2026-11-03)
+
+Image attachments use a reusable host loading stage, `zvs-host::images::ImageLoader`.
+Native file selection imports bounded PNG/JPEG/GIF/WebP copies into the conversation's work
+folder; IPC and persisted run inputs carry opaque metadata references, never image bytes or
+vendor URLs. Message history persists references, and context windowing precedes integrity
+checks and pixel loading on blocking tasks. Only Qwen and Z.ai accept these chat inputs.
+
+Vendor protocol crates build upload metadata without I/O. Z.ai multipart uploads use the
+existing account gateway and its page-owned credentials. Qwen obtains temporary OSS grants
+through that gateway, then uploads pixels through the host transport's `put_object` seam.
+Object-storage PUTs use one dedicated shared HTTP client with the native root store and system
+proxy, redirects disabled, no cookie jar and only temporary OSS authorization. This isolated
+client is an exception to the ordinary API client above: an API bearer must never reach the
+object-storage origin. The upload extension was reference-reviewed on 2026-11-03; live-client
+verification remains pending, as recorded in both provider READMEs. Image generation stays
+independent of vision input. See `crates/zvs-host/src/images/README.md` for the reusable stages.
+
 ### Accounts
 
 OpenAI's `openai` account family uses the public ChatGPT-plan OAuth flow instead of browser

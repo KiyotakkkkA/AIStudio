@@ -429,6 +429,7 @@ impl Carried {
 fn blank(message: &ChatMessage) -> bool {
     message.role == ChatRole::Assistant
         && message.tool_calls.is_empty()
+        && message.images.is_empty()
         && message.content.trim().is_empty()
 }
 
@@ -442,6 +443,7 @@ pub fn messages_cost(messages: &[ChatMessage]) -> i64 {
         .map(|message| {
             tokens(&message.content)
                 + MESSAGE_OVERHEAD
+                + message.images.len() as i64 * crate::images::IMAGE_TOKEN_ESTIMATE
                 + message
                     .tool_calls
                     .iter()

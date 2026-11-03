@@ -63,6 +63,7 @@ pub struct MessageRow {
     pub reasoning: String,
     pub citations: Vec<ChatCitationDto>,
     pub tool_calls: Vec<ChatToolCallDto>,
+    pub images: Vec<zvs_contract::ImageAttachmentDto>,
     pub selections: Vec<DocumentSelectionDto>,
     pub commands: Vec<ChatCommand>,
     pub plugins: Vec<ChatPluginDto>,
@@ -85,7 +86,7 @@ pub struct MessageRow {
 impl MessageRow {
     pub const COLUMNS: &str = "id, conversation_id, role, content, reasoning, citations, \
         (SELECT json_group_array(json(call) ORDER BY idx) FROM message_tool_call \
-        WHERE message_id = message.id) AS tool_calls, selections, commands, plugins, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, \
+        WHERE message_id = message.id) AS tool_calls, images, selections, commands, plugins, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, \
         pinned, event, created_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
@@ -97,6 +98,7 @@ impl MessageRow {
             reasoning: row.get("reasoning")?,
             citations: json_column(row, "citations")?,
             tool_calls: json_column(row, "tool_calls")?,
+            images: json_column(row, "images")?,
             selections: json_column(row, "selections")?,
             commands: json_column(row, "commands")?,
             plugins: json_column(row, "plugins")?,

@@ -7,6 +7,8 @@ license.workspace = true
 description = "The chat.qwen.ai web-client protocol: request bodies, model lists and the SSE turn decoder, without I/O."
 
 [dependencies]
+sha2.workspace = true
+url.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
