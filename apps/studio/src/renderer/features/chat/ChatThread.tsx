@@ -2,6 +2,7 @@ import ImageAttachments, { ImagePreview } from "./ImageAttachments";
 import { CLOSE_IMAGE } from "./imageCopy";
 import type { ImageAttachmentDto } from "@zvs/shared";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { observer } from "mobx-react-lite";
 import { Dropdown, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
@@ -575,40 +576,43 @@ export default observer(function ChatThread({
             onSelect={jumpToPin}
           />
         )}
-        <AnimatePresence>
-          {preview !== null && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={pop}
-              className="absolute inset-0 z-20 flex items-center justify-center bg-main-950/60 p-8"
-              onClick={() => setPreview(null)}
-            >
+        {createPortal(
+          <AnimatePresence>
+            {preview !== null && (
               <motion.div
-                initial={{ opacity: 0, scale: level === "full" ? 0.85 : 1 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: level === "full" ? 0.85 : 1 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 transition={pop}
-                className="relative flex max-h-full max-w-full flex-col items-center gap-2"
-                onClick={(event) => event.stopPropagation()}
+                className="fixed inset-0 z-50 flex items-center justify-center bg-main-950/85 p-10"
+                onClick={() => setPreview(null)}
               >
-                <ImagePreview image={preview} load={store.loadImage} />
-                <span className="max-w-full truncate text-[12px] text-main-300">
-                  {preview.name}
-                </span>
-                <span className="absolute -top-2.5 -right-2.5">
-                  <IconButton
-                    size="sm"
-                    path={mdiClose}
-                    label={CLOSE_IMAGE}
-                    onClick={() => setPreview(null)}
-                  />
-                </span>
+                <motion.div
+                  initial={{ opacity: 0, scale: level === "full" ? 0.85 : 1 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: level === "full" ? 0.85 : 1 }}
+                  transition={pop}
+                  className="relative flex max-h-full max-w-full flex-col items-center gap-2"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <ImagePreview image={preview} load={store.loadImage} />
+                  <span className="max-w-full truncate text-[12px] text-main-300">
+                    {preview.name}
+                  </span>
+                  <span className="absolute -top-2.5 -right-2.5">
+                    <IconButton
+                      size="sm"
+                      path={mdiClose}
+                      label={CLOSE_IMAGE}
+                      onClick={() => setPreview(null)}
+                    />
+                  </span>
+                </motion.div>
               </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
       </div>
       <AnimatePresence>
         {jump && !statsOpen && (

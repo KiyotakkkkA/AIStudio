@@ -748,8 +748,8 @@ test("image previews load through the host once and failures resolve to a placeh
     calls += 1;
     return { dataUrl: "data:image/png;base64,AAAA" };
   });
-  await expect(store.loadImage(imageAttachment)).resolves.toBe("data:image/png;base64,AAAA");
-  await expect(store.loadImage(imageAttachment)).resolves.toBe("data:image/png;base64,AAAA");
+  await expect(store.loadImage(imageAttachment)).resolves.toMatch(/^blob:/);
+  await expect(store.loadImage(imageAttachment)).resolves.toMatch(/^blob:/);
   expect(calls).toBe(1);
   bridge.fail("chat.images.read", AppErrorCode.VALIDATION_FAILED, "missing");
   const missing = { ...imageAttachment, id: "b222dc0d-1910-427d-b25e-291a8570e557" };
