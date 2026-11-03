@@ -25,12 +25,17 @@ trusting extensions, caps each file at 20 MiB and each message at five images, b
 rolls back a failed batch. It does not decode or resize images. Unsupported/corrupt image
 contents beyond header validation may still be refused by the provider.
 
-Copies and SHA-256 manifests live under `conversations/<owner>/work/_images/`. They survive
-restart, are copied by the existing branch operation, and are removed with the conversation.
-Removing a draft chip or truncating history retains the local copy until conversation deletion,
-so edits and retries can reuse its reference. Imports share the existing 200 MiB / 1,000-file
-working-folder quota. Per-owner UUID paths and canonical containment checks prevent traversal
-and cross-conversation attachment references. Changed copies fail integrity checks.
+Copies and SHA-256 manifests live under `conversations/<owner>/attachments/`. Copies stored by
+earlier builds under `work/_images/` are moved there on first access. The files survive restart,
+are copied by the existing branch operation, and are removed with the conversation. Removing a
+draft chip or truncating history retains the local copy until conversation deletion, so edits and
+retries can reuse its reference. Imports share the existing 200 MiB / 1,000-file conversation
+quota. Per-owner UUID paths and canonical containment checks prevent traversal and
+cross-conversation attachment references. Changed copies fail integrity checks.
+
+The renderer shows stored copies through `chat.images.read` (input `ImageReadInput`, output
+`ImageDataDto`). The handler resolves the reference through `ImageLoader::load`, so previews run
+the same ownership, manifest and hash checks as generation, and returns a bounded data URL.
 
 `message.images` is a JSON column introduced by migration `0038_message_images`, defaulting to
 `[]` for old conversations. Rust and Zod definitions and golden fixtures cover the DTOs and

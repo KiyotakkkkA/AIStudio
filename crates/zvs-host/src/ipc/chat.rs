@@ -4,9 +4,9 @@ use zvs_contract::{
     AppError, AppErrorCode, BindFolderInput, BranchConversationInput, ChatAnswerInput,
     ChatAttachInput, ChatContextInput, ChatEvalInput, ChatGoalInput, ChatQueueAddInput,
     ChatQueueEditInput, ChatQueueInput, ChatQueueRemoveInput, ChatSendInput, ChatSkipInput,
-    ConversationRef, CreateConversationInput, PickFolderResultDto, PinConversationInput,
-    PinMessageInput, RenameConversationInput, RunIdInput, TruncateConversationInput,
-    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    ConversationRef, CreateConversationInput, ImageDataDto, ImageReadInput, PickFolderResultDto,
+    PinConversationInput, PinMessageInput, RenameConversationInput, RunIdInput,
+    TruncateConversationInput, UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
     UpdateConversationStoresInput, VectorSourceKind,
 };
 
@@ -178,6 +178,25 @@ pub fn register(server: &mut IpcServer) {
                 let loader = crate::images::ImageLoader::new(services.artifacts.clone());
                 tokio::task::spawn_blocking(move || loader.import(&input.id.to_string(), &paths))
                     .await.map_err(|_| AppError::new(AppErrorCode::Unknown, crate::images::IMAGE_MISSING))?
+            },
+        )
+        .handle(
+            "chat.images.read",
+            |services: Arc<Services>, input: ImageReadInput| async move {
+                services.chat.get(&input.id)?;
+                let loader = crate::images::ImageLoader::new(services.artifacts.clone());
+                tokio::task::spawn_blocking(move || {
+                    use base64::Engine;
+                    let loaded = loader.load(&input.id.to_string(), &input.image)?;
+                    Ok::<_, AppError>(ImageDataDto {
+                        data_url: format!(
+                            "data:{};base64,{}",
+                            loaded.attachment.mime_type,
+                            base64::engine::general_purpose::STANDARD.encode(&loaded.bytes)
+                        ),
+                    })
+                })
+                .await.map_err(|_| AppError::new(AppErrorCode::Unknown, crate::images::IMAGE_MISSING))?
             },
         )
         .handle(

@@ -98,6 +98,12 @@ export default observer(function ChatComposer({
               <span className="block h-full w-2/5 animate-zvs-sweep bg-linear-to-r from-transparent via-accent-dark to-transparent" />
             </span>
           ) : null}
+          <ImageAttachments
+            images={store.composer.images}
+            load={store.loadImage}
+            size={48}
+            onRemove={store.composer.removeImage}
+          />
           {store.composer.selections.length > 0 ? (
             <div className="px-1">
               <SelectionChips
@@ -106,7 +112,6 @@ export default observer(function ChatComposer({
               />
             </div>
           ) : null}
-          <ImageAttachments images={store.composer.images} onRemove={store.composer.removeImage} />
           <ChatCommandMenu store={store} />
           {(store.attachedStoreIds.length > 0 || store.composer.hasAttachments) && (
             <div className="flex flex-wrap gap-1.5 px-1">

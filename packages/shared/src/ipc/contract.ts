@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ImageAttachments } from "../images.js";
+import { ImageAttachments, ImageDataDto, ImageReadInput } from "../images.js";
 import { ProviderUsageDto } from "../providers/ProviderDto.js";
 import {
   AgenticInstructInput,
@@ -310,6 +310,7 @@ export const contract = defineContract({
   "chat.stats": { input: ChatContextInput, output: ChatStatsDto },
   "chat.commands": { input: z.void(), output: z.array(ChatCommandDto) },
   "chat.images.pick": { input: ConversationRef, output: ImageAttachments },
+  "chat.images.read": { input: ImageReadInput, output: ImageDataDto },
   "chat.send": { input: ChatSendInput, output: RunHandleDto },
   "chat.attach": { input: ChatAttachInput, output: ChatAttachDto.nullable() },
   "chat.cancel": { input: RunIdInput, output: z.void() },

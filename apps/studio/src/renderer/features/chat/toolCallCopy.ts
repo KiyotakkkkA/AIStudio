@@ -94,8 +94,16 @@ export const TOOL_PRESENTATION: Readonly<Record<string, ToolPresentation>> = {
   "fs.search": { title: "Поиск по файлам", icon: mdiFileFind, category: "files" },
   "fs.apply": { title: "Изменение файлов", icon: mdiFileDocumentEditOutline, category: "files" },
   "code.run": { title: "Выполнение программы", icon: mdiCodeBraces, category: "process" },
-  "shell.run": { title: "Выполнить команду в терминале", icon: mdiConsoleLine, category: "process" },
-  "shell.list": { title: "Просмотр запущенных фоновых процессов", icon: mdiConsoleLine, category: "process" },
+  "shell.run": {
+    title: "Выполнить команду в терминале",
+    icon: mdiConsoleLine,
+    category: "process",
+  },
+  "shell.list": {
+    title: "Просмотр запущенных фоновых процессов",
+    icon: mdiConsoleLine,
+    category: "process",
+  },
   "shell.output": {
     title: "Вывод фонового процесса",
     icon: mdiTextBoxSearchOutline,

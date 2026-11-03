@@ -2,6 +2,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { reaction } from "mobx";
 import { createIpcClient } from "@zvs/ipc";
 import {
+  AppErrorCode,
   contract,
   ConversationDetailDto,
   RunHandleDto,
@@ -16,6 +17,7 @@ import {
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
 import { VISION_UNSUPPORTED } from "../../src/renderer/features/chat/imageCopy.ts";
+import { clearImageDataCache } from "../../src/renderer/features/chat/imageData.ts";
 import ChatStore, { SELECTIONS_FULL } from "../../src/renderer/features/chat/ChatStore.ts";
 import { shouldPinToBottom } from "../../src/renderer/features/chat/scroll.ts";
 import { ADAPTERS, MODEL, model, provider } from "./providerFixtures.ts";
@@ -733,6 +735,28 @@ test("an image picker result is discarded after switching conversations", async 
   await picking;
   expect(store.composer.images).toEqual([]);
   expect(store.pickingImages).toBe(false);
+  store.dispose();
+  events.dispose();
+});
+
+test("image previews load through the host once and failures resolve to a placeholder", async () => {
+  clearImageDataCache();
+  const { store, bridge, events } = setup();
+  store.active = structuredClone(conversation);
+  let calls = 0;
+  bridge.handle("chat.images.read", () => {
+    calls += 1;
+    return { dataUrl: "data:image/png;base64,AAAA" };
+  });
+  await expect(store.loadImage(imageAttachment)).resolves.toBe("data:image/png;base64,AAAA");
+  await expect(store.loadImage(imageAttachment)).resolves.toBe("data:image/png;base64,AAAA");
+  expect(calls).toBe(1);
+  bridge.fail("chat.images.read", AppErrorCode.VALIDATION_FAILED, "missing");
+  const missing = { ...imageAttachment, id: "b222dc0d-1910-427d-b25e-291a8570e557" };
+  await expect(store.loadImage(missing)).resolves.toBeNull();
+  store.active = null;
+  const unsaved = { ...imageAttachment, id: "b222dc0d-1910-427d-b25e-291a8570e558" };
+  await expect(store.loadImage(unsaved)).resolves.toBeNull();
   store.dispose();
   events.dispose();
 });

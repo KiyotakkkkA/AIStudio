@@ -1,0 +1,26 @@
+[
+  {
+    "name": "image id is a path",
+    "value": {
+      "id": "0199aa11-2222-7111-8111-111111111111",
+      "image": {
+        "id": "../escape",
+        "name": "image.png",
+        "mimeType": "image/png",
+        "sizeBytes": 68
+      }
+    }
+  },
+  {
+    "name": "conversation id is a path",
+    "value": {
+      "id": "../escape",
+      "image": {
+        "id": "b222dc0d-1910-427d-b25e-291a8570e556",
+        "name": "image.png",
+        "mimeType": "image/png",
+        "sizeBytes": 68
+      }
+    }
+  }
+]

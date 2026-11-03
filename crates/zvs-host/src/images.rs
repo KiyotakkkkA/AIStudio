@@ -21,7 +21,7 @@ pub const IMAGES_FULL: &str = "К сообщению можно прикрепи
 pub const VISION_UNSUPPORTED: &str = "Изображения доступны только для провайдеров Qwen и Z.ai";
 pub const UPLOAD_FAILED: &str = "Не удалось загрузить изображение провайдеру. Повторите запрос.";
 pub const IMAGE_TOKEN_ESTIMATE: i64 = 4096;
-const DIRECTORY: &str = "_images";
+const LEGACY_DIRECTORY: &str = "_images";
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct ImageInput {
@@ -105,6 +105,18 @@ fn mime(bytes: &[u8]) -> Option<&'static str> {
     }
 }
 
+/// Moves copies stored before the attachments folder existed next to the conversation root.
+fn migrate_legacy(owner_folder: &Path) -> Result<(), AppError> {
+    let legacy = owner_folder
+        .join(crate::conversations::WORK_DIR)
+        .join(LEGACY_DIRECTORY);
+    let target = owner_folder.join(crate::conversations::ATTACHMENTS_DIR);
+    if extended(&target).exists() || !extended(&legacy).is_dir() {
+        return Ok(());
+    }
+    std::fs::rename(extended(&legacy), extended(&target)).map_err(|_| failure(IMAGE_MISSING))
+}
+
 fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>, AppError> {
     let file = std::fs::File::open(extended(path)).map_err(|_| failure(IMAGE_MISSING))?;
     if !file
@@ -135,7 +147,10 @@ impl ImageLoader {
         std::fs::create_dir_all(extended(self.store.root())).map_err(|_| failure(IMAGE_MISSING))?;
         let mut folder = std::fs::canonicalize(extended(self.store.root()))
             .map_err(|_| failure(IMAGE_MISSING))?;
-        for name in [owner, crate::conversations::WORK_DIR, DIRECTORY] {
+        for name in [owner, crate::conversations::ATTACHMENTS_DIR] {
+            if name == crate::conversations::ATTACHMENTS_DIR {
+                migrate_legacy(&folder)?;
+            }
             let next = folder.join(name);
             match std::fs::create_dir(extended(&next)) {
                 Ok(()) => {}

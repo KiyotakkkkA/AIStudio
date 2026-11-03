@@ -268,7 +268,7 @@ The grant's `data` carries `file_id`, `file_path` (`<user_id>/<file_id>_<filenam
 `bucketname`, `region` (with an `oss-` prefix: `oss-ap-southeast-1`), `endpoint`
 (`oss-accelerate.aliyuncs.com`), `access_key_id`, `access_key_secret`, `security_token` and a
 `file_url` that is already a **pre-signed GET URL**: its query holds `x-oss-signature` with a
-*different* temporary credential and expires in 300 s.
+_different_ temporary credential and expires in 300 s.
 
 For the PUT the client strips the query and signs the request itself with the grant's own
 `access_key_id`/`access_key_secret`/`security_token`: PUT to

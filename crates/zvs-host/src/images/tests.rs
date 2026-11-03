@@ -36,6 +36,32 @@ fn imports_survive_restart_and_branch_and_detect_tampering() {
 }
 
 #[test]
+fn moves_copies_from_the_legacy_work_subfolder_into_attachments() {
+    let root = crate::testing::temporary_directory("vision");
+    let store = ArtifactStore::new(root.path().join("conversations"));
+    let loader = ImageLoader::new(store);
+    let source = root.path().join("source.png");
+    std::fs::write(&source, png()).unwrap();
+    let images = loader
+        .import("chat", &[source.to_string_lossy().into_owned()])
+        .unwrap();
+    let attachments = loader.folder("chat").unwrap();
+    assert_eq!(
+        attachments.file_name().unwrap(),
+        crate::conversations::ATTACHMENTS_DIR
+    );
+    let legacy = root.path().join("conversations/chat/work/_images");
+    std::fs::create_dir_all(&legacy).unwrap();
+    for entry in std::fs::read_dir(&attachments).unwrap().flatten() {
+        std::fs::rename(entry.path(), legacy.join(entry.file_name())).unwrap();
+    }
+    std::fs::remove_dir(&attachments).unwrap();
+    assert_eq!(&*loader.load("chat", &images[0]).unwrap().bytes, png());
+    assert!(!legacy.exists());
+    assert!(attachments.join(&images[0].id).is_file());
+}
+
+#[test]
 fn rejects_non_images_and_too_many_before_persisting_a_batch() {
     let root = crate::testing::temporary_directory("vision");
     let store = ArtifactStore::new(root.path().join("conversations"));

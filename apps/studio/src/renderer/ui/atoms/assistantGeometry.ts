@@ -1,5 +1,3 @@
-
-
 export interface AssistantFrame {
   readonly mainPath: string;
   readonly headOffsetY: number;

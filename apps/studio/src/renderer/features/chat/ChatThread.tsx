@@ -1,10 +1,13 @@
-import ImageAttachments from "./ImageAttachments";
+import ImageAttachments, { ImagePreview } from "./ImageAttachments";
+import { CLOSE_IMAGE } from "./imageCopy";
+import type { ImageAttachmentDto } from "@zvs/shared";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Dropdown, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Button from "../../ui/atoms/buttons/Button";
 import {
   mdiChartBoxOutline,
+  mdiClose,
   mdiCodeJson,
   mdiConsole,
   mdiExportVariant,
@@ -83,6 +86,7 @@ export default observer(function ChatThread({
   const [editingText, setEditingText] = useState("");
   const [pinAt, setPinAt] = useState<string | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<ImageAttachmentDto | null>(null);
   const statsOpen = store.stats.open;
   const { motion: level } = useFx();
   const pop = useTransition("reveal");
@@ -93,8 +97,17 @@ export default observer(function ChatThread({
   useLayoutEffect(() => {
     pinned.current = true;
     setJump(false);
+    setPreview(null);
     scrollLatest();
   }, [store.active?.id, store.revealed]);
+  useEffect(() => {
+    if (preview === null) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreview(null);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [preview]);
   useLayoutEffect(() => {
     if (pinned.current) scrollLatest();
   }, [
@@ -355,7 +368,12 @@ export default observer(function ChatThread({
               ) : message.role === "user" ? (
                 <div key={message.id} className="group flex justify-end">
                   <div className="flex max-w-[78%] flex-col items-end">
-                    <ImageAttachments images={message.images ?? []} />
+                    <ImageAttachments
+                      images={message.images ?? []}
+                      load={store.loadImage}
+                      className="mb-1.5 justify-end"
+                      onOpen={setPreview}
+                    />
                     {editingId === message.id ? (
                       <div className="w-[min(78vw,620px)] space-y-2 rounded-card bg-main-900 p-2.5 shadow-pop">
                         <TextArea
@@ -459,7 +477,13 @@ export default observer(function ChatThread({
             {(store.pendingUserText || store.pendingUserImages.length > 0) && (
               <div className="flex justify-end">
                 <div className="max-w-[78%] animate-zvs-rise rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
-                  <ImageAttachments images={store.pendingUserImages} />
+                  <ImageAttachments
+                    images={store.pendingUserImages}
+                    load={store.loadImage}
+                    size={64}
+                    className="mb-1.5 justify-end"
+                    onOpen={setPreview}
+                  />
                   {store.pendingUserText}
                 </div>
               </div>
@@ -551,6 +575,40 @@ export default observer(function ChatThread({
             onSelect={jumpToPin}
           />
         )}
+        <AnimatePresence>
+          {preview !== null && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={pop}
+              className="absolute inset-0 z-20 flex items-center justify-center bg-main-950/60 p-8"
+              onClick={() => setPreview(null)}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: level === "full" ? 0.85 : 1 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: level === "full" ? 0.85 : 1 }}
+                transition={pop}
+                className="relative flex max-h-full max-w-full flex-col items-center gap-2"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <ImagePreview image={preview} load={store.loadImage} />
+                <span className="max-w-full truncate text-[12px] text-main-300">
+                  {preview.name}
+                </span>
+                <span className="absolute -top-2.5 -right-2.5">
+                  <IconButton
+                    size="sm"
+                    path={mdiClose}
+                    label={CLOSE_IMAGE}
+                    onClick={() => setPreview(null)}
+                  />
+                </span>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
       <AnimatePresence>
         {jump && !statsOpen && (

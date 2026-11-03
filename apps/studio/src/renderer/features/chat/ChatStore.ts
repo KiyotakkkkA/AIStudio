@@ -59,6 +59,7 @@ import {
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import ConversationVm from "./ConversationVm";
 import { IMAGES_FULL, VISION_UNSUPPORTED } from "./imageCopy";
+import { readImageData } from "./imageData";
 import { accountProviderLabel } from "../providers/accountPresentation";
 import { suggestedBaseUrl } from "../providers/providerPresentation";
 import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
@@ -617,6 +618,10 @@ export default class ChatStore {
   get supportsImages() {
     return this.provider?.adapter === "qwen-web" || this.provider?.adapter === "zai-web";
   }
+  readonly loadImage = (image: ImageAttachmentDto): Promise<string | null> => {
+    const id = this.active?.id;
+    return id === undefined ? Promise.resolve(null) : readImageData(this.ipc, id, image);
+  };
   async pickImages() {
     if (!this.supportsImages || this.generating || this.loading || this.pickingImages) return;
     if (this.composer.images.length >= IMAGES_MAX) {

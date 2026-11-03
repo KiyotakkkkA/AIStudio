@@ -750,6 +750,14 @@ const TABLE: &[(&str, Check)] = &[
         "images/ImageAttachmentDto",
         round_trip::<zvs_contract::ImageAttachmentDto>,
     ),
+    (
+        "images/ImageReadInput",
+        round_trip::<zvs_contract::ImageReadInput>,
+    ),
+    (
+        "images/ImageDataDto",
+        round_trip::<zvs_contract::ImageDataDto>,
+    ),
     ("chat/MessageDto", round_trip::<zvs_contract::MessageDto>),
     (
         "chat/ConversationDetailDto",

@@ -8,6 +8,7 @@ use crate::platform::long_path::extended;
 
 pub const CONVERSATIONS_DIR: &str = "conversations";
 pub const WORK_DIR: &str = "work";
+pub const ATTACHMENTS_DIR: &str = "attachments";
 pub const OUTPUTS_DIR: &str = "outputs";
 pub const SNAPSHOTS_DIR: &str = "snapshots";
 pub const MANIFEST_FILE: &str = "manifest.json";
@@ -118,7 +119,7 @@ impl ConversationFolders {
         if !extended(&source).is_dir() {
             return Ok(());
         }
-        for name in [WORK_DIR, SNAPSHOTS_DIR] {
+        for name in [WORK_DIR, SNAPSHOTS_DIR, ATTACHMENTS_DIR] {
             copy_tree(&source.join(name), &target.join(name))?;
         }
         let _guard = self
@@ -318,11 +319,20 @@ mod tests {
         );
         folders.record_outputs("c1", "r1", &[inside.clone(), outside.clone()]);
 
+        write(
+            &root.path().join("c1").join(ATTACHMENTS_DIR).join("image"),
+            "pixels",
+        );
         folders.copy("c1", "c2").expect("copies");
 
         let copied = folders.work("c2").expect("work").join("report.docx");
         assert_eq!(std::fs::read_to_string(&copied).expect("reads"), "report");
         assert!(root.path().join("c2/snapshots/r1/a.txt").is_file());
+        assert_eq!(
+            std::fs::read_to_string(root.path().join("c2").join(ATTACHMENTS_DIR).join("image"))
+                .expect("reads"),
+            "pixels"
+        );
         assert_eq!(folders.output("c2", "report.docx"), Some(copied));
         assert_eq!(folders.output("c2", "deck.pptx"), Some(outside));
         assert_eq!(folders.output("c1", "report.docx"), Some(inside));
