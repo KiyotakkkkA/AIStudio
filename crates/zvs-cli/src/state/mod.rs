@@ -1919,6 +1919,7 @@ impl App {
             Some(command) => format!("/{} {text}", command.as_str()),
             None => text.clone(),
         });
+        self.transcript.push_attachments(&self.outgoing_attachments);
         self.scroll = 0;
         self.started = self.frame;
         if let Some(id) = self

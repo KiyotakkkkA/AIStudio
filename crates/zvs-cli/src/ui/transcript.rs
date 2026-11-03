@@ -866,9 +866,38 @@ pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
     let expanded = app.expanded;
     let toggle = app.keymap.label(Shortcut::Details);
     for entry in &app.transcript.entries {
-        lines.push(Line::default());
+        if !matches!(entry, Entry::Attachments(_)) {
+            lines.push(Line::default());
+        }
         lines.extend(match entry {
             Entry::User(text) => user(text, width),
+            Entry::Attachments(attachments) => attachments
+                .iter()
+                .flat_map(|attachment| {
+                    let color = if attachment.image {
+                        theme::colors().ok
+                    } else {
+                        theme::colors().accent
+                    };
+                    let icon = if attachment.image { "▧" } else { "▤" };
+                    wrap(&attachment.reference(), width.saturating_sub(8).max(1))
+                        .into_iter()
+                        .enumerate()
+                        .map(move |(index, text)| {
+                            Line::from(vec![
+                                Span::styled(
+                                    if index == 0 {
+                                        format!("  └ {icon} ")
+                                    } else {
+                                        "      ".to_owned()
+                                    },
+                                    theme::faint(),
+                                ),
+                                Span::styled(text, Style::new().fg(color)),
+                            ])
+                        })
+                })
+                .collect(),
             Entry::Assistant { text, reasoning } => assistant(text, reasoning, expanded, width),
             Entry::Tool(call) if call.key == AGENT_DELEGATE && call.meta.is_some() => {
                 subagent_block(call, &[], expanded, app.frame, width)

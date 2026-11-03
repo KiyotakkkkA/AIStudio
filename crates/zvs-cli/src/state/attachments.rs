@@ -8,7 +8,26 @@ pub enum Attachment {
     Image { path: String, name: String },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttachmentLabel {
+    pub name: String,
+    pub image: bool,
+}
+
+impl AttachmentLabel {
+    pub fn reference(&self) -> String {
+        let kind = if self.image { "Image" } else { "Vector" };
+        format!("[{kind} {}]", self.name.replace(['\n', '\r'], " "))
+    }
+}
+
 impl Attachment {
+    pub fn label(&self) -> AttachmentLabel {
+        AttachmentLabel {
+            name: self.name().to_owned(),
+            image: self.image(),
+        }
+    }
     pub fn name(&self) -> &str {
         match self {
             Self::Store { name, .. } | Self::Image { name, .. } => name,

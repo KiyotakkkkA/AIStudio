@@ -98,11 +98,7 @@ impl Input {
     pub fn attach(&mut self, attachment: Attachment, start: usize) {
         self.remove(start, self.cursor);
         self.cursor = start;
-        let label = format!(
-            "[{} {}]",
-            attachment.icon(),
-            attachment.name().replace(['\n', '\r'], " ")
-        );
+        let label = format!("{} {}", attachment.icon(), attachment.label().reference());
         self.insert(&label);
         self.tokens.push(Token {
             start,
@@ -353,7 +349,7 @@ mod tests {
         input.attach(image(), 0);
         input.insert("\nabc");
         input.up();
-        assert_eq!(input.cursor(), "[▧ снимок.png]".len());
+        assert_eq!(input.cursor(), "▧ [Image снимок.png]".len());
         input.backspace();
         assert_eq!(input.text(), " \nabc");
     }

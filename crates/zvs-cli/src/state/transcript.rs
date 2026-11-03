@@ -1,3 +1,4 @@
+use super::attachments::{Attachment, AttachmentLabel};
 use std::collections::BTreeMap;
 
 use serde_json::Value;
@@ -16,6 +17,7 @@ pub enum Tone {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Entry {
     User(String),
+    Attachments(Vec<AttachmentLabel>),
     Assistant { text: String, reasoning: String },
     Tool(Box<ChatToolCallDto>),
     Notice { tone: Tone, text: String },
@@ -203,9 +205,21 @@ impl Transcript {
         let mut transcript = Self::default();
         for message in messages {
             match message.role {
-                MessageRole::User => transcript
-                    .entries
-                    .push(Entry::User(message.content.clone())),
+                MessageRole::User => {
+                    transcript.push_user(&message.content);
+                    if !message.images.is_empty() {
+                        transcript.entries.push(Entry::Attachments(
+                            message
+                                .images
+                                .iter()
+                                .map(|image| AttachmentLabel {
+                                    name: image.name.clone(),
+                                    image: true,
+                                })
+                                .collect(),
+                        ));
+                    }
+                }
                 MessageRole::Event => {
                     if let Some(event) = &message.event {
                         transcript.notice(Tone::Info, crate::copy::process_event(event));
@@ -233,6 +247,14 @@ impl Transcript {
 
     pub fn push_user(&mut self, text: &str) {
         self.entries.push(Entry::User(text.to_owned()));
+    }
+
+    pub fn push_attachments(&mut self, attachments: &[Attachment]) {
+        if !attachments.is_empty() {
+            self.entries.push(Entry::Attachments(
+                attachments.iter().map(Attachment::label).collect(),
+            ));
+        }
     }
 
     pub fn notice(&mut self, tone: Tone, text: impl Into<String>) {
