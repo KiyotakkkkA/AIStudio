@@ -25,7 +25,6 @@ import { useTransition } from "../../ui/motion/fx";
 import ChatQuestionCard, { QuestionAnswers } from "./ChatQuestionCard";
 import FileChangeList from "./FileChangeList";
 import ProcessPlanView from "./ProcessPlanView";
-import BackgroundShellLine from "../backgroundShells/BackgroundShellLine";
 import {
   REJECT_PROCESS,
   RUN_PROCESS,
@@ -70,7 +69,7 @@ import {
 } from "./ToolCallDetails";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import MailDraftView from "../mail/MailDraftView";
-import ToolImages from "./ToolImages";
+import { useToolCallSlots } from "./ToolCallSlots";
 import AppAccessRequest from "../computer/AppAccessRequest";
 import { toolImageReferences } from "./imageData";
 import { MAIL_LEAD, REJECT_MAIL, SEND_MAIL, type MailPreview } from "../mail/mailCopy";
@@ -222,6 +221,7 @@ export function ToolCallCard({
       ? toolImageReferences(call.meta)
       : null;
   const access = approval?.apps;
+  const slots = useToolCallSlots();
 
   return (
     <PipelineItem
@@ -312,7 +312,7 @@ export function ToolCallCard({
                   {exitLabel(finished)} · {durationLabel(finished.durationMs)}
                 </p>
               ) : (
-                <BackgroundShellLine id={finished.shellId} />
+                slots.shell(finished.shellId)
               )}
               <ProcessPlanView plan={finished.process} />
             </div>
@@ -327,7 +327,7 @@ export function ToolCallCard({
             <ResultBlock result={call.result} truncated={call.truncated} />
           )}
           {call.error !== null && <p className="text-[12px] text-err">{call.error}</p>}
-          {images === null ? null : <ToolImages references={images} />}
+          {images === null ? null : slots.images(images)}
           {call.authorisation !== undefined && (
             <AuthorisationNote authorisation={call.authorisation} />
           )}

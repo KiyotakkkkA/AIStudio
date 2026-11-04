@@ -2,15 +2,12 @@ use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 
 use zvs_contract::{
-    AppError, AppErrorCode, AppGrantDto, ComputerAction, ComputerActionState, ComputerAppDto,
-    ComputerApproval, ComputerCall, ComputerDisplay, ComputerRequest, ComputerState,
-    ComputerStatus, DeltaKind, FolderAccessAnswer, FolderGrantChatDto, FolderGrantScope, HostEvent,
-    HostEventDraft, RunId,
+    APPS_APPROVAL_KIND, AppError, AppErrorCode, AppGrantDto, ComputerAction, ComputerActionState,
+    ComputerAppDto, ComputerApproval, ComputerDisplay, ComputerFeed, ComputerState, ComputerStatus,
+    FolderAccessAnswer, FolderGrantChatDto, FolderGrantScope, HostEvent, RunId,
 };
 
-use super::progress::{
-    REPLY_KEPT, call_entry, keep_tail, merge_call, pending_request, settled, tool_call,
-};
+use super::progress::{Absorbed, absorb, approval_id, approval_kind, approval_run, derived_status};
 use super::sidecar::SharedDesktop;
 use crate::browser::AgentRuns;
 use crate::data::schema::AppGrantRow;
@@ -87,10 +84,9 @@ struct Session {
     next: u64,
     handoff: bool,
     started_at: Option<i64>,
-    reply: String,
-    calls: Vec<ComputerCall>,
-    requests: Vec<ComputerRequest>,
-    request_runs: HashMap<String, String>,
+    feed: ComputerFeed,
+    seq: Option<u64>,
+    held: Option<Vec<HostEvent>>,
     token_notified: i64,
 }
 
@@ -116,6 +112,14 @@ struct Inner {
 
 #[derive(Clone)]
 pub struct ComputerAgent(Arc<Inner>);
+
+fn apply(session: &mut Session, event: &HostEvent) -> Absorbed {
+    if session.seq.is_some_and(|seen| event.seq <= seen) {
+        return Absorbed::Nothing;
+    }
+    session.seq = Some(event.seq);
+    absorb(&mut session.feed, &event.body)
+}
 
 impl ComputerAgent {
     pub fn new(
@@ -164,10 +168,25 @@ impl ComputerAgent {
     }
 
     pub fn state(&self) -> ComputerState {
-        let (conversation, run) = {
+        let (conversation, run, mut feed) = {
             let session = lock(&self.0.session);
-            (session.conversation.clone(), session.run.clone())
+            (
+                session.conversation.clone(),
+                session.run.clone(),
+                session.feed.clone(),
+            )
         };
+        if let Some(controls) = self.0.controls.get() {
+            feed.approvals.retain(|request| {
+                match (
+                    approval_run(request).or(run.as_deref()),
+                    approval_id(request),
+                ) {
+                    (Some(owner), Some(id)) => controls.runs.pending(owner, id),
+                    _ => false,
+                }
+            });
+        }
         let apps = conversation
             .as_deref()
             .map(|conversation| {
@@ -177,21 +196,20 @@ impl ComputerAgent {
             })
             .unwrap_or_default();
         let session = lock(&self.0.session);
+        let actions: Vec<ComputerAction> = session.actions.iter().cloned().collect();
         ComputerState {
             active: session.conversation.is_some(),
-            status: session.status,
+            status: derived_status(session.status, &feed, &actions, session.approval.is_some()),
             conversation_id: session.conversation.clone(),
             title: session.title.clone(),
             display: session.display,
             apps,
-            actions: session.actions.iter().cloned().collect(),
+            actions,
             approval: session.approval.clone(),
             collapsed: session.collapsed,
             appearance: zvs_contract::BrowserAppearance::default(),
             started_at: session.started_at,
-            reply: session.reply.clone(),
-            calls: session.calls.clone(),
-            requests: session.requests.clone(),
+            feed,
         }
     }
 
@@ -258,10 +276,9 @@ impl ComputerAgent {
         {
             let mut session = lock(&self.0.session);
             session.started_at = Some(started);
-            session.reply.clear();
-            session.calls.clear();
-            session.requests.clear();
-            session.request_runs.clear();
+            session.feed = ComputerFeed::default();
+            session.seq = None;
+            session.held = Some(Vec::new());
         }
         let observer = self.clone();
         let subscription = controls.runs.observe(
@@ -271,6 +288,15 @@ impl ComputerAgent {
         if let Some(previous) = std::mem::replace(&mut *lock(&self.0.observing), subscription) {
             previous.unsubscribe();
         }
+        let recorded = controls.runs.record(run);
+        {
+            let mut session = lock(&self.0.session);
+            let held = session.held.take().unwrap_or_default();
+            for event in recorded.iter().chain(held.iter()) {
+                apply(&mut session, event);
+            }
+        }
+        self.notify(ComputerChange::Updated);
         let Ok(handle) = tokio::runtime::Handle::try_current() else {
             return;
         };
@@ -301,45 +327,20 @@ impl ComputerAgent {
             if session.conversation.is_none() {
                 return;
             }
-            match &event.body {
-                HostEventDraft::Token { delta, kind } => {
-                    if *kind == Some(DeltaKind::Reasoning) {
-                        false
-                    } else {
-                        session.reply.push_str(delta);
-                        keep_tail(&mut session.reply, REPLY_KEPT);
-                        let due = now - session.token_notified >= TOKEN_NOTIFY_MS;
-                        if due {
-                            session.token_notified = now;
-                        }
-                        due
+            if let Some(held) = session.held.as_mut() {
+                held.push(event.clone());
+                return;
+            }
+            match apply(&mut session, event) {
+                Absorbed::Nothing => false,
+                Absorbed::Changed => true,
+                Absorbed::Token => {
+                    let due = now - session.token_notified >= TOKEN_NOTIFY_MS;
+                    if due {
+                        session.token_notified = now;
                     }
+                    due
                 }
-                HostEventDraft::Step { step } => tool_call(step).is_some_and(|call| {
-                    if let Some(approval) = settled(&call) {
-                        session.requests.retain(|request| request.id != approval);
-                        session.request_runs.remove(approval);
-                    }
-                    merge_call(&mut session.calls, call_entry(&call));
-                    true
-                }),
-                HostEventDraft::Approval { request } => {
-                    pending_request(request).is_some_and(|pending| {
-                        if session
-                            .requests
-                            .iter()
-                            .any(|request| request.id == pending.request.id)
-                        {
-                            return false;
-                        }
-                        session
-                            .request_runs
-                            .insert(pending.request.id.clone(), pending.run);
-                        session.requests.push(pending.request);
-                        true
-                    })
-                }
-                _ => false,
             }
         };
         if changed {
@@ -347,16 +348,24 @@ impl ComputerAgent {
         }
     }
 
-    fn request_run(&self, id: &str) -> Option<String> {
-        lock(&self.0.session).request_runs.get(id).cloned()
+    fn feed_request(&self, id: &str) -> Option<(String, Option<String>)> {
+        let session = lock(&self.0.session);
+        let request = session
+            .feed
+            .approvals
+            .iter()
+            .find(|request| approval_id(request) == Some(id))?;
+        let run = approval_run(request)
+            .map(str::to_owned)
+            .or_else(|| session.run.clone())?;
+        Some((run, approval_kind(request).map(str::to_owned)))
     }
 
     fn settle_request(&self, id: &str) {
-        {
-            let mut session = lock(&self.0.session);
-            session.requests.retain(|request| request.id != id);
-            session.request_runs.remove(id);
-        }
+        lock(&self.0.session)
+            .feed
+            .approvals
+            .retain(|request| approval_id(request) != Some(id));
         self.notify(ComputerChange::Updated);
     }
 
@@ -669,17 +678,22 @@ impl ComputerAgent {
         approval: &str,
         answer: FolderAccessAnswer,
     ) -> Result<(), AppError> {
-        if let Some(run) = self.request_run(approval) {
-            let folders = self
-                .controls()?
-                .folders
-                .ok_or_else(|| AppError::new(AppErrorCode::Conflict, NOT_PENDING))?;
-            folders.answer(&run, approval, answer)?;
-            self.settle_request(approval);
-            return Ok(());
+        match self.feed_request(approval) {
+            Some((run, kind)) if kind.as_deref() != Some(APPS_APPROVAL_KIND) => {
+                let folders = self
+                    .controls()?
+                    .folders
+                    .ok_or_else(|| AppError::new(AppErrorCode::Conflict, NOT_PENDING))?;
+                folders.answer(&run, approval, answer)?;
+            }
+            Some((run, _)) => self.answer(&run, approval, answer)?,
+            None => {
+                let run = self.pending(approval)?;
+                self.answer(&run, approval, answer)?;
+            }
         }
-        let run = self.pending(approval)?;
-        self.answer(&run, approval, answer)
+        self.settle_request(approval);
+        Ok(())
     }
 
     pub fn collapse(&self, collapsed: bool) {
@@ -726,23 +740,23 @@ impl ComputerAgent {
     }
 
     pub fn approve(&self, id: &str) -> Result<(), AppError> {
-        if let Some(run) = self.request_run(id) {
-            self.controls()?.runs.approve(&run, id)?;
-            self.settle_request(id);
-            return Ok(());
-        }
-        let run = self.pending(id)?;
-        self.controls()?.runs.approve(&run, id)
+        let run = match self.feed_request(id) {
+            Some((run, _)) => run,
+            None => self.pending(id)?,
+        };
+        self.controls()?.runs.approve(&run, id)?;
+        self.settle_request(id);
+        Ok(())
     }
 
     pub fn deny(&self, id: &str) -> Result<(), AppError> {
-        if let Some(run) = self.request_run(id) {
-            self.controls()?.runs.deny(&run, id)?;
-            self.settle_request(id);
-            return Ok(());
-        }
-        let run = self.pending(id)?;
-        self.controls()?.runs.deny(&run, id)
+        let run = match self.feed_request(id) {
+            Some((run, _)) => run,
+            None => self.pending(id)?,
+        };
+        self.controls()?.runs.deny(&run, id)?;
+        self.settle_request(id);
+        Ok(())
     }
 
     pub async fn say(&self, text: &str) -> Result<(), AppError> {

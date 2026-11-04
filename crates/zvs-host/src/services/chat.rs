@@ -66,6 +66,7 @@ use super::retrieval_query::retrieval_query;
 use super::runs::{RunService, WeakRunService};
 use super::subagents::SubagentService;
 use super::token_estimate::TOKENIZER;
+use super::tool_arguments::{INVALID_ARGUMENTS, arguments_failure};
 use super::tool_loop::{
     CallOutcome, ChatTurn, LoopBudget, LoopCall, LoopHost, LoopTranscript, RoundHook, ToolLoop,
 };
@@ -2313,11 +2314,18 @@ impl GenerateChatNode {
                     (error.message == SKILL_READ_ONLY).then(|| error.message.clone()),
                 )))
             }
-            Err(error) => Ok(plain(settle(
-                ChatToolCallStatus::Failed,
-                Some(&error.message),
-                None,
-            ))),
+            Err(error) => {
+                let failure = arguments_failure(&error, &tool.parameters, &observed);
+                Ok(plain(settle(
+                    ChatToolCallStatus::Failed,
+                    Some(if failure.is_some() {
+                        INVALID_ARGUMENTS
+                    } else {
+                        &error.message
+                    }),
+                    failure,
+                )))
+            }
         }
     }
 

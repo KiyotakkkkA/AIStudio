@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::browser::BrowserAppearance;
-use crate::chat::{CHAT_TEXT_MAX, ChatToolCallStatus};
+use crate::chat::{CHAT_TEXT_MAX, ChatRoundDto, ChatToolCallDto};
 use crate::errors::AppError;
+use crate::events::ApprovalRequestDto;
 use crate::folders::{FOLDER_PATH_MAX, FolderAccessAnswer, FolderGrantChatDto, FolderGrantScope};
 use crate::ids::{RunId, is_wire_uuid};
 use crate::primitives::Timestamp;
@@ -199,7 +200,7 @@ pub struct ComputerDisplay {
     pub height: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ComputerState {
     pub active: bool,
@@ -239,46 +240,18 @@ pub struct ComputerState {
     )]
     pub started_at: Option<Timestamp>,
     #[serde(default)]
-    pub reply: String,
-    #[serde(default)]
-    pub calls: Vec<ComputerCall>,
-    #[serde(default)]
-    pub requests: Vec<ComputerRequest>,
+    pub feed: ComputerFeed,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ComputerCall {
-    pub id: String,
-    pub key: String,
-    pub status: ChatToolCallStatus,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub summary: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ComputerRequest {
-    pub id: String,
-    pub kind: String,
-    pub tool: String,
-    pub action: String,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub reason: Option<String>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::wire::present"
-    )]
-    pub detail: Option<String>,
+pub struct ComputerFeed {
+    pub content: String,
+    pub reasoning: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rounds: Vec<ChatRoundDto>,
+    pub tool_calls: Vec<ChatToolCallDto>,
+    pub approvals: Vec<ApprovalRequestDto>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -323,9 +296,7 @@ mod tests {
                 "actions": [],
                 "collapsed": false,
                 "appearance": { "theme": "system", "darkPalette": "zvs-dark", "lightPalette": "zvs-light" },
-                "reply": "",
-                "calls": [],
-                "requests": []
+                "feed": { "content": "", "reasoning": "", "toolCalls": [], "approvals": [] }
             })
         );
     }

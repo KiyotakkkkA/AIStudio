@@ -3,7 +3,7 @@ import { observer } from "mobx-react-lite";
 import Button from "../../ui/atoms/buttons/Button";
 import type ChatStore from "./ChatStore";
 import FadeIn from "../../ui/motion/FadeIn";
-import { isBuiltinTool, toolTitle } from "./toolCallCopy";
+import { ALLOW_ONCE, FORBID, approvalQuestion } from "./toolCallCopy";
 import { subagentApprovalTitle } from "../subagents/subagentCopy";
 import MailDraftView from "../mail/MailDraftView";
 
@@ -23,15 +23,7 @@ export default observer(function ChatApprovals({ store }: { readonly store: Chat
                   {subagentApprovalTitle(request.subagent.label)}
                 </span>
               )}
-              Разрешить{" "}
-              {request.subject === "llm.generate"
-                ? "генерацию ответа"
-                : request.subject === "vector.search"
-                  ? "поиск в подключённом хранилище"
-                  : isBuiltinTool(request.subject)
-                    ? `«${toolTitle(request.subject)}»`
-                    : request.subject}{" "}
-              для этого запроса?
+              {approvalQuestion(request.subject)}
             </p>
             {request.mail === undefined ? null : (
               <div className="w-full">
@@ -45,14 +37,14 @@ export default observer(function ChatApprovals({ store }: { readonly store: Chat
                 tone="primary"
                 onClick={() => void store.decideApproval(request.id, true)}
               >
-                Разрешить один раз
+                {ALLOW_ONCE}
               </Button>
               <Button
                 size="sm"
                 disabled={request.busy}
                 onClick={() => void store.decideApproval(request.id, false)}
               >
-                Запретить
+                {FORBID}
               </Button>
             </div>
           </div>

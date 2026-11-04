@@ -28,6 +28,7 @@ use crate::services::chat_tools::{
     OfferedTool, TOOL_RESULT_MAX_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result,
     parse_tool_arguments, tool_result_text, tool_specs, unoffered_text,
 };
+use crate::services::tool_arguments::arguments_failure;
 use crate::services::tool_loop::{request_tokens, round_tokens};
 use crate::skills::{presented, result_limit};
 use crate::tools::ToolRegistry;
@@ -426,9 +427,10 @@ impl SessionNode {
             );
         }
         progress.usage.tool_calls += 1;
+        let observed = Value::Object(arguments);
         let Some(invocation) = context.invoke_tool(ToolStepRequest {
             key: tool.key.clone(),
-            input: Value::Object(arguments),
+            input: observed.clone(),
             label: format!("call{}", progress.usage.tool_calls),
             minimum_tier: minimum_tier(tool, progress.mode),
             on_approval: None,
@@ -470,7 +472,9 @@ impl SessionNode {
                     AppErrorCode::ApprovalDenied => "denied",
                     _ => "failed",
                 };
-                Ok(shape(status, error.message))
+                let text =
+                    arguments_failure(&error, &tool.parameters, &observed).unwrap_or(error.message);
+                Ok(shape(status, text))
             }
         }
     }

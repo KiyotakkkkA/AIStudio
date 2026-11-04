@@ -7,7 +7,7 @@ use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, AppErrorCode, BrowserActionState, BrowserAgentAction, BrowserAgentApproval,
     BrowserAgentState, BrowserAgentStatus, BrowserAuthorisation, BrowserGrantDto, BrowserSiteGrant,
-    RunId,
+    HostEvent, RunId,
 };
 
 use super::capability::BrowserCapability;
@@ -52,6 +52,14 @@ pub trait AgentRuns: Send + Sync {
     fn started(&self, _run_id: &str) -> Option<i64> {
         None
     }
+
+    fn record(&self, _run_id: &str) -> Vec<HostEvent> {
+        Vec::new()
+    }
+
+    fn pending(&self, _run_id: &str, _approval_id: &str) -> bool {
+        true
+    }
 }
 
 fn run_id(id: &str) -> Result<RunId, AppError> {
@@ -90,6 +98,16 @@ impl AgentRuns for RunService {
     fn started(&self, id: &str) -> Option<i64> {
         let run = self.get(&RunId::parse(id)?).ok()?;
         Some(run.started_at.unwrap_or(run.created_at))
+    }
+
+    fn record(&self, id: &str) -> Vec<HostEvent> {
+        Self::record(self, id).unwrap_or_default()
+    }
+
+    fn pending(&self, id: &str, approval_id: &str) -> bool {
+        self.approvals()
+            .is_pending(id, approval_id)
+            .unwrap_or(false)
     }
 }
 

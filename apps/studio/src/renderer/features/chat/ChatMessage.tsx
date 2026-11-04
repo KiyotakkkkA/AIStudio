@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type {
   ChatCitationDto,
   ChatRoundDto,
@@ -14,11 +14,7 @@ import { mdiFileEyeOutline } from "@mdi/js";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import ChatMarkdown from "./ChatMarkdown";
 import AnswerQuote from "./AnswerQuote";
-import ReasoningBlock from "./ReasoningBlock";
-import { answerBlocks } from "./answerRounds";
-import { PIPELINE_LABEL, PipelineList } from "./Pipeline";
-import { TOOL_CALLS_LABEL } from "./toolCallCopy";
-import ToolWorkGroup, { workGroupLabel } from "./ToolWorkGroup";
+import AnswerFlow from "./AnswerFlow";
 import ChatSources from "./ChatSources";
 import WebSourceCard from "./WebSourceCard";
 import { WEB_SOURCES_TAB } from "./webSources";
@@ -112,7 +108,6 @@ export default function ChatMessage({
   const [activeTab, setActiveTab] = useState<string>(tabs[0] ?? "");
   const selectedTab = tabs.find((tab) => tab === activeTab) ?? tabs[0] ?? "";
   const selectedCitations = citations.filter((citation) => citation.storeId === selectedTab);
-  const blocks = answerBlocks(content, reasoning, rounds, toolCalls);
   const markdown = (text: string, streaming: boolean) => (
     <ChatMarkdown
       content={text}
@@ -124,67 +119,23 @@ export default function ChatMessage({
     />
   );
   const sources = citationSources(citations, storeName);
-
-  const units: ReactNode[] = [];
-  let pipelineItems: ReactNode[] = [];
-  let pipelineKey = "";
-  let pipelineReasoning = false;
-  let pipelineCalls = 0;
-  let pipelineMs = 0;
-  const flushPipeline = () => {
-    if (pipelineItems.length === 0) return;
-    const list = (
-      <PipelineList label={pipelineReasoning ? PIPELINE_LABEL : TOOL_CALLS_LABEL}>
-        {pipelineItems}
-      </PipelineList>
-    );
-    units.push(
-      !generating && pipelineCalls > 0 ? (
-        <ToolWorkGroup key={pipelineKey} label={workGroupLabel(pipelineMs, pipelineCalls)}>
-          {list}
-        </ToolWorkGroup>
-      ) : (
-        <Fragment key={pipelineKey}>{list}</Fragment>
-      ),
-    );
-    pipelineItems = [];
-    pipelineReasoning = false;
-    pipelineCalls = 0;
-    pipelineMs = 0;
-  };
-  blocks.forEach((block, index) => {
-    if (block.kind === "tools") {
-      if (pipelineItems.length === 0) pipelineKey = block.key;
-      pipelineCalls += block.calls.length;
-      pipelineMs += block.calls.reduce((sum, call) => sum + call.durationMs, 0);
-      pipelineItems.push(<Fragment key={block.key}>{renderToolItems(block.calls)}</Fragment>);
-      return;
-    }
-    const last = generating && index === blocks.length - 1;
-    if (block.reasoning.trim().length > 0) {
-      if (pipelineItems.length === 0) pipelineKey = block.key;
-      pipelineReasoning = true;
-      pipelineItems.push(
-        <ReasoningBlock
-          key={`${block.key}-reasoning`}
-          reasoning={block.reasoning}
-          thinking={last && block.text === ""}
-        />,
-      );
-    }
-    if (block.text.trim().length === 0) return;
-    flushPipeline();
-    units.push(
-      messageId === undefined || generating ? (
-        <Fragment key={block.key}>{markdown(block.text, last)}</Fragment>
-      ) : (
-        <AnswerQuote key={block.key} messageId={messageId}>
-          {markdown(block.text, false)}
-        </AnswerQuote>
-      ),
-    );
-  });
-  flushPipeline();
+  const units = (
+    <AnswerFlow
+      content={content}
+      reasoning={reasoning}
+      rounds={rounds}
+      toolCalls={toolCalls}
+      generating={generating}
+      renderToolItems={renderToolItems}
+      renderText={(text, last) =>
+        messageId === undefined || generating ? (
+          markdown(text, last)
+        ) : (
+          <AnswerQuote messageId={messageId}>{markdown(text, false)}</AnswerQuote>
+        )
+      }
+    />
+  );
 
   return (
     <article aria-label="Ответ ассистента" className="group flex min-w-0 gap-3">

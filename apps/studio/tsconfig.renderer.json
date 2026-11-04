@@ -3,10 +3,17 @@
   "compilerOptions": {
     "composite": true,
     "noEmit": true,
-    "rootDir": "src/renderer",
+    "rootDir": "src",
     "lib": ["ES2023", "ESNext.Collection", "ESNext.Disposable", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "types": ["vite/client"]
   },
-  "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx"]
+  "include": [
+    "src/renderer/**/*.ts",
+    "src/renderer/**/*.tsx",
+    "src/computer-ui/**/*.ts",
+    "src/computer-ui/**/*.tsx",
+    "src/browser-ui/Icon.tsx",
+    "src/browser-ui/appearance.ts"
+  ]
 }

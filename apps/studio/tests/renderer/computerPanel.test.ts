@@ -1,12 +1,24 @@
 import { expect, test } from "vitest";
+import type { ComputerAction } from "@zvs/shared";
 import {
-  ACTION_TITLE,
-  REQUEST_TITLE,
+  STATUS_TEXT,
+  currentAction,
   elapsedText,
-  requestTitle,
+  statusLine,
 } from "../../src/computer-ui/computerCopy.ts";
+import { approvalView } from "../../src/renderer/features/chat/approvalModel.ts";
 import { toolPresentation } from "../../src/renderer/features/chat/toolPresentation.ts";
-import { toolPresentation as reexported } from "../../src/renderer/features/chat/toolCallCopy.ts";
+import {
+  approvalQuestion,
+  toolPresentation as reexported,
+} from "../../src/renderer/features/chat/toolCallCopy.ts";
+
+const RUN = "0199aa11-3333-7111-8111-111111111111";
+const APPROVAL = "0199aa11-5555-7111-8111-111111111111";
+
+function action(id: number, state: ComputerAction["state"], label: string): ComputerAction {
+  return { id, tool: "computer.act", label, state, startedAt: 0 };
+}
 
 test("the panel timer counts whole seconds since the turn started", () => {
   expect(elapsedText(undefined, 5_000)).toBeNull();
@@ -15,10 +27,45 @@ test("the panel timer counts whole seconds since the turn started", () => {
   expect(elapsedText(5_000, 1_000)).toBe(`${(0).toLocaleString("ru-RU")} с`);
 });
 
-test("each confirmation kind has its own title and unknown kinds fall back", () => {
-  expect(requestTitle("process")).toBe(REQUEST_TITLE.process);
-  expect(requestTitle("folder")).toBe(REQUEST_TITLE.folder);
-  expect(requestTitle("plugin")).toBe(ACTION_TITLE);
+test("the status line names the action on the screen while the agent works", () => {
+  const actions = [
+    action(1, "done", "Снимок экрана"),
+    action(2, "running", "Нажатие"),
+    action(3, "done", "Ввод текста"),
+  ];
+
+  expect(currentAction(actions)?.id).toBe(2);
+  expect(statusLine("working", actions)).toBe(`${STATUS_TEXT.working}: Нажатие`);
+  expect(statusLine("starting", actions)).toBe(STATUS_TEXT.starting);
+  expect(statusLine("working", [action(1, "done", "Снимок экрана")])).toBe(STATUS_TEXT.working);
+});
+
+test("the panel and the chat read approvals the same way", () => {
+  const view = approvalView({
+    id: APPROVAL,
+    runId: RUN,
+    kind: "apps",
+    subject: "computer.request_access",
+    apps: [{ app: "excel.exe", path: "C:\\excel.exe" }],
+    detail: "Заполнить таблицу",
+  });
+
+  expect(view).toEqual({
+    id: APPROVAL,
+    runId: RUN,
+    subject: "computer.request_access",
+    changes: [],
+    apps: [{ app: "excel.exe", path: "C:\\excel.exe" }],
+    detail: "Заполнить таблицу",
+  });
+  expect(approvalView({ id: APPROVAL, subject: "shell.run" })).toBeNull();
+});
+
+test("a standalone approval names the tool it asks about", () => {
+  expect(approvalQuestion("shell.run")).toBe(
+    `Разрешить «${toolPresentation("shell.run").title}» для этого запроса?`,
+  );
+  expect(approvalQuestion("vendor.custom")).toBe("Разрешить vendor.custom для этого запроса?");
 });
 
 test("the panel and the chat share one tool title table", () => {

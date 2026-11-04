@@ -35,6 +35,7 @@ pub mod stored;
 pub mod subagents;
 pub mod system;
 pub mod token_estimate;
+pub mod tool_arguments;
 pub mod tool_loop;
 pub mod vector_eval;
 pub mod vector_health;

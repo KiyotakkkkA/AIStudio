@@ -1,73 +1,40 @@
 use serde_json::Value;
 use zvs_contract::{
-    APPS_APPROVAL_KIND, ApprovalRequestDto, ChatToolCallDto, ChatToolCallStatus, ComputerCall,
-    ComputerRequest, StepEventDto,
+    ApprovalRequestDto, ChatToolCallDto, ChatToolCallStatus, ComputerAction, ComputerActionState,
+    ComputerFeed, ComputerStatus, DeltaKind, HostEventDraft, MessageDto, StepEventDto,
 };
 
-use crate::commands::SHELL_RUN;
+use crate::services::chat_reply::{append_round, apply_tool_call};
 
-pub const REPLY_KEPT: usize = 2000;
-pub const CALLS_KEPT: usize = 30;
-pub const DETAIL_KEPT: usize = 1200;
 const TOOL_CALL_DOMAIN: &str = "tool-call";
-const COMPUTER_PREFIX: &str = "computer.";
+const PERSIST_NODE: &str = "persist";
 
-pub fn keep_tail(text: &mut String, kept: usize) {
-    let count = text.chars().count();
-    if count > kept {
-        let cut = text
-            .char_indices()
-            .nth(count - kept)
-            .map_or(0, |(index, _)| index);
-        text.drain(..cut);
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Absorbed {
+    Nothing,
+    Token,
+    Changed,
 }
 
-fn keep_head(text: &str, kept: usize) -> String {
-    if text.chars().count() <= kept {
-        return text.to_owned();
-    }
-    let mut head: String = text.chars().take(kept).collect();
-    head.push('…');
-    head
-}
-
-pub fn tool_call(step: &StepEventDto) -> Option<ChatToolCallDto> {
+pub fn tool_call(step: &StepEventDto) -> Option<(usize, ChatToolCallDto)> {
     if step.get("domain").and_then(Value::as_str) != Some(TOOL_CALL_DOMAIN) {
         return None;
     }
-    serde_json::from_value(step.get("call")?.clone()).ok()
+    let index = step
+        .get("index")
+        .and_then(Value::as_u64)
+        .and_then(|index| usize::try_from(index).ok())?;
+    let call = serde_json::from_value(step.get("call")?.clone()).ok()?;
+    Some((index, call))
 }
 
-fn text_field<'a>(value: &'a Value, pointer: &str) -> Option<&'a str> {
-    value
-        .pointer(pointer)
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|text| !text.is_empty())
-}
-
-pub fn call_entry(call: &ChatToolCallDto) -> ComputerCall {
-    let summary = (call.key == SHELL_RUN)
-        .then(|| text_field(&call.arguments, "/reason").map(|reason| keep_head(reason, 200)))
-        .flatten();
-    ComputerCall {
-        id: call.id.clone(),
-        key: call.key.clone(),
-        status: call.status,
-        summary,
+fn persisted(step: &StepEventDto) -> Option<MessageDto> {
+    if step.get("nodeId").and_then(Value::as_str) != Some(PERSIST_NODE)
+        || step.get("status").and_then(Value::as_str) != Some("succeeded")
+    {
+        return None;
     }
-}
-
-pub fn merge_call(calls: &mut Vec<ComputerCall>, call: ComputerCall) {
-    match calls.iter_mut().find(|entry| entry.id == call.id) {
-        Some(entry) => *entry = call,
-        None => calls.push(call),
-    }
-    if calls.len() > CALLS_KEPT {
-        let extra = calls.len() - CALLS_KEPT;
-        calls.drain(..extra);
-    }
+    serde_json::from_value(step.get("output")?.clone()).ok()
 }
 
 pub fn settled(call: &ChatToolCallDto) -> Option<&str> {
@@ -77,70 +44,100 @@ pub fn settled(call: &ChatToolCallDto) -> Option<&str> {
     }
 }
 
-fn quoted(argument: &str) -> String {
-    if !argument.is_empty() && !argument.contains([' ', '\t', '"']) {
-        return argument.to_owned();
-    }
-    format!("\"{}\"", argument.replace('"', "\\\""))
+pub fn approval_id(request: &ApprovalRequestDto) -> Option<&str> {
+    request.get("id").and_then(Value::as_str)
 }
 
-fn joined(value: &Value, list: &str, field: &str) -> Option<String> {
-    let lines: Vec<&str> = value
-        .get(list)?
-        .as_array()?
+pub fn approval_run(request: &ApprovalRequestDto) -> Option<&str> {
+    request.get("runId").and_then(Value::as_str)
+}
+
+pub fn approval_kind(request: &ApprovalRequestDto) -> Option<&str> {
+    request.get("kind").and_then(Value::as_str)
+}
+
+pub fn absorb(feed: &mut ComputerFeed, body: &HostEventDraft) -> Absorbed {
+    match body {
+        HostEventDraft::Token { delta, kind } => {
+            if *kind == Some(DeltaKind::Reasoning) {
+                feed.reasoning.push_str(delta);
+            } else {
+                feed.content.push_str(delta);
+            }
+            append_round(&mut feed.rounds, &feed.tool_calls, *kind, delta);
+            Absorbed::Token
+        }
+        HostEventDraft::Step { step } => {
+            if let Some((index, call)) = tool_call(step) {
+                if let Some(approval) = settled(&call).map(str::to_owned) {
+                    feed.approvals
+                        .retain(|request| approval_id(request) != Some(approval.as_str()));
+                }
+                apply_tool_call(&mut feed.tool_calls, index, call);
+                return Absorbed::Changed;
+            }
+            match persisted(step) {
+                Some(message) => {
+                    feed.content = message.content;
+                    feed.reasoning = message.reasoning;
+                    Absorbed::Changed
+                }
+                None => Absorbed::Nothing,
+            }
+        }
+        HostEventDraft::Approval { request } => {
+            let Some(id) = approval_id(request) else {
+                return Absorbed::Nothing;
+            };
+            if feed
+                .approvals
+                .iter()
+                .any(|known| approval_id(known) == Some(id))
+            {
+                return Absorbed::Nothing;
+            }
+            feed.approvals.push(request.clone());
+            Absorbed::Changed
+        }
+        _ => Absorbed::Nothing,
+    }
+}
+
+pub fn derived_status(
+    base: ComputerStatus,
+    feed: &ComputerFeed,
+    actions: &[ComputerAction],
+    approval_open: bool,
+) -> ComputerStatus {
+    if matches!(base, ComputerStatus::Idle | ComputerStatus::Stopping) {
+        return base;
+    }
+    let waiting = approval_open
+        || !feed.approvals.is_empty()
+        || feed.tool_calls.iter().any(|call| {
+            matches!(
+                call.status,
+                ChatToolCallStatus::AwaitingApproval | ChatToolCallStatus::AwaitingAnswer
+            )
+        })
+        || actions
+            .iter()
+            .any(|action| action.state == ComputerActionState::Waiting);
+    if waiting {
+        return ComputerStatus::Awaiting;
+    }
+    let running = feed
+        .tool_calls
         .iter()
-        .filter_map(|entry| entry.get(field).and_then(Value::as_str))
-        .collect();
-    (!lines.is_empty()).then(|| lines.join("\n"))
-}
-
-fn process_detail(process: &Value) -> Option<String> {
-    if let Some(source) = text_field(process, "/source") {
-        return Some(source.to_owned());
+        .any(|call| call.status == ChatToolCallStatus::Running)
+        || actions
+            .iter()
+            .any(|action| action.state == ComputerActionState::Running);
+    if running {
+        ComputerStatus::Working
+    } else {
+        ComputerStatus::Starting
     }
-    let argv: Vec<String> = process
-        .get("argv")?
-        .as_array()?
-        .iter()
-        .filter_map(Value::as_str)
-        .map(quoted)
-        .collect();
-    (!argv.is_empty()).then(|| argv.join(" "))
-}
-
-pub struct PendingRequest {
-    pub request: ComputerRequest,
-    pub run: String,
-}
-
-pub fn pending_request(request: &ApprovalRequestDto) -> Option<PendingRequest> {
-    let value = Value::Object(request.clone());
-    let id = text_field(&value, "/id")?.to_owned();
-    let run = text_field(&value, "/runId")?.to_owned();
-    let kind = text_field(&value, "/kind").unwrap_or("approval").to_owned();
-    let tool = text_field(&value, "/tool")
-        .or_else(|| text_field(&value, "/subject"))?
-        .to_owned();
-    if kind == APPS_APPROVAL_KIND || tool.starts_with(COMPUTER_PREFIX) {
-        return None;
-    }
-    let detail = match kind.as_str() {
-        "process" => value.get("process").and_then(process_detail),
-        "files" => joined(&value, "changes", "path"),
-        "folder" => joined(&value, "folders", "path"),
-        _ => text_field(&value, "/detail").map(str::to_owned),
-    };
-    Some(PendingRequest {
-        request: ComputerRequest {
-            id,
-            kind,
-            action: text_field(&value, "/action").unwrap_or_default().to_owned(),
-            tool,
-            reason: text_field(&value, "/process/reason").map(str::to_owned),
-            detail: detail.map(|detail| keep_head(&detail, DETAIL_KEPT)),
-        },
-        run,
-    })
 }
 
 #[cfg(test)]

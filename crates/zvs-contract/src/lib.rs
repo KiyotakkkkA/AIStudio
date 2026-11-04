@@ -106,9 +106,8 @@ pub use cli::{
 };
 pub use computer::{
     APPS_APPROVAL_KIND, AnswerAppRequestInput, AppGrantDto, AppGrantRef, AppGrantsListOutput,
-    ComputerAction, ComputerActionState, ComputerAppDto, ComputerApproval, ComputerCall,
-    ComputerCommand, ComputerDisplay, ComputerPointer, ComputerRequest, ComputerState,
-    ComputerStatus,
+    ComputerAction, ComputerActionState, ComputerAppDto, ComputerApproval, ComputerCommand,
+    ComputerDisplay, ComputerFeed, ComputerPointer, ComputerState, ComputerStatus,
 };
 pub use documents::{
     DOCUMENT_BYTES_DATA_MAX, DOCUMENT_BYTES_PAGE_MAX, DOCUMENT_LIST_MAX, DOCUMENT_PATH_MAX,

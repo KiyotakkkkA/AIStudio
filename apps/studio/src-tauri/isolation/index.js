@@ -3,6 +3,9 @@ const allowed = new Set([
   "events_subscribe",
   "browser_command",
   "browser_subscribe",
+  "computer_command",
+  "computer_subscribe",
+  "computer_pointer",
   "plugin:__TAURI_CHANNEL__|fetch",
 ]);
 

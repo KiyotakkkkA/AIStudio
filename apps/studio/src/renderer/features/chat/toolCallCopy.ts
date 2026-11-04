@@ -84,6 +84,18 @@ export const APPROVAL_QUESTION = "Разрешить?";
 export const ALLOW_ONCE = "Разрешить один раз";
 export const FORBID = "Запретить";
 
+export function approvalQuestion(subject: string): string {
+  const target =
+    subject === "llm.generate"
+      ? "генерацию ответа"
+      : subject === "vector.search"
+        ? "поиск в подключённом хранилище"
+        : isBuiltinTool(subject)
+          ? `«${toolTitle(subject)}»`
+          : subject;
+  return `Разрешить ${target} для этого запроса?`;
+}
+
 export function lineRange(start: number | null, end: number | null): string {
   if (start === null && end === null) return WHOLE_FILE;
   if (end === null) return `строки ${String(start)}–конец`;

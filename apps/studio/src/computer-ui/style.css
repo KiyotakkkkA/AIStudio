@@ -88,6 +88,9 @@ svg {
   font-weight: 600;
 }
 .badge-status {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--color-main-400);
 }
 kbd {
@@ -170,7 +173,7 @@ kbd {
   color: var(--color-main-500);
 }
 
-button {
+.chrome-button {
   display: inline-flex;
   gap: 6px;
   align-items: center;
@@ -186,183 +189,51 @@ button {
   cursor: pointer;
   white-space: nowrap;
 }
-button:hover:not(:disabled) {
+.chrome-button:hover:not(:disabled) {
   background: var(--color-main-850);
   border-color: var(--color-line-strong);
 }
-button:disabled {
+.chrome-button:disabled {
   opacity: 0.4;
   cursor: default;
 }
-button:focus-visible,
-textarea:focus-visible {
+.chrome-button:focus-visible,
+.composer textarea:focus-visible {
   outline: 2px solid var(--color-accent-line);
   outline-offset: -2px;
 }
-button.primary {
-  background: var(--color-accent-medium);
-  border-color: transparent;
-  color: #fff;
-}
-button.primary:hover:not(:disabled) {
-  background: var(--color-accent-dark);
-}
-button.danger {
+.chrome-button.danger {
   background: var(--color-danger-medium);
   border-color: transparent;
   color: #fff;
 }
-button.danger:hover:not(:disabled) {
+.chrome-button.danger:hover:not(:disabled) {
   background: var(--color-danger-dark);
 }
-button.danger-soft {
-  background: var(--color-err-soft);
-  border-color: transparent;
-  color: var(--color-err);
-}
-.icon-button {
+.chrome-button.icon-button {
   width: 30px;
   padding: 0;
   background: transparent;
   border-color: transparent;
   color: var(--color-main-400);
 }
-.icon-button:hover:not(:disabled) {
+.chrome-button.icon-button:hover:not(:disabled) {
   background: var(--color-main-750);
   color: var(--color-main-50);
 }
 
-.approval {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  border-radius: var(--radius-card);
-  background: var(--color-warn-soft);
-  border: 1px solid var(--color-warn-line);
-}
-.approval h2 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-.approval-reason {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--color-main-50);
-}
-.approval-code {
-  max-height: 120px;
-  margin: 0;
-  padding: 6px 8px;
-  overflow: auto;
-  border-radius: var(--radius-control);
-  background: var(--color-main-900);
-  font: 11.5px/1.5 var(--font-mono, monospace);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: var(--color-main-200);
-}
-.approval-tool {
-  margin: 0;
-  font-size: 11px;
-  color: var(--color-main-500);
-}
-.approval-detail {
-  margin: 0;
-  font-size: 12px;
-  color: var(--color-main-200);
-}
-.approval-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.app-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.app-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: var(--radius-control);
-  background: var(--color-main-900);
-}
-.app-icon {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  border-radius: 4px;
-}
-.app-icon-empty {
-  display: grid;
-  place-items: center;
-  background: var(--color-main-800);
-  color: var(--color-main-400);
-}
-.app-text {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-.app-name {
-  font-weight: 600;
-  font-size: 12.5px;
-}
-.app-path {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font: 11px/1.4 var(--font-mono, monospace);
-  color: var(--color-main-500);
-}
-
 .panel-body {
-  display: flex;
   min-height: 0;
   flex: 1;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0 -4px;
-  padding: 0 4px;
+  margin: 0 -12px;
+  padding: 4px 12px 8px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.section-title {
+.feed-empty {
   margin: 0;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--color-main-500);
-}
-.reply {
-  max-height: 168px;
-  padding: 8px 10px;
-  overflow-y: auto;
-  border-radius: var(--radius-card);
-  background: var(--color-main-850);
-  border: 1px solid var(--color-line);
+  padding: 8px 0;
   font-size: 12.5px;
-  line-height: 1.55;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: var(--color-main-100);
-}
-.reply-live {
-  border-color: color-mix(in srgb, var(--computer-accent) 45%, var(--color-line));
-}
-.reply-empty {
   color: var(--color-main-500);
 }
 .elapsed {
@@ -370,82 +241,6 @@ button.danger-soft {
   font: 12px/1 var(--font-mono, monospace);
   font-variant-numeric: tabular-nums;
   color: var(--color-main-400);
-}
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.actions-empty {
-  padding: 8px;
-  font-size: 12px;
-  color: var(--color-main-500);
-}
-.action {
-  display: flex;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: var(--radius-control);
-}
-.action:first-child {
-  background: var(--color-main-850);
-}
-.action-mark {
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  color: var(--color-main-400);
-}
-.action-running .action-mark svg {
-  animation: computer-spin 0.9s linear infinite;
-  color: var(--computer-accent);
-}
-.action-done .action-mark {
-  color: var(--color-ok);
-}
-.action-failed .action-mark,
-.action-denied .action-mark {
-  color: var(--color-err);
-}
-.action-waiting .action-mark {
-  color: var(--color-warn);
-}
-@keyframes computer-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.action-text {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-.action-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12.5px;
-}
-.action-summary {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11.5px;
-  color: var(--color-main-400);
-}
-.action-state {
-  margin-left: auto;
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--color-main-500);
-}
-.action-error {
-  font-size: 11.5px;
-  color: var(--color-err);
 }
 .panel-error {
   margin: 0;

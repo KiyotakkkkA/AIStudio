@@ -1,69 +1,58 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
+import { mdiChevronDown, mdiChevronUp, mdiSendOutline, mdiStop } from "@mdi/js";
 import {
-  mdiAlertCircleOutline,
-  mdiCancel,
-  mdiCheck,
-  mdiChevronDown,
-  mdiChevronUp,
-  mdiClockOutline,
-  mdiLoading,
-  mdiMonitor,
-  mdiSendOutline,
-  mdiStop,
-} from "@mdi/js";
-import type {
-  ChatToolCallStatus,
-  ComputerAction,
-  ComputerApproval,
-  ComputerAppDto,
-  ComputerCall,
-  ComputerCommand,
-  ComputerPointer,
-  ComputerRequest,
-  ComputerState,
+  FolderApprovalDto,
+  type ApprovalRequestDto,
+  type ComputerCommand,
+  type ComputerPointer,
+  type ComputerState,
+  type FolderAccessAnswer,
 } from "@zvs/shared";
 import "../renderer/app/theme.css";
 import "./style.css";
 import Icon from "../browser-ui/Icon";
 import { applyChromeAppearance } from "../browser-ui/appearance";
-import { useIconUrl } from "../renderer/features/computer/iconUrl";
-import { toolPresentation } from "../renderer/features/chat/toolPresentation";
+import AnswerFlow from "../renderer/features/chat/AnswerFlow";
+import ChatMarkdown from "../renderer/features/chat/ChatMarkdown";
+import { ToolCallItems, type ToolCallApproval } from "../renderer/features/chat/ChatToolCalls";
+import { ToolCallSlotsContext, type ToolCallSlots } from "../renderer/features/chat/ToolCallSlots";
+import { approvalView } from "../renderer/features/chat/approvalModel";
+import { ALLOW_ONCE, FORBID, approvalQuestion } from "../renderer/features/chat/toolCallCopy";
+import {
+  ALLOW_ALWAYS,
+  ALLOW_CONVERSATION,
+  ALLOW_ONCE as ALLOW_FOLDER_ONCE,
+  DENY,
+  accessLead,
+  accessTitle,
+} from "../renderer/features/chat/workingFolderCopy";
+import { IN_BACKGROUND } from "../renderer/features/backgroundShells/backgroundShellsCopy";
+import MailDraftView from "../renderer/features/mail/MailDraftView";
+import { mailPreview } from "../renderer/features/mail/mailCopy";
+import Button from "../renderer/ui/atoms/buttons/Button";
+import GenerationStatus from "../renderer/ui/molecules/GenerationStatus";
 import { GLOW_LABEL, sendCommand, subscribePointer, subscribeState, windowLabel } from "./bridge";
 import {
-  ACCESS_ANSWERS,
-  ACCESS_TITLE,
-  ACTION_STATE_TEXT,
-  ACTION_TITLE,
-  ACTIONS_EMPTY,
-  ACTIONS_TITLE,
-  ALLOW,
   BADGE_TEXT,
-  CALL_STATUS_TEXT,
-  CALLS_EMPTY,
-  CALLS_TITLE,
   COLLAPSE,
   COMMAND_FAILED,
   COMPOSER_PLACEHOLDER,
-  DENY,
   ELAPSED_TITLE,
   EXPAND,
-  FOLDER_ANSWERS,
-  FOLDER_REQUEST_KIND,
+  FEED_EMPTY,
+  FEED_TITLE,
   PANEL_TITLE,
-  REPLY_EMPTY,
-  REPLY_TITLE,
   SEND,
   STATUS_TEXT,
   STOP,
   STOP_HINT,
   elapsedText,
-  requestTitle,
+  statusLine,
 } from "./computerCopy";
 
 const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
-const ACTIONS_SHOWN = 8;
-const CALLS_SHOWN = 12;
+const STICK_DISTANCE = 48;
 
 const INITIAL: ComputerState = {
   active: false,
@@ -72,40 +61,15 @@ const INITIAL: ComputerState = {
   actions: [],
   collapsed: false,
   appearance: { theme: "system", darkPalette: "zvs-dark", lightPalette: "zvs-light" },
-  reply: "",
-  calls: [],
-  requests: [],
+  feed: { content: "", reasoning: "", toolCalls: [], approvals: [] },
 };
 
-const ACTION_ICONS: Record<ComputerAction["state"], string> = {
-  running: mdiLoading,
-  waiting: mdiClockOutline,
-  done: mdiCheck,
-  failed: mdiAlertCircleOutline,
-  denied: mdiCancel,
+const PANEL_SLOTS: ToolCallSlots = {
+  images: () => null,
+  shell: () => <p className="m-0 font-mono text-[11.5px] text-main-300">{IN_BACKGROUND}</p>,
 };
 
-const CALL_ICONS: Record<ChatToolCallStatus, string> = {
-  running: mdiLoading,
-  "awaiting-approval": mdiClockOutline,
-  "awaiting-answer": mdiClockOutline,
-  succeeded: mdiCheck,
-  failed: mdiAlertCircleOutline,
-  refused: mdiAlertCircleOutline,
-  denied: mdiCancel,
-  cancelled: mdiCancel,
-};
-
-const CALL_TONE: Record<ChatToolCallStatus, ComputerAction["state"]> = {
-  running: "running",
-  "awaiting-approval": "waiting",
-  "awaiting-answer": "waiting",
-  succeeded: "done",
-  failed: "failed",
-  refused: "failed",
-  denied: "denied",
-  cancelled: "denied",
-};
+type Run = (command: ComputerCommand) => Promise<boolean>;
 
 function useOsDark(): boolean {
   const [dark, setDark] = useState(() => window.matchMedia(DARK_SCHEME_QUERY).matches);
@@ -121,7 +85,13 @@ function useOsDark(): boolean {
 function useComputerState(): ComputerState {
   const [state, setState] = useState<ComputerState>(INITIAL);
   const osDark = useOsDark();
-  useEffect(() => subscribeState(setState), []);
+  useEffect(
+    () =>
+      subscribeState((next) =>
+        setState({ ...INITIAL, ...next, feed: { ...INITIAL.feed, ...next.feed } }),
+      ),
+    [],
+  );
   useEffect(() => applyChromeAppearance(state.appearance, osDark), [state.appearance, osDark]);
   return state;
 }
@@ -137,180 +107,200 @@ function useNow(ticking: boolean): number {
   return now;
 }
 
-function AppRow({ app }: { readonly app: ComputerAppDto }) {
-  const url = useIconUrl(app.icon);
-  const [failed, setFailed] = useState<string | null>(null);
-  return (
-    <li className="app-row">
-      {url === null || failed === url ? (
-        <span className="app-icon app-icon-empty">
-          <Icon path={mdiMonitor} size={16} />
-        </span>
-      ) : (
-        <img className="app-icon" src={url} alt="" onError={() => setFailed(url)} />
-      )}
-      <span className="app-text">
-        <span className="app-name">{app.app}</span>
-        {app.path.length > 0 ? (
-          <span className="app-path" title={app.path}>
-            {app.path}
-          </span>
-        ) : null}
-      </span>
-    </li>
-  );
+function approvalKey(request: ApprovalRequestDto): string | null {
+  return typeof request.id === "string" ? request.id : null;
 }
 
-function ApprovalBlock({
-  approval,
-  run,
-}: {
-  readonly approval: ComputerApproval;
-  readonly run: (command: ComputerCommand) => void;
-}) {
-  const access = approval.kind === "access";
-  return (
-    <section className="approval" aria-label={access ? ACCESS_TITLE : ACTION_TITLE}>
-      <h2>{access ? ACCESS_TITLE : ACTION_TITLE}</h2>
-      {approval.detail === undefined ? null : <p className="approval-detail">{approval.detail}</p>}
-      {approval.apps.length === 0 ? null : (
-        <ul className="app-list">
-          {approval.apps.map((app) => (
-            <AppRow key={app.app} app={app} />
-          ))}
-        </ul>
-      )}
-      <div className="approval-actions">
-        {access ? (
-          ACCESS_ANSWERS.map(({ answer, label }) => (
-            <button
-              key={answer}
-              type="button"
-              className={answer === "deny" ? "danger-soft" : answer === "once" ? "primary" : ""}
-              onClick={() => run({ action: "answer", id: approval.id, answer })}
-            >
-              {label}
-            </button>
-          ))
-        ) : (
-          <>
-            <button
-              type="button"
-              className="primary"
-              onClick={() => run({ action: "approve", id: approval.id })}
-            >
-              {ALLOW}
-            </button>
-            <button
-              type="button"
-              className="danger-soft"
-              onClick={() => run({ action: "deny", id: approval.id })}
-            >
-              {DENY}
-            </button>
-          </>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function RequestBlock({
+function FolderRequest({
   request,
+  busy,
+  onAnswer,
+}: {
+  readonly request: FolderApprovalDto;
+  readonly busy: boolean;
+  readonly onAnswer: (answer: FolderAccessAnswer) => void;
+}) {
+  const answers: readonly { answer: FolderAccessAnswer; label: string }[] = [
+    { answer: "once", label: ALLOW_FOLDER_ONCE },
+    { answer: "conversation", label: ALLOW_CONVERSATION },
+    { answer: "always", label: ALLOW_ALWAYS },
+    { answer: "deny", label: DENY },
+  ];
+  return (
+    <div role="status" className="space-y-2 rounded-control bg-warn-soft px-3 py-2.5">
+      <p className="m-0 text-[12.5px] font-medium text-main-100">{accessTitle(request)}</p>
+      <p className="m-0 text-[12.5px] text-main-200">{accessLead(request)}</p>
+      <ul className="m-0 list-none space-y-1 p-0">
+        {request.folders.map((folder) => (
+          <li
+            key={folder.path}
+            className="rounded-control bg-main-850 px-2.5 py-1.5 font-mono text-[12px] break-all text-main-100"
+          >
+            {folder.path}
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap gap-2">
+        {answers.map(({ answer, label }) => (
+          <Button
+            key={answer}
+            size="sm"
+            disabled={busy}
+            {...(answer === "once" ? { tone: "primary" as const } : {})}
+            onClick={() => onAnswer(answer)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PlainRequest({
+  request,
+  busy,
+  onDecide,
+}: {
+  readonly request: ApprovalRequestDto;
+  readonly busy: boolean;
+  readonly onDecide: (approve: boolean) => void;
+}) {
+  const subject = typeof request.subject === "string" ? request.subject : "";
+  const mail = mailPreview(request);
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-center gap-3 rounded-control bg-warn-soft px-3 py-2.5"
+    >
+      <p className="m-0 min-w-0 flex-1 text-[12.5px] text-main-100">{approvalQuestion(subject)}</p>
+      {mail === null ? null : (
+        <div className="w-full">
+          <MailDraftView preview={mail} expanded />
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Button size="sm" disabled={busy} tone="primary" onClick={() => onDecide(true)}>
+          {ALLOW_ONCE}
+        </Button>
+        <Button size="sm" disabled={busy} onClick={() => onDecide(false)}>
+          {FORBID}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function Feed({
+  state,
+  live,
   run,
 }: {
-  readonly request: ComputerRequest;
-  readonly run: (command: ComputerCommand) => void;
+  readonly state: ComputerState;
+  readonly live: boolean;
+  readonly run: Run;
 }) {
-  const title = requestTitle(request.kind);
+  const { feed } = state;
+  const [busy, setBusy] = useState<readonly string[]>([]);
+  const send = (id: string, command: ComputerCommand) => {
+    setBusy((current) => [...current, id]);
+    void run(command).then((done) => {
+      if (!done) setBusy((current) => current.filter((item) => item !== id));
+    });
+  };
+  const decide = (id: string, approve: boolean) =>
+    send(id, approve ? { action: "approve", id } : { action: "deny", id });
+  const answer = (id: string, value: FolderAccessAnswer) =>
+    send(id, { action: "answer", id, answer: value });
+  const views = feed.approvals.flatMap((request) => {
+    const view = approvalView(request);
+    return view === null ? [] : [view];
+  });
+  const approvalFor = (id: string | null): ToolCallApproval | undefined => {
+    const view = id === null ? undefined : views.find((item) => item.id === id);
+    return view === undefined ? undefined : { ...view, busy: busy.includes(view.id) };
+  };
+  const attached = new Set(
+    feed.toolCalls.flatMap((call) => (call.approvalId === null ? [] : [call.approvalId])),
+  );
+  const standalone = feed.approvals.filter((request) => {
+    const id = approvalKey(request);
+    return id !== null && !attached.has(id);
+  });
+  const empty =
+    feed.content.trim() === "" &&
+    feed.reasoning.trim() === "" &&
+    feed.toolCalls.length === 0 &&
+    standalone.length === 0;
+  const requests: ReactNode[] = standalone.map((request) => {
+    const id = approvalKey(request) ?? "";
+    const folder = FolderApprovalDto.safeParse(request);
+    return folder.success ? (
+      <FolderRequest
+        key={id}
+        request={folder.data}
+        busy={busy.includes(id)}
+        onAnswer={(value) => answer(id, value)}
+      />
+    ) : (
+      <PlainRequest
+        key={id}
+        request={request}
+        busy={busy.includes(id)}
+        onDecide={(approve) => decide(id, approve)}
+      />
+    );
+  });
   return (
-    <section className="approval" aria-label={title}>
-      <h2>{title}</h2>
-      {request.reason === undefined ? null : <p className="approval-reason">{request.reason}</p>}
-      {request.detail === undefined ? null : <pre className="approval-code">{request.detail}</pre>}
-      <p className="approval-tool">{toolPresentation(request.tool).title}</p>
-      <div className="approval-actions">
-        {request.kind === FOLDER_REQUEST_KIND ? (
-          FOLDER_ANSWERS.map(({ answer, label }) => (
-            <button
-              key={answer}
-              type="button"
-              className={answer === "deny" ? "danger-soft" : answer === "once" ? "primary" : ""}
-              onClick={() => run({ action: "answer", id: request.id, answer })}
-            >
-              {label}
-            </button>
-          ))
-        ) : (
-          <>
-            <button
-              type="button"
-              className="primary"
-              onClick={() => run({ action: "approve", id: request.id })}
-            >
-              {ALLOW}
-            </button>
-            <button
-              type="button"
-              className="danger-soft"
-              onClick={() => run({ action: "deny", id: request.id })}
-            >
-              {DENY}
-            </button>
-          </>
-        )}
-      </div>
-    </section>
+    <ToolCallSlotsContext.Provider value={PANEL_SLOTS}>
+      <section aria-label={FEED_TITLE} className="space-y-3">
+        {empty && !live ? <p className="feed-empty">{FEED_EMPTY}</p> : null}
+        <AnswerFlow
+          content={feed.content}
+          reasoning={feed.reasoning}
+          rounds={feed.rounds ?? []}
+          toolCalls={feed.toolCalls}
+          generating={live}
+          renderToolItems={(calls) => (
+            <ToolCallItems
+              calls={calls}
+              approvalFor={approvalFor}
+              onDecide={decide}
+              onAnswerAccess={answer}
+              questionFor={() => undefined}
+            />
+          )}
+          renderText={(text, last) => <ChatMarkdown content={text} streaming={last} />}
+        />
+        {requests}
+        {live ? (
+          <GenerationStatus
+            label={statusLine(state.status, state.actions)}
+            since={state.startedAt ?? null}
+          />
+        ) : null}
+      </section>
+    </ToolCallSlotsContext.Provider>
   );
 }
 
-function Reply({ text, live }: { readonly text: string; readonly live: boolean }) {
+function useStickToBottom(change: unknown) {
   const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  const pinned = useRef(true);
+  useLayoutEffect(() => {
     const element = box.current;
-    if (element !== null) element.scrollTop = element.scrollHeight;
-  }, [text]);
-  return (
-    <section className="section" aria-label={REPLY_TITLE}>
-      <h3 className="section-title">{REPLY_TITLE}</h3>
-      <div ref={box} className={`reply ${live ? "reply-live" : ""}`} aria-live="polite">
-        {text.trim().length === 0 ? <span className="reply-empty">{REPLY_EMPTY}</span> : text}
-      </div>
-    </section>
-  );
+    if (element !== null && pinned.current) element.scrollTop = element.scrollHeight;
+  }, [change]);
+  const onScroll = () => {
+    const element = box.current;
+    if (element === null) return;
+    pinned.current =
+      element.scrollHeight - element.scrollTop - element.clientHeight < STICK_DISTANCE;
+  };
+  return { box, onScroll };
 }
 
-function CallRow({ call }: { readonly call: ComputerCall }) {
-  const tone = CALL_TONE[call.status];
-  return (
-    <li className={`action action-${tone}`}>
-      <span className="action-mark" title={CALL_STATUS_TEXT[call.status]}>
-        <Icon path={CALL_ICONS[call.status]} size={14} />
-      </span>
-      <span className="action-text">
-        <span className="action-label">{toolPresentation(call.key).title}</span>
-        {call.summary === undefined ? null : <span className="action-summary">{call.summary}</span>}
-      </span>
-      <span className="action-state">{CALL_STATUS_TEXT[call.status]}</span>
-    </li>
-  );
-}
-
-function ActionRow({ action }: { readonly action: ComputerAction }) {
-  return (
-    <li className={`action action-${action.state}`}>
-      <span className="action-mark" title={ACTION_STATE_TEXT[action.state]}>
-        <Icon path={ACTION_ICONS[action.state]} size={14} />
-      </span>
-      <span className="action-text">
-        <span className="action-label">{action.label}</span>
-        {action.error === undefined ? null : <span className="action-error">{action.error}</span>}
-      </span>
-    </li>
-  );
-}
-
-function Composer({ run }: { readonly run: (command: ComputerCommand) => void }) {
+function Composer({ run }: { readonly run: Run }) {
   const [text, setText] = useState("");
   const field = useRef<HTMLTextAreaElement>(null);
   const submit = () => {
@@ -318,7 +308,7 @@ function Composer({ run }: { readonly run: (command: ComputerCommand) => void })
     if (value.length === 0) return;
     setText("");
     field.current?.blur();
-    run({ action: "say", text: value });
+    void run({ action: "say", text: value });
   };
   return (
     <form
@@ -333,9 +323,9 @@ function Composer({ run }: { readonly run: (command: ComputerCommand) => void })
         rows={2}
         value={text}
         placeholder={COMPOSER_PLACEHOLDER}
-        onPointerDown={() => run({ action: "engage" })}
-        onFocus={() => run({ action: "engage" })}
-        onBlur={() => run({ action: "release" })}
+        onPointerDown={() => void run({ action: "engage" })}
+        onFocus={() => void run({ action: "engage" })}
+        onBlur={() => void run({ action: "release" })}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
@@ -345,7 +335,12 @@ function Composer({ run }: { readonly run: (command: ComputerCommand) => void })
           if (event.key === "Escape") field.current?.blur();
         }}
       />
-      <button type="submit" className="icon-button" aria-label={SEND} disabled={text.trim() === ""}>
+      <button
+        type="submit"
+        className="chrome-button icon-button"
+        aria-label={SEND}
+        disabled={text.trim() === ""}
+      >
         <Icon path={mdiSendOutline} size={16} />
       </button>
     </form>
@@ -355,16 +350,19 @@ function Composer({ run }: { readonly run: (command: ComputerCommand) => void })
 function Panel({ state }: { readonly state: ComputerState }) {
   const [error, setError] = useState<string | null>(null);
   const live = state.active && state.status !== "idle" && state.status !== "stopping";
-  const now = useNow(live && state.startedAt !== undefined);
-  const run = (command: ComputerCommand) => {
+  const now = useNow(live && state.collapsed && state.startedAt !== undefined);
+  const { box, onScroll } = useStickToBottom(state.feed);
+  const run: Run = (command) => {
     setError(null);
-    sendCommand(command).catch((reason: unknown) => {
-      setError(typeof reason === "string" ? reason : COMMAND_FAILED);
-    });
+    return sendCommand(command).then(
+      () => true,
+      (reason: unknown) => {
+        setError(typeof reason === "string" ? reason : COMMAND_FAILED);
+        return false;
+      },
+    );
   };
-  const actions = state.actions.slice(-ACTIONS_SHOWN).reverse();
-  const calls = state.calls.slice(-CALLS_SHOWN).reverse();
-  const elapsed = elapsedText(state.startedAt, now);
+  const elapsed = state.collapsed ? elapsedText(state.startedAt, now) : null;
   return (
     <main className={`panel ${state.collapsed ? "collapsed" : ""}`}>
       <header className="panel-header">
@@ -380,48 +378,26 @@ function Panel({ state }: { readonly state: ComputerState }) {
         )}
         <button
           type="button"
-          className="icon-button"
+          className="chrome-button icon-button"
           aria-label={state.collapsed ? EXPAND : COLLAPSE}
-          onClick={() => run({ action: "collapse", collapsed: !state.collapsed })}
+          onClick={() => void run({ action: "collapse", collapsed: !state.collapsed })}
         >
           <Icon path={state.collapsed ? mdiChevronUp : mdiChevronDown} size={16} />
         </button>
-        <button type="button" className="danger" onClick={() => run({ action: "stop" })}>
+        <button
+          type="button"
+          className="chrome-button danger"
+          onClick={() => void run({ action: "stop" })}
+        >
           <Icon path={mdiStop} size={14} />
           {STOP}
         </button>
       </header>
       {state.collapsed ? null : (
         <>
-          <p className={`hint ${live ? "zvs-shimmer-text" : ""}`}>
-            {STATUS_TEXT[state.status]} · {STOP_HINT}
-          </p>
-          <div className="panel-body">
-            {state.approval === undefined ? null : (
-              <ApprovalBlock approval={state.approval} run={run} />
-            )}
-            {state.requests.map((request) => (
-              <RequestBlock key={request.id} request={request} run={run} />
-            ))}
-            <Reply text={state.reply} live={live} />
-            <section className="section" aria-label={CALLS_TITLE}>
-              <h3 className="section-title">{CALLS_TITLE}</h3>
-              <ol className="actions" aria-live="polite">
-                {calls.length === 0 ? <li className="actions-empty">{CALLS_EMPTY}</li> : null}
-                {calls.map((call) => (
-                  <CallRow key={call.id} call={call} />
-                ))}
-              </ol>
-            </section>
-            <section className="section" aria-label={ACTIONS_TITLE}>
-              <h3 className="section-title">{ACTIONS_TITLE}</h3>
-              <ol className="actions">
-                {actions.length === 0 ? <li className="actions-empty">{ACTIONS_EMPTY}</li> : null}
-                {actions.map((action) => (
-                  <ActionRow key={action.id} action={action} />
-                ))}
-              </ol>
-            </section>
+          <p className="hint">{STOP_HINT}</p>
+          <div ref={box} className="panel-body" onScroll={onScroll}>
+            <Feed state={state} live={live} run={run} />
           </div>
           {error === null ? null : <p className="panel-error">{error}</p>}
           <Composer run={run} />
@@ -471,7 +447,7 @@ function Glow({ state }: { readonly state: ComputerState }) {
       <div className="badge" role="status">
         <span className={`pulse status-${state.status}`} aria-hidden="true" />
         <span className="badge-text">{BADGE_TEXT}</span>
-        <span className="badge-status">{STATUS_TEXT[state.status]}</span>
+        <span className="badge-status">{statusLine(state.status, state.actions)}</span>
         <kbd>{STOP_HINT}</kbd>
       </div>
       <AgentPointer />

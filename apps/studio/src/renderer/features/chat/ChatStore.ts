@@ -9,9 +9,7 @@ import {
   ChatToolCallDto,
   type BackgroundShellId,
   type ChatRoundDto,
-  FilesApprovalDto,
   FolderApprovalDto,
-  ProcessApprovalDto,
   type FileDiffDto,
   type ProcessPlanDto,
   MessageDto,
@@ -30,8 +28,7 @@ import {
   type ChatCitationDto,
   type ChatCommand,
   type ChatCommandDto,
-  APPS_APPROVAL_KIND,
-  ComputerAppDto,
+  type ComputerAppDto,
   type ChatContextDto,
   type ChatContextInput,
   type Contract,
@@ -80,7 +77,8 @@ import SubagentSteps, { subagentLabel, type SubagentLabel } from "./SubagentStep
 import { GOAL_COMMAND } from "./goalCopy";
 import { toolSections } from "./toolSets";
 import { appendRound } from "./answerRounds";
-import { mailPreview, type MailPreview } from "../mail/mailCopy";
+import { type MailPreview } from "../mail/mailCopy";
+import { approvalView } from "./approvalModel";
 
 export const ACCOUNT_OPTION_PREFIX = "account:";
 const LAST_CONVERSATION_KEY = "chat.conversation.last";
@@ -1674,30 +1672,9 @@ export default class ChatStore {
         this.folderRequests.push({ ...folder.data, subagent });
       return;
     }
-    const id = request.id;
-    const subject = request.subject;
-    const runId = request.runId;
-    if (typeof id !== "string" || typeof subject !== "string" || typeof runId !== "string") return;
-    if (this.approvals.some((item) => item.id === id)) return;
-    const files = FilesApprovalDto.safeParse(request);
-    const process = ProcessApprovalDto.safeParse(request);
-    const mail = mailPreview(request);
-    const apps =
-      request.kind === APPS_APPROVAL_KIND ? ComputerAppDto.array().safeParse(request.apps) : null;
-    const detail = typeof request.detail === "string" ? request.detail : undefined;
-    this.approvals.push({
-      id,
-      runId,
-      subject,
-      busy: false,
-      changes: files.success ? files.data.changes : [],
-      ...(process.success ? { process: process.data.process } : {}),
-      ...(mail === null ? {} : { mail }),
-      ...(apps?.success === true
-        ? { apps: apps.data, ...(detail === undefined ? {} : { detail }) }
-        : {}),
-      subagent,
-    });
+    const view = approvalView(request);
+    if (view === null || this.approvals.some((item) => item.id === view.id)) return;
+    this.approvals.push({ ...view, busy: false, subagent });
   }
 
   async stopSubagent(runId: string) {
