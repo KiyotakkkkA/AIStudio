@@ -86,6 +86,7 @@ export const SELECTIONS_FULL = "К сообщению можно приложи�
 export const GENERATION_FAILED = "Не удалось получить ответ. Повторите запрос.";
 
 export type SidePanel = "context" | "files" | "browser";
+export const BROWSER_NAVIGATE_TOOL = "browser.navigate";
 export const BROWSER_DOCK_MIN_WIDTH = 560;
 export const BROWSER_DOCK_DEFAULT_WIDTH = 820;
 
@@ -791,6 +792,10 @@ export default class ChatStore {
       this.panelOpen = !this.panelOpen;
       return;
     }
+    this.sidePanel = panel;
+    this.panelOpen = true;
+  }
+  openPanel(panel: SidePanel) {
     this.sidePanel = panel;
     this.panelOpen = true;
   }
@@ -1726,6 +1731,11 @@ export default class ChatStore {
       const call = ChatToolCallDto.safeParse(event.step.call);
       if (typeof index === "number" && call.success) {
         this.flush();
+        if (
+          call.data.key === BROWSER_NAVIGATE_TOOL &&
+          this.liveToolCalls[index]?.id !== call.data.id
+        )
+          this.openPanel("browser");
         const calls = [...this.liveToolCalls];
         calls[Math.min(index, calls.length)] = call.data;
         this.liveToolCalls = calls;

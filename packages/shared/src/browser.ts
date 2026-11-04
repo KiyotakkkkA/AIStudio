@@ -107,6 +107,14 @@ export interface BrowserAgentState {
   grants: BrowserSiteGrant[];
 }
 
+export type BrowserTheme = "system" | "light" | "dark";
+
+export interface BrowserAppearance {
+  theme: BrowserTheme;
+  darkPalette: string;
+  lightPalette: string;
+}
+
 export interface BrowserState {
   tabs: BrowserTab[];
   activeId: string | null;
@@ -114,6 +122,7 @@ export interface BrowserState {
   devtoolsVisible: boolean;
   agentVisible: boolean;
   agent: BrowserAgentState;
+  appearance: BrowserAppearance;
 }
 
 export interface BrowserCookie {

@@ -35,6 +35,7 @@ test("each mode offers the editor classics with the built-in ZVS palette first",
     palettesFor("dark").map((palette) => palette.name),
     [
       "ZVS",
+      "Basic Grey",
       "GitHub Dark",
       "One Dark",
       "Dracula",
@@ -46,7 +47,15 @@ test("each mode offers the editor classics with the built-in ZVS palette first",
   );
   assert.deepEqual(
     palettesFor("light").map((palette) => palette.name),
-    ["ZVS", "GitHub Light", "One Light", "Catppuccin Latte", "Solarized Light", "Gruvbox Light"],
+    [
+      "ZVS",
+      "Basic White",
+      "GitHub Light",
+      "One Light",
+      "Catppuccin Latte",
+      "Solarized Light",
+      "Gruvbox Light",
+    ],
   );
   assert.equal(new Set(PALETTES.map((palette) => palette.id)).size, PALETTES.length);
   assert.equal(defaultPalette("dark").id, DEFAULT_PALETTES.dark);

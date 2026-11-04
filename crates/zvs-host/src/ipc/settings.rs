@@ -5,7 +5,8 @@ use zvs_contract::{SettingsGetInput, SettingsGetOutput, SettingsSetInput};
 
 use super::IpcServer;
 use crate::platform::theme::{
-    FONT_SIZE_SETTING_KEY, THEME_SETTING_KEY, apply_interface_zoom, apply_theme_source,
+    FONT_SIZE_SETTING_KEY, THEME_SETTING_KEY, apply_interface_zoom, apply_palette,
+    apply_theme_source,
 };
 use crate::policy::EXEC_POLICY_KEY;
 use crate::services::Services;
@@ -47,6 +48,7 @@ pub fn register(server: &mut IpcServer) {
                 if input.key == FONT_SIZE_SETTING_KEY {
                     apply_interface_zoom(Some(&input.value), services.theme.as_ref());
                 }
+                apply_palette(&input.key, Some(&input.value), services.theme.as_ref());
                 Ok(result)
             },
         );
@@ -62,7 +64,7 @@ mod tests {
     use crate::platform::clock::FakeClock;
     use crate::platform::events::EventBus;
     use crate::platform::logger::silent_logger;
-    use crate::platform::theme::ThemeSource;
+    use crate::platform::theme::{PaletteMode, ThemeSource};
     use crate::services::SystemService;
     use crate::testing::{TestServices, test_services};
 
@@ -122,6 +124,28 @@ mod tests {
             assert_eq!(response["ok"], json!(true));
         }
         assert_eq!(host.theme.applied(), [ThemeSource::Light]);
+    }
+
+    #[tokio::test]
+    async fn saving_a_palette_setting_mirrors_it_to_the_platform() {
+        let (host, server) = server();
+        for (key, value) in [
+            ("ui.palette.dark", json!("basic-grey")),
+            ("ui.theme", json!("dark")),
+            ("ui.palette.light", json!("basic-white")),
+        ] {
+            let response = server
+                .dispatch("settings.set", json!({ "key": key, "value": value }))
+                .await;
+            assert_eq!(response["ok"], json!(true));
+        }
+        assert_eq!(
+            host.theme.palettes(),
+            [
+                (PaletteMode::Dark, "basic-grey".to_owned()),
+                (PaletteMode::Light, "basic-white".to_owned()),
+            ]
+        );
     }
 
     #[tokio::test]

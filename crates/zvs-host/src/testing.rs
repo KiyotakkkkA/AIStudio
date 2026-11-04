@@ -42,7 +42,7 @@ use crate::platform::events::EventBus;
 use crate::platform::events::EventSink;
 use crate::platform::logger::{Field, LogLevel, Logger, SharedLogger, silent_logger};
 use crate::platform::shell::{NotificationDraft, ShellPort};
-use crate::platform::theme::{ThemePort, ThemeSource};
+use crate::platform::theme::{PaletteMode, ThemePort, ThemeSource};
 use crate::services::crypto::BackendFailure;
 use crate::services::{
     AccountService, AccountServiceOptions, CryptoBackend, CryptoService, GraphService,
@@ -1035,7 +1035,10 @@ impl EventSink for MemorySink {
 }
 
 #[derive(Debug, Default)]
-pub struct RecordingTheme(Mutex<Vec<ThemeSource>>);
+pub struct RecordingTheme {
+    applied: Mutex<Vec<ThemeSource>>,
+    palettes: Mutex<Vec<(PaletteMode, String)>>,
+}
 
 impl RecordingTheme {
     pub fn shared() -> Arc<Self> {
@@ -1043,7 +1046,14 @@ impl RecordingTheme {
     }
 
     pub fn applied(&self) -> Vec<ThemeSource> {
-        self.0
+        self.applied
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    pub fn palettes(&self) -> Vec<(PaletteMode, String)> {
+        self.palettes
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
@@ -1052,10 +1062,17 @@ impl RecordingTheme {
 
 impl ThemePort for RecordingTheme {
     fn apply(&self, source: ThemeSource) {
-        self.0
+        self.applied
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .push(source);
+    }
+
+    fn palette(&self, mode: PaletteMode, id: &str) {
+        self.palettes
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push((mode, id.to_owned()));
     }
 }
 

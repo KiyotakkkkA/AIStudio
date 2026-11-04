@@ -4,6 +4,9 @@ use serde_json::Value;
 
 pub const THEME_SETTING_KEY: &str = "ui.theme";
 pub const FONT_SIZE_SETTING_KEY: &str = "ui.font.size";
+pub const DARK_PALETTE_SETTING_KEY: &str = "ui.palette.dark";
+pub const LIGHT_PALETTE_SETTING_KEY: &str = "ui.palette.light";
+pub const PALETTE_ID_MAX: usize = 64;
 pub const BASE_FONT_SIZE: u64 = 13;
 pub const FONT_SIZE_RANGE: std::ops::RangeInclusive<u64> = 12..=16;
 
@@ -25,10 +28,43 @@ impl ThemeSource {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PaletteMode {
+    Dark,
+    Light,
+}
+
+impl PaletteMode {
+    pub const ALL: [Self; 2] = [Self::Dark, Self::Light];
+
+    pub const fn setting_key(self) -> &'static str {
+        match self {
+            Self::Dark => DARK_PALETTE_SETTING_KEY,
+            Self::Light => LIGHT_PALETTE_SETTING_KEY,
+        }
+    }
+
+    pub fn from_setting_key(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|mode| mode.setting_key() == key)
+    }
+}
+
+pub fn palette_id(value: &Value) -> Option<&str> {
+    value.as_str().filter(|id| {
+        !id.is_empty()
+            && id.len() <= PALETTE_ID_MAX
+            && id
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+    })
+}
+
 pub trait ThemePort: Send + Sync {
     fn apply(&self, source: ThemeSource);
 
     fn zoom(&self, _factor: f64) {}
+
+    fn palette(&self, _mode: PaletteMode, _id: &str) {}
 }
 
 pub fn interface_zoom(value: Option<&Value>) -> f64 {
@@ -43,6 +79,15 @@ pub fn apply_interface_zoom(value: Option<&Value>, port: &dyn ThemePort) {
 }
 
 pub type SharedThemePort = Arc<dyn ThemePort>;
+
+pub fn apply_palette(key: &str, value: Option<&Value>, port: &dyn ThemePort) {
+    if let (Some(mode), Some(id)) = (
+        PaletteMode::from_setting_key(key),
+        value.and_then(palette_id),
+    ) {
+        port.palette(mode, id);
+    }
+}
 
 pub fn apply_theme_source(value: Option<&Value>, port: &dyn ThemePort) {
     if let Some(source) = value.and_then(ThemeSource::parse) {
@@ -69,6 +114,26 @@ mod tests {
         assert_eq!(
             theme.applied(),
             [ThemeSource::Dark, ThemeSource::Light, ThemeSource::System]
+        );
+    }
+
+    #[test]
+    fn only_well_formed_palette_ids_under_palette_keys_reach_the_platform() {
+        let theme = RecordingTheme::default();
+        apply_palette("ui.palette.dark", Some(&json!("basic-grey")), &theme);
+        apply_palette("ui.palette.light", Some(&json!("basic-white")), &theme);
+        apply_palette("ui.palette.sepia", Some(&json!("nord")), &theme);
+        apply_palette("ui.palette.dark", Some(&json!("Nord")), &theme);
+        apply_palette("ui.palette.dark", Some(&json!("")), &theme);
+        apply_palette("ui.palette.dark", Some(&json!("x".repeat(65))), &theme);
+        apply_palette("ui.palette.dark", Some(&json!(3)), &theme);
+        apply_palette("ui.palette.light", None, &theme);
+        assert_eq!(
+            theme.palettes(),
+            [
+                (PaletteMode::Dark, "basic-grey".to_owned()),
+                (PaletteMode::Light, "basic-white".to_owned()),
+            ]
         );
     }
 

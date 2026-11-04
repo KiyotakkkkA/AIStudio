@@ -101,6 +101,30 @@ export const PALETTES: readonly Palette[] = [
     ),
   },
   {
+    id: "basic-grey",
+    name: "Basic Grey",
+    mode: "dark",
+    ...CUSTOM,
+    frame: "#111111",
+    surface: "#181818",
+    raised: "#1f1f1f",
+    hover: "#262626",
+    strong: "#2c2c2c",
+    border: "#3a3a3a",
+    muted: "#8c8c8c",
+    text: "#e8e8e8",
+    ink: "#ffffff",
+    accent: "#ffffff",
+    ok: "#5cbf7a",
+    warn: "#e0b44f",
+    err: "#f06b60",
+    info: "#7fa8d6",
+    ansi: ansi(
+      ["#2c2c2c", "#f06b60", "#5cbf7a", "#e0b44f", "#7fa8d6", "#c49ad6", "#6cc4c0", "#d4d4d4"],
+      ["#6e6e6e", "#ff8a80", "#7bd696", "#f0c873", "#9cc0e8", "#d8b4e6", "#8ad8d4", "#ffffff"],
+    ),
+  },
+  {
     id: "github-dark",
     name: "GitHub Dark",
     mode: "dark",
@@ -290,6 +314,30 @@ export const PALETTES: readonly Palette[] = [
     ansi: ansi(
       ["#2f2924", "#bf3a30", "#4d7a2a", "#94600b", "#3f6c84", "#8e4a78", "#2f7a72", "#8a7e71"],
       ["#6c6258", "#d4493e", "#5d8f35", "#a46b0d", "#4f84a0", "#a65a8d", "#3a8f86", "#453d36"],
+    ),
+  },
+  {
+    id: "basic-white",
+    name: "Basic White",
+    mode: "light",
+    ...CUSTOM,
+    frame: "#f2f2f2",
+    surface: "#ffffff",
+    raised: "#fafafa",
+    hover: "#f0f0f0",
+    strong: "#e9e9e9",
+    border: "#dadada",
+    muted: "#737373",
+    text: "#262626",
+    ink: "#0a0a0a",
+    accent: "#111111",
+    ok: "#2e8549",
+    warn: "#9a6500",
+    err: "#c8352b",
+    info: "#2f6aa3",
+    ansi: ansi(
+      ["#262626", "#c8352b", "#2e8549", "#9a6500", "#2f6aa3", "#8a3fa0", "#1f7f7a", "#737373"],
+      ["#525252", "#e0483d", "#3a9c58", "#b07a0a", "#3d80bf", "#a254b8", "#2a9690", "#0a0a0a"],
     ),
   },
   {
@@ -527,3 +575,13 @@ export function paletteTokens(palette: Palette): Readonly<Record<string, string>
 export const PALETTE_TOKEN_NAMES: readonly string[] = Object.keys(
   paletteTokens(defaultPalette("dark")),
 );
+
+export function applyPalette(root: HTMLElement, palette: Palette): void {
+  for (const name of PALETTE_TOKEN_NAMES) root.style.removeProperty(name);
+  if (!palette.builtIn) {
+    for (const [name, value] of Object.entries(paletteTokens(palette))) {
+      root.style.setProperty(name, value);
+    }
+  }
+  root.dataset.palette = palette.id;
+}

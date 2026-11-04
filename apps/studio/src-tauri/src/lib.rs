@@ -69,8 +69,8 @@ use zvs_host::platform::shutdown::{
     DEFAULT_SHUTDOWN_CAP, ExitDecision, ShutdownCoordinator, ShutdownStage,
 };
 use zvs_host::platform::theme::{
-    FONT_SIZE_SETTING_KEY, SharedThemePort, THEME_SETTING_KEY, apply_interface_zoom,
-    apply_theme_source,
+    FONT_SIZE_SETTING_KEY, PaletteMode, SharedThemePort, THEME_SETTING_KEY, apply_interface_zoom,
+    apply_palette, apply_theme_source,
 };
 use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_window_state};
 use zvs_host::policy::{ExecPolicyOptions, ExecPolicyService, POLICY_DIR};
@@ -217,6 +217,21 @@ pub fn run() {
                             stored.map(|setting| setting.value).as_ref(),
                             zoom_services.theme.as_ref(),
                         );
+                    }
+                    if let Ok(stored) = zoom_services.settings.get(THEME_SETTING_KEY) {
+                        apply_theme_source(
+                            stored.map(|setting| setting.value).as_ref(),
+                            zoom_services.theme.as_ref(),
+                        );
+                    }
+                    for mode in PaletteMode::ALL {
+                        if let Ok(stored) = zoom_services.settings.get(mode.setting_key()) {
+                            apply_palette(
+                                mode.setting_key(),
+                                stored.map(|setting| setting.value).as_ref(),
+                                zoom_services.theme.as_ref(),
+                            );
+                        }
                     }
                     if let Some(studio) = app.get_window(window::STUDIO) {
                         studio.on_window_event(move |event| {

@@ -19,7 +19,7 @@ use tauri_plugin_dialog::DialogExt;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie,
-    BrowserNetworkDetail, BrowserNetworkLog, BrowserNetworkSaved, BrowserState,
+    BrowserNetworkDetail, BrowserNetworkLog, BrowserNetworkSaved, BrowserState, BrowserTheme,
 };
 use zvs_host::browser::automation::{
     DownloadedFile, NO_BROWSER_TAB, PageMatches, PageScreenshot, PageSnapshot, PageState, conflict,
@@ -32,6 +32,7 @@ use zvs_host::browser::{
 use zvs_host::platform::ids::new_id;
 use zvs_host::platform::navigation::{SharedNavigator, WorkspaceRoute};
 use zvs_host::platform::paths::utc_stamp;
+use zvs_host::platform::theme::PaletteMode;
 
 use crate::browser::automation::{Downloads, Session, Sessions};
 use crate::browser::bearer::{BearerTokens, request_filters};
@@ -58,6 +59,7 @@ enum Work {
     Signal(String, PageSignal),
     Adopt(String),
     Layout,
+    Publish,
     Agent(AgentChange),
     Closed,
 }
@@ -181,6 +183,15 @@ impl BrowserWorkspace {
         Ok(())
     }
 
+    fn ensure_tab(&self) -> Result<(), String> {
+        let _creating = lock(&self.0.creating);
+        self.ensure_chrome()?;
+        if lock(&self.0.model).is_empty() {
+            self.open_tab(None)?;
+        }
+        Ok(())
+    }
+
     pub fn open_link_tab(&self, url: &str) -> Result<(), String> {
         self.0.navigator.navigate(WorkspaceRoute::Browser);
         let _creating = lock(&self.0.creating);
@@ -208,6 +219,18 @@ impl BrowserWorkspace {
             let _ = chrome.set_zoom(lock(&self.0.model).zoom());
         }
         self.post(Work::Layout);
+    }
+
+    pub fn set_theme(&self, theme: BrowserTheme) {
+        if lock(&self.0.model).set_theme(theme) {
+            self.post(Work::Publish);
+        }
+    }
+
+    pub fn set_palette(&self, mode: PaletteMode, id: &str) {
+        if lock(&self.0.model).set_palette(mode, id) {
+            self.post(Work::Publish);
+        }
     }
 
     pub fn hide(&self) {
@@ -931,6 +954,12 @@ impl AutomationPort for BrowserWorkspace {
     }
 
     async fn navigate(&self, url: &str) -> Result<PageState, AppError> {
+        if self.active_label().is_none() {
+            let workspace = self.clone();
+            off_thread(move || workspace.ensure_tab())
+                .await
+                .map_err(|reason| conflict(NO_BROWSER_TAB).with_detail("reason", reason))?;
+        }
         let (_, session) = self.session()?;
         session.navigate(url).await
     }
@@ -1012,6 +1041,7 @@ fn run(inner: &Weak<Inner>, receiver: &Receiver<Work>) {
             Work::Signal(label, signal) => workspace.signal(&label, signal),
             Work::Adopt(label) => workspace.adopt(&label),
             Work::Layout => workspace.layout(),
+            Work::Publish => workspace.publish(),
             Work::Agent(change) => workspace.agent_changed(change),
             Work::Closed => workspace.closed(),
         }

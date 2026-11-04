@@ -1,6 +1,6 @@
 /*
  * Browser chrome in the ZVS Warm system: shares theme.css tokens, so it follows the same
- * light/dark mode as the studio (via nativeTheme). 64px heading + 38px tabs + 46px toolbar
+ * theme and palette as the studio (BrowserState.appearance). 64px heading + 38px tabs + 46px toolbar
  * = CHROME_HEIGHT (148) in host/browser/policy.ts; the 28px footer is STATUS_HEIGHT.
  */
 :root {

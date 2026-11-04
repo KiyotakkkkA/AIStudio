@@ -11,7 +11,7 @@ export const FIXED_EFFORT_STEPS: readonly ThinkingEffort[] = ["fast", "thinking"
 export const EFFORT_LABELS: Record<ThinkingEffort, string> = {
   fast: "Быстрый",
   auto: "Авто",
-  thinking: "С рассуждением",
+  thinking: "Мышление",
 };
 
 export const EFFORT_HINTS: Record<ThinkingEffort, string> = {

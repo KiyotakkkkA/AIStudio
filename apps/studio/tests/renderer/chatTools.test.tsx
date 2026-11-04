@@ -15,7 +15,7 @@ import {
 } from "@zvs/shared";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
-import ChatStore from "../../src/renderer/features/chat/ChatStore.ts";
+import ChatStore, { BROWSER_NAVIGATE_TOOL } from "../../src/renderer/features/chat/ChatStore.ts";
 import ChatToolCalls from "../../src/renderer/features/chat/ChatToolCalls";
 import {
   AUTOMATIC_TOOLS_TITLE,
@@ -424,6 +424,44 @@ test("live tool-call events drive the cards and keep their approval out of the g
     channel: "runs.approve",
     payload: { id: handle.id, approvalId, always: false },
   });
+  store.dispose();
+  events.dispose();
+});
+
+test("a browser.navigate call opens the browser panel once per call", async () => {
+  const { store, events } = setup();
+  await store.mount();
+  store.composer.setText("Question");
+  await store.send();
+  const navigate = ChatToolCallDto.parse({
+    id: "call_nav",
+    key: BROWSER_NAVIGATE_TOOL,
+    name: "browser_navigate",
+    round: 0,
+    arguments: { url: "https://example.com" },
+    status: "running",
+  });
+  const step = (seq: number, index: number, call: ChatToolCallDto) =>
+    events.dispatch({
+      type: "step",
+      ...handle,
+      seq,
+      ts: Date.now(),
+      step: { domain: "tool-call", index, call },
+    });
+
+  step(1, 0, { ...pendingCall, status: "running" });
+  expect(store.isPanelShown("browser")).toBe(false);
+
+  step(2, 1, navigate);
+  expect(store.isPanelShown("browser")).toBe(true);
+
+  store.closePanel();
+  step(3, 1, { ...navigate, status: "succeeded" });
+  expect(store.isPanelShown("browser")).toBe(false);
+
+  step(4, 2, { ...navigate, id: "call_nav_2" });
+  expect(store.isPanelShown("browser")).toBe(true);
   store.dispose();
   events.dispose();
 });

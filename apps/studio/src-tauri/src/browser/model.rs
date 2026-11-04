@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 
-use zvs_contract::{BrowserBounds, BrowserSecurity, BrowserState, BrowserTab};
+use zvs_contract::{
+    BrowserAppearance, BrowserBounds, BrowserSecurity, BrowserState, BrowserTab, BrowserTheme,
+};
 use zvs_host::browser::{
     AGENT_PANEL_WIDTH, APPROVAL_HEIGHT, CHROME_HEIGHT, NAVIGATION_BLOCKED, STATUS_HEIGHT,
     TAB_LIMIT, devtools_height,
 };
+use zvs_host::platform::theme::PaletteMode;
 
 pub const NEW_TAB_TITLE: &str = "Новая вкладка";
 pub const PROCESS_GONE: &str = "Процесс страницы остановлен. Обновите страницу.";
@@ -129,9 +132,28 @@ pub struct Model {
     visible: bool,
     bounds: BrowserBounds,
     zoom: Option<f64>,
+    appearance: BrowserAppearance,
 }
 
 impl Model {
+    pub fn set_theme(&mut self, theme: BrowserTheme) -> bool {
+        let changed = self.appearance.theme != theme;
+        self.appearance.theme = theme;
+        changed
+    }
+
+    pub fn set_palette(&mut self, mode: PaletteMode, id: &str) -> bool {
+        let slot = match mode {
+            PaletteMode::Dark => &mut self.appearance.dark_palette,
+            PaletteMode::Light => &mut self.appearance.light_palette,
+        };
+        if slot == id {
+            return false;
+        }
+        id.clone_into(slot);
+        true
+    }
+
     pub fn set_zoom(&mut self, factor: f64) -> bool {
         let next = (factor.is_finite() && factor > 0.0).then_some(factor);
         let changed = next != self.zoom;
@@ -300,6 +322,7 @@ impl Model {
             devtools_visible: self.devtools_visible,
             agent_visible: self.agent_visible,
             agent: Box::default(),
+            appearance: self.appearance.clone(),
         }
     }
 
@@ -407,6 +430,25 @@ mod tests {
             can_go_back: false,
             can_go_forward: false,
         }
+    }
+
+    #[test]
+    fn appearance_changes_report_whether_the_chrome_needs_a_new_state() {
+        let mut model = Model::default();
+        assert_eq!(model.state().appearance, BrowserAppearance::default());
+        assert!(model.set_theme(BrowserTheme::Dark));
+        assert!(!model.set_theme(BrowserTheme::Dark));
+        assert!(model.set_palette(PaletteMode::Dark, "basic-grey"));
+        assert!(!model.set_palette(PaletteMode::Dark, "basic-grey"));
+        assert!(model.set_palette(PaletteMode::Light, "basic-white"));
+        assert_eq!(
+            model.state().appearance,
+            BrowserAppearance {
+                theme: BrowserTheme::Dark,
+                dark_palette: "basic-grey".to_owned(),
+                light_palette: "basic-white".to_owned(),
+            }
+        );
     }
 
     fn three() -> Model {

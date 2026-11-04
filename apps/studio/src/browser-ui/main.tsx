@@ -27,6 +27,7 @@ import "./style.css";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import Icon from "./Icon";
 import AgentPanel from "./AgentPanel";
+import { applyChromeAppearance } from "./appearance";
 import ApprovalBar from "./ApprovalBar";
 import IconButton from "./IconButton";
 import NetworkPanel from "./NetworkPanel";
@@ -82,6 +83,19 @@ function siteInitial(domain: string): string {
   return domain.replace(/^\./, "").charAt(0).toUpperCase() || "·";
 }
 
+const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
+
+function useOsDark(): boolean {
+  const [dark, setDark] = useState(() => window.matchMedia(DARK_SCHEME_QUERY).matches);
+  useEffect(() => {
+    const list = window.matchMedia(DARK_SCHEME_QUERY);
+    const sync = () => setDark(list.matches);
+    list.addEventListener("change", sync);
+    return () => list.removeEventListener("change", sync);
+  }, []);
+  return dark;
+}
+
 function BrowserApp() {
   const [state, setState] = useState<BrowserState>({
     tabs: [],
@@ -102,7 +116,9 @@ function BrowserApp() {
       origin: null,
       grants: [],
     },
+    appearance: { theme: "system", darkPalette: "zvs-dark", lightPalette: "zvs-light" },
   });
+  const osDark = useOsDark();
   const [address, setAddress] = useState("");
   const [error, setError] = useState("");
   const [cookies, setCookies] = useState<BrowserCookie[]>([]);
@@ -134,6 +150,7 @@ function BrowserApp() {
     void send({ action: "state" });
     return unsubscribe;
   }, []);
+  useEffect(() => applyChromeAppearance(state.appearance, osDark), [state.appearance, osDark]);
   useEffect(() => setAddress(active?.url ?? ""), [active?.url, active?.id]);
   useEffect(() => {
     if (!state.sitesVisible) return;

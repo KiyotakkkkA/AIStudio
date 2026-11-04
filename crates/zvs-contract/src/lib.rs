@@ -75,11 +75,11 @@ pub use artifacts::{
 };
 pub use browser::{
     BrowserActionState, BrowserAgentAction, BrowserAgentApproval, BrowserAgentState,
-    BrowserAgentStatus, BrowserAuthorisation, BrowserBounds, BrowserCommand, BrowserCommandOutput,
-    BrowserCookie, BrowserGrantDto, BrowserGrantRef, BrowserGrantsListOutput, BrowserHeader,
-    BrowserNetworkBody, BrowserNetworkDetail, BrowserNetworkEntry, BrowserNetworkLog,
-    BrowserNetworkSaved, BrowserRequestState, BrowserSecurity, BrowserSiteGrant, BrowserState,
-    BrowserTab,
+    BrowserAgentStatus, BrowserAppearance, BrowserAuthorisation, BrowserBounds, BrowserCommand,
+    BrowserCommandOutput, BrowserCookie, BrowserGrantDto, BrowserGrantRef, BrowserGrantsListOutput,
+    BrowserHeader, BrowserNetworkBody, BrowserNetworkDetail, BrowserNetworkEntry,
+    BrowserNetworkLog, BrowserNetworkSaved, BrowserRequestState, BrowserSecurity, BrowserSiteGrant,
+    BrowserState, BrowserTab, BrowserTheme,
 };
 pub use channels::{CHANNELS, is_channel};
 pub use chat::{

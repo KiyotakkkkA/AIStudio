@@ -293,6 +293,33 @@ pub struct BrowserAgentState {
     pub grants: Vec<BrowserSiteGrant>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BrowserTheme {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserAppearance {
+    pub theme: BrowserTheme,
+    pub dark_palette: String,
+    pub light_palette: String,
+}
+
+impl Default for BrowserAppearance {
+    fn default() -> Self {
+        Self {
+            theme: BrowserTheme::System,
+            dark_palette: "zvs-dark".to_owned(),
+            light_palette: "zvs-light".to_owned(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserState {
@@ -303,6 +330,7 @@ pub struct BrowserState {
     pub devtools_visible: bool,
     pub agent_visible: bool,
     pub agent: Box<BrowserAgentState>,
+    pub appearance: BrowserAppearance,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -606,6 +634,7 @@ mod tests {
             devtools_visible: true,
             agent_visible: false,
             agent: Box::default(),
+            appearance: BrowserAppearance::default(),
         };
         assert_eq!(
             serde_json::to_value(BrowserCommandOutput::State(state)).expect("serialises"),
@@ -635,6 +664,11 @@ mod tests {
                     "actions": [],
                     "origin": null,
                     "grants": [],
+                },
+                "appearance": {
+                    "theme": "system",
+                    "darkPalette": "zvs-dark",
+                    "lightPalette": "zvs-light",
                 },
             })
         );

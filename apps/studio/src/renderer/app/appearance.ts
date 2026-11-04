@@ -1,7 +1,7 @@
 import { autorun } from "mobx";
 import { fontStack } from "../features/preferences/preferencesPresentation";
 import type { UiStore } from "../stores/UiStore";
-import { PALETTE_TOKEN_NAMES, paletteTokens } from "./palettes";
+import { applyPalette } from "./palettes";
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
@@ -23,16 +23,7 @@ export function bindAppearance(ui: UiStore, root: HTMLElement = document.documen
       if (ui.theme === "system") delete root.dataset.theme;
       else root.dataset.theme = ui.theme;
     }),
-    autorun(() => {
-      const palette = ui.palette;
-      for (const name of PALETTE_TOKEN_NAMES) root.style.removeProperty(name);
-      if (!palette.builtIn) {
-        for (const [name, value] of Object.entries(paletteTokens(palette))) {
-          root.style.setProperty(name, value);
-        }
-      }
-      root.dataset.palette = palette.id;
-    }),
+    autorun(() => applyPalette(root, ui.palette)),
     autorun(() => {
       root.dataset.motion = ui.motion;
       root.dataset.effects = ui.effects;

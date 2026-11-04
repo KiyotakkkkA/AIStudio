@@ -3,10 +3,10 @@
   "compilerOptions": {
     "composite": true,
     "noEmit": true,
-    "rootDir": "src/browser-ui",
+    "rootDir": "src",
     "lib": ["ES2023", "ESNext.Disposable", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "types": ["vite/client"]
   },
-  "include": ["src/browser-ui/**/*.ts", "src/browser-ui/**/*.tsx"]
+  "include": ["src/browser-ui/**/*.ts", "src/browser-ui/**/*.tsx", "src/renderer/app/palettes.ts"]
 }
