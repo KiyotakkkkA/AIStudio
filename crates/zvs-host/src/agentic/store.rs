@@ -41,6 +41,7 @@ pub fn session_tools(
 
 #[derive(Clone)]
 pub struct SessionStore {
+    images: Option<crate::images::ImageLoader>,
     database: Arc<Database>,
     clock: SharedClock,
     tools: ToolRegistry,
@@ -49,10 +50,20 @@ pub struct SessionStore {
 impl SessionStore {
     pub fn new(database: Arc<Database>, clock: SharedClock, tools: ToolRegistry) -> Self {
         Self {
+            images: None,
             database,
             clock,
             tools,
         }
+    }
+
+    pub fn with_images(mut self, images: Option<crate::images::ImageLoader>) -> Self {
+        self.images = images;
+        self
+    }
+
+    pub fn images(&self) -> Option<&crate::images::ImageLoader> {
+        self.images.as_ref()
     }
 
     pub fn now(&self) -> i64 {

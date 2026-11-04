@@ -36,6 +36,7 @@ pub const TOOL_UNKNOWN: &str = "Инструмент не зарегистрир
 pub const RUN_INTERRUPTED: &str = "Выполнение прервано";
 
 pub struct AgenticServiceOptions {
+    pub images: Option<crate::images::ImageLoader>,
     pub database: Arc<Database>,
     pub runs: RunService,
     pub folders: FolderAccessService,
@@ -51,6 +52,7 @@ impl AgenticServiceOptions {
         tools: ToolRegistry,
     ) -> Self {
         Self {
+            images: None,
             database,
             runs,
             folders,
@@ -109,7 +111,8 @@ impl AgenticService {
     pub fn new(options: AgenticServiceOptions) -> Self {
         Self {
             inner: Arc::new(Inner {
-                store: SessionStore::new(options.database, options.clock, options.tools.clone()),
+                store: SessionStore::new(options.database, options.clock, options.tools.clone())
+                    .with_images(options.images),
                 runs: options.runs,
                 folders: options.folders,
                 tools: options.tools,

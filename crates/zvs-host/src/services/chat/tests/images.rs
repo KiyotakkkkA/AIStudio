@@ -66,10 +66,211 @@ async fn images_are_persisted_and_loaded_again_in_followup_history() {
             .unwrap();
         assert_eq!(&*image.bytes, bytes);
     }
+    harness
+        .database
+        .with_connection(|connection| {
+            Repositories::new(connection).providers.update(
+                &harness.provider_id.to_string(),
+                &ProviderPatch {
+                    adapter: Some(zvs_contract::AdapterFamily::OpenaiCompatible),
+                    ..ProviderPatch::default()
+                },
+                2,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let handle = harness.turn(conversation, "Continue without vision").await;
+    assert_eq!(harness.status(&handle), RunStatus::Succeeded);
+    let requests = harness.driver.requests();
+    let request = requests.last().unwrap();
+    assert!(
+        request
+            .messages
+            .iter()
+            .all(|message| message.images.is_empty())
+    );
+    assert!(
+        request
+            .messages
+            .iter()
+            .any(|message| message.content.contains(&images[0].name))
+    );
+    assert_eq!(harness.messages(conversation)[0].images, images);
+}
+
+#[tokio::test]
+async fn file_tool_pixels_reach_the_next_round_and_history_and_survive_provider_switches() {
+    use super::tool_loop::{Scripted, call};
+    use crate::kernel::{NodeRegistry, register_core_nodes};
+    use crate::tools::{ToolRegistry, ToolRegistryOptions};
+    let root = crate::testing::temporary_directory("chat-tool-images");
+    let store = ArtifactStore::new(root.path().join("conversations"));
+    let loader = ImageLoader::new(store.clone());
+    let database = crate::testing::temporary_database();
+    let tools = ToolRegistry::new(ToolRegistryOptions::new(database.shared()));
+    let registry = Arc::new(NodeRegistry::new());
+    register_core_nodes(&registry).unwrap();
+    let driver = Scripted::new();
+    let harness = Harness::with(HarnessOptions {
+        database: Some(database.shared()),
+        tools: Some(tools.clone()),
+        registry: Some(registry.clone()),
+        providers: Some(Arc::new(OneDriver(driver.clone()))),
+        images: Some(loader.clone()),
+        context_window: 100_000,
+        ..HarnessOptions::default()
+    });
+    let folders = crate::workspace::FolderAccessService::new(
+        database.shared(),
+        harness.runs.approvals(),
+        crate::workspace::ForbiddenFolders::new(&[], &[], Arc::new(Vec::new)),
+        Arc::new(crate::testing::FakeClock::default()),
+    );
+    crate::files::register_file_nodes(
+        &registry,
+        &folders,
+        crate::files::FileToolOptions {
+            roots: crate::files::VirtualRoots::new(Some(store.clone()), None),
+            ..crate::files::FileToolOptions::new(store.root().to_path_buf())
+        },
+    )
+    .unwrap();
+    crate::tools::register_kernel_tools(&registry, &tools).unwrap();
+    harness
+        .database
+        .with_connection(|connection| {
+            Repositories::new(connection).providers.update(
+                &harness.provider_id.to_string(),
+                &ProviderPatch {
+                    adapter: Some(zvs_contract::AdapterFamily::QwenWeb),
+                    ..ProviderPatch::default()
+                },
+                1,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let conversation = harness.conversation();
+    let work = crate::chat_files::chat_dir(&store, &conversation.to_string()).unwrap();
+    std::fs::write(work.join("source.jpg"), [255, 216, 255, 217]).unwrap();
+    driver.round(|request| {
+        let tool = request
+            .tools
+            .iter()
+            .find(|tool| tool.name == "fs__read")
+            .unwrap();
+        assert!(tool.parameters.to_string().contains("viewImage"));
+        assert!(
+            request
+                .system
+                .as_deref()
+                .unwrap()
+                .contains(crate::images::IMAGE_VIEW_RULES)
+        );
+        vec![call(
+            "fs__read",
+            &json!({ "paths": [{ "path": "chat:source.jpg", "viewImage": true }] }),
+        )]
+    });
+    driver.round(|request| {
+        let images: Vec<_> = request
+            .messages
+            .iter()
+            .flat_map(|message| &message.images)
+            .collect();
+        assert_eq!(images.len(), 1);
+        assert_eq!(&*images[0].bytes, [255, 216, 255, 217]);
+        vec![TextDelta::text("An image.")]
+    });
+    let handle = harness.turn(conversation, "Inspect source.jpg").await;
+    assert_eq!(harness.status(&handle), RunStatus::Succeeded);
+    let saved = harness.last(conversation);
+    assert_eq!(
+        crate::images::preview_images(saved.tool_calls[0].meta.as_ref()).len(),
+        1
+    );
+    std::fs::remove_file(work.join("source.jpg")).unwrap();
+    let handle = harness.turn(conversation, "Describe it again").await;
+    assert_eq!(harness.status(&handle), RunStatus::Succeeded);
+    assert!(
+        driver
+            .requests()
+            .last()
+            .unwrap()
+            .messages
+            .iter()
+            .any(|message| !message.images.is_empty())
+    );
+    harness
+        .database
+        .with_connection(|connection| {
+            Repositories::new(connection).providers.update(
+                &harness.provider_id.to_string(),
+                &ProviderPatch {
+                    adapter: Some(zvs_contract::AdapterFamily::OpenaiCompatible),
+                    ..ProviderPatch::default()
+                },
+                2,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    driver.round(|_| vec![call("fs__read", &json!({ "imageViewing": true, "paths": [{ "path": "chat:source.jpg", "viewImage": true }] }))]);
+    let handle = harness.turn(conversation, "Continue with text").await;
+    assert_eq!(harness.status(&handle), RunStatus::Succeeded);
+    let rejected = harness.last(conversation);
+    assert_eq!(
+        rejected.tool_calls[0].status,
+        zvs_contract::ChatToolCallStatus::Failed
+    );
+    assert_eq!(
+        rejected.tool_calls[0].error.as_deref(),
+        Some(crate::images::VISION_UNSUPPORTED)
+    );
+    let requests = driver.requests();
+    let request = requests.last().unwrap();
+    assert!(
+        request
+            .messages
+            .iter()
+            .all(|message| message.images.is_empty())
+    );
+    assert!(
+        !request
+            .system
+            .as_deref()
+            .unwrap()
+            .contains(crate::images::IMAGE_VIEW_RULES)
+    );
+    assert!(
+        !request
+            .tools
+            .iter()
+            .find(|tool| tool.name == "fs__read")
+            .unwrap()
+            .parameters
+            .to_string()
+            .contains("viewImage")
+    );
+    let branch = harness.chat.branch(&conversation, &saved.id).unwrap();
+    crate::chat_files::copy_chat_dir(&store, &conversation.to_string(), &branch.id.to_string())
+        .unwrap();
+    let branched = harness.last(branch.id);
+    let meta = branched.tool_calls[0].meta.as_ref().unwrap();
+    assert_eq!(meta["imageOwner"], json!(branch.id.to_string()));
+    let images = crate::images::preview_images(Some(meta));
+    assert_eq!(
+        &*loader
+            .load(&branch.id.to_string(), &images[0])
+            .unwrap()
+            .bytes,
+        [255, 216, 255, 217]
+    );
 }
 
 #[test]
-fn unsupported_providers_refuse_images_before_creating_a_run_or_message() {
+fn unowned_images_are_refused_before_creating_a_run_or_message() {
     let harness = Harness::new();
     let conversation = harness.conversation();
     let image = zvs_contract::ImageAttachmentDto {
@@ -85,7 +286,7 @@ fn unsupported_providers_refuse_images_before_creating_a_run_or_message() {
             ..ChatSendInput::new(conversation, "Describe")
         })
         .unwrap_err();
-    assert_eq!(error.message, crate::images::VISION_UNSUPPORTED);
+    assert_eq!(error.message, crate::images::IMAGE_MISSING);
     assert!(harness.messages(conversation).is_empty());
     assert!(harness.driver.requests().is_empty());
 }

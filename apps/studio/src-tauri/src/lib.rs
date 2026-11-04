@@ -951,10 +951,15 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             grants,
             runs.approvals(),
             agent.clone(),
+        )
+        .with_images(
+            zvs_host::images::ImageLoader::new(artifacts.clone()),
+            clock.clone(),
         ),
     )?;
     register_kernel_tools(&nodes, &tools)?;
     let agentic = AgenticService::new(AgenticServiceOptions {
+        images: Some(zvs_host::images::ImageLoader::new(artifacts.clone())),
         clock: clock.clone(),
         ..AgenticServiceOptions::new(
             Arc::clone(&database),

@@ -150,7 +150,7 @@ impl AutomationPort for FakePort {
             mime_type: "image/jpeg".to_owned(),
             width: 1280,
             height: 720,
-            data: "/9j/".to_owned(),
+            data: "/9j/2Q==".to_owned(),
         })
     }
 
@@ -238,6 +238,10 @@ impl Host {
             grants.clone(),
             services.runs.approvals(),
             agent.clone(),
+        )
+        .with_images(
+            crate::images::ImageLoader::new(services.artifacts.clone()),
+            clock.clone(),
         );
         register_browser_nodes(&services.nodes, &browser).expect("registers the browser nodes");
         crate::tools::register_kernel_tools(&services.nodes, &services.tools)
@@ -465,12 +469,19 @@ async fn reading_primitives_run_without_asking_and_fence_the_page() {
     let (status, output, _) = host.run("browser.screenshot", json!({})).await;
     assert_eq!(status, RunStatus::Succeeded);
     assert_eq!(
-        (
-            output["mimeType"].clone(),
-            output["width"].clone(),
-            output["data"].clone()
-        ),
-        (json!("image/jpeg"), json!(1280), json!("/9j/"))
+        (output["mimeType"].clone(), output["width"].clone()),
+        (json!("image/jpeg"), json!(1280))
+    );
+    assert!(output.get("data").is_none());
+    let path = std::path::Path::new(output["path"].as_str().unwrap());
+    assert!(path.is_file());
+    assert_eq!(path.parent().unwrap().file_name().unwrap(), "browser");
+    assert_eq!(std::fs::read(path).unwrap(), [255, 216, 255, 217]);
+    assert!(
+        output["text"]
+            .as_str()
+            .unwrap()
+            .contains(path.to_str().unwrap())
     );
 
     let (status, output, _) = host

@@ -777,6 +777,7 @@ impl NodeDef for SubagentNode {
         };
         let calls: Arc<Mutex<Vec<ChatToolCallDto>>> = Arc::new(Mutex::new(Vec::new()));
         let host = ChatLoopHost {
+            images_supported: inner.supports_images(&input.provider_id)?,
             node: &node,
             sink: CallSink::Subagent,
             delegation: None,

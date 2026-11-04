@@ -1,7 +1,17 @@
-import type { Contract, ConversationId, ImageAttachmentDto } from "@zvs/shared";
+import { ConversationId, ImageAttachmentDto, type Contract, type Json } from "@zvs/shared";
 import type { IpcClient } from "@zvs/ipc";
 
 const cache = new Map<string, Promise<string | null>>();
+
+export function toolImageReferences(meta: Json | undefined) {
+  if (meta === undefined || meta === null || typeof meta !== "object" || Array.isArray(meta))
+    return null;
+  const owner = ConversationId.safeParse(meta.imageOwner);
+  const images = ImageAttachmentDto.array().safeParse(meta.images);
+  return owner.success && images.success && images.data.length > 0
+    ? { owner: owner.data, images: images.data }
+    : null;
+}
 
 /** The renderer CSP allows blob: images but not data: URLs, so pixels arrive as a blob. */
 function toBlobUrl(dataUrl: string): string | null {

@@ -739,13 +739,20 @@ known dialect must be a row, not a file.**
 - Streaming: the vendor stream is consumed on the host and re-emitted as `token` events on the
   one event channel (D4). The renderer never sees a vendor payload.
 
-### Vision input (2026-11-03)
+### Vision input (2026-11-04)
 
 Image attachments use a reusable host loading stage, `zvs-host::images::ImageLoader`.
-Native file selection imports bounded PNG/JPEG/GIF/WebP copies into the conversation's work
+Native file selection imports bounded PNG/JPEG/GIF/WebP copies into the conversation's attachments
 folder; IPC and persisted run inputs carry opaque metadata references, never image bytes or
 vendor URLs. Message history persists references, and context windowing precedes integrity
-checks and pixel loading on blocking tasks. Only Qwen and Z.ai accept these chat inputs.
+checks and pixel loading on blocking tasks. Only Qwen and Z.ai receive pixels. Switching to
+another provider preserves local draft and history references but sends textual references
+without image bytes, and rebuilds the offered schemas and prompt without image-viewing options.
+`fs.read` accepts `viewImage: true` per path entry for supported providers; paths pass the existing
+folder checks before immutable copies are imported. The host overwrites the hidden provider
+capability, so a model cannot enable it itself. Tool results carry references, not pixels;
+Chat and Agentic Build load them for a user-role message after the batch of tool results and
+show previews inside the expandable tool card. Agentic transcripts persist image references.
 
 Vendor protocol crates build upload metadata without I/O. Z.ai multipart uploads use the
 existing account gateway and its page-owned credentials. Qwen obtains temporary OSS grants
@@ -966,6 +973,11 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `manifest.json`, writes each file through a temp file renamed over the target, and restores
   everything already written if any write fails. NTFS has no cross-file transaction: this is
   all-or-nothing by rollback, not atomic. Line endings and a BOM are kept.
+  **Saved screenshots** (2026-11-04). `fs.read` may also read a canonical path returned by
+  `browser.screenshot` inside the current owner's `attachments/browser/` directory. This is a
+  read-only exception for the owner's saved browser files: it grants no access to the parent
+  attachment directory, other owners, or paths that resolve outside that directory. Global
+  tool tiers remain in force. Image imports and screenshot copies share the conversation quota.
 - **Process tools** (`zvs-host/src/commands/`, TASK_036_EXTRA_3) are offered alongside the
   file tools: `shell.run`
   (an argument vector, never a shell string; `argv[0]` resolved through the connected toolchain
@@ -1595,7 +1607,7 @@ absent.
 | --- | --- | --- |
 | `browser.navigate` | auto | Blocked schemes: `file:`, `data:`, `javascript:` |
 | `browser.read_page` | auto | Accessibility tree, not raw DOM — smaller and less injectable |
-| `browser.screenshot` | auto | |
+| `browser.screenshot` | auto | Saves JPEG to the owner's attachments/browser folder and returns its path; pixels require a separate fs.read call |
 | `browser.find` | auto | Locates an element, returns a handle |
 | `browser.click` · `browser.type` | per-site | Granted once per origin, revocable any time |
 | `browser.submit` · `browser.download` | always ask | Every time, regardless of prior grants |

@@ -26,7 +26,9 @@ use zvs_contract::{
 };
 
 use super::chat_ask::{ASK_MALFORMED, ASK_TOOL, answers_text, ask_request, ask_section, ask_tool};
-use super::chat_carry::{Carried, CarryShape, SourceLookup, carry_into, cited_citations};
+use super::chat_carry::{
+    Carried, CarryShape, SourceLookup, carry_into_with_images, cited_citations,
+};
 use super::chat_goal::{
     GOAL_CONTINUE_TEXT, GOAL_DESCRIPTION, GOAL_NEEDS_TOOLS, GOAL_NOT_PAUSED, GOAL_NOT_STOPPABLE,
     GOAL_RUNNING, GOAL_TOOL, GoalHook, default_budget, ended, goal_section, goal_tools, restarted,
@@ -321,6 +323,21 @@ pub fn process_tools_section(offered: &[OfferedTool]) -> String {
 
 fn rehome_artifacts(call: &ChatToolCallDto, from: &str, to: &str) -> ChatToolCallDto {
     let mut call = call.clone();
+    if matches!(call.key.as_str(), "fs.read" | "browser.screenshot")
+        && let Some(meta) = call.meta.as_mut().and_then(Value::as_object_mut)
+        && meta.get("imageOwner").and_then(Value::as_str) == Some(from)
+    {
+        meta.insert("imageOwner".to_owned(), json!(to));
+        if let Some(Value::String(path)) = meta.get_mut("path") {
+            let previous = path.clone();
+            *path = path
+                .replace(&format!("/{from}/"), &format!("/{to}/"))
+                .replace(&format!("\\{from}\\"), &format!("\\{to}\\"));
+            if let Some(result) = &mut call.result {
+                *result = result.replace(&previous, path);
+            }
+        }
+    }
     let prefix = format!("{from}/");
     if let Some(Value::Array(artifacts)) = call
         .meta
@@ -385,6 +402,10 @@ fn as_i64(value: u64) -> i64 {
 }
 
 impl Inner {
+    fn supports_images(&self, provider: &str) -> Result<bool, AppError> {
+        crate::images::supports_provider(&self.database, provider)
+    }
+
     fn now(&self) -> i64 {
         self.clock.now()
     }
@@ -1068,6 +1089,7 @@ fn knowledge_prompt(attached: &[AttachedStore], hybrid: bool) -> String {
 }
 
 struct Preview {
+    images_supported: bool,
     model: Model,
     parts: PromptParts,
     offered: Vec<OfferedTool>,
@@ -1149,14 +1171,25 @@ impl Preview {
         let system_part = self.parts.compose_where(|section| !in_tool_block(section));
         let sent = sendable_messages(&self.messages);
         let mut carried = HashMap::new();
+        let mut history = model_history(&self.messages);
+        if !self.images_supported {
+            crate::images::text_references(&mut history);
+        }
         let usage = measure_context(
             &system_text,
             tokens(&system_part),
-            &model_history(&self.messages),
+            &history,
             self.model.context_window,
             self.model.max_output_tokens,
             |prepared, budget| {
-                carried = carry_into(prepared, &sent, &self.lookup, self.shape, budget);
+                carried = carry_into_with_images(
+                    prepared,
+                    &sent,
+                    &self.lookup,
+                    self.shape,
+                    budget,
+                    self.images_supported,
+                );
             },
         );
         let count = |value: i64| u64::try_from(value).unwrap_or(0);
@@ -1486,7 +1519,11 @@ impl NodeDef for PrepareNode {
         {
             context.emit(HostEventDraft::Step { step })?;
         }
-        let history = model_history(&conversation.messages[..position]);
+        let mut history = model_history(&conversation.messages[..position]);
+        let images_supported = inner.supports_images(&input.provider_id)?;
+        if !images_supported {
+            crate::images::text_references(&mut history);
+        }
         let model = inner.resolve_model(&input.provider_id, &input.model_id, &input.settings)?;
         let details = &conversation.conversation;
         let attached = inner.attached_stores(&details.attached_store_ids);
@@ -1521,7 +1558,7 @@ impl NodeDef for PrepareNode {
         }
         let ToolPlan {
             mut offered,
-            deferred,
+            mut deferred,
         } = if tools_usable {
             inner.plan(
                 &registered,
@@ -1533,6 +1570,8 @@ impl NodeDef for PrepareNode {
         } else {
             ToolPlan::default()
         };
+        crate::images::configure_tools(&mut offered, images_supported);
+        crate::images::configure_tools(&mut deferred, images_supported);
         let guidance = inner.mcp_guidance(&offered)?;
         let command_note = inner.command_note(&commands, &plugins, &offered);
         let skill_note =
@@ -1629,7 +1668,14 @@ impl NodeDef for PrepareNode {
             offered.push(search_tool(&offered, &deferred));
         }
         let (profile, tool_calls) = inner.profile_prompt(&row.profile)?;
-        let files = file_tools_section(&offered);
+        let files = [
+            file_tools_section(&offered),
+            crate::images::viewing_section(&offered, images_supported),
+        ]
+        .into_iter()
+        .filter(|text| !text.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n");
         let processes = process_tools_section(&offered);
         let ended = inner.ended_shells_note(&input.conversation_id, true);
         let asking = ask_section(&offered);
@@ -1667,11 +1713,15 @@ impl NodeDef for PrepareNode {
                 tool_specs_json(&offered)
             )
         };
+        let mut current = ChatMessage::user(with_selections(&user.content, &user.selections))
+            .with_images(user.images.clone());
+        if !images_supported {
+            crate::images::text_references(std::slice::from_mut(&mut current));
+        }
         let mut prepared = window_chat_history(
             &system,
             &history,
-            &ChatMessage::user(with_selections(&user.content, &user.selections))
-                .with_images(user.images.clone()),
+            &current,
             model.context_window,
             model.max_output_tokens,
             &sources,
@@ -1679,12 +1729,13 @@ impl NodeDef for PrepareNode {
         )?;
         let sent = sendable_messages(&conversation.messages[..position]);
         let lookup = source_lookup(inner, context.services.vector_stores.as_ref(), &sent).await;
-        carry_into(
+        carry_into_with_images(
             &mut prepared,
             &sent,
             &lookup,
             carry_shape(tool_mode, &offered),
             model.context_window - model.max_output_tokens,
+            images_supported,
         );
         let run_id = context.run_id.to_string();
         if !details.attached_store_ids.is_empty() {
@@ -1803,6 +1854,7 @@ pub(crate) struct RoundOutput {
 }
 
 struct CallOptions<'a> {
+    images_supported: bool,
     tool: Option<&'a OfferedTool>,
     label: String,
     limit: usize,
@@ -2114,6 +2166,14 @@ impl GenerateChatNode {
         {
             fields.insert("conversationId".to_owned(), json!(options.conversation));
         }
+        if let Some(fields) = arguments.as_object_mut() {
+            if tool.key == crate::browser::capability::BROWSER_SCREENSHOT {
+                fields.insert("conversationId".to_owned(), json!(options.conversation));
+            }
+            if tool.key == crate::files::FS_READ {
+                fields.insert("imageViewing".to_owned(), json!(options.images_supported));
+            }
+        }
         let hint = options
             .skills
             .lock()
@@ -2333,17 +2393,20 @@ impl GenerateChatNode {
             tools: specs,
             ..base.clone().request()
         };
+        if !self.0.supports_images(&base.provider_id)? {
+            crate::images::text_references(&mut template.messages);
+        }
+        crate::images::bound_images(&mut template.messages);
         if template
             .messages
             .iter()
             .any(|message| !message.images.is_empty())
+            && self.0.images.is_none()
         {
-            let loader = self.0.images.as_ref().ok_or_else(|| {
-                AppError::new(AppErrorCode::Conflict, crate::images::IMAGE_MISSING)
-            })?;
-            loader
-                .load_messages(&conversation_id, &mut template.messages, &context.cancel)
-                .await?;
+            return Err(AppError::new(
+                AppErrorCode::Conflict,
+                crate::images::IMAGE_MISSING,
+            ));
         }
         let calls: Arc<Mutex<Vec<ChatToolCallDto>>> = Arc::new(Mutex::new(Vec::new()));
         let sink = CallSink::Message(assistant_id.clone());
@@ -2353,6 +2416,7 @@ impl GenerateChatNode {
             self.0.subagents.preferences().concurrency,
         );
         let host = ChatLoopHost {
+            images_supported: self.0.supports_images(&base.provider_id)?,
             node: self,
             sink: sink.clone(),
             delegation: Some(&delegation),
@@ -2416,6 +2480,7 @@ impl GenerateChatNode {
 }
 
 struct ChatLoopHost<'a> {
+    images_supported: bool,
     node: &'a GenerateChatNode,
     sink: CallSink,
     delegation: Option<&'a Delegation>,
@@ -2429,6 +2494,13 @@ struct ChatLoopHost<'a> {
 
 #[async_trait]
 impl LoopHost for ChatLoopHost<'_> {
+    fn image_loader(&self) -> Option<(crate::images::ImageLoader, String, bool)> {
+        self.node
+            .0
+            .images
+            .clone()
+            .map(|loader| (loader, self.conversation.to_owned(), self.images_supported))
+    }
     fn yields(&self) -> bool {
         self.node.0.queue_yields(self.conversation)
     }
@@ -2446,6 +2518,7 @@ impl LoopHost for ChatLoopHost<'_> {
                 calls,
                 call.index,
                 CallOptions {
+                    images_supported: self.images_supported,
                     tool: call.tool,
                     label: call.label,
                     limit: self.limit,
@@ -3208,39 +3281,24 @@ impl ChatService {
             .inner
             .resolve_model(&provider_id, &model_id, &settings)?;
         input.validate()?;
-        if !input.images.is_empty()
-            || conversation
-                .messages
-                .iter()
-                .any(|message| !message.images.is_empty())
-        {
-            let supported = self
-                .inner
-                .read(|repositories| Ok(repositories.providers.find_by_id(&provider_id)?))?
-                .is_some_and(|provider| {
-                    matches!(provider.adapter.as_str(), "qwen-web" | "zai-web")
-                });
-            if !supported {
-                return Err(AppError::new(
-                    AppErrorCode::ValidationFailed,
-                    crate::images::VISION_UNSUPPORTED,
-                ));
-            }
-            if !input.images.is_empty() {
-                let loader = self.inner.images.as_ref().ok_or_else(|| {
-                    AppError::new(AppErrorCode::Conflict, crate::images::IMAGE_MISSING)
-                })?;
-                for image in &input.images {
-                    loader.validate_reference(&conversation_id, image)?;
-                }
+        if !input.images.is_empty() {
+            let loader = self.inner.images.as_ref().ok_or_else(|| {
+                AppError::new(AppErrorCode::Conflict, crate::images::IMAGE_MISSING)
+            })?;
+            for image in &input.images {
+                loader.validate_reference(&conversation_id, image)?;
             }
         }
         let text = input.text().to_owned();
+        let mut current = ChatMessage::user(with_selections(&text, &input.selections))
+            .with_images(input.images.clone());
+        if !self.inner.supports_images(&provider_id)? {
+            crate::images::text_references(std::slice::from_mut(&mut current));
+        }
         window_chat_history(
             &details.system_prompt,
             &[],
-            &ChatMessage::user(with_selections(&text, &input.selections))
-                .with_images(input.images.clone()),
+            &current,
             model.context_window,
             model.max_output_tokens,
             &[],
@@ -3509,13 +3567,16 @@ impl ChatService {
         }
         let ToolPlan {
             mut offered,
-            deferred,
+            mut deferred,
         } = if tools_usable {
             self.inner
                 .plan(&registered, wants_knowledge, &commands, &plugins, &messages)
         } else {
             ToolPlan::default()
         };
+        let images_supported = self.inner.supports_images(&provider_id)?;
+        crate::images::configure_tools(&mut offered, images_supported);
+        crate::images::configure_tools(&mut deferred, images_supported);
         let mcp_guidance = self.inner.mcp_guidance(&offered)?;
         let command = self.inner.command_note(&commands, &plugins, &offered);
         let last_user = messages
@@ -3601,7 +3662,14 @@ impl ChatService {
             command,
             skills,
             workspace,
-            file_tools: file_tools_section(&offered),
+            file_tools: [
+                file_tools_section(&offered),
+                crate::images::viewing_section(&offered, images_supported),
+            ]
+            .into_iter()
+            .filter(|text| !text.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n\n"),
             process_tools: process_tools_section(&offered),
             ended_shells: self.inner.ended_shells_note(&conversation_id, false),
             ask: ask_section(&offered),
@@ -3616,6 +3684,7 @@ impl ChatService {
         )
         .await;
         Ok(Preview {
+            images_supported,
             model,
             parts,
             shape: carry_shape(tool_mode, &offered),

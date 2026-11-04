@@ -58,7 +58,7 @@ import {
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import ConversationVm from "./ConversationVm";
-import { IMAGES_FULL, VISION_UNSUPPORTED } from "./imageCopy";
+import { IMAGES_FULL } from "./imageCopy";
 import { readImageData } from "./imageData";
 import { accountProviderLabel } from "../providers/accountPresentation";
 import { suggestedBaseUrl } from "../providers/providerPresentation";
@@ -660,7 +660,6 @@ export default class ChatStore {
       !this.changingOpenaiMode &&
       !this.pickingImages &&
       !this.goals.active &&
-      (this.composer.images.length === 0 || this.supportsImages) &&
       (this.composer.text.trim().length > 0 || this.composer.images.length > 0)
     );
   }
@@ -1199,10 +1198,6 @@ export default class ChatStore {
     }
     if (this.canQueue) {
       if (await this.queue.add(this.composer.text)) this.composer.setText("");
-      return;
-    }
-    if (this.composer.images.length > 0 && !this.supportsImages) {
-      this.error = VISION_UNSUPPORTED;
       return;
     }
     if (!this.canSend) return;

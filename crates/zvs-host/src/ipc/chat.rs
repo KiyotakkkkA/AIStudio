@@ -183,7 +183,7 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "chat.images.read",
             |services: Arc<Services>, input: ImageReadInput| async move {
-                services.chat.get(&input.id)?;
+                if services.chat.get(&input.id).is_err() { services.agentic.get(&input.id.to_string())?; }
                 let loader = crate::images::ImageLoader::new(services.artifacts.clone());
                 tokio::task::spawn_blocking(move || {
                     use base64::Engine;

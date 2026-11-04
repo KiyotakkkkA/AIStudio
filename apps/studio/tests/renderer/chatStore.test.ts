@@ -16,7 +16,6 @@ import {
 } from "@zvs/shared";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
-import { VISION_UNSUPPORTED } from "../../src/renderer/features/chat/imageCopy.ts";
 import { clearImageDataCache } from "../../src/renderer/features/chat/imageData.ts";
 import ChatStore, { SELECTIONS_FULL } from "../../src/renderer/features/chat/ChatStore.ts";
 import { shouldPinToBottom } from "../../src/renderer/features/chat/scroll.ts";
@@ -692,19 +691,26 @@ test.each(["qwen-web", "zai-web"] as const)(
   },
 );
 
-test("image attachments block unsupported providers and cannot enter the text queue", async () => {
-  const { store, events } = setup();
+test("switching to an unsupported provider preserves image references without allowing the text queue", async () => {
+  const { store, bridge, events } = setup();
   store.providers = [saved];
   store.composer.selectProvider(saved);
   store.composer.setImages([imageAttachment]);
   store.composer.setText("Describe");
   expect(store.supportsImages).toBe(false);
-  expect(store.canSend).toBe(false);
+  expect(store.canSend).toBe(true);
   store.active = structuredClone(conversation);
-  store.run = handle;
-  expect(store.canQueue).toBe(false);
+  let sent: unknown;
+  bridge.handle("chat.send", (input) => {
+    sent = input;
+    return handle;
+  });
   await store.send();
-  expect(store.error).toBe(VISION_UNSUPPORTED);
+  expect(sent).toMatchObject({ images: [imageAttachment] });
+  store.run = handle;
+  store.composer.setImages([imageAttachment]);
+  store.composer.setText("Describe again");
+  expect(store.canQueue).toBe(false);
   store.dispose();
   events.dispose();
 });

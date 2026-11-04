@@ -40,15 +40,37 @@ the same ownership, manifest and hash checks as generation, and returns a bounde
 `message.images` is a JSON column introduced by migration `0038_message_images`, defaulting to
 `[]` for old conversations. Rust and Zod definitions and golden fixtures cover the DTOs and
 image-only `ChatSendInput`. `GenerateMessage` serializes references, never image bytes, so run
-inputs and diagnostics do not store base64. Current chat admission accepts images only for
-`qwen-web` and `zai-web`; a different adapter is rejected before a run is created. Provider
+inputs and diagnostics do not store base64. Pixel input is enabled for `qwen-web` and `zai-web`.
+Other adapters receive textual image references while local attachments remain available. Provider
 image-generation capabilities remain unchanged.
 
 Context budgeting reserves an estimated 4,096 tokens per image; actual usage comes from the
 provider. Windowing drops the oldest history when its retained image batch would exceed five.
-The text queue remains text-only, and does not silently strip attached images. Switching to an
-unsupported provider blocks sending until the attachments are removed or a supported provider
-is selected. Existing image history also requires a supported provider.
+The text queue remains text-only. Switching providers preserves both draft and historical image
+references. Unsupported providers receive names, MIME types and sizes without pixels; their offered
+`fs.read` schema omits `viewImage`, and their system prompt omits image-viewing instructions.
+
+## Tool images (2026-11-04)
+
+`fs.read` accepts `viewImage: true` per path entry. Chat, delegated turns and Agentic Build set
+the hidden `imageViewing` capability from the selected provider; model-supplied values are
+overwritten. Existing folder permissions run before the authorized paths reach `ImageLoader::import`.
+The result and tool metadata carry immutable image references with `imageOwner`. Pixels are loaded
+for a separate user-role message after the complete batch of tool responses, through the existing
+provider upload pipeline. Historical tool references are carried with their results; Agentic Build
+transcripts persist references without bytes and reload them when a paused session resumes.
+
+`browser.screenshot` saves JPEGs to
+`conversations/<owner>/attachments/browser/screen-<short-id>-<timestamp>.jpg`, and returns the absolute
+path in its text and structured result. It does not attach pixels to model input. The owning
+conversation can read that path with `fs.read` without granting access to the whole attachment
+directory. Other paths retain the existing permission checks. Screenshot previews use an immutable
+copy in the attachment store. Both copies count toward the existing conversation quota and follow
+branch/deletion lifecycle. Chat and Agentic Build show thumbnails and an expanded image inside tool
+cards, using `chat.images.read`; that endpoint validates either a conversation or an agentic owner.
+
+Tool rounds retain at most the five latest images as pixels, replacing older ones with textual
+references. The existing image format, size, ownership and integrity checks also apply to tool images.
 
 Tests: `cargo test -p zvs-host images`, the provider adapter suites, contract golden fixtures,
 and `apps/studio/tests/renderer/chatStore.test.ts`. Upload fixtures are synthetic. Provider

@@ -194,6 +194,7 @@ impl Effects {
 }
 
 struct Rig {
+    nodes: Arc<NodeRegistry>,
     database: TemporaryDatabase,
     workspace: TempDir,
     runs: RunService,
@@ -326,6 +327,9 @@ fn rig() -> Rig {
         clock.clone(),
     );
     let service = AgenticService::new(AgenticServiceOptions {
+        images: Some(crate::images::ImageLoader::new(
+            crate::artifacts::ArtifactStore::new(workspace.path().join("conversations")),
+        )),
         clock: clock.clone(),
         ..AgenticServiceOptions::new(
             database.shared(),
@@ -351,6 +355,7 @@ fn rig() -> Rig {
         })
         .expect("a provider");
     Rig {
+        nodes,
         database,
         workspace,
         runs,
@@ -527,6 +532,88 @@ async fn a_plain_answer_without_tool_calls_completes_the_session() {
     let done = rig.settle(&rig.start(AgenticPermissionMode::Ask)).await;
     assert_eq!(done.status, AgenticSessionStatus::Completed);
     assert_eq!(done.summary.as_deref(), Some("Цель уже достигнута."));
+}
+
+#[tokio::test]
+async fn image_tool_results_are_loaded_for_the_next_round_and_persisted_without_pixels() {
+    let rig = rig();
+    let store = crate::artifacts::ArtifactStore::new(rig.workspace.path().join("conversations"));
+    crate::files::register_file_nodes(
+        &rig.nodes,
+        &rig.folders,
+        crate::files::FileToolOptions::new(store.root().to_path_buf()),
+    )
+    .unwrap();
+    crate::tools::register_kernel_tools(&rig.nodes, &rig.tools).unwrap();
+    rig.database
+        .with_connection(|connection| {
+            Repositories::new(connection).providers.update(
+                &rig.provider.to_string(),
+                &crate::data::repositories::ProviderPatch {
+                    adapter: Some(zvs_contract::AdapterFamily::QwenWeb),
+                    ..crate::data::repositories::ProviderPatch::default()
+                },
+                1,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    std::fs::write(
+        rig.workspace.path().join("source.jpg"),
+        [255, 216, 255, 217],
+    )
+    .unwrap();
+    rig.driver.round(|request| {
+        assert!(
+            request
+                .tools
+                .iter()
+                .find(|tool| tool.name == "fs__read")
+                .unwrap()
+                .parameters
+                .to_string()
+                .contains("viewImage")
+        );
+        vec![TextDelta::ToolCall(ToolCall::new(
+            "read-image",
+            "fs__read",
+            json!({ "paths": [{ "path": "source.jpg", "viewImage": true }] }).to_string(),
+        ))]
+    });
+    rig.driver.round(|request| {
+        let images: Vec<_> = request
+            .messages
+            .iter()
+            .flat_map(|message| &message.images)
+            .collect();
+        assert_eq!(images.len(), 1);
+        assert_eq!(&*images[0].bytes, [255, 216, 255, 217]);
+        vec![TextDelta::text("Image inspected.")]
+    });
+    let session = rig.start_with(CreateAgenticSessionInput {
+        tools: Some(vec![crate::files::FS_READ.to_owned()]),
+        ..rig.input(AgenticPermissionMode::Auto)
+    });
+    let done = rig.settle(&session).await;
+    assert_eq!(done.status, AgenticSessionStatus::Completed);
+    let entries = rig
+        .service
+        .store()
+        .transcript(&session.id.to_string())
+        .unwrap();
+    assert_eq!(entries.iter().flat_map(|entry| &entry.images).count(), 1);
+    let serialized = serde_json::to_string(&entries).unwrap();
+    assert!(!serialized.contains("/9j/2Q=="));
+    let steps = rig
+        .runs
+        .step_rows(&done.run_id.unwrap().to_string())
+        .unwrap();
+    let meta = &steps
+        .iter()
+        .find(|step| step.step_type == crate::files::FS_READ)
+        .unwrap()
+        .output;
+    assert_eq!(meta["imageOwner"], json!(session.id.to_string()));
 }
 
 #[tokio::test]

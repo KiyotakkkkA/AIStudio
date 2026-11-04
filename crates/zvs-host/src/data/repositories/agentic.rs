@@ -201,6 +201,7 @@ mod tests {
                     title: "Проверить".to_owned(),
                 }]);
                 let entry = |content: &str| TranscriptEntry {
+                    images: Vec::new(),
                     role: "user".to_owned(),
                     content: content.to_owned(),
                     tool_call_id: None,

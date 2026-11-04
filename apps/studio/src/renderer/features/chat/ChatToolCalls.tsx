@@ -65,6 +65,8 @@ import {
 } from "./ToolCallDetails";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import MailDraftView from "../mail/MailDraftView";
+import ToolImages from "./ToolImages";
+import { toolImageReferences } from "./imageData";
 import { MAIL_LEAD, REJECT_MAIL, SEND_MAIL, type MailPreview } from "../mail/mailCopy";
 
 export const TOOL_CALL_STATUS: Record<
@@ -183,6 +185,10 @@ export function ToolCallCard({
       ? toolCallView(call)
       : null;
   const searched = view?.kind === "search" && view.citations !== null;
+  const images =
+    (call.key === "fs.read" || call.key === "browser.screenshot") && call.status === "succeeded"
+      ? toolImageReferences(call.meta)
+      : null;
 
   return (
     <PipelineItem icon={presentation.icon} enter={live} layout="position" tail={open}>
@@ -282,6 +288,7 @@ export function ToolCallCard({
             <ResultBlock result={call.result} truncated={call.truncated} />
           )}
           {call.error !== null && <p className="text-[12px] text-err">{call.error}</p>}
+          {images === null ? null : <ToolImages references={images} />}
           {call.authorisation !== undefined && (
             <AuthorisationNote authorisation={call.authorisation} />
           )}

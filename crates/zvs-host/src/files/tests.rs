@@ -245,12 +245,14 @@ fn read_input_is_capped_at_sixteen_paths() {
     let input = |count: usize| FsReadInput {
         paths: (0..count)
             .map(|index| FsReadTarget {
+                view_image: false,
                 path: format!("f{index}.txt"),
                 start_line: None,
                 end_line: None,
             })
             .collect(),
         conversation_id: String::new(),
+        image_viewing: false,
     };
     use zvs_contract::Validate;
     assert!(input(READ_PATHS_MAX).validate().is_ok());
@@ -512,6 +514,64 @@ fn read_node(conversation: ConversationId, paths: &[&Path]) -> Value {
             "paths": paths.iter().map(|path| json!({ "path": path.to_string_lossy() })).collect::<Vec<_>>()
         }
     })
+}
+
+#[tokio::test]
+async fn image_reads_use_authorized_paths_and_return_immutable_preview_references() {
+    let host = Host::new();
+    let root = temporary_directory("file-images");
+    let conversation = host.bound(root.path());
+    let source = root.path().join("source.jpg");
+    std::fs::write(&source, [255, 216, 255, 217]).unwrap();
+    let mut node = read_node(conversation, &[&source]);
+    node["input"]["paths"][0]["viewImage"] = json!(true);
+    node["input"]["imageViewing"] = json!(true);
+    let handle = host.start(json!([node.clone()]));
+    assert_eq!(host.finish(&handle.id).await, RunStatus::Succeeded);
+    let output = host.output(&handle.id, "read");
+    let images: Vec<zvs_contract::ImageAttachmentDto> =
+        serde_json::from_value(output["images"].clone()).unwrap();
+    assert_eq!(output["files"][0]["status"], "image");
+    assert_eq!(images.len(), 1);
+    let loader = crate::images::ImageLoader::new(host.services.artifacts.clone());
+    std::fs::remove_file(&source).unwrap();
+    assert_eq!(
+        &*loader
+            .load(&conversation.to_string(), &images[0])
+            .unwrap()
+            .bytes,
+        [255, 216, 255, 217]
+    );
+    node["input"]["imageViewing"] = json!(false);
+    let handle = host.start(json!([node]));
+    assert_eq!(host.finish(&handle.id).await, RunStatus::Failed);
+    assert_eq!(
+        host.failure(&handle.id).as_deref(),
+        Some(crate::images::VISION_UNSUPPORTED)
+    );
+}
+
+#[tokio::test]
+async fn owned_screenshot_paths_can_be_read_without_granting_the_attachment_directory() {
+    let host = Host::new();
+    let conversation = host.conversation();
+    let loader = crate::images::ImageLoader::new(host.services.artifacts.clone());
+    let (path, _) = loader
+        .save_browser(&conversation.to_string(), "/9j/2Q==", 1234)
+        .unwrap();
+    let mut node = read_node(conversation, &[Path::new(&path)]);
+    node["input"]["paths"][0]["viewImage"] = json!(true);
+    node["input"]["imageViewing"] = json!(true);
+    let handle = host.start(json!([node]));
+    assert_eq!(host.finish(&handle.id).await, RunStatus::Succeeded);
+    assert!(host.approvals(&handle.id).is_empty());
+    assert_eq!(
+        host.output(&handle.id, "read")["images"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 fn apply_node(conversation: ConversationId, after: &[&str], changes: Value) -> Value {

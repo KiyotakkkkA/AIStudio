@@ -35,6 +35,7 @@ pub const FILE_TOOLS: [&str; 4] = [FS_LIST, FS_READ, FS_SEARCH, FS_APPLY];
 
 pub const LIST_DESCRIPTION: &str = "Lists files and folders. The path is absolute, relative to the conversation working folder, chat: (the conversation files folder), or skill:<key>/ (a skill folder, read-only). Files matched by .gitignore are skipped. recursive walks nested folders; glob filters files by pattern, e.g. **/*.rs. Access to a folder outside granted permissions is confirmed by the user.";
 pub const READ_DESCRIPTION: &str = "Reads up to 16 text files per call; each may specify a startLine–endLine range. Paths work as in fs.list, e.g. chat:_spec.json or skill:dashboard/references/spec.md. Content size is limited; for binary files only the size is reported. An existing file outside chat: must be read in the current turn before it is changed via fs.apply.";
+pub const READ_IMAGE_DESCRIPTION: &str = "Reads up to 16 files. Set viewImage: true on a path entry to view PNG, JPEG, GIF or WebP pixels, at most 5 images per call. Text files support startLine and endLine. Paths are absolute, relative to the working folder, chat: or skill:<key>/. Browser screenshots can be read at their returned paths. Access outside granted folders requires user confirmation.";
 pub const SEARCH_DESCRIPTION: &str = "Searches text across the files of a folder, honoring .gitignore; paths work as in fs.list. By default query is a plain string; regex: true enables regular expressions; ignoreCase disables case sensitivity; glob limits the file set. Returns path, line number, and the line itself for each match.";
 pub const APPLY_DESCRIPTION: &str = "A batch of file changes in one call: write writes a whole file, edit replaces fragments old with new (each old must occur in the file exactly once), move renames a file, delete removes a file. Changes run in order; each sees the result of the previous ones. Paths work as in fs.list; skill: folders are read-only. An existing file outside chat: must be read via fs.read in the current turn before changing it and must not change afterwards. The user confirms the whole batch from a combined diff; changes only inside chat: need no confirmation. The batch applies in full or not at all. Line endings and BOM are preserved; binary files are not modified.";
 
@@ -342,6 +343,9 @@ pub struct FsReadTarget {
     #[serde(default)]
     #[schemars(description = "Last line, inclusive")]
     pub end_line: Option<u64>,
+    #[serde(default)]
+    #[schemars(description = "View image pixels instead of reading text")]
+    pub view_image: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -352,6 +356,9 @@ pub struct FsReadInput {
     #[serde(default)]
     #[schemars(skip)]
     pub conversation_id: String,
+    #[serde(default)]
+    #[schemars(skip)]
+    pub image_viewing: bool,
 }
 
 impl Validate for FsReadInput {
@@ -361,6 +368,14 @@ impl Validate for FsReadInput {
         }
         if self.paths.len() > READ_PATHS_MAX {
             return Err(invalid("paths", "maxItems"));
+        }
+        if self.paths.iter().filter(|target| target.view_image).count()
+            > zvs_contract::images::IMAGES_MAX
+        {
+            return Err(AppError::new(
+                AppErrorCode::LimitExceeded,
+                crate::images::IMAGES_FULL,
+            ));
         }
         for (index, target) in self.paths.iter().enumerate() {
             check_path(&format!("paths.{index}.path"), &target.path)?;
@@ -391,6 +406,10 @@ pub struct FsReadFile {
 pub struct FsReadOutput {
     pub text: String,
     pub files: Vec<FsReadFile>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub images: Vec<zvs_contract::ImageAttachmentDto>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub image_owner: String,
 }
 
 impl Validate for FsReadOutput {
@@ -559,12 +578,24 @@ impl NodeDef for FsReadNode {
         context: &StepContext,
         input: FsReadInput,
     ) -> Result<FsReadOutput, AppError> {
+        if input.paths.iter().any(|target| target.view_image) && !input.image_viewing {
+            return Err(AppError::new(
+                AppErrorCode::ValidationFailed,
+                crate::images::VISION_UNSUPPORTED,
+            ));
+        }
+        let loader = crate::images::ImageLoader::new(crate::artifacts::ArtifactStore::new(
+            self.0.options.conversations.root().to_path_buf(),
+        ));
         let mut located: Vec<Option<PathBuf>> = Vec::with_capacity(input.paths.len());
         for target in &input.paths {
             located.push(
-                self.0
-                    .located(&input.conversation_id, &target.path)?
-                    .map(|found| found.path),
+                loader
+                    .browser_path(&input.conversation_id, &target.path)?
+                    .or(self
+                        .0
+                        .located(&input.conversation_id, &target.path)?
+                        .map(|found| found.path)),
             );
         }
         let targets: Vec<FolderTarget> = input
@@ -596,7 +627,14 @@ impl NodeDef for FsReadNode {
             };
             let mut sections = Vec::with_capacity(resolved.len());
             let mut files = Vec::with_capacity(resolved.len());
+            let image_paths: Vec<String> = resolved.iter().zip(&input.paths).filter(|(_, request)| request.view_image).map(|(path, _)| path_text(path)).collect();
+            let images = if image_paths.is_empty() { Vec::new() } else { loader.import(&input.conversation_id, &image_paths)? };
             for (path, request) in resolved.iter().zip(&input.paths) {
+                if request.view_image {
+                    sections.push(format!("<file path=\"{}\" untrusted=\"true\">\n[image attached for viewing]\n</file>", path.display()));
+                    files.push(FsReadFile { path: path_text(path), status: "image".to_owned(), lines: 0, truncated: false });
+                    continue;
+                }
                 let (section, file) = read_one(path, request, &mut budget, &ledger, &run);
                 sections.push(section);
                 files.push(file);
@@ -604,9 +642,16 @@ impl NodeDef for FsReadNode {
             Ok(FsReadOutput {
                 text: sections.join("\n"),
                 files,
+                image_owner: if images.is_empty() { String::new() } else { input.conversation_id },
+                images,
             })
         })
         .await
+    }
+
+    fn tool_meta(&self, input: &Value, output: &FsReadOutput) -> Option<Value> {
+        (!output.images.is_empty())
+            .then(|| json!({ "imageOwner": input["conversationId"], "images": output.images }))
     }
 }
 
