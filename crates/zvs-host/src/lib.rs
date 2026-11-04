@@ -9,6 +9,7 @@ pub mod chat_export;
 pub mod chat_files;
 pub mod cli;
 pub mod commands;
+pub mod computer;
 pub mod conversations;
 pub mod data;
 pub mod documents;

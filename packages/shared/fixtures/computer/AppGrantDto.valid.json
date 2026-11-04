@@ -1,0 +1,28 @@
+[
+  {
+    "name": "global",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "app": "chrome.exe",
+      "path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      "icon": "iVBORw0KGgo=",
+      "scope": "always",
+      "conversation": null,
+      "grantedAt": 1800000000000,
+      "lastUsedAt": null
+    }
+  },
+  {
+    "name": "dialog",
+    "value": {
+      "id": "0199aa11-2222-7111-8111-111111111111",
+      "app": "notepad.exe",
+      "path": "",
+      "icon": null,
+      "scope": "conversation",
+      "conversation": { "id": "0199aa11-3333-7111-8111-111111111111", "title": "Отчёт" },
+      "grantedAt": 1800000000000,
+      "lastUsedAt": 1800000005000
+    }
+  }
+]

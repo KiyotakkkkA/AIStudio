@@ -672,6 +672,12 @@ pub fn test_services(system: SystemService) -> TestServices {
             exec_policy,
             subagents,
             browser: crate::browser::BrowserAgent::new(clock.clone()),
+            computer: crate::computer::ComputerAgent::new(
+                Arc::new(crate::computer::sidecar::NoDesktop),
+                database.shared(),
+                clock.clone(),
+                Arc::new(crate::platform::logger::SilentLogger),
+            ),
             documents: crate::documents::DocumentService::new(
                 crate::documents::DocumentServiceOptions {
                     clock: clock.clone(),

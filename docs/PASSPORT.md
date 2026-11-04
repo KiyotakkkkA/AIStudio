@@ -58,6 +58,7 @@ are Rust.
 | D11 | Account-mode providers | **Qwen only; no vendor whose web API demands a proof of work or other anti-automation challenge** *(decided 2026-10-19, ADR 0001)* | Account mode sends the requests the user's own signed-in page sends and nothing more; solving a vendor's anti-bot challenge would mean shipping code that defeats its abuse protection | DeepSeek is offered only through its official API (`openai-compatible`) or OpenRouter; existing `deepseek-web` rows are deleted by migration 0002 |
 | D12 | Inbound events | **No webhooks; integrations pull through supervised background workers (long polling, IDLE, interval polling)** *(decided 2026-10-28, ADR 0004)* | A desktop app has no public endpoint, and a listener open to the internet is a server product with its own attack surface | Event latency is the poll interval; events arrive only while the app runs |
 | D13 | Secrets | **A secret is a name, a value, a scope and metadata; no types, every picker lists every secret** *(decided 2026-11-02, ADR 0006)* | A type registry duplicated consumer configuration and hid usable secrets from pickers | Choosing the right secret is the user's job, helped by search |
+| D14 | Computer use | **The live Windows desktop driven by a Python sidecar (`uv run --script`) shipped in the bundled `computer-use` skill; generic function tools for every vision-capable provider; per-app grants** *(decided 2026-11-04)* | Screenshots, OS input and UI Automation come from the mature Windows Python stack (mss, Pillow, uiautomation, Win32 `SendInput`) without a native dependency in the host; the same tool set works for every provider that can read images | Needs uv (managed or global); one dialog controls the desktop at a time; Windows-only; providers without image input cannot use it |
 
 **D10, what replaced what.** `BrowserWindow` became a Tauri window with a `studio` webview.
 The preloads became capabilities: the studio webview may call only `ipc_call` and
@@ -1700,3 +1701,79 @@ The window is a kernel front-end like any other: a browser session is a **Run**,
 **Step**, and the panel log is that run's event stream — the same events the Tasks page
 renders. An approval request is the same `approval` event the Agentic Build page uses (§7,
 §11). Nothing here is a parallel mechanism.
+
+## 22. Computer use (D14)
+
+`/computer-use` (`ChatCommand::ComputerUse`) lets a dialog operate the user's own desktop. The
+command holds for the rest of the dialog like `/browser-use` and brings the bundled
+`computer-use` skill's instructions. Its seven tools — `computer.screenshot`, `computer.act`,
+`computer.zoom`, `computer.inspect`, `computer.apps`, `computer.open_app`,
+`computer.request_access` — are offered only while the turn's provider accepts images
+(`images::configure_tools` drops them otherwise, and the composer hides the command). Subagents
+never receive them.
+
+### Layers
+
+| Layer | Where | Owns |
+| --- | --- | --- |
+| Model-facing tools | `zvs-host/src/computer/nodes.rs` | Input schemas, policy, approvals, screenshots saved under the dialog's `computer/` folder and attached to the next request (`images::tool_images`) |
+| Session | `computer/agent.rs` (`ComputerAgent`) | One active dialog, the run it follows, the action log, pending approvals, grants, stop and corrections |
+| Desktop port | `computer/sidecar.rs` (`DesktopPort`) | JSON lines over stdio to the sidecar; `NoDesktop` elsewhere. A remote or another local backend is another `DesktopPort` |
+| Sidecar | `skills/computer-use/scripts/` | `mss` capture scaled to ≤1280×800, Win32 `SendInput` (marked, flagged injected), UI Automation tree with `e1`-style refs, window list, app launch and focus, app path and icon lookup |
+| Shell | `src-tauri/src/computer.rs` | The edge glow with its badge, the floating panel, LShift+Esc, minimising and restoring the studio window |
+
+The sidecar script is compiled into the host from the bundled skill and written to
+`<app data>/computer/scripts` at each start; the copy in the skills folder is documentation and
+is never executed. It runs with the toolchain's isolated environment
+(`ToolchainService::launch(Uv)`); dependencies are pinned in the script's PEP 723 header. A call
+has a timeout (45 s, 180 s for actions, 240 s for the first start), a dead or silent process is
+killed and restarted on the next call, and cancelling the run kills it at once so input stops
+mid-batch. The session ends with its run; the sidecar is closed then.
+
+### Coordinates and hybrid targeting
+
+Coordinates are pixels of the last screenshot of the selected display; the sidecar maps them to
+physical pixels (per-monitor DPI aware). `computer.inspect` lists UI Automation elements of the
+foreground window with refs and centre coordinates; `computer.act` accepts a `ref` instead of
+`x`/`y`. Every action returns a fresh screenshot; `computer.zoom` returns a region at full
+resolution.
+
+### Access and policy
+
+- **Grants are per app** (lowercase executable name; Store apps resolve to the hosted process,
+  not `ApplicationFrameHost.exe`). Acting in an app without access raises a `kind: "apps"`
+  approval with each app's path and icon; `computer.request_access` raises the same one up
+  front. It is answered through `computer.answer` with `once` (this generation: kept in memory
+  for the run), `conversation` or `always` (rows in `app_grant`, migration 0039), or `deny`.
+  The «Разрешения → Приложения» tab lists and revokes stored grants (`computer.grants`,
+  `computer.revoke`).
+- **Floor, refused in every mode:** windows of the app itself (by process id), credential
+  prompts and password managers (`policy::FORBIDDEN_APPS`), typing into a password field
+  (checked by the sidecar against the focused element just before input).
+- **Every batch asks** (as `browser.submit`: asks unless the execution policy is
+  `no-restrictions`): terminals, the registry editor, Task Manager, system settings and
+  installers (`policy::SENSITIVE_APPS`), and Windows-key or Ctrl+Alt+Del shortcuts.
+- The host probes each action's target window before asking; the sidecar checks the target
+  again immediately before input against the granted set and refuses anything else, so a window
+  that changes between the check and the input is not driven.
+- Limits: 12 actions per batch, 5000 characters per `type`, 120 actions a minute.
+- Screen content is fenced as `<screen untrusted="true">` data.
+
+### Live surface
+
+While a session runs, the studio window is minimised and two always-on-top windows appear on
+the selected display: `computer-glow` (click-through, the animated edge glow and a badge with the
+status and the stop shortcut) and `computer-panel` (status, the pending approval with app cards,
+the action log and a correction field). Both are excluded from screen capture
+(`WDA_EXCLUDEFROMCAPTURE`) and never take focus (`WS_EX_NOACTIVATE`) until the user clicks into
+the correction field. A correction cancels the running turn and sends the text as the next user
+message; the session continues with the new run. LShift+Esc is a low-level keyboard hook that
+ignores injected input, so only a physical key press stops the run. The windows reach the host
+only through `computer_command` (panel) and `computer_subscribe` (both), label-checked.
+
+### Observability
+
+Each tool call is a step of the turn's run with its result and screenshot in the dialog folder.
+The host log (`computer` scope) records session start and end, grants and revocations,
+corrections, stops and sidecar starts, failures and stderr; typed text is never logged.
+

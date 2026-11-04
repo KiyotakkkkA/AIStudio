@@ -4,6 +4,7 @@ pub mod artifacts;
 pub mod browser_grants;
 pub mod chat;
 pub mod cli;
+pub mod computer;
 pub mod documents;
 pub mod downloads;
 pub mod exec_policy;
@@ -65,6 +66,7 @@ pub fn register(server: &mut IpcServer) {
     documents::register(server);
     artifacts::register(server);
     browser_grants::register(server);
+    computer::register(server);
     storage::register(server);
     voice::register(server);
 }
@@ -167,6 +169,9 @@ mod tests {
                 "cli.theme.get",
                 "cli.theme.set",
                 "cli.uninstall",
+                "computer.answer",
+                "computer.grants",
+                "computer.revoke",
                 "documents.close",
                 "documents.list",
                 "documents.open",

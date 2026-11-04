@@ -1,5 +1,6 @@
 pub mod account;
 pub mod agentic;
+pub mod app_grant;
 pub mod browser_grant;
 pub mod chat;
 pub mod document;
@@ -30,6 +31,7 @@ pub use account::{
     AccountDraft, AccountPatch, AccountRemoval, AccountRepository, NO_ACCOUNT_LINKED,
 };
 pub use agentic::AgenticSessionRepository;
+pub use app_grant::AppGrantRepository;
 pub use browser_grant::BrowserGrantRepository;
 pub use chat::{ChatRepository, ConversationPatch, MessagePatch};
 pub use document::DocumentRepository;
@@ -83,6 +85,7 @@ pub struct Repositories<'c> {
     pub scenarios: ScenarioRepository<'c>,
     pub memory: MemoryRepository<'c>,
     pub agentic_sessions: AgenticSessionRepository<'c>,
+    pub app_grants: AppGrantRepository<'c>,
     pub browser_grants: BrowserGrantRepository<'c>,
     pub integrations: IntegrationRepository<'c>,
 }
@@ -113,6 +116,7 @@ impl<'c> Repositories<'c> {
             scenarios: ScenarioRepository::new(connection),
             memory: MemoryRepository::new(connection),
             agentic_sessions: AgenticSessionRepository::new(connection),
+            app_grants: AppGrantRepository::new(connection),
             browser_grants: BrowserGrantRepository::new(connection),
             integrations: IntegrationRepository::new(connection),
         }

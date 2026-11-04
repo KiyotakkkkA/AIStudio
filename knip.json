@@ -9,6 +9,7 @@
     "apps/studio": {
       "entry": [
         "src/browser-ui/main.tsx",
+        "src/computer-ui/main.tsx",
         "src/recovery/main.ts",
         "src-tauri/isolation/index.js",
         "src-tauri/src/browser/gateway/page.js"

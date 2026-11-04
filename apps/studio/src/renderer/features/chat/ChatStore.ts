@@ -30,6 +30,8 @@ import {
   type ChatCitationDto,
   type ChatCommand,
   type ChatCommandDto,
+  APPS_APPROVAL_KIND,
+  ComputerAppDto,
   type ChatContextDto,
   type ChatContextInput,
   type Contract,
@@ -152,6 +154,8 @@ export default class ChatStore {
     changes: FileDiffDto[];
     process?: ProcessPlanDto;
     mail?: MailPreview;
+    apps?: ComputerAppDto[];
+    detail?: string;
     subagent: SubagentLabel | null;
   }[] = [];
   folderRequests: (FolderApprovalDto & { subagent: SubagentLabel | null })[] = [];
@@ -546,6 +550,7 @@ export default class ChatStore {
       attachedPlugins: this.composer.plugins,
       text: this.composer.text,
       picking: this.pickingPlugin,
+      vision: this.supportsImages,
     });
   }
   get attachedPlugins(): IntegrationAccountDto[] {
@@ -1400,6 +1405,27 @@ export default class ChatStore {
     }
   }
 
+  async answerAccess(id: string, answer: FolderAccessAnswer) {
+    const request = this.approvals.find((item) => item.id === id);
+    if (!request || request.busy) return;
+    request.busy = true;
+    try {
+      await this.ipc.call("computer.answer", {
+        id: request.runId as RunId,
+        approvalId: id,
+        answer,
+      });
+      runInAction(() => {
+        this.approvals = this.approvals.filter((item) => item.id !== id);
+      });
+    } catch (error) {
+      runInAction(() => {
+        request.busy = false;
+        this.error = errorCopy(error);
+      });
+    }
+  }
+
   async answerFolder(answer: FolderAccessAnswer) {
     const request = this.folderRequest;
     if (request === null || this.answeringFolder) return;
@@ -1656,6 +1682,9 @@ export default class ChatStore {
     const files = FilesApprovalDto.safeParse(request);
     const process = ProcessApprovalDto.safeParse(request);
     const mail = mailPreview(request);
+    const apps =
+      request.kind === APPS_APPROVAL_KIND ? ComputerAppDto.array().safeParse(request.apps) : null;
+    const detail = typeof request.detail === "string" ? request.detail : undefined;
     this.approvals.push({
       id,
       runId,
@@ -1664,6 +1693,9 @@ export default class ChatStore {
       changes: files.success ? files.data.changes : [],
       ...(process.success ? { process: process.data.process } : {}),
       ...(mail === null ? {} : { mail }),
+      ...(apps?.success === true
+        ? { apps: apps.data, ...(detail === undefined ? {} : { detail }) }
+        : {}),
       subagent,
     });
   }

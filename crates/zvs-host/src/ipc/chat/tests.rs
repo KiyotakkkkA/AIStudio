@@ -208,6 +208,7 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
             .collect::<Vec<_>>(),
         [
             zvs_contract::ChatCommand::BrowserUse,
+            zvs_contract::ChatCommand::ComputerUse,
             zvs_contract::ChatCommand::Goal
         ]
     );

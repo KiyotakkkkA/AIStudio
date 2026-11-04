@@ -103,10 +103,13 @@ pub const COMMAND_HEADING: &str = "Instructions of the command";
 const BLANK_LINE: &str = "\n\n";
 pub const BROWSER_USE_DESCRIPTION: &str =
     "Работа во встроенном браузере: открытие и чтение страниц, действия на сайтах";
+pub const COMPUTER_USE_DESCRIPTION: &str =
+    "Управление компьютером: снимки экрана, мышь и клавиатура в разрешённых приложениях";
 
 pub fn command_description(command: ChatCommand) -> &'static str {
     match command {
         ChatCommand::BrowserUse => BROWSER_USE_DESCRIPTION,
+        ChatCommand::ComputerUse => COMPUTER_USE_DESCRIPTION,
         ChatCommand::Goal => GOAL_DESCRIPTION,
     }
 }
@@ -2167,7 +2170,9 @@ impl GenerateChatNode {
             fields.insert("conversationId".to_owned(), json!(options.conversation));
         }
         if let Some(fields) = arguments.as_object_mut() {
-            if tool.key == crate::browser::capability::BROWSER_SCREENSHOT {
+            if tool.key == crate::browser::capability::BROWSER_SCREENSHOT
+                || crate::computer::COMPUTER_TOOLS.contains(&tool.key.as_str())
+            {
                 fields.insert("conversationId".to_owned(), json!(options.conversation));
             }
             if tool.key == crate::files::FS_READ {

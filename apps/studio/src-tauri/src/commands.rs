@@ -3,11 +3,14 @@ use std::sync::Arc;
 use serde_json::Value;
 use tauri::ipc::Channel;
 use tauri::{Manager, Runtime, State, Webview};
-use zvs_contract::{BrowserBounds, BrowserCommand, BrowserState, HostEvent, parse};
+use zvs_contract::{
+    BrowserBounds, BrowserCommand, BrowserState, ComputerCommand, ComputerState, HostEvent, parse,
+};
 use zvs_host::platform::events::{EventBus, EventSink};
 use zvs_host::{IpcServer, Services};
 
 use crate::browser::{BROWSER_UI, BrowserWorkspace};
+use crate::computer::{ComputerShell, GLOW, PANEL};
 use crate::window::STUDIO;
 
 pub const BROWSER_MOUNT: &str = "browser.mount";
@@ -15,6 +18,7 @@ pub const BROWSER_HIDE: &str = "browser.hide";
 const INVALID_BOUNDS: &str = "Invalid browser bounds";
 const INVALID_COMMAND: &str = "Invalid browser command";
 const NO_WORKSPACE: &str = "The browser workspace is unavailable";
+const INVALID_COMPUTER_COMMAND: &str = "Invalid computer command";
 
 pub struct Host {
     pub server: Arc<IpcServer>,
@@ -120,6 +124,31 @@ pub async fn browser_subscribe<R: Runtime>(
     Ok(())
 }
 
+#[tauri::command]
+pub async fn computer_command<R: Runtime>(
+    webview: Webview<R>,
+    shell: State<'_, ComputerShell>,
+    command: Value,
+) -> Result<(), String> {
+    ensure(webview.label(), PANEL)?;
+    let command =
+        parse::<ComputerCommand>(command).map_err(|_| INVALID_COMPUTER_COMMAND.to_owned())?;
+    shell.inner().clone().command(command).await
+}
+
+#[tauri::command]
+pub async fn computer_subscribe<R: Runtime>(
+    webview: Webview<R>,
+    shell: State<'_, ComputerShell>,
+    channel: Channel<ComputerState>,
+) -> Result<(), String> {
+    if webview.label() != GLOW {
+        ensure(webview.label(), PANEL)?;
+    }
+    shell.subscribe(channel);
+    Ok(())
+}
+
 fn ensure(label: &str, expected: &str) -> Result<(), String> {
     if label == expected {
         Ok(())
@@ -138,6 +167,13 @@ mod tests {
         let refused = ensure(BROWSER_UI, STUDIO).expect_err("refused");
         assert!(refused.contains(BROWSER_UI));
         assert!(ensure("browser-site-0", STUDIO).is_err());
+    }
+
+    #[test]
+    fn only_the_panel_sends_computer_commands() {
+        assert!(ensure(PANEL, PANEL).is_ok());
+        assert!(ensure(GLOW, PANEL).is_err());
+        assert!(ensure(STUDIO, PANEL).is_err());
     }
 
     #[test]

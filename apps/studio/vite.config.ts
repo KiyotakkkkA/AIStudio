@@ -93,6 +93,7 @@ export default defineConfig(({ command }) => {
         input: {
           studio: "src/index.html",
           browser: "src/browser-ui/index.html",
+          computer: "src/computer-ui/index.html",
           recovery: "src/recovery/index.html",
         },
       },

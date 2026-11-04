@@ -48,6 +48,8 @@ pub const CORE_TOOLS: [&str; 8] = [
     SHELL_KILL,
     SKILL_LOAD,
 ];
+pub use crate::computer::COMPUTER_TOOLS;
+
 pub const BROWSER_TOOLS: [&str; 8] = [
     BROWSER_NAVIGATE,
     BROWSER_READ_PAGE,
@@ -192,6 +194,7 @@ pub fn offered_tools(enabled: &[String], registered: &[ToolDto]) -> Vec<OfferedT
 pub fn command_tools(command: ChatCommand) -> &'static [&'static str] {
     match command {
         ChatCommand::BrowserUse => &BROWSER_TOOLS,
+        ChatCommand::ComputerUse => &COMPUTER_TOOLS,
         ChatCommand::Goal => &[],
     }
 }
@@ -230,7 +233,8 @@ pub fn plan_tools(inputs: &ToolInputs<'_>) -> ToolPlan {
                         .as_ref()
                         .is_some_and(|server| inputs.servers.contains(server)))
                 && (inputs.knowledge || !KNOWLEDGE_TOOLS.contains(&key))
-                && (commanded.contains(&key) || !BROWSER_TOOLS.contains(&key))
+                && (commanded.contains(&key)
+                    || (!BROWSER_TOOLS.contains(&key) && !COMPUTER_TOOLS.contains(&key)))
                 && (tool.source != ToolSource::Integration
                     || tool
                         .source_ref

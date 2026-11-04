@@ -72,7 +72,7 @@ pub fn bound_images(messages: &mut [ChatMessage]) {
 }
 
 pub fn tool_images(key: &str, meta: Option<&serde_json::Value>) -> Vec<ImageAttachmentDto> {
-    if key != crate::files::FS_READ {
+    if key != crate::files::FS_READ && !crate::computer::COMPUTER_IMAGE_TOOLS.contains(&key) {
         return Vec::new();
     }
     preview_images(meta)
@@ -95,7 +95,10 @@ pub fn text_references(messages: &mut [ChatMessage]) {
     }
 }
 
-pub fn configure_tools(tools: &mut [crate::services::chat_tools::OfferedTool], supported: bool) {
+pub fn configure_tools(tools: &mut Vec<crate::services::chat_tools::OfferedTool>, supported: bool) {
+    if !supported {
+        tools.retain(|tool| !crate::computer::COMPUTER_TOOLS.contains(&tool.key.as_str()));
+    }
     fn remove_flag(value: &mut serde_json::Value) {
         match value {
             serde_json::Value::Object(fields) => {
@@ -265,6 +268,16 @@ impl ImageLoader {
         data: &str,
         now: i64,
     ) -> Result<(String, ImageAttachmentDto), AppError> {
+        self.save_capture(owner, "browser", data, now)
+    }
+
+    pub fn save_capture(
+        &self,
+        owner: &str,
+        directory: &str,
+        data: &str,
+        now: i64,
+    ) -> Result<(String, ImageAttachmentDto), AppError> {
         use base64::Engine;
         if data.len() > (IMAGE_BYTES_MAX as usize).div_ceil(3) * 4 {
             return Err(failure(IMAGE_INVALID));
@@ -276,7 +289,7 @@ impl ImageLoader {
             return Err(failure(IMAGE_INVALID));
         }
         let folder = self.folder(owner)?;
-        let browser = folder.join("browser");
+        let browser = folder.join(directory);
         std::fs::create_dir_all(extended(&browser)).map_err(|_| failure(IMAGE_MISSING))?;
         if std::fs::canonicalize(extended(&browser)).map_err(|_| failure(IMAGE_MISSING))? != browser
         {

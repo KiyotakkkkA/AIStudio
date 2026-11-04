@@ -2220,6 +2220,7 @@ async fn the_browser_command_brings_the_browser_tools_and_its_skill_for_the_rest
             .collect::<Vec<_>>(),
         [
             zvs_contract::ChatCommand::BrowserUse,
+            zvs_contract::ChatCommand::ComputerUse,
             zvs_contract::ChatCommand::Goal
         ]
     );

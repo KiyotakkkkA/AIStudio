@@ -238,6 +238,10 @@ impl BrowserWorkspace {
         self.layout();
     }
 
+    pub fn appearance(&self) -> zvs_contract::BrowserAppearance {
+        lock(&self.0.model).state().appearance
+    }
+
     pub fn subscribe(&self, channel: Channel<BrowserState>) {
         let state = self.state();
         if channel.send(state).is_ok() {

@@ -1,5 +1,9 @@
 import {
   mdiAccountCheckOutline,
+  mdiApplicationOutline,
+  mdiDockWindow,
+  mdiMagnifyPlusOutline,
+  mdiMonitorScreenshot,
   mdiCheckCircleOutline,
   mdiFlagCheckered,
   mdiFormatListChecks,
@@ -148,6 +152,29 @@ export const TOOL_PRESENTATION: Readonly<Record<string, ToolPresentation>> = {
   "browser.type": { title: "Ввод текста", icon: mdiFormTextbox, category: "other" },
   "browser.submit": { title: "Отправка формы", icon: mdiSendOutline, category: "other" },
   "browser.download": { title: "Загрузка файла", icon: mdiDownloadOutline, category: "other" },
+  "computer.screenshot": { title: "Снимок экрана", icon: mdiMonitorScreenshot, category: "other" },
+  "computer.act": {
+    title: "Действия мышью и клавиатурой",
+    icon: mdiCursorDefaultClickOutline,
+    category: "other",
+  },
+  "computer.zoom": {
+    title: "Увеличение области экрана",
+    icon: mdiMagnifyPlusOutline,
+    category: "other",
+  },
+  "computer.inspect": { title: "Элементы окна", icon: mdiFileTreeOutline, category: "other" },
+  "computer.apps": { title: "Список окон", icon: mdiDockWindow, category: "other" },
+  "computer.open_app": {
+    title: "Запуск приложения",
+    icon: mdiApplicationOutline,
+    category: "other",
+  },
+  "computer.request_access": {
+    title: "Доступ к приложениям",
+    icon: mdiShieldKeyOutline,
+    category: "other",
+  },
 };
 
 const OTHER: Omit<ToolPresentation, "title"> = { icon: mdiWrenchOutline, category: "other" };

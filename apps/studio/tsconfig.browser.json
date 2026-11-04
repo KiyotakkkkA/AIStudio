@@ -8,5 +8,11 @@
     "jsx": "react-jsx",
     "types": ["vite/client"]
   },
-  "include": ["src/browser-ui/**/*.ts", "src/browser-ui/**/*.tsx", "src/renderer/app/palettes.ts"]
+  "include": [
+    "src/browser-ui/**/*.ts",
+    "src/browser-ui/**/*.tsx",
+    "src/computer-ui/**/*.ts",
+    "src/computer-ui/**/*.tsx",
+    "src/renderer/app/palettes.ts"
+  ]
 }

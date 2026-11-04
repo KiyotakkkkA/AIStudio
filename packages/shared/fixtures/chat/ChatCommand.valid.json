@@ -4,6 +4,10 @@
     "value": "browser-use"
   },
   {
+    "name": "computer use",
+    "value": "computer-use"
+  },
+  {
     "name": "goal",
     "value": "goal"
   }

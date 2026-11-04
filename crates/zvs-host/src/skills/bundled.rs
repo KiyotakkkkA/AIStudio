@@ -65,6 +65,15 @@ macro_rules! bundled_skill {
 pub const BUNDLED_SKILLS: &[BundledSkill] = &[
     bundled_skill!("browser-use", []),
     bundled_skill!(
+        "computer-use",
+        [
+            "scripts/_icons.py",
+            "scripts/_uia.py",
+            "scripts/_win.py",
+            "scripts/computer_server.py",
+        ]
+    ),
+    bundled_skill!(
         "pdf",
         [
             "references/forms.md",

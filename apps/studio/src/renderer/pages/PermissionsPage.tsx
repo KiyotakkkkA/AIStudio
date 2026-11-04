@@ -6,7 +6,13 @@ import FolderGrantDetail from "../features/permissions/FolderGrantDetail";
 import FolderGrantList from "../features/permissions/FolderGrantList";
 import ToolDefaultsTable from "../features/permissions/ToolDefaultsTable";
 import SiteGrantsTable from "../features/permissions/SiteGrantsTable";
+import AppGrantList from "../features/permissions/AppGrantList";
+import AppGrantDetail from "../features/permissions/AppGrantDetail";
 import {
+  APPS_NOTHING_SELECTED,
+  APPS_TAB,
+  APPS_TAB_PARAM,
+  appCountLabel,
   BROWSER_TAB,
   BROWSER_TAB_PARAM,
   FOLDERS_TAB,
@@ -30,6 +36,7 @@ const TABS = [
   { value: "folders", label: FOLDERS_TAB },
   { value: TOOLS_TAB_PARAM, label: TOOLS_TAB },
   { value: BROWSER_TAB_PARAM, label: BROWSER_TAB },
+  { value: APPS_TAB_PARAM, label: APPS_TAB },
 ] as const;
 
 type TabValue = (typeof TABS)[number]["value"];
@@ -55,7 +62,13 @@ function PermissionsPage() {
       icon={mdiShieldCheckOutline}
       title={PAGE_TITLE}
       subtitle={
-        tab === BROWSER_TAB_PARAM ? (
+        tab === APPS_TAB_PARAM ? (
+          permissions.appGrantsLoaded ? (
+            appCountLabel(permissions.appGrants.length)
+          ) : (
+            <InlineSkeleton label={PAGE_LOADING} className="w-28" />
+          )
+        ) : tab === BROWSER_TAB_PARAM ? (
           permissions.siteGrantsLoaded ? (
             siteCountLabel(permissions.siteGroups.length)
           ) : (
@@ -78,6 +91,30 @@ function PermissionsPage() {
         <ToolDefaultsTable />
       ) : tab === BROWSER_TAB_PARAM ? (
         <SiteGrantsTable />
+      ) : tab === APPS_TAB_PARAM ? (
+        <div className="flex min-h-0 flex-1">
+          <AppGrantList />
+          {permissions.selectedApp === null ? (
+            permissions.appGrantsLoaded ? (
+              <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
+                <EmptyState
+                  icon={mdiShieldOutline}
+                  title={NOTHING_SELECTED_TITLE}
+                  description={APPS_NOTHING_SELECTED}
+                />
+              </div>
+            ) : (
+              <PaneSkeleton />
+            )
+          ) : (
+            <AppGrantDetail
+              grant={permissions.selectedApp}
+              now={permissions.now}
+              revoking={permissions.revokingApp}
+              onRevoke={(id) => void permissions.revokeApp(id)}
+            />
+          )}
+        </div>
       ) : (
         <div className="flex min-h-0 flex-1">
           <FolderGrantList />

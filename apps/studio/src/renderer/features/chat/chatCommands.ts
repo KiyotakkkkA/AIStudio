@@ -1,4 +1,4 @@
-import { mdiFlagOutline, mdiWeb } from "@mdi/js";
+import { mdiFlagOutline, mdiMonitorDashboard, mdiWeb } from "@mdi/js";
 import type {
   ChatCommand,
   ChatCommandDto,
@@ -25,6 +25,7 @@ export function commandText(command: ChatCommand): string {
 
 const COMMAND_MARKS: Record<ChatCommand, string> = {
   "browser-use": mdiWeb,
+  "computer-use": mdiMonitorDashboard,
   goal: mdiFlagOutline,
 };
 
@@ -63,7 +64,10 @@ export interface MenuInput {
   readonly attachedPlugins: readonly IntegrationId[];
   readonly text: string;
   readonly picking: IntegrationKind | null;
+  readonly vision?: boolean;
 }
+
+export const VISION_COMMANDS: readonly ChatCommand[] = ["computer-use"];
 
 const SLASH_TOKEN = /(^|\s)\/([^\s/]*)$/u;
 
@@ -106,7 +110,10 @@ export function menuEntries(input: MenuInput): MenuEntry[] {
   if (query === null) return [];
   const commands: MenuEntry[] = input.commands
     .filter(
-      (item) => !input.attachedCommands.includes(item.command) && item.command.startsWith(query),
+      (item) =>
+        !input.attachedCommands.includes(item.command) &&
+        item.command.startsWith(query) &&
+        (input.vision !== false || !VISION_COMMANDS.includes(item.command)),
     )
     .map((item) => ({
       type: "command",

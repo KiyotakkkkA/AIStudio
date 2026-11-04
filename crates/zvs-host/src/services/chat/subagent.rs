@@ -209,6 +209,7 @@ pub fn excluded(key: &str) -> bool {
         || GOAL_TOOLS.contains(&key)
         || BROWSER_TOOLS.contains(&key)
         || key.starts_with("browser.")
+        || key.starts_with("computer.")
 }
 
 fn explores(tool: &OfferedTool) -> bool {

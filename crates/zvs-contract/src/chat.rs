@@ -67,6 +67,7 @@ wire_enum!(OfferedToolSource {
 
 wire_enum!(ChatCommand {
     BrowserUse => "browser-use",
+    ComputerUse => "computer-use",
     Goal => "goal",
 });
 

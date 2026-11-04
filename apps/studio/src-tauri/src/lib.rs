@@ -1,6 +1,7 @@
 pub mod browser;
 mod cli;
 mod commands;
+mod computer;
 mod e2e;
 mod picker;
 mod platform;
@@ -25,6 +26,9 @@ use zvs_host::browser::{
     profile_dir, register_browser_nodes, setting_limit,
 };
 use zvs_host::commands::{CommandToolOptions, register_command_nodes};
+use zvs_host::computer::{
+    Computer, ComputerAgent, ComputerControls, UvSidecar, register_computer_nodes,
+};
 use zvs_host::data::Repositories;
 use zvs_host::data::repositories::{ProviderFilter, SecretFilter};
 use zvs_host::data::{MigrationFailed, PrepareOptions, prepare_database};
@@ -135,6 +139,7 @@ struct Browser {
     workspace: BrowserWorkspace,
     gateway: Arc<AccountGateway>,
     events: BrowserLifecycle,
+    computer: computer::ComputerShell,
 }
 
 struct Lifecycle {
@@ -171,7 +176,9 @@ pub fn run() {
             commands::ipc_call,
             commands::events_subscribe,
             commands::browser_command,
-            commands::browser_subscribe
+            commands::browser_subscribe,
+            commands::computer_command,
+            commands::computer_subscribe
         ])
         .setup(|app| {
             match compose(app)? {
@@ -190,6 +197,7 @@ pub fn run() {
                     #[cfg(feature = "e2e")]
                     probe_gateway(Arc::clone(&gateway), logger.clone());
                     app.manage(browser.workspace);
+                    app.manage(browser.computer);
                     app.manage(Arc::clone(&gateway));
                     app.manage(browser.events);
                     app.manage(host);
@@ -972,6 +980,31 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             clock.clone(),
         ),
     )?;
+    let computer_agent = {
+        let toolchain = toolchain.clone();
+        ComputerAgent::new(
+            Arc::new(UvSidecar::new(
+                Arc::new(move |args: &[String]| {
+                    toolchain.launch(zvs_host::toolchain::ToolchainCommand::Uv, args)
+                }),
+                paths.data_dir.join("computer"),
+                logger.clone(),
+            )),
+            Arc::clone(&database),
+            clock.clone(),
+            logger.clone(),
+        )
+    };
+    register_computer_nodes(
+        &nodes,
+        &Computer::new(
+            computer_agent.clone(),
+            runs.approvals(),
+            Some(zvs_host::images::ImageLoader::new(artifacts.clone())),
+            clock.clone(),
+            vec![std::process::id()],
+        ),
+    )?;
     register_kernel_tools(&nodes, &tools)?;
     let agentic = AgenticService::new(AgenticServiceOptions {
         images: Some(zvs_host::images::ImageLoader::new(artifacts.clone())),
@@ -1021,6 +1054,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         clock: clock.clone(),
         ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), Arc::clone(&nodes))
     })?;
+    computer_agent.attach(ComputerControls {
+        runs: Arc::new(runs.clone()),
+        chat: Arc::new(computer::ChatSender(chat.clone())),
+    });
     register_kernel_tools(&nodes, &tools)?;
     let explorer = ExplorerService::new(folders.clone(), events.clone());
     let terminals = TerminalService::new(TerminalServiceOptions {
@@ -1234,6 +1271,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         exec_policy,
         subagents,
         browser: agent.clone(),
+        computer: computer_agent.clone(),
         folders,
         picker: Some(picker),
         cli: platform::cli_installer(paths.cli_path.clone()),
@@ -1307,6 +1345,14 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             events,
         },
         browser: Browser {
+            computer: {
+                let appearance = workspace.clone();
+                computer::ComputerShell::new(
+                    app.handle().clone(),
+                    computer_agent,
+                    Arc::new(move || appearance.appearance()),
+                )
+            },
             workspace,
             gateway,
             events: browser_events,

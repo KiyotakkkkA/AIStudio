@@ -1,0 +1,28 @@
+[
+  {
+    "name": "dialog scope without a dialog",
+    "value": {
+      "id": "0199aa11-1111-7111-8111-111111111111",
+      "app": "notepad.exe",
+      "path": "",
+      "icon": null,
+      "scope": "conversation",
+      "conversation": null,
+      "grantedAt": 1,
+      "lastUsedAt": null
+    }
+  },
+  {
+    "name": "id is not a uuid",
+    "value": {
+      "id": "g1",
+      "app": "notepad.exe",
+      "path": "",
+      "icon": null,
+      "scope": "always",
+      "conversation": null,
+      "grantedAt": 1,
+      "lastUsedAt": null
+    }
+  }
+]

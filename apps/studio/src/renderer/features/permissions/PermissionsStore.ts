@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import type {
+  AppGrantDto,
   BrowserGrantDto,
   Contract,
   FolderGrantDto,
@@ -11,6 +12,7 @@ import type {
 } from "@zvs/shared";
 import { toolErrorCopy } from "../tools/toolPresentation";
 import {
+  APPS_LOAD_ERROR,
   LOAD_ERROR,
   SITES_LOAD_ERROR,
   groupSiteGrants,
@@ -34,6 +36,11 @@ export default class PermissionsStore {
   siteGrants: BrowserGrantDto[] = [];
   siteGrantsLoaded = false;
   revokingSiteGrant: string | null = null;
+  appGrants: AppGrantDto[] = [];
+  appGrantsLoaded = false;
+  appQuery = "";
+  selectedAppId: string | null = null;
+  revokingApp = false;
   now: number;
   private readonly clock: () => number;
   private revision = 0;
@@ -73,6 +80,74 @@ export default class PermissionsStore {
 
   get selected(): FolderGrantDto | null {
     return this.grants.find((grant) => grant.id === this.selectedId) ?? null;
+  }
+
+  get visibleApps(): AppGrantDto[] {
+    const query = this.appQuery.trim().toLocaleLowerCase("ru-RU");
+    if (query.length === 0) return this.appGrants;
+    return this.appGrants.filter(
+      (grant) =>
+        grant.app.toLocaleLowerCase("ru-RU").includes(query) ||
+        grant.path.toLocaleLowerCase("ru-RU").includes(query) ||
+        (grant.conversation?.title.toLocaleLowerCase("ru-RU").includes(query) ?? false),
+    );
+  }
+
+  get globalApps(): AppGrantDto[] {
+    return this.visibleApps.filter((grant) => grant.scope === "always");
+  }
+
+  get dialogApps(): AppGrantDto[] {
+    return this.visibleApps.filter((grant) => grant.scope === "conversation");
+  }
+
+  get selectedApp(): AppGrantDto | null {
+    return this.appGrants.find((grant) => grant.id === this.selectedAppId) ?? null;
+  }
+
+  setAppQuery(query: string) {
+    this.appQuery = query;
+  }
+
+  selectApp(id: string) {
+    this.selectedAppId = id;
+  }
+
+  async loadAppGrants() {
+    try {
+      const grants = await this.ipc.call("computer.grants", undefined);
+      runInAction(() => {
+        this.appGrants = grants;
+        this.appGrantsLoaded = true;
+        this.now = this.clock();
+        if (this.error === APPS_LOAD_ERROR) this.error = null;
+        if (this.selectedAppId !== null && !grants.some((grant) => grant.id === this.selectedAppId))
+          this.selectedAppId = null;
+        this.selectedAppId ??= grants[0]?.id ?? null;
+      });
+    } catch {
+      runInAction(() => {
+        this.error = APPS_LOAD_ERROR;
+      });
+    }
+  }
+
+  async revokeApp(id: string) {
+    if (this.revokingApp) return;
+    this.revokingApp = true;
+    this.error = null;
+    try {
+      await this.ipc.call("computer.revoke", { id });
+    } catch (error) {
+      runInAction(() => {
+        this.error = revokeErrorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.revokingApp = false;
+      });
+    }
+    await this.loadAppGrants();
   }
 
   get siteGroups() {

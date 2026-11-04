@@ -1,0 +1,6 @@
+[
+  { "name": "unknown action", "value": { "action": "launch" } },
+  { "name": "approval id is not a uuid", "value": { "action": "approve", "id": "a1" } },
+  { "name": "blank correction", "value": { "action": "say", "text": "   " } },
+  { "name": "collapse without a flag", "value": { "action": "collapse" } }
+]

@@ -6,6 +6,7 @@ pub mod browser;
 pub mod channels;
 pub mod chat;
 pub mod cli;
+pub mod computer;
 pub mod documents;
 pub mod downloads;
 pub mod enums;
@@ -102,6 +103,11 @@ pub use cli::{
     CLI_COMMAND, CLI_LAUNCH_ARG, CLI_LINE_MAX, CLI_PIPE_PREFIX, CLI_PROTOCOL_VERSION,
     CLI_THEME_FILE, CliClientMessage, CliInstallDto, CliNotice, CliOpenInput, CliServerMessage,
     CliSessionDto, CliTheme, CliThemeDto, cli_pipe_name,
+};
+pub use computer::{
+    APPS_APPROVAL_KIND, AnswerAppRequestInput, AppGrantDto, AppGrantRef, AppGrantsListOutput,
+    ComputerAction, ComputerActionState, ComputerAppDto, ComputerApproval, ComputerCommand,
+    ComputerDisplay, ComputerState, ComputerStatus,
 };
 pub use documents::{
     DOCUMENT_BYTES_DATA_MAX, DOCUMENT_BYTES_PAGE_MAX, DOCUMENT_LIST_MAX, DOCUMENT_PATH_MAX,

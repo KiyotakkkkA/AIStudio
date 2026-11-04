@@ -102,7 +102,7 @@ export const WebSourceDto = z.object({
   icon: WebUrl.optional(),
 });
 export type WebSourceDto = z.infer<typeof WebSourceDto>;
-export const CHAT_COMMANDS = ["browser-use", "goal"] as const;
+export const CHAT_COMMANDS = ["browser-use", "computer-use", "goal"] as const;
 export const ChatCommand = z.enum(CHAT_COMMANDS);
 export type ChatCommand = z.infer<typeof ChatCommand>;
 export const CHAT_COMMANDS_MAX = 8;

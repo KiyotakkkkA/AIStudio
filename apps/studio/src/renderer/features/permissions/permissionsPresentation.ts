@@ -1,4 +1,9 @@
-import { AppErrorCode, type BrowserGrantDto, type FolderGrantDto } from "@zvs/shared";
+import {
+  AppErrorCode,
+  type AppGrantDto,
+  type BrowserGrantDto,
+  type FolderGrantDto,
+} from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 import { plural } from "../connections/connectionPresentation";
 import { formatLastUsed } from "../tools/toolPresentation";
@@ -9,6 +14,18 @@ export const TOOLS_TAB = "Инструменты";
 export const TOOLS_TAB_PARAM = "tools";
 export const BROWSER_TAB = "Браузер";
 export const BROWSER_TAB_PARAM = "browser";
+export const APPS_TAB = "Приложения";
+export const APPS_TAB_PARAM = "apps";
+export const APPS_SEARCH_LABEL = "Поиск приложений";
+export const APPS_SEARCH_PLACEHOLDER = "Поиск приложений…";
+export const APPS_EMPTY_TITLE = "Разрешений для приложений нет";
+export const APPS_EMPTY_DESCRIPTION =
+  "Разрешение появляется после ответа «Разрешить всегда» или «Разрешить для этого диалога» на запрос доступа к приложению.";
+export const APPS_NOTHING_SELECTED = "Выберите приложение в списке.";
+export const APPS_LOAD_ERROR = "Не удалось загрузить разрешения приложений. Попробуйте ещё раз.";
+export const APPS_NOTE =
+  "Ответ «Только для этого ответа» действует до конца ответа агента и здесь не показывается.";
+export const APP_PATH_UNKNOWN = "Путь не определён";
 export const SITES_TITLE = "Разрешения на сайтах";
 export const SITES_DESCRIPTION = "Действия, которые агент выполняет на сайте без подтверждения.";
 export const SITES_EMPTY_TITLE = "Разрешений для сайтов нет";
@@ -43,6 +60,26 @@ export const PROCESS_TOOLS_NOTE =
 
 export function grantCountLabel(count: number): string {
   return plural(count, "папка", "папки", "папок");
+}
+
+export function appCountLabel(count: number): string {
+  return plural(count, "приложение", "приложения", "приложений");
+}
+
+export function appScopeLabel(grant: AppGrantDto): string {
+  return grant.conversation === null ? "Во всех диалогах" : `Диалог «${grant.conversation.title}»`;
+}
+
+export function appLastUsedLabel(grant: AppGrantDto, now: number): string {
+  return grant.lastUsedAt === null
+    ? "Не использовалось"
+    : `Использовано ${formatLastUsed(grant.lastUsedAt, now)}`;
+}
+
+export function appRevokeConsequence(grant: AppGrantDto): string {
+  return grant.conversation === null
+    ? `Агент снова запросит доступ к ${grant.app} в любом диалоге.`
+    : `Агент снова запросит доступ к ${grant.app} в диалоге «${grant.conversation.title}».`;
 }
 
 export function siteCountLabel(count: number): string {

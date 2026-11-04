@@ -27,6 +27,12 @@ pub const fn browser_theme(source: ThemeSource) -> BrowserTheme {
 }
 
 impl<R: Runtime> TauriTheme<R> {
+    fn computer(&self) {
+        if let Some(shell) = self.0.try_state::<crate::computer::ComputerShell>() {
+            shell.publish();
+        }
+    }
+
     fn workspace(&self) -> Option<crate::browser::BrowserWorkspace> {
         self.0
             .try_state::<crate::browser::BrowserWorkspace>()
@@ -40,12 +46,14 @@ impl<R: Runtime> ThemePort for TauriTheme<R> {
         if let Some(workspace) = self.workspace() {
             workspace.set_theme(browser_theme(source));
         }
+        self.computer();
     }
 
     fn palette(&self, mode: PaletteMode, id: &str) {
         if let Some(workspace) = self.workspace() {
             workspace.set_palette(mode, id);
         }
+        self.computer();
     }
 
     fn zoom(&self, factor: f64) {

@@ -2,7 +2,9 @@ import { useId, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type {
   ChatToolCallDto,
+  ComputerAppDto,
   FileDiffDto,
+  FolderAccessAnswer,
   IntegrationKind,
   Json,
   ProcessPlanDto,
@@ -69,6 +71,7 @@ import {
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import MailDraftView from "../mail/MailDraftView";
 import ToolImages from "./ToolImages";
+import AppAccessRequest from "../computer/AppAccessRequest";
 import { toolImageReferences } from "./imageData";
 import { MAIL_LEAD, REJECT_MAIL, SEND_MAIL, type MailPreview } from "../mail/mailCopy";
 
@@ -105,7 +108,18 @@ export interface ToolCallApproval {
   readonly changes?: readonly FileDiffDto[];
   readonly process?: ProcessPlanDto;
   readonly mail?: MailPreview;
+  readonly apps?: readonly ComputerAppDto[];
+  readonly detail?: string;
 }
+
+const IMAGE_TOOLS: readonly string[] = [
+  "fs.read",
+  "browser.screenshot",
+  "computer.screenshot",
+  "computer.act",
+  "computer.zoom",
+  "computer.open_app",
+];
 
 export interface ToolCallQuestion {
   readonly request: QuestionRequestDto;
@@ -163,12 +177,14 @@ export function ToolCallCard({
   onDecide,
   onAnswer,
   onSkip,
+  onAnswerAccess,
 }: {
   readonly call: ChatToolCallDto;
   readonly approval: ToolCallApproval | undefined;
   readonly asking: ToolCallQuestion | undefined;
   readonly live: boolean;
   readonly onDecide?: ((id: string, approve: boolean) => void) | undefined;
+  readonly onAnswerAccess?: ((id: string, answer: FolderAccessAnswer) => void) | undefined;
   readonly onAnswer?: ((id: string, answers: QuestionAnswerDto[]) => void) | undefined;
   readonly onSkip?: ((id: string) => void) | undefined;
 }) {
@@ -202,9 +218,10 @@ export function ToolCallCard({
       : null;
   const searched = view?.kind === "search" && view.citations !== null;
   const images =
-    (call.key === "fs.read" || call.key === "browser.screenshot") && call.status === "succeeded"
+    IMAGE_TOOLS.includes(call.key) && call.status === "succeeded"
       ? toolImageReferences(call.meta)
       : null;
+  const access = approval?.apps;
 
   return (
     <PipelineItem
@@ -383,39 +400,51 @@ export function ToolCallCard({
               </div>
             </div>
           )}
-          {approval && proposed.length === 0 && !proposedProcess && !proposedMail && (
-            <div
-              role="status"
-              className="flex flex-wrap items-center gap-3 rounded-control bg-warn-soft px-3 py-2.5"
-            >
-              <p className="min-w-0 flex-1 text-[12.5px] text-main-100">
-                {APPROVAL_PROMPT}{" "}
-                {builtin ? (
-                  `«${presentation.title}»`
-                ) : (
-                  <span className="font-mono">{call.key}</span>
-                )}
-                . {APPROVAL_QUESTION}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  disabled={approval.busy}
-                  tone="primary"
-                  onClick={() => onDecide?.(approval.id, true)}
-                >
-                  {ALLOW_ONCE}
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={approval.busy}
-                  onClick={() => onDecide?.(approval.id, false)}
-                >
-                  {FORBID}
-                </Button>
-              </div>
-            </div>
+          {approval && access !== undefined && (
+            <AppAccessRequest
+              apps={access}
+              detail={approval.detail}
+              busy={approval.busy}
+              onAnswer={(answer) => onAnswerAccess?.(approval.id, answer)}
+            />
           )}
+          {approval &&
+            access === undefined &&
+            proposed.length === 0 &&
+            !proposedProcess &&
+            !proposedMail && (
+              <div
+                role="status"
+                className="flex flex-wrap items-center gap-3 rounded-control bg-warn-soft px-3 py-2.5"
+              >
+                <p className="min-w-0 flex-1 text-[12.5px] text-main-100">
+                  {APPROVAL_PROMPT}{" "}
+                  {builtin ? (
+                    `«${presentation.title}»`
+                  ) : (
+                    <span className="font-mono">{call.key}</span>
+                  )}
+                  . {APPROVAL_QUESTION}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    disabled={approval.busy}
+                    tone="primary"
+                    onClick={() => onDecide?.(approval.id, true)}
+                  >
+                    {ALLOW_ONCE}
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={approval.busy}
+                    onClick={() => onDecide?.(approval.id, false)}
+                  >
+                    {FORBID}
+                  </Button>
+                </div>
+              </div>
+            )}
           {builtin && (
             <p className="m-0 text-[11px] text-main-500">
               {TOOL_KEY_LABEL} <span className="font-mono">{call.key}</span>
@@ -440,6 +469,7 @@ export interface ToolCallItemsProps {
   readonly questionFor?: (id: string) => ToolCallQuestion | undefined;
   readonly onAnswer?: (id: string, answers: QuestionAnswerDto[]) => void;
   readonly onSkip?: (id: string) => void;
+  readonly onAnswerAccess?: (id: string, answer: FolderAccessAnswer) => void;
   readonly subagents?: SubagentHandlers;
 }
 
@@ -450,6 +480,7 @@ export function ToolCallItems({
   questionFor,
   onAnswer,
   onSkip,
+  onAnswerAccess,
   subagents,
 }: ToolCallItemsProps): ReactNode {
   const live = questionFor !== undefined;
@@ -492,6 +523,7 @@ export function ToolCallItems({
           onDecide={onDecide}
           onAnswer={onAnswer}
           onSkip={onSkip}
+          onAnswerAccess={onAnswerAccess}
         />
       );
     });

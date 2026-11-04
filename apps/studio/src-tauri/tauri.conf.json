@@ -32,7 +32,7 @@
         "use": "isolation",
         "options": { "dir": "isolation" }
       },
-      "capabilities": ["studio", "browser-ui"]
+      "capabilities": ["studio", "browser-ui", "computer-ui"]
     }
   },
   "plugins": {

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-computer-subscribe"
+description = "Enables the computer_subscribe command without any pre-configured scope."
+commands.allow = ["computer_subscribe"]
+
+[[permission]]
+identifier = "deny-computer-subscribe"
+description = "Denies the computer_subscribe command without any pre-configured scope."
+commands.deny = ["computer_subscribe"]

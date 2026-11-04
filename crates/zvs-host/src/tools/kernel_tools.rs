@@ -13,6 +13,10 @@ use crate::browser::nodes::{
     READ_PAGE_DESCRIPTION, SCREENSHOT_DESCRIPTION, SUBMIT_DESCRIPTION, TYPE_DESCRIPTION,
 };
 use crate::commands::nodes::{SHELL_DESCRIPTION, SHELL_RUN};
+use crate::computer::nodes::{
+    self as computer, COMPUTER_ACT, COMPUTER_APPS, COMPUTER_INSPECT, COMPUTER_OPEN_APP,
+    COMPUTER_REQUEST_ACCESS, COMPUTER_SCREENSHOT, COMPUTER_ZOOM,
+};
 use crate::files::nodes::{
     APPLY_DESCRIPTION as FS_APPLY_DESCRIPTION, FS_APPLY, FS_LIST, FS_READ, FS_SEARCH,
     LIST_DESCRIPTION as FS_LIST_DESCRIPTION, READ_DESCRIPTION as FS_READ_DESCRIPTION,
@@ -36,6 +40,13 @@ const AUTO_BY_DEFAULT: &[&str] = &[
     BROWSER_TYPE,
     SHELL_OUTPUT,
     SHELL_KILL,
+    COMPUTER_SCREENSHOT,
+    COMPUTER_ACT,
+    COMPUTER_ZOOM,
+    COMPUTER_INSPECT,
+    COMPUTER_APPS,
+    COMPUTER_OPEN_APP,
+    COMPUTER_REQUEST_ACCESS,
 ];
 
 struct BuiltinToolMeta {
@@ -211,6 +222,62 @@ const BUILTIN: &[(&str, BuiltinToolMeta)] = &[
             display_name: "Загрузка файла",
             description: DOWNLOAD_DESCRIPTION,
             destructive: true,
+        },
+    ),
+    (
+        COMPUTER_SCREENSHOT,
+        BuiltinToolMeta {
+            display_name: "Снимок экрана",
+            description: computer::SCREENSHOT_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        COMPUTER_ACT,
+        BuiltinToolMeta {
+            display_name: "Действия мышью и клавиатурой",
+            description: computer::ACT_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        COMPUTER_ZOOM,
+        BuiltinToolMeta {
+            display_name: "Увеличение области экрана",
+            description: computer::ZOOM_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        COMPUTER_INSPECT,
+        BuiltinToolMeta {
+            display_name: "Элементы окна",
+            description: computer::INSPECT_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        COMPUTER_APPS,
+        BuiltinToolMeta {
+            display_name: "Список окон",
+            description: computer::APPS_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        COMPUTER_OPEN_APP,
+        BuiltinToolMeta {
+            display_name: "Запуск приложения",
+            description: computer::OPEN_APP_DESCRIPTION,
+            destructive: false,
+        },
+    ),
+    (
+        COMPUTER_REQUEST_ACCESS,
+        BuiltinToolMeta {
+            display_name: "Доступ к приложениям",
+            description: computer::REQUEST_ACCESS_DESCRIPTION,
+            destructive: false,
         },
     ),
 ];

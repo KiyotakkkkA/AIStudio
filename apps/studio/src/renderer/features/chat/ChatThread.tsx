@@ -515,6 +515,7 @@ export default observer(function ChatThread({
                       calls={calls}
                       approvalFor={store.approvalFor}
                       onDecide={(id, approve) => void store.decideApproval(id, approve)}
+                      onAnswerAccess={(id, answer) => void store.answerAccess(id, answer)}
                       questionFor={store.questionFor}
                       onAnswer={(id, answers) => void store.answerQuestion(id, answers)}
                       onSkip={(id) => void store.skipQuestion(id)}

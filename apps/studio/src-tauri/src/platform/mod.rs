@@ -4,6 +4,15 @@ pub mod windows;
 #[cfg(not(windows))]
 mod site_stub;
 
+#[cfg(not(windows))]
+pub mod overlay_stub;
+
+#[cfg(windows)]
+pub use windows::overlay;
+
+#[cfg(not(windows))]
+pub use overlay_stub as overlay;
+
 use std::path::Path;
 use std::sync::Arc;
 
