@@ -25,6 +25,13 @@ fn skill_path(raw: &str) -> Option<String> {
 }
 
 impl SkillTurn {
+    pub fn with_requires(requires: &[(String, Vec<String>)]) -> Self {
+        Self {
+            requires: requires.iter().cloned().collect(),
+            read: HashSet::new(),
+        }
+    }
+
     pub fn observe(&mut self, tool_key: &str, arguments: &Value, output: &Value) {
         match tool_key {
             SKILL_LOAD => {

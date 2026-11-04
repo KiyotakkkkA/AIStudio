@@ -4,7 +4,7 @@ use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 use zvs_contract::CodeLanguage;
 
-use super::action::{FileAction, FileOperation, ReviewedAction};
+use super::action::{FileAction, FileOperation, ReviewedAction, UNREAD_SCRIPT};
 
 pub const VENDOR_PACK: &str = include_str!("vendor.json");
 pub const ANY_REST: &str = "**";
@@ -489,12 +489,24 @@ impl RuleSet {
             {
                 let language = process.language.unwrap_or(CodeLanguage::Python);
                 let source = process.source.as_deref().unwrap_or_default();
-                let matched = self
-                    .rules
-                    .iter()
-                    .filter(|rule| rule.matches_code(language, source))
-                    .collect();
-                self.resolve_items(vec![matched])
+                let code: Vec<&Rule> = if source == UNREAD_SCRIPT {
+                    Vec::new()
+                } else {
+                    self.rules
+                        .iter()
+                        .filter(|rule| rule.matches_code(language, source))
+                        .collect()
+                };
+                let mut items = vec![code];
+                if !process.argv.is_empty() {
+                    items.push(
+                        self.rules
+                            .iter()
+                            .filter(|rule| rule.matches_process(&process.argv, &process.cwd))
+                            .collect(),
+                    );
+                }
+                self.resolve_items(items)
             }
             ReviewedAction::Process { process, .. }
                 if process.language.is_none() && !process.argv.is_empty() =>

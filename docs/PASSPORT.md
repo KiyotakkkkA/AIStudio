@@ -848,7 +848,10 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   model tool the registry allows (available, enabled, tier not `off`), with three conditions.
   An MCP tool is offered only while its server is connected and signed in: `McpServers::usable`
   is a live client, status `connected`, enabled, and no pending sign-in; a call whose token
-  cannot be refreshed marks the server as needing a sign-in. Knowledge tools need an
+  cannot be refreshed marks the server as needing a sign-in. The `instructions` a server
+  publishes go into the system prompt fenced as `<mcp_server_instructions server tools>` under a
+  heading that marks them as third-party data about that server's own tools, never able to
+  override system or user instructions (2026-11-05). Knowledge tools need an
   attached store and a retrieval mode other than `auto`, and memory tools need the memory
   switches. The `browser.*` tools are offered only after a user message carries the
   `/browser-use` command (`ChatCommand`, listed by `chat.commands`). The command then holds for
@@ -1087,7 +1090,13 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   are rewritten to the names offered in that turn, and its result limit is six times the
   per-call share, at most 40 000 characters. A script listed in `metadata.requires` is refused
   with a hint, not counted against the call budget, until its files were loaded or read in the
-  same turn. The folder is capped at 200 MB and
+  same turn. **Active skills** (`skills/active.rs`, 2026-11-05): the three most recent skills
+  loaded by successful `skill.load` calls earlier in the dialog are active. Their instructions
+  go into the Skills section of the system prompt as `<skill key name>` blocks under a heading
+  that marks them as trusted (at most 24 000 characters, newest first), and their `requires`
+  rules hold from the start of every later turn. Skill instructions are the one exception
+  `TOOL_RESULTS_INSTRUCTION` names: the `<instructions>` block of a skill-loading result is to be
+  followed. When a goal loop sheds older tool results, `skill.load` results are kept. The folder is capped at 200 MB and
   1000 files, and writes go through `fs.apply`'s temporary files. Names whose path has a
   segment starting with `_` are working files: they never become artifact cards. Other
   documents a script creates there are reported like scratch results (recorded in the
@@ -1185,9 +1194,17 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   host cannot see asks in every mode but `no-restrictions`. Rule packs are JSON
   (`{ id, allows, rules[] }`, each rule `files: { paths, operations }`, `process: { argv, cwd }`
   or `code: { languages, avoid }`, `**` matching any run of arguments, `{a,b}` alternation,
-  case-insensitive). A legacy `code` rule matches a source-bearing process plan whose
-  language is listed and whose
-  source matches none of the `avoid` regexes. Since 2026-10-29 the vendor pack ends in two
+  case-insensitive). A `code` rule matches a source-bearing process plan whose language is
+  listed and whose source matches none of the `avoid` regexes. **Script sources**
+  (`commands/script.rs`, 2026-11-05): when `shell.run` starts an interpreter (`python`, `py`,
+  `uv run`, `node`, `deno`, `bun`, `tsx`, `pwsh`, `powershell`) on a script file, the host reads
+  that file into the plan's `language` and `source`; code passed through `stdin` with no script
+  file is the source instead. Only a file inside the run's cwd, at most 256 KiB of UTF-8, is
+  read; anything else carries `UNREAD_SCRIPT` and matches no `code` rule, so it goes to the
+  judge. A source-bearing plan is matched by its `code` rules and its `argv` rules as two items
+  of one batch, so `allow-unflagged` alone never lets a script run, and an `ask` or `deny` on the
+  command line still applies. The approval shows the script text. Skill scripts keep the argv
+  path. Since 2026-10-29 the vendor pack ends in two
   catch-alls so routine work stops asking: `allow-unflagged` allows any command no `ask` or
   `deny` rule names (vendor `ask` outranks vendor `allow`), and `allow-plain-scripts` allows a
   script without network use, process launches, generated code, deleting or moving files,

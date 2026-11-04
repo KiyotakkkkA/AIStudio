@@ -500,6 +500,49 @@ fn the_vendor_pack_guards_the_obvious_cases() {
     }
 }
 
+fn script_file(argv: &[&str], source: &str) -> ReviewedAction {
+    let ReviewedAction::Process { mut process, tool } = shell(argv) else {
+        panic!("a process");
+    };
+    process.language = Some(zvs_contract::CodeLanguage::Javascript);
+    process.source = Some(source.to_owned());
+    ReviewedAction::Process { tool, process }
+}
+
+#[test]
+fn a_script_file_is_judged_by_its_text_and_its_command_line() {
+    let rules = vendor();
+    let cases = [
+        (
+            script_file(&["node", "_work/main.mjs"], "console.log(1 + 1)"),
+            "allow",
+            Some("vendor.code.allow-plain-scripts"),
+        ),
+        (
+            script_file(
+                &["node", "_work/clean.mjs"],
+                "import fs from 'node:fs';\nfs.rmSync('C:/data', { recursive: true });",
+            ),
+            "unmatched",
+            None,
+        ),
+        (
+            script_file(&["node", "_work/main.mjs"], super::UNREAD_SCRIPT),
+            "unmatched",
+            None,
+        ),
+        (
+            script_file(&["node", "_work/main.mjs", "publish"], "console.log(1)"),
+            "ask",
+            Some("vendor.process.ask-release-verbs"),
+        ),
+    ];
+    for (action, effect, rule) in cases {
+        let outcome = rules.evaluate(&action);
+        assert_eq!(rule_of(&outcome), (effect, rule), "{action:?}");
+    }
+}
+
 #[test]
 fn a_benign_batch_and_code_run_never_meet_the_rules() {
     let rules = vendor();

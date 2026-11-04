@@ -3,6 +3,8 @@ use zvs_contract::{FileChangeKind, FileDiffDto, ProcessPlanDto};
 
 use super::table::Family;
 
+pub const UNREAD_SCRIPT: &str = "Текст программы не прочитан: файл находится вне папки запуска, превышает 256 КиБ или не является текстом UTF-8.";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FileOperation {

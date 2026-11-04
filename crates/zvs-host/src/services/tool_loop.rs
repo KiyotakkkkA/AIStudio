@@ -204,14 +204,18 @@ pub(crate) fn compact_knowledge(
     compacted
 }
 
-pub(crate) fn shed_tool_results(messages: &mut [ChatMessage], budget: i64) -> usize {
+pub(crate) fn shed_tool_results(messages: &mut [ChatMessage], budget: i64, kept: &str) -> usize {
+    let kept = (!kept.is_empty()).then(|| format!("<tool_result name=\"{kept}\""));
     let mut shed = 0;
     for index in 0..messages.len() {
         if messages_cost(messages) <= budget {
             break;
         }
         let message = &mut messages[index];
-        if message.role == ChatRole::Tool && message.content != SHED_RESULT {
+        let protected = kept
+            .as_deref()
+            .is_some_and(|prefix| message.content.starts_with(prefix));
+        if message.role == ChatRole::Tool && message.content != SHED_RESULT && !protected {
             message.content = SHED_RESULT.to_owned();
             shed += 1;
         }
@@ -360,7 +364,11 @@ impl ToolLoop<'_> {
                 })?;
             }
             if budget == LoopBudget::Open {
-                let shed = shed_tool_results(&mut messages, room);
+                let kept = offered
+                    .iter()
+                    .find(|tool| tool.key == crate::skills::SKILL_LOAD)
+                    .map_or("", |tool| tool.name.as_str());
+                let shed = shed_tool_results(&mut messages, room, kept);
                 if shed > 0 {
                     context.emit(HostEventDraft::Log {
                         line: log_line(&[
@@ -565,5 +573,32 @@ impl ToolLoop<'_> {
             round += 1;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::chat_tools::fence_tool_result;
+
+    #[test]
+    fn shedding_spares_skill_instructions_and_drops_other_results_oldest_first() {
+        let skill = fence_tool_result("skill_load", "succeeded", &"s".repeat(4000));
+        let mut messages = vec![
+            ChatMessage::tool("1", skill.clone()),
+            ChatMessage::tool(
+                "2",
+                fence_tool_result("fs_read", "succeeded", &"r".repeat(4000)),
+            ),
+            ChatMessage::tool(
+                "3",
+                fence_tool_result("fs_read", "succeeded", &"r".repeat(4000)),
+            ),
+        ];
+        let budget = messages_cost(&messages[..2]);
+        assert_eq!(shed_tool_results(&mut messages, budget, "skill_load"), 2);
+        assert_eq!(messages[0].content, skill);
+        assert_eq!(messages[1].content, SHED_RESULT);
+        assert_eq!(messages[2].content, SHED_RESULT);
     }
 }

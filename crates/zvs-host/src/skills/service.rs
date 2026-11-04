@@ -52,6 +52,10 @@ pub trait SkillCatalogue: Send + Sync {
     fn command(&self, _key: &str) -> Option<String> {
         None
     }
+
+    fn active(&self, _key: &str) -> Option<super::ActiveSkill> {
+        None
+    }
 }
 
 pub fn command_skill(key: &str) -> bool {
@@ -493,5 +497,18 @@ impl SkillCatalogue for SkillService {
             .ok()
             .map(|loaded| loaded.instructions)
             .filter(|text| !js_trim(text).is_empty())
+    }
+
+    fn active(&self, key: &str) -> Option<super::ActiveSkill> {
+        let loaded = self.inner.library.load(key).ok()?;
+        if js_trim(&loaded.instructions).is_empty() {
+            return None;
+        }
+        Some(super::ActiveSkill {
+            key: loaded.skill.key,
+            name: loaded.skill.name,
+            instructions: loaded.instructions,
+            requires: loaded.requires,
+        })
     }
 }

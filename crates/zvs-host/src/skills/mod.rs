@@ -1,3 +1,4 @@
+pub mod active;
 pub mod bundled;
 pub mod library;
 pub mod manifest;
@@ -11,6 +12,7 @@ pub mod turn;
 #[cfg(test)]
 mod tests;
 
+pub use active::{ActiveSkill, active_requires, active_skill_keys, active_skills_text};
 pub use bundled::{BUNDLED_SKILLS, BundledFile, BundledSkill};
 pub use library::{AuthoredSkill, SKILLS_DIR, SkillLibrary, SkillLibraryOptions};
 pub use nodes::{SKILL_GENERATE, SKILL_LOAD, SKILL_SAVE, SKILL_TOOLS, register_skill_nodes};

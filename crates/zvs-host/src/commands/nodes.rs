@@ -656,12 +656,17 @@ impl NodeDef for ShellRunNode {
                 shell_spec(&input.argv, &cwd, &dirs)?
             }
         };
+        let script = if skill.is_none() {
+            super::script::script_source(&input.argv, &cwd, input.stdin.as_deref())
+        } else {
+            None
+        };
         let process = ProcessPlanDto {
             program: spec.command.clone(),
-            language: None,
+            language: script.as_ref().map(|script| script.language),
             argv: input.argv.clone(),
             cwd: path_text(&cwd),
-            source: None,
+            source: script.map(|script| script.source),
             packages: Vec::new(),
             background: input.background,
             reason: Some(input.reason.trim().to_owned()),

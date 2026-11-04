@@ -8,7 +8,7 @@ pub mod user_rules;
 #[cfg(test)]
 mod tests;
 
-pub use action::{FileAction, FileOperation, ReviewVerdict, ReviewedAction};
+pub use action::{FileAction, FileOperation, ReviewVerdict, ReviewedAction, UNREAD_SCRIPT};
 pub use judge::{JUDGE_SYSTEM, JudgeFailure, JudgeOutcome, VERDICT_TOOL, parse_verdict};
 pub use rules::{PackOrigin, RuleEffect, RuleOutcome, RuleSet, VENDOR_PACK, compile_pack};
 pub use service::{

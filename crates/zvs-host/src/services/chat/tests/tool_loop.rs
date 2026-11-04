@@ -1259,8 +1259,14 @@ async fn only_a_connected_mcp_server_offers_its_tools_and_they_bring_its_instruc
         ]
     );
     let system = request.system.clone().unwrap_or_default();
-    assert!(system.contains("Read testix://instructions/questions before importing."));
-    assert!(system.contains("«Testix»"));
+    assert!(system.contains(crate::services::chat::MCP_INSTRUCTIONS_HEADING));
+    assert!(
+        system.contains(&crate::services::chat::mcp_instructions_block(
+            "Testix",
+            "testix",
+            "Read testix://instructions/questions before importing."
+        ))
+    );
 }
 
 struct OneSkill;
@@ -1363,6 +1369,98 @@ async fn a_turn_lists_the_skills_and_offers_skill_load_even_when_the_conversatio
     assert_eq!(
         assistant.tool_calls[0].result.as_deref(),
         Some("instructions for release-notes")
+    );
+}
+
+struct ActiveReleaseNotes;
+
+#[async_trait]
+impl crate::skills::SkillCatalogue for ActiveReleaseNotes {
+    async fn catalogue(
+        &self,
+        _query: &str,
+        _cancel: &CancellationToken,
+    ) -> Vec<crate::skills::SkillCatalogueEntry> {
+        vec![crate::skills::SkillCatalogueEntry {
+            key: "release-notes".to_owned(),
+            description: "Writes release notes from a change list".to_owned(),
+        }]
+    }
+
+    fn active(&self, key: &str) -> Option<crate::skills::ActiveSkill> {
+        (key == "release-notes").then(|| crate::skills::ActiveSkill {
+            key: key.to_owned(),
+            name: "Release notes".to_owned(),
+            instructions: "Group changes by area; call fs.read on the change list first."
+                .to_owned(),
+            requires: Vec::new(),
+        })
+    }
+}
+
+#[tokio::test]
+async fn a_skill_loaded_in_an_earlier_turn_stays_in_the_system_prompt() {
+    let database = temporary_database();
+    let registry = Arc::new(NodeRegistry::new());
+    register_core_nodes(&registry).expect("registers the core nodes");
+    registry
+        .register(FnNode::new(
+            crate::skills::SKILL_LOAD,
+            PermissionRequirement::tool(crate::skills::SKILL_LOAD),
+            false,
+            |_context: StepContext, _input: Value| async move {
+                Ok(TextOutput {
+                    text: "instructions".to_owned(),
+                })
+            },
+        ))
+        .expect("registers skill.load");
+    let tools = ToolRegistry::new(ToolRegistryOptions::new(database.shared()));
+    for key in crate::skills::SKILL_TOOLS {
+        tools
+            .register(&ToolDescriptor {
+                read_only: true,
+                ..ToolDescriptor::new(key, ToolSource::Builtin)
+            })
+            .expect("registers a skill tool");
+    }
+    let driver = Scripted::new();
+    driver.round(|_| vec![call("skill__load", &json!({ "key": "release-notes" }))]);
+    driver.fallback(|_| vec![text("Notes.")]);
+    let harness = Harness::with(HarnessOptions {
+        database: Some(database.shared()),
+        providers: Some(Arc::new(OneDriver(Arc::clone(&driver) as SharedTextDriver))),
+        tools: Some(tools),
+        skills: Some(Arc::new(ActiveReleaseNotes)),
+        registry: Some(registry),
+        capabilities: vec![ProviderCapability::Text],
+        context_window: 16384,
+        max_output: 512,
+        ..HarnessOptions::default()
+    });
+    let created = harness.create(harness.input());
+
+    within(harness.turn(created, "Write the release notes")).await;
+    let first = driver.requests()[0].system.clone().unwrap_or_default();
+    assert!(!first.contains("<skill key="), "{first}");
+    within(harness.turn(created, "Now shorten them")).await;
+
+    let system = driver
+        .requests()
+        .last()
+        .and_then(|request| request.system.clone())
+        .unwrap_or_default();
+    assert!(
+        system
+            .contains(&crate::skills::active::ACTIVE_SKILLS_HEADING.replace("{read}", "fs__read"))
+    );
+    assert!(
+        system.contains(
+            "<skill key=\"release-notes\" name=\"Release notes\">
+Group changes by area; call fs__read on the change list first.
+</skill>"
+        ),
+        "{system}"
     );
 }
 
