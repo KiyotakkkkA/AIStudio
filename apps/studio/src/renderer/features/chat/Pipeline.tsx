@@ -24,6 +24,7 @@ export function PipelineList({
 export function PipelineItem({
   icon,
   iconClassName,
+  iconNode,
   enter = false,
   layout = false,
   tail = false,
@@ -32,6 +33,7 @@ export function PipelineItem({
 }: {
   readonly icon: string;
   readonly iconClassName?: string;
+  readonly iconNode?: ReactNode;
   readonly enter?: boolean;
   readonly layout?: "position" | false;
   readonly tail?: boolean;
@@ -58,12 +60,14 @@ export function PipelineItem({
           tail ? "" : "[li:last-child>&]:hidden"
         }`}
       />
-      <span
-        aria-hidden="true"
-        className={`absolute top-1 left-0 flex size-6 items-center justify-center rounded-md border border-line bg-main-850 text-main-400 ${iconClassName ?? ""}`}
-      >
-        <Icon path={icon} size={13} />
-      </span>
+      {iconNode ?? (
+        <span
+          aria-hidden="true"
+          className={`absolute top-1 left-0 flex size-6 items-center justify-center rounded-md border border-line bg-main-850 text-main-400 ${iconClassName ?? ""}`}
+        >
+          <Icon path={icon} size={13} />
+        </span>
+      )}
       {children}
     </motion.li>
   );

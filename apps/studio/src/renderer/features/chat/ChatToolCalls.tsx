@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type {
   ChatToolCallDto,
   FileDiffDto,
+  IntegrationKind,
   Json,
   ProcessPlanDto,
   QuestionAnswerDto,
@@ -50,8 +51,10 @@ import {
   TOOL_CALLS_LABEL,
   TOOL_KEY_LABEL,
   isBuiltinTool,
+  pluginToolKind,
   toolPresentation,
 } from "./toolCallCopy";
+import { PLUGIN_MARKS } from "../plugins/pluginPresentation";
 import { PipelineItem, PipelineList } from "./Pipeline";
 import { toolCallView } from "./toolCallView";
 import { SubagentGroup, type SubagentControls } from "./SubagentCard";
@@ -107,6 +110,18 @@ export interface ToolCallApproval {
 export interface ToolCallQuestion {
   readonly request: QuestionRequestDto;
   readonly busy: boolean;
+}
+
+function PluginToolTile({ kind }: { readonly kind: IntegrationKind }) {
+  const style = PLUGIN_MARKS[kind];
+  return (
+    <span
+      aria-hidden="true"
+      className={`absolute top-1 left-0 flex size-6 items-center justify-center rounded-md ${style.tile}`}
+    >
+      <Icon path={style.logo} size={13} fillRule="evenodd" />
+    </span>
+  );
 }
 
 function StatusMark({ status }: { readonly status: ChatToolCallDto["status"] }) {
@@ -170,6 +185,7 @@ export function ToolCallCard({
 
   const status = TOOL_CALL_STATUS[call.status];
   const presentation = toolPresentation(call.key);
+  const pluginKind = pluginToolKind(call.key);
   const builtin = isBuiltinTool(call.key);
   const proposed = approval?.changes ?? [];
   const applied = call.key === FILE_TOOL_APPLY ? fileChanges(call.meta) : [];
@@ -191,7 +207,13 @@ export function ToolCallCard({
       : null;
 
   return (
-    <PipelineItem icon={presentation.icon} enter={live} layout="position" tail={open}>
+    <PipelineItem
+      icon={presentation.icon}
+      iconNode={pluginKind === null ? undefined : <PluginToolTile kind={pluginKind} />}
+      enter={live}
+      layout="position"
+      tail={open}
+    >
       <button
         type="button"
         aria-expanded={open}

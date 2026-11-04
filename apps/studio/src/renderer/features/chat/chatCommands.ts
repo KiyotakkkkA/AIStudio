@@ -1,3 +1,4 @@
+import { mdiFlagOutline, mdiWeb } from "@mdi/js";
 import type {
   ChatCommand,
   ChatCommandDto,
@@ -20,6 +21,15 @@ export const REMOVE_PLUGIN = "Убрать плагин";
 
 export function commandText(command: ChatCommand): string {
   return `/${command}`;
+}
+
+const COMMAND_MARKS: Record<ChatCommand, string> = {
+  "browser-use": mdiWeb,
+  goal: mdiFlagOutline,
+};
+
+export function commandMark(command: ChatCommand): string {
+  return COMMAND_MARKS[command];
 }
 
 export type MenuEntry =

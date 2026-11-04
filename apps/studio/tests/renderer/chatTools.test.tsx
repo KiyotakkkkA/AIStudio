@@ -30,6 +30,7 @@ import {
   toolSections,
 } from "../../src/renderer/features/chat/toolSets.ts";
 import {
+  commandMark,
   commandText,
   menuEntries,
   parseCommands,
@@ -37,6 +38,10 @@ import {
   withoutSlashToken,
 } from "../../src/renderer/features/chat/chatCommands.ts";
 import { durationLabel } from "../../src/renderer/features/chat/processCopy.ts";
+import { pluginToolKind } from "../../src/renderer/features/chat/toolCallCopy.ts";
+import { PLUGIN_MARKS } from "../../src/renderer/features/plugins/pluginPresentation.ts";
+import ChatCommandMenu from "../../src/renderer/features/chat/ChatCommandMenu";
+import { mdiFlagOutline, mdiWeb } from "@mdi/js";
 import { provider } from "./providerFixtures.ts";
 
 const saved = provider();
@@ -464,6 +469,49 @@ test("a browser.navigate call opens the browser panel once per call", async () =
   expect(store.isPanelShown("browser")).toBe(true);
   store.dispose();
   events.dispose();
+});
+
+test("commands carry their own menu marks", () => {
+  expect(commandMark("browser-use")).toBe(mdiWeb);
+  expect(commandMark("goal")).toBe(mdiFlagOutline);
+});
+
+test("the command menu shows command marks and plugin marks", async () => {
+  const { store, events } = setup();
+  await store.mount();
+  store.typeText("/");
+  render(<ChatCommandMenu store={store} />);
+  const browserOption = screen.getByRole("option", { name: /\/browser-use/u });
+  expect(browserOption.querySelector(`svg path[d="${mdiWeb}"]`)).not.toBeNull();
+  const goalOption = screen.getByRole("option", { name: /\/goal/u });
+  expect(goalOption.querySelector(`svg path[d="${mdiFlagOutline}"]`)).not.toBeNull();
+  const telegramOption = screen.getByRole("option", { name: /\/telegram/u });
+  expect(
+    telegramOption.querySelector(`svg path[d="${PLUGIN_MARKS.telegram.logo}"]`),
+  ).not.toBeNull();
+  store.dispose();
+  events.dispose();
+});
+
+test("pluginToolKind reads the integration prefix of account tool keys", () => {
+  expect(pluginToolKind("telegram.135acee8.recentMessages")).toBe("telegram");
+  expect(pluginToolKind("mail.deadbeef.send.find")).toBe("mail");
+  expect(pluginToolKind("fs.read")).toBeNull();
+  expect(pluginToolKind("mcp.docs.search")).toBeNull();
+  expect(pluginToolKind("unknown.12345678.call")).toBeNull();
+});
+
+test("a plugin tool call carries the plugin mark instead of the generic icon", () => {
+  const telegramCall = ChatToolCallDto.parse({
+    id: "call_tg",
+    key: "telegram.135acee8.sendMessage",
+    name: "telegram_135acee8_sendMessage",
+    round: 0,
+    arguments: { chatId: "1", text: "привет" },
+    status: "succeeded",
+  });
+  const { container } = render(<ChatToolCalls calls={[telegramCall]} />);
+  expect(container.querySelector(`svg path[d="${PLUGIN_MARKS.telegram.logo}"]`)).not.toBeNull();
 });
 
 test("a card shows the call, its result and an inline approval prompt", () => {

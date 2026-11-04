@@ -18,6 +18,7 @@ import ReasoningBlock from "./ReasoningBlock";
 import { answerBlocks } from "./answerRounds";
 import { PIPELINE_LABEL, PipelineList } from "./Pipeline";
 import { TOOL_CALLS_LABEL } from "./toolCallCopy";
+import ToolWorkGroup, { workGroupLabel } from "./ToolWorkGroup";
 import ChatSources from "./ChatSources";
 import WebSourceCard from "./WebSourceCard";
 import { WEB_SOURCES_TAB } from "./webSources";
@@ -128,19 +129,34 @@ export default function ChatMessage({
   let pipelineItems: ReactNode[] = [];
   let pipelineKey = "";
   let pipelineReasoning = false;
+  let pipelineCalls = 0;
+  let pipelineMs = 0;
   const flushPipeline = () => {
     if (pipelineItems.length === 0) return;
-    units.push(
-      <PipelineList key={pipelineKey} label={pipelineReasoning ? PIPELINE_LABEL : TOOL_CALLS_LABEL}>
+    const list = (
+      <PipelineList label={pipelineReasoning ? PIPELINE_LABEL : TOOL_CALLS_LABEL}>
         {pipelineItems}
-      </PipelineList>,
+      </PipelineList>
+    );
+    units.push(
+      !generating && pipelineCalls > 0 ? (
+        <ToolWorkGroup key={pipelineKey} label={workGroupLabel(pipelineMs, pipelineCalls)}>
+          {list}
+        </ToolWorkGroup>
+      ) : (
+        <Fragment key={pipelineKey}>{list}</Fragment>
+      ),
     );
     pipelineItems = [];
     pipelineReasoning = false;
+    pipelineCalls = 0;
+    pipelineMs = 0;
   };
   blocks.forEach((block, index) => {
     if (block.kind === "tools") {
       if (pipelineItems.length === 0) pipelineKey = block.key;
+      pipelineCalls += block.calls.length;
+      pipelineMs += block.calls.reduce((sum, call) => sum + call.durationMs, 0);
       pipelineItems.push(<Fragment key={block.key}>{renderToolItems(block.calls)}</Fragment>);
       return;
     }

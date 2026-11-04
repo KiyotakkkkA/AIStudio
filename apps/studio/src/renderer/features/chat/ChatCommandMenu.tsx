@@ -1,10 +1,9 @@
-import { mdiConsoleLine } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import Icon from "../../ui/atoms/Icon";
 import PluginMark from "../plugins/PluginMark";
 import { accountMark } from "../plugins/signInTypes";
 import type ChatStore from "./ChatStore";
-import { ACCOUNTS_LABEL, COMMANDS_LABEL, type MenuEntry } from "./chatCommands";
+import { ACCOUNTS_LABEL, COMMANDS_LABEL, commandMark, type MenuEntry } from "./chatCommands";
 
 export const COMMAND_MENU_ID = "chat-command-menu";
 
@@ -19,7 +18,7 @@ function EntryMark({ entry }: { readonly entry: MenuEntry }) {
         aria-hidden="true"
         className="flex size-4.5 flex-none items-center justify-center text-main-400"
       >
-        <Icon path={mdiConsoleLine} size={14} />
+        <Icon path={commandMark(entry.command)} size={14} />
       </span>
     );
   }

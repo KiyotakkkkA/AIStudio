@@ -39,9 +39,11 @@ import {
   EXEC_MODES,
   type ChatToolCallDto,
   type ExecMode,
+  type IntegrationKind,
   type ToolAuthorisationDto,
 } from "@zvs/shared";
 import { EXEC_MODE_COPY } from "../execPolicy/execPolicyCopy";
+import { PLUGIN_KINDS } from "../plugins/pluginPresentation";
 import { SUBAGENT_TOOL_TITLE } from "../subagents/subagentCopy";
 import {
   GOAL_PLAN_TOOL,
@@ -152,6 +154,13 @@ const OTHER: Omit<ToolPresentation, "title"> = { icon: mdiWrenchOutline, categor
 
 export function toolPresentation(key: string): ToolPresentation {
   return TOOL_PRESENTATION[key] ?? { ...OTHER, title: key };
+}
+
+export function pluginToolKind(key: string): IntegrationKind | null {
+  const parts = key.split(".");
+  if (parts.length < 3) return null;
+  const head = parts[0] ?? "";
+  return (PLUGIN_KINDS as readonly string[]).includes(head) ? (head as IntegrationKind) : null;
 }
 
 export function toolTitle(key: string): string {
