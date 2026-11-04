@@ -259,31 +259,6 @@ impl ImageLoader {
         Self { store }
     }
 
-    pub fn browser_path(&self, owner: &str, path: &str) -> Result<Option<PathBuf>, AppError> {
-        if !crate::conversations::is_owner(owner) || !Path::new(path).is_absolute() {
-            return Ok(None);
-        }
-        let root = match std::fs::canonicalize(extended(self.store.root())) {
-            Ok(root) => root,
-            Err(_) => return Ok(None),
-        };
-        let folder = root
-            .join(owner)
-            .join(crate::conversations::ATTACHMENTS_DIR)
-            .join("browser");
-        let candidate = Path::new(path);
-        if !candidate.is_absolute() || !candidate.starts_with(&folder) {
-            return Ok(None);
-        }
-        let actual =
-            std::fs::canonicalize(extended(candidate)).map_err(|_| failure(IMAGE_MISSING))?;
-        let base = std::fs::canonicalize(extended(&folder)).map_err(|_| failure(IMAGE_MISSING))?;
-        if base != folder || actual.parent() != Some(base.as_path()) {
-            return Err(failure(IMAGE_MISSING));
-        }
-        Ok(Some(actual))
-    }
-
     pub fn save_browser(
         &self,
         owner: &str,
@@ -317,7 +292,7 @@ impl ImageLoader {
             &[(path.clone(), Some(bytes.len() as u64))],
         )?;
         std::fs::write(extended(&path), bytes).map_err(|_| failure(IMAGE_MISSING))?;
-        let shown = path.to_string_lossy().into_owned();
+        let shown = crate::platform::long_path::from_extended_path(&path.to_string_lossy());
         match self.import(owner, std::slice::from_ref(&shown)) {
             Ok(mut images) => Ok((shown, images.remove(0))),
             Err(error) => {

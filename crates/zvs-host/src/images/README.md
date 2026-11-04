@@ -62,9 +62,12 @@ transcripts persist references without bytes and reload them when a paused sessi
 
 `browser.screenshot` saves JPEGs to
 `conversations/<owner>/attachments/browser/screen-<short-id>-<timestamp>.jpg`, and returns the absolute
-path in its text and structured result. It does not attach pixels to model input. The owning
-conversation can read that path with `fs.read` without granting access to the whole attachment
-directory. Other paths retain the existing permission checks. Screenshot previews use an immutable
+path in its text and structured result. It does not attach pixels to model input. The shared
+`VirtualRoots` resolver grants file tools read/write access to the entire current owner's directory,
+including attachments, and lets process tools use it as cwd without a folder grant. Plain and extended
+Windows paths, case variants, and forward slashes resolve consistently. Other owners and app data
+remain forbidden, junction escapes are refused, and process approvals and disabled tools still apply.
+Screenshot previews use an immutable
 copy in the attachment store. Both copies count toward the existing conversation quota and follow
 branch/deletion lifecycle. Chat and Agentic Build show thumbnails and an expanded image inside tool
 cards, using `chat.images.read`; that endpoint validates either a conversation or an agentic owner.

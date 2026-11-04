@@ -5,6 +5,7 @@ use zvs_contract::{AppError, AppErrorCode};
 use crate::artifacts::ArtifactStore;
 use crate::chat_files::chat_dir;
 use crate::skills::SkillLibrary;
+use crate::workspace::paths::{TargetKind, covers, grant_target, normalized, same_folder};
 
 pub const CHAT_ROOT: &str = "chat:";
 pub const SKILL_ROOT: &str = "skill:";
@@ -158,13 +159,58 @@ impl VirtualRoots {
 
     pub fn locate(&self, conversation: &str, path: &str) -> Result<Option<Located>, AppError> {
         let (kind, base, rest) = match path_root(path) {
-            PathRoot::Real(_) => return Ok(None),
+            PathRoot::Real(path) => return self.owned(conversation, path),
             PathRoot::Chat(rest) => (RootKind::Chat, self.chat_folder(conversation)?, rest),
             PathRoot::Skill { key, rest } => (RootKind::Skill, self.skill_folder(key)?, rest),
         };
         let path = under(&base, rest)?;
         contained(&base, &path)?;
         Ok(Some(Located { kind, base, path }))
+    }
+
+    fn owned(&self, conversation: &str, path: &str) -> Result<Option<Located>, AppError> {
+        let Some(store) = &self.chats else {
+            return Ok(None);
+        };
+        if !crate::conversations::is_owner(conversation) {
+            return Ok(None);
+        }
+        let path = PathBuf::from(crate::platform::long_path::from_extended_path(path));
+        if !path.is_absolute() {
+            return Ok(None);
+        }
+        let root = grant_target(store.root(), TargetKind::Folder)
+            .map_err(|_| bad_path())?
+            .path;
+        let base = root.join(conversation);
+        let lexical = normalized(&path).ok_or_else(bad_path)?;
+        if !covers(&base, &lexical) {
+            return Ok(None);
+        }
+        let actual_base = grant_target(&base, TargetKind::Folder)
+            .map_err(|_| bad_path())?
+            .path;
+        let resolved = grant_target(&lexical, TargetKind::File)
+            .map_err(|_| bad_path())?
+            .path;
+        let same_base = if cfg!(windows) {
+            same_folder(&base, &actual_base)
+        } else {
+            base == actual_base
+        };
+        let contained = if cfg!(windows) {
+            covers(&base, &resolved)
+        } else {
+            resolved.starts_with(&base)
+        };
+        if !same_base || !contained {
+            return Err(bad_path());
+        }
+        Ok(Some(Located {
+            kind: RootKind::Chat,
+            base,
+            path: resolved,
+        }))
     }
 }
 

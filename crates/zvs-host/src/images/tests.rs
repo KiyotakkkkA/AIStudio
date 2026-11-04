@@ -18,13 +18,6 @@ fn browser_screenshots_have_owned_paths_immutable_previews_and_branch_copies() {
         Path::new(&path).parent().unwrap().file_name().unwrap(),
         "browser"
     );
-    assert!(loader.browser_path("first", &path).unwrap().is_some());
-    assert!(loader.browser_path("other", &path).unwrap().is_none());
-    assert!(
-        loader
-            .browser_path("first", &format!("{path}/../{}", image.name))
-            .is_err()
-    );
     crate::chat_files::copy_chat_dir(&store, "first", "branch").unwrap();
     crate::chat_files::remove_chat_dir(&store, "first");
     assert_eq!(

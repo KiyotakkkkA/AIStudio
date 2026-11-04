@@ -608,6 +608,31 @@ async fn a_foreign_cwd_goes_through_folder_access() {
 }
 
 #[tokio::test]
+async fn an_owned_absolute_cwd_needs_only_process_approval() {
+    let host = Host::new();
+    let conversation = host.conversation();
+    let folder = host
+        .services
+        .artifacts
+        .folders()
+        .folder(&conversation.to_string())
+        .unwrap()
+        .join("attachments/browser");
+    std::fs::create_dir_all(&folder).unwrap();
+    let cwd = canonical(&folder).unwrap();
+    let handle = host.start(json!({ "id": "run", "type": SHELL_RUN, "input": { "conversationId": conversation, "argv": stub_argv(), "cwd": cwd, "stdin": "echo" } }));
+    let request = host.approval(&handle.id).await;
+    assert_eq!(request["kind"], json!("process"));
+    assert!(same_path(request["process"]["cwd"].as_str().unwrap(), &cwd));
+    host.services
+        .runs
+        .approve(&handle.id, request["id"].as_str().unwrap(), false)
+        .unwrap();
+    assert_eq!(host.finish(&handle.id).await, RunStatus::Succeeded);
+    assert_eq!(host.approvals(&handle.id).len(), 1);
+}
+
+#[tokio::test]
 async fn output_is_capped_and_fenced_through_the_shared_runner() {
     let host = Host::new();
     let folder = temporary_directory("caps-");

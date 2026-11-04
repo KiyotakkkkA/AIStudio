@@ -13,6 +13,105 @@ use crate::testing::{TestServices, temporary_directory, test_services};
 const CHAT: &str = "01a17431-1de8-713c-9981-dbd5ddd5b80b";
 const KEY: &str = "extract";
 
+#[test]
+fn absolute_paths_resolve_across_the_entire_owned_conversation_directory() {
+    let root = temporary_directory("owned-roots");
+    let store = ArtifactStore::new(root.path().join("conversations"));
+    let roots = VirtualRoots::new(Some(store.clone()), None);
+    let owner = store.folders().folder(CHAT).unwrap();
+    let image = owner.join("attachments/browser/screen-test.jpg");
+    std::fs::create_dir_all(image.parent().unwrap()).unwrap();
+    std::fs::write(&image, [255, 216, 255, 217]).unwrap();
+    let plain = crate::workspace::canonical(&image)
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
+    let mut spellings = vec![
+        plain.clone(),
+        crate::platform::long_path::extended(Path::new(&plain))
+            .to_string_lossy()
+            .into_owned(),
+    ];
+    if cfg!(windows) {
+        spellings.extend([plain.to_uppercase(), plain.replace('\\', "/")]);
+    }
+    for spelling in spellings {
+        let located = roots.locate(CHAT, &spelling).unwrap().unwrap();
+        assert_eq!(located.kind, RootKind::Chat);
+        assert!(same_folder(
+            &located.base,
+            &crate::workspace::canonical(&owner).unwrap()
+        ));
+        assert!(same_folder(
+            &located.path,
+            &crate::workspace::canonical(&image).unwrap()
+        ));
+    }
+    let missing = owner.join("outputs/new/note.txt");
+    assert!(
+        roots
+            .locate(CHAT, missing.to_str().unwrap())
+            .unwrap()
+            .is_some()
+    );
+    assert!(!missing.exists());
+    assert!(roots.locate("other", &plain).unwrap().is_none());
+    let sibling = store
+        .root()
+        .join(format!("{CHAT}-other"))
+        .join("secret.txt");
+    assert!(
+        roots
+            .locate(CHAT, sibling.to_str().unwrap())
+            .unwrap()
+            .is_none()
+    );
+    let escaping = owner.join("..").join("other").join("secret.txt");
+    assert!(
+        roots
+            .locate(CHAT, escaping.to_str().unwrap())
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn owned_directory_links_cannot_escape_the_owner_boundary() {
+    let root = temporary_directory("owned-links");
+    let outside = temporary_directory("outside-owned");
+    let store = ArtifactStore::new(root.path().join("conversations"));
+    let roots = VirtualRoots::new(Some(store.clone()), None);
+    let owner = store.folders().folder(CHAT).unwrap();
+    std::fs::create_dir_all(&owner).unwrap();
+    std::fs::write(outside.path().join("secret.txt"), "private").unwrap();
+    for (link, scope) in [
+        (owner.join("linked"), CHAT),
+        (store.root().join("linked-owner"), "linked-owner"),
+    ] {
+        #[cfg(windows)]
+        {
+            let output = std::process::Command::new("cmd")
+                .args(["/C", "mklink", "/J"])
+                .arg(&link)
+                .arg(outside.path())
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "{output:?}");
+        }
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(outside.path(), &link).unwrap();
+        for name in ["secret.txt", "new/note.txt"] {
+            assert_eq!(
+                roots
+                    .locate(scope, link.join(name).to_str().unwrap())
+                    .unwrap_err()
+                    .message,
+                BAD_ROOT_PATH
+            );
+        }
+    }
+}
+
 const ESCAPES: [&str; 9] = [
     "..",
     "../x.json",

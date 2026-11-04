@@ -34,10 +34,10 @@ pub const FS_APPLY: &str = "fs.apply";
 pub const FILE_TOOLS: [&str; 4] = [FS_LIST, FS_READ, FS_SEARCH, FS_APPLY];
 
 pub const LIST_DESCRIPTION: &str = "Lists files and folders. The path is absolute, relative to the conversation working folder, chat: (the conversation files folder), or skill:<key>/ (a skill folder, read-only). Files matched by .gitignore are skipped. recursive walks nested folders; glob filters files by pattern, e.g. **/*.rs. Access to a folder outside granted permissions is confirmed by the user.";
-pub const READ_DESCRIPTION: &str = "Reads up to 16 text files per call; each may specify a startLine–endLine range. Paths work as in fs.list, e.g. chat:_spec.json or skill:dashboard/references/spec.md. Content size is limited; for binary files only the size is reported. An existing file outside chat: must be read in the current turn before it is changed via fs.apply.";
+pub const READ_DESCRIPTION: &str = "Reads up to 16 text files per call; each may specify a startLine–endLine range. Paths work as in fs.list, e.g. chat:_spec.json or skill:dashboard/references/spec.md. Absolute paths inside this conversation's own directory need no folder grant. Content size is limited; for binary files only the size is reported. An existing file outside the conversation's own directory must be read in the current turn before it is changed via fs.apply.";
 pub const READ_IMAGE_DESCRIPTION: &str = "Reads up to 16 files. Set viewImage: true on a path entry to view PNG, JPEG, GIF or WebP pixels, at most 5 images per call. Text files support startLine and endLine. Paths are absolute, relative to the working folder, chat: or skill:<key>/. Browser screenshots can be read at their returned paths. Access outside granted folders requires user confirmation.";
 pub const SEARCH_DESCRIPTION: &str = "Searches text across the files of a folder, honoring .gitignore; paths work as in fs.list. By default query is a plain string; regex: true enables regular expressions; ignoreCase disables case sensitivity; glob limits the file set. Returns path, line number, and the line itself for each match.";
-pub const APPLY_DESCRIPTION: &str = "A batch of file changes in one call: write writes a whole file, edit replaces fragments old with new (each old must occur in the file exactly once), move renames a file, delete removes a file. Changes run in order; each sees the result of the previous ones. Paths work as in fs.list; skill: folders are read-only. An existing file outside chat: must be read via fs.read in the current turn before changing it and must not change afterwards. The user confirms the whole batch from a combined diff; changes only inside chat: need no confirmation. The batch applies in full or not at all. Line endings and BOM are preserved; binary files are not modified.";
+pub const APPLY_DESCRIPTION: &str = "A batch of file changes in one call: write writes a whole file, edit replaces fragments old with new (each old must occur in the file exactly once), move renames a file, delete removes a file. Changes run in order; each sees the result of the previous ones. Paths work as in fs.list; skill: folders are read-only. An existing file outside this conversation's own directory must be read via fs.read in the current turn before changing it and must not change afterwards. The user confirms the whole batch from a combined diff; changes only inside the conversation's own directory need no folder grant or diff confirmation. The batch applies in full or not at all. Line endings and BOM are preserved; binary files are not modified.";
 
 pub const LIST_ACTION: &str = "просмотр папки";
 pub const READ_ACTION: &str = "чтение файлов";
@@ -105,18 +105,37 @@ fn read_only_skill() -> AppError {
     AppError::new(AppErrorCode::PermissionDenied, SKILL_READ_ONLY)
 }
 
-fn listing_permission(tool: &str, input: &Value) -> PermissionRequirement {
+fn listing_permission(tools: &Tools, tool: &str, input: &Value) -> PermissionRequirement {
     match input.get("path").and_then(Value::as_str) {
-        Some(path) if is_virtual(path) => PermissionRequirement::app_folder(tool),
+        Some(path) if app_path(tools, input, path) => PermissionRequirement::app_folder(tool),
         _ => PermissionRequirement::tool(tool),
     }
 }
 
-fn all_virtual<'a>(paths: impl IntoIterator<Item = Option<&'a str>>) -> bool {
+fn app_path(tools: &Tools, input: &Value, path: &str) -> bool {
+    is_virtual(path)
+        || tools
+            .located(
+                input
+                    .get("conversationId")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+                path,
+            )
+            .ok()
+            .flatten()
+            .is_some()
+}
+
+fn all_app_paths<'a>(
+    tools: &Tools,
+    input: &Value,
+    paths: impl IntoIterator<Item = Option<&'a str>>,
+) -> bool {
     let mut any = false;
     let all = paths.into_iter().all(|path| {
         any = true;
-        path.is_some_and(is_virtual)
+        path.is_some_and(|path| app_path(tools, input, path))
     });
     any && all
 }
@@ -263,7 +282,7 @@ impl NodeDef for FsListNode {
     }
 
     fn permission_for(&self, input: &Value) -> PermissionRequirement {
-        listing_permission(FS_LIST, input)
+        listing_permission(&self.0, FS_LIST, input)
     }
 
     fn side_effect(&self) -> bool {
@@ -558,7 +577,9 @@ impl NodeDef for FsReadNode {
             .and_then(Value::as_array)
             .map(Vec::as_slice)
             .unwrap_or_default();
-        if all_virtual(
+        if all_app_paths(
+            &self.0,
+            input,
             paths
                 .iter()
                 .map(|target| target.get("path").and_then(Value::as_str)),
@@ -590,12 +611,9 @@ impl NodeDef for FsReadNode {
         let mut located: Vec<Option<PathBuf>> = Vec::with_capacity(input.paths.len());
         for target in &input.paths {
             located.push(
-                loader
-                    .browser_path(&input.conversation_id, &target.path)?
-                    .or(self
-                        .0
-                        .located(&input.conversation_id, &target.path)?
-                        .map(|found| found.path)),
+                self.0
+                    .located(&input.conversation_id, &target.path)?
+                    .map(|found| found.path),
             );
         }
         let targets: Vec<FolderTarget> = input
@@ -790,7 +808,7 @@ impl NodeDef for FsSearchNode {
     }
 
     fn permission_for(&self, input: &Value) -> PermissionRequirement {
-        listing_permission(FS_SEARCH, input)
+        listing_permission(&self.0, FS_SEARCH, input)
     }
 
     fn side_effect(&self) -> bool {
@@ -1082,7 +1100,7 @@ impl NodeDef for FsApplyNode {
     }
 
     fn permission_for(&self, input: &Value) -> PermissionRequirement {
-        if all_virtual(input_paths(input)) {
+        if all_app_paths(&self.0, input, input_paths(input)) {
             PermissionRequirement::app_folder(FS_APPLY)
         } else if deletes(input) {
             PermissionRequirement::tool_at(FS_APPLY, ToolTier::Ask)

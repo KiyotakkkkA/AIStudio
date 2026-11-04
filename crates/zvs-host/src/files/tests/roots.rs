@@ -4,6 +4,121 @@ use crate::files::roots::{BAD_ROOT_PATH, SKILL_READ_ONLY};
 
 const SKILL: &str = "extract";
 
+#[tokio::test]
+async fn all_file_tools_can_use_absolute_owned_paths_without_folder_grants() {
+    let host = Host::new();
+    let conversation = host.conversation();
+    let owner = host
+        .services
+        .artifacts
+        .folders()
+        .folder(&conversation.to_string())
+        .unwrap();
+    let folder = owner.join("attachments/browser");
+    let file = folder.join("note.txt");
+    for key in [FS_LIST, FS_READ, crate::files::nodes::FS_SEARCH, FS_APPLY] {
+        let tool = host.services.tools.find_by_key(key).unwrap().unwrap();
+        host.services
+            .tools
+            .set_tier(&tool.id.to_string(), ToolTier::Ask, "user")
+            .unwrap();
+    }
+    let mut write = apply_node(
+        conversation,
+        &[],
+        json!([{ "op": "write", "path": file, "content": "needle" }]),
+    );
+    write["id"] = json!("write");
+    let edit = apply_node(
+        conversation,
+        &["write"],
+        json!([{ "op": "edit", "path": file, "edits": [{ "old": "needle", "new": "changed" }] }]),
+    );
+    let handle = host.start(json!([
+        write, edit,
+        read_paths(conversation, &["apply"], &[file.to_str().unwrap()]),
+        { "id": "list", "type": FS_LIST, "dependencies": ["apply"], "input": { "conversationId": conversation, "path": owner, "recursive": true } },
+        { "id": "search", "type": crate::files::nodes::FS_SEARCH, "dependencies": ["apply"], "input": { "conversationId": conversation, "path": folder, "query": "changed" } }
+    ]));
+    assert_eq!(host.finish(&handle.id).await, RunStatus::Succeeded);
+    assert!(host.approvals(&handle.id).is_empty());
+    assert_eq!(text(&file), "changed");
+    assert!(
+        host.output(&handle.id, "read")["text"]
+            .as_str()
+            .unwrap()
+            .contains("changed")
+    );
+    assert!(
+        host.output(&handle.id, "list")["text"]
+            .as_str()
+            .unwrap()
+            .contains("note.txt")
+    );
+    assert_eq!(host.output(&handle.id, "search")["matches"], 1);
+    host.set_tier(ToolTier::Off);
+    let blocked = host.start(json!([apply_node(
+        conversation,
+        &[],
+        json!([{ "op": "write", "path": file, "content": "blocked" }])
+    )]));
+    assert_eq!(host.finish(&blocked.id).await, RunStatus::Failed);
+    assert_eq!(text(&file), "changed");
+}
+
+#[tokio::test]
+async fn owning_a_directory_never_grants_access_to_another_conversation() {
+    let host = Host::new();
+    let conversation = host.conversation();
+    let other = host.conversation();
+    let owner = host
+        .services
+        .artifacts
+        .folders()
+        .folder(&other.to_string())
+        .unwrap();
+    let secret = owner.join("attachments/private.txt");
+    std::fs::create_dir_all(secret.parent().unwrap()).unwrap();
+    std::fs::write(&secret, "private").unwrap();
+    let handle = host.start(json!([read_paths(
+        conversation,
+        &[],
+        &[secret.to_str().unwrap()]
+    )]));
+    assert_eq!(host.finish(&handle.id).await, RunStatus::Failed);
+    assert_eq!(
+        host.failure(&handle.id).as_deref(),
+        Some(crate::workspace::FOLDER_FORBIDDEN)
+    );
+    assert!(host.approvals(&handle.id).is_empty());
+}
+
+#[tokio::test]
+async fn another_conversation_directory_cannot_be_written() {
+    let host = Host::new();
+    let conversation = host.conversation();
+    let other = host.conversation();
+    let file = host
+        .services
+        .artifacts
+        .folders()
+        .folder(&other.to_string())
+        .unwrap()
+        .join("outputs/private.txt");
+    let handle = host.start(json!([apply_node(
+        conversation,
+        &[],
+        json!([{ "op": "write", "path": file, "content": "forbidden" }])
+    )]));
+    assert_eq!(host.finish(&handle.id).await, RunStatus::Failed);
+    assert_eq!(
+        host.failure(&handle.id).as_deref(),
+        Some(crate::workspace::FOLDER_FORBIDDEN)
+    );
+    assert!(!file.exists());
+    assert!(host.approvals(&handle.id).is_empty());
+}
+
 fn chat_folder(host: &Host, conversation: ConversationId) -> PathBuf {
     host.services
         .workspace

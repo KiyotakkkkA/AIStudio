@@ -559,7 +559,8 @@ async fn owned_screenshot_paths_can_be_read_without_granting_the_attachment_dire
     let (path, _) = loader
         .save_browser(&conversation.to_string(), "/9j/2Q==", 1234)
         .unwrap();
-    let mut node = read_node(conversation, &[Path::new(&path)]);
+    let plain = crate::platform::long_path::from_extended_path(&path);
+    let mut node = read_node(conversation, &[Path::new(&plain)]);
     node["input"]["paths"][0]["viewImage"] = json!(true);
     node["input"]["imageViewing"] = json!(true);
     let handle = host.start(json!([node]));

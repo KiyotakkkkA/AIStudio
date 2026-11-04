@@ -973,11 +973,17 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `manifest.json`, writes each file through a temp file renamed over the target, and restores
   everything already written if any write fails. NTFS has no cross-file transaction: this is
   all-or-nothing by rollback, not atomic. Line endings and a BOM are kept.
-  **Saved screenshots** (2026-11-04). `fs.read` may also read a canonical path returned by
-  `browser.screenshot` inside the current owner's `attachments/browser/` directory. This is a
-  read-only exception for the owner's saved browser files: it grants no access to the parent
-  attachment directory, other owners, or paths that resolve outside that directory. Global
-  tool tiers remain in force. Image imports and screenshot copies share the conversation quota.
+  **Conversation-owned paths** (2026-11-04). Absolute paths anywhere inside
+  `conversations/<owner>/` have the same app-owned access as `chat:` for that conversation or
+  agentic session. All file tools can read, list, search, create and change files in `work`,
+  `attachments`, `outputs` and `snapshots` without a folder grant or diff confirmation.
+  `VirtualRoots::locate` is shared by file tools and process cwd resolution; it normalizes
+  extended Windows prefixes, canonicalizes existing ancestors, and checks component boundaries
+  case-insensitively. Missing paths stay under the owner; junctions and symlinks resolving
+  outside the owner are refused. Other conversations and the parent app-data directory stay
+  forbidden. Disabled tools and `off` still deny, explicit minimum tiers still apply, and
+  shell runs still need process approval. Image imports and screenshot copies share the
+  conversation quota.
 - **Process tools** (`zvs-host/src/commands/`, TASK_036_EXTRA_3) are offered alongside the
   file tools: `shell.run`
   (an argument vector, never a shell string; `argv[0]` resolved through the connected toolchain
