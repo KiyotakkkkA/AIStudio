@@ -1,6 +1,6 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { ComputerCommand, ComputerState } from "@zvs/shared";
+import type { ComputerCommand, ComputerPointer, ComputerState } from "@zvs/shared";
 
 export const GLOW_LABEL = "computer-glow";
 
@@ -15,4 +15,9 @@ export function sendCommand(command: ComputerCommand): Promise<void> {
 export function subscribeState(handler: (state: ComputerState) => void): void {
   const channel = new Channel<ComputerState>(handler);
   void invoke("computer_subscribe", { channel });
+}
+
+export function subscribePointer(handler: (pointer: ComputerPointer) => void): void {
+  const channel = new Channel<ComputerPointer>(handler);
+  void invoke("computer_pointer", { channel });
 }

@@ -59,6 +59,8 @@ export function toolCallSummary(call: ChatToolCallDto): string {
     if (changes.length > 0) return changesSummary(changes);
   }
   if (call.key === PROCESS_TOOL_SHELL) {
+    const reason = field(call.arguments, "reason");
+    if (typeof reason === "string" && reason.trim().length > 0) return reason.trim();
     const result = processResult(call.meta);
     if (result) return processSummary(result.process);
     const argv = field(call.arguments, "argv");

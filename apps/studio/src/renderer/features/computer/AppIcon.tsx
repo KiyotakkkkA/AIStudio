@@ -1,15 +1,7 @@
-import { useEffect, useMemo } from "react";
+import { useState } from "react";
 import { mdiApplicationOutline } from "@mdi/js";
 import Icon from "../../ui/atoms/Icon";
-
-export function iconBlob(icon: string): Blob | null {
-  try {
-    const bytes = Uint8Array.from(atob(icon), (char) => char.charCodeAt(0));
-    return new Blob([bytes], { type: "image/png" });
-  } catch {
-    return null;
-  }
-}
+import { useIconUrl } from "./iconUrl";
 
 export default function AppIcon({
   icon,
@@ -18,18 +10,9 @@ export default function AppIcon({
   readonly icon: string | null | undefined;
   readonly size?: number;
 }) {
-  const url = useMemo(() => {
-    if (icon === null || icon === undefined || icon.length === 0) return null;
-    const blob = iconBlob(icon);
-    return blob === null ? null : URL.createObjectURL(blob);
-  }, [icon]);
-  useEffect(
-    () => () => {
-      if (url !== null) URL.revokeObjectURL(url);
-    },
-    [url],
-  );
-  if (url === null)
+  const url = useIconUrl(icon);
+  const [failed, setFailed] = useState<string | null>(null);
+  if (url === null || failed === url)
     return (
       <span
         aria-hidden="true"
@@ -46,6 +29,7 @@ export default function AppIcon({
       aria-hidden="true"
       className="shrink-0 rounded-[6px]"
       style={{ width: size, height: size }}
+      onError={() => setFailed(url)}
     />
   );
 }

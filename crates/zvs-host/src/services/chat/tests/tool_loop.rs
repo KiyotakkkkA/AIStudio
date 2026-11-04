@@ -35,7 +35,7 @@ use crate::kernel::{
 use crate::services::chat_ask::{ASK_MALFORMED, ASK_ONCE, ASK_SKIPPED, ASK_TOOL};
 use crate::services::chat_reply::{TOOL_CALL_DOMAIN, append_round, apply_tool_call};
 use crate::services::chat_tools::{CHAT_TOOL_CALLS, TOOL_BUDGET_NOTE, TOOL_RESULTS_INSTRUCTION};
-use crate::services::profile::TOOL_CALLS_KEY;
+use crate::services::profile::{TOOL_CALLS_KEY, TOOL_CALLS_UNLIMITED_KEY};
 use crate::testing::{FAKE_CAPABILITIES, TemporaryDatabase, temporary_database};
 use crate::tools::{ToolDescriptor, ToolRegistry, ToolRegistryOptions};
 
@@ -747,6 +747,40 @@ async fn the_stored_tool_call_limit_caps_the_loop() {
     let handle = test.turn(created, "Question").await;
 
     assert_stops_after(&test, &handle, created, 3);
+}
+
+#[tokio::test]
+async fn an_unlimited_tool_call_setting_lets_the_loop_run_past_the_cap() {
+    let test = Loop::new();
+    test.harness
+        .database
+        .with_connection(|connection| {
+            let repositories = Repositories::new(connection);
+            repositories.settings.set(TOOL_CALLS_KEY, "3", 2)?;
+            repositories
+                .settings
+                .set(TOOL_CALLS_UNLIMITED_KEY, "true", 2)?;
+            Ok(())
+        })
+        .expect("settings");
+    let rounds = CHAT_TOOL_CALLS + 3;
+    for round in 0..rounds {
+        test.driver
+            .round(move |_| vec![call("demo__lookup", &json!({ "query": round.to_string() }))]);
+    }
+    let created = test.conversation(&["demo.lookup"]);
+
+    let handle = test.turn(created, "Question").await;
+
+    assert_eq!(test.harness.status(&handle), RunStatus::Succeeded);
+    assert_eq!(test.calls.lookups().len(), rounds);
+    assert!(
+        test.driver
+            .requests()
+            .iter()
+            .flat_map(|request| request.messages.iter())
+            .all(|message| message.content != TOOL_BUDGET_NOTE)
+    );
 }
 
 #[tokio::test]
@@ -1550,7 +1584,8 @@ async fn a_skill_script_waits_for_its_required_reading_and_the_hint_costs_no_bud
             })
             .expect("registers a skill tool");
     }
-    let build = json!({ "argv": ["skill:dashboard/scripts/build.py", "_spec.json"] });
+    let build =
+        json!({ "argv": ["skill:dashboard/scripts/build.py", "_spec.json"], "reason": "Сборка" });
     let spec = json!({ "paths": [{ "path": "skill:dashboard/references/spec.md" }] });
     let driver = Scripted::new();
     driver.round(|_| vec![call("skill__load", &json!({ "key": "dashboard" }))]);

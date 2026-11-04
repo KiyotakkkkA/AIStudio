@@ -9,6 +9,16 @@
     }
   },
   {
+    "name": "a command with a reason",
+    "value": {
+      "program": "C:\\Program Files\\nodejs\\npm.cmd",
+      "argv": ["npm", "test"],
+      "cwd": "D:\\work\\app",
+      "packages": [],
+      "reason": "Проверить изменения тестами"
+    }
+  },
+  {
     "name": "a script with packages",
     "value": {
       "program": "Node.js",

@@ -68,6 +68,7 @@ export type ToolCallView =
       readonly kind: "command";
       readonly argv: readonly string[];
       readonly cwd: string | null;
+      readonly reason: string | null;
     }
   | { readonly kind: "fields"; readonly fields: readonly ViewField[] }
   | { readonly kind: "goal"; readonly summary: string; readonly evidence: string };
@@ -208,7 +209,9 @@ export function toolCallView(
     }
     case PROCESS_TOOL_SHELL: {
       const argv = strings(args, "argv");
-      return argv.length === 0 ? null : { kind: "command", argv, cwd: text(args, "cwd") };
+      return argv.length === 0
+        ? null
+        : { kind: "command", argv, cwd: text(args, "cwd"), reason: text(args, "reason") };
     }
     case "shell.output":
     case "shell.kill": {

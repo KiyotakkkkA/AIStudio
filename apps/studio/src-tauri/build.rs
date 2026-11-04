@@ -63,6 +63,7 @@ fn main() {
         "browser_subscribe",
         "computer_command",
         "computer_subscribe",
+        "computer_pointer",
     ]);
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(manifest))
         .expect("tauri-build failed");

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { BrowserAppearance } from "./browser.js";
 import { FolderAccessAnswer, FolderGrantChatDto, FolderGrantScope } from "./folders.js";
+import type { ChatToolCallStatus } from "./chat.js";
 import { RunId } from "./primitives/branded.js";
 
 const approvalId = z.string().uuid();
@@ -94,4 +95,30 @@ export interface ComputerState {
   approval?: ComputerApproval;
   collapsed: boolean;
   appearance: BrowserAppearance;
+  startedAt?: number;
+  reply: string;
+  calls: ComputerCall[];
+  requests: ComputerRequest[];
+}
+
+export interface ComputerCall {
+  id: string;
+  key: string;
+  status: ChatToolCallStatus;
+  summary?: string;
+}
+
+export interface ComputerRequest {
+  id: string;
+  kind: string;
+  tool: string;
+  action: string;
+  reason?: string;
+  detail?: string;
+}
+
+export interface ComputerPointer {
+  x: number;
+  y: number;
+  down: boolean;
 }

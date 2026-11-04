@@ -13,6 +13,7 @@ use zvs_contract::{
 use super::capability::BrowserCapability;
 use super::grants::BrowserGrants;
 use crate::kernel::types::cancelled;
+use crate::kernel::{RunObserver, Subscription};
 use crate::platform::clock::SharedClock;
 use crate::services::{RunService, SettingService};
 
@@ -43,6 +44,14 @@ pub trait AgentRuns: Send + Sync {
     async fn cancel(&self, run_id: &str) -> Result<(), AppError>;
 
     async fn wait(&self, run_id: &str);
+
+    fn observe(&self, _run_id: &str, _observer: RunObserver) -> Option<Subscription> {
+        None
+    }
+
+    fn started(&self, _run_id: &str) -> Option<i64> {
+        None
+    }
 }
 
 fn run_id(id: &str) -> Result<RunId, AppError> {
@@ -72,6 +81,15 @@ impl AgentRuns for RunService {
         if let Ok(id) = run_id(id) {
             Self::wait(self, &id).await;
         }
+    }
+
+    fn observe(&self, id: &str, observer: RunObserver) -> Option<Subscription> {
+        self.subscribe(id, observer).ok()
+    }
+
+    fn started(&self, id: &str) -> Option<i64> {
+        let run = self.get(&RunId::parse(id)?).ok()?;
+        Some(run.started_at.unwrap_or(run.created_at))
     }
 }
 

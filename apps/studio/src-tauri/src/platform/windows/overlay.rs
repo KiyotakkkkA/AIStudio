@@ -3,13 +3,15 @@
 use std::ffi::c_void;
 use std::sync::{Mutex, OnceLock, PoisonError};
 
-use ::windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+use ::windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
 use ::windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use ::windows::Win32::System::Threading::GetCurrentThreadId;
-use ::windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_ESCAPE, VK_LSHIFT};
+use ::windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetAsyncKeyState, VK_ESCAPE, VK_LBUTTON, VK_LSHIFT, VK_RBUTTON,
+};
 use ::windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, GWL_EXSTYLE, GetMessageW, GetWindowLongPtrW, HC_ACTION,
-    KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG, PM_NOREMOVE, PeekMessageW, PostThreadMessageW,
+    CallNextHookEx, DispatchMessageW, GWL_EXSTYLE, GetCursorPos, GetMessageW, GetWindowLongPtrW,
+    HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG, PM_NOREMOVE, PeekMessageW, PostThreadMessageW,
     SW_SHOWNOACTIVATE, SetWindowDisplayAffinity, SetWindowLongPtrW, SetWindowsHookExW, ShowWindow,
     TranslateMessage, UnhookWindowsHookEx, WDA_EXCLUDEFROMCAPTURE, WH_KEYBOARD_LL, WM_KEYDOWN,
     WM_QUIT, WM_SYSKEYDOWN, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
@@ -46,6 +48,16 @@ pub fn show_inactive(raw: isize) {
     unsafe {
         let _ = ShowWindow(handle(raw), SW_SHOWNOACTIVATE);
     }
+}
+
+fn held(key: u16) -> bool {
+    unsafe { GetAsyncKeyState(i32::from(key)) as u16 & 0x8000 != 0 }
+}
+
+pub fn pointer() -> Option<(i32, i32, bool)> {
+    let mut point = POINT::default();
+    unsafe { GetCursorPos(&mut point) }.ok()?;
+    Some((point.x, point.y, held(VK_LBUTTON.0) || held(VK_RBUTTON.0)))
 }
 
 fn fire() {

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-computer-pointer"
+description = "Enables the computer_pointer command without any pre-configured scope."
+commands.allow = ["computer_pointer"]
+
+[[permission]]
+identifier = "deny-computer-pointer"
+description = "Denies the computer_pointer command without any pre-configured scope."
+commands.deny = ["computer_pointer"]

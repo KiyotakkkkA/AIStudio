@@ -15,6 +15,7 @@ pub const PROCESS_SOURCE_MAX: usize = 262_144;
 pub const PROCESS_PACKAGES_MAX: usize = 32;
 pub const PROCESS_PACKAGE_MAX: usize = 214;
 pub const PROCESS_ACTION_MAX: usize = 2000;
+pub const PROCESS_REASON_MAX: usize = 500;
 
 wire_enum!(CodeLanguage {
     Python => "python",
@@ -44,6 +45,12 @@ pub struct ProcessPlanDto {
     pub packages: Vec<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub background: bool,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub reason: Option<String>,
 }
 
 impl Validate for ProcessPlanDto {
@@ -57,6 +64,10 @@ impl Validate for ProcessPlanDto {
             check::max_len(&format!("argv.{index}"), argument, PROCESS_ARG_MAX)?;
         }
         check_folder_path("cwd", &self.cwd)?;
+        if let Some(reason) = &self.reason {
+            check::non_empty("reason", reason)?;
+            check::max_len("reason", reason, PROCESS_REASON_MAX)?;
+        }
         match (&self.source, self.language) {
             (Some(source), Some(_)) => check::max_len("source", source, PROCESS_SOURCE_MAX)?,
             (None, None) => {}

@@ -189,6 +189,7 @@ impl Host {
         agent.attach(ComputerControls {
             runs: Arc::new(services.runs.clone()),
             chat: Arc::new(NoChat),
+            folders: None,
         });
         let computer = Computer::new(
             agent.clone(),

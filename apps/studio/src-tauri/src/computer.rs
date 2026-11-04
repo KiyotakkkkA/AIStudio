@@ -1,13 +1,16 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
 
 use tauri::ipc::Channel;
 use tauri::{
     AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
 };
-use zvs_contract::{BrowserAppearance, ComputerCommand, ComputerDisplay, ComputerState};
+use zvs_contract::{
+    BrowserAppearance, ComputerCommand, ComputerDisplay, ComputerPointer, ComputerState,
+};
 use zvs_host::computer::{ComputerAgent, ComputerChange, ComputerChat};
 use zvs_host::services::ChatService;
 
@@ -17,8 +20,9 @@ use crate::window::STUDIO;
 pub const PANEL: &str = "computer-panel";
 pub const GLOW: &str = "computer-glow";
 const PAGE: &str = "computer-ui/index.html";
-const PANEL_WIDTH: f64 = 380.0;
-const PANEL_HEIGHT: f64 = 480.0;
+const PANEL_WIDTH: f64 = 460.0;
+const PANEL_HEIGHT: f64 = 660.0;
+const POINTER_TICK: Duration = Duration::from_millis(16);
 const PANEL_COLLAPSED: f64 = 64.0;
 const PANEL_MARGIN: f64 = 24.0;
 
@@ -42,6 +46,8 @@ struct Inner {
     subscribers: Mutex<Vec<Channel<ComputerState>>>,
     minimized: AtomicBool,
     placed: Mutex<Option<(ComputerDisplay, bool)>>,
+    pointers: Mutex<Vec<Channel<ComputerPointer>>>,
+    pointing: AtomicU64,
 }
 
 #[derive(Clone)]
@@ -78,6 +84,8 @@ impl ComputerShell {
             subscribers: Mutex::new(Vec::new()),
             minimized: AtomicBool::new(false),
             placed: Mutex::new(None),
+            pointers: Mutex::new(Vec::new()),
+            pointing: AtomicU64::new(0),
         }));
         let changes = lock(&shell.0.work).clone();
         shell.0.agent.subscribe(move |change| {
@@ -138,6 +146,41 @@ impl ComputerShell {
         }
     }
 
+    pub fn watch_pointer(&self, channel: Channel<ComputerPointer>) {
+        lock(&self.0.pointers).push(channel);
+    }
+
+    fn origin(&self) -> (i64, i64) {
+        lock(&self.0.placed)
+            .as_ref()
+            .map_or((0, 0), |(display, _)| (display.x, display.y))
+    }
+
+    fn track_pointer(&self) {
+        let generation = self.0.pointing.fetch_add(1, Ordering::SeqCst) + 1;
+        let shell = self.clone();
+        let _ = std::thread::Builder::new()
+            .name("computer-pointer".to_owned())
+            .spawn(move || {
+                let mut last = None;
+                while shell.0.pointing.load(Ordering::SeqCst) == generation {
+                    if let Some((x, y, down)) = overlay::pointer() {
+                        let (left, top) = shell.origin();
+                        let pointer = ComputerPointer {
+                            x: i64::from(x) - left,
+                            y: i64::from(y) - top,
+                            down,
+                        };
+                        if last != Some(pointer) {
+                            last = Some(pointer);
+                            lock(&shell.0.pointers).retain(|channel| channel.send(pointer).is_ok());
+                        }
+                    }
+                    std::thread::sleep(POINTER_TICK);
+                }
+            });
+    }
+
     fn build(&self, label: &str) -> Option<WebviewWindow> {
         if let Some(existing) = self.0.app.get_webview_window(label) {
             return Some(existing);
@@ -185,6 +228,7 @@ impl ComputerShell {
         }
         let shell = self.clone();
         overlay::watch_stop_key(move || shell.post(Work::Stop));
+        self.track_pointer();
     }
 
     fn place(&self) {
@@ -235,6 +279,8 @@ impl ComputerShell {
     }
 
     fn close(&self) {
+        self.0.pointing.fetch_add(1, Ordering::SeqCst);
+        lock(&self.0.pointers).clear();
         overlay::release_stop_key();
         for label in [GLOW, PANEL] {
             if let Some(window) = self.0.app.get_webview_window(label) {

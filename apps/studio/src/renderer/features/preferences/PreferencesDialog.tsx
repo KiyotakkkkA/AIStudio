@@ -179,6 +179,8 @@ import {
   STYLE_DESCRIPTIONS,
   STYLE_OPTIONS,
   STYLE_ROW,
+  TOOL_CALLS_COUNT_LABEL,
+  TOOL_CALLS_MODE_OPTIONS,
   TOOL_CALLS_ROW,
 } from "./profileCopy";
 
@@ -397,24 +399,34 @@ const ToolCallsRow = observer(function ToolCallsRow() {
       id={TOOL_CALLS_ROW.key}
       label={TOOL_CALLS_ROW.label}
       hint={TOOL_CALLS_ROW.hint}
-      error={profile.errors.toolCalls}
+      error={profile.errors.toolCalls ?? profile.errors.toolCallsUnlimited}
     >
-      <div className="w-24">
-        <TextInput
-          aria-label={TOOL_CALLS_ROW.label}
-          mono
-          type="number"
-          min={TOOL_CALLS_MIN}
-          max={TOOL_CALLS_MAX}
-          step={1}
-          value={profile.toolCallsDraft}
-          disabled={profile.pending.toolCalls !== undefined}
-          onChange={(event) => profile.setToolCallsDraft(event.target.value)}
-          onBlur={() => void profile.commitToolCalls()}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") event.currentTarget.blur();
-          }}
+      <div className="flex flex-col items-end gap-2.5">
+        <SegmentedControl
+          label={TOOL_CALLS_ROW.label}
+          value={profile.toolCallsUnlimited ? "unlimited" : "limited"}
+          options={TOOL_CALLS_MODE_OPTIONS}
+          onChange={(mode) => void profile.setToolCallsUnlimited(mode === "unlimited")}
         />
+        {profile.toolCallsUnlimited ? null : (
+          <div className="w-24">
+            <TextInput
+              aria-label={TOOL_CALLS_COUNT_LABEL}
+              mono
+              type="number"
+              min={TOOL_CALLS_MIN}
+              max={TOOL_CALLS_MAX}
+              step={1}
+              value={profile.toolCallsDraft}
+              disabled={profile.pending.toolCalls !== undefined}
+              onChange={(event) => profile.setToolCallsDraft(event.target.value)}
+              onBlur={() => void profile.commitToolCalls()}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+            />
+          </div>
+        )}
       </div>
     </SettingRow>
   );

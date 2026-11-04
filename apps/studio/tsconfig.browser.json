@@ -13,6 +13,9 @@
     "src/browser-ui/**/*.tsx",
     "src/computer-ui/**/*.ts",
     "src/computer-ui/**/*.tsx",
-    "src/renderer/app/palettes.ts"
+    "src/renderer/app/palettes.ts",
+    "src/renderer/features/chat/goalCopy.ts",
+    "src/renderer/features/chat/toolPresentation.ts",
+    "src/renderer/features/computer/iconUrl.ts"
   ]
 }

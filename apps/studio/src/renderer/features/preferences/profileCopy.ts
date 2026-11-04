@@ -1,10 +1,4 @@
-import {
-  PROFILE_KEYS,
-  TOOL_CALLS_DEFAULT,
-  TOOL_CALLS_MAX,
-  TOOL_CALLS_MIN,
-  type ReplyStyle,
-} from "./ProfileStore";
+import { PROFILE_KEYS, type ReplyStyle } from "./ProfileStore";
 
 export const STYLE_ROW = {
   key: PROFILE_KEYS.style,
@@ -44,8 +38,17 @@ export const ABOUT_NEW_DIALOGS = "Изменения применяются в �
 export const TOOL_CALLS_ROW = {
   key: PROFILE_KEYS.toolCalls,
   label: "Лимит вызовов инструментов на ответ",
-  hint: `Ограничение на один ответ модели: от ${String(TOOL_CALLS_MIN)} до ${String(TOOL_CALLS_MAX)}, по умолчанию ${String(TOOL_CALLS_DEFAULT)}.`,
+  hint: `Ограничение на один ответ модели.`,
 } as const;
+
+export type ToolCallsMode = "limited" | "unlimited";
+
+export const TOOL_CALLS_MODE_OPTIONS: readonly { value: ToolCallsMode; label: string }[] = [
+  { value: "limited", label: "Ограниченно" },
+  { value: "unlimited", label: "Без ограничений" },
+];
+
+export const TOOL_CALLS_COUNT_LABEL = "Число вызовов";
 
 export const SAVE = "Сохранить";
 export const CANCEL = "Отмена";

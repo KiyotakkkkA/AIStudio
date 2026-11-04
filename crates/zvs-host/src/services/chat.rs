@@ -472,14 +472,14 @@ impl Inner {
         self.read(profile::load)
     }
 
-    fn profile_prompt(&self, about: &str) -> Result<(String, usize), AppError> {
+    fn profile_prompt(&self, about: &str) -> Result<(String, usize, bool), AppError> {
         let settings = self.profile()?;
         let section = [style_section(&settings), about_section(about)]
             .into_iter()
             .filter(|part| !part.is_empty())
             .collect::<Vec<_>>()
             .join("\n\n");
-        Ok((section, settings.tool_calls))
+        Ok((section, settings.tool_calls, settings.tool_calls_unlimited))
     }
 
     fn conversation(&self, id: &str) -> Result<ConversationRow, AppError> {
@@ -1013,6 +1013,8 @@ pub struct ChatGenerateRequest {
     pub tool_result_chars: u64,
     #[serde(default = "default_tool_calls")]
     pub tool_calls: u64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unlimited: bool,
     #[serde(default)]
     pub knowledge: KnowledgeContext,
     #[serde(default)]
@@ -1670,7 +1672,7 @@ impl NodeDef for PrepareNode {
         if !deferred.is_empty() {
             offered.push(search_tool(&offered, &deferred));
         }
-        let (profile, tool_calls) = inner.profile_prompt(&row.profile)?;
+        let (profile, tool_calls, unlimited) = inner.profile_prompt(&row.profile)?;
         let files = [
             file_tools_section(&offered),
             crate::images::viewing_section(&offered, images_supported),
@@ -1836,6 +1838,7 @@ impl NodeDef for PrepareNode {
                 tool_calls,
             ) as u64,
             tool_calls: tool_calls as u64,
+            unlimited,
             knowledge: KnowledgeContext {
                 store_ids: details.attached_store_ids.clone(),
                 citations: prepared.citations,
@@ -2334,6 +2337,7 @@ impl GenerateChatNode {
             model_tools,
             tool_result_chars,
             tool_calls,
+            unlimited,
             knowledge,
             conversation_id,
             memory,
@@ -2438,7 +2442,7 @@ impl GenerateChatNode {
             template,
             offered,
             deferred,
-            budget: if goal_hook.is_some() {
+            budget: if goal_hook.is_some() || unlimited {
                 LoopBudget::Open
             } else {
                 LoopBudget::Calls(budget)
@@ -3652,7 +3656,7 @@ impl ChatService {
             Some(row) => row.profile.clone(),
             None => self.inner.profile()?.about,
         };
-        let (profile, _) = self.inner.profile_prompt(&about)?;
+        let (profile, _, _) = self.inner.profile_prompt(&about)?;
         let goal = details
             .and_then(|details| details.goal.as_ref())
             .filter(|_| goal_turn && offered.iter().any(|tool| tool.key == GOAL_TOOL))

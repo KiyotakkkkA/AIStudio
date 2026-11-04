@@ -23,8 +23,6 @@ export const APPS_EMPTY_DESCRIPTION =
   "Разрешение появляется после ответа «Разрешить всегда» или «Разрешить для этого диалога» на запрос доступа к приложению.";
 export const APPS_NOTHING_SELECTED = "Выберите приложение в списке.";
 export const APPS_LOAD_ERROR = "Не удалось загрузить разрешения приложений. Попробуйте ещё раз.";
-export const APPS_NOTE =
-  "Ответ «Только для этого ответа» действует до конца ответа агента и здесь не показывается.";
 export const APP_PATH_UNKNOWN = "Путь не определён";
 export const SITES_TITLE = "Разрешения на сайтах";
 export const SITES_DESCRIPTION = "Действия, которые агент выполняет на сайте без подтверждения.";

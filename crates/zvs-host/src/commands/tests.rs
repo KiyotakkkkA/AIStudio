@@ -202,6 +202,7 @@ fn context(cancel: CancellationToken) -> StepContext {
 fn shell(argv: &[&str]) -> ShellRunInput {
     ShellRunInput {
         argv: argv.iter().map(|part| (*part).to_owned()).collect(),
+        reason: "Проверка".to_owned(),
         cwd: None,
         stdin: None,
         background: false,
@@ -391,8 +392,20 @@ fn inputs_are_validated() {
         "a background process takes no stdin"
     );
     assert!(
-        serde_json::from_value::<ShellRunInput>(json!({ "argv": "npm test" })).is_err(),
+        serde_json::from_value::<ShellRunInput>(json!({ "argv": "npm test", "reason": "x" }))
+            .is_err(),
         "a shell string is not an argument vector"
+    );
+    assert!(
+        serde_json::from_value::<ShellRunInput>(json!({ "argv": ["npm", "test"] })).is_err(),
+        "a run needs a reason"
+    );
+    assert!(
+        serde_json::from_value::<ShellRunInput>(json!({ "argv": ["npm", "test"], "reason": " " }))
+            .expect("parses")
+            .validate()
+            .is_err(),
+        "a blank reason is rejected"
     );
     let mut tests = shell(&["cargo", "test"]);
     tests.notify = true;
@@ -535,6 +548,7 @@ async fn shell_asks_even_at_auto_and_off_denies() {
         "input": {
             "conversationId": conversation.to_string(),
             "argv": stub_argv(),
+            "reason": "Проверка",
             "stdin": "echo\nhello"
         }
     });
@@ -546,6 +560,7 @@ async fn shell_asks_even_at_auto_and_off_denies() {
     assert_eq!(request["action"], json!(SHELL_ACTION));
     assert_eq!(request["conversationId"], json!(conversation.to_string()));
     assert_eq!(request["process"]["argv"], json!(stub_argv()));
+    assert_eq!(request["process"]["reason"], json!("Проверка"));
     assert!(same_path(
         request["process"]["cwd"].as_str().expect("a cwd"),
         &root
@@ -584,6 +599,7 @@ async fn a_foreign_cwd_goes_through_folder_access() {
         "input": {
             "conversationId": conversation.to_string(),
             "argv": stub_argv(),
+            "reason": "Проверка",
             "cwd": other_root.to_string_lossy(),
             "stdin": "echo"
         }
@@ -620,7 +636,7 @@ async fn an_owned_absolute_cwd_needs_only_process_approval() {
         .join("attachments/browser");
     std::fs::create_dir_all(&folder).unwrap();
     let cwd = canonical(&folder).unwrap();
-    let handle = host.start(json!({ "id": "run", "type": SHELL_RUN, "input": { "conversationId": conversation, "argv": stub_argv(), "cwd": cwd, "stdin": "echo" } }));
+    let handle = host.start(json!({ "id": "run", "type": SHELL_RUN, "input": { "conversationId": conversation, "argv": stub_argv(), "reason": "Проверка", "cwd": cwd, "stdin": "echo" } }));
     let request = host.approval(&handle.id).await;
     assert_eq!(request["kind"], json!("process"));
     assert!(same_path(request["process"]["cwd"].as_str().unwrap(), &cwd));
@@ -764,6 +780,7 @@ async fn a_background_start_is_approved_like_a_foreground_run_and_returns_a_hand
         "input": {
             "conversationId": conversation.to_string(),
             "argv": stub_argv(),
+            "reason": "Проверка",
             "background": true
         }
     }));

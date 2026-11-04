@@ -101,7 +101,7 @@ test("the tool call limit commits a clamped whole number and reverts anything el
 
   const { stored, store } = profile();
   await store.load();
-  store.setToolCallsDraft("80");
+  store.setToolCallsDraft("800");
   await store.commitToolCalls();
   expect(stored.get(PROFILE_KEYS.toolCalls)).toBe(TOOL_CALLS_MAX);
   expect(store.toolCallsDraft).toBe(String(TOOL_CALLS_MAX));
@@ -110,6 +110,19 @@ test("the tool call limit commits a clamped whole number and reverts anything el
   await store.commitToolCalls();
   expect(store.toolCallsDraft).toBe(String(TOOL_CALLS_MAX));
   expect(store.toolCalls).toBe(TOOL_CALLS_MAX);
+});
+
+test("the unlimited tool call mode persists at once and a refused switch rolls back", async () => {
+  const { bridge, stored, store } = profile({ [PROFILE_KEYS.toolCallsUnlimited]: true });
+  await store.load();
+  expect(store.toolCallsUnlimited).toBe(true);
+  await store.setToolCallsUnlimited(false);
+  expect(stored.get(PROFILE_KEYS.toolCallsUnlimited)).toBe(false);
+
+  bridge.fail("settings.set", AppErrorCode.DB_ERROR, "x");
+  await store.setToolCallsUnlimited(true);
+  expect(store.toolCallsUnlimited).toBe(false);
+  expect(store.errors.toolCallsUnlimited).toBe(SETTING_SAVE_FAILED);
 });
 
 test("profile rows are found by search and counters use the Russian locale", () => {

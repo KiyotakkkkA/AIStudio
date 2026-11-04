@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::browser::BrowserAppearance;
-use crate::chat::CHAT_TEXT_MAX;
+use crate::chat::{CHAT_TEXT_MAX, ChatToolCallStatus};
 use crate::errors::AppError;
 use crate::folders::{FOLDER_PATH_MAX, FolderAccessAnswer, FolderGrantChatDto, FolderGrantScope};
 use crate::ids::{RunId, is_wire_uuid};
@@ -232,6 +232,61 @@ pub struct ComputerState {
     pub approval: Option<ComputerApproval>,
     pub collapsed: bool,
     pub appearance: BrowserAppearance,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub started_at: Option<Timestamp>,
+    #[serde(default)]
+    pub reply: String,
+    #[serde(default)]
+    pub calls: Vec<ComputerCall>,
+    #[serde(default)]
+    pub requests: Vec<ComputerRequest>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComputerCall {
+    pub id: String,
+    pub key: String,
+    pub status: ChatToolCallStatus,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub summary: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComputerRequest {
+    pub id: String,
+    pub kind: String,
+    pub tool: String,
+    pub action: String,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub reason: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComputerPointer {
+    pub x: i64,
+    pub y: i64,
+    pub down: bool,
 }
 
 #[cfg(test)]
@@ -267,7 +322,10 @@ mod tests {
                 "apps": [],
                 "actions": [],
                 "collapsed": false,
-                "appearance": { "theme": "system", "darkPalette": "zvs-dark", "lightPalette": "zvs-light" }
+                "appearance": { "theme": "system", "darkPalette": "zvs-dark", "lightPalette": "zvs-light" },
+                "reply": "",
+                "calls": [],
+                "requests": []
             })
         );
     }

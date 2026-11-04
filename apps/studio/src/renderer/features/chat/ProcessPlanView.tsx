@@ -10,6 +10,7 @@ import {
   BACKGROUND_MODE,
   PACKAGES_TITLE,
   PROGRAM_TITLE,
+  REASON_TITLE,
   SOURCE_TITLE,
   commandLine,
 } from "./processCopy";
@@ -34,6 +35,14 @@ export default function ProcessPlanView({
   const body = code ? (plan.source ?? "") : commandLine(plan.argv);
   return (
     <div className="space-y-2">
+      {plan.reason === undefined ? null : (
+        <div>
+          <p className="mb-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
+            {REASON_TITLE}
+          </p>
+          <p className="m-0 text-[12.5px] leading-relaxed text-main-100">{plan.reason}</p>
+        </div>
+      )}
       <dl className="m-0 space-y-1">
         {plan.language !== undefined && (
           <Row title={LANGUAGE_TITLE} value={LANGUAGE_LABEL[plan.language]} />

@@ -2,5 +2,5 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "computer-ui",
   "webviews": ["computer-panel", "computer-glow"],
-  "permissions": ["allow-computer-command", "allow-computer-subscribe"]
+  "permissions": ["allow-computer-command", "allow-computer-subscribe", "allow-computer-pointer"]
 }

@@ -106,8 +106,9 @@ pub use cli::{
 };
 pub use computer::{
     APPS_APPROVAL_KIND, AnswerAppRequestInput, AppGrantDto, AppGrantRef, AppGrantsListOutput,
-    ComputerAction, ComputerActionState, ComputerAppDto, ComputerApproval, ComputerCommand,
-    ComputerDisplay, ComputerState, ComputerStatus,
+    ComputerAction, ComputerActionState, ComputerAppDto, ComputerApproval, ComputerCall,
+    ComputerCommand, ComputerDisplay, ComputerPointer, ComputerRequest, ComputerState,
+    ComputerStatus,
 };
 pub use documents::{
     DOCUMENT_BYTES_DATA_MAX, DOCUMENT_BYTES_PAGE_MAX, DOCUMENT_LIST_MAX, DOCUMENT_PATH_MAX,
@@ -197,7 +198,8 @@ pub use notifications::{
 pub use primitives::{Json, MAX_SAFE_INTEGER, Page, PageRequest, Sort, SortDirection, Timestamp};
 pub use process::{
     CodeLanguage, PROCESS_APPROVAL_KIND, PROCESS_ARG_MAX, PROCESS_ARGV_MAX, PROCESS_PACKAGE_MAX,
-    PROCESS_PACKAGES_MAX, PROCESS_SOURCE_MAX, ProcessApprovalDto, ProcessPlanDto, ProcessResultDto,
+    PROCESS_PACKAGES_MAX, PROCESS_REASON_MAX, PROCESS_SOURCE_MAX, ProcessApprovalDto,
+    ProcessPlanDto, ProcessResultDto,
 };
 pub use providers::{
     CreateProviderInput, DiscoveredModelDto, ModelCapability, ModelDto, ProbeOutcomeDto,

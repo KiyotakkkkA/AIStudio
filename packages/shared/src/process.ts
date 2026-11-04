@@ -15,6 +15,7 @@ export const ProcessPlanDto = z
     source: z.string().max(262144).optional(),
     packages: z.array(z.string().min(1).max(214)).max(32),
     background: z.boolean().optional(),
+    reason: z.string().min(1).max(500).optional(),
   })
   .refine((plan) => (plan.source === undefined) === (plan.language === undefined), {
     path: ["source"],

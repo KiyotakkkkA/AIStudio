@@ -111,7 +111,14 @@ test("process, skill and job calls get their own views and unknown calls fall ba
     kind: "command",
     argv: ["npm", "test"],
     cwd: "app",
+    reason: null,
   });
+  expect(
+    toolCallView(call("shell.run", { argv: ["npm", "test"], reason: "Проверить тесты" })),
+  ).toMatchObject({ kind: "command", reason: "Проверить тесты" });
+  expect(
+    toolCallSummary(call("shell.run", { argv: ["npm", "test"], reason: "Проверить тесты" })),
+  ).toBe("Проверить тесты");
   expect(
     toolCallView(call("skill.script", { key: "docx", path: "scripts/a.py", args: ["-v"] })),
   ).toMatchObject({ kind: "skill", skill: "docx", path: "scripts/a.py", args: ["-v"] });

@@ -103,6 +103,9 @@ const ApprovalBar = observer(function ApprovalBar({ store }: { readonly store: A
           </Button>
         </div>
       </div>
+      {approval.process?.reason === undefined ? null : (
+        <p className="m-0 text-[12.5px] leading-relaxed text-main-100">{approval.process.reason}</p>
+      )}
       {detail === null ? null : (
         <pre className="m-0 max-h-40 overflow-auto rounded-control bg-main-900 px-3 py-2 font-mono text-[11.5px] whitespace-pre-wrap break-all text-main-200">
           {detail}

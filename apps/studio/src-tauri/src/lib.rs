@@ -178,7 +178,8 @@ pub fn run() {
             commands::browser_command,
             commands::browser_subscribe,
             commands::computer_command,
-            commands::computer_subscribe
+            commands::computer_subscribe,
+            commands::computer_pointer
         ])
         .setup(|app| {
             match compose(app)? {
@@ -1057,6 +1058,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     computer_agent.attach(ComputerControls {
         runs: Arc::new(runs.clone()),
         chat: Arc::new(computer::ChatSender(chat.clone())),
+        folders: Some(Arc::new(folders.clone())),
     });
     register_kernel_tools(&nodes, &tools)?;
     let explorer = ExplorerService::new(folders.clone(), events.clone());

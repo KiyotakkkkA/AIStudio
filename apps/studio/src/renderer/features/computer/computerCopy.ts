@@ -10,7 +10,7 @@ export const ACCESS_ANSWERS: readonly {
   readonly label: string;
   readonly tone: ButtonTone;
 }[] = [
-  { answer: "once", label: "Только для этого ответа", tone: "primary" },
+  { answer: "once", label: "Только для этой сессии", tone: "primary" },
   { answer: "conversation", label: "Разрешить для этого диалога", tone: "secondary" },
   { answer: "always", label: "Разрешить всегда", tone: "secondary" },
   { answer: "deny", label: "Запретить", tone: "danger-soft" },

@@ -297,6 +297,7 @@ fn script(source: &str) -> ReviewedAction {
             source: Some(source.to_owned()),
             packages: Vec::new(),
             background: false,
+            reason: None,
         },
     }
 }
@@ -312,6 +313,7 @@ fn shell(argv: &[&str]) -> ReviewedAction {
             source: None,
             packages: Vec::new(),
             background: false,
+            reason: None,
         },
     }
 }

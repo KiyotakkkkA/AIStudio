@@ -6,6 +6,10 @@ pub fn set_no_activate(_raw: isize, _enabled: bool) {}
 
 pub fn show_inactive(_raw: isize) {}
 
+pub fn pointer() -> Option<(i32, i32, bool)> {
+    None
+}
+
 pub fn watch_stop_key(_trigger: impl Fn() + Send + 'static) {}
 
 pub fn release_stop_key() {}

@@ -51,7 +51,6 @@ export const SUBAGENT_STEPS_HIDE = "Скрыть вызовы";
 export const SUBAGENT_REPORT = "Отчёт";
 export const SUBAGENT_GROUP = "Субагенты";
 export const SUBAGENT_APPROVAL_PREFIX = "Субагент";
-export const SUBAGENT_TOOL_TITLE = "Субагент";
 
 export function subagentApprovalTitle(label: string): string {
   return `${SUBAGENT_APPROVAL_PREFIX}: ${label}`;

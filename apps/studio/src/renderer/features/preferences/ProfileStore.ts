@@ -11,13 +11,14 @@ export const PROFILE_KEYS = {
   custom: "profile.style.custom",
   about: "profile.about",
   toolCalls: "chat.toolcalls",
+  toolCallsUnlimited: "chat.toolcalls.unlimited",
 } as const;
 export type ProfileField = keyof typeof PROFILE_KEYS;
 
 export const PROFILE_STYLE_MAX = 2000;
 export const PROFILE_ABOUT_MAX = 4000;
 export const TOOL_CALLS_MIN = 1;
-export const TOOL_CALLS_MAX = 50;
+export const TOOL_CALLS_MAX = 200;
 export const TOOL_CALLS_DEFAULT = 15;
 
 function isReplyStyle(value: unknown): value is ReplyStyle {
@@ -38,6 +39,7 @@ export default class ProfileStore {
   aboutDraft = "";
   toolCalls = TOOL_CALLS_DEFAULT;
   toolCallsDraft = String(TOOL_CALLS_DEFAULT);
+  toolCallsUnlimited = false;
   errors: Partial<Record<ProfileField, string>> = {};
   pending: Partial<Record<ProfileField, boolean>> = {};
   loaded = false;
@@ -63,11 +65,12 @@ export default class ProfileStore {
   }
 
   async load() {
-    const [style, custom, about, toolCalls] = await Promise.all([
+    const [style, custom, about, toolCalls, unlimited] = await Promise.all([
       this.read(PROFILE_KEYS.style),
       this.read(PROFILE_KEYS.custom),
       this.read(PROFILE_KEYS.about),
       this.read(PROFILE_KEYS.toolCalls),
+      this.read(PROFILE_KEYS.toolCallsUnlimited),
     ]);
     runInAction(() => {
       if (isReplyStyle(style) && this.pending.style === undefined) this.style = style;
@@ -89,6 +92,8 @@ export default class ProfileStore {
         this.toolCalls = toolCalls;
         this.toolCallsDraft = String(toolCalls);
       }
+      if (typeof unlimited === "boolean" && this.pending.toolCallsUnlimited === undefined)
+        this.toolCallsUnlimited = unlimited;
       this.loaded = true;
     });
   }
@@ -176,6 +181,16 @@ export default class ProfileStore {
       runInAction(() => {
         this.toolCalls = previous;
         this.toolCallsDraft = String(previous);
+      });
+  }
+
+  async setToolCallsUnlimited(unlimited: boolean) {
+    if (this.toolCallsUnlimited === unlimited || this.pending.toolCallsUnlimited !== undefined)
+      return;
+    this.toolCallsUnlimited = unlimited;
+    if (!(await this.save("toolCallsUnlimited", unlimited)))
+      runInAction(() => {
+        this.toolCallsUnlimited = !unlimited;
       });
   }
 }

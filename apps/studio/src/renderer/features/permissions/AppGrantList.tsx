@@ -13,7 +13,6 @@ import {
   ALWAYS_SECTION,
   APPS_EMPTY_DESCRIPTION,
   APPS_EMPTY_TITLE,
-  APPS_NOTE,
   APPS_SEARCH_LABEL,
   APPS_SEARCH_PLACEHOLDER,
   APPS_TAB,
@@ -98,8 +97,6 @@ function AppGrantList() {
 
       {section(ALWAYS_SECTION, permissions.globalApps)}
       {section(DIALOG_SECTION, permissions.dialogApps)}
-
-      <p className="px-1 pt-1 text-[11px] leading-relaxed text-main-500">{APPS_NOTE}</p>
     </EntityListPanel>
   );
 }

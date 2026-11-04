@@ -3,20 +3,27 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 
 use zvs_contract::{
     AppError, AppErrorCode, AppGrantDto, ComputerAction, ComputerActionState, ComputerAppDto,
-    ComputerApproval, ComputerDisplay, ComputerState, ComputerStatus, FolderAccessAnswer,
-    FolderGrantChatDto, FolderGrantScope,
+    ComputerApproval, ComputerCall, ComputerDisplay, ComputerRequest, ComputerState,
+    ComputerStatus, DeltaKind, FolderAccessAnswer, FolderGrantChatDto, FolderGrantScope, HostEvent,
+    HostEventDraft, RunId,
 };
 
+use super::progress::{
+    REPLY_KEPT, call_entry, keep_tail, merge_call, pending_request, settled, tool_call,
+};
 use super::sidecar::SharedDesktop;
 use crate::browser::AgentRuns;
 use crate::data::schema::AppGrantRow;
 use crate::data::{DataError, Database, Repositories};
+use crate::kernel::Subscription;
 use crate::platform::clock::SharedClock;
 use crate::platform::logger::{LogLevel, SharedLogger};
+use crate::workspace::FolderAccessService;
 
 pub const ACTIONS_KEPT: usize = 60;
 pub const ACTIONS_PER_MINUTE: usize = 120;
 pub const RATE_WINDOW_MS: i64 = 60_000;
+pub const TOKEN_NOTIFY_MS: i64 = 80;
 
 pub const BUSY: &str = "Компьютер уже управляется другой сессией.";
 pub const NO_SESSION: &str = "Управление компьютером не запущено";
@@ -32,10 +39,29 @@ pub trait ComputerChat: Send + Sync {
     fn send(&self, conversation_id: &str, text: &str) -> Result<String, AppError>;
 }
 
+pub trait ComputerFolders: Send + Sync {
+    fn answer(&self, run: &str, approval: &str, answer: FolderAccessAnswer)
+    -> Result<(), AppError>;
+}
+
+impl ComputerFolders for FolderAccessService {
+    fn answer(
+        &self,
+        run: &str,
+        approval: &str,
+        answer: FolderAccessAnswer,
+    ) -> Result<(), AppError> {
+        let run =
+            RunId::parse(run).ok_or_else(|| AppError::new(AppErrorCode::NotFound, NO_SESSION))?;
+        Self::answer(self, &run, approval, answer)
+    }
+}
+
 #[derive(Clone)]
 pub struct ComputerControls {
     pub runs: Arc<dyn AgentRuns>,
     pub chat: Arc<dyn ComputerChat>,
+    pub folders: Option<Arc<dyn ComputerFolders>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,6 +86,12 @@ struct Session {
     window: VecDeque<i64>,
     next: u64,
     handoff: bool,
+    started_at: Option<i64>,
+    reply: String,
+    calls: Vec<ComputerCall>,
+    requests: Vec<ComputerRequest>,
+    request_runs: HashMap<String, String>,
+    token_notified: i64,
 }
 
 struct PendingAccess {
@@ -79,6 +111,7 @@ struct Inner {
     pending: Mutex<HashMap<String, PendingAccess>>,
     listeners: Mutex<Vec<Listener>>,
     controls: OnceLock<ComputerControls>,
+    observing: Mutex<Option<Subscription>>,
 }
 
 #[derive(Clone)]
@@ -101,6 +134,7 @@ impl ComputerAgent {
             pending: Mutex::new(HashMap::new()),
             listeners: Mutex::new(Vec::new()),
             controls: OnceLock::new(),
+            observing: Mutex::new(None),
         }))
     }
 
@@ -154,6 +188,10 @@ impl ComputerAgent {
             approval: session.approval.clone(),
             collapsed: session.collapsed,
             appearance: zvs_contract::BrowserAppearance::default(),
+            started_at: session.started_at,
+            reply: session.reply.clone(),
+            calls: session.calls.clone(),
+            requests: session.requests.clone(),
         }
     }
 
@@ -213,6 +251,26 @@ impl ComputerAgent {
         let Some(controls) = self.0.controls.get().cloned() else {
             return;
         };
+        let started = controls
+            .runs
+            .started(run)
+            .unwrap_or_else(|| self.0.clock.now());
+        {
+            let mut session = lock(&self.0.session);
+            session.started_at = Some(started);
+            session.reply.clear();
+            session.calls.clear();
+            session.requests.clear();
+            session.request_runs.clear();
+        }
+        let observer = self.clone();
+        let subscription = controls.runs.observe(
+            run,
+            Arc::new(move |event: &HostEvent| observer.absorb(event)),
+        );
+        if let Some(previous) = std::mem::replace(&mut *lock(&self.0.observing), subscription) {
+            previous.unsubscribe();
+        }
         let Ok(handle) = tokio::runtime::Handle::try_current() else {
             return;
         };
@@ -236,7 +294,76 @@ impl ComputerAgent {
         }
     }
 
+    pub fn absorb(&self, event: &HostEvent) {
+        let now = self.0.clock.now();
+        let changed = {
+            let mut session = lock(&self.0.session);
+            if session.conversation.is_none() {
+                return;
+            }
+            match &event.body {
+                HostEventDraft::Token { delta, kind } => {
+                    if *kind == Some(DeltaKind::Reasoning) {
+                        false
+                    } else {
+                        session.reply.push_str(delta);
+                        keep_tail(&mut session.reply, REPLY_KEPT);
+                        let due = now - session.token_notified >= TOKEN_NOTIFY_MS;
+                        if due {
+                            session.token_notified = now;
+                        }
+                        due
+                    }
+                }
+                HostEventDraft::Step { step } => tool_call(step).is_some_and(|call| {
+                    if let Some(approval) = settled(&call) {
+                        session.requests.retain(|request| request.id != approval);
+                        session.request_runs.remove(approval);
+                    }
+                    merge_call(&mut session.calls, call_entry(&call));
+                    true
+                }),
+                HostEventDraft::Approval { request } => {
+                    pending_request(request).is_some_and(|pending| {
+                        if session
+                            .requests
+                            .iter()
+                            .any(|request| request.id == pending.request.id)
+                        {
+                            return false;
+                        }
+                        session
+                            .request_runs
+                            .insert(pending.request.id.clone(), pending.run);
+                        session.requests.push(pending.request);
+                        true
+                    })
+                }
+                _ => false,
+            }
+        };
+        if changed {
+            self.notify(ComputerChange::Updated);
+        }
+    }
+
+    fn request_run(&self, id: &str) -> Option<String> {
+        lock(&self.0.session).request_runs.get(id).cloned()
+    }
+
+    fn settle_request(&self, id: &str) {
+        {
+            let mut session = lock(&self.0.session);
+            session.requests.retain(|request| request.id != id);
+            session.request_runs.remove(id);
+        }
+        self.notify(ComputerChange::Updated);
+    }
+
     pub fn end(&self) {
+        if let Some(previous) = lock(&self.0.observing).take() {
+            previous.unsubscribe();
+        }
         let conversation = {
             let mut session = lock(&self.0.session);
             let conversation = session.conversation.take();
@@ -542,6 +669,15 @@ impl ComputerAgent {
         approval: &str,
         answer: FolderAccessAnswer,
     ) -> Result<(), AppError> {
+        if let Some(run) = self.request_run(approval) {
+            let folders = self
+                .controls()?
+                .folders
+                .ok_or_else(|| AppError::new(AppErrorCode::Conflict, NOT_PENDING))?;
+            folders.answer(&run, approval, answer)?;
+            self.settle_request(approval);
+            return Ok(());
+        }
         let run = self.pending(approval)?;
         self.answer(&run, approval, answer)
     }
@@ -590,11 +726,21 @@ impl ComputerAgent {
     }
 
     pub fn approve(&self, id: &str) -> Result<(), AppError> {
+        if let Some(run) = self.request_run(id) {
+            self.controls()?.runs.approve(&run, id)?;
+            self.settle_request(id);
+            return Ok(());
+        }
         let run = self.pending(id)?;
         self.controls()?.runs.approve(&run, id)
     }
 
     pub fn deny(&self, id: &str) -> Result<(), AppError> {
+        if let Some(run) = self.request_run(id) {
+            self.controls()?.runs.deny(&run, id)?;
+            self.settle_request(id);
+            return Ok(());
+        }
         let run = self.pending(id)?;
         self.controls()?.runs.deny(&run, id)
     }

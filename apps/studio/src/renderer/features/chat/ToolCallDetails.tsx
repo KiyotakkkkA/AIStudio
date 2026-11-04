@@ -320,6 +320,9 @@ function ViewBody({ view }: { readonly view: ToolCallView }) {
     case "command":
       return (
         <div className="space-y-2">
+          {view.reason === null ? null : (
+            <p className="m-0 text-[12.5px] leading-relaxed text-main-100">{view.reason}</p>
+          )}
           <div className="rounded-control bg-main-800 px-2.5 py-2 font-mono text-[12px] break-all text-main-100 fx-on:shadow-[inset_0_0_0_1px_var(--color-line)]">
             <span aria-hidden="true" className="text-accent-medium select-none">
               ${" "}

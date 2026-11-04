@@ -4,7 +4,8 @@ use serde_json::Value;
 use tauri::ipc::Channel;
 use tauri::{Manager, Runtime, State, Webview};
 use zvs_contract::{
-    BrowserBounds, BrowserCommand, BrowserState, ComputerCommand, ComputerState, HostEvent, parse,
+    BrowserBounds, BrowserCommand, BrowserState, ComputerCommand, ComputerPointer, ComputerState,
+    HostEvent, parse,
 };
 use zvs_host::platform::events::{EventBus, EventSink};
 use zvs_host::{IpcServer, Services};
@@ -146,6 +147,17 @@ pub async fn computer_subscribe<R: Runtime>(
         ensure(webview.label(), PANEL)?;
     }
     shell.subscribe(channel);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn computer_pointer<R: Runtime>(
+    webview: Webview<R>,
+    shell: State<'_, ComputerShell>,
+    channel: Channel<ComputerPointer>,
+) -> Result<(), String> {
+    ensure(webview.label(), GLOW)?;
+    shell.watch_pointer(channel);
     Ok(())
 }
 

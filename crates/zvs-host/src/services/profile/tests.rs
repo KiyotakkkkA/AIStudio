@@ -31,11 +31,13 @@ fn stored_values_are_read_trimmed_and_clamped() {
         (PROFILE_STYLE_CUSTOM_KEY, json!("  Short answers  ")),
         (PROFILE_ABOUT_KEY, json!("\nRust developer\n")),
         (TOOL_CALLS_KEY, json!(500)),
+        (TOOL_CALLS_UNLIMITED_KEY, json!(true)),
     ]);
     assert_eq!(settings.style, ReplyStyle::Custom);
     assert_eq!(settings.custom, "Short answers");
     assert_eq!(settings.about, "Rust developer");
     assert_eq!(settings.tool_calls, TOOL_CALLS_MAX as usize);
+    assert!(settings.tool_calls_unlimited);
 }
 
 #[test]
@@ -44,6 +46,7 @@ fn malformed_values_fall_back_to_defaults() {
         (PROFILE_STYLE_KEY, json!("loud")),
         (PROFILE_ABOUT_KEY, json!(42)),
         (TOOL_CALLS_KEY, json!("many")),
+        (TOOL_CALLS_UNLIMITED_KEY, json!("yes")),
     ]);
     assert_eq!(settings, ProfileSettings::default());
 }
@@ -60,6 +63,9 @@ fn settings_are_validated_before_they_are_stored() {
     assert!(rejected(TOOL_CALLS_KEY, json!(0)));
     assert!(rejected(TOOL_CALLS_KEY, json!(TOOL_CALLS_MAX + 1)));
     assert!(rejected(TOOL_CALLS_KEY, json!(2.5)));
+    assert!(check_setting(TOOL_CALLS_KEY, &json!(200)).is_ok());
+    assert!(check_setting(TOOL_CALLS_UNLIMITED_KEY, &json!(true)).is_ok());
+    assert!(rejected(TOOL_CALLS_UNLIMITED_KEY, json!(1)));
     assert!(check_setting(PROFILE_ABOUT_KEY, &json!("a".repeat(PROFILE_ABOUT_MAX))).is_ok());
     assert!(rejected(
         PROFILE_ABOUT_KEY,

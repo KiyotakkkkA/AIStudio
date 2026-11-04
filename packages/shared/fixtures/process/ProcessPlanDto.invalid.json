@@ -28,5 +28,15 @@
       "cwd": "D:\\work",
       "packages": []
     }
+  },
+  {
+    "name": "an empty reason",
+    "value": {
+      "program": "npm",
+      "argv": ["npm", "test"],
+      "cwd": "D:\\work",
+      "packages": [],
+      "reason": ""
+    }
   }
 ]

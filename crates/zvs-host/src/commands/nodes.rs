@@ -8,8 +8,8 @@ use serde_json::{Value, json};
 use zvs_contract::validate::{check, invalid};
 use zvs_contract::{
     AppError, AppErrorCode, ArtifactDto, BackgroundShellDto, BackgroundShellId,
-    PROCESS_APPROVAL_KIND, PROCESS_ARG_MAX, PROCESS_ARGV_MAX, ProcessPlanDto, ProcessResultDto,
-    ToolAuthorisationDto, ToolAuthorisationKind, ToolTier, Validate,
+    PROCESS_APPROVAL_KIND, PROCESS_ARG_MAX, PROCESS_ARGV_MAX, PROCESS_REASON_MAX, ProcessPlanDto,
+    ProcessResultDto, ToolAuthorisationDto, ToolAuthorisationKind, ToolTier, Validate,
 };
 
 use crate::artifacts::{ArtifactStore, Snapshot, library_env, mentioned_paths, produced, snapshot};
@@ -40,7 +40,7 @@ use crate::workspace::{FolderAccessService, FolderTarget};
 pub const SHELL_RUN: &str = "shell.run";
 pub const PROCESS_TOOLS: [&str; 1] = [SHELL_RUN];
 
-pub const SHELL_DESCRIPTION: &str = "Runs a project program, e.g. npm test or cargo check, or a skill script. argv is an array: argv[0] is the program, the rest are arguments. No shell command line is parsed, so pipes, redirections, and substitutions are unavailable. The program is looked up first in the folders of connected environments, then in PATH. A skill script is referenced as argv[0] = skill:<key>/scripts/<file>: .py runs via uv; .js, .mjs, and .cjs run via Node.js; the skill folder is passed as ZVS_SKILL_DIR. The process working directory is cwd (a path or chat:); without cwd it is the conversation working folder, or chat: for a skill script. Access to a cwd outside granted permissions is confirmed by the user, but the process itself runs with the user's rights. The user confirms every run from the full command. Execution time is limited and interactive input is not supported; standard input comes only from stdin. For a server, watcher or long build pass background: true to get a process id at once. Add notify: true for work that finishes, such as a build, tests or a job: the conversation is continued with the result when the process ends; never for a server or watcher. Returns exit code, stdout, and stderr.";
+pub const SHELL_DESCRIPTION: &str = "Runs a project program, e.g. npm test or cargo check, or a skill script. argv is an array: argv[0] is the program, the rest are arguments. No shell command line is parsed, so pipes, redirections, and substitutions are unavailable. The program is looked up first in the folders of connected environments, then in PATH. A skill script is referenced as argv[0] = skill:<key>/scripts/<file>: .py runs via uv; .js, .mjs, and .cjs run via Node.js; the skill folder is passed as ZVS_SKILL_DIR. The process working directory is cwd (a path or chat:); without cwd it is the conversation working folder, or chat: for a skill script. Access to a cwd outside granted permissions is confirmed by the user, but the process itself runs with the user's rights. The user confirms every run from the full command and the reason: a short phrase in the user's language saying why the command is run. Execution time is limited and interactive input is not supported; standard input comes only from stdin. For a server, watcher or long build pass background: true to get a process id at once. Add notify: true for work that finishes, such as a build, tests or a job: the conversation is continued with the result when the process ends; never for a server or watcher. Returns exit code, stdout, and stderr.";
 
 pub const SHELL_ACTION: &str = "запуск команды";
 
@@ -327,6 +327,10 @@ pub struct ShellRunInput {
         description = "Программа и аргументы по отдельности, например [\"npm\", \"test\"] или [\"skill:dashboard/scripts/build_dashboard.py\", \"_spec.json\"]"
     )]
     pub argv: Vec<String>,
+    #[schemars(
+        description = "Зачем нужен запуск: одна короткая фраза для пользователя, например «Запустить тесты после изменения парсера»"
+    )]
+    pub reason: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(
         description = "Рабочая папка процесса: абсолютный путь, путь относительно рабочей папки диалога или chat:"
@@ -357,6 +361,8 @@ impl Validate for ShellRunInput {
         };
         check::non_empty("argv.0", program.trim())?;
         check_args("argv", &self.argv)?;
+        check::non_empty("reason", self.reason.trim())?;
+        check::max_len("reason", &self.reason, PROCESS_REASON_MAX)?;
         if let Some(cwd) = &self.cwd {
             check::non_empty("cwd", cwd)?;
             check::max_len("cwd", cwd, PATH_MAX_CHARS)?;
@@ -658,6 +664,7 @@ impl NodeDef for ShellRunNode {
             source: None,
             packages: Vec::new(),
             background: input.background,
+            reason: Some(input.reason.trim().to_owned()),
         };
         tools
             .approve(

@@ -13,6 +13,7 @@ export const SHELL_LEAD = "Требуется подтверждение вып�
 export const SHELL_BACKGROUND_LEAD = "Требуется подтверждение фонового запуска команды.";
 export const RUN_PROCESS = "Запустить";
 export const REJECT_PROCESS = "Отклонить";
+export const REASON_TITLE = "Цель";
 export const LANGUAGE_TITLE = "Язык";
 export const PROGRAM_TITLE = "Программа";
 export const COMMAND_TITLE = "Команда";

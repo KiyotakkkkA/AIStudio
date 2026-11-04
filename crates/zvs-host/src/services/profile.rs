@@ -9,8 +9,9 @@ pub const PROFILE_STYLE_KEY: &str = "profile.style";
 pub const PROFILE_STYLE_CUSTOM_KEY: &str = "profile.style.custom";
 pub const PROFILE_ABOUT_KEY: &str = "profile.about";
 pub const TOOL_CALLS_KEY: &str = "chat.toolcalls";
+pub const TOOL_CALLS_UNLIMITED_KEY: &str = "chat.toolcalls.unlimited";
 pub const TOOL_CALLS_MIN: u64 = 1;
-pub const TOOL_CALLS_MAX: u64 = 50;
+pub const TOOL_CALLS_MAX: u64 = 200;
 pub const PROFILE_STYLE_MAX: usize = 2000;
 pub const PROFILE_ABOUT_MAX: usize = 4000;
 
@@ -51,6 +52,7 @@ pub struct ProfileSettings {
     pub custom: String,
     pub about: String,
     pub tool_calls: usize,
+    pub tool_calls_unlimited: bool,
 }
 
 impl Default for ProfileSettings {
@@ -60,6 +62,7 @@ impl Default for ProfileSettings {
             custom: String::new(),
             about: String::new(),
             tool_calls: CHAT_TOOL_CALLS,
+            tool_calls_unlimited: false,
         }
     }
 }
@@ -95,6 +98,10 @@ pub fn load(repositories: &Repositories<'_>) -> Result<ProfileSettings, DataErro
         custom: text(stored(repositories, PROFILE_STYLE_CUSTOM_KEY)?),
         about: text(stored(repositories, PROFILE_ABOUT_KEY)?),
         tool_calls,
+        tool_calls_unlimited: stored(repositories, TOOL_CALLS_UNLIMITED_KEY)?
+            .as_ref()
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
     })
 }
 
@@ -122,6 +129,10 @@ pub fn check_setting(key: &str, value: &Value) -> Result<(), AppError> {
             .filter(|count| (TOOL_CALLS_MIN..=TOOL_CALLS_MAX).contains(count))
             .map(|_| ())
             .ok_or_else(|| invalid("value", "range")),
+        TOOL_CALLS_UNLIMITED_KEY => value
+            .as_bool()
+            .map(|_| ())
+            .ok_or_else(|| invalid("value", "type")),
         _ => Ok(()),
     }
 }
