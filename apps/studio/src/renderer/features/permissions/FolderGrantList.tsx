@@ -13,7 +13,6 @@ import {
   EMPTY_TITLE,
   FOLDERS_TAB,
   NOTHING_FOUND,
-  PROCESS_TOOLS_NOTE,
   boundLabel,
   lastUsedLabel,
 } from "./permissionsPresentation";
@@ -84,8 +83,6 @@ function FolderGrantList() {
 
       {section(ALWAYS_SECTION, permissions.always)}
       {section(DIALOG_SECTION, permissions.dialog)}
-
-      <p className="px-1 pt-1 text-[11px] leading-relaxed text-main-500">{PROCESS_TOOLS_NOTE}</p>
     </EntityListPanel>
   );
 }

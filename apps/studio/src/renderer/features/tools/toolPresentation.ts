@@ -1,4 +1,4 @@
-import { AppErrorCode, type McpServerDto, type ToolDefaultTier, type ToolDto } from "@zvs/shared";
+import { AppErrorCode, type McpServerDto, type ToolDto } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 import {
@@ -23,16 +23,6 @@ export const TIER_TONES = { auto: "ok", ask: "warn", off: "idle" } as const sati
   ToolDto["tier"],
   StatusTone
 >;
-
-export const DEFAULT_TIER_LABELS: Record<ToolDefaultTier, string> = {
-  inferred: "По типу инструмента",
-  auto: "auto — без подтверждения",
-  ask: "ask — спрашивать",
-  off: "off — выключен",
-};
-
-export const DEFAULT_TIER_HINT =
-  "По типу: только чтение — auto, с побочными эффектами — ask, разрушающие — off.";
 
 export function sourcesWord(count: number): string {
   return plural(count, "источник", "источника", "источников");

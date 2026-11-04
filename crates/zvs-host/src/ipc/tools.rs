@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use zvs_contract::{
-    AppError, SetToolEnabledInput, SetToolTierInput, ToolDefaultsDto, ToolListFilter, ToolRef,
-};
+use zvs_contract::{SetToolEnabledInput, SetToolTierInput, ToolListFilter, ToolRef};
 
 use super::IpcServer;
 use crate::services::Services;
@@ -41,18 +39,6 @@ pub fn register(server: &mut IpcServer) {
             "tools.usage",
             |services: Arc<Services>, input: ToolRef| async move {
                 services.tools.usage(&input.id.to_string())
-            },
-        )
-        .handle(
-            "tools.defaults",
-            |services: Arc<Services>, _input: ()| async move {
-                Ok::<ToolDefaultsDto, AppError>(services.tools.defaults())
-            },
-        )
-        .handle(
-            "tools.setDefaults",
-            |services: Arc<Services>, input: ToolDefaultsDto| async move {
-                services.tools.set_defaults(input)
             },
         );
 }

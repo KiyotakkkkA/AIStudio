@@ -70,7 +70,7 @@ Progress text is a state, not a narration: `Индексация продолж�
   prose), **инструмент**, **коннектор**, **секрет**, **запуск**, **провайдер**
 - Latin technical tokens stay latin and lower case where they name a value the user also sees
   in code or in a payload: `auto`, `ask`, `off`, `stdio`, `http`, `bm25`. Explain them in a
-  Russian hint beside the token (`TIER_HINTS`, `DEFAULT_TIER_LABELS`); do not translate the
+  Russian hint beside the token (`TIER_HINTS`); do not translate the
   token itself, and do not replace it with an English phrase either — `Ask first` is neither.
 - Numbers: `toLocaleString("ru-RU")` for counts a user reads; units are Russian abbreviations
   (`мс`, `с`, `мин`, `ч`, `Б`, `КБ`, `МБ`, `ГБ`)

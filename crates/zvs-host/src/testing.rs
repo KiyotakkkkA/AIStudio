@@ -425,7 +425,6 @@ pub fn test_services(system: SystemService) -> TestServices {
         .register(crate::kernel::nodes::VectorIndexNode)
         .expect("registers the index node");
     let tools = crate::tools::ToolRegistry::new(crate::tools::ToolRegistryOptions {
-        settings: Some(settings.clone()),
         clock: clock.clone(),
         ..crate::tools::ToolRegistryOptions::new(database.shared())
     });

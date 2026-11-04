@@ -73,16 +73,3 @@ export type SetToolTierInput = z.infer<typeof SetToolTierInput>;
 
 export const SetToolEnabledInput = ToolRef.extend({ enabled: z.boolean() });
 export type SetToolEnabledInput = z.infer<typeof SetToolEnabledInput>;
-
-export const ToolDefaultTier = z.enum(["inferred", "auto", "ask", "off"]);
-export type ToolDefaultTier = z.infer<typeof ToolDefaultTier>;
-
-export const ToolDefaultsDto = z.object({
-  builtin: ToolDefaultTier.default("inferred"),
-  mcp: ToolDefaultTier.default("inferred"),
-  skill: ToolDefaultTier.default("inferred"),
-  integration: ToolDefaultTier.default("inferred"),
-  browser: ToolDefaultTier.default("inferred"),
-});
-export type ToolDefaultsDto = z.infer<typeof ToolDefaultsDto>;
-export type ToolDefaultsRequest = z.input<typeof ToolDefaultsDto>;

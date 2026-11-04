@@ -103,10 +103,6 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ToolReferenceKind>,
     ),
     (
-        "tools/ToolDefaultTier",
-        round_trip::<zvs_contract::ToolDefaultTier>,
-    ),
-    (
         "tools/ToolReferenceDto",
         round_trip::<zvs_contract::ToolReferenceDto>,
     ),
@@ -131,10 +127,6 @@ const TABLE: &[(&str, Check)] = &[
     (
         "tools/SetToolEnabledInput",
         round_trip::<zvs_contract::SetToolEnabledInput>,
-    ),
-    (
-        "tools/ToolDefaultsDto",
-        round_trip::<zvs_contract::ToolDefaultsDto>,
     ),
     ("mcp/McpTransport", round_trip::<zvs_contract::McpTransport>),
     ("mcp/McpStartup", round_trip::<zvs_contract::McpStartup>),

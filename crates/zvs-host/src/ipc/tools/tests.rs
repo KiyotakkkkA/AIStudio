@@ -116,18 +116,6 @@ async fn setting_a_tool_to_off_through_the_channel_fails_the_run_at_admission() 
 }
 
 #[tokio::test]
-async fn the_defaults_channels_match_the_contract() {
-    let (_host, server) = registered();
-    let set = server
-        .dispatch("tools.setDefaults", json!({ "mcp": "off" }))
-        .await;
-    assert_eq!(set["data"]["mcp"], json!("off"), "{set}");
-    assert_eq!(set["data"]["builtin"], json!("inferred"));
-    let defaults = server.dispatch("tools.defaults", Value::Null).await;
-    assert_eq!(defaults["data"]["mcp"], json!("off"), "{defaults}");
-}
-
-#[tokio::test]
 async fn the_kernel_tools_are_registered_once_in_the_composed_host() {
     let (host, server) = registered();
     let listed = server

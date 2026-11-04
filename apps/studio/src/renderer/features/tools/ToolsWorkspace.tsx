@@ -1,14 +1,9 @@
-import { mdiShieldLockOutline, mdiWrenchOutline } from "@mdi/js";
+import { mdiWrenchOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { ROUTES } from "../../app/routes";
-import Button from "../../ui/atoms/buttons/Button";
-import Icon from "../../ui/atoms/Icon";
 import TextInput from "../../ui/atoms/TextInput";
 import PageHeader from "../../ui/organisms/PageHeader";
 import { useStore } from "../../stores/useStore";
-import { TOOLS_TAB_PARAM } from "../permissions/permissionsPresentation";
 import ToolDetailRail from "./ToolDetailRail";
 import ToolFilterRail from "./ToolFilterRail";
 import { headerLine } from "./toolPresentation";
@@ -18,7 +13,6 @@ import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/L
 
 function ToolsWorkspace() {
   const { tools: store } = useStore();
-  const navigate = useNavigate();
 
   useEffect(() => {
     store.mount();
@@ -38,28 +32,17 @@ function ToolsWorkspace() {
           )
         }
         actions={
-          <>
-            <div className="w-57.5">
-              <TextInput
-                preset="search"
-                aria-label="Поиск инструментов"
-                placeholder="Поиск инструментов…"
-                value={store.query}
-                onChange={(event) => {
-                  store.setQuery(event.currentTarget.value);
-                }}
-              />
-            </div>
-            <Button
-              tone="secondary"
-              onClick={() => {
-                void navigate(`${ROUTES.permissions}?tab=${TOOLS_TAB_PARAM}`);
+          <div className="w-57.5">
+            <TextInput
+              preset="search"
+              aria-label="Поиск инструментов"
+              placeholder="Поиск инструментов…"
+              value={store.query}
+              onChange={(event) => {
+                store.setQuery(event.currentTarget.value);
               }}
-            >
-              <Icon path={mdiShieldLockOutline} size={15} />
-              Разрешения по умолчанию
-            </Button>
-          </>
+            />
+          </div>
         }
       />
 

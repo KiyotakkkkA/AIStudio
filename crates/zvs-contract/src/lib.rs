@@ -287,9 +287,9 @@ pub use toolchain::{
     ToolchainSource, ToolchainStatus,
 };
 pub use tools::{
-    SetToolEnabledInput, SetToolTierInput, ToolDefaultTier, ToolDefaultsDto, ToolDetailDto,
-    ToolDto, ToolListFilter, ToolRef, ToolReferenceDto, ToolReferenceKind, ToolSource, ToolTier,
-    ToolUsageDto, is_tool_key, tool_needs_confirmation,
+    SetToolEnabledInput, SetToolTierInput, ToolDetailDto, ToolDto, ToolListFilter, ToolRef,
+    ToolReferenceDto, ToolReferenceKind, ToolSource, ToolTier, ToolUsageDto, is_tool_key,
+    tool_needs_confirmation,
 };
 pub use validate::{VALIDATION_MESSAGE, Validate, parse};
 pub use vector_stores::{

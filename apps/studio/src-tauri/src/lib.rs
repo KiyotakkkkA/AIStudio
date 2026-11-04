@@ -823,7 +823,6 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     register_job_nodes(&nodes)?;
     register_download_nodes(&nodes)?;
     let tools = ToolRegistry::new(ToolRegistryOptions {
-        settings: Some(settings.clone()),
         logger: logger.clone(),
         clock: clock.clone(),
         ..ToolRegistryOptions::new(Arc::clone(&database))

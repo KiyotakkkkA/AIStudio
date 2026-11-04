@@ -1,11 +1,11 @@
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
 
 use serde_json::{Value, json};
 use zvs_contract::validate::{check, invalid, js_trim};
 use zvs_contract::{
-    AppError, AppErrorCode, Timestamp, ToolDefaultTier, ToolDefaultsDto, ToolDetailDto, ToolDto,
-    ToolId, ToolListFilter, ToolReferenceDto, ToolReferenceKind, ToolSource, ToolTier,
-    ToolUsageDto, Validate, ids::is_wire_uuid, tools::check_tool_key,
+    AppError, AppErrorCode, Timestamp, ToolDetailDto, ToolDto, ToolId, ToolListFilter,
+    ToolReferenceDto, ToolReferenceKind, ToolSource, ToolTier, ToolUsageDto, Validate,
+    ids::is_wire_uuid, tools::check_tool_key,
 };
 
 use crate::data::repositories::ToolPatch;
@@ -14,10 +14,8 @@ use crate::data::{DataError, Database, Repositories};
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
-use crate::services::SettingService;
 use crate::services::permissions::GLOBAL_SCOPE;
 
-pub const TOOL_DEFAULTS_KEY: &str = "tools.defaults";
 pub const TOOL_NOT_FOUND: &str = "Инструмент не найден";
 
 #[derive(Debug, Clone, PartialEq)]
@@ -98,26 +96,18 @@ pub struct ToolCeiling {
     pub available: bool,
 }
 
-pub const fn default_tool_tier(
-    read_only: bool,
-    destructive: bool,
-    preference: ToolDefaultTier,
-) -> ToolTier {
+pub const fn default_tool_tier(read_only: bool, destructive: bool) -> ToolTier {
     if destructive {
-        return ToolTier::Off;
-    }
-    match preference {
-        ToolDefaultTier::Auto => ToolTier::Auto,
-        ToolDefaultTier::Ask => ToolTier::Ask,
-        ToolDefaultTier::Off => ToolTier::Off,
-        ToolDefaultTier::Inferred if read_only => ToolTier::Auto,
-        ToolDefaultTier::Inferred => ToolTier::Ask,
+        ToolTier::Off
+    } else if read_only {
+        ToolTier::Auto
+    } else {
+        ToolTier::Ask
     }
 }
 
 pub struct ToolRegistryOptions {
     pub database: Arc<Database>,
-    pub settings: Option<SettingService>,
     pub logger: SharedLogger,
     pub clock: SharedClock,
 }
@@ -126,7 +116,6 @@ impl ToolRegistryOptions {
     pub fn new(database: Arc<Database>) -> Self {
         Self {
             database,
-            settings: None,
             logger: silent_logger(),
             clock: Arc::new(SystemClock),
         }
@@ -135,10 +124,8 @@ impl ToolRegistryOptions {
 
 struct Inner {
     database: Arc<Database>,
-    settings: Option<SettingService>,
     logger: SharedLogger,
     clock: SharedClock,
-    defaults: Mutex<ToolDefaultsDto>,
 }
 
 #[derive(Clone)]
@@ -224,10 +211,8 @@ impl ToolRegistry {
         Self {
             inner: Arc::new(Inner {
                 database: options.database,
-                settings: options.settings,
                 logger: options.logger,
                 clock: options.clock,
-                defaults: Mutex::new(ToolDefaultsDto::default()),
             }),
         }
     }
@@ -236,54 +221,14 @@ impl ToolRegistry {
         self.inner.clock.now()
     }
 
-    fn remembered(&self) -> ToolDefaultsDto {
-        *self
-            .inner
-            .defaults
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-    }
-
-    pub fn defaults(&self) -> ToolDefaultsDto {
-        let stored = self
-            .inner
-            .settings
-            .as_ref()
-            .and_then(|settings| settings.get(TOOL_DEFAULTS_KEY).ok().flatten());
-        stored
-            .and_then(|setting| serde_json::from_value::<ToolDefaultsDto>(setting.value).ok())
-            .unwrap_or_else(|| self.remembered())
-    }
-
-    pub fn set_defaults(&self, next: ToolDefaultsDto) -> Result<ToolDefaultsDto, AppError> {
-        let value = serde_json::to_value(next)
-            .map_err(|error| AppError::new(AppErrorCode::Unknown, error.to_string()))?;
-        if let Some(settings) = &self.inner.settings {
-            settings.set(TOOL_DEFAULTS_KEY, &value)?;
-        }
-        *self
-            .inner
-            .defaults
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = next;
-        self.inner.logger.log(
-            LogLevel::Info,
-            "tools",
-            "Changed the default tiers for new tools",
-            &[("defaults", value)],
-        );
-        Ok(next)
-    }
-
     pub fn register(&self, descriptor: &ToolDescriptor) -> Result<ToolDto, AppError> {
         let descriptor = descriptor.normalized()?;
         let now = self.now();
-        let preference = self.defaults().for_source(descriptor.source);
         let row = self.inner.database.transaction(|transaction| {
             let repositories = Repositories::new(transaction);
             let Some(existing) = repositories.tools.find_by_key(&descriptor.key)? else {
                 let tier = descriptor.tier.unwrap_or_else(|| {
-                    default_tool_tier(descriptor.read_only, descriptor.destructive, preference)
+                    default_tool_tier(descriptor.read_only, descriptor.destructive)
                 });
                 let created = repositories.tools.insert(&ToolRow {
                     id: id_text(),
@@ -311,11 +256,7 @@ impl ToolRegistry {
             };
             let tier = if descriptor.destructive && !existing.destructive {
                 descriptor.tier.unwrap_or_else(|| {
-                    default_tool_tier(
-                        descriptor.read_only,
-                        descriptor.destructive,
-                        ToolDefaultTier::Inferred,
-                    )
+                    default_tool_tier(descriptor.read_only, descriptor.destructive)
                 })
             } else {
                 existing.tier

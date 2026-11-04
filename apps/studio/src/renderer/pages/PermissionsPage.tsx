@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import FolderGrantDetail from "../features/permissions/FolderGrantDetail";
 import FolderGrantList from "../features/permissions/FolderGrantList";
-import ToolDefaultsTable from "../features/permissions/ToolDefaultsTable";
 import SiteGrantsTable from "../features/permissions/SiteGrantsTable";
 import AppGrantList from "../features/permissions/AppGrantList";
 import AppGrantDetail from "../features/permissions/AppGrantDetail";
@@ -19,8 +18,6 @@ import {
   NOTHING_SELECTED_DESCRIPTION,
   NOTHING_SELECTED_TITLE,
   PAGE_TITLE,
-  TOOLS_TAB,
-  TOOLS_TAB_PARAM,
   grantCountLabel,
   siteCountLabel,
 } from "../features/permissions/permissionsPresentation";
@@ -34,7 +31,6 @@ import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../ui/molecules/Load
 
 const TABS = [
   { value: "folders", label: FOLDERS_TAB },
-  { value: TOOLS_TAB_PARAM, label: TOOLS_TAB },
   { value: BROWSER_TAB_PARAM, label: BROWSER_TAB },
   { value: APPS_TAB_PARAM, label: APPS_TAB },
 ] as const;
@@ -87,9 +83,7 @@ function PermissionsPage() {
           {permissions.error}
         </Alert>
       )}
-      {tab === TOOLS_TAB_PARAM ? (
-        <ToolDefaultsTable />
-      ) : tab === BROWSER_TAB_PARAM ? (
+      {tab === BROWSER_TAB_PARAM ? (
         <SiteGrantsTable />
       ) : tab === APPS_TAB_PARAM ? (
         <div className="flex min-h-0 flex-1">

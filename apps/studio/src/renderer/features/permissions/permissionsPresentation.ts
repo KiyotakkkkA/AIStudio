@@ -10,8 +10,6 @@ import { formatLastUsed } from "../tools/toolPresentation";
 
 export const PAGE_TITLE = "Разрешения";
 export const FOLDERS_TAB = "Папки";
-export const TOOLS_TAB = "Инструменты";
-export const TOOLS_TAB_PARAM = "tools";
 export const BROWSER_TAB = "Браузер";
 export const BROWSER_TAB_PARAM = "browser";
 export const APPS_TAB = "Приложения";
@@ -35,11 +33,6 @@ const SITE_ACTIONS: Readonly<Record<string, string>> = {
   "browser.click": "Нажатия",
   "browser.type": "Ввод текста",
 };
-export const DEFAULTS_TITLE = "Разрешения по умолчанию";
-export const DEFAULTS_DESCRIPTION =
-  "Уровень, который получает инструмент при первой регистрации. Разрешения известных инструментов не меняются, разрушающие всегда начинают с «off».";
-export const DEFAULTS_SOURCE_COLUMN = "Источник";
-export const DEFAULTS_TIER_COLUMN = "Разрешение для новых инструментов";
 export const ALWAYS_SECTION = "Постоянные";
 export const DIALOG_SECTION = "В диалогах";
 export const REVOKE = "Отозвать";
@@ -53,8 +46,6 @@ export const NOTHING_FOUND = "Ничего не найдено.";
 export const LOAD_ERROR = "Не удалось загрузить разрешения. Попробуйте ещё раз.";
 export const REVOKE_ERROR = "Не удалось отозвать разрешение. Попробуйте ещё раз.";
 export const ALREADY_REVOKED = "Разрешение уже отозвано.";
-export const PROCESS_TOOLS_NOTE =
-  "«shell.run» не ограничен разрешениями на папки: каждый запуск подтверждается отдельно.";
 
 export function grantCountLabel(count: number): string {
   return plural(count, "папка", "папки", "папок");

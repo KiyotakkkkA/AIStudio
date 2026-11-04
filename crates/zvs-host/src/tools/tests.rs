@@ -6,9 +6,8 @@ use async_trait::async_trait;
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, HostEventDraft, RunHandleDto, RunId, RunStatus, ToolDefaultTier,
-    ToolDefaultsDto, ToolDto, ToolListFilter, ToolReferenceDto, ToolReferenceKind, ToolSource,
-    ToolTier, VectorSearchHitDto,
+    AppError, AppErrorCode, HostEventDraft, RunHandleDto, RunId, RunStatus, ToolDto,
+    ToolListFilter, ToolReferenceDto, ToolReferenceKind, ToolSource, ToolTier, VectorSearchHitDto,
 };
 
 use super::*;
@@ -20,7 +19,7 @@ use crate::platform::clock::FakeClock;
 use crate::platform::events::EventBus;
 use crate::services::permissions::{Admission, PermissionContext};
 use crate::services::vector_stores::VectorSearchOptions;
-use crate::services::{RunService, RunServiceOptions, SettingService};
+use crate::services::{RunService, RunServiceOptions};
 use crate::testing::{CLOCK_ORIGIN, MemorySink, TemporaryDatabase, temporary_database};
 
 mod catalogue;
@@ -248,10 +247,7 @@ async fn each_kind_of_tool_defaults_to_its_tier() {
         (true, true, ToolTier::Off),
     ] {
         let host = host();
-        assert_eq!(
-            default_tool_tier(read_only, destructive, ToolDefaultTier::Inferred),
-            expected
-        );
+        assert_eq!(default_tool_tier(read_only, destructive), expected);
         let registered = host.register(&ToolDescriptor {
             read_only,
             destructive,
@@ -766,11 +762,9 @@ fn old_tool_keys_map_onto_the_merged_tools() {
 }
 
 #[tokio::test]
-async fn permission_defaults_apply_to_newly_registered_tools_only() {
+async fn re_registration_keeps_the_user_tier_and_enabled_state() {
     let host = host();
-    let settings = SettingService::new(host.database.shared(), host.clock.clone());
     let tools = ToolRegistry::new(ToolRegistryOptions {
-        settings: Some(settings.clone()),
         clock: host.clock.clone(),
         ..ToolRegistryOptions::new(host.database.shared())
     });
@@ -800,28 +794,6 @@ async fn permission_defaults_apply_to_newly_registered_tools_only() {
         .deregister_source(ToolSource::Mcp, Some("s"))
         .expect("withdraws");
 
-    assert_eq!(tools.defaults().builtin, ToolDefaultTier::Inferred);
-    tools
-        .set_defaults(ToolDefaultsDto {
-            builtin: ToolDefaultTier::Auto,
-            mcp: ToolDefaultTier::Auto,
-            ..ToolDefaultsDto::default()
-        })
-        .expect("sets");
-    let reloaded = ToolRegistry::new(ToolRegistryOptions {
-        settings: Some(settings),
-        ..ToolRegistryOptions::new(host.database.shared())
-    })
-    .defaults();
-    assert_eq!(
-        (reloaded.builtin, reloaded.mcp, reloaded.skill),
-        (
-            ToolDefaultTier::Auto,
-            ToolDefaultTier::Auto,
-            ToolDefaultTier::Inferred
-        )
-    );
-
     assert_eq!(register(descriptor()).tier, ToolTier::Off);
     let archive = register(ToolDescriptor {
         key: "mail.archive".to_owned(),
@@ -835,7 +807,7 @@ async fn permission_defaults_apply_to_newly_registered_tools_only() {
             ..descriptor()
         })
         .tier,
-        ToolTier::Auto
+        ToolTier::Ask
     );
     assert_eq!(
         register(ToolDescriptor {
@@ -852,13 +824,6 @@ async fn permission_defaults_apply_to_newly_registered_tools_only() {
         ..read_only()
     };
     assert_eq!(register(browser("web.fetch")).tier, ToolTier::Auto);
-    tools
-        .set_defaults(ToolDefaultsDto {
-            browser: ToolDefaultTier::Ask,
-            ..ToolDefaultsDto::default()
-        })
-        .expect("sets");
-    assert_eq!(register(browser("web.read")).tier, ToolTier::Ask);
     assert_eq!(
         host.runs
             .permissions()

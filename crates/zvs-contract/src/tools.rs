@@ -24,13 +24,6 @@ wire_enum!(ToolReferenceKind {
     Scenario => "scenario",
 });
 
-wire_enum!(ToolDefaultTier {
-    Inferred => "inferred",
-    Auto => "auto",
-    Ask => "ask",
-    Off => "off",
-});
-
 pub const TOOL_KEY_MAX: usize = 128;
 
 fn segment_char(character: char) -> bool {
@@ -240,59 +233,11 @@ pub struct SetToolEnabledInput {
     pub enabled: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ToolDefaultsDto {
-    #[serde(default = "inferred")]
-    pub builtin: ToolDefaultTier,
-    #[serde(default = "inferred")]
-    pub mcp: ToolDefaultTier,
-    #[serde(default = "inferred")]
-    pub skill: ToolDefaultTier,
-    #[serde(default = "inferred")]
-    pub integration: ToolDefaultTier,
-    #[serde(default = "inferred")]
-    pub browser: ToolDefaultTier,
-}
-
-const fn inferred() -> ToolDefaultTier {
-    ToolDefaultTier::Inferred
-}
-
-impl Default for ToolDefaultsDto {
-    fn default() -> Self {
-        Self {
-            builtin: ToolDefaultTier::Inferred,
-            mcp: ToolDefaultTier::Inferred,
-            skill: ToolDefaultTier::Inferred,
-            integration: ToolDefaultTier::Inferred,
-            browser: ToolDefaultTier::Inferred,
-        }
-    }
-}
-
-impl ToolDefaultsDto {
-    pub const fn for_source(&self, source: ToolSource) -> ToolDefaultTier {
-        match source {
-            ToolSource::Builtin => self.builtin,
-            ToolSource::Mcp => self.mcp,
-            ToolSource::Skill => self.skill,
-            ToolSource::Integration => self.integration,
-            ToolSource::Browser => self.browser,
-        }
-    }
-}
-
 pub const fn tool_needs_confirmation(tier: ToolTier, destructive: bool) -> bool {
     destructive || matches!(tier, ToolTier::Ask)
 }
 
-no_refinements!(
-    ToolRef,
-    SetToolTierInput,
-    SetToolEnabledInput,
-    ToolDefaultsDto
-);
+no_refinements!(ToolRef, SetToolTierInput, SetToolEnabledInput);
 
 #[cfg(test)]
 mod tests {
@@ -336,12 +281,9 @@ mod tests {
     }
 
     #[test]
-    fn the_filter_and_the_defaults_apply_their_defaults() {
+    fn the_filter_applies_its_defaults() {
         let filter = parse::<ToolListFilter>(json!({})).expect("parses");
         assert!(filter.include_unavailable());
         assert!(parse::<ToolListFilter>(json!({ "query": null })).is_err());
-        let defaults = parse::<ToolDefaultsDto>(json!({ "mcp": "off" })).expect("parses");
-        assert_eq!(defaults.for_source(ToolSource::Mcp), ToolDefaultTier::Off);
-        assert_eq!(defaults.builtin, ToolDefaultTier::Inferred);
     }
 }

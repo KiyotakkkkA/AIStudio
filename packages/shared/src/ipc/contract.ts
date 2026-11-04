@@ -229,7 +229,6 @@ import {
 import {
   SetToolEnabledInput,
   SetToolTierInput,
-  ToolDefaultsDto,
   ToolDetailDto,
   ToolDto,
   ToolListFilter,
@@ -449,8 +448,6 @@ export const contract = defineContract({
   "tools.setTier": { input: SetToolTierInput, output: ToolDto },
   "tools.setEnabled": { input: SetToolEnabledInput, output: ToolDto },
   "tools.usage": { input: ToolRef, output: ToolUsageDto },
-  "tools.defaults": { input: z.void(), output: ToolDefaultsDto },
-  "tools.setDefaults": { input: ToolDefaultsDto, output: ToolDefaultsDto },
   "mcp.list": { input: z.void(), output: z.array(McpServerDto) },
   "mcp.get": { input: McpServerRef, output: McpServerDetailDto },
   "mcp.create": { input: CreateMcpServerInput, output: McpServerDto },
