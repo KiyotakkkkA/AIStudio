@@ -159,7 +159,7 @@ import {
   VOICE_REFRESH,
 } from "../voice/voiceCopy";
 import { formatBytes } from "../downloads/downloadPresentation";
-import { DISABLED_NOTE, ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
+import { ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
 import { aboutSettingId, SETTING_ENTRIES, SETTING_IDS, type AboutGroup } from "./settingsIndex";
 import {
   PROFILE_ABOUT_MAX,
@@ -200,6 +200,10 @@ const SECTION_ICONS: Record<PreferenceSection, string> = {
   voice: mdiMicrophoneOutline,
 };
 
+function SettingsGroup({ children }: { readonly children: ReactNode }) {
+  return <div className="h-fit rounded-card bg-main-850 px-4">{children}</div>;
+}
+
 const SettingRow = observer(function SettingRow({
   id,
   label,
@@ -221,11 +225,11 @@ const SettingRow = observer(function SettingRow({
   return (
     <div
       data-setting={id}
-      className={`-mx-3 flex flex-wrap ${stacked ? "flex-col items-stretch" : "items-center"} gap-x-6 gap-y-2.5 rounded-control border-b [clip-path:inset(0_round_12px)] border-line px-3 py-4 transition-colors duration-500 last:border-b-0 ${
+      className={`flex ${stacked ? "flex-col items-stretch" : "flex-wrap items-center"} gap-x-6 gap-y-2.5 border-b border-line py-4 transition-colors duration-500 last:border-b-0 ${
         ui.preferenceTarget === id ? "bg-accent-soft" : ""
       }`}
     >
-      <div className="flex min-w-56 flex-1 flex-col gap-0.5">
+      <div className={`flex min-w-0 flex-col gap-0.5 ${stacked ? "" : "min-w-56 flex-1"}`}>
         <span className="text-[13px] font-medium text-main-100">{label}</span>
         <span className="text-[12px] text-main-500">{hint}</span>
         {error === undefined ? null : (
@@ -278,97 +282,103 @@ const InfoTableRows = observer(function InfoTableRows({
 const AppearanceSection = observer(function AppearanceSection() {
   const { ui } = useStore();
   return (
-    <div className="flex flex-col">
-      <SettingRow
-        id={SETTING_IDS.theme}
-        label={THEME_LABEL}
-        hint={THEME_HINT}
-        footer={<ThemePalettes />}
-      >
-        <SegmentedControl
+    <div className="flex flex-col gap-4 pt-2">
+      <SettingsGroup>
+        <SettingRow
+          id={SETTING_IDS.theme}
           label={THEME_LABEL}
-          value={ui.theme}
-          options={THEME_OPTIONS}
-          onChange={ui.setTheme}
-        />
-      </SettingRow>
-      <SettingRow id={SETTING_IDS.railPicker} label={RAIL_PICKER_LABEL} hint={RAIL_PICKER_HINT}>
-        <Toggle
-          label={ui.railThemePicker ? "Показан" : "Скрыт"}
-          checked={ui.railThemePicker}
-          onChange={ui.setRailThemePicker}
-        />
-      </SettingRow>
-      <SettingRow id={SETTING_IDS.fontFamily} label={FONT_FAMILY_LABEL} hint={FONT_FAMILY_HINT}>
-        <div className="w-52">
-          <SelectInput
-            label={FONT_FAMILY_LABEL}
-            value={ui.fontFamily}
-            options={FONT_FAMILY_OPTIONS}
-            onChange={(value) => {
-              const family = FONT_FAMILIES.find((option) => option === value);
-              if (family !== undefined) ui.setFontFamily(family);
-            }}
-            menuPlacement="bottom-right"
+          hint={THEME_HINT}
+          footer={<ThemePalettes />}
+        >
+          <SegmentedControl
+            label={THEME_LABEL}
+            value={ui.theme}
+            options={THEME_OPTIONS}
+            onChange={ui.setTheme}
           />
-        </div>
-      </SettingRow>
-      <SettingRow
-        id={SETTING_IDS.fontSize}
-        label={FONT_SIZE_LABEL}
-        hint={`${FONT_SIZE_HINT} Сейчас: ${fontSizeLabel(ui.fontSize)}.`}
-      >
-        <SegmentedControl
+        </SettingRow>
+        <SettingRow id={SETTING_IDS.railPicker} label={RAIL_PICKER_LABEL} hint={RAIL_PICKER_HINT}>
+          <Toggle
+            label={ui.railThemePicker ? "Показан" : "Скрыт"}
+            checked={ui.railThemePicker}
+            onChange={ui.setRailThemePicker}
+          />
+        </SettingRow>
+      </SettingsGroup>
+      <SettingsGroup>
+        <SettingRow id={SETTING_IDS.fontFamily} label={FONT_FAMILY_LABEL} hint={FONT_FAMILY_HINT}>
+          <div className="w-52">
+            <SelectInput
+              label={FONT_FAMILY_LABEL}
+              value={ui.fontFamily}
+              options={FONT_FAMILY_OPTIONS}
+              onChange={(value) => {
+                const family = FONT_FAMILIES.find((option) => option === value);
+                if (family !== undefined) ui.setFontFamily(family);
+              }}
+              menuPlacement="bottom-right"
+            />
+          </div>
+        </SettingRow>
+        <SettingRow
+          id={SETTING_IDS.fontSize}
           label={FONT_SIZE_LABEL}
-          value={String(ui.fontSize)}
-          options={FONT_SIZE_OPTIONS}
-          onChange={(value) => {
-            const size = FONT_SIZES.find((option) => String(option) === value);
-            if (size !== undefined) ui.setFontSize(size);
-          }}
-        />
-      </SettingRow>
-      <SettingRow
-        id={SETTING_IDS.fx}
-        label={FX_LABEL}
-        hint={ui.fxPreset === null && ui.osReducedMotion ? `${FX_HINT} ${FX_OS_NOTE}` : FX_HINT}
-      >
-        <SegmentedControl
+          hint={`${FONT_SIZE_HINT} Сейчас: ${fontSizeLabel(ui.fontSize)}.`}
+        >
+          <SegmentedControl
+            label={FONT_SIZE_LABEL}
+            value={String(ui.fontSize)}
+            options={FONT_SIZE_OPTIONS}
+            onChange={(value) => {
+              const size = FONT_SIZES.find((option) => String(option) === value);
+              if (size !== undefined) ui.setFontSize(size);
+            }}
+          />
+        </SettingRow>
+      </SettingsGroup>
+      <SettingsGroup>
+        <SettingRow
+          id={SETTING_IDS.fx}
           label={FX_LABEL}
-          value={ui.fxShown}
-          options={FX_OPTIONS}
-          onChange={(value) => {
-            const preset = FX_PRESETS.find((option) => option === value);
-            if (preset !== undefined) ui.setFxPreset(preset);
-          }}
-        />
-      </SettingRow>
-      <Reveal show={ui.fxPreset === "custom"}>
-        <div className="ml-4 border-line pl-4">
-          <SettingRow id={SETTING_IDS.fxMotion} label={FX_MOTION_LABEL} hint={FX_MOTION_HINT}>
-            <SegmentedControl
-              label={FX_MOTION_LABEL}
-              value={ui.customMotion}
-              options={FX_LEVEL_OPTIONS}
-              onChange={(value) => {
-                const level = FX_LEVELS.find((option) => option === value);
-                if (level !== undefined) ui.setCustomMotion(level);
-              }}
-            />
-          </SettingRow>
-          <SettingRow id={SETTING_IDS.fxEffects} label={FX_EFFECTS_LABEL} hint={FX_EFFECTS_HINT}>
-            <SegmentedControl
-              label={FX_EFFECTS_LABEL}
-              value={ui.customEffects}
-              options={FX_LEVEL_OPTIONS}
-              onChange={(value) => {
-                const level = FX_LEVELS.find((option) => option === value);
-                if (level !== undefined) ui.setCustomEffects(level);
-              }}
-            />
-          </SettingRow>
-        </div>
-      </Reveal>
+          hint={ui.fxPreset === null && ui.osReducedMotion ? `${FX_HINT} ${FX_OS_NOTE}` : FX_HINT}
+        >
+          <SegmentedControl
+            label={FX_LABEL}
+            value={ui.fxShown}
+            options={FX_OPTIONS}
+            onChange={(value) => {
+              const preset = FX_PRESETS.find((option) => option === value);
+              if (preset !== undefined) ui.setFxPreset(preset);
+            }}
+          />
+        </SettingRow>
+        <Reveal show={ui.fxPreset === "custom"}>
+          <div className="ml-4 border-line pl-4">
+            <SettingRow id={SETTING_IDS.fxMotion} label={FX_MOTION_LABEL} hint={FX_MOTION_HINT}>
+              <SegmentedControl
+                label={FX_MOTION_LABEL}
+                value={ui.customMotion}
+                options={FX_LEVEL_OPTIONS}
+                onChange={(value) => {
+                  const level = FX_LEVELS.find((option) => option === value);
+                  if (level !== undefined) ui.setCustomMotion(level);
+                }}
+              />
+            </SettingRow>
+            <SettingRow id={SETTING_IDS.fxEffects} label={FX_EFFECTS_LABEL} hint={FX_EFFECTS_HINT}>
+              <SegmentedControl
+                label={FX_EFFECTS_LABEL}
+                value={ui.customEffects}
+                options={FX_LEVEL_OPTIONS}
+                onChange={(value) => {
+                  const level = FX_LEVELS.find((option) => option === value);
+                  if (level !== undefined) ui.setCustomEffects(level);
+                }}
+              />
+            </SettingRow>
+          </div>
+        </Reveal>
+      </SettingsGroup>
     </div>
   );
 });
@@ -620,13 +630,19 @@ const GeneralSection = observer(function GeneralSection() {
     void subagents.load();
   }, [appSettings, profile, execPolicy, subagents]);
   return (
-    <div className="flex flex-col">
-      {GENERAL_ROWS.map((row) => (
-        <ToggleSettingRow key={row.key} row={row} />
-      ))}
-      <ToolCallsRow />
-      <JudgeModelRow />
-      <SubagentsRow />
+    <div className="flex flex-col gap-4 pt-2">
+      <SettingsGroup>
+        {GENERAL_ROWS.map((row) => (
+          <ToggleSettingRow key={row.key} row={row} />
+        ))}
+      </SettingsGroup>
+      <SettingsGroup>
+        <ToolCallsRow />
+        <JudgeModelRow />
+      </SettingsGroup>
+      <SettingsGroup>
+        <SubagentsRow />
+      </SettingsGroup>
     </div>
   );
 });
@@ -637,72 +653,74 @@ const ProfileSection = observer(function ProfileSection() {
     void profile.load();
   }, [profile]);
   return (
-    <div className="flex flex-col">
-      <SettingRow
-        id={STYLE_ROW.key}
-        label={STYLE_ROW.label}
-        hint={STYLE_ROW.hint}
-        error={profile.errors.style ?? profile.errors.custom}
-        stacked
-      >
-        <div className="flex">
-          <SegmentedControl
-            label={STYLE_ROW.label}
-            value={profile.style}
-            options={STYLE_OPTIONS}
-            onChange={(style) => void profile.setStyle(style)}
-          />
-        </div>
-        <p className="m-0 text-[12px] text-main-400">{STYLE_DESCRIPTIONS[profile.style]}</p>
-        {profile.style === "custom" ? (
-          <>
-            <TextComposer
-              label={CUSTOM_STYLE_LABEL}
-              placeholder={CUSTOM_STYLE_PLACEHOLDER}
-              value={profile.customDraft}
-              max={PROFILE_STYLE_MAX}
-              submitLabel={SAVE}
-              canSubmit={profile.customDirty}
-              disabled={profile.pending.custom !== undefined}
-              onChange={profile.setCustomDraft}
-              onSubmit={() => void profile.saveCustom()}
-              {...(profile.customDirty
-                ? { cancelLabel: CANCEL, onCancel: profile.resetCustom }
-                : {})}
+    <div className="pt-2">
+      <SettingsGroup>
+        <SettingRow
+          id={STYLE_ROW.key}
+          label={STYLE_ROW.label}
+          hint={STYLE_ROW.hint}
+          error={profile.errors.style ?? profile.errors.custom}
+          stacked
+        >
+          <div className="flex">
+            <SegmentedControl
+              label={STYLE_ROW.label}
+              value={profile.style}
+              options={STYLE_OPTIONS}
+              onChange={(style) => void profile.setStyle(style)}
             />
-            {profile.custom.length === 0 ? (
-              <p className="m-0 text-[12px] text-main-500">{CUSTOM_STYLE_EMPTY}</p>
-            ) : null}
-          </>
-        ) : null}
-      </SettingRow>
-      <SettingRow
-        id={ABOUT_ROW.key}
-        label={ABOUT_ROW.label}
-        hint={ABOUT_ROW.hint}
-        error={profile.errors.about}
-        stacked
-      >
-        <div className="flex">
-          <Chip tone="accent">
-            <Icon path={mdiInformationOutline} size={12} />
-            {ABOUT_NEW_DIALOGS}
-          </Chip>
-        </div>
-        <TextComposer
+          </div>
+          <p className="m-0 text-[12px] text-main-400">{STYLE_DESCRIPTIONS[profile.style]}</p>
+          {profile.style === "custom" ? (
+            <>
+              <TextComposer
+                label={CUSTOM_STYLE_LABEL}
+                placeholder={CUSTOM_STYLE_PLACEHOLDER}
+                value={profile.customDraft}
+                max={PROFILE_STYLE_MAX}
+                submitLabel={SAVE}
+                canSubmit={profile.customDirty}
+                disabled={profile.pending.custom !== undefined}
+                onChange={profile.setCustomDraft}
+                onSubmit={() => void profile.saveCustom()}
+                {...(profile.customDirty
+                  ? { cancelLabel: CANCEL, onCancel: profile.resetCustom }
+                  : {})}
+              />
+              {profile.custom.length === 0 ? (
+                <p className="m-0 text-[12px] text-main-500">{CUSTOM_STYLE_EMPTY}</p>
+              ) : null}
+            </>
+          ) : null}
+        </SettingRow>
+        <SettingRow
+          id={ABOUT_ROW.key}
           label={ABOUT_ROW.label}
-          placeholder={ABOUT_PLACEHOLDER}
-          value={profile.aboutDraft}
-          max={PROFILE_ABOUT_MAX}
-          minRows={3}
-          submitLabel={SAVE}
-          canSubmit={profile.aboutDirty}
-          disabled={profile.pending.about !== undefined}
-          onChange={profile.setAboutDraft}
-          onSubmit={() => void profile.saveAbout()}
-          {...(profile.aboutDirty ? { cancelLabel: CANCEL, onCancel: profile.resetAbout } : {})}
-        />
-      </SettingRow>
+          hint={ABOUT_ROW.hint}
+          error={profile.errors.about}
+          stacked
+        >
+          <div className="flex">
+            <Chip tone="accent">
+              <Icon path={mdiInformationOutline} size={12} />
+              {ABOUT_NEW_DIALOGS}
+            </Chip>
+          </div>
+          <TextComposer
+            label={ABOUT_ROW.label}
+            placeholder={ABOUT_PLACEHOLDER}
+            value={profile.aboutDraft}
+            max={PROFILE_ABOUT_MAX}
+            minRows={3}
+            submitLabel={SAVE}
+            canSubmit={profile.aboutDirty}
+            disabled={profile.pending.about !== undefined}
+            onChange={profile.setAboutDraft}
+            onSubmit={() => void profile.saveAbout()}
+            {...(profile.aboutDirty ? { cancelLabel: CANCEL, onCancel: profile.resetAbout } : {})}
+          />
+        </SettingRow>
+      </SettingsGroup>
     </div>
   );
 });
@@ -713,15 +731,17 @@ const NotificationsSection = observer(function NotificationsSection() {
     void appSettings.load();
   }, [appSettings]);
   return (
-    <div className="flex flex-col">
-      <ToggleSettingRow row={NOTIFICATIONS_ROW} />
-      {appSettings.values[NOTIFICATIONS_ROW.key] ? (
-        <div className="ml-1 flex flex-col pl-5">
-          {NOTIFICATION_KIND_ROWS.map((row) => (
-            <ToggleSettingRow key={row.key} row={row} />
-          ))}
-        </div>
-      ) : null}
+    <div className="pt-2">
+      <SettingsGroup>
+        <ToggleSettingRow row={NOTIFICATIONS_ROW} />
+        {appSettings.values[NOTIFICATIONS_ROW.key] ? (
+          <div className="ml-1 flex flex-col pl-5">
+            {NOTIFICATION_KIND_ROWS.map((row) => (
+              <ToggleSettingRow key={row.key} row={row} />
+            ))}
+          </div>
+        ) : null}
+      </SettingsGroup>
     </div>
   );
 });
@@ -733,15 +753,15 @@ const MemorySection = observer(function MemorySection() {
   }, [appSettings]);
   const enabled = appSettings.values[ENABLED_ROW.key];
   return (
-    <div className="flex flex-col">
-      <ToggleSettingRow row={ENABLED_ROW} />
-      {enabled ? (
-        <div className="ml-1 flex flex-col pl-5">
-          <ToggleSettingRow row={MODEL_ROW} />
-        </div>
-      ) : (
-        <p className="m-0 pt-1 text-[12px] text-main-500">{DISABLED_NOTE}</p>
-      )}
+    <div className="flex flex-col gap-4 pt-2">
+      <SettingsGroup>
+        <ToggleSettingRow row={ENABLED_ROW} />
+        {enabled && (
+          <div className="ml-1 flex flex-col pl-5">
+            <ToggleSettingRow row={MODEL_ROW} />
+          </div>
+        )}
+      </SettingsGroup>
       <MemoryFacts />
     </div>
   );
@@ -762,48 +782,50 @@ const CliSection = observer(function CliSection() {
           ? CLI_INSTALLED
           : CLI_NOT_INSTALLED;
   return (
-    <div className="flex flex-col pt-2">
-      <SettingRow
-        id={CLI_SETTING_ID}
-        label={status?.command ?? CLI_COMMAND}
-        hint={state}
-        error={cli.error ?? undefined}
-        footer={
-          cli.notice === null ? undefined : (
-            <p role="status" className="m-0 text-[12px] text-main-500">
-              {cli.notice}
-            </p>
-          )
-        }
-      >
-        <div className="flex items-center gap-3">
-          {status?.installed ? (
-            <IconButton
-              path={mdiDeleteOutline}
-              label={CLI_UNINSTALL}
-              tone="danger"
-              disabled={cli.busy}
-              onClick={() => void cli.uninstall()}
-            />
-          ) : (
-            <IconButton
-              path={mdiDownload}
-              label={CLI_INSTALL}
-              disabled={cli.busy || !cli.available}
-              onClick={() => void cli.install()}
-            />
-          )}
-        </div>
-      </SettingRow>
-      <SettingRow
-        id={CLI_THEME_SETTING_ID}
-        label={CLI_THEME_LABEL}
-        hint={CLI_THEME_HINT}
-        error={cli.themeError ?? undefined}
-        stacked
-      >
-        <CliThemes />
-      </SettingRow>
+    <div className="pt-2">
+      <SettingsGroup>
+        <SettingRow
+          id={CLI_SETTING_ID}
+          label={status?.command ?? CLI_COMMAND}
+          hint={state}
+          error={cli.error ?? undefined}
+          footer={
+            cli.notice === null ? undefined : (
+              <p role="status" className="m-0 text-[12px] text-main-500">
+                {cli.notice}
+              </p>
+            )
+          }
+        >
+          <div className="flex items-center gap-3">
+            {status?.installed ? (
+              <IconButton
+                path={mdiDeleteOutline}
+                label={CLI_UNINSTALL}
+                tone="danger"
+                disabled={cli.busy}
+                onClick={() => void cli.uninstall()}
+              />
+            ) : (
+              <IconButton
+                path={mdiDownload}
+                label={CLI_INSTALL}
+                disabled={cli.busy || !cli.available}
+                onClick={() => void cli.install()}
+              />
+            )}
+          </div>
+        </SettingRow>
+        <SettingRow
+          id={CLI_THEME_SETTING_ID}
+          label={CLI_THEME_LABEL}
+          hint={CLI_THEME_HINT}
+          error={cli.themeError ?? undefined}
+          stacked
+        >
+          <CliThemes />
+        </SettingRow>
+      </SettingsGroup>
     </div>
   );
 });
@@ -895,35 +917,37 @@ const VoiceSection = observer(function VoiceSection() {
       : []),
   ];
   return (
-    <div className="flex flex-col pt-2">
-      <SettingRow
-        id={VOICE_DEVICE_ROW.key}
-        label={VOICE_DEVICE_ROW.label}
-        hint={VOICE_DEVICE_ROW.hint}
-        error={voice.error ?? undefined}
-      >
-        <div className="flex items-center gap-2">
-          <div className="w-64">
-            <SelectInput
-              label={VOICE_DEVICE_ROW.label}
-              value={voice.deviceId ?? ""}
-              options={options}
-              disabled={!voice.loaded || voice.saving}
-              onChange={(value) => void voice.select(value.length > 0 ? value : null)}
-              menuPlacement="bottom-right"
+    <div className="pt-2">
+      <SettingsGroup>
+        <SettingRow
+          id={VOICE_DEVICE_ROW.key}
+          label={VOICE_DEVICE_ROW.label}
+          hint={VOICE_DEVICE_ROW.hint}
+          error={voice.error ?? undefined}
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-64">
+              <SelectInput
+                label={VOICE_DEVICE_ROW.label}
+                value={voice.deviceId ?? ""}
+                options={options}
+                disabled={!voice.loaded || voice.saving}
+                onChange={(value) => void voice.select(value.length > 0 ? value : null)}
+                menuPlacement="bottom-right"
+              />
+            </div>
+            <IconButton
+              path={mdiRefresh}
+              label={VOICE_REFRESH}
+              size="md"
+              iconSize={17}
+              disabled={voice.loading}
+              onClick={() => void voice.refresh()}
             />
           </div>
-          <IconButton
-            path={mdiRefresh}
-            label={VOICE_REFRESH}
-            size="md"
-            iconSize={17}
-            disabled={voice.loading}
-            onClick={() => void voice.refresh()}
-          />
-        </div>
-      </SettingRow>
-      <VoiceModelRow />
+        </SettingRow>
+        <VoiceModelRow />
+      </SettingsGroup>
     </div>
   );
 });
@@ -942,7 +966,7 @@ const DataSection = observer(function DataSection() {
   }));
   return (
     <div className="flex flex-col gap-4 pt-2">
-      <section className="space-y-3.5 rounded-card border border-line bg-main-900 p-3.5 text-[12px] text-main-300">
+      <section className="space-y-3.5 rounded-card bg-main-850 p-3.5 text-[12px] text-main-300">
         <div className="space-y-2">
           <div className="flex items-baseline gap-2">
             <p className="m-0 flex-1 text-[13px] font-semibold text-main-50">{STORAGE_TITLE}</p>
@@ -1045,7 +1069,7 @@ const DataSection = observer(function DataSection() {
           </div>
         )}
       </section>
-      <div className="flex flex-col">
+      <SettingsGroup>
         <SettingRow
           id={STORAGE_CLEAR_ID}
           label={STORAGE_CLEAR_CACHE}
@@ -1071,7 +1095,7 @@ const DataSection = observer(function DataSection() {
             {storage.notice}
           </p>
         )}
-      </div>
+      </SettingsGroup>
     </div>
   );
 });
@@ -1146,7 +1170,7 @@ function PreferencesDialog() {
       open={section !== null}
       onClose={ui.closePreferences}
       label={PREFERENCES_TITLE}
-      className="flex h-[min(640px,88vh)] flex-row w-[min(920px,94vw)] overflow-hidden rounded-card border border-line bg-main-900 p-0 shadow-pop"
+      className="flex h-[min(780px,90vh)] w-[min(1100px,94vw)] flex-row overflow-hidden rounded-card border border-line bg-main-900 p-0 shadow-pop"
     >
       <nav
         aria-label={PREFERENCES_TITLE}

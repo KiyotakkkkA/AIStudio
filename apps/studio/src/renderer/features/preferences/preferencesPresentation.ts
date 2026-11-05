@@ -54,13 +54,13 @@ export const PREFERENCE_GROUPS: readonly {
 
 export const SECTION_HINTS: Record<PreferenceSection, string> = {
   general: "Запуск, работа в фоне, ограничения генерации и проверка действий.",
-  profile: "Стиль ответов модели и сведения о вас.",
+  profile: "Стиль ответов модели и сведения о пользователе.",
   appearance: "Тема, шрифт, размер текста и эффекты интерфейса.",
   notifications: "Системные уведомления о событиях приложения.",
-  memory: "Сохранённая о вас информация, полученная в ходе общения.",
+  memory: "Сохранённые сведения, полученные в диалогах.",
   data: "Место на диске, занятое данными приложения, и очистка кэша.",
   about: "Версия приложения и сведения о консольной версии.",
-  components: "Среды выполнения, которые нужны MCP-серверам.",
+  components: "Среды выполнения для MCP-серверов.",
   cli: "Настройка утилиты командной строки.",
   voice: "Настройка распознавания голоса и управление голосовым вводом.",
 };
@@ -77,8 +77,8 @@ export interface ToggleRowCopy {
 export const GENERAL_ROWS: readonly ToggleRowCopy[] = [
   {
     key: "app.autostart",
-    label: "Запускать вместе с системой",
-    hint: "Открывать приложение при входе в Windows.",
+    label: "Автозапуск",
+    hint: "Запуск приложения при входе в Windows.",
   },
   {
     key: "app.tray",
@@ -96,17 +96,17 @@ export const NOTIFICATIONS_ROW: ToggleRowCopy = {
 export const NOTIFICATION_KIND_ROWS: readonly ToggleRowCopy[] = [
   {
     key: "notifications.approval",
-    label: "Требуется подтверждение",
+    label: "Запрос подтверждения",
     hint: "Инструмент ожидает разрешения на выполнение.",
   },
   {
     key: "notifications.turn",
-    label: "Ответ готов",
+    label: "Завершение ответа",
     hint: "Модель завершила ответ в диалоге.",
   },
   {
     key: "notifications.download",
-    label: "Загрузка завершена",
+    label: "Завершение загрузки",
     hint: "Модель или компонент загружены.",
   },
 ];
@@ -115,11 +115,11 @@ export const AUTOSTART_FAILED = "Не удалось изменить автоз
 export const SETTING_SAVE_FAILED = "Не удалось сохранить настройку.";
 
 export const THEME_LABEL = "Тема";
-export const THEME_HINT = "Светлая, тёмная или как в настройках системы.";
+export const THEME_HINT = "Цветовой режим интерфейса.";
 export const THEME_OPTIONS: readonly { value: ThemeMode; label: string }[] = [
   { value: "light", label: "Светлая" },
   { value: "dark", label: "Тёмная" },
-  { value: "system", label: "Как в системе" },
+  { value: "system", label: "Системная" },
 ];
 
 export const PALETTES_LABEL = "Расширенные настройки темы";
@@ -131,7 +131,7 @@ export const PALETTE_GROUPS: readonly { mode: PaletteMode; label: string }[] = [
 ];
 
 export const RAIL_PICKER_LABEL = "Переключатель темы в панели навигации";
-export const RAIL_PICKER_HINT = "Показывать выбор темы над профилем в левой панели.";
+export const RAIL_PICKER_HINT = "Отображение переключателя над профилем в левой панели.";
 
 export const FONT_FAMILY_LABEL = "Шрифт";
 export const FONT_FAMILY_HINT = "Гарнитура текста интерфейса.";
@@ -149,15 +149,15 @@ export const FX_HINT = "Анимации переходов и состояни�
 export const FX_OS_NOTE = "Уровень выбран по настройке анимаций Windows.";
 export const FX_OPTIONS: readonly { value: FxPreset; label: string }[] = [
   { value: "none", label: "Нет" },
-  { value: "reduced", label: "Меньше" },
-  { value: "full", label: "Все" },
+  { value: "reduced", label: "Ограниченные" },
+  { value: "full", label: "Полные" },
   { value: "custom", label: "Пользовательские" },
 ];
 
 export const FX_LEVEL_OPTIONS: readonly { value: FxLevel; label: string }[] = [
   { value: "none", label: "Нет" },
-  { value: "reduced", label: "Меньше" },
-  { value: "full", label: "Все" },
+  { value: "reduced", label: "Ограниченные" },
+  { value: "full", label: "Полные" },
 ];
 
 export const FX_MOTION_LABEL = "Анимации";

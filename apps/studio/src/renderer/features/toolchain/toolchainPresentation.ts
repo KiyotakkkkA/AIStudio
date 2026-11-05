@@ -27,8 +27,8 @@ export const RUNTIME_ICONS: Record<ToolchainRuntime, string> = {
 };
 
 export const RUNTIME_HINTS: Record<ToolchainRuntime, string> = {
-  uv: "Нужен MCP-серверам, которые запускаются через uvx и uv.",
-  node: "Нужен MCP-серверам, которые запускаются через npx и node.",
+  uv: "Среда выполнения MCP-серверов через uvx и uv.",
+  node: "Среда выполнения MCP-серверов через npx и node.",
 };
 
 export const STATUS_LABELS: Record<ToolchainStatus, string> = {

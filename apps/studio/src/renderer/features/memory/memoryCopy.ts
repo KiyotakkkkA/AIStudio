@@ -14,13 +14,13 @@ export const PANEL_OFF = "Использование памяти отключе
 export const ENABLED_ROW = {
   key: "memory.enabled",
   label: "Память",
-  hint: "Использовать сохранённые факты при формировании ответа.",
+  hint: "Использование сохранённых фактов при формировании ответа.",
 } as const;
 
 export const MODEL_ROW = {
   key: "memory.model",
   label: "Сохранение моделью",
-  hint: "Разрешить модели добавлять, изменять и удалять записи памяти.",
+  hint: "Добавление, изменение и удаление записей памяти моделью.",
 } as const;
 
 export const SCOPE_TABS_LABEL = "Область памяти";
@@ -46,7 +46,6 @@ export const NO_DIALOGS = "Диалогов нет. Создайте диало�
 export const LOADING = "Загрузка памяти…";
 export const SOURCE_USER = "Вручную";
 export const SOURCE_MODEL = "Модель";
-export const DISABLED_NOTE = "Память выключена: сохранённые факты не передаются модели.";
 
 export const CLEAR_ACCOUNT_TITLE = "Очистить общую память";
 export const CLEAR_DIALOG_TITLE = "Очистить память диалога";
