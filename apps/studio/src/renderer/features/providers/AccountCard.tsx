@@ -58,7 +58,7 @@ function DetailRow({
   readonly children: ReactNode;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-2.5 px-3 py-2">
+    <div className="flex min-w-0 items-center gap-2.5 py-1.5">
       <Icon path={icon} size={15} className="flex-none text-main-500" />
       <span className="w-24 flex-none text-[12px] text-main-400">{label}</span>
       <span
@@ -88,12 +88,8 @@ function AccountCard({
   const detail = account.detail !== null && account.detail.length > 0 ? account.detail : null;
 
   return (
-    <article
-      className={`flex min-w-0 flex-col rounded-card border bg-main-900 shadow-card ${
-        needsRelink ? "border-warn-line" : "border-line"
-      }`}
-    >
-      <header className="flex min-w-0 items-center gap-3 px-4 pt-4 pb-3">
+    <article className="flex min-w-0 flex-col gap-4 rounded-xl bg-main-850 p-5">
+      <header className="flex min-w-0 flex-wrap items-center gap-3">
         <span className="relative flex-none">
           {showAvatar ? (
             <>
@@ -109,7 +105,7 @@ function AccountCard({
               <VendorMark
                 family={account.adapter}
                 size="xs"
-                className="absolute -right-1.5 -bottom-1.5 border-2 border-main-900"
+                className="absolute -right-1.5 -bottom-1.5"
               />
             </>
           ) : (
@@ -138,7 +134,7 @@ function AccountCard({
         </span>
       </header>
 
-      <div className="mx-4 flex flex-col divide-y divide-line rounded-control bg-main-800">
+      <div className="flex flex-col gap-1">
         {detail === null ? null : (
           <DetailRow icon={mdiAlertCircleOutline} label="Состояние" tone={tone}>
             {detail}
@@ -154,7 +150,7 @@ function AccountCard({
         </DetailRow>
       </div>
 
-      <footer className="mt-3 flex items-start gap-2 border-t border-line px-4 py-3">
+      <footer className="mt-auto flex flex-wrap items-center gap-2 rounded-control bg-main-800/40 p-2.5">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           {needsRelink ? (
             <Button tone="primary" disabled={unlinking} onClick={onRelink}>
