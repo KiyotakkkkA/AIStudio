@@ -32,7 +32,7 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
   const server = store.selectedServer;
 
   return (
-    <section className="mx-auto flex w-full max-w-360 flex-none flex-col gap-4 rounded-xl bg-main-850 p-5">
+    <section className="mx-auto flex w-full max-w-360 flex-none flex-col gap-4 rounded-xl bg-main-700/55 p-5">
       <div className="flex flex-wrap items-center gap-2.25">
         <h2 className="flex-1 text-[15px] font-semibold tracking-[-0.01em] text-main-100">
           Настройка сервера
@@ -179,7 +179,7 @@ function ServerSetupCard({ store, vm }: ServerSetupCardProps) {
       )}
 
       {vm.isNew || server?.instructions == null ? null : (
-        <Disclosure label="Инструкции сервера" className="rounded-control bg-main-800/40 px-3">
+        <Disclosure label="Инструкции сервера" className="rounded-control px-3">
           <p className="pb-2 text-[12.5px]/relaxed whitespace-pre-wrap text-main-400">
             {server.instructions}
           </p>

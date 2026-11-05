@@ -11,7 +11,7 @@ function ExposedToolsCard({ store }: { readonly store: ConnectionStore }) {
   const rows = store.toolRows;
 
   return (
-    <section className="mx-auto flex w-full max-w-360 flex-none flex-col rounded-xl bg-main-850 px-5 py-3">
+    <section className="mx-auto flex w-full max-w-360 flex-none flex-col rounded-xl bg-main-700/55 px-5 py-3">
       <Disclosure
         label="Инструменты"
         defaultOpen

@@ -26,7 +26,7 @@ function ModelGrid() {
   const curated = outcome?.kind === "ok" && !outcome.live;
 
   return (
-    <section className="mx-auto flex min-h-0 w-full max-w-360 flex-none flex-col gap-4 rounded-xl bg-main-850 p-5">
+    <section className="mx-auto flex min-h-0 w-full max-w-360 flex-none flex-col gap-4 rounded-xl bg-main-700/55 p-5">
       <div className="flex flex-none flex-wrap items-center gap-3">
         <h2 className="flex min-w-48 flex-1 flex-col gap-1 text-[15px] font-semibold tracking-[-0.01em] text-main-100">
           Доступные модели

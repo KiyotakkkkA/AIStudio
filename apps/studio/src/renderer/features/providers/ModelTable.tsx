@@ -55,7 +55,7 @@ export default function ModelTable({
     <ScrollArea className="max-h-120 min-w-0 rounded-control bg-main-850">
       <table
         aria-label="Модели провайдера"
-        className="w-full min-w-180 border-collapse text-left text-[12px]"
+        className="w-full min-w-180 text-left text-[12px]"
       >
         <thead className="sticky top-0 z-10 bg-main-850 text-[11px] shadow-[0_1px_0_var(--color-line)]">
           <tr>
@@ -78,7 +78,7 @@ export default function ModelTable({
               <tr
                 key={row.key}
                 onClick={() => onToggle(row.externalId)}
-                className={`transition-colors ${checked ? "bg-accent-soft/50" : "even:bg-main-800/25 hover:bg-main-800/60"}`}
+                className={`transition-colors ${"even:bg-main-800/25 hover:bg-main-800/60"}`}
               >
                 <td
                   className={`px-3 py-3 ${checked ? "shadow-[inset_3px_0_0_var(--color-accent-dark)]" : ""}`}

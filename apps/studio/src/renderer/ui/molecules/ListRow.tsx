@@ -22,7 +22,7 @@ export default function ListRow({
   const tone = dashed
     ? "border-dashed border-line-strong bg-transparent text-main-400 hover:border-accent-line hover:bg-accent-soft hover:text-accent-medium"
     : selected
-      ? "border-transparent bg-accent-soft"
+      ? "border-transparent bg-main-700/70"
       : "border-transparent bg-transparent hover:bg-main-800";
 
   return (

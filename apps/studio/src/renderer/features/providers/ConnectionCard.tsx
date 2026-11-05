@@ -43,7 +43,7 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
   const showsVendor = !vm.isLocal && !isAccountFamily(vm.adapter);
 
   return (
-    <section className="flex min-w-0 flex-col gap-3.5 rounded-xl bg-main-850 p-5">
+    <section className="flex min-w-0 flex-col gap-3.5 rounded-xl bg-main-700/55 p-5">
       <div className="flex items-center gap-2">
         <h2 className="flex-1 text-[15px] font-semibold tracking-[-0.01em] text-main-100">
           Настройка подключения

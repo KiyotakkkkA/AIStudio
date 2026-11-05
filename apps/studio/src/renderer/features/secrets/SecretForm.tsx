@@ -46,7 +46,7 @@ function SecretForm({
         onSave();
       }}
     >
-      <div className="mx-auto flex w-full max-w-360 flex-none items-center gap-2.5 px-5 pt-4 pb-2 lg:px-6">
+      <div className="mx-auto flex w-full max-w-360 flex-none items-center gap-2.5 pt-4 pb-2">
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[14px] font-semibold text-main-50">
             {vm.name.trim().length > 0 ? vm.name : "Создать секрет"}
@@ -76,7 +76,7 @@ function SecretForm({
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-4 px-5 py-3 lg:px-6">
         {vm.banner === null ? null : <Alert>{vm.banner}</Alert>}
 
-        <section className="mx-auto flex w-full max-w-360 flex-col gap-4 rounded-xl bg-main-850 p-5">
+        <section className="mx-auto flex w-full max-w-360 flex-col gap-4 rounded-xl bg-main-700/55 p-5">
           <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-main-100">Общее</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field
@@ -129,7 +129,7 @@ function SecretForm({
           </Field>
         </section>
 
-        <section className="mx-auto flex w-full max-w-360 flex-col gap-4 rounded-xl bg-main-850 p-5">
+        <section className="mx-auto flex w-full max-w-360 flex-col gap-4 rounded-xl bg-main-700/55 p-5">
           <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-main-100">Метаданные</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Теги" htmlFor="secret-tags">
