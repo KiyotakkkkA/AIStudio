@@ -1,0 +1,36 @@
+[
+  {
+    "name": "live with an approved script",
+    "value": {
+      "id": "dashboards/Продажи.html",
+      "live": true,
+      "interval": 300,
+      "specInterval": 60,
+      "overridden": true,
+      "refreshedAt": 1793750400000,
+      "refreshing": false,
+      "scripts": [
+        {
+          "name": "1-fetch_crm.py",
+          "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+          "approved": true,
+          "source": "import json\n",
+          "truncated": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "static page after a failed refresh",
+    "value": {
+      "id": "dashboards/old.html",
+      "live": false,
+      "interval": 0,
+      "specInterval": 0,
+      "overridden": false,
+      "refreshing": false,
+      "error": "Не удалось обновить дашборд",
+      "scripts": []
+    }
+  }
+]

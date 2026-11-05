@@ -19,6 +19,7 @@ With `shell.run`, and only when the user provides the endpoint and the credentia
 
 - Call the API with a short script that writes JSON to a file; keep the token in an environment variable, never in the script, the spec or the dashboard.
 - Respect pagination and rate limits; stop on errors instead of retrying in a loop.
+- Make the output path the script's last argument. Then the same script can be listed in the spec's `fetch` and the dashboard refreshes from the API (see `refresh.md`).
 
 ## Web pages
 

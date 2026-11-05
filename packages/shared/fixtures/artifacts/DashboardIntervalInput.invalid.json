@@ -1,0 +1,4 @@
+[
+  { "name": "too often", "value": { "id": "dashboards/a.html", "interval": 5 } },
+  { "name": "escaping id", "value": { "id": "../a.html", "interval": 60 } }
+]

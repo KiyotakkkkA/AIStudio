@@ -33,6 +33,10 @@ pub trait FileLauncher: Send + Sync {
     fn open_in_browser(&self, browser: &InstalledBrowser, path: &Path) -> Result<(), AppError> {
         open_with_program(&browser.program, path)
     }
+
+    fn open_url_in_browser(&self, browser: &InstalledBrowser, url: &str) -> Result<(), AppError> {
+        open_with_program(&browser.program, Path::new(url))
+    }
 }
 
 pub fn open_with_program(program: &Path, path: &Path) -> Result<(), AppError> {

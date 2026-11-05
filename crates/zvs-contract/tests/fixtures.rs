@@ -1280,6 +1280,18 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::artifacts::OpenArtifactInBrowserInput>,
     ),
     (
+        "artifacts/DashboardStatusDto",
+        round_trip::<zvs_contract::artifacts::DashboardStatusDto>,
+    ),
+    (
+        "artifacts/DashboardApproveInput",
+        round_trip::<zvs_contract::artifacts::DashboardApproveInput>,
+    ),
+    (
+        "artifacts/DashboardIntervalInput",
+        round_trip::<zvs_contract::artifacts::DashboardIntervalInput>,
+    ),
+    (
         "chat/DocumentSelectionDto",
         round_trip::<zvs_contract::chat::DocumentSelectionDto>,
     ),

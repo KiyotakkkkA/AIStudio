@@ -45,8 +45,14 @@ The spec is one JSON object. Pass it to `build_dashboard.py` on standard input (
 | `datasets` | yes      | Named data tables, see below.                                             |
 | `filters`  |          | The filter row above all sections.                                        |
 | `sections` | yes      | The page content, in order.                                               |
+| `refresh`  |          | `{ "interval": 300 }`: how often an open page refreshes its data, in seconds (15–86 400); `0` refreshes only on request. See `refresh.md`. |
+| `fetch`    |          | Scripts that produce data files, re-run on every refresh. See `refresh.md`.  |
 
 The build time is stamped automatically as `generatedAt`.
+
+## Refresh
+
+Every saved dashboard can be refreshed; `refresh` and `fetch` are described in `references/refresh.md`. Read it before using either.
 
 ## Datasets
 

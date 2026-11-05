@@ -10,9 +10,11 @@ use zvs_contract::{
 };
 
 use crate::artifact_pages::{
-    NOT_A_PAGE, PAGES_UNAVAILABLE, PageResolver, PageServer, SharedPageOpener, page_type,
+    LivePages, NOT_A_PAGE, PAGES_UNAVAILABLE, PageResolver, PageServer, SharedLivePages,
+    SharedPageOpener, page_type,
 };
 use crate::conversations::ConversationFolders;
+use crate::dashboards::{DashboardService, NOT_LIVE, SharedDashboardRunner};
 use crate::platform::external::{
     PathRevealer, SharedFileLauncher, system_file_launcher, system_path_revealer,
 };
@@ -136,6 +138,7 @@ pub struct ArtifactStore {
     launcher: SharedFileLauncher,
     pages: Option<SharedPageOpener>,
     server: Arc<tokio::sync::OnceCell<PageServer>>,
+    dashboards: Option<DashboardService>,
 }
 
 pub fn library_env(name: &str) -> String {
@@ -152,6 +155,7 @@ impl ArtifactStore {
             launcher: system_file_launcher(),
             pages: None,
             server: Arc::new(tokio::sync::OnceCell::new()),
+            dashboards: None,
         }
     }
 
@@ -165,6 +169,82 @@ impl ArtifactStore {
     pub fn with_pages(mut self, pages: SharedPageOpener) -> Self {
         self.pages = Some(pages);
         self
+    }
+
+    #[must_use]
+    pub fn with_dashboards(mut self, runner: SharedDashboardRunner) -> Self {
+        if let Some(folder) = self.library(DASHBOARDS) {
+            self.dashboards = Some(DashboardService::new(folder.to_path_buf(), runner));
+        }
+        self
+    }
+
+    pub const fn dashboards(&self) -> Option<&DashboardService> {
+        self.dashboards.as_ref()
+    }
+
+    fn dashboard(&self, id: &str) -> Result<(&DashboardService, String), AppError> {
+        let path = self.resolve(id)?;
+        let (owner, name) = id.split_once('/').ok_or_else(|| not_found(id))?;
+        let service = self
+            .dashboards
+            .as_ref()
+            .filter(|_| owner == DASHBOARDS && page_type(name) == page_type("a.html"))
+            .ok_or_else(|| AppError::new(AppErrorCode::ValidationFailed, NOT_LIVE))?;
+        let name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .ok_or_else(|| not_found(id))?;
+        Ok((service, name))
+    }
+
+    pub fn dashboard_status(&self, id: &str) -> Result<zvs_contract::DashboardStatusDto, AppError> {
+        let (service, name) = self.dashboard(id)?;
+        service.status(id, &name)
+    }
+
+    pub async fn refresh_dashboard(
+        &self,
+        id: &str,
+        fresh_within: std::time::Duration,
+    ) -> Result<zvs_contract::DashboardStatusDto, AppError> {
+        let (service, name) = self.dashboard(id)?;
+        service.refresh(id, &name, fresh_within).await
+    }
+
+    pub fn approve_dashboard(
+        &self,
+        id: &str,
+        hashes: &[String],
+    ) -> Result<zvs_contract::DashboardStatusDto, AppError> {
+        let (service, name) = self.dashboard(id)?;
+        service.approve(id, &name, hashes)
+    }
+
+    pub fn set_dashboard_interval(
+        &self,
+        id: &str,
+        interval: Option<u32>,
+    ) -> Result<zvs_contract::DashboardStatusDto, AppError> {
+        let (service, name) = self.dashboard(id)?;
+        service.set_interval(id, &name, interval)
+    }
+
+    fn is_live_dashboard(&self, id: &str) -> bool {
+        self.dashboard(id)
+            .is_ok_and(|(service, name)| service.is_live(&name))
+    }
+
+    async fn page_server(&self) -> Result<&PageServer, AppError> {
+        let store = self.clone();
+        let resolve: PageResolver = Arc::new(move |id: &str| store.resolve(id));
+        let live: Option<SharedLivePages> = self
+            .dashboards
+            .is_some()
+            .then(|| Arc::new(self.clone()) as SharedLivePages);
+        self.server
+            .get_or_try_init(|| PageServer::start(resolve, live))
+            .await
     }
 
     pub fn libraries(&self) -> &[(String, PathBuf)] {
@@ -316,7 +396,7 @@ impl ArtifactStore {
         ArtifactBrowsersDto { browsers }
     }
 
-    pub fn open_in_browser(&self, id: &str, browser: &str) -> Result<(), AppError> {
+    pub async fn open_in_browser(&self, id: &str, browser: &str) -> Result<(), AppError> {
         let path = self.resolve(id)?;
         let installed = self
             .launcher
@@ -324,6 +404,10 @@ impl ArtifactStore {
             .into_iter()
             .find(|candidate| candidate.id == browser)
             .ok_or_else(|| AppError::new(AppErrorCode::NotFound, BROWSER_NOT_FOUND))?;
+        if self.is_live_dashboard(id) {
+            let url = self.page_server().await?.url(id)?;
+            return self.launcher.open_url_in_browser(&installed, &url);
+        }
         self.launcher.open_in_browser(&installed, &path)
     }
 
@@ -340,12 +424,7 @@ impl ArtifactStore {
             .pages
             .clone()
             .ok_or_else(|| AppError::new(AppErrorCode::NotImplemented, PAGES_UNAVAILABLE))?;
-        let store = self.clone();
-        let resolve: PageResolver = Arc::new(move |id: &str| store.resolve(id));
-        let server = self
-            .server
-            .get_or_try_init(|| PageServer::start(resolve))
-            .await?;
+        let server = self.page_server().await?;
         pages.open(&server.url(id)?).await
     }
 
@@ -384,6 +463,46 @@ impl ArtifactStore {
 }
 
 pub type SharedArtifactStore = Arc<ArtifactStore>;
+
+const AUTOMATIC_FRESHNESS: std::time::Duration = std::time::Duration::from_secs(10);
+
+fn as_value<T: serde::Serialize>(value: &T) -> serde_json::Value {
+    serde_json::to_value(value).unwrap_or_default()
+}
+
+#[async_trait::async_trait]
+impl LivePages for ArtifactStore {
+    fn is_live(&self, id: &str) -> bool {
+        self.is_live_dashboard(id)
+    }
+
+    fn state(&self, id: &str) -> Result<serde_json::Value, AppError> {
+        let (service, name) = self.dashboard(id)?;
+        service.page_state(id, &name).map(|state| as_value(&state))
+    }
+
+    fn data(&self, id: &str) -> Result<Vec<u8>, AppError> {
+        let (service, name) = self.dashboard(id)?;
+        service.data(&name)
+    }
+
+    async fn refresh(&self, id: &str, automatic: bool) -> Result<serde_json::Value, AppError> {
+        let (service, name) = self.dashboard(id)?;
+        let fresh_within = if automatic {
+            AUTOMATIC_FRESHNESS
+        } else {
+            std::time::Duration::ZERO
+        };
+        service.refresh(id, &name, fresh_within).await?;
+        service.page_state(id, &name).map(|state| as_value(&state))
+    }
+
+    fn set_interval(&self, id: &str, interval: Option<u32>) -> Result<serde_json::Value, AppError> {
+        let (service, name) = self.dashboard(id)?;
+        service.set_interval(id, &name, interval)?;
+        service.page_state(id, &name).map(|state| as_value(&state))
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -654,6 +773,31 @@ mod tests {
                 .push((browser.id.clone(), path.to_path_buf()));
             Ok(())
         }
+
+        fn open_url_in_browser(
+            &self,
+            browser: &crate::platform::external::InstalledBrowser,
+            url: &str,
+        ) -> Result<(), AppError> {
+            self.launched
+                .lock()
+                .expect("records")
+                .push((browser.id.clone(), PathBuf::from(url)));
+            Ok(())
+        }
+    }
+
+    struct NoRunner;
+
+    #[async_trait::async_trait]
+    impl crate::dashboards::DashboardRunner for NoRunner {
+        async fn fetch(&self, _script: &Path, _output: &Path, _cwd: &Path) -> Result<(), AppError> {
+            Ok(())
+        }
+
+        async fn build(&self, _library: &Path, _stem: &str) -> Result<(), AppError> {
+            Ok(())
+        }
     }
 
     struct Pages(Mutex<Vec<String>>);
@@ -705,8 +849,8 @@ mod tests {
         assert_eq!(library_env(DASHBOARDS), "ZVS_DASHBOARDS_DIR");
     }
 
-    #[test]
-    fn a_file_opens_only_in_a_browser_the_system_lists() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_file_opens_only_in_a_browser_the_system_lists() {
         let root = tempfile::tempdir().expect("the data folder");
         let dashboards = root.path().join(DASHBOARDS);
         write(&dashboards.join("sales.html"), "x");
@@ -725,9 +869,11 @@ mod tests {
         );
         store
             .open_in_browser("dashboards/sales.html", "Google Chrome")
+            .await
             .expect("opens");
         let error = store
             .open_in_browser("dashboards/sales.html", "C:/Windows/System32/cmd.exe")
+            .await
             .expect_err("an unlisted program is refused");
         assert_eq!(error.code, AppErrorCode::NotFound);
         assert_eq!(error.message, BROWSER_NOT_FOUND);
@@ -735,6 +881,51 @@ mod tests {
             launcher.launched.lock().expect("reads").as_slice(),
             [("Google Chrome".to_owned(), dashboards.join("sales.html"))]
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_live_dashboard_opens_in_a_browser_through_the_loopback_server() {
+        let root = tempfile::tempdir().expect("the data folder");
+        let dashboards = root.path().join(DASHBOARDS);
+        write(&dashboards.join("live.html"), "x");
+        write(&dashboards.join("static.html"), "x");
+        write(
+            &dashboards.join(".zvs").join("live").join("meta.json"),
+            r#"{"interval":60,"fetch":[]}"#,
+        );
+        let launcher = Arc::new(Browsers {
+            launched: Mutex::new(Vec::new()),
+        });
+        let store = ArtifactStore::new(root.path().join("artifacts"))
+            .with_library(DASHBOARDS, dashboards.clone())
+            .with_launcher(launcher.clone())
+            .with_dashboards(Arc::new(NoRunner));
+        store
+            .open_in_browser("dashboards/live.html", "Google Chrome")
+            .await
+            .expect("opens");
+        store
+            .open_in_browser("dashboards/static.html", "Google Chrome")
+            .await
+            .expect("opens");
+        let launched = launcher.launched.lock().expect("reads").clone();
+        let live = launched[0].1.to_string_lossy().into_owned();
+        assert!(live.starts_with("http://127.0.0.1:"), "{live}");
+        assert!(live.ends_with("/dashboards/live.html"), "{live}");
+        assert_eq!(launched[1].1, dashboards.join("static.html"));
+        assert!(
+            store
+                .dashboard_status("dashboards/live.html")
+                .expect("a status")
+                .live
+        );
+        assert!(
+            !store
+                .dashboard_status("dashboards/static.html")
+                .expect("a status")
+                .live
+        );
+        assert!(store.dashboard_status("run/report.html").is_err());
     }
 
     #[tokio::test(flavor = "multi_thread")]

@@ -11,7 +11,10 @@ import json
 import os
 import re
 import sys
+import tempfile
 from pathlib import Path
+
+from _live import LIVE_DIR, check_fetch, check_refresh, live_dir, read_live, refresh_live, stage, write_live
 
 DASHBOARDS_ENV = "ZVS_DASHBOARDS_DIR"
 NAME_MAX = 120
@@ -224,8 +227,6 @@ def convert(value, kind: str, decimal_comma: bool):
 
 
 def load_sql(name: str, spec: dict) -> tuple[list[str], list[list]]:
-    import tempfile
-
     import duckdb
 
     from _sources import SourceError, parse_named, register
@@ -573,7 +574,7 @@ def validate(spec: dict, datasets: dict, problems: Problems) -> None:
 
 
 def payload(spec: dict, datasets: dict) -> dict:
-    result = {key: value for key, value in spec.items() if key != "datasets"}
+    result = {key: value for key, value in spec.items() if key not in ("datasets", "fetch")}
     result["lang"] = spec.get("lang", "ru")
     result["theme"] = spec.get("theme", "auto")
     result.setdefault("generatedAt", dt.datetime.now().replace(microsecond=0).isoformat(timespec="minutes"))
@@ -584,6 +585,67 @@ def payload(spec: dict, datasets: dict) -> dict:
 def script_json(data: dict) -> str:
     text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     return text.replace("</", "<\\/").replace("<!--", "<\\!--")
+
+
+def render(spec: dict, datasets: dict) -> tuple[str, str]:
+    data = payload(spec, datasets)
+    assets = assets_dir()
+    template = (assets / "template.html").read_text(encoding="utf-8")
+    page = (
+        template.replace("{{lang}}", html.escape(spec.get("lang", "ru")))
+        .replace("{{title}}", html.escape(spec["title"]))
+        .replace("{{css}}", (assets / "zvs-dash.css").read_text(encoding="utf-8"))
+        .replace("{{js}}", (assets / "zvs-dash.js").read_text(encoding="utf-8"))
+        .replace("{{data}}", script_json(data))
+    )
+    return page, json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+
+
+def load_all(spec: dict, base: Path, problems: Problems) -> dict:
+    datasets = {}
+    for name, dataset in (spec.get("datasets") or {}).items():
+        loaded = load_dataset(name, dataset, base, problems)
+        if loaded is not None:
+            datasets[name] = loaded
+    return datasets
+
+
+def fail(problems: Problems) -> int:
+    print(json.dumps({"ok": False, "problems": problems.errors, "warnings": problems.warnings}, ensure_ascii=False, indent=1))
+    return 1
+
+
+def summary(datasets: dict) -> dict:
+    return {
+        name: {"rows": len(data["rows"]), "columns": {c["name"]: c["type"] for c in data["columns"]}}
+        for name, data in datasets.items()
+    }
+
+
+def refresh(stem: str, library: str | None) -> int:
+    if not library:
+        print("--refresh needs the dashboards folder", file=sys.stderr)
+        return 2
+    folder = Path(library)
+    problems = Problems()
+    try:
+        spec, meta = read_live(folder, stem)
+        page_name = Path(str(meta["page"])).name
+    except (OSError, ValueError, KeyError) as error:
+        problems.error(f"refresh: no saved spec for {stem!r}: {error}")
+        return fail(problems)
+    datasets = load_all(spec, live_dir(folder, stem), problems)
+    validate(spec, datasets, problems)
+    if problems.errors:
+        return fail(problems)
+    page, data_json = render(spec, datasets)
+    target = folder / page_name
+    temporary = target.with_name(f"{target.name}.tmp")
+    temporary.write_text(page, encoding="utf-8")
+    os.replace(temporary, target)
+    refresh_live(folder, stem, meta, data_json)
+    print(json.dumps({"ok": True, "out": str(target), "datasets": summary(datasets), "warnings": problems.warnings}, ensure_ascii=False, indent=1))
+    return 0
 
 
 def main() -> int:
@@ -604,8 +666,15 @@ def main() -> int:
         "--out",
         help="absolute path of an extra copy; outside the app it is the only output",
     )
+    parser.add_argument(
+        "--refresh",
+        metavar="NAME",
+        help="rebuild a saved dashboard from its saved spec; the app runs this, not the model",
+    )
     args = parser.parse_args()
     library = os.environ.get(DASHBOARDS_ENV)
+    if args.refresh:
+        return refresh(args.refresh, library)
     if not library and not args.out:
         print("--out is required when the dashboards folder is not set", file=sys.stderr)
         return 2
@@ -626,27 +695,16 @@ def main() -> int:
         print(json.dumps({"ok": False, "problems": [f"spec: {error}"]}, ensure_ascii=False))
         return 1
     problems = Problems()
-    datasets = {}
-    for name, dataset in (spec.get("datasets") or {}).items():
-        loaded = load_dataset(name, dataset, spec_path.parent, problems)
-        if loaded is not None:
-            datasets[name] = loaded
+    check_refresh(spec, problems)
+    fetch = check_fetch(spec, spec_path.parent, problems)
+    datasets = load_all(spec, spec_path.parent, problems)
     if not spec.get("datasets"):
         problems.warn("datasets: none; only text and literal numbers can be shown")
     validate(spec, datasets, problems)
     if problems.errors:
-        print(json.dumps({"ok": False, "problems": problems.errors, "warnings": problems.warnings}, ensure_ascii=False, indent=1))
-        return 1
+        return fail(problems)
 
-    assets = assets_dir()
-    template = (assets / "template.html").read_text(encoding="utf-8")
-    page = (
-        template.replace("{{lang}}", html.escape(spec.get("lang", "ru")))
-        .replace("{{title}}", html.escape(spec["title"]))
-        .replace("{{css}}", (assets / "zvs-dash.css").read_text(encoding="utf-8"))
-        .replace("{{js}}", (assets / "zvs-dash.js").read_text(encoding="utf-8"))
-        .replace("{{data}}", script_json(payload(spec, datasets)))
-    )
+    page, data_json = render(spec, datasets)
     size = len(page.encode("utf-8"))
     if size > MAX_BYTES:
         print(json.dumps({"ok": False, "problems": [f"the page is {size // 1024} KiB; aggregate the data further"]}, ensure_ascii=False))
@@ -661,14 +719,19 @@ def main() -> int:
     for target in targets:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(page, encoding="utf-8")
+    if library:
+        stem = targets[0].stem
+        scratch = Path(library) / LIVE_DIR
+        scratch.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=scratch) as work:
+            staged_dir = Path(work) / "stage"
+            staged = stage(spec, spec_path.parent, fetch, staged_dir, live_dir(Path(library), stem), problems)
+            write_live(Path(library), stem, targets[0].name, staged_dir, staged, data_json)
     report = {
         "ok": True,
         "out": str(targets[0]),
         "kib": round(size / 1024, 1),
-        "datasets": {
-            name: {"rows": len(data["rows"]), "columns": {c["name"]: c["type"] for c in data["columns"]}}
-            for name, data in datasets.items()
-        },
+        "datasets": summary(datasets),
         "components": sum(len(section.get("items", [])) for section in spec["sections"]),
         "warnings": problems.warnings,
     }

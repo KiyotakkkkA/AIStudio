@@ -1,0 +1,5 @@
+[
+  { "name": "every five minutes", "value": { "id": "dashboards/a.html", "interval": 300 } },
+  { "name": "off", "value": { "id": "dashboards/a.html", "interval": 0 } },
+  { "name": "back to the spec", "value": { "id": "dashboards/a.html" } }
+]

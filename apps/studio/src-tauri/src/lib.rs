@@ -29,6 +29,7 @@ use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::computer::{
     Computer, ComputerAgent, ComputerControls, UvSidecar, register_computer_nodes,
 };
+use zvs_host::dashboards::ProcessDashboardRunner;
 use zvs_host::data::Repositories;
 use zvs_host::data::repositories::{ProviderFilter, SecretFilter};
 use zvs_host::data::{MigrationFailed, PrepareOptions, prepare_database};
@@ -846,6 +847,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     });
     let artifacts = ArtifactStore::new(paths.conversations_dir.clone())
         .with_library(DASHBOARDS, paths.data_dir.join(DASHBOARDS))
+        .with_dashboards(Arc::new(ProcessDashboardRunner::new(
+            Arc::new(toolchain.clone()),
+            skill_library.clone(),
+        )))
         .with_picker(Arc::clone(&picker))
         .with_launcher(platform::file_launcher())
         .with_pages(Arc::new(WorkspacePages(workspace.clone())));

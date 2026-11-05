@@ -1492,6 +1492,49 @@ button {
   flex-wrap: wrap;
 }
 
+.zd-live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.zd-live-status {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--main-500);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.zd-live-status[data-tone="warn"] {
+  color: var(--warn);
+}
+
+.zd-live-status[data-tone="error"] {
+  color: var(--err);
+}
+
+.zd-live-interval {
+  min-width: 150px;
+}
+
+.zd-live-interval .zd-select-trigger {
+  height: 28px;
+  font-size: 12.5px;
+}
+
+.zd-main {
+  transition: opacity 160ms ease;
+}
+
+:root.zd-stale .zd-main {
+  opacity: 0.6;
+}
+
 .zd-btn.zd-texture-toggle[aria-pressed="true"] {
   background: var(--accent-soft);
   color: var(--accent-light);
@@ -1552,6 +1595,7 @@ button {
   }
 
   .zd-filters,
+  .zd-live,
   .zd-theme,
   .zd-toggle,
   .zd-search,

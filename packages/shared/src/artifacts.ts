@@ -58,3 +58,52 @@ export const OpenArtifactInBrowserInput = z.object({
   browser: z.string().min(1).max(BROWSER_ID_MAX),
 });
 export type OpenArtifactInBrowserInput = z.infer<typeof OpenArtifactInBrowserInput>;
+
+export const DASHBOARD_INTERVAL_MIN = 15;
+export const DASHBOARD_INTERVAL_MAX = 86400;
+export const DASHBOARD_SCRIPTS_MAX = 16;
+export const DASHBOARD_SCRIPT_SOURCE_MAX = 65536;
+export const DASHBOARD_ERROR_MAX = 2000;
+
+export const DashboardInterval = z
+  .number()
+  .int()
+  .refine(
+    (value) => value === 0 || (value >= DASHBOARD_INTERVAL_MIN && value <= DASHBOARD_INTERVAL_MAX),
+  );
+
+export const Sha256Hex = z.string().regex(/^[0-9a-f]{64}$/);
+
+export const DashboardScriptDto = z.object({
+  name: z.string().min(1).max(ARTIFACT_NAME_MAX),
+  sha256: Sha256Hex,
+  approved: z.boolean(),
+  source: z.string().max(DASHBOARD_SCRIPT_SOURCE_MAX),
+  truncated: z.boolean(),
+});
+export type DashboardScriptDto = z.infer<typeof DashboardScriptDto>;
+
+export const DashboardStatusDto = z.object({
+  id: ArtifactId,
+  live: z.boolean(),
+  interval: DashboardInterval,
+  specInterval: DashboardInterval,
+  overridden: z.boolean(),
+  refreshedAt: z.number().int().nonnegative().optional(),
+  refreshing: z.boolean(),
+  error: z.string().min(1).max(DASHBOARD_ERROR_MAX).optional(),
+  scripts: z.array(DashboardScriptDto).max(DASHBOARD_SCRIPTS_MAX),
+});
+export type DashboardStatusDto = z.infer<typeof DashboardStatusDto>;
+
+export const DashboardApproveInput = z.object({
+  id: ArtifactId,
+  hashes: z.array(Sha256Hex).min(1).max(DASHBOARD_SCRIPTS_MAX),
+});
+export type DashboardApproveInput = z.infer<typeof DashboardApproveInput>;
+
+export const DashboardIntervalInput = z.object({
+  id: ArtifactId,
+  interval: DashboardInterval.nullable().optional(),
+});
+export type DashboardIntervalInput = z.infer<typeof DashboardIntervalInput>;

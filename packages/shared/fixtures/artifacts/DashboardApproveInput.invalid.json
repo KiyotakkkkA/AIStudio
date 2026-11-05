@@ -1,0 +1,4 @@
+[
+  { "name": "no hashes", "value": { "id": "dashboards/a.html", "hashes": [] } },
+  { "name": "short hash", "value": { "id": "dashboards/a.html", "hashes": ["abc"] } }
+]

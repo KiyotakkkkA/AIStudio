@@ -1078,6 +1078,21 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   against DNS rebinding, and `Content-Security-Policy: default-src 'none'; script-src
   'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'` — a
   page can run its own inline code but cannot load or send anything.
+- **Live dashboards** (`zvs-host/src/dashboards/`). `build_dashboard.py` saves each page's
+  spec, its embedded data and copies of its `fetch` scripts and their outputs in
+  `<app data>/dashboards/.zvs/<name>/`; `--refresh <name>` rebuilds the page in place from
+  them. A page with a saved spec is *live*: the page server serves it with `connect-src
+  'self'` and answers `GET …/<name>/state|data` and `POST …/<name>/refresh|interval` (same
+  token and `Host` check, plus an `Origin` check on POST); every other page keeps `connect-src
+  'none'`. A refresh is single-flight per dashboard; an automatic one is skipped when the last
+  finished under 10 s ago. It runs the `fetch` scripts with the toolchain (`uv run`, `node`;
+  120 s each), then the builder (300 s). A `fetch` script runs only when its SHA-256 is in the
+  dashboard's approved set; the set is changed only through `dashboards.approve` from the
+  studio webview, which must name exactly the current hashes, never from a page. The page asks
+  for a refresh only while it is open and visible, on its interval (`refresh.interval` in the
+  spec, overridden per dashboard by `dashboards.setInterval`; 15 s–24 h or off). Approvals and
+  overrides live in `.zvs/settings.json`. `artifacts.openInBrowser` opens a live dashboard by
+  its loopback URL, so it stays live in an installed browser while the app runs.
 - **Chat working folder** (`zvs-host/src/chat_files.rs`). Each conversation, and each agentic
   session, owns `<app data>/conversations/<id>/work/`, created on first use and removed with the
   conversation or session. It is the one app folder an agent reaches without a grant: in a

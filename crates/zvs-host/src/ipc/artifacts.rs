@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use zvs_contract::{ArtifactRef, OpenArtifactInBrowserInput};
+use zvs_contract::{
+    ArtifactRef, DashboardApproveInput, DashboardIntervalInput, OpenArtifactInBrowserInput,
+};
 
 use super::IpcServer;
 use crate::services::Services;
@@ -43,12 +45,44 @@ pub fn register(server: &mut IpcServer) {
                 services
                     .artifacts
                     .open_in_browser(&input.id, &input.browser)
+                    .await
             },
         )
         .handle(
             "artifacts.openInApp",
             |services: Arc<Services>, input: ArtifactRef| async move {
                 services.artifacts.open_in_app(&input.id).await
+            },
+        )
+        .handle(
+            "dashboards.status",
+            |services: Arc<Services>, input: ArtifactRef| async move {
+                services.artifacts.dashboard_status(&input.id)
+            },
+        )
+        .handle(
+            "dashboards.refresh",
+            |services: Arc<Services>, input: ArtifactRef| async move {
+                services
+                    .artifacts
+                    .refresh_dashboard(&input.id, std::time::Duration::ZERO)
+                    .await
+            },
+        )
+        .handle(
+            "dashboards.approve",
+            |services: Arc<Services>, input: DashboardApproveInput| async move {
+                services
+                    .artifacts
+                    .approve_dashboard(&input.id, &input.hashes)
+            },
+        )
+        .handle(
+            "dashboards.setInterval",
+            |services: Arc<Services>, input: DashboardIntervalInput| async move {
+                services
+                    .artifacts
+                    .set_dashboard_interval(&input.id, input.interval)
             },
         );
 }

@@ -1,0 +1,34 @@
+[
+  {
+    "name": "interval below the minimum",
+    "value": {
+      "id": "dashboards/a.html",
+      "live": true,
+      "interval": 5,
+      "specInterval": 0,
+      "overridden": true,
+      "refreshing": false,
+      "scripts": []
+    }
+  },
+  {
+    "name": "script hash in uppercase",
+    "value": {
+      "id": "dashboards/a.html",
+      "live": true,
+      "interval": 0,
+      "specInterval": 0,
+      "overridden": false,
+      "refreshing": false,
+      "scripts": [
+        {
+          "name": "a.py",
+          "sha256": "ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB",
+          "approved": false,
+          "source": "",
+          "truncated": false
+        }
+      ]
+    }
+  }
+]

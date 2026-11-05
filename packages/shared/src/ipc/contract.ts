@@ -83,6 +83,9 @@ import {
   ArtifactBrowsersDto,
   ArtifactRef,
   ArtifactSaveResult,
+  DashboardApproveInput,
+  DashboardIntervalInput,
+  DashboardStatusDto,
   OpenArtifactInBrowserInput,
 } from "../artifacts.js";
 import { OpenSiteInput, SiteIconDto, SiteIconInput } from "../sites.js";
@@ -378,6 +381,10 @@ export const contract = defineContract({
   "artifacts.browsers": { input: z.void(), output: ArtifactBrowsersDto },
   "artifacts.openInBrowser": { input: OpenArtifactInBrowserInput, output: z.void() },
   "artifacts.openInApp": { input: ArtifactRef, output: z.void() },
+  "dashboards.status": { input: ArtifactRef, output: DashboardStatusDto },
+  "dashboards.refresh": { input: ArtifactRef, output: DashboardStatusDto },
+  "dashboards.approve": { input: DashboardApproveInput, output: DashboardStatusDto },
+  "dashboards.setInterval": { input: DashboardIntervalInput, output: DashboardStatusDto },
   "sites.open": { input: OpenSiteInput, output: z.void() },
   "sites.icon": { input: SiteIconInput, output: SiteIconDto.nullable() },
   "runs.approve": {

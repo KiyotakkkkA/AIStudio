@@ -30,6 +30,19 @@
       theme: "Тема",
       themes: { auto: "Авто", light: "Светлая", dark: "Тёмная" },
       texture: "Штриховка",
+      refresh: "Обновить",
+      refreshing: "Обновление…",
+      updated: "Обновлено",
+      autoRefresh: "Автообновление",
+      intervalOff: "Вручную",
+      intervalEvery: (seconds) =>
+        seconds % 3600 === 0
+          ? `Каждые ${seconds / 3600} ч`
+          : seconds % 60 === 0
+            ? `Каждые ${seconds / 60} мин`
+            : `Каждые ${seconds} с`,
+      approval: "Для обновления подтвердите скрипты в разделе «Галерея» приложения",
+      offline: "Нет связи с приложением; показаны последние данные",
       view: "Вид",
       pickDate: "Выбрать дату",
       prevMonth: "Предыдущий месяц",
@@ -61,6 +74,19 @@
       theme: "Theme",
       themes: { auto: "Auto", light: "Light", dark: "Dark" },
       texture: "Patterns",
+      refresh: "Refresh",
+      refreshing: "Refreshing…",
+      updated: "Updated",
+      autoRefresh: "Auto refresh",
+      intervalOff: "Manual",
+      intervalEvery: (seconds) =>
+        seconds % 3600 === 0
+          ? `Every ${seconds / 3600} h`
+          : seconds % 60 === 0
+            ? `Every ${seconds / 60} min`
+            : `Every ${seconds} s`,
+      approval: "Approve the data scripts in the Gallery of the app to refresh",
+      offline: "The app is not reachable; showing the last data",
       view: "View",
       pickDate: "Pick a date",
       prevMonth: "Previous month",
@@ -86,6 +112,21 @@
     copy: COPY.ru,
     cards: [],
     formats: new Map(),
+    observer: null,
+  };
+
+  const LIVE_INTERVALS = [0, 15, 60, 300, 900, 3600];
+
+  const live = {
+    base: null,
+    interval: 0,
+    refreshedAt: null,
+    error: null,
+    approval: false,
+    offline: false,
+    busy: false,
+    timer: null,
+    view: null,
   };
 
   function el(tag, className, text) {
@@ -761,9 +802,14 @@
 
   function load() {
     const node = document.getElementById("zvs-dashboard-data");
-    const spec = JSON.parse(node.textContent);
+    adopt(JSON.parse(node.textContent));
+  }
+
+  function adopt(spec) {
     state.spec = spec;
     state.copy = COPY[spec.lang] || COPY.ru;
+    state.data = {};
+    state.formats = new Map();
     for (const [name, dataset] of Object.entries(spec.datasets || {})) {
       const columns = dataset.columns || [];
       const types = {};
@@ -2663,6 +2709,7 @@
       }
     });
     const controls = el("div", "zd-header-controls");
+    if (live.base) controls.appendChild(liveControls());
     controls.append(texture, toggle.node);
     header.appendChild(controls);
     root.appendChild(header);
@@ -2706,6 +2753,7 @@
 
   function watchSizes() {
     if (typeof ResizeObserver !== "function") return;
+    if (state.observer) state.observer.disconnect();
     let pending = null;
     const observer = new ResizeObserver((records) => {
       const changed = new Set();
@@ -2731,6 +2779,192 @@
         observer.observe(entry.body);
       }
     }
+    state.observer = observer;
+  }
+
+  function build(root) {
+    renderHeader(root);
+    renderFilters(root);
+    const main = el("main", "zd-main");
+    root.appendChild(main);
+    renderSections(main);
+    renderFooter(root);
+    renderAll();
+    watchSizes();
+  }
+
+  function rebuild(spec) {
+    const root = document.getElementById("app");
+    const tables = state.cards.map((card) => card.showTable);
+    const scroll = window.scrollY;
+    closePopover();
+    hideTip();
+    adopt(spec);
+    state.cards = [];
+    root.replaceChildren();
+    build(root);
+    state.cards.forEach((card, index) => {
+      if (!tables[index] || !card.toggle) return;
+      card.showTable = true;
+      card.toggle.set("table");
+      renderCard(card);
+    });
+    window.scrollTo(0, scroll);
+  }
+
+  function liveBase() {
+    if (!/^https?:$/.test(window.location.protocol)) return null;
+    return window.location.pathname.replace(/\/+$/, "");
+  }
+
+  async function liveCall(action, body) {
+    const options = { cache: "no-store", credentials: "same-origin" };
+    if (body !== undefined) {
+      options.method = "POST";
+      options.headers = { "Content-Type": "application/json" };
+      options.body = JSON.stringify(body);
+    }
+    const response = await window.fetch(`${live.base}/${action}`, options);
+    const text = await response.text();
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = null;
+    }
+    if (!response.ok) {
+      const error = new Error((payload && payload.error) || String(response.status));
+      error.status = response.status;
+      throw error;
+    }
+    return payload;
+  }
+
+  function adoptLive(next) {
+    live.interval = Number(next.interval) || 0;
+    live.refreshedAt = next.refreshedAt || null;
+    live.error = next.error || null;
+    live.approval = Boolean(next.needsApproval);
+    live.offline = false;
+  }
+
+  function schedule() {
+    if (live.timer) window.clearTimeout(live.timer);
+    live.timer = null;
+    if (!live.interval || document.hidden || live.approval || live.offline) return;
+    const age = live.refreshedAt ? Date.now() - live.refreshedAt : Infinity;
+    const wait = Math.max(1000, live.interval * 1000 - age);
+    live.timer = window.setTimeout(() => refreshNow(true), wait);
+  }
+
+  async function refreshNow(automatic) {
+    if (live.busy) return;
+    live.busy = true;
+    document.documentElement.classList.add("zd-stale");
+    drawLive();
+    const before = live.refreshedAt;
+    try {
+      adoptLive(await liveCall("refresh", { automatic }));
+    } catch {
+      try {
+        adoptLive(await liveCall("state"));
+      } catch {
+        live.offline = true;
+      }
+    }
+    if (!live.offline && live.refreshedAt && live.refreshedAt !== before) {
+      try {
+        rebuild(await liveCall("data"));
+      } catch {
+        live.offline = true;
+      }
+    }
+    live.busy = false;
+    document.documentElement.classList.remove("zd-stale");
+    drawLive();
+    schedule();
+  }
+
+  async function setLiveInterval(value) {
+    try {
+      adoptLive(await liveCall("interval", { interval: value }));
+    } catch {
+      live.offline = true;
+    }
+    drawLive();
+    schedule();
+  }
+
+  function liveControls() {
+    const group = el("div", "zd-live");
+    const status = el("span", "zd-live-status");
+    status.setAttribute("role", "status");
+    const refresh = button(state.copy.refresh, "secondary", "sm");
+    refresh.addEventListener("click", () => refreshNow(false));
+    const values = LIVE_INTERVALS.includes(live.interval)
+      ? LIVE_INTERVALS
+      : [...LIVE_INTERVALS, live.interval].sort((a, b) => a - b);
+    const interval = select({
+      label: state.copy.autoRefresh,
+      value: String(live.interval),
+      options: values.map((value) => ({
+        value: String(value),
+        label: value ? state.copy.intervalEvery(value) : state.copy.intervalOff,
+      })),
+      onChange: (value) => setLiveInterval(Number(value)),
+    });
+    interval.node.classList.add("zd-live-interval");
+    group.append(status, refresh, interval.node);
+    live.view = { status, refresh, interval };
+    drawLive();
+    return group;
+  }
+
+  function drawLive() {
+    const view = live.view;
+    if (!view) return;
+    let text = "";
+    let tone = "";
+    if (live.busy) text = state.copy.refreshing;
+    else if (live.offline) {
+      text = state.copy.offline;
+      tone = "warn";
+    } else if (live.approval) {
+      text = state.copy.approval;
+      tone = "warn";
+    } else if (live.error) {
+      text = live.error;
+      tone = "error";
+    } else if (live.refreshedAt) {
+      text = `${state.copy.updated} ${new Date(live.refreshedAt).toLocaleTimeString(state.copy.locale)}`;
+    }
+    view.status.textContent = text;
+    view.status.title = text;
+    view.status.dataset.tone = tone;
+    view.refresh.disabled = live.busy || live.approval;
+    view.interval.set(String(live.interval));
+  }
+
+  async function startLive() {
+    live.base = liveBase();
+    if (!live.base) return;
+    try {
+      adoptLive(await liveCall("state"));
+    } catch {
+      live.base = null;
+      return;
+    }
+    const header = document.querySelector(".zd-header-controls");
+    if (header) header.prepend(liveControls());
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        if (live.timer) window.clearTimeout(live.timer);
+        live.timer = null;
+      } else {
+        schedule();
+      }
+    });
+    schedule();
   }
 
   function start() {
@@ -2743,16 +2977,10 @@
     }
     document.documentElement.lang = state.spec.lang || "ru";
     textureDefs();
-    renderHeader(root);
-    renderFilters(root);
-    const main = el("main", "zd-main");
-    root.appendChild(main);
-    renderSections(main);
-    renderFooter(root);
-    renderAll();
-    watchSizes();
+    build(root);
     window.addEventListener("scroll", hideTip, { passive: true });
     document.documentElement.dataset.ready = "true";
+    startLive();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);

@@ -11,6 +11,7 @@ pub mod cli;
 pub mod commands;
 pub mod computer;
 pub mod conversations;
+pub mod dashboards;
 pub mod data;
 pub mod documents;
 pub mod downloads;
