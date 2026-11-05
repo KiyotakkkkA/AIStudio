@@ -1,0 +1,28 @@
+[
+  {
+    "name": "live dashboard",
+    "value": {
+      "id": "dashboards/Продажи.html",
+      "name": "Продажи.html",
+      "format": "html",
+      "kind": "dashboard",
+      "sizeBytes": 160000,
+      "modifiedAt": 1793750400000,
+      "owner": "dashboards",
+      "live": true
+    }
+  },
+  {
+    "name": "chat document",
+    "value": {
+      "id": "c_0b4f2e/Отчёт.pdf",
+      "name": "Отчёт.pdf",
+      "format": "pdf",
+      "kind": "document",
+      "sizeBytes": 52000,
+      "modifiedAt": 1793750400000,
+      "owner": "c_0b4f2e",
+      "live": false
+    }
+  }
+]

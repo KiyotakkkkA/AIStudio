@@ -7,6 +7,7 @@ import { DEFAULT_ROUTE, ROUTES } from "./routes";
 const SecretsPage = lazy(() => import("../pages/SecretsPage"));
 const ProvidersPage = lazy(() => import("../pages/ProvidersPage"));
 const VectorStoresPage = lazy(() => import("../pages/VectorStoresPage"));
+const GalleryPage = lazy(() => import("../pages/GalleryPage"));
 const ChatPage = lazy(() => import("../pages/ChatPage"));
 const AgenticBuildPage = lazy(() => import("../pages/AgenticBuildPage"));
 const ScenariosPage = lazy(() => import("../pages/ScenariosPage"));
@@ -39,6 +40,7 @@ export const routes: RouteObject[] = [
       page(ROUTES.secrets, SecretsPage),
       page(ROUTES.providers, ProvidersPage),
       page(ROUTES.vectorStores, VectorStoresPage),
+      page(ROUTES.gallery, GalleryPage),
       page(ROUTES.chat, ChatPage),
       page(ROUTES.agenticBuild, AgenticBuildPage),
       page(ROUTES.scenarios, ScenariosPage),

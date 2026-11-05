@@ -78,6 +78,24 @@ pub fn register(server: &mut IpcServer) {
             },
         )
         .handle(
+            "gallery.list",
+            |services: Arc<Services>, _input: ()| async move {
+                Ok::<_, zvs_contract::AppError>(services.artifacts.gallery())
+            },
+        )
+        .handle(
+            "gallery.thumbnail",
+            |services: Arc<Services>, input: ArtifactRef| async move {
+                services.artifacts.thumbnail(&input.id).await
+            },
+        )
+        .handle(
+            "gallery.remove",
+            |services: Arc<Services>, input: ArtifactRef| async move {
+                services.artifacts.remove_artifact(&input.id)
+            },
+        )
+        .handle(
             "dashboards.setInterval",
             |services: Arc<Services>, input: DashboardIntervalInput| async move {
                 services

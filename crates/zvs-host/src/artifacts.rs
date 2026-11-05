@@ -22,6 +22,10 @@ use crate::platform::long_path::extended;
 use crate::platform::picker::{SAVE_DIALOG_UNAVAILABLE, SharedPicker};
 use crate::workspace::canonical;
 
+mod gallery;
+
+pub use gallery::{HeadlessCapture, PageCapture, REMOVE_FAILED, SharedPageCapture, kind_of};
+
 pub const ARTIFACT_EXTENSIONS: &[&str] = &[
     "pdf", "docx", "doc", "xlsx", "xlsm", "xls", "pptx", "ppt", "odt", "ods", "odp", "rtf", "csv",
     "md", "html", "png", "jpg", "jpeg", "svg", "zip",
@@ -31,7 +35,7 @@ pub const ARTIFACT_MAX_BYTES: u64 = 512 * 1024 * 1024;
 const SNAPSHOT_DEPTH: usize = 4;
 const SNAPSHOT_FILES_MAX: usize = 4096;
 
-pub const ARTIFACT_NOT_FOUND: &str = "Файл не найден";
+pub const ARTIFACT_NOT_FOUND: &str = "Файл удалён или перемещён";
 pub const ARTIFACT_SAVE_FAILED: &str = "Не удалось сохранить файл";
 pub const BROWSER_NOT_FOUND: &str = "Браузер не найден";
 pub const DASHBOARDS: &str = "dashboards";
@@ -139,6 +143,8 @@ pub struct ArtifactStore {
     pages: Option<SharedPageOpener>,
     server: Arc<tokio::sync::OnceCell<PageServer>>,
     dashboards: Option<DashboardService>,
+    thumbnails: Option<(PathBuf, SharedPageCapture)>,
+    capture_gate: Arc<tokio::sync::Mutex<()>>,
 }
 
 pub fn library_env(name: &str) -> String {
@@ -156,6 +162,8 @@ impl ArtifactStore {
             pages: None,
             server: Arc::new(tokio::sync::OnceCell::new()),
             dashboards: None,
+            thumbnails: None,
+            capture_gate: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
 
@@ -176,6 +184,19 @@ impl ArtifactStore {
         if let Some(folder) = self.library(DASHBOARDS) {
             self.dashboards = Some(DashboardService::new(folder.to_path_buf(), runner));
         }
+        self
+    }
+
+    #[must_use]
+    pub fn with_thumbnails(mut self, cache: PathBuf) -> Self {
+        let capture = HeadlessCapture::new(self.launcher.clone(), cache.join("profile"));
+        self.thumbnails = Some((cache, Arc::new(capture)));
+        self
+    }
+
+    #[must_use]
+    pub fn with_capture(mut self, cache: PathBuf, capture: SharedPageCapture) -> Self {
+        self.thumbnails = Some((cache, capture));
         self
     }
 

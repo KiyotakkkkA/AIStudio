@@ -11,7 +11,7 @@ import Icon from "../../ui/atoms/Icon";
 import { STATUS_TONE_TEXT, type StatusTone } from "../../ui/atoms/statusTone";
 import { artifactKind } from "./artifacts";
 
-const TILE_BACKGROUNDS: Record<StatusTone, string> = {
+export const TILE_BACKGROUNDS: Record<StatusTone, string> = {
   ok: "bg-ok-soft",
   warn: "bg-warn-soft",
   err: "bg-err-soft",
@@ -19,7 +19,7 @@ const TILE_BACKGROUNDS: Record<StatusTone, string> = {
   accent: "bg-accent-soft",
 };
 
-function formatIcon(format: string): string {
+export function formatIcon(format: string): string {
   switch (format.toLowerCase()) {
     case "pdf":
       return mdiFilePdfBox;

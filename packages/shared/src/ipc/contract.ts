@@ -86,6 +86,8 @@ import {
   DashboardApproveInput,
   DashboardIntervalInput,
   DashboardStatusDto,
+  GalleryListDto,
+  GalleryThumbnailDto,
   OpenArtifactInBrowserInput,
 } from "../artifacts.js";
 import { OpenSiteInput, SiteIconDto, SiteIconInput } from "../sites.js";
@@ -385,6 +387,9 @@ export const contract = defineContract({
   "dashboards.refresh": { input: ArtifactRef, output: DashboardStatusDto },
   "dashboards.approve": { input: DashboardApproveInput, output: DashboardStatusDto },
   "dashboards.setInterval": { input: DashboardIntervalInput, output: DashboardStatusDto },
+  "gallery.list": { input: z.void(), output: GalleryListDto },
+  "gallery.thumbnail": { input: ArtifactRef, output: GalleryThumbnailDto },
+  "gallery.remove": { input: ArtifactRef, output: z.void() },
   "sites.open": { input: OpenSiteInput, output: z.void() },
   "sites.icon": { input: SiteIconInput, output: SiteIconDto.nullable() },
   "runs.approve": {

@@ -36,11 +36,15 @@
       autoRefresh: "Автообновление",
       intervalOff: "Вручную",
       intervalEvery: (seconds) =>
-        seconds % 3600 === 0
-          ? `Каждые ${seconds / 3600} ч`
-          : seconds % 60 === 0
-            ? `Каждые ${seconds / 60} мин`
-            : `Каждые ${seconds} с`,
+        seconds === 60
+          ? "Каждую минуту"
+          : seconds === 3600
+            ? "Каждый час"
+            : seconds % 3600 === 0
+              ? `Каждые ${seconds / 3600} ч`
+              : seconds % 60 === 0
+                ? `Каждые ${seconds / 60} мин`
+                : `Каждые ${seconds} с`,
       approval: "Для обновления подтвердите скрипты в разделе «Галерея» приложения",
       offline: "Нет связи с приложением; показаны последние данные",
       view: "Вид",
@@ -80,11 +84,15 @@
       autoRefresh: "Auto refresh",
       intervalOff: "Manual",
       intervalEvery: (seconds) =>
-        seconds % 3600 === 0
-          ? `Every ${seconds / 3600} h`
-          : seconds % 60 === 0
-            ? `Every ${seconds / 60} min`
-            : `Every ${seconds} s`,
+        seconds === 60
+          ? "Every minute"
+          : seconds === 3600
+            ? "Every hour"
+            : seconds % 3600 === 0
+              ? `Every ${seconds / 3600} h`
+              : seconds % 60 === 0
+                ? `Every ${seconds / 60} min`
+                : `Every ${seconds} s`,
       approval: "Approve the data scripts in the Gallery of the app to refresh",
       offline: "The app is not reachable; showing the last data",
       view: "View",
@@ -2814,6 +2822,7 @@
 
   function liveBase() {
     if (!/^https?:$/.test(window.location.protocol)) return null;
+    if (new window.URLSearchParams(window.location.search).has("preview")) return null;
     return window.location.pathname.replace(/\/+$/, "");
   }
 

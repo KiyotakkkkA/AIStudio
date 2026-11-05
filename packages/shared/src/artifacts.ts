@@ -107,3 +107,45 @@ export const DashboardIntervalInput = z.object({
   interval: DashboardInterval.nullable().optional(),
 });
 export type DashboardIntervalInput = z.infer<typeof DashboardIntervalInput>;
+
+export const GALLERY_ITEMS_MAX = 4096;
+export const GALLERY_OWNER_MAX = 256;
+export const GALLERY_THUMBNAIL_BYTES_MAX = 16 * 1024 * 1024;
+export const GALLERY_THUMBNAIL_DATA_MAX = Math.ceil(GALLERY_THUMBNAIL_BYTES_MAX / 3) * 4;
+
+export const GalleryKind = z.enum(["dashboard", "document", "table", "image", "other"]);
+export type GalleryKind = z.infer<typeof GalleryKind>;
+
+export const GalleryItemDto = z.object({
+  id: ArtifactId,
+  name: z.string().min(1).max(ARTIFACT_NAME_MAX),
+  format: z.string().min(1).max(ARTIFACT_FORMAT_MAX),
+  kind: GalleryKind,
+  sizeBytes: z.number().int().nonnegative(),
+  modifiedAt: z.number().int().nonnegative(),
+  owner: z.string().min(1).max(GALLERY_OWNER_MAX),
+  live: z.boolean(),
+});
+export type GalleryItemDto = z.infer<typeof GalleryItemDto>;
+
+export const GalleryListDto = z.object({
+  items: z.array(GalleryItemDto).max(GALLERY_ITEMS_MAX),
+});
+export type GalleryListDto = z.infer<typeof GalleryListDto>;
+
+export const GalleryMediaType = z.enum([
+  "image/png",
+  "image/jpeg",
+  "image/svg+xml",
+  "application/pdf",
+]);
+export type GalleryMediaType = z.infer<typeof GalleryMediaType>;
+
+export const GalleryThumbnailDto = z.union([
+  z.object({
+    mediaType: GalleryMediaType,
+    data: z.string().min(1).max(GALLERY_THUMBNAIL_DATA_MAX),
+  }),
+  z.object({}).strict(),
+]);
+export type GalleryThumbnailDto = z.infer<typeof GalleryThumbnailDto>;

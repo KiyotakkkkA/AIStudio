@@ -1093,6 +1093,18 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   spec, overridden per dashboard by `dashboards.setInterval`; 15 s–24 h or off). Approvals and
   overrides live in `.zvs/settings.json`. `artifacts.openInBrowser` opens a live dashboard by
   its loopback URL, so it stays live in an installed browser while the app runs.
+- **Gallery** (`zvs-host/src/artifacts/gallery.rs`, «Хранилище» → «Галерея»). `gallery.list`
+  returns the files of every library and every conversation's output manifest that still
+  exist, typed `dashboard` (HTML in `dashboards`), `document`, `table`, `image` or `other`;
+  the renderer groups them and hides empty groups. `gallery.thumbnail` returns PNG, JPEG,
+  SVG and PDF files as they are (8 / 2 / 16 MB caps; the renderer draws a PDF's first page
+  with pdf.js) and captures HTML with a headless Chromium-family browser from the system list,
+  through the loopback page server with `?preview` (a live page then stays static), one
+  capture at a time, cached under `<cache>/gallery/` per path, size and modification time.
+  The studio CSP allows only `blob:` images, so previews travel as base64 and become object
+  URLs. `gallery.remove` deletes the file, its previews and, for a dashboard, its saved spec
+  and settings; a conversation keeps its manifest entry, so its card reports
+  `ARTIFACT_NOT_FOUND` («Файл удалён или перемещён»).
 - **Chat working folder** (`zvs-host/src/chat_files.rs`). Each conversation, and each agentic
   session, owns `<app data>/conversations/<id>/work/`, created on first use and removed with the
   conversation or session. It is the one app folder an agent reaches without a grant: in a

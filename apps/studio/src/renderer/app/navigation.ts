@@ -4,6 +4,7 @@ import {
   mdiClockOutline,
   mdiCreationOutline,
   mdiDatabaseOutline,
+  mdiViewGridOutline,
   mdiGraphOutline,
   mdiHistory,
   mdiKeyOutline,
@@ -48,6 +49,7 @@ export const NAV_GROUPS: readonly NavGroupModel[] = [
         icon: mdiDatabaseOutline,
         path: ROUTES.vectorStores,
       },
+      { id: "gallery", label: "Галерея", icon: mdiViewGridOutline, path: ROUTES.gallery },
     ],
   },
   {

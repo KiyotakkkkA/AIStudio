@@ -8,6 +8,7 @@ import { SecretStore } from "../features/secrets/SecretStore";
 import { UiStore } from "./UiStore";
 import ViewerStore from "./ViewerStore";
 import VectorStoreStore from "../features/vector-stores/VectorStoreStore";
+import GalleryStore from "../features/gallery/GalleryStore";
 import ChatStore from "../features/chat/ChatStore";
 import DownloadStore from "../features/downloads/DownloadStore";
 import TaskStore from "../features/tasks/TaskStore";
@@ -41,6 +42,7 @@ export class RootStore {
   readonly providers: ProviderStore;
   readonly accounts: AccountStore;
   readonly vectorStores: VectorStoreStore;
+  readonly gallery: GalleryStore;
   readonly chat: ChatStore;
   readonly tasks: TaskStore;
   readonly downloads: DownloadStore;
@@ -68,6 +70,7 @@ export class RootStore {
     this.providers = new ProviderStore(environment.ipc);
     this.accounts = new AccountStore(environment);
     this.vectorStores = new VectorStoreStore(environment.ipc, environment.events);
+    this.gallery = new GalleryStore(environment.ipc);
     this.chat = new ChatStore(environment.ipc, environment.events);
     this.viewer = new ViewerStore(environment.ipc, {
       attachSelection: (selection) => this.chat.attachSelection(selection),
@@ -104,6 +107,7 @@ export class RootStore {
         providers: false,
         accounts: false,
         vectorStores: false,
+        gallery: false,
         chat: false,
         tasks: false,
         downloads: false,
@@ -144,6 +148,7 @@ export class RootStore {
     this.viewer.dispose();
     this.accounts.dispose();
     this.vectorStores.dispose();
+    this.gallery.dispose();
     this.chat.dispose();
     this.tasks.dispose();
     this.downloads.dispose();

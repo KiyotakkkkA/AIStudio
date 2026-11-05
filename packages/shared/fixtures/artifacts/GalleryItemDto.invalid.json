@@ -1,0 +1,28 @@
+[
+  {
+    "name": "unknown kind",
+    "value": {
+      "id": "dashboards/a.html",
+      "name": "a.html",
+      "format": "html",
+      "kind": "page",
+      "sizeBytes": 1,
+      "modifiedAt": 1,
+      "owner": "dashboards",
+      "live": false
+    }
+  },
+  {
+    "name": "empty owner",
+    "value": {
+      "id": "dashboards/a.html",
+      "name": "a.html",
+      "format": "html",
+      "kind": "dashboard",
+      "sizeBytes": 1,
+      "modifiedAt": 1,
+      "owner": "",
+      "live": false
+    }
+  }
+]

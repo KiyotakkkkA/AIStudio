@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::enums::wire_enum;
 use crate::errors::AppError;
 use crate::validate::{Validate, check, invalid};
 
@@ -264,11 +265,118 @@ impl Validate for DashboardIntervalInput {
     }
 }
 
+pub const GALLERY_ITEMS_MAX: usize = 4_096;
+pub const GALLERY_OWNER_MAX: usize = 256;
+pub const GALLERY_THUMBNAIL_BYTES_MAX: usize = 16 * 1024 * 1024;
+pub const GALLERY_THUMBNAIL_DATA_MAX: usize = GALLERY_THUMBNAIL_BYTES_MAX.div_ceil(3) * 4;
+pub const GALLERY_MEDIA_TYPES: &[&str] = &[
+    "image/png",
+    "image/jpeg",
+    "image/svg+xml",
+    "application/pdf",
+];
+
+wire_enum!(GalleryKind {
+    Dashboard => "dashboard",
+    Document => "document",
+    Table => "table",
+    Image => "image",
+    Other => "other",
+});
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryItemDto {
+    pub id: String,
+    pub name: String,
+    pub format: String,
+    pub kind: GalleryKind,
+    pub size_bytes: u64,
+    pub modified_at: crate::primitives::Timestamp,
+    pub owner: String,
+    pub live: bool,
+}
+
+impl Validate for GalleryItemDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check_id(&self.id)?;
+        check::non_empty("name", &self.name)?;
+        check::max_len("name", &self.name, ARTIFACT_NAME_MAX)?;
+        check::non_empty("format", &self.format)?;
+        check::max_len("format", &self.format, ARTIFACT_FORMAT_MAX)?;
+        check::safe_integer("sizeBytes", self.size_bytes)?;
+        if self.modified_at < 0 {
+            return Err(invalid("modifiedAt", "min"));
+        }
+        check::non_empty("owner", &self.owner)?;
+        check::max_len("owner", &self.owner, GALLERY_OWNER_MAX)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryListDto {
+    pub items: Vec<GalleryItemDto>,
+}
+
+impl Validate for GalleryListDto {
+    fn validate(&self) -> Result<(), AppError> {
+        if self.items.len() > GALLERY_ITEMS_MAX {
+            return Err(invalid("items", "maxLength"));
+        }
+        crate::validate::nested("items", self.items.validate())
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryThumbnailDto {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+}
+
+impl Validate for GalleryThumbnailDto {
+    fn validate(&self) -> Result<(), AppError> {
+        match (&self.media_type, &self.data) {
+            (None, None) => Ok(()),
+            (Some(media_type), Some(data)) => {
+                if !GALLERY_MEDIA_TYPES.contains(&media_type.as_str()) {
+                    return Err(invalid("mediaType", "enum"));
+                }
+                check::non_empty("data", data)?;
+                check::max_len("data", data, GALLERY_THUMBNAIL_DATA_MAX)
+            }
+            _ => Err(invalid("data", "pair")),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::validate::parse;
     use serde_json::json;
+
+    #[test]
+    fn a_thumbnail_carries_both_its_type_and_data_or_neither() {
+        assert!(parse::<GalleryThumbnailDto>(json!({})).is_ok());
+        assert!(
+            parse::<GalleryThumbnailDto>(json!({ "mediaType": "image/png", "data": "iVBO" }))
+                .is_ok()
+        );
+        for value in [
+            json!({ "mediaType": "image/png" }),
+            json!({ "data": "iVBO" }),
+            json!({ "mediaType": "text/html", "data": "PGgx" }),
+        ] {
+            assert!(
+                parse::<GalleryThumbnailDto>(value.clone()).is_err(),
+                "{value}"
+            );
+        }
+    }
 
     #[test]
     fn a_refresh_interval_is_off_or_between_the_bounds() {

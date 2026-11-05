@@ -1,0 +1,20 @@
+[
+  { "name": "empty", "value": { "items": [] } },
+  {
+    "name": "one image",
+    "value": {
+      "items": [
+        {
+          "id": "c_1/chart.png",
+          "name": "chart.png",
+          "format": "png",
+          "kind": "image",
+          "sizeBytes": 2048,
+          "modifiedAt": 1793750400000,
+          "owner": "c_1",
+          "live": false
+        }
+      ]
+    }
+  }
+]

@@ -3,6 +3,7 @@ export const ROUTES = {
   secrets: "/secrets",
   providers: "/providers",
   vectorStores: "/vector-stores",
+  gallery: "/gallery",
   chat: "/chat",
   agenticBuild: "/agentic-build",
   scenarios: "/scenarios",

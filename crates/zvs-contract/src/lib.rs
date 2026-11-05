@@ -73,7 +73,8 @@ pub use ai::{
 pub use artifacts::{
     ArtifactApplicationDto, ArtifactBrowsersDto, ArtifactDto, ArtifactRef, ArtifactSaveResult,
     DashboardApproveInput, DashboardIntervalInput, DashboardScriptDto, DashboardStatusDto,
-    InstalledBrowserDto, OpenArtifactInBrowserInput,
+    GalleryItemDto, GalleryKind, GalleryListDto, GalleryThumbnailDto, InstalledBrowserDto,
+    OpenArtifactInBrowserInput,
 };
 pub use browser::{
     BrowserActionState, BrowserAgentAction, BrowserAgentApproval, BrowserAgentState,

@@ -1,0 +1,7 @@
+[
+  { "name": "dashboard", "value": "dashboard" },
+  { "name": "document", "value": "document" },
+  { "name": "table", "value": "table" },
+  { "name": "image", "value": "image" },
+  { "name": "other", "value": "other" }
+]

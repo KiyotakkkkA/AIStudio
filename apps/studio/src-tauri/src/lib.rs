@@ -853,6 +853,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         )))
         .with_picker(Arc::clone(&picker))
         .with_launcher(platform::file_launcher())
+        .with_thumbnails(paths.cache_dir.join("gallery"))
         .with_pages(Arc::new(WorkspacePages(workspace.clone())));
     let sites = zvs_host::sites::SiteService::new(zvs_host::sites::SiteServiceOptions {
         pages: Some(Arc::new(WorkspacePages(workspace.clone()))),

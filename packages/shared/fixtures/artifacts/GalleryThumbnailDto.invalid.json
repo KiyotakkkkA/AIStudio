@@ -1,0 +1,4 @@
+[
+  { "name": "type without data", "value": { "mediaType": "image/png" } },
+  { "name": "html is never a preview", "value": { "mediaType": "text/html", "data": "PGgxPg==" } }
+]

@@ -1292,6 +1292,22 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::artifacts::DashboardIntervalInput>,
     ),
     (
+        "artifacts/GalleryKind",
+        round_trip::<zvs_contract::artifacts::GalleryKind>,
+    ),
+    (
+        "artifacts/GalleryItemDto",
+        round_trip::<zvs_contract::artifacts::GalleryItemDto>,
+    ),
+    (
+        "artifacts/GalleryListDto",
+        round_trip::<zvs_contract::artifacts::GalleryListDto>,
+    ),
+    (
+        "artifacts/GalleryThumbnailDto",
+        round_trip::<zvs_contract::artifacts::GalleryThumbnailDto>,
+    ),
+    (
         "chat/DocumentSelectionDto",
         round_trip::<zvs_contract::chat::DocumentSelectionDto>,
     ),
