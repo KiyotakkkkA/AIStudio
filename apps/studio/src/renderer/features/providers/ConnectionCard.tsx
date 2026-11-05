@@ -224,12 +224,6 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
       )}
 
       <div className="flex flex-col gap-3">
-        {vm.isLocal ? (
-          <p className="text-[12px] text-main-400">
-            Модели из папки загрузок доступны после поиска.
-          </p>
-        ) : null}
-
         {vm.isLocal ? null : (
           <Field label="Возможности" error={vm.errorOf("capabilities")}>
             <div className="flex flex-wrap gap-1.5">

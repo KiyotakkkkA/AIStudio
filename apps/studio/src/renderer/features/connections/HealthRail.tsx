@@ -12,7 +12,7 @@ import {
   scenariosWord,
 } from "./connectionPresentation";
 
-const HEADING = "text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase";
+const HEADING = "text-[13px] font-semibold text-main-200";
 
 function HealthRail({ store }: { readonly store: ConnectionStore }) {
   const health = store.selectedHealth;
@@ -20,10 +20,7 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
 
   if (server === null || store.form?.isNew === true) {
     return (
-      <aside
-        aria-label="Состояние сервера"
-        className="flex w-71.5 flex-none flex-col border-l border-line bg-main-800"
-      >
+      <aside aria-label="Состояние сервера" className="flex w-71.5 flex-none flex-col bg-main-900">
         <div className="flex flex-1 items-center justify-center p-4">
           <EmptyState
             icon={mdiHeartPulse}
@@ -52,10 +49,10 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
   return (
     <aside
       aria-label="Состояние сервера"
-      className="flex min-h-0 w-71.5 flex-none flex-col gap-3 border-l border-line bg-main-800 px-3.5 py-4"
+      className="flex min-h-0 w-71.5 flex-none flex-col gap-3 bg-main-900 px-3.5 py-4"
     >
       <div className={HEADING}>Состояние</div>
-      <div className="flex flex-none flex-col gap-2.25 rounded-card border border-line bg-main-900 p-3">
+      <div className="flex flex-none flex-col gap-2.25 rounded-xl bg-main-850 p-3">
         {metrics.map((metric) => (
           <div key={metric.label} className="flex justify-between gap-2 text-[11.5px]">
             <span className="text-main-400">{metric.label}</span>
@@ -72,14 +69,14 @@ function HealthRail({ store }: { readonly store: ConnectionStore }) {
           Ни один сценарий не ссылается на инструменты этого сервера.
         </div>
       ) : (
-        <div className="flex flex-none items-center gap-2.25 rounded-card border border-line bg-main-900 px-2.75 py-2.5">
+        <div className="flex flex-none items-center gap-2.25 rounded-xl bg-main-850 px-2.75 py-2.5">
           <Icon path={mdiSitemapOutline} size={15} className="text-main-400" />
           <span className="flex-1 text-[12px] text-main-100">{scenariosWord(usedBy)}</span>
         </div>
       )}
 
       <div className={`mt-0.5 ${HEADING}`}>Журнал</div>
-      <ScrollArea className="flex min-h-40 flex-1 flex-col rounded-card border border-line bg-main-900 px-2.75 py-2.5 font-mono text-[10.5px]/[1.8]">
+      <ScrollArea className="flex min-h-40 flex-1 flex-col rounded-xl bg-main-850 px-2.75 py-2.5 font-mono text-[10.5px]/[1.8]">
         {log.length === 0 ? (
           <span className="text-main-500">Сервер пока ничего не писал в этой сессии.</span>
         ) : (

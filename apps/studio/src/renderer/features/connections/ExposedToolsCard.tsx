@@ -2,17 +2,16 @@ import { mdiWrenchOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import Chip from "../../ui/atoms/Chip";
 import Toggle from "../../ui/atoms/Toggle";
-import EmptyState from "../../ui/molecules/EmptyState";
+import Icon from "../../ui/atoms/Icon";
 import type ConnectionStore from "./ConnectionStore";
 import Disclosure from "./Disclosure";
 import TierPicker from "./TierPicker";
 
 function ExposedToolsCard({ store }: { readonly store: ConnectionStore }) {
   const rows = store.toolRows;
-  const isNew = store.form?.isNew === true;
 
   return (
-    <section className="flex flex-none flex-col">
+    <section className="mx-auto flex w-full max-w-360 flex-none flex-col rounded-xl bg-main-850 px-5 py-3">
       <Disclosure
         label="Инструменты"
         defaultOpen
@@ -25,16 +24,9 @@ function ExposedToolsCard({ store }: { readonly store: ConnectionStore }) {
         }
       >
         {rows.length === 0 ? (
-          <div className="flex items-center justify-center py-4">
-            <EmptyState
-              icon={mdiWrenchOutline}
-              title="Инструментов пока нет"
-              description={
-                isNew
-                  ? "Сохраните сервер и проверьте связь."
-                  : "Сервер ещё не отдавал список инструментов. Проверьте связь или подключите его."
-              }
-            />
+          <div className="flex items-center gap-3 py-4 text-main-400">
+            <Icon path={mdiWrenchOutline} size={22} className="flex-none text-main-500" />
+            <p className="text-[12px]">Проверьте связь, чтобы получить список инструментов.</p>
           </div>
         ) : (
           <div className="flex flex-col pb-2">
@@ -45,7 +37,7 @@ function ExposedToolsCard({ store }: { readonly store: ConnectionStore }) {
               return (
                 <div
                   key={capability.id}
-                  className={`flex items-center gap-2.75 py-2.25 ${muted ? "opacity-55" : ""}`}
+                  className={`flex items-center gap-2.75 rounded-control px-2 py-2.5 transition-colors even:bg-main-800/25 hover:bg-main-800/60 ${muted ? "opacity-65" : ""}`}
                 >
                   <Toggle
                     checked={tool?.enabled === true}

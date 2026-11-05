@@ -3,6 +3,7 @@ import { observer } from "mobx-react-lite";
 import EntityListPanel from "../../ui/molecules/EntityListPanel";
 import Chip from "../../ui/atoms/Chip";
 import Icon from "../../ui/atoms/Icon";
+import Button from "../../ui/atoms/buttons/Button";
 import StatusDot from "../../ui/atoms/StatusDot";
 import { STATUS_TONE_TEXT } from "../../ui/atoms/statusTone";
 import EmptyState from "../../ui/molecules/EmptyState";
@@ -22,6 +23,12 @@ function ServerList({ store }: { readonly store: ConnectionStore }) {
         placeholder: "Поиск серверов…",
         onChange: store.setQuery,
       }}
+      footer={
+        <Button tone="primary" onClick={() => store.requestCreate(null)}>
+          <Icon path={mdiPlus} size={15} />
+          Добавить сервер
+        </Button>
+      }
     >
       {awaitingData(store) ? <ListSkeleton /> : null}
 
@@ -79,19 +86,6 @@ function ServerList({ store }: { readonly store: ConnectionStore }) {
           <span className="truncate text-[11px] text-main-400">Не сохранён</span>
         </ListRow>
       ) : null}
-
-      <ListRow
-        dashed
-        onClick={store.openRegistry}
-        leading={
-          <span className="flex size-7.5 flex-none items-center justify-center rounded-control bg-main-700 text-main-400">
-            <Icon path={mdiPlus} size={14} />
-          </span>
-        }
-      >
-        <span className="font-medium text-main-300">Добавить из каталога</span>
-        <span className="truncate text-[11px] text-main-400">Готовые конфигурации серверов</span>
-      </ListRow>
     </EntityListPanel>
   );
 }

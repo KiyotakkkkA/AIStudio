@@ -61,7 +61,7 @@ function SkillFileView({ store, vm }: { readonly store: SkillStore; readonly vm:
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               icon={mdiFileOutline}
-              title="Новый файл"
+              title="Создать файл"
               description="Файл будет добавлен в навык после сохранения."
             />
           </div>

@@ -42,7 +42,7 @@ function VectorStoresWorkspace() {
           </Button>
           <Button tone="primary" disabled={store.busy || !!store.form} onClick={store.create}>
             <Icon path={mdiPlus} size={15} />
-            Новое хранилище
+            Создать хранилище
           </Button>
         </div>
       }
@@ -76,6 +76,12 @@ function VectorStoresWorkspace() {
               store.set("filter", value);
             },
           }}
+          footer={
+            <Button tone="primary" disabled={store.busy || !!store.form} onClick={store.create}>
+              <Icon path={mdiPlus} size={15} />
+              Создать хранилище
+            </Button>
+          }
         >
           {awaitingData(store) ? <ListSkeleton /> : null}
           {store.visibleStores.map((item) => (
@@ -112,20 +118,6 @@ function VectorStoresWorkspace() {
               />
             </div>
           ) : null}
-
-          <ListRow
-            dashed
-            disabled={store.busy || !!store.form}
-            onClick={store.create}
-            leading={
-              <span className="flex size-7.5 flex-none items-center justify-center rounded-control bg-main-700 text-main-400">
-                <Icon path={mdiPlus} size={14} />
-              </span>
-            }
-          >
-            <span className="font-medium text-main-300">Подключить хранилище</span>
-            <span className="text-[11px] text-main-400">Документы хранятся локально.</span>
-          </ListRow>
         </EntityListPanel>
         {!store.form && awaitingData(store) ? (
           <PaneSkeleton cards={3} />

@@ -13,6 +13,8 @@ import HealthRail from "./HealthRail";
 import RegistryDialog from "./RegistryDialog";
 import ServerList from "./ServerList";
 import ServerSetupCard from "./ServerSetupCard";
+import ServerActionsMenu from "./ServerActionsMenu";
+import ConnectionControlActions from "./ConnectionControlActions";
 import Alert from "../../ui/molecules/Alert";
 import { PaneSkeleton } from "../../ui/organisms/PageSkeletons";
 import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
@@ -83,10 +85,18 @@ function ConnectionsWorkspace() {
             />
           </div>
         ) : (
-          <ScrollArea className="flex min-w-0 flex-1 flex-col gap-3.5 px-4.5 py-4">
-            <ServerSetupCard store={store} vm={form} />
-            <ExposedToolsCard store={store} />
-          </ScrollArea>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <ScrollArea className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 px-5 py-4 lg:px-6">
+              <div className="mx-auto flex w-full max-w-360 flex-none justify-end">
+                <ServerActionsMenu store={store} />
+              </div>
+              <ServerSetupCard store={store} vm={form} />
+              <ExposedToolsCard store={store} />
+            </ScrollArea>
+            <div className="flex-none px-5 pt-2 pb-4 lg:px-6">
+              <ConnectionControlActions store={store} />
+            </div>
+          </div>
         )}
 
         <HealthRail store={store} />

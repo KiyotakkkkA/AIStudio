@@ -26,7 +26,7 @@ export const NODE_TYPE_LABELS: Readonly<Record<string, string>> = {
   "tool.set": "Набор инструментов",
   "output.chatReply": "Ответ в диалог",
   "output.chatMessage": "Сообщение в диалог",
-  "output.newChat": "Новый диалог",
+  "output.newChat": "Создать диалог",
   "output.notify": "Уведомление",
   "output.file": "Сохранение в файл",
   "flow.branch": "Ветвление",

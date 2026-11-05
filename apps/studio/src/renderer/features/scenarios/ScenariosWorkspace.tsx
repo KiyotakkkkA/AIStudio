@@ -218,7 +218,7 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
         actions={
           <Button tone="primary" disabled={store.creating} onClick={() => void store.create()}>
             <Icon path={mdiPlus} size={15} />
-            Новый сценарий
+            Создать сценарий
           </Button>
         }
       />
@@ -247,7 +247,7 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
             action={
               <Button tone="primary" onClick={() => void store.create()}>
                 <Icon path={mdiPlus} size={15} />
-                Новый сценарий
+                Создать сценарий
               </Button>
             }
           />

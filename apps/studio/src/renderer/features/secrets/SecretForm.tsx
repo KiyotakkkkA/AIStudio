@@ -46,10 +46,10 @@ function SecretForm({
         onSave();
       }}
     >
-      <div className="flex flex-none items-center gap-2.5 border-b border-line px-4.5 py-4">
+      <div className="mx-auto flex w-full max-w-360 flex-none items-center gap-2.5 px-5 pt-4 pb-2 lg:px-6">
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[14px] font-semibold text-main-50">
-            {vm.name.trim().length > 0 ? vm.name : "Новый секрет"}
+            {vm.name.trim().length > 0 ? vm.name : "Создать секрет"}
           </h2>
         </div>
         {vm.isNew ? null : (
@@ -73,14 +73,12 @@ function SecretForm({
         )}
       </div>
 
-      <ScrollArea className="flex min-h-0 flex-1 flex-col gap-5 p-4.5">
+      <ScrollArea className="flex min-h-0 flex-1 flex-col gap-4 px-5 py-3 lg:px-6">
         {vm.banner === null ? null : <Alert>{vm.banner}</Alert>}
 
-        <section className="flex flex-col gap-3">
-          <h3 className="text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-            Общее
-          </h3>
-          <div className="grid grid-cols-2 gap-3.5">
+        <section className="mx-auto flex w-full max-w-360 flex-col gap-4 rounded-xl bg-main-850 p-5">
+          <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-main-100">Общее</h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field
               label="Отображаемое имя"
               htmlFor="secret-name"
@@ -131,11 +129,9 @@ function SecretForm({
           </Field>
         </section>
 
-        <section className="flex flex-col gap-3">
-          <h3 className="text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-            Метаданные
-          </h3>
-          <div className="grid grid-cols-2 gap-3.5">
+        <section className="mx-auto flex w-full max-w-360 flex-col gap-4 rounded-xl bg-main-850 p-5">
+          <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-main-100">Метаданные</h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Теги" htmlFor="secret-tags">
               <TagsInput id="secret-tags" tags={vm.tags} onChange={vm.setTags} />
             </Field>
@@ -164,31 +160,32 @@ function SecretForm({
         </section>
       </ScrollArea>
 
-      <div className="flex flex-none items-center gap-3 border-t border-line px-4.5 py-3.5">
-        <Icon path={mdiLockOutline} size={15} className="flex-none text-ok" />
-        <span
-          className="line-clamp-2 min-w-0 flex-1 text-[12px] text-main-400"
-          title="Значение шифруется хранилищем учётных данных операционной системы и не покидает это устройство."
-        >
-          Значение шифруется хранилищем учётных данных операционной системы и не покидает эту
-          машину, пока его не запросит провайдер.
-        </span>
-        <Button
-          tone="secondary"
-          onClick={onCancel}
-          disabled={saving}
-          needConfirm
-          modalSetup={{
-            title: "Отменить?",
-            content: "Несохранённые изменения будут потеряны.",
-            confirmLabel: "Отменить",
-          }}
-        >
-          Отмена
-        </Button>
-        <Button type="submit" tone="primary" disabled={saving}>
-          {saving ? "Сохранение…" : "Сохранить секрет"}
-        </Button>
+      <div className="flex-none px-5 pt-2 pb-4 lg:px-6">
+        <div className="mx-auto flex w-full max-w-360 flex-wrap items-center gap-3 rounded-xl bg-main-800 px-4 py-3 shadow-[0_6px_24px_rgb(0_0_0/0.12)]">
+          <Icon path={mdiLockOutline} size={15} className="flex-none text-ok" />
+          <span
+            className="line-clamp-2 min-w-0 flex-1 text-[12px] text-main-400"
+            title="Значение шифруется хранилищем учётных данных операционной системы и не покидает это устройство."
+          >
+            Зашифрованное хранение
+          </span>
+          <Button
+            tone="ghost"
+            onClick={onCancel}
+            disabled={saving}
+            needConfirm
+            modalSetup={{
+              title: "Отменить?",
+              content: "Несохранённые изменения будут потеряны.",
+              confirmLabel: "Отменить",
+            }}
+          >
+            Отмена
+          </Button>
+          <Button type="submit" tone="primary" disabled={saving}>
+            {saving ? "Сохранение…" : "Сохранить секрет"}
+          </Button>
+        </div>
       </div>
       <ConfirmDialog
         open={confirmDelete && !vm.isNew}

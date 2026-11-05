@@ -16,7 +16,7 @@ function SecretsHeaderActions() {
       </Button>
       <Button tone="primary" onClick={secrets.requestCreate}>
         <Icon path={mdiPlus} size={15} />
-        Новый секрет
+        Создать секрет
       </Button>
     </div>
   );

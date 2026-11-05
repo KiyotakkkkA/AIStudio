@@ -142,7 +142,7 @@ test("create adds the secret to the list and selects it", async () => {
   );
   await store.load();
   store.startCreate();
-  store.form?.setName("Новый ключ");
+  store.form?.setName("Создать ключ");
   store.form?.setValue("osk_live_value");
 
   const saved = await store.submit();
@@ -152,7 +152,7 @@ test("create adds the secret to the list and selects it", async () => {
   assert.equal(store.selectedId, CREATED);
   assert.equal(store.form?.dirty, false);
   const call = bridge.calls.find((entry) => entry.channel === "secrets.create");
-  assert.equal((call?.payload as { name: string }).name, "Новый ключ");
+  assert.equal((call?.payload as { name: string }).name, "Создать ключ");
 });
 
 test("a validation failure from the host lands on the field, not in a banner", async () => {

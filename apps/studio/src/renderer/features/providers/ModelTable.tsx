@@ -77,6 +77,7 @@ export default function ModelTable({
             return (
               <tr
                 key={row.key}
+                onClick={() => onToggle(row.externalId)}
                 className={`transition-colors ${checked ? "bg-accent-soft/50" : "even:bg-main-800/25 hover:bg-main-800/60"}`}
               >
                 <td
@@ -86,7 +87,6 @@ export default function ModelTable({
                     aria-label={`Использовать модель: ${row.externalId}`}
                     checked={checked}
                     disabled={!selectable || (!row.available && !checked)}
-                    onChange={() => onToggle(row.externalId)}
                   />
                 </td>
                 <th scope="row" className="max-w-100 px-3 py-3 font-normal">

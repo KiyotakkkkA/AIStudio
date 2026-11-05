@@ -88,7 +88,7 @@ function SkillsWorkspace() {
             </Button>
             <Button tone="primary" onClick={store.requestCreate}>
               <Icon path={mdiPlus} size={15} />
-              Новый навык
+              Создать навык
             </Button>
           </>
         }
@@ -126,7 +126,7 @@ function SkillsWorkspace() {
               action={
                 <Button tone="primary" onClick={store.requestCreate}>
                   <Icon path={mdiPlus} size={15} />
-                  Новый навык
+                  Создать навык
                 </Button>
               }
             />
@@ -136,7 +136,7 @@ function SkillsWorkspace() {
             <div className="flex min-w-0 flex-1 flex-col">
               <div className="flex h-11.5 flex-none items-center gap-1.5 border-b border-line px-4.5">
                 <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-main-50">
-                  {form.isNew ? "Новый навык" : form.name}
+                  {form.isNew ? "Создать навык" : form.name}
                 </span>
                 {selected === null || update === null || form.isNew ? null : (
                   <IconButton
