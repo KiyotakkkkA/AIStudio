@@ -7,23 +7,11 @@
   const DONUT_SEGMENTS = 6;
   const BAR_MAX = 24;
   const GAP = 2;
-  const SEQUENTIAL = [
-    "#fbf1e8",
-    "#f8e3d2",
-    "#f4d3ba",
-    "#efc2a1",
-    "#e9b088",
-    "#e29d70",
-    "#d98958",
-    "#cd7341",
-    "#c2571c",
-    "#a44818",
-    "#863b14",
-    "#692e10",
-    "#4d220c",
-  ];
-  const ORDINAL = SEQUENTIAL.slice(3, 11);
+  const SEQUENTIAL = Array.from({ length: 13 }, (_, step) => `var(--q${step})`);
+  const ORDINAL = Array.from({ length: 5 }, (_, step) => `var(--o${step + 1})`);
   const DARK_LABEL_FROM = 7;
+  const OTHER_SLOT = -1;
+  const TEXTURE_KEY = "zvs-dashboard-texture";
   const CHART_TYPES = ["line", "area", "bar", "donut", "scatter", "heatmap", "funnel"];
 
   const COPY = {
@@ -41,6 +29,7 @@
       to: "по",
       theme: "Тема",
       themes: { auto: "Авто", light: "Светлая", dark: "Тёмная" },
+      texture: "Штриховка",
       view: "Вид",
       pickDate: "Выбрать дату",
       prevMonth: "Предыдущий месяц",
@@ -71,6 +60,7 @@
       to: "to",
       theme: "Theme",
       themes: { auto: "Auto", light: "Light", dark: "Dark" },
+      texture: "Patterns",
       view: "View",
       pickDate: "Pick a date",
       prevMonth: "Previous month",
@@ -576,7 +566,50 @@
   }
 
   function color(slot) {
+    if (slot === OTHER_SLOT) return "var(--s-other)";
     return `var(--s${(slot % MAX_SERIES) + 1})`;
+  }
+
+  function slotOf(name, slot) {
+    return name === state.copy.other ? OTHER_SLOT : slot;
+  }
+
+  function markOf(slot) {
+    return slot === OTHER_SLOT ? "other" : String(slot % MAX_SERIES);
+  }
+
+  function textureDefs() {
+    const host = svg("svg", {
+      class: "zd-defs",
+      width: 0,
+      height: 0,
+      "aria-hidden": "true",
+      focusable: "false",
+    });
+    const defs = svg("defs", {}, host);
+    const slots = [...Array.from({ length: MAX_SERIES }, (_, slot) => slot), OTHER_SLOT];
+    for (const slot of slots) {
+      const pattern = svg(
+        "pattern",
+        {
+          id: `zd-tex-${markOf(slot)}`,
+          width: 6,
+          height: 6,
+          patternUnits: "userSpaceOnUse",
+          patternTransform: `rotate(${slot === OTHER_SLOT || slot % 2 === 1 ? 45 : 135})`,
+        },
+        defs,
+      );
+      svg("rect", { width: 6, height: 6, style: `fill:${color(slot)}` }, pattern);
+      if (slot !== 0) {
+        svg("line", { x1: 0, y1: 0, x2: 0, y2: 6, class: "zd-tex-line" }, pattern);
+      }
+    }
+    document.body.appendChild(host);
+  }
+
+  function applyTexture(on) {
+    document.documentElement.classList.toggle("zd-textured", on);
   }
 
   let measureContext = null;
@@ -901,7 +934,7 @@
       series = names.map((name, slot) => ({
         name,
         label: name,
-        slot,
+        slot: slotOf(name, slot),
         field: measure.field,
         agg: measure.agg || defaultAgg,
       }));
@@ -1483,6 +1516,8 @@
           "path",
           {
             d: barPath(x, top, thickness, bottom - top, end, 4),
+            class: "zd-mark",
+            "data-slot": markOf(span.series.slot),
             style: `fill:${color(span.series.slot)}`,
           },
           bars,
@@ -1613,6 +1648,8 @@
           "path",
           {
             d: barPath(left, y, right - left, thickness, end, 4),
+            class: "zd-mark",
+            "data-slot": markOf(span.series.slot),
             style: `fill:${color(span.series.slot)}`,
           },
           bars,
@@ -1675,7 +1712,11 @@
     }
     const format = formatter(c.format);
     const segments = names
-      .map((name, slot) => ({ name, slot, value: aggregate(buckets.get(name), c.value, c.agg) }))
+      .map((name, slot) => ({
+        name,
+        slot: slotOf(name, slot),
+        value: aggregate(buckets.get(name), c.value, c.agg),
+      }))
       .filter((segment) => Number(segment.value) > 0);
     const total = segments.reduce((sum, segment) => sum + Number(segment.value), 0);
     if (segments.length === 0 || total <= 0) return emptyState(entry);
@@ -1735,7 +1776,8 @@
         "path",
         {
           d: arcPath(size / 2, size / 2, inner, outer, angle, angle + sweep),
-          class: "zd-arc",
+          class: "zd-arc zd-mark",
+          "data-slot": markOf(segment.slot),
           style: `fill:${color(segment.slot)}`,
         },
         figure,
@@ -1796,10 +1838,10 @@
       let name = c.series ? keyOf(row[c.series]) : names[0];
       if (!known.has(name)) name = state.copy.other;
       if (!known.has(name)) continue;
-      points.push({ x, y, name, slot: names.indexOf(name), row });
+      points.push({ x, y, name, slot: slotOf(name, names.indexOf(name)), row });
       if (points.length >= 5000) break;
     }
-    const series = names.map((name, slot) => ({ name, label: name, slot }));
+    const series = names.map((name, slot) => ({ name, label: name, slot: slotOf(name, slot) }));
     legend(entry, c.series ? series : [], "rect");
     const xFormat = formatter(c.xFormat);
     const yFormat = formatter(c.format);
@@ -2029,7 +2071,7 @@
                 y: cy + cellHeight / 2 + 4,
                 "text-anchor": "middle",
                 class: "zd-cell-label",
-                style: `fill:${index >= DARK_LABEL_FROM ? "#ffffff" : "#0b0b0b"}`,
+                style: `fill:var(${index >= DARK_LABEL_FROM ? "--q-ink-high" : "--q-ink-low"})`,
               },
               figure,
             );
@@ -2600,7 +2642,29 @@
       },
     );
     toggle.node.classList.add("zd-theme");
-    header.appendChild(toggle.node);
+    let textured = false;
+    try {
+      textured = window.localStorage.getItem(TEXTURE_KEY) === "on";
+    } catch {
+      textured = false;
+    }
+    applyTexture(textured);
+    const texture = button(state.copy.texture, "ghost", "sm");
+    texture.classList.add("zd-texture-toggle");
+    texture.setAttribute("aria-pressed", String(textured));
+    texture.addEventListener("click", () => {
+      textured = !textured;
+      texture.setAttribute("aria-pressed", String(textured));
+      applyTexture(textured);
+      try {
+        window.localStorage.setItem(TEXTURE_KEY, textured ? "on" : "off");
+      } catch {
+        return;
+      }
+    });
+    const controls = el("div", "zd-header-controls");
+    controls.append(texture, toggle.node);
+    header.appendChild(controls);
     root.appendChild(header);
   }
 
@@ -2678,6 +2742,7 @@
       return;
     }
     document.documentElement.lang = state.spec.lang || "ru";
+    textureDefs();
     renderHeader(root);
     renderFilters(root);
     const main = el("main", "zd-main");

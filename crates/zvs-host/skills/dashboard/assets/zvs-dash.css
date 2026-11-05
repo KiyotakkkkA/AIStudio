@@ -32,14 +32,36 @@
   --shadow-card: 0 1px 2px rgb(60 40 20 / 0.04), 0 8px 24px rgb(60 40 20 / 0.05);
   --shadow-pop: 0 2px 6px rgb(60 40 20 / 0.06), 0 18px 44px rgb(60 40 20 / 0.12);
   --scrollbar: rgb(120 100 80 / 0.3);
-  --s1: #c2571c;
-  --s2: #3f6c84;
-  --s3: #4d7a2a;
-  --s4: #a46b0d;
-  --s5: #8a4f7d;
-  --s6: #2f7d74;
-  --s7: #bf3a30;
-  --s8: #8a7e71;
+  --s1: #c4530f;
+  --s2: #179a8e;
+  --s3: #7055b0;
+  --s4: #dc9e12;
+  --s5: #b2548d;
+  --s6: #4e8626;
+  --s7: #1777b8;
+  --s8: #c13c3b;
+  --s-other: #a39686;
+  --q0: #fef0e9;
+  --q1: #fedbca;
+  --q2: #ffc5a7;
+  --q3: #fab08a;
+  --q4: #f59b6b;
+  --q5: #ef854a;
+  --q6: #e2722e;
+  --q7: #d16319;
+  --q8: #bf5502;
+  --q9: #aa4a00;
+  --q10: #954000;
+  --q11: #803701;
+  --q12: #6d2d00;
+  --o1: #fd9156;
+  --o2: #e1773b;
+  --o3: #c55f1d;
+  --o4: #a74900;
+  --o5: #853900;
+  --q-ink-low: #2a1a0e;
+  --q-ink-high: #ffffff;
+  --texture-ink: rgb(255 255 255 / 0.55);
   --font: "Onest Variable", "Onest", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --mono: "JetBrains Mono Variable", "JetBrains Mono", Consolas, "Cascadia Mono", monospace;
   --radius-card: 12px;
@@ -82,14 +104,36 @@
     --shadow-card: 0 1px 2px rgb(0 0 0 / 0.25);
     --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.3), 0 18px 44px rgb(0 0 0 / 0.45);
     --scrollbar: rgb(200 180 160 / 0.22);
-    --s1: #e57532;
-    --s2: #8fb3c4;
-    --s3: #a9be6a;
-    --s4: #e5b350;
-    --s5: #c58bb8;
-    --s6: #6fc0b4;
-    --s7: #ec6b5f;
-    --s8: #a89b8d;
+    --s1: #d26c28;
+    --s2: #37a69a;
+    --s3: #765bb6;
+    --s4: #b68b16;
+    --s5: #ac4e87;
+    --s6: #5d913c;
+    --s7: #3080bc;
+    --s8: #c04442;
+    --s-other: #7a6e62;
+    --q0: #302016;
+    --q1: #462815;
+    --q2: #5c3011;
+    --q3: #743706;
+    --q4: #894102;
+    --q5: #9e4b00;
+    --q6: #b45700;
+    --q7: #c96203;
+    --q8: #dc701c;
+    --q9: #ed8032;
+    --q10: #ff9044;
+    --q11: #feaa76;
+    --q12: #fec29e;
+    --o1: #894101;
+    --o2: #ad5300;
+    --o3: #ce6a1e;
+    --o4: #eb853f;
+    --o5: #ffa56d;
+    --q-ink-low: #f7f1e8;
+    --q-ink-high: #1a1007;
+    --texture-ink: rgb(0 0 0 / 0.45);
   }
 }
 
@@ -127,14 +171,36 @@
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.25);
   --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.3), 0 18px 44px rgb(0 0 0 / 0.45);
   --scrollbar: rgb(200 180 160 / 0.22);
-  --s1: #e57532;
-  --s2: #8fb3c4;
-  --s3: #a9be6a;
-  --s4: #e5b350;
-  --s5: #c58bb8;
-  --s6: #6fc0b4;
-  --s7: #ec6b5f;
-  --s8: #a89b8d;
+  --s1: #d26c28;
+  --s2: #37a69a;
+  --s3: #765bb6;
+  --s4: #b68b16;
+  --s5: #ac4e87;
+  --s6: #5d913c;
+  --s7: #3080bc;
+  --s8: #c04442;
+  --s-other: #7a6e62;
+  --q0: #302016;
+  --q1: #462815;
+  --q2: #5c3011;
+  --q3: #743706;
+  --q4: #894102;
+  --q5: #9e4b00;
+  --q6: #b45700;
+  --q7: #c96203;
+  --q8: #dc701c;
+  --q9: #ed8032;
+  --q10: #ff9044;
+  --q11: #feaa76;
+  --q12: #fec29e;
+  --o1: #894101;
+  --o2: #ad5300;
+  --o3: #ce6a1e;
+  --o4: #eb853f;
+  --o5: #ffa56d;
+  --q-ink-low: #f7f1e8;
+  --q-ink-high: #1a1007;
+  --texture-ink: rgb(0 0 0 / 0.45);
 }
 
 * {
@@ -893,7 +959,6 @@ button {
 .zd-crosshair {
   stroke: var(--main-600);
   stroke-width: 1;
-  stroke-dasharray: 3 3;
 }
 
 .zd-hit {
@@ -1420,6 +1485,66 @@ button {
   }
 }
 
+.zd-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.zd-btn.zd-texture-toggle[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-light);
+}
+
+.zd-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.zd-tex-line {
+  stroke: var(--texture-ink);
+  stroke-width: 2;
+}
+
+:root.zd-textured .zd-mark[data-slot="0"] {
+  fill: url(#zd-tex-0) !important;
+}
+
+:root.zd-textured .zd-mark[data-slot="1"] {
+  fill: url(#zd-tex-1) !important;
+}
+
+:root.zd-textured .zd-mark[data-slot="2"] {
+  fill: url(#zd-tex-2) !important;
+}
+
+:root.zd-textured .zd-mark[data-slot="3"] {
+  fill: url(#zd-tex-3) !important;
+}
+
+:root.zd-textured .zd-mark[data-slot="4"] {
+  fill: url(#zd-tex-4) !important;
+}
+
+:root.zd-textured .zd-mark[data-slot="5"] {
+  fill: url(#zd-tex-5) !important;
+}
+
+:root.zd-textured .zd-mark[data-slot="6"] {
+  fill: url(#zd-tex-6) !important;
+}
+
+:root.zd-textured .zd-mark[data-slot="7"] {
+  fill: url(#zd-tex-7) !important;
+}
+
+:root.zd-textured .zd-mark[data-slot="other"] {
+  fill: url(#zd-tex-other) !important;
+}
+
 @media print {
   html,
   body {
@@ -1438,6 +1563,42 @@ button {
     break-inside: avoid;
     box-shadow: none;
   }
+
+  .zd-mark[data-slot="0"] {
+    fill: url(#zd-tex-0) !important;
+  }
+
+  .zd-mark[data-slot="1"] {
+    fill: url(#zd-tex-1) !important;
+  }
+
+  .zd-mark[data-slot="2"] {
+    fill: url(#zd-tex-2) !important;
+  }
+
+  .zd-mark[data-slot="3"] {
+    fill: url(#zd-tex-3) !important;
+  }
+
+  .zd-mark[data-slot="4"] {
+    fill: url(#zd-tex-4) !important;
+  }
+
+  .zd-mark[data-slot="5"] {
+    fill: url(#zd-tex-5) !important;
+  }
+
+  .zd-mark[data-slot="6"] {
+    fill: url(#zd-tex-6) !important;
+  }
+
+  .zd-mark[data-slot="7"] {
+    fill: url(#zd-tex-7) !important;
+  }
+
+  .zd-mark[data-slot="other"] {
+    fill: url(#zd-tex-other) !important;
+  }
 }
 
 @media (forced-colors: active) {
@@ -1447,7 +1608,44 @@ button {
 
   .zd-bars path,
   .zd-arc,
-  .zd-cell {
+  .zd-cell,
+  .zd-defs {
     forced-color-adjust: none;
+  }
+
+  .zd-mark[data-slot="0"] {
+    fill: url(#zd-tex-0) !important;
+  }
+
+  .zd-mark[data-slot="1"] {
+    fill: url(#zd-tex-1) !important;
+  }
+
+  .zd-mark[data-slot="2"] {
+    fill: url(#zd-tex-2) !important;
+  }
+
+  .zd-mark[data-slot="3"] {
+    fill: url(#zd-tex-3) !important;
+  }
+
+  .zd-mark[data-slot="4"] {
+    fill: url(#zd-tex-4) !important;
+  }
+
+  .zd-mark[data-slot="5"] {
+    fill: url(#zd-tex-5) !important;
+  }
+
+  .zd-mark[data-slot="6"] {
+    fill: url(#zd-tex-6) !important;
+  }
+
+  .zd-mark[data-slot="7"] {
+    fill: url(#zd-tex-7) !important;
+  }
+
+  .zd-mark[data-slot="other"] {
+    fill: url(#zd-tex-other) !important;
   }
 }

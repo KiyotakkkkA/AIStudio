@@ -2,6 +2,13 @@
 
 Every chart card has a «Таблица» button that shows its numbers as a table, a tooltip on hover and keyboard focus, and a legend when it has two or more series. Colours are assigned to series in a fixed order by their total over the unfiltered data, so a filter never repaints a series.
 
+## Colour is the library's job
+
+- Eight series colours in a fixed order, checked for colour-blind readers in both themes. «Прочее» is always neutral grey. There is no ninth colour: past the cap, the tail folds into «Прочее». Never ask for or set colours.
+- One series is one colour. Bars of products, regions or managers are all the same colour; the bar length already shows the value.
+- Ordered stages (`funnel`) and magnitude grids (`heatmap`) use one-hue ramps; the status colours (green, amber, red) are kept for deltas against a target and never mark a series.
+- The «Штриховка» button in the header adds hatching to bars, stacks and donut segments for readers who cannot tell colours apart; print always uses it. Do not mention it in text blocks.
+
 ## Choosing a block
 
 | The reader must…                               | Use                                   | Not                         |
@@ -18,7 +25,9 @@ Every chart card has a «Таблица» button that shows its numbers as a tab
 | Look up exact values                           | `table`                               | a chart with labels on every point |
 | Explain, conclude, warn                        | `text`                                | a title that is a sentence  |
 
-Never put two measures with different scales on one chart; use two charts side by side.
+Never put two measures with different scales on one chart; use two charts side by side, or index both to 100 at the first period.
+
+Signs that the form is wrong: one bar (use `kpi`), a donut of two parts or of close values (use `kpi`, `meter` or `bar`), eight series when the story is one number (use `kpi` with `compare`, or `seriesOrder` plus a `note` naming the one that matters), more than about seven colours carrying meaning (use a `table`).
 
 ## `kpi` — stat tile
 
@@ -94,7 +103,7 @@ One point per row (up to 5 000). At most 3 series; more fold into «Прочее
 { "type": "heatmap", "title": "Обращения по дням и часам", "dataset": "tickets", "x": "hour", "y": "weekday", "value": "tickets", "yOrder": ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] }
 ```
 
-Cells aggregate `value` with `agg`; one blue ramp from low to high with a scale under the title. Text categories keep the data order; `xOrder` and `yOrder` fix it, `sortCategories: true` sorts them. Values are printed in cells that fit them; `cellLabels: false` hides them. `cellHeight` sets the row height (default 28).
+Cells aggregate `value` with `agg`; one orange ramp from low to high (light to dark on a light page, dark to bright on a dark one) with a scale under the title. Use it for magnitude only; for signed values (deviation from plan, change) chart a `bar` instead. Text categories keep the data order; `xOrder` and `yOrder` fix it, `sortCategories: true` sorts them. Values are printed in cells that fit them; `cellLabels: false` hides them. `cellHeight` sets the row height (default 28).
 
 ## `funnel` — ordered stages
 
