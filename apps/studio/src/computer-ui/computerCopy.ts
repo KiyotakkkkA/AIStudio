@@ -12,6 +12,30 @@ export const ELAPSED_TITLE = "Время ответа";
 export const COMPOSER_PLACEHOLDER = "Уточнить задачу…";
 export const SEND = "Отправить";
 export const COMMAND_FAILED = "Не удалось выполнить команду";
+export const VERIFICATION_LEAD =
+  "Работа приостановлена до прохождения антибот проверки";
+export const VERIFICATION_OPEN = "Открыть проверку";
+export const VERIFICATION_GENERIC = "Провайдер запросил антибот проверку";
+
+const PROVIDER_NAMES: Record<string, string> = {
+  "https://chat.qwen.ai": "Qwen",
+  "https://chat.z.ai": "Z.ai",
+};
+
+export function providerName(origin: string): string {
+  const known = PROVIDER_NAMES[origin];
+  if (known !== undefined) return known;
+  try {
+    return new URL(origin).host;
+  } catch {
+    return origin;
+  }
+}
+
+export function verificationTitle(origins: readonly string[]): string {
+  const names = origins.map(providerName).join(", ");
+  return names === "" ? VERIFICATION_GENERIC : `Провайдер ${names} запросил антибот проверку`;
+}
 
 export const STATUS_TEXT: Record<ComputerStatus, string> = {
   idle: "Ожидание",

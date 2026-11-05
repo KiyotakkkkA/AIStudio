@@ -121,6 +121,7 @@ pub enum ComputerCommand {
     Collapse {
         collapsed: bool,
     },
+    Verify,
 }
 
 impl Validate for ComputerCommand {
@@ -131,9 +132,12 @@ impl Validate for ComputerCommand {
                 check::non_empty("text", text.trim())?;
                 check::max_len("text", text, CHAT_TEXT_MAX)
             }
-            Self::State | Self::Stop | Self::Engage | Self::Release | Self::Collapse { .. } => {
-                Ok(())
-            }
+            Self::State
+            | Self::Stop
+            | Self::Engage
+            | Self::Release
+            | Self::Collapse { .. }
+            | Self::Verify => Ok(()),
         }
     }
 }
@@ -241,6 +245,8 @@ pub struct ComputerState {
     pub started_at: Option<Timestamp>,
     #[serde(default)]
     pub feed: ComputerFeed,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub verifications: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]

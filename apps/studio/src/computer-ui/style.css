@@ -128,6 +128,39 @@ kbd {
   }
 }
 
+.verification {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-warn-soft);
+  color: var(--color-main-100);
+}
+.verification.compact {
+  padding: 6px 10px;
+}
+.verification-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.verification-title {
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.verification.compact .verification-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.verification-lead {
+  font-size: 12.5px;
+  color: var(--color-main-200);
+}
+
 .panel {
   position: fixed;
   inset: 0;

@@ -163,6 +163,8 @@ fn fixture() -> Fixture {
                     json!(page.focused)
                 } else if declaration == SUBMIT {
                     json!(node == 17 || node == 16 || node == 10)
+                } else if declaration == *PRESENCE {
+                    json!(true)
                 } else {
                     return Some(Err("unexpected function".to_owned()));
                 };
@@ -172,6 +174,7 @@ fn fixture() -> Fixture {
                 json!({ "quads": [[10.0, 10.0, 110.0, 10.0, 110.0, 40.0, 10.0, 40.0]] })
             }
             "Page.captureScreenshot" => json!({ "data": "/9j/4AAQ" }),
+            "Page.addScriptToEvaluateOnNewDocument" => json!({ "identifier": "presence-1" }),
             "Page.getLayoutMetrics" => json!({
                 "cssVisualViewport": { "clientWidth": 1280.4, "clientHeight": 719.6 }
             }),
@@ -217,6 +220,28 @@ impl Fixture {
             .find(|element| element.name == name)
             .unwrap_or_else(|| panic!("{name} is on the page"))
             .handle
+    }
+
+    fn presence_ops(&self) -> Vec<String> {
+        lock(&self.fake.calls)
+            .iter()
+            .filter(|(method, params)| {
+                method == "Runtime.callFunctionOn"
+                    || method == "Page.captureScreenshot"
+                    || method == "Input.dispatchMouseEvent" && params["type"] == "mousePressed"
+            })
+            .map(|(method, params)| match method.as_str() {
+                "Runtime.callFunctionOn" if params["functionDeclaration"] == *PRESENCE => {
+                    params["arguments"][0]["value"]["op"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_owned()
+                }
+                "Runtime.callFunctionOn" => "audited".to_owned(),
+                other => other.to_owned(),
+            })
+            .filter(|op| op != "audited")
+            .collect()
     }
 
     fn only_the_audited_functions_ran(&self) {
@@ -399,6 +424,66 @@ async fn a_click_presses_the_centre_of_the_element_it_was_given() {
         [json!({ "objectGroup": OBJECT_GROUP })]
     );
     fixture.only_the_audited_functions_ran();
+}
+
+#[tokio::test]
+async fn the_agent_presence_is_absent_until_the_workspace_asks_for_it() {
+    let fixture = fixture();
+    let button = fixture.handle("Нажми меня").await;
+    fixture.session.click(&button).await.expect("clicks");
+    fixture.session.screenshot().await.expect("captures");
+    assert_eq!(fixture.count("Page.addScriptToEvaluateOnNewDocument"), 0);
+    assert_eq!(
+        fixture.presence_ops(),
+        ["Input.dispatchMouseEvent", "Page.captureScreenshot"]
+    );
+}
+
+#[tokio::test]
+async fn the_presence_follows_every_document_glides_to_clicks_and_stays_out_of_screenshots() {
+    let fixture = fixture();
+    fixture.session.present(true).await.expect("shows");
+    fixture.session.present(true).await.expect("shows once");
+    let added = fixture.params("Page.addScriptToEvaluateOnNewDocument");
+    assert_eq!(added.len(), 1);
+    assert_eq!(added[0]["worldName"], json!(WORLD));
+    assert_eq!(added[0]["source"], json!(presence_source()));
+
+    let button = fixture.handle("Нажми меня").await;
+    fixture.session.click(&button).await.expect("clicks");
+    fixture.session.screenshot().await.expect("captures");
+    assert_eq!(
+        fixture.presence_ops(),
+        [
+            "show",
+            "point",
+            "Input.dispatchMouseEvent",
+            "hide",
+            "Page.captureScreenshot",
+            "show"
+        ]
+    );
+    let point = fixture
+        .params("Runtime.callFunctionOn")
+        .into_iter()
+        .find(|params| params["arguments"][0]["value"]["op"] == "point")
+        .expect("a point");
+    assert_eq!(
+        point["arguments"][0]["value"],
+        json!({ "op": "point", "x": 60.0, "y": 25.0, "press": true, "from": null })
+    );
+    assert_eq!(point["executionContextId"], json!(7));
+    assert_eq!(point["awaitPromise"], json!(true));
+
+    fixture.session.present(false).await.expect("hides");
+    assert_eq!(
+        fixture.params("Page.removeScriptToEvaluateOnNewDocument"),
+        [json!({ "identifier": "presence-1" })]
+    );
+    assert_eq!(
+        fixture.presence_ops().last().map(String::as_str),
+        Some("remove")
+    );
 }
 
 #[tokio::test]

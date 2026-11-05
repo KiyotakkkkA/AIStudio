@@ -9,8 +9,9 @@ use tauri::{
     WebviewWindowBuilder,
 };
 use zvs_contract::{
-    BrowserAppearance, ComputerCommand, ComputerDisplay, ComputerPointer, ComputerState,
+    BrowserAppearance, CliNotice, ComputerCommand, ComputerDisplay, ComputerPointer, ComputerState,
 };
+use zvs_host::cli::CliNotices;
 use zvs_host::computer::{ComputerAgent, ComputerChange, ComputerChat};
 use zvs_host::services::ChatService;
 
@@ -24,6 +25,7 @@ const PANEL_WIDTH: f64 = 460.0;
 const PANEL_HEIGHT: f64 = 660.0;
 const POINTER_TICK: Duration = Duration::from_millis(16);
 const PANEL_COLLAPSED: f64 = 64.0;
+const PANEL_VERIFYING: f64 = 116.0;
 const PANEL_MARGIN: f64 = 24.0;
 
 type Appearance = Arc<dyn Fn() -> BrowserAppearance + Send + Sync>;
@@ -34,6 +36,7 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 
 enum Work {
     Change(ComputerChange),
+    Verification,
     Engage(bool),
     Stop,
 }
@@ -42,10 +45,11 @@ struct Inner {
     app: AppHandle,
     agent: ComputerAgent,
     appearance: Appearance,
+    notices: CliNotices,
     work: Mutex<Sender<Work>>,
     subscribers: Mutex<Vec<Channel<ComputerState>>>,
     minimized: AtomicBool,
-    placed: Mutex<Option<(ComputerDisplay, bool)>>,
+    placed: Mutex<Option<(ComputerDisplay, bool, bool)>>,
     pointers: Mutex<Vec<Channel<ComputerPointer>>>,
     pointing: AtomicU64,
 }
@@ -74,12 +78,19 @@ fn raw(window: &WebviewWindow) -> Option<isize> {
 }
 
 impl ComputerShell {
-    pub fn new(app: AppHandle, agent: ComputerAgent, appearance: Appearance) -> Self {
+    pub fn new(
+        app: AppHandle,
+        agent: ComputerAgent,
+        appearance: Appearance,
+        notices: CliNotices,
+    ) -> Self {
         let (sender, receiver) = mpsc::channel();
+        let mut verifications = notices.subscribe();
         let shell = Self(Arc::new(Inner {
             app,
             agent,
             appearance,
+            notices,
             work: Mutex::new(sender),
             subscribers: Mutex::new(Vec::new()),
             minimized: AtomicBool::new(false),
@@ -90,6 +101,20 @@ impl ComputerShell {
         let changes = lock(&shell.0.work).clone();
         shell.0.agent.subscribe(move |change| {
             let _ = changes.send(Work::Change(change));
+        });
+        let verified = lock(&shell.0.work).clone();
+        tauri::async_runtime::spawn(async move {
+            loop {
+                match verifications.recv().await {
+                    Ok(CliNotice::AccountVerification { .. })
+                    | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                        if verified.send(Work::Verification).is_err() {
+                            return;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                }
+            }
         });
         let worker = shell.clone();
         std::thread::Builder::new()
@@ -118,6 +143,10 @@ impl ComputerShell {
                     self.close();
                     self.publish();
                 }
+                Work::Verification => {
+                    self.place();
+                    self.publish();
+                }
                 Work::Engage(engaged) => self.engage(engaged),
                 Work::Stop => {
                     let agent = self.0.agent.clone();
@@ -132,6 +161,19 @@ impl ComputerShell {
     pub fn state(&self) -> ComputerState {
         let mut state = self.0.agent.state();
         state.appearance = (self.0.appearance)();
+        state.verifications = self
+            .0
+            .notices
+            .current()
+            .into_iter()
+            .filter_map(|notice| match notice {
+                CliNotice::AccountVerification {
+                    origin,
+                    shown: true,
+                } => Some(origin),
+                _ => None,
+            })
+            .collect();
         state
     }
 
@@ -153,7 +195,7 @@ impl ComputerShell {
     fn origin(&self) -> (i64, i64) {
         lock(&self.0.placed)
             .as_ref()
-            .map_or((0, 0), |(display, _)| (display.x, display.y))
+            .map_or((0, 0), |(display, _, _)| (display.x, display.y))
     }
 
     fn track_pointer(&self) {
@@ -236,7 +278,8 @@ impl ComputerShell {
         let Some(display) = state.display.or_else(|| self.primary()) else {
             return;
         };
-        let placed = Some((display, state.collapsed));
+        let verifying = !self.0.notices.current().is_empty();
+        let placed = Some((display, state.collapsed, verifying));
         if *lock(&self.0.placed) == placed {
             return;
         }
@@ -250,10 +293,10 @@ impl ComputerShell {
         }
         if let Some(panel) = self.0.app.get_webview_window(PANEL) {
             let scale = panel.scale_factor().unwrap_or(1.0);
-            let height = if state.collapsed {
-                PANEL_COLLAPSED
-            } else {
-                PANEL_HEIGHT
+            let height = match (state.collapsed, verifying) {
+                (false, _) => PANEL_HEIGHT,
+                (true, false) => PANEL_COLLAPSED,
+                (true, true) => PANEL_VERIFYING,
             };
             let width = (PANEL_WIDTH * scale).round();
             let tall = (height * scale).round();
@@ -332,6 +375,10 @@ impl ComputerShell {
             }
             ComputerCommand::Collapse { collapsed } => {
                 agent.collapse(collapsed);
+                Ok(())
+            }
+            ComputerCommand::Verify => {
+                self.0.notices.focus();
                 Ok(())
             }
         };

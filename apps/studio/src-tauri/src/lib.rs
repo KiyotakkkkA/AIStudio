@@ -1358,6 +1358,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
                     app.handle().clone(),
                     computer_agent,
                     Arc::new(move || appearance.appearance()),
+                    notices,
                 )
             },
             workspace,

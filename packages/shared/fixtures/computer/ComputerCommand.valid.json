@@ -9,5 +9,6 @@
   { "name": "correction", "value": { "action": "say", "text": "Открой вкладку «Отчёты»" } },
   { "name": "engage the input", "value": { "action": "engage" } },
   { "name": "release the input", "value": { "action": "release" } },
-  { "name": "collapse", "value": { "action": "collapse", "collapsed": true } }
+  { "name": "collapse", "value": { "action": "collapse", "collapsed": true } },
+  { "name": "show the provider verification", "value": { "action": "verify" } }
 ]

@@ -47,8 +47,11 @@ import {
   STATUS_TEXT,
   STOP,
   STOP_HINT,
+  VERIFICATION_LEAD,
+  VERIFICATION_OPEN,
   elapsedText,
   statusLine,
+  verificationTitle,
 } from "./computerCopy";
 
 const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
@@ -284,6 +287,28 @@ function Feed({
   );
 }
 
+function Verification({
+  origins,
+  compact,
+  run,
+}: {
+  readonly origins: readonly string[];
+  readonly compact: boolean;
+  readonly run: Run;
+}) {
+  return (
+    <div role="alert" className={`verification ${compact ? "compact" : ""}`}>
+      <span className="verification-text">
+        <span className="verification-title">{verificationTitle(origins)}</span>
+        {compact ? null : <span className="verification-lead">{VERIFICATION_LEAD}</span>}
+      </span>
+      <Button size="sm" tone="primary" onClick={() => void run({ action: "verify" })}>
+        {VERIFICATION_OPEN}
+      </Button>
+    </div>
+  );
+}
+
 function useStickToBottom(change: unknown) {
   const box = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
@@ -363,6 +388,7 @@ function Panel({ state }: { readonly state: ComputerState }) {
     );
   };
   const elapsed = state.collapsed ? elapsedText(state.startedAt, now) : null;
+  const verifications = state.verifications ?? [];
   return (
     <main className={`panel ${state.collapsed ? "collapsed" : ""}`}>
       <header className="panel-header">
@@ -393,6 +419,9 @@ function Panel({ state }: { readonly state: ComputerState }) {
           {STOP}
         </button>
       </header>
+      {verifications.length === 0 ? null : (
+        <Verification origins={verifications} compact={state.collapsed} run={run} />
+      )}
       {state.collapsed ? null : (
         <>
           <p className="hint">{STOP_HINT}</p>
@@ -442,12 +471,18 @@ function AgentPointer() {
 }
 
 function Glow({ state }: { readonly state: ComputerState }) {
+  const verifications = state.verifications ?? [];
+  const status = verifications.length === 0 ? state.status : "awaiting";
   return (
-    <div className={`glow status-${state.status}`}>
+    <div className={`glow status-${status}`}>
       <div className="badge" role="status">
-        <span className={`pulse status-${state.status}`} aria-hidden="true" />
+        <span className={`pulse status-${status}`} aria-hidden="true" />
         <span className="badge-text">{BADGE_TEXT}</span>
-        <span className="badge-status">{statusLine(state.status, state.actions)}</span>
+        <span className="badge-status">
+          {verifications.length === 0
+            ? statusLine(state.status, state.actions)
+            : verificationTitle(verifications)}
+        </span>
         <kbd>{STOP_HINT}</kbd>
       </div>
       <AgentPointer />

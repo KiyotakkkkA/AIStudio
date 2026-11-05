@@ -2,9 +2,12 @@ import { expect, test } from "vitest";
 import type { ComputerAction } from "@zvs/shared";
 import {
   STATUS_TEXT,
+  VERIFICATION_GENERIC,
   currentAction,
   elapsedText,
+  providerName,
   statusLine,
+  verificationTitle,
 } from "../../src/computer-ui/computerCopy.ts";
 import { approvalView } from "../../src/renderer/features/chat/approvalModel.ts";
 import { toolPresentation } from "../../src/renderer/features/chat/toolPresentation.ts";
@@ -25,6 +28,15 @@ test("the panel timer counts whole seconds since the turn started", () => {
   expect(elapsedText(1_000, 1_999)).toBe(`${(0).toLocaleString("ru-RU")} с`);
   expect(elapsedText(1_000, 1_390_000)).toBe(`${(1389).toLocaleString("ru-RU")} с`);
   expect(elapsedText(5_000, 1_000)).toBe(`${(0).toLocaleString("ru-RU")} с`);
+});
+
+test("a provider verification names the provider that asked for it", () => {
+  expect(providerName("https://chat.qwen.ai")).toBe("Qwen");
+  expect(providerName("https://chat.z.ai")).toBe("Z.ai");
+  expect(providerName("https://chat.example.test")).toBe("chat.example.test");
+  expect(verificationTitle([])).toBe(VERIFICATION_GENERIC);
+  expect(verificationTitle(["https://chat.z.ai"])).not.toBe(VERIFICATION_GENERIC);
+  expect(verificationTitle(["https://chat.z.ai"])).toContain(providerName("https://chat.z.ai"));
 });
 
 test("the status line names the action on the screen while the agent works", () => {

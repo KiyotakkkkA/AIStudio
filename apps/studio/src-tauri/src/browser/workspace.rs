@@ -18,8 +18,9 @@ use tauri::{
 use tauri_plugin_dialog::DialogExt;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, BrowserBounds, BrowserCommand, BrowserCommandOutput, BrowserCookie,
-    BrowserNetworkDetail, BrowserNetworkLog, BrowserNetworkSaved, BrowserState, BrowserTheme,
+    AppError, BrowserAgentStatus, BrowserBounds, BrowserCommand, BrowserCommandOutput,
+    BrowserCookie, BrowserNetworkDetail, BrowserNetworkLog, BrowserNetworkSaved, BrowserState,
+    BrowserTheme,
 };
 use zvs_host::browser::automation::{
     DownloadedFile, NO_BROWSER_TAB, PageMatches, PageScreenshot, PageSnapshot, PageState, conflict,
@@ -376,6 +377,27 @@ impl BrowserWorkspace {
             model.set_approval(pending);
         }
         self.publish();
+        self.withdraw_presence();
+    }
+
+    fn withdraw_presence(&self) {
+        let status = self.0.agent.snapshot(None).status;
+        let active = matches!(
+            status,
+            BrowserAgentStatus::Running
+                | BrowserAgentStatus::Approval
+                | BrowserAgentStatus::Paused
+                | BrowserAgentStatus::Control
+        );
+        let sessions = self.0.sessions.all();
+        if active || sessions.is_empty() {
+            return;
+        }
+        tauri::async_runtime::spawn(async move {
+            for session in sessions {
+                let _ = session.present(false).await;
+            }
+        });
     }
 
     fn studio(&self) -> Result<Window, String> {
@@ -939,6 +961,17 @@ impl BrowserWorkspace {
             .open(&label, || WebviewCdp::client(webview, DEFAULT_CALL_TIMEOUT));
         Ok((label, session))
     }
+
+    async fn engaged(&self) -> Result<(String, Arc<Session>), AppError> {
+        let (label, session) = self.session()?;
+        for other in self.0.sessions.all() {
+            if !Arc::ptr_eq(&other, &session) {
+                let _ = other.present(false).await;
+            }
+        }
+        let _ = session.present(true).await;
+        Ok((label, session))
+    }
 }
 
 #[async_trait]
@@ -964,27 +997,27 @@ impl AutomationPort for BrowserWorkspace {
                 .await
                 .map_err(|reason| conflict(NO_BROWSER_TAB).with_detail("reason", reason))?;
         }
-        let (_, session) = self.session()?;
+        let (_, session) = self.engaged().await?;
         session.navigate(url).await
     }
 
     async fn read_page(&self) -> Result<PageSnapshot, AppError> {
-        let (_, session) = self.session()?;
+        let (_, session) = self.engaged().await?;
         session.read_page().await
     }
 
     async fn screenshot(&self) -> Result<PageScreenshot, AppError> {
-        let (_, session) = self.session()?;
+        let (_, session) = self.engaged().await?;
         session.screenshot().await
     }
 
     async fn find(&self, query: &str, role: Option<&str>) -> Result<PageMatches, AppError> {
-        let (_, session) = self.session()?;
+        let (_, session) = self.engaged().await?;
         session.find(query, role).await
     }
 
     async fn click(&self, handle: &str) -> Result<PageState, AppError> {
-        let (_, session) = self.session()?;
+        let (_, session) = self.engaged().await?;
         session.click(handle).await
     }
 
@@ -994,12 +1027,12 @@ impl AutomationPort for BrowserWorkspace {
         text: &str,
         replace: bool,
     ) -> Result<PageState, AppError> {
-        let (_, session) = self.session()?;
+        let (_, session) = self.engaged().await?;
         session.type_text(handle, text, replace).await
     }
 
     async fn submit(&self, handle: &str) -> Result<PageState, AppError> {
-        let (_, session) = self.session()?;
+        let (_, session) = self.engaged().await?;
         session.submit(handle).await
     }
 
@@ -1008,7 +1041,7 @@ impl AutomationPort for BrowserWorkspace {
         handle: &str,
         cancel: &CancellationToken,
     ) -> Result<DownloadedFile, AppError> {
-        let (label, session) = self.session()?;
+        let (label, session) = self.engaged().await?;
         session
             .download(handle, &self.0.downloads, &label, cancel)
             .await

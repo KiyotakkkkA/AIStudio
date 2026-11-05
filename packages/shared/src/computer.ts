@@ -54,6 +54,7 @@ export const ComputerCommand = z.discriminatedUnion("action", [
   z.object({ action: z.literal("engage") }),
   z.object({ action: z.literal("release") }),
   z.object({ action: z.literal("collapse"), collapsed: z.boolean() }),
+  z.object({ action: z.literal("verify") }),
 ]);
 export type ComputerCommand = z.infer<typeof ComputerCommand>;
 
@@ -98,6 +99,7 @@ export interface ComputerState {
   appearance: BrowserAppearance;
   startedAt?: number;
   feed: ComputerFeed;
+  verifications?: string[];
 }
 
 export interface ComputerFeed {

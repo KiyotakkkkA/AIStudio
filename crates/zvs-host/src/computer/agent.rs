@@ -210,6 +210,7 @@ impl ComputerAgent {
             appearance: zvs_contract::BrowserAppearance::default(),
             started_at: session.started_at,
             feed,
+            verifications: Vec::new(),
         }
     }
 

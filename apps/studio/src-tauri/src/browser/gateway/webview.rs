@@ -421,12 +421,15 @@ impl GatewayPage for WebviewPage {
         let _ = self.webview.set_size(size);
         let _ = window.center();
         let _ = window.set_skip_taskbar(false);
+        let _ = window.set_always_on_top(true);
+        let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
     }
 
     fn conceal(&self) {
         let window = self.webview.window();
+        let _ = window.set_always_on_top(false);
         let _ = window.hide();
         let _ = window.set_skip_taskbar(true);
         let _ = self.webview.set_size(LogicalSize::new(1.0, 1.0));

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, LazyLock, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use serde::Deserialize;
@@ -19,7 +19,7 @@ use zvs_host::browser::page::{self, AxNode, ElementRef, Handles};
 use zvs_host::browser::{FieldFacts, is_web_url, navigation_url, secret_field, site_origin};
 use zvs_host::kernel::types::cancelled;
 
-use crate::browser::cdp::{CdpClient, CdpError, RemoteObject};
+use crate::browser::cdp::{CallFunctionOn, CdpClient, CdpError, RemoteObject};
 
 pub const WORLD: &str = "zvs-automation";
 pub const OBJECT_GROUP: &str = "zvs-automation";
@@ -28,6 +28,15 @@ pub const LOAD_TIMEOUT: Duration = Duration::from_secs(30);
 pub const DOWNLOAD_START: Duration = Duration::from_secs(15);
 pub const DOWNLOAD_FINISH: Duration = Duration::from_secs(600);
 pub const SCREENSHOT_QUALITY: u8 = 70;
+
+pub static PRESENCE: LazyLock<&'static str> = LazyLock::new(|| {
+    let source = include_str!("automation/presence.js").trim();
+    source.strip_prefix("export default ").unwrap_or(source)
+});
+
+pub fn presence_source() -> String {
+    format!("({})({{\"op\":\"show\"}});", *PRESENCE)
+}
 
 const FACTS: &str = r"function () {
   const submitter = (element) => {
@@ -179,6 +188,11 @@ struct Quads {
 }
 
 #[derive(Debug, Deserialize)]
+struct AddedScript {
+    identifier: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct Hit {
     inside: bool,
     submits: bool,
@@ -210,6 +224,8 @@ pub struct Session {
     cdp: CdpClient,
     enabled: tokio::sync::Mutex<bool>,
     handles: Mutex<Handles>,
+    presence: tokio::sync::Mutex<Option<String>>,
+    cursor: Mutex<Option<(f64, f64)>>,
 }
 
 impl Session {
@@ -218,6 +234,8 @@ impl Session {
             cdp,
             enabled: tokio::sync::Mutex::new(false),
             handles: Mutex::default(),
+            presence: tokio::sync::Mutex::new(None),
+            cursor: Mutex::default(),
         }
     }
 
@@ -254,7 +272,86 @@ impl Session {
         Ok(())
     }
 
+    pub async fn present(&self, shown: bool) -> Result<(), AppError> {
+        let mut script = self.presence.lock().await;
+        if shown == script.is_some() {
+            return Ok(());
+        }
+        if shown {
+            self.ensure_enabled().await?;
+            let added: AddedScript = decode(
+                self.send(
+                    "Page.addScriptToEvaluateOnNewDocument",
+                    json!({ "source": presence_source(), "worldName": WORLD }),
+                )
+                .await?,
+            )?;
+            *script = Some(added.identifier);
+            drop(script);
+            self.cue(json!({ "op": "show" })).await;
+        } else {
+            if let Some(identifier) = script.take() {
+                let _ = self
+                    .cdp
+                    .send(
+                        "Page.removeScriptToEvaluateOnNewDocument",
+                        json!({ "identifier": identifier }),
+                    )
+                    .await;
+            }
+            drop(script);
+            *lock(&self.cursor) = None;
+            self.cue(json!({ "op": "remove" })).await;
+        }
+        Ok(())
+    }
+
+    async fn presenting(&self) -> bool {
+        self.presence.lock().await.is_some()
+    }
+
+    async fn cue(&self, command: Value) {
+        let _ = async {
+            let frame = self.cdp.main_frame().await?;
+            let world = self.cdp.create_isolated_world(&frame, WORLD).await?;
+            self.cdp
+                .call_function_on(CallFunctionOn::new(*PRESENCE, world, vec![command]).awaiting())
+                .await
+        }
+        .await;
+    }
+
+    async fn point(&self, x: f64, y: f64, press: bool) {
+        if !self.presenting().await {
+            return;
+        }
+        let from = lock(&self.cursor)
+            .replace((x, y))
+            .map_or(Value::Null, |(left, top)| json!([left, top]));
+        self.cue(json!({ "op": "point", "x": x, "y": y, "press": press, "from": from }))
+            .await;
+    }
+
+    async fn aim(&self, backend: i64) -> Result<(f64, f64), AppError> {
+        let _ = self
+            .send(
+                "DOM.scrollIntoViewIfNeeded",
+                json!({ "backendNodeId": backend }),
+            )
+            .await;
+        let quads: Quads = decode(
+            self.send("DOM.getContentQuads", json!({ "backendNodeId": backend }))
+                .await?,
+        )?;
+        quads
+            .quads
+            .iter()
+            .find_map(|quad| center(quad))
+            .ok_or_else(|| conflict(NOT_VISIBLE))
+    }
+
     pub async fn end(&self) {
+        let _ = self.present(false).await;
         let mut enabled = self.enabled.lock().await;
         if *enabled {
             for domain in DOMAINS.iter().rev() {
@@ -329,13 +426,20 @@ impl Session {
         self.ensure_enabled().await?;
         let page = self.page().await?;
         let metrics: LayoutMetrics = decode(self.send("Page.getLayoutMetrics", json!({})).await?)?;
-        let captured: Captured = decode(
-            self.send(
+        let presenting = self.presenting().await;
+        if presenting {
+            self.cue(json!({ "op": "hide" })).await;
+        }
+        let captured = self
+            .send(
                 "Page.captureScreenshot",
                 json!({ "format": "jpeg", "quality": SCREENSHOT_QUALITY }),
             )
-            .await?,
-        )?;
+            .await;
+        if presenting {
+            self.cue(json!({ "op": "show" })).await;
+        }
+        let captured: Captured = decode(captured?)?;
         Ok(PageScreenshot {
             page,
             mime_type: "image/jpeg".to_owned(),
@@ -402,22 +506,7 @@ impl Session {
     }
 
     async fn press(&self, resolved: &Resolved) -> Result<(), AppError> {
-        let backend = resolved.element.backend_node_id;
-        let _ = self
-            .send(
-                "DOM.scrollIntoViewIfNeeded",
-                json!({ "backendNodeId": backend }),
-            )
-            .await;
-        let quads: Quads = decode(
-            self.send("DOM.getContentQuads", json!({ "backendNodeId": backend }))
-                .await?,
-        )?;
-        let (x, y) = quads
-            .quads
-            .iter()
-            .find_map(|quad| center(quad))
-            .ok_or_else(|| conflict(NOT_VISIBLE))?;
+        let (x, y) = self.aim(resolved.element.backend_node_id).await?;
         let hit: Hit = self.call(resolved, HIT, vec![json!(x), json!(y)]).await?;
         if !hit.inside {
             return Err(refused(OBSCURED));
@@ -425,6 +514,7 @@ impl Session {
         if hit.submits {
             return Err(refused(SUBMITS_FORM));
         }
+        self.point(x, y, true).await;
         for (kind, buttons) in [("mouseMoved", 0), ("mousePressed", 1), ("mouseReleased", 0)] {
             self.send(
                 "Input.dispatchMouseEvent",
@@ -512,6 +602,11 @@ impl Session {
             }
             if facts.disabled || facts.read_only {
                 return Err(conflict(ELEMENT_DISABLED));
+            }
+            if self.presenting().await
+                && let Ok((x, y)) = self.aim(resolved.element.backend_node_id).await
+            {
+                self.point(x, y, true).await;
             }
             self.send(
                 "DOM.focus",
@@ -783,6 +878,10 @@ impl Sessions {
                 .entry(label.to_owned())
                 .or_insert_with(|| Arc::new(Session::new(connect()))),
         )
+    }
+
+    pub fn all(&self) -> Vec<Arc<Session>> {
+        lock(&self.0).values().cloned().collect()
     }
 
     pub fn detach(&self, label: &str) {
