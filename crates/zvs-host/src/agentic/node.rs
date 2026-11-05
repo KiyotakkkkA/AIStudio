@@ -26,7 +26,7 @@ use crate::kernel::{NodeDef, PermissionRequirement, StepContext, ToolStepRequest
 use crate::services::chat::{FILE_TOOLS_RULES, GenerateChatNode, PROCESS_TOOLS_RULES};
 use crate::services::chat_tools::{
     OfferedTool, TOOL_RESULT_MAX_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result,
-    parse_tool_arguments, tool_result_text, tool_specs, unoffered_text,
+    parse_tool_arguments, parse_tool_call, tool_result_text, tool_specs, unoffered_text,
 };
 use crate::services::tool_arguments::arguments_failure;
 use crate::services::tool_loop::{request_tokens, round_tokens};
@@ -406,7 +406,7 @@ impl SessionNode {
         progress: &mut Progress,
     ) -> Result<String, AppError> {
         let shape = |status: &str, text: String| fence_tool_result(&call.name, status, &text);
-        let mut arguments = parse_tool_arguments(&call.arguments).unwrap_or_default();
+        let mut arguments = parse_tool_call(&call.arguments, &tool.parameters).unwrap_or_default();
         if FILE_TOOLS.contains(&tool.key.as_str())
             || PROCESS_TOOLS.contains(&tool.key.as_str())
             || BACKGROUND_TOOLS.contains(&tool.key.as_str())
@@ -669,7 +669,14 @@ impl NodeDef for SessionNode {
             let mut tripped = !watched.is_empty() && guard.round(signature(&watched));
             let mut finished: Option<Option<String>> = None;
             for call in &round.tool_calls {
-                let arguments = parse_tool_arguments(&call.arguments).unwrap_or_default();
+                let arguments = bridge_specs()
+                    .into_iter()
+                    .find(|spec| spec.name == call.name)
+                    .map_or_else(
+                        || parse_tool_arguments(&call.arguments),
+                        |spec| parse_tool_call(&call.arguments, &spec.parameters),
+                    )
+                    .unwrap_or_default();
                 let content = match call.name.as_str() {
                     PLAN_TOOL | COMPLETE_TOOL | FINISH_TOOL => {
                         let text = self.bridge(

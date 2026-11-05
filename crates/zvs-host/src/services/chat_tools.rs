@@ -623,6 +623,18 @@ pub fn parse_tool_arguments(raw: &str) -> Option<Map<String, Value>> {
     let source = if trimmed.is_empty() { "{}" } else { trimmed };
     match serde_json::from_str::<Value>(source) {
         Ok(Value::Object(map)) => Some(map),
+        Ok(Value::String(inner)) => match serde_json::from_str::<Value>(js_trim(&inner)) {
+            Ok(Value::Object(map)) => Some(map),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+pub fn parse_tool_call(raw: &str, schema: &Value) -> Option<Map<String, Value>> {
+    let arguments = parse_tool_arguments(raw)?;
+    match super::tool_arguments::repair(schema, Value::Object(arguments)) {
+        Value::Object(map) => Some(map),
         _ => None,
     }
 }

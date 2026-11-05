@@ -388,6 +388,125 @@ fn array(
     }
 }
 
+pub fn repair(schema: &Value, value: Value) -> Value {
+    mend(schema, schema, value, 0)
+}
+
+fn mend(root: &Value, schema: &Value, value: Value, depth: usize) -> Value {
+    if depth > DEPTH_MAX {
+        return value;
+    }
+    let schema = resolve(root, schema);
+    let Value::Object(rules) = schema else {
+        return value;
+    };
+    let mut value = match value {
+        Value::String(raw) => decoded(root, schema, raw),
+        other => other,
+    };
+    if let Some(Value::Array(parts)) = rules.get("allOf") {
+        for part in parts {
+            value = mend(root, part, value, depth + 1);
+        }
+    }
+    if let Some(Value::Array(branches)) = rules.get("anyOf").or_else(|| rules.get("oneOf")) {
+        return match branch(root, branches, &value) {
+            Some(chosen) => mend(root, chosen, value, depth + 1),
+            None => value,
+        };
+    }
+    match value {
+        Value::Object(mut fields) => {
+            if let Some(Value::Object(properties)) = rules.get("properties") {
+                for (name, property) in properties {
+                    if let Some(field) = fields.remove(name) {
+                        fields.insert(name.clone(), mend(root, property, field, depth + 1));
+                    }
+                }
+            }
+            Value::Object(fields)
+        }
+        Value::Array(items) => {
+            let prefix = rules
+                .get("prefixItems")
+                .and_then(Value::as_array)
+                .map_or(&[][..], Vec::as_slice);
+            Value::Array(
+                items
+                    .into_iter()
+                    .enumerate()
+                    .map(
+                        |(index, item)| match prefix.get(index).or_else(|| rules.get("items")) {
+                            Some(schema) => mend(root, schema, item, depth + 1),
+                            None => item,
+                        },
+                    )
+                    .collect(),
+            )
+        }
+        other => other,
+    }
+}
+
+fn accepted<'a>(root: &'a Value, schema: &'a Value) -> Option<Vec<&'a str>> {
+    let mut names = expected_types(schema);
+    let branches = schema
+        .get("anyOf")
+        .or_else(|| schema.get("oneOf"))
+        .and_then(Value::as_array);
+    if let Some(branches) = branches {
+        for branch in branches {
+            let types = expected_types(resolve(root, branch));
+            if types.is_empty() {
+                return None;
+            }
+            names.extend(types);
+        }
+    }
+    (!names.is_empty()).then_some(names)
+}
+
+fn decoded(root: &Value, schema: &Value, raw: String) -> Value {
+    let Some(types) = accepted(root, schema) else {
+        return Value::String(raw);
+    };
+    if types.contains(&"string") || !types.iter().any(|name| matches!(*name, "array" | "object")) {
+        return Value::String(raw);
+    }
+    let trimmed = raw.trim();
+    if !trimmed.starts_with('[') && !trimmed.starts_with('{') {
+        return Value::String(raw);
+    }
+    match serde_json::from_str::<Value>(trimmed) {
+        Ok(inner) if types.iter().any(|name| matches_type(name, &inner)) => inner,
+        _ => Value::String(raw),
+    }
+}
+
+fn branch<'a>(root: &'a Value, branches: &'a [Value], value: &Value) -> Option<&'a Value> {
+    let fitting: Vec<&Value> = branches
+        .iter()
+        .filter(|branch| {
+            let types = expected_types(resolve(root, branch));
+            types.is_empty() || types.iter().any(|name| matches_type(name, value))
+        })
+        .collect();
+    if let [only] = fitting.as_slice() {
+        return Some(only);
+    }
+    let fields = value.as_object()?;
+    fitting.into_iter().find(|branch| {
+        resolve(root, branch)
+            .get("properties")
+            .and_then(Value::as_object)
+            .is_some_and(|properties| {
+                properties.keys().any(|name| {
+                    tag(root, branch, name).is_some_and(|tag| fields.get(name) == Some(&tag))
+                })
+            })
+    })
+}
+
 pub fn shape(schema: &Value) -> Value {
     sketch(schema, schema, 0)
 }

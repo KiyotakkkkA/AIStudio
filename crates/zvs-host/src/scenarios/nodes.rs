@@ -33,7 +33,7 @@ use crate::services::chat_memory::{
 };
 use crate::services::chat_tools::{
     KNOWLEDGE_INSTRUCTION, OfferedTool, TOOL_BUDGET_NOTE, TOOL_RESULT_MAX_CHARS,
-    TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result, offered_tools, parse_tool_arguments,
+    TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result, offered_tools, parse_tool_call,
     tool_parameters, tool_result_text, tool_specs, wire_tool_name,
 };
 use crate::skills::{presented, result_limit};
@@ -645,7 +645,7 @@ impl AgentNode {
         let Some(tool) = session.by_name.get(call.name.as_str()).copied() else {
             return Ok(shape("refused", UNKNOWN_TOOL.to_owned()));
         };
-        let mut arguments = parse_tool_arguments(&call.arguments).unwrap_or_default();
+        let mut arguments = parse_tool_call(&call.arguments, &tool.parameters).unwrap_or_default();
         if tool.key == MEMORY_TOOL {
             let Some(recall) = session.recall.as_mut() else {
                 return Ok(shape("refused", UNKNOWN_TOOL.to_owned()));

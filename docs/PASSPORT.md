@@ -873,6 +873,14 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   dialog, appended after the core tools so the cached prompt prefix holds. Folder grants,
   tiers, approvals and browser grants are unchanged; deciding *what is offered* is the only
   part this replaced.
+- **Argument repair** (`services/tool_arguments.rs::repair`, 2026-11-05). Before admission, the
+  chat and subagent loop, agentic sessions (including `update_plan`) and scenarios decode a
+  string argument as JSON only where the tool's schema does not accept a string but does accept
+  an array or object, the trimmed text starts with `[` or `{`, and the parsed value has an
+  accepted type; it walks `properties`, `items`, `prefixItems`, `allOf` and the one fitting
+  `anyOf`/`oneOf` branch (by type, then by tag). Arguments sent as one JSON string holding an
+  object are unwrapped. The repaired value is what the call record stores and the node
+  validates; anything else is left as is and fails validation with the usual feedback.
 - **Goals** (`/goal`, `zvs-host/src/services/chat_goal.rs`, TASK_048_EXTRA_3, 2026-11-01). A
   user message with `ChatCommand::Goal` starts a goal: `ConversationDto.goal` holds its text,
   status (`active | paused | done | stopped | failed`), reason, budget and usage. The turn runs

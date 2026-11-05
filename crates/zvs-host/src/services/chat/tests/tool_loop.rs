@@ -2455,3 +2455,58 @@ async fn a_turn_without_vendor_usage_keeps_the_estimate() {
     assert!(last.usage_estimated);
     assert!(last.tokens_out > 0);
 }
+
+#[tokio::test]
+async fn an_array_sent_as_a_json_string_reaches_the_tool_as_an_array() {
+    let test = Loop::new();
+    let seen: Arc<Mutex<Vec<Value>>> = Arc::new(Mutex::new(Vec::new()));
+    let inputs = Arc::clone(&seen);
+    test.harness
+        .runs
+        .registry()
+        .register(FnNode::new(
+            "demo.tags",
+            PermissionRequirement::tool("demo.tags"),
+            false,
+            move |_context: StepContext, input: Value| {
+                let inputs = Arc::clone(&inputs);
+                async move {
+                    inputs
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .push(input);
+                    Ok(TextOutput {
+                        text: "tagged".to_owned(),
+                    })
+                }
+            },
+        ))
+        .expect("registers the tag node");
+    test.tools
+        .register(&ToolDescriptor {
+            description: "Tag things".to_owned(),
+            input_schema: json!({
+                "type": "object",
+                "properties": { "tags": { "type": "array", "items": { "type": "string" } } },
+                "required": ["tags"]
+            }),
+            read_only: true,
+            tier: Some(ToolTier::Auto),
+            ..ToolDescriptor::new("demo.tags", ToolSource::Builtin)
+        })
+        .expect("registers the tag tool");
+    test.driver
+        .round(|_| vec![call("demo__tags", &json!({ "tags": "[\"a\", \"b\"]" }))]);
+    test.driver.fallback(|_| vec![text("Done.")]);
+    let created = test.conversation(&["demo.tags"]);
+
+    let handle = test.turn(created, "Tag it").await;
+
+    assert_eq!(test.harness.status(&handle), RunStatus::Succeeded);
+    let seen = seen.lock().unwrap_or_else(PoisonError::into_inner).clone();
+    assert_eq!(seen.len(), 1);
+    assert_eq!(seen[0]["tags"], json!(["a", "b"]));
+    let record = &test.harness.last(created).tool_calls[0];
+    assert_eq!(record.status, ChatToolCallStatus::Succeeded);
+    assert_eq!(record.arguments, json!({ "tags": ["a", "b"] }));
+}

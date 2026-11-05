@@ -16,8 +16,8 @@ use super::chat::{
 use super::chat_ask::{ASK_ONCE, ASK_TOOL};
 use super::chat_history::{MESSAGE_OVERHEAD, tokens};
 use super::chat_tools::{
-    OfferedTool, TOOL_BUDGET_NOTE, fence_tool_result, parse_tool_arguments, tool_specs,
-    tool_specs_json,
+    OfferedTool, TOOL_BUDGET_NOTE, fence_tool_result, parse_tool_arguments, parse_tool_call,
+    tool_specs, tool_specs_json,
 };
 use super::token_estimate::estimate_tokens;
 use crate::drivers::ai::ports::SharedTextDriver;
@@ -286,7 +286,11 @@ fn record(call: &ToolCall, tool: Option<&OfferedTool>, round: usize) -> ChatTool
         key: tool.map_or_else(|| call.name.clone(), |tool| tool.key.clone()),
         name: call.name.clone(),
         round: round as u64,
-        arguments: parse_tool_arguments(&call.arguments)
+        arguments: tool
+            .map_or_else(
+                || parse_tool_arguments(&call.arguments),
+                |tool| parse_tool_call(&call.arguments, &tool.parameters),
+            )
             .map_or_else(|| Value::String(call.arguments.clone()), Value::Object),
         status: ChatToolCallStatus::Running,
         result: None,

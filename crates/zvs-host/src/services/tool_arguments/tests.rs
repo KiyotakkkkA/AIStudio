@@ -258,3 +258,93 @@ fn description_examples_parse_into_the_typed_inputs() {
         zvs_contract::parse::<FsApplyInput>(example).expect("a valid fs.apply call");
     }
 }
+
+#[test]
+fn a_json_array_sent_as_a_string_is_repaired_to_the_array() {
+    let schema = input_schema::<ShellRunInput>();
+    let arguments = json!({ "argv": " [\"npm\", \"test\"] ", "reason": "Тесты" });
+
+    let repaired = repair(&schema, arguments);
+
+    assert_eq!(
+        repaired,
+        json!({ "argv": ["npm", "test"], "reason": "Тесты" })
+    );
+    assert!(check(&schema, &repaired).is_empty());
+    zvs_contract::parse::<ShellRunInput>(repaired).expect("a valid shell.run call");
+}
+
+#[test]
+fn a_string_field_holding_json_stays_a_string() {
+    let schema = input_schema::<FsApplyInput>();
+    let arguments = json!({ "changes": [
+        { "op": "write", "path": "a.json", "content": "{\"a\": [1]}" }
+    ] });
+
+    assert_eq!(repair(&schema, arguments.clone()), arguments);
+}
+
+#[test]
+fn a_string_that_is_not_json_or_has_the_wrong_type_is_left_for_the_checker() {
+    let schema = input_schema::<ShellRunInput>();
+    let plain = json!({ "argv": "npm test", "reason": "Тесты" });
+    let wrong = json!({ "argv": "{\"program\": \"npm\"}", "reason": "Тесты" });
+    let broken = json!({ "argv": "[\"npm\", ", "reason": "Тесты" });
+
+    assert_eq!(repair(&schema, plain.clone()), plain);
+    assert_eq!(repair(&schema, wrong.clone()), wrong);
+    assert_eq!(repair(&schema, broken.clone()), broken);
+}
+
+#[test]
+fn nested_strings_inside_tagged_variants_are_repaired() {
+    let schema = input_schema::<FsApplyInput>();
+    let edits = json!([{ "old": "a", "new": "b" }]).to_string();
+    let changes = json!([
+        { "op": "edit", "path": "src/app.ts", "edits": edits },
+        { "op": "write", "path": "notes.md", "content": "[x]" }
+    ])
+    .to_string();
+
+    let repaired = repair(&schema, json!({ "changes": changes }));
+
+    assert_eq!(
+        repaired,
+        json!({ "changes": [
+            { "op": "edit", "path": "src/app.ts", "edits": [{ "old": "a", "new": "b" }] },
+            { "op": "write", "path": "notes.md", "content": "[x]" }
+        ] })
+    );
+    assert!(check(&schema, &repaired).is_empty());
+}
+
+#[test]
+fn computer_actions_sent_as_a_string_are_repaired() {
+    use crate::computer::nodes::ActInput;
+
+    let schema = input_schema::<ActInput>();
+    let actions = json!([{"type": "click", "x": 32, "y": 288}, {"type": "wait", "ms": 500}]);
+
+    let repaired = repair(&schema, json!({ "actions": actions.to_string() }));
+
+    assert_eq!(repaired, json!({ "actions": actions }));
+    zvs_contract::parse::<ActInput>(repaired).expect("a valid computer.act call");
+}
+
+#[test]
+fn arguments_sent_as_one_json_string_are_unwrapped() {
+    use crate::services::chat_tools::{parse_tool_arguments, parse_tool_call};
+
+    let schema = input_schema::<ShellRunInput>();
+    let raw = json!(json!({ "argv": "[\"npm\"]", "reason": "Тесты" }).to_string()).to_string();
+
+    assert_eq!(
+        parse_tool_arguments(&raw).map(Value::Object),
+        Some(json!({ "argv": "[\"npm\"]", "reason": "Тесты" }))
+    );
+    assert_eq!(
+        parse_tool_call(&raw, &schema).map(Value::Object),
+        Some(json!({ "argv": ["npm"], "reason": "Тесты" }))
+    );
+    assert_eq!(parse_tool_arguments("\"npm test\""), None);
+}
