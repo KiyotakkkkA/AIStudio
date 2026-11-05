@@ -44,7 +44,6 @@ import {
   SESSION_ACTIONS,
   removeLead,
   SESSION_TITLE,
-  sessionsWord,
   STOP_SESSION,
 } from "./agenticCopy";
 import type AgenticStore from "./AgenticStore";
@@ -54,7 +53,7 @@ import NewSessionModal from "./NewSessionModal";
 import PlanColumn from "./PlanColumn";
 import SessionStream from "./SessionStream";
 import { planProgress, planRows, sessionPhase } from "./sessionModel";
-import { DetailSkeleton, InlineSkeleton, awaitingData } from "../../ui/molecules/LoadingSkeleton";
+import { DetailSkeleton, awaitingData } from "../../ui/molecules/LoadingSkeleton";
 import { CardListSkeleton } from "../../ui/organisms/PageSkeletons";
 
 const NewSessionButton = observer(function NewSessionButton({
@@ -87,13 +86,7 @@ const SessionList = observer(function SessionList({ store }: { readonly store: A
       <PageHeader
         icon={mdiCreationOutline}
         title={PAGE_TITLE}
-        subtitle={
-          !awaitingData(store) ? (
-            sessionsWord(sessions.length)
-          ) : (
-            <InlineSkeleton label={LOADING} className="w-20" />
-          )
-        }
+        subtitle="Запуск и управление сессиями выполнения задач"
         actions={<NewSessionButton store={store} />}
       />
       <ErrorBar store={store} />

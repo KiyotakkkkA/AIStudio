@@ -12,6 +12,7 @@ export default function AnswerFlow({
   rounds,
   toolCalls,
   generating,
+  durationMs = 0,
   renderToolItems,
   renderText,
 }: {
@@ -20,6 +21,7 @@ export default function AnswerFlow({
   readonly rounds: readonly ChatRoundDto[];
   readonly toolCalls: readonly ChatToolCallDto[];
   readonly generating: boolean;
+  readonly durationMs?: number;
   readonly renderToolItems: (calls: readonly ChatToolCallDto[]) => ReactNode;
   readonly renderText: (text: string, last: boolean) => ReactNode;
 }) {
@@ -29,7 +31,6 @@ export default function AnswerFlow({
   let pipelineKey = "";
   let pipelineReasoning = false;
   let pipelineCalls = 0;
-  let pipelineMs = 0;
   const flushPipeline = () => {
     if (pipelineItems.length === 0) return;
     const list = (
@@ -39,7 +40,7 @@ export default function AnswerFlow({
     );
     units.push(
       !generating && pipelineCalls > 0 ? (
-        <ToolWorkGroup key={pipelineKey} label={workGroupLabel(pipelineMs, pipelineCalls)}>
+        <ToolWorkGroup key={pipelineKey} label={workGroupLabel(durationMs, pipelineCalls)}>
           {list}
         </ToolWorkGroup>
       ) : (
@@ -49,13 +50,11 @@ export default function AnswerFlow({
     pipelineItems = [];
     pipelineReasoning = false;
     pipelineCalls = 0;
-    pipelineMs = 0;
   };
   blocks.forEach((block, index) => {
     if (block.kind === "tools") {
       if (pipelineItems.length === 0) pipelineKey = block.key;
       pipelineCalls += block.calls.length;
-      pipelineMs += block.calls.reduce((sum, call) => sum + call.durationMs, 0);
       pipelineItems.push(<Fragment key={block.key}>{renderToolItems(block.calls)}</Fragment>);
       return;
     }

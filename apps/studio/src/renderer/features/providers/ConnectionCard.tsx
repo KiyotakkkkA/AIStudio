@@ -1,4 +1,4 @@
-import { mdiAccountCircleOutline, mdiFlashOutline, mdiKeyOutline } from "@mdi/js";
+import { mdiAccountCircleOutline, mdiKeyOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import {
   PROVIDER_CAPABILITIES,
@@ -17,12 +17,12 @@ import StatusDot from "../../ui/atoms/StatusDot";
 import TextInput from "../../ui/atoms/TextInput";
 import Field from "../../ui/molecules/Field";
 import AuthModeSwitch from "./AuthModeSwitch";
-import ProbeResultLine from "./ProbeResultLine";
 import type { ProviderFormVm } from "./ProviderFormVm";
 import {
   ADAPTER_LABELS,
   CAPABILITY_LABELS,
   KIND_LABELS,
+  PROVIDER_TYPE_LABEL,
   STATUS_LABELS,
   statusTone,
 } from "./providerPresentation";
@@ -43,76 +43,79 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
   const showsVendor = !vm.isLocal && !isAccountFamily(vm.adapter);
 
   return (
-    <section className="flex min-w-0 flex-[1.35] flex-col gap-3.25 rounded-card border border-line bg-main-900 p-4">
+    <section className="flex min-w-0 flex-col gap-3.5 rounded-xl bg-main-850 p-5">
       <div className="flex items-center gap-2">
-        <h2 className="flex-1 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
+        <h2 className="flex-1 text-[15px] font-semibold tracking-[-0.01em] text-main-100">
           Настройка подключения
         </h2>
         {summary === null ? null : (
-          <Chip>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium ${summary.status === "ok" ? "bg-ok-soft text-ok" : summary.status === "failed" ? "bg-err-soft text-err" : summary.status === "unknown" ? "bg-main-700 text-main-300" : "bg-warn-soft text-warn"}`}
+          >
             <StatusDot tone={statusTone(summary.status)} />
             {STATUS_LABELS[summary.status]}
-          </Chip>
+          </span>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3.25">
-        <Field
-          label="Семейство адаптера"
-          help={
-            vm.descriptor.implemented ? undefined : "Семейство объявлено, но ещё не реализован."
-          }
-          error={vm.errorOf("adapter")}
-        >
-          <SelectInput
-            label="Семейство адаптера"
-            value={vm.adapter}
-            options={vm.adapterOptions.map((entry) => ({
-              value: entry.family,
-              label: entry.implemented
-                ? ADAPTER_LABELS[entry.family]
-                : `${ADAPTER_LABELS[entry.family]} — не реализован`,
-            }))}
-            onChange={(value) => {
-              vm.setAdapter(value as AdapterFamily);
-            }}
-          />
-        </Field>
-        <Field
-          label="Название подключения"
-          htmlFor="provider-name"
-          required
-          error={vm.errorOf("name")}
-        >
-          <TextInput
-            id="provider-name"
-            value={vm.name}
-            maxLength={128}
-            placeholder="Ollama"
-            invalid={vm.errorOf("name") !== undefined}
-            onChange={(event) => {
-              vm.setName(event.target.value);
-            }}
-          />
-        </Field>
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field
+            label={PROVIDER_TYPE_LABEL}
+            help={
+              vm.descriptor.implemented ? undefined : "Семейство объявлено, но ещё не реализован."
+            }
+            error={vm.errorOf("adapter")}
+          >
+            <SelectInput
+              label={PROVIDER_TYPE_LABEL}
+              value={vm.adapter}
+              options={vm.adapterOptions.map((entry) => ({
+                value: entry.family,
+                label: entry.implemented
+                  ? ADAPTER_LABELS[entry.family]
+                  : `${ADAPTER_LABELS[entry.family]} — не реализован`,
+              }))}
+              onChange={(value) => {
+                vm.setAdapter(value as AdapterFamily);
+              }}
+            />
+          </Field>
+          <Field
+            label="Название подключения"
+            htmlFor="provider-name"
+            required
+            error={vm.errorOf("name")}
+          >
+            <TextInput
+              id="provider-name"
+              value={vm.name}
+              maxLength={128}
+              placeholder="Ollama"
+              invalid={vm.errorOf("name") !== undefined}
+              onChange={(event) => {
+                vm.setName(event.target.value);
+              }}
+            />
+          </Field>
+        </div>
+
+        {showsVendor ? (
+          <Field label="Вендор">
+            <SelectInput
+              label="Вендор"
+              value={vm.kind}
+              options={PROVIDER_KINDS.map((kind) => ({ value: kind, label: KIND_LABELS[kind] }))}
+              onChange={(value) => {
+                vm.setKind(value as ProviderKind);
+              }}
+            />
+          </Field>
+        ) : null}
       </div>
 
-      {showsVendor || hasAuthModeChoice ? (
-        <div
-          className={`grid gap-3.25 ${showsVendor && hasAuthModeChoice ? "grid-cols-2" : "grid-cols-1"}`}
-        >
-          {showsVendor ? (
-            <Field label="Вендор">
-              <SelectInput
-                label="Вендор"
-                value={vm.kind}
-                options={PROVIDER_KINDS.map((kind) => ({ value: kind, label: KIND_LABELS[kind] }))}
-                onChange={(value) => {
-                  vm.setKind(value as ProviderKind);
-                }}
-              />
-            </Field>
-          ) : null}
+      {vm.isLocal ? null : (
+        <div className="flex flex-col gap-3">
           {hasAuthModeChoice ? (
             <Field label="Способ авторизации" error={vm.errorOf("authMode")}>
               <AuthModeSwitch
@@ -122,154 +125,140 @@ function ConnectionCard({ vm, onManageSecrets }: ConnectionCardProps) {
               />
             </Field>
           ) : null}
-        </div>
-      ) : null}
-
-      {vm.isLocal ? (
-        <p className="rounded-control bg-main-800 px-3 py-2.25 text-[12px] text-main-400">
-          Модели читаются из папки загрузок этого компьютера. Ничего настраивать не нужно — нажмите
-          «Найти модели», чтобы увидеть найденные файлы.
-        </p>
-      ) : vm.usesAccount ? (
-        <Field label="Связанный аккаунт" error={vm.errorOf("accountId")}>
-          {vm.accountOptions.length === 0 ? (
-            <div className="flex items-center gap-2.5 rounded-control bg-main-800 px-2.5 py-2 text-[12px] text-main-400">
-              <Icon path={mdiAccountCircleOutline} size={16} className="flex-none text-main-500" />
-              <span className="flex-1">
-                Нет привязанных аккаунтов для {ADAPTER_LABELS[vm.adapter]}.
-              </span>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control bg-main-900 px-2.5 py-1.5">
-                <Icon
-                  path={mdiAccountCircleOutline}
-                  size={16}
-                  className="flex-none text-accent-dark"
-                />
-                <span className="min-w-0 flex-1">
-                  <SelectInput
-                    label="Связанный аккаунт"
-                    value={vm.accountId ?? ""}
-                    options={vm.accountOptions.map((entry) => ({
-                      value: entry.id,
-                      label: entry.emailMasked ?? entry.displayName ?? entry.id,
-                    }))}
-                    onChange={(value) => {
-                      vm.setAccountId(value === "" ? null : (value as AccountId));
-                    }}
+          {vm.usesAccount ? (
+            <Field label="Связанный аккаунт" error={vm.errorOf("accountId")}>
+              {vm.accountOptions.length === 0 ? (
+                <div className="flex items-center gap-2.5 rounded-control bg-main-800 px-2.5 py-2 text-[12px] text-main-400">
+                  <Icon
+                    path={mdiAccountCircleOutline}
+                    size={16}
+                    className="flex-none text-main-500"
                   />
-                </span>
-                {account === null ? null : (
-                  <Chip tone={account.status === "linked" ? "accent" : "neutral"}>
-                    {account.status === "linked"
-                      ? "сессия активна"
-                      : (account.detail ?? "нужна повторная привязка")}
-                  </Chip>
-                )}
-              </div>
-            </div>
-          )}
-        </Field>
-      ) : (
-        <>
-          <Field
-            label="Базовый адрес"
-            htmlFor="provider-base-url"
-            required
-            error={vm.errorOf("baseUrl")}
-          >
-            <TextInput
-              id="provider-base-url"
-              mono
-              value={vm.baseUrl}
-              placeholder="https://ollama.com/v1"
-              invalid={vm.errorOf("baseUrl") !== undefined}
-              onChange={(event) => {
-                vm.setBaseUrl(event.target.value);
-              }}
-            />
-          </Field>
-
-          <Field
-            label="API-токен"
-            help="Значение берётся из вкладки `Секреты`."
-            error={vm.errorOf("secretId")}
-          >
-            <div className="flex gap-2">
-              <span className="min-w-0 flex-1">
-                <SelectInput
-                  label="API-токен"
-                  value={vm.secretId ?? ""}
-                  placeholder="Выберите секрет"
-                  searchable
-                  invalid={vm.errorOf("secretId") !== undefined}
-                  options={pickable.map((secret) => ({
-                    value: secret.id,
-                    label: `${secret.name} — ${secret.hint}`,
-                  }))}
-                  onChange={(value) => {
-                    vm.setSecretId(value === "" ? null : (value as SecretId));
+                  <span className="flex-1">
+                    Нет привязанных аккаунтов для {ADAPTER_LABELS[vm.adapter]}.
+                  </span>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
+                    <Icon
+                      path={mdiAccountCircleOutline}
+                      size={16}
+                      className="flex-none text-accent-dark"
+                    />
+                    <span className="min-w-48 flex-1">
+                      <SelectInput
+                        label="Связанный аккаунт"
+                        value={vm.accountId ?? ""}
+                        options={vm.accountOptions.map((entry) => ({
+                          value: entry.id,
+                          label: entry.emailMasked ?? entry.displayName ?? entry.id,
+                        }))}
+                        onChange={(value) => {
+                          vm.setAccountId(value === "" ? null : (value as AccountId));
+                        }}
+                      />
+                    </span>
+                    {account === null ? null : (
+                      <Chip tone={account.status === "linked" ? "accent" : "neutral"}>
+                        {account.status === "linked"
+                          ? "сессия активна"
+                          : (account.detail ?? "нужна повторная привязка")}
+                      </Chip>
+                    )}
+                  </div>
+                </div>
+              )}
+            </Field>
+          ) : (
+            <>
+              <Field
+                label="Базовый адрес"
+                htmlFor="provider-base-url"
+                required
+                error={vm.errorOf("baseUrl")}
+              >
+                <TextInput
+                  id="provider-base-url"
+                  mono
+                  value={vm.baseUrl}
+                  placeholder="https://ollama.com/v1"
+                  invalid={vm.errorOf("baseUrl") !== undefined}
+                  onChange={(event) => {
+                    vm.setBaseUrl(event.target.value);
                   }}
                 />
-              </span>
-              <Button tone="ghost" onClick={onManageSecrets}>
-                <Icon path={mdiKeyOutline} size={15} />
-                Секреты
-              </Button>
+              </Field>
+
+              <Field
+                label="API-токен"
+                help="Ключ доступа из раздела «Секреты»."
+                error={vm.errorOf("secretId")}
+              >
+                <div className="flex gap-2">
+                  <span className="min-w-0 flex-1">
+                    <SelectInput
+                      label="API-токен"
+                      value={vm.secretId ?? ""}
+                      placeholder="Выберите секрет"
+                      searchable
+                      invalid={vm.errorOf("secretId") !== undefined}
+                      options={pickable.map((secret) => ({
+                        value: secret.id,
+                        label: `${secret.name} — ${secret.hint}`,
+                      }))}
+                      onChange={(value) => {
+                        vm.setSecretId(value === "" ? null : (value as SecretId));
+                      }}
+                    />
+                  </span>
+                  <Button tone="ghost" onClick={onManageSecrets}>
+                    <Icon path={mdiKeyOutline} size={15} />
+                    Секреты
+                  </Button>
+                </div>
+              </Field>
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3">
+        {vm.isLocal ? (
+          <p className="text-[12px] text-main-400">
+            Модели из папки загрузок доступны после поиска.
+          </p>
+        ) : null}
+
+        {vm.isLocal ? null : (
+          <Field label="Возможности" error={vm.errorOf("capabilities")}>
+            <div className="flex flex-wrap gap-1.5">
+              {PROVIDER_CAPABILITIES.map((capability) => {
+                const reason = vm.capabilityDisabledReason(capability);
+                const active = vm.capabilities.includes(capability);
+                return (
+                  <Chip
+                    key={capability}
+                    tone={active ? "selected" : "neutral"}
+                    title={reason ?? undefined}
+                    onClick={
+                      reason === null
+                        ? () => {
+                            vm.toggleCapability(capability);
+                          }
+                        : undefined
+                    }
+                  >
+                    {CAPABILITY_LABELS[capability]}
+                  </Chip>
+                );
+              })}
             </div>
           </Field>
-        </>
-      )}
+        )}
 
-      {vm.isLocal ? null : (
-        <Field label="Возможности" error={vm.errorOf("capabilities")}>
-          <div className="flex flex-wrap gap-1.5">
-            {PROVIDER_CAPABILITIES.map((capability) => {
-              const reason = vm.capabilityDisabledReason(capability);
-              const active = vm.capabilities.includes(capability);
-              return (
-                <Chip
-                  key={capability}
-                  tone={active ? "selected" : "neutral"}
-                  title={reason ?? undefined}
-                  onClick={
-                    reason === null
-                      ? () => {
-                          vm.toggleCapability(capability);
-                        }
-                      : undefined
-                  }
-                >
-                  {CAPABILITY_LABELS[capability]}
-                </Chip>
-              );
-            })}
-          </div>
-        </Field>
-      )}
-
-      <div className="mt-0.5 flex items-center gap-3">
-        <Button
-          tone="primary"
-          disabled={providers.probing}
-          onClick={() => {
-            void providers.probe();
-          }}
-        >
-          <Icon path={mdiFlashOutline} size={15} />
-          {providers.probing
-            ? vm.isLocal
-              ? "Поиск…"
-              : "Проверка…"
-            : vm.isLocal
-              ? "Найти модели"
-              : "Проверить связь"}
-        </Button>
-        <ProbeResultLine result={vm.probeResult} probing={providers.probing} />
+        {vm.banner === null ? null : <Alert>{vm.banner}</Alert>}
       </div>
-
-      {vm.banner === null ? null : <Alert>{vm.banner}</Alert>}
     </section>
   );
 }

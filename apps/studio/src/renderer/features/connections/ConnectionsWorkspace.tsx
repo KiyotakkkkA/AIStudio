@@ -8,7 +8,6 @@ import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import EmptyState from "../../ui/molecules/EmptyState";
 import PageHeader from "../../ui/organisms/PageHeader";
 import { useStore } from "../../stores/useStore";
-import { serversWord, toolsWord } from "./connectionPresentation";
 import ExposedToolsCard from "./ExposedToolsCard";
 import HealthRail from "./HealthRail";
 import RegistryDialog from "./RegistryDialog";
@@ -16,7 +15,7 @@ import ServerList from "./ServerList";
 import ServerSetupCard from "./ServerSetupCard";
 import Alert from "../../ui/molecules/Alert";
 import { PaneSkeleton } from "../../ui/organisms/PageSkeletons";
-import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function ConnectionsWorkspace() {
   const { connections: store } = useStore();
@@ -32,13 +31,7 @@ function ConnectionsWorkspace() {
       <PageHeader
         icon={mdiPowerPlugOutline}
         title="Коннекторы"
-        subtitle={
-          awaitingData(store) ? (
-            <InlineSkeleton label={PAGE_LOADING} className="w-48" />
-          ) : (
-            `MCP-серверы · ${serversWord(store.servers.length)} · ${toolsWord(store.exposedToolCount)} доступно`
-          )
-        }
+        subtitle="Подключение внешних инструментов через MCP-серверы"
         actions={
           <>
             <Button tone="secondary" onClick={store.openRegistry}>

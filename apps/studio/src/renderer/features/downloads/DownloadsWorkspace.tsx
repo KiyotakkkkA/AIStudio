@@ -16,10 +16,10 @@ import DownloadFailureRow from "./DownloadFailureRow";
 import DownloadFilterRail from "./DownloadFilterRail";
 import DownloadProgressRow from "./DownloadProgressRow";
 import DownloadQueueRow from "./DownloadQueueRow";
-import { formatBytes, formatRate, SECTION_LABELS } from "./downloadPresentation";
+import { formatRate, SECTION_LABELS } from "./downloadPresentation";
 import Alert from "../../ui/molecules/Alert";
 import { TableSkeleton } from "../../ui/organisms/PageSkeletons";
-import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 const CatalogueEntry = observer(function CatalogueEntry({
   item,
@@ -50,25 +50,13 @@ export default observer(function DownloadsWorkspace() {
   }, [store]);
 
   const busy = store.busy;
-  const disk = store.disk;
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <PageHeader
         icon={mdiTrayArrowDown}
         title="Загрузки"
-        subtitle={
-          awaitingData(store) ? (
-            <InlineSkeleton label={PAGE_LOADING} className="w-56" />
-          ) : (
-            <>
-              {store.runningCount} загружается · {store.queued.length} в очереди
-              {disk === null
-                ? ""
-                : ` · занято ${formatBytes(disk.usedBytes)} из ${formatBytes(disk.totalBytes)}`}
-            </>
-          )
-        }
+        subtitle="Установка моделей, движков и компонентов для работы"
         actions={
           <>
             <Button

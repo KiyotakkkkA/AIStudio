@@ -1,9 +1,7 @@
-import { mdiDeleteOutline, mdiImageOutline, mdiLayersOutline } from "@mdi/js";
+import { mdiImageOutline, mdiLayersOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useEffect } from "react";
-import Button from "../../ui/atoms/buttons/Button";
-import IconButton from "../../ui/atoms/buttons/IconButton";
 import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import EmptyState from "../../ui/molecules/EmptyState";
 import { useAppNavigation } from "../../hooks/useAppNavigation";
@@ -13,7 +11,8 @@ import ConnectionCard from "./ConnectionCard";
 import ModelGrid from "./ModelGrid";
 import ModelSettingsCard from "./ModelSettingsCard";
 import ProviderList from "./ProviderList";
-import { modelsWord } from "./providerPresentation";
+import ProviderActionsMenu from "./ProviderActionsMenu";
+import ProviderControlActions from "./ProviderControlActions";
 import Alert from "../../ui/molecules/Alert";
 import { PaneSkeleton } from "../../ui/organisms/PageSkeletons";
 import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
@@ -61,73 +60,28 @@ function ProvidersWorkspace() {
             />
           </div>
         ) : (
-          <ScrollArea className="flex min-w-0 flex-1 flex-col gap-3.5 px-4.5 py-4">
-            <div className="flex flex-none flex-col gap-3.5 xl:flex-row">
-              <ConnectionCard
-                vm={form}
-                onManageSecrets={() => {
-                  navigation.go(ROUTES.secrets);
-                }}
-              />
-              <ModelSettingsCard vm={form} />
-            </div>
-
-            <ModelGrid />
-
-            <div className="flex flex-none items-center gap-3 rounded-card border border-line bg-main-900 px-4 py-3">
-              {form.isNew ? null : (
-                <IconButton
-                  key={form.providerId}
-                  tone="danger"
-                  size="md"
-                  path={mdiDeleteOutline}
-                  label="Удалить подключение"
-                  disabled={providers.removing}
-                  needConfirm
-                  modalSetup={{
-                    title: "Удалить подключение?",
-                    content: (
-                      <>
-                        «{form.name}» будет удалено вместе с кэшем моделей (
-                        {modelsWord(providers.models.length)}
-                        {providers.detail?.defaultModelId === null
-                          ? ""
-                          : ", включая выбранную по умолчанию"}
-                        ). Сценарии и чаты, ссылающиеся на это подключение, останутся без модели.
-                      </>
-                    ),
-                    tone: "danger",
-                    confirmLabel: "Удалить",
-                  }}
-                  onClick={() => {
-                    void providers.removeSelected();
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <ScrollArea className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 px-5 py-4 lg:px-6">
+              <div className="mx-auto flex w-full max-w-360 flex-none justify-end">
+                <ProviderActionsMenu />
+              </div>
+              <div className="mx-auto grid w-full max-w-360 flex-none items-start gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(18rem,1fr)]">
+                <ConnectionCard
+                  vm={form}
+                  onManageSecrets={() => {
+                    navigation.go(ROUTES.secrets);
                   }}
                 />
-              )}
-              <Button
-                tone="secondary"
-                disabled={!form.dirty || providers.saving}
-                needConfirm
-                modalSetup={{
-                  title: "Отменить?",
-                  content: "Несохранённые изменения будут потеряны.",
-                  confirmLabel: "Отменить",
-                }}
-                onClick={providers.resetForm}
-              >
-                Отменить
-              </Button>
-              <Button
-                tone="primary"
-                disabled={providers.saving}
-                onClick={() => {
-                  void providers.submit();
-                }}
-              >
-                {providers.saving ? "Сохранение…" : "Сохранить подключение"}
-              </Button>
+                <ModelSettingsCard vm={form} />
+              </div>
+
+              <ModelGrid key={form.providerId ?? "new"} />
+            </ScrollArea>
+
+            <div className="flex-none px-5 pt-2 pb-4 lg:px-6">
+              <ProviderControlActions />
             </div>
-          </ScrollArea>
+          </div>
         )}
       </div>
 

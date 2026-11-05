@@ -3,6 +3,7 @@ import { observer } from "mobx-react-lite";
 import EntityListPanel from "../../ui/molecules/EntityListPanel";
 import type { ProviderId } from "@zvs/shared";
 import Icon from "../../ui/atoms/Icon";
+import Button from "../../ui/atoms/buttons/Button";
 import StatusDot from "../../ui/atoms/StatusDot";
 import EmptyState from "../../ui/molecules/EmptyState";
 import ListRow from "../../ui/molecules/ListRow";
@@ -33,6 +34,12 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
         placeholder: "Поиск подключений…",
         onChange: providers.setListQuery,
       }}
+      footer={
+        <Button tone="primary" onClick={onCreate}>
+          <Icon path={mdiPlus} size={15} />
+          Добавить подключение
+        </Button>
+      }
     >
       {awaitingData(providers) ? <ListSkeleton /> : null}
 
@@ -75,19 +82,6 @@ function ProviderList({ onSelect, onCreate }: ProviderListProps) {
           </span>
         </ListRow>
       ))}
-
-      <ListRow
-        dashed
-        onClick={onCreate}
-        leading={
-          <span className="flex size-7.5 flex-none items-center justify-center rounded-control bg-main-700 text-main-400">
-            <Icon path={mdiPlus} size={14} />
-          </span>
-        }
-      >
-        <span className="font-medium text-main-300">Добавить подключение</span>
-        <span className="truncate text-[11px] text-main-400">Подключения хранятся локально.</span>
-      </ListRow>
     </EntityListPanel>
   );
 }

@@ -16,7 +16,7 @@ import Icon from "../../ui/atoms/Icon";
 import EmptyState from "../../ui/molecules/EmptyState";
 import Alert from "../../ui/molecules/Alert";
 import { ListSkeleton, PaneSkeleton } from "../../ui/organisms/PageSkeletons";
-import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function VectorStoresWorkspace() {
   const { vectorStores: store } = useStore();
@@ -28,13 +28,7 @@ function VectorStoresWorkspace() {
       bleed
       icon={mdiDatabaseOutline}
       title="Векторные хранилища"
-      subtitle={
-        awaitingData(store) ? (
-          <InlineSkeleton label={PAGE_LOADING} className="w-24" />
-        ) : (
-          `${store.stores.length} хранилищ`
-        )
-      }
+      subtitle="Документы и поиск по источникам для диалогов"
       actions={
         <div className="flex flex-none items-center gap-3">
           <Button

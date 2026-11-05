@@ -446,6 +446,8 @@ export default observer(function ChatThread({
                 <div key={message.id} data-message-id={message.id} className="scroll-mt-6">
                   <ChatMessage
                     messageId={message.id}
+                    durationMs={message.durationMs}
+                    completedAt={message.createdAt + message.durationMs}
                     content={message.content}
                     reasoning={message.reasoning}
                     rounds={message.rounds}

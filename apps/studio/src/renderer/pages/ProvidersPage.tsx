@@ -6,13 +6,11 @@ import Icon from "../ui/atoms/Icon";
 import AccountLoginMenu from "../features/providers/AccountLoginMenu";
 import AccountsTab from "../features/providers/AccountsTab";
 import ProvidersWorkspace from "../features/providers/ProvidersWorkspace";
-import { accountsWord } from "../features/providers/accountPresentation";
-import { modelsWord } from "../features/providers/providerPresentation";
 import { ACCOUNTS_TAB, PROVIDERS_TABS, TAB_LABELS } from "../features/providers/providerTabs";
 import { useStore } from "../stores/useStore";
 import PageShell from "../ui/templates/PageShell";
 import PageTabs from "../ui/molecules/PageTabs";
-import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../ui/molecules/LoadingSkeleton";
+import { awaitingData } from "../ui/molecules/LoadingSkeleton";
 
 function ProvidersPage() {
   const { providers, accounts } = useStore();
@@ -28,13 +26,9 @@ function ProvidersPage() {
       icon={mdiLayersOutline}
       title="AI-провайдеры"
       subtitle={
-        awaitingData(onAccounts ? accounts : providers) ? (
-          <InlineSkeleton label={PAGE_LOADING} className="w-48" />
-        ) : onAccounts ? (
-          `${accountsWord(accounts.accounts.length)} привязано`
-        ) : (
-          `${String(providers.summaries.length)} подключений · ${modelsWord(providers.discoveredModelCount)} найдено`
-        )
+        onAccounts
+          ? "Учётные записи для доступа к моделям провайдеров"
+          : "Подключение и настройка облачных и локальных моделей"
       }
       actions={
         onAccounts ? (

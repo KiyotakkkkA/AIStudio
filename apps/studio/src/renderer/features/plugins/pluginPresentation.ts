@@ -54,8 +54,7 @@ export const PLUGIN_SECTIONS: readonly PluginSection[] = [
 ];
 
 export const CATALOGUE_TITLE = "Плагины";
-export const CATALOGUE_SUBTITLE =
-  "Подключите плагины, чтобы использовать их в диалогах и сценариях";
+export const CATALOGUE_SUBTITLE = "Подключения к внешним сервисам для диалогов и сценариев";
 export const SEARCH_PLACEHOLDER = "Поиск плагинов";
 
 export type CatalogueTab = "all" | "connected";

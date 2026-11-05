@@ -14,17 +14,13 @@ export default function ProbeResultLine({ result, probing }: ProbeResultLineProp
     return (
       <span className="flex items-center gap-1.75 text-[12px] text-main-400">
         <Icon path={mdiInformationOutline} size={14} className="flex-none" />
-        Проверяем связь…
+        Проверка связи…
       </span>
     );
   }
 
   if (result === null) {
-    return (
-      <span className="text-[12px] text-main-500">
-        Связь ещё не проверялась — модели появятся после проверки.
-      </span>
-    );
+    return <span className="text-[12px] text-main-500">Проверка не выполнена</span>;
   }
 
   const line = probeLine(result.outcome);

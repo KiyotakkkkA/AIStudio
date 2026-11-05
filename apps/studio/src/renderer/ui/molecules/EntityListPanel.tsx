@@ -14,6 +14,7 @@ export interface EntityListPanelProps {
   readonly search?: EntityListSearch;
   readonly filters?: ReactNode;
   readonly children: ReactNode;
+  readonly footer?: ReactNode;
 }
 
 export default function EntityListPanel({
@@ -21,6 +22,7 @@ export default function EntityListPanel({
   search,
   filters,
   children,
+  footer,
 }: EntityListPanelProps) {
   return (
     <div className="flex min-h-0 w-65.5 flex-none flex-col gap-2 border-r border-line py-3.5 pr-2.5 pl-3">
@@ -42,6 +44,7 @@ export default function EntityListPanel({
         <div className="flex flex-none flex-wrap gap-1.5">{filters}</div>
       )}
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-2 pr-0.5">{children}</ScrollArea>
+      {footer}
     </div>
   );
 }

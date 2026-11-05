@@ -1,5 +1,6 @@
 import { mdiOpenInNew } from "@mdi/js";
 import Icon from "../atoms/Icon";
+import IconButton from "../atoms/buttons/IconButton";
 import ActivePill from "../motion/ActivePill";
 import type { NavItemModel, NavStatus } from "../organisms/NavRailTypes";
 
@@ -18,15 +19,45 @@ export interface NavRailItemProps {
 }
 
 export default function NavRailItem({ item, active, collapsed, onSelect }: NavRailItemProps) {
+  if (collapsed) {
+    return (
+      <div className="relative size-8 flex-none self-center">
+        {active ? (
+          <ActivePill
+            layoutId="nav-rail-active"
+            className="rounded-control bg-main-100 fx-on:shadow-[0_1px_2px_rgb(30_20_10/0.18)]"
+          />
+        ) : null}
+        <IconButton
+          path={item.icon}
+          label={item.label}
+          tooltip="right-center"
+          size="md"
+          iconSize={17}
+          aria-current={active ? "page" : undefined}
+          onClick={() => onSelect(item)}
+          toneClassName={
+            active ? "text-main-900" : "text-main-400 hover:bg-main-900/70 hover:text-main-200"
+          }
+          className="relative"
+        />
+        {item.status ? (
+          <span
+            className={`pointer-events-none absolute top-1.5 right-1 size-2 rounded-full ring-2 ring-main-950 ${STATUS_COLOR[item.status]}`}
+          />
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
-      title={collapsed ? item.label : undefined}
       aria-current={active ? "page" : undefined}
       onClick={() => onSelect(item)}
       className={[
         "group relative flex h-8.5 w-full flex-none items-center gap-2.5 rounded-control text-[13px]",
-        collapsed ? "justify-center px-0" : "px-2.5",
+        "px-2.5",
         active
           ? "font-medium text-main-900"
           : "text-main-300 hover:bg-main-900/70 hover:text-main-50",
@@ -44,34 +75,23 @@ export default function NavRailItem({ item, active, collapsed, onSelect }: NavRa
           size={17}
           className={active ? "text-main-900" : "text-main-400 group-hover:text-main-200"}
         />
-        {collapsed && item.status ? (
-          <span
-            className={`absolute -top-0.5 -right-1 size-2 flex-none rounded-full ring-2 ring-main-950 ${STATUS_COLOR[item.status]}`}
-          />
-        ) : null}
       </span>
-      {collapsed ? null : (
-        <>
-          <span className="relative flex-1 truncate text-left">{item.label}</span>
-          {item.badge === undefined ? null : (
-            <span
-              className={`relative inline-flex h-4.5 min-w-4.5 flex-none items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold tabular-nums ${
-                active ? "bg-main-900/20 text-main-900" : "bg-main-700 text-main-300"
-              }`}
-            >
-              {item.badge}
-            </span>
-          )}
-          {item.status ? (
-            <span
-              className={`relative size-2 flex-none rounded-full ${STATUS_COLOR[item.status]}`}
-            />
-          ) : null}
-          {item.external ? (
-            <Icon path={mdiOpenInNew} size={12} className="relative flex-none opacity-55" />
-          ) : null}
-        </>
+      <span className="relative flex-1 truncate text-left">{item.label}</span>
+      {item.badge === undefined ? null : (
+        <span
+          className={`relative inline-flex h-4.5 min-w-4.5 flex-none items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold tabular-nums ${
+            active ? "bg-main-900/20 text-main-900" : "bg-main-700 text-main-300"
+          }`}
+        >
+          {item.badge}
+        </span>
       )}
+      {item.status ? (
+        <span className={`relative size-2 flex-none rounded-full ${STATUS_COLOR[item.status]}`} />
+      ) : null}
+      {item.external ? (
+        <Icon path={mdiOpenInNew} size={12} className="relative flex-none opacity-55" />
+      ) : null}
     </button>
   );
 }

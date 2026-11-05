@@ -12,7 +12,7 @@ import TaskFilterRail from "./TaskFilterRail";
 import TaskRow from "./TaskRow";
 import Alert from "../../ui/molecules/Alert";
 import { TableSkeleton } from "../../ui/organisms/PageSkeletons";
-import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 const GROUP_TITLES = {
   running: "Выполняется",
@@ -28,7 +28,6 @@ export default observer(function TasksWorkspace() {
     return store.dispose;
   }, [store]);
 
-  const { byStatus } = store.counts;
   const groups = store.groups;
   const sections = (["running", "queued", "attention", "finished"] as const).filter(
     (group) => groups[group].length > 0,
@@ -39,16 +38,7 @@ export default observer(function TasksWorkspace() {
       <PageHeader
         icon={mdiClockOutline}
         title="Задачи"
-        subtitle={
-          awaitingData(store) ? (
-            <InlineSkeleton label={PAGE_LOADING} className="w-56" />
-          ) : (
-          <>
-              {byStatus.running} выполняется · {byStatus.queued} в очереди · {byStatus.blocked} ждут
-              решения
-          </>
-          )
-        }
+        subtitle="Управление текущими, запланированными и завершёнными задачами"
         actions={
           <>
             <Button

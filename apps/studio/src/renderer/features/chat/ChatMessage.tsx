@@ -49,6 +49,8 @@ export default function ChatMessage({
   status = "Обработка запроса",
   since = null,
   usage,
+  durationMs = 0,
+  completedAt,
   toolCalls = [],
   renderToolItems,
   artifacts,
@@ -72,6 +74,8 @@ export default function ChatMessage({
   readonly status?: string;
   readonly since?: number | null;
   readonly usage?: string;
+  readonly durationMs?: number;
+  readonly completedAt?: number;
   readonly toolCalls?: readonly ChatToolCallDto[];
   readonly renderToolItems: (calls: readonly ChatToolCallDto[]) => ReactNode;
   readonly artifacts?: ReactNode;
@@ -126,6 +130,7 @@ export default function ChatMessage({
       rounds={rounds}
       toolCalls={toolCalls}
       generating={generating}
+      durationMs={durationMs}
       renderToolItems={renderToolItems}
       renderText={(text, last) =>
         messageId === undefined || generating ? (
@@ -160,7 +165,7 @@ export default function ChatMessage({
           )}
           {usage && <p className="pt-2 font-mono text-[11px] text-main-500">{usage}</p>}
         </div>
-        <div className="mt-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <MessageActions
             content={content}
             onEdit={onEdit}
@@ -170,6 +175,19 @@ export default function ChatMessage({
             onPin={onPin}
             branch={branch}
           />
+          {!generating && completedAt !== undefined ? (
+            <time
+              dateTime={new Date(completedAt).toISOString()}
+              title={new Date(completedAt).toLocaleString("ru-RU")}
+              className="text-[11px] text-main-500"
+            >
+              {new Date(completedAt).toLocaleString("ru-RU", {
+                weekday: "long",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </time>
+          ) : null}
         </div>
       </div>
       <SlidedPanel

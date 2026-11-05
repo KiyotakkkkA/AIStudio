@@ -13,6 +13,8 @@ import type {
 import { plural } from "../connections/connectionPresentation";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 
+export const PROVIDER_TYPE_LABEL = "Тип подключения";
+
 export const CAPABILITY_LABELS: Record<ProviderCapability, string> = {
   text: "Генерация текста",
   embedding: "Эмбеддинги",

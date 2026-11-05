@@ -27,7 +27,6 @@ import SkillList from "./SkillList";
 import SkillManifestView from "./SkillManifestView";
 import { MANIFEST_PATH } from "./SkillStore";
 import {
-  headerLine,
   UPDATE_ALL_TITLE,
   UPDATE_CONFIRM_LABEL,
   UPDATE_MODIFIED_WARNING,
@@ -38,7 +37,7 @@ import {
 } from "./skillPresentation";
 import Alert from "../../ui/molecules/Alert";
 import { PaneSkeleton } from "../../ui/organisms/PageSkeletons";
-import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function SkillsWorkspace() {
   const { skills: store } = useStore();
@@ -58,13 +57,7 @@ function SkillsWorkspace() {
       <PageHeader
         icon={mdiBookOpenOutline}
         title="Навыки"
-        subtitle={
-          awaitingData(store) ? (
-            <InlineSkeleton label={PAGE_LOADING} className="w-32" />
-          ) : (
-            headerLine(store.skills)
-          )
-        }
+        subtitle="Инструкции и материалы для выполнения специализированных задач"
         actions={
           <>
             {store.updatable.length === 0 ? null : (

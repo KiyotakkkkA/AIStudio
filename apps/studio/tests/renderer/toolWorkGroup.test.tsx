@@ -29,14 +29,21 @@ const call = (extra: Partial<ChatToolCallDto> = {}) =>
     ...extra,
   });
 
-function renderMessage(props: { readonly generating?: boolean }) {
+function renderMessage(props: {
+  readonly generating?: boolean;
+  readonly durationMs?: number;
+  readonly toolCalls?: ChatToolCallDto[];
+  readonly completedAt?: number;
+}) {
   return render(
     <StoreContext.Provider value={rootStore}>
       <ChatMessage
         content="Готово."
         citations={[]}
         stores={[]}
-        toolCalls={[call()]}
+        toolCalls={props.toolCalls ?? [call()]}
+        durationMs={props.durationMs ?? 240_000}
+        completedAt={props.completedAt}
         renderToolItems={(calls) => <ToolCallItems calls={calls} />}
         generating={props.generating ?? false}
       />
@@ -56,13 +63,43 @@ test("worked duration formats milliseconds, seconds and minutes", () => {
 
 test("a finished answer folds its tool calls into a collapsed work group", () => {
   renderMessage({});
-  const toggle = screen.getByRole("button", { name: `${WORKED_LEAD} 3 мин 20 с` });
+  const toggle = screen.getByRole("button", { name: workGroupLabel(240_000, 1) });
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
   expect(screen.queryByRole("list", { name: TOOL_CALLS_LABEL })).toBeNull();
 
   fireEvent.click(toggle);
   expect(toggle.getAttribute("aria-expanded")).toBe("true");
   expect(screen.getByRole("list", { name: TOOL_CALLS_LABEL })).toBeTruthy();
+});
+
+test("work duration uses elapsed generation time rather than summed tool execution", () => {
+  renderMessage({
+    durationMs: 250_000,
+    toolCalls: [call(), call({ id: "call_2" })],
+  });
+  expect(screen.getByRole("button", { name: workGroupLabel(250_000, 2) })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: workGroupLabel(400_000, 2) })).toBeNull();
+});
+
+test("missing generation timing does not fall back to tool execution time", () => {
+  renderMessage({ durationMs: 0 });
+  expect(screen.getByRole("button", { name: workGroupLabel(0, 1) })).toBeTruthy();
+});
+
+test("a completed answer shows its completion timestamp beside the actions", () => {
+  const completedAt = new Date(2026, 10, 5, 23, 50).getTime();
+  const { container } = renderMessage({ completedAt });
+  const timestamp = container.querySelector("time");
+  expect(timestamp?.getAttribute("datetime")).toBe(new Date(completedAt).toISOString());
+  expect(timestamp?.textContent).toBe("четверг 23:50");
+  expect(
+    timestamp?.parentElement?.querySelector('button[aria-label="Копировать сообщение"]'),
+  ).toBeTruthy();
+});
+
+test("an in-progress answer does not show a completion timestamp", () => {
+  const { container } = renderMessage({ generating: true, completedAt: 1_000 });
+  expect(container.querySelector("time")).toBeNull();
 });
 
 test("a streaming answer keeps the timeline expanded", () => {

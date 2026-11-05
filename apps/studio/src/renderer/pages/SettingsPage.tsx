@@ -4,7 +4,11 @@ import PageShell from "../ui/templates/PageShell";
 
 export default function SettingsPage() {
   return (
-    <PageShell icon={mdiPuzzleOutline} title="Расширения" subtitle="Диагностика связи с хостом">
+    <PageShell
+      icon={mdiPuzzleOutline}
+      title="Расширения"
+      subtitle="Состояние подключения и диагностика приложения"
+    >
       <HostCheck />
     </PageShell>
   );

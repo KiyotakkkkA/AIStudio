@@ -16,7 +16,7 @@ import { KIND_FILTER_LABELS, STATUS_LABELS, STATUS_TONES } from "./runPresentati
 import type { RunRangeKey } from "./RunHistoryStore";
 import Alert from "../../ui/molecules/Alert";
 import { TableSkeleton } from "../../ui/organisms/PageSkeletons";
-import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../../ui/molecules/LoadingSkeleton";
+import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 const RANGES: readonly { key: RunRangeKey; label: string }[] = [
   { key: "all", label: "За всё время" },
@@ -45,13 +45,7 @@ export default observer(function RunsWorkspace() {
       <PageHeader
         icon={mdiHistory}
         title="Запуски и логи"
-        subtitle={
-          awaitingData(store) ? (
-            <InlineSkeleton label={PAGE_LOADING} className="w-36" />
-          ) : (
-            <>{store.counts.total} запусков в истории</>
-          )
-        }
+        subtitle="История выполнения, результаты и журналы запусков"
         actions={
           <>
             <div className="w-64">

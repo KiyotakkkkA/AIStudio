@@ -11,15 +11,12 @@ import {
   APPS_NOTHING_SELECTED,
   APPS_TAB,
   APPS_TAB_PARAM,
-  appCountLabel,
   BROWSER_TAB,
   BROWSER_TAB_PARAM,
   FOLDERS_TAB,
   NOTHING_SELECTED_DESCRIPTION,
   NOTHING_SELECTED_TITLE,
   PAGE_TITLE,
-  grantCountLabel,
-  siteCountLabel,
 } from "../features/permissions/permissionsPresentation";
 import { useStore } from "../stores/useStore";
 import PageTabs from "../ui/molecules/PageTabs";
@@ -27,7 +24,7 @@ import EmptyState from "../ui/molecules/EmptyState";
 import PageShell from "../ui/templates/PageShell";
 import Alert from "../ui/molecules/Alert";
 import { PaneSkeleton } from "../ui/organisms/PageSkeletons";
-import { InlineSkeleton, PAGE_LOADING, awaitingData } from "../ui/molecules/LoadingSkeleton";
+import { awaitingData } from "../ui/molecules/LoadingSkeleton";
 
 const TABS = [
   { value: "folders", label: FOLDERS_TAB },
@@ -58,23 +55,11 @@ function PermissionsPage() {
       icon={mdiShieldCheckOutline}
       title={PAGE_TITLE}
       subtitle={
-        tab === APPS_TAB_PARAM ? (
-          permissions.appGrantsLoaded ? (
-            appCountLabel(permissions.appGrants.length)
-          ) : (
-            <InlineSkeleton label={PAGE_LOADING} className="w-28" />
-          )
-        ) : tab === BROWSER_TAB_PARAM ? (
-          permissions.siteGrantsLoaded ? (
-            siteCountLabel(permissions.siteGroups.length)
-          ) : (
-            <InlineSkeleton label={PAGE_LOADING} className="w-28" />
-          )
-        ) : awaitingData(permissions) ? (
-          <InlineSkeleton label={PAGE_LOADING} className="w-28" />
-        ) : (
-          grantCountLabel(permissions.grants.length)
-        )
+        tab === APPS_TAB_PARAM
+          ? "Управление доступом к приложениям"
+          : tab === BROWSER_TAB_PARAM
+            ? "Управление доступом к сайтам и действиям в браузере"
+            : "Управление доступом к файлам и папкам"
       }
       toolbar={<PageTabs label="Вид разрешений" value={tab} tabs={TABS} onChange={setTab} />}
     >

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { test } from "vitest";
 import { createIpcClient } from "@zvs/ipc";
@@ -19,6 +19,17 @@ import {
   summary,
 } from "./providerFixtures.ts";
 import { SEARCH_PLACEHOLDER } from "../../src/renderer/ui/atoms/SelectInput.tsx";
+import { PROVIDER_TYPE_LABEL } from "../../src/renderer/features/providers/providerPresentation";
+import {
+  PROVIDER_CONTROL_ACTIONS_LABEL,
+  PROBE_PROVIDER,
+} from "../../src/renderer/features/providers/ProviderControlActions";
+import {
+  PROVIDER_ACTIONS,
+  DELETE_PROVIDER,
+  DELETE_PROVIDER_TITLE,
+  DELETE_PROVIDER_ACCEPT,
+} from "../../src/renderer/features/providers/ProviderActionsMenu";
 
 function renderPage(selectedProvider = provider()) {
   const bridge = createFakeBridge<Contract>();
@@ -75,6 +86,34 @@ test("model checkboxes allow multiple selections and filtering preserves checked
   assert.equal(screen.queryByRole("checkbox", { name: "Не используют данные для обучения" }), null);
 });
 
+test("provider deletion is the only workspace menu action and requires confirmation", async () => {
+  const bridge = renderPage();
+  bridge.handle("providers.remove", () => undefined);
+  await screen.findByText("Настройка подключения");
+  assert.equal(screen.queryByRole("button", { name: DELETE_PROVIDER }), null);
+  const trigger = screen.getByRole("button", { name: PROVIDER_ACTIONS });
+  assert.equal(trigger.closest("header"), null);
+  fireEvent.click(trigger);
+  assert.equal(screen.getAllByRole("menuitem").length, 1);
+  fireEvent.click(screen.getByRole("menuitem", { name: DELETE_PROVIDER }));
+  const dialog = await screen.findByRole("dialog", { name: DELETE_PROVIDER_TITLE });
+  assert.equal(bridge.calls.filter((call) => call.channel === "providers.remove").length, 0);
+  fireEvent.click(within(dialog).getByRole("button", { name: DELETE_PROVIDER_ACCEPT }));
+  await waitFor(() => {
+    assert.deepEqual(bridge.calls.find((call) => call.channel === "providers.remove")?.payload, {
+      id: OLLAMA,
+    });
+  });
+});
+
+test("connection checking belongs to the persistent control actions alongside saving", async () => {
+  renderPage();
+  const actions = await screen.findByRole("group", { name: PROVIDER_CONTROL_ACTIONS_LABEL });
+  assert.ok(within(actions).getByRole("button", { name: PROBE_PROVIDER }));
+  assert.equal(screen.getAllByRole("button", { name: PROBE_PROVIDER }).length, 1);
+  assert.equal(actions.closest("section"), null);
+});
+
 test("the page mounts one form and one list, with the token as a picker over secrets", async () => {
   renderPage();
 
@@ -108,7 +147,7 @@ test("web adapter hides the vendor field", async () => {
     }),
   );
 
-  assert.ok(await screen.findByText("Семейство адаптера"));
+  assert.ok(await screen.findByText(PROVIDER_TYPE_LABEL));
   assert.equal(screen.queryByText("Вендор"), null);
   assert.equal(screen.queryByText("Способ авторизации"), null);
 });

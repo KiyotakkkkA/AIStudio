@@ -4,6 +4,7 @@ import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
 import { mdiCheck, mdiCogOutline } from "@mdi/js";
 import Button from "../../ui/atoms/buttons/Button";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
+import { IconFloatingButton } from "../../ui/atoms/buttons/IconFloatingButton";
 import Icon from "../../ui/atoms/Icon";
 import ConfirmModal from "../../ui/molecules/ConfirmModal";
 import type ExecPolicyStore from "./ExecPolicyStore";
@@ -28,14 +29,21 @@ const TRIGGER_TONES: Record<ExecMode, string | undefined> = {
 function ModeText({ mode, muted }: { readonly mode: ExecMode; readonly muted: boolean }) {
   const copy = EXEC_MODE_COPY[mode];
   return (
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-      <span className={`text-[13px] font-medium ${muted ? "text-main-400" : "text-main-100"}`}>
-        {copy.label}
-      </span>
-      <span className="text-[11.5px] leading-[16px] whitespace-normal text-main-500">
-        {copy.hint}
-      </span>
+    <span
+      className={`min-w-0 flex-1 text-[13px] font-medium ${muted ? "text-main-400" : "text-main-100"}`}
+    >
+      {copy.label}
     </span>
+  );
+}
+
+function ModeInfo({ mode }: { readonly mode: ExecMode }) {
+  const copy = EXEC_MODE_COPY[mode];
+  return (
+    <IconFloatingButton label={`О режиме «${copy.label}»`} anchor="right-center">
+      <p className="mb-2 font-medium text-main-50">{copy.label}</p>
+      <p>{copy.hint}</p>
+    </IconFloatingButton>
   );
 }
 
@@ -95,40 +103,46 @@ function ExecPolicyMenu({ store: execPolicy, setup }: ExecPolicyBinding) {
                         </Button>
                       </span>
                     </span>
+                    <ModeInfo mode={mode} />
                   </div>
                 );
               }
               return (
-                <Dropdown.Item
+                <div
                   key={mode}
-                  role="menuitemradio"
-                  aria-checked={selected}
-                  rounded=""
-                  className={`rounded-control px-2.5 py-2 ${selected ? "bg-main-800" : ""}`}
-                  onClick={() => {
-                    if (mode === "no-restrictions" && !selected) {
-                      setConfirming(true);
-                      return;
-                    }
-                    void execPolicy.setMode(mode);
-                  }}
+                  className={`flex items-center rounded-control pr-1 ${selected ? "bg-main-800" : ""}`}
                 >
-                  <span className="flex items-start gap-2.5 text-left">
-                    <Icon
-                      path={copy.icon}
-                      size={16}
-                      className={`mt-0.5 flex-none ${
-                        mode === "no-restrictions" ? "text-warn" : "text-main-400"
-                      }`}
-                    />
-                    <ModeText mode={mode} muted={false} />
-                    <Icon
-                      path={mdiCheck}
-                      size={15}
-                      className={`mt-0.5 flex-none text-accent-medium ${selected ? "" : "invisible"}`}
-                    />
-                  </span>
-                </Dropdown.Item>
+                  <Dropdown.Item
+                    role="menuitemradio"
+                    aria-checked={selected}
+                    rounded=""
+                    className="min-w-0 flex-1 rounded-control px-2.5 py-2"
+                    onClick={() => {
+                      if (mode === "no-restrictions" && !selected) {
+                        setConfirming(true);
+                        return;
+                      }
+                      void execPolicy.setMode(mode);
+                    }}
+                  >
+                    <span className="flex items-center gap-2.5 text-left">
+                      <Icon
+                        path={copy.icon}
+                        size={16}
+                        className={`flex-none ${
+                          mode === "no-restrictions" ? "text-warn" : "text-main-400"
+                        }`}
+                      />
+                      <ModeText mode={mode} muted={false} />
+                      <Icon
+                        path={mdiCheck}
+                        size={15}
+                        className={`flex-none text-accent-medium ${selected ? "" : "invisible"}`}
+                      />
+                    </span>
+                  </Dropdown.Item>
+                  <ModeInfo mode={mode} />
+                </div>
               );
             })}
           </div>

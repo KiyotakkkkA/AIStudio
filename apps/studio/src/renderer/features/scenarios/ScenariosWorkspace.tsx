@@ -17,13 +17,8 @@ import RunLogStrip from "./RunLogStrip";
 import ScenarioCanvas from "./ScenarioCanvas";
 import type ScenarioEditor from "./ScenarioEditor";
 import type ScenarioStore from "./ScenarioStore";
-import { issuesWord, savedAtLabel, scenariosWord } from "./scenarioCopy";
-import {
-  DetailSkeleton,
-  InlineSkeleton,
-  PAGE_LOADING,
-  awaitingData,
-} from "../../ui/molecules/LoadingSkeleton";
+import { issuesWord, savedAtLabel } from "./scenarioCopy";
+import { DetailSkeleton, awaitingData } from "../../ui/molecules/LoadingSkeleton";
 import { CardListSkeleton } from "../../ui/organisms/PageSkeletons";
 
 function Banner({
@@ -219,13 +214,7 @@ const ScenarioList = observer(function ScenarioList({ store }: { readonly store:
       <PageHeader
         icon={mdiGraphOutline}
         title="Сценарии"
-        subtitle={
-          awaitingData(store) ? (
-            <InlineSkeleton label={PAGE_LOADING} className="w-24" />
-          ) : (
-            scenariosWord(store.scenarios.length)
-          )
-        }
+        subtitle="Создание и запуск последовательностей действий"
         actions={
           <Button tone="primary" disabled={store.creating} onClick={() => void store.create()}>
             <Icon path={mdiPlus} size={15} />
