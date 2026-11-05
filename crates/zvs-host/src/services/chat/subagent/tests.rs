@@ -156,8 +156,15 @@ fn a_forwarded_approval_names_the_dialog_and_the_subagent() {
 }
 
 #[test]
-fn the_delegate_tool_is_offered_only_when_enabled_and_not_off() {
-    let preferences = SubagentPreferencesDto::default();
-    let registered: Vec<ToolDto> = Vec::new();
-    assert!(!delegation_offered(&registered, &preferences));
+fn the_delegate_tool_follows_the_subagent_setting() {
+    let enabled = SubagentPreferencesDto {
+        enabled: true,
+        ..SubagentPreferencesDto::default()
+    };
+    let disabled = SubagentPreferencesDto {
+        enabled: false,
+        ..SubagentPreferencesDto::default()
+    };
+    assert!(delegation_offered(&enabled));
+    assert!(!delegation_offered(&disabled));
 }

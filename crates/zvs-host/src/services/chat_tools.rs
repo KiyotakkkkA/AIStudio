@@ -11,7 +11,6 @@ use zvs_contract::{
     OfferedToolSource, ToolDto, ToolSource, ToolTier, Validate,
 };
 
-use super::chat::subagent::AGENT_DELEGATE;
 use super::chat_history::{attribute, defang_sources, source_label, to_fixed_2, tokens};
 use crate::background::{SHELL_KILL, SHELL_OUTPUT};
 use crate::browser::capability::{
@@ -226,7 +225,6 @@ pub fn plan_tools(inputs: &ToolInputs<'_>) -> ToolPlan {
         .filter(|tool| {
             let key = tool.key.as_str();
             model_tool(key)
-                && key != AGENT_DELEGATE
                 && (tool.source != ToolSource::Mcp
                     || tool
                         .source_ref

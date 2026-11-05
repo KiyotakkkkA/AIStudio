@@ -12,6 +12,10 @@
     "value": "memory"
   },
   {
+    "name": "subagent",
+    "value": "subagent"
+  },
+  {
     "name": "command",
     "value": "command"
   },

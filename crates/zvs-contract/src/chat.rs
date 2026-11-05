@@ -61,6 +61,7 @@ wire_enum!(OfferedToolSource {
     Base => "base",
     Knowledge => "knowledge",
     Memory => "memory",
+    Subagent => "subagent",
     Command => "command",
     Loaded => "loaded",
 });

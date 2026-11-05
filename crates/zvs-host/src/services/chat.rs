@@ -1705,7 +1705,7 @@ impl NodeDef for PrepareNode {
         }
         if tools_usable {
             offered.push(ask_tool(&offered));
-            if delegation_offered(&registered, &inner.subagents.preferences()) {
+            if delegation_offered(&inner.subagents.preferences()) {
                 offered.push(delegate_tool(&offered));
             }
         }
@@ -2772,7 +2772,6 @@ impl ChatService {
             .registry
             .register(GenerateChatNode(Arc::clone(&inner)))?;
         options.registry.register(PersistNode(Arc::clone(&inner)))?;
-        options.registry.register(DelegateNode)?;
         options
             .registry
             .register(SubagentNode(Arc::clone(&inner)))?;
@@ -3681,7 +3680,7 @@ impl ChatService {
         };
         if tools_usable {
             offered.push(ask_tool(&offered));
-            if delegation_offered(&registered, &self.inner.subagents.preferences()) {
+            if delegation_offered(&self.inner.subagents.preferences()) {
                 offered.push(delegate_tool(&offered));
             }
         }
@@ -4025,8 +4024,8 @@ use wake::Waker;
 pub use wake::{WAKE_DELAY, WAKE_HEADING, WAKE_STREAK_MAX, wake_streak, wake_text};
 
 use subagent::{
-    AGENT_DELEGATE, CallSink, DelegateNode, Delegation, SubagentNode, delegate_section,
-    delegate_tool, delegation_offered,
+    AGENT_DELEGATE, CallSink, Delegation, SubagentNode, delegate_section, delegate_tool,
+    delegation_offered,
 };
 
 #[cfg(test)]

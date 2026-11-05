@@ -7,6 +7,13 @@
     }
   },
   {
+    "name": "subagent",
+    "value": {
+      "key": "agent.delegate",
+      "source": "subagent"
+    }
+  },
+  {
     "name": "loaded",
     "value": {
       "key": "docs.search",

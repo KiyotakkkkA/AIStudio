@@ -350,6 +350,12 @@ impl Harness {
             ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), registry)
         })
         .expect("a chat service");
+        crate::services::SubagentService::new(Arc::clone(&database), Arc::new(SystemClock))
+            .set(&zvs_contract::SubagentPreferencesDto {
+                enabled: false,
+                ..zvs_contract::SubagentPreferencesDto::default()
+            })
+            .expect("starts without subagents");
         let (provider_id, model_id) = database
             .with_connection(|connection| {
                 let repositories = Repositories::new(connection);

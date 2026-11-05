@@ -100,12 +100,9 @@ impl Loop {
                 ..ToolDescriptor::new("fs.read", ToolSource::Builtin)
             })
             .expect("registers fs.read");
-        test.tools
-            .register(&ToolDescriptor {
-                tier: Some(ToolTier::Auto),
-                ..ToolDescriptor::new(AGENT_DELEGATE, ToolSource::Builtin)
-            })
-            .expect("registers the delegate tool");
+        test.preferences()
+            .set(&SubagentPreferencesDto::default())
+            .expect("enables subagents");
         (test, probe)
     }
 
@@ -685,19 +682,4 @@ async fn disabled_subagents_remove_the_delegate_tool() {
         .collect();
     assert!(!tools.iter().any(|name| name == DELEGATE_NAME));
     assert!(tools.iter().any(|name| name == "fs__read"));
-}
-
-#[tokio::test]
-async fn a_delegate_tool_set_off_is_not_offered() {
-    let (test, _probe) = Loop::with_subagents();
-    let created = test.conversation(&["fs.read"]);
-
-    test.turn(created, "Привет").await;
-
-    assert!(
-        !test.driver.requests()[0]
-            .tools
-            .iter()
-            .any(|tool| tool.name == DELEGATE_NAME)
-    );
 }

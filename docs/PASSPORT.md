@@ -895,9 +895,12 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   and starts a new turn.
 - **Subagents** (`agent.delegate`, `zvs-host/src/services/chat/subagent.rs`, TASK_048_EXTRA_4,
   2026-11-01). A chat turn may hand a self-contained task to a child run of kind `subagent`
-  (`parentRunId` = the turn, `subjectId` = the dialog). The delegate call is a catalogue tool
-  (default tier `auto`, Russian description in `kernel_tools.rs`) handled like `chat.ask`: it
-  needs no approval of its own, because every call the child makes is admitted separately.
+  (`parentRunId` = the turn, `subjectId` = the dialog). The delegate call is not a catalogue
+  tool (2026-11-05): like `chat.memory` it is offered automatically while the subagent
+  preference is on, with offered source `subagent`, and is absent from «Инструменты»; the
+  catalogue row of older installations is retired (`RETIRED_BUILTINS`). It is handled like
+  `chat.ask`: it needs no approval of its own, because every call the child makes is admitted
+  separately.
   - *Ceiling.* `explore` offers `fs.list`, `fs.read`, `fs.search`, the knowledge and memory
     tools the parent was offered, and `tool.search` over the parent's read-only deferred
     tools; `general` offers the parent turn's tool set. Both drop `browser.*`, `chat.ask`,

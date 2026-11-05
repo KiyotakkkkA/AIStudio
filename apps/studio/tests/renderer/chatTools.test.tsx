@@ -25,6 +25,7 @@ import {
   OFFERED_BY_COMMAND,
   OFFERED_BY_KNOWLEDGE,
   OFFERED_BY_MEMORY,
+  OFFERED_BY_SUBAGENTS,
   OFFERED_ON_REQUEST,
   SOURCE_HINTS,
   toolSections,
@@ -332,10 +333,11 @@ test("tool sections group the offered tools by why they were offered", () => {
     { key: "chat.memory", tokens: 1, source: "memory" },
     { key: "browser.navigate", tokens: 1, source: "command" },
     { key: "knowledge.search", tokens: 1, source: "knowledge" },
+    { key: "agent.delegate", tokens: 1, source: "subagent" },
   ];
   expect(toolSections(items)).toEqual([
     { title: BASE_TOOLS_TITLE, items: [items[1]] },
-    { title: AUTOMATIC_TOOLS_TITLE, items: [items[2], items[4]] },
+    { title: AUTOMATIC_TOOLS_TITLE, items: [items[2], items[4], items[5]] },
     { title: COMMAND_TOOLS_TITLE, items: [items[3]] },
     { title: LOADED_TOOLS_TITLE, items: [items[0]] },
   ]);
@@ -344,6 +346,7 @@ test("tool sections group the offered tools by why they were offered", () => {
     base: null,
     knowledge: OFFERED_BY_KNOWLEDGE,
     memory: OFFERED_BY_MEMORY,
+    subagent: OFFERED_BY_SUBAGENTS,
     command: OFFERED_BY_COMMAND,
     loaded: OFFERED_ON_REQUEST,
   });

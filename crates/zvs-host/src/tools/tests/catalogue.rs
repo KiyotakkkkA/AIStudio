@@ -25,11 +25,7 @@ fn the_full_chat_tool_catalogue_is_measured() {
     let registered = host.tools.list(&ToolListFilter::default()).expect("lists");
     let keys: Vec<String> = registered
         .iter()
-        .filter(|tool| {
-            tool.source == ToolSource::Builtin
-                && model_tool(&tool.key)
-                && tool.key != AGENT_DELEGATE
-        })
+        .filter(|tool| tool.source == ToolSource::Builtin && model_tool(&tool.key))
         .map(|tool| tool.key.clone())
         .collect();
     let mut offered = offered_tools(&keys, &registered);
@@ -75,6 +71,34 @@ fn the_full_chat_tool_catalogue_is_measured() {
         ]
     );
     assert!(size < 16_000, "{size}");
+}
+
+#[test]
+fn the_delegate_tool_leaves_the_catalogue() {
+    let host = test_services(SystemService::new(
+        Arc::new(FakeClock::default()),
+        EventBus::default(),
+        Duration::ZERO,
+    ));
+    host.tools
+        .register(&crate::tools::ToolDescriptor::new(
+            AGENT_DELEGATE,
+            ToolSource::Builtin,
+        ))
+        .expect("seeds an old installation");
+    crate::tools::register_kernel_tools(&host.nodes, &host.tools).expect("registers current tools");
+    assert!(
+        !host
+            .tools
+            .list(&ToolListFilter::default())
+            .expect("lists")
+            .iter()
+            .any(|tool| tool.key == AGENT_DELEGATE)
+    );
+    assert_eq!(
+        delegate_tool(&[]).source,
+        zvs_contract::OfferedToolSource::Subagent
+    );
 }
 
 #[test]

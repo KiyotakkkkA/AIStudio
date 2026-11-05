@@ -77,7 +77,14 @@ export const ChatToolCallDto = z.object({
   authorisation: ToolAuthorisationDto.optional(),
 });
 export type ChatToolCallDto = z.infer<typeof ChatToolCallDto>;
-export const OFFERED_TOOL_SOURCES = ["base", "knowledge", "memory", "command", "loaded"] as const;
+export const OFFERED_TOOL_SOURCES = [
+  "base",
+  "knowledge",
+  "memory",
+  "subagent",
+  "command",
+  "loaded",
+] as const;
 export const OfferedToolSource = z.enum(OFFERED_TOOL_SOURCES);
 export type OfferedToolSource = z.infer<typeof OfferedToolSource>;
 export const OfferedToolDto = z.object({

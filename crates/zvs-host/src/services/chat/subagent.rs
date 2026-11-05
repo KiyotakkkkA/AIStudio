@@ -12,7 +12,7 @@ use zvs_contract::validate::{check, js_slice, js_trim};
 use zvs_contract::{
     AppError, AppErrorCode, ChatSettings, ChatToolCallDto, ChatToolCallStatus, GraphNode,
     HostEvent, HostEventDraft, RunGraph, RunKind, RunStatus, SUBAGENT_DOMAIN, StartRunInput,
-    StepStatus, SubagentPreferencesDto, ToolDto, ToolTier, Validate, VectorStoreId,
+    StepStatus, SubagentPreferencesDto, Validate, VectorStoreId,
 };
 
 use super::{
@@ -46,7 +46,6 @@ pub const SUBAGENT_NODE: &str = "subagent.run";
 pub const SUBAGENT_NODE_ID: &str = "agent";
 pub const REPORT_TAG: &str = "subagent-report";
 pub const LABEL_MAX: usize = 80;
-pub const DELEGATE_ONLY_IN_DIALOG: &str = "Субагента можно запустить только из диалога";
 pub const DELEGATE_MALFORMED: &str = "Поручение субагенту сформулировано некорректно";
 pub const SUBAGENTS_UNAVAILABLE: &str = "Субагенты недоступны в этом запуске";
 pub const SUBAGENT_STOPPED: &str = "Субагент остановлен";
@@ -259,14 +258,8 @@ pub fn concurrent_delegate(tool: &OfferedTool, arguments: &str) -> bool {
             == Some(SubagentPreset::Explore)
 }
 
-pub fn delegation_offered(registered: &[ToolDto], preferences: &SubagentPreferencesDto) -> bool {
+pub fn delegation_offered(preferences: &SubagentPreferencesDto) -> bool {
     preferences.enabled
-        && registered.iter().any(|tool| {
-            tool.key == AGENT_DELEGATE
-                && tool.enabled
-                && tool.available
-                && tool.tier != ToolTier::Off
-        })
 }
 
 pub fn delegate_parameters() -> Value {
@@ -295,7 +288,7 @@ pub fn delegate_tool(offered: &[OfferedTool]) -> OfferedTool {
         parameters: delegate_parameters(),
         destructive: false,
         read_only: false,
-        source: zvs_contract::OfferedToolSource::Base,
+        source: zvs_contract::OfferedToolSource::Subagent,
         server: None,
         plugin: None,
     }
@@ -704,37 +697,6 @@ impl RoundHook for SubagentHook {
             return Ok(RoundNext::Wrap);
         }
         Ok(RoundNext::Continue)
-    }
-}
-
-pub(crate) struct DelegateNode;
-
-#[async_trait]
-impl NodeDef for DelegateNode {
-    type Input = DelegateArguments;
-    type Output = SubagentOutput;
-
-    fn node_type(&self) -> &str {
-        AGENT_DELEGATE
-    }
-
-    fn permission(&self) -> PermissionRequirement {
-        PermissionRequirement::tool(AGENT_DELEGATE)
-    }
-
-    fn side_effect(&self) -> bool {
-        true
-    }
-
-    async fn run(
-        &self,
-        _context: &StepContext,
-        _input: DelegateArguments,
-    ) -> Result<SubagentOutput, AppError> {
-        Err(AppError::new(
-            AppErrorCode::Conflict,
-            DELEGATE_ONLY_IN_DIALOG,
-        ))
     }
 }
 
