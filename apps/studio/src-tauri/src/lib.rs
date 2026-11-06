@@ -22,8 +22,9 @@ use zvs_host::agentic::{AgenticService, AgenticServiceOptions, register_agentic_
 use zvs_host::artifacts::{ArtifactStore, DASHBOARDS};
 use zvs_host::background::{BackgroundShellOptions, BackgroundShells, register_background_nodes};
 use zvs_host::browser::{
-    AgentControls, Browser as BrowserTools, BrowserAgent, BrowserGrants, BrowserLifecycle,
-    BrowserSettings, RoutedPages, profile_dir, register_browser_nodes, setting_limit, tool_switch,
+    AgentControls, Browser as BrowserTools, BrowserAgent, BrowserDownloads, BrowserGrants,
+    BrowserLifecycle, BrowserSettings, RoutedPages, profile_dir, register_browser_nodes,
+    setting_limit, tool_switch,
 };
 use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::computer::{
@@ -115,7 +116,7 @@ use zvs_host::{IpcServer, ipc};
 use crate::browser::gateway::GatewayOptions;
 use crate::browser::{
     AccountGateway, BearerTokens, BrowserWorkspace, WebviewPages, WorkspaceOpener, WorkspacePages,
-    gateway_sessions, workspace_url_opener,
+    WorkspaceProfile, gateway_sessions, workspace_url_opener,
 };
 use crate::commands::Host;
 use crate::picker::DialogPicker;
@@ -996,10 +997,14 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         ),
     )?;
     browser_settings.subscribe(tool_switch(tools.clone()));
+    let browser_downloads = BrowserDownloads::new(Arc::clone(&database), clock.clone())
+        .with_launcher(platform::file_launcher());
+    workspace.attach_downloads(browser_settings.clone(), browser_downloads.clone());
     {
         let workspace = workspace.clone();
         browser_settings.subscribe(Arc::new(move |current| {
             workspace.set_full_url(current.full_url);
+            workspace.set_autofill(current.password_autosave, current.form_autofill);
             if !current.enabled {
                 workspace.hide();
             }
@@ -1300,6 +1305,8 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         browser: agent.clone(),
         browser_settings,
         browser_sites: grants,
+        browser_downloads,
+        browser_profile: Some(Arc::new(WorkspaceProfile(workspace.clone()))),
         computer: computer_agent.clone(),
         folders,
         picker: Some(picker),

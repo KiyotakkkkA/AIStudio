@@ -43,6 +43,7 @@ import {
   PickFolderResultDto,
 } from "../chat.js";
 import { AnswerFolderRequestInput, FolderGrantDto, FolderGrantRef } from "../folders.js";
+import { BrowserDownloadRef, BrowserDownloadsDto } from "../browserData.js";
 import { BrowserSettingsDto } from "../browserSettings.js";
 import {
   BrowserSiteDefaultInput,
@@ -349,6 +350,13 @@ export const contract = defineContract({
   "browserSites.remove": { input: BrowserSiteRef, output: BrowserSitesDto },
   "browserSettings.get": { input: z.void(), output: BrowserSettingsDto },
   "browserSettings.set": { input: BrowserSettingsDto, output: BrowserSettingsDto },
+  "browserSettings.pickDownloadDir": { input: z.void(), output: BrowserSettingsDto },
+  "browserSettings.clearData": { input: z.void(), output: z.void() },
+  "browserDownloads.list": { input: z.void(), output: BrowserDownloadsDto },
+  "browserDownloads.remove": { input: BrowserDownloadRef, output: BrowserDownloadsDto },
+  "browserDownloads.clear": { input: z.void(), output: BrowserDownloadsDto },
+  "browserDownloads.open": { input: BrowserDownloadRef, output: z.void() },
+  "browserDownloads.reveal": { input: BrowserDownloadRef, output: z.void() },
   "agentic.list": { input: z.void(), output: z.array(AgenticSessionDto) },
   "agentic.get": { input: AgenticSessionRef, output: AgenticSessionDto },
   "agentic.create": { input: CreateAgenticSessionInput, output: AgenticSessionDto },

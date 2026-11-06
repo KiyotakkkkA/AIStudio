@@ -1,9 +1,44 @@
 use std::sync::Arc;
 
-use zvs_contract::{AppError, BrowserSettingsDto};
+use zvs_contract::{
+    AppError, AppErrorCode, BrowserDownloadRef, BrowserSettingsDto, VectorSourceKind,
+};
 
 use super::IpcServer;
+use crate::browser::PROFILE_UNAVAILABLE;
 use crate::services::Services;
+
+pub const FOLDER_PICKER_UNAVAILABLE: &str = "Окно выбора папки недоступно";
+
+async fn pick_download_dir(services: Arc<Services>) -> Result<BrowserSettingsDto, AppError> {
+    let picker = services
+        .picker
+        .clone()
+        .ok_or_else(|| AppError::new(AppErrorCode::NotImplemented, FOLDER_PICKER_UNAVAILABLE))?;
+    let current = services.browser_settings.get();
+    let Some(folder) = picker
+        .pick(VectorSourceKind::Folder)
+        .await?
+        .into_iter()
+        .next()
+    else {
+        return Ok(current);
+    };
+    services.browser_settings.set(&BrowserSettingsDto {
+        download_dir: Some(folder),
+        ..current
+    })
+}
+
+async fn clear_data(services: Arc<Services>) -> Result<(), AppError> {
+    let profile = services
+        .browser_profile
+        .clone()
+        .ok_or_else(|| AppError::new(AppErrorCode::NotImplemented, PROFILE_UNAVAILABLE))?;
+    profile.clear_data().await?;
+    services.browser_downloads.clear()?;
+    Ok(())
+}
 
 pub fn register(server: &mut IpcServer) {
     server
@@ -17,6 +52,40 @@ pub fn register(server: &mut IpcServer) {
             "browserSettings.set",
             |services: Arc<Services>, input: BrowserSettingsDto| async move {
                 services.browser_settings.set(&input)
+            },
+        )
+        .handle(
+            "browserSettings.pickDownloadDir",
+            |services: Arc<Services>, _input: ()| pick_download_dir(services),
+        )
+        .handle(
+            "browserSettings.clearData",
+            |services: Arc<Services>, _input: ()| clear_data(services),
+        )
+        .handle(
+            "browserDownloads.list",
+            |services: Arc<Services>, _input: ()| async move { services.browser_downloads.list() },
+        )
+        .handle(
+            "browserDownloads.remove",
+            |services: Arc<Services>, input: BrowserDownloadRef| async move {
+                services.browser_downloads.remove(&input.id)
+            },
+        )
+        .handle(
+            "browserDownloads.clear",
+            |services: Arc<Services>, _input: ()| async move { services.browser_downloads.clear() },
+        )
+        .handle(
+            "browserDownloads.open",
+            |services: Arc<Services>, input: BrowserDownloadRef| async move {
+                services.browser_downloads.open(&input.id)
+            },
+        )
+        .handle(
+            "browserDownloads.reveal",
+            |services: Arc<Services>, input: BrowserDownloadRef| async move {
+                services.browser_downloads.reveal(&input.id)
             },
         );
 }
@@ -68,17 +137,17 @@ mod tests {
         assert!(commands(&host).contains(&"browser-use".to_owned()));
         assert_eq!(
             server.dispatch("browserSettings.get", json!(null)).await,
-            json!({ "ok": true, "data": { "enabled": true, "webLinks": "studio", "localLinks": "studio", "fullUrl": false } })
+            json!({ "ok": true, "data": { "enabled": true, "webLinks": "studio", "localLinks": "studio", "fullUrl": false, "passwordAutosave": false, "formAutofill": true, "downloadDir": null, "askDownload": false } })
         );
         let saved = server
             .dispatch(
                 "browserSettings.set",
-                json!({ "enabled": false, "webLinks": "system", "localLinks": "studio", "fullUrl": true }),
+                json!({ "enabled": false, "webLinks": "system", "localLinks": "studio", "fullUrl": true, "passwordAutosave": false, "formAutofill": true, "downloadDir": null, "askDownload": false }),
             )
             .await;
         assert_eq!(
             saved,
-            json!({ "ok": true, "data": { "enabled": false, "webLinks": "system", "localLinks": "studio", "fullUrl": true } })
+            json!({ "ok": true, "data": { "enabled": false, "webLinks": "system", "localLinks": "studio", "fullUrl": true, "passwordAutosave": false, "formAutofill": true, "downloadDir": null, "askDownload": false } })
         );
         assert!(!commands(&host).contains(&"browser-use".to_owned()));
         let click = host
@@ -90,7 +159,7 @@ mod tests {
         server
             .dispatch(
                 "browserSettings.set",
-                json!({ "enabled": true, "webLinks": "system", "localLinks": "studio", "fullUrl": true }),
+                json!({ "enabled": true, "webLinks": "system", "localLinks": "studio", "fullUrl": true, "passwordAutosave": false, "formAutofill": true, "downloadDir": null, "askDownload": false }),
             )
             .await;
         assert!(

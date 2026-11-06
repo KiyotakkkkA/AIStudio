@@ -9,5 +9,9 @@ export const BrowserSettingsDto = z.object({
   webLinks: BrowserLinkTarget,
   localLinks: BrowserLinkTarget,
   fullUrl: z.boolean(),
+  passwordAutosave: z.boolean(),
+  formAutofill: z.boolean(),
+  downloadDir: z.string().min(1).max(32_767).nullable(),
+  askDownload: z.boolean(),
 });
 export type BrowserSettingsDto = z.infer<typeof BrowserSettingsDto>;

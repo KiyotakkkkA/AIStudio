@@ -54,6 +54,19 @@ impl AccountBrowser for WorkspaceOpener {
 
 pub struct WorkspacePages(pub BrowserWorkspace);
 
+pub struct WorkspaceProfile(pub BrowserWorkspace);
+
+#[async_trait]
+impl zvs_host::browser::BrowserProfile for WorkspaceProfile {
+    async fn clear_data(&self) -> Result<(), AppError> {
+        let workspace = self.0.clone();
+        tauri::async_runtime::spawn_blocking(move || workspace.clear_data())
+            .await
+            .map_err(|error| unavailable(&error.to_string()))?
+            .map_err(|error| unavailable(&error))
+    }
+}
+
 fn pages_unavailable(reason: &str) -> AppError {
     AppError::new(AppErrorCode::Unknown, PAGES_UNAVAILABLE).with_detail("reason", reason)
 }

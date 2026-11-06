@@ -1704,8 +1704,8 @@ exceed what Tools allows, only narrow it.
 > tokens and the words in its name, id, placeholder, aria-label and labels; the driver checks
 > it before focusing and again after. A click is refused when the element, or whatever is
 > under its centre point, submits a form, or when another element covers it. Downloads are
-> cancelled by the profile unless `browser.download` armed one for that tab; the file goes to
-> the user's Downloads folder. The driver (`src-tauri/src/browser/automation.rs`) enables
+> held for the user unless `browser.download` armed one for that tab; an armed file goes to
+> the download folder from Preferences (§21 *Preferences*). The driver (`src-tauri/src/browser/automation.rs`) enables
 > `Page`, `DOM` and `Accessibility` on a tab's first action and drops the session with the tab.
 > It runs only four fixed functions in an isolated world (element facts, hit test, focus check,
 > form submit) and never sends `Runtime.evaluate`.
@@ -1785,6 +1785,22 @@ and `browserSettings.set` (`BrowserSettingsDto`, stored as the one setting `brow
   browser sends both to the system browser. Plugin sign-in pages follow the switch alone.
 - **Full URL** (`fullUrl`, default off). The chrome shows only the host until the address bar is
   focused.
+- **Browsing data** (`browserSettings.clearData`). `ClearBrowsingDataAll` on the work profile
+  (cookies, cache, storage, autofill data), then the download history. Every cookie domain that
+  existed is announced as `CookiesCleared`, so browser-session accounts report `session-expired`.
+  Site rules are kept.
+- **Autofill** (`passwordAutosave` default off, `formAutofill` default on), applied to the work
+  profile (`ICoreWebView2Profile6`) on every new tab and on change. The agent still never types into
+  credential or payment fields.
+- **Downloads** (`downloadDir`, `null` = the system Downloads folder; `askDownload`). A download the
+  agent did not arm is held, never written to the target folder directly: it lands in
+  `<app data>/browser/pending-downloads/<id>/` and the chrome shows a bar in the approval slot
+  («Сохранить» / «Отменить»). Keeping moves it into `downloadDir` under a free name, or, with
+  `askDownload`, to where the save dialog points; cancelling deletes it. While an agent run is
+  active (running, waiting for approval or paused) such downloads are refused, so `browser.download`
+  stays the only way the agent saves a file. The holding folder is emptied at start-up. Every kept,
+  cancelled or failed download, the agent's included, is a `browser_download` row (newest 500,
+  migration 0041), listed by `browserDownloads.*`.
 
 ## 22. Computer use (D14)
 

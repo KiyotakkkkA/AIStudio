@@ -808,3 +808,128 @@ fn sessions_are_kept_per_tab_and_closed_when_the_tab_goes() {
     assert!(second.cdp.is_closed());
     assert!(!fake.refuse_listen.load(Ordering::SeqCst));
 }
+
+struct UserDownloads {
+    downloads: Downloads,
+    history: zvs_host::browser::BrowserDownloads,
+    busy: Arc<std::sync::atomic::AtomicBool>,
+    folder: zvs_host::testing::TemporaryDirectory,
+    _database: zvs_host::testing::TemporaryDatabase,
+}
+
+fn user_downloads() -> UserDownloads {
+    let folder = temporary_directory("browser-user-downloads");
+    let database = zvs_host::testing::temporary_database();
+    let clock: zvs_host::platform::clock::SharedClock =
+        Arc::new(zvs_host::platform::clock::FakeClock::default());
+    let history = zvs_host::browser::BrowserDownloads::new(database.shared(), clock.clone());
+    let settings = BrowserSettings::new(zvs_host::services::SettingService::new(
+        database.shared(),
+        clock,
+    ));
+    let downloads =
+        Downloads::with_pending(folder.path().join("kept"), folder.path().join("pending"));
+    let busy = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let flag = Arc::clone(&busy);
+    downloads.attach(DownloadHooks {
+        settings,
+        history: history.clone(),
+        agent_busy: Arc::new(move || flag.load(Ordering::SeqCst)),
+        changed: Arc::new(|| {}),
+    });
+    UserDownloads {
+        downloads,
+        history,
+        busy,
+        folder,
+        _database: database,
+    }
+}
+
+fn finish(downloads: &Downloads, url: &str, body: &str) -> PathBuf {
+    let mut destination = PathBuf::from(r"C:\default\report.txt");
+    assert!(downloads.requested("tab", url, &mut destination));
+    std::fs::write(&destination, body).expect("the download lands");
+    downloads.finished("tab", Some(&destination), true);
+    destination
+}
+
+#[test]
+fn a_page_download_waits_in_the_holding_folder_until_it_is_kept() {
+    let fixture = user_downloads();
+    let held = finish(
+        &fixture.downloads,
+        "https://files.example/report.txt",
+        "report",
+    );
+    assert!(held.starts_with(fixture.folder.path().join("pending")));
+    let pending = fixture.downloads.pending_view();
+    assert_eq!(pending.len(), 1);
+    assert!(pending[0].ready);
+    assert_eq!(pending[0].host, "files.example");
+    assert_eq!(pending[0].bytes, 6);
+    assert!(!fixture.folder.path().join("kept").exists());
+
+    let entry = fixture.downloads.take_ready(&pending[0].id).expect("ready");
+    let kept = fixture.downloads.keep(&entry).expect("keeps");
+    assert_eq!(kept, fixture.folder.path().join("kept").join("report.txt"));
+    assert_eq!(std::fs::read_to_string(&kept).expect("reads"), "report");
+    assert!(!held.exists());
+    assert!(!fixture.downloads.has_pending());
+    let history = fixture.history.list().expect("lists").items;
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].state, BrowserDownloadState::Done);
+    assert!(!history[0].agent);
+}
+
+#[test]
+fn a_discarded_or_failed_download_leaves_nothing_behind() {
+    let fixture = user_downloads();
+    let held = finish(&fixture.downloads, "https://files.example/a.bin", "a");
+    let id = fixture.downloads.pending_view()[0].id.clone();
+    assert!(fixture.downloads.discard_by_id(&id));
+    assert!(!held.exists());
+    assert!(!fixture.downloads.discard_by_id(&id));
+
+    let mut destination = PathBuf::from(r"C:\default\b.bin");
+    assert!(
+        fixture
+            .downloads
+            .requested("tab", "https://files.example/b.bin", &mut destination)
+    );
+    fixture.downloads.finished("tab", Some(&destination), false);
+    assert!(!fixture.downloads.has_pending());
+    let states: Vec<BrowserDownloadState> = fixture
+        .history
+        .list()
+        .expect("lists")
+        .items
+        .into_iter()
+        .map(|item| item.state)
+        .collect();
+    assert!(states.contains(&BrowserDownloadState::Cancelled));
+    assert!(states.contains(&BrowserDownloadState::Failed));
+}
+
+#[test]
+fn downloads_the_agent_did_not_ask_for_are_refused_while_it_acts() {
+    let fixture = user_downloads();
+    fixture.busy.store(true, Ordering::SeqCst);
+    let mut destination = PathBuf::from(r"C:\default\a.exe");
+    assert!(
+        !fixture
+            .downloads
+            .requested("tab", "https://files.example/a.exe", &mut destination)
+    );
+    fixture.busy.store(false, Ordering::SeqCst);
+    assert!(
+        !fixture
+            .downloads
+            .requested("tab", "file:///C:/a.exe", &mut destination)
+    );
+    assert!(fixture.downloads.requested(
+        "tab",
+        "blob:https://files.example/0f3a",
+        &mut destination
+    ));
+}

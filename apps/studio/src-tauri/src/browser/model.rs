@@ -129,6 +129,7 @@ pub struct Model {
     devtools_visible: bool,
     agent_visible: bool,
     approval: bool,
+    download_bar: bool,
     visible: bool,
     bounds: BrowserBounds,
     zoom: Option<f64>,
@@ -266,6 +267,12 @@ impl Model {
         self.agent_visible
     }
 
+    pub const fn set_download_bar(&mut self, shown: bool) -> bool {
+        let changed = self.download_bar != shown;
+        self.download_bar = shown;
+        changed
+    }
+
     pub const fn set_approval(&mut self, pending: bool) -> bool {
         let changed = self.approval != pending;
         self.approval = pending;
@@ -331,6 +338,7 @@ impl Model {
             agent: Box::default(),
             appearance: self.appearance.clone(),
             full_url: self.full_url,
+            downloads: Vec::new(),
         }
     }
 
@@ -356,7 +364,7 @@ impl Model {
                 } else {
                     0.0
                 };
-                let approval = if self.approval {
+                let approval = if self.approval || self.download_bar {
                     APPROVAL_HEIGHT * self.zoom()
                 } else {
                     0.0

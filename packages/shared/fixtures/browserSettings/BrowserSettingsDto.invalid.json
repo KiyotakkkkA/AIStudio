@@ -5,7 +5,11 @@
       "enabled": true,
       "webLinks": "chrome",
       "localLinks": "studio",
-      "fullUrl": false
+      "fullUrl": false,
+      "passwordAutosave": false,
+      "formAutofill": true,
+      "downloadDir": null,
+      "askDownload": false
     }
   },
   {
@@ -14,7 +18,24 @@
       "enabled": "yes",
       "webLinks": "studio",
       "localLinks": "studio",
-      "fullUrl": false
+      "fullUrl": false,
+      "passwordAutosave": false,
+      "formAutofill": true,
+      "downloadDir": null,
+      "askDownload": false
+    }
+  },
+  {
+    "name": "empty download folder",
+    "value": {
+      "enabled": true,
+      "webLinks": "studio",
+      "localLinks": "studio",
+      "fullUrl": false,
+      "passwordAutosave": false,
+      "formAutofill": true,
+      "downloadDir": "",
+      "askDownload": false
     }
   }
 ]

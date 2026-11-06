@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+use crate::browser_data::DOWNLOAD_PATH_MAX;
 use crate::enums::wire_enum;
-use crate::validate::no_refinements;
+use crate::errors::AppError;
+use crate::validate::{Validate, check};
 
 wire_enum!(BrowserLinkTarget {
     Studio => "studio",
@@ -16,6 +18,11 @@ pub struct BrowserSettingsDto {
     pub web_links: BrowserLinkTarget,
     pub local_links: BrowserLinkTarget,
     pub full_url: bool,
+    pub password_autosave: bool,
+    pub form_autofill: bool,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub download_dir: Option<String>,
+    pub ask_download: bool,
 }
 
 impl Default for BrowserSettingsDto {
@@ -25,11 +32,23 @@ impl Default for BrowserSettingsDto {
             web_links: BrowserLinkTarget::Studio,
             local_links: BrowserLinkTarget::Studio,
             full_url: false,
+            password_autosave: false,
+            form_autofill: true,
+            download_dir: None,
+            ask_download: false,
         }
     }
 }
 
-no_refinements!(BrowserSettingsDto);
+impl Validate for BrowserSettingsDto {
+    fn validate(&self) -> Result<(), AppError> {
+        if let Some(dir) = &self.download_dir {
+            check::non_empty("downloadDir", dir)?;
+            check::max_len("downloadDir", dir, DOWNLOAD_PATH_MAX)?;
+        }
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -46,6 +65,10 @@ mod tests {
                 "webLinks": "studio",
                 "localLinks": "studio",
                 "fullUrl": false,
+                "passwordAutosave": false,
+                "formAutofill": true,
+                "downloadDir": null,
+                "askDownload": false,
             })
         );
     }

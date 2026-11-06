@@ -2,6 +2,7 @@ pub mod agent;
 pub mod automation;
 pub mod capability;
 pub mod credentials;
+pub mod downloads;
 pub mod grants;
 pub mod lifecycle;
 pub mod network;
@@ -17,6 +18,7 @@ pub use agent::{AgentChange, AgentControls, AgentRuns, BrowserAgent, setting_lim
 pub use automation::{AutomationPort, ElementTarget, SharedAutomation};
 pub use capability::{BrowserCapability, BrowserTier, resolve_tier, site_origin, site_scope};
 pub use credentials::{FieldFacts, SecretField, secret_field};
+pub use downloads::{BrowserDownloads, DownloadRecord, move_file, unique_path};
 pub use grants::{
     BrowserGrant, BrowserGrants, DEFAULT_ORIGIN, SITE_BLOCKED, SiteDecision, canonical_site,
     site_action,
@@ -31,6 +33,7 @@ pub use policy::{
     is_web_url, navigation_url, profile_dir,
 };
 pub use settings::{
-    ACCOUNT_NEEDS_BROWSER, BROWSER_DISABLED, BrowserSettings, RoutedPages, SettingsListener,
-    is_local_url, routed_url_opener, tool_switch,
+    ACCOUNT_NEEDS_BROWSER, BROWSER_DISABLED, BrowserProfile, BrowserSettings, PROFILE_UNAVAILABLE,
+    RoutedPages, SettingsListener, SharedBrowserProfile, is_local_url, routed_url_opener,
+    tool_switch,
 };

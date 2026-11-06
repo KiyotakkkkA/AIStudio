@@ -1,6 +1,7 @@
 pub mod account;
 pub mod agentic;
 pub mod app_grant;
+pub mod browser_download;
 pub mod browser_site_rule;
 pub mod chat;
 pub mod columns;
@@ -30,6 +31,7 @@ pub mod vector_store;
 pub use account::{AccountRow, SESSION_EXPIRED_DETAIL};
 pub use agentic::{AgenticSessionRow, TranscriptCall, TranscriptEntry};
 pub use app_grant::AppGrantRow;
+pub use browser_download::BrowserDownloadRow;
 pub use browser_site_rule::BrowserSiteRuleRow;
 pub use chat::{ConversationRow, MessageRow};
 pub use columns::EnumColumn;

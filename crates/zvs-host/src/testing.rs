@@ -675,6 +675,11 @@ pub fn test_services(system: SystemService) -> TestServices {
             browser: crate::browser::BrowserAgent::new(clock.clone()),
             browser_settings,
             browser_sites: crate::browser::BrowserGrants::new(database.shared(), clock.clone()),
+            browser_downloads: crate::browser::BrowserDownloads::new(
+                database.shared(),
+                clock.clone(),
+            ),
+            browser_profile: None,
             computer: crate::computer::ComputerAgent::new(
                 Arc::new(crate::computer::sidecar::NoDesktop),
                 database.shared(),

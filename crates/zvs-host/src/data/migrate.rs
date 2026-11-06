@@ -250,6 +250,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0040_browser_site_rule",
         sql: include_str!("../../migrations/0040_browser_site_rule.sql"),
     },
+    Migration {
+        id: 41,
+        name: "0041_browser_download",
+        sql: include_str!("../../migrations/0041_browser_download.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

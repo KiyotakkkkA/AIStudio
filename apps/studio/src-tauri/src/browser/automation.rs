@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, LazyLock, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::Duration;
 
 use serde::Deserialize;
@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
-use zvs_contract::AppError;
+use zvs_contract::{AppError, BrowserDownloadState, BrowserPendingDownload};
 use zvs_host::browser::automation::{
     AUTOMATION_FAILED, BLOCKED_ADDRESS, DOWNLOAD_FAILED, DOWNLOAD_NOT_STARTED, DownloadedFile,
     ELEMENT_DISABLED, ElementTarget, FOCUS_MOVED, NAVIGATION_FAILED, NO_FORM, NOT_A_LINK,
@@ -16,8 +16,12 @@ use zvs_host::browser::automation::{
     STALE_HANDLE, SUBMITS_FORM, UNKNOWN_HANDLE, conflict, failed, refused,
 };
 use zvs_host::browser::page::{self, AxNode, ElementRef, Handles};
-use zvs_host::browser::{FieldFacts, is_web_url, navigation_url, secret_field, site_origin};
+use zvs_host::browser::{
+    BrowserDownloads, BrowserSettings, DownloadRecord, FieldFacts, is_web_url, move_file,
+    navigation_url, secret_field, site_origin, unique_path,
+};
 use zvs_host::kernel::types::cancelled;
+use zvs_host::platform::ids::new_id;
 
 use crate::browser::cdp::{CallFunctionOn, CdpClient, CdpError, RemoteObject};
 
@@ -711,18 +715,90 @@ struct Armed {
     started: Option<oneshot::Sender<()>>,
     finished: Option<Finished>,
     destination: Option<PathBuf>,
+    url: String,
+}
+
+pub struct DownloadHooks {
+    pub settings: BrowserSettings,
+    pub history: BrowserDownloads,
+    pub agent_busy: Arc<dyn Fn() -> bool + Send + Sync>,
+    pub changed: Arc<dyn Fn() + Send + Sync>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingDownload {
+    pub id: String,
+    pub label: String,
+    pub url: String,
+    pub file_name: String,
+    pub path: PathBuf,
+    pub bytes: u64,
+    pub ready: bool,
 }
 
 pub struct Downloads {
     folder: PathBuf,
+    pending_dir: PathBuf,
     armed: Mutex<HashMap<String, Armed>>,
+    pending: Mutex<Vec<PendingDownload>>,
+    hooks: OnceLock<DownloadHooks>,
+}
+
+fn user_download_url(url: &str) -> bool {
+    is_web_url(url) || url.starts_with("blob:http://") || url.starts_with("blob:https://")
+}
+
+fn url_host(url: &str) -> String {
+    let inner = url.strip_prefix("blob:").unwrap_or(url);
+    url::Url::parse(inner)
+        .ok()
+        .and_then(|parsed| parsed.host_str().map(str::to_owned))
+        .unwrap_or_default()
 }
 
 impl Downloads {
     pub fn new(folder: PathBuf) -> Self {
+        let pending_dir = folder.join(".zvs-pending");
+        Self::with_pending(folder, pending_dir)
+    }
+
+    pub fn with_pending(folder: PathBuf, pending_dir: PathBuf) -> Self {
+        let _ = std::fs::remove_dir_all(&pending_dir);
         Self {
             folder,
+            pending_dir,
             armed: Mutex::default(),
+            pending: Mutex::default(),
+            hooks: OnceLock::new(),
+        }
+    }
+
+    pub fn attach(&self, hooks: DownloadHooks) {
+        let _ = self.hooks.set(hooks);
+    }
+
+    pub fn folder(&self) -> PathBuf {
+        self.hooks
+            .get()
+            .and_then(|hooks| hooks.settings.get().download_dir)
+            .map_or_else(|| self.folder.clone(), PathBuf::from)
+    }
+
+    pub fn asks(&self) -> bool {
+        self.hooks
+            .get()
+            .is_some_and(|hooks| hooks.settings.get().ask_download)
+    }
+
+    fn changed(&self) {
+        if let Some(hooks) = self.hooks.get() {
+            (hooks.changed)();
+        }
+    }
+
+    pub fn record(&self, record: &DownloadRecord) {
+        if let Some(hooks) = self.hooks.get() {
+            let _ = hooks.history.record(record);
         }
     }
 
@@ -741,6 +817,7 @@ impl Downloads {
                 started: Some(started),
                 finished: Some(finished),
                 destination: None,
+                url: String::new(),
             },
         );
         (began, done)
@@ -753,11 +830,11 @@ impl Downloads {
     pub fn requested(&self, label: &str, url: &str, destination: &mut PathBuf) -> bool {
         let mut armed = lock(&self.armed);
         let Some(entry) = armed.get_mut(label) else {
-            return false;
+            drop(armed);
+            return self.requested_by_user(label, url, destination);
         };
-        if entry.started.is_none()
-            || !is_web_url(url)
-            || std::fs::create_dir_all(&self.folder).is_err()
+        let folder = self.folder();
+        if entry.started.is_none() || !is_web_url(url) || std::fs::create_dir_all(&folder).is_err()
         {
             return false;
         }
@@ -765,16 +842,47 @@ impl Downloads {
             return false;
         };
         let name = file_name(destination, url);
-        let target = unique_destination(&self.folder, &name);
+        let target = unique_destination(&folder, &name);
         destination.clone_from(&target);
         entry.destination = Some(target);
+        url.clone_into(&mut entry.url);
         let _ = started.send(());
+        true
+    }
+
+    fn requested_by_user(&self, label: &str, url: &str, destination: &mut PathBuf) -> bool {
+        let Some(hooks) = self.hooks.get() else {
+            return false;
+        };
+        if (hooks.agent_busy)() || !user_download_url(url) {
+            return false;
+        }
+        let id = new_id().hyphenated().to_string();
+        let folder = self.pending_dir.join(&id);
+        if std::fs::create_dir_all(&folder).is_err() {
+            return false;
+        }
+        let name = file_name(destination, url);
+        let path = folder.join(&name);
+        destination.clone_from(&path);
+        lock(&self.pending).push(PendingDownload {
+            id,
+            label: label.to_owned(),
+            url: url.to_owned(),
+            file_name: name,
+            path,
+            bytes: 0,
+            ready: false,
+        });
+        self.changed();
         true
     }
 
     pub fn finished(&self, label: &str, path: Option<&Path>, success: bool) {
         let mut armed = lock(&self.armed);
         let Some(entry) = armed.get_mut(label) else {
+            drop(armed);
+            self.finished_by_user(label, path, success);
             return;
         };
         let Some(expected) = entry.destination.clone() else {
@@ -783,6 +891,8 @@ impl Downloads {
         let Some(reply) = entry.finished.take() else {
             return;
         };
+        let url = entry.url.clone();
+        drop(armed);
         let path = path.map_or(expected, Path::to_path_buf);
         let outcome = std::fs::metadata(&path)
             .ok()
@@ -794,9 +904,149 @@ impl Downloads {
                     .unwrap_or_default(),
                 path: path.to_string_lossy().into_owned(),
                 bytes: metadata.len(),
+            });
+        if let Some(file) = &outcome {
+            self.record(&DownloadRecord {
+                url,
+                file_name: file.file_name.clone(),
+                path: Some(path.clone()),
+                bytes: file.bytes,
+                state: BrowserDownloadState::Done,
+                agent: true,
+            });
+        } else if !url.is_empty() {
+            self.record(&DownloadRecord {
+                url,
+                file_name: path.file_name().map_or_else(
+                    || FALLBACK_NAME.to_owned(),
+                    |name| name.to_string_lossy().into_owned(),
+                ),
+                path: None,
+                bytes: 0,
+                state: BrowserDownloadState::Failed,
+                agent: true,
+            });
+        }
+        let _ = reply.send(outcome.ok_or_else(|| failed(DOWNLOAD_FAILED)));
+    }
+
+    fn finished_by_user(&self, label: &str, path: Option<&Path>, success: bool) {
+        let failed_entry = {
+            let mut pending = lock(&self.pending);
+            let Some(index) = pending
+                .iter()
+                .position(|entry| !entry.ready && path.is_some_and(|path| entry.path == path))
+                .or_else(|| {
+                    pending
+                        .iter()
+                        .position(|entry| !entry.ready && entry.label == label)
+                })
+            else {
+                return;
+            };
+            let bytes = std::fs::metadata(&pending[index].path)
+                .ok()
+                .filter(|metadata| success && metadata.is_file())
+                .map(|metadata| metadata.len());
+            match bytes {
+                Some(bytes) => {
+                    pending[index].ready = true;
+                    pending[index].bytes = bytes;
+                    None
+                }
+                None => Some(pending.remove(index)),
+            }
+        };
+        if let Some(entry) = failed_entry {
+            self.forget(&entry);
+            self.record(&DownloadRecord {
+                url: entry.url,
+                file_name: entry.file_name,
+                path: None,
+                bytes: 0,
+                state: BrowserDownloadState::Failed,
+                agent: false,
+            });
+        }
+        self.changed();
+    }
+
+    pub fn pending_view(&self) -> Vec<BrowserPendingDownload> {
+        lock(&self.pending)
+            .iter()
+            .map(|entry| BrowserPendingDownload {
+                id: entry.id.clone(),
+                file_name: entry.file_name.clone(),
+                host: url_host(&entry.url),
+                bytes: entry.bytes,
+                ready: entry.ready,
             })
-            .ok_or_else(|| failed(DOWNLOAD_FAILED));
-        let _ = reply.send(outcome);
+            .collect()
+    }
+
+    pub fn has_pending(&self) -> bool {
+        !lock(&self.pending).is_empty()
+    }
+
+    pub fn take_ready(&self, id: &str) -> Option<PendingDownload> {
+        let mut pending = lock(&self.pending);
+        let index = pending
+            .iter()
+            .position(|entry| entry.id == id && entry.ready)?;
+        Some(pending.remove(index))
+    }
+
+    fn forget(&self, entry: &PendingDownload) {
+        if let Some(folder) = entry.path.parent() {
+            let _ = std::fs::remove_dir_all(folder);
+        }
+    }
+
+    pub fn keep_at(&self, entry: &PendingDownload, target: &Path) -> Result<PathBuf, String> {
+        let outcome = move_file(&entry.path, target).map_err(|error| error.to_string());
+        self.forget(entry);
+        let kept = outcome.is_ok();
+        self.record(&DownloadRecord {
+            url: entry.url.clone(),
+            file_name: entry.file_name.clone(),
+            path: kept.then(|| target.to_path_buf()),
+            bytes: entry.bytes,
+            state: if kept {
+                BrowserDownloadState::Done
+            } else {
+                BrowserDownloadState::Failed
+            },
+            agent: false,
+        });
+        self.changed();
+        outcome.map(|()| target.to_path_buf())
+    }
+
+    pub fn keep(&self, entry: &PendingDownload) -> Result<PathBuf, String> {
+        let folder = self.folder();
+        std::fs::create_dir_all(&folder).map_err(|error| error.to_string())?;
+        self.keep_at(entry, &unique_path(&folder, &entry.file_name))
+    }
+
+    pub fn discard(&self, entry: &PendingDownload) {
+        self.forget(entry);
+        self.record(&DownloadRecord {
+            url: entry.url.clone(),
+            file_name: entry.file_name.clone(),
+            path: None,
+            bytes: entry.bytes,
+            state: BrowserDownloadState::Cancelled,
+            agent: false,
+        });
+        self.changed();
+    }
+
+    pub fn discard_by_id(&self, id: &str) -> bool {
+        let Some(entry) = self.take_ready(id) else {
+            return false;
+        };
+        self.discard(&entry);
+        true
     }
 }
 

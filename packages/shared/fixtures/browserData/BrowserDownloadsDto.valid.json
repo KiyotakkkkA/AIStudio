@@ -1,0 +1,25 @@
+[
+  {
+    "name": "empty",
+    "value": {
+      "items": []
+    }
+  },
+  {
+    "name": "one file",
+    "value": {
+      "items": [
+        {
+          "id": "0199aa22-2222-7222-8222-222222222222",
+          "url": "https://files.acme.io/report.pdf",
+          "fileName": "report.pdf",
+          "path": "C:\\Users\\me\\Downloads\\report.pdf",
+          "bytes": 20480,
+          "state": "done",
+          "agent": false,
+          "finishedAt": 1793037480000
+        }
+      ]
+    }
+  }
+]

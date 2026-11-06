@@ -2,12 +2,17 @@ import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import type { BrowserSettingsDto, Contract } from "@zvs/shared";
 import { BROWSER_SAVE_FAILED } from "./browserSettingsCopy";
+import { CLEAR_DATA_DONE, CLEAR_DATA_FAILED } from "./browserDataCopy";
 
 export const DEFAULT_BROWSER_SETTINGS: BrowserSettingsDto = {
   enabled: true,
   webLinks: "studio",
   localLinks: "studio",
   fullUrl: false,
+  passwordAutosave: false,
+  formAutofill: true,
+  downloadDir: null,
+  askDownload: false,
 };
 
 export default class BrowserSettingsStore {
@@ -15,6 +20,8 @@ export default class BrowserSettingsStore {
   loaded = false;
   saving = false;
   error: string | null = null;
+  clearing = false;
+  notice: string | null = null;
 
   constructor(private readonly ipc: IpcClient<Contract>) {
     makeAutoObservable<BrowserSettingsStore, "ipc">(this, { ipc: false }, { autoBind: true });
@@ -57,6 +64,41 @@ export default class BrowserSettingsStore {
     } finally {
       runInAction(() => {
         this.saving = false;
+      });
+    }
+  }
+
+  async pickDownloadDir() {
+    this.error = null;
+    try {
+      const settings = await this.ipc.call("browserSettings.pickDownloadDir", undefined);
+      runInAction(() => {
+        this.settings = settings;
+      });
+    } catch {
+      runInAction(() => {
+        this.error = BROWSER_SAVE_FAILED;
+      });
+    }
+  }
+
+  async clearData() {
+    if (this.clearing) return;
+    this.clearing = true;
+    this.error = null;
+    this.notice = null;
+    try {
+      await this.ipc.call("browserSettings.clearData", undefined);
+      runInAction(() => {
+        this.notice = CLEAR_DATA_DONE;
+      });
+    } catch {
+      runInAction(() => {
+        this.error = CLEAR_DATA_FAILED;
+      });
+    } finally {
+      runInAction(() => {
+        this.clearing = false;
       });
     }
   }

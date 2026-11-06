@@ -101,6 +101,12 @@ pub enum BrowserCommand {
     AgentRevoke {
         id: String,
     },
+    DownloadKeep {
+        id: String,
+    },
+    DownloadDiscard {
+        id: String,
+    },
 }
 
 fn tab_id(id: &str) -> Result<(), AppError> {
@@ -125,7 +131,9 @@ impl Validate for BrowserCommand {
             Self::AgentApprove { id }
             | Self::AgentAlways { id }
             | Self::AgentDeny { id }
-            | Self::AgentRevoke { id } => tab_id(id),
+            | Self::AgentRevoke { id }
+            | Self::DownloadKeep { id }
+            | Self::DownloadDiscard { id } => tab_id(id),
             Self::Reorder { id, index } => {
                 tab_id(id)?;
                 check::safe_integer("index", *index)
@@ -332,6 +340,17 @@ pub struct BrowserState {
     pub agent: Box<BrowserAgentState>,
     pub appearance: BrowserAppearance,
     pub full_url: bool,
+    pub downloads: Vec<BrowserPendingDownload>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserPendingDownload {
+    pub id: String,
+    pub file_name: String,
+    pub host: String,
+    pub bytes: u64,
+    pub ready: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -605,6 +624,7 @@ mod tests {
             agent: Box::default(),
             appearance: BrowserAppearance::default(),
             full_url: false,
+            downloads: Vec::new(),
         };
         assert_eq!(
             serde_json::to_value(BrowserCommandOutput::State(state)).expect("serialises"),
@@ -641,6 +661,7 @@ mod tests {
                     "lightPalette": "zvs-light",
                 },
                 "fullUrl": false,
+                "downloads": [],
             })
         );
     }

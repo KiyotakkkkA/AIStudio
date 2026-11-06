@@ -1,0 +1,14 @@
+[
+  {
+    "name": "done",
+    "value": "done"
+  },
+  {
+    "name": "failed",
+    "value": "failed"
+  },
+  {
+    "name": "cancelled",
+    "value": "cancelled"
+  }
+]

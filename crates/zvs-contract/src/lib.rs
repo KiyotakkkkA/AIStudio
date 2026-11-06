@@ -3,6 +3,7 @@ pub mod agentic;
 pub mod ai;
 pub mod artifacts;
 pub mod browser;
+pub mod browser_data;
 pub mod browser_settings;
 pub mod browser_sites;
 pub mod channels;
@@ -82,8 +83,11 @@ pub use browser::{
     BrowserActionState, BrowserAgentAction, BrowserAgentApproval, BrowserAgentState,
     BrowserAgentStatus, BrowserAppearance, BrowserAuthorisation, BrowserBounds, BrowserCommand,
     BrowserCommandOutput, BrowserCookie, BrowserHeader, BrowserNetworkBody, BrowserNetworkDetail,
-    BrowserNetworkEntry, BrowserNetworkLog, BrowserNetworkSaved, BrowserRequestState,
-    BrowserSecurity, BrowserSiteGrant, BrowserState, BrowserTab, BrowserTheme,
+    BrowserNetworkEntry, BrowserNetworkLog, BrowserNetworkSaved, BrowserPendingDownload,
+    BrowserRequestState, BrowserSecurity, BrowserSiteGrant, BrowserState, BrowserTab, BrowserTheme,
+};
+pub use browser_data::{
+    BrowserDownloadDto, BrowserDownloadRef, BrowserDownloadState, BrowserDownloadsDto,
 };
 pub use browser_settings::{BrowserLinkTarget, BrowserSettingsDto};
 pub use browser_sites::{

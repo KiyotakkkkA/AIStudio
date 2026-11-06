@@ -27,15 +27,16 @@ use zvs_host::browser::automation::{
 };
 use zvs_host::browser::network::{NetworkLog, har};
 use zvs_host::browser::{
-    AgentChange, AutomationPort, BrowserAgent, BrowserLifecycle, BrowserLifecycleEvent,
-    ElementTarget, LifecycleSubscription, NetworkCapture, navigation_url, site_origin,
+    AgentChange, AutomationPort, BrowserAgent, BrowserDownloads, BrowserLifecycle,
+    BrowserLifecycleEvent, BrowserSettings, ElementTarget, LifecycleSubscription, NetworkCapture,
+    navigation_url, site_origin,
 };
 use zvs_host::platform::ids::new_id;
 use zvs_host::platform::navigation::{SharedNavigator, WorkspaceRoute};
 use zvs_host::platform::paths::utc_stamp;
 use zvs_host::platform::theme::PaletteMode;
 
-use crate::browser::automation::{Downloads, Session, Sessions};
+use crate::browser::automation::{DownloadHooks, Downloads, Session, Sessions};
 use crate::browser::bearer::{BearerTokens, request_filters};
 use crate::browser::cdp::{DEFAULT_CALL_TIMEOUT, WebviewCdp};
 use crate::browser::cookies::{CookieMeta, cleared_domains};
@@ -55,6 +56,15 @@ const CHROME_RADIUS: f64 = 15.0;
 const HAR_CREATOR: &str = "ZVS AI Studio";
 const HAR_FILTER: &str = "Архив HTTP (HAR)";
 const HAR_FALLBACK_NAME: &str = "network";
+const UNKNOWN_DOWNLOAD: &str = "Unknown download";
+const CLEAR_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+fn pending_downloads_dir(profile: &std::path::Path) -> PathBuf {
+    profile.parent().map_or_else(
+        || profile.join("pending-downloads"),
+        |browser| browser.join("pending-downloads"),
+    )
+}
 
 enum Work {
     Signal(String, PageSignal),
@@ -62,6 +72,7 @@ enum Work {
     Layout,
     Publish,
     Agent(AgentChange),
+    Downloads,
     Closed,
 }
 
@@ -86,6 +97,7 @@ struct Inner {
     work: Mutex<Sender<Work>>,
     labels: AtomicU64,
     hooked: AtomicBool,
+    autofill: Mutex<Option<(bool, bool)>>,
 }
 
 #[derive(Clone)]
@@ -124,6 +136,7 @@ impl BrowserWorkspace {
         agent: BrowserAgent,
     ) -> Self {
         let (sender, receiver) = mpsc::channel();
+        let profile_dir = profile.clone();
         let download_dir = app.path().download_dir().unwrap_or_else(|_| {
             profile.parent().map_or_else(
                 || profile.join("downloads"),
@@ -145,12 +158,16 @@ impl BrowserWorkspace {
             sites: Mutex::default(),
             recorders: Mutex::default(),
             sessions: Sessions::default(),
-            downloads: Arc::new(Downloads::new(download_dir)),
+            downloads: Arc::new(Downloads::with_pending(
+                download_dir,
+                pending_downloads_dir(&profile_dir),
+            )),
             shown: Mutex::default(),
             subscribers: Mutex::default(),
             work: Mutex::new(sender),
             labels: AtomicU64::new(0),
             hooked: AtomicBool::new(false),
+            autofill: Mutex::default(),
         }));
         let finished = Arc::downgrade(&workspace.0);
         let subscription = workspace.0.lifecycle.subscribe(move |event| {
@@ -226,6 +243,102 @@ impl BrowserWorkspace {
         if lock(&self.0.model).set_theme(theme) {
             self.post(Work::Publish);
         }
+    }
+
+    pub fn attach_downloads(&self, settings: BrowserSettings, history: BrowserDownloads) {
+        let changes = lock(&self.0.work).clone();
+        let agent = self.0.agent.clone();
+        self.0.downloads.attach(DownloadHooks {
+            settings,
+            history,
+            agent_busy: Arc::new(move || {
+                matches!(
+                    agent.status(),
+                    BrowserAgentStatus::Running
+                        | BrowserAgentStatus::Approval
+                        | BrowserAgentStatus::Paused
+                )
+            }),
+            changed: Arc::new(move || {
+                let _ = changes.send(Work::Downloads);
+            }),
+        });
+    }
+
+    pub fn set_autofill(&self, passwords: bool, forms: bool) {
+        *lock(&self.0.autofill) = Some((passwords, forms));
+        let sites: Vec<Webview> = lock(&self.0.sites).values().cloned().collect();
+        for webview in sites {
+            let _ = webview.with_webview(move |platform| {
+                let _ = site::set_autofill(&platform, passwords, forms);
+            });
+        }
+    }
+
+    pub fn clear_data(&self) -> Result<(), String> {
+        self.ensure_tab()?;
+        let domains: Vec<String> = self
+            .cookies()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|cookie| cookie.domain)
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let webview = self.any_site().ok_or(NO_ACTIVE_TAB)?;
+        let (reply, answer) = mpsc::channel();
+        webview
+            .with_webview(move |platform| {
+                site::clear_browsing_data(
+                    &platform,
+                    Box::new(move |result| {
+                        let _ = reply.send(result);
+                    }),
+                );
+            })
+            .map_err(failed)?;
+        answer.recv_timeout(CLEAR_TIMEOUT).map_err(failed)??;
+        for domain in domains {
+            self.0
+                .lifecycle
+                .emit(&BrowserLifecycleEvent::CookiesCleared { domain });
+        }
+        Ok(())
+    }
+
+    fn keep_download(&self, id: &str) -> Result<(), String> {
+        let downloads = Arc::clone(&self.0.downloads);
+        let entry = downloads.take_ready(id).ok_or(UNKNOWN_DOWNLOAD)?;
+        if !downloads.asks() {
+            return downloads.keep(&entry).map(|_| ());
+        }
+        let mut dialog = self
+            .0
+            .app
+            .dialog()
+            .file()
+            .set_file_name(&entry.file_name)
+            .set_directory(downloads.folder());
+        if let Ok(window) = self.studio() {
+            dialog = dialog.set_parent(&window);
+        }
+        dialog.save_file(
+            move |picked| match picked.and_then(|path| path.into_path().ok()) {
+                Some(path) => {
+                    let _ = downloads.keep_at(&entry, &path);
+                }
+                None => downloads.discard(&entry),
+            },
+        );
+        Ok(())
+    }
+
+    fn downloads_changed(&self) {
+        let shown = self.0.downloads.has_pending();
+        if lock(&self.0.model).set_download_bar(shown) {
+            self.layout();
+        }
+        self.publish();
     }
 
     pub fn set_full_url(&self, full_url: bool) {
@@ -349,6 +462,12 @@ impl BrowserWorkspace {
             BrowserCommand::AgentControl => self.0.agent.take_control().map_err(message)?,
             BrowserCommand::AgentResume => self.0.agent.resume().map_err(message)?,
             BrowserCommand::AgentRevoke { id } => self.0.agent.revoke(&id).map_err(message)?,
+            BrowserCommand::DownloadKeep { id } => self.keep_download(&id)?,
+            BrowserCommand::DownloadDiscard { id } => {
+                if !self.0.downloads.discard_by_id(&id) {
+                    return Err(UNKNOWN_DOWNLOAD.to_owned());
+                }
+            }
             BrowserCommand::AgentStop => {
                 let agent = self.0.agent.clone();
                 tauri::async_runtime::spawn(async move {
@@ -370,6 +489,7 @@ impl BrowserWorkspace {
         let origin = self.active_origin();
         let mut state = lock(&self.0.model).state();
         state.agent = Box::new(self.0.agent.snapshot(origin.as_deref()));
+        state.downloads = self.0.downloads.pending_view();
         state
     }
 
@@ -637,11 +757,15 @@ impl BrowserWorkspace {
         let sightings: site::SightingSink = Arc::new(move |sighting| {
             tokens.observe(&sighting);
         });
+        let autofill = *lock(&self.0.autofill);
         webview
             .with_webview(move |platform| {
                 let _ = site::strip_host_bridge(&platform);
                 let _ = site::observe_site(&platform, sink);
                 let _ = site::observe_bearer(&platform, &request_filters(), sightings);
+                if let Some((passwords, forms)) = autofill {
+                    let _ = site::set_autofill(&platform, passwords, forms);
+                }
             })
             .map_err(failed)
     }
@@ -1086,6 +1210,7 @@ fn run(inner: &Weak<Inner>, receiver: &Receiver<Work>) {
             Work::Layout => workspace.layout(),
             Work::Publish => workspace.publish(),
             Work::Agent(change) => workspace.agent_changed(change),
+            Work::Downloads => workspace.downloads_changed(),
             Work::Closed => workspace.closed(),
         }
     }

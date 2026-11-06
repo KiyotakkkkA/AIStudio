@@ -19,6 +19,15 @@ pub const ACCOUNT_NEEDS_BROWSER: &str = "Вход в аккаунт выполн
 
 pub type SettingsListener = Arc<dyn Fn(&BrowserSettingsDto) + Send + Sync>;
 
+pub const PROFILE_UNAVAILABLE: &str = "Данные браузера недоступны";
+
+#[async_trait]
+pub trait BrowserProfile: Send + Sync {
+    async fn clear_data(&self) -> Result<(), AppError>;
+}
+
+pub type SharedBrowserProfile = Arc<dyn BrowserProfile>;
+
 struct Inner {
     settings: SettingService,
     listeners: Mutex<Vec<SettingsListener>>,

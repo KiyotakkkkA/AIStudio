@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { mdiWeb } from "@mdi/js";
 import Icon from "../../ui/atoms/Icon";
 import SelectInput from "../../ui/atoms/SelectInput";
@@ -9,6 +9,8 @@ import PreferenceContainer from "../../ui/molecules/PreferenceContainer";
 import { useStore } from "../../stores/useStore";
 import SettingRow from "../preferences/SettingRow";
 import SitePermissions from "./SitePermissions";
+import DownloadHistory from "./DownloadHistory";
+import { AutofillBlock, ClearDataRow, DownloadsBlock, type BrowserPage } from "./BrowserDataBlocks";
 import { TOGGLE_OFF, TOGGLE_ON } from "../preferences/preferencesPresentation";
 import {
   BROWSER_DISABLED_NOTE,
@@ -99,15 +101,18 @@ const GeneralBlock = observer(function GeneralBlock() {
           onChange={(value) => void browserSettings.update({ fullUrl: value })}
         />
       </SettingRow>
+      <ClearDataRow />
     </PreferenceContainer>
   );
 });
 
 export default observer(function BrowserPreferences() {
   const { browserSettings } = useStore();
+  const [page, setPage] = useState<BrowserPage>("main");
   useEffect(() => {
     void browserSettings.load();
   }, [browserSettings]);
+  if (page === "downloads") return <DownloadHistory onBack={() => setPage("main")} />;
   return (
     <div className="flex flex-col gap-6 pt-2">
       {browserSettings.error === null ? null : (
@@ -115,6 +120,8 @@ export default observer(function BrowserPreferences() {
       )}
       <BrowserSwitch />
       <GeneralBlock />
+      <AutofillBlock />
+      <DownloadsBlock onManage={setPage} />
       <SitePermissions />
     </div>
   );

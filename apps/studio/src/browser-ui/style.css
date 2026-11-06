@@ -1156,6 +1156,12 @@ button.ghost {
   padding: 0 16px;
   background: var(--color-warn-soft);
 }
+.download-bar {
+  background: var(--color-main-850);
+}
+.download-mark {
+  color: var(--color-accent-medium);
+}
 .approval-mark {
   display: inline-flex;
   flex: 0 0 auto;

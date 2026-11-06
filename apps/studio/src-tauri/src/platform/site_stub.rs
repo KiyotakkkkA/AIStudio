@@ -12,6 +12,7 @@ pub type SignalSink = Arc<dyn Fn(PageSignal) + Send + Sync>;
 pub type SightingSink = Arc<dyn Fn(Sighting) + Send + Sync>;
 pub type CookieReply = Box<dyn FnOnce(Result<Vec<CookieMeta>, String>)>;
 pub type CookieFilter = Box<dyn Fn(&CookieMeta) -> bool + Send>;
+pub type DoneReply = Box<dyn FnOnce(Result<(), String>)>;
 
 const UNSUPPORTED: &str = "The browser workspace needs WebView2";
 
@@ -45,6 +46,18 @@ pub fn list_cookies(_platform: &PlatformWebview, reply: CookieReply) {
 
 pub fn delete_cookies(_platform: &PlatformWebview, _filter: CookieFilter, reply: CookieReply) {
     reply(Err(UNSUPPORTED.to_owned()));
+}
+
+pub fn clear_browsing_data(_platform: &PlatformWebview, reply: DoneReply) {
+    reply(Err(UNSUPPORTED.to_owned()));
+}
+
+pub fn set_autofill(
+    _platform: &PlatformWebview,
+    _passwords: bool,
+    _forms: bool,
+) -> Result<(), String> {
+    Err(UNSUPPORTED.to_owned())
 }
 
 pub fn call_devtools(_platform: &PlatformWebview, _method: &str, _params: &str, reply: CdpReply) {

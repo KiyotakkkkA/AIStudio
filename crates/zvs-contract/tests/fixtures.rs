@@ -1171,6 +1171,22 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ExecJudgeDto>,
     ),
     (
+        "browserData/BrowserDownloadState",
+        round_trip::<zvs_contract::BrowserDownloadState>,
+    ),
+    (
+        "browserData/BrowserDownloadDto",
+        round_trip::<zvs_contract::BrowserDownloadDto>,
+    ),
+    (
+        "browserData/BrowserDownloadRef",
+        round_trip::<zvs_contract::BrowserDownloadRef>,
+    ),
+    (
+        "browserData/BrowserDownloadsDto",
+        round_trip::<zvs_contract::BrowserDownloadsDto>,
+    ),
+    (
         "browserSettings/BrowserLinkTarget",
         round_trip::<zvs_contract::BrowserLinkTarget>,
     ),

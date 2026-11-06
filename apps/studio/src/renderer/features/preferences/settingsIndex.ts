@@ -22,6 +22,20 @@ import {
 } from "../browser/browserSettingsCopy";
 import { SITES_ID, SITES_TITLE } from "../browser/browserSitesCopy";
 import {
+  ASK_DOWNLOAD_ID,
+  ASK_DOWNLOAD_LABEL,
+  CLEAR_DATA_ID,
+  CLEAR_DATA_LABEL,
+  DOWNLOAD_DIR_ID,
+  DOWNLOAD_DIR_LABEL,
+  DOWNLOAD_HISTORY_ID,
+  DOWNLOAD_HISTORY_LABEL,
+  FORMS_ID,
+  FORMS_LABEL,
+  PASSWORDS_ID,
+  PASSWORDS_LABEL,
+} from "../browser/browserDataCopy";
+import {
   APP_ROW_LABELS,
   CLI_ROW_LABELS,
   FONT_FAMILY_LABEL,
@@ -132,6 +146,12 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: WEB_LINKS_ID, section: "browser", label: WEB_LINKS_LABEL },
   { id: LOCAL_LINKS_ID, section: "browser", label: LOCAL_LINKS_LABEL },
   { id: FULL_URL_ID, section: "browser", label: FULL_URL_LABEL },
+  { id: CLEAR_DATA_ID, section: "browser", label: CLEAR_DATA_LABEL },
+  { id: PASSWORDS_ID, section: "browser", label: PASSWORDS_LABEL },
+  { id: FORMS_ID, section: "browser", label: FORMS_LABEL },
+  { id: DOWNLOAD_DIR_ID, section: "browser", label: DOWNLOAD_DIR_LABEL },
+  { id: ASK_DOWNLOAD_ID, section: "browser", label: ASK_DOWNLOAD_LABEL },
+  { id: DOWNLOAD_HISTORY_ID, section: "browser", label: DOWNLOAD_HISTORY_LABEL },
   { id: SITES_ID, section: "browser", label: SITES_TITLE },
   ...Object.values(APP_ROW_LABELS).map((label) => ({
     id: aboutSettingId("app", label),

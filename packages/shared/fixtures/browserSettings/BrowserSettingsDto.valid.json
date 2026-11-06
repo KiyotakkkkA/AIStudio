@@ -5,7 +5,11 @@
       "enabled": true,
       "webLinks": "studio",
       "localLinks": "studio",
-      "fullUrl": false
+      "fullUrl": false,
+      "passwordAutosave": false,
+      "formAutofill": true,
+      "downloadDir": null,
+      "askDownload": false
     }
   },
   {
@@ -14,7 +18,11 @@
       "enabled": false,
       "webLinks": "system",
       "localLinks": "system",
-      "fullUrl": true
+      "fullUrl": true,
+      "passwordAutosave": true,
+      "formAutofill": false,
+      "downloadDir": "D:\\Загрузки",
+      "askDownload": true
     }
   }
 ]

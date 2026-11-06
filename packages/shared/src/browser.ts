@@ -35,6 +35,8 @@ export const BrowserCommand = z.discriminatedUnion("action", [
   z.object({ action: z.literal("agentResume") }),
   z.object({ action: z.literal("agentStop") }),
   z.object({ action: z.literal("agentRevoke"), id: tabId }),
+  z.object({ action: z.literal("downloadKeep"), id: tabId }),
+  z.object({ action: z.literal("downloadDiscard"), id: tabId }),
 ]);
 export type BrowserCommand = z.infer<typeof BrowserCommand>;
 
@@ -114,6 +116,15 @@ export interface BrowserState {
   agent: BrowserAgentState;
   appearance: BrowserAppearance;
   fullUrl: boolean;
+  downloads: BrowserPendingDownload[];
+}
+
+export interface BrowserPendingDownload {
+  id: string;
+  fileName: string;
+  host: string;
+  bytes: number;
+  ready: boolean;
 }
 
 export interface BrowserCookie {

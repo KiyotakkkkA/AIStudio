@@ -15,16 +15,17 @@ use webview2_com::Microsoft::Web::WebView2::Win32::{
     COREWEBVIEW2_WEB_ERROR_STATUS, COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED,
     COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
     COREWEBVIEW2_WEB_RESOURCE_REQUEST_SOURCE_KINDS_DOCUMENT, ICoreWebView2, ICoreWebView2_2,
-    ICoreWebView2_22, ICoreWebView2Cookie, ICoreWebView2CookieList,
+    ICoreWebView2_13, ICoreWebView2_22, ICoreWebView2Cookie, ICoreWebView2CookieList,
     ICoreWebView2NavigationStartingEventArgs, ICoreWebView2NavigationStartingEventArgs3,
-    ICoreWebView2Settings2,
+    ICoreWebView2Profile, ICoreWebView2Profile2, ICoreWebView2Profile6, ICoreWebView2Settings2,
 };
 use webview2_com::{
-    CallDevToolsProtocolMethodCompletedHandler, DOMContentLoadedEventHandler,
-    DevToolsProtocolEventReceivedEventHandler, DocumentTitleChangedEventHandler,
-    GetCookiesCompletedHandler, HistoryChangedEventHandler, NavigationCompletedEventHandler,
-    NavigationStartingEventHandler, ProcessFailedEventHandler, SourceChangedEventHandler,
-    WebResourceRequestedEventHandler, WindowCloseRequestedEventHandler, take_pwstr,
+    CallDevToolsProtocolMethodCompletedHandler, ClearBrowsingDataCompletedHandler,
+    DOMContentLoadedEventHandler, DevToolsProtocolEventReceivedEventHandler,
+    DocumentTitleChangedEventHandler, GetCookiesCompletedHandler, HistoryChangedEventHandler,
+    NavigationCompletedEventHandler, NavigationStartingEventHandler, ProcessFailedEventHandler,
+    SourceChangedEventHandler, WebResourceRequestedEventHandler, WindowCloseRequestedEventHandler,
+    take_pwstr,
 };
 use zvs_host::browser::is_web_url;
 
@@ -37,6 +38,7 @@ pub type SignalSink = Arc<dyn Fn(PageSignal) + Send + Sync>;
 pub type SightingSink = Arc<dyn Fn(Sighting) + Send + Sync>;
 pub type CookieReply = Box<dyn FnOnce(Result<Vec<CookieMeta>, String>)>;
 pub type CookieFilter = Box<dyn Fn(&CookieMeta) -> bool + Send>;
+pub type DoneReply = Box<dyn FnOnce(Result<(), String>)>;
 
 const HOST_SCRIPT_IDS: u32 = 64;
 const BLANK: &str = "about:blank";
@@ -364,6 +366,43 @@ pub fn delete_cookies(platform: &PlatformWebview, filter: CookieFilter, reply: C
         && let Some(reply) = reply.borrow_mut().take()
     {
         reply(Err(error.to_string()));
+    }
+}
+
+fn profile(platform: &PlatformWebview) -> ::windows::core::Result<ICoreWebView2Profile> {
+    unsafe { core(platform)?.cast::<ICoreWebView2_13>()?.Profile() }
+}
+
+pub fn clear_browsing_data(platform: &PlatformWebview, reply: DoneReply) {
+    let profile =
+        match profile(platform).and_then(|profile| profile.cast::<ICoreWebView2Profile2>()) {
+            Ok(profile) => profile,
+            Err(error) => return reply(Err(error.to_string())),
+        };
+    let reply = Rc::new(RefCell::new(Some(reply)));
+    let answer = Rc::clone(&reply);
+    let handler = ClearBrowsingDataCompletedHandler::create(Box::new(move |result| {
+        if let Some(reply) = answer.borrow_mut().take() {
+            reply(result.map_err(|error| error.to_string()));
+        }
+        Ok(())
+    }));
+    if let Err(error) = unsafe { profile.ClearBrowsingDataAll(&handler) }
+        && let Some(reply) = reply.borrow_mut().take()
+    {
+        reply(Err(error.to_string()));
+    }
+}
+
+pub fn set_autofill(
+    platform: &PlatformWebview,
+    passwords: bool,
+    forms: bool,
+) -> ::windows::core::Result<()> {
+    let profile = profile(platform)?.cast::<ICoreWebView2Profile6>()?;
+    unsafe {
+        profile.SetIsPasswordAutosaveEnabled(passwords)?;
+        profile.SetIsGeneralAutofillEnabled(forms)
     }
 }
 

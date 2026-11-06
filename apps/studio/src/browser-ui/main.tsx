@@ -29,6 +29,7 @@ import Icon from "./Icon";
 import AgentPanel from "./AgentPanel";
 import { applyChromeAppearance } from "./appearance";
 import ApprovalBar from "./ApprovalBar";
+import DownloadBar from "./DownloadBar";
 import IconButton from "./IconButton";
 import NetworkPanel from "./NetworkPanel";
 import {
@@ -119,6 +120,7 @@ function BrowserApp() {
     },
     appearance: { theme: "system", darkPalette: "zvs-dark", lightPalette: "zvs-light" },
     fullUrl: false,
+    downloads: [],
   });
   const osDark = useOsDark();
   const [address, setAddress] = useState("");
@@ -527,9 +529,11 @@ function BrowserApp() {
               )
             )}
           </ScrollArea>
-          {agent.approval && (
+          {agent.approval ? (
             <ApprovalBar approval={agent.approval} busy={agentBusy} send={sendAgent} />
-          )}
+          ) : state.downloads.length > 0 ? (
+            <DownloadBar downloads={state.downloads} send={(command) => void send(command)} />
+          ) : null}
           {state.devtoolsVisible && (
             <NetworkPanel
               tabId={state.activeId}
