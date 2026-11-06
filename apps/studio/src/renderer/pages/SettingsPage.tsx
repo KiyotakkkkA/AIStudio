@@ -1,15 +1,20 @@
 import { mdiPuzzleOutline } from "@mdi/js";
-import HostCheck from "../features/diagnostics/HostCheck";
+import PreferencesWorkspace from "../features/preferences/PreferencesWorkspace";
+import {
+  SETTINGS_PAGE_SUBTITLE,
+  SETTINGS_PAGE_TITLE,
+} from "../features/preferences/preferencesPresentation";
 import PageShell from "../ui/templates/PageShell";
 
 export default function SettingsPage() {
   return (
     <PageShell
+      bleed={true}
       icon={mdiPuzzleOutline}
-      title="Расширения"
-      subtitle="Состояние подключения и диагностика приложения"
+      title={SETTINGS_PAGE_TITLE}
+      subtitle={SETTINGS_PAGE_SUBTITLE}
     >
-      <HostCheck />
+      <PreferencesWorkspace />
     </PageShell>
   );
 }

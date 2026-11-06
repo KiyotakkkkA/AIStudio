@@ -1,10 +1,4 @@
-import {
-  mdiCogOutline,
-  mdiDockLeft,
-  mdiMonitor,
-  mdiWeatherNight,
-  mdiWhiteBalanceSunny,
-} from "@mdi/js";
+import { mdiDockLeft, mdiMonitor, mdiWeatherNight, mdiWhiteBalanceSunny } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import AppLogo from "../atoms/AppLogo";
 import Icon from "../atoms/Icon";
@@ -27,13 +21,10 @@ export interface NavRailProps {
   readonly isActive: (item: NavItemModel) => boolean;
   readonly onSelect: (item: NavItemModel) => void;
   readonly onToggleCollapse: () => void;
-  readonly onOpenIdentity: () => void;
   readonly onThemeChange: (theme: RailTheme) => void;
 }
 
 const RAIL_ICON_TONE = "text-main-500 hover:bg-main-900/70 hover:text-main-100";
-
-const RAIL_ICON_BUTTON = `flex size-7 flex-none items-center justify-center rounded-control ${RAIL_ICON_TONE}`;
 
 export default function NavRail({
   groups,
@@ -44,7 +35,6 @@ export default function NavRail({
   isActive,
   onSelect,
   onToggleCollapse,
-  onOpenIdentity,
   onThemeChange,
 }: NavRailProps) {
   return (
@@ -151,14 +141,6 @@ export default function NavRail({
                 </span>
                 <span className="truncate text-[11px] text-main-500">{identity.hint}</span>
               </div>
-              <IconButton
-                tooltip="top-center"
-                label="Открыть параметры"
-                path={mdiCogOutline}
-                iconSize={16}
-                onClick={onOpenIdentity}
-                className={RAIL_ICON_BUTTON}
-              />
             </>
           )}
         </div>

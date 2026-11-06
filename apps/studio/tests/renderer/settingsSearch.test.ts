@@ -39,11 +39,12 @@ test("every setting id is unique and a notification kind falls back to its maste
   expect(kind?.fallback).toBe(NOTIFICATIONS_ROW.key);
 });
 
-test("revealing a setting opens its section and closing clears the target", () => {
+test("revealing a setting opens its section and picking another section clears the target", () => {
   const ui = new UiStore(createIpcClient(contract, createFakeBridge<Contract>()));
   ui.revealPreference("appearance", SETTING_IDS.fontSize);
   expect(ui.preferences).toBe("appearance");
   expect(ui.preferenceTarget).toBe(SETTING_IDS.fontSize);
-  ui.closePreferences();
+  expect(ui.preferenceRequest).toBe(1);
+  ui.selectPreference("memory");
   expect(ui.preferenceTarget).toBeNull();
 });

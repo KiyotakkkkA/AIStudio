@@ -25,7 +25,9 @@ export const SEARCH_LABEL = "Поиск параметров";
 export const SEARCH_PLACEHOLDER = "Поиск";
 export const SEARCH_EMPTY = "Ничего не найдено";
 export const PREFERENCES_GROUP = "Приложение";
-export const CLOSE_PREFERENCES = "Закрыть параметры";
+export const DIAGNOSTICS_TITLE = "Диагностика";
+export const SETTINGS_PAGE_TITLE = "Расширения";
+export const SETTINGS_PAGE_SUBTITLE = "Параметры приложения, расширений и встроенного браузера";
 
 export const SECTION_LABELS: Record<PreferenceSection, string> = {
   general: "Общие",
@@ -61,7 +63,7 @@ export const SECTION_HINTS: Record<PreferenceSection, string> = {
   notifications: "Системные уведомления о событиях приложения.",
   memory: "Сохранённые сведения, полученные в диалогах.",
   data: "Место на диске, занятое данными приложения, и очистка кэша.",
-  about: "Версия приложения и сведения о консольной версии.",
+  about: "Версия приложения, сведения о консольной версии и диагностика.",
   components: "Среды выполнения для MCP-серверов.",
   cli: "Настройка утилиты командной строки.",
   voice: "Настройка распознавания голоса и управление голосовым вводом.",

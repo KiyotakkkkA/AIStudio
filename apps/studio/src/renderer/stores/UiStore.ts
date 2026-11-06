@@ -89,7 +89,8 @@ export class UiStore {
   osDark = false;
   palettes: Record<PaletteMode, string> = { ...DEFAULT_PALETTES };
   private customChosen = false;
-  preferences: PreferenceSection | null = null;
+  preferences: PreferenceSection = "general";
+  preferenceRequest = 0;
   preferenceTarget: string | null = null;
   restored = false;
 
@@ -250,21 +251,23 @@ export class UiStore {
     this.osReducedMotion = reduced;
   }
 
-  openPreferences(section: PreferenceSection = "appearance"): void {
+  openPreferences(section: PreferenceSection = "general"): void {
     this.preferences = section;
+    this.preferenceRequest += 1;
+  }
+
+  selectPreference(section: PreferenceSection): void {
+    this.preferences = section;
+    this.preferenceTarget = null;
   }
 
   revealPreference(section: PreferenceSection, target: string): void {
     this.preferences = section;
     this.preferenceTarget = target;
+    this.preferenceRequest += 1;
   }
 
   clearPreferenceTarget(): void {
-    this.preferenceTarget = null;
-  }
-
-  closePreferences(): void {
-    this.preferences = null;
     this.preferenceTarget = null;
   }
 

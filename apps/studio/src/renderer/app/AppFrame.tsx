@@ -10,7 +10,6 @@ import type { NavItemModel } from "../ui/organisms/NavRailTypes";
 import AppShell from "../ui/templates/AppShell";
 import { ConversationId, HostEvent, NAVIGATION_STEP_DOMAIN } from "@zvs/shared";
 import { ROUTES } from "./routes";
-import PreferencesDialog from "../features/preferences/PreferencesDialog";
 import { FxContext } from "../ui/motion/fx";
 
 function AppFrame() {
@@ -22,12 +21,8 @@ function AppFrame() {
     (path: unknown, conversationId?: unknown) => {
       if (path === ROUTES.browser && browserSettings.enabled) navigation.go(path);
       if (path === ROUTES.providers) navigation.go(path);
-      if (path === ROUTES.downloads) {
-        ui.closePreferences();
-        navigation.go(path);
-      }
+      if (path === ROUTES.downloads) navigation.go(path);
       if (path === ROUTES.chat) {
-        ui.closePreferences();
         navigation.go(path);
         const conversation = ConversationId.safeParse(conversationId);
         if (conversation.success) void chat.open(conversation.data);
@@ -79,9 +74,10 @@ function AppFrame() {
     [navigation],
   );
 
-  const openPreferences = useCallback(() => {
-    ui.openPreferences();
-  }, [ui]);
+  const preferenceRequest = ui.preferenceRequest;
+  useEffect(() => {
+    if (preferenceRequest > 0) navigation.go(ROUTES.settings);
+  }, [preferenceRequest, navigation]);
 
   return (
     <FxContext value={fx}>
@@ -97,13 +93,11 @@ function AppFrame() {
               isActive={isActive}
               onSelect={select}
               onToggleCollapse={ui.toggleRail}
-              onOpenIdentity={openPreferences}
               onThemeChange={ui.setTheme}
             />
           }
         >
           <Outlet />
-          <PreferencesDialog />
         </AppShell>
       </MotionConfig>
     </FxContext>

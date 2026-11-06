@@ -59,15 +59,19 @@ test("unknown stored fonts fall back to the defaults", async () => {
   expect([ui.fontFamily, ui.fontSize]).toEqual(["onest", 13]);
 });
 
-test("the preferences dialog opens on a section and closes", () => {
+test("opening a section asks the frame to show the settings page, picking one does not", () => {
   const { ui } = settings();
-  expect(ui.preferences).toBeNull();
-  ui.openPreferences();
-  expect(ui.preferences).toBe("appearance");
+  expect(ui.preferences).toBe("general");
+  expect(ui.preferenceRequest).toBe(0);
   ui.openPreferences("about");
   expect(ui.preferences).toBe("about");
-  ui.closePreferences();
-  expect(ui.preferences).toBeNull();
+  expect(ui.preferenceRequest).toBe(1);
+  ui.selectPreference("browser");
+  expect(ui.preferences).toBe("browser");
+  expect(ui.preferenceRequest).toBe(1);
+  ui.openPreferences();
+  expect(ui.preferences).toBe("general");
+  expect(ui.preferenceRequest).toBe(2);
 });
 
 test("fonts and sizes map to a font stack and an interface zoom", () => {

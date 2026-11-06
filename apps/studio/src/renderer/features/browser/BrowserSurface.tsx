@@ -13,7 +13,7 @@ export default observer(function BrowserSurface({
 }) {
   const { ui } = useStore();
   const zoom = interfaceZoom(ui.fontSize);
-  const hidden = suspended || ui.preferences !== null;
+  const hidden = suspended;
   const panel = useRef<HTMLDivElement>(null);
   const [error, setError] = useState(false);
   useLayoutEffect(() => {

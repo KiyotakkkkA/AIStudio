@@ -1678,7 +1678,7 @@ absent.
 > Revised 2026-11-06: the fixed tiers became **site rules**. Each of the five site actions
 > resolves to `ask`, `allow` or `block` — first the rule for the page's origin, then the default
 > row the user set, then the defaults above. `allow` runs without asking, `ask` raises the
-> approval, `block` refuses before anything is asked or done. Rules are edited in «Параметры» →
+> approval, `block` refuses before anything is asked or done. Rules are edited on the «Расширения» page →
 > «Браузер» → «Разрешения сайтов» (`browserSites.get` · `setDefault` · `put` · `remove`), which
 > replaced the Permissions page's «Браузер» tab and `browserGrants.*`. The agent panel lists and
 > revokes the origin's `allow` rules for click and type.
@@ -1768,7 +1768,11 @@ renders. An approval request is the same `approval` event the Agentic Build page
 
 ### Preferences (2026-11-06)
 
-«Параметры» → «Расширения» → «Браузер» owns the browser's switches, through `browserSettings.get`
+Preferences are a page, not a dialog (2026-11-06): the rail's «Расширения» item (`/settings`)
+hosts every section with its own section list and search, and diagnostics moved into «О
+системе». `ui.openPreferences` and `ui.revealPreference` select a section and ask the frame to
+navigate there; the rail no longer has a settings button. Its «Браузер» section owns the browser's
+switches, through `browserSettings.get`
 and `browserSettings.set` (`BrowserSettingsDto`, stored as the one setting `browser.settings`;
 `zvs-host/src/browser/settings.rs`). A missing or damaged field falls back to its default.
 

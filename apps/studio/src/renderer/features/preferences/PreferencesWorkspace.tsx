@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
-import { Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import {
   mdiAccountCircleOutline,
   mdiBellOutline,
@@ -61,7 +61,7 @@ import {
   APP_EDITION,
   APP_NAME,
   APP_VERSION_LABEL,
-  CLOSE_PREFERENCES,
+  DIAGNOSTICS_TITLE,
   FONT_FAMILY_HINT,
   FONT_FAMILY_LABEL,
   FONT_FAMILY_OPTIONS,
@@ -102,6 +102,7 @@ import SettingRow from "./SettingRow";
 import BrowserPreferences from "../browser/BrowserPreferences";
 import ThemePalettes from "./ThemePalettes";
 import ComponentsTab from "../toolchain/ComponentsTab";
+import HostCheck from "../diagnostics/HostCheck";
 import { SUBAGENT_CONCURRENCY_MAX, SUBAGENT_CONCURRENCY_MIN } from "@zvs/shared";
 import ModelFields, { availableModelOptions } from "../chat/ModelFields";
 import {
@@ -1093,6 +1094,12 @@ const AboutSection = observer(function AboutSection() {
         </h3>
         <InfoTableRows group="cli" rows={cliRows()} />
       </section>
+      <section className="flex flex-col gap-3">
+        <h3 className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
+          {DIAGNOSTICS_TITLE}
+        </h3>
+        <HostCheck />
+      </section>
     </div>
   );
 });
@@ -1127,21 +1134,16 @@ function useRevealTarget(container: RefObject<HTMLElement | null>) {
   }, [container, target, section, ui]);
 }
 
-function PreferencesDialog() {
+function PreferencesWorkspace() {
   const { ui } = useStore();
   const section = ui.preferences;
   const content = useRef<HTMLDivElement | null>(null);
   useRevealTarget(content);
   return (
-    <Modal
-      open={section !== null}
-      onClose={ui.closePreferences}
-      label={PREFERENCES_TITLE}
-      className="flex h-[min(860px,92vh)] w-[min(1240px,95vw)] flex-row overflow-hidden rounded-card border border-line bg-main-900 p-0 shadow-pop"
-    >
+    <div className="flex min-h-0 flex-1 flex-row">
       <nav
         aria-label={PREFERENCES_TITLE}
-        className="flex w-56 flex-none flex-col gap-0.5 border-r border-line bg-main-950 px-3 py-4"
+        className="flex w-60 flex-none flex-col gap-0.5 overflow-y-auto border-r border-line px-3 py-4"
       >
         <PreferencesSearch />
         {PREFERENCE_GROUPS.map((group, index) => (
@@ -1156,11 +1158,11 @@ function PreferencesDialog() {
                 key={item}
                 type="button"
                 aria-current={section === item ? "page" : undefined}
-                onClick={() => ui.openPreferences(item)}
+                onClick={() => ui.selectPreference(item)}
                 className={`relative flex h-8.5 items-center gap-2.5 rounded-control px-2.5 text-left text-[13px] ${
                   section === item
                     ? "font-medium text-main-50"
-                    : "text-main-300 hover:bg-main-900 hover:text-main-100"
+                    : "text-main-300 hover:bg-main-850 hover:text-main-100"
                 }`}
               >
                 {section === item ? (
@@ -1177,44 +1179,36 @@ function PreferencesDialog() {
         ))}
       </nav>
       <div ref={content} className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-none items-start gap-3 px-7 pt-6 pb-2">
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <h2 className="m-0 text-[16px] font-semibold tracking-[-0.01em] text-main-50">
-              {section === null ? PREFERENCES_TITLE : SECTION_LABELS[section]}
-            </h2>
-            {section === null ? null : (
-              <p className="m-0 text-[12.5px] text-main-400">{SECTION_HINTS[section]}</p>
-            )}
-          </div>
-          <IconButton
-            path={mdiClose}
-            label={CLOSE_PREFERENCES}
-            iconSize={18}
-            onClick={ui.closePreferences}
-          />
+        <div className="flex flex-none flex-col gap-0.5 px-7 pt-6 pb-2">
+          <h2 className="m-0 text-[16px] font-semibold tracking-[-0.01em] text-main-50">
+            {SECTION_LABELS[section]}
+          </h2>
+          <p className="m-0 text-[12.5px] text-main-400">{SECTION_HINTS[section]}</p>
         </div>
         <ScrollArea className="min-h-0 flex-1 px-7 pb-6">
-          <FadeIn key={section}>
-            {section === "general" ? <GeneralSection /> : null}
-            {section === "profile" ? <ProfileSection /> : null}
-            {section === "appearance" ? <AppearanceSection /> : null}
-            {section === "notifications" ? <NotificationsSection /> : null}
-            {section === "memory" ? <MemorySection /> : null}
-            {section === "data" ? <DataSection /> : null}
-            {section === "about" ? <AboutSection /> : null}
-            {section === "cli" ? <CliSection /> : null}
-            {section === "voice" ? <VoiceSection /> : null}
-            {section === "browser" ? <BrowserPreferences /> : null}
-            {section === "components" ? (
-              <div data-setting={SETTING_IDS.components} className="pt-2">
-                <ComponentsTab />
-              </div>
-            ) : null}
-          </FadeIn>
+          <div className="mx-auto w-full max-w-240">
+            <FadeIn key={section}>
+              {section === "general" ? <GeneralSection /> : null}
+              {section === "profile" ? <ProfileSection /> : null}
+              {section === "appearance" ? <AppearanceSection /> : null}
+              {section === "notifications" ? <NotificationsSection /> : null}
+              {section === "memory" ? <MemorySection /> : null}
+              {section === "data" ? <DataSection /> : null}
+              {section === "about" ? <AboutSection /> : null}
+              {section === "cli" ? <CliSection /> : null}
+              {section === "voice" ? <VoiceSection /> : null}
+              {section === "browser" ? <BrowserPreferences /> : null}
+              {section === "components" ? (
+                <div data-setting={SETTING_IDS.components} className="pt-2">
+                  <ComponentsTab />
+                </div>
+              ) : null}
+            </FadeIn>
+          </div>
         </ScrollArea>
       </div>
-    </Modal>
+    </div>
   );
 }
 
-export default observer(PreferencesDialog);
+export default observer(PreferencesWorkspace);
