@@ -20,6 +20,7 @@ export const APP_EDITION = "Локальная установка";
 
 export const CLI_VERSION_LABEL = `${CLI_CHANNEL} v${CLI_VERSION}`;
 
+export const SETTINGS_MANAGE = "Управление";
 export const PREFERENCES_TITLE = "Параметры";
 export const SEARCH_LABEL = "Поиск параметров";
 export const SEARCH_PLACEHOLDER = "Поиск";
@@ -37,10 +38,10 @@ export const SECTION_LABELS: Record<PreferenceSection, string> = {
   memory: "Память",
   data: "Данные",
   about: "О системе",
+  browser: "Браузер",
   components: "Компоненты",
   voice: VOICE_INPUT,
   cli: "CLI",
-  browser: "Браузер",
 };
 
 export const EXTENSIONS_GROUP = "Расширения";
@@ -53,7 +54,7 @@ export const PREFERENCE_GROUPS: readonly {
     label: PREFERENCES_GROUP,
     sections: ["general", "profile", "appearance", "notifications", "memory", "data", "about"],
   },
-  { label: EXTENSIONS_GROUP, sections: ["components", "voice", "cli", "browser"] },
+  { label: EXTENSIONS_GROUP, sections: ["browser", "components", "voice", "cli"] },
 ];
 
 export const SECTION_HINTS: Record<PreferenceSection, string> = {

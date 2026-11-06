@@ -4,8 +4,9 @@ import {
   SUBAGENT_CONCURRENCY_ROW,
   SUBAGENT_MODELS_ROW,
   SUBAGENTS_ROW,
+  SUBAGENT_SETTINGS_ROW,
 } from "../subagents/subagentCopy";
-import { ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
+import { ENABLED_ROW, MEMORY_RECORDS_ROW, MODEL_ROW } from "../memory/memoryCopy";
 import { ABOUT_ROW, STYLE_ROW, TOOL_CALLS_ROW } from "./profileCopy";
 import { CLI_SETTING_ID, CLI_THEME_LABEL, CLI_THEME_SETTING_ID, CLI_TITLE } from "./cliCopy";
 import { STORAGE_CLEAR_CACHE, STORAGE_CLEAR_ID } from "./storageCopy";
@@ -98,6 +99,12 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: JUDGE_ROW.key, section: "general", label: JUDGE_ROW.label },
   { id: SUBAGENTS_ROW.key, section: "general", label: SUBAGENTS_ROW.label },
   {
+    id: SUBAGENT_SETTINGS_ROW.key,
+    section: "general",
+    label: SUBAGENT_SETTINGS_ROW.label,
+    fallback: SUBAGENTS_ROW.key,
+  },
+  {
     id: SUBAGENT_MODELS_ROW.key,
     section: "general",
     label: SUBAGENT_MODELS_ROW.label,
@@ -142,6 +149,7 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
     fallback: NOTIFICATIONS_ROW.key,
   })),
   { id: ENABLED_ROW.key, section: "memory", label: ENABLED_ROW.label },
+  { id: MEMORY_RECORDS_ROW.key, section: "memory", label: MEMORY_RECORDS_ROW.label },
   { id: MODEL_ROW.key, section: "memory", label: MODEL_ROW.label, fallback: ENABLED_ROW.key },
   { id: STORAGE_CLEAR_ID, section: "data", label: STORAGE_CLEAR_CACHE },
   { id: SETTING_IDS.components, section: "components", label: SECTION_LABELS.components },

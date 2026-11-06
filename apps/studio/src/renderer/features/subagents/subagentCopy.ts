@@ -6,6 +6,12 @@ export const SUBAGENTS_ROW = {
   hint: "Выполнение отдельных задач субагентами.",
 } as const;
 
+export const SUBAGENT_SETTINGS_ROW = {
+  key: "subagents.settings",
+  label: "Настройки субагентов",
+  hint: "Предпочтительные модели и лимит параллельного выполнения задач.",
+} as const;
+
 export const SUBAGENT_MODELS_ROW = {
   key: "subagents.models",
   label: "Предпочтительные модели",

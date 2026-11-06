@@ -1,7 +1,7 @@
 import type { BrowserImportKind, BrowserImportResultDto } from "@zvs/shared";
 import { plural } from "../connections/connectionPresentation";
 
-export const IMPORT_OPEN = "Импорт…";
+export const IMPORT_OPEN = "Импорт данных";
 export const IMPORT_TITLE = "Импорт из браузеров";
 export const IMPORT_HINT =
   "История и закладки из браузеров, установленных на компьютере. Пароли и файлы cookie не переносятся.";
@@ -59,7 +59,7 @@ export function historyCountLabel(shown: number, total: number): string {
 export const BOOKMARKS_ID = "browser.bookmarks";
 export const BOOKMARKS_LABEL = "Закладки";
 export const BOOKMARKS_HINT =
-  "Страницы, отмеченные звёздочкой в адресной строке или импортированные.";
+  "Сохранённые страницы, включая закладки, импортированные из других браузеров.";
 export const BOOKMARKS_EMPTY = "Закладок нет.";
 export const BOOKMARK_ROOT = "Без папки";
 export const BOOKMARK_RENAME = "Переименовать";

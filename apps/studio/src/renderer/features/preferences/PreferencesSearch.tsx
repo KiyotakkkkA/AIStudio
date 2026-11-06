@@ -40,7 +40,7 @@ function PreferencesSearch() {
   };
 
   return (
-    <div className="relative px-0.5 pb-2.5">
+    <div className="relative z-50 flex-none px-0.5 pb-2.5">
       <label className="flex h-8 items-center gap-2 rounded-control bg-main-850 px-2.5 text-main-500 focus-within:text-main-300">
         <Icon path={mdiMagnify} size={15} className="flex-none" />
         <input
@@ -80,7 +80,7 @@ function PreferencesSearch() {
           id={listId}
           role="listbox"
           aria-label={SEARCH_LABEL}
-          className="absolute top-full left-0 z-20 -mt-1 flex w-80 flex-col gap-0.5 rounded-card border border-line bg-main-900 p-1.5 shadow-pop"
+          className="absolute top-full left-0 z-50 -mt-1 flex w-80 flex-col gap-0.5 rounded-card border border-line bg-main-900 p-1.5 shadow-pop"
         >
           {matches.length === 0 ? (
             <p className="m-0 px-2 py-3 text-center text-[12px] text-main-500">{SEARCH_EMPTY}</p>

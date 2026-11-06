@@ -5,19 +5,20 @@ export const BROWSER_SECTION_HINT = "Встроенный браузер, отк
 export const BROWSER_ENABLED_ID = "browser.enabled";
 export const BROWSER_ENABLED_LABEL = "Встроенный браузер";
 export const BROWSER_ENABLED_HINT =
-  "Работа с сайтами внутри приложения и управление браузером по команде /browser-use.";
+  "Просмотр сайтов в приложении и управление браузером с помощью команды /browser-use.";
 export const BROWSER_DISABLED_NOTE =
-  "Браузер скрыт, команда /browser-use недоступна, ссылки открываются в системном браузере.";
+  "Встроенный браузер отключён. Ссылки открываются в системном браузере.";
 
 export const BROWSER_GENERAL_TITLE = "Основные";
 
 export const WEB_LINKS_ID = "browser.webLinks";
 export const WEB_LINKS_LABEL = "Открытие веб-ссылок";
-export const WEB_LINKS_HINT = "Ссылки на сайты из диалогов, артефактов и плагинов.";
+export const WEB_LINKS_HINT = "Браузер для открытия веб-ссылок из диалогов, артефактов и плагинов.";
 
 export const LOCAL_LINKS_ID = "browser.localLinks";
 export const LOCAL_LINKS_LABEL = "Открытие локальных адресов";
-export const LOCAL_LINKS_HINT = "Адреса localhost и 127.0.0.1, в том числе живые дашборды.";
+export const LOCAL_LINKS_HINT =
+  "Браузер для открытия локальных веб-приложений по адресам localhost и 127.0.0.1.";
 
 export const LINK_TARGET_OPTIONS: readonly { value: BrowserLinkTarget; label: string }[] = [
   { value: "studio", label: "Встроенный браузер" },
@@ -25,7 +26,7 @@ export const LINK_TARGET_OPTIONS: readonly { value: BrowserLinkTarget; label: st
 ];
 
 export const FULL_URL_ID = "browser.fullUrl";
-export const FULL_URL_LABEL = "Полный адрес";
-export const FULL_URL_HINT = "Полный адрес веб-сайта";
+export const FULL_URL_LABEL = "Отображение полного адреса";
+export const FULL_URL_HINT = "Отображение полного URL страницы в адресной строке.";
 
 export const BROWSER_SAVE_FAILED = "Не удалось сохранить настройки браузера.";

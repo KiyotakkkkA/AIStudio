@@ -554,3 +554,23 @@ select:focus-visible,
   border-radius: 3px;
   box-shadow: var(--zvs-shadow-pop);
 }
+
+/* Search destinations remain legible in both themes without shifting the row. */
+[data-setting] {
+  scroll-margin-block: 24px;
+}
+
+[data-setting-highlighted="true"] {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-setting-highlighted="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 3px -10px;
+  z-index: -1;
+  border-radius: var(--radius-control);
+  background: var(--zvs-accent-soft);
+  pointer-events: none;
+}

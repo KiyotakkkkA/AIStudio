@@ -4,8 +4,8 @@ export const EXTENSIONS_TITLE = "Расширения";
 export const EXTENSIONS_ID = "browser.extensions";
 export const EXTENSIONS_LABEL = "Управление расширениями";
 export const EXTENSIONS_HINT =
-  "Распакованные расширения Chromium из папки с файлом manifest.json. Магазин расширений не поддерживается.";
-export const EXTENSIONS_ADD = "Добавить…";
+  "Установка и настройка распакованных расширений Chromium. Для установки требуется папка с файлом manifest.json.";
+export const EXTENSIONS_ADD = "Добавить из папки";
 export const EXTENSIONS_EMPTY = "Расширения не установлены.";
 export const EXTENSION_REMOVE = "Удалить расширение";
 export const EXTENSION_REMOVE_TITLE = "Удалить расширение?";

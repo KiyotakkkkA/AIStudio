@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useEffect, useState } from "react";
-import { mdiWeb } from "@mdi/js";
+import { mdiTune, mdiWeb } from "@mdi/js";
 import Icon from "../../ui/atoms/Icon";
 import SelectInput from "../../ui/atoms/SelectInput";
 import Toggle from "../../ui/atoms/Toggle";
@@ -49,9 +49,8 @@ const BrowserSwitch = observer(function BrowserSwitch() {
   return (
     <div
       data-setting={BROWSER_ENABLED_ID}
-      className={`flex items-center gap-3.5 rounded-card border border-line bg-main-850 px-4 py-3.5 transition-colors duration-500 ${
-        ui.preferenceTarget === BROWSER_ENABLED_ID ? "bg-accent-soft" : ""
-      }`}
+      data-setting-highlighted={ui.preferenceTarget === BROWSER_ENABLED_ID || undefined}
+      className="flex items-center gap-3.5 rounded-card border border-line bg-main-850 px-4 py-3.5"
     >
       <span className="flex size-10 flex-none items-center justify-center rounded-control bg-main-800 text-main-200">
         <Icon path={mdiWeb} size={20} />
@@ -85,6 +84,7 @@ const GeneralBlock = observer(function GeneralBlock({
       title={BROWSER_GENERAL_TITLE}
       action={
         <Button tone="secondary" size="sm" onClick={() => onManage("import")}>
+          <Icon path={mdiTune} />
           {IMPORT_OPEN}
         </Button>
       }
@@ -127,12 +127,14 @@ const GeneralBlock = observer(function GeneralBlock({
       </SettingRow>
       <ClearDataRow />
       <SettingRow id={HISTORY_ID} label={HISTORY_LABEL} hint={HISTORY_HINT}>
-        <Button tone="secondary" size="sm" onClick={() => onManage("history")}>
+        <Button tone="primary" size="sm" onClick={() => onManage("history")}>
+          <Icon path={mdiTune} />
           {MANAGE}
         </Button>
       </SettingRow>
       <SettingRow id={BOOKMARKS_ID} label={BOOKMARKS_LABEL} hint={BOOKMARKS_HINT}>
-        <Button tone="secondary" size="sm" onClick={() => onManage("bookmarks")}>
+        <Button tone="primary" size="sm" onClick={() => onManage("bookmarks")}>
+          <Icon path={mdiTune} />
           {MANAGE}
         </Button>
       </SettingRow>

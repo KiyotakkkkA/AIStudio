@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import {
   mdiAccountCircleOutline,
@@ -18,6 +18,7 @@ import {
   mdiPackageVariantClosed,
   mdiPaletteOutline,
   mdiRefresh,
+  mdiTune,
   mdiWeb,
 } from "@mdi/js";
 import Button from "../../ui/atoms/buttons/Button";
@@ -84,6 +85,7 @@ import {
   PREFERENCES_TITLE,
   RAIL_PICKER_HINT,
   RAIL_PICKER_LABEL,
+  SETTINGS_MANAGE,
   SECTION_HINTS,
   SECTION_LABELS,
   THEME_HINT,
@@ -99,6 +101,7 @@ import {
 } from "./preferencesPresentation";
 import PreferencesSearch from "./PreferencesSearch";
 import SettingRow from "./SettingRow";
+import SettingsSubPage from "./SettingsSubPage";
 import BrowserPreferences from "../browser/BrowserPreferences";
 import ThemePalettes from "./ThemePalettes";
 import ComponentsTab from "../toolchain/ComponentsTab";
@@ -120,6 +123,7 @@ import {
   SUBAGENT_PROVIDER,
   SUBAGENT_PROVIDER_LABEL,
   SUBAGENT_REMOVE,
+  SUBAGENT_SETTINGS_ROW,
   SUBAGENT_UP,
   SUBAGENTS_ROW,
 } from "../subagents/subagentCopy";
@@ -164,7 +168,7 @@ import {
   VOICE_REFRESH,
 } from "../voice/voiceCopy";
 import { formatBytes } from "../downloads/downloadPresentation";
-import { ENABLED_ROW, MODEL_ROW } from "../memory/memoryCopy";
+import { ENABLED_ROW, MEMORY_RECORDS_ROW, MODEL_ROW } from "../memory/memoryCopy";
 import { aboutSettingId, SETTING_ENTRIES, SETTING_IDS, type AboutGroup } from "./settingsIndex";
 import {
   PROFILE_ABOUT_MAX,
@@ -189,7 +193,7 @@ import {
   TOOL_CALLS_ROW,
 } from "./profileCopy";
 
-const REVEAL_MS = 1600;
+const REVEAL_MS = 3200;
 const REVEAL_ATTEMPTS = 10;
 
 const SECTION_ICONS: Record<PreferenceSection, string> = {
@@ -226,17 +230,18 @@ const InfoTableRows = observer(function InfoTableRows({
     <dl className="m-0 grid grid-cols-[minmax(10rem,auto)_1fr] gap-x-6 gap-y-2.5 text-[13px]">
       {rows.map((row) => {
         const id = aboutSettingId(group, row.label);
-        const tone = ui.preferenceTarget === id ? "bg-accent-soft" : "";
         return (
           <div key={row.label} className="contents">
             <dt
               data-setting={id}
-              className={`rounded-control transition-colors duration-500 ${tone} text-main-500`}
+              data-setting-highlighted={ui.preferenceTarget === id || undefined}
+              className="rounded-control text-main-500"
             >
               {row.label}
             </dt>
             <dd
-              className={`m-0 min-w-0 rounded-control wrap-break-word transition-colors duration-500 ${tone} text-main-100`}
+              data-setting-highlighted={ui.preferenceTarget === id || undefined}
+              className="m-0 min-w-0 rounded-control wrap-break-word text-main-100"
             >
               {row.value}
             </dd>
@@ -464,9 +469,122 @@ const CONCURRENCY_OPTIONS = Array.from(
   },
 );
 
-const SubagentsRow = observer(function SubagentsRow() {
+const SubagentSettings = observer(function SubagentSettings() {
   const { subagents } = useStore();
   const empty = subagents.loaded && subagents.providers.length === 0;
+  return (
+    <PreferenceContainer title={SUBAGENT_SETTINGS_ROW.label}>
+      <SettingRow
+        id={SUBAGENT_MODELS_ROW.key}
+        label={SUBAGENT_MODELS_ROW.label}
+        hint={SUBAGENT_MODELS_ROW.hint}
+        error={subagents.error ?? undefined}
+        stacked
+        footer={
+          empty ? (
+            <p className="m-0 text-[12px] text-main-500">{SUBAGENT_NO_PROVIDERS}</p>
+          ) : undefined
+        }
+      >
+        {subagents.views.length === 0 ? (
+          <p className="m-0 text-[12px] text-main-400">{SUBAGENT_MODELS_EMPTY}</p>
+        ) : (
+          <ol className="m-0 flex list-none flex-col gap-1 p-0">
+            {subagents.views.map((view, index) => (
+              <li
+                key={view.key}
+                className="flex min-w-0 items-center gap-2 rounded-control border border-line bg-main-800 px-2.5 py-1.5"
+              >
+                <span className="w-4 flex-none font-mono text-[11.5px] text-main-500">
+                  {index + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] text-main-100">
+                  {view.modelName}
+                  <span className="text-main-500"> · {view.providerName}</span>
+                </span>
+                {view.missing ? <Chip>{SUBAGENT_MISSING_MODEL}</Chip> : null}
+                <IconButton
+                  path={mdiChevronUp}
+                  label={SUBAGENT_UP}
+                  size="sm"
+                  disabled={index === 0}
+                  onClick={() => void subagents.move(index, -1)}
+                />
+                <IconButton
+                  path={mdiChevronDown}
+                  label={SUBAGENT_DOWN}
+                  size="sm"
+                  disabled={index === subagents.views.length - 1}
+                  onClick={() => void subagents.move(index, 1)}
+                />
+                <IconButton
+                  path={mdiClose}
+                  label={SUBAGENT_REMOVE}
+                  size="sm"
+                  onClick={() => void subagents.remove(index)}
+                />
+              </li>
+            ))}
+          </ol>
+        )}
+        {subagents.full ? null : (
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="grid min-w-0 flex-1 grid-cols-2 gap-3 max-sm:grid-cols-1">
+              <ModelFields
+                providerTitle={SUBAGENT_PROVIDER}
+                providerLabel={SUBAGENT_PROVIDER_LABEL}
+                providerValue={subagents.draftProviderId ?? ""}
+                providerOptions={subagents.providers.map((provider) => ({
+                  value: provider.id,
+                  label: provider.name,
+                }))}
+                providerDisabled={subagents.providers.length === 0}
+                onProviderChange={subagents.selectDraftProvider}
+                modelTitle={SUBAGENT_MODEL}
+                modelLabel={SUBAGENT_MODEL_LABEL}
+                modelValue={subagents.draftModelId ?? ""}
+                modelOptions={availableModelOptions(subagents.draftProvider)}
+                modelDisabled={subagents.draftProvider === undefined}
+                onModelChange={subagents.setDraftModel}
+                placeholder={SUBAGENT_NONE}
+              />
+            </div>
+            <Button
+              tone="ghost"
+              disabled={!subagents.canAdd}
+              onClick={() => void subagents.addDraft()}
+            >
+              {SUBAGENT_ADD}
+            </Button>
+          </div>
+        )}
+      </SettingRow>
+      <SettingRow
+        id={SUBAGENT_CONCURRENCY_ROW.key}
+        label={SUBAGENT_CONCURRENCY_ROW.label}
+        hint={
+          subagents.accountListed
+            ? `${SUBAGENT_CONCURRENCY_ROW.hint} ${SUBAGENT_ACCOUNT_NOTE}.`
+            : SUBAGENT_CONCURRENCY_ROW.hint
+        }
+      >
+        <SegmentedControl
+          label={SUBAGENT_CONCURRENCY_ROW.label}
+          value={String(subagents.concurrency)}
+          options={CONCURRENCY_OPTIONS}
+          onChange={(value) => void subagents.setConcurrency(Number(value))}
+        />
+      </SettingRow>
+    </PreferenceContainer>
+  );
+});
+
+const SubagentsRow = observer(function SubagentsRow({
+  onManage,
+}: {
+  readonly onManage: () => void;
+}) {
+  const { subagents } = useStore();
   return (
     <>
       <SettingRow
@@ -481,115 +599,25 @@ const SubagentsRow = observer(function SubagentsRow() {
           onChange={(value) => void subagents.setEnabled(value)}
         />
       </SettingRow>
+
       <Reveal show={subagents.enabled}>
-        <NestedSettings>
-          <SettingRow
-            id={SUBAGENT_MODELS_ROW.key}
-            label={SUBAGENT_MODELS_ROW.label}
-            hint={SUBAGENT_MODELS_ROW.hint}
-            stacked
-            footer={
-              empty ? (
-                <p className="m-0 text-[12px] text-main-500">{SUBAGENT_NO_PROVIDERS}</p>
-              ) : undefined
-            }
-          >
-            {subagents.views.length === 0 ? (
-              <p className="m-0 text-[12px] text-main-400">{SUBAGENT_MODELS_EMPTY}</p>
-            ) : (
-              <ol className="m-0 flex list-none flex-col gap-1 p-0">
-                {subagents.views.map((view, index) => (
-                  <li
-                    key={view.key}
-                    className="flex min-w-0 items-center gap-2 rounded-control border border-line bg-main-800 px-2.5 py-1.5"
-                  >
-                    <span className="w-4 flex-none font-mono text-[11.5px] text-main-500">
-                      {index + 1}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-main-100">
-                      {view.modelName}
-                      <span className="text-main-500"> · {view.providerName}</span>
-                    </span>
-                    {view.missing ? <Chip>{SUBAGENT_MISSING_MODEL}</Chip> : null}
-                    <IconButton
-                      path={mdiChevronUp}
-                      label={SUBAGENT_UP}
-                      size="sm"
-                      disabled={index === 0}
-                      onClick={() => void subagents.move(index, -1)}
-                    />
-                    <IconButton
-                      path={mdiChevronDown}
-                      label={SUBAGENT_DOWN}
-                      size="sm"
-                      disabled={index === subagents.views.length - 1}
-                      onClick={() => void subagents.move(index, 1)}
-                    />
-                    <IconButton
-                      path={mdiClose}
-                      label={SUBAGENT_REMOVE}
-                      size="sm"
-                      onClick={() => void subagents.remove(index)}
-                    />
-                  </li>
-                ))}
-              </ol>
-            )}
-            {subagents.full ? null : (
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="grid min-w-0 flex-1 grid-cols-2 gap-3 max-sm:grid-cols-1">
-                  <ModelFields
-                    providerTitle={SUBAGENT_PROVIDER}
-                    providerLabel={SUBAGENT_PROVIDER_LABEL}
-                    providerValue={subagents.draftProviderId ?? ""}
-                    providerOptions={subagents.providers.map((provider) => ({
-                      value: provider.id,
-                      label: provider.name,
-                    }))}
-                    providerDisabled={subagents.providers.length === 0}
-                    onProviderChange={subagents.selectDraftProvider}
-                    modelTitle={SUBAGENT_MODEL}
-                    modelLabel={SUBAGENT_MODEL_LABEL}
-                    modelValue={subagents.draftModelId ?? ""}
-                    modelOptions={availableModelOptions(subagents.draftProvider)}
-                    modelDisabled={subagents.draftProvider === undefined}
-                    onModelChange={subagents.setDraftModel}
-                    placeholder={SUBAGENT_NONE}
-                  />
-                </div>
-                <Button
-                  tone="ghost"
-                  disabled={!subagents.canAdd}
-                  onClick={() => void subagents.addDraft()}
-                >
-                  {SUBAGENT_ADD}
-                </Button>
-              </div>
-            )}
-          </SettingRow>
-          <SettingRow
-            id={SUBAGENT_CONCURRENCY_ROW.key}
-            label={SUBAGENT_CONCURRENCY_ROW.label}
-            hint={
-              subagents.accountListed
-                ? `${SUBAGENT_CONCURRENCY_ROW.hint} ${SUBAGENT_ACCOUNT_NOTE}.`
-                : SUBAGENT_CONCURRENCY_ROW.hint
-            }
-          >
-            <SegmentedControl
-              label={SUBAGENT_CONCURRENCY_ROW.label}
-              value={String(subagents.concurrency)}
-              options={CONCURRENCY_OPTIONS}
-              onChange={(value) => void subagents.setConcurrency(Number(value))}
-            />
-          </SettingRow>
-        </NestedSettings>
+        <SettingRow
+          id={SUBAGENT_SETTINGS_ROW.key}
+          label={SUBAGENT_SETTINGS_ROW.label}
+          hint={SUBAGENT_SETTINGS_ROW.hint}
+        >
+          <Button tone="primary" size="sm" onClick={onManage}>
+            <Icon path={mdiTune} />
+            {SETTINGS_MANAGE}
+          </Button>
+        </SettingRow>
       </Reveal>
     </>
   );
 });
 
 const GeneralSection = observer(function GeneralSection() {
+  const [page, setPage] = useState<"main" | "judge" | "subagents">("main");
   const { appSettings, profile, execPolicy, subagents } = useStore();
   useEffect(() => {
     void appSettings.load();
@@ -597,6 +625,24 @@ const GeneralSection = observer(function GeneralSection() {
     void execPolicy.load();
     void subagents.load();
   }, [appSettings, profile, execPolicy, subagents]);
+  if (page === "subagents")
+    return (
+      <SettingsSubPage
+        title={SUBAGENT_SETTINGS_ROW.label}
+        hint={SUBAGENT_SETTINGS_ROW.hint}
+        onBack={() => setPage("main")}
+      >
+        <SubagentSettings />
+      </SettingsSubPage>
+    );
+  if (page === "judge")
+    return (
+      <SettingsSubPage title={JUDGE_ROW.label} hint={JUDGE_ROW.hint} onBack={() => setPage("main")}>
+        <PreferenceContainer title={JUDGE_ROW.label}>
+          <JudgeModelRow />
+        </PreferenceContainer>
+      </SettingsSubPage>
+    );
   return (
     <div className="flex flex-col gap-4 pt-2">
       <PreferenceContainer title="Работа приложения">
@@ -606,10 +652,15 @@ const GeneralSection = observer(function GeneralSection() {
       </PreferenceContainer>
       <PreferenceContainer title="Выполнение действий">
         <ToolCallsRow />
-        <JudgeModelRow />
+        <SettingRow id={JUDGE_ROW.key} label={JUDGE_ROW.label} hint={JUDGE_ROW.hint}>
+          <Button tone="primary" size="sm" onClick={() => setPage("judge")}>
+            <Icon path={mdiTune} />
+            {SETTINGS_MANAGE}
+          </Button>
+        </SettingRow>
       </PreferenceContainer>
       <PreferenceContainer title="Делегирование задач">
-        <SubagentsRow />
+        <SubagentsRow onManage={() => setPage("subagents")} />
       </PreferenceContainer>
     </div>
   );
@@ -715,11 +766,22 @@ const NotificationsSection = observer(function NotificationsSection() {
 });
 
 const MemorySection = observer(function MemorySection() {
+  const [managingMemory, setManagingMemory] = useState(false);
   const { appSettings } = useStore();
   useEffect(() => {
     void appSettings.load();
   }, [appSettings]);
   const enabled = appSettings.values[ENABLED_ROW.key];
+  if (managingMemory)
+    return (
+      <SettingsSubPage
+        title={MEMORY_RECORDS_ROW.label}
+        hint={MEMORY_RECORDS_ROW.hint}
+        onBack={() => setManagingMemory(false)}
+      >
+        <MemoryFacts />
+      </SettingsSubPage>
+    );
   return (
     <div className="flex flex-col gap-4 pt-2">
       <PreferenceContainer title="Управление памятью">
@@ -730,7 +792,18 @@ const MemorySection = observer(function MemorySection() {
           </NestedSettings>
         )}
       </PreferenceContainer>
-      <MemoryFacts />
+      <PreferenceContainer title={MEMORY_RECORDS_ROW.label}>
+        <SettingRow
+          id={MEMORY_RECORDS_ROW.key}
+          label={MEMORY_RECORDS_ROW.label}
+          hint={MEMORY_RECORDS_ROW.hint}
+        >
+          <Button tone="primary" size="sm" onClick={() => setManagingMemory(true)}>
+            <Icon path={mdiTune} />
+            {SETTINGS_MANAGE}
+          </Button>
+        </SettingRow>
+      </PreferenceContainer>
     </div>
   );
 });
@@ -1143,50 +1216,52 @@ function PreferencesWorkspace() {
     <div className="flex min-h-0 flex-1 flex-row">
       <nav
         aria-label={PREFERENCES_TITLE}
-        className="flex w-60 flex-none flex-col gap-0.5 overflow-y-auto border-r border-line px-3 py-4"
+        className="relative z-30 flex min-h-0 w-60 flex-none flex-col gap-0.5 border-r border-line px-3 py-4"
       >
         <PreferencesSearch />
-        {PREFERENCE_GROUPS.map((group, index) => (
-          <div key={group.label} className="flex flex-col gap-0.5">
-            <span
-              className={`px-2.5 pb-1.5 text-[12px] text-main-500 ${index === 0 ? "" : "pt-4"}`}
-            >
-              {group.label}
-            </span>
-            {group.sections.map((item) => (
-              <button
-                key={item}
-                type="button"
-                aria-current={section === item ? "page" : undefined}
-                onClick={() => ui.selectPreference(item)}
-                className={`relative flex h-8.5 items-center gap-2.5 rounded-control px-2.5 text-left text-[13px] ${
-                  section === item
-                    ? "font-medium text-main-50"
-                    : "text-main-300 hover:bg-main-850 hover:text-main-100"
-                }`}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {PREFERENCE_GROUPS.map((group, index) => (
+            <div key={group.label} className="flex flex-col gap-0.5">
+              <span
+                className={`px-2.5 pb-1.5 text-[12px] text-main-500 ${index === 0 ? "" : "pt-4"}`}
               >
-                {section === item ? (
-                  <ActivePill
-                    layoutId="preferences-section"
-                    className="rounded-control bg-main-800"
-                  />
-                ) : null}
-                <Icon path={SECTION_ICONS[item]} size={16} className="relative flex-none" />
-                <span className="relative">{SECTION_LABELS[item]}</span>
-              </button>
-            ))}
-          </div>
-        ))}
+                {group.label}
+              </span>
+              {group.sections.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  aria-current={section === item ? "page" : undefined}
+                  onClick={() => ui.selectPreference(item)}
+                  className={`relative flex h-8.5 items-center gap-2.5 rounded-control px-2.5 text-left text-[13px] ${
+                    section === item
+                      ? "font-medium text-main-50"
+                      : "text-main-300 hover:bg-main-850 hover:text-main-100"
+                  }`}
+                >
+                  {section === item ? (
+                    <ActivePill
+                      layoutId="preferences-section"
+                      className="rounded-control bg-main-800"
+                    />
+                  ) : null}
+                  <Icon path={SECTION_ICONS[item]} size={16} className="relative flex-none" />
+                  <span className="relative">{SECTION_LABELS[item]}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
       </nav>
       <div ref={content} className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-none flex-col gap-0.5 px-7 pt-6 pb-2">
-          <h2 className="m-0 text-[16px] font-semibold tracking-[-0.01em] text-main-50">
-            {SECTION_LABELS[section]}
-          </h2>
-          <p className="m-0 text-[12.5px] text-main-400">{SECTION_HINTS[section]}</p>
-        </div>
-        <ScrollArea className="min-h-0 flex-1 px-7 pb-6">
+        <ScrollArea className="min-h-0 flex-1 px-7 pt-7 pb-8">
           <div className="mx-auto w-full max-w-240">
+            <header className="mb-8 flex flex-col gap-2">
+              <h2 className="m-0 text-[28px] leading-tight font-semibold tracking-[-0.02em] text-main-50">
+                {SECTION_LABELS[section]}
+              </h2>
+              <p className="m-0 text-[13px] text-main-400">{SECTION_HINTS[section]}</p>
+            </header>
             <FadeIn key={section}>
               {section === "general" ? <GeneralSection /> : null}
               {section === "profile" ? <ProfileSection /> : null}

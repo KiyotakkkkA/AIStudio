@@ -112,7 +112,10 @@ test("the application group lists its sections in order and the extensions group
       "Приложение",
       ["Общие", "Профиль", "Внешний вид", "Уведомления", "Память", "Данные", "О системе"],
     ],
-    ["Расширения", ["Компоненты", VOICE_INPUT, "CLI", "Браузер"]],
+    [
+      "Расширения",
+      [SECTION_LABELS.browser, SECTION_LABELS.components, VOICE_INPUT, SECTION_LABELS.cli],
+    ],
   ]);
   expect(PREFERENCE_GROUPS.flatMap((group) => group.sections).sort()).toEqual(
     [...PREFERENCE_SECTIONS].sort(),

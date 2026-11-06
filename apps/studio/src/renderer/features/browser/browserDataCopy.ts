@@ -20,18 +20,19 @@ export const PASSWORDS_HINT =
   "Предложение сохранить пароль после входа на сайт и подстановка сохранённых паролей.";
 export const FORMS_ID = "browser.forms";
 export const FORMS_LABEL = "Автозаполнение форм";
-export const FORMS_HINT = "Подсказки адресов, телефонов и других данных, введённых ранее.";
+export const FORMS_HINT =
+  "Заполнение полей форм ранее сохранёнными адресами, номерами телефонов и другими данными.";
 
 export const DOWNLOADS_TITLE = "Загрузки";
 export const DOWNLOAD_DIR_ID = "browser.downloadDir";
 export const DOWNLOAD_DIR_LABEL = "Папка загрузок";
 export const DOWNLOAD_DIR_SYSTEM = "Системная папка «Загрузки»";
-export const DOWNLOAD_DIR_CHANGE = "Изменить";
+export const DOWNLOAD_DIR_CHANGE = "Выбрать папку";
 export const DOWNLOAD_DIR_RESET = "По умолчанию";
 export const ASK_DOWNLOAD_ID = "browser.askDownload";
-export const ASK_DOWNLOAD_LABEL = "Спрашивать, куда сохранить";
+export const ASK_DOWNLOAD_LABEL = "Выбор места сохранения";
 export const ASK_DOWNLOAD_HINT =
-  "Окно сохранения после загрузки файла, начатой во встроенном браузере.";
+  "Выбор папки и имени файла для каждой загрузки во встроенном браузере.";
 export const DOWNLOAD_HISTORY_ID = "browser.downloadHistory";
 export const DOWNLOAD_HISTORY_LABEL = "История загрузок";
 export const DOWNLOAD_HISTORY_HINT = "Файлы, загруженные во встроенном браузере.";

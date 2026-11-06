@@ -1,3 +1,5 @@
+import { mdiDeleteOutline, mdiFolderOutline, mdiRestore, mdiTune } from "@mdi/js";
+import Icon from "../../ui/atoms/Icon";
 import { observer } from "mobx-react-lite";
 import Button from "../../ui/atoms/buttons/Button";
 import Toggle from "../../ui/atoms/Toggle";
@@ -52,7 +54,7 @@ export const ClearDataRow = observer(function ClearDataRow() {
       }
     >
       <Button
-        tone="secondary"
+        tone="danger-soft"
         size="sm"
         disabled={browserSettings.clearing || !browserSettings.enabled}
         needConfirm
@@ -63,6 +65,7 @@ export const ClearDataRow = observer(function ClearDataRow() {
         }}
         onClick={() => void browserSettings.clearData()}
       >
+        <Icon path={mdiDeleteOutline} />
         {CLEAR_DATA}
       </Button>
     </SettingRow>
@@ -113,10 +116,12 @@ export const DownloadsBlock = observer(function DownloadsBlock({
               size="sm"
               onClick={() => void browserSettings.update({ downloadDir: null })}
             >
+              <Icon path={mdiRestore} />
               {DOWNLOAD_DIR_RESET}
             </Button>
           )}
-          <Button tone="secondary" size="sm" onClick={() => void browserSettings.pickDownloadDir()}>
+          <Button tone="primary" size="sm" onClick={() => void browserSettings.pickDownloadDir()}>
+            <Icon path={mdiFolderOutline} />
             {DOWNLOAD_DIR_CHANGE}
           </Button>
         </div>
@@ -133,7 +138,8 @@ export const DownloadsBlock = observer(function DownloadsBlock({
         label={DOWNLOAD_HISTORY_LABEL}
         hint={DOWNLOAD_HISTORY_HINT}
       >
-        <Button tone="secondary" size="sm" onClick={() => onManage("downloads")}>
+        <Button tone="primary" size="sm" onClick={() => onManage("downloads")}>
+          <Icon path={mdiTune} />
           {MANAGE}
         </Button>
       </SettingRow>

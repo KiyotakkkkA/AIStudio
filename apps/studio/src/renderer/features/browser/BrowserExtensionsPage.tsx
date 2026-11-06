@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
-import { mdiDeleteOutline, mdiPuzzleOutline } from "@mdi/js";
+import { mdiDeleteOutline, mdiFolderOutline, mdiPuzzleOutline, mdiTune } from "@mdi/js";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
@@ -33,7 +33,8 @@ export const ExtensionsBlock = observer(function ExtensionsBlock({
   return (
     <PreferenceContainer title={EXTENSIONS_TITLE}>
       <SettingRow id={EXTENSIONS_ID} label={EXTENSIONS_LABEL} hint={EXTENSIONS_HINT}>
-        <Button tone="secondary" size="sm" onClick={() => onManage("extensions")}>
+        <Button tone="primary" size="sm" onClick={() => onManage("extensions")}>
+          <Icon path={mdiTune} />
           {MANAGE}
         </Button>
       </SettingRow>
@@ -59,11 +60,12 @@ export default observer(function BrowserExtensionsPage({
       onBack={onBack}
       actions={
         <Button
-          tone="secondary"
+          tone="primary"
           size="sm"
           disabled={extensions.busy}
           onClick={() => void extensions.add()}
         >
+          <Icon path={mdiFolderOutline} />
           {EXTENSIONS_ADD}
         </Button>
       }

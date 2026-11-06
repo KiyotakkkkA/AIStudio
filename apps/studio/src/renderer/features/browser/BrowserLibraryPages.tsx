@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
-import { mdiClose, mdiPencilOutline, mdiStar, mdiWeb } from "@mdi/js";
+import { mdiDeleteOutline, mdiClose, mdiPencilOutline, mdiStar, mdiWeb } from "@mdi/js";
 import type { BrowserBookmarkDto } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
@@ -68,7 +68,7 @@ export const HistoryPage = observer(function HistoryPage({
       onBack={onBack}
       actions={
         <Button
-          tone="secondary"
+          tone="danger-soft"
           size="sm"
           disabled={library.historyTotal === 0 || library.busy}
           needConfirm
@@ -79,6 +79,7 @@ export const HistoryPage = observer(function HistoryPage({
           }}
           onClick={() => void library.clearHistory()}
         >
+          <Icon path={mdiDeleteOutline} />
           {HISTORY_CLEAR}
         </Button>
       }

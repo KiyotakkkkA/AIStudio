@@ -1,9 +1,8 @@
 import { observer } from "mobx-react-lite";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   mdiAccountOutline,
   mdiBrain,
-  mdiChevronDown,
   mdiCreationOutline,
   mdiDeleteOutline,
   mdiForumOutline,
@@ -27,7 +26,6 @@ import {
   ACCOUNT_PLACEHOLDER,
   ACCOUNT_TAB,
   ADD,
-  ADVANCED_LABEL,
   CANCEL,
   CLEAR,
   CLEAR_ACCOUNT_TITLE,
@@ -54,7 +52,6 @@ import {
 import Alert from "../../ui/molecules/Alert";
 import ListRowSkeleton from "../../ui/molecules/ListRowSkeleton";
 import { LoadingStatus } from "../../ui/molecules/LoadingSkeleton";
-import Reveal from "../../ui/motion/Reveal";
 
 type Scope = "account" | "dialog";
 
@@ -272,8 +269,6 @@ const DialogFacts = observer(function DialogFacts() {
 function MemoryFacts() {
   const { memory } = useStore();
   const [scope, setScope] = useState<Scope>("account");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const advancedId = useId();
   useEffect(() => {
     void memory.load();
   }, [memory]);
@@ -294,7 +289,7 @@ function MemoryFacts() {
     { value: "dialog" as const, label: `${DIALOG_TAB} · ${dialogCount.toLocaleString("ru-RU")}` },
   ];
   return (
-    <div className="flex flex-col gap-4 pt-6">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <SegmentedControl
           label={SCOPE_TABS_LABEL}
@@ -308,32 +303,10 @@ function MemoryFacts() {
         ) : null}
       </div>
       {memory.error === null ? null : <Alert>{memory.error}</Alert>}
-      <div className="flex flex-col">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            aria-expanded={advancedOpen}
-            aria-controls={advancedId}
-            onClick={() => setAdvancedOpen((value) => !value)}
-            className="flex w-fit flex-none items-center gap-1 rounded-control text-[12px] text-main-400 hover:text-main-100 anim-on:transition-colors"
-          >
-            {ADVANCED_LABEL}
-            <Icon
-              path={mdiChevronDown}
-              size={14}
-              className={`anim-on:transition-transform ${advancedOpen ? "rotate-180" : ""}`}
-            />
-          </button>
-          <span className="min-w-0 flex-1 truncate text-right text-[12px] text-main-500">
-            {scope === "account" ? ACCOUNT_HINT : DIALOG_HINT}
-          </span>
-        </div>
-        <Reveal show={advancedOpen}>
-          <div id={advancedId} className="pt-3">
-            <Composer key={scope} scope={scope} />
-          </div>
-        </Reveal>
-      </div>
+      <p className="m-0 text-[12px] text-main-500">
+        {scope === "account" ? ACCOUNT_HINT : DIALOG_HINT}
+      </p>
+      <Composer key={scope} scope={scope} />
       {scope === "account" ? <AccountFacts /> : <DialogFacts />}
     </div>
   );

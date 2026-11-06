@@ -23,9 +23,8 @@ export default observer(function SettingRow({
   return (
     <div
       data-setting={id}
-      className={`flex ${stacked ? "flex-col items-stretch" : "flex-wrap items-center"} gap-x-6 gap-y-2.5 border-b border-line py-4 transition-colors duration-500 last:border-b-0 ${
-        ui.preferenceTarget === id ? "bg-accent-soft" : ""
-      }`}
+      data-setting-highlighted={ui.preferenceTarget === id || undefined}
+      className={`flex ${stacked ? "flex-col items-stretch" : "flex-wrap items-center"} gap-x-6 gap-y-2.5 border-b border-line py-4 last:border-b-0`}
     >
       <div className={`flex min-w-0 flex-col gap-0.5 ${stacked ? "" : "min-w-56 flex-1"}`}>
         <span className="text-[13px] font-medium text-main-100">{label}</span>

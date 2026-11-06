@@ -1,6 +1,13 @@
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
-import { mdiClose, mdiFileOutline, mdiFolderOutline, mdiOpenInNew, mdiRobotOutline } from "@mdi/js";
+import {
+  mdiDeleteOutline,
+  mdiClose,
+  mdiFileOutline,
+  mdiFolderOutline,
+  mdiOpenInNew,
+  mdiRobotOutline,
+} from "@mdi/js";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import Chip from "../../ui/atoms/Chip";
@@ -39,7 +46,7 @@ export default observer(function DownloadHistory({ onBack }: { readonly onBack: 
       onBack={onBack}
       actions={
         <Button
-          tone="secondary"
+          tone="danger-soft"
           size="sm"
           disabled={items.length === 0 || browserDownloads.busy}
           needConfirm
@@ -50,6 +57,7 @@ export default observer(function DownloadHistory({ onBack }: { readonly onBack: 
           }}
           onClick={() => void browserDownloads.clear()}
         >
+          <Icon path={mdiDeleteOutline} />
           {DOWNLOADS_CLEAR}
         </Button>
       }

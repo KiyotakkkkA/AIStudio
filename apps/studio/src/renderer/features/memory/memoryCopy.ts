@@ -23,8 +23,13 @@ export const MODEL_ROW = {
   hint: "Добавление, изменение и удаление записей памяти моделью.",
 } as const;
 
+export const MEMORY_RECORDS_ROW = {
+  key: "memory.records",
+  label: "Сохранённые записи",
+  hint: "Просмотр, добавление и удаление записей общей памяти и памяти диалогов.",
+} as const;
+
 export const SCOPE_TABS_LABEL = "Область памяти";
-export const ADVANCED_LABEL = "Расширенные настройки памяти";
 export const ACCOUNT_TAB = "Общая";
 export const DIALOG_TAB = "Диалоги";
 export const ACCOUNT_HINT = "Факты о пользователе. Доступны во всех диалогах.";
