@@ -26,8 +26,8 @@ export const SEARCH_PLACEHOLDER = "Поиск";
 export const SEARCH_EMPTY = "Ничего не найдено";
 export const PREFERENCES_GROUP = "Приложение";
 export const DIAGNOSTICS_TITLE = "Диагностика";
-export const SETTINGS_PAGE_TITLE = "Расширения";
-export const SETTINGS_PAGE_SUBTITLE = "Параметры приложения, расширений и встроенного браузера";
+export const SETTINGS_PAGE_TITLE = PREFERENCES_TITLE;
+export const SETTINGS_PAGE_SUBTITLE = "Приложение, расширения и встроенный браузер";
 
 export const SECTION_LABELS: Record<PreferenceSection, string> = {
   general: "Общие",

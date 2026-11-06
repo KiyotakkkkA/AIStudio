@@ -13,7 +13,7 @@ import {
   mdiShieldCheckOutline,
   mdiToyBrickOutline,
   mdiTrayArrowDown,
-  mdiPuzzleOutline,
+  mdiCogOutline,
   mdiWeb,
   mdiWrenchOutline,
 } from "@mdi/js";
@@ -81,7 +81,7 @@ export const NAV_GROUPS: readonly NavGroupModel[] = [
         icon: mdiShieldCheckOutline,
         path: ROUTES.permissions,
       },
-      { id: "settings", label: "Расширения", icon: mdiPuzzleOutline, path: ROUTES.settings },
+      { id: "settings", label: "Параметры", icon: mdiCogOutline, path: ROUTES.settings },
     ],
   },
 ];

@@ -28,13 +28,13 @@ const RAIL_ITEMS = [
   "Задачи",
   "Загрузки",
   "Запуски и логи",
-  "Расширения",
+  "Параметры",
 ];
 
 const ROUTE_HEADERS = [
   { item: "Секреты", header: "Секреты" },
   { item: "Навыки", header: "Навыки" },
-  { item: "Расширения", header: "Расширения" },
+  { item: "Параметры", header: "Параметры" },
 ];
 
 let studio: Studio;
@@ -104,7 +104,7 @@ test("every rail page renders under the Tauri shell without an error boundary", 
     await expect(page.locator("main")).toBeVisible();
     await expect(page.getByText("Интерфейс не удалось отрисовать", { exact: true })).toHaveCount(0);
   }
-  await page.locator("aside").getByText("Расширения", { exact: true }).click();
+  await page.locator("aside").getByText("Параметры", { exact: true }).click();
 });
 
 test("every channel group answers from the Rust host", async () => {
@@ -136,7 +136,7 @@ test("every channel group answers from the Rust host", async () => {
 });
 
 test("system.ping round-trips from the renderer to the host", async () => {
-  await page.locator("aside").getByText("Расширения", { exact: true }).click();
+  await page.locator("aside").getByText("Параметры", { exact: true }).click();
   const value = page.getByTestId("ping-value");
   await expect(value).toHaveText("—");
   await page.getByTestId("ping-button").click();
@@ -144,7 +144,7 @@ test("system.ping round-trips from the renderer to the host", async () => {
 });
 
 test("the demo stream counts to completion over the event channel", async () => {
-  await page.locator("aside").getByText("Расширения", { exact: true }).click();
+  await page.locator("aside").getByText("Параметры", { exact: true }).click();
   const value = page.getByTestId("stream-value");
   await page.getByTestId("stream-button").click();
   await expect(value).toHaveText("1/5");

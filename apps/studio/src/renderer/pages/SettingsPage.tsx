@@ -1,4 +1,4 @@
-import { mdiPuzzleOutline } from "@mdi/js";
+import { mdiCogOutline } from "@mdi/js";
 import PreferencesWorkspace from "../features/preferences/PreferencesWorkspace";
 import {
   SETTINGS_PAGE_SUBTITLE,
@@ -10,7 +10,7 @@ export default function SettingsPage() {
   return (
     <PageShell
       bleed={true}
-      icon={mdiPuzzleOutline}
+      icon={mdiCogOutline}
       title={SETTINGS_PAGE_TITLE}
       subtitle={SETTINGS_PAGE_SUBTITLE}
     >
