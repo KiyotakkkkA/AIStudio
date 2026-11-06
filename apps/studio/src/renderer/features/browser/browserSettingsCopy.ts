@@ -26,6 +26,6 @@ export const LINK_TARGET_OPTIONS: readonly { value: BrowserLinkTarget; label: st
 
 export const FULL_URL_ID = "browser.fullUrl";
 export const FULL_URL_LABEL = "Полный адрес";
-export const FULL_URL_HINT = "Путь, параметры и фрагмент в адресной строке, а не только домен.";
+export const FULL_URL_HINT = "Полный адрес веб-сайта";
 
 export const BROWSER_SAVE_FAILED = "Не удалось сохранить настройки браузера.";

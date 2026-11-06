@@ -12,8 +12,7 @@ export const ELAPSED_TITLE = "Время ответа";
 export const COMPOSER_PLACEHOLDER = "Уточнить задачу…";
 export const SEND = "Отправить";
 export const COMMAND_FAILED = "Не удалось выполнить команду";
-export const VERIFICATION_LEAD =
-  "Работа приостановлена до прохождения антибот проверки";
+export const VERIFICATION_LEAD = "Работа приостановлена до прохождения антибот проверки";
 export const VERIFICATION_OPEN = "Открыть проверку";
 export const VERIFICATION_GENERIC = "Провайдер запросил антибот проверку";
 

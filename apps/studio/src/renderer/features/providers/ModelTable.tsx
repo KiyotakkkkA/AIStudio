@@ -53,10 +53,7 @@ export default function ModelTable({
   );
   return (
     <ScrollArea className="max-h-120 min-w-0 rounded-control bg-main-850">
-      <table
-        aria-label="Модели провайдера"
-        className="w-full min-w-180 text-left text-[12px]"
-      >
+      <table aria-label="Модели провайдера" className="w-full min-w-180 text-left text-[12px]">
         <thead className="sticky top-0 z-10 bg-main-850 text-[11px] shadow-[0_1px_0_var(--color-line)]">
           <tr>
             <th scope="col" className="w-12 px-3 py-2.5">
