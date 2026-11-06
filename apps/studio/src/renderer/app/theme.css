@@ -2,6 +2,7 @@
 @import "@kiyotakkkka/zvs-uikit-lib/styles.css";
 @import "@fontsource-variable/onest";
 @import "@fontsource-variable/jetbrains-mono";
+@import "katex/dist/katex.min.css";
 
 @source "../../../node_modules/@kiyotakkkka/zvs-uikit-lib/dist";
 
@@ -573,4 +574,16 @@ select:focus-visible,
   border-radius: var(--radius-control);
   background: var(--zvs-accent-soft);
   pointer-events: none;
+}
+
+.zvs-chat-markdown .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.25em;
+}
+
+.zvs-chat-markdown .katex {
+  font-size: 1.1em;
+  overflow-wrap: normal;
 }

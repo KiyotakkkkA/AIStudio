@@ -9,6 +9,8 @@ import {
 } from "react";
 import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { CodeView } from "@kiyotakkkka/zvs-uikit-lib/code-view";
 import type { ChatCitationDto, WebSourceDto } from "@zvs/shared";
@@ -119,9 +121,32 @@ function Picture({ alt }: ComponentProps<"img"> & ExtraProps) {
   return <span>{alt}</span>;
 }
 
-const COMPONENTS: Components = { pre: CodeBlock, a: Link, img: Picture };
+function MathSpan({
+  children,
+  className,
+  style,
+  title,
+  "aria-hidden": ariaHidden,
+}: ComponentProps<"span">) {
+  const invalid = className?.split(" ").includes("katex-error") === true;
+  return (
+    <span
+      className={className}
+      style={style}
+      aria-hidden={ariaHidden}
+      title={invalid ? "Не удалось отобразить формулу." : title}
+    >
+      {children}
+    </span>
+  );
+}
 
-const REMARK_PLUGINS = [remarkGfm];
+const COMPONENTS: Components = { pre: CodeBlock, a: Link, img: Picture, span: MathSpan };
+
+type MarkdownPlugins = NonNullable<ComponentProps<typeof ReactMarkdown>["remarkPlugins"]>;
+
+const REMARK_PLUGINS: MarkdownPlugins = [remarkGfm, remarkMath];
+const REHYPE_PLUGINS: MarkdownPlugins = [[rehypeKatex, { trust: false, strict: "ignore" }]];
 
 export default function ChatMarkdown({
   content,
@@ -145,10 +170,15 @@ export default function ChatMarkdown({
   );
   return (
     <div
-      className={`${streaming ? "*:animate-zvs-rise " : ""}min-w-0 space-y-3 text-[13.5px] leading-relaxed wrap-break-word text-main-100 [&_a]:text-accent-medium [&_a]:underline [&_a]:decoration-accent-line [&_a]:underline-offset-2 [&_h1]:text-[20px] [&_h1]:font-semibold [&_h1]:tracking-[-0.02em] [&_h2]:text-[17px] [&_h2]:font-semibold [&_h2]:tracking-[-0.01em] [&_h3]:font-semibold [&_hr]:border-line [&_li]:my-1 [&_li]:marker:text-main-500 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:border-accent-dark [&_blockquote]:pl-3.5 [&_blockquote]:text-main-300 [&_table]:w-full [&_table]:border-collapse [&_th]:border-b [&_th]:border-line [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-left [&_th]:bg-main-850 [&_th]:text-[12px] [&_th]:font-semibold [&_th]:text-main-300 [&_td]:border-b [&_td]:border-line [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top [&_td]:text-[13px] [&_tr:last-child_td]:border-b-0`}
+      className={`zvs-chat-markdown ${streaming ? "*:animate-zvs-rise " : ""}min-w-0 space-y-3 text-[13.5px] leading-relaxed wrap-break-word text-main-100 [&_a]:text-accent-medium [&_a]:underline [&_a]:decoration-accent-line [&_a]:underline-offset-2 [&_h1]:text-[20px] [&_h1]:font-semibold [&_h1]:tracking-[-0.02em] [&_h2]:text-[17px] [&_h2]:font-semibold [&_h2]:tracking-[-0.01em] [&_h3]:font-semibold [&_hr]:border-line [&_li]:my-1 [&_li]:marker:text-main-500 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:border-accent-dark [&_blockquote]:pl-3.5 [&_blockquote]:text-main-300 [&_table]:w-full [&_table]:border-collapse [&_th]:border-b [&_th]:border-line [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-left [&_th]:bg-main-850 [&_th]:text-[12px] [&_th]:font-semibold [&_th]:text-main-300 [&_td]:border-b [&_td]:border-line [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top [&_td]:text-[13px] [&_tr:last-child_td]:border-b-0`}
     >
       <SourceContext.Provider value={source}>
-        <ReactMarkdown skipHtml remarkPlugins={REMARK_PLUGINS} components={COMPONENTS}>
+        <ReactMarkdown
+          skipHtml
+          remarkPlugins={REMARK_PLUGINS}
+          rehypePlugins={REHYPE_PLUGINS}
+          components={COMPONENTS}
+        >
           {text}
         </ReactMarkdown>
       </SourceContext.Provider>
