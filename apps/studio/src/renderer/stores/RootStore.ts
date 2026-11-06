@@ -1,4 +1,4 @@
-import { makeAutoObservable } from "mobx";
+import { makeAutoObservable, reaction, type IReactionDisposer } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import type { Contract } from "@zvs/shared";
 import type { EventRouter } from "../app/EventRouter";
@@ -20,6 +20,7 @@ import ToolchainStore from "../features/toolchain/ToolchainStore";
 import SkillStore from "../features/skills/SkillStore";
 import ScenarioStore from "../features/scenarios/ScenarioStore";
 import AgenticStore from "../features/agentic/AgenticStore";
+import DevicePermissionsStore from "../features/device/DevicePermissionsStore";
 import PermissionsStore from "../features/permissions/PermissionsStore";
 import StorageStore from "../features/preferences/StorageStore";
 import CliStore from "../features/preferences/CliStore";
@@ -41,6 +42,7 @@ export interface RootStoreEnvironment {
 }
 
 export class RootStore {
+  private readonly disposeFeatureSwitch: IReactionDisposer;
   readonly ui: UiStore;
   readonly viewer: ViewerStore;
   readonly secrets: SecretStore;
@@ -60,6 +62,7 @@ export class RootStore {
   readonly scenarios: ScenarioStore;
   readonly agentic: AgenticStore;
   readonly permissions: PermissionsStore;
+  readonly devicePermissions: DevicePermissionsStore;
   readonly storage: StorageStore;
   readonly cli: CliStore;
   readonly appSettings: AppSettingsStore;
@@ -96,6 +99,7 @@ export class RootStore {
     this.scenarios = new ScenarioStore(environment.ipc, {}, environment.events);
     this.agentic = new AgenticStore(environment.ipc, environment.events);
     this.permissions = new PermissionsStore(environment.ipc);
+    this.devicePermissions = new DevicePermissionsStore(environment.ipc);
     this.storage = new StorageStore(environment.ipc);
     this.appSettings = new AppSettingsStore(environment.ipc);
     this.cli = new CliStore(environment.ipc, () => this.appSettings.load());
@@ -112,10 +116,33 @@ export class RootStore {
     this.browserDownloads = new BrowserDownloadsStore(environment.ipc);
     this.browserLibrary = new BrowserLibraryStore(environment.ipc);
     this.browserExtensions = new BrowserExtensionsStore(environment.ipc);
-    makeAutoObservable<RootStore, "environment">(
+    this.chat.useCommandSwitch((command) =>
+      command === "browser-use"
+        ? this.browserSettings.enabled
+        : command !== "computer-use" || this.appSettings.values["computer.enabled"],
+    );
+    this.disposeFeatureSwitch = reaction(
+      () => [
+        this.browserSettings.enabled,
+        this.browserSettings.saving,
+        this.browserSettings.loaded,
+        this.appSettings.values["computer.enabled"],
+        this.appSettings.pending["computer.enabled"],
+        this.appSettings.loaded,
+      ],
+      () => {
+        if (
+          !this.browserSettings.saving &&
+          this.appSettings.pending["computer.enabled"] === undefined
+        )
+          void this.chat.refreshCommands();
+      },
+    );
+    makeAutoObservable<RootStore, "environment" | "disposeFeatureSwitch">(
       this,
       {
         environment: false,
+        disposeFeatureSwitch: false,
         ui: false,
         viewer: false,
         secrets: false,
@@ -135,6 +162,7 @@ export class RootStore {
         scenarios: false,
         agentic: false,
         permissions: false,
+        devicePermissions: false,
         appSettings: false,
         cli: false,
         memory: false,
@@ -160,6 +188,7 @@ export class RootStore {
   }
 
   dispose(): void {
+    this.disposeFeatureSwitch();
     this.viewer.dispose();
     this.accounts.dispose();
     this.vectorStores.dispose();

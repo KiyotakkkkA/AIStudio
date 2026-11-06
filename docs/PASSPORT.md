@@ -1875,8 +1875,8 @@ resolution.
   approval with each app's path and icon; `computer.request_access` raises the same one up
   front. It is answered through `computer.answer` with `once` (this generation: kept in memory
   for the run), `conversation` or `always` (rows in `app_grant`, migration 0039), or `deny`.
-  The «Разрешения → Приложения» tab lists and revokes stored grants (`computer.grants`,
-  `computer.revoke`).
+  «Параметры → Устройство → Разрешения приложений» lists and revokes stored grants
+  (`computer.grants`, `computer.revoke`). The Permissions page manages folder grants only.
 - **Floor, refused in every mode:** windows of the app itself (by process id), credential
   prompts and password managers (`policy::FORBIDDEN_APPS`), typing into a password field
   (checked by the sidecar against the focused element just before input).
@@ -1888,6 +1888,25 @@ resolution.
   that changes between the check and the input is not driven.
 - Limits: 12 actions per batch, 5000 characters per `type`, 120 actions a minute.
 - Screen content is fenced as `<screen untrusted="true">` data.
+
+### Preferences (2026-11-07)
+
+«Устройство» follows «Браузер» in Settings. Its «Управление устройством» switch is
+stored as the boolean `computer.enabled`, defaulting to true. Both this switch and the
+browser switch disable their corresponding bundled command skill and lock its toggle;
+turning the feature back on enables and unlocks the skill. Commands, model instructions
+and offered tools follow the host setting, including commands retained in dialog history.
+Changing the switch does not cancel a running session. App grants remain manageable and
+are retained while device control is disabled.
+
+The app-permissions subpage groups grants by executable name and scope into «Постоянные»
+and «В диалогах». `computer.pickApp` uses the shell picker filtered to one .exe;
+`computer.addGrant` validates the file and policy, resolves its icon through the desktop
+port, and atomically grants access globally or to the selected existing dialogs. It never
+launches the selected executable. Missing icons use the standard app placeholder. The
+app detail shows metadata and, for scoped grants, dialogs with open and individual revoke
+actions. A permanent grant takes precedence during permission lookup and usage tracking;
+scoped grants are retained and take effect again after the permanent grant is revoked.
 
 ### Live surface
 

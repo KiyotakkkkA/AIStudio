@@ -173,12 +173,35 @@ impl SkillService {
         }
     }
 
+    fn feature_enabled(&self, key: &str) -> Result<bool, AppError> {
+        crate::computer::settings::command_enabled(&self.inner.database, key)
+    }
+
+    pub fn sync_feature(&self, key: &str, enabled: bool) -> Result<(), AppError> {
+        for skill in self.inner.library.list()? {
+            if skill.key == key {
+                self.inner.library.set_enabled(&skill.id, enabled)?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn library(&self) -> &SkillLibrary {
         &self.inner.library
     }
 
     pub fn list(&self) -> Result<Vec<SkillDto>, AppError> {
-        self.inner.library.reconcile()
+        let skills = self.inner.library.reconcile()?;
+        skills
+            .into_iter()
+            .map(|skill| {
+                if skill.enabled && !self.feature_enabled(&skill.key)? {
+                    self.inner.library.set_enabled(&skill.id, false)
+                } else {
+                    Ok(skill)
+                }
+            })
+            .collect()
     }
 
     pub fn get(&self, id: &SkillId) -> Result<SkillDetailDto, AppError> {
@@ -198,6 +221,13 @@ impl SkillService {
     }
 
     pub fn set_enabled(&self, id: &SkillId, enabled: bool) -> Result<SkillDto, AppError> {
+        let skill = self.inner.library.get(id)?;
+        if enabled && !self.feature_enabled(&skill.skill.key)? {
+            return Err(AppError::new(
+                AppErrorCode::PermissionDenied,
+                "Навык недоступен: соответствующая функция выключена в параметрах",
+            ));
+        }
         self.inner.library.set_enabled(id, enabled)
     }
 
@@ -491,6 +521,9 @@ impl SkillCatalogue for SkillService {
     }
 
     fn command(&self, key: &str) -> Option<String> {
+        if !self.feature_enabled(key).ok()? {
+            return None;
+        }
         self.inner
             .library
             .load(key)
@@ -500,6 +533,9 @@ impl SkillCatalogue for SkillService {
     }
 
     fn active(&self, key: &str) -> Option<super::ActiveSkill> {
+        if !self.feature_enabled(key).ok()? {
+            return None;
+        }
         let loaded = self.inner.library.load(key).ok()?;
         if js_trim(&loaded.instructions).is_empty() {
             return None;

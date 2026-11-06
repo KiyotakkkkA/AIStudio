@@ -12,6 +12,7 @@ import {
   mdiConsole,
   mdiDeleteOutline,
   mdiDownload,
+  mdiDevices,
   mdiHarddisk,
   mdiInformationOutline,
   mdiMicrophoneOutline,
@@ -102,6 +103,7 @@ import {
 import PreferencesSearch from "./PreferencesSearch";
 import SettingRow from "./SettingRow";
 import SettingsSubPage from "./SettingsSubPage";
+import DevicePreferences from "../device/DevicePreferences";
 import BrowserPreferences from "../browser/BrowserPreferences";
 import ThemePalettes from "./ThemePalettes";
 import ComponentsTab from "../toolchain/ComponentsTab";
@@ -208,6 +210,7 @@ const SECTION_ICONS: Record<PreferenceSection, string> = {
   cli: mdiConsole,
   voice: mdiMicrophoneOutline,
   browser: mdiWeb,
+  device: mdiDevices,
 };
 
 function NestedSettings({ children }: { readonly children: ReactNode }) {
@@ -1273,6 +1276,7 @@ function PreferencesWorkspace() {
               {section === "cli" ? <CliSection /> : null}
               {section === "voice" ? <VoiceSection /> : null}
               {section === "browser" ? <BrowserPreferences /> : null}
+              {section === "device" ? <DevicePreferences /> : null}
               {section === "components" ? (
                 <div data-setting={SETTING_IDS.components} className="pt-2">
                   <ComponentsTab />

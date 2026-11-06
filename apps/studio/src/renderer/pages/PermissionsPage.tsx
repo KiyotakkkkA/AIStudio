@@ -1,44 +1,22 @@
 import { mdiShieldCheckOutline, mdiShieldOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
 import FolderGrantDetail from "../features/permissions/FolderGrantDetail";
 import FolderGrantList from "../features/permissions/FolderGrantList";
-import AppGrantList from "../features/permissions/AppGrantList";
-import AppGrantDetail from "../features/permissions/AppGrantDetail";
 import {
-  APPS_NOTHING_SELECTED,
-  APPS_TAB,
-  APPS_TAB_PARAM,
-  FOLDERS_TAB,
   NOTHING_SELECTED_DESCRIPTION,
   NOTHING_SELECTED_TITLE,
   PAGE_TITLE,
 } from "../features/permissions/permissionsPresentation";
 import { useStore } from "../stores/useStore";
-import PageTabs from "../ui/molecules/PageTabs";
 import EmptyState from "../ui/molecules/EmptyState";
 import PageShell from "../ui/templates/PageShell";
 import Alert from "../ui/molecules/Alert";
 import { PaneSkeleton } from "../ui/organisms/PageSkeletons";
 import { awaitingData } from "../ui/molecules/LoadingSkeleton";
 
-const TABS = [
-  { value: "folders", label: FOLDERS_TAB },
-  { value: APPS_TAB_PARAM, label: APPS_TAB },
-] as const;
-
-type TabValue = (typeof TABS)[number]["value"];
-
 function PermissionsPage() {
   const { permissions } = useStore();
-  const [params, setParams] = useSearchParams();
-  const tab: TabValue =
-    TABS.find((option) => option.value === params.get("tab"))?.value ?? "folders";
-  const setTab = (value: TabValue) => {
-    setParams(value === "folders" ? {} : { tab: value }, { replace: true });
-  };
-
   useEffect(() => {
     void permissions.load();
   }, [permissions]);
@@ -50,65 +28,34 @@ function PermissionsPage() {
       bleed={true}
       icon={mdiShieldCheckOutline}
       title={PAGE_TITLE}
-      subtitle={
-        tab === APPS_TAB_PARAM
-          ? "Управление доступом к приложениям"
-          : "Управление доступом к файлам и папкам"
-      }
-      toolbar={<PageTabs label="Вид разрешений" value={tab} tabs={TABS} onChange={setTab} />}
+      subtitle="Управление доступом к файлам и папкам"
     >
       {permissions.error === null ? null : (
         <Alert className="mx-6 mt-3" onDismiss={permissions.dismissError}>
           {permissions.error}
         </Alert>
       )}
-      {tab === APPS_TAB_PARAM ? (
-        <div className="flex min-h-0 flex-1">
-          <AppGrantList />
-          {permissions.selectedApp === null ? (
-            permissions.appGrantsLoaded ? (
-              <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
-                <EmptyState
-                  icon={mdiShieldOutline}
-                  title={NOTHING_SELECTED_TITLE}
-                  description={APPS_NOTHING_SELECTED}
-                />
-              </div>
-            ) : (
-              <PaneSkeleton />
-            )
-          ) : (
-            <AppGrantDetail
-              grant={permissions.selectedApp}
-              now={permissions.now}
-              revoking={permissions.revokingApp}
-              onRevoke={(id) => void permissions.revokeApp(id)}
+      <div className="flex min-h-0 flex-1">
+        <FolderGrantList />
+        {selected === null && awaitingData(permissions) ? (
+          <PaneSkeleton />
+        ) : selected === null ? (
+          <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
+            <EmptyState
+              icon={mdiShieldOutline}
+              title={NOTHING_SELECTED_TITLE}
+              description={NOTHING_SELECTED_DESCRIPTION}
             />
-          )}
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1">
-          <FolderGrantList />
-          {selected === null && awaitingData(permissions) ? (
-            <PaneSkeleton />
-          ) : selected === null ? (
-            <div className="flex min-w-0 flex-1 items-center justify-center p-4.5">
-              <EmptyState
-                icon={mdiShieldOutline}
-                title={NOTHING_SELECTED_TITLE}
-                description={NOTHING_SELECTED_DESCRIPTION}
-              />
-            </div>
-          ) : (
-            <FolderGrantDetail
-              grant={selected}
-              now={permissions.now}
-              revoking={permissions.revoking}
-              onRevoke={() => void permissions.revoke(selected.id)}
-            />
-          )}
-        </div>
-      )}
+          </div>
+        ) : (
+          <FolderGrantDetail
+            grant={selected}
+            now={permissions.now}
+            revoking={permissions.revoking}
+            onRevoke={() => void permissions.revoke(selected.id)}
+          />
+        )}
+      </div>
     </PageShell>
   );
 }

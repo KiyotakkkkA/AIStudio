@@ -66,7 +66,7 @@ import {
   BrowserSiteRef,
   BrowserSitesDto,
 } from "../browserSites.js";
-import { AnswerAppRequestInput, AppGrantDto, AppGrantRef } from "../computer.js";
+import { AddAppGrantInput, AnswerAppRequestInput, AppGrantDto, AppGrantRef } from "../computer.js";
 import { ChatAnswerInput, ChatSkipInput } from "../questions.js";
 import {
   ClearMemoryInput,
@@ -356,6 +356,8 @@ export const contract = defineContract({
   "folders.list": { input: z.void(), output: z.array(FolderGrantDto) },
   "folders.revoke": { input: FolderGrantRef, output: z.void() },
   "folders.answer": { input: AnswerFolderRequestInput, output: z.void() },
+  "computer.pickApp": { input: z.void(), output: z.string().nullable() },
+  "computer.addGrant": { input: AddAppGrantInput, output: z.array(AppGrantDto) },
   "computer.grants": { input: z.void(), output: z.array(AppGrantDto) },
   "computer.revoke": { input: AppGrantRef, output: z.void() },
   "computer.answer": { input: AnswerAppRequestInput, output: z.void() },

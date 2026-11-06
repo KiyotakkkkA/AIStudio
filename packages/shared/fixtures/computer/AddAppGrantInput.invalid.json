@@ -1,0 +1,42 @@
+[
+  {
+    "name": "no dialogs",
+    "value": {
+      "path": "C:\\Windows\\notepad.exe",
+      "scope": "conversation",
+      "conversations": []
+    }
+  },
+  {
+    "name": "permanent with dialogs",
+    "value": {
+      "path": "C:\\Windows\\notepad.exe",
+      "scope": "always",
+      "conversations": ["00000000-0000-4000-8000-000000000001"]
+    }
+  },
+  {
+    "name": "unsupported scope",
+    "value": {
+      "path": "C:\\Windows\\notepad.exe",
+      "scope": "once",
+      "conversations": ["00000000-0000-4000-8000-000000000001"]
+    }
+  },
+  {
+    "name": "invalid dialog",
+    "value": {
+      "path": "C:\\Windows\\notepad.exe",
+      "scope": "conversation",
+      "conversations": ["bad"]
+    }
+  },
+  {
+    "name": "empty path",
+    "value": {
+      "path": "",
+      "scope": "conversation",
+      "conversations": ["00000000-0000-4000-8000-000000000001"]
+    }
+  }
+]

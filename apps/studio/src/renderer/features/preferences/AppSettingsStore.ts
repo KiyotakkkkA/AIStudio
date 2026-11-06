@@ -10,6 +10,7 @@ export const APP_SETTING_KEYS = [
   "notifications.approval",
   "notifications.turn",
   "notifications.download",
+  "computer.enabled",
   "memory.enabled",
   "memory.model",
 ] as const;
@@ -22,6 +23,7 @@ export const APP_SETTING_DEFAULTS: Record<AppSettingKey, boolean> = {
   "notifications.approval": true,
   "notifications.turn": true,
   "notifications.download": true,
+  "computer.enabled": true,
   "memory.enabled": true,
   "memory.model": true,
 };

@@ -387,6 +387,10 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ComputerCommand>,
     ),
     (
+        "computer/AddAppGrantInput",
+        round_trip::<zvs_contract::AddAppGrantInput>,
+    ),
+    (
         "computer/AppGrantDto",
         round_trip::<zvs_contract::AppGrantDto>,
     ),

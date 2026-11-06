@@ -26,7 +26,7 @@ impl<'c> AppGrantRepository<'c> {
     pub fn usable(&self, conversation_id: &str) -> rusqlite::Result<Vec<AppGrantRow>> {
         self.connection
             .prepare_cached(&format!(
-                "SELECT {} {FROM} WHERE g.conversation_id IS NULL OR g.conversation_id = ?1",
+                "SELECT {} {FROM} WHERE g.conversation_id IS NULL OR (g.conversation_id = ?1 AND NOT EXISTS (SELECT 1 FROM app_grant global WHERE global.app = g.app AND global.conversation_id IS NULL))",
                 AppGrantRow::COLUMNS
             ))?
             .query_map([conversation_id], AppGrantRow::from_row)?
@@ -89,7 +89,7 @@ impl<'c> AppGrantRepository<'c> {
         self.connection
             .prepare_cached(
                 "UPDATE app_grant SET last_used_at = ?3 WHERE app = ?1 \
-                 AND (conversation_id IS NULL OR conversation_id = ?2)",
+                 AND (conversation_id IS NULL OR (conversation_id = ?2 AND NOT EXISTS (SELECT 1 FROM app_grant global WHERE global.app = ?1 AND global.conversation_id IS NULL)))",
             )?
             .execute(params![app, conversation_id, now])
     }

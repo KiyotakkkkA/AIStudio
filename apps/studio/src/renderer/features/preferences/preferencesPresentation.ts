@@ -11,6 +11,7 @@ import {
   type ThemeMode,
 } from "../../stores/UiStore";
 import { VOICE_INPUT } from "../voice/voiceCopy";
+import { DEVICE_TITLE, DEVICE_HINT } from "../device/deviceCopy";
 import { BROWSER_SECTION_HINT } from "../browser/browserSettingsCopy";
 import type { AppSettingKey } from "./AppSettingsStore";
 
@@ -39,6 +40,7 @@ export const SECTION_LABELS: Record<PreferenceSection, string> = {
   data: "Данные",
   about: "О системе",
   browser: "Браузер",
+  device: DEVICE_TITLE,
   components: "Компоненты",
   voice: VOICE_INPUT,
   cli: "CLI",
@@ -54,7 +56,7 @@ export const PREFERENCE_GROUPS: readonly {
     label: PREFERENCES_GROUP,
     sections: ["general", "profile", "appearance", "notifications", "memory", "data", "about"],
   },
-  { label: EXTENSIONS_GROUP, sections: ["browser", "components", "voice", "cli"] },
+  { label: EXTENSIONS_GROUP, sections: ["browser", "device", "components", "voice", "cli"] },
 ];
 
 export const SECTION_HINTS: Record<PreferenceSection, string> = {
@@ -69,6 +71,7 @@ export const SECTION_HINTS: Record<PreferenceSection, string> = {
   cli: "Настройка утилиты командной строки.",
   voice: "Настройка распознавания голоса и управление голосовым вводом.",
   browser: BROWSER_SECTION_HINT,
+  device: DEVICE_HINT,
 };
 
 export const TOGGLE_ON = "Включено";

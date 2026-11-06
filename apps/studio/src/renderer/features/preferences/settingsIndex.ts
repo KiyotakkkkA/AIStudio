@@ -1,3 +1,9 @@
+import {
+  DEVICE_ENABLED_ID,
+  DEVICE_ENABLED_LABEL,
+  APP_PERMISSIONS_ID,
+  APP_PERMISSIONS_TITLE,
+} from "../device/deviceCopy";
 import type { PreferenceSection } from "../../stores/UiStore";
 import { JUDGE_ROW } from "../execPolicy/execPolicyCopy";
 import {
@@ -157,6 +163,8 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: CLI_THEME_SETTING_ID, section: "cli", label: CLI_THEME_LABEL },
   { id: VOICE_DEVICE_ROW.key, section: "voice", label: VOICE_DEVICE_ROW.label },
   { id: VOICE_MODEL_ROW.key, section: "voice", label: VOICE_MODEL_ROW.label },
+  { id: DEVICE_ENABLED_ID, section: "device", label: DEVICE_ENABLED_LABEL },
+  { id: APP_PERMISSIONS_ID, section: "device", label: APP_PERMISSIONS_TITLE },
   { id: BROWSER_ENABLED_ID, section: "browser", label: BROWSER_ENABLED_LABEL },
   { id: WEB_LINKS_ID, section: "browser", label: WEB_LINKS_LABEL },
   { id: LOCAL_LINKS_ID, section: "browser", label: LOCAL_LINKS_LABEL },

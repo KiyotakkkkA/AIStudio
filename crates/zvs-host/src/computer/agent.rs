@@ -581,6 +581,110 @@ impl ComputerAgent {
         });
     }
 
+    pub async fn add_grant(&self, input: &zvs_contract::AddAppGrantInput) -> Result<(), AppError> {
+        use zvs_contract::Validate;
+        input.validate()?;
+        let path = std::path::Path::new(&input.path);
+        if !path.is_absolute()
+            || path
+                .extension()
+                .is_none_or(|ext| !ext.eq_ignore_ascii_case("exe"))
+        {
+            return Err(AppError::new(
+                AppErrorCode::ValidationFailed,
+                "Выберите исполняемый файл приложения с расширением .exe",
+            ));
+        }
+        let metadata = tokio::fs::metadata(path).await.map_err(|_| {
+            AppError::new(
+                AppErrorCode::NotFound,
+                "Исполняемый файл приложения не найден",
+            )
+        })?;
+        if !metadata.is_file() {
+            return Err(AppError::new(
+                AppErrorCode::ValidationFailed,
+                "Выберите исполняемый файл приложения",
+            ));
+        }
+        let app = super::policy::normalize_app(&input.path).ok_or_else(|| {
+            AppError::new(AppErrorCode::ValidationFailed, super::nodes::INVALID_APP)
+        })?;
+        if super::policy::classify(&app) == super::policy::AppClass::Forbidden {
+            return Err(AppError::new(
+                AppErrorCode::PermissionDenied,
+                super::nodes::forbidden(&app),
+            ));
+        }
+        let own = std::env::current_exe().ok().and_then(|path| {
+            path.file_name()
+                .map(|name| name.to_string_lossy().to_lowercase())
+        });
+        if own.as_deref() == Some(&app) {
+            return Err(AppError::new(
+                AppErrorCode::PermissionDenied,
+                super::nodes::OWN_WINDOW,
+            ));
+        }
+        let resolved = self
+            .0
+            .desktop
+            .call(
+                "resolve",
+                serde_json::json!({"apps": [{"app": app, "path": input.path}]}),
+                &tokio_util::sync::CancellationToken::new(),
+            )
+            .await
+            .ok();
+        let icon = resolved
+            .as_ref()
+            .and_then(|value| value.pointer("/apps/0/icon"))
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned);
+        let now = self.0.clock.now();
+        let conversations: BTreeSet<String> = input
+            .conversations
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        self.0.database.transaction(|transaction| {
+            let repositories = Repositories::new(transaction);
+            for id in &conversations {
+                if repositories.chat.get(id)?.is_none() {
+                    return Err(AppError::new(AppErrorCode::NotFound, "Диалог не найден").into());
+                }
+            }
+            let scopes: Vec<Option<String>> = if conversations.is_empty() {
+                vec![None]
+            } else {
+                conversations.iter().cloned().map(Some).collect()
+            };
+            for conversation_id in scopes {
+                repositories.app_grants.save(&AppGrantRow {
+                    id: crate::platform::ids::new_id().hyphenated().to_string(),
+                    app: app.clone(),
+                    path: input.path.clone(),
+                    icon: icon.clone(),
+                    scope: input.scope.as_str().to_owned(),
+                    conversation_id,
+                    conversation_title: None,
+                    granted_at: now,
+                    last_used_at: None,
+                })?;
+            }
+            Ok(())
+        })?;
+        self.granted(
+            input.scope.as_str(),
+            &[ComputerAppDto {
+                app,
+                path: input.path.clone(),
+                icon,
+            }],
+        );
+        Ok(())
+    }
+
     pub fn app_grants(&self) -> Result<Vec<AppGrantDto>, AppError> {
         let rows = self.repositories(|repositories| Ok(repositories.app_grants.list()?))?;
         Ok(rows

@@ -199,6 +199,7 @@ export default class ChatStore {
   private refreshing: Promise<void> | null = null;
 
   private memoryTool: () => boolean = () => false;
+  private commandSwitch: (command: ChatCommand) => boolean = () => true;
 
   constructor(
     private readonly ipc: IpcClient<Contract>,
@@ -249,6 +250,7 @@ export default class ChatStore {
       | "followPending"
       | "refreshing"
       | "memoryTool"
+      | "commandSwitch"
     >(
       this,
       {
@@ -268,6 +270,7 @@ export default class ChatStore {
         timer: false,
         unsubscribe: false,
         memoryTool: false,
+        commandSwitch: false,
         lastSeq: false,
         revision: false,
         mounted: false,
@@ -539,10 +542,26 @@ export default class ChatStore {
   useMemorySwitch(source: () => boolean) {
     this.memoryTool = source;
   }
+  useCommandSwitch(source: (command: ChatCommand) => boolean) {
+    this.commandSwitch = source;
+  }
+  get availableCommands() {
+    return this.commands.filter((command) => this.commandSwitch(command.command));
+  }
+  async refreshCommands() {
+    try {
+      const commands = await this.ipc.call("chat.commands", undefined);
+      runInAction(() => {
+        this.commands = commands;
+      });
+    } catch {
+      /* Keep the last command list while the host is unavailable. */
+    }
+  }
   get commandMatches(): MenuEntry[] {
     if (this.commandsDismissed) return [];
     return menuEntries({
-      commands: this.commands,
+      commands: this.availableCommands,
       accounts: this.pluginAccounts,
       attachedCommands: this.composer.commands,
       attachedPlugins: this.composer.plugins,
@@ -717,7 +736,7 @@ export default class ChatStore {
     const providerId = this.composer.providerId;
     const modelId = this.model?.externalId;
     if (!providerId || !modelId || !this.available) return null;
-    const commands = [...this.composer.commands];
+    const commands = this.composer.commands.filter((command) => this.commandSwitch(command));
     const plugins = [...this.composer.plugins];
     if (this.active)
       return {
@@ -1209,14 +1228,14 @@ export default class ChatStore {
       return;
     }
     if (!this.canSend) return;
-    const typed = parseCommands(this.commands, this.composer.text);
+    const typed = parseCommands(this.availableCommands, this.composer.text);
     if (typed !== null && typed.text.length === 0) {
       for (const command of typed.commands) this.composer.addCommand(command);
       this.composer.setText("");
       if (typed.commands.includes(GOAL_COMMAND)) this.goalEmpty = true;
       return;
     }
-    const commands = [...this.composer.commands];
+    const commands = this.composer.commands.filter((command) => this.commandSwitch(command));
     for (const command of typed?.commands ?? []) {
       if (!commands.includes(command)) commands.push(command);
     }

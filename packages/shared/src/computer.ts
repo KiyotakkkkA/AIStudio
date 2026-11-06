@@ -3,7 +3,7 @@ import type { BrowserAppearance } from "./browser.js";
 import { FolderAccessAnswer, FolderGrantChatDto, FolderGrantScope } from "./folders.js";
 import type { ChatRoundDto, ChatToolCallDto } from "./chat.js";
 import type { ApprovalRequestDto } from "./events/HostEvent.js";
-import { RunId } from "./primitives/branded.js";
+import { ConversationId, RunId } from "./primitives/branded.js";
 
 const approvalId = z.string().uuid();
 
@@ -31,6 +31,19 @@ export const AppGrantDto = z
     path: ["conversation"],
   });
 export type AppGrantDto = z.infer<typeof AppGrantDto>;
+
+export const AddAppGrantInput = z
+  .object({
+    path: z.string().min(1).max(32767),
+    scope: FolderGrantScope,
+    conversations: z.array(ConversationId).max(1000),
+  })
+  .refine(
+    (input) =>
+      input.scope === "always" ? input.conversations.length === 0 : input.conversations.length > 0,
+    { path: ["conversations"] },
+  );
+export type AddAppGrantInput = z.infer<typeof AddAppGrantInput>;
 
 export const AppGrantRef = z.object({ id: z.string().uuid() });
 export type AppGrantRef = z.infer<typeof AppGrantRef>;

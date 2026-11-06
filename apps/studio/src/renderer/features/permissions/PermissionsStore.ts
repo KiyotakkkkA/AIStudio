@@ -1,7 +1,7 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
-import type { AppGrantDto, Contract, FolderGrantDto, FolderGrantId } from "@zvs/shared";
-import { APPS_LOAD_ERROR, LOAD_ERROR, revokeErrorCopy } from "./permissionsPresentation";
+import type { Contract, FolderGrantDto, FolderGrantId } from "@zvs/shared";
+import { LOAD_ERROR, revokeErrorCopy } from "./permissionsPresentation";
 
 export interface PermissionsStoreOptions {
   readonly clock?: () => number;
@@ -15,11 +15,6 @@ export default class PermissionsStore {
   query = "";
   selectedId: FolderGrantId | null = null;
   revoking = false;
-  appGrants: AppGrantDto[] = [];
-  appGrantsLoaded = false;
-  appQuery = "";
-  selectedAppId: string | null = null;
-  revokingApp = false;
   now: number;
   private readonly clock: () => number;
   private revision = 0;
@@ -59,74 +54,6 @@ export default class PermissionsStore {
 
   get selected(): FolderGrantDto | null {
     return this.grants.find((grant) => grant.id === this.selectedId) ?? null;
-  }
-
-  get visibleApps(): AppGrantDto[] {
-    const query = this.appQuery.trim().toLocaleLowerCase("ru-RU");
-    if (query.length === 0) return this.appGrants;
-    return this.appGrants.filter(
-      (grant) =>
-        grant.app.toLocaleLowerCase("ru-RU").includes(query) ||
-        grant.path.toLocaleLowerCase("ru-RU").includes(query) ||
-        (grant.conversation?.title.toLocaleLowerCase("ru-RU").includes(query) ?? false),
-    );
-  }
-
-  get globalApps(): AppGrantDto[] {
-    return this.visibleApps.filter((grant) => grant.scope === "always");
-  }
-
-  get dialogApps(): AppGrantDto[] {
-    return this.visibleApps.filter((grant) => grant.scope === "conversation");
-  }
-
-  get selectedApp(): AppGrantDto | null {
-    return this.appGrants.find((grant) => grant.id === this.selectedAppId) ?? null;
-  }
-
-  setAppQuery(query: string) {
-    this.appQuery = query;
-  }
-
-  selectApp(id: string) {
-    this.selectedAppId = id;
-  }
-
-  async loadAppGrants() {
-    try {
-      const grants = await this.ipc.call("computer.grants", undefined);
-      runInAction(() => {
-        this.appGrants = grants;
-        this.appGrantsLoaded = true;
-        this.now = this.clock();
-        if (this.error === APPS_LOAD_ERROR) this.error = null;
-        if (this.selectedAppId !== null && !grants.some((grant) => grant.id === this.selectedAppId))
-          this.selectedAppId = null;
-        this.selectedAppId ??= grants[0]?.id ?? null;
-      });
-    } catch {
-      runInAction(() => {
-        this.error = APPS_LOAD_ERROR;
-      });
-    }
-  }
-
-  async revokeApp(id: string) {
-    if (this.revokingApp) return;
-    this.revokingApp = true;
-    this.error = null;
-    try {
-      await this.ipc.call("computer.revoke", { id });
-    } catch (error) {
-      runInAction(() => {
-        this.error = revokeErrorCopy(error);
-      });
-    } finally {
-      runInAction(() => {
-        this.revokingApp = false;
-      });
-    }
-    await this.loadAppGrants();
   }
 
   get isEmpty(): boolean {

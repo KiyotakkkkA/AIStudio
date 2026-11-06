@@ -114,7 +114,13 @@ test("the application group lists its sections in order and the extensions group
     ],
     [
       "Расширения",
-      [SECTION_LABELS.browser, SECTION_LABELS.components, VOICE_INPUT, SECTION_LABELS.cli],
+      [
+        SECTION_LABELS.browser,
+        SECTION_LABELS.device,
+        SECTION_LABELS.components,
+        VOICE_INPUT,
+        SECTION_LABELS.cli,
+      ],
     ],
   ]);
   expect(PREFERENCE_GROUPS.flatMap((group) => group.sections).sort()).toEqual(
@@ -139,6 +145,7 @@ test("application settings load with their defaults and persist each toggle", as
     "notifications.approval": true,
     "notifications.turn": true,
     "notifications.download": true,
+    "computer.enabled": true,
     "memory.enabled": true,
     "memory.model": true,
   });

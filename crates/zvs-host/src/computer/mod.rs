@@ -2,6 +2,7 @@ pub mod agent;
 pub mod nodes;
 pub mod policy;
 pub mod progress;
+pub mod settings;
 pub mod sidecar;
 
 #[cfg(test)]

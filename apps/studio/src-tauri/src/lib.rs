@@ -997,6 +997,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         ),
     )?;
     browser_settings.subscribe(tool_switch(tools.clone()));
+    if !browser_settings.enabled() {
+        skills.sync_feature("browser-use", false)?;
+    }
+    if !zvs_host::computer::settings::command_enabled(&database, "computer-use")? {
+        skills.sync_feature("computer-use", false)?;
+    }
     let browser_downloads = BrowserDownloads::new(Arc::clone(&database), clock.clone())
         .with_launcher(platform::file_launcher());
     workspace.attach_downloads(browser_settings.clone(), browser_downloads.clone());
@@ -1112,6 +1118,13 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         folders: Some(Arc::new(folders.clone())),
     });
     register_kernel_tools(&nodes, &tools)?;
+    for key in zvs_host::computer::COMPUTER_TOOLS {
+        tools.set_available(
+            key,
+            zvs_host::computer::settings::command_enabled(&database, "computer-use")?,
+        )?;
+    }
+
     let explorer = ExplorerService::new(folders.clone(), events.clone());
     let terminals = TerminalService::new(TerminalServiceOptions {
         folders: folders.clone(),

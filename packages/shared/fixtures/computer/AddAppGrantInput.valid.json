@@ -1,0 +1,21 @@
+[
+  {
+    "name": "multiple dialogs",
+    "value": {
+      "path": "C:\\Windows\\notepad.exe",
+      "scope": "conversation",
+      "conversations": [
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000002"
+      ]
+    }
+  },
+  {
+    "name": "permanent",
+    "value": {
+      "path": "C:\\Windows\\notepad.exe",
+      "scope": "always",
+      "conversations": []
+    }
+  }
+]

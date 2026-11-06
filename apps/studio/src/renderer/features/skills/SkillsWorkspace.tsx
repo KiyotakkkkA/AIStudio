@@ -40,7 +40,7 @@ import { PaneSkeleton } from "../../ui/organisms/PageSkeletons";
 import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function SkillsWorkspace() {
-  const { skills: store } = useStore();
+  const { skills: store, appSettings, browserSettings } = useStore();
   const form = store.form;
   const selected = store.selectedSkill;
   const update = selected?.update ?? null;
@@ -160,7 +160,12 @@ function SkillsWorkspace() {
                   <Toggle
                     label="Включён"
                     checked={store.selectedSkill.enabled}
-                    disabled={store.isSwitching(store.selectedSkill.id)}
+                    disabled={
+                      store.isSwitching(store.selectedSkill.id) ||
+                      (store.selectedSkill.key === "browser-use" && !browserSettings.enabled) ||
+                      (store.selectedSkill.key === "computer-use" &&
+                        !appSettings.values["computer.enabled"])
+                    }
                     onChange={(checked) => {
                       const skill = store.selectedSkill;
                       if (skill !== null) void store.setEnabled(skill.id, checked);

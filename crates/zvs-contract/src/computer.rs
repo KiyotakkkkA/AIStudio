@@ -5,7 +5,7 @@ use crate::chat::{CHAT_TEXT_MAX, ChatRoundDto, ChatToolCallDto};
 use crate::errors::AppError;
 use crate::events::ApprovalRequestDto;
 use crate::folders::{FOLDER_PATH_MAX, FolderAccessAnswer, FolderGrantChatDto, FolderGrantScope};
-use crate::ids::{RunId, is_wire_uuid};
+use crate::ids::{ConversationId, RunId, is_wire_uuid};
 use crate::primitives::Timestamp;
 use crate::validate::{Validate, check, invalid};
 
@@ -65,6 +65,27 @@ impl Validate for AppGrantDto {
         check::safe_integer("grantedAt", self.granted_at.unsigned_abs())?;
         if let Some(used) = self.last_used_at {
             check::safe_integer("lastUsedAt", used.unsigned_abs())?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddAppGrantInput {
+    pub path: String,
+    pub scope: FolderGrantScope,
+    pub conversations: Vec<ConversationId>,
+}
+
+impl Validate for AddAppGrantInput {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("path", &self.path)?;
+        check::max_len("path", &self.path, FOLDER_PATH_MAX)?;
+        if self.conversations.len() > 1000
+            || (self.scope == FolderGrantScope::Always) != self.conversations.is_empty()
+        {
+            return Err(invalid("conversations", "scope"));
         }
         Ok(())
     }

@@ -52,7 +52,12 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "browserSettings.set",
             |services: Arc<Services>, input: BrowserSettingsDto| async move {
-                services.browser_settings.set(&input)
+                let previous = services.browser_settings.enabled();
+                let saved = services.browser_settings.set(&input)?;
+                if previous != saved.enabled {
+                    services.skills.sync_feature("browser-use", saved.enabled)?;
+                }
+                Ok::<_, AppError>(saved)
             },
         )
         .handle(
@@ -123,6 +128,10 @@ mod tests {
     #[tokio::test]
     async fn turning_the_browser_off_hides_its_command_and_withdraws_its_tools() {
         let (host, server) = server();
+        host.skills
+            .library()
+            .install_bundled()
+            .expect("installs skills");
         host.tools
             .register(&ToolDescriptor::new(BROWSER_CLICK, ToolSource::Browser))
             .expect("registers");
@@ -151,6 +160,16 @@ mod tests {
             json!({ "ok": true, "data": { "enabled": false, "webLinks": "system", "localLinks": "studio", "fullUrl": true, "passwordAutosave": false, "formAutofill": true, "downloadDir": null, "askDownload": false } })
         );
         assert!(!commands(&host).contains(&"browser-use".to_owned()));
+        let skill = host
+            .skills
+            .list()
+            .expect("lists")
+            .into_iter()
+            .find(|skill| skill.key == "browser-use")
+            .expect("skill");
+        assert!(!skill.enabled);
+        assert!(host.skills.set_enabled(&skill.id, true).is_err());
+        assert!(crate::skills::SkillCatalogue::command(&host.skills, "browser-use").is_none());
         let click = host
             .tools
             .find_by_key(BROWSER_CLICK)
@@ -170,5 +189,6 @@ mod tests {
                 .expect("registered")
                 .available
         );
+        assert!(host.skills.get(&skill.id).expect("reads").skill.enabled);
     }
 }

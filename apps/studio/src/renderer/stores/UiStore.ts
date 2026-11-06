@@ -64,6 +64,7 @@ export const PREFERENCE_SECTIONS = [
   "cli",
   "voice",
   "browser",
+  "device",
 ] as const;
 export type PreferenceSection = (typeof PREFERENCE_SECTIONS)[number];
 

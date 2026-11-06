@@ -128,9 +128,9 @@ pub use cli::{
     CliSessionDto, CliTheme, CliThemeDto, cli_pipe_name,
 };
 pub use computer::{
-    APPS_APPROVAL_KIND, AnswerAppRequestInput, AppGrantDto, AppGrantRef, AppGrantsListOutput,
-    ComputerAction, ComputerActionState, ComputerAppDto, ComputerApproval, ComputerCommand,
-    ComputerDisplay, ComputerFeed, ComputerPointer, ComputerState, ComputerStatus,
+    APPS_APPROVAL_KIND, AddAppGrantInput, AnswerAppRequestInput, AppGrantDto, AppGrantRef,
+    AppGrantsListOutput, ComputerAction, ComputerActionState, ComputerAppDto, ComputerApproval,
+    ComputerCommand, ComputerDisplay, ComputerFeed, ComputerPointer, ComputerState, ComputerStatus,
 };
 pub use documents::{
     DOCUMENT_BYTES_DATA_MAX, DOCUMENT_BYTES_PAGE_MAX, DOCUMENT_LIST_MAX, DOCUMENT_PATH_MAX,

@@ -64,7 +64,7 @@ const BrowserSwitch = observer(function BrowserSwitch() {
       <Toggle
         label={enabled ? TOGGLE_ON : TOGGLE_OFF}
         checked={enabled}
-        disabled={!browserSettings.loaded}
+        disabled={!browserSettings.loaded || browserSettings.saving}
         onChange={(value) => void browserSettings.update({ enabled: value })}
       />
     </div>

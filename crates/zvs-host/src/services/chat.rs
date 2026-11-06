@@ -815,11 +815,13 @@ impl Inner {
     }
 
     fn command_usable(&self, command: ChatCommand) -> bool {
-        command != ChatCommand::BrowserUse
-            || self
-                .browser
-                .as_ref()
-                .is_none_or(crate::browser::BrowserSettings::enabled)
+        crate::computer::settings::command_enabled(&self.database, command.as_str())
+            .unwrap_or(false)
+            && (command != ChatCommand::BrowserUse
+                || self
+                    .browser
+                    .as_ref()
+                    .is_none_or(crate::browser::BrowserSettings::enabled))
     }
 
     fn usable_commands(&self, commands: Vec<ChatCommand>) -> Vec<ChatCommand> {

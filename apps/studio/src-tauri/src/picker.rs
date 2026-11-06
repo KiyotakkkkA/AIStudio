@@ -46,6 +46,21 @@ impl PickerPort for DialogPicker {
         Ok(paths.into_iter().filter_map(path_text).collect())
     }
 
+    async fn pick_executable(&self) -> Result<Option<String>, AppError> {
+        let (sender, receiver) = oneshot::channel();
+        let mut dialog = self.0.dialog().file().add_filter("Приложения", &["exe"]);
+        if let Some(studio) = self.0.get_window(window::STUDIO) {
+            dialog = dialog.set_parent(&studio);
+        }
+        dialog.pick_file(move |path| {
+            let _ = sender.send(path);
+        });
+        let path = receiver
+            .await
+            .map_err(|_| AppError::new(AppErrorCode::Unknown, PICKER_CLOSED))?;
+        Ok(path.and_then(path_text))
+    }
+
     async fn pick_images(&self) -> Result<Vec<String>, AppError> {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         let mut dialog = self

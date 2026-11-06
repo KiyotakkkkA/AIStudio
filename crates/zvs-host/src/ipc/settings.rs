@@ -35,9 +35,21 @@ pub fn register(server: &mut IpcServer) {
                 if input.key == EXEC_POLICY_KEY || input.key == SUBAGENTS_KEY {
                     return Err(invalid("key", "reserved"));
                 }
+                if input.key == crate::computer::settings::COMPUTER_ENABLED_KEY
+                    && !input.value.is_boolean()
+                {
+                    return Err(invalid("value", "type"));
+                }
                 check_setting(&input.key, &input.value)?;
                 services.notifications.apply(&input.key, &input.value)?;
                 let result = services.settings.set(&input.key, &input.value)?;
+                if input.key == crate::computer::settings::COMPUTER_ENABLED_KEY {
+                    let enabled = input.value.as_bool().unwrap_or(true);
+                    services.skills.sync_feature("computer-use", enabled)?;
+                    for key in crate::computer::COMPUTER_TOOLS {
+                        services.tools.set_available(key, enabled)?;
+                    }
+                }
                 if is_health_check_key(&input.key) {
                     services.health.stop();
                     services.health.start();
@@ -78,6 +90,73 @@ mod tests {
             IpcServer::new(host.shared(), silent_logger()).with_output_validation(true);
         register(&mut server);
         (host, server)
+    }
+
+    #[tokio::test]
+    async fn device_switch_blocks_and_restores_the_command_skill_and_tools() {
+        use crate::skills::SkillCatalogue;
+        let (host, server) = server();
+        host.skills
+            .library()
+            .install_bundled()
+            .expect("installs skills");
+        host.tools
+            .register(&crate::tools::ToolDescriptor::new(
+                "computer.screenshot",
+                zvs_contract::ToolSource::Builtin,
+            ))
+            .expect("registers");
+        assert!(
+            host.chat
+                .commands()
+                .iter()
+                .any(|item| item.command == zvs_contract::ChatCommand::ComputerUse)
+        );
+        for enabled in [false, true] {
+            let response = server
+                .dispatch(
+                    "settings.set",
+                    json!({"key": "computer.enabled", "value": enabled}),
+                )
+                .await;
+            assert_eq!(response["ok"], json!(true));
+            assert_eq!(
+                host.chat
+                    .commands()
+                    .iter()
+                    .any(|item| item.command == zvs_contract::ChatCommand::ComputerUse),
+                enabled
+            );
+            let skill = host
+                .skills
+                .list()
+                .expect("lists")
+                .into_iter()
+                .find(|skill| skill.key == "computer-use")
+                .expect("skill");
+            assert_eq!(skill.enabled, enabled);
+            assert_eq!(host.skills.command("computer-use").is_some(), enabled);
+            assert_eq!(
+                host.tools
+                    .find_by_key("computer.screenshot")
+                    .expect("reads")
+                    .expect("registered")
+                    .available,
+                enabled
+            );
+            if !enabled {
+                assert!(host.skills.set_enabled(&skill.id, true).is_err());
+            }
+        }
+        assert_eq!(
+            server
+                .dispatch(
+                    "settings.set",
+                    json!({"key": "computer.enabled", "value": "false"})
+                )
+                .await["ok"],
+            json!(false)
+        );
     }
 
     #[tokio::test]
