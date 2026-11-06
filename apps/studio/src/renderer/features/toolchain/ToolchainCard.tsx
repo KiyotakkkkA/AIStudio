@@ -41,7 +41,7 @@ export default function ToolchainCard({ dto, busy, error, onAction }: ToolchainC
   return (
     <section
       aria-label={dto.displayName}
-      className="flex flex-col gap-3 rounded-card border border-line bg-main-900 px-4 py-3.5"
+      className="flex flex-col gap-3 rounded-card bg-main-850 px-4 py-3.5"
     >
       <header className="flex items-center gap-3">
         <span className="flex size-9 flex-none items-center justify-center rounded-control bg-main-700 text-main-300">

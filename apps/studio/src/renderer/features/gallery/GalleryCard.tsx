@@ -158,7 +158,7 @@ const CardMenu = observer(function CardMenu({
   readonly onRemove: () => void;
   readonly onApprove: () => void;
 }) {
-  const { viewer } = useStore();
+  const { viewer, browserSettings } = useStore();
   const actions = store.actions;
   const page = opensAsPage(item.format);
   const viewable = viewerCanShow(item.format);
@@ -184,7 +184,7 @@ const CardMenu = observer(function CardMenu({
       />
       <ActionMenu label={GALLERY_ACTIONS}>
         <ActionSubmenu icon={mdiOpenInNew} label={GALLERY_OPEN}>
-          {page ? (
+          {page && browserSettings.enabled ? (
             <ActionMenuItem
               icon={mdiApplicationOutline}
               onClick={() => void actions.openInApp(item.id)}

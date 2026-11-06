@@ -23,6 +23,8 @@
   "artifacts.save",
   "browserGrants.list",
   "browserGrants.revoke",
+  "browserSettings.get",
+  "browserSettings.set",
   "chat.answer",
   "chat.attach",
   "chat.bindFolder",

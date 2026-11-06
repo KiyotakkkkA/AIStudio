@@ -11,6 +11,7 @@ import {
   type ThemeMode,
 } from "../../stores/UiStore";
 import { VOICE_INPUT } from "../voice/voiceCopy";
+import { BROWSER_SECTION_HINT } from "../browser/browserSettingsCopy";
 import type { AppSettingKey } from "./AppSettingsStore";
 
 export const APP_NAME = "ZVS AI Studio";
@@ -37,6 +38,7 @@ export const SECTION_LABELS: Record<PreferenceSection, string> = {
   components: "Компоненты",
   voice: VOICE_INPUT,
   cli: "CLI",
+  browser: "Браузер",
 };
 
 export const EXTENSIONS_GROUP = "Расширения";
@@ -49,7 +51,7 @@ export const PREFERENCE_GROUPS: readonly {
     label: PREFERENCES_GROUP,
     sections: ["general", "profile", "appearance", "notifications", "memory", "data", "about"],
   },
-  { label: EXTENSIONS_GROUP, sections: ["components", "voice", "cli"] },
+  { label: EXTENSIONS_GROUP, sections: ["components", "voice", "cli", "browser"] },
 ];
 
 export const SECTION_HINTS: Record<PreferenceSection, string> = {
@@ -63,6 +65,7 @@ export const SECTION_HINTS: Record<PreferenceSection, string> = {
   components: "Среды выполнения для MCP-серверов.",
   cli: "Настройка утилиты командной строки.",
   voice: "Настройка распознавания голоса и управление голосовым вводом.",
+  browser: BROWSER_SECTION_HINT,
 };
 
 export const TOGGLE_ON = "Включено";

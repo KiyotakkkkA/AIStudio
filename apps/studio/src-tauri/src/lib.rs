@@ -23,7 +23,7 @@ use zvs_host::artifacts::{ArtifactStore, DASHBOARDS};
 use zvs_host::background::{BackgroundShellOptions, BackgroundShells, register_background_nodes};
 use zvs_host::browser::{
     AgentControls, Browser as BrowserTools, BrowserAgent, BrowserGrants, BrowserLifecycle,
-    profile_dir, register_browser_nodes, setting_limit,
+    BrowserSettings, RoutedPages, profile_dir, register_browser_nodes, setting_limit, tool_switch,
 };
 use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::computer::{
@@ -512,6 +512,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         toaster,
     ));
     let settings = SettingService::new(Arc::clone(&database), clock.clone());
+    let browser_settings = BrowserSettings::new(settings.clone());
     apply_theme_source(
         settings
             .get(THEME_SETTING_KEY)?
@@ -635,7 +636,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             Arc::clone(&database),
             Arc::clone(&secrets),
             sessions,
-            Arc::new(WorkspaceOpener(workspace.clone())),
+            Arc::new(WorkspaceOpener(workspace.clone(), browser_settings.clone())),
             browser_events.clone(),
             events.clone(),
             navigator,
@@ -854,9 +855,17 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         .with_picker(Arc::clone(&picker))
         .with_launcher(platform::file_launcher())
         .with_thumbnails(paths.cache_dir.join("gallery"))
-        .with_pages(Arc::new(WorkspacePages(workspace.clone())));
+        .with_pages(Arc::new(RoutedPages::new(
+            Arc::new(WorkspacePages(workspace.clone())),
+            zvs_host::platform::external::system_url_opener(),
+            browser_settings.clone(),
+        )));
     let sites = zvs_host::sites::SiteService::new(zvs_host::sites::SiteServiceOptions {
-        pages: Some(Arc::new(WorkspacePages(workspace.clone()))),
+        pages: Some(Arc::new(RoutedPages::new(
+            Arc::new(WorkspacePages(workspace.clone())),
+            zvs_host::platform::external::system_url_opener(),
+            browser_settings.clone(),
+        ))),
         ..zvs_host::sites::SiteServiceOptions::default()
     });
     let roots = VirtualRoots::new(Some(artifacts.clone()), Some(skill_library.clone()));
@@ -986,6 +995,16 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             clock.clone(),
         ),
     )?;
+    browser_settings.subscribe(tool_switch(tools.clone()));
+    {
+        let workspace = workspace.clone();
+        browser_settings.subscribe(Arc::new(move |current| {
+            workspace.set_full_url(current.full_url);
+            if !current.enabled {
+                workspace.hide();
+            }
+        }));
+    }
     let computer_agent = {
         let toolchain = toolchain.clone();
         ComputerAgent::new(
@@ -1037,7 +1056,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             Arc::new(GitHostingProvider::gitlab(http.client().clone()).with_clock(clock.clone())),
         ],
         approvals: Some(runs.approvals()),
-        opener: Some(workspace_url_opener(&workspace)),
+        opener: Some(workspace_url_opener(&workspace, browser_settings.clone())),
         events: Some(events.clone()),
         ..IntegrationServiceOptions::new(
             Arc::clone(&database),
@@ -1048,6 +1067,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         )
     })?;
     let chat = ChatService::new(ChatServiceOptions {
+        browser: Some(browser_settings.clone()),
         images: Some(zvs_host::images::ImageLoader::new(artifacts.clone())),
         tools: Some(tools.clone()),
         skills: Some(Arc::new(skills.clone())),
@@ -1278,6 +1298,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         exec_policy,
         subagents,
         browser: agent.clone(),
+        browser_settings,
         computer: computer_agent.clone(),
         folders,
         picker: Some(picker),

@@ -548,7 +548,9 @@ pub fn test_services(system: SystemService) -> TestServices {
     crate::agentic::register_agentic_nodes(&nodes, agentic.store(), tools.clone())
         .expect("registers the agentic node");
     let subagents = crate::services::SubagentService::new(database.shared(), clock.clone());
+    let browser_settings = crate::browser::BrowserSettings::new(settings.clone());
     let chat = crate::services::ChatService::new(crate::services::ChatServiceOptions {
+        browser: Some(browser_settings.clone()),
         images: Some(crate::images::ImageLoader::new(test_artifacts(
             workspace.join("conversations"),
         ))),
@@ -671,6 +673,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             exec_policy,
             subagents,
             browser: crate::browser::BrowserAgent::new(clock.clone()),
+            browser_settings,
             computer: crate::computer::ComputerAgent::new(
                 Arc::new(crate::computer::sidecar::NoDesktop),
                 database.shared(),

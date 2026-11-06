@@ -133,9 +133,16 @@ pub struct Model {
     bounds: BrowserBounds,
     zoom: Option<f64>,
     appearance: BrowserAppearance,
+    full_url: bool,
 }
 
 impl Model {
+    pub fn set_full_url(&mut self, full_url: bool) -> bool {
+        let changed = self.full_url != full_url;
+        self.full_url = full_url;
+        changed
+    }
+
     pub fn set_theme(&mut self, theme: BrowserTheme) -> bool {
         let changed = self.appearance.theme != theme;
         self.appearance.theme = theme;
@@ -323,6 +330,7 @@ impl Model {
             agent_visible: self.agent_visible,
             agent: Box::default(),
             appearance: self.appearance.clone(),
+            full_url: self.full_url,
         }
     }
 

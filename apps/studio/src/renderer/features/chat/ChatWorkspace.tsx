@@ -12,7 +12,7 @@ import { JUDGE_ROW } from "../execPolicy/execPolicyCopy";
 import { VOICE_DEVICE_ROW } from "../voice/voiceCopy";
 
 export default observer(function ChatWorkspace() {
-  const { chat, viewer, execPolicy, ui, voice } = useStore();
+  const { chat, viewer, execPolicy, ui, voice, browserSettings } = useStore();
   useEffect(() => {
     void chat.mount();
     return chat.unmount;
@@ -42,7 +42,7 @@ export default observer(function ChatWorkspace() {
           setup: () => ui.revealPreference("voice", VOICE_DEVICE_ROW.key),
         }}
       />
-      {chat.activePanel === "browser" && !viewer.isOpen ? (
+      {chat.activePanel === "browser" && browserSettings.enabled && !viewer.isOpen ? (
         chat.panelOpen ? (
           <ChatBrowserDock store={chat} />
         ) : null

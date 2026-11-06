@@ -1757,6 +1757,26 @@ The window is a kernel front-end like any other: a browser session is a **Run**,
 renders. An approval request is the same `approval` event the Agentic Build page uses (§7,
 §11). Nothing here is a parallel mechanism.
 
+### Preferences (2026-11-06)
+
+«Параметры» → «Расширения» → «Браузер» owns the browser's switches, through `browserSettings.get`
+and `browserSettings.set` (`BrowserSettingsDto`, stored as the one setting `browser.settings`;
+`zvs-host/src/browser/settings.rs`). A missing or damaged field falls back to its default.
+
+- **The switch** (`enabled`, default on). Off is enforced by the host, not by hiding: every
+  `browser.*` tool is marked unavailable in the registry (admission refuses it, chats do not offer
+  it), `chat.commands` drops `/browser-use` and an older dialog's active `/browser-use` stops
+  counting, the shell refuses to mount the workspace and hides it, and an account login, which
+  needs the work profile, is refused with a message that points at the switch. Linked accounts
+  keep working through the gateway's hidden webviews. The renderer hides the rail item, the
+  `/browser` route, the chat dock and its toggle, and «Открыть во встроенном браузере».
+- **Links** (`webLinks`, `localLinks`: `studio` | `system`). `RoutedPages` decides where
+  `sites.open` and the artifact page opener go: loopback hosts (`localhost`, `*.localhost`,
+  `127.0.0.0/8`, `::1`, `0.0.0.0`) follow `localLinks`, everything else `webLinks`, and a disabled
+  browser sends both to the system browser. Plugin sign-in pages follow the switch alone.
+- **Full URL** (`fullUrl`, default off). The chrome shows only the host until the address bar is
+  focused.
+
 ## 22. Computer use (D14)
 
 `/computer-use` (`ChatCommand::ComputerUse`) lets a dialog operate the user's own desktop. The

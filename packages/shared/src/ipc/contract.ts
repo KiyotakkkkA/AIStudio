@@ -44,6 +44,7 @@ import {
 } from "../chat.js";
 import { AnswerFolderRequestInput, FolderGrantDto, FolderGrantRef } from "../folders.js";
 import { BrowserGrantDto, BrowserGrantRef } from "../browser.js";
+import { BrowserSettingsDto } from "../browserSettings.js";
 import { AnswerAppRequestInput, AppGrantDto, AppGrantRef } from "../computer.js";
 import { ChatAnswerInput, ChatSkipInput } from "../questions.js";
 import {
@@ -339,6 +340,8 @@ export const contract = defineContract({
   "computer.revoke": { input: AppGrantRef, output: z.void() },
   "computer.answer": { input: AnswerAppRequestInput, output: z.void() },
   "browserGrants.revoke": { input: BrowserGrantRef, output: z.void() },
+  "browserSettings.get": { input: z.void(), output: BrowserSettingsDto },
+  "browserSettings.set": { input: BrowserSettingsDto, output: BrowserSettingsDto },
   "agentic.list": { input: z.void(), output: z.array(AgenticSessionDto) },
   "agentic.get": { input: AgenticSessionRef, output: AgenticSessionDto },
   "agentic.create": { input: CreateAgenticSessionInput, output: AgenticSessionDto },

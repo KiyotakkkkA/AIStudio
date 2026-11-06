@@ -21,6 +21,7 @@ import * as documents from "../src/documents.js";
 import * as artifacts from "../src/artifacts.js";
 import * as sites from "../src/sites.js";
 import * as execPolicy from "../src/execPolicy.js";
+import * as browserSettings from "../src/browserSettings.js";
 import * as subagents from "../src/subagents.js";
 import * as cli from "../src/cli.js";
 import * as voice from "../src/voice.js";
@@ -312,6 +313,8 @@ const schemas: Record<string, z.ZodType> = {
   "sites/OpenSiteInput": sites.OpenSiteInput,
   "sites/SiteIconInput": sites.SiteIconInput,
   "sites/SiteIconDto": sites.SiteIconDto,
+  "browserSettings/BrowserLinkTarget": browserSettings.BrowserLinkTarget,
+  "browserSettings/BrowserSettingsDto": browserSettings.BrowserSettingsDto,
   "execPolicy/ExecMode": execPolicy.ExecMode,
   "execPolicy/ExecJudgeDto": execPolicy.ExecJudgeDto,
   "execPolicy/ExecPolicyDto": execPolicy.ExecPolicyDto,

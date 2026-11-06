@@ -228,6 +228,12 @@ impl BrowserWorkspace {
         }
     }
 
+    pub fn set_full_url(&self, full_url: bool) {
+        if lock(&self.0.model).set_full_url(full_url) {
+            self.post(Work::Publish);
+        }
+    }
+
     pub fn set_palette(&self, mode: PaletteMode, id: &str) {
         if lock(&self.0.model).set_palette(mode, id) {
             self.post(Work::Publish);

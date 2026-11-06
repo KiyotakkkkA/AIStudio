@@ -182,6 +182,7 @@ pub struct ChatServiceOptions {
     pub clock: SharedClock,
     pub wake_delay: std::time::Duration,
     pub images: Option<crate::images::ImageLoader>,
+    pub browser: Option<crate::browser::BrowserSettings>,
 }
 
 impl ChatServiceOptions {
@@ -201,6 +202,7 @@ impl ChatServiceOptions {
             clock: Arc::new(SystemClock),
             wake_delay: WAKE_DELAY,
             images: None,
+            browser: None,
         }
     }
 }
@@ -232,6 +234,7 @@ struct Inner {
     wake_delay: std::time::Duration,
     queues: queue::Queues,
     images: Option<crate::images::ImageLoader>,
+    browser: Option<crate::browser::BrowserSettings>,
 }
 
 #[derive(Clone)]
@@ -809,6 +812,21 @@ impl Inner {
             plugins,
             loaded: &loaded_keys(history),
         })
+    }
+
+    fn command_usable(&self, command: ChatCommand) -> bool {
+        command != ChatCommand::BrowserUse
+            || self
+                .browser
+                .as_ref()
+                .is_none_or(crate::browser::BrowserSettings::enabled)
+    }
+
+    fn usable_commands(&self, commands: Vec<ChatCommand>) -> Vec<ChatCommand> {
+        commands
+            .into_iter()
+            .filter(|command| self.command_usable(*command))
+            .collect()
     }
 
     fn command_note(
@@ -1601,7 +1619,7 @@ impl NodeDef for PrepareNode {
             (Some(skills), true) => skills.catalogue(&user.content, &context.cancel).await,
             _ => Vec::new(),
         };
-        let commands = active_commands(&conversation.messages[..=position]);
+        let commands = inner.usable_commands(active_commands(&conversation.messages[..=position]));
         let plugins = active_plugins(&conversation.messages[..=position]);
         let goal_turn = user.commands.contains(&ChatCommand::Goal)
             && details.goal.as_ref().is_some_and(ChatGoalDto::active);
@@ -2749,6 +2767,7 @@ impl ChatService {
         });
         let inner = Arc::new(Inner {
             images: options.images,
+            browser: options.browser,
             database: options.database,
             tools: options.tools,
             skills: options.skills,
@@ -2935,6 +2954,7 @@ impl ChatService {
     pub fn commands(&self) -> Vec<ChatCommandDto> {
         ChatCommand::ALL
             .iter()
+            .filter(|command| self.inner.command_usable(**command))
             .map(|command| ChatCommandDto {
                 command: *command,
                 description: command_description(*command).to_owned(),
@@ -3621,6 +3641,7 @@ impl ChatService {
                 commands.push(*command);
             }
         }
+        let commands = self.inner.usable_commands(commands);
         let mut plugins = active_plugins(&messages);
         for plugin in &input.plugins {
             let plugin = plugin.to_string();

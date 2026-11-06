@@ -1,0 +1,20 @@
+[
+  {
+    "name": "unknown link target",
+    "value": {
+      "enabled": true,
+      "webLinks": "chrome",
+      "localLinks": "studio",
+      "fullUrl": false
+    }
+  },
+  {
+    "name": "enabled is not a boolean",
+    "value": {
+      "enabled": "yes",
+      "webLinks": "studio",
+      "localLinks": "studio",
+      "fullUrl": false
+    }
+  }
+]

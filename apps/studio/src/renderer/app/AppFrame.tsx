@@ -5,7 +5,7 @@ import { Outlet } from "react-router-dom";
 import { useAppNavigation } from "../hooks/useAppNavigation";
 import { useStore } from "../stores/useStore";
 import NavRail from "../ui/organisms/NavRail";
-import { NAV_GROUPS, RAIL_IDENTITY } from "./navigation";
+import { RAIL_IDENTITY, visibleNavGroups } from "./navigation";
 import type { NavItemModel } from "../ui/organisms/NavRailTypes";
 import AppShell from "../ui/templates/AppShell";
 import { ConversationId, HostEvent, NAVIGATION_STEP_DOMAIN } from "@zvs/shared";
@@ -14,13 +14,14 @@ import PreferencesDialog from "../features/preferences/PreferencesDialog";
 import { FxContext } from "../ui/motion/fx";
 
 function AppFrame() {
-  const { ui, chat, appSettings } = useStore();
+  const { ui, chat, appSettings, browserSettings } = useStore();
   const navigation = useAppNavigation();
   const restoredOnce = useRef(false);
 
   const follow = useCallback(
     (path: unknown, conversationId?: unknown) => {
-      if (path === ROUTES.browser || path === ROUTES.providers) navigation.go(path);
+      if (path === ROUTES.browser && browserSettings.enabled) navigation.go(path);
+      if (path === ROUTES.providers) navigation.go(path);
       if (path === ROUTES.downloads) {
         ui.closePreferences();
         navigation.go(path);
@@ -32,7 +33,7 @@ function AppFrame() {
         if (conversation.success) void chat.open(conversation.data);
       }
     },
-    [navigation, ui, chat],
+    [navigation, ui, chat, browserSettings],
   );
 
   useEffect(
@@ -51,12 +52,13 @@ function AppFrame() {
     restoredOnce.current = true;
     navigation.replace(ui.activeRoute);
     void appSettings.load();
+    void browserSettings.load();
     void appSettings.takePendingTarget().then((target) => {
       if (target?.kind === "conversation") follow(ROUTES.chat, target.conversationId);
       if (target?.kind === "downloads") follow(ROUTES.downloads);
       if (target?.kind === "scenarios") follow(ROUTES.scenarios);
     });
-  }, [ui.restored, ui.activeRoute, navigation, appSettings, follow]);
+  }, [ui.restored, ui.activeRoute, navigation, appSettings, browserSettings, follow]);
 
   const fx = useMemo(() => ({ motion: ui.motion, effects: ui.effects }), [ui.motion, ui.effects]);
 
@@ -87,7 +89,7 @@ function AppFrame() {
         <AppShell
           rail={
             <NavRail
-              groups={NAV_GROUPS}
+              groups={visibleNavGroups(browserSettings.enabled)}
               identity={RAIL_IDENTITY}
               collapsed={ui.railCollapsed}
               theme={ui.theme}

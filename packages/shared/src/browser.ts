@@ -123,6 +123,7 @@ export interface BrowserState {
   agentVisible: boolean;
   agent: BrowserAgentState;
   appearance: BrowserAppearance;
+  fullUrl: boolean;
 }
 
 export interface BrowserCookie {

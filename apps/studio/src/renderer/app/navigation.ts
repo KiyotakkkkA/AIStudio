@@ -86,6 +86,14 @@ export const NAV_GROUPS: readonly NavGroupModel[] = [
   },
 ];
 
+export function visibleNavGroups(browser: boolean): readonly NavGroupModel[] {
+  if (browser) return NAV_GROUPS;
+  return NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => item.id !== BROWSER_NAV_ID),
+  }));
+}
+
 export const RAIL_IDENTITY: RailIdentity = {
   initials: "ZV",
   name: "Локальный профиль",

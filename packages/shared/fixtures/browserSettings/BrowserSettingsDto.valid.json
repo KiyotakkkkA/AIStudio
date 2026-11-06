@@ -1,0 +1,20 @@
+[
+  {
+    "name": "defaults",
+    "value": {
+      "enabled": true,
+      "webLinks": "studio",
+      "localLinks": "studio",
+      "fullUrl": false
+    }
+  },
+  {
+    "name": "disabled browser opens links in the system browser",
+    "value": {
+      "enabled": false,
+      "webLinks": "system",
+      "localLinks": "system",
+      "fullUrl": true
+    }
+  }
+]

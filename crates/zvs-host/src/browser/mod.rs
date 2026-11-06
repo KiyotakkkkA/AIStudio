@@ -8,6 +8,7 @@ pub mod network;
 pub mod nodes;
 pub mod page;
 pub mod policy;
+pub mod settings;
 
 #[cfg(test)]
 mod tests;
@@ -25,4 +26,8 @@ pub use policy::{
     AGENT_PANEL_WIDTH, APPROVAL_HEIGHT, BROWSER_PARTITION, CHROME_HEIGHT, DEVTOOLS_SHARE,
     NAVIGATION_BLOCKED, ONLY_WEB_ADDRESSES, PROFILE_DIR, STATUS_HEIGHT, TAB_LIMIT, devtools_height,
     is_web_url, navigation_url, profile_dir,
+};
+pub use settings::{
+    ACCOUNT_NEEDS_BROWSER, BROWSER_DISABLED, BrowserSettings, RoutedPages, SettingsListener,
+    is_local_url, routed_url_opener, tool_switch,
 };

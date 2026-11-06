@@ -68,6 +68,7 @@ import ChatStatsView from "./stats/ChatStatsView";
 import { STATS_EXPORT_GROUP, STATS_TOGGLE } from "./stats/chatStatsCopy";
 import PluginMark from "../plugins/PluginMark";
 import { pluginChipLabel } from "../plugins/pluginPresentation";
+import { useStore } from "../../stores/useStore";
 
 export default observer(function ChatThread({
   store,
@@ -78,6 +79,7 @@ export default observer(function ChatThread({
   readonly policy?: ExecPolicyBinding;
   readonly voice?: VoiceBinding;
 }) {
+  const { browserSettings } = useStore();
   const viewport = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
@@ -218,12 +220,14 @@ export default observer(function ChatThread({
               onClick={() => store.showPanel("files")}
             />
           )}
-          <PanelButton
-            label={BROWSER_PANEL}
-            path={mdiWeb}
-            active={store.isPanelShown("browser")}
-            onClick={() => store.showPanel("browser")}
-          />
+          {browserSettings.enabled ? (
+            <PanelButton
+              label={BROWSER_PANEL}
+              path={mdiWeb}
+              active={store.isPanelShown("browser")}
+              onClick={() => store.showPanel("browser")}
+            />
+          ) : null}
         </div>
         <div
           role="group"

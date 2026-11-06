@@ -60,7 +60,13 @@ async fn browser_channel<R: Runtime>(
     else {
         return Some(Err(NO_WORKSPACE.to_owned()));
     };
-    let result = if channel == BROWSER_MOUNT {
+    let disabled = webview
+        .app_handle()
+        .try_state::<Host>()
+        .is_some_and(|host| !host.services.browser_settings.enabled());
+    let result = if channel == BROWSER_MOUNT && disabled {
+        Err(zvs_host::browser::BROWSER_DISABLED.to_owned())
+    } else if channel == BROWSER_MOUNT {
         match parse::<BrowserBounds>(payload) {
             Ok(bounds) => blocking(move || workspace.mount(bounds)).await,
             Err(_) => Err(INVALID_BOUNDS.to_owned()),

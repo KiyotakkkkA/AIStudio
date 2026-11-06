@@ -11,6 +11,16 @@ import { CLI_SETTING_ID, CLI_THEME_LABEL, CLI_THEME_SETTING_ID, CLI_TITLE } from
 import { STORAGE_CLEAR_CACHE, STORAGE_CLEAR_ID } from "./storageCopy";
 import { VOICE_DEVICE_ROW, VOICE_MODEL_ROW } from "../voice/voiceCopy";
 import {
+  BROWSER_ENABLED_ID,
+  BROWSER_ENABLED_LABEL,
+  FULL_URL_ID,
+  FULL_URL_LABEL,
+  LOCAL_LINKS_ID,
+  LOCAL_LINKS_LABEL,
+  WEB_LINKS_ID,
+  WEB_LINKS_LABEL,
+} from "../browser/browserSettingsCopy";
+import {
   APP_ROW_LABELS,
   CLI_ROW_LABELS,
   FONT_FAMILY_LABEL,
@@ -117,6 +127,10 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: CLI_THEME_SETTING_ID, section: "cli", label: CLI_THEME_LABEL },
   { id: VOICE_DEVICE_ROW.key, section: "voice", label: VOICE_DEVICE_ROW.label },
   { id: VOICE_MODEL_ROW.key, section: "voice", label: VOICE_MODEL_ROW.label },
+  { id: BROWSER_ENABLED_ID, section: "browser", label: BROWSER_ENABLED_LABEL },
+  { id: WEB_LINKS_ID, section: "browser", label: WEB_LINKS_LABEL },
+  { id: LOCAL_LINKS_ID, section: "browser", label: LOCAL_LINKS_LABEL },
+  { id: FULL_URL_ID, section: "browser", label: FULL_URL_LABEL },
   ...Object.values(APP_ROW_LABELS).map((label) => ({
     id: aboutSettingId("app", label),
     section: "about" as const,

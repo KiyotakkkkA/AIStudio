@@ -2,6 +2,7 @@ pub mod accounts;
 pub mod agentic;
 pub mod artifacts;
 pub mod browser_grants;
+pub mod browser_settings;
 pub mod chat;
 pub mod cli;
 pub mod computer;
@@ -66,6 +67,7 @@ pub fn register(server: &mut IpcServer) {
     documents::register(server);
     artifacts::register(server);
     browser_grants::register(server);
+    browser_settings::register(server);
     computer::register(server);
     storage::register(server);
     voice::register(server);
@@ -124,6 +126,8 @@ mod tests {
                 "artifacts.save",
                 "browserGrants.list",
                 "browserGrants.revoke",
+                "browserSettings.get",
+                "browserSettings.set",
                 "chat.answer",
                 "chat.attach",
                 "chat.bindFolder",

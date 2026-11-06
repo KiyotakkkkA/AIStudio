@@ -17,7 +17,7 @@ import { ListSkeleton } from "../../ui/organisms/PageSkeletons";
 import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
 
 function AccountsTab() {
-  const { accounts } = useStore();
+  const { accounts, browserSettings, ui } = useStore();
   const navigation = useAppNavigation();
   const linking = accounts.linking;
   const now = Date.now();
@@ -29,7 +29,8 @@ function AccountsTab() {
   }, [accounts]);
 
   const openSites = (): void => {
-    navigation.go(ROUTES.browser);
+    if (browserSettings.enabled) navigation.go(ROUTES.browser);
+    else ui.openPreferences("browser");
   };
 
   return (

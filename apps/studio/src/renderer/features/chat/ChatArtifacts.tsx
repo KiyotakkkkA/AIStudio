@@ -38,7 +38,7 @@ const OpenMenu = observer(function OpenMenu({
   readonly actions: ArtifactActions;
   readonly disabled: boolean;
 }) {
-  const { viewer } = useStore();
+  const { viewer, browserSettings } = useStore();
   const viewable = viewerCanShow(artifact.format);
   const page = opensAsPage(artifact.format);
   return (
@@ -75,7 +75,7 @@ const OpenMenu = observer(function OpenMenu({
               </ActionMenuItem>
             ))
           : null}
-        {page ? (
+        {page && browserSettings.enabled ? (
           <ActionMenuItem
             icon={mdiApplicationOutline}
             onClick={() => void actions.openInApp(artifact.id)}

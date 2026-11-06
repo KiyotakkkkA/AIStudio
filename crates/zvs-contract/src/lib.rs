@@ -3,6 +3,7 @@ pub mod agentic;
 pub mod ai;
 pub mod artifacts;
 pub mod browser;
+pub mod browser_settings;
 pub mod channels;
 pub mod chat;
 pub mod cli;
@@ -84,6 +85,7 @@ pub use browser::{
     BrowserNetworkLog, BrowserNetworkSaved, BrowserRequestState, BrowserSecurity, BrowserSiteGrant,
     BrowserState, BrowserTab, BrowserTheme,
 };
+pub use browser_settings::{BrowserLinkTarget, BrowserSettingsDto};
 pub use channels::{CHANNELS, is_channel};
 pub use chat::{
     BranchConversationInput, ChatAttachDto, ChatAttachInput, ChatAttachOutput, ChatCarriedKind,

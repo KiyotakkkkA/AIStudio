@@ -1174,6 +1174,14 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ExecJudgeDto>,
     ),
     (
+        "browserSettings/BrowserLinkTarget",
+        round_trip::<zvs_contract::BrowserLinkTarget>,
+    ),
+    (
+        "browserSettings/BrowserSettingsDto",
+        round_trip::<zvs_contract::BrowserSettingsDto>,
+    ),
+    (
         "execPolicy/ExecPolicyDto",
         round_trip::<zvs_contract::ExecPolicyDto>,
     ),

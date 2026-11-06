@@ -39,6 +39,7 @@ import {
   STATUS_TONES,
 } from "./agentCopy";
 import { DEVTOOLS_CLOSE, DEVTOOLS_OPEN } from "./networkCopy";
+import { displayAddress } from "./address";
 import {
   ACTION_FAILED,
   CANCEL,
@@ -117,9 +118,11 @@ function BrowserApp() {
       grants: [],
     },
     appearance: { theme: "system", darkPalette: "zvs-dark", lightPalette: "zvs-light" },
+    fullUrl: false,
   });
   const osDark = useOsDark();
   const [address, setAddress] = useState("");
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
   const [cookies, setCookies] = useState<BrowserCookie[]>([]);
   const [query, setQuery] = useState("");
@@ -308,10 +311,15 @@ function BrowserApp() {
             <input
               aria-label="Адрес"
               placeholder="Введите адрес сайта"
-              value={address}
+              value={editing ? address : displayAddress(address, state.fullUrl)}
               spellCheck={false}
               onChange={(event) => setAddress(event.target.value)}
-              onFocus={(event) => event.target.select()}
+              onFocus={(event) => {
+                setEditing(true);
+                const input = event.target;
+                requestAnimationFrame(() => input.select());
+              }}
+              onBlur={() => setEditing(false)}
             />
           </label>
           <div className="nav-group">

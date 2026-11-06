@@ -331,6 +331,7 @@ pub struct BrowserState {
     pub agent_visible: bool,
     pub agent: Box<BrowserAgentState>,
     pub appearance: BrowserAppearance,
+    pub full_url: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -635,6 +636,7 @@ mod tests {
             agent_visible: false,
             agent: Box::default(),
             appearance: BrowserAppearance::default(),
+            full_url: false,
         };
         assert_eq!(
             serde_json::to_value(BrowserCommandOutput::State(state)).expect("serialises"),
@@ -670,6 +672,7 @@ mod tests {
                     "darkPalette": "zvs-dark",
                     "lightPalette": "zvs-light",
                 },
+                "fullUrl": false,
             })
         );
     }

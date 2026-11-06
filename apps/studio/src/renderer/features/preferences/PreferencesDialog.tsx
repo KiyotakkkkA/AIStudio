@@ -18,6 +18,7 @@ import {
   mdiPackageVariantClosed,
   mdiPaletteOutline,
   mdiRefresh,
+  mdiWeb,
 } from "@mdi/js";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
@@ -28,6 +29,7 @@ import SelectInput from "../../ui/atoms/SelectInput";
 import TextInput from "../../ui/atoms/TextInput";
 import Toggle from "../../ui/atoms/Toggle";
 import TextComposer from "../../ui/molecules/TextComposer";
+import PreferenceContainer from "../../ui/molecules/PreferenceContainer";
 import AppLogo from "../../ui/atoms/AppLogo";
 import Reveal from "../../ui/motion/Reveal";
 import { MeterBar, StackedBar, percent } from "../../ui/molecules/StackedBar";
@@ -96,6 +98,8 @@ import {
   type ToggleRowCopy,
 } from "./preferencesPresentation";
 import PreferencesSearch from "./PreferencesSearch";
+import SettingRow from "./SettingRow";
+import BrowserPreferences from "../browser/BrowserPreferences";
 import ThemePalettes from "./ThemePalettes";
 import ComponentsTab from "../toolchain/ComponentsTab";
 import { SUBAGENT_CONCURRENCY_MAX, SUBAGENT_CONCURRENCY_MIN } from "@zvs/shared";
@@ -198,53 +202,16 @@ const SECTION_ICONS: Record<PreferenceSection, string> = {
   components: mdiPackageVariantClosed,
   cli: mdiConsole,
   voice: mdiMicrophoneOutline,
+  browser: mdiWeb,
 };
 
-function SettingsGroup({ children }: { readonly children: ReactNode }) {
-  return <div className="h-fit rounded-card bg-main-850 px-4">{children}</div>;
-}
-
-const SettingRow = observer(function SettingRow({
-  id,
-  label,
-  hint,
-  error,
-  stacked = false,
-  footer,
-  children,
-}: {
-  readonly id: string;
-  readonly label: string;
-  readonly hint: string;
-  readonly error?: string | undefined;
-  readonly stacked?: boolean;
-  readonly footer?: ReactNode;
-  readonly children: ReactNode;
-}) {
-  const { ui } = useStore();
+function NestedSettings({ children }: { readonly children: ReactNode }) {
   return (
-    <div
-      data-setting={id}
-      className={`flex ${stacked ? "flex-col items-stretch" : "flex-wrap items-center"} gap-x-6 gap-y-2.5 border-b border-line py-4 transition-colors duration-500 last:border-b-0 ${
-        ui.preferenceTarget === id ? "bg-accent-soft" : ""
-      }`}
-    >
-      <div className={`flex min-w-0 flex-col gap-0.5 ${stacked ? "" : "min-w-56 flex-1"}`}>
-        <span className="text-[13px] font-medium text-main-100">{label}</span>
-        <span className="text-[12px] text-main-500">{hint}</span>
-        {error === undefined ? null : (
-          <span role="alert" className="text-[12px] text-err">
-            {error}
-          </span>
-        )}
-      </div>
-      <div className={stacked ? "flex flex-col gap-2.5" : "flex flex-none items-center"}>
-        {children}
-      </div>
-      {footer === undefined ? null : <div className="basis-full">{footer}</div>}
+    <div className="my-3 ml-1 rounded-r-control border-l-2 border-line bg-main-900/50 px-4 *:data-setting:py-3">
+      {children}
     </div>
   );
-});
+}
 
 const InfoTableRows = observer(function InfoTableRows({
   group,
@@ -283,7 +250,7 @@ const AppearanceSection = observer(function AppearanceSection() {
   const { ui } = useStore();
   return (
     <div className="flex flex-col gap-4 pt-2">
-      <SettingsGroup>
+      <PreferenceContainer title="Цветовая схема">
         <SettingRow
           id={SETTING_IDS.theme}
           label={THEME_LABEL}
@@ -304,8 +271,8 @@ const AppearanceSection = observer(function AppearanceSection() {
             onChange={ui.setRailThemePicker}
           />
         </SettingRow>
-      </SettingsGroup>
-      <SettingsGroup>
+      </PreferenceContainer>
+      <PreferenceContainer title="Текст">
         <SettingRow id={SETTING_IDS.fontFamily} label={FONT_FAMILY_LABEL} hint={FONT_FAMILY_HINT}>
           <div className="w-52">
             <SelectInput
@@ -335,8 +302,8 @@ const AppearanceSection = observer(function AppearanceSection() {
             }}
           />
         </SettingRow>
-      </SettingsGroup>
-      <SettingsGroup>
+      </PreferenceContainer>
+      <PreferenceContainer title="Эффекты интерфейса">
         <SettingRow
           id={SETTING_IDS.fx}
           label={FX_LABEL}
@@ -353,7 +320,7 @@ const AppearanceSection = observer(function AppearanceSection() {
           />
         </SettingRow>
         <Reveal show={ui.fxPreset === "custom"}>
-          <div className="ml-4 border-line pl-4">
+          <NestedSettings>
             <SettingRow id={SETTING_IDS.fxMotion} label={FX_MOTION_LABEL} hint={FX_MOTION_HINT}>
               <SegmentedControl
                 label={FX_MOTION_LABEL}
@@ -376,9 +343,9 @@ const AppearanceSection = observer(function AppearanceSection() {
                 }}
               />
             </SettingRow>
-          </div>
+          </NestedSettings>
         </Reveal>
-      </SettingsGroup>
+      </PreferenceContainer>
     </div>
   );
 });
@@ -514,7 +481,7 @@ const SubagentsRow = observer(function SubagentsRow() {
         />
       </SettingRow>
       <Reveal show={subagents.enabled}>
-        <div className="ml-4 border-line pl-4">
+        <NestedSettings>
           <SettingRow
             id={SUBAGENT_MODELS_ROW.key}
             label={SUBAGENT_MODELS_ROW.label}
@@ -615,7 +582,7 @@ const SubagentsRow = observer(function SubagentsRow() {
               onChange={(value) => void subagents.setConcurrency(Number(value))}
             />
           </SettingRow>
-        </div>
+        </NestedSettings>
       </Reveal>
     </>
   );
@@ -631,18 +598,18 @@ const GeneralSection = observer(function GeneralSection() {
   }, [appSettings, profile, execPolicy, subagents]);
   return (
     <div className="flex flex-col gap-4 pt-2">
-      <SettingsGroup>
+      <PreferenceContainer title="Работа приложения">
         {GENERAL_ROWS.map((row) => (
           <ToggleSettingRow key={row.key} row={row} />
         ))}
-      </SettingsGroup>
-      <SettingsGroup>
+      </PreferenceContainer>
+      <PreferenceContainer title="Выполнение действий">
         <ToolCallsRow />
         <JudgeModelRow />
-      </SettingsGroup>
-      <SettingsGroup>
+      </PreferenceContainer>
+      <PreferenceContainer title="Делегирование задач">
         <SubagentsRow />
-      </SettingsGroup>
+      </PreferenceContainer>
     </div>
   );
 });
@@ -654,7 +621,7 @@ const ProfileSection = observer(function ProfileSection() {
   }, [profile]);
   return (
     <div className="pt-2">
-      <SettingsGroup>
+      <PreferenceContainer title="Персонализация">
         <SettingRow
           id={STYLE_ROW.key}
           label={STYLE_ROW.label}
@@ -720,7 +687,7 @@ const ProfileSection = observer(function ProfileSection() {
             {...(profile.aboutDirty ? { cancelLabel: CANCEL, onCancel: profile.resetAbout } : {})}
           />
         </SettingRow>
-      </SettingsGroup>
+      </PreferenceContainer>
     </div>
   );
 });
@@ -732,16 +699,16 @@ const NotificationsSection = observer(function NotificationsSection() {
   }, [appSettings]);
   return (
     <div className="pt-2">
-      <SettingsGroup>
+      <PreferenceContainer title="События приложения">
         <ToggleSettingRow row={NOTIFICATIONS_ROW} />
         {appSettings.values[NOTIFICATIONS_ROW.key] ? (
-          <div className="ml-1 flex flex-col pl-5">
+          <NestedSettings>
             {NOTIFICATION_KIND_ROWS.map((row) => (
               <ToggleSettingRow key={row.key} row={row} />
             ))}
-          </div>
+          </NestedSettings>
         ) : null}
-      </SettingsGroup>
+      </PreferenceContainer>
     </div>
   );
 });
@@ -754,14 +721,14 @@ const MemorySection = observer(function MemorySection() {
   const enabled = appSettings.values[ENABLED_ROW.key];
   return (
     <div className="flex flex-col gap-4 pt-2">
-      <SettingsGroup>
+      <PreferenceContainer title="Управление памятью">
         <ToggleSettingRow row={ENABLED_ROW} />
         {enabled && (
-          <div className="ml-1 flex flex-col pl-5">
+          <NestedSettings>
             <ToggleSettingRow row={MODEL_ROW} />
-          </div>
+          </NestedSettings>
         )}
-      </SettingsGroup>
+      </PreferenceContainer>
       <MemoryFacts />
     </div>
   );
@@ -783,7 +750,7 @@ const CliSection = observer(function CliSection() {
           : CLI_NOT_INSTALLED;
   return (
     <div className="pt-2">
-      <SettingsGroup>
+      <PreferenceContainer title="Командная строка">
         <SettingRow
           id={CLI_SETTING_ID}
           label={status?.command ?? CLI_COMMAND}
@@ -825,7 +792,7 @@ const CliSection = observer(function CliSection() {
         >
           <CliThemes />
         </SettingRow>
-      </SettingsGroup>
+      </PreferenceContainer>
     </div>
   );
 });
@@ -918,7 +885,7 @@ const VoiceSection = observer(function VoiceSection() {
   ];
   return (
     <div className="pt-2">
-      <SettingsGroup>
+      <PreferenceContainer title="Распознавание речи">
         <SettingRow
           id={VOICE_DEVICE_ROW.key}
           label={VOICE_DEVICE_ROW.label}
@@ -947,7 +914,7 @@ const VoiceSection = observer(function VoiceSection() {
           </div>
         </SettingRow>
         <VoiceModelRow />
-      </SettingsGroup>
+      </PreferenceContainer>
     </div>
   );
 });
@@ -1069,7 +1036,7 @@ const DataSection = observer(function DataSection() {
           </div>
         )}
       </section>
-      <SettingsGroup>
+      <PreferenceContainer title="Очистка данных">
         <SettingRow
           id={STORAGE_CLEAR_ID}
           label={STORAGE_CLEAR_CACHE}
@@ -1095,7 +1062,7 @@ const DataSection = observer(function DataSection() {
             {storage.notice}
           </p>
         )}
-      </SettingsGroup>
+      </PreferenceContainer>
     </div>
   );
 });
@@ -1170,7 +1137,7 @@ function PreferencesDialog() {
       open={section !== null}
       onClose={ui.closePreferences}
       label={PREFERENCES_TITLE}
-      className="flex h-[min(780px,90vh)] w-[min(1100px,94vw)] flex-row overflow-hidden rounded-card border border-line bg-main-900 p-0 shadow-pop"
+      className="flex h-[min(860px,92vh)] w-[min(1240px,95vw)] flex-row overflow-hidden rounded-card border border-line bg-main-900 p-0 shadow-pop"
     >
       <nav
         aria-label={PREFERENCES_TITLE}
@@ -1237,6 +1204,7 @@ function PreferencesDialog() {
             {section === "about" ? <AboutSection /> : null}
             {section === "cli" ? <CliSection /> : null}
             {section === "voice" ? <VoiceSection /> : null}
+            {section === "browser" ? <BrowserPreferences /> : null}
             {section === "components" ? (
               <div data-setting={SETTING_IDS.components} className="pt-2">
                 <ComponentsTab />

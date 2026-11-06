@@ -301,6 +301,10 @@ impl ToolRegistry {
     }
 
     pub fn deregister(&self, key: &str) -> Result<Option<ToolDto>, AppError> {
+        self.set_available(key, false)
+    }
+
+    pub fn set_available(&self, key: &str, available: bool) -> Result<Option<ToolDto>, AppError> {
         check_tool_key("key", key)?;
         let now = self.now();
         let row = self.inner.database.with_connection(|connection| {
@@ -308,10 +312,13 @@ impl ToolRegistry {
             let Some(existing) = tools.find_by_key(js_trim(key))? else {
                 return Ok(None);
             };
+            if existing.available == available {
+                return Ok(Some(existing));
+            }
             Ok(tools.update(
                 &existing.id,
                 &ToolPatch {
-                    available: Some(false),
+                    available: Some(available),
                     updated_at: Some(now),
                     ..ToolPatch::default()
                 },
