@@ -1,0 +1,14 @@
+[
+  {
+    "name": "a hidden folder",
+    "value": {
+      "id": ".git"
+    }
+  },
+  {
+    "name": "a slash",
+    "value": {
+      "id": "a/b"
+    }
+  }
+]

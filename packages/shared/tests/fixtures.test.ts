@@ -23,6 +23,7 @@ import * as sites from "../src/sites.js";
 import * as execPolicy from "../src/execPolicy.js";
 import * as browserSettings from "../src/browserSettings.js";
 import * as browserData from "../src/browserData.js";
+import * as browserExtensions from "../src/browserExtensions.js";
 import * as browserLibrary from "../src/browserLibrary.js";
 import * as browserSites from "../src/browserSites.js";
 import * as subagents from "../src/subagents.js";
@@ -326,6 +327,10 @@ const schemas: Record<string, z.ZodType> = {
   "browserLibrary/BrowserImportSourcesDto": browserLibrary.BrowserImportSourcesDto,
   "browserLibrary/BrowserImportInput": browserLibrary.BrowserImportInput,
   "browserLibrary/BrowserImportResultDto": browserLibrary.BrowserImportResultDto,
+  "browserExtensions/BrowserExtensionDto": browserExtensions.BrowserExtensionDto,
+  "browserExtensions/BrowserExtensionsDto": browserExtensions.BrowserExtensionsDto,
+  "browserExtensions/BrowserExtensionRef": browserExtensions.BrowserExtensionRef,
+  "browserExtensions/BrowserExtensionToggleInput": browserExtensions.BrowserExtensionToggleInput,
   "browserData/BrowserDownloadState": browserData.BrowserDownloadState,
   "browserData/BrowserDownloadDto": browserData.BrowserDownloadDto,
   "browserData/BrowserDownloadRef": browserData.BrowserDownloadRef,

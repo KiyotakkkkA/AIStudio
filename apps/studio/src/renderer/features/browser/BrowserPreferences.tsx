@@ -10,6 +10,7 @@ import { useStore } from "../../stores/useStore";
 import SettingRow from "../preferences/SettingRow";
 import SitePermissions from "./SitePermissions";
 import DownloadHistory from "./DownloadHistory";
+import BrowserExtensionsPage, { ExtensionsBlock } from "./BrowserExtensionsPage";
 import { BookmarksPage, HistoryPage, ImportPage } from "./BrowserLibraryPages";
 import {
   BOOKMARKS_HINT,
@@ -150,6 +151,7 @@ export default observer(function BrowserPreferences() {
   if (page === "history") return <HistoryPage onBack={back} />;
   if (page === "bookmarks") return <BookmarksPage onBack={back} />;
   if (page === "import") return <ImportPage onBack={back} />;
+  if (page === "extensions") return <BrowserExtensionsPage onBack={back} />;
   return (
     <div className="flex flex-col gap-6 pt-2">
       {browserSettings.error === null ? null : (
@@ -158,6 +160,7 @@ export default observer(function BrowserPreferences() {
       <BrowserSwitch />
       <GeneralBlock onManage={setPage} />
       <AutofillBlock />
+      <ExtensionsBlock onManage={setPage} />
       <DownloadsBlock onManage={setPage} />
       <SitePermissions />
     </div>

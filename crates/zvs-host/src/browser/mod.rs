@@ -3,6 +3,7 @@ pub mod automation;
 pub mod capability;
 pub mod credentials;
 pub mod downloads;
+pub mod extensions;
 pub mod grants;
 pub mod import;
 pub mod library;
@@ -21,6 +22,7 @@ pub use automation::{AutomationPort, ElementTarget, SharedAutomation};
 pub use capability::{BrowserCapability, BrowserTier, resolve_tier, site_origin, site_scope};
 pub use credentials::{FieldFacts, SecretField, secret_field};
 pub use downloads::{BrowserDownloads, DownloadRecord, move_file, unique_path};
+pub use extensions::{BrowserExtensions, ExtensionsChanged};
 pub use grants::{
     BrowserGrant, BrowserGrants, DEFAULT_ORIGIN, SITE_BLOCKED, SiteDecision, canonical_site,
     site_action,

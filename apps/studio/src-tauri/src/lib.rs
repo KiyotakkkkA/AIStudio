@@ -22,9 +22,9 @@ use zvs_host::agentic::{AgenticService, AgenticServiceOptions, register_agentic_
 use zvs_host::artifacts::{ArtifactStore, DASHBOARDS};
 use zvs_host::background::{BackgroundShellOptions, BackgroundShells, register_background_nodes};
 use zvs_host::browser::{
-    AgentControls, Browser as BrowserTools, BrowserAgent, BrowserDownloads, BrowserGrants,
-    BrowserImporter, BrowserLibrary, BrowserLifecycle, BrowserSettings, ImportRoots, RoutedPages,
-    profile_dir, register_browser_nodes, setting_limit, tool_switch,
+    AgentControls, Browser as BrowserTools, BrowserAgent, BrowserDownloads, BrowserExtensions,
+    BrowserGrants, BrowserImporter, BrowserLibrary, BrowserLifecycle, BrowserSettings, ImportRoots,
+    RoutedPages, profile_dir, register_browser_nodes, setting_limit, tool_switch,
 };
 use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::computer::{
@@ -1003,6 +1003,16 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let browser_library = BrowserLibrary::new(Arc::clone(&database), clock.clone());
     workspace.attach_library(browser_library.clone());
     let browser_importer = BrowserImporter::new(ImportRoots::system(), browser_library.clone());
+    let browser_extensions = BrowserExtensions::new(
+        profile_dir(&paths.data_dir)
+            .parent()
+            .unwrap_or(&paths.data_dir),
+    );
+    workspace.set_extensions(browser_extensions.enabled_folders());
+    {
+        let workspace = workspace.clone();
+        browser_extensions.on_change(Arc::new(move |folders| workspace.set_extensions(folders)));
+    }
     {
         let workspace = workspace.clone();
         browser_settings.subscribe(Arc::new(move |current| {
@@ -1311,6 +1321,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         browser_downloads,
         browser_library,
         browser_importer,
+        browser_extensions,
         browser_profile: Some(Arc::new(WorkspaceProfile(workspace.clone()))),
         computer: computer_agent.clone(),
         folders,

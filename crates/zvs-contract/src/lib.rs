@@ -4,6 +4,7 @@ pub mod ai;
 pub mod artifacts;
 pub mod browser;
 pub mod browser_data;
+pub mod browser_extensions;
 pub mod browser_library;
 pub mod browser_settings;
 pub mod browser_sites;
@@ -90,6 +91,9 @@ pub use browser::{
 };
 pub use browser_data::{
     BrowserDownloadDto, BrowserDownloadRef, BrowserDownloadState, BrowserDownloadsDto,
+};
+pub use browser_extensions::{
+    BrowserExtensionDto, BrowserExtensionRef, BrowserExtensionToggleInput, BrowserExtensionsDto,
 };
 pub use browser_library::{
     BrowserBookmarkDto, BrowserBookmarkRenameInput, BrowserBookmarksDto, BrowserHistoryDto,

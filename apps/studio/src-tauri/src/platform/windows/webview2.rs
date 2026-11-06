@@ -15,15 +15,18 @@ use webview2_com::Microsoft::Web::WebView2::Win32::{
     COREWEBVIEW2_WEB_ERROR_STATUS, COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED,
     COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
     COREWEBVIEW2_WEB_RESOURCE_REQUEST_SOURCE_KINDS_DOCUMENT, ICoreWebView2, ICoreWebView2_2,
-    ICoreWebView2_13, ICoreWebView2_22, ICoreWebView2Cookie, ICoreWebView2CookieList,
-    ICoreWebView2NavigationStartingEventArgs, ICoreWebView2NavigationStartingEventArgs3,
-    ICoreWebView2Profile, ICoreWebView2Profile2, ICoreWebView2Profile6, ICoreWebView2Settings2,
+    ICoreWebView2_13, ICoreWebView2_22, ICoreWebView2BrowserExtensionList, ICoreWebView2Cookie,
+    ICoreWebView2CookieList, ICoreWebView2NavigationStartingEventArgs,
+    ICoreWebView2NavigationStartingEventArgs3, ICoreWebView2Profile, ICoreWebView2Profile2,
+    ICoreWebView2Profile6, ICoreWebView2Profile7, ICoreWebView2Settings2,
 };
 use webview2_com::{
-    CallDevToolsProtocolMethodCompletedHandler, ClearBrowsingDataCompletedHandler,
-    DOMContentLoadedEventHandler, DevToolsProtocolEventReceivedEventHandler,
-    DocumentTitleChangedEventHandler, GetCookiesCompletedHandler, HistoryChangedEventHandler,
-    NavigationCompletedEventHandler, NavigationStartingEventHandler, ProcessFailedEventHandler,
+    BrowserExtensionRemoveCompletedHandler, CallDevToolsProtocolMethodCompletedHandler,
+    ClearBrowsingDataCompletedHandler, DOMContentLoadedEventHandler,
+    DevToolsProtocolEventReceivedEventHandler, DocumentTitleChangedEventHandler,
+    GetCookiesCompletedHandler, HistoryChangedEventHandler, NavigationCompletedEventHandler,
+    NavigationStartingEventHandler, ProcessFailedEventHandler,
+    ProfileAddBrowserExtensionCompletedHandler, ProfileGetBrowserExtensionsCompletedHandler,
     SourceChangedEventHandler, WebResourceRequestedEventHandler, WindowCloseRequestedEventHandler,
     take_pwstr,
 };
@@ -392,6 +395,65 @@ pub fn clear_browsing_data(platform: &PlatformWebview, reply: DoneReply) {
     {
         reply(Err(error.to_string()));
     }
+}
+
+fn add_extensions(profile: &ICoreWebView2Profile7, folders: &[std::path::PathBuf]) {
+    for folder in folders {
+        let path = HSTRING::from(folder.as_path());
+        let handler = ProfileAddBrowserExtensionCompletedHandler::create(Box::new(|_, _| Ok(())));
+        let _ = unsafe { profile.AddBrowserExtension(&path, &handler) };
+    }
+}
+
+pub fn sync_extensions(platform: &PlatformWebview, folders: Vec<std::path::PathBuf>) {
+    let Ok(profile) = profile(platform).and_then(|profile| profile.cast::<ICoreWebView2Profile7>())
+    else {
+        return;
+    };
+    let target = profile.clone();
+    let handler = ProfileGetBrowserExtensionsCompletedHandler::create(Box::new(
+        move |result, list: Option<ICoreWebView2BrowserExtensionList>| {
+            let installed: Vec<_> = result
+                .ok()
+                .and(list)
+                .map(|list| {
+                    let mut count = 0;
+                    let _ = unsafe { list.Count(&raw mut count) };
+                    (0..count)
+                        .filter_map(|index| unsafe { list.GetValueAtIndex(index) }.ok())
+                        .collect()
+                })
+                .unwrap_or_default();
+            if installed.is_empty() {
+                add_extensions(&target, &folders);
+                return Ok(());
+            }
+            let pending = Rc::new(RefCell::new(installed.len()));
+            let folders = Rc::new(folders);
+            for extension in installed {
+                let left_after = Rc::clone(&pending);
+                let folders_after = Rc::clone(&folders);
+                let profile = target.clone();
+                let done = BrowserExtensionRemoveCompletedHandler::create(Box::new(move |_| {
+                    let mut left = left_after.borrow_mut();
+                    *left = left.saturating_sub(1);
+                    if *left == 0 {
+                        add_extensions(&profile, &folders_after);
+                    }
+                    Ok(())
+                }));
+                if unsafe { extension.Remove(&done) }.is_err() {
+                    let mut left = pending.borrow_mut();
+                    *left = left.saturating_sub(1);
+                    if *left == 0 {
+                        add_extensions(&target, &folders);
+                    }
+                }
+            }
+            Ok(())
+        },
+    ));
+    let _ = unsafe { profile.GetBrowserExtensions(&handler) };
 }
 
 pub fn set_autofill(

@@ -33,6 +33,7 @@ import BrowserSettingsStore from "../features/browser/BrowserSettingsStore";
 import BrowserSitesStore from "../features/browser/BrowserSitesStore";
 import BrowserDownloadsStore from "../features/browser/BrowserDownloadsStore";
 import BrowserLibraryStore from "../features/browser/BrowserLibraryStore";
+import BrowserExtensionsStore from "../features/browser/BrowserExtensionsStore";
 
 export interface RootStoreEnvironment {
   readonly ipc: IpcClient<Contract>;
@@ -71,6 +72,7 @@ export class RootStore {
   readonly browserSites: BrowserSitesStore;
   readonly browserDownloads: BrowserDownloadsStore;
   readonly browserLibrary: BrowserLibraryStore;
+  readonly browserExtensions: BrowserExtensionsStore;
 
   constructor(private readonly environment: RootStoreEnvironment) {
     this.ui = new UiStore(environment.ipc);
@@ -109,6 +111,7 @@ export class RootStore {
     this.browserSites = new BrowserSitesStore(environment.ipc);
     this.browserDownloads = new BrowserDownloadsStore(environment.ipc);
     this.browserLibrary = new BrowserLibraryStore(environment.ipc);
+    this.browserExtensions = new BrowserExtensionsStore(environment.ipc);
     makeAutoObservable<RootStore, "environment">(
       this,
       {

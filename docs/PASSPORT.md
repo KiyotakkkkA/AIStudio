@@ -1818,6 +1818,16 @@ and `browserSettings.set` (`BrowserSettingsDto`, stored as the one setting `brow
   time; imported rows carry their source. Passwords and cookies are never read: Chromium encrypts
   them with keys bound to that browser.
 
+- **Extensions** (`browserExtensions.*`, `zvs-host/src/browser/extensions.rs`). An unpacked
+  Chromium extension (a folder with `manifest.json`) picked by the user is copied into
+  `<app data>/browser/extensions/<slug>`; turning it off moves it to `extensions-off/`. Every
+  webview of the work profile, the gateway's hidden ones included, is created with
+  `AreBrowserExtensionsEnabled`, because WebView2 refuses a second environment on the same data
+  folder with other options. On the first tab of a session and after every change the shell
+  removes every extension the profile has and adds the enabled folders back
+  (`ICoreWebView2Profile7`), so a removed or turned-off extension does not linger in the
+  profile. There is no extension store.
+
 ## 22. Computer use (D14)
 
 `/computer-use` (`ChatCommand::ComputerUse`) lets a dialog operate the user's own desktop. The

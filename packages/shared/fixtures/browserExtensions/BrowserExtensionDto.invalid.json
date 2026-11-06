@@ -1,0 +1,22 @@
+[
+  {
+    "name": "a path as the id",
+    "value": {
+      "id": "..\\\\evil",
+      "name": "uBlock Origin",
+      "version": "1.62.0",
+      "description": "Блокировщик рекламы",
+      "enabled": true
+    }
+  },
+  {
+    "name": "empty name",
+    "value": {
+      "id": "ublock-origin",
+      "name": "",
+      "version": "1.62.0",
+      "description": "Блокировщик рекламы",
+      "enabled": true
+    }
+  }
+]

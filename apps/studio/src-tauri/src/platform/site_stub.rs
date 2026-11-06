@@ -52,6 +52,8 @@ pub fn clear_browsing_data(_platform: &PlatformWebview, reply: DoneReply) {
     reply(Err(UNSUPPORTED.to_owned()));
 }
 
+pub fn sync_extensions(_platform: &PlatformWebview, _folders: Vec<std::path::PathBuf>) {}
+
 pub fn set_autofill(
     _platform: &PlatformWebview,
     _passwords: bool,

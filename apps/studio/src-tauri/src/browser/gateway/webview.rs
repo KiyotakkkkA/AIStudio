@@ -180,6 +180,7 @@ impl WebviewPages {
             WebviewUrl::External(Url::parse(BLANK).expect("a static url")),
         )
         .data_directory(self.profile.clone())
+        .browser_extensions_enabled(true)
         .devtools(false)
         .on_navigation(move |url| allowed_location(&allowed, url.as_str()) || url.as_str() == BLANK)
         .on_new_window(|_, _| NewWindowResponse::Deny)

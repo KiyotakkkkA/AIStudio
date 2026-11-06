@@ -45,6 +45,11 @@ import {
 import { AnswerFolderRequestInput, FolderGrantDto, FolderGrantRef } from "../folders.js";
 import { BrowserDownloadRef, BrowserDownloadsDto } from "../browserData.js";
 import {
+  BrowserExtensionRef,
+  BrowserExtensionToggleInput,
+  BrowserExtensionsDto,
+} from "../browserExtensions.js";
+import {
   BrowserBookmarkRenameInput,
   BrowserBookmarksDto,
   BrowserHistoryDto,
@@ -375,6 +380,13 @@ export const contract = defineContract({
   "browserBookmarks.remove": { input: BrowserLibraryRef, output: BrowserBookmarksDto },
   "browserImport.sources": { input: z.void(), output: BrowserImportSourcesDto },
   "browserImport.run": { input: BrowserImportInput, output: BrowserImportResultDto },
+  "browserExtensions.list": { input: z.void(), output: BrowserExtensionsDto },
+  "browserExtensions.add": { input: z.void(), output: BrowserExtensionsDto },
+  "browserExtensions.remove": { input: BrowserExtensionRef, output: BrowserExtensionsDto },
+  "browserExtensions.setEnabled": {
+    input: BrowserExtensionToggleInput,
+    output: BrowserExtensionsDto,
+  },
   "agentic.list": { input: z.void(), output: z.array(AgenticSessionDto) },
   "agentic.get": { input: AgenticSessionRef, output: AgenticSessionDto },
   "agentic.create": { input: CreateAgenticSessionInput, output: AgenticSessionDto },

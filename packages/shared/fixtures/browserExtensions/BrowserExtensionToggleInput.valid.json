@@ -1,0 +1,9 @@
+[
+  {
+    "name": "off",
+    "value": {
+      "id": "ublock-origin",
+      "enabled": false
+    }
+  }
+]

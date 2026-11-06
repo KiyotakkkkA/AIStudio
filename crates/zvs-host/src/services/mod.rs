@@ -131,6 +131,7 @@ pub struct Services {
     pub browser_downloads: crate::browser::BrowserDownloads,
     pub browser_library: crate::browser::BrowserLibrary,
     pub browser_importer: crate::browser::BrowserImporter,
+    pub browser_extensions: crate::browser::BrowserExtensions,
     pub browser_profile: Option<crate::browser::SharedBrowserProfile>,
     pub computer: crate::computer::ComputerAgent,
     pub picker: Option<SharedPicker>,

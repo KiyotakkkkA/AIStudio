@@ -680,6 +680,7 @@ pub fn test_services(system: SystemService) -> TestServices {
                 clock.clone(),
             ),
             browser_profile: None,
+            browser_extensions: crate::browser::BrowserExtensions::new(&workspace.join("browser")),
             browser_library: crate::browser::BrowserLibrary::new(database.shared(), clock.clone()),
             browser_importer: crate::browser::BrowserImporter::new(
                 crate::browser::ImportRoots {

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "an extension",
+    "value": {
+      "id": "ublock-origin",
+      "name": "uBlock Origin",
+      "version": "1.62.0",
+      "description": "Блокировщик рекламы",
+      "enabled": true
+    }
+  },
+  {
+    "name": "turned off without a description",
+    "value": {
+      "id": "ublock-origin",
+      "name": "uBlock Origin",
+      "version": "1.62.0",
+      "description": "",
+      "enabled": false
+    }
+  }
+]

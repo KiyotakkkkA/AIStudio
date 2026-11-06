@@ -1,0 +1,16 @@
+[
+  {
+    "name": "an invalid item",
+    "value": {
+      "items": [
+        {
+          "id": "",
+          "name": "uBlock Origin",
+          "version": "1.62.0",
+          "description": "Блокировщик рекламы",
+          "enabled": true
+        }
+      ]
+    }
+  }
+]

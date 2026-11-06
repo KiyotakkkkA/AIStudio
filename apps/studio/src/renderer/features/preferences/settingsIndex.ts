@@ -41,6 +41,7 @@ import {
   HISTORY_ID,
   HISTORY_LABEL,
 } from "../browser/browserLibraryCopy";
+import { EXTENSIONS_ID, EXTENSIONS_LABEL } from "../browser/browserExtensionsCopy";
 import {
   APP_ROW_LABELS,
   CLI_ROW_LABELS,
@@ -160,6 +161,7 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: DOWNLOAD_DIR_ID, section: "browser", label: DOWNLOAD_DIR_LABEL },
   { id: ASK_DOWNLOAD_ID, section: "browser", label: ASK_DOWNLOAD_LABEL },
   { id: DOWNLOAD_HISTORY_ID, section: "browser", label: DOWNLOAD_HISTORY_LABEL },
+  { id: EXTENSIONS_ID, section: "browser", label: EXTENSIONS_LABEL },
   { id: SITES_ID, section: "browser", label: SITES_TITLE },
   ...Object.values(APP_ROW_LABELS).map((label) => ({
     id: aboutSettingId("app", label),

@@ -1219,6 +1219,22 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::BrowserImportResultDto>,
     ),
     (
+        "browserExtensions/BrowserExtensionDto",
+        round_trip::<zvs_contract::BrowserExtensionDto>,
+    ),
+    (
+        "browserExtensions/BrowserExtensionsDto",
+        round_trip::<zvs_contract::BrowserExtensionsDto>,
+    ),
+    (
+        "browserExtensions/BrowserExtensionRef",
+        round_trip::<zvs_contract::BrowserExtensionRef>,
+    ),
+    (
+        "browserExtensions/BrowserExtensionToggleInput",
+        round_trip::<zvs_contract::BrowserExtensionToggleInput>,
+    ),
+    (
         "browserData/BrowserDownloadState",
         round_trip::<zvs_contract::BrowserDownloadState>,
     ),

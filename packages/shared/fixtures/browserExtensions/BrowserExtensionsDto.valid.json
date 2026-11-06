@@ -1,0 +1,22 @@
+[
+  {
+    "name": "none",
+    "value": {
+      "items": []
+    }
+  },
+  {
+    "name": "one",
+    "value": {
+      "items": [
+        {
+          "id": "ublock-origin",
+          "name": "uBlock Origin",
+          "version": "1.62.0",
+          "description": "Блокировщик рекламы",
+          "enabled": true
+        }
+      ]
+    }
+  }
+]

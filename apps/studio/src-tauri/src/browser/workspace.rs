@@ -100,6 +100,8 @@ struct Inner {
     hooked: AtomicBool,
     autofill: Mutex<Option<(bool, bool)>>,
     library: std::sync::OnceLock<BrowserLibrary>,
+    extensions: Mutex<Option<Vec<PathBuf>>>,
+    extensions_synced: AtomicBool,
 }
 
 #[derive(Clone)]
@@ -171,6 +173,8 @@ impl BrowserWorkspace {
             hooked: AtomicBool::new(false),
             autofill: Mutex::default(),
             library: std::sync::OnceLock::new(),
+            extensions: Mutex::default(),
+            extensions_synced: AtomicBool::new(false),
         }));
         let finished = Arc::downgrade(&workspace.0);
         let subscription = workspace.0.lifecycle.subscribe(move |event| {
@@ -283,6 +287,16 @@ impl BrowserWorkspace {
             .toggle(&page.url, &page.title)
             .map(|_| ())
             .map_err(message)
+    }
+
+    pub fn set_extensions(&self, folders: Vec<PathBuf>) {
+        *lock(&self.0.extensions) = Some(folders.clone());
+        let Some(webview) = self.any_site() else {
+            self.0.extensions_synced.store(false, Ordering::SeqCst);
+            return;
+        };
+        self.0.extensions_synced.store(true, Ordering::SeqCst);
+        let _ = webview.with_webview(move |platform| site::sync_extensions(&platform, folders));
     }
 
     pub fn set_autofill(&self, passwords: bool, forms: bool) {
@@ -757,6 +771,7 @@ impl BrowserWorkspace {
         let owner = label.to_owned();
         WebviewBuilder::new(label, blank())
             .data_directory(self.0.profile.clone())
+            .browser_extensions_enabled(true)
             .devtools(cfg!(debug_assertions))
             .on_navigation(|url| site::allowed_main(url.as_str()))
             .on_download(move |_, event| match event {
@@ -785,6 +800,11 @@ impl BrowserWorkspace {
             tokens.observe(&sighting);
         });
         let autofill = *lock(&self.0.autofill);
+        let extensions = if self.0.extensions_synced.swap(true, Ordering::SeqCst) {
+            None
+        } else {
+            lock(&self.0.extensions).clone()
+        };
         webview
             .with_webview(move |platform| {
                 let _ = site::strip_host_bridge(&platform);
@@ -792,6 +812,9 @@ impl BrowserWorkspace {
                 let _ = site::observe_bearer(&platform, &request_filters(), sightings);
                 if let Some((passwords, forms)) = autofill {
                     let _ = site::set_autofill(&platform, passwords, forms);
+                }
+                if let Some(folders) = extensions {
+                    site::sync_extensions(&platform, folders);
                 }
             })
             .map_err(failed)
