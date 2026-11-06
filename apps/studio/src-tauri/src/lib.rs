@@ -1002,7 +1002,15 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     workspace.attach_downloads(browser_settings.clone(), browser_downloads.clone());
     let browser_library = BrowserLibrary::new(Arc::clone(&database), clock.clone());
     workspace.attach_library(browser_library.clone());
-    let browser_importer = BrowserImporter::new(ImportRoots::system(), browser_library.clone());
+    // Resolve the user's Windows folders independently of the launcher's environment.
+    let import_fallback = ImportRoots::system();
+    let browser_importer = BrowserImporter::new(
+        ImportRoots {
+            local: app.path().local_data_dir().ok().or(import_fallback.local),
+            roaming: app.path().data_dir().ok().or(import_fallback.roaming),
+        },
+        browser_library.clone(),
+    );
     let browser_extensions = BrowserExtensions::new(
         profile_dir(&paths.data_dir)
             .parent()

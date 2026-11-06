@@ -10,6 +10,7 @@ import TextInput from "../../ui/atoms/TextInput";
 import Toggle from "../../ui/atoms/Toggle";
 import { useStore } from "../../stores/useStore";
 import BrowserSubPage from "./BrowserSubPage";
+import BrowserAppIcon from "./BrowserAppIcon";
 import {
   BOOKMARK_CANCEL,
   BOOKMARK_REMOVE,
@@ -277,6 +278,7 @@ export const ImportPage = observer(function ImportPage({
               const running = library.importing === source.id;
               return (
                 <li key={source.id} className={`${ROW} flex-wrap py-3`}>
+                  <BrowserAppIcon kind={source.kind} />
                   <div className="flex min-w-48 flex-1 flex-col gap-0.5">
                     <span className="text-[13px] font-medium text-main-100">
                       {IMPORT_KIND_LABELS[source.kind]}
