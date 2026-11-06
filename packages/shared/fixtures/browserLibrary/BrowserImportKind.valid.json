@@ -1,0 +1,30 @@
+[
+  {
+    "name": "chrome",
+    "value": "chrome"
+  },
+  {
+    "name": "edge",
+    "value": "edge"
+  },
+  {
+    "name": "brave",
+    "value": "brave"
+  },
+  {
+    "name": "vivaldi",
+    "value": "vivaldi"
+  },
+  {
+    "name": "yandex",
+    "value": "yandex"
+  },
+  {
+    "name": "opera",
+    "value": "opera"
+  },
+  {
+    "name": "firefox",
+    "value": "firefox"
+  }
+]

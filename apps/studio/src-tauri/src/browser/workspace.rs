@@ -27,7 +27,7 @@ use zvs_host::browser::automation::{
 };
 use zvs_host::browser::network::{NetworkLog, har};
 use zvs_host::browser::{
-    AgentChange, AutomationPort, BrowserAgent, BrowserDownloads, BrowserLifecycle,
+    AgentChange, AutomationPort, BrowserAgent, BrowserDownloads, BrowserLibrary, BrowserLifecycle,
     BrowserLifecycleEvent, BrowserSettings, ElementTarget, LifecycleSubscription, NetworkCapture,
     navigation_url, site_origin,
 };
@@ -57,6 +57,7 @@ const HAR_CREATOR: &str = "ZVS AI Studio";
 const HAR_FILTER: &str = "Архив HTTP (HAR)";
 const HAR_FALLBACK_NAME: &str = "network";
 const UNKNOWN_DOWNLOAD: &str = "Unknown download";
+const NO_LIBRARY: &str = "Bookmarks are unavailable";
 const CLEAR_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
 fn pending_downloads_dir(profile: &std::path::Path) -> PathBuf {
@@ -98,6 +99,7 @@ struct Inner {
     labels: AtomicU64,
     hooked: AtomicBool,
     autofill: Mutex<Option<(bool, bool)>>,
+    library: std::sync::OnceLock<BrowserLibrary>,
 }
 
 #[derive(Clone)]
@@ -168,6 +170,7 @@ impl BrowserWorkspace {
             labels: AtomicU64::new(0),
             hooked: AtomicBool::new(false),
             autofill: Mutex::default(),
+            library: std::sync::OnceLock::new(),
         }));
         let finished = Arc::downgrade(&workspace.0);
         let subscription = workspace.0.lifecycle.subscribe(move |event| {
@@ -263,6 +266,23 @@ impl BrowserWorkspace {
                 let _ = changes.send(Work::Downloads);
             }),
         });
+    }
+
+    pub fn attach_library(&self, library: BrowserLibrary) {
+        let _ = self.0.library.set(library);
+        self.post(Work::Publish);
+    }
+
+    fn toggle_bookmark(&self) -> Result<(), String> {
+        let library = self.0.library.get().ok_or(NO_LIBRARY)?;
+        let page = lock(&self.0.model)
+            .active()
+            .map(|tab| tab.page.clone())
+            .ok_or(NO_ACTIVE_TAB)?;
+        library
+            .toggle(&page.url, &page.title)
+            .map(|_| ())
+            .map_err(message)
     }
 
     pub fn set_autofill(&self, passwords: bool, forms: bool) {
@@ -463,6 +483,7 @@ impl BrowserWorkspace {
             BrowserCommand::AgentResume => self.0.agent.resume().map_err(message)?,
             BrowserCommand::AgentRevoke { id } => self.0.agent.revoke(&id).map_err(message)?,
             BrowserCommand::DownloadKeep { id } => self.keep_download(&id)?,
+            BrowserCommand::BookmarkToggle => self.toggle_bookmark()?,
             BrowserCommand::DownloadDiscard { id } => {
                 if !self.0.downloads.discard_by_id(&id) {
                     return Err(UNKNOWN_DOWNLOAD.to_owned());
@@ -490,6 +511,12 @@ impl BrowserWorkspace {
         let mut state = lock(&self.0.model).state();
         state.agent = Box::new(self.0.agent.snapshot(origin.as_deref()));
         state.downloads = self.0.downloads.pending_view();
+        if let Some(library) = self.0.library.get() {
+            state.bookmarked = lock(&self.0.model)
+                .active()
+                .is_some_and(|tab| library.is_bookmarked(&tab.page.url));
+            state.bookmarks = library.links();
+        }
         state
     }
 
@@ -906,8 +933,25 @@ impl BrowserWorkspace {
         }
         if signal == PageSignal::CloseRequested {
             self.close_label(label);
-        } else if lock(&self.0.model).apply(label, signal) {
-            self.publish();
+        } else {
+            let settled = matches!(signal, PageSignal::Finished(None) | PageSignal::Snapshot(_));
+            let changed = lock(&self.0.model).apply(label, signal);
+            if settled {
+                self.remember(label);
+            }
+            if changed {
+                self.publish();
+            }
+        }
+    }
+
+    fn remember(&self, label: &str) {
+        let Some(library) = self.0.library.get() else {
+            return;
+        };
+        let page = lock(&self.0.model).loaded_page(label);
+        if let Some(page) = page {
+            let _ = library.visit(&page.url, &page.title);
         }
     }
 

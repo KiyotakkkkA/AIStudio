@@ -1,0 +1,22 @@
+[
+  {
+    "name": "a chrome profile",
+    "value": {
+      "id": "chrome:Default",
+      "kind": "chrome",
+      "profile": "Основной",
+      "history": true,
+      "bookmarks": true
+    }
+  },
+  {
+    "name": "opera without a profile name",
+    "value": {
+      "id": "opera:",
+      "kind": "opera",
+      "profile": "",
+      "history": true,
+      "bookmarks": true
+    }
+  }
+]

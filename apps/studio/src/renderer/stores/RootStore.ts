@@ -32,6 +32,7 @@ import VoiceStore from "../features/voice/VoiceStore";
 import BrowserSettingsStore from "../features/browser/BrowserSettingsStore";
 import BrowserSitesStore from "../features/browser/BrowserSitesStore";
 import BrowserDownloadsStore from "../features/browser/BrowserDownloadsStore";
+import BrowserLibraryStore from "../features/browser/BrowserLibraryStore";
 
 export interface RootStoreEnvironment {
   readonly ipc: IpcClient<Contract>;
@@ -69,6 +70,7 @@ export class RootStore {
   readonly browserSettings: BrowserSettingsStore;
   readonly browserSites: BrowserSitesStore;
   readonly browserDownloads: BrowserDownloadsStore;
+  readonly browserLibrary: BrowserLibraryStore;
 
   constructor(private readonly environment: RootStoreEnvironment) {
     this.ui = new UiStore(environment.ipc);
@@ -106,6 +108,7 @@ export class RootStore {
     this.browserSettings = new BrowserSettingsStore(environment.ipc);
     this.browserSites = new BrowserSitesStore(environment.ipc);
     this.browserDownloads = new BrowserDownloadsStore(environment.ipc);
+    this.browserLibrary = new BrowserLibraryStore(environment.ipc);
     makeAutoObservable<RootStore, "environment">(
       this,
       {

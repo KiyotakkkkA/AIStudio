@@ -10,6 +10,18 @@ import { useStore } from "../../stores/useStore";
 import SettingRow from "../preferences/SettingRow";
 import SitePermissions from "./SitePermissions";
 import DownloadHistory from "./DownloadHistory";
+import { BookmarksPage, HistoryPage, ImportPage } from "./BrowserLibraryPages";
+import {
+  BOOKMARKS_HINT,
+  BOOKMARKS_ID,
+  BOOKMARKS_LABEL,
+  HISTORY_HINT,
+  HISTORY_ID,
+  HISTORY_LABEL,
+  IMPORT_OPEN,
+} from "./browserLibraryCopy";
+import { MANAGE } from "./browserDataCopy";
+import Button from "../../ui/atoms/buttons/Button";
 import { AutofillBlock, ClearDataRow, DownloadsBlock, type BrowserPage } from "./BrowserDataBlocks";
 import { TOGGLE_OFF, TOGGLE_ON } from "../preferences/preferencesPresentation";
 import {
@@ -59,12 +71,23 @@ const BrowserSwitch = observer(function BrowserSwitch() {
   );
 });
 
-const GeneralBlock = observer(function GeneralBlock() {
+const GeneralBlock = observer(function GeneralBlock({
+  onManage,
+}: {
+  readonly onManage: (page: BrowserPage) => void;
+}) {
   const { browserSettings } = useStore();
   const { settings } = browserSettings;
   const disabled = !settings.enabled;
   return (
-    <PreferenceContainer title={BROWSER_GENERAL_TITLE}>
+    <PreferenceContainer
+      title={BROWSER_GENERAL_TITLE}
+      action={
+        <Button tone="secondary" size="sm" onClick={() => onManage("import")}>
+          {IMPORT_OPEN}
+        </Button>
+      }
+    >
       <SettingRow id={WEB_LINKS_ID} label={WEB_LINKS_LABEL} hint={WEB_LINKS_HINT}>
         <div className="w-56">
           <SelectInput
@@ -102,6 +125,16 @@ const GeneralBlock = observer(function GeneralBlock() {
         />
       </SettingRow>
       <ClearDataRow />
+      <SettingRow id={HISTORY_ID} label={HISTORY_LABEL} hint={HISTORY_HINT}>
+        <Button tone="secondary" size="sm" onClick={() => onManage("history")}>
+          {MANAGE}
+        </Button>
+      </SettingRow>
+      <SettingRow id={BOOKMARKS_ID} label={BOOKMARKS_LABEL} hint={BOOKMARKS_HINT}>
+        <Button tone="secondary" size="sm" onClick={() => onManage("bookmarks")}>
+          {MANAGE}
+        </Button>
+      </SettingRow>
     </PreferenceContainer>
   );
 });
@@ -112,14 +145,18 @@ export default observer(function BrowserPreferences() {
   useEffect(() => {
     void browserSettings.load();
   }, [browserSettings]);
-  if (page === "downloads") return <DownloadHistory onBack={() => setPage("main")} />;
+  const back = () => setPage("main");
+  if (page === "downloads") return <DownloadHistory onBack={back} />;
+  if (page === "history") return <HistoryPage onBack={back} />;
+  if (page === "bookmarks") return <BookmarksPage onBack={back} />;
+  if (page === "import") return <ImportPage onBack={back} />;
   return (
     <div className="flex flex-col gap-6 pt-2">
       {browserSettings.error === null ? null : (
         <Alert onDismiss={browserSettings.dismissError}>{browserSettings.error}</Alert>
       )}
       <BrowserSwitch />
-      <GeneralBlock />
+      <GeneralBlock onManage={setPage} />
       <AutofillBlock />
       <DownloadsBlock onManage={setPage} />
       <SitePermissions />

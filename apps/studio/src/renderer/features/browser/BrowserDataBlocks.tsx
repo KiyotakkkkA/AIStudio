@@ -34,7 +34,7 @@ import {
   PASSWORDS_LABEL,
 } from "./browserDataCopy";
 
-export type BrowserPage = "main" | "downloads";
+export type BrowserPage = "main" | "downloads" | "history" | "bookmarks" | "import";
 
 export const ClearDataRow = observer(function ClearDataRow() {
   const { browserSettings } = useStore();

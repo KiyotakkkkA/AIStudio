@@ -36,6 +36,12 @@ import {
   PASSWORDS_LABEL,
 } from "../browser/browserDataCopy";
 import {
+  BOOKMARKS_ID,
+  BOOKMARKS_LABEL,
+  HISTORY_ID,
+  HISTORY_LABEL,
+} from "../browser/browserLibraryCopy";
+import {
   APP_ROW_LABELS,
   CLI_ROW_LABELS,
   FONT_FAMILY_LABEL,
@@ -147,6 +153,8 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: LOCAL_LINKS_ID, section: "browser", label: LOCAL_LINKS_LABEL },
   { id: FULL_URL_ID, section: "browser", label: FULL_URL_LABEL },
   { id: CLEAR_DATA_ID, section: "browser", label: CLEAR_DATA_LABEL },
+  { id: HISTORY_ID, section: "browser", label: HISTORY_LABEL },
+  { id: BOOKMARKS_ID, section: "browser", label: BOOKMARKS_LABEL },
   { id: PASSWORDS_ID, section: "browser", label: PASSWORDS_LABEL },
   { id: FORMS_ID, section: "browser", label: FORMS_LABEL },
   { id: DOWNLOAD_DIR_ID, section: "browser", label: DOWNLOAD_DIR_LABEL },

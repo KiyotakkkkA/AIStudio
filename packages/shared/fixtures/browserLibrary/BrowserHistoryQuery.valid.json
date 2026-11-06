@@ -1,0 +1,12 @@
+[
+  {
+    "name": "everything",
+    "value": {}
+  },
+  {
+    "name": "a search",
+    "value": {
+      "query": "acme"
+    }
+  }
+]

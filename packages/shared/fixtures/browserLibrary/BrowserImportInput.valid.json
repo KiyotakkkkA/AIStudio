@@ -1,0 +1,10 @@
+[
+  {
+    "name": "history only",
+    "value": {
+      "source": "chrome:Default",
+      "history": true,
+      "bookmarks": false
+    }
+  }
+]

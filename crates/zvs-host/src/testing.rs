@@ -680,6 +680,14 @@ pub fn test_services(system: SystemService) -> TestServices {
                 clock.clone(),
             ),
             browser_profile: None,
+            browser_library: crate::browser::BrowserLibrary::new(database.shared(), clock.clone()),
+            browser_importer: crate::browser::BrowserImporter::new(
+                crate::browser::ImportRoots {
+                    local: None,
+                    roaming: None,
+                },
+                crate::browser::BrowserLibrary::new(database.shared(), clock.clone()),
+            ),
             computer: crate::computer::ComputerAgent::new(
                 Arc::new(crate::computer::sidecar::NoDesktop),
                 database.shared(),

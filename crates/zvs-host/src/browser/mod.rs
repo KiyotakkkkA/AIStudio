@@ -4,6 +4,8 @@ pub mod capability;
 pub mod credentials;
 pub mod downloads;
 pub mod grants;
+pub mod import;
+pub mod library;
 pub mod lifecycle;
 pub mod network;
 pub mod nodes;
@@ -23,6 +25,8 @@ pub use grants::{
     BrowserGrant, BrowserGrants, DEFAULT_ORIGIN, SITE_BLOCKED, SiteDecision, canonical_site,
     site_action,
 };
+pub use import::{BrowserImporter, ImportRoots};
+pub use library::{BrowserLibrary, ImportedBookmark, ImportedVisit};
 pub use lifecycle::{BrowserLifecycle, BrowserLifecycleEvent, LifecycleSubscription};
 pub use network::{NetworkCapture, NetworkEvent, NetworkLog, SharedNetworkCapture, record_for};
 pub use nodes::{Browser, register_browser_nodes};

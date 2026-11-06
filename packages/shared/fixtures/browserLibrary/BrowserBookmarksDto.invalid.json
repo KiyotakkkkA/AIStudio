@@ -1,0 +1,16 @@
+[
+  {
+    "name": "a broken item",
+    "value": {
+      "items": [
+        {
+          "id": "x",
+          "url": "https://docs.acme.io/",
+          "title": "Документация",
+          "folder": "Панель закладок/Работа",
+          "createdAt": 1793037480000
+        }
+      ]
+    }
+  }
+]

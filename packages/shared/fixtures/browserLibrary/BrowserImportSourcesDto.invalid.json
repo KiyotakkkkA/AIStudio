@@ -1,0 +1,16 @@
+[
+  {
+    "name": "unknown kind",
+    "value": {
+      "sources": [
+        {
+          "id": "chrome:Default",
+          "kind": "safari",
+          "profile": "Основной",
+          "history": true,
+          "bookmarks": true
+        }
+      ]
+    }
+  }
+]

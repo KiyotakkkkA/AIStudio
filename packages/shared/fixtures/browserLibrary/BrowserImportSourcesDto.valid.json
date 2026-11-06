@@ -1,0 +1,22 @@
+[
+  {
+    "name": "nothing installed",
+    "value": {
+      "sources": []
+    }
+  },
+  {
+    "name": "one",
+    "value": {
+      "sources": [
+        {
+          "id": "chrome:Default",
+          "kind": "chrome",
+          "profile": "Основной",
+          "history": true,
+          "bookmarks": true
+        }
+      ]
+    }
+  }
+]

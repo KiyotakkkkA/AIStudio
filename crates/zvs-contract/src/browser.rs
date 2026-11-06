@@ -107,6 +107,7 @@ pub enum BrowserCommand {
     DownloadDiscard {
         id: String,
     },
+    BookmarkToggle,
 }
 
 fn tab_id(id: &str) -> Result<(), AppError> {
@@ -164,7 +165,8 @@ impl Validate for BrowserCommand {
             | Self::Agent { .. }
             | Self::AgentControl
             | Self::AgentResume
-            | Self::AgentStop => Ok(()),
+            | Self::AgentStop
+            | Self::BookmarkToggle => Ok(()),
         }
     }
 }
@@ -341,6 +343,16 @@ pub struct BrowserState {
     pub appearance: BrowserAppearance,
     pub full_url: bool,
     pub downloads: Vec<BrowserPendingDownload>,
+    pub bookmarked: bool,
+    pub bookmarks: Vec<BrowserBookmarkLink>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserBookmarkLink {
+    pub id: String,
+    pub title: String,
+    pub url: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -625,6 +637,8 @@ mod tests {
             appearance: BrowserAppearance::default(),
             full_url: false,
             downloads: Vec::new(),
+            bookmarked: false,
+            bookmarks: Vec::new(),
         };
         assert_eq!(
             serde_json::to_value(BrowserCommandOutput::State(state)).expect("serialises"),
@@ -662,6 +676,8 @@ mod tests {
                 },
                 "fullUrl": false,
                 "downloads": [],
+                "bookmarked": false,
+                "bookmarks": [],
             })
         );
     }

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "a visit",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "url": "https://docs.acme.io/start",
+      "title": "Начало работы",
+      "visitedAt": 1793037480000,
+      "importedFrom": null
+    }
+  },
+  {
+    "name": "an imported visit",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "url": "https://docs.acme.io/start",
+      "title": "",
+      "visitedAt": 1793037480000,
+      "importedFrom": "firefox"
+    }
+  }
+]

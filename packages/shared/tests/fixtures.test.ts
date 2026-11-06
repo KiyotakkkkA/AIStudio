@@ -23,6 +23,7 @@ import * as sites from "../src/sites.js";
 import * as execPolicy from "../src/execPolicy.js";
 import * as browserSettings from "../src/browserSettings.js";
 import * as browserData from "../src/browserData.js";
+import * as browserLibrary from "../src/browserLibrary.js";
 import * as browserSites from "../src/browserSites.js";
 import * as subagents from "../src/subagents.js";
 import * as cli from "../src/cli.js";
@@ -313,6 +314,18 @@ const schemas: Record<string, z.ZodType> = {
   "sites/OpenSiteInput": sites.OpenSiteInput,
   "sites/SiteIconInput": sites.SiteIconInput,
   "sites/SiteIconDto": sites.SiteIconDto,
+  "browserLibrary/BrowserImportKind": browserLibrary.BrowserImportKind,
+  "browserLibrary/BrowserHistoryEntryDto": browserLibrary.BrowserHistoryEntryDto,
+  "browserLibrary/BrowserHistoryDto": browserLibrary.BrowserHistoryDto,
+  "browserLibrary/BrowserHistoryQuery": browserLibrary.BrowserHistoryQuery,
+  "browserLibrary/BrowserLibraryRef": browserLibrary.BrowserLibraryRef,
+  "browserLibrary/BrowserBookmarkDto": browserLibrary.BrowserBookmarkDto,
+  "browserLibrary/BrowserBookmarksDto": browserLibrary.BrowserBookmarksDto,
+  "browserLibrary/BrowserBookmarkRenameInput": browserLibrary.BrowserBookmarkRenameInput,
+  "browserLibrary/BrowserImportSourceDto": browserLibrary.BrowserImportSourceDto,
+  "browserLibrary/BrowserImportSourcesDto": browserLibrary.BrowserImportSourcesDto,
+  "browserLibrary/BrowserImportInput": browserLibrary.BrowserImportInput,
+  "browserLibrary/BrowserImportResultDto": browserLibrary.BrowserImportResultDto,
   "browserData/BrowserDownloadState": browserData.BrowserDownloadState,
   "browserData/BrowserDownloadDto": browserData.BrowserDownloadDto,
   "browserData/BrowserDownloadRef": browserData.BrowserDownloadRef,

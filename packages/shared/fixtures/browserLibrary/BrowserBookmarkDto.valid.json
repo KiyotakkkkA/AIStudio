@@ -1,0 +1,22 @@
+[
+  {
+    "name": "a bookmark",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "url": "https://docs.acme.io/",
+      "title": "Документация",
+      "folder": "Панель закладок/Работа",
+      "createdAt": 1793037480000
+    }
+  },
+  {
+    "name": "at the root",
+    "value": {
+      "id": "0199aa22-2222-7222-8222-222222222222",
+      "url": "https://docs.acme.io/",
+      "title": "Документация",
+      "folder": "",
+      "createdAt": 1793037480000
+    }
+  }
+]

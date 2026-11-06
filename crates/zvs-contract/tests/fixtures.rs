@@ -1171,6 +1171,54 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ExecJudgeDto>,
     ),
     (
+        "browserLibrary/BrowserImportKind",
+        round_trip::<zvs_contract::BrowserImportKind>,
+    ),
+    (
+        "browserLibrary/BrowserHistoryEntryDto",
+        round_trip::<zvs_contract::BrowserHistoryEntryDto>,
+    ),
+    (
+        "browserLibrary/BrowserHistoryDto",
+        round_trip::<zvs_contract::BrowserHistoryDto>,
+    ),
+    (
+        "browserLibrary/BrowserHistoryQuery",
+        round_trip::<zvs_contract::BrowserHistoryQuery>,
+    ),
+    (
+        "browserLibrary/BrowserLibraryRef",
+        round_trip::<zvs_contract::BrowserLibraryRef>,
+    ),
+    (
+        "browserLibrary/BrowserBookmarkDto",
+        round_trip::<zvs_contract::BrowserBookmarkDto>,
+    ),
+    (
+        "browserLibrary/BrowserBookmarksDto",
+        round_trip::<zvs_contract::BrowserBookmarksDto>,
+    ),
+    (
+        "browserLibrary/BrowserBookmarkRenameInput",
+        round_trip::<zvs_contract::BrowserBookmarkRenameInput>,
+    ),
+    (
+        "browserLibrary/BrowserImportSourceDto",
+        round_trip::<zvs_contract::BrowserImportSourceDto>,
+    ),
+    (
+        "browserLibrary/BrowserImportSourcesDto",
+        round_trip::<zvs_contract::BrowserImportSourcesDto>,
+    ),
+    (
+        "browserLibrary/BrowserImportInput",
+        round_trip::<zvs_contract::BrowserImportInput>,
+    ),
+    (
+        "browserLibrary/BrowserImportResultDto",
+        round_trip::<zvs_contract::BrowserImportResultDto>,
+    ),
+    (
         "browserData/BrowserDownloadState",
         round_trip::<zvs_contract::BrowserDownloadState>,
     ),

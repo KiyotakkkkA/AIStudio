@@ -44,6 +44,16 @@ import {
 } from "../chat.js";
 import { AnswerFolderRequestInput, FolderGrantDto, FolderGrantRef } from "../folders.js";
 import { BrowserDownloadRef, BrowserDownloadsDto } from "../browserData.js";
+import {
+  BrowserBookmarkRenameInput,
+  BrowserBookmarksDto,
+  BrowserHistoryDto,
+  BrowserHistoryQuery,
+  BrowserImportInput,
+  BrowserImportResultDto,
+  BrowserImportSourcesDto,
+  BrowserLibraryRef,
+} from "../browserLibrary.js";
 import { BrowserSettingsDto } from "../browserSettings.js";
 import {
   BrowserSiteDefaultInput,
@@ -357,6 +367,14 @@ export const contract = defineContract({
   "browserDownloads.clear": { input: z.void(), output: BrowserDownloadsDto },
   "browserDownloads.open": { input: BrowserDownloadRef, output: z.void() },
   "browserDownloads.reveal": { input: BrowserDownloadRef, output: z.void() },
+  "browserHistory.list": { input: BrowserHistoryQuery, output: BrowserHistoryDto },
+  "browserHistory.remove": { input: BrowserLibraryRef, output: z.void() },
+  "browserHistory.clear": { input: z.void(), output: z.void() },
+  "browserBookmarks.list": { input: z.void(), output: BrowserBookmarksDto },
+  "browserBookmarks.rename": { input: BrowserBookmarkRenameInput, output: BrowserBookmarksDto },
+  "browserBookmarks.remove": { input: BrowserLibraryRef, output: BrowserBookmarksDto },
+  "browserImport.sources": { input: z.void(), output: BrowserImportSourcesDto },
+  "browserImport.run": { input: BrowserImportInput, output: BrowserImportResultDto },
   "agentic.list": { input: z.void(), output: z.array(AgenticSessionDto) },
   "agentic.get": { input: AgenticSessionRef, output: AgenticSessionDto },
   "agentic.create": { input: CreateAgenticSessionInput, output: AgenticSessionDto },

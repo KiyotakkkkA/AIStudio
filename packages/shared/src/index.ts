@@ -13,6 +13,7 @@ export * from "./ipc/contract.js";
 export * from "./events/HostEvent.js";
 export * from "./browser.js";
 export * from "./browserData.js";
+export * from "./browserLibrary.js";
 export * from "./browserSettings.js";
 export * from "./browserSites.js";
 export * from "./computer.js";

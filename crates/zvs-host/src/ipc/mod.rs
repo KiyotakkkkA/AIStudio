@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod agentic;
 pub mod artifacts;
+pub mod browser_library;
 pub mod browser_settings;
 pub mod browser_sites;
 pub mod chat;
@@ -66,6 +67,7 @@ pub fn register(server: &mut IpcServer) {
     shells::register(server);
     documents::register(server);
     artifacts::register(server);
+    browser_library::register(server);
     browser_settings::register(server);
     browser_sites::register(server);
     computer::register(server);
@@ -124,11 +126,19 @@ mod tests {
                 "artifacts.openInBrowser",
                 "artifacts.reveal",
                 "artifacts.save",
+                "browserBookmarks.list",
+                "browserBookmarks.remove",
+                "browserBookmarks.rename",
                 "browserDownloads.clear",
                 "browserDownloads.list",
                 "browserDownloads.open",
                 "browserDownloads.remove",
                 "browserDownloads.reveal",
+                "browserHistory.clear",
+                "browserHistory.list",
+                "browserHistory.remove",
+                "browserImport.run",
+                "browserImport.sources",
                 "browserSettings.clearData",
                 "browserSettings.get",
                 "browserSettings.pickDownloadDir",

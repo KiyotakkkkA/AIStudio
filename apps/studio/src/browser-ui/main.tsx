@@ -19,6 +19,8 @@ import {
   mdiRefresh,
   mdiReload,
   mdiRobotOutline,
+  mdiStar,
+  mdiStarOutline,
   mdiTrashCanOutline,
   mdiWeb,
 } from "@mdi/js";
@@ -41,6 +43,7 @@ import {
 } from "./agentCopy";
 import { DEVTOOLS_CLOSE, DEVTOOLS_OPEN } from "./networkCopy";
 import { displayAddress } from "./address";
+import { BOOKMARK_ADD, BOOKMARK_REMOVE, BOOKMARKS_TITLE, bookmarkLabel } from "./bookmarkCopy";
 import {
   ACTION_FAILED,
   CANCEL,
@@ -121,6 +124,8 @@ function BrowserApp() {
     appearance: { theme: "system", darkPalette: "zvs-dark", lightPalette: "zvs-light" },
     fullUrl: false,
     downloads: [],
+    bookmarked: false,
+    bookmarks: [],
   });
   const osDark = useOsDark();
   const [address, setAddress] = useState("");
@@ -327,6 +332,14 @@ function BrowserApp() {
           <div className="nav-group">
             <IconButton type="submit" path={mdiArrowRightCircleOutline} label="Перейти" />
             <IconButton
+              path={state.bookmarked ? mdiStar : mdiStarOutline}
+              label={state.bookmarked ? BOOKMARK_REMOVE : BOOKMARK_ADD}
+              className="toggle"
+              aria-pressed={state.bookmarked}
+              disabled={!active?.url}
+              onClick={() => void send({ action: "bookmarkToggle" })}
+            />
+            <IconButton
               path={mdiCookieOutline}
               label={SITES_TITLE}
               className="toggle"
@@ -525,6 +538,25 @@ function BrowserApp() {
                     Введите адрес в строке выше. Вход на сайтах и куки сохраняются в рабочем
                     профиле.
                   </p>
+                  {state.bookmarks.length > 0 && (
+                    <nav className="bookmarks" aria-label={BOOKMARKS_TITLE}>
+                      <h2>{BOOKMARKS_TITLE}</h2>
+                      <ul>
+                        {state.bookmarks.map((bookmark) => (
+                          <li key={bookmark.id}>
+                            <button
+                              type="button"
+                              title={bookmark.url}
+                              onClick={() => void send({ action: "navigate", url: bookmark.url })}
+                            >
+                              <Icon path={mdiStar} size={13} />
+                              <span>{bookmarkLabel(bookmark)}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </nav>
+                  )}
                 </section>
               )
             )}

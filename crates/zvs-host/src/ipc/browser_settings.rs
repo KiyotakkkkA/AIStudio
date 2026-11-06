@@ -37,6 +37,7 @@ async fn clear_data(services: Arc<Services>) -> Result<(), AppError> {
         .ok_or_else(|| AppError::new(AppErrorCode::NotImplemented, PROFILE_UNAVAILABLE))?;
     profile.clear_data().await?;
     services.browser_downloads.clear()?;
+    services.browser_library.clear_history()?;
     Ok(())
 }
 

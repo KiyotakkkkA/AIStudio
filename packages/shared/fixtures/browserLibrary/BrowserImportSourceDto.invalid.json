@@ -1,0 +1,12 @@
+[
+  {
+    "name": "empty id",
+    "value": {
+      "id": "",
+      "kind": "chrome",
+      "profile": "Основной",
+      "history": true,
+      "bookmarks": true
+    }
+  }
+]

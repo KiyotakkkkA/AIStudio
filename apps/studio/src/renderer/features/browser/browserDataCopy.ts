@@ -5,7 +5,7 @@ import { formatBytes } from "../downloads/downloadPresentation";
 export const CLEAR_DATA_ID = "browser.clearData";
 export const CLEAR_DATA_LABEL = "Данные браузера";
 export const CLEAR_DATA_HINT =
-  "Файлы cookie, кэш, данные сайтов и история загрузок встроенного браузера.";
+  "Файлы cookie, кэш, данные сайтов, история просмотров и загрузок встроенного браузера.";
 export const CLEAR_DATA = "Очистить данные";
 export const CLEAR_DATA_TITLE = "Очистить данные браузера?";
 export const CLEAR_DATA_CONSEQUENCE =

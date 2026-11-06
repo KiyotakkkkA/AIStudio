@@ -1802,6 +1802,22 @@ and `browserSettings.set` (`BrowserSettingsDto`, stored as the one setting `brow
   cancelled or failed download, the agent's included, is a `browser_download` row (newest 500,
   migration 0041), listed by `browserDownloads.*`.
 
+- **History and bookmarks** (`browserHistory.*`, `browserBookmarks.*`, migration 0042). A tab
+  that settles on an HTTP(S) page records a visit; a revisit within 30 minutes updates the same row
+  (title, time), and the newest 20 000 rows are kept. Search is case-insensitive in the host, so
+  Cyrillic titles match. The star in the address bar toggles a bookmark for the active page; the
+  new-tab page lists the latest 24. Bookmarks are unique by URL and capped at 5 000. «Данные
+  браузера» also clears the history, never the bookmarks.
+- **Import** (`browserImport.sources` · `run`, `zvs-host/src/browser/import.rs`). Sources are found
+  under `%LOCALAPPDATA%` (Chrome, Edge, Brave, Vivaldi, Yandex: every profile folder, named from
+  `Local State`) and `%APPDATA%` (Opera Stable, Firefox profiles). The renderer sends a source id,
+  never a path; the host rediscovers the folder. History and `places.sqlite` are copied (with
+  their `-wal`) to a temporary folder before reading, so a running browser is not touched; a copy
+  that fails is `CONFLICT`. Chromium bookmarks come from the `Bookmarks` JSON with their folder
+  path, Firefox ones from `moz_bookmarks`. Up to 10 000 visits per run, deduplicated by URL and
+  time; imported rows carry their source. Passwords and cookies are never read: Chromium encrypts
+  them with keys bound to that browser.
+
 ## 22. Computer use (D14)
 
 `/computer-use` (`ChatCommand::ComputerUse`) lets a dialog operate the user's own desktop. The

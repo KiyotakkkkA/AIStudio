@@ -23,8 +23,8 @@ use zvs_host::artifacts::{ArtifactStore, DASHBOARDS};
 use zvs_host::background::{BackgroundShellOptions, BackgroundShells, register_background_nodes};
 use zvs_host::browser::{
     AgentControls, Browser as BrowserTools, BrowserAgent, BrowserDownloads, BrowserGrants,
-    BrowserLifecycle, BrowserSettings, RoutedPages, profile_dir, register_browser_nodes,
-    setting_limit, tool_switch,
+    BrowserImporter, BrowserLibrary, BrowserLifecycle, BrowserSettings, ImportRoots, RoutedPages,
+    profile_dir, register_browser_nodes, setting_limit, tool_switch,
 };
 use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::computer::{
@@ -1000,6 +1000,9 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let browser_downloads = BrowserDownloads::new(Arc::clone(&database), clock.clone())
         .with_launcher(platform::file_launcher());
     workspace.attach_downloads(browser_settings.clone(), browser_downloads.clone());
+    let browser_library = BrowserLibrary::new(Arc::clone(&database), clock.clone());
+    workspace.attach_library(browser_library.clone());
+    let browser_importer = BrowserImporter::new(ImportRoots::system(), browser_library.clone());
     {
         let workspace = workspace.clone();
         browser_settings.subscribe(Arc::new(move |current| {
@@ -1306,6 +1309,8 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         browser_settings,
         browser_sites: grants,
         browser_downloads,
+        browser_library,
+        browser_importer,
         browser_profile: Some(Arc::new(WorkspaceProfile(workspace.clone()))),
         computer: computer_agent.clone(),
         folders,

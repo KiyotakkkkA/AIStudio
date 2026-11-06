@@ -196,6 +196,13 @@ impl Model {
         Ok(())
     }
 
+    pub fn loaded_page(&self, label: &str) -> Option<PageSnapshot> {
+        self.tabs
+            .iter()
+            .find(|tab| tab.label == label && !tab.loading && tab.error.is_none())
+            .map(|tab| tab.page.clone())
+    }
+
     pub fn active(&self) -> Option<&Tab> {
         let active = self.active.as_deref()?;
         self.tabs.iter().find(|tab| tab.id == active)
@@ -339,6 +346,8 @@ impl Model {
             appearance: self.appearance.clone(),
             full_url: self.full_url,
             downloads: Vec::new(),
+            bookmarked: false,
+            bookmarks: Vec::new(),
         }
     }
 
