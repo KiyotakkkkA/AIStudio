@@ -1187,7 +1187,7 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   | tier `auto` | runs | runs | runs | runs |
   | tier `ask`, not destructive | asks | runs | runs | runs |
   | `fs.apply` delete, overwrite, move onto a path | asks | asks | rules → judge → asks | runs |
-  | `browser.submit`, `browser.download` | asks | asks | asks | runs |
+  | `browser.submit`, `browser.download` (site rule `ask`) | asks | asks | asks | runs |
   | `shell.run` | asks | asks | rules → judge → asks | runs |
   | tier `off`, disabled tool, forbidden folder, outside a grant or the session workspace, credential and payment fields | refused | refused | refused | refused |
 
@@ -1665,26 +1665,34 @@ CDP client the account gateway uses. The driver in `src-tauri/src/browser/` sits
 port. The driver exposes a small, audited set of primitives; everything else is deliberately
 absent.
 
-| Node | Tier | Notes |
-| --- | --- | --- |
-| `browser.navigate` | auto | Blocked schemes: `file:`, `data:`, `javascript:` |
-| `browser.read_page` | auto | Accessibility tree, not raw DOM — smaller and less injectable |
-| `browser.screenshot` | auto | Saves JPEG to the owner's attachments/browser folder and returns its path; pixels require a separate fs.read call |
-| `browser.find` | auto | Locates an element, returns a handle |
-| `browser.click` · `browser.type` | per-site | Granted once per origin, revocable any time |
-| `browser.submit` · `browser.download` | always ask | Every time, regardless of prior grants |
-| Credential and payment fields | **never** | The driver refuses, by input type and field heuristics |
+| Node | Site action | Default | Notes |
+| --- | --- | --- | --- |
+| `browser.navigate` | browse | allow | Blocked schemes: `file:`, `data:`, `javascript:` |
+| `browser.read_page` | browse | allow | Accessibility tree, not raw DOM — smaller and less injectable |
+| `browser.screenshot` | browse | allow | Saves JPEG to the owner's attachments/browser folder and returns its path; pixels require a separate fs.read call |
+| `browser.find` | browse | allow | Locates an element, returns a handle |
+| `browser.click` · `browser.type` | click · type | ask | «Всегда на этом сайте» in the agent panel writes `allow` for the origin |
+| `browser.submit` · `browser.download` | submit · download | ask | Changed only in Preferences, never from the agent panel |
+| Credential and payment fields | — | **never** | The driver refuses, by input type and field heuristics; no rule reaches them |
 
-Grants are stored per origin, not per session, and are listed and revocable in the agent panel
-and in Settings. A chat reaches the `browser.*` tools only through the `/browser-use` command
+> Revised 2026-11-06: the fixed tiers became **site rules**. Each of the five site actions
+> resolves to `ask`, `allow` or `block` — first the rule for the page's origin, then the default
+> row the user set, then the defaults above. `allow` runs without asking, `ask` raises the
+> approval, `block` refuses before anything is asked or done. Rules are edited in «Параметры» →
+> «Браузер» → «Разрешения сайтов» (`browserSites.get` · `setDefault` · `put` · `remove`), which
+> replaced the Permissions page's «Браузер» tab and `browserGrants.*`. The agent panel lists and
+> revokes the origin's `allow` rules for click and type.
+
+Rules are stored per origin, not per session. A chat reaches the `browser.*` tools only through the `/browser-use` command
 (§14, *Chat tool set*). The tiers compose with the global tool ceiling (§14): the browser can never
 exceed what Tools allows, only narrow it.
 
-> Implementation (TASK_046, 2026-10-26). `zvs-host/src/browser/`: `capability.rs` holds the
-> table and `resolve_tier`, the one place a tier is decided; submit and download resolve to
-> `ask` without looking at grants. `grants.rs` stores `browser_grant` rows (origin ×
-> `browser.click` | `browser.type`, enforced by a `CHECK`); granting any other capability is
-> refused. A node's `permission_for` passes the resolved tier as the minimum to
+> Implementation (TASK_046, 2026-10-26; site rules 2026-11-06). `zvs-host/src/browser/`:
+> `grants.rs` stores `browser_site_rule` rows (origin × action × decision, both enforced by a
+> `CHECK`; the default row's origin is `*`) and is the one place a decision is made. Migration
+> 0040 turned every `browser_grant` row into an `allow` rule and dropped that table. The agent
+> panel can grant only click and type. A node's requirement takes the origin of the element, of
+> the address being opened, or of the current page. A node's `permission_for` passes the resolved tier as the minimum to
 > `PermissionService::admit_subject`, so the Tools page ceiling, `off` and a disabled tool still
 > win; on the Tools page navigate, click and type default to `auto` and submit and download to
 > `ask`. Every browser node defers approval and raises it itself, with scope `site:<origin>`
@@ -1746,7 +1754,8 @@ runaway loop stops itself.
 
 The threat is explicit: the agent reads pages, and pages can contain text aimed at the agent.
 Mitigations, in order of importance — page text is fenced as data (§14); irreversible actions
-always require a human (submit, download, purchase); credentials are never typed; the action
+require a human by default (submit, download, purchase; only a site rule set in Preferences
+lifts this, never the agent panel); credentials are never typed; the action
 log makes an anomaly visible immediately; the rate limiter bounds the blast radius. None is
 sufficient alone, which is why all five ship together.
 

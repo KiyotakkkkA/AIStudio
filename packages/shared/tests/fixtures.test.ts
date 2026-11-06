@@ -22,6 +22,7 @@ import * as artifacts from "../src/artifacts.js";
 import * as sites from "../src/sites.js";
 import * as execPolicy from "../src/execPolicy.js";
 import * as browserSettings from "../src/browserSettings.js";
+import * as browserSites from "../src/browserSites.js";
 import * as subagents from "../src/subagents.js";
 import * as cli from "../src/cli.js";
 import * as voice from "../src/voice.js";
@@ -66,8 +67,6 @@ import {
   AppGrantDto,
   AppGrantRef,
   AnswerAppRequestInput,
-  BrowserGrantDto,
-  BrowserGrantRef,
   contract,
   DeviceGpuDto,
   DeviceProfileDto,
@@ -315,6 +314,12 @@ const schemas: Record<string, z.ZodType> = {
   "sites/SiteIconDto": sites.SiteIconDto,
   "browserSettings/BrowserLinkTarget": browserSettings.BrowserLinkTarget,
   "browserSettings/BrowserSettingsDto": browserSettings.BrowserSettingsDto,
+  "browserSites/BrowserSiteAction": browserSites.BrowserSiteAction,
+  "browserSites/BrowserSiteDecision": browserSites.BrowserSiteDecision,
+  "browserSites/BrowserSitesDto": browserSites.BrowserSitesDto,
+  "browserSites/BrowserSiteDefaultInput": browserSites.BrowserSiteDefaultInput,
+  "browserSites/BrowserSitePutInput": browserSites.BrowserSitePutInput,
+  "browserSites/BrowserSiteRef": browserSites.BrowserSiteRef,
   "execPolicy/ExecMode": execPolicy.ExecMode,
   "execPolicy/ExecJudgeDto": execPolicy.ExecJudgeDto,
   "execPolicy/ExecPolicyDto": execPolicy.ExecPolicyDto,
@@ -483,8 +488,6 @@ const schemas: Record<string, z.ZodType> = {
   "computer/AppGrantDto": AppGrantDto,
   "computer/AppGrantRef": AppGrantRef,
   "computer/AnswerAppRequestInput": AnswerAppRequestInput,
-  "browser/BrowserGrantDto": BrowserGrantDto,
-  "browser/BrowserGrantRef": BrowserGrantRef,
   "accounts/AccountDto": AccountDto,
   "accounts/AccountLinkInput": contract["accounts.link"].input,
   "accounts/AccountRef": contract["accounts.refresh"].input,

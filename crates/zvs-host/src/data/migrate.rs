@@ -245,6 +245,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0039_app_grant",
         sql: include_str!("../../migrations/0039_app_grant.sql"),
     },
+    Migration {
+        id: 40,
+        name: "0040_browser_site_rule",
+        sql: include_str!("../../migrations/0040_browser_site_rule.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -744,6 +749,39 @@ mod tests {
             query(
                 &database,
                 "SELECT name FROM pragma_table_info('conversation') WHERE name = 'enabled_tools'"
+            )
+            .is_empty()
+        );
+    }
+
+    #[test]
+    fn browser_grants_become_allow_rules_for_their_site() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..40], &options(&backups, &clock)).expect("applies");
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    "INSERT INTO browser_grant (id, origin, capability, granted_at) VALUES ('g1', 'https://shop.example', 'browser.click', 5), ('g2', 'https://shop.example', 'browser.type', 6);",
+                )?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        assert_eq!(
+            query(
+                &database,
+                "SELECT id || ' ' || origin || ' ' || action || ' ' || decision || ' ' || updated_at FROM browser_site_rule ORDER BY id"
+            ),
+            [
+                "g1 https://shop.example click allow 5",
+                "g2 https://shop.example type allow 6",
+            ]
+        );
+        assert!(
+            query(
+                &database,
+                "SELECT name FROM sqlite_master WHERE name = 'browser_grant'"
             )
             .is_empty()
         );

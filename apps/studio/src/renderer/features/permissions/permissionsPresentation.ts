@@ -1,17 +1,10 @@
-import {
-  AppErrorCode,
-  type AppGrantDto,
-  type BrowserGrantDto,
-  type FolderGrantDto,
-} from "@zvs/shared";
+import { AppErrorCode, type AppGrantDto, type FolderGrantDto } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 import { plural } from "../connections/connectionPresentation";
 import { formatLastUsed } from "../tools/toolPresentation";
 
 export const PAGE_TITLE = "Разрешения";
 export const FOLDERS_TAB = "Папки";
-export const BROWSER_TAB = "Браузер";
-export const BROWSER_TAB_PARAM = "browser";
 export const APPS_TAB = "Приложения";
 export const APPS_TAB_PARAM = "apps";
 export const APPS_SEARCH_LABEL = "Поиск приложений";
@@ -22,17 +15,6 @@ export const APPS_EMPTY_DESCRIPTION =
 export const APPS_NOTHING_SELECTED = "Выберите приложение в списке.";
 export const APPS_LOAD_ERROR = "Не удалось загрузить разрешения приложений. Попробуйте ещё раз.";
 export const APP_PATH_UNKNOWN = "Путь не определён";
-export const SITES_TITLE = "Разрешения на сайтах";
-export const SITES_DESCRIPTION = "Действия, которые агент выполняет на сайте без подтверждения.";
-export const SITES_EMPTY_TITLE = "Разрешений для сайтов нет";
-export const SITES_EMPTY_DESCRIPTION = "Разрешение появляется после ответа «Всегда на этом сайте».";
-export const SITE_GRANTED_COLUMN = "Выдано";
-export const SITES_LOAD_ERROR = "Не удалось загрузить разрешения сайтов. Попробуйте ещё раз.";
-
-const SITE_ACTIONS: Readonly<Record<string, string>> = {
-  "browser.click": "Нажатия",
-  "browser.type": "Ввод текста",
-};
 export const ALWAYS_SECTION = "Постоянные";
 export const DIALOG_SECTION = "В диалогах";
 export const REVOKE = "Отозвать";
@@ -71,41 +53,6 @@ export function appRevokeConsequence(grant: AppGrantDto): string {
     : `Агент снова запросит доступ к ${grant.app} в диалоге «${grant.conversation.title}».`;
 }
 
-export function siteCountLabel(count: number): string {
-  return plural(count, "сайт", "сайта", "сайтов");
-}
-
-export function siteActionLabel(tool: string): string {
-  return SITE_ACTIONS[tool] ?? tool;
-}
-
-export function siteHost(origin: string): string {
-  try {
-    return new URL(origin).host;
-  } catch {
-    return origin;
-  }
-}
-
-export interface SiteGrantGroup {
-  readonly origin: string;
-  readonly host: string;
-  readonly grants: readonly BrowserGrantDto[];
-}
-
-export function groupSiteGrants(grants: readonly BrowserGrantDto[]): SiteGrantGroup[] {
-  const groups = new Map<string, BrowserGrantDto[]>();
-  for (const grant of grants)
-    groups.set(grant.origin, [...(groups.get(grant.origin) ?? []), grant]);
-  return [...groups]
-    .map(([origin, list]) => ({
-      origin,
-      host: siteHost(origin),
-      grants: list.slice().sort((a, b) => a.tool.localeCompare(b.tool)),
-    }))
-    .sort((a, b) => a.host.localeCompare(b.host, "ru-RU"));
-}
-
 export function chatsLabel(count: number): string {
   return plural(count, "диалог", "диалога", "диалогов");
 }
@@ -142,10 +89,6 @@ export function revokeConsequence(grant: FolderGrantDto): string {
       ? ""
       : ` ${bound === 1 ? "Привязанный диалог сохранит" : "Привязанные диалоги сохранят"} рабочую папку, но следующий доступ к ней потребует подтверждения.`;
   return `Доступ к папке ${grant.path} будет закрыт.${kept}`;
-}
-
-export function siteRevokeConsequence(grant: BrowserGrantDto): string {
-  return `«${siteActionLabel(grant.tool)}» на ${siteHost(grant.origin)} снова потребуют подтверждения.`;
 }
 
 export function revokeErrorCopy(error: unknown): string {

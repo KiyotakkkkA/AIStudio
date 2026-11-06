@@ -8,6 +8,7 @@ import Alert from "../../ui/molecules/Alert";
 import PreferenceContainer from "../../ui/molecules/PreferenceContainer";
 import { useStore } from "../../stores/useStore";
 import SettingRow from "../preferences/SettingRow";
+import SitePermissions from "./SitePermissions";
 import { TOGGLE_OFF, TOGGLE_ON } from "../preferences/preferencesPresentation";
 import {
   BROWSER_DISABLED_NOTE,
@@ -114,6 +115,7 @@ export default observer(function BrowserPreferences() {
       )}
       <BrowserSwitch />
       <GeneralBlock />
+      <SitePermissions />
     </div>
   );
 });

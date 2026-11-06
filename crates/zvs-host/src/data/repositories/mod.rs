@@ -1,7 +1,7 @@
 pub mod account;
 pub mod agentic;
 pub mod app_grant;
-pub mod browser_grant;
+pub mod browser_site_rule;
 pub mod chat;
 pub mod document;
 pub mod download;
@@ -32,7 +32,7 @@ pub use account::{
 };
 pub use agentic::AgenticSessionRepository;
 pub use app_grant::AppGrantRepository;
-pub use browser_grant::BrowserGrantRepository;
+pub use browser_site_rule::BrowserSiteRuleRepository;
 pub use chat::{ChatRepository, ConversationPatch, MessagePatch};
 pub use document::DocumentRepository;
 pub use download::{DownloadPatch, DownloadRepository};
@@ -86,7 +86,7 @@ pub struct Repositories<'c> {
     pub memory: MemoryRepository<'c>,
     pub agentic_sessions: AgenticSessionRepository<'c>,
     pub app_grants: AppGrantRepository<'c>,
-    pub browser_grants: BrowserGrantRepository<'c>,
+    pub browser_site_rules: BrowserSiteRuleRepository<'c>,
     pub integrations: IntegrationRepository<'c>,
 }
 
@@ -117,7 +117,7 @@ impl<'c> Repositories<'c> {
             memory: MemoryRepository::new(connection),
             agentic_sessions: AgenticSessionRepository::new(connection),
             app_grants: AppGrantRepository::new(connection),
-            browser_grants: BrowserGrantRepository::new(connection),
+            browser_site_rules: BrowserSiteRuleRepository::new(connection),
             integrations: IntegrationRepository::new(connection),
         }
     }

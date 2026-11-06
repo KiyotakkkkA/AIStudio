@@ -20,6 +20,7 @@ import {
   WEB_LINKS_ID,
   WEB_LINKS_LABEL,
 } from "../browser/browserSettingsCopy";
+import { SITES_ID, SITES_TITLE } from "../browser/browserSitesCopy";
 import {
   APP_ROW_LABELS,
   CLI_ROW_LABELS,
@@ -131,6 +132,7 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: WEB_LINKS_ID, section: "browser", label: WEB_LINKS_LABEL },
   { id: LOCAL_LINKS_ID, section: "browser", label: LOCAL_LINKS_LABEL },
   { id: FULL_URL_ID, section: "browser", label: FULL_URL_LABEL },
+  { id: SITES_ID, section: "browser", label: SITES_TITLE },
   ...Object.values(APP_ROW_LABELS).map((label) => ({
     id: aboutSettingId("app", label),
     section: "about" as const,

@@ -1,19 +1,7 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
-import type {
-  AppGrantDto,
-  BrowserGrantDto,
-  Contract,
-  FolderGrantDto,
-  FolderGrantId,
-} from "@zvs/shared";
-import {
-  APPS_LOAD_ERROR,
-  LOAD_ERROR,
-  SITES_LOAD_ERROR,
-  groupSiteGrants,
-  revokeErrorCopy,
-} from "./permissionsPresentation";
+import type { AppGrantDto, Contract, FolderGrantDto, FolderGrantId } from "@zvs/shared";
+import { APPS_LOAD_ERROR, LOAD_ERROR, revokeErrorCopy } from "./permissionsPresentation";
 
 export interface PermissionsStoreOptions {
   readonly clock?: () => number;
@@ -27,9 +15,6 @@ export default class PermissionsStore {
   query = "";
   selectedId: FolderGrantId | null = null;
   revoking = false;
-  siteGrants: BrowserGrantDto[] = [];
-  siteGrantsLoaded = false;
-  revokingSiteGrant: string | null = null;
   appGrants: AppGrantDto[] = [];
   appGrantsLoaded = false;
   appQuery = "";
@@ -144,10 +129,6 @@ export default class PermissionsStore {
     await this.loadAppGrants();
   }
 
-  get siteGroups() {
-    return groupSiteGrants(this.siteGrants);
-  }
-
   get isEmpty(): boolean {
     return this.loaded && this.grants.length === 0;
   }
@@ -206,39 +187,6 @@ export default class PermissionsStore {
       });
     }
     await this.load();
-  }
-
-  async loadSiteGrants() {
-    try {
-      const grants = await this.ipc.call("browserGrants.list", undefined);
-      runInAction(() => {
-        this.siteGrants = grants;
-        this.siteGrantsLoaded = true;
-        if (this.error === SITES_LOAD_ERROR) this.error = null;
-      });
-    } catch {
-      runInAction(() => {
-        this.error = SITES_LOAD_ERROR;
-      });
-    }
-  }
-
-  async revokeSiteGrant(id: string) {
-    if (this.revokingSiteGrant !== null) return;
-    this.revokingSiteGrant = id;
-    this.error = null;
-    try {
-      await this.ipc.call("browserGrants.revoke", { id });
-    } catch (error) {
-      runInAction(() => {
-        this.error = revokeErrorCopy(error);
-      });
-    } finally {
-      runInAction(() => {
-        this.revokingSiteGrant = null;
-      });
-    }
-    await this.loadSiteGrants();
   }
 
   dispose() {

@@ -1,0 +1,7 @@
+[
+  { "name": "browse", "value": "browse" },
+  { "name": "click", "value": "click" },
+  { "name": "type", "value": "type" },
+  { "name": "submit", "value": "submit" },
+  { "name": "download", "value": "download" }
+]

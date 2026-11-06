@@ -1,0 +1,41 @@
+[
+  {
+    "name": "a default is missing",
+    "value": {
+      "defaults": { "browse": "allow", "click": "ask", "type": "ask", "submit": "ask" },
+      "sites": []
+    }
+  },
+  {
+    "name": "origin is not a url",
+    "value": {
+      "defaults": {
+        "browse": "allow",
+        "click": "ask",
+        "type": "ask",
+        "submit": "ask",
+        "download": "ask"
+      },
+      "sites": [{ "origin": "portal", "rules": {}, "updatedAt": 1793037480000 }]
+    }
+  },
+  {
+    "name": "unknown decision in a site rule",
+    "value": {
+      "defaults": {
+        "browse": "allow",
+        "click": "ask",
+        "type": "ask",
+        "submit": "ask",
+        "download": "ask"
+      },
+      "sites": [
+        {
+          "origin": "https://portal.acme.io",
+          "rules": { "click": "sometimes" },
+          "updatedAt": 1793037480000
+        }
+      ]
+    }
+  }
+]

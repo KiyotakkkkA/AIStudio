@@ -1,0 +1,7 @@
+[
+  { "name": "empty site", "value": { "site": "", "rules": {} } },
+  {
+    "name": "unknown decision",
+    "value": { "site": "portal.acme.io", "rules": { "type": "maybe" } }
+  }
+]

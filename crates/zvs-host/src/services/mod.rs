@@ -127,6 +127,7 @@ pub struct Services {
     pub subagents: SubagentService,
     pub browser: crate::browser::BrowserAgent,
     pub browser_settings: crate::browser::BrowserSettings,
+    pub browser_sites: crate::browser::BrowserGrants,
     pub computer: crate::computer::ComputerAgent,
     pub picker: Option<SharedPicker>,
     pub cli: crate::cli::SharedCliInstaller,

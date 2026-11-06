@@ -21,7 +21,7 @@ use super::automation::{
     PageScreenshot, PageSnapshot, PageState, UNKNOWN_HANDLE,
 };
 use super::capability::BrowserCapability;
-use super::grants::{BrowserGrants, NOT_A_SITE, NOT_GRANTABLE};
+use super::grants::{BrowserGrants, NOT_A_SITE, NOT_GRANTABLE, SITE_BLOCKED};
 use super::nodes::{Browser, CLICK_ACTION, SUBMIT_ACTION, TYPE_ACTION, register_browser_nodes};
 use super::page::PageElement;
 use crate::kernel::PermissionRequirement;
@@ -30,6 +30,9 @@ use crate::platform::events::EventBus;
 use crate::services::SystemService;
 use crate::services::permissions::GLOBAL_SCOPE;
 use crate::testing::{TestServices, test_services};
+use zvs_contract::{
+    BrowserSiteAction, BrowserSiteDecision, BrowserSiteDefaultsDto, BrowserSiteRulesDto,
+};
 
 const SHOP: &str = "https://shop.example";
 const OTHER: &str = "https://other.example";
@@ -1047,16 +1050,16 @@ async fn every_site_grant_is_listed_and_a_missing_one_is_not_revoked() {
     host.grants
         .grant(OTHER, BrowserCapability::Type)
         .expect("grants typing elsewhere");
-    let listed = host.agent.site_grants().expect("lists");
+    let listed = host.grants.list().expect("lists");
     assert_eq!(listed.len(), 2);
     let shop = listed
         .iter()
         .find(|grant| grant.id == click.id)
         .expect("lists the shop grant");
     assert_eq!(shop.origin, SHOP);
-    assert_eq!(shop.tool, "browser.click");
+    assert_eq!(shop.capability, BrowserCapability::Click);
     host.agent.revoke(&click.id).expect("revokes");
-    assert_eq!(host.agent.site_grants().expect("lists").len(), 1);
+    assert_eq!(host.grants.list().expect("lists").len(), 1);
     let missing = host.agent.revoke(&click.id).expect_err("already revoked");
     assert_eq!(missing.code, AppErrorCode::NotFound);
     assert_eq!(missing.message, GRANT_NOT_FOUND);
@@ -1072,4 +1075,144 @@ async fn the_target_is_outlined_by_the_host_while_the_action_runs() {
     host.run("browser.read_page", json!({})).await;
     assert_eq!(host.port.highlights(), [Some("e1".to_owned()), None]);
     assert_eq!(host.snapshot().target, None);
+}
+
+#[tokio::test]
+async fn a_blocked_action_is_refused_before_anything_asks_or_acts() {
+    let host = Host::new();
+    host.grants
+        .put(
+            SHOP,
+            &BrowserSiteRulesDto {
+                click: Some(BrowserSiteDecision::Block),
+                ..BrowserSiteRulesDto::default()
+            },
+        )
+        .expect("blocks clicks on the shop");
+    let (status, _, error) = host.run("browser.click", json!({ "handle": "e1" })).await;
+    assert_eq!(status, RunStatus::Failed);
+    assert!(error.is_some_and(|error| error.contains(SITE_BLOCKED)));
+    assert!(host.port.calls().is_empty());
+
+    host.grants
+        .set_default(BrowserSiteAction::Browse, BrowserSiteDecision::Block)
+        .expect("blocks browsing everywhere");
+    let (status, _, _) = host.run("browser.read_page", json!({})).await;
+    assert_eq!(status, RunStatus::Failed);
+    assert!(host.port.calls().is_empty());
+}
+
+#[tokio::test]
+async fn a_site_rule_overrides_the_default_and_the_default_overrides_the_built_in_table() {
+    let host = Host::new();
+    host.grants
+        .set_default(BrowserSiteAction::Browse, BrowserSiteDecision::Ask)
+        .expect("asks before browsing");
+    host.approved("browser.read_page", json!({})).await;
+    host.grants
+        .put(
+            SHOP,
+            &BrowserSiteRulesDto {
+                browse: Some(BrowserSiteDecision::Allow),
+                submit: Some(BrowserSiteDecision::Allow),
+                ..BrowserSiteRulesDto::default()
+            },
+        )
+        .expect("trusts the shop");
+    let (status, _, _) = host.run("browser.read_page", json!({})).await;
+    assert_eq!(status, RunStatus::Succeeded);
+    assert_eq!(
+        host.browser
+            .requirement(BrowserCapability::Submit, &json!({ "handle": "e3" })),
+        PermissionRequirement::tool_at(BrowserCapability::Submit.key(), ToolTier::Auto)
+    );
+    assert_eq!(
+        host.browser.requirement(
+            BrowserCapability::Navigate,
+            &json!({ "url": "other.example/path" })
+        ),
+        PermissionRequirement::tool_at(BrowserCapability::Navigate.key(), ToolTier::Ask)
+    );
+}
+
+#[test]
+fn the_sites_view_groups_rules_by_origin_and_put_replaces_a_site() {
+    let host = Host::new();
+    let empty = host.grants.sites().expect("lists");
+    assert_eq!(empty.defaults, BrowserSiteDefaultsDto::default());
+    assert!(empty.sites.is_empty());
+
+    let typed = host
+        .grants
+        .put(
+            "  shop.example/checkout?step=2 ",
+            &BrowserSiteRulesDto {
+                click: Some(BrowserSiteDecision::Allow),
+                download: Some(BrowserSiteDecision::Block),
+                ..BrowserSiteRulesDto::default()
+            },
+        )
+        .expect("adds the shop");
+    assert_eq!(typed.sites.len(), 1);
+    assert_eq!(typed.sites[0].origin, SHOP);
+    assert_eq!(
+        typed.sites[0].rules,
+        BrowserSiteRulesDto {
+            click: Some(BrowserSiteDecision::Allow),
+            download: Some(BrowserSiteDecision::Block),
+            ..BrowserSiteRulesDto::default()
+        }
+    );
+    assert_eq!(host.grants.list().expect("lists").len(), 1);
+
+    let replaced = host
+        .grants
+        .put(
+            SHOP,
+            &BrowserSiteRulesDto {
+                type_text: Some(BrowserSiteDecision::Ask),
+                ..BrowserSiteRulesDto::default()
+            },
+        )
+        .expect("replaces the shop rules");
+    assert_eq!(
+        replaced.sites[0].rules,
+        BrowserSiteRulesDto {
+            type_text: Some(BrowserSiteDecision::Ask),
+            ..BrowserSiteRulesDto::default()
+        }
+    );
+    assert!(
+        host.grants
+            .put(SHOP, &BrowserSiteRulesDto::default())
+            .expect("clears")
+            .sites
+            .is_empty()
+    );
+    for site in ["file:///C:/", "javascript:alert(1)", ""] {
+        assert_eq!(
+            host.grants
+                .put(site, &BrowserSiteRulesDto::default())
+                .expect_err("refused")
+                .message,
+            NOT_A_SITE,
+            "{site}"
+        );
+    }
+    host.grants
+        .put(
+            OTHER,
+            &BrowserSiteRulesDto {
+                browse: Some(BrowserSiteDecision::Block),
+                ..BrowserSiteRulesDto::default()
+            },
+        )
+        .expect("adds");
+    assert!(
+        host.grants
+            .remove_site(OTHER)
+            .expect("removes")
+            .sites
+            .is_empty()
+    );
 }

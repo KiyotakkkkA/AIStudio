@@ -986,7 +986,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         &nodes,
         &BrowserTools::new(
             Arc::new(workspace.clone()),
-            grants,
+            grants.clone(),
             runs.approvals(),
             agent.clone(),
         )
@@ -1299,6 +1299,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         subagents,
         browser: agent.clone(),
         browser_settings,
+        browser_sites: grants,
         computer: computer_agent.clone(),
         folders,
         picker: Some(picker),

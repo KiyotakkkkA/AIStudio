@@ -4,15 +4,12 @@ import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import FolderGrantDetail from "../features/permissions/FolderGrantDetail";
 import FolderGrantList from "../features/permissions/FolderGrantList";
-import SiteGrantsTable from "../features/permissions/SiteGrantsTable";
 import AppGrantList from "../features/permissions/AppGrantList";
 import AppGrantDetail from "../features/permissions/AppGrantDetail";
 import {
   APPS_NOTHING_SELECTED,
   APPS_TAB,
   APPS_TAB_PARAM,
-  BROWSER_TAB,
-  BROWSER_TAB_PARAM,
   FOLDERS_TAB,
   NOTHING_SELECTED_DESCRIPTION,
   NOTHING_SELECTED_TITLE,
@@ -28,7 +25,6 @@ import { awaitingData } from "../ui/molecules/LoadingSkeleton";
 
 const TABS = [
   { value: "folders", label: FOLDERS_TAB },
-  { value: BROWSER_TAB_PARAM, label: BROWSER_TAB },
   { value: APPS_TAB_PARAM, label: APPS_TAB },
 ] as const;
 
@@ -57,9 +53,7 @@ function PermissionsPage() {
       subtitle={
         tab === APPS_TAB_PARAM
           ? "Управление доступом к приложениям"
-          : tab === BROWSER_TAB_PARAM
-            ? "Управление доступом к сайтам и действиям в браузере"
-            : "Управление доступом к файлам и папкам"
+          : "Управление доступом к файлам и папкам"
       }
       toolbar={<PageTabs label="Вид разрешений" value={tab} tabs={TABS} onChange={setTab} />}
     >
@@ -68,9 +62,7 @@ function PermissionsPage() {
           {permissions.error}
         </Alert>
       )}
-      {tab === BROWSER_TAB_PARAM ? (
-        <SiteGrantsTable />
-      ) : tab === APPS_TAB_PARAM ? (
+      {tab === APPS_TAB_PARAM ? (
         <div className="flex min-h-0 flex-1">
           <AppGrantList />
           {permissions.selectedApp === null ? (

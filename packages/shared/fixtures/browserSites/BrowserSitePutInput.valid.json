@@ -1,0 +1,7 @@
+[
+  {
+    "name": "a typed site with two rules",
+    "value": { "site": "portal.acme.io", "rules": { "click": "allow", "submit": "ask" } }
+  },
+  { "name": "clearing every rule", "value": { "site": "https://portal.acme.io", "rules": {} } }
+]

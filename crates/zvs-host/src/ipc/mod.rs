@@ -1,8 +1,8 @@
 pub mod accounts;
 pub mod agentic;
 pub mod artifacts;
-pub mod browser_grants;
 pub mod browser_settings;
+pub mod browser_sites;
 pub mod chat;
 pub mod cli;
 pub mod computer;
@@ -66,8 +66,8 @@ pub fn register(server: &mut IpcServer) {
     shells::register(server);
     documents::register(server);
     artifacts::register(server);
-    browser_grants::register(server);
     browser_settings::register(server);
+    browser_sites::register(server);
     computer::register(server);
     storage::register(server);
     voice::register(server);
@@ -124,10 +124,12 @@ mod tests {
                 "artifacts.openInBrowser",
                 "artifacts.reveal",
                 "artifacts.save",
-                "browserGrants.list",
-                "browserGrants.revoke",
                 "browserSettings.get",
                 "browserSettings.set",
+                "browserSites.get",
+                "browserSites.put",
+                "browserSites.remove",
+                "browserSites.setDefault",
                 "chat.answer",
                 "chat.attach",
                 "chat.bindFolder",

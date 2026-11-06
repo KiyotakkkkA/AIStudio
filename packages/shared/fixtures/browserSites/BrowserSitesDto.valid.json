@@ -1,0 +1,34 @@
+[
+  {
+    "name": "defaults only",
+    "value": {
+      "defaults": {
+        "browse": "allow",
+        "click": "ask",
+        "type": "ask",
+        "submit": "ask",
+        "download": "ask"
+      },
+      "sites": []
+    }
+  },
+  {
+    "name": "a site with exceptions",
+    "value": {
+      "defaults": {
+        "browse": "allow",
+        "click": "ask",
+        "type": "ask",
+        "submit": "ask",
+        "download": "block"
+      },
+      "sites": [
+        {
+          "origin": "https://portal.acme.io",
+          "rules": { "click": "allow", "type": "allow" },
+          "updatedAt": 1793037480000
+        }
+      ]
+    }
+  }
+]

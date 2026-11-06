@@ -1,0 +1,5 @@
+[
+  { "name": "ask", "value": "ask" },
+  { "name": "allow", "value": "allow" },
+  { "name": "block", "value": "block" }
+]

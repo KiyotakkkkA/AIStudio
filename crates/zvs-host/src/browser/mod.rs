@@ -17,7 +17,10 @@ pub use agent::{AgentChange, AgentControls, AgentRuns, BrowserAgent, setting_lim
 pub use automation::{AutomationPort, ElementTarget, SharedAutomation};
 pub use capability::{BrowserCapability, BrowserTier, resolve_tier, site_origin, site_scope};
 pub use credentials::{FieldFacts, SecretField, secret_field};
-pub use grants::{BrowserGrant, BrowserGrants};
+pub use grants::{
+    BrowserGrant, BrowserGrants, DEFAULT_ORIGIN, SITE_BLOCKED, SiteDecision, canonical_site,
+    site_action,
+};
 pub use lifecycle::{BrowserLifecycle, BrowserLifecycleEvent, LifecycleSubscription};
 pub use network::{NetworkCapture, NetworkEvent, NetworkLog, SharedNetworkCapture, record_for};
 pub use nodes::{Browser, register_browser_nodes};

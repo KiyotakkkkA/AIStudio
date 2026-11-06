@@ -43,8 +43,13 @@ import {
   PickFolderResultDto,
 } from "../chat.js";
 import { AnswerFolderRequestInput, FolderGrantDto, FolderGrantRef } from "../folders.js";
-import { BrowserGrantDto, BrowserGrantRef } from "../browser.js";
 import { BrowserSettingsDto } from "../browserSettings.js";
+import {
+  BrowserSiteDefaultInput,
+  BrowserSitePutInput,
+  BrowserSiteRef,
+  BrowserSitesDto,
+} from "../browserSites.js";
 import { AnswerAppRequestInput, AppGrantDto, AppGrantRef } from "../computer.js";
 import { ChatAnswerInput, ChatSkipInput } from "../questions.js";
 import {
@@ -335,11 +340,13 @@ export const contract = defineContract({
   "folders.list": { input: z.void(), output: z.array(FolderGrantDto) },
   "folders.revoke": { input: FolderGrantRef, output: z.void() },
   "folders.answer": { input: AnswerFolderRequestInput, output: z.void() },
-  "browserGrants.list": { input: z.void(), output: z.array(BrowserGrantDto) },
   "computer.grants": { input: z.void(), output: z.array(AppGrantDto) },
   "computer.revoke": { input: AppGrantRef, output: z.void() },
   "computer.answer": { input: AnswerAppRequestInput, output: z.void() },
-  "browserGrants.revoke": { input: BrowserGrantRef, output: z.void() },
+  "browserSites.get": { input: z.void(), output: BrowserSitesDto },
+  "browserSites.setDefault": { input: BrowserSiteDefaultInput, output: BrowserSitesDto },
+  "browserSites.put": { input: BrowserSitePutInput, output: BrowserSitesDto },
+  "browserSites.remove": { input: BrowserSiteRef, output: BrowserSitesDto },
   "browserSettings.get": { input: z.void(), output: BrowserSettingsDto },
   "browserSettings.set": { input: BrowserSettingsDto, output: BrowserSettingsDto },
   "agentic.list": { input: z.void(), output: z.array(AgenticSessionDto) },

@@ -4,6 +4,7 @@ pub mod ai;
 pub mod artifacts;
 pub mod browser;
 pub mod browser_settings;
+pub mod browser_sites;
 pub mod channels;
 pub mod chat;
 pub mod cli;
@@ -80,12 +81,15 @@ pub use artifacts::{
 pub use browser::{
     BrowserActionState, BrowserAgentAction, BrowserAgentApproval, BrowserAgentState,
     BrowserAgentStatus, BrowserAppearance, BrowserAuthorisation, BrowserBounds, BrowserCommand,
-    BrowserCommandOutput, BrowserCookie, BrowserGrantDto, BrowserGrantRef, BrowserGrantsListOutput,
-    BrowserHeader, BrowserNetworkBody, BrowserNetworkDetail, BrowserNetworkEntry,
-    BrowserNetworkLog, BrowserNetworkSaved, BrowserRequestState, BrowserSecurity, BrowserSiteGrant,
-    BrowserState, BrowserTab, BrowserTheme,
+    BrowserCommandOutput, BrowserCookie, BrowserHeader, BrowserNetworkBody, BrowserNetworkDetail,
+    BrowserNetworkEntry, BrowserNetworkLog, BrowserNetworkSaved, BrowserRequestState,
+    BrowserSecurity, BrowserSiteGrant, BrowserState, BrowserTab, BrowserTheme,
 };
 pub use browser_settings::{BrowserLinkTarget, BrowserSettingsDto};
+pub use browser_sites::{
+    BrowserSiteAction, BrowserSiteDecision, BrowserSiteDefaultInput, BrowserSiteDefaultsDto,
+    BrowserSiteDto, BrowserSitePutInput, BrowserSiteRef, BrowserSiteRulesDto, BrowserSitesDto,
+};
 pub use channels::{CHANNELS, is_channel};
 pub use chat::{
     BranchConversationInput, ChatAttachDto, ChatAttachInput, ChatAttachOutput, ChatCarriedKind,

@@ -3,7 +3,6 @@ import { createIpcClient } from "@zvs/ipc";
 import {
   AppErrorCode,
   contract,
-  type BrowserGrantDto,
   type Contract,
   type ConversationId,
   type FolderGrantDto,
@@ -15,7 +14,6 @@ import PermissionsStore from "../../src/renderer/features/permissions/Permission
 import {
   ALREADY_REVOKED,
   LOAD_ERROR,
-  SITES_LOAD_ERROR,
   boundLabel,
   lastUsedLabel,
   revokeConsequence,
@@ -127,61 +125,4 @@ test("the revoke confirmation names the folder and what happens to bound chats",
   expect(revokeConsequence(bound)).toContain(bound.path);
   expect(revokeConsequence(bound)).toContain("Привязанные диалоги сохранят");
   expect(revokeConsequence(grant(3))).toBe(`Доступ к папке ${grant(3).path} будет закрыт.`);
-});
-
-describe("site grants", () => {
-  const SHOP = "https://shop.acme.io";
-  const PORTAL = "https://portal.acme.io";
-
-  function siteGrant(n: number, origin: string, tool: string): BrowserGrantDto {
-    return {
-      id: `0199dd11-7777-7111-8111-${String(n).padStart(12, "0")}`,
-      origin,
-      tool,
-      grantedAt: 1_000,
-    };
-  }
-
-  function siteSetup(grants: BrowserGrantDto[]) {
-    const bridge = createFakeBridge<Contract>();
-    let stored = [...grants];
-    bridge
-      .handle("browserGrants.list", () => stored)
-      .handle("browserGrants.revoke", ({ id: revoked }) => {
-        stored = stored.filter((item) => item.id !== revoked);
-      });
-    return { bridge, store: new PermissionsStore(createIpcClient(contract, bridge)) };
-  }
-
-  test("groups the grants by site and revokes one", async () => {
-    const { bridge, store } = siteSetup([
-      siteGrant(1, SHOP, "browser.type"),
-      siteGrant(2, PORTAL, "browser.click"),
-      siteGrant(3, SHOP, "browser.click"),
-    ]);
-    await store.loadSiteGrants();
-    expect(store.siteGrantsLoaded).toBe(true);
-    expect(store.siteGroups.map((group) => group.host)).toEqual(["portal.acme.io", "shop.acme.io"]);
-    expect(store.siteGroups[1]?.grants.map((grant) => grant.tool)).toEqual([
-      "browser.click",
-      "browser.type",
-    ]);
-
-    await store.revokeSiteGrant(siteGrant(3, SHOP, "browser.click").id);
-    expect(bridge.calls.filter((call) => call.channel === "browserGrants.revoke")).toHaveLength(1);
-    expect(store.siteGroups[1]?.grants.map((grant) => grant.tool)).toEqual(["browser.type"]);
-    expect(store.revokingSiteGrant).toBeNull();
-  });
-
-  test("maps a stale revoke and a failed load to copy", async () => {
-    const { bridge, store } = siteSetup([]);
-    bridge.fail("browserGrants.revoke", AppErrorCode.NOT_FOUND, "Разрешение не найдено");
-    await store.revokeSiteGrant(siteGrant(1, SHOP, "browser.click").id);
-    expect(store.error).toBe(ALREADY_REVOKED);
-
-    bridge.fail("browserGrants.list", AppErrorCode.DB_ERROR, "db");
-    await store.loadSiteGrants();
-    expect(store.error).toBe(SITES_LOAD_ERROR);
-    expect(store.siteGrantsLoaded).toBe(true);
-  });
 });

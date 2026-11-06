@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use zvs_contract::validate::{check, invalid, js_slice};
 use zvs_contract::{
-    AppError, AppErrorCode, BrowserAgentApproval, BrowserAuthorisation, ToolAuthorisationDto,
-    ToolAuthorisationKind, Validate,
+    AppError, AppErrorCode, BrowserAgentApproval, BrowserAuthorisation, BrowserSiteAction,
+    BrowserSiteDecision, ToolAuthorisationDto, ToolAuthorisationKind, Validate,
 };
 
 use super::agent::BrowserAgent;
@@ -18,7 +18,7 @@ use super::automation::{
     conflict, refused,
 };
 use super::capability::{BrowserCapability, site_origin, site_scope};
-use super::grants::BrowserGrants;
+use super::grants::{BrowserGrants, SITE_BLOCKED, site_action};
 use super::page::{PageElement, fence_page};
 use super::policy::navigation_url;
 use crate::kernel::{
@@ -332,11 +332,20 @@ impl Browser {
         capability: BrowserCapability,
         input: &Value,
     ) -> PermissionRequirement {
-        let origin = input
-            .get("handle")
-            .and_then(Value::as_str)
-            .and_then(|handle| self.port.target(handle))
-            .map(|target| target.origin);
+        let origin = if let Some(handle) = input.get("handle") {
+            handle
+                .as_str()
+                .and_then(|handle| self.port.target(handle))
+                .map(|target| target.origin)
+        } else if let Some(url) = input.get("url") {
+            url.as_str()
+                .and_then(|url| navigation_url(url).ok())
+                .and_then(|url| site_origin(&url))
+        } else if site_action(capability) == BrowserSiteAction::Browse {
+            self.port.origin()
+        } else {
+            None
+        };
         PermissionRequirement::tool_at(
             capability.key(),
             self.grants.tier(capability, origin.as_deref()),
@@ -364,17 +373,18 @@ impl Browser {
         target: Option<&ElementTarget>,
         extra: Option<(&str, Value)>,
     ) -> Result<(), AppError> {
+        let decided = self.grants.decision(origin.as_deref(), capability);
+        if decided.decision == BrowserSiteDecision::Block {
+            return Err(AppError::new(AppErrorCode::PermissionDenied, SITE_BLOCKED));
+        }
         let Some(ticket) = act.context.take_deferred_approval() else {
-            let grant = origin
-                .as_deref()
-                .filter(|_| capability.grantable())
-                .and_then(|origin| self.grants.find(origin, capability).ok().flatten());
+            let granted = decided
+                .updated_at
+                .filter(|_| decided.site && decided.decision == BrowserSiteDecision::Allow);
             self.agent.authorised(
                 act.action,
-                grant.map_or(BrowserAuthorisation::Auto, |grant| {
-                    BrowserAuthorisation::Granted {
-                        at: grant.granted_at,
-                    }
+                granted.map_or(BrowserAuthorisation::Auto, |at| {
+                    BrowserAuthorisation::Granted { at }
                 }),
             );
             return Ok(());

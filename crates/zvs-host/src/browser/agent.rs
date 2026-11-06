@@ -6,8 +6,8 @@ use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, AppErrorCode, BrowserActionState, BrowserAgentAction, BrowserAgentApproval,
-    BrowserAgentState, BrowserAgentStatus, BrowserAuthorisation, BrowserGrantDto, BrowserSiteGrant,
-    HostEvent, RunId,
+    BrowserAgentState, BrowserAgentStatus, BrowserAuthorisation, BrowserSiteGrant, HostEvent,
+    RunId,
 };
 
 use super::capability::BrowserCapability;
@@ -569,23 +569,6 @@ impl BrowserAgent {
         }
         self.changed(AgentChange::Updated);
         Ok(())
-    }
-
-    pub fn site_grants(&self) -> Result<Vec<BrowserGrantDto>, AppError> {
-        let Some(controls) = self.0.controls.get() else {
-            return Ok(Vec::new());
-        };
-        Ok(controls
-            .grants
-            .list()?
-            .into_iter()
-            .map(|grant| BrowserGrantDto {
-                id: grant.id,
-                origin: grant.origin,
-                tool: grant.capability.key().to_owned(),
-                granted_at: grant.granted_at,
-            })
-            .collect())
     }
 
     pub fn has_approval(&self) -> bool {
