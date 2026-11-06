@@ -88,7 +88,7 @@ function AccountCard({
   const detail = account.detail !== null && account.detail.length > 0 ? account.detail : null;
 
   return (
-    <article className="flex min-w-0 flex-col gap-4 rounded-xl bg-main-700/55 p-5">
+    <article className="flex min-w-0 flex-col gap-4 rounded-card border border-line bg-main-850 p-5">
       <header className="flex min-w-0 flex-wrap items-center gap-3">
         <span className="relative flex-none">
           {showAvatar ? (

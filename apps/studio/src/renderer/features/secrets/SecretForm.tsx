@@ -76,7 +76,7 @@ function SecretForm({
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-4 px-5 py-3 lg:px-6">
         {vm.banner === null ? null : <Alert>{vm.banner}</Alert>}
 
-        <section className="mx-auto flex w-full max-w-360 flex-col gap-4 rounded-xl bg-main-700/55 p-5">
+        <section className="mx-auto flex w-full max-w-360 flex-col gap-4 rounded-card border border-line bg-main-850 p-5">
           <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-main-100">Общее</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field
@@ -129,7 +129,7 @@ function SecretForm({
           </Field>
         </section>
 
-        <section className="mx-auto flex w-full max-w-360 flex-col gap-4 rounded-xl bg-main-700/55 p-5">
+        <section className="mx-auto flex w-full max-w-360 flex-col gap-4 rounded-card border border-line bg-main-850 p-5">
           <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-main-100">Метаданные</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Теги" htmlFor="secret-tags">

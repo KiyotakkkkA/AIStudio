@@ -46,7 +46,7 @@ function AccountsTab() {
       )}
 
       {linking === null || linking.phase === "cancelled" ? null : (
-        <div className="flex flex-none flex-col gap-2.5 rounded-card bg-main-800 px-4 py-3.5">
+        <div className="flex flex-none flex-col gap-2.5 rounded-card border border-line bg-main-850 px-4 py-3.5">
           {linking.phase === "waiting" ? (
             <>
               <div className="flex items-center gap-3">
