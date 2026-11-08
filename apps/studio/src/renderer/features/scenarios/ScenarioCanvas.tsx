@@ -1,6 +1,8 @@
 import {
   mdiFitToScreenOutline,
   mdiFormatAlignLeft,
+  mdiGrid,
+  mdiMagnet,
   mdiMagnifyMinusOutline,
   mdiMagnifyPlusOutline,
   mdiPlay,
@@ -48,6 +50,8 @@ const NODE_TYPES = { scenario: ScenarioNodeView };
 const EDGE_TYPES = { scenario: ScenarioEdgeView };
 const PAN_BUTTONS = [1];
 const FIT_OPTIONS = { padding: 0.25, maxZoom: 1, duration: 180 };
+const GRID_GAP = 22;
+const SNAP_GRID: [number, number] = [GRID_GAP, GRID_GAP];
 const TEST_BLOCKED = "Запуск недоступен, пока в сценарии есть ошибки";
 
 const FLOW_STYLE = {
@@ -64,23 +68,39 @@ interface ToolProps {
   readonly label: string;
   readonly icon: string;
   readonly disabled?: boolean;
+  readonly pressed?: boolean;
   readonly onClick: () => void;
 }
 
-function Tool({ label, icon, disabled = false, onClick }: ToolProps) {
+function Tool({ label, icon, disabled = false, pressed, onClick }: ToolProps) {
   return (
     <IconButton
       path={icon}
       label={label}
       iconSize={16}
       disabled={disabled}
+      aria-pressed={pressed}
       onClick={onClick}
-      className="size-7.5 rounded-[7px] text-main-300"
+      className="size-7.5 rounded-[7px] text-main-300 aria-pressed:bg-accent-soft aria-pressed:text-accent-dark"
     />
   );
 }
 
-const Toolbar = observer(function Toolbar({ editor }: { readonly editor: ScenarioEditor }) {
+interface ToolbarProps {
+  readonly editor: ScenarioEditor;
+  readonly showGrid: boolean;
+  readonly snapToGrid: boolean;
+  readonly onToggleGrid: () => void;
+  readonly onToggleSnap: () => void;
+}
+
+const Toolbar = observer(function Toolbar({
+  editor,
+  showGrid,
+  snapToGrid,
+  onToggleGrid,
+  onToggleSnap,
+}: ToolbarProps) {
   const flow = useReactFlow();
   const { zoom } = useViewport();
   return (
@@ -112,6 +132,9 @@ const Toolbar = observer(function Toolbar({ editor }: { readonly editor: Scenari
         }}
       />
       <span className="mx-0.5 my-1 w-px bg-line" />
+      <Tool label="Привязка к сетке" icon={mdiMagnet} pressed={snapToGrid} onClick={onToggleSnap} />
+      <Tool label="Показать сетку" icon={mdiGrid} pressed={showGrid} onClick={onToggleGrid} />
+      <span className="mx-0.5 my-1 w-px bg-line" />
       <span className="flex h-7.5 items-center px-2 font-mono text-[11px] text-main-400">
         {`${String(Math.round(zoom * 100))}%`}
       </span>
@@ -127,6 +150,8 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
     [editor],
   );
   const [measured, setMeasured] = useState<Record<string, Size>>({});
+  const [showGrid, setShowGrid] = useState(true);
+  const [snapToGrid, setSnapToGrid] = useState(false);
 
   const nodes = flowNodes(editor).map((node) => {
     const size = measured[node.id];
@@ -265,6 +290,8 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
           panActivationKeyCode="Space"
           panOnDrag={PAN_BUTTONS}
           selectionOnDrag
+          snapToGrid={snapToGrid}
+          snapGrid={SNAP_GRID}
           zoomOnDoubleClick={false}
           minZoom={0.25}
           maxZoom={2}
@@ -274,13 +301,15 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
           proOptions={{ hideAttribution: true }}
           style={FLOW_STYLE}
         >
-          <Background
-            id="scenario-dots"
-            variant={BackgroundVariant.Dots}
-            gap={22}
-            size={1}
-            color="var(--color-main-700)"
-          />
+          {showGrid ? (
+            <Background
+              id="scenario-dots"
+              variant={BackgroundVariant.Dots}
+              gap={GRID_GAP}
+              size={1.5}
+              color="var(--color-main-600)"
+            />
+          ) : null}
         </ReactFlow>
 
         {editor.graph.nodes.length === 0 ? (
@@ -324,7 +353,13 @@ const CanvasInner = observer(function CanvasInner({ editor }: { readonly editor:
 
         {editor.paletteOpen ? <NodePalette editor={editor} onPick={addStep} /> : null}
 
-        <Toolbar editor={editor} />
+        <Toolbar
+          editor={editor}
+          showGrid={showGrid}
+          snapToGrid={snapToGrid}
+          onToggleGrid={() => setShowGrid((visible) => !visible)}
+          onToggleSnap={() => setSnapToGrid((enabled) => !enabled)}
+        />
 
         {editor.graph.nodes.length === 0 ? null : (
           <div className="absolute bottom-4.5 left-1/2 z-10 flex -translate-x-1/2 gap-2">
