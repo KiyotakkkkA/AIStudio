@@ -1260,15 +1260,18 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   the audit to the tool call details, and each admission writes a `Tool call authorised` line
   to the run log. A folder grant raised with the diff in every mode is unchanged.
 - No telemetry, no outbound calls the user did not configure. One narrow exception: **site
-  icons** for the web sources a provider returned with an answer (`zvs-host/src/sites.rs`,
-  2026-10-27). The renderer never loads a remote image (CSP `img-src 'self' blob:`). It asks
+    icons** for the web sources a provider returned with an answer and saved browser bookmarks
+    (`zvs-host/src/sites.rs`, updated 2026-11-09). The renderer never loads a remote image
+    (CSP `img-src 'self' blob:`). It asks
   `sites.icon`, and the host fetches the vendor's icon URL (Qwen's `hostlogo`) or the site's
   `/favicon.ico`. Only `http(s)` addresses are fetched, never `localhost`, and every resolved
   address must be public: loopback, private, link-local, CGNAT, documentation, unique-local
   and IPv4-mapped forms are refused. The connection is pinned to the checked address, uses no
   proxy and no cookies, follows at most three redirects (each checked again), times out after
   4 s and stops at 64 KiB. The bytes must sniff as PNG, JPEG, GIF, WebP or ICO (never SVG), and
-  results, misses included, are cached per site for the session. `sites.open` opens a web
+    results, misses included, are cached per site for the session. Successful icons also persist
+    under `<app data>/cache/favicons` and are validated by size and file signature when read.
+    `sites.open` opens a web
   source in the agent browser (§21) through the same page opener as `artifacts.openInApp`;
   only `http(s)` URLs without credentials pass.
 - **Page and document content is untrusted input.** Anything the agent reads from a web page,
@@ -1816,7 +1819,12 @@ and `browserSettings.set` (`BrowserSettingsDto`, stored as the one setting `brow
   that settles on an HTTP(S) page records a visit; a revisit within 30 minutes updates the same row
   (title, time), and the newest 20 000 rows are kept. Search is case-insensitive in the host, so
   Cyrillic titles match. The star in the address bar toggles a bookmark for the active page; the
-  new-tab page lists the latest 24. Bookmarks are unique by URL and capped at 5 000. «Данные
+  new-tab page lists the latest 24 as shortcuts with circular icons. Adding a bookmark starts
+  a background favicon fetch through `SiteService`, using the same public-address guard as web
+  source icons and the existing cache directory. The chrome requests icons with
+  `browser.command` → `bookmarkIcon` by bookmark id; the host resolves the saved URL and returns
+  the image bytes, never a remote image URL. Missing icons fall back to the title's first letter.
+  Bookmarks are unique by URL and capped at 5 000. «Данные
   браузера» also clears the history, never the bookmarks.
 - **Import** (`browserImport.sources` · `run`, `zvs-host/src/browser/import.rs`). Sources are found
   under `%LOCALAPPDATA%` (Chrome, Edge, Brave, Vivaldi, Yandex: every profile folder, named from

@@ -4,7 +4,7 @@ import Chip from "../../ui/atoms/Chip";
 import Toggle from "../../ui/atoms/Toggle";
 import Icon from "../../ui/atoms/Icon";
 import type ConnectionStore from "./ConnectionStore";
-import Disclosure from "./Disclosure";
+import Disclosure from "../../ui/molecules/Disclosure";
 import TierPicker from "./TierPicker";
 
 function ExposedToolsCard({ store }: { readonly store: ConnectionStore }) {

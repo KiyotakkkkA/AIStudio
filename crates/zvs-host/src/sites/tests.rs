@@ -80,6 +80,7 @@ async fn serve(hits: Arc<AtomicUsize>) -> SocketAddr {
 fn service(address: SocketAddr, permit: Permit) -> SiteService {
     SiteService::new(SiteServiceOptions {
         pages: None,
+        cache_dir: None,
         resolver: Arc::new(Fixed(address)),
         permit,
     })
@@ -234,4 +235,62 @@ async fn an_icon_is_never_fetched_from_a_private_address() {
         None
     );
     assert_eq!(hits.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn disk_icons_survive_service_restart_and_corrupt_entries_are_replaced() {
+    let directory = crate::testing::temporary_directory("site-icons-");
+    let hits = Arc::new(AtomicUsize::new(0));
+    let address = serve(Arc::clone(&hits)).await;
+    let create = || {
+        SiteService::new(SiteServiceOptions {
+            cache_dir: Some(directory.path().join("favicons")),
+            resolver: Arc::new(Fixed(address)),
+            permit: |_| true,
+            ..SiteServiceOptions::default()
+        })
+    };
+    let request = input(address.port(), None);
+    let sites = create();
+    let expected = sites.icon(&request).await.expect("loads").expect("icon");
+    assert_eq!(hits.load(Ordering::SeqCst), 2);
+    let (cache, name) = sites.disk_cache(&cache_key(&request)).expect("disk cache");
+    assert_eq!(std::fs::read(cache.path(&name)).expect("cached bytes"), ICO);
+    drop(sites);
+    assert_eq!(
+        create().icon(&request).await.expect("reuses cache"),
+        Some(expected.clone())
+    );
+    assert_eq!(hits.load(Ordering::SeqCst), 2);
+
+    for invalid in [b"<svg onload=x>".to_vec(), vec![0; SITE_ICON_BYTES_MAX + 1]] {
+        std::fs::write(cache.path(&name), invalid).expect("corrupts entry");
+        assert_eq!(
+            create().icon(&request).await.expect("refetches"),
+            Some(expected.clone())
+        );
+        assert_eq!(std::fs::read(cache.path(&name)).expect("replaced"), ICO);
+    }
+    assert_eq!(hits.load(Ordering::SeqCst), 6);
+}
+
+#[tokio::test]
+async fn an_unwritable_disk_cache_does_not_prevent_an_icon_from_loading() {
+    let directory = crate::testing::temporary_directory("site-icons-");
+    let path = directory.path().join("not-a-directory");
+    std::fs::write(&path, b"file").expect("writes");
+    let address = serve(Arc::new(AtomicUsize::new(0))).await;
+    let sites = SiteService::new(SiteServiceOptions {
+        cache_dir: Some(path),
+        resolver: Arc::new(Fixed(address)),
+        permit: |_| true,
+        ..SiteServiceOptions::default()
+    });
+    assert!(
+        sites
+            .icon(&input(address.port(), None))
+            .await
+            .expect("loads")
+            .is_some()
+    );
 }

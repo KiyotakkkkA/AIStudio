@@ -573,8 +573,11 @@ describe("node rules", () => {
     expect(dialogNeed(node("n", "output.notify"))).toBeNull();
   });
 
-  test("browser, vector and knowledge tools are restricted to their own nodes", () => {
+  test("browser, computer, vector and knowledge tools are excluded from tool set choices", () => {
     expect(isRestrictedTool("browser.click")).toBe(true);
+    expect(isRestrictedTool("computer.act")).toBe(true);
+    expect(isRestrictedTool("computer.request_access")).toBe(true);
+    expect(isRestrictedTool("computer.future_tool")).toBe(true);
     expect(isRestrictedTool("vector.search")).toBe(true);
     expect(isRestrictedTool("knowledge.search")).toBe(true);
     expect(isRestrictedTool("fs.read")).toBe(false);

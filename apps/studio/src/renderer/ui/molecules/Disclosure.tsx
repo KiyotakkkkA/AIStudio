@@ -1,7 +1,7 @@
 import { mdiChevronDown } from "@mdi/js";
 import { useId, useState, type ReactNode } from "react";
-import Icon from "../../ui/atoms/Icon";
-import Collapse from "../../ui/motion/Collapse";
+import Icon from "../atoms/Icon";
+import Collapse from "../motion/Collapse";
 
 function Disclosure({
   label,

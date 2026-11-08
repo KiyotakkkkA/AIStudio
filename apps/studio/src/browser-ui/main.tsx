@@ -44,6 +44,7 @@ import {
 import { DEVTOOLS_CLOSE, DEVTOOLS_OPEN } from "./networkCopy";
 import { displayAddress } from "./address";
 import { BOOKMARK_ADD, BOOKMARK_REMOVE, BOOKMARKS_TITLE, bookmarkLabel } from "./bookmarkCopy";
+import BookmarkIcon from "./BookmarkIcon";
 import {
   ACTION_FAILED,
   CANCEL,
@@ -534,26 +535,25 @@ function BrowserApp() {
                     <Icon path={mdiWeb} size={28} />
                   </div>
                   <h1>Новая вкладка</h1>
-                  <p>
-                    Введите адрес в строке выше. Вход на сайтах и куки сохраняются в рабочем
-                    профиле.
-                  </p>
                   {state.bookmarks.length > 0 && (
                     <nav className="bookmarks" aria-label={BOOKMARKS_TITLE}>
                       <h2>{BOOKMARKS_TITLE}</h2>
                       <ul>
-                        {state.bookmarks.map((bookmark) => (
-                          <li key={bookmark.id}>
-                            <button
-                              type="button"
-                              title={bookmark.url}
-                              onClick={() => void send({ action: "navigate", url: bookmark.url })}
-                            >
-                              <Icon path={mdiStar} size={13} />
-                              <span>{bookmarkLabel(bookmark)}</span>
-                            </button>
-                          </li>
-                        ))}
+                        {state.bookmarks.map((bookmark) => {
+                          const label = bookmarkLabel(bookmark);
+                          return (
+                            <li key={bookmark.id}>
+                              <button
+                                type="button"
+                                title={`${label}\n${bookmark.url}`}
+                                onClick={() => void send({ action: "navigate", url: bookmark.url })}
+                              >
+                                <BookmarkIcon id={bookmark.id} label={label} />
+                                <span className="bookmark-label">{label}</span>
+                              </button>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </nav>
                   )}

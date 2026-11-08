@@ -1,7 +1,5 @@
 import {
   mdiCancel,
-  mdiChevronDown,
-  mdiChevronRight,
   mdiClose,
   mdiContentCopy,
   mdiDeleteOutline,
@@ -19,7 +17,6 @@ import type {
   ScenarioNodeSettingsDto,
   ScenarioOnError,
   ScenarioOverlap,
-  ScenarioParams,
 } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
@@ -67,7 +64,6 @@ import { TOOL_SET_PARAM, TOOL_SET_TYPE, toolSetKeys } from "./toolSet";
 import ToolSetPicker from "./ToolSetPicker";
 import Alert from "../../ui/molecules/Alert";
 
-const PARAMS_INVALID = "Параметры должны быть JSON-объектом";
 const SECTION = "m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase";
 
 type InspectorTab = "params" | "settings" | "notes";
@@ -91,16 +87,6 @@ const OVERLAP_OPTIONS = (Object.keys(OVERLAP_LABELS) as ScenarioOverlap[]).map((
 function paramText(value: Json | undefined): string {
   if (value === undefined || value === null) return "";
   return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-function parseParams(text: string): ScenarioParams | null {
-  try {
-    const value: unknown = JSON.parse(text.trim().length === 0 ? "{}" : text);
-    if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
-    return value as ScenarioParams;
-  } catch {
-    return null;
-  }
 }
 
 function parseJson(text: string): { readonly value: Json | null } | null {
@@ -280,46 +266,6 @@ function ParamField({
   );
 }
 
-const ParamsJson = observer(function ParamsJson({
-  editor,
-  node,
-}: {
-  readonly editor: ScenarioEditor;
-  readonly node: ScenarioNodeDto;
-}) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const text = JSON.stringify(node.params, null, 2);
-  return (
-    <Field label="Параметры (JSON)" htmlFor="scenario-node-params" error={error ?? undefined}>
-      <TextArea
-        id="scenario-node-params"
-        value={draft ?? text}
-        invalid={error !== null}
-        spellCheck={false}
-        onFocus={() => {
-          setDraft(text);
-        }}
-        onChange={(event) => {
-          setDraft(event.target.value);
-        }}
-        onBlur={() => {
-          const params = parseParams(draft ?? text);
-          if (params === null) {
-            setError(PARAMS_INVALID);
-            return;
-          }
-          setError(null);
-          setDraft(null);
-          if (JSON.stringify(params) !== JSON.stringify(node.params)) {
-            editor.updateNode(node.id, { params });
-          }
-        }}
-      />
-    </Field>
-  );
-});
-
 function childLine(child: ScenarioNodeDto): string {
   if (child.disabled === true) return "Отключён";
   if (child.type === TOOL_SET_TYPE) {
@@ -462,7 +408,6 @@ const ParamsTab = observer(function ParamsTab({
   const issues = editor.issuesByNode.get(node.id) ?? [];
   const fields = formFields(spec, node.type);
   const description = descriptionOf(node.type);
-  const [showJson, setShowJson] = useState(false);
   const toolSet = node.type === TOOL_SET_TYPE;
   const stores = node.type === STORES_TYPE;
   const ceiling = editor.ceilingOf(node.id);
@@ -529,19 +474,6 @@ const ParamsTab = observer(function ParamsTab({
         <ToolSetPicker editor={editor} node={node} invalid={missing(TOOL_SET_PARAM)} />
       ) : null}
       {stores ? <StoresPicker editor={editor} node={node} invalid={missing(STORES_PARAM)} /> : null}
-
-      <button
-        type="button"
-        aria-expanded={showJson}
-        className="flex items-center gap-1.5 self-start text-[12px] text-main-400 hover:text-main-100"
-        onClick={() => {
-          setShowJson(!showJson);
-        }}
-      >
-        <Icon path={showJson ? mdiChevronDown : mdiChevronRight} size={16} />
-        Все параметры в JSON
-      </button>
-      {showJson ? <ParamsJson editor={editor} node={node} /> : null}
 
       {ceiling === null ? null : (
         <p className="m-0 rounded-control bg-warn-soft px-3 py-2 text-[12px] text-warn">

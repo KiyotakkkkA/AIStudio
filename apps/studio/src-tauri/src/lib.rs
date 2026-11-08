@@ -862,6 +862,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             browser_settings.clone(),
         )));
     let sites = zvs_host::sites::SiteService::new(zvs_host::sites::SiteServiceOptions {
+        cache_dir: Some(paths.cache_dir.join("favicons")),
         pages: Some(Arc::new(RoutedPages::new(
             Arc::new(WorkspacePages(workspace.clone())),
             zvs_host::platform::external::system_url_opener(),
@@ -1007,7 +1008,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         .with_launcher(platform::file_launcher());
     workspace.attach_downloads(browser_settings.clone(), browser_downloads.clone());
     let browser_library = BrowserLibrary::new(Arc::clone(&database), clock.clone());
-    workspace.attach_library(browser_library.clone());
+    workspace.attach_library(browser_library.clone(), sites.clone());
     // Resolve the user's Windows folders independently of the launcher's environment.
     let import_fallback = ImportRoots::system();
     let browser_importer = BrowserImporter::new(

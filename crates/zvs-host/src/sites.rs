@@ -1,5 +1,7 @@
 use std::collections::HashMap;
+use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
@@ -7,6 +9,7 @@ use async_trait::async_trait;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use reqwest::redirect::Policy;
+use sha2::{Digest, Sha256};
 use url::{Host, Url};
 use zvs_contract::validate::js_trim;
 use zvs_contract::{
@@ -16,6 +19,7 @@ use zvs_contract::{
 
 use crate::artifact_pages::{PAGES_UNAVAILABLE, SharedPageOpener};
 use crate::browser::policy::is_web_url;
+use crate::documents::DocumentCache;
 
 pub const ICON_TIMEOUT: Duration = Duration::from_secs(4);
 pub const ICON_REDIRECTS: usize = 3;
@@ -118,6 +122,7 @@ fn cache_key(input: &SiteIconInput) -> String {
 
 pub struct SiteServiceOptions {
     pub pages: Option<SharedPageOpener>,
+    pub cache_dir: Option<PathBuf>,
     pub resolver: Arc<dyn Resolve>,
     pub permit: Permit,
 }
@@ -126,6 +131,7 @@ impl Default for SiteServiceOptions {
     fn default() -> Self {
         Self {
             pages: None,
+            cache_dir: None,
             resolver: Arc::new(SystemResolve),
             permit: public_address,
         }
@@ -173,11 +179,16 @@ impl SiteService {
         if let Some(known) = self.icons().get(&key) {
             return Ok(known.clone());
         }
-        let mut found = None;
-        for candidate in icon_candidates(input) {
-            found = self.fetch(candidate).await;
-            if found.is_some() {
-                break;
+        let mut found = self.read_cached(&key).await;
+        if found.is_none() {
+            for candidate in icon_candidates(input) {
+                found = self.fetch(candidate).await;
+                if found.is_some() {
+                    break;
+                }
+            }
+            if let Some(icon) = &found {
+                self.store_cached(&key, icon).await;
             }
         }
         let mut icons = self.icons();
@@ -186,6 +197,49 @@ impl SiteService {
         }
         icons.insert(key, found.clone());
         Ok(found)
+    }
+
+    fn disk_cache(&self, key: &str) -> Option<(DocumentCache, String)> {
+        let directory = self.inner.options.cache_dir.clone()?;
+        let hash: String = Sha256::digest(key.as_bytes())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        let name = format!("{hash}.bin");
+        Some((DocumentCache::new(directory), name))
+    }
+
+    async fn read_cached(&self, key: &str) -> Option<SiteIconDto> {
+        let (cache, name) = self.disk_cache(key)?;
+        tokio::task::spawn_blocking(move || {
+            let file = std::fs::File::open(cache.path(&name)).ok()?;
+            let mut bytes = Vec::new();
+            file.take((SITE_ICON_BYTES_MAX + 1) as u64)
+                .read_to_end(&mut bytes)
+                .ok()?;
+            let mime = sniff_icon(&bytes);
+            if bytes.len() > SITE_ICON_BYTES_MAX || mime.is_none() {
+                let _ = std::fs::remove_file(cache.path(&name));
+                return None;
+            }
+            Some(SiteIconDto {
+                mime: mime?.to_owned(),
+                data: STANDARD.encode(&bytes),
+            })
+        })
+        .await
+        .ok()
+        .flatten()
+    }
+
+    async fn store_cached(&self, key: &str, icon: &SiteIconDto) {
+        let Some((cache, name)) = self.disk_cache(key) else {
+            return;
+        };
+        let Ok(bytes) = STANDARD.decode(&icon.data) else {
+            return;
+        };
+        let _ = tokio::task::spawn_blocking(move || cache.store(&name, &bytes)).await;
     }
 
     fn icons(&self) -> std::sync::MutexGuard<'_, HashMap<String, Option<SiteIconDto>>> {

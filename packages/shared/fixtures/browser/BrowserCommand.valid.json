@@ -1,5 +1,9 @@
 [
   { "name": "state", "value": { "action": "state" } },
+  {
+    "name": "bookmark icon",
+    "value": { "action": "bookmarkIcon", "id": "0199aa11-1111-7111-8111-111111111111" }
+  },
   { "name": "new blank tab", "value": { "action": "new" } },
   { "name": "new tab with address", "value": { "action": "new", "url": "example.com" } },
   { "name": "navigate", "value": { "action": "navigate", "url": "https://example.com/" } },

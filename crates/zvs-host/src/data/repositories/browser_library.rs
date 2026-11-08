@@ -133,6 +133,16 @@ impl<'c> BrowserBookmarkRepository<'c> {
             .optional()
     }
 
+    pub fn find_by_id(&self, id: &str) -> rusqlite::Result<Option<BrowserBookmarkRow>> {
+        self.connection
+            .prepare_cached(&format!(
+                "SELECT {} FROM browser_bookmark WHERE id = ?1",
+                BrowserBookmarkRow::COLUMNS
+            ))?
+            .query_row([id], BrowserBookmarkRow::from_row)
+            .optional()
+    }
+
     pub fn insert(&self, row: &BrowserBookmarkRow) -> rusqlite::Result<bool> {
         Ok(self
             .connection

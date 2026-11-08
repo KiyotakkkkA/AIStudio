@@ -825,7 +825,8 @@ p {
 
 .welcome {
   display: flex;
-  max-width: 520px;
+  width: 100%;
+  max-width: 760px;
   flex-direction: column;
   align-items: center;
   gap: 10px;
@@ -835,11 +836,11 @@ p {
 }
 .bookmarks {
   width: 100%;
-  margin-top: 18px;
-  text-align: left;
+  margin-top: 24px;
+  text-align: center;
 }
 .bookmarks h2 {
-  margin: 0 0 8px;
+  margin: 0 0 16px;
   color: var(--color-main-500);
   font-size: 10.5px;
   font-weight: 600;
@@ -847,32 +848,57 @@ p {
   text-transform: uppercase;
 }
 .bookmarks ul {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 4px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 .bookmarks button {
   display: flex;
-  width: 100%;
+  width: 108px;
+  height: 108px;
+  min-width: 0;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 12px 8px;
   border-color: transparent;
-  background: var(--color-main-850);
+  border-radius: 12px;
+  background: transparent;
   box-shadow: none;
   color: var(--color-main-200);
   font-size: 12.5px;
 }
-.bookmarks button svg {
-  flex: 0 0 auto;
-  color: var(--color-accent-medium);
+.bookmarks button:hover,
+.bookmarks button:focus-visible {
+  border-color: transparent;
+  background: var(--color-main-850);
 }
-.bookmarks button span {
+.bookmark-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-main-750);
+  color: var(--color-main-100);
+  font-size: 21px;
+  font-weight: 600;
+}
+.bookmark-label {
+  display: block;
+  width: 100%;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.bookmark-icon img {
+  object-fit: contain;
 }
 .welcome-icon {
   display: grid;

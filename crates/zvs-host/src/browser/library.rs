@@ -183,6 +183,15 @@ impl BrowserLibrary {
         })
     }
 
+    pub fn bookmark_url(&self, id: &str) -> Result<Option<String>, AppError> {
+        self.database.with_connection(|connection| {
+            Ok(Repositories::new(connection)
+                .browser_bookmarks
+                .find_by_id(id)?
+                .map(|bookmark| bookmark.url))
+        })
+    }
+
     pub fn links(&self) -> Vec<BrowserBookmarkLink> {
         self.database
             .with_connection(|connection| {
@@ -336,6 +345,27 @@ mod tests {
         assert_eq!(library.history(None).expect("lists").total, 1);
         library.clear_history().expect("clears");
         assert_eq!(library.history(None).expect("lists").total, 0);
+    }
+
+    #[test]
+    fn icon_lookup_only_resolves_existing_bookmarks() {
+        let (_database, _clock, library) = library();
+        library
+            .toggle("https://example.com/page", "Example")
+            .expect("adds");
+        let id = library.links()[0].id.clone();
+        assert_eq!(
+            library.bookmark_url(&id).expect("finds"),
+            Some("https://example.com/page".to_owned())
+        );
+        assert_eq!(
+            library
+                .bookmark_url("https://other.example/")
+                .expect("not a bookmark"),
+            None
+        );
+        library.remove_bookmark(&id).expect("removes");
+        assert_eq!(library.bookmark_url(&id).expect("removed"), None);
     }
 
     #[test]

@@ -108,6 +108,9 @@ pub enum BrowserCommand {
         id: String,
     },
     BookmarkToggle,
+    BookmarkIcon {
+        id: String,
+    },
 }
 
 fn tab_id(id: &str) -> Result<(), AppError> {
@@ -134,7 +137,8 @@ impl Validate for BrowserCommand {
             | Self::AgentDeny { id }
             | Self::AgentRevoke { id }
             | Self::DownloadKeep { id }
-            | Self::DownloadDiscard { id } => tab_id(id),
+            | Self::DownloadDiscard { id }
+            | Self::BookmarkIcon { id } => tab_id(id),
             Self::Reorder { id, index } => {
                 tab_id(id)?;
                 check::safe_integer("index", *index)
@@ -501,6 +505,7 @@ pub struct BrowserNetworkSaved {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum BrowserCommandOutput {
+    Icon(Option<crate::SiteIconDto>),
     State(BrowserState),
     Cookies(Vec<BrowserCookie>),
     Network(BrowserNetworkLog),

@@ -1,6 +1,11 @@
 [
   { "name": "unknown action", "value": { "action": "execute", "script": "alert(1)" } },
   { "name": "missing action", "value": {} },
+  { "name": "bookmark icon without id", "value": { "action": "bookmarkIcon" } },
+  {
+    "name": "bookmark icon invalid id",
+    "value": { "action": "bookmarkIcon", "id": "https://example.com" }
+  },
   { "name": "empty domain", "value": { "action": "clearSite", "domain": "" } },
   { "name": "tab id not a uuid", "value": { "action": "switch", "id": "not-a-tab" } },
   {

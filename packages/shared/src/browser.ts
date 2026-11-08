@@ -38,6 +38,7 @@ export const BrowserCommand = z.discriminatedUnion("action", [
   z.object({ action: z.literal("downloadKeep"), id: tabId }),
   z.object({ action: z.literal("downloadDiscard"), id: tabId }),
   z.object({ action: z.literal("bookmarkToggle") }),
+  z.object({ action: z.literal("bookmarkIcon"), id: tabId }),
 ]);
 export type BrowserCommand = z.infer<typeof BrowserCommand>;
 

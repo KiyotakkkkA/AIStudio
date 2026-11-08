@@ -65,7 +65,7 @@ function ProvidersWorkspace() {
               <div className="mx-auto flex w-full max-w-360 flex-none justify-end">
                 <ProviderActionsMenu />
               </div>
-              <div className="mx-auto grid w-full max-w-360 flex-none items-start gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(18rem,1fr)]">
+              <div className="mx-auto flex w-full max-w-360 flex-none flex-col gap-4">
                 <ConnectionCard
                   vm={form}
                   onManageSecrets={() => {

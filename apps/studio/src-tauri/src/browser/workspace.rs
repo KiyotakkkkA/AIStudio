@@ -20,7 +20,7 @@ use tokio_util::sync::CancellationToken;
 use zvs_contract::{
     AppError, BrowserAgentStatus, BrowserBounds, BrowserCommand, BrowserCommandOutput,
     BrowserCookie, BrowserNetworkDetail, BrowserNetworkLog, BrowserNetworkSaved, BrowserState,
-    BrowserTheme,
+    BrowserTheme, SiteIconDto, SiteIconInput,
 };
 use zvs_host::browser::automation::{
     DownloadedFile, NO_BROWSER_TAB, PageMatches, PageScreenshot, PageSnapshot, PageState, conflict,
@@ -100,6 +100,7 @@ struct Inner {
     hooked: AtomicBool,
     autofill: Mutex<Option<(bool, bool)>>,
     library: std::sync::OnceLock<BrowserLibrary>,
+    icons: std::sync::OnceLock<zvs_host::sites::SiteService>,
     extensions: Mutex<Option<Vec<PathBuf>>>,
     extensions_synced: AtomicBool,
 }
@@ -173,6 +174,7 @@ impl BrowserWorkspace {
             hooked: AtomicBool::new(false),
             autofill: Mutex::default(),
             library: std::sync::OnceLock::new(),
+            icons: std::sync::OnceLock::new(),
             extensions: Mutex::default(),
             extensions_synced: AtomicBool::new(false),
         }));
@@ -272,8 +274,9 @@ impl BrowserWorkspace {
         });
     }
 
-    pub fn attach_library(&self, library: BrowserLibrary) {
+    pub fn attach_library(&self, library: BrowserLibrary, icons: zvs_host::sites::SiteService) {
         let _ = self.0.library.set(library);
+        let _ = self.0.icons.set(icons);
         self.post(Work::Publish);
     }
 
@@ -283,9 +286,29 @@ impl BrowserWorkspace {
             .active()
             .map(|tab| tab.page.clone())
             .ok_or(NO_ACTIVE_TAB)?;
-        library
-            .toggle(&page.url, &page.title)
-            .map(|_| ())
+        let added = library.toggle(&page.url, &page.title).map_err(message)?;
+        if added && let Some(icons) = self.0.icons.get().cloned() {
+            tauri::async_runtime::spawn(async move {
+                let _ = icons
+                    .icon(&SiteIconInput {
+                        url: page.url,
+                        icon: None,
+                    })
+                    .await;
+            });
+        }
+        Ok(())
+    }
+
+    fn bookmark_icon(&self, id: &str) -> Result<Option<SiteIconDto>, String> {
+        let library = self.0.library.get().ok_or(NO_LIBRARY)?;
+        let Some(url) = library.bookmark_url(id).map_err(message)? else {
+            return Ok(None);
+        };
+        let Some(icons) = self.0.icons.get() else {
+            return Ok(None);
+        };
+        tauri::async_runtime::block_on(icons.icon(&SiteIconInput { url, icon: None }))
             .map_err(message)
     }
 
@@ -498,6 +521,9 @@ impl BrowserWorkspace {
             BrowserCommand::AgentRevoke { id } => self.0.agent.revoke(&id).map_err(message)?,
             BrowserCommand::DownloadKeep { id } => self.keep_download(&id)?,
             BrowserCommand::BookmarkToggle => self.toggle_bookmark()?,
+            BrowserCommand::BookmarkIcon { id } => {
+                return self.bookmark_icon(&id).map(BrowserCommandOutput::Icon);
+            }
             BrowserCommand::DownloadDiscard { id } => {
                 if !self.0.downloads.discard_by_id(&id) {
                     return Err(UNKNOWN_DOWNLOAD.to_owned());

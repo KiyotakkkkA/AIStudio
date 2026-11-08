@@ -11,7 +11,7 @@ import Field from "../../ui/molecules/Field";
 import type ConnectionStore from "./ConnectionStore";
 import { STARTUP_LABELS, STATE_LABELS, STATE_TONES } from "./connectionPresentation";
 import type { ServerFormVm } from "./ServerFormVm";
-import Disclosure from "./Disclosure";
+import Disclosure from "../../ui/molecules/Disclosure";
 import ValueTable from "./ValueTable";
 import Alert from "../../ui/molecules/Alert";
 

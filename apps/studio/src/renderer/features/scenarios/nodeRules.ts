@@ -25,7 +25,12 @@ export type FactsArea = "global" | "dialog" | "both";
 export const KNOWLEDGE_TOOL = "knowledge.search";
 export const MEMORY_TOOL = "memory";
 
-export const RESTRICTED_TOOL_PREFIXES: readonly string[] = ["browser.", "vector.", "knowledge."];
+export const RESTRICTED_TOOL_PREFIXES: readonly string[] = [
+  "browser.",
+  "computer.",
+  "vector.",
+  "knowledge.",
+];
 
 export const MEMORY_TYPES: ReadonlySet<string> = new Set([HISTORY_TYPE, FACTS_TYPE, STORES_TYPE]);
 
