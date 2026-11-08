@@ -194,7 +194,13 @@ const EntityField = observer(function EntityField({
   readonly required: boolean;
   readonly invalid: boolean;
 }) {
-  const options = editor.entities.options(kind, node.params);
+  const listed = editor.entities.options(kind, node.params);
+  const plugin =
+    node.type === "trigger.mail" ? "mail" : node.type === "trigger.telegram" ? "telegram" : null;
+  const options =
+    kind === "integration" && plugin !== null
+      ? (listed?.filter((entry) => entry.kind === plugin) ?? null)
+      : listed;
   const current = paramText(node.params[param]);
   return (
     <Field label={label} required={required}>

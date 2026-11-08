@@ -14,8 +14,7 @@ use zvs_contract::{
 use super::catalogue::{
     AGENT_TOOLS, AREA_BOTH, AREA_DIALOG, AREA_GLOBAL, AREA_PARAM, OUTPUT_CHAT_MESSAGE,
     OUTPUT_CHAT_REPLY, OUTPUT_FILE, OUTPUT_NEW_CHAT, OUTPUT_NOTIFY, POLICY_PARAM,
-    POLICY_READ_WRITE, STORES_PARAM, TEMPLATE_PARAM, TRIGGER_CHAT, TRIGGER_INTEGRATION,
-    TRIGGER_MAIL, TRIGGER_SCHEDULE, TRIGGER_WEBHOOK,
+    POLICY_READ_WRITE, STORES_PARAM, TEMPLATE_PARAM, TRIGGER_CHAT, TRIGGER_MAIL, TRIGGER_TELEGRAM,
 };
 use super::compile::FROM_PREFIX;
 use super::template::{
@@ -700,13 +699,7 @@ pub fn register_scenario_nodes(
     registry: &Arc<NodeRegistry>,
     options: &ScenarioNodeOptions,
 ) -> Result<(), AppError> {
-    for trigger in [
-        TRIGGER_CHAT,
-        TRIGGER_MAIL,
-        TRIGGER_SCHEDULE,
-        TRIGGER_WEBHOOK,
-        TRIGGER_INTEGRATION,
-    ] {
+    for trigger in [TRIGGER_CHAT, TRIGGER_MAIL, TRIGGER_TELEGRAM] {
         registry.register(TriggerNode(trigger))?;
     }
     registry.register(AgentNode {

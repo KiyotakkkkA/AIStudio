@@ -323,6 +323,19 @@ impl IntegrationService {
         self.account_dto(&self.require(id)?)
     }
 
+    pub async fn repositories(
+        &self,
+        id: &str,
+    ) -> Result<Vec<zvs_contract::integrations::GitRepositoryDto>, AppError> {
+        let row = self.require(id)?;
+        let result = self
+            .provider(row.kind)?
+            .repositories(&row.id, &self.view(&row))
+            .await?;
+        result.validate()?;
+        Ok(result)
+    }
+
     pub fn get(&self, id: &str) -> Result<IntegrationAccountDetailDto, AppError> {
         let row = self.require(id)?;
         let (triggers, tools) = match self.provider(row.kind) {

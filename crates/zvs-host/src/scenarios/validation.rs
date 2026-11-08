@@ -148,10 +148,19 @@ pub fn trigger_binding(
         .filter(|node| seen.insert(node.id.as_str()))
         .find_map(|node| {
             let kind = catalogue.spec(&node.node_type)?.trigger?;
+            let mut params = node.params.clone();
+            let event = match node.node_type.as_str() {
+                super::catalogue::TRIGGER_MAIL => Some(crate::integrations::mail::RECEIVED),
+                super::catalogue::TRIGGER_TELEGRAM => Some(crate::integrations::telegram::MESSAGE),
+                _ => None,
+            };
+            if let Some(event) = event {
+                params.insert("trigger".to_owned(), serde_json::json!(event));
+            }
             Some(ScenarioTriggerDto {
                 kind,
                 node_id: node.id.clone(),
-                params: node.params.clone(),
+                params,
             })
         })
 }

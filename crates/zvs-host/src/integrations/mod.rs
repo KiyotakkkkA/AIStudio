@@ -284,6 +284,17 @@ pub trait IntegrationProvider: Send + Sync {
         self.tools()
     }
 
+    async fn repositories(
+        &self,
+        _account: &str,
+        _config: &IntegrationConfigView,
+    ) -> Result<Vec<zvs_contract::integrations::GitRepositoryDto>, AppError> {
+        Err(AppError::new(
+            AppErrorCode::ValidationFailed,
+            "Плагин не поддерживает выбор репозиториев",
+        ))
+    }
+
     async fn test(
         &self,
         config: &IntegrationConfigView,

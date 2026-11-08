@@ -49,39 +49,12 @@ export const NODE_FORMS: Readonly<Record<string, NodeForm>> = {
     fields: [{ key: "conversationId", label: "Диалог" }],
   },
   "trigger.mail": {
-    description: "Запускает сценарий при получении письма, подходящего под условия.",
-    fields: [
-      { key: "from", label: "Отправитель", placeholder: "support@example.com" },
-      { key: "subject", label: "Тема содержит" },
-    ],
+    description: "Запускает сценарий при получении письма выбранным аккаунтом.",
+    fields: [{ key: "accountId", label: "Почтовый аккаунт" }],
   },
-  "trigger.schedule": {
-    description: "Запускает сценарий по расписанию.",
-    fields: [
-      {
-        key: "cron",
-        label: "Расписание (cron)",
-        placeholder: "0 9 * * 1-5",
-        hint: "Минуты, часы, день месяца, месяц, день недели. Пример — по будням в 9:00.",
-      },
-    ],
-  },
-  "trigger.webhook": {
-    description: "Запускает сценарий HTTP-запросом POST на указанный путь.",
-    fields: [{ key: "path", label: "Путь", placeholder: "support/incoming" }],
-  },
-  "trigger.integration": {
-    description:
-      "Запускает сценарий, когда подключённая интеграция сообщает о событии. Повтор события с тем же идентификатором сценарий не запускает.",
-    fields: [
-      { key: "accountId", label: "Интеграция" },
-      {
-        key: "trigger",
-        label: "Событие",
-        placeholder: "telegram.message",
-        hint: "Ключ события из панели автоматизации интеграции.",
-      },
-    ],
+  "trigger.telegram": {
+    description: "Запускает сценарий при получении сообщения выбранным аккаунтом.",
+    fields: [{ key: "accountId", label: "Аккаунт Telegram" }],
   },
   "agent.tools": {
     description:

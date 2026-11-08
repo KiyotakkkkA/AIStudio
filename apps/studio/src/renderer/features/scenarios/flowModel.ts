@@ -1,14 +1,13 @@
 import {
   mdiBellOutline,
   mdiBrain,
-  mdiClockOutline,
   mdiCogOutline,
   mdiDatabaseSearchOutline,
   mdiEmailOutline,
   mdiFileDocumentOutline,
   mdiFormatListBulleted,
   mdiHistory,
-  mdiLightningBoltOutline,
+  mdiSendOutline,
   mdiMessageArrowRightOutline,
   mdiMessageOutline,
   mdiMessagePlusOutline,
@@ -18,7 +17,6 @@ import {
   mdiSourceBranch,
   mdiToolboxOutline,
   mdiVectorPoint,
-  mdiWebhook,
   mdiWrenchOutline,
 } from "@mdi/js";
 import type { Edge, Node } from "@xyflow/react";
@@ -120,9 +118,7 @@ export type ScenarioFlowEdge = Edge<ScenarioEdgeData, "scenario">;
 const TYPE_ICONS: Readonly<Record<string, string>> = {
   "trigger.chat": mdiMessageOutline,
   "trigger.mail": mdiEmailOutline,
-  "trigger.schedule": mdiClockOutline,
-  "trigger.webhook": mdiWebhook,
-  "trigger.integration": mdiLightningBoltOutline,
+  "trigger.telegram": mdiSendOutline,
   "agent.tools": mdiRobotOutline,
   "model.chat": mdiBrain,
   "memory.window": mdiHistory,

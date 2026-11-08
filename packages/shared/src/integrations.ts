@@ -16,6 +16,12 @@ const count = z.number().int().nonnegative();
 export const IntegrationKind = z.enum(["mail", "telegram", "github", "gitlab"]);
 export type IntegrationKind = z.infer<typeof IntegrationKind>;
 
+export const GitRepositoryDto = z.object({
+  id: z.string().min(1).max(512),
+  name: z.string().min(1).max(512),
+});
+export type GitRepositoryDto = z.infer<typeof GitRepositoryDto>;
+
 export const IntegrationStatus = z.enum([
   "disabled",
   "stopped",

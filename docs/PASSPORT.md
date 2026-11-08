@@ -1341,14 +1341,20 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `integration` consumers. An enabled account runs as the worker `integration:<id>`. Its
   `start` emits `IntegrationEvent { trigger, eventId, payload }`. The dispatcher records
   `(account, trigger, eventId)` in `integration_event` (kept 30 days) before anything starts, so
-  a replayed event is counted as a duplicate and starts nothing. A new event fires
-  `trigger.integration` scenarios whose `accountId` and `trigger` params match, with
+  a replayed event is counted as a duplicate and starts nothing. Incoming mail and Telegram
+  events fire `trigger.mail` and `trigger.telegram` scenarios for the selected `accountId`;
+  each node binds its plugin's fixed incoming event, with
   `{ accountId, kind, trigger, eventId, payload }` as the run input. Tools register per
   account as `<head>.<last 8 of the account id>.<rest>` (`telegram.a1b2c3d4.send`), with source
   `integration` and the account as `sourceRef`. A side-effecting tool defaults to `ask` and
   stays under the tool ceiling (§14). Disable or remove withdraws them. Counters, `last_error`
   and the last 200 activity lines per account feed the automation rail. Channels:
-  `integrations.kinds|list|get|create|update|remove|test|enable|disable|activity|signIn|cancelSignIn`.
+  `integrations.kinds|list|get|create|update|remove|test|enable|disable|activity|signIn|cancelSignIn|repositories`.
+  Together with `trigger.chat`, mail and Telegram are the only scenario trigger nodes.
+  Webhook, schedule and generic integration nodes are not offered; GitHub and GitLab
+  have no scenario trigger nodes. Their account settings load accessible repositories
+  through the host-owned `integrations.repositories` channel and select repositories
+  from a searchable list. Branch and permission discovery are outside this contract.
   A provider may narrow its tools per account (`account_tools(config)`), keep cursors in
   `integration_cursor` (`IntegrationSession::cursor` / `set_cursor`), react to a scenario run that
   finished `ok` for one of its events (`handled`, fed by `IntegrationService::run_watcher`), and

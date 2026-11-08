@@ -13,10 +13,8 @@ import type { AttachRefusal, ConnectRefusal, Refusal } from "./graphModel";
 
 export const NODE_TYPE_LABELS: Readonly<Record<string, string>> = {
   "trigger.chat": "Сообщение в диалоге",
-  "trigger.mail": "Новое письмо",
-  "trigger.schedule": "Расписание",
-  "trigger.webhook": "Вебхук",
-  "trigger.integration": "Событие интеграции",
+  "trigger.mail": "Почта",
+  "trigger.telegram": "Telegram",
   "agent.tools": "ИИ-агент",
   "model.chat": "Текстовая модель",
   "memory.window": "История диалога",

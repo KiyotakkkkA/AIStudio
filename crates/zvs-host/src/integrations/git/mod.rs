@@ -1,5 +1,6 @@
 mod client;
 mod copy;
+mod discovery;
 mod forge;
 mod poll;
 mod settings;
@@ -779,6 +780,13 @@ fn fault(error: AppError) -> WorkerFault {
 
 #[async_trait]
 impl IntegrationProvider for GitHostingProvider {
+    async fn repositories(
+        &self,
+        account: &str,
+        config: &IntegrationConfigView,
+    ) -> Result<Vec<zvs_contract::integrations::GitRepositoryDto>, AppError> {
+        self.load_repositories(account, config).await
+    }
     fn kind(&self) -> IntegrationKind {
         self.forge.kind()
     }

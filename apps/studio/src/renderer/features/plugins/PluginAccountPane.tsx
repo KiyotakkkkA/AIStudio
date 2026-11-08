@@ -27,6 +27,7 @@ import EmptyState from "../../ui/molecules/EmptyState";
 import Field from "../../ui/molecules/Field";
 import { formatLatency } from "../connections/connectionPresentation";
 import PluginField from "./PluginField";
+import RepositoryPicker from "./RepositoryPicker";
 import type { PluginFormVm } from "./PluginFormVm";
 import PluginMark from "./PluginMark";
 import { PLUGIN_LABELS, SIGNED_IN } from "./pluginPresentation";
@@ -248,12 +249,18 @@ const AccountForm = observer(function AccountForm({
               />
             </Field>
           </div>
-          {vm.visibleFields.map((field) => (
-            <PluginField key={field.key} field={field} vm={vm} secrets={store.secretChoices} />
-          ))}
+          {vm.visibleFields.map((field) =>
+            field.key === "repositories" &&
+            (vm.type.kind === "github" || vm.type.kind === "gitlab") ? null : (
+              <PluginField key={field.key} field={field} vm={vm} secrets={store.secretChoices} />
+            ),
+          )}
         </div>
 
         {vm.type.browser ? <SignInBlock store={store} vm={vm} /> : null}
+        {vm.type.kind === "github" || vm.type.kind === "gitlab" ? (
+          <RepositoryPicker store={store} vm={vm} />
+        ) : null}
       </section>
 
       {account === null || (test === null && !store.testing) ? null : (

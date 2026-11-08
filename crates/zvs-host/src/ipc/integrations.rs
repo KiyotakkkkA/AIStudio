@@ -11,6 +11,15 @@ use crate::services::Services;
 pub fn register(server: &mut IpcServer) {
     server
         .handle(
+            "integrations.repositories",
+            |services: Arc<Services>, input: IntegrationRef| async move {
+                services
+                    .integrations
+                    .repositories(&input.id.to_string())
+                    .await
+            },
+        )
+        .handle(
             "integrations.kinds",
             |services: Arc<Services>, _input: ()| async move {
                 Ok::<_, AppError>(services.integrations.kinds())

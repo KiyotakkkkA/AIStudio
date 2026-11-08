@@ -28,6 +28,97 @@ const GITLAB_PAT: &str = "glpat-planted-token";
 
 static SECRETS: AtomicUsize = AtomicUsize::new(0);
 
+#[tokio::test]
+async fn repository_loading_paginates_sorts_and_deduplicates_github_results() {
+    let rig = rig(GitHostingProvider::github(reqwest::Client::new())).await;
+    let first: Vec<Value> = (0..100)
+        .map(|index| json!({ "full_name": format!("owner/repo-{index:03}") }))
+        .collect();
+    rig.server
+        .queue("/user/repos", Reply::json(&json!(first)))
+        .queue(
+            "/user/repos",
+            Reply::json(
+                &json!([{ "full_name": "owner/repo-000" }, { "full_name": "team/shared" }]),
+            ),
+        );
+    let config = rig.token_config(GITHUB_PAT, READ_ONLY, "");
+    let account = rig
+        .account(zvs_contract::IntegrationKind::Github, config, false)
+        .await;
+    let repositories = rig
+        .service
+        .repositories(&account.id.to_string())
+        .await
+        .expect("accessible repositories");
+    assert_eq!(repositories.len(), 101);
+    assert_eq!(repositories[0].id, "owner/repo-000");
+    assert_eq!(repositories.last().expect("last").id, "team/shared");
+    let calls = rig.server.calls();
+    let pages: Vec<_> = calls
+        .iter()
+        .filter(|call| call.path == "/user/repos")
+        .collect();
+    assert_eq!(pages.len(), 2);
+    assert!(pages[0].query.contains("page=1"));
+    assert!(pages[1].query.contains("page=2"));
+    assert_eq!(
+        pages[0].header("authorization"),
+        Some(format!("Bearer {GITHUB_PAT}").as_str())
+    );
+}
+
+#[tokio::test]
+async fn repository_loading_supports_gitlab_nested_projects_and_rejects_bad_credentials() {
+    let rig = rig(GitHostingProvider::gitlab(reqwest::Client::new())).await;
+    rig.server
+        .queue(
+            "/api/v4/projects",
+            Reply::json(&json!([{ "path_with_namespace": "group/subgroup/project" }])),
+        )
+        .queue(
+            "/api/v4/projects",
+            Reply::json(&json!({ "message": "unauthorized" })).status(401),
+        );
+    let config = rig.token_config(GITLAB_PAT, READ_ONLY, "");
+    let account = rig
+        .account(zvs_contract::IntegrationKind::Gitlab, config, false)
+        .await;
+    let repositories = rig
+        .service
+        .repositories(&account.id.to_string())
+        .await
+        .expect("nested projects");
+    assert_eq!(repositories[0].id, "group/subgroup/project");
+    let error = rig
+        .service
+        .repositories(&account.id.to_string())
+        .await
+        .expect_err("expired credentials");
+    assert_eq!(error.code, AppErrorCode::ProviderAuthFailed);
+}
+
+#[tokio::test]
+async fn repository_loading_refuses_malformed_responses() {
+    let rig = rig(GitHostingProvider::github(reqwest::Client::new())).await;
+    rig.server.steady(
+        "/user/repos",
+        Reply::json(&json!([{ "name": "missing full name" }])),
+    );
+    let config = rig.token_config(GITHUB_PAT, READ_ONLY, "");
+    let account = rig
+        .account(zvs_contract::IntegrationKind::Github, config, false)
+        .await;
+    assert_eq!(
+        rig.service
+            .repositories(&account.id.to_string())
+            .await
+            .expect_err("invalid response")
+            .code,
+        AppErrorCode::ProviderUnreachable
+    );
+}
+
 fn at(offset: i64) -> String {
     forge::iso(NOW + offset)
 }

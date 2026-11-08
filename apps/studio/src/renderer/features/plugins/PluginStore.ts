@@ -2,6 +2,7 @@ import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import type {
   Contract,
+  GitRepositoryDto,
   IntegrationAccountDetailDto,
   IntegrationAccountDto,
   IntegrationActivityDto,
@@ -91,6 +92,8 @@ export default class PluginStore {
   testing = false;
   toggling = false;
   removing = false;
+  repositories: Record<string, GitRepositoryDto[]> = {};
+  loadingRepositories = false;
   redirect: string | null = null;
 
   readonly now: () => number;
@@ -364,6 +367,29 @@ export default class PluginStore {
         else this.error = pluginErrorCopy(error);
       });
       return null;
+    }
+  }
+
+  async loadRepositories(): Promise<void> {
+    if (this.loadingRepositories) return;
+    this.loadingRepositories = true;
+    this.error = null;
+    try {
+      let id = this.accountId;
+      if (this.form !== null && (this.form.isNew || this.form.dirty)) id = await this.save();
+      if (id === null) return;
+      const repositories = await this.ipc.call("integrations.repositories", { id });
+      runInAction(() => {
+        this.repositories[id] = repositories;
+      });
+    } catch (error: unknown) {
+      runInAction(() => {
+        this.error = pluginErrorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.loadingRepositories = false;
+      });
     }
   }
 

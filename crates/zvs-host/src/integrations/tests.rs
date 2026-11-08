@@ -22,7 +22,7 @@ use crate::services::{SecretCreateInput, SystemService};
 use crate::testing::{TestServices, test_services};
 use crate::workers::{Backoff, WorkerFault, WorkerSupervisor};
 
-const EVENT: &str = "fake.event";
+const EVENT: &str = "telegram.message";
 const READ: &str = "fake.read";
 const SEND: &str = "fake.send";
 const OFFLINE: &str = "Сервер недоступен";
@@ -253,8 +253,8 @@ impl Rig {
                     nodes: vec![
                         node(
                             "trigger",
-                            "trigger.integration",
-                            json!({ "accountId": account.id.to_string(), "trigger": EVENT }),
+                            "trigger.telegram",
+                            json!({ "accountId": account.id.to_string() }),
                         ),
                         node("notify", "output.notify", json!({ "title": "Событие" })),
                     ],

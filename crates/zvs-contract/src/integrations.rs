@@ -99,6 +99,21 @@ impl Validate for IntegrationValue {
 
 pub type IntegrationConfig = BTreeMap<String, IntegrationValue>;
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GitRepositoryDto {
+    pub id: String,
+    pub name: String,
+}
+
+impl Validate for GitRepositoryDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::non_empty("id", &self.id)?;
+        check::max_len("id", &self.id, 512)?;
+        check::non_empty("name", &self.name)?;
+        check::max_len("name", &self.name, 512)
+    }
+}
+
 pub fn check_config(field: &str, config: &IntegrationConfig) -> Result<(), AppError> {
     if config.len() > INTEGRATION_CONFIG_FIELDS_MAX {
         return Err(invalid(field, "maxItems"));

@@ -40,6 +40,7 @@ export const ENTITY_MISSING = "Не найден";
 export interface EntityOption {
   readonly value: string;
   readonly label: string;
+  readonly kind?: string;
 }
 
 export function entityKindOf(param: string): EntityKind | null {
@@ -122,6 +123,7 @@ export default class EntityOptions {
         return (await this.ipc.call("integrations.list", undefined)).map((entry) => ({
           value: entry.id,
           label: entry.name,
+          kind: entry.kind,
         }));
     }
   }

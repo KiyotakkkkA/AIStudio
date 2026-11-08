@@ -8,9 +8,7 @@ use crate::kernel::NodeRegistry;
 
 pub const TRIGGER_CHAT: &str = "trigger.chat";
 pub const TRIGGER_MAIL: &str = "trigger.mail";
-pub const TRIGGER_SCHEDULE: &str = "trigger.schedule";
-pub const TRIGGER_WEBHOOK: &str = "trigger.webhook";
-pub const TRIGGER_INTEGRATION: &str = "trigger.integration";
+pub const TRIGGER_TELEGRAM: &str = "trigger.telegram";
 pub const AGENT_TOOLS: &str = "agent.tools";
 pub const MODEL_CHAT: &str = "model.chat";
 pub const MEMORY_WINDOW: &str = "memory.window";
@@ -233,18 +231,10 @@ impl ScenarioCatalogue {
         let specs = [
             NodeSpec::trigger(TRIGGER_CHAT, ScenarioTriggerKind::Chat)
                 .with_schema(object_schema(&[("conversationId", text())], &[])),
-            NodeSpec::trigger(TRIGGER_MAIL, ScenarioTriggerKind::Mail)
-                .with_schema(object_schema(&[("from", text()), ("subject", text())], &[])),
-            NodeSpec::trigger(TRIGGER_SCHEDULE, ScenarioTriggerKind::Schedule)
-                .with_schema(object_schema(&[("cron", text())], &["cron"])),
-            NodeSpec::trigger(TRIGGER_WEBHOOK, ScenarioTriggerKind::Webhook)
-                .with_schema(object_schema(&[("path", text())], &["path"])),
-            NodeSpec::trigger(TRIGGER_INTEGRATION, ScenarioTriggerKind::Integration).with_schema(
-                object_schema(
-                    &[("accountId", text()), ("trigger", text())],
-                    &["accountId", "trigger"],
-                ),
-            ),
+            NodeSpec::trigger(TRIGGER_MAIL, ScenarioTriggerKind::Integration)
+                .with_schema(object_schema(&[("accountId", text())], &["accountId"])),
+            NodeSpec::trigger(TRIGGER_TELEGRAM, ScenarioTriggerKind::Integration)
+                .with_schema(object_schema(&[("accountId", text())], &["accountId"])),
             NodeSpec::action(AGENT_TOOLS)
                 .with_slots(&[
                     SlotSpec::required(ScenarioSlot::Model),

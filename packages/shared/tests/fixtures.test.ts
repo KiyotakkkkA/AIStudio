@@ -231,6 +231,7 @@ const schemas: Record<string, z.ZodType> = {
   "integrations/IntegrationRemoveOutput": integrations.IntegrationRemoveOutput,
   "integrations/IntegrationStatus": integrations.IntegrationStatus,
   "integrations/IntegrationTestResultDto": integrations.IntegrationTestResultDto,
+  "integrations/GitRepositoryDto": integrations.GitRepositoryDto,
   "integrations/IntegrationToolDto": integrations.IntegrationToolDto,
   "integrations/IntegrationTriggerDto": integrations.IntegrationTriggerDto,
   "integrations/IntegrationValue": integrations.IntegrationValue,

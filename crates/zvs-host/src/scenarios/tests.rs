@@ -10,7 +10,7 @@ use zvs_contract::{
 
 use super::catalogue::{
     AGENT_TOOLS, EMBEDDING_MODEL, FLOW_BRANCH, KNOWLEDGE_STORES, MEMORY_FACTS, MEMORY_WINDOW,
-    MODEL_CHAT, TOOL_SET, TRIGGER_CHAT, TRIGGER_MAIL, TRIGGER_SCHEDULE,
+    MODEL_CHAT, TOOL_SET, TRIGGER_CHAT, TRIGGER_MAIL, TRIGGER_TELEGRAM,
 };
 use super::*;
 use crate::ipc::IpcServer;
@@ -22,6 +22,47 @@ use crate::services::SystemService;
 use crate::testing::{TemporaryDatabase, temporary_database, test_services};
 
 const SEARCH: &str = "kb.search";
+
+#[test]
+fn only_chat_mail_and_telegram_are_available_as_triggers() {
+    let catalogue = ScenarioCatalogue::builtin();
+    let triggers: Vec<&str> = catalogue
+        .specs()
+        .iter()
+        .filter(|spec| spec.trigger.is_some())
+        .map(|spec| spec.node_type.as_str())
+        .collect();
+    assert_eq!(triggers, [TRIGGER_CHAT, TRIGGER_MAIL, TRIGGER_TELEGRAM]);
+    for removed in [
+        "trigger.schedule",
+        "trigger.webhook",
+        "trigger.integration",
+        "trigger.github",
+        "trigger.gitlab",
+    ] {
+        assert!(catalogue.spec(removed).is_none());
+    }
+}
+
+#[test]
+fn plugin_trigger_bindings_use_fixed_events_and_selected_accounts() {
+    for (node_type, event) in [
+        (TRIGGER_MAIL, crate::integrations::mail::RECEIVED),
+        (TRIGGER_TELEGRAM, crate::integrations::telegram::MESSAGE),
+    ] {
+        let graph = ScenarioGraphDto {
+            nodes: vec![with_params(
+                node("trigger", node_type),
+                json!({ "accountId": "selected", "trigger": "untrusted.override" }),
+            )],
+            ..ScenarioGraphDto::default()
+        };
+        let binding = trigger_binding(&graph, &ScenarioCatalogue::builtin()).expect("a binding");
+        assert_eq!(binding.kind, ScenarioTriggerKind::Integration);
+        assert_eq!(binding.params["accountId"], "selected");
+        assert_eq!(binding.params["trigger"], event);
+    }
+}
 
 fn catalogue() -> ScenarioCatalogue {
     ScenarioCatalogue::builtin()
@@ -339,12 +380,18 @@ fn a_missing_or_blank_required_parameter_is_named() {
     );
 
     let mut graph = valid_graph();
-    graph.nodes[0] = with_params(node("trigger", TRIGGER_SCHEDULE), json!({ "cron": " " }));
+    graph.nodes[0] = with_params(
+        node("trigger", TRIGGER_TELEGRAM),
+        json!({ "accountId": " " }),
+    );
     graph.nodes.retain(|node| node.id != "memory");
     graph
         .attachments
         .retain(|attachment| attachment.child_node_id != "memory");
-    assert_eq!(issues(&graph), [ScenarioIssueDto::param("trigger", "cron")]);
+    assert_eq!(
+        issues(&graph),
+        [ScenarioIssueDto::param("trigger", "accountId")]
+    );
 }
 
 #[test]
@@ -371,7 +418,10 @@ fn a_scenario_needs_exactly_one_trigger() {
     );
 
     let mut graph = valid_graph();
-    graph.nodes.push(node("mail", TRIGGER_MAIL));
+    graph.nodes.push(with_params(
+        node("mail", TRIGGER_MAIL),
+        json!({ "accountId": "mail-account" }),
+    ));
     graph.edges.push(edge("mail", "agent"));
     assert_eq!(
         issues(&graph),
@@ -828,10 +878,10 @@ fn the_catalogue_describes_roles_slots_and_what_each_node_fills() {
             .find(|entry| entry.node_type == node_type)
             .unwrap_or_else(|| panic!("{node_type} is catalogued"))
     };
-    let trigger = find(TRIGGER_SCHEDULE);
+    let trigger = find(TRIGGER_TELEGRAM);
     assert_eq!(trigger.role, zvs_contract::ScenarioNodeRole::Trigger);
-    assert_eq!(trigger.trigger, Some(ScenarioTriggerKind::Schedule));
-    assert_eq!(trigger.required_params, ["cron"]);
+    assert_eq!(trigger.trigger, Some(ScenarioTriggerKind::Integration));
+    assert_eq!(trigger.required_params, ["accountId"]);
     let agent = find(AGENT_TOOLS);
     assert_eq!(agent.role, zvs_contract::ScenarioNodeRole::Action);
     assert_eq!(
@@ -1038,8 +1088,8 @@ fn browser_vector_and_knowledge_tools_are_refused_in_a_tool_set() {
 
 fn without_chat_trigger(mut graph: ScenarioGraphDto) -> ScenarioGraphDto {
     graph.nodes[0] = with_params(
-        node("trigger", TRIGGER_SCHEDULE),
-        json!({ "cron": "0 9 * * *" }),
+        node("trigger", TRIGGER_TELEGRAM),
+        json!({ "accountId": "telegram-account" }),
     );
     graph
 }

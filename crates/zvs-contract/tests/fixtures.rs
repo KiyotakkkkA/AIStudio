@@ -210,6 +210,10 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::IntegrationStatus>,
     ),
     (
+        "integrations/GitRepositoryDto",
+        round_trip::<zvs_contract::integrations::GitRepositoryDto>,
+    ),
+    (
         "integrations/IntegrationTestResultDto",
         round_trip::<zvs_contract::IntegrationTestResultDto>,
     ),

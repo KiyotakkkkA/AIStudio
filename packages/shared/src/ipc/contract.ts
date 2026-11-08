@@ -241,6 +241,7 @@ import {
 } from "../mcp/index.js";
 import {
   CreateIntegrationInput,
+  GitRepositoryDto,
   IntegrationAccountDetailDto,
   IntegrationAccountDto,
   IntegrationActivityDto,
@@ -526,6 +527,7 @@ export const contract = defineContract({
   "mcp.cancelSignIn": { input: McpServerRef, output: McpServerDto },
   "mcp.signOut": { input: McpServerRef, output: McpServerDto },
   "integrations.kinds": { input: z.void(), output: z.array(IntegrationKindDto) },
+  "integrations.repositories": { input: IntegrationRef, output: z.array(GitRepositoryDto) },
   "integrations.list": { input: z.void(), output: z.array(IntegrationAccountDto) },
   "integrations.get": { input: IntegrationRef, output: IntegrationAccountDetailDto },
   "integrations.create": { input: CreateIntegrationInput, output: IntegrationAccountDto },
