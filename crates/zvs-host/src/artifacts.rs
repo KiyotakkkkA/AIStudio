@@ -483,8 +483,6 @@ impl ArtifactStore {
     }
 }
 
-pub type SharedArtifactStore = Arc<ArtifactStore>;
-
 const AUTOMATIC_FRESHNESS: std::time::Duration = std::time::Duration::from_secs(10);
 
 fn as_value<T: serde::Serialize>(value: &T) -> serde_json::Value {

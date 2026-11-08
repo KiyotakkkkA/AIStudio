@@ -80,7 +80,7 @@ import { appendRound } from "./answerRounds";
 import { type MailPreview } from "../mail/mailCopy";
 import { approvalView } from "./approvalModel";
 
-export const ACCOUNT_OPTION_PREFIX = "account:";
+const ACCOUNT_OPTION_PREFIX = "account:";
 const LAST_CONVERSATION_KEY = "chat.conversation.last";
 export const SELECTIONS_FULL = "К сообщению можно приложить не больше 8 фрагментов.";
 export const GENERATION_FAILED = "Не удалось получить ответ. Повторите запрос.";
@@ -88,7 +88,7 @@ export const GENERATION_FAILED = "Не удалось получить отве�
 export type SidePanel = "context" | "files" | "browser";
 export const BROWSER_NAVIGATE_TOOL = "browser.navigate";
 export const BROWSER_DOCK_MIN_WIDTH = 560;
-export const BROWSER_DOCK_DEFAULT_WIDTH = 820;
+const BROWSER_DOCK_DEFAULT_WIDTH = 820;
 
 export interface AccountChoice {
   readonly value: string;

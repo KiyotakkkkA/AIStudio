@@ -113,7 +113,7 @@ export function summaryLine(summary: ProviderSummaryDto): string {
   return STATUS_LABELS[summary.status];
 }
 
-export function modelsWord(count: number): string {
+function modelsWord(count: number): string {
   return plural(count, "модель", "модели", "моделей");
 }
 
@@ -186,11 +186,6 @@ export function checkedAgo(result: ProbeResultDto, now: number): string {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `проверено ${String(hours)} ч назад`;
   return `проверено ${String(Math.round(hours / 24))} дн. назад`;
-}
-
-export function contextWindowLabel(tokens: number): string {
-  if (tokens >= 1000) return `${String(Math.round(tokens / 1000))}k ctx`;
-  return `${String(tokens)} ctx`;
 }
 
 export function sizeLabel(bytes: number): string {

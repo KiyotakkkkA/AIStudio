@@ -29,10 +29,10 @@ export const SHELL_LABELS: Record<TerminalShell, string> = {
   wsl: "WSL",
 };
 
-export const CREATE_FAILED = "Не удалось запустить командную оболочку";
+const CREATE_FAILED = "Не удалось запустить командную оболочку";
 export const NO_SHELL = "Командная оболочка не найдена";
 export const SESSIONS_LIMIT = `Открыто максимальное число сеансов в диалоге: ${String(TERMINAL_SESSIONS_MAX)}`;
-export const ACTION_FAILED = "Не удалось выполнить действие с сеансом";
+const ACTION_FAILED = "Не удалось выполнить действие с сеансом";
 export const SESSION_GONE = "Сеанс завершён";
 
 export function exitLabel(exitCode: number | null): string {

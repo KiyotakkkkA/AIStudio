@@ -79,10 +79,6 @@ export function accountsWord(count: number): string {
   return plural(count, "аккаунт", "аккаунта", "аккаунтов");
 }
 
-export function eventsWord(count: number): string {
-  return plural(count, "событие", "события", "событий");
-}
-
 export type AccountState =
   | "disabled"
   | "signing"

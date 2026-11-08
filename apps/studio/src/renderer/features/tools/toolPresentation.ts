@@ -1,21 +1,10 @@
 import { AppErrorCode, type McpServerDto, type ToolDto } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 import type { StatusTone } from "../../ui/atoms/statusTone";
-import {
-  plural,
-  serverState,
-  STATE_LABELS,
-  STATE_TONES,
-  toolsWord,
-} from "../connections/connectionPresentation";
+import { serverState, STATE_LABELS, STATE_TONES } from "../connections/connectionPresentation";
 import type { SourceGroup } from "./toolFilters";
 
-export {
-  TIER_HINTS,
-  TIER_LABELS,
-  TIER_TEXT,
-  toolsWord,
-} from "../connections/connectionPresentation";
+export { TIER_HINTS, TIER_LABELS, TIER_TEXT } from "../connections/connectionPresentation";
 
 export const TIER_FILTER_LABELS = { auto: "auto", ask: "ask", off: "off" } as const;
 
@@ -23,14 +12,6 @@ export const TIER_TONES = { auto: "ok", ask: "warn", off: "idle" } as const sati
   ToolDto["tier"],
   StatusTone
 >;
-
-export function sourcesWord(count: number): string {
-  return plural(count, "источник", "источника", "источников");
-}
-
-export function headerLine(tools: number, sources: number): string {
-  return `${toolsWord(tools)} из ${sourcesWord(sources)}`;
-}
 
 export function groupTone(group: SourceGroup): StatusTone {
   if (group.source === "builtin") return "accent";
@@ -96,7 +77,7 @@ export function unavailability(tool: ToolDto, server: McpServerDto | null): Unav
   };
 }
 
-export const UNKNOWN_TOOL_ERROR = "Не удалось выполнить операцию. Попробуйте ещё раз.";
+const UNKNOWN_TOOL_ERROR = "Не удалось выполнить операцию. Попробуйте ещё раз.";
 
 const COPY: Partial<Record<AppErrorCode, string>> = {
   [AppErrorCode.VALIDATION_FAILED]: "Входные данные не подходят под схему инструмента.",

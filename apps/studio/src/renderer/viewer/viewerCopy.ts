@@ -37,13 +37,13 @@ export const CHIP_APPROXIMATE_HINT =
 export const PPTX_NOTE = "Для презентации показан только текст слайдов.";
 
 export const MISSING_TITLE = "Файл не найден";
-export const MISSING_HINT = "Файл перемещён или удалён. Проверьте исходную папку.";
+const MISSING_HINT = "Файл перемещён или удалён. Проверьте исходную папку.";
 export const UNSUPPORTED_TITLE = "Формат не поддерживается";
-export const UNSUPPORTED_HINT = "Этот файл нельзя показать в просмотрщике.";
-export const FORBIDDEN_TITLE = "Доступ к файлу закрыт";
-export const TOO_LARGE_TITLE = "Файл слишком большой";
-export const FAILED_TITLE = "Не удалось открыть документ";
-export const FAILED_HINT = "Повторите попытку позже.";
+const UNSUPPORTED_HINT = "Этот файл нельзя показать в просмотрщике.";
+const FORBIDDEN_TITLE = "Доступ к файлу закрыт";
+const TOO_LARGE_TITLE = "Файл слишком большой";
+const FAILED_TITLE = "Не удалось открыть документ";
+const FAILED_HINT = "Повторите попытку позже.";
 export const RENDER_FAILED = "Не удалось отобразить документ.";
 export const EMPTY_DOCUMENT = "Документ пуст.";
 export const SAVE_FAILED = "Не удалось сохранить документ.";
@@ -88,7 +88,7 @@ export function actionErrorCopy(error: unknown, fallback: string): string {
   return fallback;
 }
 
-export function pagesLabel(count: number): string {
+function pagesLabel(count: number): string {
   return plural(count, "страница", "страницы", "страниц");
 }
 
@@ -107,8 +107,4 @@ export function matchesLabel(current: number, total: number): string {
 
 export function zoomLabel(zoom: number): string {
   return `${Math.round(zoom * 100).toLocaleString("ru-RU")}%`;
-}
-
-export function pageLocation(page: number | null): string | null {
-  return page === null ? null : `стр. ${page.toLocaleString("ru-RU")}`;
 }

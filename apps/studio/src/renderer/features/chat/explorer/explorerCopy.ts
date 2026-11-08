@@ -36,7 +36,7 @@ export const FILE_REMOVED_HINT = "Ниже показано последнее �
 export const FILE_EMPTY = "Файл пуст";
 
 export const LIST_ERROR_FALLBACK = "Не удалось загрузить содержимое папки.";
-export const READ_ERROR_FALLBACK = "Не удалось открыть файл.";
+const READ_ERROR_FALLBACK = "Не удалось открыть файл.";
 
 export type RootState = "ready" | "missing" | "gone";
 
@@ -61,10 +61,6 @@ export function readErrorCopy(error: unknown): string {
 
 export function isMarkdown(path: string): boolean {
   return /\.(md|markdown)$/i.test(path);
-}
-
-export function baseName(path: string): string {
-  return path.split("/").pop() ?? path;
 }
 
 export function modifiedLabel(timestamp: number | null): string | null {

@@ -1,6 +1,5 @@
 import type { FolderAccessAnswer } from "@zvs/shared";
 
-export const ACCESS_REQUEST_TITLE = "Запрос доступа к приложениям";
 export const ACCESS_REQUEST_LEAD = "Агент просит разрешения управлять приложениями:";
 export const PATH_UNKNOWN = "Путь не определён";
 

@@ -55,7 +55,7 @@ export interface StepRow {
   readonly duration: number | null;
 }
 
-export const STEP_PATH_SEPARATOR = ".";
+const STEP_PATH_SEPARATOR = ".";
 
 const STEP_STATUSES: readonly StepStatus[] = [
   "running",

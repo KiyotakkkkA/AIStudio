@@ -25,7 +25,7 @@ const FULL: Record<TransitionKind, Transition> = {
   pop: { type: "spring", bounce: 0.45, duration: 0.42 },
 };
 
-export function transitionFor(level: FxLevel, kind: TransitionKind): Transition {
+function transitionFor(level: FxLevel, kind: TransitionKind): Transition {
   if (level === "none") return INSTANT;
   if (level === "reduced") return REDUCED;
   return FULL[kind];

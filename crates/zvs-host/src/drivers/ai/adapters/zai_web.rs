@@ -1,6 +1,4 @@
-use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashMap, VecDeque};
-use std::hash::{Hash, Hasher};
+use std::collections::VecDeque;
 use std::mem;
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -16,16 +14,17 @@ use zvs_zai_web::{
 };
 
 use super::account_family::{
-    AccountAdapterCore, AccountAdapterOptions, malformed_payload, malformed_turn,
-    response_diagnostics, role_label, truncated_stream,
+    self, AccountAdapterCore, AccountAdapterOptions, ChatChain, SharedSummary, history_key,
+    malformed_payload, malformed_turn, response_diagnostics, role_label, truncated_stream,
+    with_summary,
 };
 use crate::drivers::ai::capabilities::{AdapterCapabilities, Honours};
 use crate::drivers::ai::errors::{
     browser_verification, cancelled, is_cancellation, is_session_expired, session_expired,
 };
 use crate::drivers::ai::ports::{
-    ChatMessage, ChatRole, DeltaStream, DiscoveredModel, FinishReason, GenerateRequest,
-    GenerateResult, SharedTextDriver, TextDelta, TextGenerationDriver, TokenUsage,
+    ChatRole, DeltaStream, DiscoveredModel, FinishReason, GenerateRequest, GenerateResult,
+    SharedTextDriver, TextDelta, TextGenerationDriver, TokenUsage,
 };
 use crate::drivers::ai::sse::FrameStream;
 use crate::drivers::ai::tool_dialect::{DefaultDialect, with_tool_dialect};
@@ -159,69 +158,19 @@ fn dialog(request: &GenerateRequest) -> Vec<(&'static str, String)> {
     turns
 }
 
-#[derive(Debug, Default)]
-struct TurnSummary {
-    usage: Option<TokenUsage>,
-    finish_reason: Option<FinishReason>,
-}
-
-type SharedSummary = Arc<Mutex<TurnSummary>>;
-
-fn with_summary(summary: &SharedSummary, update: impl FnOnce(&mut TurnSummary)) {
-    update(&mut summary.lock().unwrap_or_else(PoisonError::into_inner));
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Chain {
     chat_id: String,
     answer_id: String,
 }
 
-#[derive(Debug, Default)]
-struct Chains {
-    order: VecDeque<u64>,
-    by_key: HashMap<u64, Chain>,
-}
-
-impl Chains {
-    fn insert(&mut self, key: u64, chain: Chain) {
-        if self.by_key.insert(key, chain).is_none() {
-            self.order.push_back(key);
-        }
-        while self.order.len() > ZAI_CHAINS_MAX {
-            if let Some(oldest) = self.order.pop_front() {
-                self.by_key.remove(&oldest);
-            }
-        }
-    }
-
-    fn forget_chat(&mut self, chat_id: &str) {
-        self.by_key.retain(|_, chain| chain.chat_id != chat_id);
-        let by_key = &self.by_key;
-        self.order.retain(|key| by_key.contains_key(key));
-    }
-
-    fn clear(&mut self) {
-        self.order.clear();
-        self.by_key.clear();
+impl ChatChain for Chain {
+    fn chat_id(&self) -> &str {
+        &self.chat_id
     }
 }
 
-fn history_key(model: &str, system: Option<&str>, messages: &[ChatMessage]) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    model.hash(&mut hasher);
-    system.map(str::trim).unwrap_or_default().hash(&mut hasher);
-    for message in messages {
-        message.role.hash(&mut hasher);
-        message.content.hash(&mut hasher);
-        for image in &message.images {
-            image.attachment.hash(&mut hasher);
-        }
-        message.tool_call_id.hash(&mut hasher);
-        format!("{:?}", message.tool_calls).hash(&mut hasher);
-    }
-    hasher.finish()
-}
+type Chains = account_family::Chains<Chain, ZAI_CHAINS_MAX>;
 
 fn retryable_on_new_chat(error: &AppError) -> bool {
     !is_cancellation(error)

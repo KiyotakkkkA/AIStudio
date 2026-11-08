@@ -112,12 +112,6 @@ pub struct ToolDto {
     pub updated_at: Timestamp,
 }
 
-impl ToolDto {
-    pub const fn needs_confirmation(&self) -> bool {
-        tool_needs_confirmation(self.tier, self.destructive)
-    }
-}
-
 impl Validate for ToolDto {
     fn validate(&self) -> Result<(), AppError> {
         check_tool_key("key", &self.key)?;

@@ -4,7 +4,7 @@ import BackgroundShellLine from "../backgroundShells/BackgroundShellLine";
 import ToolImages from "./ToolImages";
 import type { toolImageReferences } from "./imageData";
 
-export type ToolImageReferences = NonNullable<ReturnType<typeof toolImageReferences>>;
+type ToolImageReferences = NonNullable<ReturnType<typeof toolImageReferences>>;
 
 export interface ToolCallSlots {
   readonly images: (references: ToolImageReferences) => ReactNode;

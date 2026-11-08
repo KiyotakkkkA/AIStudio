@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ComponentProps } from "react";
 import { Tooltip } from "@kiyotakkkka/zvs-uikit-lib";
 import Icon from "./Icon";
 
-export type TooltipPlacement = NonNullable<ComponentProps<typeof Tooltip>["placement"]>;
+type TooltipPlacement = NonNullable<ComponentProps<typeof Tooltip>["placement"]>;
 
 export type IconButtonProps = Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,

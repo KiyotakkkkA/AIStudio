@@ -3,7 +3,7 @@ import { isIpcError, type IpcClient } from "@zvs/ipc";
 import { AppErrorCode, type Contract, type NotificationTargetDto } from "@zvs/shared";
 import { AUTOSTART_FAILED, SETTING_SAVE_FAILED } from "./preferencesPresentation";
 
-export const APP_SETTING_KEYS = [
+const APP_SETTING_KEYS = [
   "app.autostart",
   "app.tray",
   "notifications.enabled",
@@ -16,7 +16,7 @@ export const APP_SETTING_KEYS = [
 ] as const;
 export type AppSettingKey = (typeof APP_SETTING_KEYS)[number];
 
-export const APP_SETTING_DEFAULTS: Record<AppSettingKey, boolean> = {
+const APP_SETTING_DEFAULTS: Record<AppSettingKey, boolean> = {
   "app.autostart": false,
   "app.tray": false,
   "notifications.enabled": true,

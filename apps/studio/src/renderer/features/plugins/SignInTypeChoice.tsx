@@ -2,7 +2,7 @@ import { observer } from "mobx-react-lite";
 import type PluginStore from "./PluginStore";
 import PluginMark from "./PluginMark";
 
-export const SIGN_IN_TYPE_HEADING = "Способ подключения";
+const SIGN_IN_TYPE_HEADING = "Способ подключения";
 
 function SignInTypeChoice({ store }: { readonly store: PluginStore }) {
   const kind = store.kind;

@@ -10,9 +10,9 @@ import { accountPath } from "./pluginRoutes";
 import type PluginStore from "./PluginStore";
 import { signInTypeOf } from "./signInTypes";
 
-export const ACCOUNTS_HEADING = "Аккаунты";
-export const NEW_ACCOUNT_NAME = "Новый аккаунт";
-export const NOT_SAVED = "Не сохранён";
+const ACCOUNTS_HEADING = "Аккаунты";
+const NEW_ACCOUNT_NAME = "Новый аккаунт";
+const NOT_SAVED = "Не сохранён";
 
 function PluginAccountList({ store }: { readonly store: PluginStore }) {
   const navigate = useNavigate();

@@ -8,9 +8,9 @@ import type ChatStore from "./ChatStore";
 import { isBuiltinTool, toolTitle } from "./toolCallCopy";
 import { SOURCE_HINTS, type ToolSection } from "./toolSets";
 
-export const TOOLS_UNAVAILABLE = "Модель не поддерживает вызов инструментов";
+const TOOLS_UNAVAILABLE = "Модель не поддерживает вызов инструментов";
 
-export const TIER_PILL: Record<ToolTier, string> = {
+const TIER_PILL: Record<ToolTier, string> = {
   auto: "bg-ok-soft text-ok",
   ask: "bg-warn-soft text-warn",
   off: "bg-main-800 text-main-400",

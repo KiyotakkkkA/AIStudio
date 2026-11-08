@@ -44,8 +44,6 @@ export const SUBAGENT_PRESET_LABELS = {
   general: "Общая задача",
 } as const;
 
-export type SubagentPreset = keyof typeof SUBAGENT_PRESET_LABELS;
-
 export const SUBAGENT_RUNNING = "Выполняется";
 export const SUBAGENT_QUEUED = "В очереди";
 export const SUBAGENT_PARTIAL = "Частичный результат";

@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 
-export const SHEET_ROWS_MAX = 5000;
-export const SHEET_COLUMNS_MAX = 200;
+const SHEET_ROWS_MAX = 5000;
+const SHEET_COLUMNS_MAX = 200;
 
 export interface Sheet {
   readonly name: string;

@@ -6,7 +6,7 @@ import { MEMORY_TOOL, memoryCallSummary } from "../memory/memoryCopy";
 import { WORKING_FOLDER } from "./toolCallCopy";
 import { toolCallView, type ToolCallView } from "./toolCallView";
 
-export function toolArgumentsSummary(value: Json): string {
+function toolArgumentsSummary(value: Json): string {
   const text = typeof value === "string" ? value : JSON.stringify(value);
   return text.length > 80 ? `${text.slice(0, 80)}…` : text;
 }

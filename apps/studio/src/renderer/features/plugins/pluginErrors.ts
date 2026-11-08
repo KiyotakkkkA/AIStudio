@@ -1,7 +1,7 @@
 import { AppErrorCode } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 
-export const UNKNOWN_PLUGIN_ERROR = "Не удалось выполнить операцию. Попробуйте ещё раз.";
+const UNKNOWN_PLUGIN_ERROR = "Не удалось выполнить операцию. Попробуйте ещё раз.";
 export const SIGN_IN_EXPIRED = "Сеанс истёк. Войдите снова.";
 
 const COPY: Partial<Record<AppErrorCode, string>> = {

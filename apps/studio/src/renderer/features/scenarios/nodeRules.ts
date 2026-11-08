@@ -8,24 +8,23 @@ import {
 import { childrenIn, findNode, parentOf } from "./graphModel";
 import { TOOL_SET_PARAM, TOOL_SET_TYPE } from "./toolSet";
 
-export const TRIGGER_CHAT_TYPE = "trigger.chat";
-export const HISTORY_TYPE = "memory.window";
-export const FACTS_TYPE = "memory.facts";
+const TRIGGER_CHAT_TYPE = "trigger.chat";
+const HISTORY_TYPE = "memory.window";
+const FACTS_TYPE = "memory.facts";
 export const STORES_TYPE = "knowledge.stores";
-export const BRANCH_TYPE = "flow.branch";
-export const CHAT_REPLY_TYPE = "output.chatReply";
+const CHAT_REPLY_TYPE = "output.chatReply";
 
 export const STORES_PARAM = "stores";
-export const POLICY_PARAM = "policy";
-export const AREA_PARAM = "area";
+const POLICY_PARAM = "policy";
+const AREA_PARAM = "area";
 
-export type FactsPolicy = "read" | "readWrite";
-export type FactsArea = "global" | "dialog" | "both";
+type FactsPolicy = "read" | "readWrite";
+type FactsArea = "global" | "dialog" | "both";
 
 export const KNOWLEDGE_TOOL = "knowledge.search";
 export const MEMORY_TOOL = "memory";
 
-export const RESTRICTED_TOOL_PREFIXES: readonly string[] = [
+const RESTRICTED_TOOL_PREFIXES: readonly string[] = [
   "browser.",
   "computer.",
   "vector.",
@@ -62,12 +61,12 @@ export function blockingIssues(issues: readonly ScenarioIssueDto[]): ScenarioIss
   return issues.filter((issue) => !isWarning(issue));
 }
 
-export function factsArea(params: ScenarioParams): FactsArea {
+function factsArea(params: ScenarioParams): FactsArea {
   const area = params[AREA_PARAM];
   return area === "dialog" || area === "both" ? area : "global";
 }
 
-export function factsPolicy(params: ScenarioParams): FactsPolicy {
+function factsPolicy(params: ScenarioParams): FactsPolicy {
   return params[POLICY_PARAM] === "readWrite" ? "readWrite" : "read";
 }
 

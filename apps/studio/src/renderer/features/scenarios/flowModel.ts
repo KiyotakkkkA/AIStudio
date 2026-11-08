@@ -46,11 +46,11 @@ import type { NodeRunStatus } from "./runModel";
 import { TOOL_SET_TYPE, toolSetKeys } from "./toolSet";
 
 export const IN_HANDLE = "in";
-export const OUT_HANDLE = "out";
+const OUT_HANDLE = "out";
 export const UP_HANDLE = "up";
-export const PORT_HANDLE_PREFIX = "out:";
+const PORT_HANDLE_PREFIX = "out:";
 
-export function portHandle(port: string): string {
+function portHandle(port: string): string {
   return port === SCENARIO_MAIN_PORT ? OUT_HANDLE : `${PORT_HANDLE_PREFIX}${port}`;
 }
 
@@ -60,7 +60,7 @@ export function portOfHandle(handle: string | null | undefined): string | null {
   return handle.slice(PORT_HANDLE_PREFIX.length);
 }
 
-export type DropState = "accept" | "refuse" | null;
+type DropState = "accept" | "refuse" | null;
 
 export interface SlotPort {
   readonly slot: ScenarioSlot;
@@ -71,7 +71,7 @@ export interface SlotPort {
   readonly drop: DropState;
 }
 
-export interface OutPort {
+interface OutPort {
   readonly port: string;
   readonly handle: string;
   readonly label: string | null;
@@ -85,7 +85,7 @@ export interface NextAnchor {
   readonly offset: number;
 }
 
-export interface ScenarioNodeData extends Record<string, unknown> {
+interface ScenarioNodeData extends Record<string, unknown> {
   readonly label: string;
   readonly subLabel: string;
   readonly role: ScenarioNodeRole | null;
@@ -106,7 +106,7 @@ export interface ScenarioNodeData extends Record<string, unknown> {
   readonly runError: string | null;
 }
 
-export interface ScenarioEdgeData extends Record<string, unknown> {
+interface ScenarioEdgeData extends Record<string, unknown> {
   readonly kind: "main" | "attachment";
   readonly traversed: boolean;
   readonly items: number | null;

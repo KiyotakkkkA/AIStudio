@@ -9,7 +9,7 @@ import { csvDelimiter, parseCsv } from "./csv";
 import { EMPTY_DOCUMENT } from "./viewerCopy";
 import { useDocumentText } from "./useDocumentText";
 
-export const HIGHLIGHT_LIMIT = 400_000;
+const HIGHLIGHT_LIMIT = 400_000;
 
 function useContentVersion(root: RefObject<HTMLElement | null>): number {
   const [version, setVersion] = useState(0);

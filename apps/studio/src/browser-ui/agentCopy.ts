@@ -61,7 +61,7 @@ export const STATUS_TONES: Readonly<Record<BrowserAgentStatus, StatusTone>> = {
   finished: "ok",
 };
 
-export const TOOL_ACTIONS: Readonly<Record<string, string>> = {
+const TOOL_ACTIONS: Readonly<Record<string, string>> = {
   "browser.navigate": "переход",
   "browser.read_page": "чтение страницы",
   "browser.screenshot": "снимок страницы",
@@ -72,7 +72,7 @@ export const TOOL_ACTIONS: Readonly<Record<string, string>> = {
   "browser.download": "загрузка файла",
 };
 
-export function toolAction(tool: string): string {
+function toolAction(tool: string): string {
   return TOOL_ACTIONS[tool] ?? tool;
 }
 

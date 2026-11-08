@@ -8,19 +8,19 @@ import {
 } from "./goalCopy";
 import { PROCESS_TOOL_SHELL } from "./processCopy";
 
-export const SHELL_ID_LABEL = "Процесс";
-export const SINCE_LABEL = "С позиции";
-export const TAIL_LABEL = "Последние строки";
+const SHELL_ID_LABEL = "Процесс";
+const SINCE_LABEL = "С позиции";
+const TAIL_LABEL = "Последние строки";
 
 const Citations = ChatCitationDto.array();
 
-export interface FileTarget {
+interface FileTarget {
   readonly path: string;
   readonly start: number | null;
   readonly end: number | null;
 }
 
-export interface ViewField {
+interface ViewField {
   readonly label: string;
   readonly value: string;
 }
@@ -100,7 +100,7 @@ function strings(args: JsonObject, name: string): string[] {
     : [];
 }
 
-export function callCitations(call: Pick<ChatToolCallDto, "meta">): ChatCitationDto[] | null {
+function callCitations(call: Pick<ChatToolCallDto, "meta">): ChatCitationDto[] | null {
   const meta = object(call.meta);
   if (meta === null) return null;
   const parsed = Citations.safeParse(meta.citations);

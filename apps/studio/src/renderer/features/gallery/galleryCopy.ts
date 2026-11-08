@@ -1,7 +1,6 @@
 import { isIpcError } from "@zvs/ipc";
 import { AppErrorCode, type GalleryItemDto, type GalleryKind } from "@zvs/shared";
 import { formatBytes } from "../downloads/downloadPresentation";
-import { plural } from "../connections/connectionPresentation";
 
 export const GALLERY_TITLE = "Галерея";
 export const GALLERY_SUBTITLE = "Артефакты и дашборды, созданные в ходе диалогов";
@@ -29,7 +28,7 @@ export const GALLERY_APPROVE_HINT =
 export const GALLERY_SCRIPT_TRUNCATED = "Показано начало скрипта.";
 export const GALLERY_NEEDS_APPROVAL = "Ждёт подтверждения";
 export const GALLERY_OUTSIDE_DIALOG = "Вне диалога";
-export const GALLERY_UNKNOWN_ERROR = "Не удалось выполнить действие. Попробуйте ещё раз.";
+const GALLERY_UNKNOWN_ERROR = "Не удалось выполнить действие. Попробуйте ещё раз.";
 
 export type GallerySort = "newest" | "oldest" | "name";
 
@@ -58,17 +57,13 @@ export function intervalLabel(seconds: number): string {
   return `Каждые ${seconds} с`;
 }
 
-export function filesCount(count: number): string {
-  return `${count.toLocaleString("ru-RU")} ${plural(count, "файл", "файла", "файлов")}`;
-}
-
 export function removeQuestion(name: string, dashboard: boolean): string {
   return dashboard
     ? `Дашборд «${name}», его сохранённая спецификация и разрешения будут удалены. Действие нельзя отменить.`
     : `Файл «${name}» будет удалён с диска. Действие нельзя отменить.`;
 }
 
-export function modifiedLabel(timestamp: number, now: number): string {
+function modifiedLabel(timestamp: number, now: number): string {
   const date = new Date(timestamp);
   const today = new Date(now);
   const sameDay = date.toDateString() === today.toDateString();

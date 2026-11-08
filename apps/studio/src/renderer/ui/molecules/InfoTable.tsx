@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Icon from "../atoms/Icon";
 
-export interface InfoRow {
+interface InfoRow {
   readonly key: string;
   readonly icon: string;
   readonly label: string;

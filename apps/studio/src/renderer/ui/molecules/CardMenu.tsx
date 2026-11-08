@@ -5,8 +5,8 @@ import IconDropdownButton from "../atoms/buttons/IconDropdownButton";
 import { ActionMenu, ActionMenuItem, ActionMenuSeparator } from "./ActionMenu";
 import ConfirmDialog from "./ConfirmDialog";
 
-export const OPEN_ITEM = "Открыть";
-export const DUPLICATE_ITEM = "Дублировать";
+const OPEN_ITEM = "Открыть";
+const DUPLICATE_ITEM = "Дублировать";
 
 export interface CardMenuProps {
   readonly label: string;

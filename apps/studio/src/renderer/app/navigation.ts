@@ -22,7 +22,7 @@ import { ROUTES } from "./routes";
 
 export const BROWSER_NAV_ID = "browser";
 
-export const NAV_GROUPS: readonly NavGroupModel[] = [
+const NAV_GROUPS: readonly NavGroupModel[] = [
   {
     id: "workspace",
     label: "Рабочее пространство",

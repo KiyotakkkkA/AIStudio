@@ -2,7 +2,7 @@ import type { Json, ScenarioNodeTypeDto, ScenarioParams } from "@zvs/shared";
 import { entityKindOf } from "./entityParams";
 import { STORES_PARAM, STORES_TYPE } from "./nodeRules";
 
-export type FieldKind = "text" | "multiline" | "number" | "boolean" | "json" | "select";
+type FieldKind = "text" | "multiline" | "number" | "boolean" | "json" | "select";
 
 export interface ParamField {
   readonly key: string;
@@ -24,7 +24,7 @@ export interface FormField extends ParamField {
   readonly entity: boolean;
 }
 
-export const OUTPUT_PREFIX = "output.";
+const OUTPUT_PREFIX = "output.";
 
 const TEMPLATE_HINT =
   "Пусто — отправляется результат предыдущего шага целиком. {{result}} подставляет результат в текст.";
@@ -242,7 +242,7 @@ export function optionLabel(field: ParamField, option: string): string {
   return field.optionLabels?.[option] ?? option;
 }
 
-export function fieldValue(field: ParamField, text: string): Json | undefined {
+function fieldValue(field: ParamField, text: string): Json | undefined {
   const trimmed = text.trim();
   if (trimmed.length === 0) return undefined;
   if (field.kind === "json") {

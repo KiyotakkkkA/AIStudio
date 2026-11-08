@@ -28,7 +28,7 @@ export interface SignInType {
   readonly hiddenWhen?: (values: FormValues) => readonly string[];
 }
 
-export const SIGNED_IN_FIELD = "oauthToken";
+const SIGNED_IN_FIELD = "oauthToken";
 
 const ALWAYS_HIDDEN = [SIGNED_IN_FIELD];
 

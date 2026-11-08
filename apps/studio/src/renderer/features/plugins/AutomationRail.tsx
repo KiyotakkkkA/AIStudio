@@ -11,17 +11,17 @@ import type PluginStore from "./PluginStore";
 
 const HEADING = "text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase";
 
-export const RAIL_LABEL = "Автоматизация";
-export const TRIGGERS_HEADING = "Триггеры";
-export const TOOLS_HEADING = "Инструменты";
-export const USED_BY_HEADING = "Используется в";
-export const HEALTH_HEADING = "Состояние";
-export const ACTIVITY_HEADING = "Журнал";
-export const NO_TRIGGERS = "Плагин не объявляет триггеров.";
-export const NO_TOOLS = "Инструменты появятся после настройки доступа.";
-export const NOT_USED = "Ни один сценарий не запускается от этого аккаунта.";
-export const NO_ACTIVITY = "Записей пока нет.";
-export const NO_ACCOUNT_DATA = "Данные появятся после подключения аккаунта.";
+const RAIL_LABEL = "Автоматизация";
+const TRIGGERS_HEADING = "Триггеры";
+const TOOLS_HEADING = "Инструменты";
+const USED_BY_HEADING = "Используется в";
+const HEALTH_HEADING = "Состояние";
+const ACTIVITY_HEADING = "Журнал";
+const NO_TRIGGERS = "Плагин не объявляет триггеров.";
+const NO_TOOLS = "Инструменты появятся после настройки доступа.";
+const NOT_USED = "Ни один сценарий не запускается от этого аккаунта.";
+const NO_ACTIVITY = "Записей пока нет.";
+const NO_ACCOUNT_DATA = "Данные появятся после подключения аккаунта.";
 
 const LEVEL_TEXT: Record<IntegrationActivityLevel, string> = {
   info: "text-main-300",

@@ -31,7 +31,7 @@ const page = (path: string, Component: ComponentType): RouteObject => ({
   ),
 });
 
-export const routes: RouteObject[] = [
+const routes: RouteObject[] = [
   {
     path: "/",
     element: <AppFrame />,

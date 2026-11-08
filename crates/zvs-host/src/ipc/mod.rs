@@ -246,6 +246,7 @@ mod tests {
                 "integrations.kinds",
                 "integrations.list",
                 "integrations.remove",
+                "integrations.repositories",
                 "integrations.signIn",
                 "integrations.test",
                 "integrations.update",

@@ -31,7 +31,7 @@ export function opensAsPage(format: string): boolean {
   return PAGE_FORMATS.has(format.toLowerCase());
 }
 
-export function isDashboard(artifact: ArtifactDto): boolean {
+function isDashboard(artifact: ArtifactDto): boolean {
   return artifact.id.startsWith(DASHBOARDS_PREFIX);
 }
 
@@ -56,7 +56,7 @@ export function openInApplication(name: string | null): string {
   return name === null ? OPEN_IN_DEFAULT_APP : `Открыть в ${name}`;
 }
 export const ARTIFACT_SAVED = "Файл сохранён";
-export const UNKNOWN_ARTIFACT_ERROR = "Не удалось выполнить действие с файлом. Попробуйте ещё раз.";
+const UNKNOWN_ARTIFACT_ERROR = "Не удалось выполнить действие с файлом. Попробуйте ещё раз.";
 
 export const ARTIFACT_ERROR_COPY: Partial<Record<AppErrorCode, string>> = {
   [AppErrorCode.PERMISSION_DENIED]: "Недостаточно прав для записи в выбранную папку.",

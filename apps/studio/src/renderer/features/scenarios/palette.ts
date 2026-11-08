@@ -10,7 +10,7 @@ import {
 import { isOutputType } from "./nodeForms";
 import { MEMORY_TYPES } from "./nodeRules";
 
-export interface PaletteEntry {
+interface PaletteEntry {
   readonly type: string;
   readonly label: string;
   readonly spec: ScenarioNodeTypeDto;
@@ -28,7 +28,7 @@ export interface PaletteGroup {
 
 const ORDER: readonly PaletteGroup["key"][] = ["triggers", "agents", "memory", "outputs", "core"];
 
-export function toolFor(spec: ScenarioNodeTypeDto, tools: readonly ToolDto[]): ToolDto | undefined {
+function toolFor(spec: ScenarioNodeTypeDto, tools: readonly ToolDto[]): ToolDto | undefined {
   return spec.toolKey === null ? undefined : tools.find((tool) => tool.key === spec.toolKey);
 }
 

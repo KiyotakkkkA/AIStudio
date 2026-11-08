@@ -2,7 +2,14 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.mjs", "e2e/**/*.ts", "test/helpers/fakeMcpServer.mjs"],
+      "entry": [
+        "scripts/*.mjs",
+        "e2e/**/*.ts",
+        "test/helpers/fakeMcpServer.mjs",
+        "test/helpers/fakeCodexServer.mjs",
+        "test/helpers/fakeCopilot.mjs",
+        "crates/zvs-host/skills/*/assets/*.js"
+      ],
       "ignoreBinaries": ["tauri"],
       "ignore": ["scripts/app-env.d.mts"]
     },
@@ -12,7 +19,8 @@
         "src/computer-ui/main.tsx",
         "src/recovery/main.ts",
         "src-tauri/isolation/index.js",
-        "src-tauri/src/browser/gateway/page.js"
+        "src-tauri/src/browser/gateway/page.js",
+        "src-tauri/src/browser/automation/presence.js"
       ],
       "ignoreDependencies": ["@tauri-apps/cli"],
       "ignore": ["src-tauri/src/browser/gateway/page.d.ts"]

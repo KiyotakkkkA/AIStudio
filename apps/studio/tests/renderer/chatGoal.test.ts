@@ -290,10 +290,10 @@ test("the composer refuses an empty goal with a reason and locks while a goal ru
   running.store.dispose();
 });
 
-const plan = [
+const plan: ChatGoalStepDto["plan"] = [
   { id: "p1", title: "Найти модули", status: "done", stepIds: [], summary: "4 модуля" },
   { id: "p2", title: "Добавить тесты", status: "running", stepIds: [], summary: null },
-] as const;
+];
 
 test("the plan follows the live steps and counts what is done", () => {
   const { store } = setup(goal());

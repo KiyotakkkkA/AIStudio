@@ -17,7 +17,7 @@ export type Catalogue = ReadonlyMap<string, ScenarioNodeTypeDto>;
 
 export const EMPTY_GRAPH: ScenarioGraphDto = { nodes: [], edges: [], attachments: [] };
 
-export const DUPLICATE_OFFSET = 32;
+const DUPLICATE_OFFSET = 32;
 
 export type ConnectRefusal = "selfLoop" | "notTrunk" | "intoTrigger" | "duplicate" | "cycle";
 

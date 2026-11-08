@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import Icon from "../atoms/Icon";
 import IconButton from "../atoms/buttons/IconButton";
 
-export type AlertTone = "error" | "warning" | "info";
+type AlertTone = "error" | "warning" | "info";
 
 const TONES: Record<
   AlertTone,
@@ -14,7 +14,7 @@ const TONES: Record<
   info: { icon: mdiInformationOutline, box: "border-info-line bg-info-soft", mark: "text-info" },
 };
 
-export const DISMISS_ALERT = "Скрыть";
+const DISMISS_ALERT = "Скрыть";
 
 export type AlertProps = {
   readonly tone?: AlertTone;

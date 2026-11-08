@@ -17,11 +17,11 @@ export interface SecretOption {
   readonly label: string;
 }
 
-export const NAME_MAX = 120;
-export const NAME_REQUIRED = "Укажите название аккаунта.";
-export const NAME_TOO_LONG = `Не длиннее ${String(NAME_MAX)} символов.`;
+const NAME_MAX = 120;
+const NAME_REQUIRED = "Укажите название аккаунта.";
+const NAME_TOO_LONG = `Не длиннее ${String(NAME_MAX)} символов.`;
 export const FIELD_REQUIRED = "Заполните обязательное поле.";
-export const NUMBER_INVALID = "Укажите целое неотрицательное число.";
+const NUMBER_INVALID = "Укажите целое неотрицательное число.";
 
 export function configKey(key: string): string {
   return `config.${key}`;

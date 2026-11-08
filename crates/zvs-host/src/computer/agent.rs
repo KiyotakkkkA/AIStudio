@@ -214,10 +214,6 @@ impl ComputerAgent {
         }
     }
 
-    pub fn active_conversation(&self) -> Option<String> {
-        lock(&self.0.session).conversation.clone()
-    }
-
     pub fn begin(&self, conversation: &str, run: &str) -> Result<(), AppError> {
         let (started, watch) = {
             let mut session = lock(&self.0.session);

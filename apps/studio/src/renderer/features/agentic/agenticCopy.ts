@@ -132,10 +132,6 @@ function stepsWord(count: number): string {
   return plural(count, "шаг", "шага", "шагов");
 }
 
-export function sessionsWord(count: number): string {
-  return plural(count, "сессия", "сессии", "сессий");
-}
-
 export function callsWord(count: number): string {
   return plural(count, "вызов", "вызова", "вызовов");
 }

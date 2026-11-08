@@ -14,7 +14,7 @@ function barColour(percent: number): string {
   return "bg-accent-dark";
 }
 
-export function metersOf(sample: ResourceSampleDto): readonly Meter[] {
+function metersOf(sample: ResourceSampleDto): readonly Meter[] {
   const memoryPercent =
     sample.memoryTotalBytes > 0 ? (sample.memoryUsedBytes / sample.memoryTotalBytes) * 100 : 0;
   const vramPercent =

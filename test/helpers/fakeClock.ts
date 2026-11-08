@@ -1,4 +1,4 @@
-export const CLOCK_ORIGIN = 1_700_000_000_000;
+const CLOCK_ORIGIN = 1_700_000_000_000;
 
 export interface FakeClock {
   /** Callable so it drops straight into a `clock: () => number` service dependency. */

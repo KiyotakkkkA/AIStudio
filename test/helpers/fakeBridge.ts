@@ -2,12 +2,12 @@ import { AppError, AppErrorCode, err, isAppError, ok } from "@zvs/shared";
 import type { ChannelName, ContractShape, InputOf, OutputOf } from "@zvs/shared";
 import type { IpcBridge } from "@zvs/ipc";
 
-export interface BridgeCall {
+interface BridgeCall {
   readonly channel: string;
   readonly payload: unknown;
 }
 
-export type FakeHandler<C extends ContractShape, K extends ChannelName<C>> = (
+type FakeHandler<C extends ContractShape, K extends ChannelName<C>> = (
   input: InputOf<C, K>,
 ) => OutputOf<C, K> | Promise<OutputOf<C, K>>;
 

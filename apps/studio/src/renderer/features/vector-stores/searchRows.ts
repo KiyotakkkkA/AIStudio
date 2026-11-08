@@ -5,7 +5,7 @@ import {
   type VectorSearchHitDto,
 } from "@zvs/shared";
 
-export const PROVENANCE_LABELS: Record<VectorHitProvenance, string> = {
+const PROVENANCE_LABELS: Record<VectorHitProvenance, string> = {
   vector: "векторы",
   keyword: "ключевые слова",
   both: "векторы + слова",
@@ -26,7 +26,7 @@ function textOf(hit: Pick<VectorSearchHitDto, "text" | "payload">): string | nul
   return null;
 }
 
-export function placeOf(hit: Pick<VectorSearchHitDto, "page" | "section">): string | null {
+function placeOf(hit: Pick<VectorSearchHitDto, "page" | "section">): string | null {
   const parts = [
     ...(hit.page === null ? [] : [`стр. ${String(hit.page)}`]),
     ...(hit.section === "" ? [] : [hit.section]),

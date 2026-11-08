@@ -1,6 +1,6 @@
 export const ZOOM_PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const;
-export const ZOOM_MIN = 0.25;
-export const ZOOM_MAX = 4;
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 4;
 export const PAGE_GAP = 16;
 export const PAGE_PADDING = 20;
 export const PDF_TO_CSS = 96 / 72;
@@ -89,7 +89,7 @@ export interface PageSize {
   readonly height: number;
 }
 
-export interface PageSlot {
+interface PageSlot {
   readonly page: number;
   readonly top: number;
   readonly width: number;
@@ -194,7 +194,7 @@ function normalized(text: string): { readonly folded: string; readonly origin: n
   return { folded, origin };
 }
 
-export const PASSAGE_PROBE = 80;
+const PASSAGE_PROBE = 80;
 
 export function locatePassage(text: string, passage: string): TextRange | null {
   const target = normalized(passage).folded;
@@ -225,7 +225,7 @@ export function textNodes(root: Node): Text[] {
   return nodes;
 }
 
-export function offsetWithin(root: Node, container: Node, offset: number): number | null {
+function offsetWithin(root: Node, container: Node, offset: number): number | null {
   if (!root.contains(container)) return null;
   let total = 0;
   if (container.nodeType !== 3) {
@@ -272,7 +272,7 @@ export function rangeAt(root: Node, start: number, end: number): Range | null {
   return null;
 }
 
-export const SELECTION_TEXT_LIMIT = 8000;
+const SELECTION_TEXT_LIMIT = 8000;
 
 export function clipSelection(text: string): string {
   const trimmed = text.replace(/\s+$/u, "").replace(/^\s+/u, "");

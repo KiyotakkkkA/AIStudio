@@ -21,7 +21,7 @@ export const SUBFOLDERS_NOTE =
 export const CREATES_LABEL = "Будут созданы:";
 
 export const FOLDER_ERROR_FALLBACK = "Не удалось изменить рабочую папку. Повторите попытку.";
-export const ANSWER_ERROR_FALLBACK = "Не удалось передать ответ на запрос доступа.";
+const ANSWER_ERROR_FALLBACK = "Не удалось передать ответ на запрос доступа.";
 
 const ERRORS: Partial<Record<AppErrorCode, string>> = {
   [AppErrorCode.PERMISSION_DENIED]:

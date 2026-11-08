@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::collections::hash_map::DefaultHasher;
+use std::collections::{HashMap, VecDeque};
+use std::hash::{Hash, Hasher};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use futures::StreamExt;
@@ -9,7 +12,7 @@ use zvs_contract::{AdapterFamily, AppError, AppErrorCode, TunableParameter};
 use super::wire::{normalise, open_frames};
 use crate::drivers::ai::capabilities::AdapterCapabilities;
 use crate::drivers::ai::errors::{html_title, is_session_expired};
-use crate::drivers::ai::ports::{ChatRole, GenerateRequest};
+use crate::drivers::ai::ports::{ChatMessage, ChatRole, FinishReason, GenerateRequest, TokenUsage};
 use crate::drivers::ai::sse::{FrameStream, sse_data};
 use crate::drivers::ai::transport::{RequestSpec, SharedTransport, TransportResponse};
 use crate::platform::clock::{SharedClock, SystemClock};
@@ -22,12 +25,6 @@ pub const TRUNCATED_STREAM_MESSAGE: &str = "Поток вендора оборв
 
 pub type NewId = Arc<dyn Fn() -> String + Send + Sync>;
 pub type SessionExpiredHook = Arc<dyn Fn(&AppError) + Send + Sync>;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct VendorObservation {
-    pub source: &'static str,
-    pub observed_at: &'static str,
-}
 
 pub const fn role_label(role: ChatRole) -> &'static str {
     match role {
@@ -264,6 +261,77 @@ impl AccountAdapterCore {
         }
         dropped
     }
+}
+
+#[derive(Debug, Default)]
+pub struct TurnSummary {
+    pub usage: Option<TokenUsage>,
+    pub finish_reason: Option<FinishReason>,
+}
+
+pub type SharedSummary = Arc<Mutex<TurnSummary>>;
+
+pub fn with_summary(summary: &SharedSummary, update: impl FnOnce(&mut TurnSummary)) {
+    update(&mut summary.lock().unwrap_or_else(PoisonError::into_inner));
+}
+
+pub trait ChatChain {
+    fn chat_id(&self) -> &str;
+}
+
+#[derive(Debug)]
+pub struct Chains<C, const MAX: usize> {
+    order: VecDeque<u64>,
+    pub by_key: HashMap<u64, C>,
+}
+
+impl<C, const MAX: usize> Default for Chains<C, MAX> {
+    fn default() -> Self {
+        Self {
+            order: VecDeque::new(),
+            by_key: HashMap::new(),
+        }
+    }
+}
+
+impl<C: ChatChain, const MAX: usize> Chains<C, MAX> {
+    pub fn insert(&mut self, key: u64, chain: C) {
+        if self.by_key.insert(key, chain).is_none() {
+            self.order.push_back(key);
+        }
+        while self.order.len() > MAX {
+            if let Some(oldest) = self.order.pop_front() {
+                self.by_key.remove(&oldest);
+            }
+        }
+    }
+
+    pub fn forget_chat(&mut self, chat_id: &str) {
+        self.by_key.retain(|_, chain| chain.chat_id() != chat_id);
+        let by_key = &self.by_key;
+        self.order.retain(|key| by_key.contains_key(key));
+    }
+
+    pub fn clear(&mut self) {
+        self.order.clear();
+        self.by_key.clear();
+    }
+}
+
+pub fn history_key(model: &str, system: Option<&str>, messages: &[ChatMessage]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    model.hash(&mut hasher);
+    system.map(str::trim).unwrap_or_default().hash(&mut hasher);
+    for message in messages {
+        message.role.hash(&mut hasher);
+        message.content.hash(&mut hasher);
+        for image in &message.images {
+            image.attachment.hash(&mut hasher);
+        }
+        message.tool_call_id.hash(&mut hasher);
+        format!("{:?}", message.tool_calls).hash(&mut hasher);
+    }
+    hasher.finish()
 }
 
 #[cfg(test)]

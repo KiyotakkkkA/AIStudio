@@ -19,10 +19,6 @@ macro_rules! branded_ids {
             pub fn parse(value: &str) -> Option<Self> {
                 wire_uuid::parse(value).map(Self)
             }
-
-            pub const fn as_uuid(&self) -> &Uuid {
-                &self.0
-            }
         }
 
         impl From<Uuid> for $name {

@@ -32,7 +32,6 @@ pub const NO_STORES: &str = "К диалогу не подключены хра�
 pub const STORE_OUT_OF_SCOPE: &str = "Это хранилище не подключено к диалогу";
 pub const DOCUMENT_OUT_OF_SCOPE: &str = "Документ не найден в подключённых хранилищах";
 pub const SECTION_NOT_FOUND: &str = "В документе нет раздела с таким названием";
-pub const EMPTY_QUERY: &str = "Пустой поисковый запрос";
 pub const QUERY_OR_DOCUMENT: &str = "Укажите query для поиска или documentId для чтения документа";
 pub const VECTORS_MISSING: &str = "Сервис векторного поиска недоступен";
 

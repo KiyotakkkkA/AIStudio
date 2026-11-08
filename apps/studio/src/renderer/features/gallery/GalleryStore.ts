@@ -17,7 +17,7 @@ import {
 } from "./galleryCopy";
 import { decodeBase64 } from "./base64";
 
-export const DASHBOARDS_OWNER = "dashboards";
+const DASHBOARDS_OWNER = "dashboards";
 
 export interface GallerySection {
   readonly kind: GalleryKind;

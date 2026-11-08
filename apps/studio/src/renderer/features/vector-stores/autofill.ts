@@ -17,9 +17,7 @@ import {
  */
 
 /** Installed and usable. An `update` row is an older build of something that still works. */
-export function installedItems(
-  catalogue: readonly CatalogueItemDto[],
-): readonly CatalogueItemDto[] {
+function installedItems(catalogue: readonly CatalogueItemDto[]): readonly CatalogueItemDto[] {
   return catalogue.filter((item) => item.state === "installed" || item.state === "update");
 }
 

@@ -6,7 +6,7 @@ import { IMAGE_UNAVAILABLE, OPEN_IMAGE, REMOVE_IMAGE } from "./imageCopy";
 
 export type ImageDataLoader = (image: ImageAttachmentDto) => Promise<string | null>;
 
-export function useImageData(
+function useImageData(
   load: ImageDataLoader,
   image: ImageAttachmentDto,
 ): { readonly dataUrl: string | null; readonly failed: boolean } {

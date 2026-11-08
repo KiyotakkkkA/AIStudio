@@ -127,11 +127,6 @@ export function linesWord(count: number): string {
   return plural(count, "строка", "строки", "строк");
 }
 
-export function headerLine(skills: readonly SkillDto[]): string {
-  const enabled = skills.filter((skill) => skill.enabled).length;
-  return `${skillsCount(skills.length)} · ${plural(enabled, "включён", "включено", "включено")}`;
-}
-
 function skillsCount(count: number): string {
   return plural(count, "навык", "навыка", "навыков");
 }

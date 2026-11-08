@@ -37,7 +37,7 @@ export const ROLE_LABELS: Record<ScenarioNodeRole, string> = {
   subNode: "Подузел",
 };
 
-export const SLOT_LABELS: Record<ScenarioSlot, string> = {
+const SLOT_LABELS: Record<ScenarioSlot, string> = {
   model: "Текстовая модель",
   memory: "Память",
   tool: "Инструменты",
@@ -86,8 +86,8 @@ export function grantedBy(name: string): string {
 }
 
 export const SCENARIO_LOAD_FAILED = "Не удалось загрузить сценарий.";
-export const SCENARIO_ACTION_FAILED = "Не удалось выполнить операцию со сценарием.";
-export const SCENARIO_MISSING = "Сценарий не найден.";
+const SCENARIO_ACTION_FAILED = "Не удалось выполнить операцию со сценарием.";
+const SCENARIO_MISSING = "Сценарий не найден.";
 export const DRAFT_SAVE_FAILED = "Черновик не сохранён. Изменения останутся в редакторе.";
 
 export const CONNECT_REFUSALS: Record<ConnectRefusal, string> = {
@@ -107,7 +107,7 @@ function fillsText(fills: readonly ScenarioSlot[]): string {
   return `подключается к слоту ${fills.map((slot) => `«${SLOT_LABELS[slot]}»`).join(", ")}`;
 }
 
-export function attachRefusalText(
+function attachRefusalText(
   refusal: Extract<Refusal, { kind: "attach" }>,
   nameOf: (id: string) => string,
   fillsOf: (id: string) => readonly ScenarioSlot[],
@@ -164,10 +164,6 @@ export function issueText(issue: ScenarioIssueDto, nameOf: (id: string) => strin
     duplicateKind: `Слот ${slot} узла ${node} принимает не больше одного узла каждого вида`,
   };
   return texts[issue.rule];
-}
-
-export function scenariosWord(count: number): string {
-  return plural(count, "сценарий", "сценария", "сценариев");
 }
 
 export function stepsWord(count: number): string {

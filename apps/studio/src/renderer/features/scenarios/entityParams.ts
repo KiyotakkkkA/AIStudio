@@ -5,7 +5,7 @@ import type { Contract, ProviderId, ScenarioParams } from "@zvs/shared";
 export type EntityKind =
   "provider" | "model" | "vectorStore" | "conversation" | "mcpServer" | "integration";
 
-export const ENTITY_PARAMS: Readonly<Record<string, EntityKind>> = {
+const ENTITY_PARAMS: Readonly<Record<string, EntityKind>> = {
   providerId: "provider",
   modelId: "model",
   model: "model",
@@ -14,15 +14,6 @@ export const ENTITY_PARAMS: Readonly<Record<string, EntityKind>> = {
   conversationId: "conversation",
   serverId: "mcpServer",
   accountId: "integration",
-};
-
-export const ENTITY_LABELS: Record<EntityKind, string> = {
-  provider: "Провайдер",
-  model: "Модель",
-  vectorStore: "Хранилище",
-  conversation: "Диалог",
-  mcpServer: "MCP-сервер",
-  integration: "Интеграция",
 };
 
 export const ENTITY_PLACEHOLDERS: Record<EntityKind, string> = {
@@ -47,7 +38,7 @@ export function entityKindOf(param: string): EntityKind | null {
   return ENTITY_PARAMS[param] ?? null;
 }
 
-export function providerOf(params: ScenarioParams): string | null {
+function providerOf(params: ScenarioParams): string | null {
   const value = params.providerId;
   return typeof value === "string" && value.length > 0 ? value : null;
 }

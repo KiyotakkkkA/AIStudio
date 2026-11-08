@@ -2,7 +2,7 @@ import type { Json } from "@zvs/shared";
 
 type JsonObject = { readonly [key: string]: Json };
 
-export interface SchemaField {
+interface SchemaField {
   readonly path: string;
   readonly name: string;
   readonly depth: number;

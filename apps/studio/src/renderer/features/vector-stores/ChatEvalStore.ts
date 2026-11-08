@@ -15,7 +15,7 @@ export interface ChatEvalModel {
   readonly label: string;
 }
 
-export const CHAT_EVAL_MODES: readonly RetrievalMode[] = ["auto", "agentic"];
+const CHAT_EVAL_MODES: readonly RetrievalMode[] = ["auto", "agentic"];
 
 export const CHAT_EVAL_MODE_LABELS: Record<RetrievalMode, string> = {
   auto: "Перед ответом",

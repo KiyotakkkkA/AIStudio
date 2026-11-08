@@ -7,8 +7,8 @@ import { EMPTY_DOCUMENT } from "./viewerCopy";
 import { PAGE_ATTRIBUTE, useSelectionCapture } from "./useDocumentText";
 import { locatePassage } from "./viewerModel";
 
-export const ROW_HEIGHT = 28;
-export const ROW_HEADER_WIDTH = 52;
+const ROW_HEIGHT = 28;
+const ROW_HEADER_WIDTH = 52;
 const OVERSCAN = 12;
 const COLUMNS_SHOWN = 200;
 

@@ -2,7 +2,7 @@ import Skeleton from "../ui/atoms/Skeleton";
 import ListRowSkeleton from "../ui/molecules/ListRowSkeleton";
 import { LoadingStatus } from "../ui/molecules/LoadingSkeleton";
 
-export const ROUTE_LOADING = "Загрузка раздела…";
+const ROUTE_LOADING = "Загрузка раздела…";
 
 export default function RouteFallback() {
   return (

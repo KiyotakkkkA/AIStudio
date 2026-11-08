@@ -3,7 +3,6 @@ import { isIpcError } from "@zvs/ipc";
 import { plural } from "../connections/connectionPresentation";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 
-export const BACKGROUND_LABEL = "Фоновые процессы";
 export const IN_BACKGROUND = "В фоне";
 export const OUTPUT = "Вывод";
 export const STOP = "Остановить";
@@ -11,7 +10,6 @@ export const STOPPING = "Остановка…";
 export const AGENT_TAB = "Процесс агента";
 export const CLOSE_TAB = "Закрыть вкладку";
 export const READ_ONLY_HINT = "Вывод процесса, запущенного агентом. Ввод недоступен.";
-export const LIST_EMPTY = "Нет фоновых процессов";
 export const LIST_LABEL = "Фоновые процессы диалога";
 export const FOLDER = "Папка";
 export const RUN_TIME = "Время работы";

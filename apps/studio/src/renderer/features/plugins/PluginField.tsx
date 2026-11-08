@@ -8,10 +8,10 @@ import Field from "../../ui/molecules/Field";
 import { ROUTES } from "../../app/routes";
 import { configKey, type PluginFormVm, type SecretOption } from "./PluginFormVm";
 
-export const SECRET_PLACEHOLDER = "Выберите секрет";
-export const OPEN_SECRETS = "Секреты";
+const SECRET_PLACEHOLDER = "Выберите секрет";
+const OPEN_SECRETS = "Секреты";
 
-export interface PluginFieldProps {
+interface PluginFieldProps {
   readonly field: FieldDescriptor;
   readonly vm: PluginFormVm;
   readonly secrets: readonly SecretOption[];

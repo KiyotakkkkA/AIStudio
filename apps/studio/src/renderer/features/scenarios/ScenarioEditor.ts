@@ -838,13 +838,13 @@ export default class ScenarioEditor {
   }
 }
 
-export const SLOT_HANDLE_PREFIX = "slot:";
+const SLOT_HANDLE_PREFIX = "slot:";
 
 export function slotHandle(slot: ScenarioSlot): string {
   return `${SLOT_HANDLE_PREFIX}${slot}`;
 }
 
-export function slotOfHandle(handle: string | null | undefined): ScenarioSlot | null {
+function slotOfHandle(handle: string | null | undefined): ScenarioSlot | null {
   if (handle?.startsWith(SLOT_HANDLE_PREFIX) !== true) return null;
   const parsed = SlotSchema.safeParse(handle.slice(SLOT_HANDLE_PREFIX.length));
   return parsed.success ? parsed.data : null;

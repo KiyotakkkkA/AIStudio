@@ -6,14 +6,13 @@ import {
 } from "@mdi/js";
 import {
   EXEC_MODES,
-  type ChatToolCallDto,
   type ExecMode,
   type IntegrationKind,
   type ToolAuthorisationDto,
 } from "@zvs/shared";
 import { EXEC_MODE_COPY } from "../execPolicy/execPolicyCopy";
 import { PLUGIN_KINDS } from "../plugins/pluginPresentation";
-import { TOOL_PRESENTATION, toolPresentation, type ToolCategory } from "./toolPresentation";
+import { TOOL_PRESENTATION, toolPresentation } from "./toolPresentation";
 export { TOOL_PRESENTATION, toolPresentation } from "./toolPresentation";
 
 export function pluginToolKind(key: string): IntegrationKind | null {
@@ -31,27 +30,6 @@ export function isBuiltinTool(key: string): boolean {
   return key in TOOL_PRESENTATION;
 }
 
-export const CATEGORY_BADGE: Record<ToolCategory, string> = {
-  knowledge:
-    "bg-accent-soft text-accent-medium fx-on:shadow-[inset_0_0_0_1px_var(--color-accent-line)]",
-  files: "bg-info-soft text-info fx-on:shadow-[inset_0_0_0_1px_var(--color-info-line)]",
-  process: "bg-main-100 text-main-900",
-  skills: "bg-ok-soft text-ok fx-on:shadow-[inset_0_0_0_1px_var(--color-ok-line)]",
-  dialog: "bg-warn-soft text-warn fx-on:shadow-[inset_0_0_0_1px_var(--color-warn-line)]",
-  data: "bg-main-700 text-main-200 fx-on:shadow-[inset_0_0_0_1px_var(--color-line-strong)]",
-  other: "bg-main-700 text-main-300",
-};
-
-export const CATEGORY_RAIL: Record<ToolCategory, string> = {
-  knowledge: "bg-accent-dark",
-  files: "bg-info",
-  process: "bg-main-300",
-  skills: "bg-ok",
-  dialog: "bg-warn",
-  data: "bg-main-400",
-  other: "bg-main-500",
-};
-
 export const TOOL_CALLS_LABEL = "Вызовы инструментов";
 export const TOOL_KEY_LABEL = "Инструмент";
 export const ARGUMENTS_TITLE = "Аргументы";
@@ -62,7 +40,6 @@ export const COPY_RESULT = "Копировать результат";
 export const RESULT_COPIED = "Результат скопирован";
 export const FOUND_TITLE = "Найденные фрагменты";
 export const NOTHING_FOUND = "Подходящих фрагментов нет.";
-export const QUERY_TITLE = "Запрос";
 export const FOLDER_FIELD = "Папка";
 export const WORKING_FOLDER = "рабочая папка";
 export const RECURSIVE_FLAG = "с вложенными папками";
@@ -76,7 +53,7 @@ export const DOCUMENT_FIELD = "Документ";
 export const RANGE_FIELD = "Фрагменты";
 export const SECTION_FIELD = "Раздел";
 export const FILES_TITLE = "Файлы";
-export const WHOLE_FILE = "целиком";
+const WHOLE_FILE = "целиком";
 export const SKILL_FIELD = "Навык";
 export const STDIN_FIELD = "Стандартный ввод";
 export const APPROVAL_PROMPT = "Запрос на вызов инструмента";
@@ -104,10 +81,6 @@ export function lineRange(start: number | null, end: number | null): string {
 
 export function scorePercent(score: number): string {
   return `${Math.round(score * 100).toLocaleString("ru-RU")}%`;
-}
-
-export function runningPhase(call: Pick<ChatToolCallDto, "key">): string {
-  return toolTitle(call.key);
 }
 
 export const AUTHORISATION_TITLE = "Основание запуска";

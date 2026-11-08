@@ -15,8 +15,8 @@ export interface SubagentCompactStep {
   readonly error?: string;
 }
 
-export type SubagentPresetKey = "explore" | "general";
-export type SubagentStatus = "queued" | "running" | "ok" | "partial" | "cancelled" | "failed";
+type SubagentPresetKey = "explore" | "general";
+type SubagentStatus = "queued" | "running" | "ok" | "partial" | "cancelled" | "failed";
 
 export interface SubagentMeta {
   readonly runId?: string;

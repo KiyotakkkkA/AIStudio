@@ -58,7 +58,7 @@ export const TIER_TEXT: Record<ToolTier, string> = {
 const AUTH_FAILURE = /\b(401|403)\b|учётные данные|требует входа|unauthori[sz]ed|forbidden/i;
 const SIGN_IN_FAILURE = /требует входа/i;
 
-export function needsReauthorisation(lastError: string | null): boolean {
+function needsReauthorisation(lastError: string | null): boolean {
   return lastError !== null && AUTH_FAILURE.test(lastError);
 }
 
@@ -86,12 +86,8 @@ export function toolsWord(count: number): string {
   return plural(count, "инструмент", "инструмента", "инструментов");
 }
 
-export function resourcesWord(count: number): string {
+function resourcesWord(count: number): string {
   return plural(count, "ресурс", "ресурса", "ресурсов");
-}
-
-export function serversWord(count: number): string {
-  return plural(count, "сервер", "сервера", "серверов");
 }
 
 export function scenariosWord(count: number): string {

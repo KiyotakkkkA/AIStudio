@@ -5,7 +5,7 @@ import type { EventRouter } from "../../app/EventRouter";
 import ScenarioEditor, { type ScenarioEditorOptions } from "./ScenarioEditor";
 import { scenarioErrorCopy } from "./scenarioCopy";
 
-export const NEW_SCENARIO_NAME = "Новый сценарий";
+const NEW_SCENARIO_NAME = "Новый сценарий";
 
 export default class ScenarioStore {
   scenarios: ScenarioDto[] = [];

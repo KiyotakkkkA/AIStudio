@@ -3,7 +3,7 @@ import type { DocumentSelectionDto } from "@zvs/shared";
 export const SELECTIONS_LABEL = "Прикреплённые фрагменты";
 export const ASK_IN_CHAT = "Спросить в диалоге";
 export const ANSWER_QUOTE_NAME = "Ответ ассистента";
-export const EXCERPT_PREVIEW = 48;
+const EXCERPT_PREVIEW = 48;
 
 export function selectionTitle(selection: DocumentSelectionDto): string {
   return selection.page === null

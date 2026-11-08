@@ -7,11 +7,11 @@ import Field from "../../ui/molecules/Field";
 import type PluginStore from "./PluginStore";
 import type { PluginFormVm } from "./PluginFormVm";
 
-export const LOAD_REPOSITORIES = "Загрузить репозитории";
-export const LOADING_REPOSITORIES = "Загрузка репозиториев…";
-export const REPOSITORIES_LABEL = "Отслеживаемые репозитории";
+const LOAD_REPOSITORIES = "Загрузить репозитории";
+const LOADING_REPOSITORIES = "Загрузка репозиториев…";
+const REPOSITORIES_LABEL = "Отслеживаемые репозитории";
 
-export function selectedRepositories(raw: unknown): string[] {
+function selectedRepositories(raw: unknown): string[] {
   return typeof raw === "string"
     ? [
         ...new Set(

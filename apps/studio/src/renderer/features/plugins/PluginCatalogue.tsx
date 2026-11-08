@@ -26,9 +26,9 @@ import {
 import { pluginPath } from "./pluginRoutes";
 import type PluginStore from "./PluginStore";
 
-export const EMPTY_SEARCH_HINT = "По вашему запросу ничего не найдено.";
-export const NOTHING_CONNECTED = "Подключённых плагинов нет";
-export const NOTHING_CONNECTED_HINT = "Выберите плагин и подключите аккаунт.";
+const EMPTY_SEARCH_HINT = "По вашему запросу ничего не найдено.";
+const NOTHING_CONNECTED = "Подключённых плагинов нет";
+const NOTHING_CONNECTED_HINT = "Выберите плагин и подключите аккаунт.";
 
 const PluginRow = observer(function PluginRow({
   store,

@@ -8,7 +8,7 @@ export interface RateState {
   readonly sample: RateSample;
 }
 
-export const RATE_WINDOW_MS = 3_000;
+const RATE_WINDOW_MS = 3_000;
 
 /**
  * Exponentially smoothed rate of progress, in whatever unit the counter is in — bytes for a

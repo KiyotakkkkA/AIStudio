@@ -133,12 +133,6 @@ impl NodeSpec {
     }
 
     #[must_use]
-    pub fn with_required(mut self, params: &[&str]) -> Self {
-        self.required_params = params.iter().map(|param| (*param).to_owned()).collect();
-        self
-    }
-
-    #[must_use]
     pub fn with_schema(mut self, schema: Value) -> Self {
         self.required_params = required_params(&schema);
         self.params_schema = schema;

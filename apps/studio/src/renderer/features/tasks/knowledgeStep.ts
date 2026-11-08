@@ -1,6 +1,6 @@
 import type { Json, StepDto } from "@zvs/shared";
 
-export interface KnowledgeStepPassage {
+interface KnowledgeStepPassage {
   readonly path: string;
   readonly section: string;
   readonly score: number;

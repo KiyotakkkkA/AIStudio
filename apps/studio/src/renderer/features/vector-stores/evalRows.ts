@@ -21,7 +21,7 @@ export interface EvalMetricRow {
   readonly improved: boolean | null;
 }
 
-export interface EvalCaseRank {
+interface EvalCaseRank {
   readonly mode: VectorEvalMode;
   readonly label: string;
   readonly missed: boolean;

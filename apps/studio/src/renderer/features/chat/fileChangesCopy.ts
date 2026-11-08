@@ -19,7 +19,7 @@ export const REJECT_CHANGES = "Отклонить";
 export const CHANGES_LEAD =
   "Требуется подтверждение изменений файлов. Все изменения применяются вместе.";
 
-export function filesWord(count: number): string {
+function filesWord(count: number): string {
   return plural(count, "файл", "файла", "файлов");
 }
 

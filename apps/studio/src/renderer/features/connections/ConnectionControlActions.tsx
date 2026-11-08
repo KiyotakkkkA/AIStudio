@@ -5,7 +5,7 @@ import Icon from "../../ui/atoms/Icon";
 import type ConnectionStore from "./ConnectionStore";
 import TestResultLine from "./TestResultLine";
 
-export const CONNECTOR_CONTROL_ACTIONS = "Управление коннектором";
+const CONNECTOR_CONTROL_ACTIONS = "Управление коннектором";
 
 function ConnectionControlActions({ store }: { readonly store: ConnectionStore }) {
   const vm = store.form;

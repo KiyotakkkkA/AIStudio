@@ -62,12 +62,6 @@ impl FileSystemModelStore {
         }
     }
 
-    #[must_use]
-    pub fn with_directories(mut self, directories: Vec<String>) -> Self {
-        self.directories = directories;
-        self
-    }
-
     fn scan(
         directory: &Path,
         cancel: &CancellationToken,

@@ -26,8 +26,8 @@ export interface ExplorerRow {
 
 export type ExplorerMark = "created" | "modified";
 
-export const VIEW_WIDTH_MIN = 360;
-export const VIEW_WIDTH_DEFAULT = 560;
+const VIEW_WIDTH_MIN = 360;
+const VIEW_WIDTH_DEFAULT = 560;
 
 function parentOf(path: string): string {
   const at = path.lastIndexOf("/");

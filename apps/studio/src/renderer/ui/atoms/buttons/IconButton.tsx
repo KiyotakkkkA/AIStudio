@@ -6,7 +6,7 @@ import useConfirmedClick, { type ConfirmProps } from "./useConfirmedClick";
 
 export type TooltipPlacement = NonNullable<ComponentProps<typeof Tooltip>["placement"]>;
 
-export type IconButtonTone = "ghost" | "primary" | "danger";
+type IconButtonTone = "ghost" | "primary" | "danger";
 
 export type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "title"> &
   ConfirmProps & {

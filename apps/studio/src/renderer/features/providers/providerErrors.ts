@@ -1,7 +1,7 @@
 import { AppErrorCode } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 
-export const UNKNOWN_PROVIDER_ERROR = "Не удалось выполнить операцию. Попробуйте ещё раз.";
+const UNKNOWN_PROVIDER_ERROR = "Не удалось выполнить операцию. Попробуйте ещё раз.";
 
 const COPY: Partial<Record<AppErrorCode, string>> = {
   [AppErrorCode.VALIDATION_FAILED]: "Проверьте заполненные поля.",

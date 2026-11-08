@@ -25,7 +25,7 @@ export interface ValueRow {
   secretId: SecretId | null;
 }
 
-export const TRANSPORT_FIELDS: Record<McpTransport, readonly string[]> = {
+const TRANSPORT_FIELDS: Record<McpTransport, readonly string[]> = {
   stdio: ["command", "args", "env"],
   http: ["url", "headers"],
 };

@@ -25,7 +25,7 @@ export interface VoiceBinding {
   readonly setup: () => void;
 }
 
-export interface VoiceMenuProps extends VoiceBinding {
+interface VoiceMenuProps extends VoiceBinding {
   readonly disabled: boolean;
   readonly onText: (text: string) => void;
 }

@@ -7,14 +7,14 @@ import Icon from "../../ui/atoms/Icon";
 import type PluginStore from "./PluginStore";
 import { formatCountdown } from "./pluginPresentation";
 
-export const SIGN_IN_WAITING = "Ожидание входа в браузере";
-export const SIGN_IN_BROWSER_HINT = "Страница входа открыта в браузере. Завершите вход там.";
-export const DEVICE_CODE_HINT = "Введите этот код на странице подтверждения.";
-export const COPY_CODE = "Скопировать код";
-export const CODE_COPIED = "Код скопирован";
-export const CODE_EXPIRES = "Код действует ещё";
-export const CODE_EXPIRED = "Срок действия кода истёк";
-export const CANCEL_SIGN_IN = "Отмена";
+const SIGN_IN_WAITING = "Ожидание входа в браузере";
+const SIGN_IN_BROWSER_HINT = "Страница входа открыта в браузере. Завершите вход там.";
+const DEVICE_CODE_HINT = "Введите этот код на странице подтверждения.";
+const COPY_CODE = "Скопировать код";
+const CODE_COPIED = "Код скопирован";
+const CODE_EXPIRES = "Код действует ещё";
+const CODE_EXPIRED = "Срок действия кода истёк";
+const CANCEL_SIGN_IN = "Отмена";
 
 function useTicker(now: () => number, active: boolean): number {
   const [value, setValue] = useState(now);

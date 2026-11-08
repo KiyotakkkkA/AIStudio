@@ -292,5 +292,3 @@ export function SubagentGroup({
     </PipelineItem>
   );
 }
-
-export default SubagentCard;

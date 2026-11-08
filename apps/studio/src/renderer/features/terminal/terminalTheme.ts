@@ -6,7 +6,7 @@ function token(style: CSSStyleDeclaration, name: string, fallback: string): stri
   return value === "" ? fallback : value;
 }
 
-export function isDark(): boolean {
+function isDark(): boolean {
   return getComputedStyle(document.documentElement).colorScheme.includes("dark");
 }
 

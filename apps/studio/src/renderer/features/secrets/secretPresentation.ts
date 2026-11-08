@@ -35,7 +35,7 @@ export function metaLabel(secret: SecretSummaryDto, now: number): string {
   return `Обновлён ${relativeTime(secret.updatedAt, now)}`;
 }
 
-export function relativeTime(at: number, now: number): string {
+function relativeTime(at: number, now: number): string {
   const minutes = Math.max(0, Math.round((now - at) / 60_000));
   if (minutes < 1) return "только что";
   if (minutes < 60) return `${String(minutes)} мин назад`;

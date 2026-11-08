@@ -16,14 +16,10 @@ export const NOTHING_SELECTED_TITLE = "Разрешение не выбрано"
 export const NOTHING_SELECTED_DESCRIPTION = "Выберите папку в списке.";
 export const NOTHING_FOUND = "Ничего не найдено.";
 export const LOAD_ERROR = "Не удалось загрузить разрешения. Попробуйте ещё раз.";
-export const REVOKE_ERROR = "Не удалось отозвать разрешение. Попробуйте ещё раз.";
+const REVOKE_ERROR = "Не удалось отозвать разрешение. Попробуйте ещё раз.";
 export const ALREADY_REVOKED = "Разрешение уже отозвано.";
 
-export function grantCountLabel(count: number): string {
-  return plural(count, "папка", "папки", "папок");
-}
-
-export function chatsLabel(count: number): string {
+function chatsLabel(count: number): string {
   return plural(count, "диалог", "диалога", "диалогов");
 }
 

@@ -17,8 +17,8 @@ export interface TerminalScreen {
   reset(): void;
 }
 
-export const DOCK_HEIGHT_MIN = 140;
-export const DOCK_HEIGHT_DEFAULT = 280;
+const DOCK_HEIGHT_MIN = 140;
+const DOCK_HEIGHT_DEFAULT = 280;
 export const DEFAULT_COLS = 120;
 export const DEFAULT_ROWS = 30;
 

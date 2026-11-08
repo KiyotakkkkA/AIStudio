@@ -17,14 +17,14 @@ import {
   toolsWord,
 } from "./chatStatsCopy";
 
-export const TOOLS_SHARE_LIMIT = 0.3;
-export const SERVER_SHARE_LIMIT = 0.15;
-export const SECTION_SHARE_LIMIT = 0.15;
-export const RESERVE_SHARE_LIMIT = 0.25;
-export const CACHE_SHARE_FLOOR = 0.3;
-export const ANSWERS_FOR_USAGE_HINTS = 3;
-export const RECENT_TURNS = 5;
-export const HINTS_MAX = 5;
+const TOOLS_SHARE_LIMIT = 0.3;
+const SERVER_SHARE_LIMIT = 0.15;
+const SECTION_SHARE_LIMIT = 0.15;
+const RESERVE_SHARE_LIMIT = 0.25;
+const CACHE_SHARE_FLOOR = 0.3;
+const ANSWERS_FOR_USAGE_HINTS = 3;
+const RECENT_TURNS = 5;
+const HINTS_MAX = 5;
 
 export interface TurnRow {
   readonly id: string;

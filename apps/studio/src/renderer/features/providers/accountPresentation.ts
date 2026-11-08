@@ -3,9 +3,9 @@ import { plural } from "../connections/connectionPresentation";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 
 /** Mirrors the host's rotation window, so an expiring session reads like an expiring secret. */
-export const EXPIRY_WARNING_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+const EXPIRY_WARNING_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
-export const ACCOUNT_ADAPTER_LABELS: Record<AccountFamily, string> = {
+const ACCOUNT_ADAPTER_LABELS: Record<AccountFamily, string> = {
   openai: "OpenAI",
   copilot: "GitHub Copilot",
   "qwen-web": "Qwen",
@@ -19,7 +19,7 @@ export const ACCOUNT_DESC_LABELS: Record<AccountFamily, string> = {
   "zai-web": "Вход во встроенном браузере",
 };
 
-export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, string> = {
+const ACCOUNT_STATUS_LABELS: Record<AccountStatus, string> = {
   linked: "Аккаунт привязан",
   "needs-relink": "Нужен повторный вход",
   revoked: "Доступ отозван",
@@ -102,10 +102,6 @@ export function accountStatusLine(account: AccountDto): string {
 
 export function providersWord(count: number): string {
   return plural(count, "подключение", "подключения", "подключений");
-}
-
-export function accountsWord(count: number): string {
-  return plural(count, "аккаунт", "аккаунта", "аккаунтов");
 }
 
 export function secondsLeftLabel(elapsedMs: number, totalMs: number): string | null {

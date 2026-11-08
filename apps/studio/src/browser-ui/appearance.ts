@@ -1,7 +1,7 @@
 import type { BrowserAppearance } from "@zvs/shared";
 import { applyPalette, defaultPalette, findPalette, type Palette } from "../renderer/app/palettes";
 
-export function chromePalette(appearance: BrowserAppearance, osDark: boolean): Palette {
+function chromePalette(appearance: BrowserAppearance, osDark: boolean): Palette {
   const dark = appearance.theme === "dark" || (appearance.theme === "system" && osDark);
   const mode = dark ? "dark" : "light";
   const id = dark ? appearance.darkPalette : appearance.lightPalette;

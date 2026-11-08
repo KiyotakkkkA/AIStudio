@@ -25,7 +25,7 @@ const PALETTE_KEYS: Readonly<Record<PaletteMode, string>> = {
   light: "ui.palette.light",
 };
 
-export const THEME_MODES = ["system", "light", "dark"] as const;
+const THEME_MODES = ["system", "light", "dark"] as const;
 export type ThemeMode = (typeof THEME_MODES)[number];
 
 function isThemeMode(value: unknown): value is ThemeMode {

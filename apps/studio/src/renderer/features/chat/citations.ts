@@ -111,7 +111,7 @@ export function citationLocation(citation: ChatCitationDto, store: string): stri
 }
 
 export const SELECTIONS_TAB = "Выделенные фрагменты";
-export const SELECTION_ORIGIN = "выделено в документе";
+const SELECTION_ORIGIN = "выделено в документе";
 export const OPEN_SELECTION = "Открыть фрагмент в документе";
 
 export type DocumentQuote = DocumentSelectionDto & { readonly documentId: DocumentId };

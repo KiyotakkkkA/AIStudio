@@ -1,7 +1,6 @@
 import type { WebSourceDto } from "@zvs/shared";
 import { plural } from "../connections/connectionPresentation";
 
-export const WEB_SOURCES_TITLE = "Источники из сети";
 export const WEB_SOURCES_TAB = "Сеть";
 export const COPY_LINK = "Копировать ссылку";
 export const LINK_COPIED = "Ссылка скопирована";

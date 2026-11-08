@@ -13,7 +13,7 @@ export const STORAGE_CLEAR_CONFIRM = "Очистить кэш?";
 export const STORAGE_CLEAR_CONSEQUENCE = "Временные файлы будут удалены.";
 export const STORAGE_CLEAR = "Очистить";
 export const STORAGE_CLEAR_ID = "storage.clearCache";
-export const STORAGE_CLEAR_FAILED = "Не удалось очистить кэш.";
+const STORAGE_CLEAR_FAILED = "Не удалось очистить кэш.";
 export const STORAGE_CACHE_BUSY = "Кэш нельзя очистить, пока выполняются задачи.";
 
 export const STORAGE_CATEGORY_LABELS: Record<StorageCategory, string> = {

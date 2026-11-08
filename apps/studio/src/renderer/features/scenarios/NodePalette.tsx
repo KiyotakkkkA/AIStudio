@@ -9,7 +9,7 @@ import { descriptionOf } from "./nodeForms";
 import type ScenarioEditor from "./ScenarioEditor";
 import { nextForPort, nextForSlot, ROLE_LABELS } from "./scenarioCopy";
 
-export interface NodePaletteProps {
+interface NodePaletteProps {
   readonly editor: ScenarioEditor;
   readonly onPick: (type: string) => void;
 }

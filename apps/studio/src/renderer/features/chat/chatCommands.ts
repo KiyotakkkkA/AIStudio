@@ -67,7 +67,7 @@ export interface MenuInput {
   readonly vision?: boolean;
 }
 
-export const VISION_COMMANDS: readonly ChatCommand[] = ["computer-use"];
+const VISION_COMMANDS: readonly ChatCommand[] = ["computer-use"];
 
 const SLASH_TOKEN = /(^|\s)\/([^\s/]*)$/u;
 
@@ -80,7 +80,7 @@ export function withoutSlashToken(text: string): string {
   return text.replace(SLASH_TOKEN, "$1");
 }
 
-export function attachableAccounts(
+function attachableAccounts(
   accounts: readonly IntegrationAccountDto[],
   attached: readonly IntegrationId[],
   kind: IntegrationKind,

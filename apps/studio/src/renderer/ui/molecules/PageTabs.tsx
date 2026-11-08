@@ -2,7 +2,7 @@ import { Switcher } from "@kiyotakkkka/zvs-uikit-lib";
 import Chip from "../atoms/Chip";
 import { InlineSkeleton, PAGE_LOADING } from "./LoadingSkeleton";
 
-export interface PageTab<T extends string> {
+interface PageTab<T extends string> {
   readonly value: T;
   readonly label: string;
   readonly count?: number | null;

@@ -74,7 +74,7 @@ import AppAccessRequest from "../computer/AppAccessRequest";
 import { toolImageReferences } from "./imageData";
 import { MAIL_LEAD, REJECT_MAIL, SEND_MAIL, type MailPreview } from "../mail/mailCopy";
 
-export const TOOL_CALL_STATUS: Record<
+const TOOL_CALL_STATUS: Record<
   ChatToolCallDto["status"],
   { readonly label: string; readonly tone: StatusTone }
 > = {
@@ -96,7 +96,7 @@ const STATUS_ICON: Partial<Record<ChatToolCallDto["status"], string>> = {
   cancelled: mdiMinus,
 };
 
-export function toolArgumentsText(value: Json): string {
+function toolArgumentsText(value: Json): string {
   if (typeof value === "string") return value;
   return JSON.stringify(value, null, 2);
 }
@@ -120,7 +120,7 @@ const IMAGE_TOOLS: readonly string[] = [
   "computer.open_app",
 ];
 
-export interface ToolCallQuestion {
+interface ToolCallQuestion {
   readonly request: QuestionRequestDto;
   readonly busy: boolean;
 }
@@ -168,7 +168,7 @@ function StatusMark({ status }: { readonly status: ChatToolCallDto["status"] }) 
   );
 }
 
-export function ToolCallCard({
+function ToolCallCard({
   call,
   approval,
   asking,
@@ -456,7 +456,7 @@ export function ToolCallCard({
   );
 }
 
-export interface SubagentHandlers {
+interface SubagentHandlers {
   readonly stepsFor: (runId: string | undefined) => readonly ChatToolCallDto[];
   readonly onStop: (runId: string) => void;
   readonly stopping: readonly string[];

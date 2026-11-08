@@ -20,7 +20,7 @@ export const ALL_SOURCES = "all";
 
 const SOURCE_ORDER: readonly ToolSource[] = ["builtin", "mcp", "skill", "integration", "browser"];
 
-export const SOURCE_CLASS_LABELS: Record<ToolSource, string> = {
+const SOURCE_CLASS_LABELS: Record<ToolSource, string> = {
   builtin: "Встроенные",
   mcp: "MCP-серверы",
   skill: "Навыки",

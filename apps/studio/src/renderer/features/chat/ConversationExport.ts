@@ -8,8 +8,8 @@ import {
 } from "@zvs/shared";
 
 export const EXPORT = "Экспорт";
-export const EXPORT_JSON = "Экспорт в JSON";
-export const EXPORT_MARKDOWN = "Экспорт в Markdown";
+const EXPORT_JSON = "Экспорт в JSON";
+const EXPORT_MARKDOWN = "Экспорт в Markdown";
 export const EXPORT_SAVED = "Диалог сохранён";
 export const EXPORT_FAILED = "Не удалось экспортировать диалог.";
 export const EXPORT_NO_ACCESS = "Недостаточно прав для записи в выбранную папку.";
@@ -24,7 +24,7 @@ export const EXPORT_FORMATS: readonly {
 
 const HOST_WORDED = new Set<AppErrorCode>([AppErrorCode.NOT_FOUND, AppErrorCode.NOT_IMPLEMENTED]);
 
-export function exportFailureCopy(error: unknown): string {
+function exportFailureCopy(error: unknown): string {
   if (!isIpcError(error)) return EXPORT_FAILED;
   if (error.code === AppErrorCode.PERMISSION_DENIED) return EXPORT_NO_ACCESS;
   if (HOST_WORDED.has(error.code) && error.message.length > 0) return error.message;

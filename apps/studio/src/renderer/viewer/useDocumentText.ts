@@ -11,13 +11,13 @@ import { findMatches, locatePassage, rangeAt, rangeOffsets, textNodes } from "./
 
 export const PAGE_ATTRIBUTE = "data-viewer-page";
 
-export function pageElement(node: Node, root: Node): HTMLElement | null {
+function pageElement(node: Node, root: Node): HTMLElement | null {
   const element = node.nodeType === 1 ? (node as Element) : node.parentElement;
   const page = element?.closest<HTMLElement>(`[${PAGE_ATTRIBUTE}]`) ?? null;
   return page !== null && root.contains(page) ? page : null;
 }
 
-export function pageNumber(element: HTMLElement | null): number | null {
+function pageNumber(element: HTMLElement | null): number | null {
   const value = Number(element?.getAttribute(PAGE_ATTRIBUTE));
   return Number.isInteger(value) && value > 0 ? value : null;
 }

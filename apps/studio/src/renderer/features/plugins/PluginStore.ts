@@ -39,9 +39,9 @@ import {
 } from "./signInTypes";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 
-export const INTEGRATIONS_DOMAIN = "integrations";
-export const DEVICE_CODE_PHASE = "device-code";
-export const ACTIVITY_LIMIT = 50;
+const INTEGRATIONS_DOMAIN = "integrations";
+const DEVICE_CODE_PHASE = "device-code";
+const ACTIVITY_LIMIT = 50;
 const WORKER_PREFIX = "integration:";
 
 export interface SignInState {
@@ -51,7 +51,7 @@ export interface SignInState {
   readonly expiresAt: number | null;
 }
 
-export interface CatalogueEntry {
+interface CatalogueEntry {
   readonly kind: IntegrationKind;
   readonly count: number;
 }

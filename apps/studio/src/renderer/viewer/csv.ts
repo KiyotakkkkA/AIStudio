@@ -1,4 +1,4 @@
-export const CSV_ROWS_MAX = 200_000;
+const CSV_ROWS_MAX = 200_000;
 
 export function csvDelimiter(firstLine: string, mimeType: string): string {
   if (mimeType.includes("tab-separated")) return "\t";
@@ -84,8 +84,8 @@ export function rowMatches(rows: readonly (readonly string[])[], query: string):
 
 export const COLUMN_MIN_WIDTH = 72;
 export const COLUMN_MAX_WIDTH = 320;
-export const CHARACTER_WIDTH = 7.2;
-export const CELL_PADDING = 20;
+const CHARACTER_WIDTH = 7.2;
+const CELL_PADDING = 20;
 const WIDTH_SAMPLE = 1000;
 
 export function columnWidths(rows: readonly (readonly string[])[], columns: number): number[] {

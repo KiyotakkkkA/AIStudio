@@ -1,11 +1,11 @@
 import type { EventRouter } from "./EventRouter";
 
-export interface ReplayOptions {
+interface ReplayOptions {
   delayMs?: number;
   wait?: (ms: number) => Promise<void>;
 }
 
-export function parseRecording(text: string): unknown[] {
+function parseRecording(text: string): unknown[] {
   const events: unknown[] = [];
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
@@ -14,7 +14,7 @@ export function parseRecording(text: string): unknown[] {
   return events;
 }
 
-export async function replayRecording(
+async function replayRecording(
   router: EventRouter,
   text: string,
   options: ReplayOptions = {},

@@ -19,14 +19,14 @@ export const APP_NAME = "ZVS AI Studio";
 export const APP_VERSION_LABEL = `${APP_CHANNEL} v${APP_VERSION}`;
 export const APP_EDITION = "Локальная установка";
 
-export const CLI_VERSION_LABEL = `${CLI_CHANNEL} v${CLI_VERSION}`;
+const CLI_VERSION_LABEL = `${CLI_CHANNEL} v${CLI_VERSION}`;
 
 export const SETTINGS_MANAGE = "Управление";
 export const PREFERENCES_TITLE = "Параметры";
 export const SEARCH_LABEL = "Поиск параметров";
 export const SEARCH_PLACEHOLDER = "Поиск";
 export const SEARCH_EMPTY = "Ничего не найдено";
-export const PREFERENCES_GROUP = "Приложение";
+const PREFERENCES_GROUP = "Приложение";
 export const DIAGNOSTICS_TITLE = "Диагностика";
 export const SETTINGS_PAGE_TITLE = PREFERENCES_TITLE;
 export const SETTINGS_PAGE_SUBTITLE = "Приложение, расширения и встроенный браузер";
@@ -46,7 +46,7 @@ export const SECTION_LABELS: Record<PreferenceSection, string> = {
   cli: "CLI",
 };
 
-export const EXTENSIONS_GROUP = "Расширения";
+const EXTENSIONS_GROUP = "Расширения";
 
 export const PREFERENCE_GROUPS: readonly {
   readonly label: string;

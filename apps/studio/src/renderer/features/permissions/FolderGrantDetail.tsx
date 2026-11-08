@@ -20,7 +20,7 @@ import {
   scopeLabel,
 } from "./permissionsPresentation";
 
-export interface FolderGrantDetailProps {
+interface FolderGrantDetailProps {
   readonly grant: FolderGrantDto;
   readonly now: number;
   readonly revoking: boolean;

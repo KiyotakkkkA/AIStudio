@@ -1411,11 +1411,6 @@ impl SkillLibrary {
         })
     }
 
-    pub fn load_by_id(&self, id: &SkillId) -> Result<LoadedSkill, AppError> {
-        let row = self.find(&id.to_string())?;
-        self.load(&row.key)
-    }
-
     pub fn script(&self, key: &str, path: &str) -> Result<SkillScriptFile, AppError> {
         let path = js_trim(path);
         if !path.starts_with(SCRIPTS_PREFIX) {

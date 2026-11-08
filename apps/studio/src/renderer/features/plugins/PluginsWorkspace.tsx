@@ -22,7 +22,7 @@ import {
 import { parseKind } from "./pluginRoutes";
 import type PluginStore from "./PluginStore";
 
-export const BACK_TO_CATALOGUE = "К каталогу плагинов";
+const BACK_TO_CATALOGUE = "К каталогу плагинов";
 
 const PluginView = observer(function PluginView({ store }: { readonly store: PluginStore }) {
   const navigate = useNavigate();

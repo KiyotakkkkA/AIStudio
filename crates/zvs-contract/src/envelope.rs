@@ -18,13 +18,6 @@ impl<T> ResultEnvelope<T> {
     pub const fn is_ok(&self) -> bool {
         matches!(self, Self::Ok(_))
     }
-
-    pub fn into_result(self) -> Result<T, AppError> {
-        match self {
-            Self::Ok(data) => Ok(data),
-            Self::Err(error) => Err(error),
-        }
-    }
 }
 
 impl<T> From<Result<T, AppError>> for ResultEnvelope<T> {

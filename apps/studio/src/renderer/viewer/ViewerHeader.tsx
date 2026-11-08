@@ -41,7 +41,7 @@ import {
 } from "./viewerCopy";
 import { ZOOM_PRESETS, extensionOf } from "./viewerModel";
 
-export function documentIcon(name: string): string {
+function documentIcon(name: string): string {
   switch (extensionOf(name)) {
     case "pdf":
       return mdiFilePdfBox;

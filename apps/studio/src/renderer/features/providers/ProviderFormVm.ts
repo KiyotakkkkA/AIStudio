@@ -22,7 +22,7 @@ import {
 } from "@zvs/shared";
 import { suggestedBaseUrl } from "./providerPresentation";
 
-export const SETTING_DEFAULTS = {
+const SETTING_DEFAULTS = {
   temperature: 0.7,
   topK: 40,
   topP: 0.95,
@@ -30,7 +30,7 @@ export const SETTING_DEFAULTS = {
   timeoutSeconds: 60,
 } as const;
 
-export const QWEN_WEB_DEFAULT_TIMEOUT_SECONDS = 600;
+const QWEN_WEB_DEFAULT_TIMEOUT_SECONDS = 600;
 export const ZAI_WEB_DEFAULT_TIMEOUT_SECONDS = 600;
 
 export const SETTING_BOUNDS = {

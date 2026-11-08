@@ -1,6 +1,6 @@
 export type PaletteMode = "dark" | "light";
 
-export interface AnsiColors {
+interface AnsiColors {
   readonly black: string;
   readonly red: string;
   readonly green: string;
@@ -492,7 +492,7 @@ function toHex(parts: readonly number[]): string {
   return `#${parts.map((part) => Math.round(part).toString(16).padStart(2, "0")).join("")}`;
 }
 
-export function mix(from: string, to: string, amount: number): string {
+function mix(from: string, to: string, amount: number): string {
   const start = channels(from);
   const end = channels(to);
   return toHex(start.map((part, index) => part + ((end[index] ?? part) - part) * amount));

@@ -2,7 +2,7 @@ import { mdiCogOutline } from "@mdi/js";
 import PreferencesWorkspace from "../features/preferences/PreferencesWorkspace";
 import {
   SETTINGS_PAGE_SUBTITLE,
-  SETTINGS_PAGE_TITLE,
+  PREFERENCES_TITLE,
 } from "../features/preferences/preferencesPresentation";
 import PageShell from "../ui/templates/PageShell";
 
@@ -11,7 +11,7 @@ export default function SettingsPage() {
     <PageShell
       bleed={true}
       icon={mdiCogOutline}
-      title={SETTINGS_PAGE_TITLE}
+      title={PREFERENCES_TITLE}
       subtitle={SETTINGS_PAGE_SUBTITLE}
     >
       <PreferencesWorkspace />

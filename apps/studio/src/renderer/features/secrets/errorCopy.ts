@@ -6,7 +6,7 @@ export interface SecretConsumerRef {
   readonly id: string;
 }
 
-export const UNKNOWN_ERROR_COPY = "Не удалось выполнить операцию. Повторите попытку.";
+const UNKNOWN_ERROR_COPY = "Не удалось выполнить операцию. Повторите попытку.";
 
 const COPY: Record<AppErrorCode, string> = {
   [AppErrorCode.UNKNOWN]: UNKNOWN_ERROR_COPY,

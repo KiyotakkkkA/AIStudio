@@ -3,7 +3,7 @@ import { AppErrorCode, type ScenarioOnError, type ScenarioOverlap } from "@zvs/s
 import { plural } from "../connections/connectionPresentation";
 import type { RunPhase, RunTab, StepStatus } from "./runModel";
 
-export const RUN_START_FAILED = "Не удалось запустить сценарий.";
+const RUN_START_FAILED = "Не удалось запустить сценарий.";
 export const RUN_LOAD_FAILED = "Не удалось загрузить последний запуск.";
 export const RUN_CANCEL_FAILED = "Не удалось остановить запуск.";
 export const PINNED_INVALID = "Входные данные должны быть корректным JSON";
@@ -50,7 +50,7 @@ export const OVERLAP_HINT = "Действие при срабатывании т
 export const TOOL_CALL_LABEL = "Вызов инструмента";
 
 export const APPROVAL_DENIED_COPY = "Разрешение на действие не получено: запрос отклонён или истёк";
-export const PERMISSION_DENIED_COPY = "Инструмент запрещён настройками разрешений";
+const PERMISSION_DENIED_COPY = "Инструмент запрещён настройками разрешений";
 export const APPROVAL_PROMPT = "Требуется разрешение на вызов инструмента";
 export const APPROVAL_DECIDE_FAILED = "Не удалось передать решение по разрешению.";
 

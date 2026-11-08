@@ -36,23 +36,23 @@ import SignInPanel from "./SignInPanel";
 import SignInTypeChoice from "./SignInTypeChoice";
 import { isSignedIn } from "./signInTypes";
 
-export const ACCOUNT_HEADING = "Аккаунт";
-export const ACCOUNT_NAME = "Название";
-export const ENABLED_LABEL = "Включён";
-export const SIGN_IN = "Войти";
-export const SIGN_IN_AGAIN = "Войти снова";
-export const NOT_SIGNED_IN = "Вход не выполнен";
-export const TEST_CONNECTION = "Проверить подключение";
-export const TESTING = "Проверка…";
-export const SAVE = "Сохранить";
-export const SAVING = "Сохранение…";
-export const CONNECT = "Подключить";
-export const CANCEL = "Отменить";
-export const REMOVE_ACCOUNT = "Удалить аккаунт";
-export const ACCOUNT_ACTIONS = "Действия с аккаунтом";
-export const NEW_ACCOUNT = "Новый";
-export const CHOOSE_TYPE_TITLE = "Выберите способ подключения";
-export const CHOOSE_TYPE_HINT = "Поля формы зависят от выбранного способа.";
+const ACCOUNT_HEADING = "Аккаунт";
+const ACCOUNT_NAME = "Название";
+const ENABLED_LABEL = "Включён";
+const SIGN_IN = "Войти";
+const SIGN_IN_AGAIN = "Войти снова";
+const NOT_SIGNED_IN = "Вход не выполнен";
+const TEST_CONNECTION = "Проверить подключение";
+const TESTING = "Проверка…";
+const SAVE = "Сохранить";
+const SAVING = "Сохранение…";
+const CONNECT = "Подключить";
+const CANCEL = "Отменить";
+const REMOVE_ACCOUNT = "Удалить аккаунт";
+const ACCOUNT_ACTIONS = "Действия с аккаунтом";
+const NEW_ACCOUNT = "Новый";
+const CHOOSE_TYPE_TITLE = "Выберите способ подключения";
+const CHOOSE_TYPE_HINT = "Поля формы зависят от выбранного способа.";
 
 function TestResult({ result }: { readonly result: IntegrationTestResultDto }) {
   return (

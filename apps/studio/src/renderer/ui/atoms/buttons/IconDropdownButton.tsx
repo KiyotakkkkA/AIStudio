@@ -3,7 +3,7 @@ import { Dropdown, Tooltip } from "@kiyotakkkka/zvs-uikit-lib";
 import Icon from "../Icon";
 import type { TooltipPlacement } from "./IconButton";
 
-export type IconDropdownButtonSize = "xs" | "sm" | "md";
+type IconDropdownButtonSize = "xs" | "sm" | "md";
 
 export type IconDropdownButtonProps = Omit<
   ComponentProps<typeof Dropdown.Trigger>,

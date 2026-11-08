@@ -10,7 +10,7 @@ export interface ConfirmModalSetup {
   readonly cancelLabel?: string;
 }
 
-export interface ConfirmModalAction {
+interface ConfirmModalAction {
   readonly label: string;
   readonly tone?: ButtonTone;
   readonly onSelect: () => void;
