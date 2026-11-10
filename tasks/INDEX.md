@@ -275,6 +275,26 @@ Phases 6, 8 and 9 can run in parallel once Phase 4 is done — they touch differ
 different pages. Everything before that is a chain. Phase M interrupted all of them; with
 TASK_076 done, the open tasks are ready to run again.
 
+## Phase A — Access pipeline (APS)
+
+Proposed 2026-11-10 by the access audit (`/docs/APS_AUDIT.md`, overall 5 / 10): one staged
+engine — floor, hard rules, grants, mode, rules, judge, person, audit — replaces the gate that
+six drivers finish by hand. TASK_079 and TASK_081 close the High findings and may run first as
+patches on the current code; each says how.
+
+- [ ] **TASK_077** — APS core: access request, decision and the staged pipeline behind the current gate
+- [ ] **TASK_078** — Drivers on the pipeline: prepare, access and the `Admitted` token
+- [ ] **TASK_079** — Rules in every mode, `auto` without a judge, the vendor pack without a catch-all
+- [ ] **TASK_080** — Allow rules bound to approvals, listed and removable
+- [ ] **TASK_081** — Caller identity and the console pipe
+- [ ] **TASK_082** — One grant store and the «Доступ» page
+- [ ] **TASK_083** — Approval lifetime, the audit trail and the agentic mode on one table
+
+```
+Phase A   077 ── 078 ── 082        077 ── 079 ── 080 ── 082        081 ── 082
+          077 ── 078 ── 083
+```
+
 ## Milestones
 
 | Milestone            | After    | What you can do                                      |
