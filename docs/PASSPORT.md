@@ -1259,6 +1259,18 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `ChatToolCallDto.authorisation` (`ToolAuthorisationDto`: `kind`, `source`, `reason`) carries
   the audit to the tool call details, and each admission writes a `Tool call authorised` line
   to the run log. A folder grant raised with the diff in every mode is unchanged.
+- **Access pipeline** (`zvs-host/src/access/`, TASK_077, 2026-11-10). Tier and policy
+  decisions are made by one engine, the access pipeline system (APS, `docs/APS_AUDIT.md`). A
+  call becomes an `AccessRequest` (actor, tool, minimum tier, effect, resources) and passes
+  ordered stages; each continues or decides, the first `Decision { outcome: allow | ask | deny,
+  stage, source, reason }` wins and keeps the trail of stages it visited, and a pipeline that
+  decides nothing asks the person. The stages are **floor** (graph allow-list, tool disabled,
+  tier `off`), **tier** (`admit_subject`), **mode** (`decide`), **rules** (`RuleSet::evaluate`)
+  and **judge**. The floor and the tier fail closed: an error in them fails the call; an error
+  in a later stage asks. The gate in `RunService` runs floor → tier and, when the tier asks,
+  defers to the node or reviews through `ExecReview`; `ExecPolicyService::review` runs mode →
+  rules → judge. The stages wrap the checks above unchanged, so the table holds as written; the
+  floor row is the floor stage and no longer a family of the table.
 - No telemetry, no outbound calls the user did not configure. One narrow exception: **site
     icons** for the web sources a provider returned with an answer and saved browser bookmarks
     (`zvs-host/src/sites.rs`, updated 2026-11-09). The renderer never loads a remote image

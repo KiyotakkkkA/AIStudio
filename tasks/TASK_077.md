@@ -2,7 +2,7 @@
 task: TASK_077
 title: APS core — access request, decision and the staged pipeline behind the current gate
 phase: A — Access pipeline (APS)
-status: todo
+status: done
 depends_on: [TASK_048_EXTRA_1]
 unblocks: [TASK_078, TASK_079, TASK_083]
 estimate: 4 h
@@ -88,18 +88,55 @@ before the change.
 
 ## Definition of done
 
-- [ ] `access/` exists with the pipeline, the five wrapping stages and tests
-- [ ] `Gate` and `ExecPolicyService` decide only through the pipeline
-- [ ] No behaviour change: existing policy, kernel and permission tests pass unmodified
-- [ ] `Family::Floor` removed
-- [ ] PASSPORT §14 and `access/README.md` updated
-- [ ] Rust gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] `access/` exists with the pipeline, the five wrapping stages and tests
+- [x] `Gate` and `ExecPolicyService` decide only through the pipeline
+- [x] No behaviour change: existing policy, kernel and permission tests pass unmodified
+- [x] `Family::Floor` removed
+- [x] PASSPORT §14 and `access/README.md` updated
+- [x] Rust gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
-> Filled in by the agent that completes this task. Delete this line when writing it.
-
 **Built:**
+
+- `crates/zvs-host/src/access/`: `AccessRequest`, `Actor`, `Effect` (every `ReviewedAction`
+  plus `Desktop`, `Remote`, `Opaque`), `Resource`, `Decision { outcome, stage, source, reason,
+  trail }`, the `Stage` trait, `AccessPipeline` and the five stages `FloorStage`, `TierStage`,
+  `ModeStage`, `RulesStage`, `JudgeStage`. `Decision::authorisation` and `Decision::refusal`
+  reproduce the gate's audit records and errors exactly.
+- `Gate` (`services/runs.rs`) decides through an admission pipeline (floor → tier; floor alone
+  for app-folder tools) and rechecks after an approval with the same pipeline.
+  `ExecPolicyService::review` runs `ExecPolicyService::pipeline()` (mode → rules → judge).
+- `PermissionService::refused` extracted from `admit_app_folder` for the floor's tier-`off`
+  check; it is the same query, so `admit_subject` still makes the tier decision.
+- `Family::Floor`, `policy::Decision::Deny` and their two table tests removed.
+- Tests in `access/tests.rs`: the table-driven pipeline contract, effect/family parity, the
+  decision records and refusals, the PASSPORT table end to end through floor → tier → mode →
+  rules → judge (with the `ExecReview` port agreeing), vendor `deny` before the judge, the
+  allow-list and the graph shortcut at the floor.
+- `access/README.md`, PASSPORT §14 *Access pipeline*, `policy/README.md` without the floor row.
+
 **Deviated from plan:**
+
+- Two pipelines, not one: the gate runs floor → tier, and the review pipeline mode → rules →
+  judge sits behind the `ExecReview` port. The deferral to a node sits between them and the
+  kernel tests inject their own `ExecReview`, so merging them belongs to TASK_078, when nodes
+  stop deferring.
+- `AccessRequest` carries `minimum` (the node's declared tier) besides actor, tool, effect and
+  resources: the tier stage needs it.
+- A stage error asks only in mode, rules and judge; the floor and the tier fail closed, and a
+  cancelled run is an error from any stage (the judge already behaved so).
+- `OUTSIDE_ALLOWED_TOOLS` moved to `access::stages` and is re-exported from `services::runs`.
+- Not run: the manual check in the four modes (needs the app and a model). The end-to-end
+  decision table test covers the same cells. No TypeScript changed.
+
 **Next session should know:**
+
+- Errors in `ModeStage` (reading `exec.policy`) now ask instead of failing the call, as the
+  task asked; no other decision changed.
+- A rule `allow` is still recorded as kind `judge` (L6); `Decision::authorisation` is the one
+  place to change for TASK_083.
+- `Pass` is the per-call scratch shared by stages (policy, rule set, reviewed action, flagged
+  rule). TASK_079 can load packs once and keep the `RuleSet` on `ExecPolicyService` instead of
+  calling `rules()` per review.

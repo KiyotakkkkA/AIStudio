@@ -13,8 +13,8 @@ use zvs_contract::{
 
 use super::action::{ReviewVerdict, ReviewedAction};
 use super::judge::{JudgeOutcome, ask_judge, judge_prompt};
-use super::rules::{RuleEffect, RuleOutcome, RuleSet, RuleText, VENDOR_PACK};
-use super::table::{Decision, decide};
+use super::rules::{RuleSet, RuleText, VENDOR_PACK};
+use crate::access::{AccessPipeline, AccessRequest, JudgeStage, ModeStage, Pass, RulesStage};
 use crate::data::{Database, Repositories};
 use crate::kernel::{ExecReview, StepContext};
 use crate::platform::clock::SharedClock;
@@ -246,7 +246,7 @@ impl ExecPolicyService {
         true
     }
 
-    async fn judge(
+    pub(crate) async fn judge(
         &self,
         context: &StepContext,
         policy: &ExecPolicyDto,
@@ -314,47 +314,25 @@ impl ExecReview for ExecPolicyService {
         context: &StepContext,
         action: &ReviewedAction,
     ) -> Result<ReviewVerdict, AppError> {
-        let policy = self.get()?;
-        match decide(policy.mode, action.family()) {
-            Decision::Run => Ok(ReviewVerdict::Run(
-                ToolAuthorisationDto::of(ToolAuthorisationKind::Policy)
-                    .from_source(policy.mode.as_str()),
-            )),
-            Decision::Ask => Ok(ReviewVerdict::Ask { reason: None }),
-            Decision::Deny => Ok(ReviewVerdict::Deny {
-                rule: "floor".to_owned(),
-            }),
-            Decision::Review => {
-                let rules = self.rules();
-                match rules.evaluate(action) {
-                    RuleOutcome::Deny { rule } => Ok(ReviewVerdict::Deny { rule }),
-                    RuleOutcome::Ask { text, .. } => Ok(ReviewVerdict::Ask {
-                        reason: Some(limited(&text, TOOL_AUTHORISATION_REASON_MAX)),
-                    }),
-                    RuleOutcome::Allow { rule, text } => Ok(ReviewVerdict::Run(
-                        ToolAuthorisationDto::of(ToolAuthorisationKind::Judge)
-                            .from_source(limited(&rule, TOOL_AUTHORISATION_SOURCE_MAX))
-                            .because(Some(limited(&text, TOOL_AUTHORISATION_REASON_MAX))),
-                    )),
-                    RuleOutcome::Review { rule, text } => {
-                        let flagged = RuleText {
-                            id: rule,
-                            effect: RuleEffect::Review,
-                            text,
-                        };
-                        self.judge(context, &policy, action, &rules, Some(&flagged))
-                            .await
-                    }
-                    RuleOutcome::Unmatched => {
-                        self.judge(context, &policy, action, &rules, None).await
-                    }
-                }
-            }
-        }
+        let request = AccessRequest::review(context.run_id.to_string(), action);
+        let mut pass = Pass::new(Some(context)).reviewing(action);
+        let decision = self.pipeline().decide(&request, &mut pass).await?;
+        Ok(decision.verdict())
     }
 }
 
-fn limited(text: &str, max: usize) -> String {
+impl ExecPolicyService {
+    pub fn pipeline(&self) -> AccessPipeline {
+        AccessPipeline::new(vec![
+            Box::new(ModeStage::new(self.clone())),
+            Box::new(RulesStage::new(self.clone())),
+            Box::new(JudgeStage::new(self.clone())),
+        ])
+        .with_logger(self.inner.logger.clone())
+    }
+}
+
+pub(crate) fn limited(text: &str, max: usize) -> String {
     text.chars().take(max).collect()
 }
 

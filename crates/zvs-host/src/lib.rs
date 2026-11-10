@@ -1,5 +1,6 @@
 #![deny(clippy::await_holding_lock)]
 
+pub mod access;
 pub mod agentic;
 pub mod artifact_pages;
 pub mod artifacts;

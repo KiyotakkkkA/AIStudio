@@ -132,6 +132,14 @@ impl PermissionService {
         subject: &str,
         context: &PermissionContext,
     ) -> Result<Admission, AppError> {
+        Ok(if self.refused(subject, context)? {
+            Admission::Deny
+        } else {
+            Admission::Allow
+        })
+    }
+
+    pub fn refused(&self, subject: &str, context: &PermissionContext) -> Result<bool, AppError> {
         self.database.with_connection(|connection| {
             let repositories = Repositories::new(connection);
             let closed = repositories
@@ -142,11 +150,7 @@ impl PermissionService {
                 row.tier == ToolTier::Off
                     && (row.scope == GLOBAL_SCOPE || context.scopes.contains(&row.scope))
             });
-            Ok(if closed || refused {
-                Admission::Deny
-            } else {
-                Admission::Allow
-            })
+            Ok(closed || refused)
         })
     }
 

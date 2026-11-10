@@ -282,7 +282,7 @@ engine — floor, hard rules, grants, mode, rules, judge, person, audit — repl
 six drivers finish by hand. TASK_079 and TASK_081 close the High findings and may run first as
 patches on the current code; each says how.
 
-- [ ] **TASK_077** — APS core: access request, decision and the staged pipeline behind the current gate
+- [x] **TASK_077** — APS core: access request, decision and the staged pipeline behind the current gate
 - [ ] **TASK_078** — Drivers on the pipeline: prepare, access and the `Admitted` token
 - [ ] **TASK_079** — Rules in every mode, `auto` without a judge, the vendor pack without a catch-all
 - [ ] **TASK_080** — Allow rules bound to approvals, listed and removable

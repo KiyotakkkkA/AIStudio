@@ -6,15 +6,15 @@ user, is reviewed by a judge model, or is denied. It sits on top of the permissi
 
 ## Files
 
-| File            | Contents                                                                                          |
-| --------------- | ------------------------------------------------------------------------------------------------- |
-| `table.rs`      | `decide(mode, family)`: the PASSPORT decision table                                               |
-| `action.rs`     | `ReviewedAction` (plain, declared, browser, files, process) and its `Family`; `ReviewVerdict`     |
-| `rules.rs`      | Rule packs: compile, match file / process / code actions, resolve conflicts (`RuleSet::evaluate`) |
-| `judge.rs`      | The judge prompt, the `verdict` tool, verdict parsing                                             |
-| `service.rs`    | `ExecPolicyService`: get/set mode and judge model, load rules, `review` (implements `ExecReview`) |
-| `user_rules.rs` | "Allow this rule" from an approval: writes a user rule to `user.cli.json`                         |
-| `vendor.json`   | The built-in rule pack                                                                            |
+| File            | Contents                                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `table.rs`      | `decide(mode, family)`: the PASSPORT decision table                                                                                         |
+| `action.rs`     | `ReviewedAction` (plain, declared, browser, files, process) and its `Family`; `ReviewVerdict`                                               |
+| `rules.rs`      | Rule packs: compile, match file / process / code actions, resolve conflicts (`RuleSet::evaluate`)                                           |
+| `judge.rs`      | The judge prompt, the `verdict` tool, verdict parsing                                                                                       |
+| `service.rs`    | `ExecPolicyService`: get/set mode and judge model, load rules, `review` (implements `ExecReview`) through the mode → rules → judge pipeline |
+| `user_rules.rs` | "Allow this rule" from an approval: writes a user rule to `user.cli.json`                                                                   |
+| `vendor.json`   | The built-in rule pack                                                                                                                      |
 
 ## Decision table (`table.rs`)
 
@@ -26,12 +26,12 @@ user, is reviewed by a judge model, or is denied. It sits on top of the permissi
 | Process             | ask        | ask        | **review**    | run             |
 | Browser             | ask        | ask        | ask           | run             |
 | Declared            | ask        | ask        | ask           | run             |
-| Floor               | deny       | deny       | deny          | deny            |
 
 `ReviewedAction::family`: a plain action is benign; file changes are `Files` only if some
 operation is destructive (overwrite, delete, move onto an existing file), otherwise benign; a
-tool that declares itself destructive with an unknown effect is `Declared`. No mode reaches
-past the floor.
+tool that declares itself destructive with an unknown effect is `Declared`. The floor (tier
+`off`, a disabled tool, the graph allow-list) is not a family: it is the floor stage of the
+access pipeline (`../access/README.md`) and holds in every mode.
 
 ## Review pipeline (auto mode, files and processes)
 

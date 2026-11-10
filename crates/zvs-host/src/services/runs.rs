@@ -16,8 +16,13 @@ use zvs_contract::{
 };
 
 use super::approvals::{ApprovalService, DEFAULT_APPROVAL_TIMEOUT};
-use super::permissions::{Admission, PermissionContext, PermissionService};
+use super::permissions::{PermissionContext, PermissionService};
 use super::questions::QuestionService;
+pub use crate::access::OUTSIDE_ALLOWED_TOOLS;
+use crate::access::{
+    AccessPipeline, AccessRequest, Actor, Decision, Effect, FloorStage, Outcome, Pass, StageName,
+    TierStage,
+};
 use crate::data::repositories::{RunCursor, RunDraft, RunPageQuery, encode_run_cursor};
 use crate::data::schema::{RunRow, StepRow};
 use crate::data::{DataError, Database, Repositories};
@@ -31,7 +36,7 @@ use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::events::{EventBus, StreamOptions};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
-use crate::policy::{ReviewVerdict, ReviewedAction, rule_denied};
+use crate::policy::{ReviewVerdict, rule_denied};
 use crate::tools::ToolRegistry;
 
 pub const DEFAULT_GRACE: Duration = Duration::from_millis(500);
@@ -44,8 +49,6 @@ pub const CHAT_RETRY_REFUSED: &str = "Повторите запрос на ст�
 pub const RESUMING_MESSAGE: &str = "Возобновление с последней контрольной точки";
 pub const ABANDONED_ON_EXIT: &str = "Выполнение прервано завершением приложения";
 pub const APPROVAL_INTERRUPTED: &str = "Approval interrupted";
-pub const OUTSIDE_ALLOWED_TOOLS: &str =
-    "Инструмент не входит в набор, разрешённый для этого запуска";
 pub const NOT_RESUMABLE: &str =
     "Автовозобновление недоступно: узел имеет побочные эффекты или отсутствует";
 
@@ -94,53 +97,68 @@ struct ActiveRun {
 
 struct Gate {
     database: Arc<Database>,
-    permissions: Arc<PermissionService>,
     approvals: Arc<ApprovalService>,
+    admission: AccessPipeline,
+    folder: AccessPipeline,
     tools: Option<ToolRegistry>,
     clock: SharedClock,
 }
 
 impl Gate {
-    fn check_enabled(&self, tool: &str) -> Result<(), AppError> {
-        if let Some(tools) = &self.tools
-            && tools
-                .ceiling(tool)?
-                .is_some_and(|ceiling| !ceiling.enabled || !ceiling.available)
-        {
-            return Err(AppError::new(
-                AppErrorCode::PermissionDenied,
-                "Tool disabled",
-            ));
+    fn new(
+        database: Arc<Database>,
+        permissions: &Arc<PermissionService>,
+        approvals: Arc<ApprovalService>,
+        tools: Option<ToolRegistry>,
+        clock: SharedClock,
+    ) -> Self {
+        let admission = AccessPipeline::new(vec![
+            Box::new(FloorStage::new(Arc::clone(permissions), tools.clone())),
+            Box::new(TierStage::new(Arc::clone(permissions))),
+        ]);
+        let folder = AccessPipeline::new(vec![Box::new(
+            FloorStage::new(Arc::clone(permissions), tools.clone()).without_shortcuts(),
+        )]);
+        Self {
+            database,
+            approvals,
+            admission,
+            folder,
+            tools,
+            clock,
         }
-        Ok(())
     }
 
-    fn admit_app_folder(
+    fn request(run: &RunRow, tool: &str, origin: AdmissionOrigin, effect: Effect) -> AccessRequest {
+        AccessRequest::new(
+            Actor {
+                run_id: run.id.clone(),
+                kind: Some(run.kind),
+                origin,
+                listed: run.graph.allows_tool(tool),
+                scopes: permission_context(run).scopes,
+            },
+            tool,
+            effect,
+        )
+    }
+
+    async fn admit_app_folder(
         &self,
         tool: &str,
         context: &StepContext,
         origin: AdmissionOrigin,
     ) -> Result<(), AppError> {
         let run = read_run(&self.database, &context.run_id.to_string())?;
-        if origin == AdmissionOrigin::Model && !run.graph.allows_tool(tool) {
-            return Err(
-                AppError::new(AppErrorCode::PermissionDenied, OUTSIDE_ALLOWED_TOOLS)
-                    .with_detail("key", tool),
-            );
+        let request = Self::request(&run, tool, origin, Effect::Plain);
+        let decision = self
+            .folder
+            .decide(&request, &mut Pass::new(Some(context)))
+            .await?;
+        if decision.outcome == Outcome::Deny {
+            return Err(decision.refusal(tool));
         }
-        self.check_enabled(tool)?;
-        match self
-            .permissions
-            .admit_app_folder(tool, &permission_context(&run))?
-        {
-            Admission::Deny => Err(AppError::new(
-                AppErrorCode::PermissionDenied,
-                "Permission denied",
-            )),
-            Admission::Allow | Admission::Ask => {
-                context.authorise(ToolAuthorisationDto::of(ToolAuthorisationKind::Auto))
-            }
-        }
+        context.authorise(ToolAuthorisationDto::of(ToolAuthorisationKind::Auto))
     }
 
     async fn admit_tool(
@@ -151,86 +169,67 @@ impl Gate {
         origin: AdmissionOrigin,
     ) -> Result<(), AppError> {
         let run = read_run(&self.database, &context.run_id.to_string())?;
-        if origin == AdmissionOrigin::Model && !run.graph.allows_tool(&tool) {
-            return Err(
-                AppError::new(AppErrorCode::PermissionDenied, OUTSIDE_ALLOWED_TOOLS)
-                    .with_detail("key", tool),
-            );
-        }
-        if origin == AdmissionOrigin::Graph {
-            let shortcut = matches!(
-                (run.kind, tool.as_str()),
-                (
-                    RunKind::Chat | RunKind::Skill | RunKind::Scenario | RunKind::Agentic,
-                    "llm.generate"
-                ) | (RunKind::Chat, "vector.search")
-                    | (RunKind::Indexing, "vector.index")
-                    | (RunKind::Download, "download.fetch")
-            );
-            if shortcut {
-                return Ok(());
-            }
-        }
-        self.check_enabled(&tool)?;
-        let permission = permission_context(&run);
         let minimum = tier.unwrap_or(ToolTier::Auto);
-        match self
-            .permissions
-            .admit_subject(&tool, &permission, minimum)?
-        {
-            Admission::Allow => {
-                let kind = if self.permissions.granted(&tool, &permission)? {
-                    ToolAuthorisationKind::Granted
-                } else {
-                    ToolAuthorisationKind::Auto
+        let effect = if minimum == ToolTier::Ask {
+            Effect::Declared
+        } else {
+            Effect::Plain
+        };
+        let request = Self::request(&run, &tool, origin, effect).at_least(minimum);
+        let decision = self
+            .admission
+            .decide(&request, &mut Pass::new(Some(&context)))
+            .await?;
+        match decision.outcome {
+            Outcome::Deny => return Err(decision.refusal(&tool)),
+            Outcome::Allow => {
+                return match decision.authorisation() {
+                    Some(authorisation) => context.authorise(authorisation),
+                    None => Ok(()),
                 };
-                context.authorise(ToolAuthorisationDto::of(kind))
             }
-            Admission::Deny => Err(AppError::new(
-                AppErrorCode::PermissionDenied,
-                "Permission denied",
-            )),
-            Admission::Ask => {
-                let scope = permission.scopes.first().map_or("global", String::as_str);
-                if context.defer_approval(DeferredApproval {
-                    subject: tool.clone(),
-                    scope: scope.to_owned(),
-                }) {
-                    return Ok(());
-                }
-                let action = if minimum == ToolTier::Ask {
-                    ReviewedAction::Declared
-                } else {
-                    ReviewedAction::Plain
-                };
-                let reason = match review_action(&context, action).await? {
-                    ReviewVerdict::Run(authorisation) => return context.authorise(authorisation),
-                    ReviewVerdict::Deny { rule } => return Err(rule_denied(&rule)),
-                    ReviewVerdict::Ask { reason } => reason,
-                };
-                let request = self.approvals.create(&run.id, &tool, scope)?;
-                let decision = context.request_approval(request).await?;
-                if decision != ApprovalDecision::Approved {
-                    return Err(AppError::new(
-                        AppErrorCode::ApprovalDenied,
-                        "Approval denied",
-                    ));
-                }
-                if self
-                    .permissions
-                    .admit_subject(&tool, &permission, minimum)?
-                    == Admission::Deny
-                {
-                    return Err(AppError::new(
-                        AppErrorCode::PermissionDenied,
-                        "Permission revoked",
-                    ));
-                }
-                context.authorise(
-                    ToolAuthorisationDto::of(ToolAuthorisationKind::Approved).because(reason),
-                )
-            }
+            Outcome::Ask => {}
         }
+        let scope = request
+            .actor
+            .scopes
+            .first()
+            .map_or("global", String::as_str);
+        if context.defer_approval(DeferredApproval {
+            subject: tool.clone(),
+            scope: scope.to_owned(),
+        }) {
+            return Ok(());
+        }
+        let reason = match review_action(&context, request.effect.reviewed()).await? {
+            ReviewVerdict::Run(authorisation) => return context.authorise(authorisation),
+            ReviewVerdict::Deny { rule } => return Err(rule_denied(&rule)),
+            ReviewVerdict::Ask { reason } => reason,
+        };
+        let approval = self.approvals.create(&run.id, &tool, scope)?;
+        let answer = context.request_approval(approval).await?;
+        if answer != ApprovalDecision::Approved {
+            return Err(AppError::new(
+                AppErrorCode::ApprovalDenied,
+                "Approval denied",
+            ));
+        }
+        let recheck = self
+            .admission
+            .decide(&request, &mut Pass::new(Some(&context)))
+            .await?;
+        if recheck.outcome == Outcome::Deny {
+            return Err(AppError::new(
+                AppErrorCode::PermissionDenied,
+                "Permission revoked",
+            ));
+        }
+        context.authorise(
+            Decision::allow(StageName::Person)
+                .because(reason)
+                .authorisation()
+                .unwrap_or_else(|| ToolAuthorisationDto::of(ToolAuthorisationKind::Approved)),
+        )
     }
 }
 
@@ -368,13 +367,13 @@ impl RunService {
             })
         };
         let admit = options.admit.unwrap_or_else(|| {
-            let gate = Arc::new(Gate {
-                database: Arc::clone(&options.database),
-                permissions: Arc::clone(&permissions),
-                approvals: Arc::clone(&approvals),
-                tools: options.tools.clone(),
-                clock: options.clock.clone(),
-            });
+            let gate = Arc::new(Gate::new(
+                Arc::clone(&options.database),
+                &permissions,
+                Arc::clone(&approvals),
+                options.tools.clone(),
+                options.clock.clone(),
+            ));
             Arc::new(move |requirement, context, origin| {
                 let gate = Arc::clone(&gate);
                 async move {
@@ -388,7 +387,7 @@ impl RunService {
                             Ok(())
                         }
                         PermissionRequirement::AppFolder { tool } => {
-                            gate.admit_app_folder(&tool, &context, origin)?;
+                            gate.admit_app_folder(&tool, &context, origin).await?;
                             if let Some(tools) = &gate.tools {
                                 tools.record_use(&tool, gate.clock.now())?;
                             }
